@@ -9320,3 +9320,3116 @@ it is the one I should have named.
   multi-hour observation window; not doable in one pass, should run as a
   scheduled watcher. **Phase 1 must not be judged against the lane's existing
   2026-08-16 table without re-taking it.**
+
+### ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 2026-08-16 (retroactively, see below) — session: sim-engine-track
+- **PROTOCOL GAP, RECORDED NOT HIDDEN:** the collision check was run before any
+  edit (both files CLEAR), but the lane entry itself was never written until
+  checkpoint. The claim was made and not published, so for ~40 minutes another
+  session could have taken `generate_smartsim2_ncaaf_projections.py` without
+  seeing a conflict. No collision occurred; the exposure was real anyway.
+- Files: `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `tests/test_ncaaf_schedule_fallback.py` (new).
+- **Goal met:** an absent engine schedule reaches the CFBD fallback instead of
+  raising. `load_engine_schedule` returns `[]` and logs `ENGINE_SCHEDULE_ABSENT`.
+- **The fallback was already written, already correct and already called** — its
+  own docstring names this case. It was unreachable because the read raised.
+  Four lines.
+- **The fix this lane did NOT make, deliberately:** re-pointing the hard-coded
+  2025 filename at 2026. No 2026 file exists, nothing writes one, all 278 in the
+  checkout are 2025 — it would rate 2026 from 2025 predicted totals, silently
+  wrong rather than loudly broken. My own `#445` ticket proposed exactly that;
+  see `learnings.md` on reasoning by analogy from a just-solved defect.
+- **Verification:** 5 new tests, two guarding the FALLBACK rather than the change
+  (FBS-vs-FBS only; rows missing a team), because a widened slate would alter
+  which games get projected rather than merely keeping the run alive.
+  295 passed / 0 failed across `-k ncaaf`.
+- **UNVERIFIED and handed over:** that CFBD `/games` returns rows for
+  `season=2026 week=1` in production. Not called against the live API, and not
+  deployed. Check when this ships.
+- Blocked by: none.
+
+### nfl-pbp-fetcher — **CLOSED-VERIFIED 2026-08-16 18:31:15Z — pbp_2025.csv written on the mounted disk (97,951,481 bytes, 46,452 REG plays) and the guard stopped refusing. `#441` FIXED.** — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. A pbp ingestion path exists, so the NFL SmartSim2 projection has
+  real ratings again instead of refusing for 2.8 days.
+- Files (exclusive to this lane): `scripts/fetch_nfl_pbp.py` (new),
+  `tests/test_fetch_nfl_pbp.py` (new). Collision check RUN: CLEAR on both.
+  `scripts/run_refresh_worker.py` (autorun wiring — claimed 2026-08-16 after a
+  fresh collision check: CLEAR, no OPEN lane holds it).
+- **Root cause is SETTLED by measurement, not assumed** (`a775e372` diagnostic,
+  17:10:45Z): the pbp is absent from all four candidate roots including the
+  mounted disk, env vars reach the subprocess, strict storage is on. There is no
+  pbp fetcher in this repo — ten scripts reference pbp, all reads.
+- **THE FILE THAT ACTUALLY MATTERS IS pbp_2025.csv, NOT 2026.** The 2026 regular
+  season has not started, so there are no current-season plays for week 1;
+  `assert_ratings_data_available` accepts current OR prior, and NFL ratings for
+  wk1 come from the prior season (`prior_season_fallback`, the mechanism
+  `verify_nfl_autorun_obligations.py` was written to check). A fetcher that only
+  pulls the current season would ship and change nothing.
+- Template: `fetch_nfl_schedule.py` (nflverse games.csv), plus the roster and
+  depth-chart fetchers. Write under `nfl_artifact_output_root()` — the `#389`
+  resolver — NOT under `default_nfl_source_root()`, which resolves to the
+  ephemeral checkout.
+- **REFUSE TO INSTALL A DEGENERATE FILE.** Same philosophy as the guard this
+  feeds: validate required columns and non-zero REG rows BEFORE replacing an
+  existing file, so a truncated or schema-changed download cannot overwrite a
+  good one. Write atomically.
+- Hypothesis: with pbp_2025.csv present on the mounted disk, the next autorun
+  writes a real artifact with non-identical rows per game.
+- Falsification: if the artifact still refuses, or writes with IDENTICAL rows for
+  every game, the ratings path is broken for a second reason and the fetcher is
+  not sufficient.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring; the artifact
+  appears with a fresh mtime AND per-game variance (identical rows would mean the
+  guard was satisfied wrongly).
+- Blocked by: none. `#443` (stale PID stalls the autorun ~45 min per restart)
+  will DELAY observation and is not a blocker.
+
+
+#### CLOSED-VERIFIED 2026-08-16 18:31:15Z
+- **Verification ran and passed, on the real success condition rather than a proxy.**
+  `season 2025: status=written, bytes=97,951,481, reg_plays=46,452` to
+  `/opt/render/project/data/nfl_source/tracking/nflverse/pbp/pbp_2025.csv`, and
+  `NO PLAY-BY-PLAY` has not recurred since. The generator ran again at 18:31:43
+  and did not refuse.
+- **The lane's own falsification test did NOT fire:** "if the artifact still
+  refuses, the fetcher is not sufficient." It stopped refusing.
+- **2026 returned 404 and that is CORRECT** — the season has not started. The
+  lane predicted this ("the file that actually matters is pbp_2025.csv"), which
+  is why `--season` fetches the prior year by default. A current-season-only
+  fetcher would have shipped, 404'd, and changed nothing.
+- **Two bugs caught pre-ship:** a ~300MB memory transient on a service at 95% of
+  cap (rewritten to stream), and `gzip.decompressobj` which does not exist (it is
+  `zlib`) — that one would have crashed every real fetch.
+- **One regression I caused and reversed:** default-ON broke three
+  `test_main_run_once_*` contracts; confirmed mine against a clean-HEAD worktree,
+  now default-off like every sibling.
+- **One overstatement corrected:** "starved" was wrong; a 23-minute delay at
+  position 6 is not `#341`'s weeks of muteness. Position-2 move stands as an
+  improvement, not a fix.
+- **Files released:** `scripts/fetch_nfl_pbp.py`, `tests/test_fetch_nfl_pbp.py`,
+  `tests/test_nfl_pbp_fetch_autorun.py`, `scripts/run_refresh_worker.py`.
+- **Handover:** `b909d008` (position-2 + skip logging) is on `origin/main`,
+  NOT deployed, rides the next worker deploy. `#443` (stale-PID silent stall)
+  and `#445` (NCAAF hard-coded 2025 input) remain open and unowned.
+
+### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
+- **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
+  - **`closing_detected_at` is present on 21 markets. The new code path ran.**
+    Source: the RAW shard `mlb_source/artifacts/mlb/odds_history/2026-08-15.json`
+    via `/api/ops/artifacts/stream` (46,317,328 B, `last-modified` 02:51:45Z).
+  - **DO NOT RE-RUN THIS CHECK ON `/api/ops/odds-history/inspect`. IT CANNOT SEE
+    THE FIELD.** That handler (`syndicate/blueprints/ops.py:2141`) builds each
+    market summary from a **fixed 10-key literal** — `stored_market_id`,
+    `last_line`, `last_odds`, `history_points`, `history_first`, `history_last`,
+    `is_live`, `closing_line`, `closing_price`, `closing_captured_at`. There is
+    no `closing_detected_at` key in it. The union of keys over all 3,574 returned
+    markets confirms it: the field is absent from the response **regardless of
+    what is on disk**. A `0` from `inspect` is instrument blindness. The earlier
+    `00:3xZ` "zero of 51" reading was almost certainly taken this way (the
+    handover names `inspect` as the step-1 endpoint), which — if so — means it
+    was never evidence either way, independently of the no-opportunity argument
+    already recorded. Not asserted as fact: I did not observe that run.
+  - **THE ASSERTION, on the 21 new-code stamps:** `closing_captured_at <=
+    commence_time` on **21 of 21**, none post-dating. Lead time min 1.1 min,
+    median 75.3 min, max 103.9 min.
+  - **THE CONTROL, in the same payload:** of the 36 stamped markets WITHOUT
+    `closing_detected_at` (pre-fix), **33 post-date `commence_time`** and 3 do
+    not. So the handed-down baseline "EVERY stamped close had
+    `close_age_seconds < 0`" is very nearly right but **not literally true at the
+    shard level — it is 33/36, not 36/36.** Stated because a claim of
+    universality invites a future reader to treat a single passing pre-fix stamp
+    as a fix.
+  - **ATTRIBUTED AT THE CLV-ROW LEVEL** (join `event_id|market|matched_bookmaker`,
+    confirmed by `close_captured_at` identity — note the row's `bookmaker` is the
+    OPENING book, `matched_bookmaker` is the close's book; joining on the wrong
+    one produced `NEW=0, unjoined=48` on the first pass and would have read as a
+    failed fix):
+    - rows off **NEW-code stamps: 30 — all 30 `pregame`, 0 `in_play`**
+    - rows off **OLD stamps: 31 — 26 `in_play` (84%), 5 `pregame`**
+    - 6 unjoined.
+  - **COUNTERFACTUAL:** headline without the 30 re-entered rows would read
+    **n=96, −0.3998**; with them it reads **n=126, −0.3165**. The 30 new rows
+    average **−0.0499**, i.e. genuine pregame closes are materially better than
+    the rows the old code left in.
+  - **STILL FORWARD-ONLY.** The stamp is idempotent on `closing_line`, so the 36
+    pre-fix markets are permanently wrong and 2026-08-15 is a mixed date forever.
+    Generality beyond MLB is UNMEASURED — nfl/wnba resolved 0 rows today, so no
+    other sport exercised this path.
+- **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
+  ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
+  IT IS THE WRONG SIDE'S PRICE.**
+  - Event `dbbb481a…` = **New York Yankees @ Toronto Blue Jays**, first pitch
+    19:08Z. FanDuel h2h `history_first` 06:02:51Z carries
+    `line={away_odds: -186, home_odds: +156}` — our opening of `-186` is the
+    AWAY side, correctly recorded.
+  - The stamped close is `closing_price = 168.0`. In that market's own history
+    the scalar `odds`/`line` field tracks **`entity`**, and `entity` is
+    **`Toronto Blue Jays` — the HOME team**. `+168` is a HOME price (betrivers
+    independently shows home `+165` at the same 20:34 tick).
+  - **So the joiner differenced an AWAY opening against a HOME close.** That is
+    the entire `-27.72`. It is not CLV, not a stale price, and not a late clock.
+  - **Measured across every stamped market, not just this one: `entity ==
+    home_team` on 18 of 18.** So `closing_price` is ALWAYS the home price.
+- **THE DEFECT, in code:** `resolve_close` path 1 takes
+  `market_state.get("closing_price")` as a **side-blind scalar**. Path 2
+  (`last_pregame_quote`) reads the `line` dict and picks `away_odds`/`home_odds`
+  by side — which is exactly why the 100%/100% split fell where it did. The file's
+  own docstring already knew: *"Game keys carry NO side — `entity` names one team
+  … the history point's `line` dict carries BOTH."* Path 2 acts on that; path 1
+  does not.
+  - Consequence: **home-side openings get a CORRECT close; away-side openings get
+    a garbage one.** Whether a given row is wrong depends only on its side, which
+    is why the contaminated bucket had no consistent sign.
+  - `totals` markets carry `home_odds/away_odds = None` entirely (6 of the 18),
+    so over/under has no side resolution on this path at all.
+- **MY SHIPPED FIX WAS RIGHT BY ACCIDENT, AND IT OVER-EXCLUDES. Stated plainly.**
+  Web `4316c907` drops `close_age_seconds < 0` rows from the CLV headline. Those
+  are exactly the `observed_transition` rows, so it removed the side-mismatched
+  ones — **but for a reason that is not the real one**, and it also drops the
+  HOME-side rows on that path, whose closes were fine. The exclusion stays (it is
+  net-correct and named), but its stated rationale in `deploys.md` is now known to
+  be secondary.
+- **The timestamp claim is NOT refuted, just demoted:** `closing_captured_at`
+  20:34:26Z against a 19:08Z first pitch is still 86 minutes late, and
+  `odds_refresh_tracking.py:1602` still writes `now`. Fix the side first; the
+  clock is a smaller, separable error.
+- **SIDE FIX SHIPPED under `clv-without-settlement` (it owns `clv_join.py`):**
+  web `c8810f45` live 21:58:19Z, main `ae0bc968`. 20 away-side openings now
+  refuse the home stamp; `observed_transition` 48 -> 22; `in_play_excluded_n`
+  48 -> 19; `same_book_n` 131 -> 151; headline `-0.3077` -> `-0.2714`,
+  recompute-verified. **THIS LANE'S REMAINING SCOPE IS THE CLOCK ONLY** —
+  `odds_refresh_tracking.py:1602` still writes `closing_captured_at = now`
+  (detection time), which is why a 19:08Z first pitch carries a 20:34Z stamp.
+  That file is still claimed here and untouched.
+- **THE `-29.90` ROW IS EXPLAINED, 2026-08-15 22:2xZ. IT IS NOT A MARKET MOVE.
+  THE ODDS-HISTORY FEED SWAPPED ITS `home_line`/`away_line` LABELS DURING THE
+  DAY, so the same two prices appear under opposite labels.** Event
+  `69928d29…` = Seattle Mariners @ **Houston Astros**, FanDuel spreads:
+
+      history_first 06:02:51Z   away_line -1.5 away_odds +168 | home_line  1.5 home_odds -205
+      history_last  21:26:47Z   away_line  1.5 away_odds -205 | home_line -1.5 home_odds +168
+
+  **Identical prices (-205 / +168). The line labels are transposed.** The market
+  did not move at all — `-205` and `+168` are the two sides of ONE run line.
+- **Why the guard could not catch it.** `_price_for_side` checks the line by
+  NUMERIC EQUALITY (`abs(point_line - opening_line) > 1e-6`). With the labels
+  flipped, opening `home -1.5` matches the close's `home_line -1.5` — which by
+  then is the OTHER bet. The guard is doing exactly what it was written to do
+  and is defeated by an unstable label, not by a missing one. **Equality of a
+  label is not identity of a bet when the label's convention is not stable.**
+- **The openings look self-consistent; the history does not.** Three opening
+  records for that event's spreads: `home +1.5 @ +178` (05:07, kalshi),
+  `home -1.5 @ -183` (07:06, onexbet), `home +1.5 @ +186` (20:40, betopenly) —
+  +1.5 is plus money at both ends of the day. The 06:02 history point calls
+  `home +1.5` **-205**, contradicting them.
+- **SCOPE, measured rather than assumed — and it is NOT the headline killer it
+  looks like:**
+
+      same_book subset        n     mean      median   |clv|>10
+      spreads (line-bearing)  42   +0.515    +0.000       2
+      h2h / totals           128   -0.521    -0.246       0
+
+  The two extreme rows are a **mirror pair from this one event** (`+30.428` on
+  `home +1.5`, `-29.900` on `home -1.5`), because BOTH openings were recorded
+  and each got the other's close. **They nearly cancel**, which is why the
+  spreads mean reads a benign `+0.515` on a median of exactly `0.000`.
+  So: **severe per row, self-cancelling in aggregate.** It corrupts any
+  per-recommendation CLV, any variance or CI, and any "worst bets" list — while
+  leaving the headline roughly intact. h2h and totals are clean (0 of 128).
+- **NOT FIXED, and deliberately not fixed from here.** The defect is upstream of
+  `clv_join.py` (an unstable label in the odds-history feed), the mirror-pair
+  cancellation means it is not urgent for the headline, and a numeric-equality
+  guard cannot be patched into correctness without deciding which source owns
+  the sign convention. **That decision is the next lane**, and it should start
+  from: does the board's published `line` sign agree with the feed's, per sport?
+- **OPEN THREAD, NOT MINE TO CLOSE:** one row survives at `clv_pct -29.90`
+  (`open -205`, `close 168.0`, side **home**, source **last_pregame_quote**) —
+  side-aware path, not a side mismatch. Real move or a third defect, unknown.
+- **REVISED FIX, for whoever takes this:** make path 1 side-aware — resolve
+  `closing_price` through the same `line`-dict logic path 2 uses, and REFUSE
+  (named, counted) when the side cannot be determined rather than returning the
+  entity's price. Then re-run this discriminator and re-derive
+  `in_play_excluded_n`.
+
+- Goal: `closing_captured_at` means the time the CLOSING PRICE WAS OBSERVED, or
+  it is renamed to say what it is. Testable outcome: for every market carrying
+  a closing stamp, `closing_captured_at <= commence_time`, OR the field is split
+  into an observation time and a detection time and every reader is updated.
+- **WHY THIS IS ITS OWN LANE AND NOT AN EDIT INSIDE `clv-without-settlement`:**
+  the fix is in the PRODUCER (`odds_refresh_tracking.py`), the CLV joiner is only
+  a consumer, and `clv_join.py` is claimed by that lane. Changing a stamp that
+  persists in shard files is also a data-shape change, not a display change.
+- **WHAT IS ALREADY MEASURED (2026-08-15, do not re-derive):**
+  - `/api/ops/clv/report` mlb 2026-08-15: **48 of 179 same-book rows** carry
+    `close_age_seconds < 0`, i.e. a closing stamp AFTER first pitch.
+  - Clean 100%/100% split by source: every contaminated row is
+    `close_source=observed_transition`; every clean row is `last_pregame_quote`.
+  - One event: opened `-186`, closing price recorded `+168`, stamped
+    `20:34:26Z` against a `19:08Z` first pitch — 86 minutes late.
+- **I GOT THE MECHANISM WRONG ONCE ALREADY. The correction is the starting
+  point of this lane, not a footnote.** I told the user the recorded price "is
+  already live". **Reading `odds_refresh_tracking.py:1600-1602` says the
+  opposite**: the stamp is guarded on `was_confirmed_pregame` and deliberately
+  records `previous_line`/`previous_odds` — "the value observed the tick BEFORE
+  this one -- not current_line/current_odds, which is already the in-play
+  number." So the PRICE is intended to be the last pregame price. Only
+  `closing_captured_at = now` is the detection tick.
+- Hypothesis: **`closing_captured_at` is the DETECTION time, not the observation
+  time of the price it accompanies.** The price comes from tick N-1 and the
+  timestamp from tick N, so on a ~2h sweep cadence the stamp can post-date the
+  price by a full interval and land after commence. If true, `close_age_seconds`
+  systematically overstates lateness and says nothing about whether the PRICE
+  was pregame.
+- Falsification test: if the recorded `closing_price` for the late-stamped rows
+  is genuinely an IN-PLAY price (not a stale pregame one), then the stamp is
+  honest and the defect is in the `was_confirmed_pregame` gate instead — a
+  different fix in a different place. **Discriminator:** compare each late row's
+  `closing_price` against that market's own history points before commence. If
+  it matches a pregame point, the price is fine and only the clock is wrong. The
+  `-186 -> +168` swing is the case to run first; it is large enough that "stale
+  pregame price" and "in-play price" make visibly different predictions.
+- **THIS LANE CAN INVALIDATE PART OF MY OWN SHIPPED FIX, stated up front so
+  nobody has to discover it.** Web `4316c907` excludes `close_age_seconds < 0`
+  from the CLV headline. If the hypothesis holds, some of those 48 rows carry
+  legitimate pregame prices and are being excluded on a bad clock — the headline
+  would be right to distrust the timestamp but wrong to drop the row. The
+  exclusion stays until this is resolved (a wrong-but-named exclusion beats a
+  silent contamination), but it is **provisional**.
+- Verification: (1) the discriminator above run on at least 10 late rows, with
+  the split reported; (2) whichever fix follows lands with a test pinning
+  `closing_captured_at <= commence_time`; (3) `/api/ops/clv/report` re-read and
+  `in_play_excluded_n` re-interpreted against the finding.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_refresh_tracking.py` — the single write site
+    (`:1602`). Collision check RUN via `lane-guard.py`'s own `_claims()`: CLEAR.
+  - `tests/test_odds_closing_stamp.py` (new). CLEAR.
+  - **NOT claimed:** `syndicate/features/shared/clv_join.py` (held by
+    `clv-without-settlement`) and `syndicate/blueprints/ops.py` (consumer only).
+    If the fix needs either, coordinate rather than edit across the lane.
+- Blocked by: none. **No deploy from this lane without `/preflight`** — a change
+  to a stamp that persists in shard files needs its backfill story decided
+  before it ships, not after.
+
+### spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist (9 away + 3 home, the previously broken case).** File claim released to `layer2-board-quality`; holding session `lane-cleanup` archived 01:14Z — opened 2026-08-15 — session: lane-cleanup → verified by layer2-board-quality
+- **VERIFICATION (2026-08-16 ~16:3xZ, by `layer2-board-quality`).** The one open
+  item — "artifact output still unverified" — is now closed against the SERVED
+  payload (`/api/board/layer2-shortlist`, `written_at` 2026-08-16T16:20:21Z)
+  cross-checked cell-by-cell against `/api/board/book-grid?sport=mlb`:
+
+      away rows agree      9/9      (already correct pre-fix)
+      home rows agree      3/3      (the case this lane fixed)
+      total               12/12
+
+  `_side_line_from_cells` confirmed present in the DEPLOYED tree —
+  `git show 97491161:syndicate/features/shared/layer2_board.py` returns 3
+  occurrences, identical to `main`.
+- **THIS LANE'S OWN DEPLOY CLAIM WAS UNPROVABLE BY ANCESTRY, AND ANCESTRY SAYS
+  THE OPPOSITE OF THE TRUTH.** `git merge-base --is-ancestor edbbee9d 97491161`
+  returns **NO**. refresh-worker runs branch `deploy/nfl-pbp-root`, not `main`,
+  so the fix rode in by content while failing every ancestry test.
+  `project_web_runs_a_deploy_branch_not_main` generalises to the WORKERS.
+- **A FALSE 3-of-3 DEFECT CAME OUT OF THIS DATA FIRST; recorded so nobody
+  re-derives it.** The grid carries MIRRORED rows for one (event, market,
+  segment): `row.line=+1.5 / home_cells=-1.5` beside `row.line=-1.5 /
+  home_cells=+1.5`. Joining the shortlist to the grid ON `line` picks the wrong
+  twin and produces a uniform-looking "home side still inverted, 3/3". The
+  discriminating field is the **price vector** — the disputed row's
+  `{leovegas_se:123, prophetx:140, unibet_nl:125, unibet_se:125}` matches
+  `row.line=1.0` (home cells -1.0) exactly, so its `-1.0` is CORRECT.
+  **The lane's original 525-cell result is NOT affected** — it compared cells
+  WITHIN a row, never across mirrored rows.
+- **THIS LANE'S "NO TEMPLATE CONSUMES THE SHORTLIST" IS NOW STALE AND WAS THE
+  BASIS FOR ITS SEVERITY CALL.** Measured 2026-08-16: `layer2_is_primary=True`,
+  `legacy_candidate_count=0`, and **108 of 108** board cards carry
+  `source=layer2_shortlist`. The `grep` over `templates/`/`static/` still returns
+  zero because the wiring is SERVER-SIDE. The blast radius was never limited to
+  the Ask headline; the shortlist is the board.
+- **CLAIM WAS NEVER ENFORCED.** `lane-guard.py`'s `_claims()` yields **zero**
+  claims on `layer2_board.py` from this lane: `FILES_RE` matched the Files header
+  on the colon inside `23:0xZ` (harvesting no paths), and the continuation lines
+  holding the real paths start with a backtick rather than `-`. This lane's note
+  "Collision check RUN … CLEAR both times, so no other lane was blocked by the
+  gap" read CLEAR **because its own claim was invisible**, not because the file
+  was free.
+- **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
+  `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
+  - From the 525-cell result: `cell.home.line == -row.line` and (per-book
+    internal consistency) `cell.home.line == -cell.away.line`. Therefore
+    **`cell.away.line == row.line`, exactly.**
+  - So: **away-side rows are CORRECT** — their price and `row["line"]` describe
+    the same bet. **Home-side rows are INVERTED** — `layer2_board.py:852` pairs
+    `cell["home"]["price"]` with `row["line"]`, which is the away handicap.
+  - That is why the no-arb violation showed up only when comparing a home `-1.5`
+    opening against a home `+1.5` one: both were home rows.
+- **NO TEMPLATE CONSUMES THE SHORTLIST — but chat does, because I wired it there
+  tonight.** `grep` over `templates/` and `static/` for `layer2-shortlist`:
+  **zero hits**; the board still renders `ranked_all`. The one consumer on a
+  user-facing path is `ask_the_syndicate_adapter.py:599`
+  (`_board_top_opportunities`), shipped this session as web `c774fe1a`, whose
+  `_board_row_selection` renders `f"{side} {line}"`.
+  - **Verified live**: the chat headline served
+    `'away -1.5 (San Diego Padres @ Cleveland Guardians)'` — an AWAY row, which
+    is the correct case. **A HOME spreads row in that list would display the
+    away handicap beside the home price.**
+  - **So the user-facing blast radius is: home-side spread selections appearing
+    in the Ask headline.** Narrow, real, and created by my own change tonight —
+    before `c774fe1a` the shortlist had no user-facing consumer at all.
+- **SEVERITY, stated so it is not over- or under-called:** not a board-wide
+  mislabel (the board does not read these rows), not zero either. It also
+  corrupts every home-side spread row in the CLV join, which is where it was
+  found.
+- Files (claimed 2026-08-15 23:0xZ — **claimed LATE, after the edit, which is a
+  protocol lapse of mine; recorded rather than quietly backfilled**):
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_layer2_book_prices_line.py`. Collision check RUN via
+  `lane-guard.py`'s own `_claims()` at edit time AND again now: CLEAR both times,
+  so no other lane was blocked by the gap.
+- **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
+  `_side_line_from_cells` reads the handicap from the same cell as the price;
+  no-op for away/h2h/props; returns None (caller keeps the row value) when books
+  disagree on the sign. 8 new tests, 71 green across board + CLV suites.
+  **Not deployed: it needs REFRESH-WORKER, and an MLB sim (pid 79) plus a board
+  build were in flight.** Forward-only — today's openings keep the bad lines.
+  Ship when the slate is quiet, then re-run the 525-cell invariant.
+- **FIX unchanged and now fully justified:** at `layer2_board.py:852` take the
+  line from the same cell as the price. Away is already right, so the change
+  must not touch it — negate only for the home side, or carry
+  `cell[side]["line"]` per book.
+- **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
+  spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
+  UNIFORM, not statistical:**
+
+      1. each book's OWN home/away lines sum to zero    525/525  consistent
+      2. cell's home line vs the ROW's `line`             0/525  agree
+                                                        525/525  OPPOSITE SIGN
+      3. no-arb per book (implied home + implied away)  median 1.0483, none < 1.0
+
+- **`book_prices` IS NOT MIXING BOOKS. Every book agrees with every other book
+  and with itself.** The 2026-08-07 `_complementary` condition (*"books inside a
+  single grid row disagree on the SIGN"*) is real but is **NOT** what is
+  happening on this data. My previous entry blamed book-vs-book mixing; that is
+  now refuted — 100% agreement between books.
+- **THE ACTUAL DEFECT, and it is deterministic:** the ROW's `line` is the
+  NEGATION of the cell's `home.line`, in every single case. So
+  `layer2_board.py:852` building `book_prices = {book: cell["home"]["price"]}`
+  and publishing it beside `row["line"]` pairs **the home team's price with the
+  opposite handicap**. Every home-side spread opening is therefore recorded as
+  `side=home, line=L, price=<home price at -L>`.
+- **THIS PARTIALLY REINSTATES THE FINDING I WITHDREW, with a corrected
+  mechanism.** The 16-of-17 no-arbitrage violations were REAL; my second reading
+  ("confounded by book mixing") was wrong. It is not mixing — it is a uniform
+  row-vs-cell convention mismatch. **Third revision of this attribution; this
+  one is measured on 525 cells with 100% agreement rather than inferred from a
+  neighbouring module's comment.** The sequence, so nobody re-treads it:
+  feed transposes labels (WRONG) -> books disagree so `book_prices` mixes
+  (WRONG) -> row.line is uniformly the negation of the cell's home line (this,
+  measured).
+- **STILL NOT ESTABLISHED — the user-facing question, now sharper.** `row["line"]`
+  being the away handicap may be the board's INTENDED convention, in which case
+  the cards are fine and only the home-side flattening at `:852` is wrong. The
+  test is narrow: **does any template render `row.line` beside a HOME selection?**
+  Read the card template before assigning any user-facing severity.
+- **FIX, now well-specified:** at `layer2_board.py:852`, take the line from the
+  same cell as the price (`cell[side]["line"]`) rather than inheriting
+  `row["line"]` — either by carrying it per book or by negating for the home
+  side. Do NOT "fix" the sign at the CLV end; the pairing is wrong where it is
+  built, and every other consumer of `book_prices` inherits it.
+- **TRACED 2026-08-15 23:0xZ. THE LINE IS SET AT `layer2_board.py:852-858`, AND
+  THE DEFECT IS A DROPPED FIELD, NOT AN INVERTED SIGN.**
+
+      "book_prices": {
+          str(book): cell[side]["price"]        # <- price kept
+          for book, cell in (row.get("cells") or {}).items()
+          ...                                    # <- cell[side]["line"] DROPPED
+      }
+
+  Full chain: fetcher (`fetch_mlb_oddsapi_local.py`, EXONERATED — derives
+  `home_line = -away_line` per lane) -> book grid (`book_grid.py:304`, passes
+  `row.get("line")` through) -> `layer2_board` flattens each cell to a bare
+  price -> `record_openings` stores that flat map -> `clv_join`'s same-book
+  override reads `book_prices[book]` and pairs it with the ROW's line.
+- **THIS REPO ALREADY KNEW, IN A NEIGHBOURING MODULE, AND SAID SO.**
+  `board_cross_book.py` tags each quote with *"the CELL's own line, which is not
+  always the row's line … this is the pairing guard"*, and `_complementary`
+  documents the measured reason (production 2026-08-07, `spreads_alt`, first5):
+
+      betmgm     away -1.5 (+210)   home +1.5 (-295)
+      betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+  **Books inside ONE grid row disagree on the SIGN of the line.** That module
+  refuses such pairings ("*spreads are signed per side*", postmortem §2.6, after
+  a false +250.88% arbitrage). `layer2_board`'s `book_prices` drops the very
+  field that guard depends on — and the comment above it says so deliberately:
+  *"Flat {book: price}, not the whole cell."* The choice was made for artifact
+  size; its cost is that sign information is unrecoverable downstream.
+- **SO MY PREVIOUS CONCLUSION IS WRONG AND I AM WITHDRAWING IT.** I reported "the
+  BOARD's home-spread `line` sign is inverted, 16 of 17 — possible user-facing
+  mislabel". **That test was confounded by exactly this mixing:** it compared
+  `book_prices` across books for one row-level line, and those books were not
+  all quoting the same side. The 16/17 measures **sign disagreement BETWEEN
+  BOOKS**, which is a known and expected market fact — not a board defect.
+  **There is no evidence of a user-facing mislabel. Do not act on that claim.**
+- **What IS established:** `book_prices` silently mixes books quoting opposite
+  sides of a spread, so ANY consumer reading it for a spread selection can get
+  the opposite bet's price. `clv_join`'s same-book override is one such consumer;
+  that is the `-29.90`/`+30.428` mirror pair.
+- **What is NOT established, and needs a same-book test to settle:** whether the
+  ROW's own `line`+`price` (anchor book) are correct. My attempt was confounded —
+  the two openings had DIFFERENT anchor books (onexbet, betopenly), and since
+  books disagree on sign, an anchor-vs-anchor comparison proves nothing. The
+  clean test is one book quoting both lines of one event.
+- **REVISED FIX (do not ship before the same-book test):** carry the cell's line
+  alongside its price — `{book: {"price": …, "line": …}}` — or refuse a same-book
+  join whose book line is unknown. The size objection in that comment is real and
+  should be answered with a line-only companion field, not by dropping the guard.
+- **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
+  makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
+  `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
+  whose naming is right.
+
+      source                          respects invariant   violates
+      BOARD (published openings)            1 of 17          16
+      FEED  (odds-history lanes)            2 of 2            0
+
+  Board pairs span **15 distinct events** and many books; junk quotes
+  (`novig -100000`) excluded. The single exception is `nordicbet -1.5=117 /
+  +1.5=111` — implied 0.461 vs 0.474, a 1.3-point gap on a near-pick'em, i.e.
+  inside the vig and not evidence of correctness.
+- **The feed, on the same event, is internally right both times:** home `+1.5`
+  at `-205` (implied 0.672, the easier bet, minus money) and home `-1.5` at
+  `+168` (implied 0.373, the harder bet, plus money).
+- **SO: `fetch_mlb_oddsapi_local.py` IS EXONERATED. The bug is downstream, where
+  a published home-spread selection gets its `line`.** The hypothesis in this
+  lane's header is CONFIRMED and the falsification branch (lane-collapse only)
+  is REFUTED — lane collapse is real but cannot explain a systematic sign
+  violation across 15 events.
+- **MY EARLIER ATTRIBUTION IS NOW DOUBLY CORRECTED, and this is the final
+  version.** First I wrote that the FEED "transposed its labels" (in
+  `learnings.md`). Then I corrected that to "each point is internally
+  consistent; the market state holds one lane at a time". **Measured, it is
+  neither: the feed is correct and the BOARD is inverted.** The learnings entry
+  from earlier tonight describes the right FAILURE MODE (a label whose
+  convention is not stable across sources) but names the wrong culprit.
+- **THIS IS BIGGER THAN CLV AND MUST NOT SHIP AS A CLV FIX.** These openings are
+  recorded FROM published board rows, so if the board serves `side=home,
+  line=-1.5` while the price is the `+1.5` price, **users are being shown the
+  wrong side of the run line.** That is a correctness problem on the product
+  surface; CLV merely made it visible.
+- **UNVERIFIED, and it decides the severity — DO THIS BEFORE ANY FIX:** I have
+  NOT checked what the rendered card/API actually displays. Two possibilities and
+  they need different fixes: (a) the board's `line` field is genuinely inverted at
+  the point of publication -> user-facing defect; (b) the board's `line` means
+  something other than the home team's handicap (e.g. it carries the away line,
+  or the market line) and only the CLV join misreads it -> internal-only. **The
+  price data cannot tell these apart; only reading the publisher and the template
+  can.**
+- Next step, concrete: find where a spreads selection's `line` is set on the
+  published row (start from `pipeline/layer2_shortlist.py` and the per-sport
+  `cards.py`), and read what the card template renders beside it. Then decide (a)
+  vs (b). **Still no deploy** — and generality beyond MLB is still unmeasured.
+
+- Goal: for a spread, ONE source owns the sign of `line` and every consumer
+  agrees with it. Testable outcome: for every same-book spreads row in
+  `/api/ops/clv/report`, the opening's `(side, line, price)` and the close's
+  `(side, line, price)` describe the SAME bet — checked by an assertion that does
+  not itself rely on the label (see below) — and a test pins the convention per
+  source.
+- **WHY: a `-29.90` CLV on a market that never moved.** Event `69928d29…`
+  (Seattle @ Houston), FanDuel spreads. The opening recorded `home -1.5 @ -205`;
+  the close resolved `home -1.5 @ +168`. `-205` and `+168` are the two sides of
+  ONE run line, so the "30-point move" is a bet differenced against its opposite.
+- **REFINEMENT FROM READING THE FETCHER — my first framing was too strong and is
+  corrected here before anyone acts on it.** I wrote in `learnings.md` that the
+  feed "transposed its labels". **Each history point is internally consistent:**
+  `fetch_mlb_oddsapi_local.py:505-525` derives `home_line = -away_line` and keys
+  each lane by the home line, so `{away -1.5 / home +1.5}` and
+  `{away +1.5 / home -1.5}` are both correct — they are **two different lanes of
+  the same spreads market**.
+  - **The real mechanism is that the odds-history market key carries NO line**
+    (`event_id|home_team|away_team|market|bookmaker`), which `clv_join.py`'s own
+    docstring already states. So every spread lane collapses into ONE market
+    state and the last writer wins. At 06:02Z that state held the home `+1.5`
+    lane; at 21:26Z it held home `-1.5`.
+  - **What is still genuinely unresolved, and is this lane's question:** the
+    opening says `home -1.5` costs `-205`; the 06:02 history says `home +1.5`
+    costs `-205`. Same price, opposite line. **One of the two is using the
+    opposite sign convention for a home spread, and I do not yet know which.**
+- Hypothesis: the board's published `line` for `side=home` carries the OPPOSITE
+  sign to the feed's `home_line`. If so every home spread opening is joined to
+  the wrong lane, and away rows are joined correctly by accident.
+- Falsification test: if the board and feed signs agree, then the mismatch is
+  purely lane-collapse (the state simply held a different lane than the opening),
+  the sign is exonerated, and the fix is to key history by line rather than to
+  change any sign.
+  - **Discriminator that does NOT trust either label:** for one event, take the
+    published `book_prices` for the home `-1.5` selection and the feed's two
+    lanes at the same instant. The lane whose `home_odds` EQUALS the published
+    price identifies which line the board meant. Prices are the invariant here;
+    labels are the thing under test.
+- **SCOPE ALREADY MEASURED, so nobody re-derives it:** mlb 2026-08-15 same-book —
+  spreads n=42, mean `+0.515`, median **exactly 0.000**, only 2 rows |clv|>10 and
+  those two are a **mirror pair from this one event** (`+30.428` / `-29.900`),
+  because both openings were recorded and each got the other's close. h2h/totals
+  n=128, **zero** |clv|>10. **Severe per row, near-cancelling in aggregate** —
+  so this corrupts per-recommendation CLV, variance, CIs and any "worst bets"
+  list, while leaving the headline roughly intact. **It is NOT a headline
+  emergency and must not be deployed like one.**
+- Files (exclusive to this lane):
+  - `scripts/fetch_mlb_oddsapi_local.py` — where `home_line`/`away_line` and the
+    lane key are derived. Collision check RUN via `lane-guard.py`'s own
+    `_claims()`: CLEAR.
+  - `tests/test_spread_line_sign_convention.py` (new). CLEAR.
+  - **NOT claimed, held by other OPEN lanes — coordinate, do not edit across:**
+    `syndicate/features/shared/odds_refresh_tracking.py`
+    (`closing-stamp-is-detection-time`) and
+    `syndicate/features/shared/clv_join.py` (`clv-without-settlement`). Both are
+    this session's lanes, so the marker can simply be moved if the fix lands
+    there — but the claim must be updated first, not bypassed.
+- Verification: (1) the discriminator run on >= 5 events across >= 2 books, with
+  the winning convention named per source; (2) a test pinning it; (3) the
+  spreads |clv|>10 count re-derived and the mirror pair gone.
+- **Generality is UNMEASURED and must be established before any fix ships:** all
+  of the above is ONE event, ONE date, MLB, FanDuel. NFL/NCAAF spreads and other
+  books are untested, and MLB run lines are the asymmetric case that makes the
+  error visible — symmetric `-110/-110` spreads would hide it entirely.
+- Blocked by: none. **No deploy without `/preflight`**, and not before generality
+  is measured — a sign flip applied to a source that was already correct would
+  invert every spread join instead of fixing it.
+
+### commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gameline-eval`
+- Goal: `commit-guard.py` evaluates the index the COMMIT will use. **DONE.**
+- Files: `.claude/hooks/commit-guard.py`, `tests/test_commit_guard_worktree_index.py`.
+  Neither claimed by any OPEN lane at the time of the edit.
+- **The bug.** Both predicates ran with `cwd=CLAUDE_PROJECT_DIR`. The commit runs
+  wherever the shell is — and this repo's own documented recipe for a contended
+  tree is `git worktree add` and commit from there. A linked worktree has its own
+  index and its own HEAD.
+- **Two opposite failures, and the SECOND is the one that mattered:**
+  - *False positive*, observed **3× in one session**: a session committing from
+    `/c/tmp/lgl-ck` was blocked over reverts staged in the MAIN index while its
+    own index held exactly its four intended appends.
+  - *False negative*, **never observed and strictly worse**: a stale index in the
+    worktree being committed from was never examined, so the guard would pass it
+    in silence. That is the entire hazard it was written to catch.
+- **`-C` is now checked instead of skipped.** The old code waved
+  `git -C <dir> commit` through because it "has its own index". **Having your own
+  index is not having a fresh one** — that conflation is what this guard exists
+  to catch, so it cannot be the reason to skip. `--git-dir` / `--work-tree` stay
+  skipped and are now named as a KNOWN GAP: index and tree decouple there, so
+  predicate 1's "is it still on disk" has no single correct base.
+- **Verification — falsified, not just asserted.** 13 tests on REAL git repos in
+  `tmp_path` (a mocked git reproduces nothing; the bug was which directory git
+  ran in). Against the pre-fix hook: **7 fail, 6 pass**, and the load-bearing
+  `test_a_stale_index_in_the_LINKED_worktree_is_caught` fails as `assert 0 == 2`
+  — the false negative, reproduced. Against the fix: **13 pass.**
+- **Honest limit on the end-to-end check.** The real hook binary was run on the
+  real payload shape and returned 0, but the shared index happened to be CLEAN at
+  that moment, so **that reading is not a positive control** — it cannot
+  distinguish the fix from the bug. The positive control is the pytest pair on
+  real repos. Deliberately staging a revert in the live shared index to produce
+  one would have created the exact landmine the guard exists to prevent.
+- Blocked by: none.
+
+### ask-answer-substance — **CLOSED-VERIFIED 2026-08-16 — 8 deploys, all measured, live web `9f617f34`. The inline quick ask names a bet a human can place and grounds it in the sim. TWO ITEMS CARRIED OUT, NOT DROPPED: the soccer margin precondition is unverified on served rows (soccer had 0 board rows all session), and board finding 3 (`live_gameline_join.py:643` pairing hazard) is diagnosed and handed to `layer2-board-quality`. Both recorded in `state.md`.** — opened 2026-08-16 — session: ask-answer-substance
+> **ASK-ANSWER-SUBSTANCE CHECKPOINT 3 applied.**
+> **ASK-ANSWER-SUBSTANCE CHECKPOINT 2, 2026-08-16 22:0xZ.** Six deploys shipped
+> and measured today, all web-only, all cut from web's own live SHA. Live
+> `d8985df8`; `main` carries the code (`339e510b`) and the ledger (`18bfc6f8`).
+> Nothing of this lane is uncommitted — all four source files verified
+> byte-identical to `origin/main` BY BLOB (local HEAD is 6 behind; the `M` flags
+> are that gap).
+>
+> **Shipped:** the bet is nameable (market/line/side/price/book); reason
+> sentences generated from `projection.projected` + `model_skill`; the briefing
+> renders 5 not 3; `bet_analysis.edge` no longer publishes EV under the model
+> edge's name (same pick read 14.01 and 0.0139 on two surfaces); quote age
+> offset by artifact age and its threshold re-calibrated 15 -> 45 min; only
+> positive-edge rows published, with every edge term vetoing; the sim-vs-line
+> clause no longer asserts causation it cannot support.
+>
+> **NOT CLOSED, and the reasons are deliberate:**
+> 1. **A BOARD DEFECT WAS FOUND AND HANDED OFF.** `projection.projected` sits on
+>    the wrong side of `line` on 12-21 of 31-39 over/under rows, pregame as well
+>    as live. Handed to `layer2-board-quality` with the table. **Consequence they
+>    must expect: the panel now visibly says "does NOT support the {side}" on
+>    roughly a third to a half of over/under rows until it is fixed.**
+> 2. **`8172fdef` is INERT on production data** — proven by unit test only. Do
+>    not read a clean board as evidence it fired.
+> 3. **HARNESS RE-RUN, OBLIGATION CLOSED (22:2xZ, live `d8985df8`): 37/52 with
+>    ZERO pass/fail flips** vs the same-slate control, every class identical.
+>    Non-regression, not a win — the harness is blind to nearly everything the
+>    six deploys changed. Its one moved warning
+>    (`edge_without_market_probability` 0 → 25) was checked against the diff and
+>    is BOARD DATA, not this lane's code.
+> 4. **CSS ships INLINE in `ask_bar.js`** because `board_cards.css` is held by
+>    `layer2-board-quality`. Move the `STYLE` const into the stylesheet when that
+>    lane closes.
+> 5. **A row can still publish model-positive with EV negative's opposite** —
+>    resolved for the both-positive case, but the underlying question of which
+>    term should win when they disagree is a product call, recorded in
+>    `deploys.md` under `ask-both-edges`.
+>
+> **Process, worth carrying:** a resumed session does NOT inherit its own lane
+> marker — it lands on the shared global `.current-lane` and `lane-guard.py`
+> blocks the first edit. Fix is the per-session slot the hook names in its own
+> error text (`.syndicate/.current-lane.<session-id>`), not closing the lane.
+- Goal: the inline quick ask names a bet a human can actually place and grounds
+  it in the sim projection that is **already in the response payload**, instead
+  of a bare name and one edge number. **Single testable outcome**, on the served
+  `/api/syndicate/query` payload plus the rendered panel:
+  (a) a prop answer carries market, line and side (`Ryan Johnson over 2.5
+  earned_runs`), not `Ryan Johnson`;
+  (b) `structured_response.edge` on `bet_analysis` equals the row's
+  `model_edge_pct` (same number the briefing shows for the same pick) — today
+  the same pick reads **14.0% in the briefing and 1.4% per-pick**;
+  (c) the briefing renders as many rows as its own sentence claims (says 5,
+  renders 3);
+  (d) a game-side selection names the team, never a bare `home -1.5`;
+  (e) every answer carries at least one sim-derived term (projection vs line,
+  or `model_skill.status`) sourced from fields already fetched.
+- Files:
+  - `syndicate/blueprints/ask_the_syndicate_adapter.py`
+  - `syndicate/static/shared/ask_bar.js`
+  - `tests/test_ask_answer_substance.py` (NEW)
+  - `syndicate/blueprints/ask_the_syndicate_data.py` — **TAKEN 2026-08-16 from
+    ORPHANED lane `ask-sport-coverage`** (archived session, last active
+    2026-08-15 19:44; file clean and unchanged since `67ff20a0`). Scope is
+    `_board_row_label` + the `_board_candidates_evidence` table ONLY. Hand back
+    on request.
+- Collision check, run by reading every OPEN lane's `- Files:` block:
+  `ask_the_syndicate_adapter.py` was held by `ask-headline-from-board`, which is
+  **CLOSED-VERIFIED 2026-08-15** (`lanes.md:1820`); the only remaining mention
+  is a *disclaimer* bullet inside `ask-sport-coverage`, not a claim.
+  `ask_bar.js` is claimed by nobody — zero hits in `lanes.md`. CLEAR.
+- NOT claimed, read-only dependencies (top-level bullets on purpose, so
+  `_claims()` cannot read them as claims):
+  - `syndicate/blueprints/ask_the_syndicate_data.py`, `..._router.py`,
+    `..._the_syndicate.py` — held by OPEN `ask-sport-coverage`. This lane does
+    **not** edit them. The sim evidence it needs (`visuals.tables/charts`) is
+    already built there and already served; nothing new is required of it.
+  - `syndicate/features/shared/layer2_board.py` — held by OPEN
+    `layer2-board-quality`. Read-only. `_pick_label` there is the reviewed owner
+    of the side→team convention; this lane pins against it rather than
+    re-deriving it.
+- Hypothesis: the "answers are only edge-based" symptom is **not** missing data
+  and **not** a missing model. Every discriminating field — `line`, `side`,
+  `market`, `sim_projection`, `projection.model_skill`, `quote.bookmaker`,
+  `quote.price`, `model_edge_pct` — is already on the candidate the adapter
+  holds in `explanation.top_candidate`, and the per-pick answer already ships 7
+  sim tables and 3 sim charts in `visuals` that the inline panel never reads.
+  The loss is entirely in the adapter's field selection and the panel's render.
+- Falsification test: if a served `bet_analysis` payload for a real prop is
+  found whose `explanation.top_candidate` lacks `line`/`side`/`sim_projection`,
+  then the cause is upstream data, this lane cannot fix it in the adapter, and
+  the work belongs to `ask-sport-coverage` instead.
+- Verification: (1) `py -3 scripts/ask_syndicate_regression.py --out
+  reports/ask_regression/latest.json` re-run and diffed per class against the
+  38/52 in the `ask-sport-coverage` measurement — **no class may regress**;
+  (2) a new `tests/test_ask_answer_substance.py` asserting (a)–(e) against a
+  captured production row; (3) the panel re-read in a browser, since (c) and the
+  visuals render are client-side and no server test can see them.
+- Blocked by: none.
+
+### nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root cause settled as an ingestion gap; the lane goal (projection writes again) is NOT met and moves to a fetcher.** — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. The NFL SmartSim2 projection writes again, because the pbp READ
+  path resolves to the mounted disk instead of the ephemeral repo checkout.
+- Files (exclusive to this lane): `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py` (new). Collision check RUN against all
+  OPEN lanes: CLEAR on all three.
+- **DIAGNOSIS COMPLETE BEFORE ANY EDIT — measured in production, not inferred:**
+  - `DATA_ROOT : /opt/render/project/src/data/nfl_source` (the CHECKOUT)
+  - `looked for : .../src/data/nfl_source/tracking/nflverse/pbp/pbp_2026.csv`
+  - `.gitignore:96` excludes `data/nfl_source/tracking/`, so the pbp exists ONLY
+    on the mounted disk. Zero plays loaded -> `assert_ratings_data_available`
+    refuses -> artifact never written -> `age_seconds` climbs forever ->
+    ~107 relaunches/day.
+- **THE GUARD IS NOT THE BUG. It is working exactly as designed** — it refuses to
+  write a degenerate artifact where every team rates `neutral_no_data` and all
+  games get the same league-average projection (production served exactly that on
+  2026-08-13: `margin 0.96 / total 44.38 / home_win 0.5267` on all 16 preseason
+  games across four dates). Do NOT relax it.
+- **ROOT CAUSE, and `#389` already found it for the OTHER path:**
+  `_first_existing_root` picks a root by probing for `upcoming_recs_*.csv` — a
+  DIFFERENT artifact family. The checkout ships those (5 tracked files); the pbp
+  subtree is gitignored. So an unrelated artifact's presence decides where the
+  pbp is read from. `#389` fixed the WRITE path by adding
+  `nfl_artifact_output_root()` and left the READ path on the same selector.
+- Hypothesis: adding a pbp-specific resolver that probes candidates for the pbp
+  FILE (not for `upcoming_recs_*.csv`) makes the generator find it on the mounted
+  disk and write the artifact.
+- Falsification test: if the pbp is ALSO absent from the mounted disk, root
+  selection is a red herring and the real gap is ingestion. The production
+  message says otherwise ("that is the bug, not a missing download") but that is
+  the code's assertion, not a directory listing — treat as unconfirmed until the
+  artifact actually writes.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring every ~40s, and
+  `smartsim2_projections_2026_wk1.csv` appears with a fresh mtime and
+  NON-IDENTICAL rows per game (identical rows would mean the guard was bypassed
+  rather than satisfied).
+#### FALSIFIED 2026-08-16 15:53:28Z — the lane's own falsification test fired
+- This lane wrote the test before shipping: *"if the pbp is ALSO absent from the
+  mounted disk, root selection is a red herring."* It is, and it was.
+- `DegenerateProjectionRun` raised again 8 minutes after go-live, with the same
+  `looked for` path as before the fix.
+- **THE LOG WAS AMBIGUOUS BY CONSTRUCTION** — the resolver's not-found fallback is
+  `default_nfl_source_root()`, i.e. the same checkout path the old code printed.
+  "Not deployed" and "ran and found nothing" are indistinguishable in the log.
+  Settled by CONTENT: `97491161` carries `nfl_pbp_path` (1) and the generator's
+  delegation (1), and refresh-worker is live on it.
+- **v3 root cause:** the pbp is gone from every root; ten scripts reference it,
+  all reads, zero writes; no nflverse fetcher exists for play-by-play. It was
+  present 2026-08-13 (`verify_nfl_autorun_obligations.py:25`, real ratings on
+  16/16 games), which matches the 2.79-day staleness.
+- **Lane goal NOT met.** The change is kept — it removes a real latent
+  misresolution and is inert when the file is absent — but it must not be
+  recorded as fixing `#441`.
+- Handover: find what REMOVED the file and how it is meant to arrive. That is not
+  a code fix and not this lane's scope; `#441` carries the next step.
+
+#### CLOSED 2026-08-16 17:10:45Z — settled by the diagnostic this lane shipped
+- **Verification ran and the result is negative-but-decisive.** The lane's own
+  falsification test fired, then the diagnostic it prompted answered the question
+  outright on the first post-restart refusal:
+
+      strict_hosted_storage_resolves_to = True
+      candidate[0] /opt/render/project/data/nfl_source/source_artifacts/... exists=False
+      candidate[1] /opt/render/project/data/nfl_source/...                  exists=False
+      candidate[2..3] /opt/render/project/src/data/...                      exists=False
+
+- **What the lane BUILT is correct and stays:** `nfl_pbp_path` searches the
+  mounted disk FIRST (candidates 0/1 prove it), replacing a resolver that picked
+  a root by probing for the unrelated `upcoming_recs_*.csv`. That was a real
+  latent defect and `#389` fixed its twin on the write path.
+- **What the lane BELIEVED was wrong twice:** v2 (root selection is the cause —
+  shipped, falsified) and v4 (env not reaching the subprocess — falsified by the
+  same reading that killed v2's successor). Root cause is v3: the file is absent
+  everywhere.
+- **Two of my own readings corrected here:**
+  1. The `DATA_ROOT`-prints-the-checkout "contradiction" was not one —
+     `_first_existing_root` returns the first root holding `upcoming_recs_*.csv`,
+     which only the checkout ships, even though mounted-disk candidates come
+     first in the list.
+  2. I claimed strict mode cannot append the checkout. There is a SECOND append
+     under `strict AND RENDER` that adds it as a lower-priority fallback.
+- **Files released:** `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py`.
+- **Handover:** `#441` needs a pbp FETCHER — no ingestion path exists in-repo.
+  Template is `fetch_nfl_schedule.py` (nflverse games.csv). `#443` (stale PID
+  silently stalling the autorun ~45 min per restart) delayed this verification
+  twice and remains open.
+
+### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch
+- Goal: `scripts/render_events.py` exists and answers "was this service killed,
+  and why" from `/v1/services/<id>/events`, so the 2026-08-15 FORBIDDEN rule
+  ("never conclude no-OOM from a LOG search") has a tool behind it. That rule
+  names `render_logs.py` as unable to answer the question and leaves nothing in
+  its place; every session that has needed a kill census since has hand-rolled
+  one. Success = the script reports the window it ACTUALLY covered, pages the
+  cursor to exhaustion, and distinguishes `oomKilled` / `evicted` / `unhealthy` /
+  `earlyExit` rather than lumping them as "failed".
+- Files: `scripts/render_events.py` (NEW). Checked against every OPEN lane's
+  `- Files:` at open time: the only claims held anywhere are
+  (`clamp-fix-to-workers`) and the four `live_gameline` paths
+  (`live-game-line-projection`). No lane claims anything under `scripts/`.
+  `refresh-worker-oom-recurrence` is the adjacent lane — it OWNS diagnosing
+  refresh-worker memory and this lane must not touch that. Read-only tooling
+  only; no service code, no config, no deploy.
+- Hypothesis: n/a (tooling, not diagnostic).
+- Falsification test: the tool is worthless if it can silently under-cover, which
+  is exactly how `render_logs.py`'s predecessor lied (`#434`: 99 samples spanning
+  1.2s of a 51s window). So: run it against a window whose contents are already
+  known independently — the 29 `oomKilled` on refresh-worker 2026-08-14 CT — and
+  require it to return all 29. If a single-page run and a paged run disagree on
+  the count, the pager is wrong and the tool must not ship.
+- Verification: (a) the 2026-08-14 census reproduces 29/29 `oomKilled`;
+  (b) `--json` output round-trips through `json.loads`; (c) `py -3 -m pytest
+  tests/test_render_events.py` passes. Recorded here, not in `deploys.md` —
+  nothing deploys.
+- **Outcome, all three verification criteria run:**
+  (a) `--failures-only --since 2026-08-14T05:00:00Z --end 2026-08-15T05:00:00Z`
+      returns **29 `oomKilled`**, matching the independently-derived census.
+      With `max_pages=1` the same window returns **20** — the pager is the
+      difference between a measurement and a plausible undercount.
+  (b) `--json` round-trips through `json.loads` (checked on live-odds-worker:
+      5 `earlyExit`, 0 OOM since 2026-08-15).
+  (c) `py -3 -m pytest tests/test_render_events.py -q` → **15 passed**.
+- **Positive control works:** the branch-overlap window 10:09:51Z..15:09:30Z
+  today returns zero events AND names the newest event overall
+  (`2026-08-16T06:01:34Z deploy_ended`), so "quiet" and "reader broken" print
+  differently and exit differently (0 vs 2). This is the whole reason the tool
+  exists — the 2026-08-15 FORBIDDEN rule said a negative result about process
+  death must come from the events API, and named `render_logs.py` as unable to
+  provide one, leaving no tool in its place.
+- **Reading it produced, recorded because it is load-bearing for
+  `refresh-worker-oom-recurrence` (that lane's, not this one's, to interpret):**
+  refresh-worker `server_failed` since 2026-08-09 is **42 events, all 42
+  `oomKilled`, none evicted** — 08-08:5, 08-13:4, **08-14:29**, 08-15:4,
+  08-16:0-so-far (CT). Kills cluster 15:00–00:00 CT. Separately,
+  live-odds-worker's 19 failures over the same week are **zero OOM, all
+  `earlyExit`**, still recurring ~1–3/day through 08-16 05:54 CT — a different
+  failure mode that a "19 failures" summary would have buried. Not diagnosed
+  here; filed as an observation only.
+- Files touched: `scripts/render_events.py` (new), `tests/test_render_events.py`
+  (new, not in the opening claim — added when the verification step needed it).
+  No service code, no config, no deploy.
+
+### ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `_settle()` can no longer return `settled: true` on a render that never
+  started. A verdict that rests on absence of change is labelled as such in the
+  JSON and in the printed row, so no reader can mistake it for a proven settle.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis: the 800ms artifact in `reports/ui_layout/rerun_2026-08-16.json`
+  (mlb desktop, `contentUnits min==max==33`, `renderSettled: true`) is the two-
+  equal-poll rule firing inside a pre-enrichment plateau, not a finished render.
+- Falsification test: if the growth curve on mlb desktop shows the fingerprint
+  genuinely constant from `load` through enrichment, the plateau theory is wrong
+  and the uniform 33 is a real slate.
+- **CONFIRMED, not falsified.** Replaying the old rule over a plateau-then-growth
+  tape returns `settledMs: 800, settled: true, finalFingerprint: 100` while the
+  render goes on to 400 — it stops inside the plateau and reports the
+  pre-enrichment DOM as final. On the live re-run with the new rule, mlb desktop
+  settled at **6800ms with `sawChange: true`** and desktop/mobile agree at
+  **41–53 pairs/card**; under the old rule the same two widths read 33–33 and
+  33–49. The contradiction is gone because the reading is no longer premature.
+- Verification: `tests/test_ui_layout_probe.py` 35 passed (27 pre-existing + 8
+  new); the plateau test asserts `settledMs > 800`, which the old rule fails by
+  construction. Live production run 2026-08-16 ~11:0x CDT, all 8 rows OK, no
+  false alarm, footer names exactly the six server-side rows.
+- What is NOT claimed: the quiet window is a longer window, not a proof. A
+  render that stays still for 2400ms and only then starts would still fool it.
+  What changed is that such a reading is now *labelled* (`sawChange: false`) and
+  fails as soon as a second reading contradicts it.
+- Blocked by: none
+- Governed by `learnings.md` 2026-08-16 "a wait loop must gate on an AFFIRMATIVE
+  success token, never on the absence of a failure string" — `_settle` was that
+  rule recurring in a render poll. Absence of DOM change cannot distinguish
+  "render finished" from "render has not started".
+
+### ui-probe-desktop-height-model — CLOSED 2026-08-16 — desktop is UNFITTABLE, not mis-tuned; measured the floor instead of tuning the threshold — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: desktop reports a height figure that is a real layout signal — either a
+  model that fits because it matches how the desktop grid actually sets height,
+  or a stated finding that no per-card model can fit and why.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE testing): (a) grid row-stretching, or (b) pairs
+  wrapping into columns so height goes as `ceil(u/cols)`.
+- **BOTH HYPOTHESES FALSIFIED.** (a) dead: every card sits at `left=4`, one per
+  row — there is no row to equalise against. (b) dead as stated: the pair grid is
+  10 visible columns at 1440 and 2 at 390, not 2, and `visRows` fits WORSE than
+  `u` (ratio 1.69 vs 1.16).
+- **What is true instead:** the grid is a wrapping flow and text WIDTH decides
+  where it wraps, so height is not a function of pair count at all. Cards with
+  identical `u` differ by **116px** (u=45, n=7) and **97px** (u=49, n=5) on
+  desktop; by 81px and 40px on mobile. Agreeing on BOTH `uVis` and `visRows`
+  still leaves **74px**. That is a floor no model in these variables can beat.
+- **Why no threshold rescues it:** `reliable` needs `residual <= 0.25*explained`,
+  so a 116px floor requires 464px of explained range; desktop's content spans
+  197px. Tuning the bar would manufacture a fit.
+- **Bonus correction:** mobile's residual (81px) EQUALS its floor (81px) — the
+  passing model sits on the noise floor and reports text wrap, not layout
+  deviation. It passes only because its slope is ~62px/pair vs desktop's ~16,
+  buying 743px of range to hide identical noise behind. This revises the
+  "residual band ~80–105px" recorded earlier in `log/2026-08-16.md`.
+- Verification: 42 tests pass (35 prior + 7 new); the new ones drive the REAL
+  shipped `fitGroup` JS in a headless browser over captured production points and
+  independently reproduce `floorPx == 116` and mobile `residual == floor == 81`.
+- **Verification LIMIT, not claimed as done:** not observed on a live run. The
+  11:5x CDT slate collapsed to a uniform 33 pairs at both widths with games Live,
+  so nothing fits anywhere (`statesUnfitted: [Live, Preview]`). Verified by
+  replay through the shipped code path only.
+- Follow-up left open by decision, not oversight: making desktop actually fit
+  needs a variable capturing rendered text extent (summed visible section
+  heights, or per-section wrapped row counts). Both edge toward circular, so it
+  was flagged for a call rather than chosen unilaterally.
+- Blocked by: none
+
+### ui-probe-tie-floor-tracking — CLOSED 2026-08-16 — floor collected on every row; 5 of 6 stable, mlb mobile fires the rule at 2.06x — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` emitted on EVERY run at both widths, printed,
+  compared across runs, and unable to fail a run while its stability is unknown.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Decision rule, written BEFORE the readings: moves more than ~2x across runs
+  with no card-surface deploy → slate-driven, cannot be baselined → option C.
+- **RESULT — 3 consecutive production runs:** nfl desktop 14/14/14, nfl mobile
+  50/50/50, ncaaf desktop 45/45/45, ncaaf mobile 53/53/53, mlb desktop
+  125/125/125 (116 on the earlier 11:0x geometry, so 1.08x across a slate
+  change). **mlb mobile 109/109/53 = 2.06x — the rule FIRES for that row only.**
+  It fails informatively: `n` at the worst tie group moved 7 → 8, so tie-group
+  membership churns as data enriches and which group is "worst" moves with it.
+- **The row the desktop question was actually about (mlb desktop) is stable** at
+  125px across three readings while its own `contentUnits` moved 33-57 → 41-57.
+  That looks like a property of the CSS, not of the slate.
+- Verification: 51 tests pass (42 prior + 9 new), including one proving the floor
+  is emitted when `heightModel is None` and `statesUnfitted == ["Preview"]` —
+  run through the real shipped JS, not a stub. Three production runs recorded.
+- Kept as WATCH, NOT promoted to STABLE_METRICS: one row fails the bar, and the
+  metric is one day old.
+- **Deliberately not done:** a statistic that would probably pull mlb mobile under
+  the bar exists (largest tie group, or a median across groups). Choosing it
+  *after* seeing which looks stable is manufacturing the result — the same error
+  as tuning the fit threshold, which is what started this whole thread. Left for
+  a decision.
+- Bug found and fixed en route, predating this lane: `compare()` guarded
+  `httpStatus >= 400` but not an `error` row, so `soccer mobile`'s 30s
+  `page.goto` timeout was reported as `CODE-DRIVEN DRIFT` on four metrics at
+  once. Errored rows are now SKIPPED and named; they still fail the run.
+- Blocked by: none
+
+### ui-probe-tie-statistic — CLOSED 2026-08-16 — implemented as decided; the statistic did NOT help and the instability is the SLATE — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: track the spread within the LARGEST tie group (user decision), applied at
+  every row; the fit-impossibility floor keeps using the MAX across groups.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE the runs): switching statistic will NOT rescue mlb
+  mobile.
+- **CONFIRMED — and it is worse, not merely no better.** 3 production runs:
+  mlb mobile tracked 67/132/164 = **2.45x** (fires) against worst-group
+  99/132/164 = 1.66x; mlb desktop tracked 64/80/64 = 1.25x against worst-group
+  83/80/83 = 1.04x. **On both MLB rows the new statistic is LESS stable than the
+  one it replaced.** My stated expectation ("would probably pull mlb mobile under
+  the bar") was wrong. Mechanism differed from the guess too: the largest group's
+  SIZE churns, n = 7/14/7 between runs.
+- **The real finding: the axis was wrong.** nfl and ncaaf read 1.00x across three
+  runs, both widths, under BOTH statistics — their slates are static (units 3-3,
+  16-16). MLB carries a live game and enriches continuously (units 41-57 / 33-57
+  / 41-57, Live 1 + Preview 14 every run). The identical-content spread is
+  exactly reproducible on a static slate and not reproducible on a churning one;
+  no choice of statistic survives content moving underneath it.
+- Verification: 57 tests pass (51 prior + 6 new) incl. largest-group tracked
+  while `floorPx` takes the worst, and equal-n groups breaking toward the larger
+  spread so the tie-break cannot hide a difference. 3 production runs recorded.
+- Both statistics are emitted and printed when they differ, so nothing is lost
+  whichever is diffed; only `_cmp_value` selects. Reverting is one line.
+- **Recommendation NOT taken unilaterally:** revert the tracked statistic to
+  `worstGroupPx` (more stable on both MLB rows, and identical to the quantity the
+  impossibility floor already uses), then baseline nfl/ncaaf and treat
+  MLB-during-a-live-slate as not baselineable in any statistic.
+- Provenance caveat: this statistic was chosen AFTER seeing which looked stable,
+  so its behaviour is not independent evidence. It did not come true.
+- Blocked by: none
+
+### ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board — opened+closed 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: tracked statistic back to the worst tie group, printed number == diffed
+  number == the quantity the impossibility floor uses.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Cross-era safety: `_cmp_value` reads `worstGroupPx` BEFORE `spreadPx`, because
+  reports from the largest-group window carry `spreadPx` meaning the other
+  quantity. Verified live: post-revert run vs a largest-group-era report reads
+  `identicalContentSpread unchanged`.
+- **False alarm 1 fixed:** mlb mobile printed "AT ITS NOISE FLOOR (164px) ... not
+  layout deviation" and failed the run on that same number (164px > 150px
+  budget). A residual at its floor is unmeetable by any model; now reported, not
+  failed.
+- **False alarm 2 fixed:** mlb desktop then failed with "LAYOUT SPREAD OVER
+  BUDGET (313px) with content not driving height" while identical-content cards
+  differed by 70px. The branch inferred "content-independent" from a flat linear
+  slope; on desktop that is false, because the grid WRAPS and a flat slope means
+  the line cannot see content, not that content is absent. The budget now applies
+  to the content-controlled figure where tied cards exist, falls back to raw
+  spread where none do, and says which it used.
+- Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
+  0 / OK where the same board failed two rows before.
+- Blocked by: none
+
+### branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-overlap-baseline-watch` (scheduled-task run)
+- Goal: take one Phase 1 (`#440`) before-baseline sample; it turned into fixing
+  the instrument, because the sample was honest and the schedule was not.
+- Files: `.syndicate/scheduled_task_branch_overlap.md`,
+  `.syndicate/scheduled_task_oom_band.md`, and three task files under
+  `~/.claude/scheduled-tasks/` (outside VCS — prompts now embedded in the
+  oom_band mirror so all three are recreatable).
+- **NO LANE WAS OPEN WHILE THE WORK HAPPENED.** Opened at checkpoint, closed
+  immediately. Config + mirrors only, no app code, nothing contended — but the
+  protocol says claim first and I did not.
+- Measured: 42 `oomKilled` in 8 days, **41 of 42 in 15:00–23:59 local**; cron
+  moved `15 */4 * * *` → `45 19,22,1 * * *` (three 5h windows tiling
+  14:45–01:45). Sampling drops 6/day → 3/day with the kill band fully covered.
+- Corrected: the oom-band tasks' SHA-equality pin → containment check. See
+  `learnings.md` 2026-08-16.
+- Added: `preband-refresh-worker-sha-check`, one-time 21:45Z, returns
+  BAND CLEAN / BAND COMPROMISED. **It notifies nobody** — created from a
+  scheduled-task run session, which cannot subscribe another task.
+- Pushed: `8150ff5b`, `b37b870c`, `80581700`, `38bb30b2`. Ledger writes from this
+  checkpoint are UNCOMMITTED (shared files carry other sessions' in-flight edits).
+- Blocked by: none. Nothing here is load-bearing for another lane; the
+  `refresh-worker-oom-recurrence` owner keeps the diagnosis.
+
+### ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` fails on drift for nfl/ncaaf, stays watch-only
+  for mlb/soccer, with a new baseline carrying the field.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `reports/ui_layout/baseline_2026-08-16.json` (NEW)
+- Falsification test: if nfl/ncaaf tie spreads differed between two runs now with
+  no deploy, they are not baselineable. **They did not** — 14/50/45/53 held
+  across every run today, and the armed comparison reports all four as
+  `unchanged (baselined)`.
+- Four outcomes kept distinct: drift FAILS; a baseline predating the field is
+  NOT COMPARED and does not fail; a VANISHED current value FAILS (absence is
+  never a pass); a state change is NOT COMPARABLE rather than drift — which is
+  what stops kickoff reading as a layout regression.
+- Verification: 72 tests pass (65 + 7 new); live run splits exactly as intended,
+  nfl/ncaaf baselined-unchanged while mlb moved 68 -> 69 on the watch line
+  without failing.
+- **First baseline run was DISCARDED, not shipped**: it failed on `ncaaf desktop
+  tab click identity`. Second run clean; the baseline carries `ok: true`. The
+  tab-click intermittent is real and unexplained — recorded, not chased.
+- **Open and unrelated:** mlb mobile Live state now fails legitimately — residual
+  151px against a 40px floor, `atNoiseFloor` False, worst card +79px at 45 pairs,
+  1px over budget. The exemption correctly declines. Needs its own look.
+- Blocked by: none
+
+### mlb-mobile-live-residual — CLOSED 2026-08-16 — HYPOTHESIS FALSIFIED; it is a false alarm, the Live fit is convex and `fitRatio` cannot see curvature — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: name what makes one Live card +79px off the model, or show the residual
+  is noise.
+- Hypothesis: the outlier carries a BLOCK its same-pair-count peers lack.
+- **FALSIFIED. There is no outlier.** Residuals are U-shaped across pair count
+  (+76 at u=45; -2/-10/-42 at u=49; -41/-75 at u=53; +73 at u=57) — a line
+  fitted to a curve, not an anomalous card.
+- **Mechanism found:** per-pair cost is LINEAR in Preview (62.4, 62.1 px/pair)
+  and CONVEX in Live (41.3, 61.8, 76.6). The curvature is entirely in
+  `section.cards-panel.is-active > div.cards-overview-grid` (3187 -> 3906px
+  across the Live series; every sibling block flat or <=28px). Live puts cells of
+  differing heights into a wrapping row-max grid, so each added pair costs more
+  than the last; Preview's cells are uniform.
+- **The harness is at fault, not the board:** `fitRatio = residual/explained`
+  cannot see curvature, so a misspecified model with a wide explained range
+  (771px) passed as `reliable: True` at ratio 0.2 and then tripped the budget
+  with a STRUCTURED residual. The named worst card (u=45) is the ONLY card at
+  that u — no peers — so "+79px off the model" is deviation from a LINE. Cards
+  that do have peers agree to 40px.
+- Recommended, NOT implemented (needs a decision): fail on deviation from
+  same-content PEERS (`floorPx`, model-free) rather than from the line; and
+  optionally flag monotone per-step slope drift as MISSPECIFIED so `fitRatio`
+  stops certifying curved fits.
+- Live consequence: the probe fails every run while MLB has a live slate.
+- Blocked by: none
+
+### branch-overlap-manual-run-marker — CLOSED — opened 2026-08-16 — session: `branch-overlap-baseline-watch` — verified in production 2026-08-16T19:52:23+00:00
+- **PROVEN IN PRODUCTION.** The 14:45 local slot landed a record at
+  `recorded_at=2026-08-16T19:52:23+00:00` carrying **`run_mode="scheduled"`** — the
+  first record ever written with the field set, so `--scheduled` does reach the
+  live task. Covered 2026-08-16T14:52:07Z—19:51:47Z (09:52—14:51 local),
+  `samples=1967`. The three prior records carry NO field and stay UNKNOWN.
+- Goal: a record in `reports/branch_overlap/baseline.jsonl` states whether it came
+  from the scheduled run or from a human, so a manual probe can never be counted
+  as evidence in the Phase 1 (`#440`) before-distribution.
+- Files: `scripts/watch_branch_overlap.py`,
+  `reports/branch_overlap/baseline.jsonl`,
+  `.syndicate/scheduled_task_branch_overlap.md`, and the live task file.
+- Why: testing the new 14:45 slot appended a record indistinguishable in shape
+  from a scheduled sample — same failure the pre-band drift check was added to
+  prevent, in the instrument this session was fixing. Baseline also already
+  double-counts 10:09–15:09Z (two runs overlapping ~4.5 of 5 hours).
+- Design: `--scheduled` flag; **absent means manual**. Fails safe — forgetting the
+  flag excludes a run from the distribution rather than silently counting a probe.
+  No time-vs-cron math, which would re-couple the script to a schedule that has
+  already changed twice today.
+- Consumer note: records written before this change carry NO field. Absent must
+  read as UNKNOWN, never as scheduled.
+- Blocked by: none. `refresh-worker-oom-recurrence` owns the diagnosis; this is
+  instrument provenance only.
+
+### ui-probe-peer-deviation-gate — CLOSED 2026-08-16 — one model-free height rule; production green, coverage gap printed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: ONE height failure rule — deviation from same-pair-count peers — with
+  residual-from-the-line and raw-spread removed.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Falsification test had two halves and BOTH passed: a fabricated 420px peer
+  deviation still fails (so a real defect with peers is caught), and the live
+  board went GREEN (exit 0/OK) where it had been failing — matching the
+  diagnosis that no card deviates from its peers.
+- Live peer deviations: mlb desktop 96px, mlb mobile 123px, nfl 14/50, ncaaf
+  45/53, all under the 150px budget.
+- **Coverage loss stated, not hidden:** a card with no same-`u` peer cannot be
+  judged. The row now prints `peer check covered 11/15 cards` and, where nothing
+  ties at all, `PEER CHECK DID NOT RUN` — a stated gap, the treatment
+  `statesUnfitted` already gets.
+- The fit is still reported (residual, chrome, px/pair, UNFITTABLE, UNRELIABLE,
+  noise floor) as CONTEXT. It decides nothing.
+- Verification: 71 tests pass. Nine tests encoding the removed rules were
+  DELETED rather than adjusted; the default fixture is now a healthy slate under
+  the peer rule; 8 new tests cover fail/pass/per-state/coverage/did-not-run/
+  no-model.
+- Closes the root cause behind all three of today's false alarms: the fitted
+  line was treated as ground truth when the tie structure is the only model-free
+  evidence available.
+- Blocked by: none
+
+### layer1-board-coverage — UPDATE 2026-08-16 17:5xZ — **DEPLOYED AND FALSIFICATION TEST PASSED. Supersedes this lane's "UNDEPLOYED" line above.**
+- Two deploys to **refresh-worker** (`srv-d91dpertqb8s73co8ls0`), both cut on the
+  LIVE SHA rather than `main` — `main` did not contain the worker's lineage (22
+  commits incl. another session's `#441` diagnostic), so deploying it would have
+  rolled all of them back. `01a4b83e` live 17:26:25Z, `f88796a9` live 17:40:50Z.
+  Web deliberately NOT deployed: `/api/board/layer1` is a pure read and the
+  `projection` field is written at artifact-build time, so a web deploy would
+  have been inert.
+- **RUN 1 FAILED, and that is the result worth keeping.** mlb 284 → 0
+  unattributed; **3 WNBA `game|h2h|full` rows did not move.**
+  `wnba_game_projections.py:208` writes `row["projection"]` DIRECTLY and never
+  passes through `attach_projections` — a **fourth producer**, exactly the shape
+  the brief warned about for `fair_price`. My pre-deploy replay proved the
+  HELPER (I supplied its arguments) and never asked whether production calls it.
+  New learnings entry: *a replay proves the FUNCTION; only the call path proves
+  the FIX.*
+- Fixed at that producer (`f88796a9`). **RUN 2 PASS: RESIDUAL 0 across 10,692
+  rows**, all three in-season sports, on artifacts stamped after the deploy.
+  Confirmed on a SECOND independent build (17:46–17:48Z), also 0.
+- Regression check: edges still served — mlb 867 / wnba 326 / soccer 528, none
+  created or removed. **mlb's edged count fell 1,462 → 867 and that is NOT this
+  change**: `by_state` went `{live 1, pregame 14}` → `{live 8, pregame 7}` and
+  the live-edge refusal rose 65 → 697 to match. Re-read on a pregame slate.
+- Another session's deploy `b9f2b5f1` went out on top at ~17:5xZ; checked by
+  content AND ancestry — `f88796a9` is an ancestor and both fixes are present,
+  so this work survives it.
+- **Lane STAYS OPEN** for the one unmeasured goal: the cross-sport LIVE A/B needs
+  two sports live at once. Everything else in the audit is delivered.
+
+### ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `reliable` stops certifying a CURVED fit.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method: slopes between consecutive pair-count group MEANS, then monotone-drift
+  test. >=3 steps required; two steps can only say "one went up".
+- Threshold measured: Live drift 0.88 vs Preview 0.008 — two orders of magnitude
+  apart, so the 0.5 cutoff is not load-bearing.
+- **Falsification test PASSED:** the known-linear Preview series is NOT flagged,
+  while Live is flagged with `fitRatio` still 0.20. Two-step and non-monotone
+  series also not flagged.
+- Verification: 77 tests pass, both series driven through the real shipped JS.
+  Live run shows no false positives; today's slate has too few distinct pair
+  counts per state to exercise the detector either way.
+- Reported as MISSPECIFIED, deliberately distinct from UNRELIABLE: the line is
+  the wrong shape, not noisy, and "no layout signal here" would understate it.
+- Low risk: `reliable` gates no failure now, so this changes a label not a
+  verdict — which is why it was safe to do after the peer rule, not before.
+- **HANDS OFF, needs a decision (see log):** the peer budget is a FIXED 150px
+  against a quantity that scales with content. mlb mobile's identical-content
+  spread read 81/109/123/164/193px today; the 193px case is 7 cards evenly
+  spread (gaps 11/23/16/49/28/66), i.e. wrap, not a defect. Must not be resolved
+  by raising 150 until the board passes.
+- Blocked by: none
+
+### ui-probe-proportional-budget — CLOSED 2026-08-16 — shipped; falsification test FIRED (proportional does not tighten the spread) but it fixes the width bias — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: peer budget as a share of the tie group's card height, percentage chosen
+  from measurement.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method held: denominator added FIRST, 16 readings collected, threshold picked
+  only afterwards — so the number could not be reverse-engineered from the answer.
+- Calibration: worst healthy reading 9.9% (mlb desktop Live); 15% is ~1.5x.
+  Deliberately tighter than the old 3x principle, which here would be 30% = 1440px
+  on a 4800px card.
+- **FALSIFICATION TEST FIRED.** The lane predicted healthy readings would cluster
+  as a share of height. They do not: raw px max/median 3.3, percentages 3.0 —
+  the same scatter. The premise was wrong and is recorded, not dropped.
+- Kept anyway because it fixes a DIFFERENT real defect: the width bias. 150px is
+  2.8% of a 4800px mlb mobile card and 27% of a 541px ncaaf desktop one.
+  Percentages separate by width; px separate the opposite way.
+- Verification: 80 tests pass incl. the same 400px passing at 4800px (8.3%) and
+  failing at 541px (73.9%); no-height groups named NOT JUDGED rather than
+  skipped; live run exit 0/OK with all four baselined rows unchanged.
+- **Standing recommendation:** this is a BACKSTOP. Drift-against-baseline caught
+  nothing false all day while the absolute budget produced three false alarms.
+  Extending `TIE_SPREAD_BASELINED` beyond nfl/ncaaf is worth more than tuning
+  this percentage.
+- Blocked by: none
+
+### layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope while attempting to close
+- The `/lane close` gate says: confirm the verification ran and state the result;
+  if it did not, refuse and say what is missing. Two things are missing.
+- **(1) The lane's own stated verification is unmet.** Cross-sport LIVE A/B
+  requires two sports live at once. At 18:00Z: mlb 8 live, wnba 3 pregame (first
+  kickoff 21:00Z, ~3h out), soccer *reported* 0 live. **Satisfiable from ~21:00Z
+  today**, when WNBA's 21:00Z games overlap the MLB slate.
+- **(2) SOCCER SERVES BETTABLE EDGES ON FINISHED MATCHES — found by the USER, not
+  by my sweep.** They said "SOCCER has live games" while the board said `live: 0`.
+  Measured 18:03Z: **14 soccer games past kickoff, 12 carrying a real score, 0
+  marked live; 45 rows serving an edge on a game in play or over.** GRO @ ADO
+  kicked off 7.8h ago, finished 4-1, and the board offers an edge on `totals 2.5`
+  — settled OVER before lunch. mlb/wnba: 0 such games.
+  - Cost mechanism: `live_edge_policy` keys on `game.state`, and `pregame` is its
+    PERMISSIVE branch, so a game stuck there never has its edge withheld. `#413`
+    reappearing on a sport whose state never becomes live at all.
+  - Decision site: `game_chip_scoreboard._game_flags:113` infers live/final from
+    status TEXT only and **never consults kickoff time or score**; absent status
+    falls through to `pregame`. `attach_game_state` copies `chip["state"]`
+    through and is NOT the cause.
+  - Unconfirmed hypothesis (two greps, not a measurement): soccer emits `status`
+    as a STRING (`soccer/cards.py:197,512`) while `_game_flags` reads it as a
+    DICT, so soccer's status is invisible by TYPE. **Falsify by dumping one
+    soccer chip as the worker sees it before touching `_game_flags`.**
+  - NOT fixed here on purpose: `_game_flags` is shared by all 8 sports and a
+    wrong `live` costs as much as a wrong `pregame`. Needs its own lane, its own
+    falsification test, and a decision. `game_chip_scoreboard.py` is unclaimed.
+- **This also invalidates my own G3 conclusion.** I wrote "no second sport was
+  live, so the cross-sport A/B is deferred". Soccer WAS live; the board could not
+  see it. The blocker was the finding.
+- Lesson, already a standing rule and violated anyway: *the user watches the
+  board, and their concrete board report beats my automated check.* My instrument
+  had produced the evidence (10 stale-pregame, 17 unknown) and I read it as a
+  scoping curiosity instead of an outage. Third occurrence.
+- Lane REMAINS OPEN.
+
+### soccer-live-game-state — CLOSED-VERIFIED 2026-08-16 18:56Z — a kicked-off match is no longer `pregame`, and no finished match carries an edge
+- **Verification RAN and PASSED**, on production artifacts stamped after the
+  18:54:37Z deploy:
+  - soccer `by_state` `{live 0, final 0, pregame 49, unknown 17}` →
+    **`{live 4, final 11, pregame 34, unknown 17}`**; games past kickoff still
+    marked pregame **10 → 0**.
+  - **Harmful edges (on a finished game, or on a live game from a pregame
+    projection) across all in-season sports: 0.** Was 27 + 9 on soccer.
+  - MLB's **2 live-aware edges preserved** — the main regression risk, since
+    suppressing those would delete the only genuinely live number on the board.
+  - **The branch is confirmed to have RUN, not just to have produced a zero:**
+    served coverage reads `live_edge_enforced_rows: 36` for soccer
+    (`final` 27 + `live` 9 — matching the pre-fix count exactly) and `0` for MLB.
+- Two deploys, both cut on the LIVE worker SHA: `38ba954c` (state) 18:37:38Z,
+  `a72b4bf4` (enforcement) 18:54:37Z. Measurement in `deploys.md`.
+- **Deploy 1 alone was NOT enough and the sweep is what said so.** With states
+  finally correct, 36 rows still carried edges, because
+  `soccer_projections._price_against_market` opens `if model_prob is None:
+  return` while `_mean_projection` sets `model_prob_over: None` alongside
+  `edge_vs_line` — so every mean-based row returned before the refusal whose own
+  comment claimed it ran "for every row, mean-based and probability-based alike.
+  Checked rather than assumed."
+- Fixed at `board_enrichment.attach_projections`, not in the producer: thirteen
+  return sites across seven sports, and that wrapper already exists for exactly
+  this argument. It also covers `soccer_projections.py` **without editing it**,
+  so the orphaned lane's claim on that file was never crossed — the file is
+  unmodified.
+- Claim override taken on `syndicate/features/soccer/cards.py` only, logged at
+  lane open: `soccer-model-coverage` is ORPHANED (owning session absent from a
+  40-entry census incl. archived).
+- Near-miss worth keeping: the first draft used `isinstance(row, Mapping)` in a
+  module that does not import `Mapping` — a `NameError` on the FIRST row that
+  would have taken the whole projection join down. Caught by running it.
+- Files: `syndicate/features/soccer/cards.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_soccer_cards_live_state.py`, `tests/test_live_edge_enforcement.py`,
+  `tests/test_projection_degeneracy.py` (one exact-dict assertion widened).
+
+- **ROOT CAUSE FOUND 2026-08-16 ~18:2xZ — the freeze WRITER and the grading READER are on two different trees, separated by one path segment (`source_artifacts/`).**
+
+      WRITER  `_freeze_oddsapi_pregame_markets`, market_dir = source_root/data/market/oddsapi
+              source_root = REPO_ROOT/data/mlb_source   (`refresh_odds_sources.py:666`, passed as --source-root)
+              => <checkout>/data/mlb_source/data/market/oddsapi/
+              git-tracked files there: **0**
+
+      READER  `_odds_paths` -> <root>/market/oddsapi, root[0] = MLB_BETTING_DATA_ROOT
+              = /opt/render/project/data/mlb_source/source_artifacts/data   (all three services)
+              => .../mlb_source/source_artifacts/data/market/oddsapi/
+              git-tracked `*_pregame.json` there: **27, newest 2026-07-08**
+
+- **That single fact explains both halves of this lane.** (1) `frozen_doc` is read back from the WRITER's tree, which git tracks as EMPTY — so every deploy recreates the checkout without it, `frozen_doc` comes back `{}`, and the merge (monotonic by construction) reseeds the freeze from live-only-pregame. (2) The grading builder reads the OTHER tree, whose newest sealed game-lines file is from **July 8** — so ~14 of 15 games warn `Missing game-line match` and exactly one grades, on every date.
+- **The merge code is NOT at fault and should not be edited.** `_merge_pregame_game_lines` seeds `frozen_games` from `frozen_doc` and only ever adds or updates. Given a readable `frozen_doc` it cannot shrink. The observed shrink is proof the input was empty, not that the merge is wrong.
+- **EVIDENCE for the deploy-reset half, stated at its real strength (n=1 on the transition):** refresh-worker deployed 6x between 16:46Z and 18:07Z. Freeze read **14 games at ~17:52Z** -> **8 games at 18:12Z** (7 of the 8 still pregame), with `cf467794` going live **18:07:36Z** between the two reads. Re-read at 18:18Z with no new deploy: still 8/7, i.e. steady between deploys. That is consistent, not conclusive; `7b544eb4` was still building and its landing is the next free test.
+- **INSTRUMENT NOTE — I corrected myself mid-check.** I nearly concluded `market/` is absent in production because `/api/ops/artifacts/export` shows 3466 files under `mlb_source/source_artifacts/data/` and **zero** containing `/market/`. That endpoint runs on WEB and reads WEB's disk; the grading builder runs on refresh-worker and reads ITS disk. Separate disks (three-service architecture). The zero is real for web and says nothing about the worker. Not usable as evidence for the reader's tree.
+- **`market/*.json` IS allowlisted** (`artifact_publisher.py:78`, `*_source/source_artifacts/data/market/*.json`, and fnmatch's `*` crosses `/`), so the absence on web is a publish/transfer question, not an allowlist one. Unresolved and NOT needed for the diagnosis above.
+- **STILL OPEN, and it is the fix decision:** which of the two trees is meant to be canonical. Either the writer should target `source_root/source_artifacts/data/market/oddsapi` (write where the reader looks), or the reader's root should include the checkout tree. Do not guess — `--artifact-root` already exists on this script (`_local_source_artifact_root("mlb")`) and a publish step may be the intended bridge. Whichever way, the freeze must live somewhere a deploy does not wipe.
+- **The scheduled check `grading-freeze-payload-check` (2026-08-17 07:00 CT) was rewritten** to predict the collapse rather than the full slate, and now carries the `_odds_data_roots()` exoneration so it is not re-opened.
+
+- **FIX BUILT AND TESTED 2026-08-16 ~18:5xZ — NOT DEPLOYED, and it is INERT until it is.** `scripts/refresh_mlb_oddsapi.py`:
+  - New `_freeze_market_dirs(source_root)` returns every `market/oddsapi` the freeze must live in: the writer's own tree (unchanged, and first — it is where the live doc it merges from is fetched to), **`<MLB_BETTING_DATA_ROOT>/market/oddsapi`**, and `source_root/source_artifacts/data/market/oddsapi` for env-less callers.
+  - **Derived from the SAME env var the reader uses, deliberately not hardcoded to `source_artifacts`.** `_odds_data_roots` resolves odds from `MLB_BETTING_DATA_ROOT`; a hardcoded second layout would silently diverge again the next time that var is repointed, which IS this bug.
+  - **Seed from every copy, not just this tree's** — `frozen_doc` is now the union of all existing seals (merged at `now_epoch=0.0` so started games carry across rather than being dropped by a pregame test that should only apply to the LIVE doc). Without this, writing to the right place still loses the slate on the next deploy.
+  - `_ensure_dir` on every destination parent. Only `snapshot_dir` was ensured; the reader's tree on a fresh disk would have raised and taken the whole freeze down with it.
+  - `_merge_pregame_game_lines` UNTOUCHED. It was never at fault.
+  - Contract change: `copied` is keyed by FULL PATH, not basename — the copies share one filename, so a name-keyed dict reported one and hid the rest. It surfaces as `frozenPregame` in the run payload, which is where this fix gets verified in production.
+- **TESTED: 419 passing.** 59 (freeze + odds-paths + odds-sources orchestrator) and 360 + 13 subtests (mlb market board, mlb refresh runner, live refresh loop). 3 new tests added in `tests/test_oddsapi_pregame_freeze.py::FreezeReachesTheGradingReaderTests`.
+- **NON-VACUITY VERIFIED, and it mattered.** The 3 new tests were re-run against a simulated pre-fix `_freeze_market_dirs` (single directory): **all 3 fail**. Without that check `test_freeze_lands_in_the_source_artifacts_tree` could have passed for the wrong reason.
+- **A test-result correction worth keeping:** the first adjacent run exited 0 with no FAILED/ERROR lines, but 464KB of worker debug output had swallowed the pytest summary. Exit code alone does not separate "all passed" from "collected oddly" — re-ran in batches to get real counts rather than bank the zero.
+- **TWO LIMITS, STATED:** (1) `autoDeploy` is off, so this ships nothing until someone deploys — the 2026-08-17 07:00 CT check will measure the OLD behaviour unless a deploy lands first, and a deploy kills any in-flight sim. (2) **Forward-only.** It seals future slates; it does not repair the already-collapsed freezes for 08-09..08-16. `scripts/backfill_pregame_game_lines.py` is the tool for that and is untouched.
+
+### ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: stop the intermittent, or name a real defect.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- **Three hypotheses written before testing, ALL FALSIFIED:** (1) deferred tab
+  handler — `activateTab` is a synchronous `classList.toggle`; (2) selection lost
+  because cards lack ids — all 16 ncaaf cards have ids; (3) the probe's click
+  triggers `refreshOnFocus` — 0 refresh fetches after the click in 10/10 runs,
+  10/10 passed.
+- **NOT REPRODUCED** in 10 scripted attempts or any probe run since. The cause of
+  the single instance stays UNKNOWN and is recorded as such.
+- Real mechanism found, previously unguarded: `game_board.js` polls every 30s and
+  does `cardsGrid.innerHTML = fresh.innerHTML`, detaching every node the check
+  holds, while the check sampled panel state exactly ONCE after `click()`.
+- Fixed: the failure now prints WHY (error type, or `active=[…] h=…px`) — the
+  primary fix, since `tab click identity` cost this whole investigation; the
+  check waits on the outcome (2000ms/100ms poll) and retries once on staleness;
+  a no-measurement result carries `ok: False` explicitly.
+- Verification: 85 tests pass (80 + 5). Live run exit 0/OK with ncaaf 4 / nfl 4 /
+  mlb 3 tabs all ok at attempts=[1,1,1,1] — the retry never fires, correct for a
+  synchronous handler.
+- Process note: the failing artifact was OVERWRITTEN by the clean re-run and
+  never committed, so its detail is unrecoverable. Keep a failing artifact under
+  a separate name before re-running.
+- Blocked by: none
+
+### layer1-board-coverage — SCOPE ADDED 2026-08-16 20:0xZ — the HR threshold ladder
+- Additional file claimed: `vendor/mlb_bettingv2/tools/daily_update.py` (the HR
+  threshold counters and `_hr_row`). Checked against every OPEN lane: unclaimed.
+  `prop_projections.py` is already this lane's.
+- Goal: `batter_home_runs` at lines 1.5 and 2.5 stops being 0% projected.
+  **504 dark rows**, the single largest coverage gap on the MLB board.
+- **The cause, read from the emitter's own key table** (`daily_update.py:4452`):
+  five stats go through the ladder helper and HR does not.
+      _inc_ge_thresholds("hits", pid, h, 3)
+      if hr >= 1: _inc_ge("hr_1plus", pid)          <- HR, single threshold
+      _inc_ge_thresholds("hits_runs_rbis", pid, hrr, 5)
+      _inc_ge_thresholds("runs", pid, rr, 3)
+      _inc_ge_thresholds("rbi", pid, rbi, 4)
+      _inc_ge_thresholds("total_bases", pid, tb, 5)
+  `hr_2plus`/`hr_3plus` are never counted, `_hr_row` emits only `p_hr_1plus`,
+  and the consumer refuses anything but line 0.5 outright
+  (`prop_projections.py:366`). Three layers agreeing on a limit none of them
+  needs — the model simulates HR per plate appearance and P(HR>=2) falls out of
+  the same counter.
+- Falsification test: if `hr_2plus` is counted and published and the board still
+  shows 0 projections at line 1.5, the consumer is not the only remaining
+  blocker and the artifact join needs looking at instead.
+- **Verification requires a SIM RUN, not just a deploy** — the counters only
+  change what a new sim writes, so an existing artifact will not gain the field.
+  Stated up front so a green deploy is not mistaken for a working fix.
+- Blocked by: nothing to build; verification blocked on the next MLB sim cycle.
+
+### ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: a PEER DEVIATION failure requires n>=3; thinner groups still reported.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Evidence: a run failed at 30.9% on an n=2 Live group (2 cards at 41 pairs,
+  312px apart) while the n=6 group on the same board sat at 82px. Minutes later
+  only ONE card remained at 41 pairs — transient pairing from MLB live
+  enrichment, which gives a card a passing pair count that can coincide with an
+  unrelated card's. Three runs after: green.
+- **Falsification test held:** had the n=6 groups also been over budget, group
+  size would not be the discriminator. They were not — 82px vs 312px.
+- `tieFloor` now returns the FULL per-group list. Required, not cosmetic: with
+  only worst+largest the gate would skip a genuine n=6 group hiding behind a
+  thin n=2 one with a larger spread. Pinned by a test.
+- Verification: 91 tests pass (85 + 6). Three consecutive live runs OK, zero
+  over-budget failures, all four baselined rows unchanged.
+- **Deliberate trade, recorded:** a defect isolated to a card with fewer than 3
+  same-content peers no longer carries a verdict, though it is still printed.
+- Does NOT make MLB baselineable — that number still read 81..312px across the
+  day. Tomorrow's scheduled pre-game run tests that separately.
+- Blocked by: none
+
+- **CHECKPOINTED 2026-08-16 ~21:0xZ — STATUS: fix BUILT + TESTED + PUSHED TO A BRANCH, NOT DEPLOYED, NOT ON `main`.**
+  - Durable copy: **`origin/wip/grading-blocker-freeze-fix` = `8ad48ac8`**, verified on the remote by content (fix 2 occurrences, `FreezeReachesTheGradingReaderTests` present, handoff blob `9e6fc894` == local).
+  - **Four earlier commits of this lane went unreachable** (`61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46`) — `main` was rewritten under the session. Everything was re-landed from the working tree. See `learnings.md` 2026-08-16 "a local commit on this worktree is not durable".
+  - Deploy runbook: `.syndicate/handoff_deploy_freeze_reader_tree.md`. **Must be executed by an ATTENDED session** — this one is a scheduled-task run and must not fire deploys.
+  - **NEXT ACTION:** merge the wip branch (or cherry-pick `8ad48ac8`), then follow the handoff — both workers in one lull, ROUTE ONE warm-up, verify by content — and re-aim `grading-freeze-payload-check` from date 08-16 to 08-17 firing 08-18, because as armed it reads a date the fix cannot affect.
+
+### sim-scheduling — **DEPLOYED AND MEASURED 2026-08-16 21:2xZ.** `#441` verified live; `#445` shipped but unverifiable today; layer2 (both halves) shipped and measured — session: sim-scheduling
+
+- **Two deploys, each cut on that service's OWN live SHA, never on `main`:**
+  - refresh-worker `c324447d` (20:33:23Z) — `#445`, `#441` position-2 + skip
+    logging, layer2 producer. Later superseded by another lane's `a9e5d3d6`
+    (20:50:14Z), which DESCENDS from it and preserves both fixes (checked).
+  - web `73e59f51` (21:21:05Z) — the three `syndicate/features/shared/` modules
+    (`layer2_board`, `opportunity_signals`, `book_shortlist` NEW). Layer 2's UI
+    files were ALREADY live; verified per file by blob rather than assumed.
+- **VERIFIED:** `#441` at dispatch position 2 in the running process; layer2
+  `no_bettable_book` / `repriced_to_bettable` non-zero on 3 sports on the served
+  payload. Numbers in `state.md` and `deploys.md`.
+- **DEFECT I SHIPPED AND ITS CLOSURE:** `c324447d` landed a caller without its
+  callee; ~17 min of zero layer2 rows, hidden by a per-sport `except`. Closed by
+  `a9e5d3d6`. Full rule in `learnings.md` (check BOTH directions across a cut
+  call boundary; ship callee-first).
+- **NOT DONE / handed on:**
+  - `#445` — cannot be closed until an ncaaf projection dispatches or the season
+    opens (~08-29). Two readings still unseparated; see `todo.md`.
+  - `#447` (NEW) — 6 `test_layer2_shortlist_wiring` tests are RED on live AND on
+    `main`. `main` is a strict subset of live (6 vs 7), which was enough to clear
+    the deploy as "not a regression" and is NOT a clean bill of health. Unowned.
+  - `#443` — stale-PID silent stall. Still open, still unowned.
+  - Layer 1 board lane needed NOTHING from me: its fix was already live and its
+    falsification test had passed.
+- **Files touched (all committed, worktree clean):** `scripts/fetch_nfl_pbp.py`,
+  `scripts/run_refresh_worker.py`, `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `syndicate/features/shared/live_refresh_loop.py`, `syndicate/features/nfl/sources.py`,
+  `scripts/census_kickoff_hours.py`, `scripts/watch_branch_overlap.py`, plus tests.
+- **Plan artifact:** `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`) —
+  phases 0/1 landed, phases 2-9 untouched.
+
+### game-shape-capture — UPDATE 2026-08-16 ~23:0xZ (checkpoint) — **PRIMITIVE COMMITTED `af3017e6`; EMIT STILL BLOCKED; HANDOFF SENT**
+
+- **Committed:** `af3017e6` — `game_shape.py` (356 ln) + `test_game_shape.py`
+  (332 ln), 2 files / 688 insertions / **0 deletions**, through an isolated
+  `GIT_INDEX_FILE` with the file-count and deletion guards asserted in the same
+  shell. Reachability asserted after the fact (`merge-base --is-ancestor`) —
+  see below for why that step is not optional.
+- **THE FIRST COMMIT (`87ffffd2`) WAS ORPHANED WITHIN MINUTES.** Another session
+  moved local `main` to a commit not descending from it. Blobs were verified
+  byte-identical (`rev-parse <sha>:<path>` vs `hash-object`) and re-committed as
+  `af3017e6`. **`05f7d8fb`, another lane's wnba commit, was orphaned by the same
+  move and is NOT recovered here** — it belongs to that lane and `origin/main`
+  carries a different wnba commit (`e9fdcf98`). Rule filed in `learnings.md`.
+- **`commit-guard` blocked twice**, both times on stale shared-index reverts that
+  were not mine (5 ledger files, then 5 more incl. 182 dropped lines of
+  `live_refresh_loop.py`). Disarmed path-scoped, index-only. **Its fix list was
+  incomplete BOTH times** (`scheduled_task_ncaaf_445.md`, then `deploys.md`);
+  every remaining staged path was audited by hand for on-disk/in-HEAD status.
+  Other sessions' legitimate staged work was left untouched throughout.
+- **HANDOFF SENT** to session `Layer 1 board coverage audit (fork 2)`
+  (`local_c83b3d44-…`), which holds both `mlb-live-gameline-distributions` and
+  `wnba-live-tier`: the two-line change (bind `situation` INSIDE the existing
+  `try` so the bare-except semantics are unchanged; one `"gameShape"` key on the
+  return) plus the guarded helper. **No reply yet.** They may decline; the
+  primitive stands either way.
+- **STILL BLOCKED, and the lane's verification has NOT run.** No production data
+  has passed through this code. Every bucket count is **n=0**. Do not read
+  "committed and tested" as "working in production".
+- **Local `main` is ahead 1 / behind 2 of `origin/main` — `af3017e6` is NOT
+  PUSHED.** That is the single largest risk to this work surviving.
+- Blocked by: `mlb-live-gameline-distributions` (emit half only).
+
+#### game-shape-capture — ORPHANED A SECOND TIME, THEN ANCHORED `[2026-08-16 ~23:1xZ]`
+
+`af3017e6` was orphaned **again** while this checkpoint was being written —
+local `main` was hard-reset to `origin/main` (`git status -sb` went from
+`ahead 1, behind 2` to level). Twice in one session, two different sessions'
+commits, so **re-committing onto `main` is not a fix; the next reset takes it
+too.**
+
+**The work is now anchored on a real ref: branch `lane/game-shape-capture` ->
+`af3017e6`.** A ref makes the commit reachable, immune to any `main` move, and
+safe from gc — and it costs nothing and touches no other session. Blobs
+re-verified against disk (`95035c9a…`, `907b4d4e…`). **`game_shape.py` is NOT
+in `main`/`HEAD` and NOT on `origin/main`.**
+
+**NEXT ACTION for whoever picks this up:** get `lane/game-shape-capture` onto
+`origin/main` (cherry-pick or merge, then push) — until then this work exists
+only in this worktree.
+- **CHECKPOINT 2 — 2026-08-16 ~22:3xZ. DEPLOY AUTHORISED, ARMED, NOT FIRED.**
+  - Fix is on `origin/main` (blob `426bbd70`, `_freeze_market_dirs` = 2) and **not live** on either worker (both `f471b0d2`, = 0). Verified by blob, not ancestry.
+  - User authorised this unattended session to fire it ("fire it"), logged as an OVERRIDE in `learnings.md` with scope bounded to this one deploy. **The override does not suspend the job gate.**
+  - Not fired because both workers read HOLD at every check — refresh-worker 5 jobs incl. `run_mlb_daily_sim_job.py`, live-odds-worker 3 jobs.
+  - **User constraint: do not fire if it slips past 08-17 first pitch.** Watch `bs8qocgqt` has two exits, `DEPLOYABLE` and `DEADLINE`; a resolver error counts as expired so an instrument failure cannot authorise a deploy. Deadline is measured from the production 08-17 snapshot, on a conservative 16:00:00Z floor until that feed populates (it currently holds 0 games).
+  - `grading-freeze-payload-check` re-aimed to **date 08-17, firing 08-18 07:00 CT**, and gained Gate A: prove by content that the fix was RUNNING for the whole slate, else VOID rather than FAIL.
+  - **NEXT ACTION:** if the window opens before first pitch, deploy both workers per the handoff doc (ROUTE ONE warm-up, one service at a time, verify by blob). If it does not, do not fire — let Tuesday's check return VOID and deploy for a later date.
+
+#### game-shape-capture — **PUSHED AND VERIFIED ON `origin/main` `597f4a80`** `[2026-08-16 ~23:2xZ]`
+
+Supersedes the two orphaning entries above: the work is now durable off this
+worktree.
+
+- **`dff358bb..597f4a80` on `origin/main`.** Built with plumbing directly on
+  `origin/main`'s tip (`read-tree` into an isolated index -> `write-tree` ->
+  `commit-tree -p origin/main` -> `push <sha>:main`), so it touched **no**
+  working-tree file, **not** local `main`, and **not** the shared index — the
+  three things that had already destroyed this commit twice.
+- **Guards asserted before the push, in the same shell:** diff vs `origin/main`
+  is exactly 2 files / **688 insertions / 0 deletions**, and the new commit's
+  parent IS `origin/main` (checked by `rev-parse`, not assumed).
+- **Verified AFTER the push, by re-fetch:** both paths present on `origin/main`;
+  blobs byte-identical to disk (`95035c9a…`, `907b4d4e…`); **0 carriage returns**
+  in the pushed blob — relevant because `origin/main`'s previous tip
+  (`dff358bb`) was itself a warning that the commit recipe is the CRLF vector.
+  That vector is `git hash-object --stdin` WITHOUT `--path`, which this recipe
+  does not use.
+- **`lane/game-shape-capture` re-anchored to `597f4a80`.**
+- **A useful side effect:** the resets that orphaned this work twice were to
+  `origin/main`. Now that the commit IS on `origin/main`, the next such reset
+  DELIVERS these files instead of destroying them.
+- **UNCHANGED BY THE PUSH — do not read this as progress:** nothing emits
+  `gameShape`, the lane's verification has not run, and **every bucket count is
+  still n=0**. The handoff to `Layer 1 board coverage audit (fork 2)` is
+  unanswered.
+
+#### game-shape-capture — WNBA EXTRACTOR ADDED `[2026-08-16 ~23:4xZ]` — **primitive done, emit blocked by the SAME session as MLB's**
+
+**WNBA is a DIFFERENT job from MLB and the plan understated it.** MLB was
+serialisation — `LiveSituation` existed in full and was discarded. WNBA has no
+state vector at all, so this derives one.
+
+**MEASURED, from a real in-progress game** (`data/live/wnba_cards_context_2026-06-05.json`,
+DAL @ LAS, period 4, clock `"7:43"`, 84-83):
+- `live_state` carries `period`, `clock`, `home_pts`, `away_pts`, `in_progress`,
+  `final`, **and a per-quarter `periods` array** — richer than expected, and the
+  per-quarter array is real run-detection material.
+- **The team objects carry ONLY branding** (`abbr`, `logo`, `name`, colours).
+  **No FGA / TOV / OREB / FTA anywhere**, and `basketball_props_features`'
+  column map is box-score totals with no pace column either.
+- **CONSEQUENCE: possession pace is NOT derivable and this module refuses to
+  fake it.** The field is `points_per_minute` (scoring pace) and every record
+  carries `possession_pace_available: False`. Naming it `pace` would let a
+  reader join it to a possession-pace prior and be silently wrong. A test
+  asserts the key `pace` does not exist.
+
+**A SECOND FIND THAT CHANGED THE DESIGN: the derivation ALREADY EXISTS.**
+`wnba/cards.py:891 _wnba_elapsed_minutes` is correct and complete (10-minute
+quarters, 5-minute OT, regulation 40 — *not* NBA's 48), **and its own comment
+says it was relocated once specifically so two copies would not drift apart.**
+That file is claimed (by `clamp-fix-to-workers`, with a logged override from
+`wnba-live-tier`), so I could not consolidate into it.
+- Resolution: implemented in `shared/game_shape.py` **parameterised** by quarter
+  length so it serves NBA (12) as well as WNBA (10), and **pinned to the
+  existing function by a drift test** that asserts agreement across a 143-cell
+  grid of periods x clocks, including the REJECTION cases. Being more permissive
+  would itself be the drift. Mutation M5 (accept a bare `"7"` as `7:00`) fires it.
+- **Owed follow-up, needs the claimed file:** have `cards.py:891` delegate here,
+  so there is one copy again.
+
+**NON-VACUITY VERIFIED BY MUTATION, 7 of 7 caught:** NBA given WNBA's 10-minute
+quarters (1 fail), dropping the `status` period/clock fallback (1), unsupported
+sport silently defaulting to WNBA (1), reusing baseball margin bands (2),
+permissive clock parsing (1), pace dividing without the `>0` guard (1), run
+detection including the in-progress period (1). **34 tests green** (19 MLB + 15).
+
+**Margin bands are deliberately NOT MLB's** — basketball uses <=5 / <=10 / <=19
+/ 20+. A 3-point basketball game is `close`; the baseball scale would call it a
+blowout, which would put nearly every live game in one cell and measure nothing.
+
+**EMIT BLOCKED, same session as MLB's.** The `live_state` producer is
+`_public_scoreboard_live_state_payload` (`wnba/cards.py:3679`) — the exact
+function `wnba-live-tier` took under a logged claim override 23:2xZ, in the same
+session (`Layer 1 board coverage audit (fork 2)`) that holds
+`mlb-live-gameline-distributions`. **One session gates both sports' emits.**
+- **UNVERIFIED, and it is the whole point:** no production data has passed
+  through this code. Every bucket count is **n=0** for WNBA too.
+
+#### game-shape-capture — NFL/NCAAF ADDED, **AND THE NFL EMIT ACTUALLY LANDED** `[2026-08-17 ~00:0xZ]`
+
+First sport whose producer was NOT held by another lane. Claim re-checked
+immediately before the edit (the rule this lane learned the hard way at 23:0xZ),
+`live_game_state` unclaimed in `lanes.md`.
+
+**A THIRD DISTINCT SITUATION — the plan's field list was wrong again (3 for 3).**
+It promised down/distance/field position/timeouts/`pace_secs_play` from a grep.
+Measured:
+- NFL's `_state_from_event` captures `period`, `clock`, `away_pts`, `home_pts`
+  **and nothing else** — no down, distance, field position or possession.
+- **BUT `_fetch_scoreboard` returns the WHOLE ESPN event JSON**, whose
+  competitions carry a `situation` block that **nothing in `nfl/`, `ncaaf/` or
+  `football/` reads** — the only `down` references in the tree are the sim
+  engine's internal `play_state` and the historical loaders, neither on the live
+  path. **Discarded, not absent** — the MLB pattern, and free to fix.
+- **`pace_features.py` IS NOT LIVE.** It reads `game["pace_features"]`, a
+  season-level secs/play feature for the pregame drive priors. Joining it to a
+  live record as in-game tempo is a silent category error.
+- **NCAAF HAS NO LIVE-STATE PRODUCER AT ALL** (no `live_game_state` analog).
+
+**TWO SPORT RULES THAT WOULD HAVE BEEN SILENTLY WRONG:**
+1. **NCAAF overtime is UNTIMED** — alternating possessions from the 25, no
+   clock. Reusing NFL's timed-OT branch would invent a 15-minute period that
+   does not exist and report a confident elapsed time. NCAAF OT returns
+   `elapsed_minutes: None` and the record stays valid. Mutation F2 fires on it.
+2. **NFL regular-season OT is 10 minutes, not 15.** Mutation F3 fires.
+
+**MARGIN BANDS ARE IN SCORES, NOT POINTS** (<=8 / <=16 / <=24 / 25+). An
+8-point football game is ONE possession; the basketball scale calls it
+`moderate` and baseball's calls it a blowout. Three sports, three units — a
+test asserts the same 8-point gap buckets differently in football vs basketball.
+
+**THE EMIT (`nfl/live_game_state.py`):**
+- `_state_from_event` now keeps `situation`, **on live games only** — a
+  `situation` on a finished game is a feed artefact and would render "3rd and 7"
+  hours after the whistle, the same class of defect as the 0-0 placeholder score
+  that file already guards against. Mutation E1 fires on it.
+- `attach_nfl_live_game_state` attaches `live_state["game_shape"]` behind a
+  function-local import and a bare except, so a failure costs the shape block
+  and nothing else. The cards board is the product.
+- Tests call the REAL `attach_nfl_live_game_state`, not a stub — that file's own
+  docstring warns that asserting a field is SET only proves presence.
+
+**66 tests green** (46 shape + 20 NFL, up from 15). **10 of 10 mutations caught**
+— 7 on the primitive (football quarters inheriting basketball's 10, NCAAF OT
+treated as timed, NFL OT at 15, point bands reused, absent situation reading as
+"not in the red zone", out-of-range situation values stored, `margin_in_scores`
+flooring instead of ceiling) and **3 on the emit** (stale situation on a finished
+game, shape built without the situation so the capture does nothing, shape never
+attached).
+
+**UNVERIFIED, and this is the part not to misread.** NFL is the first sport with
+a live emit PATH; no production slate has run through it. **n is still 0.**
+NCAAF has the contract and **no producer**, season opens 08-29, so nothing there
+is verifiable today — a ready rules entry is not coverage. No deploy requested.
+
+### ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 2026-08-16 (retroactively, see below) — session: sim-engine-track
+- **PROTOCOL GAP, RECORDED NOT HIDDEN:** the collision check was run before any
+  edit (both files CLEAR), but the lane entry itself was never written until
+  checkpoint. The claim was made and not published, so for ~40 minutes another
+  session could have taken `generate_smartsim2_ncaaf_projections.py` without
+  seeing a conflict. No collision occurred; the exposure was real anyway.
+- Files: `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `tests/test_ncaaf_schedule_fallback.py` (new).
+- **Goal met:** an absent engine schedule reaches the CFBD fallback instead of
+  raising. `load_engine_schedule` returns `[]` and logs `ENGINE_SCHEDULE_ABSENT`.
+- **The fallback was already written, already correct and already called** — its
+  own docstring names this case. It was unreachable because the read raised.
+  Four lines.
+- **The fix this lane did NOT make, deliberately:** re-pointing the hard-coded
+  2025 filename at 2026. No 2026 file exists, nothing writes one, all 278 in the
+  checkout are 2025 — it would rate 2026 from 2025 predicted totals, silently
+  wrong rather than loudly broken. My own `#445` ticket proposed exactly that;
+  see `learnings.md` on reasoning by analogy from a just-solved defect.
+- **Verification:** 5 new tests, two guarding the FALLBACK rather than the change
+  (FBS-vs-FBS only; rows missing a team), because a widened slate would alter
+  which games get projected rather than merely keeping the run alive.
+  295 passed / 0 failed across `-k ncaaf`.
+- **UNVERIFIED and handed over:** that CFBD `/games` returns rows for
+  `season=2026 week=1` in production. Not called against the live API, and not
+  deployed. Check when this ships.
+- Blocked by: none.
+
+### nfl-pbp-fetcher — **CLOSED-VERIFIED 2026-08-16 18:31:15Z — pbp_2025.csv written on the mounted disk (97,951,481 bytes, 46,452 REG plays) and the guard stopped refusing. `#441` FIXED.** — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. A pbp ingestion path exists, so the NFL SmartSim2 projection has
+  real ratings again instead of refusing for 2.8 days.
+- Files (exclusive to this lane): `scripts/fetch_nfl_pbp.py` (new),
+  `tests/test_fetch_nfl_pbp.py` (new). Collision check RUN: CLEAR on both.
+  `scripts/run_refresh_worker.py` (autorun wiring — claimed 2026-08-16 after a
+  fresh collision check: CLEAR, no OPEN lane holds it).
+- **Root cause is SETTLED by measurement, not assumed** (`a775e372` diagnostic,
+  17:10:45Z): the pbp is absent from all four candidate roots including the
+  mounted disk, env vars reach the subprocess, strict storage is on. There is no
+  pbp fetcher in this repo — ten scripts reference pbp, all reads.
+- **THE FILE THAT ACTUALLY MATTERS IS pbp_2025.csv, NOT 2026.** The 2026 regular
+  season has not started, so there are no current-season plays for week 1;
+  `assert_ratings_data_available` accepts current OR prior, and NFL ratings for
+  wk1 come from the prior season (`prior_season_fallback`, the mechanism
+  `verify_nfl_autorun_obligations.py` was written to check). A fetcher that only
+  pulls the current season would ship and change nothing.
+- Template: `fetch_nfl_schedule.py` (nflverse games.csv), plus the roster and
+  depth-chart fetchers. Write under `nfl_artifact_output_root()` — the `#389`
+  resolver — NOT under `default_nfl_source_root()`, which resolves to the
+  ephemeral checkout.
+- **REFUSE TO INSTALL A DEGENERATE FILE.** Same philosophy as the guard this
+  feeds: validate required columns and non-zero REG rows BEFORE replacing an
+  existing file, so a truncated or schema-changed download cannot overwrite a
+  good one. Write atomically.
+- Hypothesis: with pbp_2025.csv present on the mounted disk, the next autorun
+  writes a real artifact with non-identical rows per game.
+- Falsification: if the artifact still refuses, or writes with IDENTICAL rows for
+  every game, the ratings path is broken for a second reason and the fetcher is
+  not sufficient.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring; the artifact
+  appears with a fresh mtime AND per-game variance (identical rows would mean the
+  guard was satisfied wrongly).
+- Blocked by: none. `#443` (stale PID stalls the autorun ~45 min per restart)
+  will DELAY observation and is not a blocker.
+
+
+#### CLOSED-VERIFIED 2026-08-16 18:31:15Z
+- **Verification ran and passed, on the real success condition rather than a proxy.**
+  `season 2025: status=written, bytes=97,951,481, reg_plays=46,452` to
+  `/opt/render/project/data/nfl_source/tracking/nflverse/pbp/pbp_2025.csv`, and
+  `NO PLAY-BY-PLAY` has not recurred since. The generator ran again at 18:31:43
+  and did not refuse.
+- **The lane's own falsification test did NOT fire:** "if the artifact still
+  refuses, the fetcher is not sufficient." It stopped refusing.
+- **2026 returned 404 and that is CORRECT** — the season has not started. The
+  lane predicted this ("the file that actually matters is pbp_2025.csv"), which
+  is why `--season` fetches the prior year by default. A current-season-only
+  fetcher would have shipped, 404'd, and changed nothing.
+- **Two bugs caught pre-ship:** a ~300MB memory transient on a service at 95% of
+  cap (rewritten to stream), and `gzip.decompressobj` which does not exist (it is
+  `zlib`) — that one would have crashed every real fetch.
+- **One regression I caused and reversed:** default-ON broke three
+  `test_main_run_once_*` contracts; confirmed mine against a clean-HEAD worktree,
+  now default-off like every sibling.
+- **One overstatement corrected:** "starved" was wrong; a 23-minute delay at
+  position 6 is not `#341`'s weeks of muteness. Position-2 move stands as an
+  improvement, not a fix.
+- **Files released:** `scripts/fetch_nfl_pbp.py`, `tests/test_fetch_nfl_pbp.py`,
+  `tests/test_nfl_pbp_fetch_autorun.py`, `scripts/run_refresh_worker.py`.
+- **Handover:** `b909d008` (position-2 + skip logging) is on `origin/main`,
+  NOT deployed, rides the next worker deploy. `#443` (stale-PID silent stall)
+  and `#445` (NCAAF hard-coded 2025 input) remain open and unowned.
+
+### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
+- **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
+  - **`closing_detected_at` is present on 21 markets. The new code path ran.**
+    Source: the RAW shard `mlb_source/artifacts/mlb/odds_history/2026-08-15.json`
+    via `/api/ops/artifacts/stream` (46,317,328 B, `last-modified` 02:51:45Z).
+  - **DO NOT RE-RUN THIS CHECK ON `/api/ops/odds-history/inspect`. IT CANNOT SEE
+    THE FIELD.** That handler (`syndicate/blueprints/ops.py:2141`) builds each
+    market summary from a **fixed 10-key literal** — `stored_market_id`,
+    `last_line`, `last_odds`, `history_points`, `history_first`, `history_last`,
+    `is_live`, `closing_line`, `closing_price`, `closing_captured_at`. There is
+    no `closing_detected_at` key in it. The union of keys over all 3,574 returned
+    markets confirms it: the field is absent from the response **regardless of
+    what is on disk**. A `0` from `inspect` is instrument blindness. The earlier
+    `00:3xZ` "zero of 51" reading was almost certainly taken this way (the
+    handover names `inspect` as the step-1 endpoint), which — if so — means it
+    was never evidence either way, independently of the no-opportunity argument
+    already recorded. Not asserted as fact: I did not observe that run.
+  - **THE ASSERTION, on the 21 new-code stamps:** `closing_captured_at <=
+    commence_time` on **21 of 21**, none post-dating. Lead time min 1.1 min,
+    median 75.3 min, max 103.9 min.
+  - **THE CONTROL, in the same payload:** of the 36 stamped markets WITHOUT
+    `closing_detected_at` (pre-fix), **33 post-date `commence_time`** and 3 do
+    not. So the handed-down baseline "EVERY stamped close had
+    `close_age_seconds < 0`" is very nearly right but **not literally true at the
+    shard level — it is 33/36, not 36/36.** Stated because a claim of
+    universality invites a future reader to treat a single passing pre-fix stamp
+    as a fix.
+  - **ATTRIBUTED AT THE CLV-ROW LEVEL** (join `event_id|market|matched_bookmaker`,
+    confirmed by `close_captured_at` identity — note the row's `bookmaker` is the
+    OPENING book, `matched_bookmaker` is the close's book; joining on the wrong
+    one produced `NEW=0, unjoined=48` on the first pass and would have read as a
+    failed fix):
+    - rows off **NEW-code stamps: 30 — all 30 `pregame`, 0 `in_play`**
+    - rows off **OLD stamps: 31 — 26 `in_play` (84%), 5 `pregame`**
+    - 6 unjoined.
+  - **COUNTERFACTUAL:** headline without the 30 re-entered rows would read
+    **n=96, −0.3998**; with them it reads **n=126, −0.3165**. The 30 new rows
+    average **−0.0499**, i.e. genuine pregame closes are materially better than
+    the rows the old code left in.
+  - **STILL FORWARD-ONLY.** The stamp is idempotent on `closing_line`, so the 36
+    pre-fix markets are permanently wrong and 2026-08-15 is a mixed date forever.
+    Generality beyond MLB is UNMEASURED — nfl/wnba resolved 0 rows today, so no
+    other sport exercised this path.
+- **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
+  ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
+  IT IS THE WRONG SIDE'S PRICE.**
+  - Event `dbbb481a…` = **New York Yankees @ Toronto Blue Jays**, first pitch
+    19:08Z. FanDuel h2h `history_first` 06:02:51Z carries
+    `line={away_odds: -186, home_odds: +156}` — our opening of `-186` is the
+    AWAY side, correctly recorded.
+  - The stamped close is `closing_price = 168.0`. In that market's own history
+    the scalar `odds`/`line` field tracks **`entity`**, and `entity` is
+    **`Toronto Blue Jays` — the HOME team**. `+168` is a HOME price (betrivers
+    independently shows home `+165` at the same 20:34 tick).
+  - **So the joiner differenced an AWAY opening against a HOME close.** That is
+    the entire `-27.72`. It is not CLV, not a stale price, and not a late clock.
+  - **Measured across every stamped market, not just this one: `entity ==
+    home_team` on 18 of 18.** So `closing_price` is ALWAYS the home price.
+- **THE DEFECT, in code:** `resolve_close` path 1 takes
+  `market_state.get("closing_price")` as a **side-blind scalar**. Path 2
+  (`last_pregame_quote`) reads the `line` dict and picks `away_odds`/`home_odds`
+  by side — which is exactly why the 100%/100% split fell where it did. The file's
+  own docstring already knew: *"Game keys carry NO side — `entity` names one team
+  … the history point's `line` dict carries BOTH."* Path 2 acts on that; path 1
+  does not.
+  - Consequence: **home-side openings get a CORRECT close; away-side openings get
+    a garbage one.** Whether a given row is wrong depends only on its side, which
+    is why the contaminated bucket had no consistent sign.
+  - `totals` markets carry `home_odds/away_odds = None` entirely (6 of the 18),
+    so over/under has no side resolution on this path at all.
+- **MY SHIPPED FIX WAS RIGHT BY ACCIDENT, AND IT OVER-EXCLUDES. Stated plainly.**
+  Web `4316c907` drops `close_age_seconds < 0` rows from the CLV headline. Those
+  are exactly the `observed_transition` rows, so it removed the side-mismatched
+  ones — **but for a reason that is not the real one**, and it also drops the
+  HOME-side rows on that path, whose closes were fine. The exclusion stays (it is
+  net-correct and named), but its stated rationale in `deploys.md` is now known to
+  be secondary.
+- **The timestamp claim is NOT refuted, just demoted:** `closing_captured_at`
+  20:34:26Z against a 19:08Z first pitch is still 86 minutes late, and
+  `odds_refresh_tracking.py:1602` still writes `now`. Fix the side first; the
+  clock is a smaller, separable error.
+- **SIDE FIX SHIPPED under `clv-without-settlement` (it owns `clv_join.py`):**
+  web `c8810f45` live 21:58:19Z, main `ae0bc968`. 20 away-side openings now
+  refuse the home stamp; `observed_transition` 48 -> 22; `in_play_excluded_n`
+  48 -> 19; `same_book_n` 131 -> 151; headline `-0.3077` -> `-0.2714`,
+  recompute-verified. **THIS LANE'S REMAINING SCOPE IS THE CLOCK ONLY** —
+  `odds_refresh_tracking.py:1602` still writes `closing_captured_at = now`
+  (detection time), which is why a 19:08Z first pitch carries a 20:34Z stamp.
+  That file is still claimed here and untouched.
+- **THE `-29.90` ROW IS EXPLAINED, 2026-08-15 22:2xZ. IT IS NOT A MARKET MOVE.
+  THE ODDS-HISTORY FEED SWAPPED ITS `home_line`/`away_line` LABELS DURING THE
+  DAY, so the same two prices appear under opposite labels.** Event
+  `69928d29…` = Seattle Mariners @ **Houston Astros**, FanDuel spreads:
+
+      history_first 06:02:51Z   away_line -1.5 away_odds +168 | home_line  1.5 home_odds -205
+      history_last  21:26:47Z   away_line  1.5 away_odds -205 | home_line -1.5 home_odds +168
+
+  **Identical prices (-205 / +168). The line labels are transposed.** The market
+  did not move at all — `-205` and `+168` are the two sides of ONE run line.
+- **Why the guard could not catch it.** `_price_for_side` checks the line by
+  NUMERIC EQUALITY (`abs(point_line - opening_line) > 1e-6`). With the labels
+  flipped, opening `home -1.5` matches the close's `home_line -1.5` — which by
+  then is the OTHER bet. The guard is doing exactly what it was written to do
+  and is defeated by an unstable label, not by a missing one. **Equality of a
+  label is not identity of a bet when the label's convention is not stable.**
+- **The openings look self-consistent; the history does not.** Three opening
+  records for that event's spreads: `home +1.5 @ +178` (05:07, kalshi),
+  `home -1.5 @ -183` (07:06, onexbet), `home +1.5 @ +186` (20:40, betopenly) —
+  +1.5 is plus money at both ends of the day. The 06:02 history point calls
+  `home +1.5` **-205**, contradicting them.
+- **SCOPE, measured rather than assumed — and it is NOT the headline killer it
+  looks like:**
+
+      same_book subset        n     mean      median   |clv|>10
+      spreads (line-bearing)  42   +0.515    +0.000       2
+      h2h / totals           128   -0.521    -0.246       0
+
+  The two extreme rows are a **mirror pair from this one event** (`+30.428` on
+  `home +1.5`, `-29.900` on `home -1.5`), because BOTH openings were recorded
+  and each got the other's close. **They nearly cancel**, which is why the
+  spreads mean reads a benign `+0.515` on a median of exactly `0.000`.
+  So: **severe per row, self-cancelling in aggregate.** It corrupts any
+  per-recommendation CLV, any variance or CI, and any "worst bets" list — while
+  leaving the headline roughly intact. h2h and totals are clean (0 of 128).
+- **NOT FIXED, and deliberately not fixed from here.** The defect is upstream of
+  `clv_join.py` (an unstable label in the odds-history feed), the mirror-pair
+  cancellation means it is not urgent for the headline, and a numeric-equality
+  guard cannot be patched into correctness without deciding which source owns
+  the sign convention. **That decision is the next lane**, and it should start
+  from: does the board's published `line` sign agree with the feed's, per sport?
+- **OPEN THREAD, NOT MINE TO CLOSE:** one row survives at `clv_pct -29.90`
+  (`open -205`, `close 168.0`, side **home**, source **last_pregame_quote**) —
+  side-aware path, not a side mismatch. Real move or a third defect, unknown.
+- **REVISED FIX, for whoever takes this:** make path 1 side-aware — resolve
+  `closing_price` through the same `line`-dict logic path 2 uses, and REFUSE
+  (named, counted) when the side cannot be determined rather than returning the
+  entity's price. Then re-run this discriminator and re-derive
+  `in_play_excluded_n`.
+
+- Goal: `closing_captured_at` means the time the CLOSING PRICE WAS OBSERVED, or
+  it is renamed to say what it is. Testable outcome: for every market carrying
+  a closing stamp, `closing_captured_at <= commence_time`, OR the field is split
+  into an observation time and a detection time and every reader is updated.
+- **WHY THIS IS ITS OWN LANE AND NOT AN EDIT INSIDE `clv-without-settlement`:**
+  the fix is in the PRODUCER (`odds_refresh_tracking.py`), the CLV joiner is only
+  a consumer, and `clv_join.py` is claimed by that lane. Changing a stamp that
+  persists in shard files is also a data-shape change, not a display change.
+- **WHAT IS ALREADY MEASURED (2026-08-15, do not re-derive):**
+  - `/api/ops/clv/report` mlb 2026-08-15: **48 of 179 same-book rows** carry
+    `close_age_seconds < 0`, i.e. a closing stamp AFTER first pitch.
+  - Clean 100%/100% split by source: every contaminated row is
+    `close_source=observed_transition`; every clean row is `last_pregame_quote`.
+  - One event: opened `-186`, closing price recorded `+168`, stamped
+    `20:34:26Z` against a `19:08Z` first pitch — 86 minutes late.
+- **I GOT THE MECHANISM WRONG ONCE ALREADY. The correction is the starting
+  point of this lane, not a footnote.** I told the user the recorded price "is
+  already live". **Reading `odds_refresh_tracking.py:1600-1602` says the
+  opposite**: the stamp is guarded on `was_confirmed_pregame` and deliberately
+  records `previous_line`/`previous_odds` — "the value observed the tick BEFORE
+  this one -- not current_line/current_odds, which is already the in-play
+  number." So the PRICE is intended to be the last pregame price. Only
+  `closing_captured_at = now` is the detection tick.
+- Hypothesis: **`closing_captured_at` is the DETECTION time, not the observation
+  time of the price it accompanies.** The price comes from tick N-1 and the
+  timestamp from tick N, so on a ~2h sweep cadence the stamp can post-date the
+  price by a full interval and land after commence. If true, `close_age_seconds`
+  systematically overstates lateness and says nothing about whether the PRICE
+  was pregame.
+- Falsification test: if the recorded `closing_price` for the late-stamped rows
+  is genuinely an IN-PLAY price (not a stale pregame one), then the stamp is
+  honest and the defect is in the `was_confirmed_pregame` gate instead — a
+  different fix in a different place. **Discriminator:** compare each late row's
+  `closing_price` against that market's own history points before commence. If
+  it matches a pregame point, the price is fine and only the clock is wrong. The
+  `-186 -> +168` swing is the case to run first; it is large enough that "stale
+  pregame price" and "in-play price" make visibly different predictions.
+- **THIS LANE CAN INVALIDATE PART OF MY OWN SHIPPED FIX, stated up front so
+  nobody has to discover it.** Web `4316c907` excludes `close_age_seconds < 0`
+  from the CLV headline. If the hypothesis holds, some of those 48 rows carry
+  legitimate pregame prices and are being excluded on a bad clock — the headline
+  would be right to distrust the timestamp but wrong to drop the row. The
+  exclusion stays until this is resolved (a wrong-but-named exclusion beats a
+  silent contamination), but it is **provisional**.
+- Verification: (1) the discriminator above run on at least 10 late rows, with
+  the split reported; (2) whichever fix follows lands with a test pinning
+  `closing_captured_at <= commence_time`; (3) `/api/ops/clv/report` re-read and
+  `in_play_excluded_n` re-interpreted against the finding.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_refresh_tracking.py` — the single write site
+    (`:1602`). Collision check RUN via `lane-guard.py`'s own `_claims()`: CLEAR.
+  - `tests/test_odds_closing_stamp.py` (new). CLEAR.
+  - **NOT claimed:** `syndicate/features/shared/clv_join.py` (held by
+    `clv-without-settlement`) and `syndicate/blueprints/ops.py` (consumer only).
+    If the fix needs either, coordinate rather than edit across the lane.
+- Blocked by: none. **No deploy from this lane without `/preflight`** — a change
+  to a stamp that persists in shard files needs its backfill story decided
+  before it ships, not after.
+
+### spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist (9 away + 3 home, the previously broken case).** File claim released to `layer2-board-quality`; holding session `lane-cleanup` archived 01:14Z — opened 2026-08-15 — session: lane-cleanup → verified by layer2-board-quality
+- **VERIFICATION (2026-08-16 ~16:3xZ, by `layer2-board-quality`).** The one open
+  item — "artifact output still unverified" — is now closed against the SERVED
+  payload (`/api/board/layer2-shortlist`, `written_at` 2026-08-16T16:20:21Z)
+  cross-checked cell-by-cell against `/api/board/book-grid?sport=mlb`:
+
+      away rows agree      9/9      (already correct pre-fix)
+      home rows agree      3/3      (the case this lane fixed)
+      total               12/12
+
+  `_side_line_from_cells` confirmed present in the DEPLOYED tree —
+  `git show 97491161:syndicate/features/shared/layer2_board.py` returns 3
+  occurrences, identical to `main`.
+- **THIS LANE'S OWN DEPLOY CLAIM WAS UNPROVABLE BY ANCESTRY, AND ANCESTRY SAYS
+  THE OPPOSITE OF THE TRUTH.** `git merge-base --is-ancestor edbbee9d 97491161`
+  returns **NO**. refresh-worker runs branch `deploy/nfl-pbp-root`, not `main`,
+  so the fix rode in by content while failing every ancestry test.
+  `project_web_runs_a_deploy_branch_not_main` generalises to the WORKERS.
+- **A FALSE 3-of-3 DEFECT CAME OUT OF THIS DATA FIRST; recorded so nobody
+  re-derives it.** The grid carries MIRRORED rows for one (event, market,
+  segment): `row.line=+1.5 / home_cells=-1.5` beside `row.line=-1.5 /
+  home_cells=+1.5`. Joining the shortlist to the grid ON `line` picks the wrong
+  twin and produces a uniform-looking "home side still inverted, 3/3". The
+  discriminating field is the **price vector** — the disputed row's
+  `{leovegas_se:123, prophetx:140, unibet_nl:125, unibet_se:125}` matches
+  `row.line=1.0` (home cells -1.0) exactly, so its `-1.0` is CORRECT.
+  **The lane's original 525-cell result is NOT affected** — it compared cells
+  WITHIN a row, never across mirrored rows.
+- **THIS LANE'S "NO TEMPLATE CONSUMES THE SHORTLIST" IS NOW STALE AND WAS THE
+  BASIS FOR ITS SEVERITY CALL.** Measured 2026-08-16: `layer2_is_primary=True`,
+  `legacy_candidate_count=0`, and **108 of 108** board cards carry
+  `source=layer2_shortlist`. The `grep` over `templates/`/`static/` still returns
+  zero because the wiring is SERVER-SIDE. The blast radius was never limited to
+  the Ask headline; the shortlist is the board.
+- **CLAIM WAS NEVER ENFORCED.** `lane-guard.py`'s `_claims()` yields **zero**
+  claims on `layer2_board.py` from this lane: `FILES_RE` matched the Files header
+  on the colon inside `23:0xZ` (harvesting no paths), and the continuation lines
+  holding the real paths start with a backtick rather than `-`. This lane's note
+  "Collision check RUN … CLEAR both times, so no other lane was blocked by the
+  gap" read CLEAR **because its own claim was invisible**, not because the file
+  was free.
+- **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
+  `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
+  - From the 525-cell result: `cell.home.line == -row.line` and (per-book
+    internal consistency) `cell.home.line == -cell.away.line`. Therefore
+    **`cell.away.line == row.line`, exactly.**
+  - So: **away-side rows are CORRECT** — their price and `row["line"]` describe
+    the same bet. **Home-side rows are INVERTED** — `layer2_board.py:852` pairs
+    `cell["home"]["price"]` with `row["line"]`, which is the away handicap.
+  - That is why the no-arb violation showed up only when comparing a home `-1.5`
+    opening against a home `+1.5` one: both were home rows.
+- **NO TEMPLATE CONSUMES THE SHORTLIST — but chat does, because I wired it there
+  tonight.** `grep` over `templates/` and `static/` for `layer2-shortlist`:
+  **zero hits**; the board still renders `ranked_all`. The one consumer on a
+  user-facing path is `ask_the_syndicate_adapter.py:599`
+  (`_board_top_opportunities`), shipped this session as web `c774fe1a`, whose
+  `_board_row_selection` renders `f"{side} {line}"`.
+  - **Verified live**: the chat headline served
+    `'away -1.5 (San Diego Padres @ Cleveland Guardians)'` — an AWAY row, which
+    is the correct case. **A HOME spreads row in that list would display the
+    away handicap beside the home price.**
+  - **So the user-facing blast radius is: home-side spread selections appearing
+    in the Ask headline.** Narrow, real, and created by my own change tonight —
+    before `c774fe1a` the shortlist had no user-facing consumer at all.
+- **SEVERITY, stated so it is not over- or under-called:** not a board-wide
+  mislabel (the board does not read these rows), not zero either. It also
+  corrupts every home-side spread row in the CLV join, which is where it was
+  found.
+- Files (claimed 2026-08-15 23:0xZ — **claimed LATE, after the edit, which is a
+  protocol lapse of mine; recorded rather than quietly backfilled**):
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_layer2_book_prices_line.py`. Collision check RUN via
+  `lane-guard.py`'s own `_claims()` at edit time AND again now: CLEAR both times,
+  so no other lane was blocked by the gap.
+- **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
+  `_side_line_from_cells` reads the handicap from the same cell as the price;
+  no-op for away/h2h/props; returns None (caller keeps the row value) when books
+  disagree on the sign. 8 new tests, 71 green across board + CLV suites.
+  **Not deployed: it needs REFRESH-WORKER, and an MLB sim (pid 79) plus a board
+  build were in flight.** Forward-only — today's openings keep the bad lines.
+  Ship when the slate is quiet, then re-run the 525-cell invariant.
+- **FIX unchanged and now fully justified:** at `layer2_board.py:852` take the
+  line from the same cell as the price. Away is already right, so the change
+  must not touch it — negate only for the home side, or carry
+  `cell[side]["line"]` per book.
+- **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
+  spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
+  UNIFORM, not statistical:**
+
+      1. each book's OWN home/away lines sum to zero    525/525  consistent
+      2. cell's home line vs the ROW's `line`             0/525  agree
+                                                        525/525  OPPOSITE SIGN
+      3. no-arb per book (implied home + implied away)  median 1.0483, none < 1.0
+
+- **`book_prices` IS NOT MIXING BOOKS. Every book agrees with every other book
+  and with itself.** The 2026-08-07 `_complementary` condition (*"books inside a
+  single grid row disagree on the SIGN"*) is real but is **NOT** what is
+  happening on this data. My previous entry blamed book-vs-book mixing; that is
+  now refuted — 100% agreement between books.
+- **THE ACTUAL DEFECT, and it is deterministic:** the ROW's `line` is the
+  NEGATION of the cell's `home.line`, in every single case. So
+  `layer2_board.py:852` building `book_prices = {book: cell["home"]["price"]}`
+  and publishing it beside `row["line"]` pairs **the home team's price with the
+  opposite handicap**. Every home-side spread opening is therefore recorded as
+  `side=home, line=L, price=<home price at -L>`.
+- **THIS PARTIALLY REINSTATES THE FINDING I WITHDREW, with a corrected
+  mechanism.** The 16-of-17 no-arbitrage violations were REAL; my second reading
+  ("confounded by book mixing") was wrong. It is not mixing — it is a uniform
+  row-vs-cell convention mismatch. **Third revision of this attribution; this
+  one is measured on 525 cells with 100% agreement rather than inferred from a
+  neighbouring module's comment.** The sequence, so nobody re-treads it:
+  feed transposes labels (WRONG) -> books disagree so `book_prices` mixes
+  (WRONG) -> row.line is uniformly the negation of the cell's home line (this,
+  measured).
+- **STILL NOT ESTABLISHED — the user-facing question, now sharper.** `row["line"]`
+  being the away handicap may be the board's INTENDED convention, in which case
+  the cards are fine and only the home-side flattening at `:852` is wrong. The
+  test is narrow: **does any template render `row.line` beside a HOME selection?**
+  Read the card template before assigning any user-facing severity.
+- **FIX, now well-specified:** at `layer2_board.py:852`, take the line from the
+  same cell as the price (`cell[side]["line"]`) rather than inheriting
+  `row["line"]` — either by carrying it per book or by negating for the home
+  side. Do NOT "fix" the sign at the CLV end; the pairing is wrong where it is
+  built, and every other consumer of `book_prices` inherits it.
+- **TRACED 2026-08-15 23:0xZ. THE LINE IS SET AT `layer2_board.py:852-858`, AND
+  THE DEFECT IS A DROPPED FIELD, NOT AN INVERTED SIGN.**
+
+      "book_prices": {
+          str(book): cell[side]["price"]        # <- price kept
+          for book, cell in (row.get("cells") or {}).items()
+          ...                                    # <- cell[side]["line"] DROPPED
+      }
+
+  Full chain: fetcher (`fetch_mlb_oddsapi_local.py`, EXONERATED — derives
+  `home_line = -away_line` per lane) -> book grid (`book_grid.py:304`, passes
+  `row.get("line")` through) -> `layer2_board` flattens each cell to a bare
+  price -> `record_openings` stores that flat map -> `clv_join`'s same-book
+  override reads `book_prices[book]` and pairs it with the ROW's line.
+- **THIS REPO ALREADY KNEW, IN A NEIGHBOURING MODULE, AND SAID SO.**
+  `board_cross_book.py` tags each quote with *"the CELL's own line, which is not
+  always the row's line … this is the pairing guard"*, and `_complementary`
+  documents the measured reason (production 2026-08-07, `spreads_alt`, first5):
+
+      betmgm     away -1.5 (+210)   home +1.5 (-295)
+      betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+  **Books inside ONE grid row disagree on the SIGN of the line.** That module
+  refuses such pairings ("*spreads are signed per side*", postmortem §2.6, after
+  a false +250.88% arbitrage). `layer2_board`'s `book_prices` drops the very
+  field that guard depends on — and the comment above it says so deliberately:
+  *"Flat {book: price}, not the whole cell."* The choice was made for artifact
+  size; its cost is that sign information is unrecoverable downstream.
+- **SO MY PREVIOUS CONCLUSION IS WRONG AND I AM WITHDRAWING IT.** I reported "the
+  BOARD's home-spread `line` sign is inverted, 16 of 17 — possible user-facing
+  mislabel". **That test was confounded by exactly this mixing:** it compared
+  `book_prices` across books for one row-level line, and those books were not
+  all quoting the same side. The 16/17 measures **sign disagreement BETWEEN
+  BOOKS**, which is a known and expected market fact — not a board defect.
+  **There is no evidence of a user-facing mislabel. Do not act on that claim.**
+- **What IS established:** `book_prices` silently mixes books quoting opposite
+  sides of a spread, so ANY consumer reading it for a spread selection can get
+  the opposite bet's price. `clv_join`'s same-book override is one such consumer;
+  that is the `-29.90`/`+30.428` mirror pair.
+- **What is NOT established, and needs a same-book test to settle:** whether the
+  ROW's own `line`+`price` (anchor book) are correct. My attempt was confounded —
+  the two openings had DIFFERENT anchor books (onexbet, betopenly), and since
+  books disagree on sign, an anchor-vs-anchor comparison proves nothing. The
+  clean test is one book quoting both lines of one event.
+- **REVISED FIX (do not ship before the same-book test):** carry the cell's line
+  alongside its price — `{book: {"price": …, "line": …}}` — or refuse a same-book
+  join whose book line is unknown. The size objection in that comment is real and
+  should be answered with a line-only companion field, not by dropping the guard.
+- **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
+  makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
+  `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
+  whose naming is right.
+
+      source                          respects invariant   violates
+      BOARD (published openings)            1 of 17          16
+      FEED  (odds-history lanes)            2 of 2            0
+
+  Board pairs span **15 distinct events** and many books; junk quotes
+  (`novig -100000`) excluded. The single exception is `nordicbet -1.5=117 /
+  +1.5=111` — implied 0.461 vs 0.474, a 1.3-point gap on a near-pick'em, i.e.
+  inside the vig and not evidence of correctness.
+- **The feed, on the same event, is internally right both times:** home `+1.5`
+  at `-205` (implied 0.672, the easier bet, minus money) and home `-1.5` at
+  `+168` (implied 0.373, the harder bet, plus money).
+- **SO: `fetch_mlb_oddsapi_local.py` IS EXONERATED. The bug is downstream, where
+  a published home-spread selection gets its `line`.** The hypothesis in this
+  lane's header is CONFIRMED and the falsification branch (lane-collapse only)
+  is REFUTED — lane collapse is real but cannot explain a systematic sign
+  violation across 15 events.
+- **MY EARLIER ATTRIBUTION IS NOW DOUBLY CORRECTED, and this is the final
+  version.** First I wrote that the FEED "transposed its labels" (in
+  `learnings.md`). Then I corrected that to "each point is internally
+  consistent; the market state holds one lane at a time". **Measured, it is
+  neither: the feed is correct and the BOARD is inverted.** The learnings entry
+  from earlier tonight describes the right FAILURE MODE (a label whose
+  convention is not stable across sources) but names the wrong culprit.
+- **THIS IS BIGGER THAN CLV AND MUST NOT SHIP AS A CLV FIX.** These openings are
+  recorded FROM published board rows, so if the board serves `side=home,
+  line=-1.5` while the price is the `+1.5` price, **users are being shown the
+  wrong side of the run line.** That is a correctness problem on the product
+  surface; CLV merely made it visible.
+- **UNVERIFIED, and it decides the severity — DO THIS BEFORE ANY FIX:** I have
+  NOT checked what the rendered card/API actually displays. Two possibilities and
+  they need different fixes: (a) the board's `line` field is genuinely inverted at
+  the point of publication -> user-facing defect; (b) the board's `line` means
+  something other than the home team's handicap (e.g. it carries the away line,
+  or the market line) and only the CLV join misreads it -> internal-only. **The
+  price data cannot tell these apart; only reading the publisher and the template
+  can.**
+- Next step, concrete: find where a spreads selection's `line` is set on the
+  published row (start from `pipeline/layer2_shortlist.py` and the per-sport
+  `cards.py`), and read what the card template renders beside it. Then decide (a)
+  vs (b). **Still no deploy** — and generality beyond MLB is still unmeasured.
+
+- Goal: for a spread, ONE source owns the sign of `line` and every consumer
+  agrees with it. Testable outcome: for every same-book spreads row in
+  `/api/ops/clv/report`, the opening's `(side, line, price)` and the close's
+  `(side, line, price)` describe the SAME bet — checked by an assertion that does
+  not itself rely on the label (see below) — and a test pins the convention per
+  source.
+- **WHY: a `-29.90` CLV on a market that never moved.** Event `69928d29…`
+  (Seattle @ Houston), FanDuel spreads. The opening recorded `home -1.5 @ -205`;
+  the close resolved `home -1.5 @ +168`. `-205` and `+168` are the two sides of
+  ONE run line, so the "30-point move" is a bet differenced against its opposite.
+- **REFINEMENT FROM READING THE FETCHER — my first framing was too strong and is
+  corrected here before anyone acts on it.** I wrote in `learnings.md` that the
+  feed "transposed its labels". **Each history point is internally consistent:**
+  `fetch_mlb_oddsapi_local.py:505-525` derives `home_line = -away_line` and keys
+  each lane by the home line, so `{away -1.5 / home +1.5}` and
+  `{away +1.5 / home -1.5}` are both correct — they are **two different lanes of
+  the same spreads market**.
+  - **The real mechanism is that the odds-history market key carries NO line**
+    (`event_id|home_team|away_team|market|bookmaker`), which `clv_join.py`'s own
+    docstring already states. So every spread lane collapses into ONE market
+    state and the last writer wins. At 06:02Z that state held the home `+1.5`
+    lane; at 21:26Z it held home `-1.5`.
+  - **What is still genuinely unresolved, and is this lane's question:** the
+    opening says `home -1.5` costs `-205`; the 06:02 history says `home +1.5`
+    costs `-205`. Same price, opposite line. **One of the two is using the
+    opposite sign convention for a home spread, and I do not yet know which.**
+- Hypothesis: the board's published `line` for `side=home` carries the OPPOSITE
+  sign to the feed's `home_line`. If so every home spread opening is joined to
+  the wrong lane, and away rows are joined correctly by accident.
+- Falsification test: if the board and feed signs agree, then the mismatch is
+  purely lane-collapse (the state simply held a different lane than the opening),
+  the sign is exonerated, and the fix is to key history by line rather than to
+  change any sign.
+  - **Discriminator that does NOT trust either label:** for one event, take the
+    published `book_prices` for the home `-1.5` selection and the feed's two
+    lanes at the same instant. The lane whose `home_odds` EQUALS the published
+    price identifies which line the board meant. Prices are the invariant here;
+    labels are the thing under test.
+- **SCOPE ALREADY MEASURED, so nobody re-derives it:** mlb 2026-08-15 same-book —
+  spreads n=42, mean `+0.515`, median **exactly 0.000**, only 2 rows |clv|>10 and
+  those two are a **mirror pair from this one event** (`+30.428` / `-29.900`),
+  because both openings were recorded and each got the other's close. h2h/totals
+  n=128, **zero** |clv|>10. **Severe per row, near-cancelling in aggregate** —
+  so this corrupts per-recommendation CLV, variance, CIs and any "worst bets"
+  list, while leaving the headline roughly intact. **It is NOT a headline
+  emergency and must not be deployed like one.**
+- Files (exclusive to this lane):
+  - `scripts/fetch_mlb_oddsapi_local.py` — where `home_line`/`away_line` and the
+    lane key are derived. Collision check RUN via `lane-guard.py`'s own
+    `_claims()`: CLEAR.
+  - `tests/test_spread_line_sign_convention.py` (new). CLEAR.
+  - **NOT claimed, held by other OPEN lanes — coordinate, do not edit across:**
+    `syndicate/features/shared/odds_refresh_tracking.py`
+    (`closing-stamp-is-detection-time`) and
+    `syndicate/features/shared/clv_join.py` (`clv-without-settlement`). Both are
+    this session's lanes, so the marker can simply be moved if the fix lands
+    there — but the claim must be updated first, not bypassed.
+- Verification: (1) the discriminator run on >= 5 events across >= 2 books, with
+  the winning convention named per source; (2) a test pinning it; (3) the
+  spreads |clv|>10 count re-derived and the mirror pair gone.
+- **Generality is UNMEASURED and must be established before any fix ships:** all
+  of the above is ONE event, ONE date, MLB, FanDuel. NFL/NCAAF spreads and other
+  books are untested, and MLB run lines are the asymmetric case that makes the
+  error visible — symmetric `-110/-110` spreads would hide it entirely.
+- Blocked by: none. **No deploy without `/preflight`**, and not before generality
+  is measured — a sign flip applied to a source that was already correct would
+  invert every spread join instead of fixing it.
+
+### commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gameline-eval`
+- Goal: `commit-guard.py` evaluates the index the COMMIT will use. **DONE.**
+- Files: `.claude/hooks/commit-guard.py`, `tests/test_commit_guard_worktree_index.py`.
+  Neither claimed by any OPEN lane at the time of the edit.
+- **The bug.** Both predicates ran with `cwd=CLAUDE_PROJECT_DIR`. The commit runs
+  wherever the shell is — and this repo's own documented recipe for a contended
+  tree is `git worktree add` and commit from there. A linked worktree has its own
+  index and its own HEAD.
+- **Two opposite failures, and the SECOND is the one that mattered:**
+  - *False positive*, observed **3× in one session**: a session committing from
+    `/c/tmp/lgl-ck` was blocked over reverts staged in the MAIN index while its
+    own index held exactly its four intended appends.
+  - *False negative*, **never observed and strictly worse**: a stale index in the
+    worktree being committed from was never examined, so the guard would pass it
+    in silence. That is the entire hazard it was written to catch.
+- **`-C` is now checked instead of skipped.** The old code waved
+  `git -C <dir> commit` through because it "has its own index". **Having your own
+  index is not having a fresh one** — that conflation is what this guard exists
+  to catch, so it cannot be the reason to skip. `--git-dir` / `--work-tree` stay
+  skipped and are now named as a KNOWN GAP: index and tree decouple there, so
+  predicate 1's "is it still on disk" has no single correct base.
+- **Verification — falsified, not just asserted.** 13 tests on REAL git repos in
+  `tmp_path` (a mocked git reproduces nothing; the bug was which directory git
+  ran in). Against the pre-fix hook: **7 fail, 6 pass**, and the load-bearing
+  `test_a_stale_index_in_the_LINKED_worktree_is_caught` fails as `assert 0 == 2`
+  — the false negative, reproduced. Against the fix: **13 pass.**
+- **Honest limit on the end-to-end check.** The real hook binary was run on the
+  real payload shape and returned 0, but the shared index happened to be CLEAN at
+  that moment, so **that reading is not a positive control** — it cannot
+  distinguish the fix from the bug. The positive control is the pytest pair on
+  real repos. Deliberately staging a revert in the live shared index to produce
+  one would have created the exact landmine the guard exists to prevent.
+- Blocked by: none.
+
+### clamp-fix-to-workers — CLOSED-VERIFIED 2026-08-17 00:0xZ — the ±4900 clamp is gone from all three live services, and 7,002 served fair_price values carry none**
+- **CLOSED 2026-08-17 00:0xZ, ~10 minutes after the refusal below, because
+  the missing piece SHIPPED IN THE INTERVAL — and not by me.** Another
+  session deployed `c348da53` to live-odds-worker at 23:57:12Z
+  ("converge origin/main into live-odds-worker's deploy lineage"), which
+  carried the clamp removal along with everything else on main. Credit
+  where it belongs; this lane did not ship it.
+- **I did NOT ship a duplicate.** The user authorised shipping the deferred
+  fix; before cutting anything I re-read the live SHA and found it had
+  moved from `16a898ef` to `c348da53` with the work already in it. Cutting
+  on the stale SHA would have re-applied a change that was already live.
+- **STRUCTURAL HALF: PASSES.** Clamp sites (`max(0.02, min(0.98`) by
+  content at each service's CURRENT live SHA, all three re-read at 00:0xZ:
+  ```
+  web              9f617f34   0   (intelligence_state 0, cards 0, layer2_board 0)
+  refresh-worker   fdc72dd0   0   (0, 0, 0)
+  live-odds-worker c348da53   0   (0, 0, 0)
+  ```
+  Both sites now delegate to `american_price`, which REFUSES a probability
+  outside (0,1) instead of clamping it.
+- **PRODUCT-LEVEL SWEEP, the number this lane never had:** **7,002 served
+  `modelled_fair.fair_price` values** across mlb + wnba + soccer,
+  **0 at ±4900**. That is a real denominator, against the 6-row shortlist
+  the watcher kept reading.
+- **THE ORIGINAL BEHAVIOURAL CRITERION NEVER FIRED, AND IS NOW MOOT —
+  stated rather than quietly dropped.** `watch_clamp_trigger.py --once`
+  returned `no_trigger` on all FOUR reads (00:24Z, 01:30Z, 23:49Z,
+  00:00:39Z); the last read `p=[0.227201, 0.512829] out_of_clamp=0`. It was
+  never satisfied because no slate in that window carried an out-of-clamp
+  probability. It is moot because a `POST_FIX_OK` proves a clamped
+  PRODUCER priced correctly, and there is no longer a clamped producer on
+  any live service. **What remains unproven by THIS lane is that
+  `american_price` prices an extreme probability correctly in production —
+  a different claim, covered by its own unit tests, not by this one.** — opened 2026-08-15 — session: clamp-fix-verification-watch
+- **CLOSE ATTEMPTED AND REFUSED 2026-08-16 23:5xZ.** Both halves of this
+  lane's own Verification line were checked. Neither passes.
+  - **Behavioural half: still never fired.** `watch_clamp_trigger.py --once`
+    at 23:49:14Z read `served_rows=6 p=[0.145882, 0.874966] out_of_clamp=0`
+    -> `no_trigger (proves nothing)`. That is the THIRD inconclusive read
+    (00:24Z, 01:30Z, 23:49Z). A quiet slate reads identically with the bug
+    fully present, which is why this lane already refused to bank it.
+  - **Structural half: FAILS, and this is the new finding.** Clamp sites by
+    content at each service's LIVE SHA, counting `max(0.02, min(0.98`:
+    ```
+    web              9f617f34   0
+    refresh-worker   fdc72dd0   0
+    live-odds-worker 16a898ef   2   <- intelligence_state.py 1, wnba/cards.py 1
+    ```
+- **One of the two is dormant; the other is REACHABLE AND PUBLISHING.**
+  - `pipeline/intelligence_state.py` — dormant on this service:
+    `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` in its live
+    env, so the loop never starts. **Dormant is not fixed** — loop ownership
+    is an env flag that moves with no diff, so this is a latent re-arm.
+  - `syndicate/features/wnba/cards.py:848` — **REACHABLE.**
+    `_american_from_prob` still clamps, and it is called at :1614/:1616 to
+    produce `home_ml`/`away_ml` on the WNBA cards THIS SERVICE BUILDS AND
+    PUBLISHES (it runs `start_live_lens_loop`). The served lens carries
+    those exact fields in each game's `betting` block.
+- **Not observed firing today, and that is not evidence of absence.** The
+  served WNBA cards at 23:5xZ read `away_ml` -749.55 / 186.21 / 146.13 —
+  no value at ±4900, because no game today is lopsided enough to push a win
+  probability past 0.98. Same quiet-slate confound as the watcher.
+- **What would let this lane close:** ship the deferred fix to
+  live-odds-worker (`079cc42b`, re-cut on live `16a898ef`), taking all three
+  services to 0 sites. At that point the clamp CANNOT be published because
+  it does not exist, and the never-firing behavioural trigger stops being
+  load-bearing. **That deploy was DEFERRED BY USER DECISION and is NOT being
+  taken unilaterally.**
+- Note: tonight's live-odds-worker deploy (`16a898ef`, the WNBA live_state
+  carry-forward) was deliberately cut on live `440f5f29`, which already
+  carried these 2 sites — so it PRESERVED the deferral rather than
+  silently resolving or worsening it.
+- Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
+- Goal: the ±4900 clamp stops being published. **Testable outcome:**
+  `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
+  that carries an out-of-clamp probability.
+- **WHY THIS LANE EXISTS — the web deploy was falsified.** `e831263e` shipped the
+  fix to web on 2026-08-15 and production kept mispricing. Measured 23:10:13Z
+  (nfl `h2h_3_way` 0.014698 → +4900, correct +6704) and 23:15:46Z (mlb `spreads`
+  0.009911/0.990089 → ±4900, correct ±9990) — two triggers, two unrelated slates,
+  both `PRE_FIX_MISPRICE` against a fix-carrying web SHA.
+  `reports/clamp_watch/trigger_20260815T2310*.json`, `..._231546*.json`.
+- **The runbook's "WEB SERVICE ONLY" was wrong, and the reason is instructive.**
+  It inferred serve-time stamping from "0 of 108 shortlist-artifact rows carry
+  `fair_price`" — true, and about the WRONG ARTIFACT. The shortlist has no
+  `fair_price` at all; the intelligence-state card does. Web's block is a
+  **backfill** (`if ... card.get("fair_price") is None`), so an upstream-clamped
+  value passes through untouched and the web fix is structurally inert.
+- Files: `pipeline/intelligence_state.py`.
+  - **`syndicate/features/wnba/cards.py` is NOT CLAIMED by this lane as of
+    2026-08-16 23:2xZ — released to `wnba-live-tier`.** This lane's own status says the code work is done
+    (`57a437d5` shipped, 0 clamp sites by content) and that the only open
+    work is VERIFICATION, which runs `scripts/watch_clamp_trigger.py` and
+    does not read that file. The taking lane changes
+    `_public_scoreboard_live_state_payload` (the ESPN scoreboard fetch) --
+    a different function from the clamp sites, zero overlap. Coordination
+    was ATTEMPTED and refused by the transport: this lane's session
+    (`local_70bfde12…`) is UNATTENDED, a scheduled-task run, so
+    `send_message` cannot reach it. Released rather than silently
+    overridden; if the clamp lane needs it back, this line is the record.
+  - **`syndicate/features/shared/layer2_board.py` DELIBERATELY NOT TOUCHED** — it
+    is claimed by OPEN `spread-line-sign-convention`, and that lane's worker
+    deploy already carried the layer2_board fix to both workers. Collision found,
+    then dissolved by re-measuring rather than by negotiating. 3 sites → 2.
+  - Collision check on the two: `clv-without-settlement` claims no files;
+    `ask-sport-coverage` lists `intelligence_state.py` read-only;
+    `soccer-model-coverage` lists both as "NOT this lane's files". CLEAR.
+- Hypothesis: n/a — the producer is established by content, not guessed.
+- Falsification test: if refresh-worker deploys with 0 clamp sites and a
+  subsequent trigger still reads `PRE_FIX_MISPRICE`, the producer is NOT the
+  intelligence-state loop and this attribution is wrong.
+- Verification: `watch_clamp_trigger.py --once` → `POST_FIX_OK`, plus 0 clamp
+  sites by content at the new live refresh-worker SHA.
+- **Blocked by: the refresh-worker deploy claim**, held by `red-intelligence-tests`
+  (target `037eb356`, since 23:35:01Z), which still carries both sites.
+  `send_message` is unavailable from this scheduled-task session, so the claim
+  was NOT taken and no coordination message could be sent. Waiting for release.
+
+- **RESULT 2026-08-16 00:23:04Z — refresh-worker shipped `57a437d5`.** 0
+  occurrences of `max(0.02, min(0.98` across all three files at the live SHA.
+  Cut on live `2c14d9ae`, not main. Gated on `safety_rc == 0 AND zero [JOB]
+  processes`, re-verified in the same shell command as the POST.
+- **VERIFICATION DID NOT HAPPEN AND IS NOT CLAIMED.** 00:24:04Z read: `rows=12`,
+  p=[0.338468, 0.603175], `out_of_clamp=0` → `no_trigger`. The slate collapsed
+  from 97 rows as games finished. Same reading a quiet slate gives with the bug
+  fully present. The 2-hourly `clamp-fix-verification-watch` task carries this.
+- **`live-odds-worker` DEFERRED, not forgotten.** It carries the clamp but does
+  not run the intelligence-state loop, so it is not the producer of the measured
+  misprice. It is also effectively never idle — 57 samples over 35 min, zero
+  job-free moments, running a per-league soccer artifact sweep. `079cc42b` is
+  cut, tested and pushed; re-cut on the live SHA before shipping.
+- **CORRECTION LOGGED: I twice called live-odds-worker "already fixed" off a
+  PENDING claim target.** `49797f4b` was clean and never landed as-is; `c422f79a`
+  then `c4116ab6` landed instead, both still clamping. **A claim's target is an
+  intention, not a deployment.** Verify by content at the live SHA, every time.
+- **TWO SAFETY-TOOL DEFECTS, both in `learnings.md` 2026-08-16:**
+  `check_deploy_safety.py` reports CLEAR while jobs run on the service (measured
+  on BOTH workers), and has no `--service` flag so it also blocks on the wrong
+  service's work. And a wait loop of mine read a stderr HTTP 502 as CLEAR by
+  testing for the absence of a failure string.
+- **2026-08-16 03:1xZ — THE INSTRUMENT WAS BLIND IN THE WINDOW IT WATCHES, and
+  every `no_trigger` since it was built is weaker evidence than it looked.**
+  `watch_clamp_trigger.py` gated the confirming read on
+  `/api/board/layer2-shortlist`, then judged `/api/intelligence/query`. Two
+  different populations. Measured same-instant at 03:14:08Z: **shortlist 0 rows,
+  served payload 18 priced rows** — 8,345 opportunities considered and all 8,345
+  filtered out (horizon 2,488 + stale_kickoff 2,666 + quote_age 1,256 +
+  excluded_market 689 + uninformative 1,246, summing exactly).
+  The shortlist drops `stale_kickoff_seconds = 7200` and
+  `max_quote_age_seconds = 50400` — **exactly the in-play late-game population
+  both real triggers came from** (20:45Z, and 23:10/23:15Z at p=0.009911/0.990089).
+  So the gate could read 0 while a misprice was live on a row it had filtered out.
+  Found because the user disbelieved a `rows=0` reading, not by the instrument.
+- **FIXED, not just recorded.** The trigger now derives from the served payload
+  itself — the same surface the verdict judges. The shortlist is still read, as
+  recorded context that can no longer suppress a check; both counts print.
+  Self-test 11/11. Live at 03:24:19Z: `served_rows=30 (shortlist=12)`, so the
+  old gate would still have judged on under half the population.
+  - A defect found while writing it: emitting UNPRICED probabilities (needed, or
+    `POST_FIX_OK_COLUMN_ABSENT` is unreachable and the fix working becomes
+    invisible) double-counted every quoted row — once priced at the parent, once
+    unpriced at the `quote` node. Harmless while only pairs were emitted; a
+    phantom unpriced twin on every correctly-priced row the moment they were not.
+    Caught by the new self-test, not in review.
+- **STILL NO VERDICT ON THE FIX.** 03:24:19Z read the corrected population:
+  30 rows, p=[0.057749, 0.871508], nothing outside [0.02, 0.98] → `no_trigger`.
+  Genuinely quiet, now measured on the right surface. `#439` item 1 stays OPEN.
+- **THE SHORTLIST/SERVED MISMATCH IS NOT A DEFECT — AND THAT IS WORSE FOR THE
+  OLD GATE THAN "NARROWER" WAS.** Measured 03:3xZ, same instant. They are two
+  different pipelines, not two views of one:
+  - **Different date window.** shortlist `date: 2026-08-15`, `horizon_days: 1`
+    (single date, `central_today_iso()`); served `dates_covered:
+    ['2026-08-15','2026-08-16','2026-08-17']`. Late at night the shortlist's
+    one-day horizon empties by construction while tomorrow's board is live —
+    which is exactly the 0-vs-18 reading, and it will recur every night.
+  - **Different pool.** served `source: combined_board_window` (the legacy
+    `ranked_all` pool). The shortlist is `layer2_shortlist_artifact`.
+  - **Different gates.** horizon / quote_age / stale_kickoff / excluded_market /
+    uninformative are applied at BUILD time on refresh-worker for the shortlist
+    only; `combined_board_window` does not carry them.
+  This is known in-progress L2-A migration, stated in the route's own docstring
+  (`intelligence.py:2698`): the board still renders `ranked_all`, the canonical
+  board state the shortlist lands in "is never written (both migration flags
+  default False and are off)", and pointing the board at L2-A rows "is the goal".
+  **So the old gate was not a narrow view of the product — it was an artifact
+  nothing user-facing serves.** The clamp misprices were always measured on the
+  served path (`layer2_board.py:1345`: 1346 `fair_price` values, 24 on ±4900),
+  which is the population the instrument now reads. Consistent, and the reason
+  the gate had to go rather than be widened.
+  - Sports move within minutes: 03:24Z served WNBA only; 03:3xZ served
+    mlb 168 + wnba 216 priced occurrences. Do not treat one read's sport mix
+    as the slate's shape.
+
+#### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
+**HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)
+against only **95.9MB of brk `[heap]`**. Falsification was "if `[heap]` dominates,
+`mallinfo2`'s `arena` is the follow-up rather than `hblkhd`" — it does not.
+
+**AND THE LANE'S PREMISE WAS RETRACTED BY ITS OWN INSTRUMENT.** The "673MB
+outside pymalloc" this lane was opened to chase was cgroup `anon` (1,607MB,
+CONTAINER) minus pymalloc arenas (934MB, pid 39 ONLY). Different scopes. The
+smaps reader's reconciliation check refused its first production read
+(`reconciles: false`, 27.0%) and that refusal was the finding. Per-process the
+residue is **~173MB**; ~410MB was always just the 8-10 child processes.
+
+**CONSEQUENCE: `mallinfo2` IS NOT THE NEXT STEP.** I recommended it two hours
+ago. The question it was for has largely dissolved, and with pymalloc holding
+~934MB of arenas the mmap total is very nearly pymalloc itself — a duller answer
+than a mystery, and the right one.
+
+**SHIPPED:** `b0ab37a1` (reader) live 22:41:04Z, minimal — live sha + 1 commit,
+not converged main, which would have moved production 330 commits for an
+instrument.
+**NOT SHIPPED:** `c7747a29` (reconcile against the process, not the container).
+Three sessions held the deploy claim in 70 min and the live sha moved twice under
+a rebase, so it is filed as a request rather than raced for —
+`.syndicate/deploy/requests/2026-08-15T2350Z-smaps-reconciliation.md`.
+Until it lands the reader reports `reconciles: false` on every read. Cosmetic;
+the breakdown itself is correct.
+- [(superseded lane detail](lanes_closed.md) — (superseded lane detail — the original body this lane was opened with)
+- [quote-join-enrich-cost (detail below, kept for the file/line map)](lanes_closed.md) — quote-join-enrich-cost (detail below, kept for the file/line map) — session: memory-guard
+- [memory-guard-reclaimable (detail below, kept for the file/line map)](lanes_closed.md) — memory-guard-reclaimable (detail below, kept for the file/line map) — session: memory-guard
+- [render-yaml-web-block-hygiene](lanes_closed.md) — render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+- [(superseded lane detail, kept for the file/line map)](lanes_closed.md) — (superseded lane detail, kept for the file/line map)
+- [hooks-enforcement-wiring](lanes_closed.md) — hooks-enforcement-wiring — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+- [red-intelligence-tests](lanes_closed.md) — red-intelligence-tests — CLOSED-VERIFIED 2026-08-15 — all three reds fixed, 218/0, shipped `1322d0a8`/`d348e040`/`4ae71c4a`, pushed `89c3d94
+- [mlb-live-pitcher-projection](lanes_closed.md) — mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 — (a)/(b)/(c) all measured on 423 rows, 0 violations; live coverage 11.6% -> 50.3%;
+- [board-publish-stall](lanes_closed.md) — board-publish-stall — CLOSED-FALSIFIED 2026-08-16 — no stall, no publish failure; the REAL result is that my deployed fix is INERT and resta
+- [line-decimal-renderer](lanes_closed.md) — line-decimal-renderer — CLOSED-VERIFIED 2026-08-16 — shipped `f3b9b293`; 5 live rows change, 77 untouched; WEB DEPLOY OWED — opened 2026-08-
+
+#### smaps-anon-breakdown — DEPLOY LANDED 2026-08-16 00:57:32Z (`ada731f5`)
+The reconciliation fix is live and the guard is meaningful again. First reading
+01:07:38Z:
+
+    reconciles               true      (was false, 27.0% off)
+    reconciles_within_pct    0.0
+    total_anon_mb          1,672.4     smaps, per-process
+    process_rss_anon_mb    1,672.6     RssAnon, per-process
+    other_processes_anon_mb    0.4     children, now a LABELLED figure
+    cgroup_anon (container) 1,673.0
+
+Two independent kernel accountings of one process agreeing to 0.0%.
+
+**BREAKDOWN NOW TRUSTWORTHY — the lane hypothesis holds on a clean reading:**
+`anon_mmap` **1,540.3MB (92%)** against `heap` 128.3MB, `file_backed` 3.6,
+`stack` 0.1; mmap split >64MB 741.3 | 8-64MB 639.1 | 1-8MB 159.3 over 426 regions.
+
+**NOTE `other_processes_anon_mb` = 0.4 HERE, not the ~504MB seen at 22:49.** The
+children were simply not running at this instant. That is exactly why the old
+container-vs-process comparison was unusable: the gap is not a constant to
+subtract, it moves with whatever the worker has spawned.
+
+COST: five rebases across five live SHAs (`6f512ffa` -> `129395cc` -> `32186e28`
+-> `2c14d9ae` -> `57a437d5`) and four claim holders. On a worker with five
+sessions deploying, a two-file change should ride along, not chase.
+
+#### live-game-line-projection — 2026-08-16 ~01:1xZ — THE PREMISE IS TRUE: 25 LIVE GAME-LINE EDGES PUBLISHED
+- **Tier 5's goal is met in production.** `index_size 8 / considered 32 /
+  projected 32 / edged 25 / prob_interval_swamps_edge 7`, on an artifact
+  provably generated after the deploy. Baseline `index 3 / projected 12 /
+  sim_count_unusable 12 / edged 0`.
+- **Live:** live-odds-worker `c4116ab6` (simsRun stamp), refresh-worker
+  `1f36d718` (the join). Web needs neither.
+- **THE THREE DROPS, all shipped and measured:** D1 merge condition
+  (`0e0b0aa1`), D2 carry-forward (`4bd7dbb3`), D3 join+wiring (`758a89fa`) plus
+  the `simsRun` stamp (`49797f4b`) that made the precision gate reachable.
+- **NOT ESTABLISHED — the 25 edges are UNVALIDATED.** Clearing 2 sigma at 120
+  sims means the edge beats the ESTIMATOR'S noise, not that the model is right.
+  No CLV, no settlement, no backtest. **Next work is evaluation, not more
+  plumbing** — game lines carry 100% Pinnacle coverage, the strongest position
+  on the platform.
+- **OPEN:** why `index_size` was 3 earlier and 8 now is unexplained; Drop 2's
+  carry-forward has still never been observed firing; the tally is MLB-only.
+- **I no longer hold the live-odds-worker claim** — `clamp-fix-to-workers` took
+  it ~00:34 and my last two fires went over it. Not force-released; theirs.
+
+- **CHECKPOINT 2026-08-16 01:4xZ — state of the lane for whoever picks it up.**
+  - All deploy claims RELEASED. Nothing held by this session.
+  - Committed: `86ee112f` (falsification), `0f70969b` (lane), `25e34c63`
+    (deploy record + 2 learnings), `1b76c232` (defer + `#439`), `1bd520c2`
+    (state.md + the claim-target learning).
+  - **NEXT ACTION: run `py -3 scripts/watch_clamp_trigger.py --once` when
+    games are IN PLAY.** Both real triggers (23:10Z, 23:15Z) came from live
+    in-play markets; the two `no_trigger` reads were a pregame board with
+    extremes 0.0687/0.8904. A one-off task fires 2026-08-15 21:31 CDT and the
+    recurring `clamp-fix-verification-watch` runs every 2h.
+  - **`POST_FIX_OK` closes `#439` item 1.** `PRE_FIX_MISPRICE` now that
+    refresh-worker is clean would falsify the intelligence-state attribution —
+    that is this lane's stated falsification test, and it is still live.
+  - Session log: `.syndicate/log/2026-08-15.md`, final section.
+
+### nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root cause settled as an ingestion gap; the lane goal (projection writes again) is NOT met and moves to a fetcher.** — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. The NFL SmartSim2 projection writes again, because the pbp READ
+  path resolves to the mounted disk instead of the ephemeral repo checkout.
+- Files (exclusive to this lane): `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py` (new). Collision check RUN against all
+  OPEN lanes: CLEAR on all three.
+- **DIAGNOSIS COMPLETE BEFORE ANY EDIT — measured in production, not inferred:**
+  - `DATA_ROOT : /opt/render/project/src/data/nfl_source` (the CHECKOUT)
+  - `looked for : .../src/data/nfl_source/tracking/nflverse/pbp/pbp_2026.csv`
+  - `.gitignore:96` excludes `data/nfl_source/tracking/`, so the pbp exists ONLY
+    on the mounted disk. Zero plays loaded -> `assert_ratings_data_available`
+    refuses -> artifact never written -> `age_seconds` climbs forever ->
+    ~107 relaunches/day.
+- **THE GUARD IS NOT THE BUG. It is working exactly as designed** — it refuses to
+  write a degenerate artifact where every team rates `neutral_no_data` and all
+  games get the same league-average projection (production served exactly that on
+  2026-08-13: `margin 0.96 / total 44.38 / home_win 0.5267` on all 16 preseason
+  games across four dates). Do NOT relax it.
+- **ROOT CAUSE, and `#389` already found it for the OTHER path:**
+  `_first_existing_root` picks a root by probing for `upcoming_recs_*.csv` — a
+  DIFFERENT artifact family. The checkout ships those (5 tracked files); the pbp
+  subtree is gitignored. So an unrelated artifact's presence decides where the
+  pbp is read from. `#389` fixed the WRITE path by adding
+  `nfl_artifact_output_root()` and left the READ path on the same selector.
+- Hypothesis: adding a pbp-specific resolver that probes candidates for the pbp
+  FILE (not for `upcoming_recs_*.csv`) makes the generator find it on the mounted
+  disk and write the artifact.
+- Falsification test: if the pbp is ALSO absent from the mounted disk, root
+  selection is a red herring and the real gap is ingestion. The production
+  message says otherwise ("that is the bug, not a missing download") but that is
+  the code's assertion, not a directory listing — treat as unconfirmed until the
+  artifact actually writes.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring every ~40s, and
+  `smartsim2_projections_2026_wk1.csv` appears with a fresh mtime and
+  NON-IDENTICAL rows per game (identical rows would mean the guard was bypassed
+  rather than satisfied).
+#### FALSIFIED 2026-08-16 15:53:28Z — the lane's own falsification test fired
+- This lane wrote the test before shipping: *"if the pbp is ALSO absent from the
+  mounted disk, root selection is a red herring."* It is, and it was.
+- `DegenerateProjectionRun` raised again 8 minutes after go-live, with the same
+  `looked for` path as before the fix.
+- **THE LOG WAS AMBIGUOUS BY CONSTRUCTION** — the resolver's not-found fallback is
+  `default_nfl_source_root()`, i.e. the same checkout path the old code printed.
+  "Not deployed" and "ran and found nothing" are indistinguishable in the log.
+  Settled by CONTENT: `97491161` carries `nfl_pbp_path` (1) and the generator's
+  delegation (1), and refresh-worker is live on it.
+- **v3 root cause:** the pbp is gone from every root; ten scripts reference it,
+  all reads, zero writes; no nflverse fetcher exists for play-by-play. It was
+  present 2026-08-13 (`verify_nfl_autorun_obligations.py:25`, real ratings on
+  16/16 games), which matches the 2.79-day staleness.
+- **Lane goal NOT met.** The change is kept — it removes a real latent
+  misresolution and is inert when the file is absent — but it must not be
+  recorded as fixing `#441`.
+- Handover: find what REMOVED the file and how it is meant to arrive. That is not
+  a code fix and not this lane's scope; `#441` carries the next step.
+
+#### CLOSED 2026-08-16 17:10:45Z — settled by the diagnostic this lane shipped
+- **Verification ran and the result is negative-but-decisive.** The lane's own
+  falsification test fired, then the diagnostic it prompted answered the question
+  outright on the first post-restart refusal:
+
+      strict_hosted_storage_resolves_to = True
+      candidate[0] /opt/render/project/data/nfl_source/source_artifacts/... exists=False
+      candidate[1] /opt/render/project/data/nfl_source/...                  exists=False
+      candidate[2..3] /opt/render/project/src/data/...                      exists=False
+
+- **What the lane BUILT is correct and stays:** `nfl_pbp_path` searches the
+  mounted disk FIRST (candidates 0/1 prove it), replacing a resolver that picked
+  a root by probing for the unrelated `upcoming_recs_*.csv`. That was a real
+  latent defect and `#389` fixed its twin on the write path.
+- **What the lane BELIEVED was wrong twice:** v2 (root selection is the cause —
+  shipped, falsified) and v4 (env not reaching the subprocess — falsified by the
+  same reading that killed v2's successor). Root cause is v3: the file is absent
+  everywhere.
+- **Two of my own readings corrected here:**
+  1. The `DATA_ROOT`-prints-the-checkout "contradiction" was not one —
+     `_first_existing_root` returns the first root holding `upcoming_recs_*.csv`,
+     which only the checkout ships, even though mounted-disk candidates come
+     first in the list.
+  2. I claimed strict mode cannot append the checkout. There is a SECOND append
+     under `strict AND RENDER` that adds it as a lower-priority fallback.
+- **Files released:** `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py`.
+- **Handover:** `#441` needs a pbp FETCHER — no ingestion path exists in-repo.
+  Template is `fetch_nfl_schedule.py` (nflverse games.csv). `#443` (stale PID
+  silently stalling the autorun ~45 min per restart) delayed this verification
+  twice and remains open.
+
+### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch
+- Goal: `scripts/render_events.py` exists and answers "was this service killed,
+  and why" from `/v1/services/<id>/events`, so the 2026-08-15 FORBIDDEN rule
+  ("never conclude no-OOM from a LOG search") has a tool behind it. That rule
+  names `render_logs.py` as unable to answer the question and leaves nothing in
+  its place; every session that has needed a kill census since has hand-rolled
+  one. Success = the script reports the window it ACTUALLY covered, pages the
+  cursor to exhaustion, and distinguishes `oomKilled` / `evicted` / `unhealthy` /
+  `earlyExit` rather than lumping them as "failed".
+- Files: `scripts/render_events.py` (NEW). Checked against every OPEN lane's
+  `- Files:` at open time: the only claims held anywhere are
+  (`clamp-fix-to-workers`) and the four `live_gameline` paths
+  (`live-game-line-projection`). No lane claims anything under `scripts/`.
+  `refresh-worker-oom-recurrence` is the adjacent lane — it OWNS diagnosing
+  refresh-worker memory and this lane must not touch that. Read-only tooling
+  only; no service code, no config, no deploy.
+- Hypothesis: n/a (tooling, not diagnostic).
+- Falsification test: the tool is worthless if it can silently under-cover, which
+  is exactly how `render_logs.py`'s predecessor lied (`#434`: 99 samples spanning
+  1.2s of a 51s window). So: run it against a window whose contents are already
+  known independently — the 29 `oomKilled` on refresh-worker 2026-08-14 CT — and
+  require it to return all 29. If a single-page run and a paged run disagree on
+  the count, the pager is wrong and the tool must not ship.
+- Verification: (a) the 2026-08-14 census reproduces 29/29 `oomKilled`;
+  (b) `--json` output round-trips through `json.loads`; (c) `py -3 -m pytest
+  tests/test_render_events.py` passes. Recorded here, not in `deploys.md` —
+  nothing deploys.
+- **Outcome, all three verification criteria run:**
+  (a) `--failures-only --since 2026-08-14T05:00:00Z --end 2026-08-15T05:00:00Z`
+      returns **29 `oomKilled`**, matching the independently-derived census.
+      With `max_pages=1` the same window returns **20** — the pager is the
+      difference between a measurement and a plausible undercount.
+  (b) `--json` round-trips through `json.loads` (checked on live-odds-worker:
+      5 `earlyExit`, 0 OOM since 2026-08-15).
+  (c) `py -3 -m pytest tests/test_render_events.py -q` → **15 passed**.
+- **Positive control works:** the branch-overlap window 10:09:51Z..15:09:30Z
+  today returns zero events AND names the newest event overall
+  (`2026-08-16T06:01:34Z deploy_ended`), so "quiet" and "reader broken" print
+  differently and exit differently (0 vs 2). This is the whole reason the tool
+  exists — the 2026-08-15 FORBIDDEN rule said a negative result about process
+  death must come from the events API, and named `render_logs.py` as unable to
+  provide one, leaving no tool in its place.
+- **Reading it produced, recorded because it is load-bearing for
+  `refresh-worker-oom-recurrence` (that lane's, not this one's, to interpret):**
+  refresh-worker `server_failed` since 2026-08-09 is **42 events, all 42
+  `oomKilled`, none evicted** — 08-08:5, 08-13:4, **08-14:29**, 08-15:4,
+  08-16:0-so-far (CT). Kills cluster 15:00–00:00 CT. Separately,
+  live-odds-worker's 19 failures over the same week are **zero OOM, all
+  `earlyExit`**, still recurring ~1–3/day through 08-16 05:54 CT — a different
+  failure mode that a "19 failures" summary would have buried. Not diagnosed
+  here; filed as an observation only.
+- Files touched: `scripts/render_events.py` (new), `tests/test_render_events.py`
+  (new, not in the opening claim — added when the verification step needed it).
+  No service code, no config, no deploy.
+
+### ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `_settle()` can no longer return `settled: true` on a render that never
+  started. A verdict that rests on absence of change is labelled as such in the
+  JSON and in the printed row, so no reader can mistake it for a proven settle.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis: the 800ms artifact in `reports/ui_layout/rerun_2026-08-16.json`
+  (mlb desktop, `contentUnits min==max==33`, `renderSettled: true`) is the two-
+  equal-poll rule firing inside a pre-enrichment plateau, not a finished render.
+- Falsification test: if the growth curve on mlb desktop shows the fingerprint
+  genuinely constant from `load` through enrichment, the plateau theory is wrong
+  and the uniform 33 is a real slate.
+- **CONFIRMED, not falsified.** Replaying the old rule over a plateau-then-growth
+  tape returns `settledMs: 800, settled: true, finalFingerprint: 100` while the
+  render goes on to 400 — it stops inside the plateau and reports the
+  pre-enrichment DOM as final. On the live re-run with the new rule, mlb desktop
+  settled at **6800ms with `sawChange: true`** and desktop/mobile agree at
+  **41–53 pairs/card**; under the old rule the same two widths read 33–33 and
+  33–49. The contradiction is gone because the reading is no longer premature.
+- Verification: `tests/test_ui_layout_probe.py` 35 passed (27 pre-existing + 8
+  new); the plateau test asserts `settledMs > 800`, which the old rule fails by
+  construction. Live production run 2026-08-16 ~11:0x CDT, all 8 rows OK, no
+  false alarm, footer names exactly the six server-side rows.
+- What is NOT claimed: the quiet window is a longer window, not a proof. A
+  render that stays still for 2400ms and only then starts would still fool it.
+  What changed is that such a reading is now *labelled* (`sawChange: false`) and
+  fails as soon as a second reading contradicts it.
+- Blocked by: none
+- Governed by `learnings.md` 2026-08-16 "a wait loop must gate on an AFFIRMATIVE
+  success token, never on the absence of a failure string" — `_settle` was that
+  rule recurring in a render poll. Absence of DOM change cannot distinguish
+  "render finished" from "render has not started".
+
+### ui-probe-desktop-height-model — CLOSED 2026-08-16 — desktop is UNFITTABLE, not mis-tuned; measured the floor instead of tuning the threshold — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: desktop reports a height figure that is a real layout signal — either a
+  model that fits because it matches how the desktop grid actually sets height,
+  or a stated finding that no per-card model can fit and why.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE testing): (a) grid row-stretching, or (b) pairs
+  wrapping into columns so height goes as `ceil(u/cols)`.
+- **BOTH HYPOTHESES FALSIFIED.** (a) dead: every card sits at `left=4`, one per
+  row — there is no row to equalise against. (b) dead as stated: the pair grid is
+  10 visible columns at 1440 and 2 at 390, not 2, and `visRows` fits WORSE than
+  `u` (ratio 1.69 vs 1.16).
+- **What is true instead:** the grid is a wrapping flow and text WIDTH decides
+  where it wraps, so height is not a function of pair count at all. Cards with
+  identical `u` differ by **116px** (u=45, n=7) and **97px** (u=49, n=5) on
+  desktop; by 81px and 40px on mobile. Agreeing on BOTH `uVis` and `visRows`
+  still leaves **74px**. That is a floor no model in these variables can beat.
+- **Why no threshold rescues it:** `reliable` needs `residual <= 0.25*explained`,
+  so a 116px floor requires 464px of explained range; desktop's content spans
+  197px. Tuning the bar would manufacture a fit.
+- **Bonus correction:** mobile's residual (81px) EQUALS its floor (81px) — the
+  passing model sits on the noise floor and reports text wrap, not layout
+  deviation. It passes only because its slope is ~62px/pair vs desktop's ~16,
+  buying 743px of range to hide identical noise behind. This revises the
+  "residual band ~80–105px" recorded earlier in `log/2026-08-16.md`.
+- Verification: 42 tests pass (35 prior + 7 new); the new ones drive the REAL
+  shipped `fitGroup` JS in a headless browser over captured production points and
+  independently reproduce `floorPx == 116` and mobile `residual == floor == 81`.
+- **Verification LIMIT, not claimed as done:** not observed on a live run. The
+  11:5x CDT slate collapsed to a uniform 33 pairs at both widths with games Live,
+  so nothing fits anywhere (`statesUnfitted: [Live, Preview]`). Verified by
+  replay through the shipped code path only.
+- Follow-up left open by decision, not oversight: making desktop actually fit
+  needs a variable capturing rendered text extent (summed visible section
+  heights, or per-section wrapped row counts). Both edge toward circular, so it
+  was flagged for a call rather than chosen unilaterally.
+- Blocked by: none
+
+### ui-probe-tie-floor-tracking — CLOSED 2026-08-16 — floor collected on every row; 5 of 6 stable, mlb mobile fires the rule at 2.06x — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` emitted on EVERY run at both widths, printed,
+  compared across runs, and unable to fail a run while its stability is unknown.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Decision rule, written BEFORE the readings: moves more than ~2x across runs
+  with no card-surface deploy → slate-driven, cannot be baselined → option C.
+- **RESULT — 3 consecutive production runs:** nfl desktop 14/14/14, nfl mobile
+  50/50/50, ncaaf desktop 45/45/45, ncaaf mobile 53/53/53, mlb desktop
+  125/125/125 (116 on the earlier 11:0x geometry, so 1.08x across a slate
+  change). **mlb mobile 109/109/53 = 2.06x — the rule FIRES for that row only.**
+  It fails informatively: `n` at the worst tie group moved 7 → 8, so tie-group
+  membership churns as data enriches and which group is "worst" moves with it.
+- **The row the desktop question was actually about (mlb desktop) is stable** at
+  125px across three readings while its own `contentUnits` moved 33-57 → 41-57.
+  That looks like a property of the CSS, not of the slate.
+- Verification: 51 tests pass (42 prior + 9 new), including one proving the floor
+  is emitted when `heightModel is None` and `statesUnfitted == ["Preview"]` —
+  run through the real shipped JS, not a stub. Three production runs recorded.
+- Kept as WATCH, NOT promoted to STABLE_METRICS: one row fails the bar, and the
+  metric is one day old.
+- **Deliberately not done:** a statistic that would probably pull mlb mobile under
+  the bar exists (largest tie group, or a median across groups). Choosing it
+  *after* seeing which looks stable is manufacturing the result — the same error
+  as tuning the fit threshold, which is what started this whole thread. Left for
+  a decision.
+- Bug found and fixed en route, predating this lane: `compare()` guarded
+  `httpStatus >= 400` but not an `error` row, so `soccer mobile`'s 30s
+  `page.goto` timeout was reported as `CODE-DRIVEN DRIFT` on four metrics at
+  once. Errored rows are now SKIPPED and named; they still fail the run.
+- Blocked by: none
+
+### ui-probe-tie-statistic — CLOSED 2026-08-16 — implemented as decided; the statistic did NOT help and the instability is the SLATE — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: track the spread within the LARGEST tie group (user decision), applied at
+  every row; the fit-impossibility floor keeps using the MAX across groups.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE the runs): switching statistic will NOT rescue mlb
+  mobile.
+- **CONFIRMED — and it is worse, not merely no better.** 3 production runs:
+  mlb mobile tracked 67/132/164 = **2.45x** (fires) against worst-group
+  99/132/164 = 1.66x; mlb desktop tracked 64/80/64 = 1.25x against worst-group
+  83/80/83 = 1.04x. **On both MLB rows the new statistic is LESS stable than the
+  one it replaced.** My stated expectation ("would probably pull mlb mobile under
+  the bar") was wrong. Mechanism differed from the guess too: the largest group's
+  SIZE churns, n = 7/14/7 between runs.
+- **The real finding: the axis was wrong.** nfl and ncaaf read 1.00x across three
+  runs, both widths, under BOTH statistics — their slates are static (units 3-3,
+  16-16). MLB carries a live game and enriches continuously (units 41-57 / 33-57
+  / 41-57, Live 1 + Preview 14 every run). The identical-content spread is
+  exactly reproducible on a static slate and not reproducible on a churning one;
+  no choice of statistic survives content moving underneath it.
+- Verification: 57 tests pass (51 prior + 6 new) incl. largest-group tracked
+  while `floorPx` takes the worst, and equal-n groups breaking toward the larger
+  spread so the tie-break cannot hide a difference. 3 production runs recorded.
+- Both statistics are emitted and printed when they differ, so nothing is lost
+  whichever is diffed; only `_cmp_value` selects. Reverting is one line.
+- **Recommendation NOT taken unilaterally:** revert the tracked statistic to
+  `worstGroupPx` (more stable on both MLB rows, and identical to the quantity the
+  impossibility floor already uses), then baseline nfl/ncaaf and treat
+  MLB-during-a-live-slate as not baselineable in any statistic.
+- Provenance caveat: this statistic was chosen AFTER seeing which looked stable,
+  so its behaviour is not independent evidence. It did not come true.
+- Blocked by: none
+
+### ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board — opened+closed 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: tracked statistic back to the worst tie group, printed number == diffed
+  number == the quantity the impossibility floor uses.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Cross-era safety: `_cmp_value` reads `worstGroupPx` BEFORE `spreadPx`, because
+  reports from the largest-group window carry `spreadPx` meaning the other
+  quantity. Verified live: post-revert run vs a largest-group-era report reads
+  `identicalContentSpread unchanged`.
+- **False alarm 1 fixed:** mlb mobile printed "AT ITS NOISE FLOOR (164px) ... not
+  layout deviation" and failed the run on that same number (164px > 150px
+  budget). A residual at its floor is unmeetable by any model; now reported, not
+  failed.
+- **False alarm 2 fixed:** mlb desktop then failed with "LAYOUT SPREAD OVER
+  BUDGET (313px) with content not driving height" while identical-content cards
+  differed by 70px. The branch inferred "content-independent" from a flat linear
+  slope; on desktop that is false, because the grid WRAPS and a flat slope means
+  the line cannot see content, not that content is absent. The budget now applies
+  to the content-controlled figure where tied cards exist, falls back to raw
+  spread where none do, and says which it used.
+- Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
+  0 / OK where the same board failed two rows before.
+- Blocked by: none
+
+### branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-overlap-baseline-watch` (scheduled-task run)
+- Goal: take one Phase 1 (`#440`) before-baseline sample; it turned into fixing
+  the instrument, because the sample was honest and the schedule was not.
+- Files: `.syndicate/scheduled_task_branch_overlap.md`,
+  `.syndicate/scheduled_task_oom_band.md`, and three task files under
+  `~/.claude/scheduled-tasks/` (outside VCS — prompts now embedded in the
+  oom_band mirror so all three are recreatable).
+- **NO LANE WAS OPEN WHILE THE WORK HAPPENED.** Opened at checkpoint, closed
+  immediately. Config + mirrors only, no app code, nothing contended — but the
+  protocol says claim first and I did not.
+- Measured: 42 `oomKilled` in 8 days, **41 of 42 in 15:00–23:59 local**; cron
+  moved `15 */4 * * *` → `45 19,22,1 * * *` (three 5h windows tiling
+  14:45–01:45). Sampling drops 6/day → 3/day with the kill band fully covered.
+- Corrected: the oom-band tasks' SHA-equality pin → containment check. See
+  `learnings.md` 2026-08-16.
+- Added: `preband-refresh-worker-sha-check`, one-time 21:45Z, returns
+  BAND CLEAN / BAND COMPROMISED. **It notifies nobody** — created from a
+  scheduled-task run session, which cannot subscribe another task.
+- Pushed: `8150ff5b`, `b37b870c`, `80581700`, `38bb30b2`. Ledger writes from this
+  checkpoint are UNCOMMITTED (shared files carry other sessions' in-flight edits).
+- Blocked by: none. Nothing here is load-bearing for another lane; the
+  `refresh-worker-oom-recurrence` owner keeps the diagnosis.
+
+### ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` fails on drift for nfl/ncaaf, stays watch-only
+  for mlb/soccer, with a new baseline carrying the field.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `reports/ui_layout/baseline_2026-08-16.json` (NEW)
+- Falsification test: if nfl/ncaaf tie spreads differed between two runs now with
+  no deploy, they are not baselineable. **They did not** — 14/50/45/53 held
+  across every run today, and the armed comparison reports all four as
+  `unchanged (baselined)`.
+- Four outcomes kept distinct: drift FAILS; a baseline predating the field is
+  NOT COMPARED and does not fail; a VANISHED current value FAILS (absence is
+  never a pass); a state change is NOT COMPARABLE rather than drift — which is
+  what stops kickoff reading as a layout regression.
+- Verification: 72 tests pass (65 + 7 new); live run splits exactly as intended,
+  nfl/ncaaf baselined-unchanged while mlb moved 68 -> 69 on the watch line
+  without failing.
+- **First baseline run was DISCARDED, not shipped**: it failed on `ncaaf desktop
+  tab click identity`. Second run clean; the baseline carries `ok: true`. The
+  tab-click intermittent is real and unexplained — recorded, not chased.
+- **Open and unrelated:** mlb mobile Live state now fails legitimately — residual
+  151px against a 40px floor, `atNoiseFloor` False, worst card +79px at 45 pairs,
+  1px over budget. The exemption correctly declines. Needs its own look.
+- Blocked by: none
+
+### mlb-mobile-live-residual — CLOSED 2026-08-16 — HYPOTHESIS FALSIFIED; it is a false alarm, the Live fit is convex and `fitRatio` cannot see curvature — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: name what makes one Live card +79px off the model, or show the residual
+  is noise.
+- Hypothesis: the outlier carries a BLOCK its same-pair-count peers lack.
+- **FALSIFIED. There is no outlier.** Residuals are U-shaped across pair count
+  (+76 at u=45; -2/-10/-42 at u=49; -41/-75 at u=53; +73 at u=57) — a line
+  fitted to a curve, not an anomalous card.
+- **Mechanism found:** per-pair cost is LINEAR in Preview (62.4, 62.1 px/pair)
+  and CONVEX in Live (41.3, 61.8, 76.6). The curvature is entirely in
+  `section.cards-panel.is-active > div.cards-overview-grid` (3187 -> 3906px
+  across the Live series; every sibling block flat or <=28px). Live puts cells of
+  differing heights into a wrapping row-max grid, so each added pair costs more
+  than the last; Preview's cells are uniform.
+- **The harness is at fault, not the board:** `fitRatio = residual/explained`
+  cannot see curvature, so a misspecified model with a wide explained range
+  (771px) passed as `reliable: True` at ratio 0.2 and then tripped the budget
+  with a STRUCTURED residual. The named worst card (u=45) is the ONLY card at
+  that u — no peers — so "+79px off the model" is deviation from a LINE. Cards
+  that do have peers agree to 40px.
+- Recommended, NOT implemented (needs a decision): fail on deviation from
+  same-content PEERS (`floorPx`, model-free) rather than from the line; and
+  optionally flag monotone per-step slope drift as MISSPECIFIED so `fitRatio`
+  stops certifying curved fits.
+- Live consequence: the probe fails every run while MLB has a live slate.
+- Blocked by: none
+
+### branch-overlap-manual-run-marker — CLOSED — opened 2026-08-16 — session: `branch-overlap-baseline-watch` — verified in production 2026-08-16T19:52:23+00:00
+- **PROVEN IN PRODUCTION.** The 14:45 local slot landed a record at
+  `recorded_at=2026-08-16T19:52:23+00:00` carrying **`run_mode="scheduled"`** — the
+  first record ever written with the field set, so `--scheduled` does reach the
+  live task. Covered 2026-08-16T14:52:07Z—19:51:47Z (09:52—14:51 local),
+  `samples=1967`. The three prior records carry NO field and stay UNKNOWN.
+- Goal: a record in `reports/branch_overlap/baseline.jsonl` states whether it came
+  from the scheduled run or from a human, so a manual probe can never be counted
+  as evidence in the Phase 1 (`#440`) before-distribution.
+- Files: `scripts/watch_branch_overlap.py`,
+  `reports/branch_overlap/baseline.jsonl`,
+  `.syndicate/scheduled_task_branch_overlap.md`, and the live task file.
+- Why: testing the new 14:45 slot appended a record indistinguishable in shape
+  from a scheduled sample — same failure the pre-band drift check was added to
+  prevent, in the instrument this session was fixing. Baseline also already
+  double-counts 10:09–15:09Z (two runs overlapping ~4.5 of 5 hours).
+- Design: `--scheduled` flag; **absent means manual**. Fails safe — forgetting the
+  flag excludes a run from the distribution rather than silently counting a probe.
+  No time-vs-cron math, which would re-couple the script to a schedule that has
+  already changed twice today.
+- Consumer note: records written before this change carry NO field. Absent must
+  read as UNKNOWN, never as scheduled.
+- Blocked by: none. `refresh-worker-oom-recurrence` owns the diagnosis; this is
+  instrument provenance only.
+
+### ui-probe-peer-deviation-gate — CLOSED 2026-08-16 — one model-free height rule; production green, coverage gap printed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: ONE height failure rule — deviation from same-pair-count peers — with
+  residual-from-the-line and raw-spread removed.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Falsification test had two halves and BOTH passed: a fabricated 420px peer
+  deviation still fails (so a real defect with peers is caught), and the live
+  board went GREEN (exit 0/OK) where it had been failing — matching the
+  diagnosis that no card deviates from its peers.
+- Live peer deviations: mlb desktop 96px, mlb mobile 123px, nfl 14/50, ncaaf
+  45/53, all under the 150px budget.
+- **Coverage loss stated, not hidden:** a card with no same-`u` peer cannot be
+  judged. The row now prints `peer check covered 11/15 cards` and, where nothing
+  ties at all, `PEER CHECK DID NOT RUN` — a stated gap, the treatment
+  `statesUnfitted` already gets.
+- The fit is still reported (residual, chrome, px/pair, UNFITTABLE, UNRELIABLE,
+  noise floor) as CONTEXT. It decides nothing.
+- Verification: 71 tests pass. Nine tests encoding the removed rules were
+  DELETED rather than adjusted; the default fixture is now a healthy slate under
+  the peer rule; 8 new tests cover fail/pass/per-state/coverage/did-not-run/
+  no-model.
+- Closes the root cause behind all three of today's false alarms: the fitted
+  line was treated as ground truth when the tie structure is the only model-free
+  evidence available.
+- Blocked by: none
+
+### ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `reliable` stops certifying a CURVED fit.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method: slopes between consecutive pair-count group MEANS, then monotone-drift
+  test. >=3 steps required; two steps can only say "one went up".
+- Threshold measured: Live drift 0.88 vs Preview 0.008 — two orders of magnitude
+  apart, so the 0.5 cutoff is not load-bearing.
+- **Falsification test PASSED:** the known-linear Preview series is NOT flagged,
+  while Live is flagged with `fitRatio` still 0.20. Two-step and non-monotone
+  series also not flagged.
+- Verification: 77 tests pass, both series driven through the real shipped JS.
+  Live run shows no false positives; today's slate has too few distinct pair
+  counts per state to exercise the detector either way.
+- Reported as MISSPECIFIED, deliberately distinct from UNRELIABLE: the line is
+  the wrong shape, not noisy, and "no layout signal here" would understate it.
+- Low risk: `reliable` gates no failure now, so this changes a label not a
+  verdict — which is why it was safe to do after the peer rule, not before.
+- **HANDS OFF, needs a decision (see log):** the peer budget is a FIXED 150px
+  against a quantity that scales with content. mlb mobile's identical-content
+  spread read 81/109/123/164/193px today; the 193px case is 7 cards evenly
+  spread (gaps 11/23/16/49/28/66), i.e. wrap, not a defect. Must not be resolved
+  by raising 150 until the board passes.
+- Blocked by: none
+
+### ui-probe-proportional-budget — CLOSED 2026-08-16 — shipped; falsification test FIRED (proportional does not tighten the spread) but it fixes the width bias — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: peer budget as a share of the tie group's card height, percentage chosen
+  from measurement.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method held: denominator added FIRST, 16 readings collected, threshold picked
+  only afterwards — so the number could not be reverse-engineered from the answer.
+- Calibration: worst healthy reading 9.9% (mlb desktop Live); 15% is ~1.5x.
+  Deliberately tighter than the old 3x principle, which here would be 30% = 1440px
+  on a 4800px card.
+- **FALSIFICATION TEST FIRED.** The lane predicted healthy readings would cluster
+  as a share of height. They do not: raw px max/median 3.3, percentages 3.0 —
+  the same scatter. The premise was wrong and is recorded, not dropped.
+- Kept anyway because it fixes a DIFFERENT real defect: the width bias. 150px is
+  2.8% of a 4800px mlb mobile card and 27% of a 541px ncaaf desktop one.
+  Percentages separate by width; px separate the opposite way.
+- Verification: 80 tests pass incl. the same 400px passing at 4800px (8.3%) and
+  failing at 541px (73.9%); no-height groups named NOT JUDGED rather than
+  skipped; live run exit 0/OK with all four baselined rows unchanged.
+- **Standing recommendation:** this is a BACKSTOP. Drift-against-baseline caught
+  nothing false all day while the absolute budget produced three false alarms.
+  Extending `TIE_SPREAD_BASELINED` beyond nfl/ncaaf is worth more than tuning
+  this percentage.
+- Blocked by: none
+
+### soccer-live-game-state — CLOSED-VERIFIED 2026-08-16 18:56Z — a kicked-off match is no longer `pregame`, and no finished match carries an edge
+- **Verification RAN and PASSED**, on production artifacts stamped after the
+  18:54:37Z deploy:
+  - soccer `by_state` `{live 0, final 0, pregame 49, unknown 17}` →
+    **`{live 4, final 11, pregame 34, unknown 17}`**; games past kickoff still
+    marked pregame **10 → 0**.
+  - **Harmful edges (on a finished game, or on a live game from a pregame
+    projection) across all in-season sports: 0.** Was 27 + 9 on soccer.
+  - MLB's **2 live-aware edges preserved** — the main regression risk, since
+    suppressing those would delete the only genuinely live number on the board.
+  - **The branch is confirmed to have RUN, not just to have produced a zero:**
+    served coverage reads `live_edge_enforced_rows: 36` for soccer
+    (`final` 27 + `live` 9 — matching the pre-fix count exactly) and `0` for MLB.
+- Two deploys, both cut on the LIVE worker SHA: `38ba954c` (state) 18:37:38Z,
+  `a72b4bf4` (enforcement) 18:54:37Z. Measurement in `deploys.md`.
+- **Deploy 1 alone was NOT enough and the sweep is what said so.** With states
+  finally correct, 36 rows still carried edges, because
+  `soccer_projections._price_against_market` opens `if model_prob is None:
+  return` while `_mean_projection` sets `model_prob_over: None` alongside
+  `edge_vs_line` — so every mean-based row returned before the refusal whose own
+  comment claimed it ran "for every row, mean-based and probability-based alike.
+  Checked rather than assumed."
+- Fixed at `board_enrichment.attach_projections`, not in the producer: thirteen
+  return sites across seven sports, and that wrapper already exists for exactly
+  this argument. It also covers `soccer_projections.py` **without editing it**,
+  so the orphaned lane's claim on that file was never crossed — the file is
+  unmodified.
+- Claim override taken on `syndicate/features/soccer/cards.py` only, logged at
+  lane open: `soccer-model-coverage` is ORPHANED (owning session absent from a
+  40-entry census incl. archived).
+- Near-miss worth keeping: the first draft used `isinstance(row, Mapping)` in a
+  module that does not import `Mapping` — a `NameError` on the FIRST row that
+  would have taken the whole projection join down. Caught by running it.
+- Files: `syndicate/features/soccer/cards.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_soccer_cards_live_state.py`, `tests/test_live_edge_enforcement.py`,
+  `tests/test_projection_degeneracy.py` (one exact-dict assertion widened).
+
+- **ROOT CAUSE FOUND 2026-08-16 ~18:2xZ — the freeze WRITER and the grading READER are on two different trees, separated by one path segment (`source_artifacts/`).**
+
+      WRITER  `_freeze_oddsapi_pregame_markets`, market_dir = source_root/data/market/oddsapi
+              source_root = REPO_ROOT/data/mlb_source   (`refresh_odds_sources.py:666`, passed as --source-root)
+              => <checkout>/data/mlb_source/data/market/oddsapi/
+              git-tracked files there: **0**
+
+      READER  `_odds_paths` -> <root>/market/oddsapi, root[0] = MLB_BETTING_DATA_ROOT
+              = /opt/render/project/data/mlb_source/source_artifacts/data   (all three services)
+              => .../mlb_source/source_artifacts/data/market/oddsapi/
+              git-tracked `*_pregame.json` there: **27, newest 2026-07-08**
+
+- **That single fact explains both halves of this lane.** (1) `frozen_doc` is read back from the WRITER's tree, which git tracks as EMPTY — so every deploy recreates the checkout without it, `frozen_doc` comes back `{}`, and the merge (monotonic by construction) reseeds the freeze from live-only-pregame. (2) The grading builder reads the OTHER tree, whose newest sealed game-lines file is from **July 8** — so ~14 of 15 games warn `Missing game-line match` and exactly one grades, on every date.
+- **The merge code is NOT at fault and should not be edited.** `_merge_pregame_game_lines` seeds `frozen_games` from `frozen_doc` and only ever adds or updates. Given a readable `frozen_doc` it cannot shrink. The observed shrink is proof the input was empty, not that the merge is wrong.
+- **EVIDENCE for the deploy-reset half, stated at its real strength (n=1 on the transition):** refresh-worker deployed 6x between 16:46Z and 18:07Z. Freeze read **14 games at ~17:52Z** -> **8 games at 18:12Z** (7 of the 8 still pregame), with `cf467794` going live **18:07:36Z** between the two reads. Re-read at 18:18Z with no new deploy: still 8/7, i.e. steady between deploys. That is consistent, not conclusive; `7b544eb4` was still building and its landing is the next free test.
+- **INSTRUMENT NOTE — I corrected myself mid-check.** I nearly concluded `market/` is absent in production because `/api/ops/artifacts/export` shows 3466 files under `mlb_source/source_artifacts/data/` and **zero** containing `/market/`. That endpoint runs on WEB and reads WEB's disk; the grading builder runs on refresh-worker and reads ITS disk. Separate disks (three-service architecture). The zero is real for web and says nothing about the worker. Not usable as evidence for the reader's tree.
+- **`market/*.json` IS allowlisted** (`artifact_publisher.py:78`, `*_source/source_artifacts/data/market/*.json`, and fnmatch's `*` crosses `/`), so the absence on web is a publish/transfer question, not an allowlist one. Unresolved and NOT needed for the diagnosis above.
+- **STILL OPEN, and it is the fix decision:** which of the two trees is meant to be canonical. Either the writer should target `source_root/source_artifacts/data/market/oddsapi` (write where the reader looks), or the reader's root should include the checkout tree. Do not guess — `--artifact-root` already exists on this script (`_local_source_artifact_root("mlb")`) and a publish step may be the intended bridge. Whichever way, the freeze must live somewhere a deploy does not wipe.
+- **The scheduled check `grading-freeze-payload-check` (2026-08-17 07:00 CT) was rewritten** to predict the collapse rather than the full slate, and now carries the `_odds_data_roots()` exoneration so it is not re-opened.
+
+- **FIX BUILT AND TESTED 2026-08-16 ~18:5xZ — NOT DEPLOYED, and it is INERT until it is.** `scripts/refresh_mlb_oddsapi.py`:
+  - New `_freeze_market_dirs(source_root)` returns every `market/oddsapi` the freeze must live in: the writer's own tree (unchanged, and first — it is where the live doc it merges from is fetched to), **`<MLB_BETTING_DATA_ROOT>/market/oddsapi`**, and `source_root/source_artifacts/data/market/oddsapi` for env-less callers.
+  - **Derived from the SAME env var the reader uses, deliberately not hardcoded to `source_artifacts`.** `_odds_data_roots` resolves odds from `MLB_BETTING_DATA_ROOT`; a hardcoded second layout would silently diverge again the next time that var is repointed, which IS this bug.
+  - **Seed from every copy, not just this tree's** — `frozen_doc` is now the union of all existing seals (merged at `now_epoch=0.0` so started games carry across rather than being dropped by a pregame test that should only apply to the LIVE doc). Without this, writing to the right place still loses the slate on the next deploy.
+  - `_ensure_dir` on every destination parent. Only `snapshot_dir` was ensured; the reader's tree on a fresh disk would have raised and taken the whole freeze down with it.
+  - `_merge_pregame_game_lines` UNTOUCHED. It was never at fault.
+  - Contract change: `copied` is keyed by FULL PATH, not basename — the copies share one filename, so a name-keyed dict reported one and hid the rest. It surfaces as `frozenPregame` in the run payload, which is where this fix gets verified in production.
+- **TESTED: 419 passing.** 59 (freeze + odds-paths + odds-sources orchestrator) and 360 + 13 subtests (mlb market board, mlb refresh runner, live refresh loop). 3 new tests added in `tests/test_oddsapi_pregame_freeze.py::FreezeReachesTheGradingReaderTests`.
+- **NON-VACUITY VERIFIED, and it mattered.** The 3 new tests were re-run against a simulated pre-fix `_freeze_market_dirs` (single directory): **all 3 fail**. Without that check `test_freeze_lands_in_the_source_artifacts_tree` could have passed for the wrong reason.
+- **A test-result correction worth keeping:** the first adjacent run exited 0 with no FAILED/ERROR lines, but 464KB of worker debug output had swallowed the pytest summary. Exit code alone does not separate "all passed" from "collected oddly" — re-ran in batches to get real counts rather than bank the zero.
+- **TWO LIMITS, STATED:** (1) `autoDeploy` is off, so this ships nothing until someone deploys — the 2026-08-17 07:00 CT check will measure the OLD behaviour unless a deploy lands first, and a deploy kills any in-flight sim. (2) **Forward-only.** It seals future slates; it does not repair the already-collapsed freezes for 08-09..08-16. `scripts/backfill_pregame_game_lines.py` is the tool for that and is untouched.
+
+### ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: stop the intermittent, or name a real defect.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- **Three hypotheses written before testing, ALL FALSIFIED:** (1) deferred tab
+  handler — `activateTab` is a synchronous `classList.toggle`; (2) selection lost
+  because cards lack ids — all 16 ncaaf cards have ids; (3) the probe's click
+  triggers `refreshOnFocus` — 0 refresh fetches after the click in 10/10 runs,
+  10/10 passed.
+- **NOT REPRODUCED** in 10 scripted attempts or any probe run since. The cause of
+  the single instance stays UNKNOWN and is recorded as such.
+- Real mechanism found, previously unguarded: `game_board.js` polls every 30s and
+  does `cardsGrid.innerHTML = fresh.innerHTML`, detaching every node the check
+  holds, while the check sampled panel state exactly ONCE after `click()`.
+- Fixed: the failure now prints WHY (error type, or `active=[…] h=…px`) — the
+  primary fix, since `tab click identity` cost this whole investigation; the
+  check waits on the outcome (2000ms/100ms poll) and retries once on staleness;
+  a no-measurement result carries `ok: False` explicitly.
+- Verification: 85 tests pass (80 + 5). Live run exit 0/OK with ncaaf 4 / nfl 4 /
+  mlb 3 tabs all ok at attempts=[1,1,1,1] — the retry never fires, correct for a
+  synchronous handler.
+- Process note: the failing artifact was OVERWRITTEN by the clean re-run and
+  never committed, so its detail is unrecoverable. Keep a failing artifact under
+  a separate name before re-running.
+- Blocked by: none
+
+### ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: a PEER DEVIATION failure requires n>=3; thinner groups still reported.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Evidence: a run failed at 30.9% on an n=2 Live group (2 cards at 41 pairs,
+  312px apart) while the n=6 group on the same board sat at 82px. Minutes later
+  only ONE card remained at 41 pairs — transient pairing from MLB live
+  enrichment, which gives a card a passing pair count that can coincide with an
+  unrelated card's. Three runs after: green.
+- **Falsification test held:** had the n=6 groups also been over budget, group
+  size would not be the discriminator. They were not — 82px vs 312px.
+- `tieFloor` now returns the FULL per-group list. Required, not cosmetic: with
+  only worst+largest the gate would skip a genuine n=6 group hiding behind a
+  thin n=2 one with a larger spread. Pinned by a test.
+- Verification: 91 tests pass (85 + 6). Three consecutive live runs OK, zero
+  over-budget failures, all four baselined rows unchanged.
+- **Deliberate trade, recorded:** a defect isolated to a card with fewer than 3
+  same-content peers no longer carries a verdict, though it is still printed.
+- Does NOT make MLB baselineable — that number still read 81..312px across the
+  day. Tomorrow's scheduled pre-game run tests that separately.
+- Blocked by: none
+
+- **CHECKPOINTED 2026-08-16 ~21:0xZ — STATUS: fix BUILT + TESTED + PUSHED TO A BRANCH, NOT DEPLOYED, NOT ON `main`.**
+  - Durable copy: **`origin/wip/grading-blocker-freeze-fix` = `8ad48ac8`**, verified on the remote by content (fix 2 occurrences, `FreezeReachesTheGradingReaderTests` present, handoff blob `9e6fc894` == local).
+  - **Four earlier commits of this lane went unreachable** (`61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46`) — `main` was rewritten under the session. Everything was re-landed from the working tree. See `learnings.md` 2026-08-16 "a local commit on this worktree is not durable".
+  - Deploy runbook: `.syndicate/handoff_deploy_freeze_reader_tree.md`. **Must be executed by an ATTENDED session** — this one is a scheduled-task run and must not fire deploys.
+  - **NEXT ACTION:** merge the wip branch (or cherry-pick `8ad48ac8`), then follow the handoff — both workers in one lull, ROUTE ONE warm-up, verify by content — and re-aim `grading-freeze-payload-check` from date 08-16 to 08-17 firing 08-18, because as armed it reads a date the fix cannot affect.
