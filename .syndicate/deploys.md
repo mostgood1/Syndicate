@@ -13747,3 +13747,76 @@ of those features — they are what survives after the calibrated rates fight th
   individual magnitude.
 - This says nothing about batted-ball x park x defence, which remain unwired and
   untested.
+
+## 2026-08-17 — THE REFIT DOES NOT WORK AS DESIGNED, and the reason matters more than the refit
+
+Lane `convergence-phase7-crps`. `scripts/refit_mlb_rates.py`, 20 games x 60 sims,
+all three sources ON (substitution + pitch splits + batted-ball blend).
+
+### All sources are now IN
+
+- **substitution** — `GameConfig.position_substitutions` (`#440` P2)
+- **pitch splits** — 305-pitcher artifact + artifact-first loader
+- **batted-ball** — NEW: `batted_ball_2026.json` (450 players, all with
+  `gb_share`), blended into `hr_rate` / `inplay_hit_rate` via
+  `sim_engine/data/batted_ball.py`, **9 tests**. Barrels drive HR, hard-hit
+  drives in-play — the pairing the predictive test measured.
+  **Deliberately an ESTIMATOR, not a mechanism**, so it should not suffer the
+  absorption problem.
+- **NOT added: defence/OAA.** A genuine new mechanism, needs fielder->team->BABIP
+  plumbing that does not exist, and it has never passed a predictive gate.
+  Adding it untested is the error this lane already made once.
+
+### PASS 1 — the sim is badly off BEFORE any correction
+
+    rate               simulated    actual   residual
+    hr_rate              0.02221   0.03547    -37.4%
+    inplay_hit_rate      0.25761   0.24848     +3.7%
+    k_rate               0.17215   0.22590    -23.8%
+    bb_rate              0.06343   0.08784    -27.8%
+
+**The sim under-produces all three true outcomes by 24-37%.** That is a
+calibration gap far larger than any feature effect measured today (~0.001-0.006
+Brier), and it was invisible until the mechanisms were switched on together.
+
+### PASS 2 — 2 of 4 corrections did nothing. THE GUARD FIRED.
+
+    hr_rate          -37.4%  ->   +2.6%   WORKED
+    bb_rate          -27.8%  ->  +19.2%   partial
+    inplay_hit_rate   +3.7%  ->   +3.9%   NO CHANGE
+    k_rate           -23.8%  ->  +24.0%   NO CHANGE
+
+**A 1.3123x multiplier on `k_rate` moved simulated SO/PA by −0.0006.** The knob
+is not connected to the outcome in any meaningful way.
+
+### WHY — and this reframes the whole improvement programme
+
+**This is a PITCH-LEVEL simulator.** Strikeouts, walks and balls in play emerge
+from pitch-by-pitch whiff / called-strike / swing dynamics driven by the PITCHER
+side and the pitch model. The batter's `k_rate` / `bb_rate` /
+`inplay_hit_rate` scalars are **inputs to that process, not controls on its
+output.** Only `hr_rate` responded cleanly, which suggests HR is drawn far more
+directly.
+
+**Consequences, in order of importance:**
+
+1. **The refit-by-scaling-batter-rates approach is INVALID for 3 of 4 rates.**
+   A real re-fit must target the PITCH MODEL, not these scalars. That is a much
+   larger job than this script.
+2. **It explains the small feature effects.** Every mechanism added today acts on
+   a process whose output is governed elsewhere. Tuning inputs that do not
+   control the output is why +0.001 kept appearing.
+3. **The -24% to -37% calibration gap is the biggest measured defect in the
+   engine** and dwarfs every feature question this lane has been asking. It
+   should be diagnosed before ANY further feature work.
+
+### Status
+
+**Nothing is shipped and nothing should be.** The corrections are not written to
+any artifact; `refit_rates.json` is a measurement, not a config. The batted-ball
+blend is dark (caller must pass a weight) and the other two mechanisms remain
+flag-off.
+
+**The refit as specified is closed as unworkable.** The next question is not
+"which feature next" but **"why does a pitch-level sim under-produce K, BB and HR
+by a quarter to a third?"**
