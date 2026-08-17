@@ -2667,3 +2667,63 @@ exist (NFL, soccer); neither is deployed and neither has seen a production game.
    Season opens **08-29** — this is the only dated item in the lane.
 4. Owed consolidation: `wnba/cards.py:891` should delegate to
    `basketball_elapsed_minutes`; blocked on that file's holder.
+
+#### game-shape-capture — SCOPE ADDED 2026-08-16 ~19:5x CDT — WNBA pbp possessions (`#454` first step)
+
+Files added to this lane: `scripts/wnba_pbp_possessions.py` (new),
+`tests/test_wnba_pbp_possessions.py` (new). Both unclaimed; `scripts/` carries
+no lane claim.
+
+**THE ANSWER TO "TAKE WNBA PBP FOR MODELLING" IS: THE DATA IS REAL AND THE
+SAMPLE IS NOT.** Possessions genuinely exist — `pbp_possessions.poss_est`,
+computed as `FGA + TOV + 0.44*FTA - OREB`
+(`vendor/wnba_betting_repo/app.py:3572`) — and the values are sound. But on the
+tracked mirror:
+
+| stage | count |
+|---|---|
+| files scanned | 53 |
+| game records | 120 |
+| with possession data | **17** |
+| placeholder ids excluded (`0000000001`…) | 8 |
+| **partial / mid-game excluded** | 5 |
+| **USABLE GAMES** | **4** |
+| dates with possessions | 2 (`''` and `2026-06-27`) |
+
+The four survivors read 73.02 / 74.96 / 78.02 / 85.30 possessions per team —
+plausible WNBA figures, which is the sanity check that the underlying
+`poss_est` is sound. **No aggregate is emitted: `--min-games` defaults to 10 and
+the tool refuses at n=4, naming the shortfall.** Fitting anything on this would
+be `#377` committed by the tool written to prevent it. **The mirror is lossy —
+production coverage is UNKNOWN and unreadable from here (no `ADMIN_TOKEN`, and
+`/api/ops/artifacts/export` reads WEB's disk).**
+
+**TWO DEFECTS IN MY OWN FIRST VERSION, both found by running it rather than by
+review:**
+1. **Partial snapshots counted as games.** A `pace_per_team` of **2.5**
+   (CHI@DAL, one quarter) and **27.18** (CON@TOR, halftime) sat next to real
+   ~75-possession games. These are LIVE snapshots; most are mid-game. Fixed by
+   `quarters_complete()` (all four `q_totals` non-null).
+2. **Repeated snapshots of the same game counted twice.** SEA@TOR and CON@TOR
+   each appeared twice with byte-identical totals. Fixed by a dedupe keyed on
+   `(game_id, teams)` keeping the highest total.
+The docstring had CLAIMED a `partial` flag the code never implemented — a
+comment that overstated the code, caught by reading the output.
+
+**A VACUOUS TEST, CAUGHT BY MUTATION AND FIXED.** `test_team_possessions_ignores
+_the_zero_valued_home_and_away_keys` passed with the key filter REMOVED, because
+the `poss_est <= 0` filter already drops those keys on real data. It pinned the
+zero filter, not the key filter, so the key filter could have been deleted
+silently. Added
+`test_the_key_filter_is_load_bearing_independently_of_the_zero_filter`, which
+puts NON-zero values under `home`/`away` — the double-counting case. Mutation P1
+now fires.
+
+**15 tests, 6 of 6 mutations caught** (home/away key filter, completeness needing
+all four quarters, placeholder ids accepted, aggregate emitted below the floor,
+a refusal smuggling a mean out with it, duplicates not collapsed).
+
+**`game_shape.py` COMMENT AMENDED, not the flag.** `possession_pace_available:
+False` is correct for the card payload that function reads; the comment now says
+so precisely and points at the `live_pbp_stats` family where possessions DO
+live, with the coverage caveat and the tricode-vs-home/away trap attached.

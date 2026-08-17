@@ -371,15 +371,37 @@ def mlb_shape_bucket(shape: Any) -> str:
 # `[measured 2026-08-16, data/live/wnba_cards_context_2026-06-05.json,
 #   a real in-progress game: period 4, clock "7:43", 84-83]`
 #
-# **THERE IS NO POSSESSION PACE HERE, AND THIS MODULE WILL NOT INVENT ONE.**
-# Possessions need FGA, TOV, OREB and FTA. None of the four appears anywhere in
-# any live basketball artifact measured, and `basketball_props_features`'
-# column map is box-score totals with no pace column either. So the pace field
-# below is `points_per_minute` -- SCORING pace, which is a real and useful game
-# shape signal and is NOT the same statistic as possessions per 40. Naming it
-# `pace` would let a reader join it to a possession-pace prior and get a
-# silently wrong answer. If box stats are ever captured live, add possessions
-# as a NEW field; do not redefine this one.
+# **THERE IS NO POSSESSION PACE ON THIS INPUT, AND THIS MODULE WILL NOT INVENT
+# ONE.** Possessions need FGA, TOV, OREB and FTA. None of the four appears on
+# the card-context `live_state` this function reads, and
+# `basketball_props_features`' column map is box-score totals with no pace
+# column either. So the pace field below is `points_per_minute` -- SCORING
+# pace, a real and useful game-shape signal that is NOT the same statistic as
+# possessions per 40. Naming it `pace` would let a reader join it to a
+# possession-pace prior and get a silently wrong answer.
+#
+# **AMENDED 2026-08-16 -- BE PRECISE ABOUT WHAT IS MISSING AND WHERE.** The
+# sentence above is about THIS INPUT, not about the platform. Possessions ARE
+# computed elsewhere: the `live_pbp_stats_<date>.jsonl` family carries
+# `pbp_possessions` with a real `poss_est` (`FGA + TOV + 0.44*FTA - OREB`,
+# `vendor/wnba_betting_repo/app.py:3572`) plus `dreb`/`oreb`/`tov`, per team and
+# per period. So `possession_pace_available: False` on these records means "not
+# on the payload you passed me", NOT "this platform cannot know it".
+#
+# Two things to know before reaching for that family (`#454`, measured
+# 2026-08-16 on the tracked mirror):
+#   * **Coverage is thin and must be checked, never assumed** -- 17 of 120 game
+#     records, on 2 dates, several carrying placeholder game ids
+#     (`0000000001`). The mirror is lossy; production may hold far more. Print
+#     the denominator before quoting any number off it.
+#   * **`pbp_possessions["home"]`/`["away"]` are 0.0 on every populated
+#     record** -- the real data is keyed by TEAM TRICODE. The existing consumer
+#     (`app.py:45316`) resolves tricode first and falls back, so this is a trap
+#     for NEW code rather than an active bug: a reader that goes straight to
+#     `home`/`away` gets a plausible-looking zero, not an obvious miss.
+#
+# When that family is joined in, possessions should arrive as a NEW field. Do
+# not redefine `points_per_minute`.
 #
 # **PERIOD/CLOCK PRECEDENCE IS NOT ARBITRARY.** `live_state` first, then
 # `status` -- the same order as `wnba/cards.py:1048-1049`, which records the
