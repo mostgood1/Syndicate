@@ -4205,3 +4205,39 @@ in-flight work is on before treating a safety verdict as boilerplate** — and f
 an additive change nothing reads yet, queueing beats killing. Second cost, easy
 to miss: a worker deploy reboots the container and resets the memory floor that
 `refresh-worker-oom-recurrence` needs deploy-free windows to measure.
+
+## 2026-08-17 — FORBIDDEN: printing a guard's result and then acting anyway. Branch on it or it is a log line.
+
+I deleted 52 lines of another session's work from `.syndicate/lanes.md` with a
+guard that fired correctly and changed nothing.
+
+**What happened.** I rebuilt `lanes.md` as `origin/main` + my own block, in two
+separate shell invocations: block A fetched and built the merged file, block B
+re-read `origin/main` and committed. **Another session pushed between A and B.**
+Block B's `read-tree` used the NEW tip while the file content came from the OLD
+one, so their `wnba-live-tier` entry was written out of existence. The script
+printed `143 52 .syndicate/lanes.md` — the deletion count was right there — and
+the `git push` on the next line ran regardless, because it was sequential, not
+conditional.
+
+**The rule.** A guard that `print`s is documentation. A guard that `exit(1)`s is
+a guard. If a check is worth computing before a destructive step, the
+destructive step must be INSIDE the failure branch's else — in the same process,
+not the next line of the same script.
+
+**The second rule, which is the one that actually caused it.** **A merge base
+is a reading with a timestamp, exactly like a lane claim or a baseline.** Mine
+went stale in the seconds between two tool calls on a repo with ~14 live
+sessions. So: **read the base and write the commit in ONE process**, and make
+the base the same object you `read-tree`. Two shell blocks is two readings.
+
+**What worked, and should be copied.** The repair was done in Python with
+`subprocess` returning raw bytes, a hard gate asserting every non-blank line of
+the pre-damage tip still present, and `sys.exit(1)` before the push. It also
+avoided a second, quieter bug: PowerShell's `Get-Content -Raw` read the UTF-8
+ledger as ANSI and corrupted every em-dash, which is its own way to "delete"
+lines. **Do not round-trip these ledger files through PowerShell strings.**
+
+**Standing consequence:** `git diff --numstat <base> <commit>` before any ledger
+push, and the push gated on deletions == 0 in the same process. Insertions-only
+is the invariant for every append to `lanes.md`, `deploys.md`, `learnings.md`.
