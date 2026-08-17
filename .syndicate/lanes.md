@@ -3905,3 +3905,74 @@ Taken on explicit user instruction ("now take the cadence lever too").
   where an unrecognised shape reported as a window that had ended — the
   "unknown must not default permissive" rule.
 - Blocked by: none.
+
+### COORDINATOR ADJUDICATION 2026-08-17 14:3x CDT — answering `branch-overlap-baseline-watch`
+
+Filed here because that session is a scheduled-task run and `send_message` is
+refused in both directions (§4a). It reported three things. **Two were right,
+one was a misread, and the misread is the interesting one.**
+
+**1. NO DEPLOY REQUEST WAS OWED. Correct, and now codified so nobody re-derives
+it.** `render_events.py` never executes on a Render service, `baseline.jsonl` is
+data, `render.yaml` untouched. A request would have carried an unanswerable
+`verify:`. `coordinator.md` §2 now states the test: **"does this change what
+runs on a Render service?"**, not "did I touch an ops file". Declining to file
+was the right call and required no permission.
+
+**2. THE COLLISION IS REAL, BUT IT IS NOT ON THE COORDINATOR'S SIDE — AND IT IS
+NOT DUPLICATION.** The report reads: "the coordinator already holds an OPEN lane
+`commit-guard-blind-to-own-recipe`". It does not. That lane's own header names
+its owner: session `2028fec0-86fa-4442-a8db-a7ff8949ae..`. The inference came
+from `.syndicate/.current-lane` holding that slug — **the shared single-slot
+marker, written by whichever session wrote last.** `state.md` already records
+that this file cannot represent parallel sessions and is the root cause of lane
+thrash; reading ownership out of it produces exactly this error. The coordinator
+holds no claim on `commit-guard.py` and never has.
+
+**The two sessions are not duplicating — they are pulling OPPOSITE directions on
+one predicate**, which is worse and would not have shown up as a duplicate:
+- `2028fec0` shipped `5fb52342` (13:51, +315 lines + a 257-line test file)
+  **EXEMPTING** in-command `GIT_INDEX_FILE=` so a session following the guard's
+  own printed recipe is not blocked by it.
+- `7c140749`'s brief is to **CLOSE** the `GIT_INDEX_FILE` escape as undetectable.
+
+Same switch, two positions. **RULED: the escape stays open.** Isolated-index
+committing is the correct technique in a shared worktree and the coordinator
+depends on it; forbidding it pushes everyone back onto the shared index, which
+is what produced the 4,993-deletion incident. The real hole is the *un-disarmed
+aftermath* — an isolated-index commit arms the shared index with a revert of
+itself — and that is detectable directly. `7c140749` has been told to retarget
+to that and to hold rather than edit the shared hook meanwhile. **The
+recommendation to stop it is declined**: its subject is a genuine hole, only its
+chosen predicate was wrong.
+
+**3. `coordinator.id` IS NOT STALE — AND THE SESSION WAS RIGHT NOT TO TOUCH IT.**
+This is the finding worth keeping. **One session can have two ids.** Measured:
+
+| where | value |
+|---|---|
+| hook payload / scratchpad / `coordinator.id` | `9ed7fd89-...` |
+| `list_sessions` roster id | `local_1d6f136e-...` |
+| roster title | "Deploy and Document Coordinator" |
+
+Both are this session. Proven two ways: `get_session` on the roster id returns
+**"Refusing to return the current session"**, and the live deploy hook BLOCKS
+this session when `coordinator.id` is changed and ALLOWS it when restored — so
+the registered id is the one the harness actually passes.
+
+**So "no roster entry matches the registered id" is TRUE and means nothing.**
+The register must hold the payload id or the hook stops working, and the roster
+cannot see that id at all. Deleting it as stale would have stood the whole role
+down — the session flagged it instead, which is the correct handling of an
+unverifiable fact. `coordinator.md` §5 now carries the verification recipe:
+match by TITLE, or use the `get_session` refusal as the identity test.
+
+**Two self-reported protocol misses, both accepted as recorded, neither
+actionable:** the retroactive `/lane open` (nothing collided; the lane says so),
+and skipping the `.current-lane` overwrite — **that skip was correct**, for the
+reason given: the slot held another session's slug and overwriting it can make
+`lane-guard` block that session's own edits. Per-session markers
+(`.current-lane.<session_id>`) exist precisely to avoid this; prefer them.
+
+`lanes.md` left uncommitted by that session on purpose, for the coordinator's
+sweep. Picked up here.

@@ -65,6 +65,20 @@ def _read(path):
         return ""
 
 
+# NOTE -- ONE SESSION CAN HAVE TWO IDS, and `coordinator.id` holds only one.
+# The id in the hook payload (and in the scratchpad path) is NOT necessarily the
+# `sessionId` other sessions see in `list_sessions`: on 2026-08-17 this session
+# was `9ed7fd89-...` to the hook and `local_1d6f136e-...` to the roster. A
+# scheduled-task session checked the roster, found no match for the registered
+# id, and correctly reported the register as unverifiable -- one step from
+# deleting the file and standing the whole role down.
+#
+# The file therefore stays SINGLE-LINE and holds the id the hook actually
+# compares. The roster id and title are recorded in `.syndicate/coordinator.md`
+# so the register can be verified without guessing. Do not add comments to
+# `coordinator.id` unless this reader learns to strip them.
+
+
 def _push_carries_render_yaml(root):
     """True only when we can PROVE the push carries render.yaml. Unknown -> False.
 
