@@ -304,9 +304,21 @@ MEASURE_JS = """
   // and no line could be fitted at either width -- while 15 mutually tied cards
   // sat there, which is this metric at its strongest. Gating it behind the fit
   // would have thrown away the best reading of the day.
+  // A stable per-card identity, so tie groups can be matched on WHICH cards
+  // they hold rather than on how many. Verified present and unique on every
+  // card surface 2026-08-17: mlb `game-card-824514`, nfl `game-2026_01_NE_SEA`,
+  // ncaaf `game-1_North_Carolina_TCU`, soccer `game-401879301`. The href
+  // fallback is there so a surface that stops emitting ids degrades to
+  // something still comparable instead of silently losing membership.
+  function cardKey(el) {
+    const link = el.querySelector('a[href]');
+    return el.id || el.getAttribute('data-game-pk')
+        || (link && link.getAttribute('href')) || '';
+  }
+
   function tieFloor(pts) {
     const byU = {};
-    pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p.h));
+    pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p));
     const median = (v) => {
       const s = v.slice().sort((a, b) => a - b);
       const mid = Math.floor(s.length / 2);
@@ -316,12 +328,19 @@ MEASURE_JS = """
       .map((u) => ({
         u: Number(u),
         n: byU[u].length,
-        spread: Math.round(Math.max(...byU[u]) - Math.min(...byU[u])),
+        spread: Math.round(Math.max(...byU[u].map((p) => p.h))
+                         - Math.min(...byU[u].map((p) => p.h))),
+        // WHICH cards are in this group, so a comparison can tell "the same
+        // three games" from "three games that happen to carry the same pair
+        // count". Without it the tracked number is a max over a set whose
+        // membership moves with the slate, and two different groups compare as
+        // unchanged -- measured on production 2026-08-17.
+        ids: byU[u].map((p) => p.id).filter(Boolean).sort(),
         // The DENOMINATOR for a proportional budget: how tall the cards being
         // compared actually are. Wrap noise scales with card size, so the same
         // px of spread means something different on a 700px nfl card and a
         // 4800px mlb one.
-        medianH: median(byU[u]),
+        medianH: median(byU[u].map((p) => p.h)),
       }))
       .filter((g) => g.n > 1);
     if (!groups.length) return null;
@@ -365,6 +384,7 @@ MEASURE_JS = """
           n: g.n,
           spread: g.spread,
           medianH: g.medianH,
+          ids: g.ids,
           pct: g.medianH ? Math.round((g.spread / g.medianH) * 1000) / 10 : null,
         }))
         .sort((a, b) => (b.pct || 0) - (a.pct || 0)),
@@ -529,6 +549,7 @@ MEASURE_JS = """
     (ptsByState[state] = ptsByState[state] || []).push({
       u: c.querySelectorAll('.cards-data-pair').length,
       h: Math.round(c.getBoundingClientRect().height),
+      id: cardKey(c),
     });
   });
   const heightModelByState = {};
@@ -1512,6 +1533,139 @@ def _cmp_value(v):
     return v
 
 
+def _tie_groups(report_row: dict[str, Any]) -> dict[tuple[str, int], tuple[int, int]] | None:
+    """`{(state, pair-count): (spread, n)}` for every tie group in a report row.
+
+    Returns None when the row predates per-group reporting, which is NOT the
+    same as a row with no groups -- absent evidence and measured emptiness must
+    not collapse onto each other here.
+    """
+    by_state = report_row.get("identicalContentSpreadByState")
+    if not isinstance(by_state, dict):
+        return None
+    out: dict[tuple[str, int], tuple[int, int, tuple[str, ...] | None]] = {}
+    saw_groups = False
+    for state, block in by_state.items():
+        groups = (block or {}).get("groups")
+        if not isinstance(groups, list):
+            continue
+        saw_groups = True
+        for g in groups:
+            try:
+                ids = g.get("ids")
+                key = tuple(sorted(str(i) for i in ids)) if isinstance(ids, list) and ids else None
+                out[(state, int(g["u"]))] = (int(g["spread"]), int(g["n"]), key)
+            except (KeyError, TypeError, ValueError):
+                continue
+    return out if saw_groups else None
+
+
+def _compare_tie_groups(base: dict[str, Any], cur: dict[str, Any]) -> tuple[list[str], bool]:
+    """Diff tie spreads GROUP BY GROUP instead of through a single scalar.
+
+    Why this is not `_cmp_value`: `worstGroupPx` is a max over a set whose
+    membership moves with the slate. Measured on production 2026-08-17 12:37
+    CDT, one game live against an all-Preview baseline -- mobile reported
+    `43px unchanged (baselined)` while the baseline's 43 came from the 45-pair
+    group and the current 43 came from the 53-pair group, and every group that
+    WAS comparable had moved (53: 30->43, 49: 32->15, 45: 43->36). Desktop hid
+    the 45-pair group moving 28->41 behind an unchanged 86.
+
+    That is a false PASS, which is the dangerous direction: a real layout
+    regression is masked by an unrelated group happening to rise to the same
+    number. So a group is only judged when the SAME state, the SAME pair count
+    and the SAME member count exist on both sides; everything else is reported
+    as not-comparable and never silently passed.
+    """
+    pad = " " * 18          # matches the f"{'':17} " prefix the other lines use
+    b_groups, c_groups = _tie_groups(base), _tie_groups(cur)
+    if b_groups is None and c_groups is None:
+        return [], True
+    if b_groups is None:
+        return [f"{pad}identicalContentSpread NOT COMPARED -- the baseline predates "
+                "per-group reporting, so only a scalar is available and a scalar "
+                "cannot tell two different groups apart; re-baseline to arm it"], True
+    if c_groups is None:
+        return [f"{pad}identicalContentSpread VANISHED -- the current run carries no "
+                "per-group data, so the check did NOT run"], False
+
+    # Comparable means the SAME cards, when identity is available on both
+    # sides. `n` alone would let "three games at 45 pairs" match a different
+    # three games at 45 pairs and call the difference a layout change.
+    def same_members(k) -> bool:
+        b_spread, b_n, b_ids = b_groups[k]
+        c_spread, c_n, c_ids = c_groups[k]
+        if b_ids is not None and c_ids is not None:
+            return b_ids == c_ids
+        return b_n == c_n          # pre-identity reports: the weaker test
+
+    both = set(b_groups) & set(c_groups)
+    shared = sorted(k for k in both if same_members(k))
+    moved = [(k, b_groups[k][0], c_groups[k][0]) for k in shared if b_groups[k][0] != c_groups[k][0]]
+    incomparable = sorted((set(b_groups) ^ set(c_groups)) | {k for k in both if not same_members(k)})
+    # Was membership actually verified, or only counted? Saying "unchanged" off
+    # the weaker test without labelling it would be the same class of overclaim
+    # this function exists to remove.
+    identity_known = all(
+        b_groups[k][2] is not None and c_groups[k][2] is not None for k in shared)
+
+    lines = []
+    ok = True
+    if moved:
+        detail = "; ".join(
+            f"{state} {u} pairs {b}px -> {c}px" for (state, u), b, c in moved)
+        if identity_known:
+            ok = False
+            lines.append(
+                f"{pad}identicalContentSpread DRIFT in {len(moved)} of {len(shared)} "
+                f"comparable group(s): {detail} -- the SAME cards changed height. "
+                "Check whether the slate went live before reading this as a layout "
+                "regression")
+        else:
+            # Matched on size alone, so "three cards at 45 pairs" on one side may
+            # be three DIFFERENT games on the other. That cannot distinguish a
+            # layout regression from the slate reshuffling, and failing on it
+            # would manufacture exactly the false alarms this file keeps
+            # recording. Loud, specific, and not a failure.
+            lines.append(
+                f"{pad}identicalContentSpread MOVED in {len(moved)} of {len(shared)} "
+                f"group(s) but NOT FAILED: {detail} -- matched on group SIZE, not "
+                "card identity (a side predates per-card ids), so this cannot tell "
+                "a layout change from a reshuffled slate; re-baseline to arm it")
+    elif shared:
+        caveat = "" if identity_known else (
+            " -- matched on group SIZE, not card identity (a side predates "
+            "per-card ids); re-baseline for the stronger check")
+        lines.append(
+            f"{pad}identicalContentSpread unchanged (baselined) across "
+            f"{len(shared)} comparable group(s): "
+            + ", ".join(f"{state} {u} pairs {b_groups[(state, u)][0]}px"
+                        for state, u in shared)
+            + caveat)
+    else:
+        # Never a silent pass. Nothing was compared, and that has to be said.
+        lines.append(
+            f"{pad}identicalContentSpread NOT COMPARABLE -- no tie group survives "
+            "on both sides with the same state, pair count and member count, so "
+            "NOTHING was checked")
+    if incomparable:
+        def why(k) -> str:
+            if k not in c_groups:
+                return "gone"
+            if k not in b_groups:
+                return "new"
+            b_spread, b_n, b_ids = b_groups[k]
+            c_spread, c_n, c_ids = c_groups[k]
+            if b_n != c_n:
+                return f"n={b_n}->{c_n}"
+            return "same size, different cards"
+        lines.append(
+            f"{pad}  slate moved the tie groups (not judged): "
+            + "; ".join(f"{state} {u} pairs {why((state, u))}"
+                        for state, u in incomparable))
+    return lines, ok
+
+
 def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str], bool]:
     """Diff two reports, separating code-driven drift from slate movement."""
     lines = ["comparison vs baseline", "-" * 60]
@@ -1583,25 +1737,36 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str
                         "now unmeasured) -- no two cards tie, so the check did NOT run"
                     )
                     ok = False
-                elif b_tie.get("state") != c_tie.get("state"):
-                    # Per-state metric: two states are two quantities.
-                    lines.append(
-                        f"{'':17} identicalContentSpread NOT COMPARABLE -- state moved "
-                        f"{b_tie.get('state')!r} -> {c_tie.get('state')!r} "
-                        f"({b_val}px -> {c_val}px)"
-                    )
-                elif b_val != c_val:
-                    lines.append(
-                        f"{'':17} identicalContentSpread DRIFT {b_val}px -> {c_val}px "
-                        f"in {c_tie.get('state')!r} -- cards with the SAME data changed "
-                        "height. Check whether the slate went live before reading this "
-                        "as a layout regression"
-                    )
-                    ok = False
                 else:
-                    lines.append(
-                        f"{'':17} identicalContentSpread {c_val}px unchanged (baselined)"
-                    )
+                    # Per GROUP, not through the scalar. `worstGroupPx` is a max
+                    # over a set whose membership moves with the slate, so it can
+                    # read identical while standing for a different group -- see
+                    # `_compare_tie_groups` for the production measurement that
+                    # established this. The state check is subsumed: the state is
+                    # part of each group's key, so a state change simply leaves
+                    # nothing comparable and is reported as such.
+                    group_lines, group_ok = _compare_tie_groups(base, cur)
+                    if group_lines:
+                        lines.extend(group_lines)
+                        ok = ok and group_ok
+                    elif b_tie.get("state") != c_tie.get("state"):
+                        lines.append(
+                            f"{'':17} identicalContentSpread NOT COMPARABLE -- state moved "
+                            f"{b_tie.get('state')!r} -> {c_tie.get('state')!r} "
+                            f"({b_val}px -> {c_val}px)"
+                        )
+                    elif b_val != c_val:
+                        lines.append(
+                            f"{'':17} identicalContentSpread DRIFT {b_val}px -> {c_val}px "
+                            f"in {c_tie.get('state')!r} -- cards with the SAME data changed "
+                            "height. Check whether the slate went live before reading this "
+                            "as a layout regression"
+                        )
+                        ok = False
+                    else:
+                        lines.append(
+                            f"{'':17} identicalContentSpread {c_val}px unchanged (baselined)"
+                        )
             else:
                 # Collected, not judged. Printed even when unchanged, because the
                 # point of this line is to build a series -- a metric only shown

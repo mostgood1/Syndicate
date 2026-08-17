@@ -3890,7 +3890,7 @@ PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
   another betting grade** — more simulation cannot help.
 - Nothing promoted, nothing blocked, no production config changed.
 
-### tie-spread-membership-gap — OPEN — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+### tie-spread-membership-gap — CLOSED 2026-08-17 — **CONFIRMED ON PRODUCTION AND FIXED. The post-first-pitch run reported `unchanged (baselined)` while every comparable tie group had moved — a false PASS. Comparison is now per-group, matched on card identity.** — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
 - **Goal:** `identicalContentSpread` must stop comparing two different groups and
   calling the result "unchanged". **Testable outcome:** the comparison matches
   tie groups on `(state, pair-count, n)` and fails on a change in any group that

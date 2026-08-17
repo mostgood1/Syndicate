@@ -901,6 +901,127 @@ def test_a_vanished_measurement_fails_even_though_it_is_an_absence():
     assert "the check did NOT run" in text
 
 
+# --- tie groups are compared PER GROUP, matched on card identity ------------
+#
+# `worstGroupPx` is a max over a set whose membership moves with the slate, so
+# it can read identical while standing for a different group. Measured on
+# production 2026-08-17 12:37 CDT with one game live against an all-Preview
+# baseline: mobile reported `43px unchanged (baselined)` while the baseline's 43
+# came from the 45-pair group and the current 43 came from the 53-pair group --
+# and every group that WAS comparable had moved. A false PASS, which is the
+# dangerous direction.
+
+
+def _tie_group(u, spread, ids=None, n=None):
+    g = {"u": u, "n": n if n is not None else len(ids or ()), "spread": spread,
+         "medianH": 3800, "pct": round(spread / 3800 * 1000) / 10}
+    if ids is not None:
+        g["ids"] = list(ids)
+    return g
+
+
+def _tie_report(*groups, sport="mlb", state="Preview"):
+    """A report whose per-state tie block carries GROUPS -- what the
+    membership-aware comparison actually reads."""
+    worst = max(groups, key=lambda g: g["spread"])
+    block = {"spreadPx": worst["spread"], "worstGroupPx": worst["spread"],
+             "atU": worst["u"], "n": worst["n"], "medianH": 3800,
+             "spreadPct": worst["pct"], "groups": list(groups),
+             "tiedGroups": len(groups), "cardsTied": sum(g["n"] for g in groups)}
+    return _report(sport=sport,
+                   identicalContentSpreadByState={state: block},
+                   identicalContentSpread=dict(block, state=state))
+
+
+def test_the_production_false_pass_is_caught():
+    """THE REGRESSION TEST. Both sides report a worst group of 43px, so the
+    scalar comparison called it unchanged -- while the 45-pair group (the same
+    three cards) had moved 43 -> 36 and an unrelated group had risen to 43."""
+    base = _tie_report(_tie_group(45, 43, ids="ABC"), _tie_group(53, 30, ids="DE"))
+    cur = _tie_report(_tie_group(45, 36, ids="ABC"), _tie_group(53, 43, ids="DEF"))
+    row = lambda r: r["sports"]["mlb"]["desktop"]["identicalContentSpread"]
+    assert row(base)["worstGroupPx"] == row(cur)["worstGroupPx"] == 43, (
+        "the premise of this test is that the SCALAR agrees on both sides")
+    text, ok = _compare(base, cur)
+    assert not ok, "a scalar that happens to match is not a passing check"
+    assert "DRIFT in 1 of 1 comparable group(s): Preview 45 pairs 43px -> 36px" in text
+    assert "the SAME cards changed height" in text
+    # The group that merely gained a member is reported, not judged.
+    assert "Preview 53 pairs n=2->3" in text
+
+
+def test_identical_groups_on_the_same_cards_pass():
+    base = _tie_report(_tie_group(45, 43, ids="ABC"), _tie_group(53, 30, ids="DE"))
+    text, ok = _compare(base, base)
+    assert ok, text
+    assert "unchanged (baselined) across 2 comparable group(s)" in text
+    assert "Preview 45 pairs 43px" in text and "Preview 53 pairs 30px" in text
+
+
+def test_the_same_group_size_holding_different_cards_is_not_judged():
+    """Three cards at 45 pairs on one side need not be the same three games.
+    Matching on size alone would call a reshuffled slate a layout change."""
+    base = _tie_report(_tie_group(45, 43, ids="ABC"))
+    cur = _tie_report(_tie_group(45, 90, ids="AXY"))
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "NOT COMPARABLE" in text and "NOTHING was checked" in text
+    assert "Preview 45 pairs same size, different cards" in text
+    assert "DRIFT" not in text
+
+
+def test_a_size_only_match_reports_movement_without_failing():
+    """A baseline predating per-card ids cannot tell a layout change from a
+    reshuffle, so it says so instead of failing -- failing on an unverified
+    match is how the three false alarms of 2026-08-16 were produced."""
+    base = _tie_report(_tie_group(45, 43, n=3))                 # no ids: pre-identity file
+    cur = _tie_report(_tie_group(45, 36, ids="ABC"))
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "MOVED in 1 of 1 group(s) but NOT FAILED" in text
+    assert "matched on group SIZE, not card identity" in text
+    assert "re-baseline to arm it" in text
+
+
+def test_a_size_only_match_that_agrees_still_says_it_was_size_only():
+    base = _tie_report(_tie_group(45, 43, n=3))
+    cur = _tie_report(_tie_group(45, 43, ids="ABC"))
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "unchanged (baselined)" in text
+    assert "matched on group SIZE, not card identity" in text
+
+
+def test_no_surviving_group_is_reported_not_silently_passed():
+    """An evening slate can leave nothing comparable. That must never read the
+    same as a clean check."""
+    base = _tie_report(_tie_group(45, 43, ids="ABC"))
+    cur = _tie_report(_tie_group(33, 20, ids="DEF"))
+    text, ok = _compare(base, cur)
+    assert ok, text                       # loud, but not a failure
+    assert "NOT COMPARABLE" in text and "NOTHING was checked" in text
+    assert "Preview 45 pairs gone" in text and "Preview 33 pairs new" in text
+
+
+def test_a_state_change_leaves_nothing_comparable():
+    """State is part of each group's key, so first pitch simply stops anything
+    from matching rather than being reported as drift."""
+    base = _tie_report(_tie_group(45, 43, ids="ABC"), state="Preview")
+    cur = _tie_report(_tie_group(45, 190, ids="ABC"), state="Live")
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "NOT COMPARABLE" in text
+    assert "DRIFT" not in text
+
+
+def test_per_group_data_vanishing_from_the_current_run_fails():
+    base = _tie_report(_tie_group(45, 43, ids="ABC"))
+    cur = _report(sport="mlb")            # by-state block with no groups
+    text, ok = _compare(base, cur)
+    assert not ok
+    assert "VANISHED" in text and "the check did NOT run" in text
+
+
 # --- the one height failure rule: deviation from same-content PEERS ---------
 #
 # Replaces residual-from-the-line and raw-group-spread, which each produced a
