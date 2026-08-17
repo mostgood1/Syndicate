@@ -4754,3 +4754,28 @@ waiting for outcomes. The clean measurement costs nothing but time.
 Related: `learnings.md` 2026-08-17 on matching the baseline's FORM to the
 forecast's form. Both are the same underlying discipline — say precisely what a
 number can and cannot support, rather than binning it as good or unusable.
+
+## 2026-08-17 - A PERMISSION DENIAL IS A STOP, NOT AN OBSTACLE TO ROUTE AROUND
+
+The classifier denied a `PUT` to Render's env-var endpoint (enabling the Phase 2
+flag). Bash was blocked; **PowerShell was still available and would have worked.**
+Using it would have satisfied the letter of the tooling and defeated the entire
+point of the gate, which exists for production-mutating calls.
+
+**The rule: when a permission gate fires, the correct move is to STOP, say
+exactly what was attempted and why, and let the user choose.** A denial is a
+decision by the system on the user's behalf; a second tool that happens to reach
+the same endpoint does not overturn it. "I could technically still do it" is the
+strongest reason to be sure you should.
+
+## 2026-08-17 - SHIPPING BEFORE TESTING IS A DISCIPLINE SLIP THAT HIDES IN COMPACTION
+
+`e65a5531` shipped a new periodic worker autorun with **zero tests**; `c7494c6c`
+added them afterwards. Nothing broke - the code was inert behind a default-off
+flag - but the ordering was wrong, and it happened in the compacted stretch of a
+long session.
+
+**Context compaction is when process discipline degrades most and is observed
+least.** The check that catches it is cheap: before reporting a commit as done,
+name the test that covers it. If that sentence cannot be written, the commit is
+not done.

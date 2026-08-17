@@ -6917,3 +6917,21 @@ Borussia Monchengladbach -> borussia monchengladbach  OK
   `scripts/run_live_odds_refresh_worker.py` for Phase 2 DOES NOT EXIST.**
   Releasing this lane loses nothing. I still did not release it - #2 (3-way
   de-vig) is separately marked DELIBERATELY HELD and is not mine to judge.
+
+### wnba-phase2-migration - HANDED OFF 2026-08-17 ~16:2x CDT - **code SHIPPED and TESTED, flag NOT SET, deploy is the coordinator's. Session at context exhaustion.**
+- **`e65a5531`** Phase 2 WNBA pregame autorun on live-odds-worker.
+  **`c7494c6c`** its five tests - `e65a5531` shipped UNTESTED and I added them
+  after; that ordering was wrong and is recorded in `learnings.md`.
+- **INERT until `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` is truthy**, so
+  nothing is at risk from leaving it off. Rollback is the flag, not a deploy.
+- **Deploy request `2026-08-17T2115Z-wnba-phase2-migration.md`** (`e1422cef`),
+  coordinator messaged. It asks for **two staged steps** (deploy inert, confirm
+  memory, then flip), the **single-key endpoint NOT `render.yaml`** (a
+  `blueprint_sync` 502'd every route for ~2 min on 2026-08-08), and **ordered
+  verification** - `MAIN_ENTRY` is a PRECONDITION of `GAME_CARDS_CENSUS`, allow
+  a full 4h interval, and reading the census early looks exactly like failure.
+- **I attempted the env write and the permission classifier DENIED it. I did not
+  route around it** though PowerShell would have reached the same endpoint.
+- **SINGLE NEXT ACTION:** the coordinator enables the flag. Until then the
+  scheduled `wnba-game-cards-coverage-check` (2026-08-18 13:00 CDT) will
+  correctly report STILL UNMEASURED, and the open `deploys.md` row cannot close.

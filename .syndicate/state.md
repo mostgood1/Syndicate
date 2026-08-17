@@ -3915,3 +3915,25 @@ on the swept side. Appended verbatim, nothing edited, nothing reordered.
   workers behave as the inverse of their env.
 - **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design, see
   `coordinator.md:139`. **Do not edit or delete it.**
+
+## Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
+
+- **The WNBA full refresh had NO scheduled owner.** `MAIN_ENTRY` 0 hits/8h on
+  both workers. GHA `RUN_FULL_PIPELINE` reads `github.event.inputs`, empty on the
+  `schedule` trigger; Phase 1 re-homed only NFL/NCAAF/NCAAB. **Phase 2 autorun
+  now EXISTS (`e65a5531`) and is TESTED (`c7494c6c`) but is NOT ENABLED** -
+  `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` is unset, so it is INERT.
+- **`phase="pregame"` is the memory-safety property**, pinned by test:
+  live-odds-worker is 2GB, the WNBA refresh leg measures ~1.3-1.5GB RSS, and
+  pregame excludes the sim leg.
+- **The odds sweep ignored the ownership flags.** refresh-worker swept four
+  sports with `ACTIVE_SPORTS=nfl`; live-odds-worker swept ZERO with three
+  claimed. Gate committed `20025cc4`, **NOT DEPLOYED**.
+- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.**
+- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design,
+  `coordinator.md:139`. **Do not edit or delete it.**
+- **`lane-guard` cannot see the coordinator's sweep releases.**
+  `_is_disclaimer()` matches only "not claimed"/"claimed by"/"held by", so a
+  released lane still blocks every session. Cost 2 of 3 blocks this session.
+- **`game_cards` coverage fix is DEPLOYED but its EFFECT is UNMEASURED**, and
+  cannot be measured until Phase 2 is enabled.
