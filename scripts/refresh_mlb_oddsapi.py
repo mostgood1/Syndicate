@@ -677,6 +677,39 @@ def _freeze_market_dirs(source_root: Path) -> list[Path]:
     return ordered
 
 
+def _oddsapi_props_richness(path: Path) -> int:
+    """How much market a props doc actually carries. -1 = absent/unreadable.
+
+    Counts PRICED SIDES, not bytes and not players: an entry with a `line` but
+    no odds is not a quote you can grade against, and a doc can grow in bytes
+    while carrying fewer usable markets. Used to keep the pregame seal monotone,
+    so a post-slate fetch (which returns an empty market once books pull player
+    props) can never overwrite a real pregame capture.
+
+    Never raises -- a doc this cannot read scores 0 rather than taking the
+    freeze down, which is the same posture the caller takes on a missing tree.
+    """
+    if not path.exists() or not path.is_file():
+        return -1
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    total = 0
+    for markets in (payload.get("pitcher_props") or payload.get("hitter_props") or {}).values():
+        if not isinstance(markets, dict):
+            continue
+        for entry in markets.values():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("line") is None:
+                continue
+            total += sum(1 for side in ("over_odds", "under_odds") if entry.get(side))
+    return total
+
+
 def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict[str, str]:
     """Seal the day's pregame odds before a live refresh overwrites them.
 
@@ -762,13 +795,42 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
         if not source_path.exists() or not source_path.is_file():
             continue
         frozen_name = f"{prefix}_{slug}_pregame.json"
-        # Sealed once the slate starts. With no clock at all we cannot prove
-        # we are pregame, so write the first freeze and never clobber it.
+        # Sealed once the slate starts.
+        #
+        # THE SEAL IS MONOTONE: a poorer doc never replaces a richer one, and a
+        # strictly richer one may always replace a poorer one. That replaces two
+        # rules which were each wrong in one direction:
+        #
+        #   - clock UNKNOWN was first-write-wins, so the first pass of the day
+        #     sealed whatever existed and could never improve on it. Measured
+        #     2026-08-17 over 29 production dates: the props fetch usually runs
+        #     AFTER the slate (`retrieved_at` 02:00-05:00Z the FOLLOWING day),
+        #     and a post-slate fetch returns an empty market because books pull
+        #     player props once games end. 12 of 29 dates archived ZERO pitchers;
+        #     2026-08-08 sealed 1 and 2026-08-09 sealed 2, permanently.
+        #   - clock KNOWN re-copied UNCONDITIONALLY while pregame, so a later,
+        #     thinner fetch could DOWNGRADE a good seal.
+        #
+        # Monotonicity is self-protecting against the case first-write-wins was
+        # defending: a post-slate doc is EMPTY, so it scores lower and cannot
+        # replace a real pregame seal even with no clock to prove pregame-ness.
+        #
+        # This does NOT fix the bigger defect -- that the fetch runs post-slate
+        # at all. That is cadence (`odds-cadence-off-the-mlb-peak`), and this
+        # lane's own note at the game-lines freeze says the same thing: "a
+        # refresh pass that first runs after first pitch contributes nothing,
+        # forever." A better seal cannot invent data nobody fetched.
+        #
         # "Already frozen" is asked of EVERY tree, not just this one: a seal
-        # that exists only in the tree the reader uses must still count, or
-        # each pass would re-copy a now-live doc over a good seal.
-        already_frozen = any((directory / frozen_name).exists() for directory in market_dirs)
-        if slate_started or (slate_start is None and already_frozen):
+        # that exists only in the tree the reader uses must still count.
+        candidate_richness = _oddsapi_props_richness(source_path)
+        best_frozen = max(
+            (_oddsapi_props_richness(directory / frozen_name) for directory in market_dirs),
+            default=-1,
+        )
+        if slate_started:
+            continue
+        if best_frozen >= 0 and candidate_richness <= best_frozen:
             continue
         destinations = [directory / frozen_name for directory in market_dirs]
         destinations.append(snapshot_dir / frozen_name)
