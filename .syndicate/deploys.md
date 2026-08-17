@@ -9577,3 +9577,15 @@ gone from `git diff --cached --numstat`, the worktree file is identical to HEAD,
 and the other three rows are unchanged. **This is the fifth-plus occurrence of
 the mechanism `state.md` documents, and the first one observed arming itself
 against a commit made minutes earlier in the same session.**
+
+**ONE HAZARD LEFT ARMED, DELIBERATELY, AND IT IS NOT MINE TO CLEAR `[02:4xZ]`.**
+The `clv-without-settlement` note was committed to `lanes.md` as a blob built
+from **HEAD plus the note**, not from the worktree — another session has ~816
+uncommitted lines in that file and a worktree commit would have swept in their
+in-progress work. Consequence: the shared index still stages `lanes.md` at
+**542 additions / 29 deletions**, and those 29 deletions are my 27 note lines.
+**I did not reset it, because unlike the `deploys.md` case that stage carries 542
+lines of somebody's real work.** The note is safe in the worktree copy too, so a
+worktree commit by that session preserves it; only a bare commit of the stale
+stage would drop it from HEAD. Whoever owns those 542 lines should commit from
+the worktree, not from the index.
