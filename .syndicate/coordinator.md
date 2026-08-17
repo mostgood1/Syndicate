@@ -32,6 +32,30 @@ the requester's measurement design. The requester wins. If their priority and th
 user's instruction conflict, say so to the user *before* acting — they can only
 decide well if they know what the lane asked for.
 
+## 0b. A DEPLOY IS NOT DONE WHEN IT FIRES. It is done when the lane has been told.
+
+**Same turn. Not the next one.** Firing, then reporting only to the user, leaves
+the requesting lane acting on stale beliefs — and the lane cannot see anything
+said in the user's conversation.
+
+Measured on 2026-08-17: the coordinator told a lane its request was HELD pending
+that lane's choice between three options, deployed it fifteen minutes later on a
+user instruction, and told the lane nothing. That lane spent the interval
+planning around a hold that no longer existed. The user had to raise it three
+times before the pattern was fixed.
+
+Every deploy closes with **all** of:
+1. the request file moved to `done/` with its outcome, including which findings
+   were RESOLVED and which were merely OVERRIDDEN;
+2. a `deploys.md` row, with the measurement or an explicit statement of what is
+   owed and by when;
+3. **a message to the requesting lane** naming what shipped, on what base, what
+   assumptions were made on their behalf, and what reading is still owed.
+
+If a user instruction overrides a coordinator hold, the lane is told that its
+findings were overridden rather than answered. A lane that filed a request is
+entitled to know what happened to it without asking.
+
 ## 1. What the coordinator owns
 
 - **Every production deploy, to all three services.** No session fires
