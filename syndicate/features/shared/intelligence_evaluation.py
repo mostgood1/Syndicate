@@ -2279,13 +2279,59 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         for recommendation in recommendation_rows
         if isinstance(recommendation.get("market_features"), Mapping)
     ]
+    # ONE LEDGER SCAN PER BUNDLE, NOT TWO.
+    #
+    # Measured in production 2026-08-17, inside a single bundle that ran 81s
+    # (`evaluation_bundle duration_ms=80934.56`) and ended in an oomKilled at
+    # 02:27:07Z:
+    #     02:26:45.341  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078
+    #     02:26:46.720  evaluation_reliability_profile          <- scan 1 done
+    #     02:26:46.739  SKIP 08-05 / 08-06 / 08-07              <- scan 2 begins
+    #     02:27:02.574  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078
+    # Both consumers below were passed `records=None`, which is exactly the
+    # branch that falls through to `_stream_record_payloads(ledger_path=...)`
+    # and re-reads all eight chunks. `compute_metrics` further down is handed
+    # `recommendation_records` and scans nothing -- the fix pattern already
+    # existed in this function, applied to one consumer and not the other two.
+    #
+    # This is `recommendation_engine.py:1532`'s defect one level up: that file
+    # fixed three loads INSIDE one function by threading a single list through
+    # them. The same sharing was never done ACROSS the bundle's consumers.
+    #
+    # THREAD THE **REDUCED** SET, NOT THE RAW ONE, AND THAT DISTINCTION IS THE
+    # WHOLE POINT. Sharing `list(_stream_record_payloads(...))` -- all 22,078
+    # raw records -- would make the peak WORSE than the double scan it replaces:
+    # each consumer copies what it is handed (`_stream_record_payloads` yields
+    # `dict(item)` when `records` is not None), so the raw set would be held at
+    # bundle scope AND copied per consumer. The streaming rewrite in
+    # `_stream_chunked_ledger_records` exists precisely so the peak is the
+    # REDUCED set rather than the raw one; handing raw records around would
+    # discard that. Reducing here keeps the peak at what each consumer already
+    # held on its own.
+    #
+    # SAFE BECAUSE BOTH CONSUMERS REDUCE FIRST AND FILTER SECOND:
+    # `build_evaluation_history_summary` (:1638) and
+    # `build_recommendation_performance_analytics` (:2070) each open with
+    # `_latest_by_recommendation_id(_stream_record_payloads(records, ...))` and
+    # only then apply their sport / market_family / settled filters. So a
+    # pre-reduced input reaches their filters unchanged. `_latest_by_recommendation_id`
+    # is idempotent on an already-reduced set -- one record per id means no ties
+    # to re-resolve, and its `portfolio_event` skip is applied identically on
+    # both passes. (Its positional `fallback_N` keys are regenerated on a second
+    # reduction, but the surviving RECORD SET is the same, which is what the
+    # consumers read.)
+    shared_ledger_records = _latest_by_recommendation_id(
+        _stream_record_payloads(ledger_path=ledger_path)
+    )
     history_summary = build_evaluation_history_summary(
-        records=None,
+        records=shared_ledger_records,
         ledger_path=ledger_path,
         sport=artifact_metadata.get("sport"),
         market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
     )
-    performance_analytics = build_recommendation_performance_analytics(records=None, ledger_path=ledger_path)
+    performance_analytics = build_recommendation_performance_analytics(
+        records=shared_ledger_records, ledger_path=ledger_path
+    )
     _intel_trace(
         "evaluation_bundle",
         recommendation_count=len(recommendation_rows),
