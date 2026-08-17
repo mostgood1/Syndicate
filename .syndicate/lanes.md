@@ -2869,3 +2869,70 @@ False` is correct for the card payload that function reads; the comment now says
 so precisely and points at the `live_pbp_stats` family where possessions DO
 live, with the coverage caveat and the tricode-vs-home/away trap attached.
 
+### score-live-gameline-edges — OPEN — opened 2026-08-17 — session: layer1-board-coverage
+- **Goal:** the live game-line model's probabilities are SCORED against realised
+  outcomes, and against the market recorded on the same row. **Testable
+  outcome:** a written report over N ledger records with the window stated,
+  carrying (a) Brier + calibration buckets for `model_home_win_prob`, (b) the
+  SAME two for `market_fair_prob` on the identical rows, and (c) the difference.
+  **(b) is the point.** A Brier score alone says nothing about whether the model
+  is worth running; the market benchmark on the same rows is the only comparison
+  that answers it. `soccer-model-coverage` already found its model LOSING to the
+  market by this kind of test — that outcome is expected, permitted, and is a
+  result, not a failure of this lane.
+- **Why this lane exists now.** `live-game-line-projection` closed
+  2026-08-17 00:4xZ having proved the ledger can produce a sample (`written=13`
+  across two builds, 2 of them non-priceable). It explicitly carried forward:
+  *"the ledger can now produce a sample; nobody has measured whether those 11
+  edged rows were RIGHT."* This is that lane.
+- **THE SAMPLE IS CURRENTLY UNREACHABLE, and that is the first task, not the
+  scoring.** Measured 2026-08-17 00:4xZ: the ledger writes to
+  `mlb_source/data/live_gameline_ledger/live_gameline_ledger_<date>.jsonl` on the
+  WORKER's disk, and that path matches **zero** entries in
+  `HOT_ARTIFACT_PATTERNS` — `/api/ops/artifacts/export?pattern=...` returns
+  `count 0, bytes 0`. The COUNTERS are served on `/api/board/book-grid`; the
+  RECORDS are not published anywhere. Three routes, to be chosen on evidence:
+  1. publish the ledger (needs `artifact_publisher.py` — **NOT this lane's**),
+  2. score worker-side and publish only the small summary,
+  3. pull a copy and score offline for the first read.
+  **Route 3 first**, because it needs no deploy and answers whether the sample is
+  even large enough to score.
+- **Files (claimed):**
+  - `scripts/score_live_gameline_edges.py` (new)
+  - `tests/test_score_live_gameline_edges.py` (new)
+  - `syndicate/features/shared/live_gameline_ledger.py` (a READER only; the
+    writer is settled and must not be touched)
+  Collision check run with `lane-guard.py`'s own `_claims()` at open time: all
+  three CLEAR.
+- **NOT claimed, and why:**
+  - `syndicate/features/shared/artifact_publisher.py` and `clv_join.py` — held by
+    OPEN `clv-without-settlement`. Route 1 above needs the first; **coordinate,
+    do not take it.** That lane owns the CLOSE half of CLV and this lane owns
+    OUTCOME scoring; they are different questions on the same records.
+  - `syndicate/features/shared/intelligence_evaluation.py` — CLEAR, but reuse
+    `_calibration` (`:1477`, already computes Brier + MAE) rather than writing a
+    fourth copy. Claim it only if it must change.
+- **Hypothesis (falsifiable, stated before measuring):** the live game-line
+  model's `model_home_win_prob` is NOT better calibrated than `market_fair_prob`
+  on the same rows — i.e. Brier(model) >= Brier(market).
+- **Falsification test:** Brier(model) < Brier(market) on a sample of stated size,
+  with the win-rate and calibration buckets printed alongside so a single-number
+  win cannot hide a bad curve.
+- **Verification:** a report in `deploys.md` with the window, the sample size, and
+  BOTH Brier scores. Scored two ways and both reported: over `priceable: true`
+  rows (what the board actually showed) and over ALL projected rows (the model
+  itself). The ledger writes `priceable` as a FIELD not a filter precisely so
+  this split is possible — a pass restricted to priceable measures the publish
+  gate, not the model.
+- **Outcomes come from final scores, NOT from settlement.** The record carries
+  `game_pk` plus live `home_score`/`away_score`; the final result is joined from
+  the scoreboard. **This lane is therefore NOT blocked by
+  `grading-blocker-settled-zero`**, whose `EVALUATION_SETTLEMENT_...AUTORUN` is
+  off by user decision.
+- **Known trap inherited from the writer, do not re-discover:** the ledger's own
+  docstring records that the closing-price recorder
+  (`closing-stamp-is-detection-time`) writes the HOME price on every row (18/18),
+  so any CLV-style pairing against it inherits a known defect. This lane scores
+  against OUTCOMES and sidesteps that; if it ever reaches for a close, read that
+  note first.
+- Blocked by: none. First step is Route 3.
