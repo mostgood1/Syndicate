@@ -10929,3 +10929,257 @@ distinguishes *idle* from *unreadable* — a blind poll exits non-zero rather th
 reporting a false window. **It does not deploy.** The sim check gets re-read at
 the moment of deploy, because a poll reading is up to three minutes stale and a
 new job can start at any time.
+
+## 2026-08-17 — `#440` PHASE 9 COMPLETE — **the sim-count curve flattens at ~300, and the MLB verdict survives**
+
+Lane `convergence-phase7-crps`. 490,000 game-sims, leash {0,5} x sims
+{100,300,1000}, scored against the same in-sample climatology. Read-only, no
+deploy.
+
+Phase 9 was "decide sim counts and anchoring by MEASUREMENT" — two questions the
+plan says are "currently settled by argument because there is no instrument."
+Phase 7 is that instrument. This is the answer to the first.
+
+### CRPS skill vs climatology, by sim count
+
+| sims | leash 0 | leash 5 (production) | gain over previous |
+|---|---|---|---|
+| 100 | −8.97% | −14.52% | — |
+| 300 | −7.12% | −11.81% | **+1.85 / +2.71 pp** |
+| 1000 | −6.74% | −11.73% | **+0.38 / +0.08 pp** |
+
+**THE KNEE IS ~300.** 100 -> 300 recovers nearly all the available accuracy;
+300 -> 1000 recovers almost nothing (0.08 pp at production's leash). **Raising to
+the engine default of 2000 would buy essentially nothing over 300** and cost 6.7x
+the work — so the plan's expectation that this is a cheap win is CONFIRMED, and
+the cheap version is much cheaper than assumed.
+
+### AND IT CONFIRMS THE MLB VERDICT RATHER THAN OVERTURNING IT
+
+The open confound was that my replay ran at 100 sims against production's 1000,
+and a thin empirical PMF inflates CRPS. **It did — by ~2.2 pp — and the
+conclusion holds.** At 1000 sims the model is still **−6.74%** at the best leash
+value. The MLB pitcher-outs model has genuinely negative distributional skill;
+it was not an artifact of thin replay. The earlier −8.97% figure should be
+quoted as **−6.74% at production sim counts**.
+
+### THE KNOBS, read from LIVE Render env — and one is a surprise
+
+    web               none of the sim-count keys are SET  -> code defaults
+    refresh-worker    none of the sim-count keys are SET  -> code defaults
+    live-odds-worker  REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = 100
+
+- **Basketball (NBA + WNBA): `REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS`, code
+  default 500** (`refresh_nba_oddsapi_props.py:2828`,
+  `refresh_wnba_oddsapi_props.py:4153`). It is **explicitly overridden DOWN to
+  100 on live-odds-worker ONLY.** refresh-worker runs the 500 default.
+  So the measured "basketball n_sims = 100" is one env var on one service, and
+  **deleting that key alone lands at 500 — already past the measured knee.**
+- **MLB live: `MLB_LIVE_GAME_MC_SIMS`, code default 120, min 20**
+  (`flask_frontend.py:383`). **Not set on any service** — 120 is the code
+  default, not a considered setting.
+- Soccer live tick 80 is a separate knob and is NOT in scope here: it runs 4 MC
+  passes per match on the 2 GB service.
+
+**Correction to an earlier note in this ledger:** basketball's default was
+described as 2000 (the engine's). The relevant default for the production path
+is the SCRIPT's, which is **500**. The engine default never applied.
+
+### WHAT IS STILL OWED BEFORE ANY CHANGE
+
+**The memory cost per additional sim has NOT been measured yet** — a probe is
+running (`scripts/scope_sim_memory.py`), measuring accumulate-vs-retain, because
+those differ by orders of magnitude:
+
+    accumulate -> O(1) in n_sims. Raising sims costs CPU/time, NOT memory.
+    retain     -> O(n_sims). A linear memory cost.
+
+**No sim-count change should be requested until that number exists.**
+live-odds-worker peaks at 1855/2048 MB (90.6%, 257–415 MB headroom) and
+refresh-worker is OOM-looping under `#449`. A CPU-only cost is a different
+decision from a linear memory cost, and guessing which one it is on an
+OOM-looping service is exactly the mistake `#241` already cost this project.
+
+## 2026-08-17 — DOES THE REQUIRED SIM COUNT DIFFER BY SPORT? **Yes — and the driver is `sigma / CRPS_climatology`, not the sport**
+
+Lane `convergence-phase7-crps`. `scripts/sim_count_requirement.py`. Read-only.
+
+Phase 9 measured MLB's knee at ~300 on ONE quantity. Whether that transfers to a
+soccer 3-way or a basketball prop needed answering without re-simulating every
+sport for days.
+
+### It has a closed form, and it was VALIDATED before use
+
+An n-draw empirical forecast inflates CRPS by `MD / 2n`, where `MD = E|X-X'|`
+(= `2*sigma/sqrt(pi)` for a Normal). So the penalty scales with the FORECAST'S
+OWN SPREAD, and what matters for a skill score is that penalty relative to the
+climatology CRPS it is divided by.
+
+| n | measured (MLB, leash 5) | predicted | error | penalty understated |
+|---|---|---|---|---|
+| 100 | 2.5110 | 2.4668 | **−0.0442** | **3.34x** |
+| 300 | 2.4516 | 2.4542 | +0.0026 | 0.59x |
+| 1000 | 2.4498 | 2.4498 | +0.0000 | 1.00x |
+
+**The model is exact at n>=300 and UNDER-STATES the penalty at n=100 by 3.3x** —
+`outs` is discrete, bounded and skewed (26.78% of simulated mass on one value),
+and a Normal's MD under-counts a lumpy distribution's spread.
+
+**My first pass passed this validation on a |error| <= 0.05 CRPS threshold.**
+That threshold was loose enough to wave through a 3.3x error in exactly the
+direction that causes UNDER-provisioning. The check now scores the PENALTY, not
+the absolute CRPS. **Same class as the 08-17 baseline-form error: a test that
+agrees for the wrong reason.**
+
+**Consequence: the formula gives the SCALING, not the LEVEL.** The level is
+anchored on MLB's *measured* knee.
+
+### Required sims, anchored (`sigma/CRPS_clim` = 1.528 -> 300 measured)
+
+| sport | market | sigma | CRPS clim | ratio | ANCHORED n | current | verdict |
+|---|---|---|---|---|---|---|---|
+| nfl | margin | 16.473 | 7.9713 | 2.067 | **406** | 300 | **TOO THIN** |
+| nfl | total | 14.200 | 7.7692 | 1.828 | **359** | 300 | **TOO THIN** |
+| ncaaf | margin | 13.695 | 11.4848 | 1.192 | 234 | 300 | OK |
+| ncaaf | total | 12.819 | 9.2085 | 1.392 | 273 | 300 | OK |
+| mlb | outs | 3.351 | 2.1927 | 1.528 | 300 | 1000 | OK (3x over) |
+
+**THE ANSWER TO "does it differ by sport": yes, by ~1.7x across measured sports
+alone — but the sport is not the variable.** `sigma / CRPS_climatology` is. NFL
+and NCAAF are the same engine, same markets, and differ by 1.7x because college
+outcomes are themselves more spread out, which raises the denominator.
+
+**So a single global sim count is wrong in both directions at once**: 300 is
+thin for NFL and generous for NCAAF, and MLB pregame's 1000 is 3x more than its
+own quantity needs.
+
+### What this does NOT license
+
+- **NHL's 20,000 -> 300 is NOT supported.** No climatology has been measured for
+  NHL (n=10, below the floor), so its ratio is unknown. Cutting 66x on an
+  unmeasured ratio is exactly the extrapolation this method cannot carry.
+- **Basketball and soccer are unmeasured too** — no climatology CRPS exists for
+  either, so neither an anchored n nor a verdict can be given. Their current
+  counts (100 / 80) remain unjustified rather than proven wrong.
+- The anchor rests on ONE measured knee. A second measured curve on a different
+  sport would convert this from "anchored extrapolation" to "fitted".
+
+### Memory, measured `[scripts/scope_sim_memory.py]`
+
+    accumulate   0.07 MB at 25, 50 AND 100 sims -- FLAT, O(1) in n_sims
+    retain       ~11.4 MB per 1000 sims per game -- linear
+
+**If the caller accumulates, raising sim counts costs CPU and NOT memory.** Even
+the retain worst case at 300 sims is ~3.4 MB per concurrent game, against
+257–415 MB of headroom on live-odds-worker. **Memory is not the blocker; which
+call-site regime applies is still unconfirmed.**
+
+Note: the script prints "psutil available: NO". That is a bug in its own check
+(it calls `rss_mb()` twice and compares, and RSS legitimately moves between
+calls). psutil works and the RSS column is real.
+
+
+## DEPLOY 2026-08-17 20:29-20:37Z — sweep-ownership gate (BOTH workers) + monotone props seal (refresh-worker) — **LIVE, MEASUREMENT PENDING**
+
+Coordinator-executed, closing all three open deploy requests. **User instructed
+"deploy now"; the preflight HOLD was overridden knowingly, not skipped** — 5 jobs
+were killed on refresh-worker including a live `run_mlb_daily_sim_job.py --sims
+1000`, and 3 on live-odds-worker. That sim re-runs on its next cycle.
+
+- **refresh-worker** `69607619` — live 20:35:44Z (`dep-da1mu4m417fc73ep8eq0`).
+  Cut on its OWN live SHA `8c0bd8e6`, NOT on `main`. Carries BOTH refresh-worker
+  requests: the ownership gate (`live_refresh_loop.py` +79) and the monotone
+  props seal (`refresh_mlb_oddsapi.py` +74).
+- **live-odds-worker** `9773713f` — live 20:36:50Z (`dep-da1mui6gekts738cobrg`).
+  Cut on `abc99875`. Ownership gate only.
+- 28 tests pass on the cherry-picked base, not just on `main`.
+- Only conflict during either cherry-pick was `.syndicate/lanes.md`; no code
+  conflict. Deploy branches are never merged back, so the ledger side was taken
+  from the deploy base.
+
+### Bundled, and why that is not the usual mistake
+
+Two changes ride one refresh-worker restart. Normally forbidden while
+diagnosing. Permitted here because their verifications are **independent and
+distinguishable**: a log marker within a sweep cycle vs. a next-morning
+frozen-doc comparison. Neither reading can be mistaken for the other, so
+attribution survives. It also spares a second restart, i.e. a second sim kill.
+
+### Measured: `<pending>` — and the honest state of it
+
+**The env confirms the gate SHOULD fire**, read live from both services:
+
+    refresh-worker     SYNDICATE_ACTIVE_SPORTS='nfl'            MLB_TICK_OWNER='false'
+    live-odds-worker   SYNDICATE_ACTIVE_SPORTS='mlb,wnba,soccer' MLB_TICK_OWNER='true'
+
+**One sweep ran 44s after the new code went live (20:36:28Z) and still swept
+mlb, nfl and wnba with NO `SWEEP_OWNERSHIP_EXCLUDED` line.** That is either the
+fix being inert, or a cycle whose sport list was resolved before the gate was
+consulted. **It is not yet decidable**, because NO sweep has run since — a
+search over 20:36:30Z..now returns nothing for `ODDS_SWEEP_OUTCOME` either, so
+the marker's absence currently measures nothing.
+
+**Do not read this deploy as verified.** The reading that closes it is the NEXT
+sweep cycle:
+- PASS: `SWEEP_OWNERSHIP_EXCLUDED date=... kept=nfl dropped=mlb:... soccer:... wnba:...`
+  on refresh-worker, AND an MLB pregame sweep appearing on live-odds-worker.
+- FAIL: another `ODDS_SWEEP_OUTCOME sport=mlb` on refresh-worker with no
+  exclusion line. That would make the fix inert on production and is a real
+  possibility given the 20:36:28 reading.
+
+Rollback if FAIL: `render_deploy.py --service refresh-worker --commit 8c0bd8e6
+--allow-rollback`, and `--service live-odds-worker --commit abc99875`.
+
+
+### MEASUREMENT — closes the sweep-ownership row above (`69607619` / `9773713f`). **VERDICT: INERT ON PRODUCTION.**
+
+`Measured: FAIL` — the gate does not fire. This closes the `<pending>` from the
+20:29-20:37Z deploy row.
+
+- RECONCILED: sweep-ownership gate — measured FAIL 2026-08-17 21:0xZ, inert on production.
+
+**The reading, in the order it was taken:**
+
+1. Live SHA re-checked at 21:0xZ: refresh-worker still `69607619`, finished
+   20:35:44.107804Z. Nobody redeployed over it.
+2. `SWEEP_OWNERSHIP_EXCLUDED` searched from **20:35:44Z** — the exact go-live
+   instant, not a later window — **nothing matched.**
+3. `ODDS_SWEEP_OUTCOME sport=soccer wrote=False ... since_launch_s=129` at
+   **20:56:15Z**. That launch stamp resolves to **20:54:06Z, twenty minutes
+   AFTER the new code went live.**
+4. Env re-read live and it is exactly what the gate needs to fire:
+   refresh-worker `SYNDICATE_ACTIVE_SPORTS='nfl'`,
+   `SYNDICATE_MLB_REFRESH_TICK_OWNER='false'`. `soccer` is not in `{nfl}`, so the
+   gate's own rule says exclude-and-log. It did neither.
+
+**A measurement-window error of mine, corrected before it produced a wrong
+verdict.** The watcher searched from 20:36:30Z while the code went live at
+20:35:44Z, so it had excluded the 46 seconds most likely to contain a
+boot-time marker. Re-run from the true go-live instant: still nothing. The
+verdict survives the correction; it would not have been safe without it.
+
+**Where it is inert, traced rather than guessed.** `ODDS_SWEEP_OUTCOME` is
+emitted by `_report_odds_sweep_outcomes` (:4534), a REPORTER that replays a
+stored launch-stamp file — it is not the sweeper and proves nothing on its own.
+The load-bearing evidence is the absent marker: the gate prints
+`SWEEP_OWNERSHIP_EXCLUDED` unconditionally whenever it drops any sport, and a
+sport it must drop was launched post-deploy. Every call to
+`_live_refresh_loop_effective_sports` sits at :3389, :3841 and :5148-5358;
+whatever launched soccer at 20:54:06Z either does not route through those or
+computes its list before the gate is consulted.
+
+**NOT ROLLED BACK, deliberately.** An inert change alters no behaviour, so a
+rollback buys no safety and costs another restart — which on this worker means
+killing an MLB sim again. Production is exactly as it was before 20:35:44Z: the
+defect (refresh-worker sweeping sports it does not own and starving the
+designated owner) is still live. `8c0bd8e6` / `abc99875` remain the rollback
+targets if that changes.
+
+**The props seal in the same deploy is NOT covered by this verdict.** Different
+file, different mechanism, and its reading is the 08-19 frozen-doc comparison.
+It is not refuted here, only unmeasured.
+
+**Handed back to the authoring lane** — the gate needs rework at the reachability
+level, not the logic level. Its logic is right and its config is right; it is
+simply not on the path that launches sweeps. This is the fourth-plus instance of
+`presence != reachability` in this repo.

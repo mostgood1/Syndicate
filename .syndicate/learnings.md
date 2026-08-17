@@ -4112,3 +4112,128 @@ already has a rule here; this is its fourth instance.
   at `deploy-guard.py:68-79` and the verification recipe in `coordinator.md`.
 - *(evidence: `deploy-guard.py:130-140` read directly; `52d45b10`; the
   coordinator's own dual-id measurement)*
+
+## 2026-08-17 — RULE: score a DISTRIBUTIONAL forecast with a distributional baseline. A point test on a distribution is the wrong instrument, even when it agrees.
+
+**What happened.** Phase 7's whole purpose was to build a proper scoring rule for
+projections (CRPS, bias/dispersion). I built it, used it to find a real defect —
+the MLB F5 starter leash, dispersion 1.002 vs a 0.7979 target — and then decided
+whether the model had SKILL by comparing its **mean absolute error to a constant
+point prediction**. That verdict went into `state.md`.
+
+**Why that is wrong even though the conclusion survived.** A constant has no
+distribution; it cannot price `P(outs > 17.5)`, which is the only thing a prop
+model is for. And MAE is blind to calibration and sharpness — precisely the axis
+on which the sweep's headline result moved. The instrument I reached for could
+not see the finding I had just made with the other one.
+
+**The corrected test, and it came out HARDER.** CRPS skill vs climatology (the
+marginal empirical distribution): **−8.97% at the best leash value, −14.52% at
+production's.** Negative skill everywhere. The model prices these starts worse
+than the league-wide distribution of outs does. Shortening the leash reduces the
+damage and does not make it positive.
+
+**The generalisable rule.** Match the baseline's FORM to the forecast's form:
+- point forecast -> compare to the climatological mean (MAE/RMSE)
+- **distributional forecast -> compare to CLIMATOLOGY, with CRPS**
+- probability forecast -> compare to the base rate, with Brier, **and to the
+  market** where one exists
+
+**And the trap that makes this easy to miss: my wrong test AGREED with the right
+one.** Both said "loses to baseline". A confirming answer from the wrong
+instrument feels like evidence and is not — had the leash genuinely carried
+distributional skill, MAE-vs-constant would have hidden it and the model would
+have been written off on a metric that could not see its value. This is the
+`#428` lesson recurring: *"'No measured skill' would have been the WRONG
+conclusion and would have suppressed a model that needs calibrating rather than
+retiring."*
+
+**Corollary already biting:** the replay ran at 100 sims/game against production's
+1000, and a thin empirical PMF inflates CRPS. A distributional metric is
+sensitive to the ESTIMATOR of the distribution, not only to the distribution —
+so sim count is part of the measurement, not just part of the model.
+
+## 2026-08-17 — RULE: a LEAKED backtest number is an UPPER BOUND, not merely an untrustworthy one
+
+**Standing practice here is to mark a leaky backtest "not citable" and stop.**
+`plan_2026-08-14_models.md` D1 did exactly that for the soccer validation CSVs.
+That is right as far as it goes and it throws away information.
+
+**A forecast that saw its own outcome should FLATTER itself.** So the leaked
+number bounds the honest one from above:
+
+    true out-of-sample skill  <=  leaked in-sample skill
+
+**Measured today on NCAAF** (`rating_source=cfbd_ppa_season_2025` predicting
+season-2025 games, `generated_at` 2026-07-16, 761 of 761 rows):
+
+    margin  +1.72%  [+0.20%, +3.24%]   -> true skill is AT BEST +1.72%
+    total   -3.65%  [-6.94%, -0.36%]   -> true skill is AT BEST -3.65%
+
+So NCAAF total is **known to be bad** without any clean data at all, and NCAAF
+margin is **known not to be good** — plausibly zero. "Not citable" would have
+recorded both as unknown, and they are not unknown; they are bounded.
+
+**How to apply.** When a leak is found: (a) refuse to call it skill, (b) still
+compute it, (c) report it as a CEILING with the direction of the bias stated. A
+leaked number that is already weak is a strong negative result. A leaked number
+that is strong tells you nothing and must wait for clean data.
+
+**The corollary that decides what to do next.** Do not repair a leak by
+regenerating history with a better rating source — that just moves the leak
+somewhere harder to see. Score FORWARD instead. NCAAF's 2026 projections already
+carry the correct pattern (`cfbd_ppa_season_2025_fallback_for_2026`, prior-season
+ratings), the season opens 2026-08-29, and 761 projections are written and
+waiting for outcomes. The clean measurement costs nothing but time.
+
+Related: `learnings.md` 2026-08-17 on matching the baseline's FORM to the
+forecast's form. Both are the same underlying discipline — say precisely what a
+number can and cannot support, rather than binning it as good or unusable.
+
+
+## 2026-08-17 — RULE: a PATHSPEC commit is the default; the isolated index is the FALLBACK. The latter arms a revert every time
+
+**Relayed by `commit-guard-blind-to-own-recipe`, owed to and written by the
+coordinator.** That lane measured the two forms against a repo whose index held
+a revert of `A.txt` and a deletion of `C.txt`:
+
+- `git commit -m x -- <paths>` — **immune.** Tree kept `A.txt` at HEAD content
+  and `C.txt` on disk. Same for `--amend -- <paths>` and `--pathspec-from-file`.
+- `-i` / `--include` — **NOT immune**, a revert landed. Stays guarded.
+- `-a` — immune to predicate 2 but commits the deletion under predicate 1.
+
+**Why the pathspec form should be reached for FIRST:** it needs no repair step.
+The isolated-index form (`GIT_INDEX_FILE`) protects a peer's staged work, but
+`HEAD` moving under the shared index means every path you just committed is left
+staged there at PRE-commit content — a revert of your own commit, armed, every
+single time. That has to be disarmed afterwards, and forgetting is invisible.
+
+So: **pathspec by default. Isolated index only when a pathspec cannot express
+the commit**, and then `git reset -- <the same paths>` immediately after, with
+`git diff --cached --numstat` re-read to prove it.
+
+## 2026-08-17 — RULE: never close a queue item in BULK. Close each against its own evidence
+
+**I did this to a live deploy request within hours of documenting the same
+failure shape.** After deploying three requests I moved *everything* in
+`.syndicate/deploy/requests/` to `done/` and stamped it all "EXECUTED by the
+coordinator". A fourth request (`soccer-layer2-dates`) had been filed at 20:20Z,
+after that batch was scoped. It was never deployed — its commits were not even
+pushed — and it spent that time marked delivered.
+
+**The morning's version of this rule was too narrow.** It said: after a merge
+touching a queue directory, diff DELETIONS against the remote. That catches git
+relocating files. It does not catch a human-or-agent bulk `Move-Item` over a
+glob, which is what actually happened. The general form:
+
+> **A status surface must only ever be advanced one item at a time, each against
+> the evidence for THAT item.** "I deployed the batch" is not evidence about a
+> file that entered the directory after the batch was scoped.
+
+The tell was available and I did not look: the queue held 3 files when I scoped
+the work and 4 when I moved them. **Count the items you are closing against the
+count you inspected.** If they differ, something arrived while you worked.
+
+Related: the same session had already written that a queue "only ever
+accumulates because closing it was nobody's job" — the failure mode inverts the
+moment closing becomes someone's job and they close too eagerly.
