@@ -33333,3 +33333,29 @@ So `selected_date` only ever shaped the EMPTY payload; it never constrained what
 **NOT DEPLOYED and no deploy requested.** Whether the same undated-snapshot pattern affects NBA's sibling readers (`build_live_player_lens_payload`, `build_live_lines_payload` — both call `_load_live_lens_snapshot()` the same way and both discard `allow_stored_date_fallback`) is **UNCHECKED**. Likely the same shape; that is a lead, not a finding.
 
 **Related:** `#455` (WNBA, a DIFFERENT defect — do not merge them), `#454`.
+
+#### `#449` OWNERSHIP 2026-08-17 01:0xZ — **NOT MINE. Owned by session `Worker memory watchdog logs`. Fold in or close as a duplicate.**
+
+I filed `#449` after finding the OOM loop incidentally during a deploy, without
+knowing the work was already underway. It was already owned:
+
+- **`Worker memory watchdog logs`** (`local_462ec2a8`) — active, owns the OOM work.
+- **`Layer 1 board coverage audit (fork 6)`** reports *"29/29 known `oomKilled`
+  reproduced for 2026-08-14 CT, and the unpaged control returns 20/29"* — i.e. a
+  reproducer AND a pagination fix. **My raw counts may therefore be LOW**, since
+  they come from unpaged `render_events.py --failures-only`.
+- **`Sports pregame/live model learning plan`** has the cross-service control:
+  *"live-odds-worker fails at a comparable count and not one is a kill"*.
+
+**The one datum I contributed that may be additive — handed over:** the loop
+**survived a full service replacement**. I deployed two complete convergence
+merges to refresh-worker (`7c2b1a17` 00:24:01Z, `7623a233` 00:53:29Z, 650+
+commits of other lanes' code reaching the service for the first time) and the
+cadence did not break across either — 00:19:48, 00:32:32 (+12m44s), 00:49:05
+(+16m33s). So the driver is **not** a stale-process or code-state condition that
+a restart clears, and it is insensitive to a large code change. That is evidence
+against any hypothesis a redeploy would reset.
+
+**Do not let this ticket read as unowned.** If `Worker memory watchdog logs` has
+a ticket already, close `#449` as a duplicate and keep theirs — an id is cheap,
+a split investigation is not.
