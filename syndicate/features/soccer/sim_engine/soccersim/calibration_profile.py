@@ -20,6 +20,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from syndicate.features.shared.calibration_profile_paths import calibration_profile_path
+from syndicate.features.shared.calibration_profile_store import load_versioned_profile
+
 
 @dataclass(frozen=True)
 class CalibrationProfile:
@@ -114,6 +117,35 @@ class CalibrationProfile:
 # Generic top-flight baseline. Every call site that does not pass
 # ``profile=`` explicitly resolves to this default, exactly as the Football
 # Core defaults to its NFL profile.
-SOCCER_CALIBRATION_PROFILE = CalibrationProfile(name="soccer")
+SOCCER_CALIBRATION_PROFILE_DEFAULT = CalibrationProfile(name="soccer")
 
-__all__ = ["CalibrationProfile", "SOCCER_CALIBRATION_PROFILE"]
+# `#440` Part 4 Phase 5 -- the versioned-profile seam.
+#
+# RESOLVED AT IMPORT, AND ON PURPOSE. Every consumer takes this constant as a
+# DEFAULT ARGUMENT (`profile: CalibrationProfile = SOCCER_CALIBRATION_PROFILE` in
+# match_simulator, possession_simulator, possession_priors, league_profiles), and
+# Python evaluates default arguments once at import. Resolving the CONSTANT
+# therefore reaches every existing call site with no call-site churn. Adding a
+# `resolve_...()` helper instead would have required finding and changing each
+# site, and any site missed would keep reading the frozen default -- which is
+# precisely how `load_versioned_profile` came to be "complete and unreachable".
+#
+# NO-OP WHILE NO ARTIFACT EXISTS: `load_versioned_profile` returns
+# `default_profile` ITSELF (not a copy) when the file is absent, invalid, or
+# unreadable, and never raises. So with no artifact this line is exactly
+# equivalent to the old assignment.
+#
+# The cost is one `Path.exists()` (plus a small JSON read if present) at import.
+# Accepted deliberately: the profile must be stable for the life of a sim run,
+# and re-reading per call would let an artifact change mid-slate.
+SOCCER_CALIBRATION_PROFILE, SOCCER_CALIBRATION_PROFILE_METADATA = load_versioned_profile(
+    default_profile=SOCCER_CALIBRATION_PROFILE_DEFAULT,
+    artifact_path=calibration_profile_path("soccer"),
+)
+
+__all__ = [
+    "CalibrationProfile",
+    "SOCCER_CALIBRATION_PROFILE",
+    "SOCCER_CALIBRATION_PROFILE_DEFAULT",
+    "SOCCER_CALIBRATION_PROFILE_METADATA",
+]

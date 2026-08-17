@@ -1629,6 +1629,25 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
     starter_early_sample_hook_delta_max = max(0, _ov_i("starter_early_sample_hook_delta_max", 8))
     starter_early_sample_pull_bias_drop = _clamp01(_ov_f("starter_early_sample_pull_bias_drop", 0.04))
     starter_early_sample_short_start_boost = _clamp01(_ov_f("starter_early_sample_short_start_boost", 0.04))
+    # The F5 leash length itself, in innings. Until 2026-08-17 this was readable
+    # ONLY from ManagerProfile.starter_min_innings (hardcoded 5 for all 30 teams,
+    # since data/manager/manager_tendencies.json does not exist and its loader
+    # silently returns {}), which made it the one starter-depth parameter that
+    # could not be swept while every knob below it had been carefully fitted.
+    #
+    # It needed to be sweepable because it sits ABOVE those knobs: inside the
+    # leash window the pitch-count hook is bypassed unless pc >= eff_hook +
+    # starter_leash_pc_buffer, so `starter_hook_add_pitches` and friends cannot
+    # move short starts however they are tuned. Measured 2026-08-17 on 726
+    # production starts: the sim produces starts under 15 outs at 0.104 against
+    # an actual 0.296, and 26.78% of ALL simulated mass sits at exactly 15 outs
+    # -- a point mass on this parameter's boundary.
+    #
+    # Default is the manager profile's own value, so an absent override is a
+    # byte-for-byte no-op. 0 disables the leash entirely (inning <= 0 is never
+    # true); note this is the one input whose meaning changes, since the old
+    # max(1, ...) floor silently promoted 0 to 1.
+    starter_min_innings_eff = max(0, _ov_i("starter_min_innings", int(roster.manager.starter_min_innings)))
     # Starter leash-break controls (only relevant while inning <= starter_min_innings).
     # Defaults preserve the existing behavior (i.e., "always keep" within leash unless blowout).
     starter_leash_pc_buffer = max(0, _ov_i("starter_leash_pc_buffer", 20))
@@ -1734,7 +1753,7 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
 
         eff_hook = max(45, min(120, eff_hook))
 
-        in_leash_window = int(state.inning) <= max(1, int(roster.manager.starter_min_innings))
+        in_leash_window = int(state.inning) <= starter_min_innings_eff
         blowout = abs(int(fielding_diff)) >= int(roster.manager.starter_blowup_run_diff)
         runner_pressure = _runner_pressure(bases)
         third_time = bf >= 18
