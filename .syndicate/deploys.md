@@ -9814,3 +9814,78 @@ Production n = 4,695 observations / 29 dates / 370 games.
 - Two windows is not a time series. Three of seven signs flipping on ~4.7k
   observations says the per-market numbers are noisier than their n suggests,
   because observations within a start are not independent.
+
+## 2026-08-17 — F5 LEASH EXPOSED AS A TUNABLE AND SWEPT (`#440` Phase 7)
+
+Lane `convergence-phase7-crps`. **NO DEPLOY. No production config changed.**
+`py -3 scripts/sweep_starter_leash.py --sims 100 --workers 10`
+
+**Sample:** 267 distinct starts, 13 dates (2026-06-15..06-27), 175 games
+replayed from their archived roster artifacts, 87,500 game-sims, 100 sims/game.
+**Local mirror only** — 13 dates is what has roster artifacts here, not 46.
+
+Grid run on top of production's four promoted overrides, not code defaults.
+
+| leash | n | bias | MAE | CRPS | dispersion | sim P(outs<15) | vs actual |
+|---|---|---|---|---|---|---|---|
+| 0 | 267 | **−1.470** | **3.185** | **2.389** | **0.791** | **0.2394** | −0.0266 |
+| 3 | 267 | −1.580 | 3.208 | 2.411 | 0.810 | 0.2394 | −0.0266 |
+| 4 | 267 | −1.769 | 3.250 | 2.436 | 0.879 | 0.2215 | −0.0444 |
+| **5 (current)** | 267 | −2.197 | 3.352 | 2.511 | 1.002 | 0.0881 | −0.1778 |
+| 6 | 267 | −2.993 | 3.795 | 2.858 | 1.254 | 0.0728 | −0.1931 |
+
+Actual P(outs<15) = 0.2659. Target dispersion 0.7979. bias = actual − mean, so
+negative = the sim runs high.
+
+**EVERY METRIC IMPROVES MONOTONICALLY AS THE LEASH SHORTENS.** Bias, MAE, CRPS,
+dispersion and short-start rate all move the same way across all five points.
+There is no trade-off to arbitrate — which is itself unusual and worth a second
+look before trusting it.
+
+**THE DISPERSION RESULT IS THE STRIKING ONE.** At leash 0 dispersion is
+**0.791 against a calibrated 0.7979** — essentially exact. The overconfidence
+measured in production (1.10–1.54) is very largely THE LEASH: truncating the
+left tail is what made σ too narrow. Going 5 → 0 also closes
+**most of the short-start deficit** (gap −0.1778 → −0.0266).
+
+**BUT: NO GRID POINT BEATS THE CONSTANT BASELINE.** Baseline MAE is **3.0912**
+at every point (it does not depend on the leash); the best model MAE is
+**3.1852** at leash 0. So even fully unleashed, the outs projection still loses
+to "always predict this pool's average". Shortening the leash narrows the gap
+from 0.261 to 0.094 MAE and does not close it. **Do not report this sweep as
+"fixed".**
+
+**AND A RESIDUAL REMAINS THAT THE LEASH CANNOT EXPLAIN.** At leash 0 the bias
+is still **−1.470** (~half an inning) and P(outs<15) still sits 0.027 low. The
+leash is the largest single term, not the only one — the pitch-count hook is
+generous too. Anyone who sets the leash to 0 and expects zero bias will be
+wrong.
+
+**Leash 0 and 3 are nearly the same** (identical P(outs<15) to 4 dp, bias
+−1.470 vs −1.580). Physically sensible: starters are almost never pulled before
+the 3rd, so a 3-inning leash is close to no leash. Treat that as a sanity check
+that passed, not as a tie to break.
+
+**Empirical-vs-Normal gap ≤ 0.022 at every grid point**, consistent with the
+production reading. The Normal summary remains adequate for this market.
+
+### WHAT THIS IS NOT
+
+- **NOT A PROMOTION.** Betting hit rate against market lines is **not graded**
+  by this script. The overrides file's own record: `starter_tto_quality_scaling`
+  was promoted on a clean statistical win and reverted the same session for
+  making strikeout betting accuracy WORSE (55.78% → 54.65%). This sweep is
+  exactly the kind of evidence that has already proven insufficient once.
+- **NOT THE FITTED HARNESS.** The four promoted knobs were fitted on a
+  35-tune/11-holdout split. This is 13 contiguous dates with **no holdout** and
+  **no tier split** — and the team's tier data shows elite starters are
+  *under*-projected, so a global change could hurt them. A per-tier read is owed.
+- **100 sims/game, not production's 1000.** Fair across grid points, thinner
+  per start.
+
+### OWED BEFORE ANY VALUE IS PROMOTED
+
+1. Grade the grid on betting hit rate (`betting_accuracy.py`), not just bias.
+2. Split tune/holdout, and split by market-line tier.
+3. Re-run against production artifacts — 13 local dates is not the 46 the other
+   knobs were fitted on.

@@ -3761,3 +3761,40 @@ row, so the expensive mistake is not covering).
 every `expected_matchups.issubset(...)` coverage gate passes **trivially** -
 the guard that was supposed to stop a partial slate is inert exactly when the
 slate is partial. This is the `unknown-must-not-default-permissive` shape again.
+
+#### convergence-phase7-crps — LEASH EXPOSED AND SWEPT 2026-08-17 — **shorter is better on every metric, and it still loses to a constant**
+
+- **Code:** `starter_min_innings` is now a `manager_pitching_overrides` key
+  (`vendor/mlb_bettingv2/sim_engine/simulate.py`, v2 hook only — v2 is what
+  production runs). Absent override = the manager profile's own value = a
+  byte-for-byte no-op. `0` disables the leash; note the old `max(1, ...)`
+  silently promoted 0 to 1, so that one input's meaning changed.
+- **Tests:** `tests/test_mlb_starter_leash_tunable.py`, 9 passing, toy rosters,
+  no artifact/network. Both Phase 5 halves: no-behaviour-change AND
+  **reachability**. **The reachability half earned its keep immediately** — the
+  first draft read `stats["outs"]` where the key is `"OUTS"`, every reading came
+  back 0.0, and the three no-op tests PASSED on `0.0 == 0.0`. The helper now
+  refuses to return an all-zero sample.
+- **Sweep:** `scripts/sweep_starter_leash.py`. 267 starts / 13 dates / 87,500
+  game-sims, replayed from archived roster artifacts (PIT-safe by construction),
+  on top of the four already-promoted overrides. Full table in `deploys.md`.
+- **Result:** every metric improves monotonically as the leash shortens.
+  Dispersion goes **1.002 → 0.791 against a 0.7979 target** — the production
+  overconfidence is very largely this parameter truncating the left tail.
+  P(outs<15) gap closes from −0.1778 to −0.0266.
+- **AND IT STILL LOSES TO A CONSTANT.** Baseline MAE 3.0912 at every grid point;
+  best model MAE 3.1852 (leash 0). The gap narrows 0.261 → 0.094 and does not
+  close. Residual bias at leash 0 is still −1.470. **The leash is the largest
+  single term, not the only one.**
+- **NOT PROMOTED, and the reason is in the overrides file, not my judgement:**
+  `starter_tto_quality_scaling` won statistically and was reverted the same
+  session for costing real betting accuracy. This sweep grades no betting
+  outcome, has no holdout, and no tier split — and the team's tier data shows
+  elite starters are UNDER-projected, so a global shift could hurt them.
+- Also found while doing this: **`read_game_roster_artifact` returns `TeamRoster`
+  objects, not dicts** — do not pass them through `roster_from_dict`. My first
+  draft did, and a bare `except: return []` reported the whole sweep as "0
+  joined" with no reason. Failures are counted and printed now.
+- **Owed:** betting-accuracy grade, tune/holdout split, per-tier read, and a
+  re-run against production artifacts (13 local dates is not the 46 the other
+  knobs were fitted on).
