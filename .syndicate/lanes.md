@@ -6327,3 +6327,29 @@ the window, the projection index read one date. Same files, different breadth.
 is free. Verify on the served payload: `rows_with_projection` should rise from
 4 toward the thousands, and `unmatched_match_rows` fall from 8,755. **Both, or
 it did not work.**
+
+#### clv-without-settlement — INBOUND ONE-LINE REQUEST from `convergence-phase7-crps` `[2026-08-17]`
+
+**Not a claim, not an edit. A request, because you own the file.**
+
+`syndicate/features/shared/artifact_publisher.py` needs ONE pattern added to
+`HOT_ARTIFACT_PATTERNS`:
+
+    "*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json",
+
+**Why:** `#440` measured that the sim's pitch-type multipliers
+(`pitch_type_whiff_mult`, `vs_pitch_type`) are empty on **449/449 production
+pitchers**, so `.get(pitch_type, 1.0)` makes a slider and a fastball
+interchangeable. The data existed only in a `DiskCache` under `vendor/*/data/`,
+which is **gitignored AND inside Render's ephemeral checkout** — the `#389`
+shape, unable to ship. It is now published as a disk-backed artifact
+(`data/mlb_source/source_artifacts/data/pitch_splits/pitch_splits_2026.json`,
+73 pitchers) resolved through `SYNDICATE_DATA_ROOT`, and the loader reads it
+first (5 tests, including the empty-cache worker case).
+
+**Without this line the artifact will not mirror or export.** Everything else is
+committed (`87f34554`).
+
+**I did NOT take the file.** I had already taken one file under a logged override
+earlier today and did not reach across a second time. Apply it when convenient —
+nothing of mine is deployed and there is no deadline.
