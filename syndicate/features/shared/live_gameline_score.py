@@ -152,8 +152,25 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         if not isinstance(rec, Mapping):
             continue
         considered += 1
-        key = str(rec.get("game_pk") or rec.get("event_id") or "").strip()
-        if key not in finals:
+        # TRY EVERY IDENTIFIER, never `a or b`. That short-circuit was the second
+        # half of the same join failure and it survived the first fix.
+        #
+        # A ledger record is written while the game is LIVE, so it carries
+        # `game_pk` (lifted from the live_gameline block) AND `event_id`. A row
+        # that has since gone FINAL carries no live_gameline at all -- the live
+        # join refuses final games -- so it is indexed under `event_id` only.
+        # With `game_pk or event_id` the record's non-empty `game_pk` won,
+        # `event_id` was never tried, and all 3,727 records missed an index that
+        # genuinely contained their game. Measured 02:01Z, after the first fix.
+        key = next(
+            (
+                k
+                for k in (str(rec.get("game_pk") or "").strip(), str(rec.get("event_id") or "").strip())
+                if k and k in finals
+            ),
+            "",
+        )
+        if not key:
             unscored[_UNSCORED_NO_OUTCOME] = unscored.get(_UNSCORED_NO_OUTCOME, 0) + 1
             continue
         model_p = _finite_prob(rec.get("model_home_win_prob"))
