@@ -28,6 +28,7 @@ import argparse
 import math
 import os
 import sys
+from datetime import date as date_cls
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -313,7 +314,12 @@ def run_anchor_validation(
         return 1
     print(f"{len(usable)} fixtures have both an anchor book and a held-out consensus of other books")
 
-    ratings = _load_team_ratings(league)
+    # `as_of` is REQUIRED (audit §7 #6) and this call was missing it. Mirrors
+    # `run_h2h`'s own derivation at :189 -- `usable` fixtures carry
+    # `commence_time` (set where they are built, ~:270), so the fixture date is
+    # already here and no new input is needed.
+    fixture_date = str(usable[0].get("commence_time") or "")[:10]
+    ratings = _load_team_ratings(league, fixture_date)
     promoted = _fill_promoted(ratings, [{"home_team": f["home_team"], "away_team": f["away_team"]} for f in usable])
     adapter = build_soccer_simulation_adapter(league)
 
@@ -446,7 +452,23 @@ def run_props(
     ]
     print(f"{len(fixtures)} fixtures in props file")
 
-    ratings = _load_team_ratings(league)
+    # `as_of` is REQUIRED (audit §7 #6) and this call was missing it. Unlike
+    # `run_h2h` (:189) and `run_anchor_validation` above, the props CSV carries
+    # NO date -- its columns are player/team_side/event/market/line/... only, so
+    # there is no fixture date to derive and no `--date` flag on this subcommand.
+    #
+    # Today is the honest answer for this mode and is what `_load_team_ratings`'
+    # own docstring licenses: it "simulates UPCOMING fixtures against current
+    # market odds ... the history is all in the past either way". Every history
+    # row predates today, so nothing is filtered and nothing leaks.
+    #
+    # THE ONE WAY THIS IS WRONG, stated because it is invisible otherwise:
+    # re-running an OLD props CSV (the filename carries its date, e.g.
+    # `props_model_vs_market_2026-07-19.csv`) would admit history recorded AFTER
+    # those fixtures were played. That is a leak, and it is not guarded here.
+    # If this subcommand ever grows a `--date`, pass it instead of today.
+    fixture_date = date_cls.today().isoformat()
+    ratings = _load_team_ratings(league, fixture_date)
     promoted = _fill_promoted(ratings, fixtures)
     players_dir = REPO_ROOT / "data" / "soccer_source" / league / "players"
     player_frames = [pd.read_csv(path) for path in sorted(players_dir.glob("players_*.csv"))]

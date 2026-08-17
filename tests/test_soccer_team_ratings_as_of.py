@@ -11,6 +11,8 @@ using ratings built partly from May results. Every number in
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from syndicate.features.soccer.features.loaders import compute_team_ratings
@@ -114,7 +116,102 @@ def test_the_production_builder_passes_the_date_it_is_building_for():
     import scripts.build_soccer_artifacts as mod
 
     assert "as_of" in inspect.signature(mod._load_team_ratings).parameters
-    assert "_load_team_ratings(league, source_root, iso_date)" in inspect.getsource(mod)
+
+
+def _load_team_ratings_call_census() -> list[tuple[str, int, int, int]]:
+    """Every `_load_team_ratings` call in the repo, with the arity it must have.
+
+    Returns `(relative_path, lineno, positional_args_passed, args_required)`.
+
+    Resolution rule, matching Python's own: a module-local `def` wins; otherwise
+    the call binds to whatever `from ... import _load_team_ratings` brought in.
+    There are TWO distinct functions with this name and DIFFERENT arities --
+    `build_soccer_artifacts._load_team_ratings(league, source_root, as_of)` (3)
+    and `validate_soccer_vs_market._load_team_ratings(league, as_of)` (2) -- so
+    a census that assumed one arity would be wrong about half the call sites.
+    """
+    import ast
+
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    # `.claude/worktrees/` holds stale COPIES of these same scripts from other
+    # sessions, still carrying the pre-`as_of` two-arg signature. They are not
+    # this repo's code and asserting on them would make this test fail for
+    # reasons that have nothing to do with the tree under test.
+    skip = {".claude", ".venv", ".venv-1", "vendor", "node_modules", ".git", "data", "reports"}
+
+    definitions: dict[str, int] = {}
+    sources: dict[str, tuple[str, ast.Module]] = {}
+    for path in sorted(repo_root.rglob("*.py")):
+        if any(part in skip for part in path.relative_to(repo_root).parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        rel = path.relative_to(repo_root).as_posix()
+        sources[rel] = (rel, tree)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "_load_team_ratings":
+                required = len(node.args.args) - len(node.args.defaults)
+                definitions[rel] = required
+
+    census: list[tuple[str, int, int, int]] = []
+    for rel, (_, tree) in sources.items():
+        imported_from = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    if alias.name == "_load_team_ratings":
+                        imported_from = (node.module or "").replace(".", "/") + ".py"
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name != "_load_team_ratings":
+                continue
+            if rel in definitions:
+                required = definitions[rel]
+            elif imported_from and imported_from in definitions:
+                required = definitions[imported_from]
+            else:
+                continue
+            census.append((rel, node.lineno, len(node.args) + len(node.keywords), required))
+    return census
+
+
+def test_every_caller_passes_as_of():
+    """A CALLER CENSUS, because the spot-check version of this test was green
+    through a total production outage.
+
+    What stood here asserted one literal string -- the call site inside
+    `build_soccer_artifacts` -- and nothing else. When `_load_team_ratings`
+    gained its third parameter, that one caller was updated and FOUR others
+    were not. The test passed the whole time.
+
+    The cost, measured on production 2026-08-17 20:1x-20:3xZ:
+    `poll_soccer_live_state.py` raised `TypeError: _load_team_ratings() missing
+    1 required positional argument: 'as_of'` for la_liga, primeira_liga and
+    championship -- exactly and only the three leagues with matches in play,
+    because the call sits behind `if live_events:` and a league with nothing
+    live never reaches it. All three live-lens boards read "Live matches: 0 /
+    Source: No data" while those matches were being played and scoring. Two
+    more sites in `validate_soccer_vs_market.py` were broken on the same
+    footing and were found by writing this census, not by running anything.
+
+    THE GENERAL RULE, which is the point of keeping this test: a signature
+    change needs a caller census, not a spot-check of the caller you just
+    edited. Asserting call-site TEXT can only ever prove the one site you
+    thought of.
+    """
+    census = _load_team_ratings_call_census()
+    assert census, "the census found no call sites at all -- it has stopped looking correctly"
+
+    wrong = [
+        f"{rel}:{line} passes {passed} arg(s), needs {required}"
+        for rel, line, passed, required in census
+        if passed != required
+    ]
+    assert not wrong, "call sites disagree with the signature:\n  " + "\n  ".join(wrong)
 
 
 def test_undated_rows_are_admitted_only_when_explicitly_allowed():
