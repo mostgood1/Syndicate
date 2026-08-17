@@ -6084,3 +6084,21 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 - **NEXT ACTION:** slot-conditioned + score-state haircut (both curves measured
   and in `deploys.md`), then re-run `mlb_opportunity_haircut.py`. The scoreboard
   is the market, and it is now a single command.
+
+### wnba-phase2-migration - HANDED OFF, COORDINATOR HOLDS THE ONLY REMAINING ACTION
+- **Sweep gate: DEPLOYED and HALF-VERIFIED.** Half one confirmed by
+  live-odds-worker's own `SWEEP_OWNERSHIP_EXCLUDED` line. Half two
+  (`ODDS_SWEEP_OUTCOME` on live-odds-worker) pending the cadence marker;
+  **scheduled check fires 18:40 CDT and writes the measurement into `deploys.md`
+  itself** - it does not need a human.
+- **Phase 2: request `2026-08-17T2115Z` with the coordinator, updated with three
+  facts I did not have when filing** - (1) `wnba_autorun=0` on all four deploy
+  branches proves it never shipped; (2) the flag is ALREADY ON so the deploy goes
+  hot on the first tick, and the staged sequence I originally recommended is only
+  recoverable by setting the flag to `0` first; (3) memory headroom is 1237MB but
+  that service's own memory instrumentation is degraded.
+- **NOTHING IS URGENT.** The sweep gate was the time-sensitive item and it is
+  done. Phase 2 has been unowned for weeks and its code is committed and inert.
+- **SINGLE NEXT ACTION:** read the 18:40 CDT check's result. If
+  `ODDS_SWEEP_OUTCOME` landed on live-odds-worker, close the `20025cc4` row.
+  Phase 2 is the coordinator's call on their own window.

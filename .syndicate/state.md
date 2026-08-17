@@ -3938,3 +3938,27 @@ Supersedes the "loses to climatology" line above with the REASON.
 - **Consequence:** MLB outs should be served `unmeasured` or withheld, not
   calibrated. Effort belongs on hitter props.
 
+
+## Sweep ownership gate + Phase 2 - STATE 2026-08-17 ~22:00Z
+
+- **THE SWEEP GATE IS DEPLOYED** (`20025cc4`, ~20:35Z, by the coordinator) and
+  **confirmed present by CONTENT on all four deploy branches**, including the
+  later `soccer-lens` pair - another lane's deploy carried it forward rather
+  than reverting it.
+- **Partition CONFIRMED on live-odds-worker** 21:38:32Z:
+  `kept=mlb,wnba,soccer dropped=nfl,ncaaf`. **refresh-worker has not yet emitted
+  its own gate line** - code present, path infrequent, unresolved either way.
+- **`ODDS_SWEEP_OUTCOME` on live-odds-worker is STILL 0** against a hard-zero
+  30h baseline. Pending the shared cadence marker ageing past 2h. Scheduled
+  check `sweep-gate-verification-check` fires 18:40 CDT.
+- **PHASE 2 HAS NEVER SHIPPED** - `wnba_autorun=0` on all four deploy branches.
+  Its env keys on live-odds-worker (`=true`, `=7200`) are therefore **INERT**.
+  **When it does ship it goes HOT IMMEDIATELY** - the flag is already on and
+  `last_epoch=0` means the interval gate does not hold on first run.
+- **live-odds-worker: 293MB RSS / 1237MB headroom** on 2GB (21:38Z). But it
+  reports `psutil_unavailable:ImportError`, so **its memory instrumentation is
+  degraded** - the very signal one would use to abort a Phase 2 rollout.
+- **Pregame cadence: WNBA and MLB are ALREADY identical at 2h.** Only soccer
+  differs (8h). The live path differs by a deliberate memory carve-out, not cadence.
+- **`wnba_forced_through` fired 0 times in 24h on both services** - that
+  carve-out is INERT and is not what gates WNBA.

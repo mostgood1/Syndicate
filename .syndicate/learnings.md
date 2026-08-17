@@ -4821,3 +4821,34 @@ narrowed the search; none of them cost anything beyond the run.
 would mean. I wrote "if the NFL knee is below 300 the honest reading is that the
 scaling law is wrong, not that NFL is special" BEFORE seeing it — which made
 accepting the answer automatic rather than a negotiation with myself.
+
+## 2026-08-17 - A GRADING LINE IS NOT AN EVENT LINE
+
+`ODDS_SWEEP_OUTCOME sport=X wrote=True` reads like "X was just swept". **It is
+not.** It GRADES a sweep launched earlier, and carries `since_launch_s` saying
+how much earlier. Observed values ran from 880s to **153497s (42 hours)**.
+
+Two conclusions this session were wrong because of it:
+- **"refresh-worker is still sweeping soccer after the gate deployed"** - four
+  such lines 40s after `deploy_ended`. They graded pre-deploy launches. Nothing
+  had been swept.
+- **"WNBA swept 34 times in 24h"** - that was 34 gradings, not 34 sweeps.
+
+**THE RULE: before counting a log line as an event, find the field that says
+WHEN the event happened.** If the line carries an age (`since_launch_s`,
+`sidecar_age_s`, `marker_age_s`), it is describing something in the past and its
+timestamp is the timestamp of the REPORT, not of the thing reported. A line that
+needs an age field is a line that is not about now.
+
+## 2026-08-17 - SETTING ONE ENV VAR TRIGGERS A FULL DEPLOY
+
+A single-key `PUT` to `/v1/services/<id>/env-vars/<KEY>` produced a
+`deploy_started` with `trigger.envUpdated: true` on live-odds-worker at 20:55Z.
+
+I had described single-key env writes to the user as safe *because* they avoid
+`blueprint_sync` - which is true of the **blast radius** (only that key changes,
+verified 92->93->94 keys) but **false of the restart**. The service redeploys.
+
+**So an env write IS a production event.** It is still far safer than a
+`render.yaml` push, but "I only set one variable, nothing will happen" is wrong,
+and on a service with an in-flight job it would have killed it.
