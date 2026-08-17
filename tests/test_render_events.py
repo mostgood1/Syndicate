@@ -85,9 +85,10 @@ def test_pager_walks_past_the_first_page(monkeypatch):
     monkeypatch.setattr(render_events, "_api_key", lambda: "k")
     monkeypatch.setattr(render_events, "_get", lambda url, key: pages.pop(0) if pages else [])
 
-    events, page_count = render_events.fetch_events(service="refresh-worker")
+    events, page_count, truncated = render_events.fetch_events(service="refresh-worker")
     assert page_count == 2
     assert len(events) == render_events._PAGE + 1
+    assert truncated == ""  # a short final page IS the end of the window
 
 
 def test_pager_returns_oldest_first(monkeypatch):
@@ -98,7 +99,7 @@ def test_pager_returns_oldest_first(monkeypatch):
     monkeypatch.setattr(render_events, "_api_key", lambda: "k")
     monkeypatch.setattr(render_events, "_get", lambda url, key: rows)
 
-    events, _ = render_events.fetch_events(service="refresh-worker")
+    events, _, _ = render_events.fetch_events(service="refresh-worker")
     stamps = [e["timestamp"] for e in events]
     assert stamps == sorted(stamps)
 
@@ -115,10 +116,13 @@ def test_pager_terminates_when_the_cursor_stops_advancing(monkeypatch):
     monkeypatch.setattr(render_events, "_api_key", lambda: "k")
     monkeypatch.setattr(render_events, "_get", _stuck)
 
-    events, page_count = render_events.fetch_events(service="refresh-worker")
+    events, page_count, truncated = render_events.fetch_events(service="refresh-worker")
     assert page_count == 2  # one real page, one that returned nothing new
     assert calls["n"] == 2
     assert len(events) == render_events._PAGE
+    # Stopping is right; calling it the end of the window is not. Whatever lay
+    # past the stall was never read, and the report must say so.
+    assert "cursor" in truncated
 
 
 def test_duplicate_events_across_pages_are_counted_once(monkeypatch):
@@ -130,8 +134,70 @@ def test_duplicate_events_across_pages_are_counted_once(monkeypatch):
     monkeypatch.setattr(render_events, "_api_key", lambda: "k")
     monkeypatch.setattr(render_events, "_get", lambda url, key: pages.pop(0) if pages else [])
 
-    events, _ = render_events.fetch_events(service="refresh-worker")
+    events, _, _ = render_events.fetch_events(service="refresh-worker")
     assert len(events) == 2
+
+
+# --------------------------------------------------------------------------
+# READ vs EVENT SPAN. The defect this catches shipped and cost a retraction:
+# on 2026-08-17 a 5-hour read that found one 4-event deploy cycle printed
+# `COVERED 14:33 .. 14:39` and was read as a 6-minute read, turning a correct
+# all-clear into "mostly unverified".
+# --------------------------------------------------------------------------
+
+
+def test_a_sparse_window_that_reads_whole_is_not_reported_as_truncated(monkeypatch):
+    """Few events over a long window is a SPARSE window, not a short read.
+
+    The four events span ~6 minutes of a requested 5 hours. `truncated` must
+    still be empty -- the span of what was found carries no information about
+    how much was read.
+    """
+    rows = [
+        _row(_event("2026-08-17T14:33:36Z", "build_started"), "a"),
+        _row(_event("2026-08-17T14:33:36.8Z", "deploy_started"), "b"),
+        _row(_event("2026-08-17T14:38:18Z", "build_ended"), "c"),
+        _row(_event("2026-08-17T14:39:32Z", "deploy_ended"), "d"),
+    ]
+    monkeypatch.setattr(render_events, "_api_key", lambda: "k")
+    monkeypatch.setattr(render_events, "_get", lambda url, key: rows)
+
+    events, pages, truncated = render_events.fetch_events(
+        service="refresh-worker", start="2026-08-17T10:55:37Z"
+    )
+    assert len(events) == 4
+    assert pages == 1
+    assert truncated == ""
+
+
+def test_a_malformed_response_is_not_reported_as_the_end_of_the_window(monkeypatch):
+    """An unrecognised shape must not land on the permissive branch."""
+    monkeypatch.setattr(render_events, "_api_key", lambda: "k")
+    monkeypatch.setattr(render_events, "_get", lambda url, key: {"unexpected": "dict"})
+
+    events, _, truncated = render_events.fetch_events(service="refresh-worker")
+    assert events == []
+    assert truncated  # NOT "" -- this read failed, it did not finish
+
+
+def test_hitting_the_page_cap_is_reported_as_truncated(monkeypatch):
+    """Running out of pages is the one case with no break at all."""
+    counter = {"n": 0}
+
+    def _always_full(url, key):
+        counter["n"] += 1
+        # Every page full, every cursor new -> nothing ever ends the walk.
+        return [
+            _row(_event(f"2026-08-14T{counter['n']:02d}:{i:02d}:00Z"), f"c{counter['n']}-{i}")
+            for i in range(render_events._PAGE)
+        ]
+
+    monkeypatch.setattr(render_events, "_api_key", lambda: "k")
+    monkeypatch.setattr(render_events, "_get", _always_full)
+
+    _, pages, truncated = render_events.fetch_events(service="refresh-worker", max_pages=3)
+    assert pages == 3
+    assert "page cap" in truncated
 
 
 # --------------------------------------------------------------------------

@@ -14,9 +14,16 @@ tool. `render_logs.py` for what a process SAID; this for what happened TO it.
 
 WHAT IT GETS RIGHT, and why each one is load-bearing:
 
-- **It prints the window it ACTUALLY covered.** Same reason `render_logs.py`
-  does (`#434`: a pager reported 99 samples spanning 1.2s of a 51s request and
-  the number looked fine). A window you did not cover is the failure mode.
+- **It prints the window it ACTUALLY READ, separately from the span of the
+  events it found.** Same reason `render_logs.py` prints coverage (`#434`: a
+  pager reported 99 samples spanning 1.2s of a 51s request and the number looked
+  fine). A window you did not read is the failure mode -- but the two lines must
+  not be conflated, because a SPARSE window reads whole and still returns a
+  narrow span. This was reported as one `COVERED` line until 2026-08-17, when a
+  5-hour read that found a single 4-event deploy cycle printed
+  `COVERED 14:33 .. 14:39` and was read as "the API only gave me 6 minutes" --
+  retracting a correct all-clear. The span of what you found says nothing about
+  how much you looked at.
 
 - **A quiet window and a broken read are DIFFERENT and never print the same.**
   Zero events in a window is a real, useful answer -- but only once you know the
@@ -93,17 +100,28 @@ def fetch_events(
     start: str = "",
     end: str = "",
     max_pages: int = _MAX_PAGES,
-) -> tuple[list[dict], int]:
+) -> tuple[list[dict], int, str]:
     """Every event in [start, end], oldest-first, de-duplicated by event id.
 
     The endpoint returns NEWEST-first and pages backward through `cursor`, so
     this walks back to the floor and sorts on the way out.
+
+    Returns `(events, pages, truncated)`, where `truncated` is `""` when the
+    pager reached the end of the requested window and otherwise names WHY it
+    stopped short. That third value is load-bearing, not decoration: whether the
+    window was fully read cannot be recovered from the event list or the page
+    count afterwards. A window that reads whole and holds four events is, from
+    the outside, indistinguishable from one where the cursor stalled after four
+    -- and only the first licenses a statement about the whole window.
     """
     service_id = SERVICE_IDS[service]
     key = _api_key()
     cursor = ""
     seen: dict[str, dict] = {}
     pages = 0
+    # Survives only if the loop exhausts `max_pages` without ever breaking, i.e.
+    # the far end of the window was never reached.
+    truncated = f"hit the {max_pages}-page cap"
 
     for _ in range(max_pages):
         params = {"limit": str(_PAGE)}
@@ -116,7 +134,15 @@ def fetch_events(
         url = f"https://api.render.com/v1/services/{service_id}/events?" + urllib.parse.urlencode(params)
         rows = _get(url, key)
         pages += 1
-        if not isinstance(rows, list) or not rows:
+        if not isinstance(rows, list):
+            # An unrecognised response shape is a reader problem, and must not be
+            # reported as a window that ended. `learnings.md`: an unknown that
+            # lands on the permissive branch is how a bad read passes for a good one.
+            truncated = "the API returned an unexpected shape"
+            break
+        if not rows:
+            # A genuinely empty page IS the end of the window.
+            truncated = ""
             break
 
         fresh = 0
@@ -129,14 +155,20 @@ def fetch_events(
             fresh += 1
 
         cursor = str(rows[-1].get("cursor") or "")
-        # `fresh == 0` means this page held nothing new; a short page means the
-        # window is exhausted. Either way, stop -- the same no-progress guard
-        # `render_logs.fetch_window` needs.
-        if not cursor or fresh == 0 or len(rows) < _PAGE:
+        # No cursor, or a short page, means the window really is exhausted.
+        if not cursor or len(rows) < _PAGE:
+            truncated = ""
+            break
+        # `fresh == 0` on a FULL page that still carries a cursor is the
+        # no-progress guard `render_logs.fetch_window` needs -- the server is
+        # handing back the same page. Stopping is right, but this is NOT the end
+        # of the window: whatever lies past the stall was never read.
+        if fresh == 0:
+            truncated = "the cursor stopped advancing"
             break
 
     ordered = sorted(seen.values(), key=lambda e: str(e.get("timestamp") or ""))
-    return ordered, pages
+    return ordered, pages, truncated
 
 
 def newest_event(service: str) -> dict | None:
@@ -231,7 +263,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    events, pages = fetch_events(service=args.service, start=args.since, end=args.end)
+    events, pages, truncated = fetch_events(service=args.service, start=args.since, end=args.end)
 
     selected = events
     if args.failures_only:
@@ -258,14 +290,25 @@ def main() -> int:
 
     failures = [e for e in events if str(e.get("type")) == "server_failed"]
     last_failure = failures[-1] if failures else None
-    covered_from = str(events[0].get("timestamp")) if events else None
-    covered_to = str(events[-1].get("timestamp")) if events else None
+    # The span of the EVENTS FOUND. Deliberately not called "covered" -- it is
+    # not a coverage figure, and naming it one misled a reader once already.
+    span_from = str(events[0].get("timestamp")) if events else None
+    span_to = str(events[-1].get("timestamp")) if events else None
+    requested_from = args.since or "(service start)"
+    requested_to = args.end or "(now, i.e. this read)"
 
     if args.json:
         payload = {
             "service": args.service,
             "requested": {"since": args.since or None, "end": args.end or None},
-            "covered": {"from": covered_from, "to": covered_to},
+            # `read` is how much was looked at; `event_span` is what was found.
+            # The old single `covered` key conflated them.
+            # `pages` stays at the top level, where it already was.
+            "read": {
+                "fully_paged": not truncated,
+                "truncated_reason": truncated or None,
+            },
+            "event_span": {"from": span_from, "to": span_to},
             "tz": args.tz,
             "pages": pages,
             "events_total": len(events),
@@ -310,17 +353,27 @@ def main() -> int:
             print("# This is a READER FAILURE, not a quiet service. Do not conclude anything.")
             return EXIT_READER_FAILED
         stamp = str(control.get("timestamp"))
-        print(f"# COVERED    no events in the requested window   ({pages} page(s) fetched)")
+        print(f"# READ       no events in the requested window   ({pages} page(s) fetched)")
         print(f"# CONTROL    the endpoint DOES answer: newest event overall is")
         print(f"#            {stamp}  ({local(stamp)} local)  {control.get('type')}")
-        print("# So the window is genuinely QUIET. That is a reading, not a failure.")
+        if truncated:
+            print(f"# PARTIAL    the pager stopped short -- {truncated}.")
+            print("# So this is NOT a quiet window. Part of it was never read.")
+        else:
+            print("# So the window is genuinely QUIET. That is a reading, not a failure.")
         return EXIT_OK
 
-    print(
-        f"# COVERED    {covered_from} .. {covered_to}"
-        f"   ({len(events)} events, {pages} pages)"
-    )
-    print(f"#            {local(covered_from)} .. {local(covered_to)} local")
+    if truncated:
+        print(f"# READ       PARTIAL -- {truncated}, after {pages} page(s).")
+        print(f"#            Requested {requested_from} .. {requested_to}; the pager did NOT")
+        print(f"#            reach the far end. Oldest event it got to: {span_from}")
+    else:
+        print(f"# READ       {requested_from} .. {requested_to}   fully paged, {pages} page(s)")
+    print(f"# EVENTS     {len(events)} event(s), spanning {span_from} .. {span_to}")
+    print(f"#            {local(span_from)} .. {local(span_to)} local")
+    print("#            That is the span of the events FOUND, not the window read. A sparse")
+    print("#            window reads whole and still spans minutes -- a narrow span here is")
+    print("#            not a short read. Judge coverage by READ above, never by this line.")
 
     if kinds:
         print("#")
@@ -331,19 +384,24 @@ def main() -> int:
     # The question the OOM lane asks every time: how long has it been clean?
     print("#")
     if last_failure is None:
-        print("# CLEAN      no server_failed anywhere in the covered window")
+        print("# CLEAN      no server_failed anywhere in the window READ above")
     else:
         stamp = str(last_failure.get("timestamp"))
         parsed = _parse_stamp(stamp)
-        end_parsed = _parse_stamp(covered_to)
+        end_parsed = _parse_stamp(span_to)
         gap = ""
         if parsed and end_parsed:
             minutes = (end_parsed - parsed).total_seconds() / 60.0
-            gap = f"   ({minutes:.1f} min before the end of coverage)"
+            gap = f"   ({minutes:.1f} min before the NEWEST EVENT, which is not 'now')"
         print(f"# LAST FAIL  {stamp}  ({local(stamp)} local)  {classify(last_failure)}{gap}")
-    # A window's end is not "now" -- saying otherwise is how a stale read becomes
-    # a claim about the present.
-    print("# NOTE       'clean' is bounded by the covered window above, not by now.")
+    # What bounds 'clean' is the window READ, not the span of events in it. Under
+    # the old single COVERED line these looked like the same thing, and the
+    # narrower one won -- which understated a clean read to a ~6-minute slice.
+    if truncated:
+        print("# NOTE       'clean' covers only the pages actually read -- see PARTIAL above.")
+    else:
+        print(f"# NOTE       'clean' covers the whole requested window, {requested_from}")
+        print(f"#            .. {requested_to} -- NOT merely the event span above.")
     print()
 
     shown = selected[-args.tail :] if args.tail > 0 else selected
