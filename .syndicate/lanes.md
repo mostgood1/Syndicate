@@ -3254,3 +3254,16 @@ the commit count, the test count, or the fact that leverage now has a number.
    the only dated item in the lane.
 4. Source the RE reference table, then re-adjudicate the two >3 SE cells.
 5. Owed: `wnba/cards.py:891` should delegate to `basketball_elapsed_minutes`.
+
+#### convergence-phase5-profile-seam — **PHASE 5 SHIPPED 2026-08-17 01:5xZ (`964c89a4`). Lane goal met.**
+- Verification met in BOTH halves: no behaviour change (`resolved IS default`,
+  `source=default`, per engine) AND reachability (each engine calls the loader on
+  import, asserted by reload-with-patch). 61 tests pass.
+- **Falsification test did not fire** — `calibration_profile_store.py` untouched,
+  so it IS the generic seam it was built to be.
+- **NOT DEPLOYED and does not need to be urgently:** it is a no-op until an
+  artifact exists. It ships with the next routine deploy of any service.
+- **Phase 6 is NOT unblocked.** It touches the prediction-ledger write path, one
+  of two seams the plan says are shared with the betting-engine track: *"Agree an
+  owner before either phase starts."* Same for Phase 7 and
+  `shared/intelligence_evaluation.py`. Raise ownership before writing code.
