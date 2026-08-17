@@ -2995,3 +2995,26 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   measurement leaves the worker.
 - Live: refresh-worker `9bff3cc1`, web `685ab3e9`; `origin/main` matches both by
   content.
+## WEB IS `60cdf8eb` — `#455` + `#456` DEPLOYED, ONE MEASURED `[2026-08-16 21:58 CDT / 02:58:34Z]`
+
+**Supersedes any earlier web SHA in this file.** Deploy
+`dep-da17ekm7bikc738hcisg`, scoped to two files and parented on the previous
+live SHA `685ab3e9`, NOT on `main` (which carried 14 pending commits from six
+lanes). Branch `origin/deploy/web-455-456` holds the commit.
+
+- **`#456` MEASURED PASS:** `/nba/api/live_pbp_stats?date=<past>` returns
+  `empty_reason=snapshot_date_mismatch` with the stale `snapshot_date` named;
+  a request for the MATCHING date is still served unrefused (the control).
+  Before: all dates returned payload date `2026-06-13`.
+- **`#455` NOT MEASURED.** `generated_at` being current post-deploy is NOT
+  evidence — the restart alone produces it. Needs a live WNBA slate:
+  `generated_at` must ADVANCE between `ttl=1` fetches and no all-null record may
+  persist. Instrument: `scripts/capture_wnba_pbp.py --date <d> --probe`
+  (exits 2 when every record is a skeleton). **Unowned.**
+- **Rollback:** redeploy `685ab3e9`.
+
+**A FACT ABOUT THIS PLATFORM worth not re-deriving:** web's configured Render
+branch is `main`, and its live SHA was nonetheless NOT an ancestor of `main`.
+Previously-deployed commits fall out of `main`'s history when sessions rewrite
+it. **Never infer the deploy base from the branch setting — read the live SHA
+from the service.**

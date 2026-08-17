@@ -3509,3 +3509,23 @@ game is being published as in progress.**
 - **Order to attack them:** (3) first — it is one contradiction inside one
   record and the smallest surface. Then (1), the identity key, which is what
   restores two thirds of the slate. (2) likely falls out of (1).
+#### game-shape-capture — DEPLOY ADDENDUM 2026-08-16 22:0x CDT — **`#455` + `#456` LIVE; ONE MEASURED; LANE STILL OPEN**
+
+web `60cdf8eb` live 21:58:44 CDT, scoped to those two fixes only (parented on
+the live SHA `685ab3e9`; `main` carried 14 pending commits from six lanes).
+`#456` measured PASS with a control row. `#455` deployed but **NOT MEASURED** —
+the restart confounds it; needs a live WNBA slate. Record in `deploys.md`
+(`edf582db`).
+
+**LANE REMAINS OPEN, and the reason has not changed once all session:** the
+verification is one live slate with a non-zero bucket distribution read across
+two builds. **n = 0 for every sport.** Deploying two endpoint fixes does not
+touch that.
+
+**Carried forward, unowned:**
+1. `#455` read on the next live WNBA slate.
+2. NFL/soccer `game_shape` emits — still undeployed.
+3. NCAAF live-state producer — season opens **2026-08-29**, still the only
+   dated item.
+4. MLB + WNBA emits blocked behind `Layer 1 board coverage audit (fork 4)`.
+5. Source the RE reference table; re-adjudicate the two >3 SE cells.

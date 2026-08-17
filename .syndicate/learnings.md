@@ -4097,3 +4097,50 @@ refresh rather than at a bug.
   was never tried. **The first fix widened the INDEX and the bug survived,
   because the defect was in the LOOKUP.**
 - *(evidence: `.syndicate/log/2026-08-16.md`)*
+### 2026-08-16 — SCOPING A DEPLOY WHEN `main` CARRIES OTHER LANES' WORK: parent on the LIVE SHA, not on `main`
+
+`origin/main` had **14 pending code commits from six lanes** — a versioned-profile
+seam across all three sim engines, four live-gameline-score changes, an
+intelligence-evaluation trace. Deploying main would have shipped every one of
+them on its FIRST ever deployment, alongside two unrelated fixes, into a
+stop-then-start on a disk-backed service. If anything broke, attribution would
+have been impossible.
+
+- **The rule going forward — the recipe, because it worked and is reusable:**
+  1. Read the **LIVE** SHA from the service, not from `state.md` (it had moved
+     twice in the hours before this deploy).
+  2. Confirm the live SHA is **not** assumed to be on `main`. Web's configured
+     branch IS `main`, yet the live SHA was not an ancestor of it —
+     previously-deployed commits fall out of `main`'s history when sessions
+     rewrite it. **Do not infer the deploy base from the branch setting.**
+  3. `git log LIVE..origin/main -- <your files>` and confirm **only your
+     commits** touch them. That is what makes the next step safe.
+  4. Build with plumbing into an isolated index: `read-tree LIVE`,
+     `update-index` your files to `origin/main`'s blobs, `commit-tree -p LIVE`.
+     Never touches the working tree or the shared index.
+  5. Assert the result is exactly N files and each blob is **identical to
+     `origin/main`'s** — that proves you shipped your fix and not a hand-merge.
+  6. Push it to a branch so it cannot be orphaned, then deploy that SHA.
+- Cost: about ten minutes. It bought unambiguous attribution and left five other
+  lanes their own deploy decisions.
+
+### 2026-08-16 — A RESTART CONFOUNDS ANY FIX WHOSE CLAIM IS ABOUT STATE PERSISTING
+
+`#455`'s claim is that a stale all-null snapshot was STICKY — served in
+preference to real data all day once persisted. After the deploy, `generated_at`
+read current where it had been frozen three hours, and that looks exactly like
+the fix working.
+
+**It is not evidence.** The deploy restarts the service, which clears the
+replayed snapshot on its own. The convenient reading and the null hypothesis
+predict the identical observation.
+
+- **The rule going forward:** when a fix's claim is about state PERSISTING —
+  stickiness, caching, leaks, accumulation — the first minutes after a restart
+  can only ever look healthy, so a reading taken there is worthless. The
+  measurement must span the condition that produced the bug: for `#455`, a live
+  slate where `generated_at` must ADVANCE across ticks rather than freeze.
+- Same family as the existing rule that a healthy reading is evidence only once
+  you know what makes it read unhealthy — but sharper: **here the restart
+  GUARANTEES the healthy reading**, so the observation carries no information at
+  all.
