@@ -2948,3 +2948,63 @@ possessions-only detection dropping early live ticks).
 
 **Deliberately NOT done:** no second implementation of the `poss_est` formula.
 Inventing one is how two numbers that should agree start disagreeing.
+
+#### game-shape-capture — `#456` NBA DATE-SCOPE FIX BUILT; `#455` WNBA BLOCKED BY A CLAIM `[2026-08-16 ~19:5x CDT]`
+
+**NBA does NOT share `#455`.** Checked component by component rather than assumed: NBA **never persists** (zero write calls in `nba/live_lens.py`), so WNBA's sticky-skeleton mechanism cannot occur. Both sports DO emit the identical all-null `ok: True` skeleton, so the instrument-blindness half is shared.
+
+**NBA has its own defect, confirmed in production**: one undated snapshot path served for every requested date (`2025-12-25` -> payload date `2026-06-13`). Filed as **`#456`**, fix built and tested, **NOT DEPLOYED**. The refusal fires on the real endpoint path — `nba.py:_allow_stored_date_fallback()` returns `False`, verified BEFORE writing the fix rather than after.
+
+**A PRE-EXISTING FAILURE, NOT MINE:** `test_nba_refresh_runner.py::test_main_materializes_core_artifacts_into_bundle_root` fails identically with my change reverted to `origin/main`'s version. Attributed by measurement, not assumed.
+
+**`#455` (WNBA) CANNOT BE FIXED BY THIS LANE.** `syndicate/features/wnba/cards.py` is claimed by **`wnba-live-tier` (OPEN)** — re-checked immediately before the edit; no edit was made. Handed to that session. **Worth their attention: their own lane status reads "PROPS NOT WIRED — the source emits nothing." That may BE `#455`** — the skeleton is exactly what a prop consumer would see as "the source emits nothing."
+
+#### refresh-worker-oom-recurrence — CALLER-SIDE TRACE `[2026-08-17 ~00:3xZ]` — **the allocator's SPAN is now named, and BOTH designed brakes on it are measurably inert**
+- **Verdict reproduced twice** (`deploys.md`): `last_stage=board_contract_end` on
+  the 00:19:48Z kill (`94447830`, anon 1209->3998MB/~25s) and the 00:32:32Z kill
+  (`7c2b1a17`, anon 1354->3751MB/~16s). Different commits; the second had no
+  concurrent deploy in its window. `apply_game_board_contract` is exonerated.
+- **The span, from the loop structure** (`intelligence.py:2793-2835`): between
+  `OVERVIEW_SPORT_BEGIN` (a bare `print`, so it CANNOT set `last_stage` — which
+  is why the climb looked unmarked) and the `overview_sport_end` stage marker,
+  there are exactly two calls: **`_build_sport_overview`** (`home.py:6733`) and
+  **`_emit(sport_row)`**. For non-MLB sports the board contract is the LAST
+  statement of the cards builder (`nfl/cards.py:505` is
+  `return apply_game_board_contract(...)`), so `board_contract_end` is the last
+  marker before the stack unwinds — the allocator is ABOVE it, in that span.
+- **MEASURED IN PRODUCTION, window 00:24:01Z (7c2b1a17 live) -> 00:35:50Z,
+  containing the 00:32:32Z kill:**
+
+      OVERVIEW_SPORT_BEGIN            30   incl. a FULL 8-sport pass at 00:33:38-40
+                                           with force_refresh=True skip_game_hydration=False
+      OVERVIEW_SPORT_END              30
+      OVERVIEW_REBUILD_RATE_LIMITED    0   <-- #251's throttle on hydrated rebuilds
+      OVERVIEW_STOPPED_FOR_MEMORY      0   <-- #250's memory circuit breaker
+
+  **The expensive path runs all 8 sports hydrated under `force_refresh=True`,
+  and neither guard built to bound it engages — across a window containing an
+  OOM kill that reached headroom 0.0.**
+- **This REPRODUCES `#336` on current code.** That entry recorded
+  `OVERVIEW_REBUILD_RATE_LIMITED` firing ZERO times over 29 minutes and 11 passes
+  and left the reason unresolved. It is still zero. The defect is open, not
+  historical.
+- **The retention mechanism `home.py:6766-6782` describes is the standing
+  hypothesis, NOT yet confirmed by me:** `_HOME_OVERVIEW_TTL_SEC` is 10s against
+  a ~90s board loop, so the cache "structurally cannot hit" while still RETAINING
+  the previous hydrated row — the process holds the old context and builds a new
+  one on top. That comment's own 2026-08-07 numbers are `+2.9GB in 73s`. Tonight's
+  shape is +2.4GB in 16s and +2.8GB in 25s: same magnitude, much faster.
+- **NOT CLAIMED, and the next person must not read it as claimed:** I have not
+  shown WHICH of the two calls allocates, and I have not established why either
+  guard is silent. Two candidate reasons for the memory guard, untested:
+  (a) it is checked BETWEEN sports, so an excursion INSIDE one sport is invisible
+  to it by construction — `#250`'s own comment says this; (b)
+  `_overview_headroom_exhausted` (`intelligence.py:2635-2661`) returns **False**
+  when the snapshot is `None` or lacks `sufficient`, i.e. **unknown maps onto the
+  permissive branch and emits no reason** — the failure shape
+  `feedback_unknown_must_not_default_permissive` describes.
+- **NEXT, in order:** (1) determine why `OVERVIEW_STOPPED_FOR_MEMORY` is silent —
+  (a) vs (b) above is decidable by reading one snapshot at a check point;
+  (2) instrument the `_build_sport_overview` / `_emit` boundary the way
+  `board_contract_end` instrumented the builder's return, since that split is now
+  the whole remaining question; (3) only then touch the floors.

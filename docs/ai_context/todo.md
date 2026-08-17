@@ -33304,3 +33304,32 @@ several times: a healthy-looking empty reading.
 
 **Related:** `#454` (pbp as modelling substrate — this is why WNBA has no
 corpus), lane `game-shape-capture`.
+
+### `#456` — **NBA `/api/live_pbp_stats` SERVES A SNAPSHOT FROM A DIFFERENT DAY, UNDER THE REQUESTED DAY'S LABEL** — FOUND 2026-08-16, **FIX BUILT + TESTED, NOT DEPLOYED**
+
+Found while checking whether NBA shared `#455` (WNBA's sticky skeleton). **It does not** — NBA never persists, so that mechanism cannot occur. It has a different defect.
+
+**MEASURED IN PRODUCTION 2026-08-16:**
+
+    /nba/api/live_pbp_stats?date=2026-08-16 -> payload date 2026-06-13
+    /nba/api/live_pbp_stats?date=2026-03-01 -> payload date 2026-06-13
+    /nba/api/live_pbp_stats?date=2025-12-25 -> payload date 2026-06-13
+
+Every request returned the same **two-month-stale** snapshot, labelled with a date nobody asked for.
+
+**Mechanism** (`syndicate/features/nba/live_lens.py`):
+- `_load_live_lens_snapshot()` reads `live_lens_snapshot_path()` — **one undated path**, so it returns whatever was written last.
+- `allow_stored_date_fallback` was **discarded outright** (`_ = allow_stored_date_fallback`).
+- `_filter_games_payload` with no event ids — **the endpoint's default** — returns ALL games from that snapshot (`:476-478`).
+
+So `selected_date` only ever shaped the EMPTY payload; it never constrained what was served.
+
+**WHY IT LOOKS HARMLESS AND IS NOT.** `games=0` today because the offseason snapshot has none — so the DATE leak is demonstrated and the GAME leak is not. The code path guarantees the game leak whenever the snapshot has games: in season, one day's games are served under another day's label. **Checking this in August is exactly the "absence in a window is not absence" trap**; do not read today's clean result as health.
+
+**FIX BUILT, NOT DEPLOYED.** `_snapshot_date_matches()` compares the snapshot's own `date` to the request. On mismatch with `allow_stored_date_fallback=False` — **the branch the live endpoint takes**, since `nba.py:_allow_stored_date_fallback()` returns `False` — it returns the empty payload with `empty_reason="snapshot_date_mismatch"` and the `snapshot_date`, so the emptiness is diagnosable rather than silent. With the flag `True` the payload is still served but marked `stored_date_fallback`. An absent date on either side is NOT a mismatch — there is nothing to compare, and refusing there would empty the endpoint for every dateless caller.
+
+**9 tests, 5 of 5 mutations caught** (refusal removed, fallback flag ignored, absent date treated as mismatch, prefix instead of exact comparison, refusal leaking the payload anyway).
+
+**NOT DEPLOYED and no deploy requested.** Whether the same undated-snapshot pattern affects NBA's sibling readers (`build_live_player_lens_payload`, `build_live_lines_payload` — both call `_load_live_lens_snapshot()` the same way and both discard `allow_stored_date_fallback`) is **UNCHECKED**. Likely the same shape; that is a lead, not a finding.
+
+**Related:** `#455` (WNBA, a DIFFERENT defect — do not merge them), `#454`.
