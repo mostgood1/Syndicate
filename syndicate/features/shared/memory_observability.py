@@ -1202,6 +1202,143 @@ _SMAPS_STATE: dict[str, int] = {"count": 0}
 _PEAK_SMAPS_MAX_PER_PROCESS = 3
 _PEAK_SMAPS_STATE: dict[str, int] = {"count": 0}
 
+# STACK DUMP AT THE EXCURSION. The instrument of last resort, and the only one
+# left that does not depend on the allocating code volunteering a log line.
+#
+# WHY IT IS NEEDED, measured 2026-08-16/17 across seven excursions: nothing in
+# the logs distinguishes an excursion from a quiet window.
+#   - Zero stage markers across a 16s excursion (4 consecutive UNCAPPED windows).
+#   - Artifact-pull activity at the SAME rate in excursion and control arms
+#     (pulled_hot 1/7 vs 1/6).
+#   - Thread activity classified by owner: excursion 00:31 (artifact=12,
+#     live-lens=7) is IDENTICAL to control 00:36 (artifact=12, live-lens=7).
+#   - Two excursions were essentially SILENT: 23:42 produced 8 rows and 00:08
+#     produced 6, all of them this watchdog's own samples, while anon climbed at
+#     25-160 MB/s.
+# The allocating code emits nothing. Log correlation cannot name it, and three
+# independent attempts to do so were each refuted by their own control.
+#
+# WHY faulthandler AND NOT tracemalloc. `state.md:556` rules tracemalloc out at
+# any frame count -- it starved this sampler and drove the kill cadence from
+# ~16-22 min to 3-10 min. `faulthandler.dump_traceback` is a different animal: it
+# walks existing frame objects and writes them to a file descriptor. No
+# per-allocation bookkeeping, no object graph, no snapshot. The pattern is
+# already proven in this repo at `scripts/refresh_odds_sources.py:447`.
+#
+# `all_threads=True` IS THE POINT, not a detail. `_WATCHDOG_STATE` is
+# process-global with no thread-locals, so `last_stage` names the last thread to
+# SPEAK, not the one allocating -- an entire evening's attribution was built on
+# that and had to be retracted. A dump names every thread's stack at once, so
+# thread attribution stops being an inference.
+#
+# ON THE SAMPLER THREAD, DELIBERATELY, against the usual rule. The rule
+# (`:877`, `:1491`) exists for work that holds the GIL for SECONDS -- census
+# walks over millions of objects. A frame-object walk is milliseconds. And
+# deferring it to a new thread would let the stacks MOVE before capture, which
+# defeats the instrument: the whole value is the stack AT the moment anon is
+# climbing.
+#
+# WHAT IT CANNOT DO, stated so the next reader does not over-read it: a stack
+# shows where threads ARE, not what they ALLOCATED. If the cost is spread across
+# many short calls, three samples may show three unrelated stacks. That is why
+# it fires more than once -- a stable stack across samples is the signal; a
+# scattered one is its own (negative) answer.
+_STACK_DUMP_MAX_PER_PROCESS = 3
+_STACK_DUMP_STATE: dict[str, int] = {"count": 0}
+
+
+def watchdog_should_stack_dump(*, anon_mb: float | None, fired_count: int) -> bool:
+    """Fire a stack dump INSIDE an excursion. Pure predicate, falsifiable offline.
+
+    Gated on LEVEL, not `climb_mb_per_s`, for the same reason as the peak SMAPS
+    trigger: rate encodes an assumption that excursions are fast, and the first
+    slow one walks straight past it. The 2600MB level is the one already proven
+    to catch this -- peak SMAPS fired on it twice, on two separate excursions.
+    """
+    if anon_mb is None:
+        return False
+    if fired_count >= _STACK_DUMP_MAX_PER_PROCESS:
+        return False
+    return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_STACK_DUMP_MB", 2600.0)
+
+
+def _watchdog_maybe_stack_dump(payload: dict[str, Any]) -> None:
+    """Dump every thread's stack once we are inside an excursion."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_stack_dump(
+            anon_mb=anon_mb, fired_count=int(_STACK_DUMP_STATE.get("count", 0))
+        ):
+            return
+        n = int(_STACK_DUMP_STATE.get("count", 0)) + 1
+        _STACK_DUMP_STATE["count"] = n
+        # A header line so the dump can be located and correlated. faulthandler
+        # writes raw frames with no context of its own -- without this the dump
+        # is an orphan block of tracebacks in the middle of the log.
+        print(
+            f"WATCHDOG_STACK_DUMP_BEGIN n={n} anon_mb={anon_mb} "
+            f"last_stage={payload.get('last_stage')} climb_mb_per_s={payload.get('climb_mb_per_s')}",
+            file=sys.stderr,
+            flush=True,
+        )
+        # TWO WRITERS, AND THE FALLBACK IS NOT DECORATION.
+        #
+        # `faulthandler.dump_traceback` writes to a real file DESCRIPTOR, so it
+        # raises `io.UnsupportedOperation: fileno` against any wrapped stderr.
+        # Caught by this instrument's own tests, where it printed a BEGIN header
+        # and then NOTHING -- an instrument that looks installed and emits no
+        # evidence, which is the failure mode this module's history is made of
+        # and which I have now hit three times in one session.
+        #
+        # Production stderr normally has a real fd, so faulthandler is preferred:
+        # it is the cheaper writer and it can dump even a thread blocked in C.
+        # But "normally" is not a guarantee -- anything that wraps stderr (a
+        # logging shim, a capture harness, a future supervisor) silently removes
+        # the only instrument that can see this bug. `sys._current_frames()` is
+        # pure Python, needs no fd, and covers every thread; it cannot see into
+        # C frames, which is the trade for always working.
+        wrote = False
+        try:
+            import faulthandler
+
+            faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+            wrote = True
+        except Exception as exc:
+            print(
+                f"WATCHDOG_STACK_DUMP_FAULTHANDLER_UNAVAILABLE {type(exc).__name__}: {exc} "
+                "-- falling back to sys._current_frames()",
+                file=sys.stderr,
+                flush=True,
+            )
+        if not wrote:
+            import threading as _threading
+            import traceback as _traceback
+
+            names = {t.ident: t.name for t in _threading.enumerate()}
+            for thread_id, frame in sys._current_frames().items():
+                print(
+                    f"\nThread 0x{thread_id:x} ({names.get(thread_id, 'unknown')}):",
+                    file=sys.stderr,
+                )
+                for line in _traceback.format_stack(frame):
+                    print(line.rstrip(), file=sys.stderr)
+            wrote = True
+        print(f"WATCHDOG_STACK_DUMP_END n={n} wrote={wrote}", file=sys.stderr, flush=True)
+        if n == _STACK_DUMP_MAX_PER_PROCESS:
+            print(
+                f"WATCHDOG_STACK_DUMP_EXHAUSTED max={_STACK_DUMP_MAX_PER_PROCESS} "
+                "-- further excursions on this boot dump nothing",
+                file=sys.stderr,
+                flush=True,
+            )
+    except Exception as exc:  # pragma: no cover - an instrument must never kill the worker
+        try:
+            print(f"[memory_observability] STACK_DUMP_FAILED {type(exc).__name__}: {exc}", flush=True)
+        except Exception:
+            pass
+
 # Anonymous mmap regions, bucketed by SIZE. pymalloc takes 1MB arenas by mmap and
 # glibc routes anything over MMAP_THRESHOLD (128KB default) the same way, so the
 # size distribution is what separates them -- there is no name to key on.
@@ -1555,6 +1692,12 @@ def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - threa
             # blind spot -- the same reason the climb rate above is computed on
             # every sample rather than every emitted one.
             _watchdog_maybe_peak_smaps(payload)
+            # Placed LAST of the census hooks and still before the emit gate.
+            # Last because the cheaper readings should already be on the wire if
+            # this one throws; before the gate for the same reason as the others
+            # -- `_watchdog_should_emit` suppresses samples when the number is
+            # not moving, and a trigger downstream of it inherits that blind spot.
+            _watchdog_maybe_stack_dump(payload)
             if current_mb is not None:
                 previous_mb = float(current_mb)
                 previous_at = now
