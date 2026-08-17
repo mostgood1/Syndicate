@@ -116,3 +116,14 @@ Moved back to `requests/`. I bulk-moved everything in `requests/` to `done/` aft
 This is the identical failure I documented this morning in `deploys.md` — a status surface that reclassifies undelivered work as delivered — committed by the session that documented it. The lesson was "diff deletions against the remote"; the missing half is **never close a queue item in bulk. Close each against its own evidence.**
 
 Still owed on this request: push `cd46b403` and `6aaa11af` (local `main` is behind `origin/main`, so this needs the merge cycle), then deploy and measure.
+
+
+---
+
+## EXECUTED by the coordinator 2026-08-17 ~22:0xZ
+
+DEPLOYED to web as `e5107913` (= web's live `60cdf8eb` + `cd46b403`), deploy `dep-da1obf740ujc738gspu0`, at user instruction "fire all 3 now".
+
+**Two assumptions made without the requester's confirmation:** that `cd46b403` stands alone (`6aaa11af` excluded, on the lane's own note that it is inert by construction), and that the service is web. Both flagged to the lane. If either is wrong this is a re-cut.
+
+**MEASUREMENT OWED:** default-tab soccer cards with a non-today Central date 51 -> 0, and chips with an impossible state 1 -> 0.
