@@ -13513,3 +13513,63 @@ rested AB) or multiple-comparisons noise across three specifications.
 output is the warning: **any fatigue feature must be fitted WITHIN player.** The
 unpaired version has the wrong sign, and it is the version anyone would write
 first.
+
+## 2026-08-17 — THE MISSING DATA IS ONE CALL AWAY, AND IT DISCRIMINATES. Spread probe on the three absent dimensions.
+
+Lane `convergence-phase7-crps`. Read-only, ~12 network calls.
+
+### The cost finding that reframes the whole research doc
+
+pybaseball is **already vendored** (`.venv_x64`, 2.2.7) and exposes all three
+absent dimensions as **SEASON LEADERBOARDS — one call each, not per-player**:
+
+    statcast_catcher_framing(year)            1 call, all catchers
+    statcast_batter_exitvelo_barrels(year)    1 call, all batters
+    statcast_outs_above_average(year, pos)    1 call
+
+**~12 calls total, against the 314 the pitch splits required.** The dimensions I
+ranked as expensive are the CHEAP ones. That inverts the priority order in
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4.
+
+### BATTED BALL — large spread, and the GB/FB split EXISTS `[measured, n=246]`
+
+    brl_percent      mean  8.37   sd 4.30   p10  3.10  p90 13.85   range 21.7
+    ev95percent      mean 40.10   sd 8.19   p10 29.10  p90 49.70   range 51.2
+    avg_hit_speed    mean 89.13   sd 2.34   p10 86.20  p90 92.20
+    avg_distance     mean 168.5   sd 17.7   p10 145.5  p90 191.0
+
+**Barrel rate runs 3.1% to 13.9% between p10 and p90 — a 4.5x spread.** The sim
+has a single scalar `inplay_hit_rate` and no barrel concept at all.
+
+**AND THE FRAME CARRIES `gb` AND `fbld` COLUMNS.** I listed "no GB/FB/LD split"
+as an absent dimension needing new data; the split ships in the same one-call
+leaderboard. **That is a correction to the research doc.**
+
+### DEFENCE / OAA — material spread `[measured, n=257]`
+
+    outs_above_average          mean +0.60  sd 5.98  p10 -6.0  p90 +7.4  range 39
+    outs_above_average_rhh      sd 3.85     |  ..._lhh  sd 3.31
+    directional: infront / lateral_3b / lateral_1b / behind
+    also: fielding_runs_prevented
+
+**13.4 outs separate a p10 from a p90 fielder over a season**, with handedness
+and directional splits available. The sim has **no fielding term whatsoever**, so
+BABIP is currently modelled with nothing behind it.
+
+### FRAMING — obtainable but the vendored fetch is BROKEN
+
+    statcast_catcher_framing(2026) -> ParserError: Expected 1 fields in line 38, saw 4
+
+**A parser failure against the 2026 savant format, not missing data.** Fixable,
+but it is not free the way the other two are — cost it before promising it.
+
+### Revised priority, on measurement rather than intuition
+
+1. **Batted ball** — one call, 4.5x spread, and it ships the GB/FB split that
+   unlocks park interaction. Cheapest and largest.
+2. **Defence/OAA** — one call, 13.4-out p10-p90 spread, directly under BABIP.
+3. **Framing** — same value case as before, but now carries a parser fix.
+4. Pitch-type splits — already wired, 314 calls spent, **effect still unproven**.
+
+**Nothing here is built. This measures whether the dimensions DISCRIMINATE, which
+is the prior question to modelling them — and all three do.**
