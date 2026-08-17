@@ -6767,3 +6767,50 @@ Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
   WNBA full refresh (finish Phase 2), re-arm the cron, or accept that
   `game_cards` is sweep-derived - **under which the coverage fix is dead code.**
   It gates whether the open deploy row can ever close.
+
+### wnba-phase2-migration - OPEN, NOT STARTED - **design settled and blocked-then-unblocked, but NO CODE WRITTEN. Handing off deliberately rather than half-building a production autorun.**
+- Goal: Phase 2 of the migration off the daily-update GHA cron - re-home the
+  WNBA full refresh onto a worker autorun so something actually calls
+  `refresh_wnba_oddsapi_props.main()` on a cadence. Today nothing does
+  (`MAIN_ENTRY` 0 hits/8h), which is why the shipped `game_cards` coverage fix
+  cannot be measured.
+
+**THE DESIGN IS SETTLED. Mirror `_launch_autorun_soccer_pregame_refresh`**
+(`scripts/run_live_odds_refresh_worker.py:170`), which is the same job for the
+same reason on the same service:
+1. `_wnba_pregame_refresh_enabled()` - env
+   `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN`, **DEFAULT OFF.** New
+   periodic worker work is never free (`#241` caused a prod restart loop), and
+   turning it on is a `render.yaml` change, which is coordinator-owned.
+2. `_wnba_pregame_refresh_interval_seconds()` - default 14400 (4h), matching soccer.
+3. `_wnba_pregame_autorun_status_path()` + the previous-run reporter. **Do not
+   skip the reporter** - `#433` is that soccer odds stopped for FOUR DAYS with
+   no visible error because `launch_refresh_run` spawns detached with
+   stdout=DEVNULL.
+4. `_launch_autorun_wnba_pregame_refresh()` calling
+   `launch_refresh_run(sports="wnba", phase="pregame", ...)`.
+5. Call it beside the soccer one at `:385`, wrapped in the same try/except.
+
+**`phase="pregame"` IS LOAD-BEARING, NOT A COPY-PASTE DETAIL.** live-odds-worker
+is **2GB** and already carries WNBA SmartSim load - `render.yaml` records sim
+workers cut to 1 and **WNBA sim count cut 500 -> 250 -> 100** all fighting for
+that 2GB, and the WNBA refresh leg measured **~1.3-1.5GB RSS**. Pregame phase
+covers schedule/odds/props/picks and **excludes the sim leg**, which is exactly
+how soccer avoids this. **A full-phase autorun here would OOM the service.**
+
+**VERIFY, once built and enabled:** `MAIN_ENTRY` appears on live-odds-worker
+(currently 0 over 8h), then `GAME_CARDS_CENSUS` with `scheduled=N covered=N`.
+**Both, in that order** - the census cannot appear until the entrypoint runs.
+
+**LANE STATE:** `scripts/run_live_odds_refresh_worker.py` is claimed by
+`soccer-model-coverage`, which the 2026-08-17 coordinator sweep marks
+**ORPHANED with claims RELEASED at session archive - "anyone may take these
+files"**. `lane-guard` cannot see that release, so it still blocks; taking the
+file needs either a marker/slug change or a disclaimer on that lane's Files
+bullet. **Its uncommitted fixes #1 and #3 are NOT mine and remain at risk -
+do not lose them when releasing the claim.**
+
+**WHY I STOPPED:** context exhaustion, not a blocker. The remaining work is a
+mechanical mirror plus tests plus a deploy request, and starting it without
+room to test and verify would have left an untested periodic job on a
+memory-constrained production worker - the precise shape of `#241`.
