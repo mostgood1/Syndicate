@@ -1110,8 +1110,97 @@ def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool
     return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
 
 
-_SMAPS_MAX_PER_PROCESS = 3
+def watchdog_should_peak_smaps(*, anon_mb: float | None, fired_count: int) -> bool:
+    """Fire an SMAPS read INSIDE the excursion, not at the baseline.
+
+    Pure predicate, separated from the hook so it can be falsified offline --
+    the thing this file's history says goes wrong is instruments that look
+    installed and never fire.
+
+    Deliberately gated on the LEVEL (anon past a high-water threshold) and NOT
+    on `climb_mb_per_s`. Rate is the wrong quantity to gate on: it encodes an
+    assumption that the excursion is fast, and the first slow one walks straight
+    past. Level answers the question actually being asked -- "are we now holding
+    substantially more than baseline" -- and is true for a slow excursion too.
+
+    Fires up to `_PEAK_SMAPS_MAX_PER_PROCESS` times rather than once, because
+    the open question is which regions GROW; a single peak sample cannot answer
+    that, and the baseline sample it would be compared against was taken by a
+    different trigger at a different threshold.
+    """
+    if anon_mb is None:
+        return False
+    if fired_count >= _PEAK_SMAPS_MAX_PER_PROCESS:
+        return False
+    return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_PEAK_SMAPS_MB", 2600.0)
+
+
+def _watchdog_maybe_peak_smaps(payload: dict[str, Any]) -> None:
+    """Off-thread SMAPS read once we are inside an excursion."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_peak_smaps(
+            anon_mb=anon_mb, fired_count=int(_PEAK_SMAPS_STATE.get("count", 0))
+        ):
+            return
+        _PEAK_SMAPS_STATE["count"] = int(_PEAK_SMAPS_STATE.get("count", 0)) + 1
+        # OFF THE SAMPLER THREAD, for the reason recorded against the allocation
+        # dump: the kernel walks page tables to answer smaps, and a blocked
+        # sampler is indistinguishable from a calm system. Measured 2026-08-15,
+        # tracing on this thread took the worker from 567 samples to zero and
+        # cut the kill cadence from ~16-22 min to 3-10 min. An instrument must
+        # not be the reason a worker dies.
+        import threading
+
+        threading.Thread(
+            target=log_smaps_anon_breakdown,
+            args=(f"watchdog_PEAK_anon_{int(float(anon_mb))}mb",),
+            name="watchdog-peak-smaps",
+            daemon=True,
+        ).start()
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[memory_observability] PEAK_SMAPS_HOOK_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+# Raised 3 -> 8 on 2026-08-17. The baseline censuses consume one of these via
+# `_run_censuses`, and the peak trigger added below wants several more. At 3 the
+# peak samples would have been silently discarded by the cap check in
+# `log_smaps_anon_breakdown` -- which `return None`s with no line, so the
+# instrument would have looked installed and produced nothing. That is the
+# failure this file's own history is full of.
+_SMAPS_MAX_PER_PROCESS = 8
 _SMAPS_STATE: dict[str, int] = {"count": 0}
+
+# PEAK SMAPS. Separate budget and separate state from the baseline censuses, so
+# the two can never starve each other.
+#
+# WHY THIS EXISTS. Measured 2026-08-17: the existing censuses fire once, at
+# `SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB` (default 1500MB anon), which is the
+# process's ELEVATED BASELINE -- they fired at anon 1610MB and 1700MB while the
+# excursions that actually kill peak at 3700-4000MB. So every census we have
+# describes what the process HOLDS, not what the excursion ALLOCATES, and the
+# two had been read as if they were the same thing.
+#
+# What those baseline censuses did establish, and why SMAPS specifically is the
+# instrument to re-fire rather than the object walks:
+#     UNTRACKED_BYTES_CENSUS  explained_pct_of_anon = 13.7%
+#     SMAPS_ANON              anon_mmap 1848.2MB, >64MB regions = 1293.0MB,
+#                             largest single region 515.0MB
+# ~87% of anon is invisible to the Python object census and sits in anonymous
+# mmap regions far larger than pymalloc's 1MB arenas. The object walks have
+# already answered their question ("no, it is not Python containers"); repeating
+# them at the peak would cost a multi-second GIL hold to re-learn it. SMAPS is a
+# single procfs read with no object walk, and it measures exactly the quantity
+# that turned out to dominate.
+#
+# THRESHOLD. Default 2600MB sits clearly above the ~1700MB baseline and inside
+# the climb, leaving ~1.5GB before the 4096MB ceiling -- at the measured
+# 100-260 MB/s that is roughly 6-15 seconds for the read to complete before the
+# kill. Env-tunable because that margin is an estimate, not a measurement.
+_PEAK_SMAPS_MAX_PER_PROCESS = 3
+_PEAK_SMAPS_STATE: dict[str, int] = {"count": 0}
 
 # Anonymous mmap regions, bucketed by SIZE. pymalloc takes 1MB arenas by mmap and
 # glibc routes anything over MMAP_THRESHOLD (128KB default) the same way, so the
@@ -1216,6 +1305,16 @@ def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
     Capped per process like the other censuses, and run off the sampler thread.
     """
     if _SMAPS_STATE["count"] >= _SMAPS_MAX_PER_PROCESS:
+        # SAY SO. This used to `return None` in silence, which makes a capped-out
+        # instrument indistinguishable from one that ran and found nothing --
+        # the exact shape of "never record a detector's zero as a pass when the
+        # data gave it no chance to fire". A missing SMAPS_ANON must be
+        # attributable to the cap, not left for a reader to infer.
+        print(
+            f"SMAPS_SKIPPED_CAPPED reason={str(reason or '')[:60]} "
+            f"count={_SMAPS_STATE['count']} max={_SMAPS_MAX_PER_PROCESS}",
+            flush=True,
+        )
         return None
     try:
         path = _PROCFS_ROOT / "self" / "smaps"
@@ -1450,6 +1549,12 @@ def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - threa
                 payload["climb_mb_per_s"] = round(climb, 1)
             _watchdog_maybe_dump_allocations(payload, climb)
             _watchdog_maybe_heap_census(payload)
+            # Placed with the other census hooks, and like them BEFORE the emit
+            # gate: `_watchdog_should_emit` suppresses samples when the number
+            # is not moving, and a trigger downstream of it would inherit that
+            # blind spot -- the same reason the climb rate above is computed on
+            # every sample rather than every emitted one.
+            _watchdog_maybe_peak_smaps(payload)
             if current_mb is not None:
                 previous_mb = float(current_mb)
                 previous_at = now

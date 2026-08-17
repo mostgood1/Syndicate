@@ -9028,3 +9028,232 @@ it.
 **Status: line gate VERIFIED. Steam UNVERIFIED**, needing a same-line row that
 moves >=15 points within 3 hours of its opening. Scheduled re-run 2026-08-17
 09:00 CDT (`scripts/verify_movement_line_gate.py`).
+
+### board_contract_end — the instrument that names the allocator (refresh-worker)
+- Deployed: 2026-08-17 00:04:08Z — `dep-da14vu3l550s73ermc0g`, commit `94447830`,
+  trigger `api`. Service `srv-d91dpertqb8s73co8ls0` (refresh-worker).
+  Branch `deploy/board-contract-end-marker`, parented on the LIVE SHA `fdc72dd0`
+  (which is off-main, on `deploy/wnba-live-tier`) — **not** on `main`, which sits
+  639 commits / 106,125 insertions away and would have been a branch swap.
+- Change: ONE stage marker. `board_contract_end` emitted immediately before the
+  single `return out` of `apply_game_board_contract`
+  (`syndicate/features/shared/game_board_contract.py`). 5 functional lines,
+  additive; `return out` unchanged, no path's behaviour differs. Placed in the
+  SHARED builder all 8 sports call, because `_log_cards_context_memory` exists
+  only for MLB — the other seven hydrate with no stage markers at all.
+- Expected: **this is an INSTRUMENT, not a fix. It will not reduce memory and
+  must not be read as if it might.** Expected effect is a READING: on the next
+  `oomKilled`, the `MEMORY_WATCHDOG` `last_stage` field resolves to one of
+  exactly two values —
+    `board_contract_end`                -> builder returned; allocator is
+                                           DOWNSTREAM, in the caller.
+    `board_contract_games_normalized`   -> excursion is inside :850-:911, and
+                                           this lane's reasoning is WRONG.
+  Window: 5 kills tonight (23:03:50, 23:16:51, 23:32:18, 23:43:11, 23:56:00Z),
+  ~11-13 min apart, so >=1 reading expected within ~1 hour of deploy.
+- Measured: `<pending>`
+- Rollback: redeploy `fdc72dd0` (the pre-deploy live SHA) on
+  `srv-d91dpertqb8s73co8ls0`. Additive change, no data migration, no config.
+- **Preflight: FAILED, then half-cleared, then the remainder OVERRIDDEN BY THE
+  USER — recorded so nobody later reads this as a clean gate.**
+  - Scope FAIL (deploy would have carried 639 commits) — RESOLVED by parenting
+    on the live SHA. Cherry-pick tested via `git merge-tree` (no worktree, no
+    index) because the shared tree held another live lane's 1,599 staged
+    insertions.
+  - live-odds-worker concurrent build — CLEARED on its own at 23:57:12Z.
+  - **In-flight MLB sim — NOT cleared. Deployed anyway, on an explicit user
+    decision**, on the argument that the ~12-minute OOM cadence was already
+    killing that sim repeatedly (a container-level 4Gi kill takes the whole
+    instance, children included), so the guardrail's premise was largely spent.
+    That argument is recorded because it is the thing to re-check if it turns out
+    to be wrong.
+- **BOOT-CONFOUNDING WARNING for whoever reads this next:** the deploy restarts
+  the worker and memory resets to ~16%. It will look healthy for several minutes
+  REGARDLESS. The deploy proves nothing by itself; only the next kill's
+  `last_stage` is evidence.
+- Verdict: `<pending — instrument only, no fix claimed>`
+
+---
+
+## 2026-08-17 00:2xZ — lane archive — **ALREADY DONE UPSTREAM. My version was NOT pushed, and that is the result.**
+
+Asked to archive the closed lanes. The digest has been reporting
+`LANE ARCHIVE OWED: 23 closed/orphaned lanes` and `lanes.md 304KB > 117KB`.
+
+### What I built, and why it is not being shipped
+Transformed the shared worktree's `lanes.md` (310KB, 39 slugs, 23 CLOSED):
+moved every closed lane's body to `lanes_closed.md`, left 23 one-line pointers,
+`310KB -> 208KB`. Verified before writing: **1,401 distinct lines left
+`lanes.md`, 0 missing from the archive**; archive strictly additive (+3,113/-0);
+OPEN 12->12 and UNMARKED 4->4 untouched.
+
+**Then the cherry-pick onto `origin/main` conflicted, and the conflict was the
+finding.** `origin/main` ALREADY carries the archive — another session did this
+job and pushed it. Probed七 closed slugs: each appears **once** in origin's
+`lanes_closed.md` and **zero** times as a body in origin's `lanes.md`. Origin
+also carries 65 lines mine lacked, including its own pointer lines in a
+different format (`` - `ncaaf-schedule-fallback` — ... CLOSED-VERIFIED ``).
+
+Pushing mine would have **duplicated 3,113 lines** into `lanes_closed.md` and
+overwritten their pointers with mine. Commit `45ff3332` exists locally and is
+**deliberately unpushed**.
+
+### The digest was measuring the wrong file
+`LANE ARCHIVE OWED: 23` is computed from the **shared worktree copy**, which is
+a pre-archive snapshot. Origin's `lanes.md` is 183KB with 1 closed slug (the
+`clamp-fix-to-workers` I closed minutes earlier). The worktree also holds ~256
+lines of genuinely unpushed lane content from other live sessions, so it is
+**stale-plus-in-flight**, not simply stale — which is why it must not be reset
+to origin wholesale.
+
+### Repair of my own damage, and the near-miss
+Writing my archived `lanes_closed.md` (built from ORIGIN's copy + the 23 moved
+bodies) put every one of those bodies in the file **twice**, since origin had
+already archived them. Confirmed by probe (`2x` each), then repaired by
+resetting `lanes_closed.md` to origin's version — safe only because the local
+baseline was verified a strict subset first (**0 baseline lines missing from
+origin's archive**).
+
+**The near-miss worth keeping:** I overwrote a 597KB shared ledger file from a
+version built off `origin`, not off the file itself. Had the worktree's copy
+carried content origin lacked, that write would have destroyed it silently. It
+did not (verified 0 lines lost), but the check was run AFTER the write, not
+before. **Back up or diff a shared ledger file before overwriting it, not
+after.**
+
+### Net state
+- Local worktree: `lanes.md` 208KB (closed bodies out, 14 OPEN preserved, the
+  other sessions' in-flight content intact), `lanes_closed.md` 712KB = origin's,
+  each body once.
+- `origin/main`: unchanged by this task. Nothing was pushed.
+- Remaining bulk in `lanes.md` is long OPEN lane bodies, not closed ones —
+  archiving cannot get it under the 117KB budget; that needs open lanes trimmed
+  or closed.
+
+### MEASUREMENT — closes the `board_contract_end` row above (`dep-da14vu3l550s73ermc0g`)
+- Measured: 2026-08-17 00:19:48.248Z, refresh-worker `oomKilled` 4Gi, the FIRST
+  kill after the instrument went live (00:10:37Z). Appended rather than editing
+  the row above, per this file's append-only rule.
+- **VERDICT: `last_stage = 'board_contract_end'`.** The prediction was registered
+  BEFORE the reading (both branches written into the pending row), so this is not
+  a post-hoc fit.
+- The excursion, from the watchdog samples:
+
+      00:19:17.456  last_stage=board_contract_end   anon 1152MB   climb  -0.0
+      00:19:21.462  last_stage=board_contract_end   anon 1209MB   climb  28.1
+      00:19:24.022  last_stage=board_contract_end   anon 1576MB   climb 143.5
+      00:19:31.166  last_stage=board_contract_end   anon 2000MB   climb  71.5
+      00:19:38.523  last_stage=board_contract_end   anon 2693MB   climb 140.4
+      00:19:42.537  last_stage=board_contract_end   anon 3359MB   climb 211.7
+      00:19:46.545  last_stage=board_contract_end   anon 3998MB   climb 260.0
+                    -> SIGKILL 00:19:48.248
+
+  **+2.8 GB in ~25 s**, and `last_stage` reads `board_contract_end` for the whole
+  climb. **`apply_game_board_contract` RETURNED before the excursion. The
+  allocator is DOWNSTREAM, in the caller.** The builder is now exonerated by
+  measurement, not by argument.
+- **Independent corroboration in the same window**: a complete board-contract
+  triplet ran mid-climb — `begin/games_normalized/end sport=nfl games=16` at
+  00:19:40.530/.535/.538 — moving anon **2935 -> 2937 MB, i.e. +2 MB for a
+  16-game board**. The builder is cheap even while the process is dying around it.
+  This is the per-sport visibility the marker was added for, and it is the first
+  time a NON-MLB board build has been measurable at all.
+- **CONFOUND, STATED NOT BURIED:** another session's deploy
+  (`dep-da156fojo6nc73fslitg`, commit `7c2b1a17`, branch `main`, created
+  00:18:07Z) was checking out code at **00:19:32.909**, inside this excursion.
+  It is NOT read as the cause — the +2.8GB/25s shape matches the five earlier
+  kills tonight (23:03:50, 23:16:51, 23:32:18, 23:43:11, 23:56:00, 00:08:54Z)
+  which had no concurrent deploy — but any single-excursion attribution from this
+  window must carry it.
+- **Candidates now in scope, NONE of them established:** the same window shows
+  `intelligence_evaluation SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-14.jsonl
+  bytes=305,435,308 ceiling=256,000,000`, a `sys._debugmallocstats()` dump
+  reporting **1,496,868,848 bytes in allocated blocks / 1570 arenas = 1.65 GB**,
+  and `artifact_publisher` pull/repair traffic. Naming which is the next step;
+  none is claimed here.
+- Verdict: **instrument SHIPPED AND PROVEN — it answered the question it was
+  built for on its first kill.** No fix claimed, no memory reduced; that was
+  never this deploy's purpose.
+- **THE INSTRUMENT IS BEING REMOVED FROM PRODUCTION.** `7c2b1a17` is `origin/main`,
+  and the marker was never pushed to `main` (`58c6fcee` is local-only). When that
+  build lands, `board_contract_end` stops existing in production and the next
+  excursion goes dark again. To keep it: push `58c6fcee` to `main`, or re-deploy
+  `94447830`.
+
+### SECOND MEASUREMENT — the verdict REPRODUCES on different code, confound controlled
+- Measured: 2026-08-17 00:32:32.623Z, refresh-worker `oomKilled` 4Gi.
+- **`last_stage = 'board_contract_end'` again.** anon **1354 -> 3751 MB in ~16 s**:
+
+      00:31:46.597  board_contract_end  anon 1354MB  climb 104.6
+      00:31:50.607  board_contract_end  anon 2006MB  climb 164.4
+      00:31:54.616  board_contract_end  anon 2701MB  climb 209.5
+      00:31:58.628  board_contract_end  anon 3319MB  climb 230.7
+      00:32:02.977  board_contract_end  anon 3751MB  climb 122.0
+                    -> SIGKILL 00:32:32.623
+
+- **Why this one is stronger than the first:** it ran on a DIFFERENT commit
+  (`7c2b1a17`, live 00:24:01Z) and had **no concurrent deploy checkout inside the
+  window**, which was the stated confound on the 00:19:48Z reading. Two
+  excursions, two commits, same verdict. The allocator is downstream of
+  `apply_game_board_contract`; the builder is exonerated twice over.
+- **NEW context this reading adds:** two stages appear ~90 s before the climb —
+  `overview_sport_end` (anon 1472MB, 00:30:05) and `cards_context_summary_loaded`
+  (anon 1201MB, 00:30:22). The intelligence overview loop and MLB cards hydration
+  are both live in the window the allocator occupies. Not an attribution; a
+  narrowing.
+- **CORRECTION, recorded because it drove an action:** the row above says
+  "THE INSTRUMENT IS BEING REMOVED FROM PRODUCTION" by `7c2b1a17`. **That was
+  wrong.** `7c2b1a17` CONTAINS the marker (5 `_log_board_contract_memory` calls,
+  verified by reading the commit's blob). I asserted its absence from the fact
+  that I had not pushed `main`, and never checked the commit's CONTENT — the
+  precise error `learnings.md` 2026-08-16 forbids ("never test what is deployed
+  with ancestry; deployment is a question about CONTENT"), which I had applied
+  correctly to the deploy branch an hour earlier. The marker was never at risk.
+  The `main` push undertaken to "preserve" it was therefore unnecessary, and it
+  is what caused the 514-deletion revert now written up in `learnings.md`.
+- Instrument liveness reconfirmed post-swap: `board_contract_end` still emitting
+  at 00:34:00Z on `7c2b1a17`.
+
+### RETRACTION — the `board_contract_end` verdict does NOT localize the allocator
+- Applies to both measurement entries above (00:19:48Z and 00:32:32Z). **The
+  readings are real; the INFERENCE I drew from them is withdrawn.**
+- **What I claimed:** `last_stage='board_contract_end'` during the climb proves
+  `apply_game_board_contract` had returned and the allocator is downstream in its
+  caller (`_build_sport_overview` / `_emit`).
+- **Why that does not follow:** `_WATCHDOG_STATE` (`memory_observability.py:774`)
+  is a **module-level dict with no thread-locals**, and the refresh worker runs
+  multiple concurrent daemon threads — the live-lens loop
+  (`live_lens_loop.py:914`), its publish sampler (`:814`), the intelligence
+  background loop (`run_refresh_worker.py:3498`), plus the main loop.
+  `last_stage` is therefore **process-global**: it names whichever thread most
+  recently emitted a marker, which need not be the thread that is allocating. I
+  read a global as if it were thread-scoped.
+- **The direct evidence against my inference**, covered window 00:31:54-00:32:03
+  (50 rows, COMPLETE), i.e. inside the second excursion: **no
+  `OVERVIEW_SPORT_BEGIN` or `OVERVIEW_SPORT_END` at all.** The overview loop was
+  not running. What WAS executing: `artifact_publisher` x22 (PULL_OK,
+  STREAM_PULL_ABSENT, PULL_REPAIR_MISSING, PUBLISH_*), `live_lens_loop`
+  `pulled_hot_artifacts count=17`, `refresh_worker` ticks, and
+  `intelligence_evaluation SKIP_OVERSIZED_LEDGER_CHUNK bytes=305,435,308`.
+- **New leading candidate, NOT established:** `pulled_hot_artifacts count=17` at
+  00:32:01.124, immediately followed by `ALL_PROCESS_MEMORY` moving
+  **3045.7 -> 3583.2 MB (+537MB)** at 00:32:01.146. The hot-artifact pull/publish
+  path is now a better-supported suspect than the overview hydration.
+- **What SURVIVES this retraction:**
+  - M1 (zero stage markers across a 16s excursion, 4 complete windows) — valid,
+    it is a statement about marker emission, not attribution.
+  - M2 (effective headroom 2231-2953MB at excursion start, n=7) — valid,
+    container-level and thread-independent.
+  - The guard-silence explanation (headroom clears 1500, not 3000) — valid, same
+    reason.
+  - `apply_game_board_contract` is cheap: the `nfl games=16` triplet moved anon
+    2935->2937MB. That is a same-thread before/after across one call and still
+    bounds THAT call. **Caveat now required:** with other threads allocating
+    concurrently, even this is a net figure, not an isolated one.
+- **Consequence:** `design_2026-08-17_watchdog_abort.md` is **BLOCKED**. It aborts
+  the hydration loop, and the hydration loop is no longer the established
+  allocator. Do not build it until the owning thread is identified.
+- **The lesson, for `learnings.md`:** an attribution field that is not
+  thread-scoped attributes nothing in a multi-threaded process. I had the field
+  in front of me all session and never asked what its scope was — the same shape
+  as `feedback_read_the_field_you_already_have`, one level deeper.
