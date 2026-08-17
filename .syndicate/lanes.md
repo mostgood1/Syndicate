@@ -1857,7 +1857,15 @@ and then failed the thing it was checking, which is the point of running it.
 - Files:
   - `syndicate/features/shared/graded_outcomes.py`
   - `syndicate/features/shared/evaluation_settlement.py`
-  - `scripts/refresh_mlb_oddsapi.py` (read-only so far)
+  - `scripts/refresh_mlb_oddsapi.py` — **read-only dependency for this lane.** Its
+    props-freeze branch (`_freeze_oddsapi_pregame_markets`, props loop only) was
+    **REASSIGNED to `convergence-phase7-crps` on 2026-08-17**, on three grounds
+    stated so this can be judged: this lane is marked **ORPHANED — no live owner**
+    in its own header sweep; its claim here was explicitly *read-only so far*, i.e.
+    a declaration it is not editing the file; and the taking lane touches ONE
+    function and nothing on the grading/settlement path this lane cares about.
+    Notice was relayed to the live `Deploy and Document Coordinator` session.
+    **Revert by restoring this bullet to `(read-only so far)`.**
 - Hypothesis: the blocker is on the GRADED side, not the matching side.
 - Verification: per-date graded row counts off `/mlb/api/market-accuracy`, then a re-read of production `settled`.
 - Blocked by: none. `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN=false`, OFF BY USER DECISION (`todo.md:13464`).
@@ -3953,3 +3961,25 @@ PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
 - **Recommended order:** fixture-relative props fetch → positive pregame proof
   before sealing, with a strictly-richer re-seal allowed → historical backfill.
   Cost it first: OddsAPI ~62.7% of a 5M cap, MLB 93.0% of spend.
+
+#### convergence-phase7-crps — CLAIM OVERRIDE LOGGED 2026-08-17 — `scripts/refresh_mlb_oddsapi.py`, ONE FUNCTION
+
+Taken on explicit user instruction ("take the file and coordinate the claim").
+Recorded so it can be judged rather than trusted.
+
+- **Whose it is:** OPEN lane `grading-blocker-settled-zero` (session
+  `alt-line-shortlist-watch`) lists it as **"read-only so far"**.
+- **Coordination attempted and its limit stated honestly:** that session is
+  **not running and not in the recent roster**, so it could not be reached.
+  Notice relayed to the live `Deploy and Document Coordinator` session instead,
+  with the measurement and an explicit "object and I will back out".
+- **Scope taken: ONE function**, `_freeze_oddsapi_pregame_markets` (:680), and
+  within it only the **props-sealing branch**. NOT `_merge_pregame_game_lines`,
+  NOT the game-lines freeze, NOT anything on the grading/settlement path — which
+  is the half that lane actually cares about.
+- **This is ADDITIVE to their shipped freeze fix, not a revert.** Their fix made
+  the freeze reachable at all; this makes what it seals monotone.
+- **Not the bigger defect.** Most of the loss is that the props fetch runs after
+  the slate; that is cadence, owned by `odds-cadence-off-the-mlb-peak`, and I am
+  NOT taking it.
+- Trivially revertable: one guard, one helper.
