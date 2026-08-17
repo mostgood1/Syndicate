@@ -3412,3 +3412,40 @@ anywhere but next to `crps_normal` would be the "fourth copy" this repo punishes
 - **STILL NOT TAKEN:** `shared/intelligence_evaluation.py` and the prediction
   ledger write path. Phase 7 did not need either. Phase 6 still does, and still
   needs an owner agreed with the betting-engine track.
+
+### wnba-live-tier - **SPEC PREMISE FALSIFIED 2026-08-17 16:2xZ. EVERY input to `export_game_cards_cmd` is absent, and its documented COLUMNS do not match the file. It is probably not the writer at all.**
+- **Measured on the worker for 2026-08-16 - all five inputs:**
+```
+game_odds_2026-08-16.csv           ABSENT   (primary branch input)
+boxscores_2026-08-16.csv           ABSENT   (gid_map input)
+tip_winner_probs_2026-08-16.csv    ABSENT   early_threes_2026-08-16.csv        ABSENT    >  fallback inputs
+first_basket_probs_2026-08-16.csv  ABSENT   /
+smart_sim_2026-08-16_*.json        3 files  (ALL fixtures)
+game_cards_2026-08-16.csv          1 row
+```
+- **BOTH BRANCHES WOULD EMIT ZERO ROWS.** The primary needs `game_odds`; the
+  fallback unions `game_id` from the three PBP files. With all four absent,
+  `gid_set` is empty and the loop body never runs. **Yet the file has one row.**
+- **AND THE COLUMNS DO NOT MATCH.** `export_game_cards_cmd`'s own docstring
+  advertises `prob_home_tip`, `early_threes_expected`, `first_basket_top5`. The
+  actual header on the worker is
+  `date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,
+  home_spread,away_spread,total,bookmaker,home_tri,away_tri,pred_margin,
+  pred_total,...` - **market and sim columns, none of the PBP ones.**
+- **CONCLUSION: `export_game_cards_cmd` is very likely NOT the writer of this
+  file.** Two other references exist and are unread: `cli.py:13470` and
+  `app.py:6800`. I attributed on a filename match plus a plausible-looking
+  function and never checked that its OUTPUT SHAPE matched the artifact.
+- **THE SPEC IS NOW MATERIALLY WRONG.**
+  `.syndicate/spec_2026-08-17_wnba_game_cards_coverage.md` §0 states the
+  fallback is the live path; that is falsified. **Do not build from it until the
+  real writer is identified.** Its §1 gate, §2 column contract and §3 rule
+  (schedule as denominator, market coverage decides columns not rows) survive
+  and are still correct - only the attribution is wrong.
+- **WHAT SURVIVES, all still measured:** `game_cards` holds 1 of 3 fixtures; the
+  sim ran for all three; chip builder, `is_active_today` and provider code are
+  exonerated; and the file carries `pred_margin`/`pred_total` as MEANS.
+- **NEXT ACTION - identify the real writer by OUTPUT SHAPE, not by name.** Grep
+  for a writer emitting `pred_margin` AND `bookmaker` AND `home_tri` together;
+  that column set is the fingerprint. `cli.py:13470` and `app.py:6800` first.
+  **Do not attribute again without matching the columns.**

@@ -1,5 +1,13 @@
 # SPEC — WNBA `game_cards` fixture coverage + distribution publish
 
+> **⚠ PREMISE FALSIFIED 2026-08-17 16:2xZ - DO NOT BUILD FROM §0 YET.**
+> Every input to `export_game_cards_cmd` is ABSENT on the worker (odds,
+> boxscores, and all three PBP files), so BOTH its branches would emit zero
+> rows - yet the file has one. Its documented columns also do not match the
+> artifact's header. **It is probably not the writer.** §1 (the gate), §2 (the
+> column contract) and §3 (schedule as denominator) still stand. Identify the
+> real writer by OUTPUT SHAPE first - see `lanes.md`.
+
 > Written 2026-08-17 by the `layer1-board-coverage` session from a **partial
 > read** of the target function. **§1 is a gate, not a formality:** I never
 > verified the identity mapping this whole design rests on. If §1 fails, §3 is
