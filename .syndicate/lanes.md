@@ -6223,3 +6223,47 @@ either widen `HOT_ARTIFACT_PATTERNS` to cover the per-league path, or read it
 off the worker - and compare its 3 match identities against the board's 5
 fixtures. That comparison is the whole diagnosis; everything upstream of it is
 already exonerated above.
+
+### soccer-projection-collapse - **ROOT CAUSE FOUND 2026-08-17 ~23:0xZ. The sim is FINE. `predictions.probabilities` is NULL for 4 of 5 fixtures while `sim.win_probability` is populated for all 5.**
+
+**READ DIRECTLY off `/soccer/<league>/api/cards` - no deploy needed, and it
+answered what the unreadable `recommendations_<date>.json` would have:**
+```
+fixture (2026-08-17)        sim.win_probability        predictions.probabilities
+Deportivo La Coruna-Elche   home .3667 draw .2533      home_win 0.3667   <- POPULATED
+Cardiff City-Wrexham        away .445  ...             home_win null, away_win null
+Casa Pia-Benfica            away .6525 ...             home_win null, away_win null
+Austin FC-FC Dallas         away .4625 ...             home_win null, away_win null
+Seattle-Vancouver           away .4475 ...             home_win null, away_win null
+```
+**THE ONE FIXTURE WITH POPULATED `predictions.probabilities` IS THE ONE FIXTURE
+THAT PROJECTED** - the board reports `rows_with_projection: 4` and
+`rows_with_true_probability: 3`, consistent with exactly one fixture
+contributing. The causal chain is closed.
+
+**THE SIM RAN AND PRODUCED EVERY NUMBER.** All five fixtures carry a full
+`sim.win_probability` with home/draw/away. **Nothing needs re-simulating.** The
+loss is downstream: whatever writes `predictions.probabilities` (and the
+`recommendations_<date>.json` the projection join reads) drops probabilities the
+sim had already computed.
+
+**EXONERATED, each by measurement, so nobody re-chases them:**
+- **Staleness** - sims ran 0.9h before the read; all 4 leagues fresh.
+- **The sim missing fixtures** - its cards carry ALL 5 of the day's fixtures.
+- **Accents** - `_norm_name` folds correctly; `teams_match` returns True.
+- **Club-name suffixes** - **I PROPOSED THIS AND IT IS WRONG.** `Elche`/`Elche CF`,
+  `Wrexham`/`Wrexham AFC`, `Vancouver Whitecaps`/`... FC` all return True from
+  `teams_match`. **Tested before reporting; do not re-raise it.**
+- **Market support** - `unsupported_market_rows: 0`.
+
+**SINGLE NEXT ACTION:** find what writes `predictions.probabilities` and why it
+emits `null` where `sim.win_probability` has a value. Compare the two blocks for
+`Cardiff City vs Wrexham` - same card, one populated, one not. **That is a
+~3-line difference in one writer, not a modelling problem.**
+
+**STILL UNREADABLE, and worth fixing separately:** soccer's
+`recommendations_<date>.json` is not in `HOT_ARTIFACT_PATTERNS` (soccer writes
+`soccer_source/<league>/api/recommendations/`, the allowlist covers
+`source_artifacts/data/processed/`). The widening is drafted but **NOT applied** -
+`lane-guard` blocks the file, and widening cannot be READ from anyway until the
+new pattern is DEPLOYED to web. It was never completable in one session.
