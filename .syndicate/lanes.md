@@ -6057,3 +6057,30 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
 
+
+#### convergence-phase7-crps — CHECKPOINT 3 (FINAL) 2026-08-17 — **the instrument is built and it has answered the product question: no MLB market beats its price yet, and the reasons are now specific**
+
+- **Phase 7 is DONE and was used**, not just built. It found: the F5 leash, the
+  MLB outs uninformative centre (r=0.05), the sim-count knee (~300), NFL margin's
+  proven skill (+3.20%, CI excludes zero), NCAAF's total leak, and the missing
+  substitution model.
+- **THE HEADLINE: MLB hitter props lose to the market in 3 of 3 clean families**
+  (0.0015–0.010 Brier). That was the falsification test and it came back
+  negative — the programme is "close a measured gap", not "scale an edge".
+- **THE BEST NEWS: the opportunity haircut closes that gap in 3/3 families
+  out-of-sample and flips `runs` past the market.** One fitted scalar. The
+  expensive fix (real substitution) is now justified by measurement.
+- **Root cause is a MISSING MECHANIC:** the sim never substitutes position
+  players. Managers differ 1.68x, so `manager_tendencies.json` (absent, loader
+  returns `{}`) is justified — **P1 and P2 are one piece of work.**
+- **I was wrong about game lines and corrected it:** totals run LOW (−0.481), not
+  high, so the opportunity bug is PROP-PATH ONLY. Game totals and home-field
+  (−0.32 runs) are separate, unexplained defects.
+- **Plan:** `.syndicate/plan_2026-08-17_mlb_best_engine.md`.
+- **Still open / owed:** the NFL seed curve never completed; production's
+  accumulate-vs-retain regime is unconfirmed; `hits_runs_rbis` extractor is
+  broken; MLB totals' +2.02% needs a CI; two deploy requests are queued and
+  DE-PRIORITISED by me; `outs-props-coverage-check` fires 2026-08-19.
+- **NEXT ACTION:** slot-conditioned + score-state haircut (both curves measured
+  and in `deploys.md`), then re-run `mlb_opportunity_haircut.py`. The scoreboard
+  is the market, and it is now a single command.
