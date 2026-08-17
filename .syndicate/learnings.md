@@ -4331,3 +4331,34 @@ picks are not side-balanced is measuring direction, not skill.
 evidence than a statistical one just because it is denominated in money. It has
 its own confounds, and n is usually far smaller — 148 bets against 3,226 scored
 projections.
+
+## 2026-08-17 — RULE: before building a fix, check whether it was already considered and REJECTED in the code you are about to edit
+
+**What happened.** Asked to namespace the shared cadence marker — a real defect,
+correctly diagnosed, with a live production symptom. I opened the file to write
+it and found the authoring lane had rejected exactly that fix **hours earlier, in
+the docstring of the function I was about to change**:
+
+> "This deliberately does NOT namespace the cadence marker. That would treat the
+> symptom and leave an ungated sweep running on the wrong service; the ownership
+> flags are the intended mutex and they are already correct."
+
+**Why building it would have been actively harmful, not merely redundant.** The
+shared marker is what currently prevents two services sweeping the same sport.
+Namespacing it *without* the ownership gate deployed would have let refresh-worker
+and live-odds-worker sweep MLB on independent clocks — **doubling** MLB OddsAPI
+calls against a cap at ~62.7% with MLB already 93% of spend. The safe ordering is
+the exact reverse of the request: deploy the gate, and then the marker never
+matters.
+
+**The generalisable part.** A defect being real does not make the obvious fix
+right, and a rejected design usually leaves its reason near the code rather than
+in the ledger — `grep` over `lanes.md` found nothing, because the decision lived
+in a docstring. **Read the function you are about to edit before you edit it, and
+read it for prior decisions and not only for mechanism.**
+
+**Second-order:** the fix that WAS correct (`20025cc4`) turned out to be on `main`
+and deployed nowhere — measured by CONTENT against each service's live SHA. The
+real blocker was never missing code; it was an undeployed fix that everyone,
+including me, assumed was live because it was merged. *Merged is not deployed*
+already has a rule here; this is its fourth instance.

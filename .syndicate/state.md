@@ -3099,3 +3099,26 @@ from the service.**
 - **Re-simulating the leash grid on PRODUCTION data is impossible** — it needs
   schema-v4 `roster_obj_*.json`; production 404s at every root and the sim's
   loader rejects the raw bundle (`schema_version=None`).
+
+## ODDS-SWEEP OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER `[measured 2026-08-17 19:2xZ, by content]`
+
+- **`20025cc4` (`_sweep_ownership_exclusion`) is absent from both workers' live
+  SHAs** — refresh-worker `8c0bd8e6` and live-odds-worker `abc9987515`, checked
+  by CONTENT (`git show <sha>:<path>`), not by ancestry. **The starvation it
+  fixes is live in production.**
+- The defect: `_live_refresh_loop_effective_sports` fell back to "every
+  season-active sport" when `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` was unset,
+  ignoring BOTH `SYNDICATE_ACTIVE_SPORTS` and the ownership flags. refresh-worker
+  swept mlb/nfl/soccer/wnba owning only nfl; live-odds-worker swept NOTHING. The
+  non-owner wins the shared cadence marker and starves the owner.
+- **DO NOT NAMESPACE THE CADENCE MARKER.** Rejected in code by the authoring
+  lane: the ownership flags are the intended mutex. With the gate deployed the
+  shared marker is a SAFETY NET — namespacing alone lets two services sweep the
+  same sport independently and doubles OddsAPI spend (cap ~62.7%, MLB 93% of it).
+- **Weekly sports are deliberately NOT gated** by it — gating them broke
+  `test_run_tick_claims_weekly_sports_on_game_days` and would reintroduce the 24h
+  NFL capture gap measured 2026-08-07.
+- Verify after deploy is TWO-SIDED: `SWEEP_OWNERSHIP_EXCLUDED` on refresh-worker
+  naming `mlb` in `dropped`, **and** an MLB pregame sweep appearing on
+  live-odds-worker. Half one proves the non-owner stopped, not that the owner
+  started.

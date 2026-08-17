@@ -4030,3 +4030,26 @@ Taken on explicit user instruction ("now take the cadence lever too").
   does not know this. Whoever reads it must rule that out before concluding.
 - **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
   contention first; then let the coordinator ship the seal.
+
+#### convergence-phase7-crps — CHECKPOINT 2 2026-08-17 ~19:3xZ — **nothing left in flight on my side; three things queued, one live and unmeasured**
+
+Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
+
+- **Queued for the coordinator (messaged, session live 19:18Z):**
+  1. `20025cc4` ownership gate, **BOTH workers**, soft deadline before the 08-18
+     slate — measured absent from both live SHAs by content.
+  2. `bafb4fb2` monotone props seal, refresh-worker, **no deadline**, ideally
+     AFTER the 08-19 cadence result so the two do not confound.
+- **Live and unmeasured:** the fixture-aware cadence flag on live-odds-worker.
+  Reader `outs-props-coverage-check` fires 2026-08-19 07:00 CT and now carries
+  **Gate B** (marker contention) plus the undeployed-seal caveat, so it can
+  return INCONCLUSIVE instead of wrongly FAILing a starved mechanism.
+- **NOT DONE, DELIBERATELY: the cadence marker is NOT namespaced.** Asked for,
+  and refused after reading the code — the authoring lane rejected it hours
+  earlier in the docstring of the function I was about to edit, and with the gate
+  deployed the shared marker is a safety net whose removal would double MLB
+  OddsAPI spend. Recorded in `state.md` and `learnings.md`.
+- **Next action for whoever picks this up:** get `20025cc4` deployed to both
+  workers, then read `outs-props-coverage-check` on 08-19 working Gate B first.
+  Do not promote any leash value — the model still loses to a constant baseline
+  at every grid point.
