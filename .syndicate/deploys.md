@@ -10519,3 +10519,22 @@ for their FULL refresh (sims, artifacts, cards) as distinct from the odds sweep.
 Answering it needs a per-sport full-refresh marker that does not currently
 exist. **The WNBA gap is confirmed; the MLB/soccer equivalents are UNTESTED, and
 should not be reported either way.**
+
+## 2026-08-17 — READER ASSIGNED for the cadence flip — the preflight's failing item is now discharged
+
+The 2026-08-17 ~18:3xZ cadence flip was fired with its 24h read **UNASSIGNED**,
+which is the single item that made its preflight FAIL. That is now closed.
+
+- **`outs-props-coverage-check`**, one-time, **fires 2026-08-19 07:00 CT**,
+  reads date **2026-08-18**. Doc: `.syndicate/scheduled_task_outs_coverage.md`.
+- Runs `scripts/grade_production_outs_betting.py`. **PASS** = props
+  `retrieved_at` before first pitch AND >=8 pitchers carrying an `outs` line
+  (baseline: 5 of 29 dates). **FAIL** → recommends rollback, deploys nothing.
+  **VOID** if Gate A cannot prove the flag was live all day.
+- Carries the lane's standing rules: rate-with-denominator, side-blind baseline
+  beside any hit rate, "one slate is not a verdict", and the explicit note that
+  the monotone seal `bafb4fb2` is UNDEPLOYED so a FAIL may be the missing seal
+  rather than the cadence.
+
+**This does not make the deploy measured.** It makes it *scheduled to be
+measured*. The obligation closes when the reader reports.
