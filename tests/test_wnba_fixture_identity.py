@@ -255,3 +255,117 @@ def test_coverage_separates_a_missing_fixture_from_an_unresolvable_row():
 def test_coverage_does_not_double_count_a_repeated_fixture():
     rows = [{"home_team": "PHX", "visitor_team": "POR"}] * 4
     assert ident.coverage_against_schedule("2026-08-16", rows)["covered"] == 1
+
+
+# --------------------------------------------------------------------------
+# The coverage fix itself.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+def test_backfill_turns_the_real_defect_into_full_coverage(monkeypatch):
+    """2026-08-16, the measured defect: one row for a three-fixture slate."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire", "total": "163.5"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert (report["scheduled"], report["covered"], report["backfilled"]) == (3, 1, 2)
+    assert len(out) == 3
+    assert {r["fixture_id"] for r in out} == {"401857148", "401857150", "401857149"}
+
+
+@requires_schedule
+def test_the_original_row_keeps_its_market_data_and_gains_an_id(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire", "total": "163.5", "game_id": "1"}]
+    out, _ = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    original = [r for r in out if r.get("total") == "163.5"]
+    assert len(original) == 1
+    assert original[0]["fixture_id"] == "401857149"
+    # The pre-existing (bad) game_id is NOT rewritten -- only new rows get the
+    # stable one. Rewriting it could break a caller mid-migration.
+    assert original[0]["game_id"] == "1"
+
+
+@requires_schedule
+def test_backfilled_rows_carry_no_market_or_projection_columns(monkeypatch):
+    """Inventing a price would be far worse than a missing game."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    out, _ = ident.stamp_and_backfill_game_cards_rows("2026-08-16", [])
+    assert len(out) == 3
+    for row in out:
+        for banned in ("total", "home_ml", "away_ml", "home_spread", "pred_margin", "pred_total", "bookmaker"):
+            assert banned not in row, f"{banned} must not be invented on a backfilled row"
+        assert row["commence_time"].endswith("Z"), "must match the artifact's ISO spelling"
+        assert "+00:00" not in row["commence_time"]
+        assert row["game_id"] == row["fixture_id"]
+
+
+@requires_schedule
+def test_an_empty_schedule_backfills_nothing(monkeypatch, tmp_path):
+    """Out of season must not have a slate invented for it."""
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(tmp_path / "missing.csv"))
+    ident._clear_cache()
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", [])
+    assert out == []
+    assert report["scheduled"] == 0 and report["backfilled"] == 0
+
+
+@requires_schedule
+@pytest.mark.parametrize("value", ["0", "false", "no", "off", "OFF"])
+def test_the_kill_switch_restores_the_old_behaviour_exactly(monkeypatch, value):
+    monkeypatch.setenv(ident.GAME_CARDS_BACKFILL_ENV, value)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert len(out) == 1, "kill switch must stop the backfill"
+    assert report["backfilled"] == 0
+    # Identity stamping is pure metadata and stays on -- it cannot add a row.
+    assert out[0]["fixture_id"] == "401857149"
+
+
+@requires_schedule
+def test_absent_means_enabled(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    assert ident.backfill_enabled() is True
+    monkeypatch.setenv(ident.GAME_CARDS_BACKFILL_ENV, "1")
+    assert ident.backfill_enabled() is True
+
+
+@requires_schedule
+def test_an_unresolvable_row_is_counted_and_kept_never_dropped(monkeypatch):
+    """Losing it would hide genuine upstream contamination."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Oklahoma City Thunder", "visitor_team": "San Antonio Spurs", "total": "9"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert report["unresolved"] == 1
+    kept = [r for r in out if r.get("total") == "9"]
+    assert len(kept) == 1 and kept[0]["fixture_id"] == ""
+    assert len(out) == 4, "the bad row is kept AND all three fixtures are covered"
+
+
+@requires_schedule
+def test_the_input_rows_are_not_mutated(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"}]
+    ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert "fixture_id" not in rows[0], "caller's rows must not be mutated in place"
+
+
+@requires_schedule
+def test_rows_resolve_by_tricode_when_team_names_are_absent(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_tri": "PHX", "away_tri": "POR"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert report["covered"] == 1 and report["unresolved"] == 0
+
+
+@requires_schedule
+def test_a_full_slate_backfills_nothing_and_is_left_alone(monkeypatch):
+    """The no-op case. A healthy date must not be churned."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [
+        {"home_team": f.home_team, "visitor_team": f.away_team}
+        for f in ident.fixtures_for_date("2026-08-16")
+    ]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert (report["covered"], report["backfilled"], report["unresolved"]) == (3, 0, 0)
+    assert len(out) == 3

@@ -317,6 +317,132 @@ def coverage_against_schedule(
     }
 
 
+GAME_CARDS_BACKFILL_ENV = "WNBA_GAME_CARDS_SCHEDULE_BACKFILL"
+
+
+def backfill_enabled() -> bool:
+    """Kill switch for the coverage backfill. ABSENT MEANS ENABLED.
+
+    Deliberately the opposite default from
+    `_evaluation_settlement_auto_refresh_enabled` (absent -> False), and the
+    difference is not an inconsistency: that flag guards a ~1.4GB job where
+    running unintentionally is the expensive mistake, whereas the defect here is
+    a MISSING row, so the expensive mistake is NOT covering. Set to
+    `0`/`false`/`no`/`off` to restore the pre-2026-08-17 behaviour exactly.
+
+    Note for anyone editing `render.yaml`: adding this key at all is a no-op
+    unless the value is falsey, because absent and "1" mean the same thing here.
+    """
+    raw = os.environ.get(GAME_CARDS_BACKFILL_ENV, "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _iso_utc(datetime_utc: str) -> str:
+    """Schedule `2026-08-16 23:00:00+00:00` -> artifact `2026-08-16T23:00:00Z`.
+
+    The two formats differ, and a backfilled row carrying the schedule's spelling
+    would be the only row in the file with a different one -- which is the kind
+    of quiet inconsistency that makes a downstream parser fail on exactly the
+    rows this fix added. Unparseable input returns "" rather than a guess.
+    """
+    text = str(datetime_utc or "").strip()
+    if not text:
+        return ""
+    try:
+        from datetime import datetime, timezone
+
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, TypeError):
+        return ""
+
+
+def stamp_and_backfill_game_cards_rows(
+    date_str: Any,
+    rows: Any,
+    *,
+    home_key: str = "home_team",
+    away_key: str = "visitor_team",
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Stamp `fixture_id` on every row, then add any scheduled fixture missing.
+
+    THE COVERAGE FIX, kept here rather than in the builder so the builder's edit
+    is three lines and so this is testable without running an artifact build.
+
+    Returns `(rows, report)`. The report is what the `#375` census should print:
+    a RATIO, because "1 row" was the form that let this sit short for weeks.
+
+    Rules, each one load-bearing:
+
+    * **A row that cannot be resolved keeps a BLANK `fixture_id` and is
+      counted, never dropped.** Two real rows in the artifacts name NBA teams;
+      losing them would hide upstream contamination.
+    * **Backfilled rows carry identity and commence time ONLY.** Every market
+      and projection column is left absent, which the board already renders as
+      absent. Inventing a price would be far worse than a missing game.
+    * **An empty schedule backfills NOTHING.** Out of season, or a date with no
+      slate, must not have one invented -- the same refusal the WNBA
+      scoreboard carry-forward makes for a 200-with-no-events.
+    * **Never raises.** This is called from a build path.
+    """
+    out_rows: list[dict[str, Any]] = [dict(r) for r in (rows or ()) if isinstance(r, dict)]
+    report: dict[str, Any] = {
+        "scheduled": 0,
+        "covered": 0,
+        "backfilled": 0,
+        "unresolved": 0,
+        "backfill_enabled": backfill_enabled(),
+    }
+    try:
+        scheduled = fixtures_for_date(date_str)
+    except Exception:
+        return out_rows, report
+    report["scheduled"] = len(scheduled)
+
+    covered: set[str] = set()
+    for row in out_rows:
+        try:
+            fixture_id = resolve_fixture_id(date_str, row.get(home_key), row.get(away_key))
+            if fixture_id is None:
+                fixture_id = resolve_fixture_id(date_str, row.get("home_tri"), row.get("away_tri"))
+        except Exception:
+            fixture_id = None
+        if fixture_id:
+            row["fixture_id"] = fixture_id
+            covered.add(fixture_id)
+        else:
+            row.setdefault("fixture_id", "")
+            report["unresolved"] += 1
+    report["covered"] = len(covered)
+
+    if not scheduled or not report["backfill_enabled"]:
+        return out_rows, report
+
+    for fixture in scheduled:
+        if fixture.fixture_id in covered:
+            continue
+        out_rows.append(
+            {
+                "date": str(date_str or ""),
+                # `game_id` gets the STABLE id too, so newly written rows stop
+                # extending the sequential-index scheme. Existing rows keep
+                # whatever they had -- `fixture_id` is the authoritative column
+                # and the one consumers should migrate to.
+                "game_id": fixture.fixture_id,
+                "fixture_id": fixture.fixture_id,
+                "home_team": fixture.home_team,
+                "visitor_team": fixture.away_team,
+                "home_tri": fixture.home_tricode,
+                "away_tri": fixture.away_tricode,
+                "commence_time": _iso_utc(fixture.datetime_utc),
+            }
+        )
+        report["backfilled"] += 1
+    return out_rows, report
+
+
 def _clear_cache() -> None:
     """Test hook. The cache is content-keyed, so this is only needed when a
     test rewrites a schedule file within the same mtime granularity."""

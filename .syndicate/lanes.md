@@ -3711,3 +3711,53 @@ with no callers. Next: `_build_local_game_cards_artifact`
 existing regression tests** (`test_wnba_game_cards_census.py`,
 `test_wnba_refresh_runner.py::...promotes_full_slate_when_snapshot_is_partial`)
 - this defect was already fixed once on 2026-07-07 and came back.
+
+### wnba-fixture-identity - **WIRING BUILT AND TESTED (40 pass), BUT BLOCKED AT THE LAST STEP BY A LANE CONFLICT. Needs a user decision, not more work.**
+
+**BLOCKER.** `scripts/refresh_wnba_oddsapi_props.py` is claimed by OPEN lane
+`export-force-refresh-escape`. `lane-guard` blocked the edit and I did not
+override it.
+- That lane's session is **`Wnba win prob counter read`
+  (`local_e6fe220f-...`), NOT RUNNING, last active 2026-08-16 21:30Z (~20h).**
+- **It is an UNATTENDED scheduled-task run - `send_message` REFUSES delivery.**
+  So it cannot be asked, and it will never close its own lane. This lane cannot
+  clear itself; only the user can release it.
+- Its own note says the work is **deployed and verified by content, EFFECT
+  UNMEASURED** - so what remains on it is a MEASUREMENT, not an edit.
+- **The code regions are disjoint**: it holds `_export_cards_props_snapshot`
+  (`:5082`); I need `_GAME_CARDS_HEADER_ORDER` (`:2229`) and
+  `_build_local_game_cards_artifact` (`:2262`). The lane rule is file-level,
+  so that does not by itself entitle me to the file.
+
+**DONE AND PUSHED - everything that does not need that file.** The wiring logic
+lives in `wnba_fixture_identity.py` (my module) precisely so the blocked edit is
+~3 lines: `stamp_and_backfill_game_cards_rows(date, rows) -> (rows, report)`.
+40 tests pass. Rules pinned by test: an unresolvable row is **kept and counted,
+never dropped**; backfilled rows carry **identity + commence_time ONLY**, no
+invented price; an **empty schedule backfills NOTHING** (out of season must not
+have a slate invented); input rows are not mutated; kill switch
+`WNBA_GAME_CARDS_SCHEDULE_BACKFILL` where **absent means ENABLED** (opposite of
+the settlement flag's absent-is-False, deliberately - the defect is a MISSING
+row, so the expensive mistake is not covering).
+
+**THE PENDING PATCH, ready to apply the moment the lane clears:**
+1. `_GAME_CARDS_HEADER_ORDER` (`:2229`) - append `"fixture_id"` at the END.
+   Safe: `DictWriter` projects with `.get(field, "")` and readers use
+   `DictReader` + `.get()`; same precedent as the 2026-08-02 column addition.
+2. In `_build_local_game_cards_artifact`, before each of the **three** write
+   sites (`:2491` raw_player_props, `:2632` processed_game_odds, `:2702`
+   raw_team_odds) call `stamp_and_backfill_game_cards_rows(date_str, rows_out)`
+   and pass the report into `_census`.
+3. `_no_data` (`:2330`) - route through the same helper with `rows=[]`. If the
+   schedule yields fixtures, WRITE those instead of deleting, and return
+   `(n, out_path)`. **This is the fix for the empty-file mode** (`2026-06-28`
+   wrote 0 rows for 4 scheduled). Callers only read the count and derive `rc`,
+   so returning a real count is correct - checked all three call sites
+   (`:4262`, `:4428`, `:5803`).
+
+**A FINDING FOR WHOEVER HOLDS THAT FILE.** On production
+`predictions_2026-08-17.csv` is **ABSENT**, and `expected_matchups`
+(`:2395`) is derived from it. So the builder's existing denominator is EMPTY and
+every `expected_matchups.issubset(...)` coverage gate passes **trivially** -
+the guard that was supposed to stop a partial slate is inert exactly when the
+slate is partial. This is the `unknown-must-not-default-permissive` shape again.
