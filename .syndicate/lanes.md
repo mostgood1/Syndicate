@@ -3071,3 +3071,47 @@ touch that.
 - **clamp-fix-to-workers** — clamp-fix-to-workers — CLOSED-VERIFIED 2026-08-17 00:0xZ — the ±4900 clamp is gone from all three live services, and 7,002 served fair_price values ca → `lanes_closed.md`
 - **layer1-board-coverage** — layer1-board-coverage — CLOSED-VERIFIED 2026-08-17 — all four goals answered, and the last unmet criterion was EXECUTED (it returned a defect, which w → `lanes_closed.md`
 - **mlb-live-gameline-distributions** — mlb-live-gameline-distributions — CLOSED-VERIFIED 2026-08-17 — live MLB totals and spreads carry a live projection AND a priced edge — opened 2026-08- → `lanes_closed.md`
+
+### wnba-live-tier — **DEFECT 1 WRITER FOUND 2026-08-17 15:2xZ. `game_cards` walks the ODDS file, not the schedule — a fixture with no odds row does not exist.**
+- **The writer is `export_game_cards_cmd`,
+  `vendor/wnba_betting_repo/src/wnba_betting/cli.py:9581`**, and its denominator
+  is the first thing it reads:
+  ```python
+  odds_path = paths.data_processed / f"game_odds_{date_str}.csv"
+  if odds_path.exists():
+      go = pd.read_csv(odds_path)
+  else:
+      go = pd.DataFrame(columns=["home_team","visitor_team","commence_time"])  # fallback blank
+  ```
+  **Every `game_cards` row derives from a game that had ODDS CAPTURED.** A
+  fixture with no odds row never appears, and a MISSING odds file yields a
+  card file with zero games rather than an error. That is why the worker held
+  1 of 3 for 2026-08-16: only POR@PHX had an odds row.
+- **IT ALSO EXPLAINS THE SYNTHESIZED `game_id='1'`.** The real `gameId` comes
+  from `boxscores_<date>.csv` via `gid_map`, and boxscores exist only AFTER a
+  game is played and ingested. With no boxscore the id falls back to a
+  sequential index. So the survivor carried `'1'` while the two the LENS knew
+  carried real ESPN ids (`401857148`, `401857150`) from a different source. The
+  numeric-vs-synthesized split I first noticed was a symptom of the same cause,
+  not a keying bug.
+- **CORRECTION TO MY OWN PREDICTION, recorded so it is not repeated:** the
+  previous note said to check whether the writer "walks the props pool". **It
+  does not — it walks ODDS.** Right in spirit (a market-derived denominator
+  instead of the schedule) and the wrong file; following that note would have
+  cost someone time in `props`.
+- **THE FIX, and it is a contract this repo already applies everywhere else:**
+  walk the SCHEDULE and left-join odds. `vendor/wnba_betting_repo/data/processed/
+  schedule_2026.csv` is git-tracked and complete. That emits one row per real
+  fixture with market columns BLANK where odds are missing — "absent renders as
+  absent" — instead of the fixture vanishing.
+- **SAME FILE AS THE DISTRIBUTION GAP, now confirmed rather than suspected.**
+  This is the writer that emits `pred_margin`/`pred_total` as MEANS (outstanding
+  item #3). One writer owns both defects, so one change can close both: walk the
+  schedule AND publish the 2,000-sim margin/total arrays instead of their means.
+- **TWO LIMITS ON THIS READING:** I read the first ~45 lines of a large function
+  and have **not** confirmed there is no later fallback that re-adds fixtures; and
+  I have not measured whether `game_odds_2026-08-16.csv` on the worker really
+  holds one row (that would confirm the chain end to end and is one export call).
+- **Next action:** export `wnba_source/data/processed/game_odds_2026-08-16.csv`
+  from the worker and count rows. One row confirms the whole chain; three would
+  mean the loss happens inside this function and the read above is incomplete.
