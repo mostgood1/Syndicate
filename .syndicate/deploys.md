@@ -12603,3 +12603,56 @@ target — and it is consistent with the totals being low.
 - **NEW: game totals under-projection (−5.3%) and home-field under-projection
   (−0.32 runs) are separate defects**, unexplained, and are the natural next
   diagnosis for anyone wanting to improve MLB game lines specifically.
+
+## 2026-08-17 — SLOT-CONDITIONED HAIRCUT: **improves 3 of 3 out-of-sample, but the gain is small and the per-slot fit is noisy**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_opportunity_haircut.py`, now fitting
+flat and per-slot arms on the SAME train rows. Read-only, no deploy.
+
+### Fitted on TRAIN (fallback to flat below n=25 — an unknown slot must not get a confident correction of its own)
+
+    flat 0.8837 (-11.6%)
+    slot 1 0.9080  slot 4 0.9151  slot 7 0.8976
+    slot 2 0.8821  slot 5 0.8715  slot 8 0.8617
+    slot 3 0.8717  slot 6 0.8738  slot 9 0.8675      (n = 121..145 per slot)
+
+### HELD-OUT result
+
+| family | n | baseline | flat | **SLOT** | market | slot − flat |
+|---|---|---|---|---|---|---|
+| hits | 515 | 0.25286 | 0.24875 | **0.24755** | 0.23604 | +0.00120 |
+| runs | 503 | 0.22603 | 0.22356 | **0.22352** | 0.22478 | +0.00004 **BEATS MARKET** |
+| total_bases | 412 | 0.26518 | 0.25953 | **0.25669** | 0.23855 | +0.00284 |
+
+**Slot-conditioning helps in 3 of 3, out-of-sample.** Cumulatively the two
+haircuts close ~32% of the baseline-to-market gap on `total_bases`
+(0.26518 → 0.25669 against a 0.23855 target).
+
+### THE HONEST READING — the gain is SMALL and the curve is NOT what was predicted
+
+**The substitution profile predicted a monotonic slot effect** (removal rate
+7.7% at slot 3 → 16.7% at slot 9). **The fitted haircuts are not monotonic:**
+slot 4 needs the SMALLEST correction (0.9151) and slot 8 the largest (0.8617),
+with slots 1/4/7 all above 0.89 and 3/5/8/9 below 0.88.
+
+With n≈130 per slot, **much of that structure is probably noise.** The weak real
+signal — slots 8/9 needing bigger haircuts than 1/4 — points the right way, but
+this fit does not reproduce the clean monotonic curve the event data shows.
+
+**Why the mismatch is expected, and it is the same point as before:** removal
+RATE and lost-OPPORTUNITY are different quantities. Bottom-order hitters are
+substituted more often but LATER, when fewer plate appearances remain. A haircut
+scales opportunity; it does not know when in the game the removal happened.
+
+**So the slot arm is worth keeping (3/3, no cost) and is NOT the win.** The
+remaining gaps are still 0.0115 on hits and 0.0181 on total_bases. **A scalar per
+slot is near the ceiling of what rescaling can do** — closing the rest needs
+in-sim substitution that removes a batter at a specific inning, which is P2.
+
+### Next, in order
+
+1. **Score-state conditioning** — measured and unused: pinch-hits 2.7:1 when
+   trailing, defensive subs 2.5:1 when leading. Cheap, and it is a genuinely
+   different axis from slot rather than a refinement of it.
+2. **In-sim substitution** driven by per-manager tendencies (managers differ
+   1.68x). That is the only thing that can model WHEN a batter is removed.

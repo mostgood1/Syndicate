@@ -132,7 +132,14 @@ def main() -> int:
     train_dates, test_dates = set(dates[:cut]), set(dates[cut:])
 
     # ---- pass 1: fit the haircut on TRAIN ----
+    # Two arms, fitted on the SAME train rows so the comparison is like-for-like:
+    #   flat  -- one scalar for every batter
+    #   slot  -- one scalar per lineup slot
+    # Substitution rate rises monotonically 7.7% (slot 3) -> 16.7% (slot 9)
+    # `[measured, 618 games]`, so a flat scalar must be wrong for somebody. This
+    # tests whether correcting that actually buys anything on the scoreboard.
     ratios = []
+    ratios_by_slot: dict[int, list[float]] = defaultdict(list)
     rows_by_date: dict[str, list] = defaultdict(list)
     for date in dates:
         try:
@@ -162,19 +169,37 @@ def main() -> int:
                         ab_a = col(a, "ab") if a else None
                         if ab_a is not None:
                             seen.add((date, name))
-                            ratios.append(ab_a / float(ab_m))
+                            ratio = ab_a / float(ab_m)
+                            ratios.append(ratio)
+                            slot = r.get("lineup_order")
+                            if isinstance(slot, (int, float)) and 1 <= int(slot) <= 9:
+                                ratios_by_slot[int(slot)].append(ratio)
     if not ratios:
         print("no train ratios")
         return 1
     haircut = statistics.fmean(ratios)
+    # A slot with too few TRAIN observations falls back to the flat scalar
+    # rather than to a noisy per-slot fit -- an unknown must not get a
+    # confident correction of its own.
+    MIN_SLOT_N = 25
+    slot_haircut = {s: (statistics.fmean(v) if len(v) >= MIN_SLOT_N else haircut)
+                    for s, v in ratios_by_slot.items()}
+    slot_n = {s: len(v) for s, v in ratios_by_slot.items()}
 
     print("=" * 92)
     print("P1 — OPPORTUNITY HAIRCUT, scored against the market")
     print("=" * 92)
     print(f"\n  dates {len(dates)}   TRAIN {len(train_dates)} ({dates[0]}..{dates[cut-1]})"
           f"   TEST {len(test_dates)} ({dates[cut]}..{dates[-1]})")
-    print(f"  haircut fitted on TRAIN: actual_AB / model_AB = {haircut:.4f} "
-          f"({(haircut - 1) * 100:+.1f}% opportunity)\n")
+    print(f"  FLAT haircut fitted on TRAIN: actual_AB / model_AB = {haircut:.4f} "
+          f"({(haircut - 1) * 100:+.1f}% opportunity)")
+    print(f"  SLOT haircut (fallback to flat below n={MIN_SLOT_N}):")
+    for s in range(1, 10):
+        if s in slot_haircut:
+            fb = "  <- fallback" if slot_n.get(s, 0) < MIN_SLOT_N else ""
+            print(f"    slot {s}: {slot_haircut[s]:.4f} "
+                  f"({(slot_haircut[s] - 1) * 100:+5.1f}%)  n={slot_n.get(s, 0):4d}{fb}")
+    print()
 
     # ---- pass 2: score TEST ----
     scored = defaultdict(lambda: defaultdict(list))
@@ -211,8 +236,12 @@ def main() -> int:
                 continue
 
             outcome = 1.0 if actual >= k else 0.0
+            slot = r.get("lineup_order")
+            cut_slot = slot_haircut.get(int(slot), haircut) \
+                if isinstance(slot, (int, float)) else haircut
             p_base = binom_at_least(ab_m, rate, k)
             p_cut = binom_at_least(ab_m * haircut, rate, k)
+            p_slot = binom_at_least(ab_m * cut_slot, rate, k)
             prod = None
             for key, val in r.items():
                 if isinstance(key, str) and isinstance(val, (int, float)) \
@@ -221,6 +250,7 @@ def main() -> int:
 
             scored[fam]["baseline"].append(brier_score(p_base, outcome))
             scored[fam]["haircut"].append(brier_score(p_cut, outcome))
+            scored[fam]["slot"].append(brier_score(p_slot, outcome))
             scored[fam]["market"].append(brier_score(fair[0], outcome))
             if prod is not None:
                 scored[fam]["production"].append(brier_score(prod, outcome))
@@ -235,8 +265,8 @@ def main() -> int:
         return 1
 
     print("\nRESULTS on HELD-OUT dates — Brier, lower is better\n")
-    header = (f"  {'family':13s} {'n':>5s} {'base':>6s} {'baseline':>9s} {'HAIRCUT':>9s} "
-              f"{'market':>8s} {'(prod)':>8s}   gap closed?")
+    header = (f"  {'family':13s} {'n':>5s} {'baseline':>9s} {'flat':>9s} {'SLOT':>9s} "
+              f"{'market':>8s}   slot vs flat")
     print(header)
     print("  " + "-" * (len(header) + 4))
     out_rows = []
@@ -248,19 +278,19 @@ def main() -> int:
             continue
         b_base = statistics.fmean(cells["baseline"])
         b_cut = statistics.fmean(cells["haircut"])
+        b_slot = statistics.fmean(cells["slot"])
         b_mkt = statistics.fmean(cells["market"])
         b_prod = statistics.fmean(cells["production"]) if cells["production"] else None
-        gap_before, gap_after = b_base - b_mkt, b_cut - b_mkt
-        moved = gap_before - gap_after
-        verdict = (f"closed {moved:+.5f}" if moved > 0 else f"WIDENED {moved:+.5f}")
-        if b_cut < b_mkt:
-            verdict += "  ** BEATS MARKET **"
+        delta = b_cut - b_slot   # positive = slot-conditioning HELPED
+        note = f"{delta:+.5f}" + ("  better" if delta > 0 else "  worse")
+        if b_slot < b_mkt:
+            note += "  ** BEATS MARKET **"
         out_rows.append({"family": fam, "n": len(outs), "base_rate": base_rate,
-                         "baseline": b_base, "haircut": b_cut, "market": b_mkt,
-                         "production": b_prod, "gap_before": gap_before,
-                         "gap_after": gap_after})
-        print(f"  {fam:13s} {len(outs):5d} {base_rate:6.3f} {b_base:9.5f} {b_cut:9.5f} "
-              f"{b_mkt:8.5f} {(f'{b_prod:.5f}' if b_prod is not None else '—'):>8s}   {verdict}")
+                         "baseline": b_base, "haircut_flat": b_cut,
+                         "haircut_slot": b_slot, "market": b_mkt, "production": b_prod,
+                         "slot_minus_flat": delta})
+        print(f"  {fam:13s} {len(outs):5d} {b_base:9.5f} {b_cut:9.5f} {b_slot:9.5f} "
+              f"{b_mkt:8.5f}   {note}")
 
     print("\n  `baseline` and `HAIRCUT` differ in ONE thing: the opportunity. Both are")
     print("  recomputed binomially from the engine's own per-AB rate, so the comparison")
