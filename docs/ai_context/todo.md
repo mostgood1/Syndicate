@@ -33191,3 +33191,52 @@ worth knowing before anything is built on it.
 **Related:** lane `game-shape-capture`;
 `.syndicate/plan_2026-08-16_state_conditional_learning.md` (Phase 3b);
 `#441` (which is why NFL pbp exists at all).
+
+### `#449` — **refresh-worker IS IN AN OOM CRASH LOOP AND HAS BEEN FOR ~8 HOURS** — FOUND 2026-08-17 00:2xZ, NOT STARTED, no owner
+
+Found incidentally while deploying something unrelated. **Nobody was watching for
+this**, and it does not announce itself: the service restarts and keeps serving,
+so every spot-check looks healthy.
+
+**MEASURED from the Render events API (`render_events.py --failures-only`):**
+
+    23 oomKilled events since 2026-08-16T12:00:00Z, first at 16:34:32Z.
+    Recent cadence has TIGHTENED to ~11-15 minutes:
+      22:41:52  23:03:50  23:16:51  23:32:18
+      23:43:11  23:56:00  00:08:54  00:19:48
+
+`memoryLimit=4Gi` on every one. Each is followed within ~1s by
+`server_available` -- so the loop is invisible in "is it up" terms.
+
+**IT IS A SPIKE, NOT A LEAK.** Post-restart samples sit at ~510 MB of 4096
+(`container_memory_headroom_mb` ~3250). Whatever consumes the other 3.5 GB does
+so fast enough to be missed between `ALL_PROCESS_MEMORY` samples -- which is
+exactly the failure mode `#435` was filed for ("sample memory on a CLOCK, because
+the kills happen between stage samples").
+
+**WHY THIS MATTERS BEYOND THE RESTARTS:** every kill takes whatever job was
+running with it. This service runs the MLB daily sim, `daily_update --workflow
+ui-daily`, and the season/preseason projections. A ~12-minute kill cycle means
+any job longer than ~12 minutes may NEVER complete. That is a candidate
+explanation for unrelated symptoms elsewhere, and it should be checked before
+those are diagnosed on their own terms.
+
+**NOT CAUSED BY TONIGHT'S CONVERGENCE DEPLOY.** The loop starts at 16:34Z; the
+deploy was triggered at 00:18:07Z, and the 00:19:48 kill sits exactly on the
+pre-existing ~11-minute cadence. Stated explicitly because the temporal
+coincidence is otherwise inviting.
+
+**Prior art, and why this is still unowned:** lane `refresh-worker-oom-recurrence`
+is OPEN and marked **"ATTRIBUTED, NO DEPLOY MADE"** -- an attribution was reached
+and nothing shipped. `#435` (clock-based memory sampling) and `#423` (malloc_info
+/ tracemalloc wiring) are the instrumentation for exactly this. Whether they are
+live on this service is UNVERIFIED by me.
+
+**FIRST STEPS for whoever takes it, in order:**
+1. Confirm the cadence is still running (`render_events.py --service
+   refresh-worker --failures-only`). A null here means fixed, not absent -- kills
+   are EVENTS, never log lines.
+2. Correlate kill times against `run_mlb_daily_sim_job` starts. The ~12-minute
+   period is suspiciously close to the sim's cycle.
+3. Only then read memory samples. `ALL_PROCESS_MEMORY` will look healthy; that is
+   the trap, not the answer.
