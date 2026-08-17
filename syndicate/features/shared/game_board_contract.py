@@ -908,6 +908,55 @@ def apply_game_board_contract(
         "source_kind": source_kind,
         "live_lens_integrated": bool(live_lens_integrated),
     }
+    # THE RETURN IS A STAGE. Measured on refresh-worker 2026-08-16, the clean
+    # 23:16:51Z oomKilled: the watchdog's `last_stage` sat at
+    # `board_contract_games_normalized` while anon went 1746 -> 3935MB over ~41s
+    # and the container pinned at 4096.0 -- and the excursion did not begin until
+    # ~13s AFTER that marker was emitted. Eleven sports/slates had just passed
+    # through here back to back (`game_count` 16, 31, 1, 8, 1, 11, 1, 8, 8, 11, 9)
+    # with anon FLAT at 1745.52MB, so this builder is cheap and was almost
+    # certainly not the occupant.
+    #
+    # But "almost certainly" was as far as the evidence went, because
+    # `games_normalized` was the LAST marker on the path: nothing distinguished
+    # "still inside the tail of this function" from "returned, and the allocator
+    # is in the caller". Everything between :849 and here is scalar setdefault
+    # work and `build_simulation_contract_from_context` is default OFF (:892),
+    # so the tail cannot plausibly hold 2.2GB -- yet `last_stage` said it might.
+    #
+    # This marker is the discriminator, and it is worth one cgroup read because
+    # it splits the search space in half on the NEXT kill rather than the one
+    # after that:
+    #     last_stage=board_contract_end            -> this builder returned;
+    #                                                 the allocator is DOWNSTREAM,
+    #                                                 in whatever the caller does
+    #                                                 next.
+    #     last_stage=board_contract_games_normalized -> the excursion really is
+    #                                                 inside :850-:911, and the
+    #                                                 reasoning above is wrong.
+    #
+    # It goes HERE, in the shared builder, and not in a sport module on purpose.
+    # `_log_cards_context_memory` (mlb/cards.py:182) exists ONLY for MLB, so the
+    # other seven sports hydrate with no stage markers at all -- which is why
+    # `intelligence.py:2604-2611` can conclude "MLB is in a class of its own" and
+    # size two different production floors on it (3000MB vs the relaxed 1500MB at
+    # :2621) off measurements only MLB is capable of producing. An uninstrumented
+    # sport reads cheap the way an unplugged meter reads zero. This function is
+    # the one place all eight sports already converge (nba:2562, nhl:1052,
+    # nfl:505, soccer:697, wnba:3533, ncaab:181, ncaaf, mlb:5773), so a marker
+    # here is the only per-sport signal that costs one edit instead of eight.
+    #
+    # Cost, because `learnings.md` says worker periodic work is never free
+    # (`#241` put the worker in a restart loop): this is not periodic. It is one
+    # cgroup read per board build, on a function that already takes two, and it
+    # is worker-only -- `_log_board_contract_memory` returns immediately on a web
+    # dyno (:823) and swallows every exception (:829). An instrument must not be
+    # the reason a worker dies.
+    _log_board_contract_memory(
+        "end",
+        sport=normalized_sport,
+        game_count=len(out.get("games") or []),
+    )
     return out
 
 
