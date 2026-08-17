@@ -2658,3 +2658,81 @@ variable. Do not merge them** — that is how leakage gets in. pbp unblocks two
 refusals already written into `game_shape.py` by name: the MLB leverage index
 (needs a fitted win-expectancy table — `feed_live` is where it comes from) and
 football down/distance value (NFL pbp already ships `epa`/`wp`/`wpa`).
+## 2026-08-17 00:29Z — VERIFIED (sim-scheduling)
+
+**ALL THREE SERVICES ARE CONVERGED WITH `main`.** Each is a merge commit with two
+parents, cut on that service's own live SHA:
+
+| service | commit | landed |
+|---|---|---|
+| web | `763a2f66` | 00:13:41Z |
+| refresh-worker | `7c2b1a17` | 00:24:01Z |
+| live-odds-worker | `c348da53` | 23:57:12Z |
+
+**Do not deploy `main`'s tree to these services.** Each lineage held commits main
+never received (21 / 52 / 40). See `learnings.md` 2026-08-17 for the per-file
+`main-only == 0` test that finds them.
+
+**`#440` Phase 1c VERIFIED IN PRODUCTION 00:11:36Z on live-odds-worker.** Soccer
+pregame cadence now resolves PER LEAGUE: `mls due:imminent_handoff_to_t_window:1107s`
+while `championship`, `la_liga` and `primeira_liga` all skip at 18-19h out
+(`scope=league due=mls of=4`). Corroborated by a live process carrying
+`--soccer-leagues mls`. Flag `SYNDICATE_PREGAME_LEAGUE_SCOPED_CADENCE` is set on
+**live-odds-worker only** — the code is present but INERT on the other two, and
+`FIXTURE_CADENCE sport=soccer` appears in live-odds-worker's logs and nowhere else.
+
+**`refresh-worker` IS OOM CRASH-LOOPING — `#449`.** 23 `oomKilled` (4Gi) events
+since 12:00Z, first 16:34:32Z, cadence tightened to ~11-15 min. It is a SPIKE not
+a leak: post-restart memory is ~510MB of 4096. Each kill takes the running job
+with it, so **any job longer than ~12 minutes may never complete on this service**
+— check this before diagnosing unrelated "job never finished" symptoms.
+NOT caused by tonight's deploys; the loop predates them by 96 minutes.
+
+**Tooling:** `scripts/pending_deploys.py` re-derives pending work per service from
+each service's CURRENT live SHA. Use it instead of `rev-list --count live..main`,
+which reports 600-700 and means nothing because services run curated branches.
+
+## 2026-08-17 00:4xZ — LIVE HAZARD (sim-scheduling): refresh-worker's deploy lineage is POISONED until `d9088741` ships
+
+**Do not deploy refresh-worker from `7c2b1a17` + `main`. It will silently
+re-revert 10 lines of `memory_observability.py`.**
+
+`7c2b1a17` (live since 00:24:01Z) was built with its tree computed against
+`origin/main=7eb5fb28` while its `-p` parent re-resolved to `40c3c44b` in a later
+git call. New parent, old tree — a valid fast-forward, so `git push` accepted it
+with no force and no warning.
+
+It reverted, on the deployed service only (`origin/main` is intact; `40c3c44b`
+and `2aa30b7a` remain ancestors of main):
+
+| path | lines | matters? |
+|---|---|---|
+| `syndicate/features/shared/memory_observability.py` | **-10** | **YES, code** |
+| `.syndicate/{deploys,learnings,log/2026-08-16,state}` | -229 | no, inert on a service |
+
+The code is the smaps-vs-cgroup **reconciliation guard** (`cgroup_anon_mb`,
+`reconciles_within_pct`, `reconciles`) — removed from the one service that is
+OOM crash-looping (`#449`), while `#449` was open.
+
+**WHY A PLAIN RE-MERGE WILL NOT FIX IT.** The bad merge recorded the removals as
+INTENTIONAL EDITS on the live side. A fresh `merge-tree` therefore sees "live
+changed, main did not" and preserves the deletion. Re-merging returned
+`deletions=239` a second time. The five paths must be restored from `main`
+EXPLICITLY, which is what `d9088741` does.
+
+**THE FIX IS BUILT AND PUSHED: `d9088741` on branch `deploy/rw-converge-fix`.**
+It descends from live `7c2b1a17`, restores the five paths from main, keeps the
+three LIVE-wins resolutions (0 lines lost), and asserts `deletions vs the main
+parent == 0`. **It is deliberately NOT deployed — it is to ride the next
+refresh-worker ship, not to justify one of its own.** Whoever ships next: base on
+`d9088741`, not on `7c2b1a17`.
+
+**THE ASSERTION THAT CATCHES THIS CLASS, and nothing else does:**
+
+    DEL=$(git diff --numstat "$MAIN" "$SHA" | awk '{d+=$2} END {print d+0}')
+    [ "$DEL" -eq 0 ] || refuse
+
+Ancestry checks, conflict-marker scans and the `render.yaml` guard ALL PASSED on
+the broken commit. Only counting deletions against the main parent sees it.
+And resolve `origin/main` EXACTLY ONCE per build — never re-read a symbolic ref
+in a later call.

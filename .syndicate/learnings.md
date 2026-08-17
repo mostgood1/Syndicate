@@ -3516,3 +3516,52 @@ proven otherwise:
 Verify a surprising ledger result with a SECOND tool before acting on it; in this
 session every one of the three was caught that way and none by re-reading the
 output.
+## 2026-08-17 — FORBIDDEN: deploying `main`'s TREE to a service that runs a curated deploy branch
+
+Every one of the three services held commits `main` had never received —
+live-odds-worker 21, web 52, refresh-worker 40. Deploying main's tree would have
+reverted all of them, silently, in the name of "shipping the pending work".
+
+**The tell is per-file, and it is cheap:** for each conflicted path compute
+`live-only` and `main-only` line counts. **`main-only == 0` means production is
+AHEAD there** and taking main is a revert. Measured tonight on
+`refresh_nba_oddsapi_props.py`, `refresh_wnba_oddsapi_props.py` and
+`test_win_prob_null_counter.py` — three files, on two separate services, where
+the obvious move was the wrong one.
+
+**THE RULE.** Converge with a real merge commit (two parents) cut on the
+service's own live SHA. Resolve each conflict by MEASURING which side is ahead,
+never by preferring a branch. Then verify on the merged tree BEFORE pushing:
+the live-wins files lose 0 lines, no conflict markers survive, and `render.yaml`
+is byte-identical to live.
+
+**Use `git merge-tree --write-tree`, not `read-tree -m`.** `read-tree -m` is a
+trivial merge: it flagged 12 paths where either side changed, including files
+that needed CONTENT merging, and picking a side there would have dropped the
+other side's work. `merge-tree` does real 3-way content merges and found 6 true
+conflicts. It also needs no worktree, which matters here because `git worktree
+add` fails outright on this repo.
+
+**One apparent loss was a supersession, and checking cost two minutes:**
+`wnba/cards.py` "lost" 7 lines that turned out to be an inline `american_price`
+clamping to `[0.02, 0.98]`, which main deliberately replaced. Do not report a
+diff as a regression before reading what the lines say.
+
+## 2026-08-17 — FORBIDDEN: gating a deploy on "no jobs running" for a continuously-busy worker
+
+live-odds-worker's idle window is **under 25 seconds** and appeared once in an
+hour of polling. Waiting for `jobs == 0` there is waiting for a condition that
+effectively never holds, and a 90s poll steps straight over it.
+
+**Worse, the gate measures the wrong moment.** Render BUILDS first and stops the
+service after (`build_started 21:13:49 -> build_ended 21:18:29 -> live 21:21:05`).
+What dies is whatever runs at the STOP, ~5 minutes after the trigger — not what
+preflight saw when you fired.
+
+**THE RULE.** Gate on the EXPENSIVE job, not on all jobs. On refresh-worker that
+is `run_mlb_daily_sim_job`: a killed odds refresh re-runs in minutes, a killed
+MLB sim can run long with no ETA and the board depends on it. Gating on "no MLB
+sim" caught a window in 35 seconds that "no jobs" would have waited for
+indefinitely. And have the poller watch the BASE too — refresh-worker moved
+`fdc72dd0 -> 94447830` mid-build, which silently invalidates a pushed branch.
+

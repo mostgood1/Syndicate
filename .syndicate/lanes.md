@@ -3008,3 +3008,19 @@ Inventing one is how two numbers that should agree start disagreeing.
   (2) instrument the `_build_sport_overview` / `_emit` boundary the way
   `board_contract_end` instrumented the builder's return, since that split is now
   the whole remaining question; (3) only then touch the floors.
+#### PHASE 1C — **VERIFIED IN PRODUCTION 2026-08-17 00:11:36Z.** Lane goal met.
+- The lane's pre-registered outcome, met exactly: `FIXTURE_CADENCE sport=soccer
+  league=mls due:imminent_handoff_to_t_window:1107s` against `championship` /
+  `la_liga` / `primeira_liga` all `skip:mid:18-19h_out`, plus `scope=league
+  due=mls of=4` and a live process carrying `--soccer-leagues mls`.
+- Shipped as part of a three-service CONVERGENCE (live-odds-worker `c348da53`,
+  web `763a2f66`, refresh-worker `7c2b1a17`), each a real merge on its own live
+  SHA. 303 tests passed pre-deploy; 0 tracebacks post-deploy.
+- **Falsification test did NOT fire:** per-league resolution did reach distinct
+  tiers, so league granularity WAS the missing term.
+- **Still open in this lane's neighbourhood, NOT done:** soccer live sims. A live
+  MLS match serves 321 rows / 5 projections / 0 live_aware. `#440`'s Phase 3 has
+  no soccer item at all. That is a plan defect, recorded in `state.md`.
+- **Found while deploying, unrelated to this lane:** `#449` refresh-worker OOM
+  loop (23 kills / 8 hours). `#447` red layer2 wiring tests. `#448` unattended
+  scheduled tasks wedging deploy claims.
