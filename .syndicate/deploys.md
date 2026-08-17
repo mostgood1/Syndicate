@@ -12357,3 +12357,73 @@ paths forward, none of which the coordinator should choose alone:
 **Not touched:** the env keys. Changing another lane's flags to make a deploy fit
 is exactly the silent config drift this ledger keeps warning about, and
 `render.yaml` already differs from live env here.
+
+## 2026-08-17 — P1 ROOT CAUSE: **the MLB sim has NO position-player substitution model**
+
+Lane `convergence-phase7-crps`. Read-only diagnosis, no code changed yet.
+
+### Re-derived the bias first (a handed-down baseline expires)
+
+`[measured 2026-08-17, n=2,495 lineup player-games, 12 dates, production artifacts]`
+
+    ab_mean   model 4.006   actual 3.495   bias +0.511  = +14.6%
+    pa_mean   model 4.574   actual 3.822   bias +0.753  = +19.7%  (PA approx ab+bb, so CONSERVATIVE)
+
+Close to `plan_2026-08-14_models.md`'s +17.2% / +18.4%. **That baseline holds.**
+
+### Two diagnostics that localise it, and one falsified hypothesis
+
+**BY LINEUP SLOT — FLAT.**
+
+    slot 1 +0.459   slot 4 +0.479   slot 7 +0.520
+    slot 2 +0.505   slot 5 +0.492   slot 8 +0.631
+    slot 3 +0.506   slot 6 +0.541   slot 9 +0.484
+
+**This rules out a player-level cause.** Bad per-hitter rate estimates would vary
+by slot — leadoff and #8 hitters have very different profiles. Every slot is
+~+0.5 AB.
+
+**BY SIDE — FLAT, and this FALSIFIES the obvious hypothesis.**
+
+    HOME +0.478   AWAY +0.535   (home minus away = -0.057)
+
+I predicted the cause was the sim batting the home team in the bottom of the 9th
+when it is already leading (~45% of home games). **Wrong.** That would make HOME
+bias far larger; it is if anything SMALLER.
+
+### THE CAUSE, from code `[from-code]`
+
+**`vendor/mlb_bettingv2/sim_engine/simulate.py` contains exactly ONE reference to
+`bench`, and it builds a profile-lookup cache.** There is **no pinch-hitting, no
+defensive replacement, no double-switch, no substitution of any kind.** The nine
+listed starters bat all game, every game.
+
+Real games substitute 2–4 position players per team. A starter pulled in the 7th
+loses ~1 AB; spread over 9 slots that is ~+0.5 AB of phantom opportunity —
+**uniform across slots and across sides, which is exactly the measured
+signature.**
+
+### Why this matters beyond one number
+
+**Every counting prop inherits it.** hits, total_bases, RBI, runs are all
+`rate x opportunity`, and opportunity is inflated ~15% for every batter. This is
+the single largest measured error in the engine and it is a MISSING MECHANIC,
+not a mis-tuned parameter.
+
+### It converges with P2, which was not expected
+
+The fix needs to know **who** gets substituted (player-level: platoon splits,
+defensive profile, whether this player is usually pulled) and **when** (team-level:
+manager tendency). **That is the same `data/manager/manager_tendencies.json` that
+DOES NOT EXIST and whose loader silently returns `{}`** — the artifact P2 needs
+for pitching hooks. **P1 and P2 are the same missing artifact seen from two
+sides.**
+
+### Next
+
+1. Fit substitution rates from `feed_live` pbp (618+105 files) — P(removed | slot,
+   inning, score state, platoon).
+2. Apply as an opportunity haircut first (cheap, testable) before building full
+   in-sim substitution.
+3. Re-run `grade_mlb_hitter_props_vs_market.py`. The measured gap to close is
+   **0.0015–0.010 Brier**.
