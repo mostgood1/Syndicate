@@ -13099,3 +13099,62 @@ only reason any of them were caught.
 - **Bench selection is a known simplification**: next-available, not by position
   or platoon. It models the opportunity loss, not the identity of the
   replacement.
+
+## 2026-08-17 — P2 RE-PROJECTION SCORED AGAINST THE MARKET: **3 of 4 markets improve, 1 REGRESSES, and the market still wins all four**
+
+Lane `convergence-phase7-crps`. `scripts/reproject_mlb_props_with_subs.py`.
+45 games x 120 sims **per arm**, 2,415 scored rows. Read-only, no deploy.
+
+**This is the measurement P2 existed to produce.** Both arms are the SIM'S OWN
+empirical distribution over identical seeds and rosters, differing in exactly one
+input (`position_substitutions`). No binomial assumption, no rescaling of
+production's published numbers — the earlier haircut work could not answer this
+because it scored production's projections, which an undeployed engine change
+does not touch.
+
+| market | n | base | subs OFF | subs ON | market | effect |
+|---|---|---|---|---|---|---|
+| batter_hits | 659 | 0.592 | 0.24404 | 0.24195 | **0.23077** | +0.00209 better |
+| batter_rbis | 663 | 0.312 | 0.22211 | 0.21638 | **0.20959** | +0.00573 better |
+| batter_runs_scored | 651 | 0.410 | 0.23974 | 0.23828 | **0.23377** | +0.00146 better |
+| batter_total_bases | 442 | 0.423 | 0.26177 | 0.26331 | **0.24510** | **−0.00154 WORSE** |
+
+### The honest reading
+
+**Substitution helps 3 of 4 and hurts 1.** The gains are small (+0.0015 to
++0.0057) and **no arm beats the market in any market.** P2 improved the engine;
+it did not produce an edge.
+
+**TOTAL BASES REGRESSED, and the likely cause is a known simplification I
+shipped.** Bench selection is **next-available** — not by position, not by
+platoon. Total bases is power-weighted, so replacing a starter with an arbitrary
+bench bat distorts the upper tail more than the lost opportunity corrects. Hits
+and runs are less sensitive to WHO the replacement is; total bases is the market
+where the identity of the substitute matters most. **That is a falsifiable
+explanation and it is the obvious next thing to fix.**
+
+### THE SMOKE RUN OVERSTATED THE EFFECT BY ~3x — do not quote it
+
+A 12-game / 60-sim smoke showed hits **+0.00700** and runs **+0.00744**. The full
+45-game / 120-sim run shows **+0.00209** and **+0.00146**. Same code, same
+method, 3x smaller effect. **The smoke numbers were small-sample noise** and
+would have been a materially misleading result to report. Recording this because
+the temptation to publish the first encouraging number is exactly what the
+session's other corrections were about.
+
+### Where P2 stands
+
+- **Opportunity defect: 34.3% closed**, measured on the engine `[earlier entry]`.
+- **Accuracy: improved on 3 of 4 prop markets, regressed on 1.**
+- **Edge: none.** The market wins all four, by 0.0045 to 0.0182 Brier.
+- **Flag remains OFF.** Nothing is deployed and nothing should be until the
+  total-bases regression is understood — shipping a change that is known to make
+  one live market worse is not defensible on a 3-of-4 record.
+
+### Next, in order
+
+1. **Platoon/position-aware bench selection.** Directly targets the one
+   regression, and is the difference between modelling the opportunity loss and
+   modelling the substitution.
+2. Re-run this script. It is now a one-command scoreboard for any engine change.
+3. Only then consider a deploy request, with the total-bases row non-negative.
