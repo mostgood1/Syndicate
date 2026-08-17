@@ -12656,3 +12656,58 @@ in-sim substitution that removes a batter at a specific inning, which is P2.
    different axis from slot rather than a refinement of it.
 2. **In-sim substitution** driven by per-manager tendencies (managers differ
    1.68x). That is the only thing that can model WHEN a batter is removed.
+
+## 2026-08-17 — SCORE-STATE (MARGIN-BAND) CONDITIONING: **helps 3/3, and the direction is the OPPOSITE of what I predicted**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_opportunity_haircut.py`, four arms
+fitted on the same TRAIN rows and scored on the same HELD-OUT dates.
+
+### A constraint that shaped the design
+
+**Score state is a LIVE variable and is unknown when a projection is made**, so
+it cannot be conditioned on directly — a pregame haircut cannot know a team will
+end up trailing. The implementable proxy is the **projected margin** from the
+batter's own team's view, which IS known pregame. Stated in the code because it
+is a substitution for the measured quantity, not the quantity itself.
+
+### Fitted bands (TRAIN)
+
+    underdog  0.9220  (-7.8%)   n=310     <- LEAST haircut
+    even      0.8745 (-12.6%)   n=587
+    favorite  0.8627 (-13.7%)   n=305     <- MOST haircut
+
+**I PREDICTED THE OPPOSITE.** The substitution data shows pinch-hits 2.7:1 when
+TRAILING, so I expected underdogs to lose the most opportunity. **Favorites lose
+more.**
+
+**Why, and it was in the same table I read:** defensive substitutions run
+**2.5:1 when LEADING** (231 vs 94). Favorites build leads, then rest starters and
+make defensive replacements. I weighted the pinch-hit signal and ignored the
+defensive-sub signal of comparable size pointing the other way. **Fourth
+falsified prediction today; each one localised something.**
+
+### HELD-OUT result
+
+| family | n | flat | slot | band | **BOTH** | market | best − flat |
+|---|---|---|---|---|---|---|---|
+| hits | 515 | 0.24875 | 0.24755 | 0.24762 | **0.24703** | 0.23604 | +0.00172 |
+| runs | 503 | 0.22356 | **0.22352** | 0.22378 | 0.22456 | 0.22478 | +0.00004 **BEATS MARKET** |
+| total_bases | 412 | 0.25953 | 0.25669 | 0.25740 | **0.25524** | 0.23855 | +0.00428 |
+
+**Conditioning helps 3 of 3 over flat.** `BOTH` (slot x band, composed
+multiplicatively around the flat scalar) is best on hits and total_bases; `slot`
+alone is best on runs. All arms still beat the market on runs.
+
+**Cumulative on `total_bases`: 0.26518 baseline → 0.25524 → 37% of the gap to
+market closed.**
+
+### THE HONEST CEILING
+
+The increments are shrinking fast: flat bought +0.0057 on total_bases,
+slot +0.0028, band-on-top +0.0016. **Rescaling opportunity is close to
+exhausted** — remaining gaps are 0.0110 (hits) and 0.0167 (total_bases).
+
+**No further haircut axis is worth adding.** What remains needs in-sim
+substitution that removes a batter at a specific INNING — a haircut scales
+opportunity and structurally cannot know when the removal happened. That is P2,
+and per-manager tendencies (managers differ 1.68x) are its input.

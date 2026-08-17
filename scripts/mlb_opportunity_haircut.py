@@ -59,6 +59,22 @@ FAMILIES = {
 BUCKET_RE = re.compile(r"^(?P<fam>[a-z_]+?)_(?P<k>\d+)plus$")
 
 
+def margin_band(margin: float | None) -> str:
+    """Projected margin from the batter's own team's view, coarsely banded.
+
+    Three bands, not more: each must carry enough TRAIN rows to fit a ratio
+    that is not noise. `unknown` is its own band and falls back to the flat
+    scalar -- absent must never silently join a band it did not earn.
+    """
+    if margin is None:
+        return "unknown"
+    if margin <= -0.5:
+        return "underdog"
+    if margin >= 0.5:
+        return "favorite"
+    return "even"
+
+
 def binom_at_least(n_trials: float, p: float, k: int) -> float:
     """P(X >= k) for X ~ Binomial(round(n), p). Exact, no Normal approximation.
 
@@ -140,6 +156,7 @@ def main() -> int:
     # tests whether correcting that actually buys anything on the scoreboard.
     ratios = []
     ratios_by_slot: dict[int, list[float]] = defaultdict(list)
+    ratios_by_band: dict[str, list[float]] = defaultdict(list)
     rows_by_date: dict[str, list] = defaultdict(list)
     for date in dates:
         try:
@@ -149,6 +166,23 @@ def main() -> int:
             continue
         seen = set()
         for game in payload.get("outputs") or []:
+            # PROJECTED margin, from the batter's own team's perspective.
+            #
+            # Score state is a LIVE variable and is unknown when a projection is
+            # made, so it cannot be conditioned on directly. What IS known
+            # pregame is who is expected to be behind -- and the substitution
+            # data says managers pinch-hit 2.7:1 when trailing and make
+            # defensive replacements 2.5:1 when leading `[measured, 618 games]`.
+            # So the projected margin is the pregame-available proxy for the
+            # live signal. Stated because this is a substitution, not the
+            # measured quantity itself.
+            full = (game or {}).get("full") or {}
+            h_m, a_m_runs = full.get("home_runs_mean"), full.get("away_runs_mean")
+            home_name = str(game.get("home") or "").strip()
+            away_name = str(game.get("away") or "").strip()
+            proj_margin = None
+            if isinstance(h_m, (int, float)) and isinstance(a_m_runs, (int, float)):
+                proj_margin = float(h_m) - float(a_m_runs)
             for bucket, entries in ((game or {}).get("hitter_props_likelihood_topn") or {}).items():
                 m = BUCKET_RE.match(str(bucket))
                 if not m or not isinstance(entries, list):
@@ -163,7 +197,16 @@ def main() -> int:
                     ab_m = r.get("ab_mean")
                     if not name or not isinstance(ab_m, (int, float)) or ab_m <= 0:
                         continue
-                    rows_by_date[date].append({"name": name, "fam": fam, "k": k, "row": r})
+                    team = str(r.get("team") or "").strip()
+                    own_margin = None
+                    if proj_margin is not None and team:
+                        if team == home_name:
+                            own_margin = proj_margin
+                        elif team == away_name:
+                            own_margin = -proj_margin
+                    band = margin_band(own_margin)
+                    rows_by_date[date].append({"name": name, "fam": fam, "k": k,
+                                               "row": r, "band": band})
                     if date in train_dates and (date, name) not in seen:
                         a = actuals.get((date, name))
                         ab_a = col(a, "ab") if a else None
@@ -174,6 +217,7 @@ def main() -> int:
                             slot = r.get("lineup_order")
                             if isinstance(slot, (int, float)) and 1 <= int(slot) <= 9:
                                 ratios_by_slot[int(slot)].append(ratio)
+                            ratios_by_band[band].append(ratio)
     if not ratios:
         print("no train ratios")
         return 1
@@ -185,6 +229,9 @@ def main() -> int:
     slot_haircut = {s: (statistics.fmean(v) if len(v) >= MIN_SLOT_N else haircut)
                     for s, v in ratios_by_slot.items()}
     slot_n = {s: len(v) for s, v in ratios_by_slot.items()}
+    band_haircut = {b: (statistics.fmean(v) if len(v) >= MIN_SLOT_N else haircut)
+                    for b, v in ratios_by_band.items()}
+    band_n = {b: len(v) for b, v in ratios_by_band.items()}
 
     print("=" * 92)
     print("P1 — OPPORTUNITY HAIRCUT, scored against the market")
@@ -239,9 +286,16 @@ def main() -> int:
             slot = r.get("lineup_order")
             cut_slot = slot_haircut.get(int(slot), haircut) \
                 if isinstance(slot, (int, float)) else haircut
+            band = item.get("band", "unknown")
+            cut_band = band_haircut.get(band, haircut)
+            # slot x band combined, multiplicatively around the flat scalar so
+            # the two corrections compose instead of one overwriting the other
+            cut_both = haircut * (cut_slot / haircut) * (cut_band / haircut)
             p_base = binom_at_least(ab_m, rate, k)
             p_cut = binom_at_least(ab_m * haircut, rate, k)
             p_slot = binom_at_least(ab_m * cut_slot, rate, k)
+            p_band = binom_at_least(ab_m * cut_band, rate, k)
+            p_both = binom_at_least(ab_m * cut_both, rate, k)
             prod = None
             for key, val in r.items():
                 if isinstance(key, str) and isinstance(val, (int, float)) \
@@ -251,6 +305,8 @@ def main() -> int:
             scored[fam]["baseline"].append(brier_score(p_base, outcome))
             scored[fam]["haircut"].append(brier_score(p_cut, outcome))
             scored[fam]["slot"].append(brier_score(p_slot, outcome))
+            scored[fam]["band"].append(brier_score(p_band, outcome))
+            scored[fam]["both"].append(brier_score(p_both, outcome))
             scored[fam]["market"].append(brier_score(fair[0], outcome))
             if prod is not None:
                 scored[fam]["production"].append(brier_score(prod, outcome))
@@ -265,8 +321,15 @@ def main() -> int:
         return 1
 
     print("\nRESULTS on HELD-OUT dates — Brier, lower is better\n")
-    header = (f"  {'family':13s} {'n':>5s} {'baseline':>9s} {'flat':>9s} {'SLOT':>9s} "
-              f"{'market':>8s}   slot vs flat")
+    print("  MARGIN-BAND haircut fitted on TRAIN (pregame proxy for score state):")
+    for b in ("underdog", "even", "favorite", "unknown"):
+        if b in band_haircut:
+            fb = "  <- fallback" if band_n.get(b, 0) < MIN_SLOT_N else ""
+            print(f"    {b:9s}: {band_haircut[b]:.4f} "
+                  f"({(band_haircut[b] - 1) * 100:+5.1f}%)  n={band_n.get(b, 0):4d}{fb}")
+    print()
+    header = (f"  {'family':13s} {'n':>5s} {'flat':>9s} {'slot':>9s} {'band':>9s} "
+              f"{'BOTH':>9s} {'market':>8s}   best vs flat")
     print(header)
     print("  " + "-" * (len(header) + 4))
     out_rows = []
@@ -279,18 +342,21 @@ def main() -> int:
         b_base = statistics.fmean(cells["baseline"])
         b_cut = statistics.fmean(cells["haircut"])
         b_slot = statistics.fmean(cells["slot"])
+        b_band = statistics.fmean(cells["band"])
+        b_both = statistics.fmean(cells["both"])
         b_mkt = statistics.fmean(cells["market"])
         b_prod = statistics.fmean(cells["production"]) if cells["production"] else None
-        delta = b_cut - b_slot   # positive = slot-conditioning HELPED
+        best = min(b_slot, b_band, b_both)
+        delta = b_cut - best   # positive = conditioning HELPED over flat
         note = f"{delta:+.5f}" + ("  better" if delta > 0 else "  worse")
-        if b_slot < b_mkt:
+        if best < b_mkt:
             note += "  ** BEATS MARKET **"
         out_rows.append({"family": fam, "n": len(outs), "base_rate": base_rate,
-                         "baseline": b_base, "haircut_flat": b_cut,
-                         "haircut_slot": b_slot, "market": b_mkt, "production": b_prod,
-                         "slot_minus_flat": delta})
-        print(f"  {fam:13s} {len(outs):5d} {b_base:9.5f} {b_cut:9.5f} {b_slot:9.5f} "
-              f"{b_mkt:8.5f}   {note}")
+                         "baseline": b_base, "flat": b_cut, "slot": b_slot,
+                         "band": b_band, "both": b_both, "market": b_mkt,
+                         "production": b_prod, "best_minus_flat": delta})
+        print(f"  {fam:13s} {len(outs):5d} {b_cut:9.5f} {b_slot:9.5f} {b_band:9.5f} "
+              f"{b_both:9.5f} {b_mkt:8.5f}   {note}")
 
     print("\n  `baseline` and `HAIRCUT` differ in ONE thing: the opportunity. Both are")
     print("  recomputed binomially from the engine's own per-AB rate, so the comparison")
