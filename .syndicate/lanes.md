@@ -3155,3 +3155,44 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 **65 tests, 5 of 5 mutations caught** (default-to-1.0 on a miss, extras reusing the 9th, `leverage_source` dropped, margin not clipped, margin sign inverted).
 
 **WHAT IS STILL NOT TRUE, and it travels on the record:** these are LEAGUE-AVERAGE values under i.i.d. innings, one shared run distribution, no team or park term, extras as a constant, and a start-of-game WE of 0.500 against a published ~0.540 — that gap IS the omitted home-field advantage. Wrong for a specific matchup. **Also unchanged: no production slate has run through `game_shape` for any sport. n = 0 remains n = 0.**
+
+### convergence-phase5-profile-seam — OPEN — opened 2026-08-17 — session: sim-scheduling
+- **Goal (single testable outcome):** the three engines that have a calibration
+  profile resolve it through `load_versioned_profile` instead of reading their
+  in-source constant directly — and behaviour is **byte-for-byte unchanged**
+  while no artifact exists. That turns every later calibration into a file swap
+  and every rollback into a file revert.
+- **Files (collision check RUN 2026-08-17 against all OPEN lanes: ALL CLEAR):**
+  - `syndicate/features/football/sim_engine/smartsim2/calibration_profile.py`
+    (`NFL_CALIBRATION_PROFILE`, line 121)
+  - `syndicate/features/soccer/sim_engine/soccersim/calibration_profile.py`
+    (`SOCCER_CALIBRATION_PROFILE`, line 117)
+  - `syndicate/features/nhl/sim_engine/hockeysim/calibration_profile.py`
+    (`NHL_CALIBRATION_PROFILE`, a `SimConfig`, line 25; plus `build_nhl_sim_config`)
+  - `tests/test_convergence_profile_seam.py` (NEW)
+- **Why this phase and not another:** Part 4's chain is seam(5) -> attribution(6)
+  -> instrument(7) -> change(8) -> policy(9), and "running them out of order
+  produces changes nobody can attribute". Phases 6 and 7 touch the two seams the
+  plan says need an owner agreed with the betting-engine track first
+  (`shared/intelligence_evaluation.py`, the prediction ledger write path).
+  **Phase 5 touches neither.**
+- **Hypothesis:** `load_versioned_profile` is already generic enough to serve all
+  three shapes (two `CalibrationProfile` dataclasses and one `SimConfig`)
+  unchanged — its own tests exercise exactly that.
+- **Falsification test:** if wiring any of the three requires CHANGING
+  `calibration_profile_store.py`, then the store is not the generic seam it was
+  built to be, and Phase 5 should stop and re-scope rather than bend the store to
+  fit one engine.
+- **Verification (both halves — the second is the one that matters):**
+  1. **No behaviour change:** with no artifact present, the resolved profile
+     `==` the in-source default for each engine.
+  2. **REACHABILITY, not presence:** assert each engine actually calls the
+     loader. `load_versioned_profile` has been callable by nothing but its own
+     test since it was built — *"this is Stage 3's entire foundation, complete and
+     unreachable"*. A Phase 5 that adds a call site nothing reaches would
+     reproduce the exact defect it exists to fix.
+- **Blocked by:** none. Deliberately NOT touching Phase 2/2b files
+  (`live_refresh_loop.py`, `run_refresh_worker.py`) — those are held by
+  `refresh-worker-oom-recurrence`.
+- **Interleaving constraint from the plan:** do not run Phase 8 inside Phase 1's
+  measurement window. Phase 5 changes no output, so it is unaffected.
