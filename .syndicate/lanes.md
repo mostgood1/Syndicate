@@ -3012,3 +3012,48 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 **13 tests green. Full WNBA suite: 405 passed, 4 failed — all 4 PRE-EXISTING**, verified by re-running against `origin/main`'s `cards.py` (4 fail there too). My one real regression was the `pbp_recent` gap and it is closed.
 
 **NOT DEPLOYED.** No deploy requested. The fix changes what a live endpoint serves; it needs a web deploy to take effect, and that is a decision, not a formality.
+
+### score-live-gameline-edges — UPDATE 2026-08-17 01:0xZ — **ROUTE 3 IS DEAD. The sample cannot be pulled, and the reason is now measured, not assumed.**
+- **Route 3 ("pull a copy and score offline, needs no deploy") DOES NOT EXIST.**
+  Checked all three ways in:
+  1. `find`/glob for `**/live_gameline_ledger/*.jsonl` anywhere in the checkout:
+     **no files**. There is no git-tracked mirror of this ledger.
+  2. `/api/ops/artifacts/export?pattern=mlb_source/data/live_gameline_ledger/*`
+     → `count 0, bytes 0`.
+  3. `/api/ops/artifacts/stream?path=...` → both endpoints gate on
+     `is_hot_artifact_relative_path`, and the ledger matches **zero** patterns.
+     Both also read the SERVING service's disk, which never has the worker's file
+     regardless of the allowlist.
+- **AND THE RETROSPECTIVE SHORTCUT IS ALSO DEAD — this is the load-bearing new
+  measurement.** Read at 01:02:26Z with `by_state {final: 14, live: 1}`:
+  **rows carrying a `live_gameline.model_prob` = `{live: 12}`, and NOTHING for
+  the 14 final games.** A finished game retains no model probability on the
+  served board at all. So the day's projections are *only* in the ledger; there
+  is no way to reconstruct them after the fact from any served surface. **That is
+  precisely why the ledger exists, and why publishing it is not optional.**
+- **THE BLOCKER IS ONE FILE, AND ITS CLAIM IS CURRENT — I re-read it and
+  corrected myself.** `clv-without-settlement` says at one point *"Handed back:
+  lane left OPEN and unclaimed... `artifact_publisher.py` is free"* — but a
+  LATER block in the same lane re-claims it: *"Files (exclusive to this lane):
+  `syndicate/features/shared/artifact_publisher.py`"*. Line order settles it
+  (718 vs 751): the claim is the newer statement. **NOT taken.** Its session is
+  not in the live roster, so it is unowned but still claimed.
+- **Remaining routes, in preference order:**
+  1. **Publish the ledger** — add its pattern to `HOT_ARTIFACT_PATTERNS`, deploy
+     refresh-worker (the publisher runs there), wait one publish cycle, pull,
+     score. Needs `artifact_publisher.py` → needs the claim released.
+  2. **Score worker-side and ride an artifact that is ALREADY published.** The
+     `book_grid` artifact already carries a `live_gameline_ledger` counters block
+     and is already published to web. A `live_gameline_score` block alongside it
+     needs no new publish pattern and no `artifact_publisher.py`. **This is the
+     route that avoids the collision entirely** and is the recommended one.
+  3. Prospective capture: poll the board and build a parallel sample. Works with
+     no deploy, but duplicates a ledger that already functions correctly — the
+     problem is transport, not collection.
+- **NOT STARTED, deliberately.** Either surviving route is deploy-and-wait
+  (edit → refresh-worker deploy → publish cycle → pull → score). Beginning that
+  chain without the budget to finish and verify it would leave a half-applied
+  change on a shared worker, which is the failure mode this ledger's own lane
+  already paid for once.
+- Next session's first action: pick route 1 or 2. If 1, the claim on
+  `artifact_publisher.py` must be released first.
