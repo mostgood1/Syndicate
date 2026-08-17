@@ -4677,3 +4677,43 @@ own lane. **It blocked a real fix indefinitely.** A lane opened by an unattended
 session is a lane no session can clear. Scheduled tasks should be told **not to
 open lanes** - the `wnba-game-cards-coverage-check` task carries that
 instruction for exactly this reason.
+
+## 2026-08-17 — RULE: score a DISTRIBUTIONAL forecast with a distributional baseline. A point test on a distribution is the wrong instrument, even when it agrees.
+
+**What happened.** Phase 7's whole purpose was to build a proper scoring rule for
+projections (CRPS, bias/dispersion). I built it, used it to find a real defect —
+the MLB F5 starter leash, dispersion 1.002 vs a 0.7979 target — and then decided
+whether the model had SKILL by comparing its **mean absolute error to a constant
+point prediction**. That verdict went into `state.md`.
+
+**Why that is wrong even though the conclusion survived.** A constant has no
+distribution; it cannot price `P(outs > 17.5)`, which is the only thing a prop
+model is for. And MAE is blind to calibration and sharpness — precisely the axis
+on which the sweep's headline result moved. The instrument I reached for could
+not see the finding I had just made with the other one.
+
+**The corrected test, and it came out HARDER.** CRPS skill vs climatology (the
+marginal empirical distribution): **−8.97% at the best leash value, −14.52% at
+production's.** Negative skill everywhere. The model prices these starts worse
+than the league-wide distribution of outs does. Shortening the leash reduces the
+damage and does not make it positive.
+
+**The generalisable rule.** Match the baseline's FORM to the forecast's form:
+- point forecast -> compare to the climatological mean (MAE/RMSE)
+- **distributional forecast -> compare to CLIMATOLOGY, with CRPS**
+- probability forecast -> compare to the base rate, with Brier, **and to the
+  market** where one exists
+
+**And the trap that makes this easy to miss: my wrong test AGREED with the right
+one.** Both said "loses to baseline". A confirming answer from the wrong
+instrument feels like evidence and is not — had the leash genuinely carried
+distributional skill, MAE-vs-constant would have hidden it and the model would
+have been written off on a metric that could not see its value. This is the
+`#428` lesson recurring: *"'No measured skill' would have been the WRONG
+conclusion and would have suppressed a model that needs calibrating rather than
+retiring."*
+
+**Corollary already biting:** the replay ran at 100 sims/game against production's
+1000, and a thin empirical PMF inflates CRPS. A distributional metric is
+sensitive to the ESTIMATOR of the distribution, not only to the distribution —
+so sim count is part of the measurement, not just part of the model.

@@ -11660,3 +11660,68 @@ change. This lane has already been burned twice by confounded measurements
 is in the two request files, this section, and `state.md` under "ODDS-SWEEP
 OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER".
 
+## 2026-08-17 — CORRECTION TO MY OWN PHASE 7 VERDICT: the skill test was the wrong instrument, and the real answer is WORSE
+
+Lane `convergence-phase7-crps`. Read-only re-scoring of data already on disk; no
+re-simulation, no deploy.
+
+### What I got wrong
+
+`sweep_starter_leash.py` decided "beats base" by comparing the model's **mean
+absolute error** to a **constant point prediction**, and on that basis `state.md`
+was told the MLB pitcher-outs model "loses to a constant baseline at every grid
+point". **That is a POINT-forecast test applied to a DISTRIBUTIONAL model**, and
+it is the wrong instrument twice:
+
+1. **A constant has no distribution.** It cannot price `P(outs > 17.5)` at all,
+   so it was never a competitor — the thing being sold is the distribution.
+2. **MAE cannot see the result the sweep actually found.** Dispersion moved
+   **1.002 → 0.791** against a 0.7979 target: the DISTRIBUTION improved
+   dramatically while MAE barely moved. The verdict rested on the one metric
+   blind to the finding.
+
+`model_scoring.crps_empirical` — the exact integrator for this — was already
+present and I did not use it for the baseline. Phase 7 built the instrument and
+then the verdict was taken with a different one.
+
+### The correct test: CRPS skill vs CLIMATOLOGY `[measured, 267 starts]`
+
+    skill = 1 - CRPS_model / CRPS_climatology
+    CRPS(climatology) = 2.1927   (marginal empirical distribution of outs, 22 support points)
+
+| leash | CRPS model | skill vs climatology |
+|---|---|---|
+| 0 | 2.3894 | **−8.97%** |
+| 3 | 2.4114 | −9.98% |
+| 4 | 2.4355 | −11.08% |
+| **5 (current)** | 2.5110 | **−14.52%** |
+| 6 | 2.8585 | −30.37% |
+
+**THE MODEL HAS NEGATIVE SKILL AT EVERY LEASH VALUE.** You would price these
+starts better using the league-wide marginal distribution of outs than using the
+sim. Shortening the leash reduces the damage (−14.52% → −8.97%) and **does not
+make it positive.**
+
+So the corrected reading is not softer than the original, it is **harder and
+better-founded**: the leash is a real defect worth fixing, and fixing it does not
+make this model useful for outs.
+
+### The baseline is deliberately HARD, stated rather than buried
+
+Climatology is computed **in-sample**, from the very actuals being scored, so it
+is fitted to the test set while the model is not. Beating it would have been a
+conservative result; losing to it is therefore not automatically damning.
+
+### THE ONE CONFOUND THAT COULD STILL MOVE THIS, and it is being measured
+
+**The replay ran at 100 sims/game; production MLB pregame uses 1000.** A 100-draw
+empirical PMF is a NOISY estimate of the model's own predictive distribution, and
+CRPS penalises that noise — so the model's true CRPS is better than 2.389 by an
+unmeasured amount. A 9-point deficit is unlikely to flip on this alone, but the
+size is unknown and **quoting the number without this caveat would overstate the
+case.**
+
+This is exactly `#440` **Phase 9** ("re-score the same slate at several sim
+counts and read where CRPS stops improving"), which Phase 7 exists to make
+measurable. Running now at leash {0, 5} x sims {100, 300, 1000}, 490,000
+game-sims. **Treat the table above as provisional until that lands.**
