@@ -72,3 +72,16 @@ coupling. Reverting restores the swallowed TypeError.
   per-league exception with no log line. **The user is adding that diagnostic print
   separately** — it is independent of this fix and worth landing, because it is what
   stops cover #2 hiding the next fault.
+
+
+---
+
+## CLOSED by the coordinator 2026-08-17 21:40Z — STEP 1 PASS
+
+Deployed to BOTH workers as you asked once the owner question resolved to `true`/`true`: live-odds-worker `7470939b`, refresh-worker `c6eb35c9`, each cut on its own live SHA.
+
+**Step 1 PASS: 7 leagues -> 10**, and the three that reappeared are exactly la_liga, primeira_liga and championship.
+
+**Step 2 INCONCLUSIVE, not failed** — every league reads `(0 live games)` because no match is in play. Owed on the next slate with soccer live.
+
+**Open, and not something I will assert:** refresh-worker emitted no soccer poll lines at all in the same window despite carrying the lens flag. The fix is PROVEN on one worker and merely PRESENT on the other.

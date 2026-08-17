@@ -11183,3 +11183,596 @@ It is not refuted here, only unmeasured.
 level, not the logic level. Its logic is right and its config is right; it is
 simply not on the path that launches sweeps. This is the fourth-plus instance of
 `presence != reachability` in this repo.
+
+## 2026-08-17 — WHY MLB LOSES ON PITCHER OUTS: **the engine barely differentiates starts, and what it does is uncorrelated with reality**
+
+Lane `convergence-phase7-crps`. `scripts/diagnose_mlb_outs_deficit.py` + a
+correlation read. Read-only, no deploy. **This answers "MLB is the most mature
+engine — if it is not helping, identify why."**
+
+### First, the mistake I made
+
+I published **−6.74% vs climatology** and moved on **without decomposing the
+bias**. The 2026-08-14 audit demands the opposite in as many words: *"'No
+measured skill' would have been the WRONG conclusion and would have suppressed a
+model that needs calibrating rather than retiring. ALWAYS decompose bias before
+publishing a skill verdict."* Same rule, same repo, ignored by me.
+
+### The decomposition (hold-out, split BY DATE so no game is in both halves)
+
+| leash | forecast | CRPS | skill vs climatology |
+|---|---|---|---|
+| 5 (production) | raw | 2.2423 | −12.31% |
+| 5 | + shift fitted on TRAIN | 2.1809 | **−9.23%** (+3.08 pp) |
+| 0 (best shape) | raw | 2.1637 | −8.37% |
+| 0 | + shift fitted on TRAIN | 2.1732 | **−8.85%** (−0.48 pp) |
+
+**At production's leash a scalar shift recovers 3.08 points; at the best leash it
+makes things WORSE.** That asymmetry is itself the finding: the leash imposes a
+*systematic* truncation a constant can correct, and once it is gone the residual
+bias is date-to-date NOISE, so fitting it just adds variance.
+
+### THE ROOT CAUSE `[measured, n=267, 1000 sims]`
+
+    corr(sim_mean, actual)  = +0.0485   (leash 0)   +0.0448 (leash 5)
+    sim_mean spread   sd    =  1.188 outs
+    actual spread     sd    =  4.061 outs      <- 3.4x wider
+    sim mean 17.21   actual mean 15.90         <- biased high
+
+**The engine predicts nearly the same thing for every start.** It varies its
+expectation by 1.19 outs across 267 starts while reality varies by 4.06, and that
+variation is **uncorrelated with the outcome (r = 0.05)**.
+
+So MLB's outs forecast is **a biased near-constant**. Climatology is an
+**unbiased** constant with the correct spread. That is the whole deficit, and
+**no calibration layer fixes an r of 0.05.**
+
+**Why the aggregate dispersion metric (0.791 vs a 0.798 target) looked healthy:**
+it scores `sd(actual − mean) / mean(sigma)`. The per-start SIGMA is about right
+(~5). It is the per-start MEAN that does not move. A well-calibrated width around
+an uninformative centre passes that check.
+
+**One real signal in it:** removing the leash raises differentiation by **21%**
+(sd 0.98 → 1.19). The leash WAS suppressing start-to-start signal — 1.19 against
+a required 4.06 is simply nowhere near enough for that to matter.
+
+### DO NOT GENERALISE THIS TO "MLB IS NOT HELPING"
+
+The **same engine's hitter props carry measured signal**: r = 0.13–0.16 across
+markets, and de-biasing flips 5 of 7 to beating a constant baseline
+`[measured 08-14]`. That is real conditional information.
+
+The finding is narrower and more useful: **the engine has signal on hitter props
+and essentially none on pitcher outs.** Outs is dominated by MANAGER HOOK
+BEHAVIOUR — a human decision — which a plate-appearance simulator has no
+information about. `#425`'s degeneracy detector exists for this failure mode;
+outs is near-degenerate without quite tripping it.
+
+### What follows
+
+1. **Do not ship a calibration profile for MLB outs.** It cannot work; r = 0.05.
+2. **Consider whether outs should be published at all**, or served as
+   `unmeasured` — `projection_skill` already treats that as first-class.
+3. **The leash fix remains worth having** (+5 pp of CRPS and +21% differentiation)
+   but must not be sold as making outs useful.
+4. **Raise the degeneracy detector's sensitivity**: a forecast whose spread is
+   3.4x narrower than the outcome's should be flagged before a human notices.
+5. **Hitter props are where MLB's signal is** — direct effort there.
+
+## 2026-08-17 — PRIORITY LOWERED on my own two requests, by my own evidence
+
+Lane `convergence-phase7-crps`. Coordinator notified. **Recorded here because a
+de-prioritisation that lives only in a chat message does not exist.**
+
+**The coordinator IS working the queue** — `2026-08-15T2350Z-smaps-reconciliation`
+moved to `done/`. No reply is owed to me. Queue now holds 4 requests, 2 mine.
+
+### Why I am lowering my own
+
+I argued `20025cc4` (ownership gate) should land before the 08-18 slate so the
+08-19 `outs-props-coverage-check` would be interpretable. **The target of that
+measurement has since been measured, and it does not justify a window.**
+
+`corr(sim_mean, actual) = +0.05` on MLB pitcher outs, sim spread sd 1.19 vs
+actual 4.06. The model is a biased near-constant. Grading it more precisely
+grades nothing.
+
+### Revised standing
+
+| request | was | now |
+|---|---|---|
+| `20025cc4` ownership gate | "before 08-18 slate" | **soft-soft. Slipping costs ~zero.** Still worth doing on its OWN merits — refresh-worker sweeps 3 sports it does not own, starves the designated owner, and the fix REDUCES OddsAPI spend. |
+| `bafb4fb2` monotone seal | zero urgency | unchanged; still best AFTER the 08-19 read |
+
+**Both drop below the two WNBA requests in the queue.**
+
+### What is NOT withdrawn, and why
+
+Neither request is cancelled and props capture is NOT worthless:
+- the seal and cadence capture **all** pitcher props, not just outs;
+- the same engine's **hitter** props carry real signal (r = 0.13–0.16, de-biasing
+  flips 5 of 7 markets);
+- **CLV needs those lines regardless of model skill.**
+
+Only the *outs-specific* justification evaporated. **Do not read this entry as
+"props capture was a mistake" — read it as "the urgency I attached to it was
+resting on a model that turned out to be uninformative."**
+
+## 2026-08-17 — THE FALSIFICATION TEST: **MLB hitter props LOSE to the market in every clean family**
+
+Lane `convergence-phase7-crps`. `scripts/grade_mlb_hitter_props_vs_market.py`.
+Production projections (`/api/ops/artifacts/stream`) x archived odds x
+`mlb_batter_game_log.csv`. 12 dates, 5,437 scored rows. Read-only, no deploy.
+
+**This is the measurement that decides whether the MLB improvement programme is
+worth starting.** Everything else this session scored against CLIMATOLOGY, which
+answers "does the engine know anything" and cannot answer "does it know
+something the PRICE does not".
+
+| family | n | base rate | model Brier | market Brier | gap |
+|---|---|---|---|---|---|
+| hits | 1529 | 0.574 | 0.24318 | **0.23315** | +0.0100 |
+| runs | 1442 | 0.372 | 0.23230 | **0.23081** | +0.0015 |
+| total_bases | 1161 | 0.427 | 0.24854 | **0.24188** | +0.0067 |
+
+**0 of 3 clean families beat the market.** Lower Brier is better; the market is
+better everywhere.
+
+**BUT THE GAPS ARE SMALL** — 0.0015 to 0.010 Brier. This is not a model with no
+information losing badly; it is a model with real information (r = 0.13–0.16)
+landing just behind the price. That distinction matters for what to do next.
+
+### TWO BUGS IN MY OWN SCRIPT, BOTH CAUGHT, ONE NEARLY SHIPPED AS A RESULT
+
+**1. THE FIRST RUN SAID "MODEL BEATS MARKET IN 3 OF 4 FAMILIES". IT WAS FALSE.**
+`FAMILIES` mapped StatsAPI spellings (`hits`, `totalBases`, `runs`) onto a CSV
+whose headers are `h`, `tb`, `r`. Every lookup missed, and the reader did
+`float(row.get(key) or 0)` — so **every outcome silently became 0.0**. With
+all-zero outcomes Brier reduces to `p^2`, so "beating the market" meant only
+"predicts smaller numbers". The tell was a **base rate of 0.000** on three
+families; `rbi` matched by coincidence, which is the only reason one family
+looked different and the bug was visible at all.
+
+**Fixed twice over:** `stat_value` now returns **None for an absent column,
+never 0.0**, and the reporter **REFUSES any family whose base rate is <=0.001 or
+>=0.999** as a broken join rather than scoring it.
+
+**2. `hits_runs_rbis` IS STILL BROKEN AND IS EXCLUDED, NOT REPORTED.** Its Brier
+(0.46207) equals its base rate (0.46207) to five decimals — the signature of
+predicting p≈0 on every row. The extractor matches probability fields by
+THRESHOLD (`_2plus`) without checking the FAMILY, so on an hrr bucket it can
+pick up `p_h_2plus` (hits) instead of the hrr field. The three clean families do
+not share this because their prefixes do not collide. **Do not quote the hrr
+row.**
+
+### WHAT THIS MEANS FOR THE PROGRAMME
+
+**The premise I was going to build the MLB plan on — "hitter props are where a
+beatable market and a working model overlap" — is HALF TRUE AND HALF FALSE.**
+
+- TRUE: props are soft-priced (0% sharp coverage vs 100% on game lines), and the
+  engine has real conditional signal there.
+- FALSE: that signal does not currently beat the price. Not in any clean family.
+
+**So the programme is not "scale an existing edge". It is "close a measured gap
+of 0.0015–0.010 Brier".** That is a different, more honest, and much more
+tractable framing — and the largest known error (`pa_mean` +18.4%, opportunity
+explaining 55% of count bias) is exactly the size of thing that could close it.
+
+**Nothing should be promoted or shipped on the strength of an edge, because
+none has been demonstrated.**
+
+### CAVEATS
+
+- 12 dates, June 2026, one park-season. Not a verdict on the engine for all time.
+- `model_raw` and `model_cal` are IDENTICAL in every family — production's
+  calibration layer is either identity on these rows or is not being read. Worth
+  a separate look; it means the `_cal` column proved nothing here.
+- Brier gaps of ~1e-3 on n~1,400 are a SCREEN, not proof. A paired test is owed
+  before anyone acts on the *magnitude*. The DIRECTION is consistent across
+  three independent families, which is what makes it usable.
+- 17,867 rows had no market and 18,664 were line mismatches — expected, since
+  buckets exist at many thresholds and books quote one line.
+
+
+## TRIAGE 2026-08-17 ~21:2xZ — the two requests filed during the deploy window
+
+### `2026-08-17T205500Z-soccer-live-lens-as-of` (`6bdc50de`) — **ACCEPTED, BOTH WORKERS, waiting on a window**
+
+- **SHA state corrected:** the request says "local `main`, **not pushed**". It is
+  pushed now — `6bdc50de` reached `origin/main` at 21:1xZ in the coordinator's
+  push. Nothing is blocked on git any more.
+- **The request asks "confirm the owner before deploying" — ANSWERED, and the
+  answer is BOTH.** Read live from the API:
+
+      refresh-worker     SYNDICATE_ENABLE_LIVE_LENS_LOOP = 'true'
+      live-odds-worker   SYNDICATE_ENABLE_LIVE_LENS_LOOP = 'true'
+
+  So the requester's own conditional applies: *"if both genuinely run it, both
+  need this or the fix is half-applied."* **This is a two-service deploy.**
+  (`MLB_ENABLE_LIVE_LENS_LOOP` differs — `false` / `true` — but that gates the
+  MLB lens, not the soccer poll, and does not change the answer.)
+- Severity is higher than its LOW label suggests: a `TypeError` behind
+  `if live_events:` means it is **silent on a quiet slate and total on a busy
+  one** — the three leagues that vanished were exactly the three with matches in
+  play. But the requester is right that it has been broken for as long as the
+  as-of change has been in, so hours do not matter.
+- **Held only for a window, per the requester's own instruction not to stack a
+  deploy on top of the 20:29-20:37Z one.**
+
+### `2026-08-17T2115Z-wnba-phase2-migration` (`e65a5531` + `c7494c6c`) — **HELD. Its staging is impossible as written.**
+
+Both SHAs verified on `main`. The code is fine. **The request cannot be executed
+the way it is designed, and executing it anyway would be the dangerous reading.**
+
+**1. THE FLAG IS ALREADY ON.** The request's whole safety design is *"Step 1 —
+deploy the code with the flag still OFF... Step 2 — only then set the flag,
+ideally in a window you can watch."* Read live:
+
+    live-odds-worker  SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN = 'true'
+
+So step 1 does not exist. **Deploying IS enabling**, immediately, unwatched, with
+no inert observation period. Whoever set the key in advance removed the staging
+without the request's author knowing.
+
+**2. THE INTERVAL IS HALF WHAT THE REQUEST ASSUMES.** It says "Interval defaults
+to 14400s (4h), matching soccer." Live:
+
+    SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS = '7200'   (2h)
+
+Twice the frequency the risk paragraph was written against — and the verify step
+says "allow up to one full interval (4h)", which is now the wrong window to wait.
+
+**3. THE MEMORY DOES NOT FIT, on the request's own numbers.** It states the WNBA
+refresh leg measures **~1.3–1.5 GB RSS**. Measured on live-odds-worker 21:15:29Z:
+
+    container_memory_mb 867.7 / 2048.0  (42.4%)   headroom 1,186.3 MB
+
+**1,186 MB of headroom against a 1,300–1,500 MB leg.** That is a predicted OOM,
+not a risk to monitor, on the 2 GB service whose history includes `#241`'s
+production restart loop. `phase="pregame"` excluding the sim leg is what the
+request offers as the safety margin, and it is not enough on this arithmetic.
+
+**Decision: not deployed. Returned to the lane with these three readings.** The
+paths forward, none of which the coordinator should choose alone:
+  a. set the flag to `false` first, then deploy inert exactly as the request
+     intends, and enable later in a watched window;
+  b. re-measure the leg — if 1.3–1.5 GB is stale or a peak rather than a
+     steady-state, the arithmetic changes;
+  c. re-home the autorun to refresh-worker (4 GB) instead.
+
+**Not touched:** the env keys. Changing another lane's flags to make a deploy fit
+is exactly the silent config drift this ledger keeps warning about, and
+`render.yaml` already differs from live env here.
+
+## 2026-08-17 — P1 ROOT CAUSE: **the MLB sim has NO position-player substitution model**
+
+Lane `convergence-phase7-crps`. Read-only diagnosis, no code changed yet.
+
+### Re-derived the bias first (a handed-down baseline expires)
+
+`[measured 2026-08-17, n=2,495 lineup player-games, 12 dates, production artifacts]`
+
+    ab_mean   model 4.006   actual 3.495   bias +0.511  = +14.6%
+    pa_mean   model 4.574   actual 3.822   bias +0.753  = +19.7%  (PA approx ab+bb, so CONSERVATIVE)
+
+Close to `plan_2026-08-14_models.md`'s +17.2% / +18.4%. **That baseline holds.**
+
+### Two diagnostics that localise it, and one falsified hypothesis
+
+**BY LINEUP SLOT — FLAT.**
+
+    slot 1 +0.459   slot 4 +0.479   slot 7 +0.520
+    slot 2 +0.505   slot 5 +0.492   slot 8 +0.631
+    slot 3 +0.506   slot 6 +0.541   slot 9 +0.484
+
+**This rules out a player-level cause.** Bad per-hitter rate estimates would vary
+by slot — leadoff and #8 hitters have very different profiles. Every slot is
+~+0.5 AB.
+
+**BY SIDE — FLAT, and this FALSIFIES the obvious hypothesis.**
+
+    HOME +0.478   AWAY +0.535   (home minus away = -0.057)
+
+I predicted the cause was the sim batting the home team in the bottom of the 9th
+when it is already leading (~45% of home games). **Wrong.** That would make HOME
+bias far larger; it is if anything SMALLER.
+
+### THE CAUSE, from code `[from-code]`
+
+**`vendor/mlb_bettingv2/sim_engine/simulate.py` contains exactly ONE reference to
+`bench`, and it builds a profile-lookup cache.** There is **no pinch-hitting, no
+defensive replacement, no double-switch, no substitution of any kind.** The nine
+listed starters bat all game, every game.
+
+Real games substitute 2–4 position players per team. A starter pulled in the 7th
+loses ~1 AB; spread over 9 slots that is ~+0.5 AB of phantom opportunity —
+**uniform across slots and across sides, which is exactly the measured
+signature.**
+
+### Why this matters beyond one number
+
+**Every counting prop inherits it.** hits, total_bases, RBI, runs are all
+`rate x opportunity`, and opportunity is inflated ~15% for every batter. This is
+the single largest measured error in the engine and it is a MISSING MECHANIC,
+not a mis-tuned parameter.
+
+### It converges with P2, which was not expected
+
+The fix needs to know **who** gets substituted (player-level: platoon splits,
+defensive profile, whether this player is usually pulled) and **when** (team-level:
+manager tendency). **That is the same `data/manager/manager_tendencies.json` that
+DOES NOT EXIST and whose loader silently returns `{}`** — the artifact P2 needs
+for pitching hooks. **P1 and P2 are the same missing artifact seen from two
+sides.**
+
+### Next
+
+1. Fit substitution rates from `feed_live` pbp (618+105 files) — P(removed | slot,
+   inning, score state, platoon).
+2. Apply as an opportunity haircut first (cheap, testable) before building full
+   in-sim substitution.
+3. Re-run `grade_mlb_hitter_props_vs_market.py`. The measured gap to close is
+   **0.0015–0.010 Brier**.
+
+## 2026-08-17 — P1 RESULT: **the opportunity haircut closes the gap in 3 of 3 families out-of-sample, and flips `runs` past the market**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_opportunity_haircut.py`. Read-only
+counterfactual, **no code changed in the engine, no deploy.**
+
+Haircut fitted on 6 TRAIN dates, scored on 7 HELD-OUT dates:
+**actual_AB / model_AB = 0.8837 (−11.6% opportunity).**
+
+| family | n | baseline | **HAIRCUT** | market | (production) | gap closed |
+|---|---|---|---|---|---|---|
+| hits | 515 | 0.25286 | 0.24875 | **0.23604** | 0.24965 | +0.00411 |
+| runs | 503 | 0.22603 | **0.22356** | 0.22478 | 0.22384 | +0.00247 **BEATS MARKET** |
+| total_bases | 412 | 0.26518 | 0.25953 | **0.23855** | 0.24489 | +0.00566 |
+
+**Every family improves, out-of-sample, from ONE fitted scalar.** `runs` crosses
+the market. That is the first time anything in this platform has beaten a price.
+
+### Why the comparison is trustworthy
+
+`baseline` and `HAIRCUT` differ in **exactly one thing** — the opportunity. Both
+are recomputed binomially from the engine's OWN per-AB rate
+(`h_mean / ab_mean`), so nothing else moved. Production's published number is
+shown as a REFERENCE, not the control, because it carries a different
+distributional assumption; comparing to it would confound two changes.
+
+Reassuringly, production (0.24965 on hits) sits close to my recomputed baseline
+(0.25286), so the binomial proxy is fair — and the haircut beats production too.
+
+### WHAT THIS DOES NOT ESTABLISH
+
+- **`runs` beats the market by 0.00122 on n=503.** That is a hair. **A paired
+  test is owed before anyone calls it an edge.** The DIRECTION being consistent
+  across three independent families is the usable part; this single crossing is
+  not.
+- **The remaining gaps are still large** — hits 0.0127, total_bases 0.0210. The
+  haircut closes roughly a quarter to a third. Opportunity is **a** cause, not
+  **the** cause.
+- One window, June 2026, 1,430 scored rows.
+- A flat scalar is a crude stand-in for substitution. It cannot know that a
+  particular batter was pulled in the 7th; it moves everyone by 11.6%.
+
+### What it DOES establish, and it is the point
+
+**Correcting opportunity is worth real Brier, out-of-sample, on the market
+scoreboard.** The expensive fix — in-sim substitution driven by per-manager
+tendencies — is now justified by measurement rather than by argument. That was
+the whole reason to build the cheap version first.
+
+## 2026-08-17 — WHO THE MANAGER GOES TO: substitution patterns mined from `feed_live`
+
+Lane `convergence-phase7-crps`. `scripts/mlb_substitution_profile.py`.
+**618 games parsed.** Read-only, no deploy.
+
+### 1. REMOVAL RATE RISES MONOTONICALLY WITH LINEUP SLOT — my flat haircut is wrong
+
+    slot 1  8.6%    slot 4  8.3%    slot 7  13.8%
+    slot 2  8.0%    slot 5 10.7%    slot 8  14.8%
+    slot 3  7.7%    slot 6 11.4%    slot 9  16.7%
+
+**Slot 9 is substituted ~2x as often as slot 3.** The haircut applies a flat
+−11.6% to everyone; it should be slot-conditioned.
+
+**AND THIS RESOLVES AN APPARENT CONTRADICTION.** The measured AB *bias* was flat
+across slots (+0.459..+0.631) while the removal *rate* varies 2x. Both are true:
+bottom-of-order hitters are removed MORE OFTEN but LATER in the game, when fewer
+plate appearances remain. Rate and lost-opportunity are different quantities and
+the flat bias is not evidence of a flat mechanism.
+
+### 2. SCORE STATE DRIVES WHICH KIND OF SUBSTITUTION — the sim models none of it
+
+| type | trailing | tied | leading |
+|---|---|---|---|
+| `offensive_substitution` (pinch hit) | **661** | 229 | 244 |
+| `defensive_substitution` | 94 | 51 | **231** |
+| `pitching_substitution` | 1127 | 555 | **1347** |
+
+Managers **pinch-hit when behind** (2.7:1 trailing vs leading) and make
+**defensive replacements when ahead** (2.5:1 the other way). That is a strong,
+cheap, situational signal and the engine has no representation of it.
+
+### 3. TIMING — pitching changes peak in innings 7-9 (1,008 at inning 8)
+
+### 4. POSITIONS
+`P=3916, PH=1135, LF=379, RF=339, CF=316, 2B=246, PR=211, 3B=203, SS=185, DH=182`
+Corner/centre outfield dominate non-pitcher substitutions — defensive
+replacements, consistent with (2).
+
+### 5. THE ANSWER THAT DECIDES P2: **MANAGERS DIFFER MATERIALLY** `[measured]`
+
+    Chicago White Sox      7.73 subs/game        Philadelphia Phillies  5.07
+    Houston Astros         7.00                  Tampa Bay Rays         5.02
+    Colorado Rockies       6.95                  Seattle Mariners       4.67
+    Texas Rangers          6.88                  Boston Red Sox         4.61
+
+    30 teams   mean 6.02   sd 0.72   SPREAD 3.12 subs/game   max/min 1.68x
+
+**A single hardcoded `ManagerProfile` for all 30 teams is measurably wrong.**
+`data/manager/manager_tendencies.json` does not exist and its loader silently
+returns `{}` — **P2 is now justified by measurement, not by argument.**
+
+I wrote this script so it could return the OPPOSITE answer (a "managers look
+similar, do not build per-team tendencies" branch). It did not fire.
+
+### What to build, in order
+
+1. **Slot-conditioned haircut** — replaces the flat scalar. Cheap, and the slot
+   curve above is the whole input.
+2. **Score-state conditioning** — pinch-hit rate up when trailing, defensive-sub
+   rate up when leading. Two multipliers, both measured above.
+3. **Per-manager tendencies** — populate `manager_tendencies.json` from these
+   618 games. Governs BOTH position-player substitution and the pitching hook,
+   which is why P1 and P2 are one piece of work.
+4. Re-run `mlb_opportunity_haircut.py` after each. The scoreboard is the market.
+
+## 2026-08-17 — TOTALS BIAS CHECK: **my carry-over hypothesis is FALSIFIED, and that LOCALISES the bug**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_totals_bias_check.py`. n=158 games
+joined by `game_pk` (exact id join) to `feed_live` finals. Read-only.
+
+### The prediction, and the result
+
+**Predicted:** the engine over-projects plate appearances ~12-15% (no
+substitution model), so ~4.5 phantom PA/team at ~0.12 runs/PA should make game
+totals run **~+1.0 HIGH**.
+
+**Measured:**
+
+    TOTAL RUNS   model 8.563   actual 9.044   BIAS -0.481  (-5.3%)
+                 = -0.241 runs per team, i.e. LOW
+
+**Opposite sign. The hypothesis is dead.**
+
+### WHY THIS IS THE MOST USEFUL RESULT OF THE SEQUENCE
+
+If the GAME SIMULATION were producing 4.5 phantom plate appearances per team,
+totals would be high. **They are low.** So the game sim is very likely NOT
+inflating opportunity — **the ~15% PA inflation lives in the PROP PROJECTION
+path (`pa_mean`/`ab_mean`), not in the core simulation.**
+
+That is a much sharper localisation than anything the prop-side work produced,
+and it has direct consequences:
+
+1. **Fixing prop opportunity will NOT move game totals.** They are different code
+   paths with different opportunity handling. I assumed one root cause behind
+   both; there are two.
+2. **The substitution model is a PROP-SIDE fix.** Its value is the 0.0015-0.010
+   Brier gap on props, not game lines. My message to the user speculating that it
+   would help game betting was WRONG and is corrected here.
+3. **Game totals have their own, OPPOSITE defect** — under-projecting by 5.3%.
+   That needs its own diagnosis and is not addressed by anything done today.
+
+### TWO FURTHER READINGS WORTH KEEPING
+
+**MLB game totals BEAT CLIMATOLOGY: CRPS 2.4891 vs 2.5404 = +2.02% skill**
+(n=158, `total_runs_dist`). Only the second positive skill measurement in this
+platform, after NFL margin (+3.20%). **No CI computed — n=158 and this is
+INDICATIVE, not established.** It should be re-run through
+`skill_census_crps.py` to get a paired interval before anyone cites it.
+
+**The model under-projects home-field advantage:**
+
+    run margin (home - away)   model -0.187   actual +0.133   bias -0.320
+
+The sim has the home team as slight underdogs on average when they are in fact
+slight favourites. That is a separate, cheap, and probably fixable calibration
+target — and it is consistent with the totals being low.
+
+### Status of the MLB plan after this
+
+- **P1 (opportunity) stands** — it closes the market gap on PROPS, measured
+  out-of-sample, 3 of 3 families. Its scope is now correctly bounded to props.
+- **P2 (per-manager tendencies) stands** — managers differ 1.68x, measured.
+- **NEW: game totals under-projection (−5.3%) and home-field under-projection
+  (−0.32 runs) are separate defects**, unexplained, and are the natural next
+  diagnosis for anyone wanting to improve MLB game lines specifically.
+
+## 2026-08-17 21:37:37Z — live-odds-worker 7470939b + refresh-worker c6eb35c9 — soccer live-lens as-of fix — MEASURED, PARTIAL PASS
+
+Carries `6bdc50de` BY CONTENT, not by ancestry: `git merge-base --is-ancestor 6bdc50de
+7470939b` -> NO, but `git show 7470939b:scripts/poll_soccer_live_state.py` reads
+`_load_team_ratings(league, source_root, iso_date)`. Deploy-branch delivery. Testing
+this by ancestry alone would have reported the fix ABSENT when it was present.
+
+**PRIMARY CRITERION: PASS.** Post-deploy window (strictly after 21:37:45Z), tick
+21:38:37 on live-odds-worker:
+
+    before: 7 leagues per tick   after: 10 leagues per tick
+
+la_liga, primeira_liga and championship now poll instead of throwing an unlogged
+`TypeError`. That is the whole of what `6bdc50de` claimed and it is confirmed in
+production.
+
+**PRODUCT OUTCOME: NOT VERIFIED, AND NOT A FAILURE.** All 10 leagues wrote
+`(0 live games)` and `/soccer/primeira_liga/api/live-lens` still reads
+`Live matches: 0 / Source: No data`. **That is CORRECT right now** — asked ESPN
+directly with the poller's own call, `fetch_events(league, statuses={"in"})`:
+
+    primeira_liga  status=in -> 0   (Casa Pia vs Benfica  = post)
+    la_liga        status=in -> 0   (Deportivo vs Elche   = post)
+    championship   status=in -> 0   (Cardiff vs Wrexham   = post)
+
+The slate is over. A league with nothing in play writing `(0 live games)` is the
+documented correct behaviour and must not be read as the fix failing. **End-to-end
+("a live match appears on the live lens") is UNVERIFIED and needs tomorrow's slate.**
+Do not bank it.
+
+**SEPARATE DEFECT CONFIRMED WHILE MEASURING, still unfixed in production:** at
+21:39:13Z `/api/board/game-chips?sports=soccer` reported `SLB @ CAS` as
+`state: "live"`, `status_token: "LIVE"`, for a match ESPN says is `post` and which
+kicked off 19:15Z (2h24m earlier). The chip status is wrong in the same way
+`EXC @ NEC` was (final five days early). `cd46b403` addresses it and is on
+`origin/main` but **NOT deployed to web** — web is still `60cdf8eb` from 02:52Z.
+This is also why "is a match live?" could not be answered from the board and had to
+be asked of ESPN.
+
+
+## DEPLOY + MEASUREMENT 2026-08-17 21:30-21:40Z — soccer live-lens as-of fix (`6bdc50de`) — **STEP 1 PASS**
+
+- live-odds-worker `7470939b` (cut on `9773713f`), refresh-worker `c6eb35c9`
+  (cut on `69607619`). Both live. 1 file, +31/-1.
+- Cost: live-odds-worker was **idle (0 jobs)** — free. refresh-worker had 3 jobs,
+  **no MLB sim**: an 08-18 odds refresh, an MLS artifact build, and a refresh-odds
+  job. All re-run on cadence.
+- Signature confirmed before shipping rather than assumed:
+  `build_soccer_artifacts.py:54` defines
+  `_load_team_ratings(league, source_root, as_of)`, and the poller now passes
+  three args at `:105`.
+
+### Measured — the request's own step 1, PASS
+
+`text='live games'` on live-odds-worker, 21:38-21:40Z, one tick at 21:39:49:
+
+    epl, la_liga, bundesliga, serie_a, ligue_1, mls, eredivisie,
+    primeira_liga, championship, belgian_pro_league        = 10 leagues
+
+**Before: 7. Now: 10.** And the three that had been missing entirely —
+**la_liga, primeira_liga, championship** — are exactly the three that reappeared.
+That is the request's stated discriminator, met precisely.
+
+### Step 2 is INCONCLUSIVE, not failed, and the difference matters
+
+Every league reads `(0 live games)` right now because **no match is in play**.
+The request's step 2 ("at least one of those three carries `count > 0` while a
+match is actually in play") cannot be evaluated on a quiet slate. The failure it
+was written to catch — a league silently absent — is already excluded by step 1.
+**Do not read `(0 live games)` as a failure; read it as an empty slate.** Step 2
+is owed on the next slate with soccer in play.
+
+### An asymmetry worth recording, and NOT yet explained
+
+refresh-worker emitted **no soccer poll lines at all** in the same window, while
+carrying `SYNDICATE_ENABLE_LIVE_LENS_LOOP='true'` — the very flag that made this
+a two-service deploy. So either the soccer poll runs only on live-odds-worker
+regardless of that flag, or refresh-worker's tick had not come round in the
+window. **The two-service decision is therefore not yet vindicated**: the fix is
+proven on one worker and merely present on the other. Deploying both was still
+correct — the requester's own conditional was "if both run it, both need this or
+the fix is half-applied" — but which service actually polls soccer is now an open
+question, not a settled one.
+
+- RECONCILED: soccer live-lens as-of — step 1 measured PASS 2026-08-17 21:40Z; step 2 owed on the next live slate.
