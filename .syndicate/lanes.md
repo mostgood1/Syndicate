@@ -3834,3 +3834,32 @@ PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
   `covered==scheduled`. **Do not bank the fix before that line is read** - the
   census was deployed-but-never-observed once already today.
 - Kill switch `WNBA_GAME_CARDS_SCHEDULE_BACKFILL` (absent = ENABLED).
+
+#### convergence-phase7-crps — BETTING GRADE RUN 2026-08-17 — **INCONCLUSIVE. The gate is confounded and I am not promoting anything.**
+
+- `scripts/grade_leash_betting.py` (new). 148 graded starts, model-vs-devigged-
+  market picks, push excluded, ROI at quoted odds. Multiplicative and power
+  devig agree throughout. Full table in `deploys.md`.
+- **Face value: the grade reverses the sweep.** Leash 0 (statistical optimum)
+  is worst on money (53.38% / +1.93%); leash 4/5 best (59.46% / +12.40%).
+- **AND THE GRADE DOES NOT SUPPORT THAT READING.** Three checks, run before
+  reporting the number:
+  1. **ALWAYS OVER returns 58.78% / +8.16% on the identical 148 starts** — no
+     model. The best grid point is barely above it, and leash 6 scores EXACTLY
+     58.78% because it picks over 146 of 148 times.
+  2. **The grid varies the over-rate monotonically** (106 -> 146 over-picks).
+     A longer leash projects more outs, so it bets over more. In a window where
+     overs won 58.78%, that alone produces the ordering. **This measures
+     over-propensity, not skill.**
+  3. **1.49 SE.** SE at p~0.55, n=148 is 4.09pp; the spread is 6.08pp.
+- **Taken naively the grade would have ENDORSED THE DEFECT** — the sim
+  over-projects outs, so it bets over, and overs won in this window.
+- **Nothing promoted, nothing blocked.** The statistical sweep stands as
+  measured; it is simply unconfirmed by money. This is a negative result about
+  the INSTRUMENT.
+- **New standing requirement this produced:** report the side-blind baseline
+  (always-over / always-under) alongside every prop betting grade. Without it
+  this read as a +12.40% model edge when +8.16% needed no model.
+- **Owed for a valid grade:** production's 29 extra dates, an over-rate-matched
+  or side-split comparison, and note that `betting_accuracy.py` is ABSENT here
+  so none of this compares to the overrides file's 55.78%/54.65%.

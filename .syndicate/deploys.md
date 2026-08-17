@@ -9889,3 +9889,69 @@ production reading. The Normal summary remains adequate for this market.
 2. Split tune/holdout, and split by market-line tier.
 3. Re-run against production artifacts — 13 local dates is not the 46 the other
    knobs were fitted on.
+
+## 2026-08-17 — BETTING GRADE ON THE LEASH GRID — **INCONCLUSIVE, AND THE GRADE ITSELF IS CONFOUNDED**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/grade_leash_betting.py`.
+**NO DEPLOY. No value promoted. No production config changed.**
+
+148 graded starts / 13 dates, pick = the side the model thinks is mispriced,
+push excluded, ROI at the quoted odds. Multiplicative and power devig agree
+throughout, so the devig choice is not driving anything.
+
+| leash | bets | hit rate | ROI/unit | over picks | under picks |
+|---|---|---|---|---|---|
+| 0 (statistical optimum) | 148 | **53.38%** | **+1.93%** | 106 | 42 |
+| 3 | 148 | 53.38–54.05% | +1.56–2.83% | 110 | 37 |
+| 4 | 148 | **59.46%** | **+12.40%** | 113 | 35 |
+| **5 (current)** | 148 | 59.46% | +11.84% | 123 | 25 |
+| 6 | 148 | 58.78% | +7.88% | 146 | 2 |
+
+**AT FACE VALUE THIS REVERSES THE SWEEP.** Leash 0 — which halved the bias and
+put dispersion at 0.791 against a 0.7979 target — is the WORST betting outcome,
+and the current 5 is near the best. That is the
+`starter_tto_quality_scaling` pattern exactly.
+
+### BUT THE GRADE DOES NOT SUPPORT THAT READING, AND I CHECKED BEFORE REPORTING IT
+
+**1. A side-blind strategy beats almost the whole grid.** On these identical
+148 starts:
+
+    OUTCOMES over the line   87 / 148 = 58.78%
+    ALWAYS OVER              hit 58.78%   ROI  +8.16%     <- no model at all
+    ALWAYS UNDER             hit 41.22%   ROI -20.37%
+
+The best grid point (59.46% / +12.40%) is barely distinguishable from betting
+every over blind. **Leash 6 scores EXACTLY 58.78% because it picks over 146 of
+148 times — it IS always-over.**
+
+**2. The grid varies the OVER-RATE almost monotonically** (106 → 110 → 113 →
+123 → 146 over-picks out of 148). A longer leash projects more outs, so it bets
+over more often. In a window where overs won 58.78%, that alone orders the
+table. **The grade is measuring over-propensity, not model skill.**
+
+**3. It is not significant anyway.** SE of a hit rate at p≈0.55, n=148 is
+**4.09pp**; the observed 53.38% → 59.46% spread is 6.08pp = **1.49 SE**.
+
+### THE CONSEQUENCE, STATED PLAINLY
+
+**The betting gate could not be run on this sample, and I am not going to
+pretend it was.** It cannot promote leash 4/5 and it cannot block leash 0. Worse,
+taken naively it would have *endorsed the defect*: the sim over-projects outs,
+which makes it bet over, and overs won here — so the bug looks profitable.
+
+**This is a negative result about the INSTRUMENT, not about the leash.** The
+statistical sweep stands as measured; it simply has not been confirmed or
+refuted by money.
+
+### WHAT A VALID GRADE NEEDS
+
+1. **Far more than 148 bets.** At 4.09pp SE nothing under ~5pp is readable.
+   Production has 29 dates the mirror does not.
+2. **Control the over-rate.** Compare grid points at a matched number of
+   over-picks, or grade over and under separately, or report ROI against the
+   always-over baseline rather than against zero.
+3. **Report the side-blind baseline every time.** A grade without it read as a
+   +12.40% model edge when +8.16% of it was available with no model.
+4. `betting_accuracy.py` is ABSENT from this checkout, so none of this is
+   comparable to the overrides file's 55.78%/54.65%.

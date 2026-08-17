@@ -165,6 +165,11 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 2))
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--json", type=Path, default=None)
+    parser.add_argument(
+        "--dump-pmfs", type=Path, default=None,
+        help="write per-start simulated PMFs so grading can be re-run without re-simulating "
+             "(87,500 game-sims is ~7 minutes; grading them is instant)",
+    )
     args = parser.parse_args()
 
     from syndicate.features.shared.projection_score import ProjectionObservation, score_cell
@@ -215,6 +220,11 @@ def main() -> int:
         print("  reported rather than silently narrowing the sample:")
         for message in errors[:3]:
             print(f"    {message}")
+
+    if args.dump_pmfs:
+        args.dump_pmfs.parent.mkdir(parents=True, exist_ok=True)
+        args.dump_pmfs.write_text(json.dumps(records), encoding="utf-8")
+        print(f"  dumped {len(records)} per-start PMFs -> {args.dump_pmfs}")
 
     by_grid: dict[int, list[ProjectionObservation]] = defaultdict(list)
     short_sim: dict[int, list[float]] = defaultdict(list)
