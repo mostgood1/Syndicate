@@ -88,9 +88,30 @@ def build_finals_index(grid: Any) -> dict[str, bool]:
             continue
         if h == a:
             continue
-        key = str(row.get("game_pk") or game.get("game_pk") or row.get("event_id") or "").strip()
-        if key:
-            out[key] = h > a
+        # INDEX UNDER EVERY IDENTIFIER THE ROW CARRIES, because the ledger and
+        # the grid do not agree on one.
+        #
+        # Measured in production 2026-08-17 01:48Z, and this is exactly the
+        # failure the `unscored` counter exists to expose: **3,706 records
+        # considered, 0 games with an outcome, 3,706 `no_final_outcome_for_game`**
+        # — while 14 games sat FINAL on that same grid. The ledger stores
+        # `game_pk` (taken from the live_gameline block), but a grid ROW has no
+        # `game_pk` at top level: it lives inside `row["live_gameline"]`. So a
+        # `game_pk`-keyed lookup against an `event_id`-keyed index missed every
+        # single record, and reported it as "no outcome" rather than silently
+        # scoring nothing.
+        lg = row.get("live_gameline") if isinstance(row.get("live_gameline"), Mapping) else {}
+        won = h > a
+        for ident in (
+            row.get("game_pk"),
+            game.get("game_pk"),
+            lg.get("game_pk"),
+            row.get("event_id"),
+            game.get("event_id"),
+        ):
+            key = str(ident or "").strip()
+            if key:
+                out[key] = won
     return out
 
 
