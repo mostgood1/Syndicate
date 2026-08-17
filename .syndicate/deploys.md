@@ -9257,3 +9257,160 @@ after.**
   thread-scoped attributes nothing in a multi-threaded process. I had the field
   in front of me all session and never asked what its scope was — the same shape
   as `feedback_read_the_field_you_already_have`, one level deeper.
+
+### peak SMAPS — census the excursion, not the baseline (refresh-worker)
+- Deployed: 2026-08-17 01:15:49Z — `dep-da161hc9v7es73alq6ig`, commit `4ec66498`,
+  trigger `api`, service `srv-d91dpertqb8s73co8ls0`. Branch
+  `deploy/rw-peak-smaps`, parented on the LIVE SHA `7623a233`
+  (`origin/deploy/rw-ship`, off-main). **Scope: 1 commit, 2 files, 224
+  insertions, 0 deletions** — verified against the REMOTE blob, not the local one.
+  `origin/main` was 11 commits / 2094 insertions / 134 deletions ahead of live;
+  deploying it would have been a branch swap, not this change.
+- Change: `watchdog_should_peak_smaps` + `_watchdog_maybe_peak_smaps` — an SMAPS
+  read at 2600MB anon (env `SYNDICATE_MEMORY_WATCHDOG_PEAK_SMAPS_MB`), up to 3
+  times, off the sampler thread. Plus a silent-cap fix:
+  `log_smaps_anon_breakdown` returned `None` at its per-process cap with no line,
+  so a peak read could have been discarded invisibly. Peak has its own budget,
+  shared cap 3 -> 8, capped-out now prints `SMAPS_SKIPPED_CAPPED`.
+- Expected: `SMAPS_ANON` lines carrying `reason=watchdog_PEAK_anon_*` appear
+  within one excursion. Kills have run every ~12-18 min (latest 00:49:05,
+  01:07:16Z), so >=1 within the hour. **The comparison that matters is
+  `largest_regions_mb` at PEAK vs the baseline reading
+  (`515.0, 181.1, 166.2[heap], 104.3, 102.0, ...` at anon 1610-1700MB).**
+  Whichever region grew is the allocator.
+- Measured: `<pending>`
+- Rollback: redeploy `7623a233`. Additive instrumentation; no behaviour change.
+- **Preflight: sim gate OVERRIDDEN, second time tonight, on explicit user
+  instruction and the same argument as before** — an in-flight MLB sim was
+  running (6 procs at 01:15:23Z), and the ~12-18 min OOM cadence is destroying
+  that sim repeatedly regardless. Recorded so the argument can be re-checked if
+  it turns out to be wrong. All other gates PASSED.
+- **PRE-EXISTING FAILURES ON THIS BRANCH, not caused by this change:**
+  `tests/test_smaps_breakdown.py` has 3 failures on `7623a233` — the branch's
+  test file references `_process_rss_anon_bytes`, which exists in NO version of
+  the module. Verified by the only control that settles it: they fail identically
+  on the branch WITHOUT this change. `origin/main` has already dropped those
+  tests. 77 passed otherwise, on this branch's codebase rather than main's.
+- **BOOT-CONFOUNDING, again:** the deploy restarts the worker to ~16% memory. It
+  will look healthy for minutes regardless. Nothing is proven until a PEAK SMAPS
+  line exists.
+- Verdict: `<pending — instrumentation only, no fix claimed>`
+
+### MEASUREMENT — closes the peak-SMAPS row (`dep-da161hc9v7es73alq6ig`). THE ALLOCATOR IS ONE ANONYMOUS MMAP REGION.
+- Measured 2026-08-17 01:46:04–01:46:09Z, three peak samples, then `oomKilled`
+  01:46:59Z. Appended, not edited into the row above (append-only file).
+- **The instrument caught the allocation IN PROGRESS. A SINGLE region grows while
+  every other region is frozen:**
+
+      time          anon     largest_regions_mb (top 4)              anon_mmap
+      01:46:04.190  2894MB   [1096.5, 268.7, 201.8, 194.0]           2350.1
+      01:46:07.769  3111MB   [1306.2, 268.7, 201.8, 194.0]           2559.7
+      01:46:09.713  3401MB   [1586.4, 268.7, 201.8, 194.0]           2839.9
+      (baseline, prior instance, anon 1610-1700MB:  515.0, 181.1, 166.2[heap], ...)
+
+- **Region #1: 1096.5 -> 1306.2 -> 1586.4MB, +489.9MB in 5.5s. Regions #2/#3/#4
+  are IDENTICAL across all three samples (268.7 / 201.8 / 194.0).** Total
+  `anon_mmap` moves 2350.1 -> 2839.9 = **+489.8MB**, matching region #1's
+  +489.9MB to within rounding. **ALL of the growth is that one region.**
+- **This is a single contiguous anonymous buffer exceeding 1.5GB.** pymalloc
+  takes 1MB arenas, so it is not object churn — it is one allocation:
+  NumPy/bytes/decompression-class. `[heap]` stayed ~175MB throughout.
+- **STRONGLY ASSOCIATED, NOT PROVEN CAUSAL — the ledger load.** Same window:
+
+      01:46:13.386  SKIP_OVERSIZED_LEDGER_CHUNK 2026-08-05.jsonl bytes=367,229,260
+      01:46:13.386  SKIP_OVERSIZED_LEDGER_CHUNK 2026-08-06.jsonl bytes=480,112,146
+      01:46:13.386  SKIP_OVERSIZED_LEDGER_CHUNK 2026-08-07.jsonl bytes=321,685,236
+      01:46:48.499  SKIP_OVERSIZED_LEDGER_CHUNK 2026-08-14.jsonl bytes=305,435,308
+      01:46:52.562  SKIP_OVERSIZED_LEDGER_CHUNK 2026-08-16.jsonl bytes=298,240,526
+      01:46:52.576  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 ceiling=256,000,000 records=22078
+
+  **830,832,574 bytes accepted in ONE load against a per-FILE 256MB ceiling** —
+  which is `state.md:462-464`'s already-established "833,550,415 bytes of ledger
+  chunks ACCEPTED per load against a per-FILE ceiling that never bounded the
+  sum", independently re-measured. Right magnitude, right window, right process.
+- **THE TIMING CAVEAT THAT STOPS THIS BEING A VERDICT:** the region growth is at
+  01:46:04–09, while the visible ledger lines are 01:46:13 and 01:46:48–52. **The
+  growth PRECEDES the logging by 4-43s.** That is consistent with a load that
+  reads first and logs its accept/skip decisions after (the ACCEPTED line's
+  `strea...` suffix suggests a streaming path), but it is NOT proof, and a
+  competing allocator that runs just before the ledger pass would look identical.
+  **Do not write this up as "the ledger causes the OOM" without tying the region
+  to that code directly.**
+- Verdict: **instrument WORKED — it answered the question it was built for, on
+  its second excursion.** The allocator is now a single named region with a
+  measured growth curve, where before it was "somewhere in a 51s unmarked span".
+  Still no fix, no memory reduced; the worker was killed 50s after the last
+  sample.
+- **NEXT: tie the region to the code.** The cheapest decisive test is whether the
+  per-file ceiling is applied BEFORE or AFTER the read, and whether the accepted
+  sum is ever held simultaneously. `count=8 bytes=830,832,574` held at once
+  against a 4GiB cap with a ~1.7GB baseline is sufficient on its own to kill the
+  process.
+
+### ledger load trace — the anon delta across `_load_records_from_ledger` (refresh-worker)
+- Deployed: 2026-08-17 02:13:28Z — `dep-da16si67bikc738g7d00`, commit `8999f033`,
+  branch `deploy/rw-ledger-trace`, parented on the LIVE SHA `9bff3cc1`
+  (`origin/deploy/score-join-fix2`, off-main). `origin/main` was 30 commits
+  ahead of live. **Scope: 1 commit, 2 files, 193 insertions, 0 deletions**,
+  `LEDGER_LOAD` x8 verified in the REMOTE blob. Live's
+  `recommendation_engine.py` blob was byte-identical to the change's base, so
+  the carry was exact — no merge.
+- Change: `_load_records_from_ledger` reports `records`, `elapsed_s`, and
+  `anon_before/after/delta_mb` per load (cap 12, and the cap announces itself).
+- **Expected — and it is falsifiable in the direction that kills my own
+  hypothesis:** a `LEDGER_LOAD` line during an excursion with
+  `anon_delta_mb` in the +1500..+3000 range would tie this load to the
+  +2.1..2.9GB excursions. **A line with a SMALL delta kills the hypothesis
+  outright**, however well the arithmetic fits (830MB accepted / 22,078 records
+  / 37.6KB per record at 2-5x parsed = 1.7-4GB).
+- Measured: `<pending>`
+- Rollback: redeploy `9bff3cc1`. Additive; the return value is unchanged and
+  asserted so by test.
+- **Live already carried BOTH earlier instruments** (`board_contract_end` = 5,
+  peak SMAPS = 2) — another session's deploy carried them forward, so no
+  consolidation was needed beyond this one file.
+- **Preflight: sim gate OVERRIDDEN a THIRD time on explicit user instruction.**
+  2 sim procs at 02:12:55Z. Recorded rather than normalised: the earlier
+  justification (the ~12-18 min OOM cadence destroys the sim anyway) is WEAKER
+  now — the last kill was 01:46:59Z and there has been none since, though three
+  deploys (01:35, 02:00, 02:11) each rebooted the worker and reset memory, so
+  the quiet is boot-confounded and is NOT evidence the OOM stopped.
+- **CONCURRENT-DEPLOY NOTE:** refresh-worker took 3 deploys from other sessions
+  in the 40 min before this one (`e63bee63` 01:35, `b30fdb6c` 02:00, `9bff3cc1`
+  02:11). A deploy CANCELS an in-flight deploy on this platform, so this one was
+  held until `9bff3cc1` reported `live`.
+- Verdict: `<pending — instrumentation only, fourth of the night, no fix claimed>`
+
+## 2026-08-16 ~01:00Z — OOM band, early read
+
+Measured, not deployed. `py -3 scripts/oom_band_report.py --start
+2026-08-16T22:00:00Z`, band 22:00:00Z .. 2026-08-17T02:19:48Z (4h20m).
+
+- **Live SHA measured: `8999f033`, NOT the `97491161` the task pinned.** 13
+  deploys landed inside the band from other lanes, so the band is a mix of
+  builds — but **every one of them contains the three fixes** (`git merge-base
+  --is-ancestor d72d670c <sha>` passes for `94447830`, `7c2b1a17`, `7623a233`,
+  `4ec66498`, `e63bee63`, `b30fdb6c`, `9bff3cc1`, `8999f033`). Nothing was
+  reverted: the local HEAD line carries the same patch-id under the pre-rebase
+  name `aa190d58` (`git patch-id --stable` = `e914124c…`).
+- **Kills (EVENTS API): 16** in 4h20m — 22:07, 22:21, 22:41, 23:03, 23:16,
+  23:32, 23:43, 23:56, 00:08, 00:19, 00:32, 00:41, 00:49, 01:07, 01:21, 01:46.
+- **Excursions: 5** across the deploy-free segments, in 4 of 14 segments:
+  00:18–00:47 (1 exc, 2.0/hr, amp 2901.0), 00:47–01:15 (2 exc, 4.2/hr, amp
+  2431.4), 01:29–01:53 (1 exc, 2.4/hr, amp 2356.5), 01:53–02:04 (1 exc,
+  12.3/hr, amp 2511.1). **Amplitude mean 2526.3 MB vs. night baseline
+  1950–2235.**
+- **min inactive_file per segment:** 1126.4 / 7.7 / 76.8 / — / — / 0.0 / 100.0 /
+  0.0 / 5.4 / 0.0 / 150.9 / 18.8 / 966.2 / 874.8. Four segments bottom at
+  **0.0 MB**, below both prior kill windows (26.3, 42.2) and far below the
+  surviving windows (164–240).
+- Segments are short: longest deploy-free stretch 78.3 min (22:43–00:04, 0
+  excursions, but min inactive_file 0.0). Two segments produced no watchdog
+  samples at all.
+- **Verdict: the transient did NOT move.** Excursions are running at or above
+  the pre-fix night amplitude (2526 MB mean vs. 1950–2235 baseline) and the page
+  cache is being driven to zero, with 16 kills on code that contains all three
+  fixes — so the odds-shard duplicate parse, the ledger streaming, and the
+  3x→1x `rank_recommendations` ledger load were **not** the ~2 GB. No claim is
+  made about whether any of the three helped at the margin; only that the 2 GB
+  transient is still there.
