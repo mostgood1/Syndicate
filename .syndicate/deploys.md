@@ -10422,3 +10422,57 @@ Render cron, or `run_refresh_odds_job.py`) and establish whether it is
 misconfigured, disabled, or was never wired for WNBA. **Do not "fix" this by
 adding a new caller until that is known** - a second invoker of a job that
 already has an owner is how you get two concurrent refreshes.
+
+### INTENDED OWNER TRACED 2026-08-17 ~14:05 CDT - **THERE ISN'T ONE. WNBA's full refresh fell into the gap between a demoted GHA cron and a partial worker migration.**
+
+**THE ORIGINAL OWNER: `.github/workflows/daily-update.yml`**, cron `0 6 * * *`.
+Its full-regeneration step runs `daily_update_in_season.ps1`, which is the path
+that reaches `refresh_wnba_oddsapi_props.main()` -> the game_cards builder.
+
+**IT CANNOT FIRE ON THE CRON. Line 47:**
+```yaml
+RUN_FULL_PIPELINE: ${{ github.event.inputs.run_full_pipeline || 'false' }}
+```
+`github.event.inputs` is populated **only on `workflow_dispatch`**. On the
+`schedule` trigger it is empty, so `RUN_FULL_PIPELINE` is **ALWAYS `'false'`**
+on the daily run. The step is gated `if: env.RUN_FULL_PIPELINE == 'true'` and
+its own name says it: *"full regeneration -- **manual fallback only**"*. The
+scheduled path takes the `!= 'true'` branch instead: *"Pull current artifacts
+from Render (**backup-only** default path)"* - it DOWNLOADS artifacts rather
+than generating them.
+
+**AND THE WORKER MIGRATION NEVER COVERED WNBA.** `render.yaml:611`:
+*"Phase 1 of migrating off the daily-update GHA cron: **NFL/NCAAF/NCAAB**"*.
+Three sports moved. refresh-worker's autorun is `WEEKLY_SPORTS_*` with
+`SYNDICATE_ACTIVE_SPORTS=nfl` - the weekly-cadence sports. **WNBA is a DAILY
+sport and was never migrated.**
+
+**SO THE FULL CHAIN OF OWNERSHIP IS:**
+```
+GHA daily cron      -> demoted to backup-only; full pipeline is manual-dispatch only
+worker autorun      -> NFL/NCAAF/NCAAB only (Phase 1)
+live refresh loop   -> ODDS SWEEP only; never calls the refresh entrypoint
+                    => WNBA full refresh: NO SCHEDULED OWNER
+```
+That is why `MAIN_ENTRY` is 0 over 8h and `GAME_CARDS_CENSUS` is 0 over ~2 days.
+**Nothing is broken - the job was never re-homed.**
+
+**THIS IS A CLASS PROBLEM, NOT A WNBA ONE.** Phase 1 moved 3 of 8 sports. The
+same gap should be assumed for **MLB, NBA, NHL, soccer** until each is checked:
+demoted cron above, partial migration below. **Do not fix WNBA alone without
+checking the other four** - and check them by reading `MAIN_ENTRY` per sport,
+which is a cheap and direct test.
+
+**DO NOT "FIX" THIS BY ADDING A CALLER YET.** Three real options, and the choice
+is a design decision with an owner, not a patch:
+1. **Phase 2 the migration** - re-home WNBA onto the worker beside NFL. Matches
+   the stated direction. Cost: worker memory, and `#241` is on record that
+   periodic worker work is never free.
+2. **Re-arm the GHA cron** for WNBA only, by setting `RUN_FULL_PIPELINE` from a
+   schedule-safe expression rather than `github.event.inputs`. Smallest diff,
+   but pushes work back onto the path being migrated AWAY from.
+3. **Accept it and change the contract** - if game_cards is genuinely meant to
+   be sweep-derived now, then the builder is dead code and the coverage fix
+   belongs in the sweep path instead.
+**My coverage fix is correct under 1 and 2 and IRRELEVANT under 3**, so this
+decision gates whether the open deploy row can ever be closed.
