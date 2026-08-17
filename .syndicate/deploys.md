@@ -13223,3 +13223,56 @@ bvp at all**. Evaluation tooling only.
 
 **Aim all of it at PROPS.** Game lines carry a sharp reference on 102/102
 markets; props carry 0%.
+
+## 2026-08-17 — WIRING THE PITCH-TYPE SPLITS: **the cache namespace now exists and the data is real. The MEASUREMENT is not done.**
+
+Lane `convergence-phase7-crps`. `scripts/measure_pitch_splits_effect.py`.
+Local cache only, **no deploy, no production change.**
+
+### What is established
+
+**The populator works and the missing data is now obtainable.** Ran
+`tools/statcast/fetch_pitcher_pitch_splits_x64.py` under the vendored x64 venv
+(pybaseball 2.2.7). The `pitcher_pitch_splits` cache namespace — **which had
+never been written** — now exists and is filling.
+
+**The cached content is exactly the signal that was missing.** For pitcher
+518876, over **2,122 pitches**:
+
+    whiff_mult   CH 1.55   SL 1.55   |   FF 0.65   FC 0.65   SI 0.65
+    pitch_mix    7 pitch types, real usage shares
+    inplay_mult  CH 1.03  CU 0.71  FF 0.88  FC 1.22
+
+**Today every one of those collapses to 1.0.** A changeup that misses bats at
+1.55x and a fastball at 0.65x are currently interchangeable in the sim.
+
+### The measurement harness, and why its first output MUST BE IGNORED
+
+`measure_pitch_splits_effect.py` compares two arms differing in exactly one
+thing: whether pitchers carry pitch-type multipliers. Arm B calls **the
+builder's own `_apply_cached_statcast_pitch_splits`** — not a reimplementation —
+because splits are applied at ROSTER BUILD time and the archived artifacts were
+built against an empty cache, so re-reading them picks up nothing.
+
+**A 6-game smoke returned 2 markets better / 2 worse. That result is
+MEANINGLESS and is recorded here so nobody quotes it:** splits were applied to
+**3 of 109 pitcher-slots (2.8%)**. At that application rate the two arms are
+nearly identical and the differences are noise. **The script prints the
+application rate and REFUSES outright at 0%** — the guard exists because this is
+exactly the shape of a result that looks like a finding.
+
+### WHAT IS STILL OWED — this is a bigger data job than one pass
+
+- **73 starters fetched (~23 cached at the time of writing, ~3/min).**
+- **241 distinct BULLPEN arms have NOT been fetched at all.** Relievers face a
+  third of plate appearances; a starters-only application understates the effect
+  and biases it toward early innings.
+- **314 pitcher fetches total, ~60-90 minutes of network time.**
+- The real comparison needs a HIGH application rate. Do not score until it is.
+
+### Also worth recording
+
+**The archived roster artifacts cannot be re-read to pick this up.** Splits are
+applied at build time. Either rebuild rosters, or apply the builder's function to
+loaded profiles as this harness does. Anyone expecting a cache fill alone to
+change production output will see nothing.
