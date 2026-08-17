@@ -3184,3 +3184,39 @@ wnba_source/data/processed/game_odds_*        count=0
   something else - `gid_map` from `boxscores_<date>.csv`, or the sim files. Then
   check whether `boxscores_2026-08-16.csv` exists on the worker; if it holds one
   game, that is the discriminator.
+
+### wnba-live-tier - **BOTH DOCUMENTED INPUTS ARE ABSENT 2026-08-17 15:5xZ. The one `game_cards` row comes from a source I have not read.**
+- **Measured on the worker for 2026-08-16:**
+```
+game_odds_2026-08-16.csv     count=0   ABSENT
+boxscores_2026-08-16.csv     count=0   ABSENT
+smart_sim_2026-08-16_*.json  3 files   ATL_IND, PHX_POR, SEA_CHI  (ALL fixtures)
+game_cards_2026-08-16.csv    1 row     game_id='1', POR@PHX
+```
+- **`export_game_cards_cmd` opens by reading exactly these two files**, and
+  NEITHER EXISTS. `go` is an empty frame and `gid_map` is an empty dict. **So
+  neither documented input can explain the one row, and neither can explain why
+  it is POR@PHX rather than one of the other two.**
+- **The row is therefore produced further down a function I have only read the
+  first ~45 lines of.** That is now the whole remaining question.
+- **MY FIRST INSTINCT IS BACK AS A CANDIDATE, and I am labelling it as one
+  rather than re-adopting it.** I originally predicted the writer "walks the
+  props pool", retracted that when I saw the odds line at the top, and the
+  retraction was correct about the TOP of the function. But the props artifacts
+  for this date DO exist -
+  `props_recommendations_2026-08-16.csv`, `recommendations_2026-08-16.csv`,
+  `cards_props_snapshot_2026-08-16.json`, `oddsapi_player_props_2026-08-16.csv` -
+  while odds and boxscores do not. **A props-driven loop would fit every
+  observation.** It is a candidate. It has not been read.
+- **`game_id='1'` now makes more sense as a symptom**: with `gid_map` empty
+  (boxscores absent) the real gameId is unavailable by construction, so the
+  sequential index is the ONLY id it could emit. That part was never about which
+  source drove the loop.
+- **WHAT THIS DOES NOT CHANGE:** `game_cards` holds 1 of 3; chip builder,
+  `is_active_today` and provider code stay exonerated; `export_game_cards_cmd`
+  is still the writer; and it is still the same function that emits
+  `pred_margin`/`pred_total` as MEANS (outstanding #3).
+- **NEXT ACTION - read, do not measure.** The remaining question is answerable
+  from source alone: read `export_game_cards_cmd` (`cli.py:9581`) to its end and
+  identify what it iterates when `go` is empty and `gid_map` is empty. Every
+  external fact needed is now in hand; further export calls will not help.
