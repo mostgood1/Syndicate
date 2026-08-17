@@ -6814,3 +6814,50 @@ do not lose them when releasing the claim.**
 mechanical mirror plus tests plus a deploy request, and starting it without
 room to test and verify would have left an untested periodic job on a
 memory-constrained production worker - the precise shape of `#241`.
+
+### soccer-model-coverage - **ITS "UNCOMMITTED FIXES AT RISK" WARNING IS STALE. Measured 2026-08-17 ~15:0x CDT by the `wnba-fixture-identity` session. NOTHING WAS COMMITTED, BECAUSE THERE WAS NOTHING TO COMMIT.**
+- Asked to commit fixes #1 and #3 before releasing this lane, I measured first:
+```
+git status --porcelain -- soccer/ soccer_projections.py build_soccer_artifacts.py
+  tests/test_soccer_seed_bootstrap.py tests/test_soccer_feature_loaders.py
+  tests/test_soccer_three_way_devig.py
+    -> EMPTY. Nothing uncommitted, for any of them.
+
+tests/test_soccer_seed_bootstrap.py    COMMITTED on origin/main, 108 lines
+tests/test_soccer_three_way_devig.py   ABSENT from disk
+soccer/features/loaders.py             ABSENT from disk
+seed-bootstrap source refs             PRESENT on main (run_live_odds_refresh_worker.py)
+```
+- **FIX #1 (seed bootstrap) IS ON MAIN** - test and source both. This lane's
+  *"built and tested, never committed"* line and its *"the only work in this lane
+  at risk of being lost"* warning are **STALE**.
+- **FIX #3 (accent join) IS UNVERIFIED - neither confirmed committed nor
+  confirmed lost.** A grep for accent handling hits five files across
+  mlb/nhl/intelligence plus `scripts/build_soccer_picks.py`, too noisy to call
+  either way, and I ran out of context to resolve it. **Two of this lane's named
+  files are ABSENT from disk entirely, so "lost" is a live possibility for #3.**
+  Do not record it as safe on the strength of #1 being safe.
+- **CONSEQUENCE: the "commit the soccer fixes first" gate on taking
+  `run_live_odds_refresh_worker.py` for Phase 2 DOES NOT EXIST.** That file is
+  free to take, subject only to `lane-guard` being unable to see the coordinator
+  sweep's release.
+- I did not edit any soccer code, and did not release this lane - #3 being
+  unresolved is a reason for someone to look, not for me to close it blind.
+
+## 2026-08-17 - THE LEDGER IS A RECORD, NOT EVIDENCE (the inverse of the same day's other lesson)
+
+I relayed *"two uncommitted soccer fixes at risk of being lost"* to the
+coordinator as an action item. **It came from a lane entry, not from a
+measurement.** `git status` was empty and fix #1 was already on main.
+
+**This is the exact inverse of the three errors recorded above it today.** There
+I called healthy things BROKEN from a null lookup. Here I called a committed
+thing AT RISK from a written claim I never checked. **Same root cause: treating
+a statement as a reading.**
+
+`.syndicate/**` records what was true WHEN WRITTEN. This lane was last touched
+two days before I quoted it. **Before acting on or forwarding a ledger claim
+about the state of the working tree - uncommitted work, missing files, a broken
+service - re-measure it.** The cost here was small (a wrong action item, since
+retracted). The cost of the reverse - deleting or "rescuing" files on a stale
+claim - would not have been.
