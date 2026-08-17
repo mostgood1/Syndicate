@@ -755,6 +755,78 @@ and gate it per-league using the Phase 1c machinery that already exists
 and no score **2h50m after kickoff**, while a different 19:30Z fixture resolved
 `FINAL`. A live sim cannot help a game whose state never resolves.
 
+**3e UPDATE 2026-08-17 02:0xZ — THE PHASE-3e TEXT ABOVE IS WRONG, AND THE REAL
+BLOCKER IS CAPACITY, NOT CODE.** Corrected after tracing the actual pipeline
+rather than reasoning from the board's output.
+
+**SOCCER'S LIVE SIM ALREADY EXISTS, RUNS EVERY 60s, AND PUBLISHES.** The text
+above says it "needs a live variant that re-seeds from current score + minute +
+red cards". That is `soccer/features/live_lens.py`, built on
+`match_simulator.simulate_match`'s `initial_state` hook, with
+`build_resume_state()` and `apply_red_card_penalty()`. It has been shipped since
+`df96c3fb`. The published `data/live/soccer_live_lens.json` already carries a
+full live game-line projection per match:
+
+    home_win_probability  away_win_probability  draw_probability
+    over_2_5_probability  both_teams_scored_probability
+    projected_final_home_goals / away_goals / total   corners   simulations
+
+**WHAT IS ACTUALLY MISSING IS THE BOARD JOIN.** Three named gates exclude soccer,
+which is why the board reads `live_aware: 0` on a live MLS match:
+
+    board_enrichment.attach_live_projections_for_sport   `if sport != "mlb"`
+    board_enrichment._LIVE_GAMELINE_SPORTS               frozenset({"mlb","wnba"})
+    live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT        has mlb, wnba; no soccer
+
+Fourth "presence is not reachability" instance of the 2026-08-16 session, and the
+largest: an entire live sim running, publishing every tick, read by nothing.
+
+**BUT WIRING IT TODAY WOULD PRODUCE JOINED-BUT-UNPRICEABLE ROWS.** The join
+releases an edge only when it clears `PRICEABLE_SIGMA = 2.0` standard errors,
+`prob_std_err = sqrt(p(1-p)/n)` (Agresti-Coull). Soccer's live TICK runs at **80
+sims** — deliberately, not by oversight (`_soccer_live_lens_tick_simulations`,
+default 80; the standalone script's 300 is for one-off runs):
+
+    sims | std_err @ p=.50 | min releasable edge
+      80 |      5.46 pp    |   **10.91 pp**      <- soccer today
+     120 |      4.49 pp    |     8.98 pp         <- MLB live
+     300 |      2.87 pp    |     5.74 pp
+    1000 |      1.58 pp    |     3.16 pp
+
+For soccer's THREE-WAY market (p nearer 0.33 per outcome) the bar is ~10.3 pp. A
+live edge that large is rare, so `live_aware` would go 0 -> non-zero while edges
+stayed ~0, and it would look like the wiring failed when the gate was working.
+
+**AND 300 SIMS IS NOT AFFORDABLE ON THAT SERVICE TODAY. MEASURED 2026-08-17
+01:49-01:56Z on live-odds-worker (2048 MB cap), STILL AT 80 SIMS:**
+
+    peak container_memory_mb   1855.2 of 2048   (90.6%)
+    headroom at recent ticks   257-415 MB
+    samples                    127
+
+Soccer runs **4 separate Monte Carlo passes per in-progress match**
+(`project_live_match` + 2x `goal_in_window_probability` +
+`project_live_player_props`), on a 60s cadence, across up to ~18 concurrent
+fixtures (measured 2026-08-16). 80 -> 300 is 3.75x on each pass, into 257 MB of
+headroom — on the same 2 GB service where WNBA's builder once allocated
+**+1,062 MB in a single step** and crash-looped the container (boots 03:07:56,
+03:09:09, 03:10:31, 03:12:07 on 2026-08-08). **Do not set
+`SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS=300` on live-odds-worker as it
+stands.**
+
+**SO PHASE 3e REDUCES TO PHASE 4.** Soccer's live tier is blocked by neither
+engine work nor wiring; it is blocked by memory on a 2 GB service. That is
+exactly the capacity question Phase 4 exists to settle, and Phase 4 is stuck
+behind `#449`. **The primary goal has ONE blocker, not several** — every route to
+"live sims for every sport" arrives at the same wall.
+
+**When capacity is settled, the remaining work is small and known:** add soccer
+to the two gates and to `LIVE_LENS_SOURCES_BY_SPORT`, with a THREE-WAY-aware
+index shape (`draw_probability` has no counterpart in MLB's 2-way moneyline
+index), then raise the tick sim count. Both join files are held by OPEN lanes
+(`board_enrichment.py` by `wnba-live-tier`, `live_gameline_join.py` by
+`live-edge-basis`), so agree the claim before editing.
+
 **Contract every addition must satisfy** (enforced by
 `tests/test_live_lens_active_sports.py`): builder + validator + snapshot path,
 all three registered, plus a per-sport memory gate **calibrated from a real
