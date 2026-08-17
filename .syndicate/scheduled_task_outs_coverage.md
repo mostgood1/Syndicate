@@ -44,3 +44,31 @@ failing. `[the "confirm the code ran" rule]`
   and the seal half is not, so a good pregame capture can still be overwritten
   by a later thin fetch. A FAIL may be the missing seal rather than the cadence —
   the task says so explicitly.
+
+## Gate B — marker contention (added 2026-08-17, AFTER the flip went live)
+
+Commit `7c4439f4` found that **refresh-worker sweeps mlb/wnba/soccer/nfl while
+owning only nfl**, gated by neither the ownership flags nor `ACTIVE_SPORTS`, so
+it **wins the shared unnamespaced cadence marker and starves the designated
+owner** — which for MLB odds is live-odds-worker, the service carrying the flag.
+
+**The flag is on live-odds-worker ONLY.** So a post-slate capture on 08-18 has
+two explanations demanding opposite follow-ups, and the task now forces them
+apart:
+
+| verdict | meaning | follow-up |
+|---|---|---|
+| **INCONCLUSIVE** | refresh-worker won the marker; the mechanism never ran | fix the marker — **do NOT roll back the flag** |
+| **FAIL** | the mechanism ran and did not help | roll the flag back |
+
+Discriminator: pull `FIXTURE_CADENCE`/`PREGAME` lines from **both** services for
+08-18 daytime. If refresh-worker swept MLB while live-odds-worker's MLB sweeps
+are absent, that is contention. Caveat written into the task: a live sport is
+kept unconditionally, so a missing `mlb` line mid-slate is not by itself
+starvation. The task also checks whether a namespacing fix shipped in the
+meantime, **by deployed SHA per service, not by what is on `main`**.
+
+**Three alternative explanations now, not one.** The third is the undeployed
+monotone seal (`bafb4fb2`): a good pregame capture can still be overwritten by a
+later thin fetch. Reporting a starved or seal-less mechanism as a failed one
+would get a working change rolled back.
