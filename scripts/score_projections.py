@@ -45,6 +45,7 @@ import io
 import json
 import re
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 from collections import defaultdict
@@ -66,7 +67,12 @@ DATE_RE = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
 
 BASE = "https://syndicate-an21.onrender.com"
 ARTIFACT_PREFIX = "mlb_source/source_artifacts/data"
-CACHE = REPO_ROOT / "reports/phase7_cache"
+# OUTSIDE THE REPO ON PURPOSE. These are whole production artifacts -- one
+# `--source production` run cached 58.6 MB across 31 files. Left under
+# `reports/` they are untracked, un-ignored and sitting in a tree where other
+# sessions stage broadly, which is how a 58 MB blob ends up in a commit nobody
+# meant to make. Regenerating costs egress; a bad commit costs more.
+CACHE = Path(tempfile.gettempdir()) / "syndicate_phase7_cache"
 
 # THE TWO SOURCES ARE NEARLY DISJOINT IN TIME, and that is the opposite of what
 # "production has more history than the checkout" would lead you to expect.
