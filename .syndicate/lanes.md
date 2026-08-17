@@ -2496,6 +2496,155 @@ and then failed the thing it was checking, which is the point of running it.
   (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
 - Blocked by: none.
 
+### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+- Goal: WNBA live games carry a live tier on the Layer 1 board, GAME LINES and
+  PROPS. Baseline was **0 of 521 rows** across 2 live games.
+- Files: `syndicate/features/shared/live_gameline_join.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `syndicate/features/wnba/cards.py`, `tests/test_wnba_live_tier.py`,
+  `tests/test_wnba_scoreboard_carry_forward.py`.
+- **DONE — game lines.** `attach_live_gamelines_for_sport` was gated
+  `if sport != "mlb"` on a docstring claim that WNBA "has no live tier at all",
+  which had gone stale: the live-lens loop already ran for wnba on a 60s tick,
+  writing the exact path the join reads. Shipped `fdc72dd0` (refresh-worker) via
+  a per-sport `LIVE_LENS_SOURCES_BY_SPORT` (wnba stamps `live_projection`, not
+  `live_mc`) plus a top-level team-name fallback (wnba has no `matchup`
+  wrapper). **Verified twice on production live slates: 149 rows, then 218 of
+  321.** No `simsRun` is published by wnba, so the edge is withheld by
+  `REASON_UNUSABLE_SIMS` — an n was NOT invented to open the gate.
+- **DONE — the live_state dropout.** `_public_scoreboard_live_state_payload` was
+  `except Exception: return None`, publishing a 6s ESPN timeout as "no games in
+  progress". Age-bounded MARKED carry-forward shipped `16a898ef`
+  (live-odds-worker). **Its trigger has NOT fired in production yet** — unit
+  verified only.
+- **NOT DONE — props.** Across the entire wnba snapshot, `actual` /
+  `live_projection` / `live_total` / `live_total_line` appear 24 times each and
+  are **NULL in all 24**. Wiring the prop join would be inert. Producer gap in
+  `wnba/live_lens.py` and its box-score source.
+- **NOT DONE — tick-over-tick movement.** The stated verification wanted a diff
+  proving the numbers MOVE. The second tick had no live rows to compare, so it
+  is **unproven, not passed**. Needs another live WNBA slate.
+- Verification: game-line half MET (two independent live slates). Props half and
+  movement UNMET. Lane stays OPEN for those.
+- Blocked by: none.
+
+#### game-shape-capture — WNBA pbp CAPTURE BUILT; THE SOURCE IS SERVING A FROZEN SKELETON (`#455`) `[2026-08-16 ~19:3x CDT]`
+
+**The user corrected me and the correction found a production defect.** I had
+reported "no WNBA pbp corpus exists on Render" and, when asked "did you check
+render disk", had to answer no — I inferred unreachability from
+`HOT_ARTIFACT_PATTERNS` without checking whether the data was there.
+
+**Two of my own claims were wrong:**
+1. "Production has been accumulating all season" — **false**. The endpoint
+   returns 0 games for 2026-06-27 and 2026-07-15; it serves live only.
+2. "The allowlist is the root cause" — **not the binding constraint**. Adding
+   the pattern would export an empty set. I had proposed a fix that would have
+   cost a web deploy and changed nothing.
+
+**What the checkout files actually are:** cached API responses. The
+`payload`/`ttl`/`ok`/`generated_at` wrapper is an HTTP cache envelope, not a
+data record — which explains all three anomalies at once (17 records on 2 dates,
+test fixtures `0000000001` mixed in, mid-game partials beside completed games).
+
+**THEN THE USER SAID: 2 of today's 3 games are FINAL and one is LIVE.** The
+endpoint returned all-null for all three. Reproduced and filed as **`#455`**:
+`build_live_pbp_stats_payload` (`wnba/cards.py:6390`) never computes pbp — it
+replays a stored snapshot and otherwise emits a hardcoded all-null skeleton,
+**and a skeleton has a non-empty `games` list, so once persisted it is served in
+preference to real data all day** (`:6401`). `generated_at` read
+**16:14:21 CDT, frozen ~3 hours** on a `ttl=1` re-fetch.
+
+**BUILT:** `scripts/capture_wnba_pbp.py` + `tests/test_capture_wnba_pbp.py`.
+Its defining rule is a REFUSAL: it never stores a skeleton, counts them
+separately, and **exits 2** when every record is one, so "captured nothing"
+cannot read as "nothing happened". Storing what the endpoint returns would have
+industrialised the defect — a corpus of confident nulls with a fake denominator.
+`--probe` reports without writing.
+
+**12 tests, 5 of 5 mutations caught** (skeleton counted as signal, zero-valued
+home/away counted as signal, storing with no signal, probe mode writing,
+possessions-only detection dropping early live ticks).
+
+**Deliberately NOT done:** no second implementation of the `poss_est` formula.
+Inventing one is how two numbers that should agree start disagreeing.
+
+#### game-shape-capture — `#456` NBA DATE-SCOPE FIX BUILT; `#455` WNBA BLOCKED BY A CLAIM `[2026-08-16 ~19:5x CDT]`
+
+**NBA does NOT share `#455`.** Checked component by component rather than assumed: NBA **never persists** (zero write calls in `nba/live_lens.py`), so WNBA's sticky-skeleton mechanism cannot occur. Both sports DO emit the identical all-null `ok: True` skeleton, so the instrument-blindness half is shared.
+
+**NBA has its own defect, confirmed in production**: one undated snapshot path served for every requested date (`2025-12-25` -> payload date `2026-06-13`). Filed as **`#456`**, fix built and tested, **NOT DEPLOYED**. The refusal fires on the real endpoint path — `nba.py:_allow_stored_date_fallback()` returns `False`, verified BEFORE writing the fix rather than after.
+
+**A PRE-EXISTING FAILURE, NOT MINE:** `test_nba_refresh_runner.py::test_main_materializes_core_artifacts_into_bundle_root` fails identically with my change reverted to `origin/main`'s version. Attributed by measurement, not assumed.
+
+**`#455` (WNBA) CANNOT BE FIXED BY THIS LANE.** `syndicate/features/wnba/cards.py` is claimed by **`wnba-live-tier` (OPEN)** — re-checked immediately before the edit; no edit was made. Handed to that session. **Worth their attention: their own lane status reads "PROPS NOT WIRED — the source emits nothing." That may BE `#455`** — the skeleton is exactly what a prop consumer would see as "the source emits nothing."
+
+#### refresh-worker-oom-recurrence — CALLER-SIDE TRACE `[2026-08-17 ~00:3xZ]` — **the allocator's SPAN is now named, and BOTH designed brakes on it are measurably inert**
+- **Verdict reproduced twice** (`deploys.md`): `last_stage=board_contract_end` on
+  the 00:19:48Z kill (`94447830`, anon 1209->3998MB/~25s) and the 00:32:32Z kill
+  (`7c2b1a17`, anon 1354->3751MB/~16s). Different commits; the second had no
+  concurrent deploy in its window. `apply_game_board_contract` is exonerated.
+- **The span, from the loop structure** (`intelligence.py:2793-2835`): between
+  `OVERVIEW_SPORT_BEGIN` (a bare `print`, so it CANNOT set `last_stage` — which
+  is why the climb looked unmarked) and the `overview_sport_end` stage marker,
+  there are exactly two calls: **`_build_sport_overview`** (`home.py:6733`) and
+  **`_emit(sport_row)`**. For non-MLB sports the board contract is the LAST
+  statement of the cards builder (`nfl/cards.py:505` is
+  `return apply_game_board_contract(...)`), so `board_contract_end` is the last
+  marker before the stack unwinds — the allocator is ABOVE it, in that span.
+- **MEASURED IN PRODUCTION, window 00:24:01Z (7c2b1a17 live) -> 00:35:50Z,
+  containing the 00:32:32Z kill:**
+
+      OVERVIEW_SPORT_BEGIN            30   incl. a FULL 8-sport pass at 00:33:38-40
+                                           with force_refresh=True skip_game_hydration=False
+      OVERVIEW_SPORT_END              30
+      OVERVIEW_REBUILD_RATE_LIMITED    0   <-- #251's throttle on hydrated rebuilds
+      OVERVIEW_STOPPED_FOR_MEMORY      0   <-- #250's memory circuit breaker
+
+  **The expensive path runs all 8 sports hydrated under `force_refresh=True`,
+  and neither guard built to bound it engages — across a window containing an
+  OOM kill that reached headroom 0.0.**
+- **This REPRODUCES `#336` on current code.** That entry recorded
+  `OVERVIEW_REBUILD_RATE_LIMITED` firing ZERO times over 29 minutes and 11 passes
+  and left the reason unresolved. It is still zero. The defect is open, not
+  historical.
+- **The retention mechanism `home.py:6766-6782` describes is the standing
+  hypothesis, NOT yet confirmed by me:** `_HOME_OVERVIEW_TTL_SEC` is 10s against
+  a ~90s board loop, so the cache "structurally cannot hit" while still RETAINING
+  the previous hydrated row — the process holds the old context and builds a new
+  one on top. That comment's own 2026-08-07 numbers are `+2.9GB in 73s`. Tonight's
+  shape is +2.4GB in 16s and +2.8GB in 25s: same magnitude, much faster.
+- **NOT CLAIMED, and the next person must not read it as claimed:** I have not
+  shown WHICH of the two calls allocates, and I have not established why either
+  guard is silent. Two candidate reasons for the memory guard, untested:
+  (a) it is checked BETWEEN sports, so an excursion INSIDE one sport is invisible
+  to it by construction — `#250`'s own comment says this; (b)
+  `_overview_headroom_exhausted` (`intelligence.py:2635-2661`) returns **False**
+  when the snapshot is `None` or lacks `sufficient`, i.e. **unknown maps onto the
+  permissive branch and emits no reason** — the failure shape
+  `feedback_unknown_must_not_default_permissive` describes.
+- **NEXT, in order:** (1) determine why `OVERVIEW_STOPPED_FOR_MEMORY` is silent —
+  (a) vs (b) above is decidable by reading one snapshot at a check point;
+  (2) instrument the `_build_sport_overview` / `_emit` boundary the way
+  `board_contract_end` instrumented the builder's return, since that split is now
+  the whole remaining question; (3) only then touch the floors.
+#### PHASE 1C — **VERIFIED IN PRODUCTION 2026-08-17 00:11:36Z.** Lane goal met.
+- The lane's pre-registered outcome, met exactly: `FIXTURE_CADENCE sport=soccer
+  league=mls due:imminent_handoff_to_t_window:1107s` against `championship` /
+  `la_liga` / `primeira_liga` all `skip:mid:18-19h_out`, plus `scope=league
+  due=mls of=4` and a live process carrying `--soccer-leagues mls`.
+- Shipped as part of a three-service CONVERGENCE (live-odds-worker `c348da53`,
+  web `763a2f66`, refresh-worker `7c2b1a17`), each a real merge on its own live
+  SHA. 303 tests passed pre-deploy; 0 tracebacks post-deploy.
+- **Falsification test did NOT fire:** per-league resolution did reach distinct
+  tiers, so league granularity WAS the missing term.
+- **Still open in this lane's neighbourhood, NOT done:** soccer live sims. A live
+  MLS match serves 321 rows / 5 projections / 0 live_aware. `#440`'s Phase 3 has
+  no soccer item at all. That is a plan defect, recorded in `state.md`.
+- **Found while deploying, unrelated to this lane:** `#449` refresh-worker OOM
+  loop (23 kills / 8 hours). `#447` red layer2 wiring tests. `#448` unattended
+  scheduled tasks wedging deploy claims.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 - `nfl-pbp-root-resolution` — nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root caus → `lanes_closed.md`.
 - `render-events-reader` — render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this → `lanes_closed.md`.
@@ -2720,151 +2869,3 @@ False` is correct for the card payload that function reads; the comment now says
 so precisely and points at the `live_pbp_stats` family where possessions DO
 live, with the coverage caveat and the tricode-vs-home/away trap attached.
 
-### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
-- Goal: WNBA live games carry a live tier on the Layer 1 board, GAME LINES and
-  PROPS. Baseline was **0 of 521 rows** across 2 live games.
-- Files: `syndicate/features/shared/live_gameline_join.py`,
-  `syndicate/features/shared/board_enrichment.py`,
-  `syndicate/features/wnba/cards.py`, `tests/test_wnba_live_tier.py`,
-  `tests/test_wnba_scoreboard_carry_forward.py`.
-- **DONE — game lines.** `attach_live_gamelines_for_sport` was gated
-  `if sport != "mlb"` on a docstring claim that WNBA "has no live tier at all",
-  which had gone stale: the live-lens loop already ran for wnba on a 60s tick,
-  writing the exact path the join reads. Shipped `fdc72dd0` (refresh-worker) via
-  a per-sport `LIVE_LENS_SOURCES_BY_SPORT` (wnba stamps `live_projection`, not
-  `live_mc`) plus a top-level team-name fallback (wnba has no `matchup`
-  wrapper). **Verified twice on production live slates: 149 rows, then 218 of
-  321.** No `simsRun` is published by wnba, so the edge is withheld by
-  `REASON_UNUSABLE_SIMS` — an n was NOT invented to open the gate.
-- **DONE — the live_state dropout.** `_public_scoreboard_live_state_payload` was
-  `except Exception: return None`, publishing a 6s ESPN timeout as "no games in
-  progress". Age-bounded MARKED carry-forward shipped `16a898ef`
-  (live-odds-worker). **Its trigger has NOT fired in production yet** — unit
-  verified only.
-- **NOT DONE — props.** Across the entire wnba snapshot, `actual` /
-  `live_projection` / `live_total` / `live_total_line` appear 24 times each and
-  are **NULL in all 24**. Wiring the prop join would be inert. Producer gap in
-  `wnba/live_lens.py` and its box-score source.
-- **NOT DONE — tick-over-tick movement.** The stated verification wanted a diff
-  proving the numbers MOVE. The second tick had no live rows to compare, so it
-  is **unproven, not passed**. Needs another live WNBA slate.
-- Verification: game-line half MET (two independent live slates). Props half and
-  movement UNMET. Lane stays OPEN for those.
-- Blocked by: none.
-
-#### game-shape-capture — WNBA pbp CAPTURE BUILT; THE SOURCE IS SERVING A FROZEN SKELETON (`#455`) `[2026-08-16 ~19:3x CDT]`
-
-**The user corrected me and the correction found a production defect.** I had
-reported "no WNBA pbp corpus exists on Render" and, when asked "did you check
-render disk", had to answer no — I inferred unreachability from
-`HOT_ARTIFACT_PATTERNS` without checking whether the data was there.
-
-**Two of my own claims were wrong:**
-1. "Production has been accumulating all season" — **false**. The endpoint
-   returns 0 games for 2026-06-27 and 2026-07-15; it serves live only.
-2. "The allowlist is the root cause" — **not the binding constraint**. Adding
-   the pattern would export an empty set. I had proposed a fix that would have
-   cost a web deploy and changed nothing.
-
-**What the checkout files actually are:** cached API responses. The
-`payload`/`ttl`/`ok`/`generated_at` wrapper is an HTTP cache envelope, not a
-data record — which explains all three anomalies at once (17 records on 2 dates,
-test fixtures `0000000001` mixed in, mid-game partials beside completed games).
-
-**THEN THE USER SAID: 2 of today's 3 games are FINAL and one is LIVE.** The
-endpoint returned all-null for all three. Reproduced and filed as **`#455`**:
-`build_live_pbp_stats_payload` (`wnba/cards.py:6390`) never computes pbp — it
-replays a stored snapshot and otherwise emits a hardcoded all-null skeleton,
-**and a skeleton has a non-empty `games` list, so once persisted it is served in
-preference to real data all day** (`:6401`). `generated_at` read
-**16:14:21 CDT, frozen ~3 hours** on a `ttl=1` re-fetch.
-
-**BUILT:** `scripts/capture_wnba_pbp.py` + `tests/test_capture_wnba_pbp.py`.
-Its defining rule is a REFUSAL: it never stores a skeleton, counts them
-separately, and **exits 2** when every record is one, so "captured nothing"
-cannot read as "nothing happened". Storing what the endpoint returns would have
-industrialised the defect — a corpus of confident nulls with a fake denominator.
-`--probe` reports without writing.
-
-**12 tests, 5 of 5 mutations caught** (skeleton counted as signal, zero-valued
-home/away counted as signal, storing with no signal, probe mode writing,
-possessions-only detection dropping early live ticks).
-
-**Deliberately NOT done:** no second implementation of the `poss_est` formula.
-Inventing one is how two numbers that should agree start disagreeing.
-
-#### game-shape-capture — `#456` NBA DATE-SCOPE FIX BUILT; `#455` WNBA BLOCKED BY A CLAIM `[2026-08-16 ~19:5x CDT]`
-
-**NBA does NOT share `#455`.** Checked component by component rather than assumed: NBA **never persists** (zero write calls in `nba/live_lens.py`), so WNBA's sticky-skeleton mechanism cannot occur. Both sports DO emit the identical all-null `ok: True` skeleton, so the instrument-blindness half is shared.
-
-**NBA has its own defect, confirmed in production**: one undated snapshot path served for every requested date (`2025-12-25` -> payload date `2026-06-13`). Filed as **`#456`**, fix built and tested, **NOT DEPLOYED**. The refusal fires on the real endpoint path — `nba.py:_allow_stored_date_fallback()` returns `False`, verified BEFORE writing the fix rather than after.
-
-**A PRE-EXISTING FAILURE, NOT MINE:** `test_nba_refresh_runner.py::test_main_materializes_core_artifacts_into_bundle_root` fails identically with my change reverted to `origin/main`'s version. Attributed by measurement, not assumed.
-
-**`#455` (WNBA) CANNOT BE FIXED BY THIS LANE.** `syndicate/features/wnba/cards.py` is claimed by **`wnba-live-tier` (OPEN)** — re-checked immediately before the edit; no edit was made. Handed to that session. **Worth their attention: their own lane status reads "PROPS NOT WIRED — the source emits nothing." That may BE `#455`** — the skeleton is exactly what a prop consumer would see as "the source emits nothing."
-
-#### refresh-worker-oom-recurrence — CALLER-SIDE TRACE `[2026-08-17 ~00:3xZ]` — **the allocator's SPAN is now named, and BOTH designed brakes on it are measurably inert**
-- **Verdict reproduced twice** (`deploys.md`): `last_stage=board_contract_end` on
-  the 00:19:48Z kill (`94447830`, anon 1209->3998MB/~25s) and the 00:32:32Z kill
-  (`7c2b1a17`, anon 1354->3751MB/~16s). Different commits; the second had no
-  concurrent deploy in its window. `apply_game_board_contract` is exonerated.
-- **The span, from the loop structure** (`intelligence.py:2793-2835`): between
-  `OVERVIEW_SPORT_BEGIN` (a bare `print`, so it CANNOT set `last_stage` — which
-  is why the climb looked unmarked) and the `overview_sport_end` stage marker,
-  there are exactly two calls: **`_build_sport_overview`** (`home.py:6733`) and
-  **`_emit(sport_row)`**. For non-MLB sports the board contract is the LAST
-  statement of the cards builder (`nfl/cards.py:505` is
-  `return apply_game_board_contract(...)`), so `board_contract_end` is the last
-  marker before the stack unwinds — the allocator is ABOVE it, in that span.
-- **MEASURED IN PRODUCTION, window 00:24:01Z (7c2b1a17 live) -> 00:35:50Z,
-  containing the 00:32:32Z kill:**
-
-      OVERVIEW_SPORT_BEGIN            30   incl. a FULL 8-sport pass at 00:33:38-40
-                                           with force_refresh=True skip_game_hydration=False
-      OVERVIEW_SPORT_END              30
-      OVERVIEW_REBUILD_RATE_LIMITED    0   <-- #251's throttle on hydrated rebuilds
-      OVERVIEW_STOPPED_FOR_MEMORY      0   <-- #250's memory circuit breaker
-
-  **The expensive path runs all 8 sports hydrated under `force_refresh=True`,
-  and neither guard built to bound it engages — across a window containing an
-  OOM kill that reached headroom 0.0.**
-- **This REPRODUCES `#336` on current code.** That entry recorded
-  `OVERVIEW_REBUILD_RATE_LIMITED` firing ZERO times over 29 minutes and 11 passes
-  and left the reason unresolved. It is still zero. The defect is open, not
-  historical.
-- **The retention mechanism `home.py:6766-6782` describes is the standing
-  hypothesis, NOT yet confirmed by me:** `_HOME_OVERVIEW_TTL_SEC` is 10s against
-  a ~90s board loop, so the cache "structurally cannot hit" while still RETAINING
-  the previous hydrated row — the process holds the old context and builds a new
-  one on top. That comment's own 2026-08-07 numbers are `+2.9GB in 73s`. Tonight's
-  shape is +2.4GB in 16s and +2.8GB in 25s: same magnitude, much faster.
-- **NOT CLAIMED, and the next person must not read it as claimed:** I have not
-  shown WHICH of the two calls allocates, and I have not established why either
-  guard is silent. Two candidate reasons for the memory guard, untested:
-  (a) it is checked BETWEEN sports, so an excursion INSIDE one sport is invisible
-  to it by construction — `#250`'s own comment says this; (b)
-  `_overview_headroom_exhausted` (`intelligence.py:2635-2661`) returns **False**
-  when the snapshot is `None` or lacks `sufficient`, i.e. **unknown maps onto the
-  permissive branch and emits no reason** — the failure shape
-  `feedback_unknown_must_not_default_permissive` describes.
-- **NEXT, in order:** (1) determine why `OVERVIEW_STOPPED_FOR_MEMORY` is silent —
-  (a) vs (b) above is decidable by reading one snapshot at a check point;
-  (2) instrument the `_build_sport_overview` / `_emit` boundary the way
-  `board_contract_end` instrumented the builder's return, since that split is now
-  the whole remaining question; (3) only then touch the floors.
-#### PHASE 1C — **VERIFIED IN PRODUCTION 2026-08-17 00:11:36Z.** Lane goal met.
-- The lane's pre-registered outcome, met exactly: `FIXTURE_CADENCE sport=soccer
-  league=mls due:imminent_handoff_to_t_window:1107s` against `championship` /
-  `la_liga` / `primeira_liga` all `skip:mid:18-19h_out`, plus `scope=league
-  due=mls of=4` and a live process carrying `--soccer-leagues mls`.
-- Shipped as part of a three-service CONVERGENCE (live-odds-worker `c348da53`,
-  web `763a2f66`, refresh-worker `7c2b1a17`), each a real merge on its own live
-  SHA. 303 tests passed pre-deploy; 0 tracebacks post-deploy.
-- **Falsification test did NOT fire:** per-league resolution did reach distinct
-  tiers, so league granularity WAS the missing term.
-- **Still open in this lane's neighbourhood, NOT done:** soccer live sims. A live
-  MLS match serves 321 rows / 5 projections / 0 live_aware. `#440`'s Phase 3 has
-  no soccer item at all. That is a plan defect, recorded in `state.md`.
-- **Found while deploying, unrelated to this lane:** `#449` refresh-worker OOM
-  loop (23 kills / 8 hours). `#447` red layer2 wiring tests. `#448` unattended
-  scheduled tasks wedging deploy claims.
