@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -528,6 +529,95 @@ def evaluate_protected_runtime_contracts(payload: object) -> list[dict[str, obje
         if actual["parity_gap_count"] != int(expected["parity_gap_count"]):
             violations.append({"slug": slug, "field": "parity_gap_count", "expected": expected["parity_gap_count"], "actual": actual["parity_gap_count"]})
     return violations
+
+
+PROTECTED_MIRROR_DATA_FAMILIES = (
+    {
+        "slug": "mlb",
+        "description": "daily summary artifacts on disk",
+        # BOTH mirror roots. The tracked copies live under `data/mlb_source/data/`
+        # and the bundle copies under `source_artifacts/`; either satisfies a
+        # reader, so requiring a specific one would fail on a legitimate layout.
+        "globs": (
+            "data/mlb_source/data/daily/daily_summary_*.json",
+            "data/mlb_source/source_artifacts/data/daily/daily_summary_*.json",
+        ),
+        "min_count": 1,
+    },
+)
+
+
+def evaluate_protected_mirror_data(root: Path | None = None) -> dict[str, object]:
+    """Does the mirror actually HAVE data? Counted on disk, not read off a manifest.
+
+    **WHY THIS EXISTS.** `PROTECTED_MIRROR_ASSETS`' breadth check reads
+    `mirror_refresh_latest.json` -- the manifest of the last refresh -- and the
+    MLB entry is waived (see `ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS`), because
+    that manifest is CI-written, was a month stale, and no local action updates
+    it. Proved on 2026-08-17: 255 artifacts (186 MiB) were pulled from production
+    taking the mirror 161 -> 416 files, matching production inventory exactly, and
+    the violation did not move at all.
+
+    Waiving it left a hole, and this closes it. `PROTECTED_LOCAL_RESOLVER_CHECKS`
+    looks like the backstop and is NOT: it runs against a `TemporaryDirectory`
+    with patched roots and verifies path RESOLUTION, so it passes on a completely
+    empty mirror.
+
+    **THE FLOOR IS 1, DELIBERATELY, AND THAT IS NOT LAZINESS.** The failure this
+    has to catch is the mirror being EMPTIED or never populated -- a catastrophic
+    state no other check in this gate sees. It must NOT re-fail on the thing the
+    waiver was granted for: a mirror that is legitimately thin or lagging.
+    `data/**` is a lossy, per-family-scheduled mirror by design (CLAUDE.md), so a
+    count floor tuned to today's 416 would fail every fresh clone and every
+    quiet-family day, and would be waived within the week like its predecessor.
+    A gate that fires on normal operation gets switched off.
+
+    Staleness is REPORTED, never gated: `newest_date` and `count` go into the
+    report so a human can see a lagging mirror without the gate blocking on it.
+    If staleness ever needs to gate, it needs its own decision and its own
+    allowance list -- do not quietly raise `min_count` to approximate it.
+    """
+    repo_root = (root or ROOT).resolve()
+    families: list[dict[str, object]] = []
+    violations: list[dict[str, object]] = []
+    date_re = re.compile(r"(20\d\d)[-_](\d\d)[-_](\d\d)")
+    for family in PROTECTED_MIRROR_DATA_FAMILIES:
+        matches: list[Path] = []
+        for pattern in family["globs"]:
+            matches.extend(repo_root.glob(str(pattern)))
+        files = [path for path in matches if path.is_file()]
+        dates = sorted(
+            {"-".join(m.groups()) for path in files for m in [date_re.search(path.name)] if m}
+        )
+        total_bytes = sum(path.stat().st_size for path in files)
+        summary = {
+            "slug": str(family["slug"]),
+            "description": str(family["description"]),
+            "count": len(files),
+            "min_count": int(family["min_count"]),
+            "bytes": total_bytes,
+            "distinct_dates": len(dates),
+            "oldest_date": dates[0] if dates else None,
+            "newest_date": dates[-1] if dates else None,
+        }
+        families.append(summary)
+        if len(files) < int(family["min_count"]):
+            violations.append(
+                {
+                    "slug": str(family["slug"]),
+                    "description": str(family["description"]),
+                    "issue": "mirror_family_empty",
+                    "globs": [str(pattern) for pattern in family["globs"]],
+                    "count": len(files),
+                    "min_count": int(family["min_count"]),
+                }
+            )
+    return {
+        "ok": not violations,
+        "family_count": len(PROTECTED_MIRROR_DATA_FAMILIES),
+        "families": families,
+        "violations": violations,
+    }
 
 
 def evaluate_protected_mirror_assets(root: Path | None = None) -> list[dict[str, object]]:
@@ -1323,6 +1413,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     protected_local_resolver_violations = evaluate_protected_local_resolvers()
     protected_source_shell_violations = evaluate_protected_source_shell_routes()
+    # Reads the DISK, unlike the manifest-breadth check above whose MLB entry is
+    # waived. See `evaluate_protected_mirror_data` for why the floor is 1.
+    protected_mirror_data = evaluate_protected_mirror_data()
     advanced_readiness = evaluate_active_sport_advanced_readiness()
     runtime_dependency_summary = (
         module_tracker_payload.get("gap_summary") if isinstance(module_tracker_payload, dict) else {}
@@ -1336,6 +1429,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         and not unexpected_protected_mirror_asset_violations
         and not protected_local_resolver_violations
         and not protected_source_shell_violations
+        and bool(protected_mirror_data.get("ok"))
         and bool(advanced_readiness.get("ok"))
     )
 
@@ -1375,6 +1469,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "protected_contract_count": len(PROTECTED_RUNTIME_CONTRACTS),
             "protected_contract_violations": protected_contract_violations,
             "protected_mirror_asset_count": len(PROTECTED_MIRROR_ASSETS),
+            "protected_mirror_data": protected_mirror_data,
             "protected_mirror_asset_violations": protected_mirror_asset_violations,
             "allowed_protected_mirror_asset_violation_count": len(ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS),
             "allowed_protected_mirror_asset_violations": allowed_protected_mirror_asset_violations,
