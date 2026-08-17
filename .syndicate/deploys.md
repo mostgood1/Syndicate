@@ -10289,3 +10289,30 @@ Firing this would have made it 15.
 Cadence makes the pregame capture happen; the seal makes it stick. Flipping
 cadence alone improves capture but still lets a later thin fetch overwrite a good
 seal on any date whose slate clock is unreadable.
+
+### MEASUREMENT SCHEDULED - the open WNBA row above has an owner and a date
+
+**Task `wnba-game-cards-coverage-check`, fires ONCE 2026-08-18 13:00 CDT**
+(`~/.claude/scheduled-tasks/wnba-game-cards-coverage-check/SKILL.md`). Chosen so
+several 2h WNBA pregame cycles have run and it is still ~5h before first tip
+(23:00Z).
+
+**Expected reading: `scheduled=4 covered=4`** on the 08-18 slate (LAS@CON,
+IND@TOR, NYL@CHI, ATL@LVA / `401857152-155`). It fills in the measurement column
+on the 2026-08-17 row and states CONFIRMED / FAILED / STILL UNMEASURED.
+
+**The task carries the traps forward so the next reader does not re-learn them:**
+- **`fixture_id` in the header proves only that the code RAN.** Header present
+  WITH `covered<scheduled` means the id shipped and the coverage fix did not.
+  It is told to report a RATIO, never a bare row count.
+- **It must not believe a null.** Before reporting "did not run" it has to
+  re-confirm the emitter is in the deployed SHA AND run a control query proving
+  logs flow in the same window - both halves, as done 2026-08-17.
+- **Cadence is not fault.** WNBA pregame is a 7200s interval that logs
+  `PREGAME_CADENCE_SKIPPED sports=wnba`; if it simply has not run, report the
+  marker age rather than calling it a failure.
+- **It must NOT open a lane.** Unattended sessions cannot be messaged and cannot
+  close their own lane - that is exactly what blocked this work earlier today
+  (`export-force-refresh-escape`). Findings go to `deploys.md` only.
+- **It must NOT deploy.** Deploys are coordinator-owned as of the 2026-08-17
+  protocol change.
