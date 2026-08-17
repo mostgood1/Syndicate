@@ -13455,3 +13455,61 @@ the accident.
   observations says the per-market numbers are noisier than their n suggests,
   because observations within a start are not independent.
 
+## 2026-08-17 — TWO RESEARCH ITEMS CLOSED WITH LOCAL DATA (no network, while the statcast fetch ran)
+
+Lane `convergence-phase7-crps`. Read-only.
+
+### 1. **CORRECTION: recency weighting EXISTS and IS ACTIVE.** My research doc was wrong.
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §2e listed *"no explicit recency
+weighting"* as an absent modelling item, labelled BELIEVED-NOT-VERIFIED. **It is
+wrong.**
+
+    sim_engine/data/recency.py -> batter_recent_rates(games=14)
+                                  pitcher_recent_rates(games=6)
+    build_roster.py:1609        batter_recency_weight: float = 0.15
+    build_roster.py:1611        pitcher_recency_weight: float = 0.15
+    applied at :2080-2081 (batters) and :1952-1953 (pitchers)
+
+**No caller overrides the weight**, so recency is live at 15% toward the last 14
+games for batters / 6 for pitchers. **Remove §2e from the gap list.** The
+believed-not-verified label is what made this cheap to catch.
+
+### 2. **Batter fatigue: the naive feature would have the WRONG SIGN.**
+
+Measured on 12,046 player-games / 524 players, local game log only.
+
+**UNPAIRED — more rest looks WORSE:**
+
+    rest 0 (b2b)  AVG .250  TB/AB .421  K% 22.3%
+    rest 1 day    AVG .250  TB/AB .427  K% 22.9%
+    rest 2-3 days AVG .236  TB/AB .396  K% 24.3%
+    rest 4+ days  AVG .232  TB/AB .388  K% 25.2%
+
+    streak 1-2  AVG .246      streak 6-9  AVG .257
+    streak 3-5  AVG .249      streak 10+  AVG .253  (K% 20.2%)
+
+**Both cuts point away from fatigue**, and both are SELECTION: irregular players
+are bench/platoon hitters and injury returnees; everyday players are the good
+ones. **A fatigue feature fitted on this data would learn "rested batters are
+worse" and be actively harmful.**
+
+**WITHIN-PLAYER (paired, controls for player quality) — the sign FLIPS:**
+
+    floor 10 AB  n=384  AVG +0.0078 [-0.0039,+0.0194] n.s.  TB/AB +0.0239 n.s.
+    floor 15 AB  n=327  AVG +0.0025 [-0.0088,+0.0138] n.s.  TB/AB +0.0230 n.s.
+    floor 25 AB  n=182  AVG +0.0164 [+0.0031,+0.0298] SIG   TB/AB +0.0462 SIG
+
+**Direction is consistent and positive at every floor** (rested better), and
+**TB/AB moves ~3x more than AVG** — power before contact, which is the
+physiologically plausible shape.
+
+**BUT SIGNIFICANCE IS NOT ROBUST AND I AM NOT CLAIMING IT.** It appears only at
+the most restrictive floor, with the FEWEST players — the opposite of how power
+normally behaves — so it is more likely a further selection (regulars with enough
+rested AB) or multiple-comparisons noise across three specifications.
+
+**Verdict: do NOT build a batter-fatigue term on this evidence.** The usable
+output is the warning: **any fatigue feature must be fitted WITHIN player.** The
+unpaired version has the wrong sign, and it is the version anyone would write
+first.
