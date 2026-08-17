@@ -43,7 +43,19 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   (a scheduled-task run), and `send_message` refuses to send from those. The
   ledger is the channel; that is why this is here and not a DM.
 
-### export-force-refresh-escape — OPEN — **DEPLOYED TO BOTH WORKERS 17:53Z (refresh-worker `b9f2b5f1`, live-odds-worker `e28594a7`), verified BY CONTENT; EFFECT UNMEASURED — needs a `:cards_props_snapshot` staged record from a forced run over an existing snapshot** — opened 2026-08-16 — session: win-prob-null-readable
+### export-force-refresh-escape — CLOSED — **DEPLOYED TO BOTH WORKERS 17:53Z (refresh-worker `b9f2b5f1`, live-odds-worker `e28594a7`), verified BY CONTENT; EFFECT UNMEASURED — needs a `:cards_props_snapshot` staged record from a forced run over an existing snapshot** — opened 2026-08-16 — session: win-prob-null-readable
+- **CLOSED 2026-08-17 BY OVERRIDE, by the `wnba-fixture-identity` session, with
+  explicit user authorization. NOT my lane and NOT my work.**
+  - **Why it could not release itself:** its session (`Wnba win prob counter
+    read`, `local_e6fe220f-...`) is an **UNATTENDED scheduled-task run** - not
+    running, ~20h idle, and `send_message` REFUSES delivery to it.
+  - **STILL OWED, NOT DISCHARGED BY THIS CLOSE:** its effect measurement (a
+    `:cards_props_snapshot` staged record from a forced run). The code was
+    deployed and verified BY CONTENT; the EFFECT was never measured. Re-open
+    or carry it forward if force-refresh still matters.
+  - **What I changed in its file:** `_GAME_CARDS_HEADER_ORDER` and
+    `_build_local_game_cards_artifact` only. Its own region,
+    `_export_cards_props_snapshot`, is UNTOUCHED.
 - Goal: `--force-refresh` actually regenerates the three props SNAPSHOT exports
   instead of re-serving a stale per-date file. Testable: with `force_refresh=True`
   the builder is CALLED even when the snapshot exists; with `False` it is not.
@@ -3798,3 +3810,27 @@ slate is partial. This is the `unknown-must-not-default-permissive` shape again.
 - **Owed:** betting-accuracy grade, tune/holdout split, per-tier read, and a
   re-run against production artifacts (13 local dates is not the 46 the other
   knobs were fitted on).
+
+### wnba-fixture-identity - CLOSED - **SHIPPED. Stable ESPN fixture identity + the
+game_cards coverage fix, wired into the builder. 117 pass; the only 3 failures are
+PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
+2026-08-17 - session: layer1-board-coverage
+- Files: `wnba_fixture_identity.py`, `test_wnba_fixture_identity.py`,
+  `scripts/refresh_wnba_oddsapi_props.py`, `test_wnba_game_cards_census.py`,
+  `test_wnba_refresh_runner.py`
+- **PROVEN ON THE REAL PRODUCTION ARTIFACT**, replaying the exact bytes prod
+  served for 2026-08-16: **1 row -> 3**, `backfilled=2`, `unresolved=0`. The
+  priced row kept `total=163.5 pred_margin=11.52 pred_total=179.4` and gained
+  `fixture_id=401857149`; the two added carry identity + tip time and **no
+  invented market**.
+- **The census now prints a RATIO**: `scheduled= covered= backfilled=
+  unresolved= backfill_enabled=`. `expected_matchups` is still printed beside
+  it so the gap between the two denominators stays visible - **it reads 0 on
+  production because `predictions_<date>.csv` is ABSENT, which is why every
+  `issubset` gate in that builder passed trivially.**
+- **NOT YET MEASURED IN PRODUCTION.** Nothing is deployed. Autodeploy is off
+  for code, so this push ships nothing on its own. Next: deploy refresh-worker,
+  then read `GAME_CARDS_CENSUS` right after a WNBA tick and confirm
+  `covered==scheduled`. **Do not bank the fix before that line is read** - the
+  census was deployed-but-never-observed once already today.
+- Kill switch `WNBA_GAME_CARDS_SCHEDULE_BACKFILL` (absent = ENABLED).
