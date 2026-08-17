@@ -6144,3 +6144,31 @@ until they return.** I did not chase it - separate defect, separate owner.
   `edge_vs_modelled_fair_pct` populated - expect ~228 on `batter_home_runs`
   alone - and assert **`edge_vs_market_pct` is unchanged on every row.** The
   second half is the one that matters: this must never have moved the real edge.
+
+#### convergence-phase7-crps — CHECKPOINT 4 (FINAL) 2026-08-17 — **P2 shipped to the tree, measured against the market, and DELIBERATELY NOT DEPLOYED**
+
+- **The engine now has a position-player substitution model.** It never did.
+  Behind `GameConfig.position_substitutions`, **default False**, 9 tests, and the
+  leash suite still green.
+- **Opportunity: 34.3% of the gap closed** (starter AB 3.985 → 3.817 vs an actual
+  3.495), measured on the real engine, not a rescaling.
+- **Accuracy vs the market, 2,415 rows:** hits +0.00209, RBI +0.00573, runs
+  +0.00146, **total_bases −0.00154 WORSE**. **The market wins all four.**
+  P2 improved the engine and produced **no edge**.
+- **NOT DEPLOYED, on purpose.** A 3-of-4 record is not a defensible basis for
+  shipping when the failure is in a market we publish. Likely cause is a
+  simplification I shipped knowingly: bench selection is **next-available**, not
+  platoon/position aware, and total bases is power-weighted.
+- **`scripts/reproject_mlb_props_with_subs.py` is the durable win** — a
+  one-command market scoreboard for ANY MLB engine change, from archived rosters,
+  both arms the sim's own PMF over identical seeds. This did not exist today.
+- **Three of my own claims retracted this stretch**: the tendencies artifact was
+  inert three ways; the root cause was the missing CONSUMER not the missing file
+  (`pinch_hit_aggressiveness` is read by nothing); the anchored sim-count table
+  was wrong for NFL/NCAAF. Also: the re-projection smoke run overstated by ~3x.
+- **NEXT ACTION:** platoon/position-aware bench selection, then re-run
+  `reproject_mlb_props_with_subs.py`. Deploy only with the total-bases row
+  non-negative.
+- **Still open:** `hits_runs_rbis` extractor broken; MLB totals' +2.02% has no CI;
+  two deploy requests queued and de-prioritised by me; `outs-props-coverage-check`
+  fires 2026-08-19.
