@@ -2860,3 +2860,52 @@ that guard is doing work.
 **Deployed:** web `763a2f66`, live-odds-worker `c348da53`, refresh-worker
 `4ec66498` (01:23:37Z, another session) — which DESCENDS from my `7623a233` and
 retains Phase 1c and the reconciliation guard. The convergence held.
+## `#454` COMPLETE — RE, WE AND LEVERAGE EXIST AND ARE ON MAIN `[measured 2026-08-16]`
+
+Built from `data/mlb_source/**/feed_live`: 723 files, 714 games, **47 dates**
+(2026-05-28..07-14), **53,049 plate appearances**.
+
+- **`scripts/mlb_run_expectancy.py`** — RE24. Reproduces published values under a
+  single **+14.6%** run-environment factor, 21 of 23 comparable cells within
+  3 SE. **0 score cross-check mismatches over 12,361 half-innings**, monotonic in
+  outs in all 8 base states.
+- **`scripts/mlb_win_expectancy.py`** — WE by COMPOSITION. The empirical table was
+  refused on measurement: 4,039 cells, **median 4 observations**, zero at 1,000+.
+  Composed from P(k runs | base-out) at ~2,200 obs/state.
+- **`scripts/mlb_leverage_index.py`** + **`shared/mlb_leverage_table.py`**
+  (GENERATED, 5,382 cells) — LI matching published values (start 0.93,
+  bottom-9-tied 2.36, bases-loaded-tied-2-out 10.61, 6-run 9th 0.00).
+- **`game_shape.py` emits `leverage_index` + `leverage_source`.** Its leverage
+  REFUSAL is lifted; the module stays pure (generated literals, function-local
+  import).
+
+**THE CAVEATS ARE LOAD-BEARING AND RIDE ON THE RECORDS THEMSELVES:**
+league-average only — i.i.d. innings, one shared run distribution for both sides,
+no team or park term, extras as a constant, and a start-of-game WE of **0.500**
+against a published ~0.540 (that gap IS the omitted home-field advantage).
+**Wrong for a specific matchup.** The RE reference table is **RECALLED, NOT
+SOURCED**; two cells disagree by >3 SE and the attribution is deliberately OPEN.
+
+## `#455` / `#456` — BOTH FIXED, NEITHER DEPLOYED `[measured 2026-08-16]`
+
+- **`#455` WNBA:** `build_live_pbp_stats_payload` never computes pbp — it replays
+  a stored snapshot and otherwise emits an all-null skeleton, and a skeleton has a
+  NON-EMPTY `games` list, so once persisted it was served over real data all day.
+  Reproduced on a slate that was two games FINAL and one LIVE, `generated_at`
+  **frozen 3 hours**. Fixed in `ea9a2be8` under a logged claim override on
+  `wnba/cards.py`, taken on explicit user instruction.
+- **`#456` NBA:** a DIFFERENT defect — one undated snapshot path served for every
+  requested date (`?date=2025-12-25` -> payload date `2026-06-13`). NBA never
+  persists, so it does NOT share `#455`. Fixed in `0fcdefa4`.
+- **Both change what a live endpoint serves and NEITHER IS DEPLOYED.** `#455` is
+  verifiable only during a live slate: check that `generated_at` advances.
+
+## WNBA pbp IS NOT A CORPUS `[measured 2026-08-16]`
+
+`live_pbp_stats_*.jsonl` are **cached API responses** (`payload`/`ttl`/`ok` is an
+HTTP envelope), not a data store. 53 files -> 120 game records -> 17 with
+possessions -> minus 8 placeholder ids and 5 partial snapshots -> **4 usable
+games**. The endpoint serves LIVE ONLY (past dates return 0 games), so there is
+nothing to accumulate historically. **The mirror refresh cannot help — it copies
+local-to-local and never contacts production.** `HOT_ARTIFACT_PATTERNS` excludes
+the family, but that is NOT the binding constraint: there is nothing to export.

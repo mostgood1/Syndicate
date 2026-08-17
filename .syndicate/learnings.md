@@ -3961,3 +3961,66 @@ If a reverted repair does not reproduce failures, the test no longer tests the
 gate and the repair was a cover-up. **Three lines of scripting, and it is the
 difference between fixing a suite and teaching it to lie more quietly** — which
 matters especially here, where one of these tests had been lying for a while.
+### 2026-08-16 — A "NEVER DEFAULTS" TEST THAT ONLY EXERCISES GUARD CLAUSES IS VACUOUS. Three times in one session
+
+Each time the pattern was identical: assert that a lookup does not fall back to a
+permissive value, using inputs rejected BEFORE the fallback is reached. The test
+passes against the broken implementation.
+
+1. `wnba_pbp_possessions.team_possessions` — removing `home`/`away` from the key
+   filter changed nothing, because the `poss_est <= 0` check already dropped them
+   on real data.
+2. `wnba/cards.py:_has_pbp_signal` — the same vacuity, reintroduced hours after
+   fixing the first.
+3. `game_shape.mlb_leverage_index` — `.get(key, 1.0)` passed, because every input
+   in the test was rejected by a guard clause before the dict was touched.
+
+- **The rule going forward:** a test for "does not default" must use an input
+  that **reaches the defaulting line** — valid in every other respect and missing
+  only the thing under test. For a lookup that means a key passing all validation
+  and genuinely absent from the table (here: `1-3` with 0 outs, the one base-out
+  combination below the n>=100 floor). If no such input can be named, the
+  fallback may be unreachable — also worth knowing.
+- **Mutation testing caught all three**, including the third AFTER I had written
+  the rule for the first. Run it against the guard you care most about, not only
+  the code you are least sure of.
+
+### 2026-08-16 — A RESIDUAL THAT CORRELATES WITH THE FITTED VALUE MEANS THE MODEL IS WRONG, NOT THE DATA
+
+Comparing a freshly built RE24 table to published values under an ADDITIVE offset
+gave 0.53 runs of post-offset scatter and a "does not reproduce" verdict — i.e. a
+broken join. The residuals were strongly negative on low-RE cells and positive on
+high-RE ones. That is a scale factor, not a shift: an environment 14.6% livelier
+lifts a 2.3-run cell by 0.34 and a 0.10-run cell by 0.015, and no constant fits
+both. Under a multiplicative fit the same data landed 21 of 23 cells inside 3 SE.
+
+- **The rule going forward:** before concluding the DATA is wrong, scan the
+  residual against the fitted value. Structure there indicts the model.
+- Same session, same shape: a leverage normalisation weighted by state frequency
+  alone made start-of-game read 1.14 when an average plate appearance is 1.00
+  **by definition**. That definition was the check that caught it. **Prefer a
+  quantity whose correct value is known a priori as the sanity check.**
+
+### 2026-08-16 — SAMPLE SIZE CHOOSES THE METHOD. An empirical win-expectancy table was refused at 4 observations per cell
+
+Counting win rates per (inning, half, base-out, score band) over 47 dates gives
+4,039 occupied cells, **median 4 observations**, 68.7% below 10, zero at 1,000+.
+The composition route — estimating P(k runs | base-out state) at ~2,200
+observations per state and convolving — answers the same question from the same
+corpus.
+
+- **The rule going forward:** when a table is too thin, the answer is usually a
+  different ESTIMATOR over the same data, not more data and not a published
+  number copied in. Compute the per-cell n BEFORE choosing the method.
+
+### 2026-08-16 — AN ARCHIVED SESSION IS NOT AN ABANDONED LANE. The lineage forks forward
+
+`wnba-live-tier`'s holder (`Layer 1 board coverage audit (fork 2)`) was archived,
+and I was about to declare the lane orphaned and take a claim override — there is
+precedent in this file for exactly that. The roster showed fork 2 -> fork 3 (also
+archived) -> **fork 4, running**. The lane was actively held.
+
+- **The rule going forward:** before calling a lane orphaned, list sessions with
+  `include_archived: true` and look for a SUCCESSOR BY TITLE, not only for the
+  session named in the lane. Archived means that session ended, not that the work
+  stopped.
