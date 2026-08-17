@@ -9555,3 +9555,12 @@ there — it was not mine to disarm and it is still armed.**
 3. **Allowlist the ledger** (`*_source/data/live_gameline_ledger/*.jsonl` in
    `HOT_ARTIFACT_PATTERNS`) if the per-reason refusal breakdown is ever wanted
    off-worker. Allowlisting permits a transfer; it does not make one happen.
+
+**THIRD BUILD, completing the sample series `[02:35:2xZ]`.** `generated_at`
+02:35:18.511Z — a third distinct build, ~7 min after the second.
+`live_gameline_ledger` unchanged (`candidates 0 written 0 skipped_unchanged 0`,
+`enabled true`), `live_gamelines` all-zero with `withheld_by_reason {}`, and
+**`records_considered` still 3,748 — frozen across all three builds.** The
+negative control holds: builds are still running post-slate and the ledger
+appends nothing when nothing is live. Dedup remains unmeasured, for the reason
+stated above.
