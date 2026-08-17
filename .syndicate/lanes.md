@@ -1174,7 +1174,14 @@ needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
   where `live_gameline_ledger.written > 0` and the counters are reachable from
   an API.
 - Files: `syndicate/features/shared/live_gameline_ledger.py`,
-  `syndicate/blueprints/intelligence.py`, `tests/test_live_gameline_ledger.py`.
+  `tests/test_live_gameline_ledger.py`.
+- **`syndicate/blueprints/intelligence.py` RELEASED 2026-08-17 00:4xZ — second
+  double-claim on this lane, resolved the same way as the first.** It was
+  contested with `layer2-board-quality`, which holds it in a nine-path list and
+  reads **ALL 8 GOALS SHIPPED**; this lane is `OPEN, UNOWNED` since 15:2xZ and its
+  own stated single next action is a READ of `/api/board/book-grid`. Finishing it
+  needs no edit here. **TO RE-TAKE:** put the path back and tell
+  `layer2-board-quality`.
 - **`syndicate/features/shared/live_gameline_join.py` RELEASED 2026-08-17 00:2xZ
   — it was double-claimed, and this lane is the one that does not need it.**
   Reconciled by the `ask-answer-substance` session (holds no claim on either
@@ -1350,14 +1357,18 @@ close. **That is evaluation, not plumbing.** The plumbing is done.
   and a SECOND one is now binding. Then attack whichever is actually binding.
   Success = a written attribution in `deploys.md` backed by a **deploy-free**
   window, with the window stated.
-- Files: none claimed yet — this lane is diagnostic until the attribution is
-  made. Expected candidates when it turns into a change:
-  `syndicate/features/intelligence.py` (the 3000MB `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`
-  floor), `syndicate/blueprints/home.py` (MLB hydration entry),
-  `syndicate/features/shared/memory_observability.py`. Checked against every
-  OPEN lane's `- Files:` at open time: the only claims held anywhere are
-  `pipeline/intelligence_state.py` + `syndicate/features/wnba/cards.py`
-  (`clamp-fix-to-workers`). No overlap.
+- Files: none claimed yet — this lane is diagnostic until the attribution is made.
+- **Expected candidates when it turns into a change** (deliberately NOT under
+  `- Files:` — `_claims()` reads every indented line there as a CLAIM, so listing
+  a candidate inside that block claims it):
+  `syndicate/features/intelligence.py` (the 3000MB
+  `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` floor), `syndicate/blueprints/home.py`
+  (MLB hydration entry), `syndicate/features/shared/memory_observability.py`.
+  Checked against every OPEN lane's `- Files:` at open time: the only claims held
+  anywhere were `pipeline/intelligence_state.py` +
+  `syndicate/features/wnba/cards.py` (`clamp-fix-to-workers`). No overlap.
+  **These five were live PHANTOM claims until 2026-08-17 00:4xZ**, including a
+  contested `wnba/cards.py` against `wnba-live-tier`.
 - Hypothesis (to be falsified, NOT assumed): `#435`'s `read_book_quotes_latest`
   streaming fix is still in effect on the deployed tree, and the 3,857MB anon at
   02:37:00Z is a DIFFERENT contributor — the standing finding that the kill is
