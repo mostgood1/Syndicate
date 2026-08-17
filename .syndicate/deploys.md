@@ -11857,3 +11857,73 @@ source, which would just move the leak.
 
 Still exactly **one** forecast in this platform with proven distributional skill:
 NFL margin, +3.20% [+1.10%, +5.31%].
+
+## 2026-08-17 — `#440` PHASE 9 COMPLETE — **the sim-count curve flattens at ~300, and the MLB verdict survives**
+
+Lane `convergence-phase7-crps`. 490,000 game-sims, leash {0,5} x sims
+{100,300,1000}, scored against the same in-sample climatology. Read-only, no
+deploy.
+
+Phase 9 was "decide sim counts and anchoring by MEASUREMENT" — two questions the
+plan says are "currently settled by argument because there is no instrument."
+Phase 7 is that instrument. This is the answer to the first.
+
+### CRPS skill vs climatology, by sim count
+
+| sims | leash 0 | leash 5 (production) | gain over previous |
+|---|---|---|---|
+| 100 | −8.97% | −14.52% | — |
+| 300 | −7.12% | −11.81% | **+1.85 / +2.71 pp** |
+| 1000 | −6.74% | −11.73% | **+0.38 / +0.08 pp** |
+
+**THE KNEE IS ~300.** 100 -> 300 recovers nearly all the available accuracy;
+300 -> 1000 recovers almost nothing (0.08 pp at production's leash). **Raising to
+the engine default of 2000 would buy essentially nothing over 300** and cost 6.7x
+the work — so the plan's expectation that this is a cheap win is CONFIRMED, and
+the cheap version is much cheaper than assumed.
+
+### AND IT CONFIRMS THE MLB VERDICT RATHER THAN OVERTURNING IT
+
+The open confound was that my replay ran at 100 sims against production's 1000,
+and a thin empirical PMF inflates CRPS. **It did — by ~2.2 pp — and the
+conclusion holds.** At 1000 sims the model is still **−6.74%** at the best leash
+value. The MLB pitcher-outs model has genuinely negative distributional skill;
+it was not an artifact of thin replay. The earlier −8.97% figure should be
+quoted as **−6.74% at production sim counts**.
+
+### THE KNOBS, read from LIVE Render env — and one is a surprise
+
+    web               none of the sim-count keys are SET  -> code defaults
+    refresh-worker    none of the sim-count keys are SET  -> code defaults
+    live-odds-worker  REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = 100
+
+- **Basketball (NBA + WNBA): `REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS`, code
+  default 500** (`refresh_nba_oddsapi_props.py:2828`,
+  `refresh_wnba_oddsapi_props.py:4153`). It is **explicitly overridden DOWN to
+  100 on live-odds-worker ONLY.** refresh-worker runs the 500 default.
+  So the measured "basketball n_sims = 100" is one env var on one service, and
+  **deleting that key alone lands at 500 — already past the measured knee.**
+- **MLB live: `MLB_LIVE_GAME_MC_SIMS`, code default 120, min 20**
+  (`flask_frontend.py:383`). **Not set on any service** — 120 is the code
+  default, not a considered setting.
+- Soccer live tick 80 is a separate knob and is NOT in scope here: it runs 4 MC
+  passes per match on the 2 GB service.
+
+**Correction to an earlier note in this ledger:** basketball's default was
+described as 2000 (the engine's). The relevant default for the production path
+is the SCRIPT's, which is **500**. The engine default never applied.
+
+### WHAT IS STILL OWED BEFORE ANY CHANGE
+
+**The memory cost per additional sim has NOT been measured yet** — a probe is
+running (`scripts/scope_sim_memory.py`), measuring accumulate-vs-retain, because
+those differ by orders of magnitude:
+
+    accumulate -> O(1) in n_sims. Raising sims costs CPU/time, NOT memory.
+    retain     -> O(n_sims). A linear memory cost.
+
+**No sim-count change should be requested until that number exists.**
+live-odds-worker peaks at 1855/2048 MB (90.6%, 257–415 MB headroom) and
+refresh-worker is OOM-looping under `#449`. A CPU-only cost is a different
+decision from a linear memory cost, and guessing which one it is on an
+OOM-looping service is exactly the mistake `#241` already cost this project.
