@@ -10940,3 +10940,634 @@ attached).
 a live emit PATH; no production slate has run through it. **n is still 0.**
 NCAAF has the contract and **no producer**, season opens 08-29, so nothing there
 is verifiable today — a ready rules entry is not coverage. No deploy requested.
+
+---
+
+## Archived from lanes.md 2026-08-17
+
+### live-game-line-projection — CLOSED-VERIFIED 2026-08-17 00:4xZ — v2 EXERCISED on a live slate: `written=13` across two builds, 2 of them NON-priceable — opened 2026-08-15 — session: live-gameline-eval (closed by `layer1-board-coverage`)
+- **The lane's own SINGLE NEXT ACTION was run, verbatim:** read
+  `live_gameline_ledger` off `/api/board/book-grid?sport=mlb&date=2026-08-16`
+  during a live slate, **across two builds, never one.**
+- **Its stated success criterion — quoted — is MET:** *"one live slate where
+  `live_gameline_ledger.written > 0` and the counters are reachable from an
+  API."*
+  ```
+  BUILD 1  00:37:48.762827Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  BUILD 2  00:39:58.257836Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  ```
+  Counters served on the API, no 10 MB artifact stream needed — the second
+  half of the goal.
+- **The v2 discriminator held, and it is the part that could have been
+  faked.** The lane warned that `skipped_unchanged > 0` is NOT the signal
+  (seen under v1 at 04:22:51Z, which refuted this lane's own earlier claim).
+  Here `skipped_unchanged` is **0** and `written 13` exceeds `priceable 11`,
+  so **2 rows that v1 could never have written were recorded** — on both
+  builds. Withheld: `segment_is_not_full_game` 49,
+  `prob_interval_swamps_edge` 2, of 62 considered.
+- Measurement in `deploys.md` with the window stated, which was this lane's
+  literal Verification line.
+- **TWO THINGS THIS DOES NOT ESTABLISH, carried forward so they do not
+  disappear with the lane:**
+  1. **The edges are still UNSCORED.** The old heading's "THE EDGES ARE
+     UNEVALUATED" is a broader ambition than the Goal this lane actually
+     stated. The ledger can now produce a sample; nobody has measured
+     whether those 11 edged rows were RIGHT. **Needs its own lane.**
+  2. **The ledger's RSS was never measured.** This lane records an
+     `oomKilled` at 04:46:44Z, 22 min after its deploy added work to
+     refresh-worker, and says plainly it is *not* claiming exoneration.
+     **That debt is NOT discharged here** — it stays with
+     `refresh-worker-oom-recurrence` (OPEN). Kill switch, no deploy:
+     `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+**STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
+`origin/main` and content-verified there. web `ebd5f677` live 03:38:07Z,
+refresh-worker `5c419007` live 04:24:33Z — and `LEDGER_VERSION = 2` is
+content-verified on the CURRENTLY live `d72d670c`, which another lane deployed
+at 06:01:34Z and carried it forward. Board at 15:17Z reads `index_size 0,
+considered 0` — Sunday pregame, nothing live yet.
+
+**THE SINGLE NEXT ACTION:** read `live_gameline_ledger` off
+`/api/board/book-grid?sport=mlb&date=2026-08-16` during tonight's slate
+(scheduled `live-gameline-ledger-check`, 20:30 Central). **The discriminator
+for v2 is `written` rising on rows that are NOT priceable.**
+`skipped_unchanged > 0` is NOT it — that was already observed under v1 at
+04:22:51Z, which is what refuted this lane's own "never recorded a row".
+Read across two builds, never one.
+
+**ONE UNPAID DEBT:** an `oomKilled` fired at 04:46:44Z, 22 min after my
+deploy added work to refresh-worker. Recorded by `refresh-worker-oom-recurrence`,
+and `44ad2f9d` reports `d72d670c` as 9h clean since — **but I never measured
+the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
+needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+— original re-take header follows —
+### live-game-line-projection — SUPERSEDED (see CLOSED-VERIFIED 2026-08-17 00:4xZ above) — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+- Goal: make the ledger capable of producing a sample at all, and make its
+  counters readable without streaming a 10 MB artifact. Success = one live slate
+  where `live_gameline_ledger.written > 0` and the counters are reachable from
+  an API.
+- Files: `syndicate/features/shared/live_gameline_ledger.py`,
+  `tests/test_live_gameline_ledger.py`.
+- **`syndicate/blueprints/intelligence.py` RELEASED 2026-08-17 00:4xZ — second
+  double-claim on this lane, resolved the same way as the first.** It was
+  contested with `layer2-board-quality`, which holds it in a nine-path list and
+  reads **ALL 8 GOALS SHIPPED**; this lane is `OPEN, UNOWNED` since 15:2xZ and its
+  own stated single next action is a READ of `/api/board/book-grid`. Finishing it
+  needs no edit here. **TO RE-TAKE:** put the path back and tell
+  `layer2-board-quality`.
+- **`syndicate/features/shared/live_gameline_join.py` RELEASED 2026-08-17 00:2xZ
+  — it was double-claimed, and this lane is the one that does not need it.**
+  Reconciled by the `ask-answer-substance` session (holds no claim on either
+  lane) on evidence, not preference:
+  - `mlb-live-gameline-distributions` also claims it, is the file's ACTIVE
+    EDITOR (`c7e39e58`, "the re-sim's own histograms, not just their means", is
+    its work and is already in the file), and its goal is literally "consume +
+    price" there. Its session is idle-but-resumable, last active 00:15Z.
+  - this lane reads `OPEN, UNOWNED` since the 15:2xZ checkpoint, and its own
+    stated SINGLE NEXT ACTION is a READ of `/api/board/book-grid` — finishing it
+    requires no edit here.
+  **HOLDER CHANGED WITHIN THE HOUR, 2026-08-17 00:3xZ:**
+  `mlb-live-gameline-distributions` went **CLOSED-VERIFIED** and
+  **`wnba-live-tier`** (restored, same work family) now holds this path. Still exactly
+  one holder, which is the point — but the counterpart to coordinate with is now
+  `wnba-live-tier`, not the closed lane.
+  **TO RE-TAKE:** put the path back on the `- Files:` line above and tell
+  `wnba-live-tier`. The release is a coordination decision
+  between two unattended lanes, not a judgement that this lane's interest was
+  invalid — it wrote the `edge_vs_market_pct` line that sits there.
+- Collision check at re-take: no OPEN lane claims any of the four above.
+  `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py` as an
+  expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
+  **Kept OUT of the `- Files:` block on purpose:** `_claims()` reads every nested
+  line under `- Files:` as a CLAIM, so a disclaimer written there becomes a
+  PHANTOM claim on a file this lane does not hold. `ask-sport-coverage` was bitten
+  by exactly this and it blocked another lane's one-line fix.
+- Deploy intent: **PREPARE ONLY.** The recorder runs on refresh-worker, and
+  `refresh-worker-oom-recurrence` has an explicit hold on deploys to that service
+  until its attribution is written. Request file, not a deploy.
+- Verification: written to `deploys.md` with the window stated.
+- Blocked by: refresh-worker deploy hold (`refresh-worker-oom-recurrence`) for
+  the recorder half only. The web half is unblocked.
+- **Took `.syndicate/.current-lane` from `refresh-worker-oom-recurrence`** — one
+  single-valued marker, N sessions, the known root cause. That lane claims no
+  files, so the cost is bounded.
+
+**MEASURED 2026-08-16 03:00–03:1xZ on a LIVE slate (2 games live, 13 final).**
+Source: the `book_grid_2026-08-15.json` artifact streamed from web
+(`/api/ops/artifacts/stream`, 9,953,474 bytes, `generated_at 03:00:00.538Z`) and
+`/mlb/api/live-lens` at 03:00Z. Both read at the same instant, both post-date
+`f8ca54e1`.
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+                         index_size 10
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+1. **`index_size` IS EXPLAINED. It is not a live-game count and nothing is
+   wrong.** It counts snapshot games carrying a `live_mc` lens. Census at 03:0xZ:
+   **10 of 15 games carry one — 8 FINAL and 2 LIVE.** A Final keeps its last
+   `live_mc` lens, so the number is monotone through a slate: 3 → 8 → 10 is just
+   how many games had gone live-or-through-live by each read. **The join loop
+   filters on `game.state == live` on the GRID side, so the Final entries are
+   never used** — the counter is misleading, not the join. Retire the "unexplained"
+   framing; the defect, if any, is that this is the one counter in the block with
+   no denominator, which is exactly what invited the wrong reading.
+2. **THE RECORDER CANNOT PRODUCE A SAMPLE, AND THIS IS THE REAL BLOCKER.**
+   `build_records` skips any row that is not `priceable`; `priceable` requires the
+   edge to clear a 2σ bar at 120 sims. Tonight that is **0 of 8**, so
+   `candidates: 0` — the ledger was never asked to write anything. **The
+   scheduled `live-gameline-ledger-check` will very likely read `written: 0`
+   again tomorrow, and that will mean neither "broken" nor "working."**
+3. **The filter's stated justification is wrong by three orders of magnitude.**
+   The docstring refuses non-priceable rows because "recording thousands of
+   refusals per build would bury the handful CLV can score." The measured
+   population is **8 rows per build, 2 of them projected.** There are no
+   thousands. Recording every PROJECTED row costs ~2 records/build against a
+   20,000-record file cap, and it is the difference between a sample and none.
+4. **`liveStateAsOf` and `liveStateCarriedForward` are `None` on all 10 lensed
+   games, including the 2 live ones.** Consistent with "Drop 2's carry-forward has
+   never fired" AND with "the stamp is only applied on the carry-forward path."
+   **Not disambiguated — do not record either as established.**
+
+**BOTH HALVES ARE NOW DEPLOYED — 2026-08-16 04:2xZ. `DEPLOYED NOWHERE` below is
+SUPERSEDED; the rest of that block still reads true.**
+- web `ebd5f677` live 03:38:07Z — the counters are served. Measured null -> object
+  across two artifacts.
+- refresh-worker `5c419007` live 04:24:33Z — ledger v2. **Deployed and NOT YET
+  EXERCISED:** the slate ended between the last pre-deploy build and the first
+  post-deploy one, so `considered` went 4 -> 0 and v2 has had no live row to act
+  on. Both parented on their service's LIVE SHA, never on main.
+- The `refresh-worker-oom-recurrence` hold cleared on its own evidence
+  (`9ed17262`: a ~2 GB transient, not a leak) rather than being overridden. I
+  asked that session first; it archived between the question and the answer.
+
+**CORRECTION TO THIS LANE'S OWN FINDING #2 ABOVE — read it before quoting the
+arc.** "The recorder has never recorded a row" is **FALSE**. The 04:22:51Z
+pre-deploy build read `priceable 1, candidates 1, skipped_unchanged 1`, and
+`skipped_unchanged` cannot be non-zero unless a matching record already sits on
+disk — an empty file always writes, because `_moved(None, rec)` is True. **v1
+wrote at least one row tonight**, between 02:4xZ and 04:22Z. The 03:00Z reading
+was real and I generalised it to a night. v2's premise survives (1 priceable of 4
+considered is a self-selected sample), but "it structurally could not write" was
+an overclaim.
+
+**NEXT ACTION is now purely measurement, and the plumbing question is closed.**
+`live-gameline-ledger-check`, 20:30 Central 08-16, on a full slate:
+`written > 0` on one build, then **`skipped_unchanged > 0` on a later one** —
+the second is the real test, and note it has ALREADY been observed once under
+v1, so the discriminator for v2 is `written` rising on rows that are NOT
+priceable. Read across two builds, never once.
+
+**CHECKPOINT 2026-08-16 03:4xZ.** Shipped to `origin/main`, DEPLOYED NOWHERE:
+`c87f6634` (ledger v2 + the book-grid pass-through + 2 test files),
+`bbc70d16` (the two deploy requests), `4e82d4b7` (the learnings rule).
+97 tests pass, and the pass-through was falsified first — commenting out the two
+served keys fails all 6 new tests.
+
+**THE ONE THING THAT DECIDES WHETHER TOMORROW IS A TEST:** the v2 recorder must
+be on refresh-worker before the scheduled `live-gameline-ledger-check` fires at
+**08-16 20:30 Central**. Against v1 it reads `written: 0` again and means nothing.
+That deploy is HELD by `refresh-worker-oom-recurrence`, deliberately — the hold is
+correct and the deadline is real, and only the user can trade them off.
+
+**NEXT ACTION for whoever picks this up:** not code. Get the refresh-worker
+deploy decided. Everything after it is measurement:
+`live_gameline_ledger.written > 0` on one build, then `skipped_unchanged > 0` on
+a later one — **the second is the real test**, because the append proving it
+writes is not the dedup proving it writes only on movement. Read it across two
+builds, never once.
+**Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
+
+**SHIPPED AND LIVE (content-verified per service, not by ancestry):**
+- live-odds-worker `c4116ab6` — the live MC stamps `simsRun`.
+- refresh-worker `f8ca54e1` — the game-line join, the segment filter, the
+  Agresti-Coull boundary, and the CLV recorder.
+- web carries D1+D2; it needs neither the vendor stamp nor the join.
+
+**THE ARC, in measured numbers:**
+
+    baseline   index 3   projected 12  edged 0   (sim_count_unusable 12)
+    +simsRun   index 8   projected 32  edged 25  <- FIRST EVER, and WRONG
+    +segment   index 10  projected  5  edged 4   <- first credible ones
+    tail       index 10  projected  2  edged 0   (slate over; ledger written 0)
+
+**THE 25 WERE FAKE AND I RETRACTED THEM MYSELF**, caught while packaging them
+for handoff: Wald `sqrt(p(1-p)/n)` is **0.0 at p in {0,1}**, so the 2-sigma bar
+was ZERO and everything cleared it; and the full-game projection was priced
+against every SEGMENT (SD @ CLE `first1` gave **+42.43 pp**). Both fixed.
+
+**WHAT IS NOT ESTABLISHED — do not let the arc imply otherwise:**
+- **No CLV, no settlement, no backtest.** Surviving means an edge exceeds the
+  ESTIMATOR'S OWN NOISE at 120 sims. It says nothing about the model.
+- **The recorder has never recorded a row** — it went live on a finished slate.
+  `written: 0` with `enabled: true` proves wiring, not behaviour.
+- **`index_size` 3 -> 8 -> 10 across the night is unexplained.**
+- **Drop 2's carry-forward has never been observed firing.**
+- The tally is MLB-only; soccer/wnba report `liveMcSources: null`.
+
+**HANDOFFS, all verified present in HEAD:**
+- `clv-without-settlement` — the rows are TRANSIENT (edged 25→4→1 on one slate);
+  the recorder is the prerequisite, and `clv_join.py` was deliberately untouched.
+  Carries two corrections: **Pinnacle is 15/30 in production** (the sharp SET is
+  30/30), and "close" is ill-defined for a live market.
+- `memory-watchdog-435` — a **2,092 MB** in-process excursion, pid 39, 34 s,
+  children proven flat. ~3x `#327`'s largest.
+- `soccer-model-coverage` — `SOCCER_PREGAME_AUTORUN_FAILED` lock contention.
+
+**COSTS I IMPOSED, recorded rather than netted out:** three soccer runs killed,
+one wrong rollback of a working fix, and two deploys fired over another
+session's claim. **No claims held; refresh-worker and live-odds-worker are free.**
+
+**NEXT SESSION STARTS HERE:** tomorrow's live slate is the first real test —
+does the ledger grow only on movement, and do the surviving edges beat a sharp
+close. **That is evaluation, not plumbing.** The plumbing is done.
+
+### clamp-fix-to-workers — CLOSED-VERIFIED 2026-08-17 00:0xZ — the ±4900 clamp is gone from all three live services, and 7,002 served fair_price values carry none**
+- **CLOSED 2026-08-17 00:0xZ, ~10 minutes after the refusal below, because
+  the missing piece SHIPPED IN THE INTERVAL — and not by me.** Another
+  session deployed `c348da53` to live-odds-worker at 23:57:12Z
+  ("converge origin/main into live-odds-worker's deploy lineage"), which
+  carried the clamp removal along with everything else on main. Credit
+  where it belongs; this lane did not ship it.
+- **I did NOT ship a duplicate.** The user authorised shipping the deferred
+  fix; before cutting anything I re-read the live SHA and found it had
+  moved from `16a898ef` to `c348da53` with the work already in it. Cutting
+  on the stale SHA would have re-applied a change that was already live.
+- **STRUCTURAL HALF: PASSES.** Clamp sites (`max(0.02, min(0.98`) by
+  content at each service's CURRENT live SHA, all three re-read at 00:0xZ:
+  ```
+  web              9f617f34   0   (intelligence_state 0, cards 0, layer2_board 0)
+  refresh-worker   fdc72dd0   0   (0, 0, 0)
+  live-odds-worker c348da53   0   (0, 0, 0)
+  ```
+  Both sites now delegate to `american_price`, which REFUSES a probability
+  outside (0,1) instead of clamping it.
+- **PRODUCT-LEVEL SWEEP, the number this lane never had:** **7,002 served
+  `modelled_fair.fair_price` values** across mlb + wnba + soccer,
+  **0 at ±4900**. That is a real denominator, against the 6-row shortlist
+  the watcher kept reading.
+- **THE ORIGINAL BEHAVIOURAL CRITERION NEVER FIRED, AND IS NOW MOOT —
+  stated rather than quietly dropped.** `watch_clamp_trigger.py --once`
+  returned `no_trigger` on all FOUR reads (00:24Z, 01:30Z, 23:49Z,
+  00:00:39Z); the last read `p=[0.227201, 0.512829] out_of_clamp=0`. It was
+  never satisfied because no slate in that window carried an out-of-clamp
+  probability. It is moot because a `POST_FIX_OK` proves a clamped
+  PRODUCER priced correctly, and there is no longer a clamped producer on
+  any live service. **What remains unproven by THIS lane is that
+  `american_price` prices an extreme probability correctly in production —
+  a different claim, covered by its own unit tests, not by this one.** — opened 2026-08-15 — session: clamp-fix-verification-watch
+- **CLOSE ATTEMPTED AND REFUSED 2026-08-16 23:5xZ.** Both halves of this
+  lane's own Verification line were checked. Neither passes.
+  - **Behavioural half: still never fired.** `watch_clamp_trigger.py --once`
+    at 23:49:14Z read `served_rows=6 p=[0.145882, 0.874966] out_of_clamp=0`
+    -> `no_trigger (proves nothing)`. That is the THIRD inconclusive read
+    (00:24Z, 01:30Z, 23:49Z). A quiet slate reads identically with the bug
+    fully present, which is why this lane already refused to bank it.
+  - **Structural half: FAILS, and this is the new finding.** Clamp sites by
+    content at each service's LIVE SHA, counting `max(0.02, min(0.98`:
+    ```
+    web              9f617f34   0
+    refresh-worker   fdc72dd0   0
+    live-odds-worker 16a898ef   2   <- intelligence_state.py 1, wnba/cards.py 1
+    ```
+- **One of the two is dormant; the other is REACHABLE AND PUBLISHING.**
+  - `pipeline/intelligence_state.py` — dormant on this service:
+    `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` in its live
+    env, so the loop never starts. **Dormant is not fixed** — loop ownership
+    is an env flag that moves with no diff, so this is a latent re-arm.
+  - `syndicate/features/wnba/cards.py:848` — **REACHABLE.**
+    `_american_from_prob` still clamps, and it is called at :1614/:1616 to
+    produce `home_ml`/`away_ml` on the WNBA cards THIS SERVICE BUILDS AND
+    PUBLISHES (it runs `start_live_lens_loop`). The served lens carries
+    those exact fields in each game's `betting` block.
+- **Not observed firing today, and that is not evidence of absence.** The
+  served WNBA cards at 23:5xZ read `away_ml` -749.55 / 186.21 / 146.13 —
+  no value at ±4900, because no game today is lopsided enough to push a win
+  probability past 0.98. Same quiet-slate confound as the watcher.
+- **What would let this lane close:** ship the deferred fix to
+  live-odds-worker (`079cc42b`, re-cut on live `16a898ef`), taking all three
+  services to 0 sites. At that point the clamp CANNOT be published because
+  it does not exist, and the never-firing behavioural trigger stops being
+  load-bearing. **That deploy was DEFERRED BY USER DECISION and is NOT being
+  taken unilaterally.**
+- Note: tonight's live-odds-worker deploy (`16a898ef`, the WNBA live_state
+  carry-forward) was deliberately cut on live `440f5f29`, which already
+  carried these 2 sites — so it PRESERVED the deferral rather than
+  silently resolving or worsening it.
+- Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
+  - **`syndicate/features/shared/layer2_board.py` DELIBERATELY NOT TOUCHED** — it
+    is claimed by OPEN `spread-line-sign-convention`, and that lane's worker
+    deploy already carried the layer2_board fix to both workers. Collision found,
+    then dissolved by re-measuring rather than by negotiating. 3 sites → 2.
+  - Collision check on the two: `clv-without-settlement` claims no files;
+    `ask-sport-coverage` lists `intelligence_state.py` read-only;
+    `soccer-model-coverage` lists both as "NOT this lane's files". CLEAR.
+- Hypothesis: n/a — the producer is established by content, not guessed.
+- Falsification test: if refresh-worker deploys with 0 clamp sites and a
+  subsequent trigger still reads `PRE_FIX_MISPRICE`, the producer is NOT the
+  intelligence-state loop and this attribution is wrong.
+- Verification: `watch_clamp_trigger.py --once` → `POST_FIX_OK`, plus 0 clamp
+  sites by content at the new live refresh-worker SHA.
+- **Blocked by: the refresh-worker deploy claim**, held by `red-intelligence-tests`
+  (target `037eb356`, since 23:35:01Z), which still carries both sites.
+  `send_message` is unavailable from this scheduled-task session, so the claim
+  was NOT taken and no coordination message could be sent. Waiting for release.
+
+- **RESULT 2026-08-16 00:23:04Z — refresh-worker shipped `57a437d5`.** 0
+  occurrences of `max(0.02, min(0.98` across all three files at the live SHA.
+  Cut on live `2c14d9ae`, not main. Gated on `safety_rc == 0 AND zero [JOB]
+  processes`, re-verified in the same shell command as the POST.
+- **VERIFICATION DID NOT HAPPEN AND IS NOT CLAIMED.** 00:24:04Z read: `rows=12`,
+  p=[0.338468, 0.603175], `out_of_clamp=0` → `no_trigger`. The slate collapsed
+  from 97 rows as games finished. Same reading a quiet slate gives with the bug
+  fully present. The 2-hourly `clamp-fix-verification-watch` task carries this.
+- **`live-odds-worker` DEFERRED, not forgotten.** It carries the clamp but does
+  not run the intelligence-state loop, so it is not the producer of the measured
+  misprice. It is also effectively never idle — 57 samples over 35 min, zero
+  job-free moments, running a per-league soccer artifact sweep. `079cc42b` is
+  cut, tested and pushed; re-cut on the live SHA before shipping.
+- **CORRECTION LOGGED: I twice called live-odds-worker "already fixed" off a
+  PENDING claim target.** `49797f4b` was clean and never landed as-is; `c422f79a`
+  then `c4116ab6` landed instead, both still clamping. **A claim's target is an
+  intention, not a deployment.** Verify by content at the live SHA, every time.
+- **TWO SAFETY-TOOL DEFECTS, both in `learnings.md` 2026-08-16:**
+  `check_deploy_safety.py` reports CLEAR while jobs run on the service (measured
+  on BOTH workers), and has no `--service` flag so it also blocks on the wrong
+  service's work. And a wait loop of mine read a stderr HTTP 502 as CLEAR by
+  testing for the absence of a failure string.
+- **2026-08-16 03:1xZ — THE INSTRUMENT WAS BLIND IN THE WINDOW IT WATCHES, and
+  every `no_trigger` since it was built is weaker evidence than it looked.**
+  `watch_clamp_trigger.py` gated the confirming read on
+  `/api/board/layer2-shortlist`, then judged `/api/intelligence/query`. Two
+  different populations. Measured same-instant at 03:14:08Z: **shortlist 0 rows,
+  served payload 18 priced rows** — 8,345 opportunities considered and all 8,345
+  filtered out (horizon 2,488 + stale_kickoff 2,666 + quote_age 1,256 +
+  excluded_market 689 + uninformative 1,246, summing exactly).
+  The shortlist drops `stale_kickoff_seconds = 7200` and
+  `max_quote_age_seconds = 50400` — **exactly the in-play late-game population
+  both real triggers came from** (20:45Z, and 23:10/23:15Z at p=0.009911/0.990089).
+  So the gate could read 0 while a misprice was live on a row it had filtered out.
+  Found because the user disbelieved a `rows=0` reading, not by the instrument.
+- **FIXED, not just recorded.** The trigger now derives from the served payload
+  itself — the same surface the verdict judges. The shortlist is still read, as
+  recorded context that can no longer suppress a check; both counts print.
+  Self-test 11/11. Live at 03:24:19Z: `served_rows=30 (shortlist=12)`, so the
+  old gate would still have judged on under half the population.
+  - A defect found while writing it: emitting UNPRICED probabilities (needed, or
+    `POST_FIX_OK_COLUMN_ABSENT` is unreachable and the fix working becomes
+    invisible) double-counted every quoted row — once priced at the parent, once
+    unpriced at the `quote` node. Harmless while only pairs were emitted; a
+    phantom unpriced twin on every correctly-priced row the moment they were not.
+    Caught by the new self-test, not in review.
+- **STILL NO VERDICT ON THE FIX.** 03:24:19Z read the corrected population:
+  30 rows, p=[0.057749, 0.871508], nothing outside [0.02, 0.98] → `no_trigger`.
+  Genuinely quiet, now measured on the right surface. `#439` item 1 stays OPEN.
+- **THE SHORTLIST/SERVED MISMATCH IS NOT A DEFECT — AND THAT IS WORSE FOR THE
+  OLD GATE THAN "NARROWER" WAS.** Measured 03:3xZ, same instant. They are two
+  different pipelines, not two views of one:
+  - **Different date window.** shortlist `date: 2026-08-15`, `horizon_days: 1`
+    (single date, `central_today_iso()`); served `dates_covered:
+    ['2026-08-15','2026-08-16','2026-08-17']`. Late at night the shortlist's
+    one-day horizon empties by construction while tomorrow's board is live —
+    which is exactly the 0-vs-18 reading, and it will recur every night.
+  - **Different pool.** served `source: combined_board_window` (the legacy
+    `ranked_all` pool). The shortlist is `layer2_shortlist_artifact`.
+  - **Different gates.** horizon / quote_age / stale_kickoff / excluded_market /
+    uninformative are applied at BUILD time on refresh-worker for the shortlist
+    only; `combined_board_window` does not carry them.
+  This is known in-progress L2-A migration, stated in the route's own docstring
+  (`intelligence.py:2698`): the board still renders `ranked_all`, the canonical
+  board state the shortlist lands in "is never written (both migration flags
+  default False and are off)", and pointing the board at L2-A rows "is the goal".
+  **So the old gate was not a narrow view of the product — it was an artifact
+  nothing user-facing serves.** The clamp misprices were always measured on the
+  served path (`layer2_board.py:1345`: 1346 `fair_price` values, 24 on ±4900),
+  which is the population the instrument now reads. Consistent, and the reason
+  the gate had to go rather than be widened.
+  - Sports move within minutes: 03:24Z served WNBA only; 03:3xZ served
+    mlb 168 + wnba 216 priced occurrences. Do not treat one read's sport mix
+    as the slate's shape.
+
+#### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
+**HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)
+against only **95.9MB of brk `[heap]`**. Falsification was "if `[heap]` dominates,
+`mallinfo2`'s `arena` is the follow-up rather than `hblkhd`" — it does not.
+
+**AND THE LANE'S PREMISE WAS RETRACTED BY ITS OWN INSTRUMENT.** The "673MB
+outside pymalloc" this lane was opened to chase was cgroup `anon` (1,607MB,
+CONTAINER) minus pymalloc arenas (934MB, pid 39 ONLY). Different scopes. The
+smaps reader's reconciliation check refused its first production read
+(`reconciles: false`, 27.0%) and that refusal was the finding. Per-process the
+residue is **~173MB**; ~410MB was always just the 8-10 child processes.
+
+**CONSEQUENCE: `mallinfo2` IS NOT THE NEXT STEP.** I recommended it two hours
+ago. The question it was for has largely dissolved, and with pymalloc holding
+~934MB of arenas the mmap total is very nearly pymalloc itself — a duller answer
+than a mystery, and the right one.
+
+**SHIPPED:** `b0ab37a1` (reader) live 22:41:04Z, minimal — live sha + 1 commit,
+not converged main, which would have moved production 330 commits for an
+instrument.
+**NOT SHIPPED:** `c7747a29` (reconcile against the process, not the container).
+Three sessions held the deploy claim in 70 min and the live sha moved twice under
+a rebase, so it is filed as a request rather than raced for —
+`.syndicate/deploy/requests/2026-08-15T2350Z-smaps-reconciliation.md`.
+Until it lands the reader reports `reconciles: false` on every read. Cosmetic;
+the breakdown itself is correct.
+- [(superseded lane detail](lanes_closed.md) — (superseded lane detail — the original body this lane was opened with)
+- [quote-join-enrich-cost (detail below, kept for the file/line map)](lanes_closed.md) — quote-join-enrich-cost (detail below, kept for the file/line map) — session: memory-guard
+- [memory-guard-reclaimable (detail below, kept for the file/line map)](lanes_closed.md) — memory-guard-reclaimable (detail below, kept for the file/line map) — session: memory-guard
+- [render-yaml-web-block-hygiene](lanes_closed.md) — render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+- [(superseded lane detail, kept for the file/line map)](lanes_closed.md) — (superseded lane detail, kept for the file/line map)
+- [hooks-enforcement-wiring](lanes_closed.md) — hooks-enforcement-wiring — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+- [red-intelligence-tests](lanes_closed.md) — red-intelligence-tests — CLOSED-VERIFIED 2026-08-15 — all three reds fixed, 218/0, shipped `1322d0a8`/`d348e040`/`4ae71c4a`, pushed `89c3d94
+- [mlb-live-pitcher-projection](lanes_closed.md) — mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 — (a)/(b)/(c) all measured on 423 rows, 0 violations; live coverage 11.6% -> 50.3%;
+- [board-publish-stall](lanes_closed.md) — board-publish-stall — CLOSED-FALSIFIED 2026-08-16 — no stall, no publish failure; the REAL result is that my deployed fix is INERT and resta
+- [line-decimal-renderer](lanes_closed.md) — line-decimal-renderer — CLOSED-VERIFIED 2026-08-16 — shipped `f3b9b293`; 5 live rows change, 77 untouched; WEB DEPLOY OWED — opened 2026-08-
+
+#### smaps-anon-breakdown — DEPLOY LANDED 2026-08-16 00:57:32Z (`ada731f5`)
+The reconciliation fix is live and the guard is meaningful again. First reading
+01:07:38Z:
+
+    reconciles               true      (was false, 27.0% off)
+    reconciles_within_pct    0.0
+    total_anon_mb          1,672.4     smaps, per-process
+    process_rss_anon_mb    1,672.6     RssAnon, per-process
+    other_processes_anon_mb    0.4     children, now a LABELLED figure
+    cgroup_anon (container) 1,673.0
+
+Two independent kernel accountings of one process agreeing to 0.0%.
+
+**BREAKDOWN NOW TRUSTWORTHY — the lane hypothesis holds on a clean reading:**
+`anon_mmap` **1,540.3MB (92%)** against `heap` 128.3MB, `file_backed` 3.6,
+`stack` 0.1; mmap split >64MB 741.3 | 8-64MB 639.1 | 1-8MB 159.3 over 426 regions.
+
+**NOTE `other_processes_anon_mb` = 0.4 HERE, not the ~504MB seen at 22:49.** The
+children were simply not running at this instant. That is exactly why the old
+container-vs-process comparison was unusable: the gap is not a constant to
+subtract, it moves with whatever the worker has spawned.
+
+COST: five rebases across five live SHAs (`6f512ffa` -> `129395cc` -> `32186e28`
+-> `2c14d9ae` -> `57a437d5`) and four claim holders. On a worker with five
+sessions deploying, a two-file change should ride along, not chase.
+
+#### live-game-line-projection — 2026-08-16 ~01:1xZ — THE PREMISE IS TRUE: 25 LIVE GAME-LINE EDGES PUBLISHED
+- **Tier 5's goal is met in production.** `index_size 8 / considered 32 /
+  projected 32 / edged 25 / prob_interval_swamps_edge 7`, on an artifact
+  provably generated after the deploy. Baseline `index 3 / projected 12 /
+  sim_count_unusable 12 / edged 0`.
+- **Live:** live-odds-worker `c4116ab6` (simsRun stamp), refresh-worker
+  `1f36d718` (the join). Web needs neither.
+- **THE THREE DROPS, all shipped and measured:** D1 merge condition
+  (`0e0b0aa1`), D2 carry-forward (`4bd7dbb3`), D3 join+wiring (`758a89fa`) plus
+  the `simsRun` stamp (`49797f4b`) that made the precision gate reachable.
+- **NOT ESTABLISHED — the 25 edges are UNVALIDATED.** Clearing 2 sigma at 120
+  sims means the edge beats the ESTIMATOR'S noise, not that the model is right.
+  No CLV, no settlement, no backtest. **Next work is evaluation, not more
+  plumbing** — game lines carry 100% Pinnacle coverage, the strongest position
+  on the platform.
+- **OPEN:** why `index_size` was 3 earlier and 8 now is unexplained; Drop 2's
+  carry-forward has still never been observed firing; the tally is MLB-only.
+- **I no longer hold the live-odds-worker claim** — `clamp-fix-to-workers` took
+  it ~00:34 and my last two fires went over it. Not force-released; theirs.
+
+- **CHECKPOINT 2026-08-16 01:4xZ — state of the lane for whoever picks it up.**
+  - All deploy claims RELEASED. Nothing held by this session.
+  - Committed: `86ee112f` (falsification), `0f70969b` (lane), `25e34c63`
+    (deploy record + 2 learnings), `1b76c232` (defer + `#439`), `1bd520c2`
+    (state.md + the claim-target learning).
+  - **NEXT ACTION: run `py -3 scripts/watch_clamp_trigger.py --once` when
+    games are IN PLAY.** Both real triggers (23:10Z, 23:15Z) came from live
+    in-play markets; the two `no_trigger` reads were a pregame board with
+    extremes 0.0687/0.8904. A one-off task fires 2026-08-15 21:31 CDT and the
+    recurring `clamp-fix-verification-watch` runs every 2h.
+  - **`POST_FIX_OK` closes `#439` item 1.** `PRE_FIX_MISPRICE` now that
+    refresh-worker is clean would falsify the intelligence-state attribution —
+    that is this lane's stated falsification test, and it is still live.
+  - Session log: `.syndicate/log/2026-08-15.md`, final section.
+
+### layer1-board-coverage — CLOSED-VERIFIED 2026-08-17 — all four goals answered, and the last unmet criterion was EXECUTED (it returned a defect, which was then fixed and verified)
+- **THE ONE OPEN CRITERION IS NOW MET.** This lane closed-refused twice for
+  the same gap: the cross-sport LIVE A/B needed two sports live at once.
+  **It was run 2026-08-16 22:2xZ** on a real live WNBA slate against a live
+  MLB slate. Result: WNBA had **0 of 521 rows** carrying any live field —
+  i.e. no live tier at all. That answer was the deliverable; it was then
+  fixed (`wnba-live-tier`) and verified at **218 of 321 game rows
+  live_aware**.
+- G1 rates, G2 bucket classification, G3 (MLB live lens measured moving),
+  G4 (missing term named at the producer, fixed in `e543e8dd`, 287/287
+  attributed) all delivered and recorded in `deploys.md`.
+- Scope added mid-lane and also delivered: the HR threshold ladder
+  (`hr_2plus`/`hr_3plus`), the NFL window 5->7, and the soccer game-state
+  defect that was serving edges on finished matches.
+- Goal: for every in-season sport, a per-sport/per-market-family RATE of
+  `projected / total` (alt and period families broken out), every unprojected
+  prop classified as EITHER stale-fingerprint OR sim-does-not-emit-this-stat,
+  and the `Edge` column's missing term named AT ITS PRODUCER.
+- Files (claimed): `syndicate/features/shared/layer1_board.py`,
+  `syndicate/templates/shared/layer1_board.html`,
+  `syndicate/blueprints/layer1_page.py`,
+  `syndicate/blueprints/intelligence.py` (the `/api/board/layer1` handler only).
+  Edited in the end: `syndicate/features/shared/prop_projections.py` +
+  `tests/test_prop_projections_edge_attribution.py` — checked against every OPEN
+  lane's `- Files:` at edit time and claimed by none. Read-only throughout on
+  `layer2_board.py`, `intelligence.html`, `bet_slip.js`, `board_cards.css`,
+  `soccer_projections.py`, `pipeline/intelligence_state.py`, sim internals.
+- **THIS ENTRY WAS WRITTEN TWICE.** The first append was silently overwritten in
+  the worktree by a parallel session's read-modify-write of `lanes.md`, and my
+  own commit then staged THEIR 44 lines under my message without either of us
+  noticing. See the learnings entry of the same date. Re-appended, not rewritten.
+- **RESULT** (full audit `.syndicate/audit_2026-08-16_layer1_board.md`;
+  measurement + falsification test in `deploys.md`, 2026-08-16 16:19–16:40Z):
+  - **Both briefed premises were wrong, and re-checking them first was the whole
+    value of the first ten minutes.** Layer 1 is NOT dark (**5 of 5** consecutive
+    builds non-zero). Alt lines are NOT unprojected on MLB (`totals_alt` 86/86,
+    `spreads_alt` 76/77) — they are unprojected on **WNBA** (419/419 dark). The
+    `Edge` column is not blank everywhere: MLB serves **1,462** edges, and most
+    rows lacking one already state why on the row.
+  - The prior baseline in `docs/ai_context/betting_contract_lifecycle.md` §3a
+    (MLB 19.7% projected / **0** edges / game state 1,220 of 3,604) is **EXPIRED**
+    — today 68.3% / 1,462 / 2,843 of 2,843. Quoting it would book another lane's
+    fix as this lane's regression.
+  - **G1** rates measured per sport × family. mlb 1,941/2,843 (68.3%), soccer
+    1,704/6,453 (26.4%), wnba 305/872 (35.0%). The MLB gap is **LINE-shaped, not
+    market-shaped**: `batter_home_runs` 0.5 → 82.8%, 1.5 → **0.4%**, 2.5 → **0%**.
+  - **G2** every unprojected prop classified. mlb 504 no-such-rung / 337
+    player-dark (63 players) / 42 residual; soccer 1,293 / 3,128 (836) / 268;
+    wnba 39 / 41 / 0. Mapping named: the sim publishes a `<stat>_<N>plus` ladder
+    and `hr_2plus`, `hr_3plus`, `hits_runs_rbis_1plus` are the missing rungs.
+  - **G3** MLB live lens MEASURED working for props (27 of 201 `live_projected`
+    moved, 3 `actual_so_far` advanced over 4 min, right direction) and NOT
+    working for game lines (0 live projections on every `game|*` family).
+  - **G4** missing term named at the producer: `prop_projections.py` set
+    `edge_vs_market_pct = None` and no reason — key **ABSENT** on 284/284 —
+    while its soccer sibling has always attributed the same refusal. Fixed in
+    `e543e8dd`; replay over real served payloads gives **287/287 attributed, 0
+    silent**. The refusal itself is correct (`#238`) and unchanged.
+- **NOT DONE, owned elsewhere, routed by `send_message`:** missing sim rungs, the
+  63 dark MLB players, WNBA needs a distribution → sim-engine session. The 1,416
+  rows carrying BOTH EV terms → Layer 2 session and a **user decision**,
+  deliberately not taken here because `modelled_fair` is a book-margin ESTIMATE,
+  not a de-vig. The WNBA `wnba_game_cards` +31.7pp finding could NOT be delivered
+  (that session is unattended) — it lives in audit §4b and `e543e8dd`'s message.
+- Falsification test for the undeployed fix: re-sweep and count rows with a
+  projection, no edge of either contract, and no reason. **Expected 0.** Do NOT
+  verify by "the reason string appears" — it already appears on 287 rows in
+  replay; the residual is the discriminator.
+- Verification: met for G1/G2/G4 and for G3-props. **Unmet:** cross-sport live
+  A/B (no second live sport in the window). Lane stays OPEN for that.
+- Blocked by: none.
+
+### mlb-live-gameline-distributions — CLOSED-VERIFIED 2026-08-17 — live MLB totals and spreads carry a live projection AND a priced edge — opened 2026-08-16 — session: layer1-board-coverage
+- **VERIFICATION RAN AND PASSED**, production, live slate 2026-08-16 22:23Z
+  (6 live MLB games): `game|spreads` **65 rows / 36 live_aware / 28 edged**,
+  `game|totals` **65 / 37 / 30**, `game|h2h` 24 / 6 / 3. Before this lane the
+  same families read **0 live_aware and 0 edged on every live game**.
+- Re-closing: an earlier close of this lane was clobbered back to OPEN by a
+  parallel rewrite of `lanes.md`. The measurement above is unchanged.
+- Goal: a LIVE MLB game carries a live projection and a priced edge on its
+  TOTALS and SPREADS, not just its moneyline, sourced from the same 120-sim
+  re-sim and gated on the same interval. **Testable outcome:** on the served
+  `/api/board/layer1?sport=mlb&view=live`, `totals|full` and `spreads|full` go
+  from **0 live_aware / 0 edge** to non-zero, and every released edge carries a
+  `prob_std_err` that cleared `PRICEABLE_SIGMA`.
+- Files (all checked unclaimed at open):
+  - `vendor/mlb_bettingv2/sim_engine/live_mc.py` (add a margin histogram)
+  - `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (carry the histograms)
+  - `syndicate/features/shared/live_gameline_join.py` (consume + price)
+  - `tests/test_live_gameline_join.py`, `tests/test_mlb_live_game_line_lens.py`
+- **NOT taken:** `syndicate/features/mlb/live_lens.py` — claimed by
+  `refresh-worker-oom-recurrence` and `odds-cadence-off-the-mlb-peak`. Avoid; if
+  the merge side turns out to need a change, stop and coordinate.
+- **The finding, measured 2026-08-16 19:13Z on 8 live MLB games:**
+  `h2h|full` 8 rows / 7 joined / 2 priceable / 2 edges — the moneyline works.
+  Every other game family is **0 live_gameline, 0 live_aware, 0 edge** across
+  **470+ rows**: `totals_alt|first5` 98, `spreads_alt|first5` 79, `totals|full`
+  41, `spreads|full` 36, and the rest. They render a PREGAME projection on a
+  live game.
+- **Root cause, and it is a discard, not a gap.** `live_mc.LiveMcResult` already
+  carries `total_runs_dist: Dict[int, int]` — a full histogram over the 120
+  sims. `flask_frontend`'s live-MC return (`:16683`) keeps `batterStatDist` and
+  `pitcherStatDist` — added, in that same dict, with the comment *"Carried so
+  the live PROP rows can price off the same 120 sims that produced the numbers
+  above, instead of falling back to the pregame distribution"* — and drops
+  `total_runs_dist` on the floor. So the props got a real live probability and
+  the game total, from the identical sims, kept only `avg_total_runs`.
+  `live_gameline_join` then has nothing but a mean, which is exactly what
+  `REASON_TOTALS_MEAN = "totals_mean_not_distribution"` reports.
+- `sigma: 2.0` in the served payload is `PRICEABLE_SIGMA`, the threshold — NOT a
+  distribution width. I misread it as interval data on the first pass; it is not.
+- No margin histogram exists yet. The MC's loop already computes `home_final -
+  away_final` per sim, so it is a two-line addition in the same loop, not a new
+  model.
+- Falsification test: if `totals|full` still reports 0 `live_aware` after the
+  dists are published and consumed, the diagnosis is wrong and the lens is not
+  the carrier. Check `projections`/`live_gameline` coverage counters first.
+- Verification: (a) unit tests price a known histogram at a known line;
+  (b) production `view=live` shows non-zero live_aware + edge on totals/spreads;
+  (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
+- Blocked by: none.
