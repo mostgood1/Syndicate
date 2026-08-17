@@ -2501,8 +2501,27 @@ and then failed the thing it was checking, which is the point of running it.
   PROPS. Baseline was **0 of 521 rows** across 2 live games.
 - Files: `syndicate/features/shared/live_gameline_join.py`,
   `syndicate/features/shared/board_enrichment.py`,
-  `syndicate/features/wnba/cards.py`, `tests/test_wnba_live_tier.py`,
+  `tests/test_wnba_live_tier.py`,
   `tests/test_wnba_scoreboard_carry_forward.py`.
+  - **NOT claimed by this lane any more:** `syndicate/features/wnba/cards.py` is
+    now held by `game-shape-capture` under a claim override taken 2026-08-16
+    ~20:1x CDT **on explicit user instruction**, for ONE function only
+    (`build_live_pbp_stats_payload`, `:6390`), to fix `#455`. Logged rather than
+    silent, so it can be judged:
+    1. **The user directed it** — "take the override and fix it - i dont think
+       its actually being worked on by any other lane." That is the authority
+       here; the reasoning below is corroboration, not the basis.
+    2. **Coordination was attempted three times and never reached a reader.**
+       fork 2 (`local_c83b3d44`) archived before replying to two handoffs; a
+       third was sent to fork 4 (`local_0cec671d`, running) and is unanswered.
+    3. **Zero functional overlap with this lane's own work**, which is the live
+       TIER on the Layer 1 board (`attach_live_gamelines_for_sport`,
+       `LIVE_LENS_SOURCES_BY_SPORT`). `build_live_pbp_stats_payload` is the pbp
+       stats endpoint and is untouched by it.
+    4. **It plausibly FIXES this lane's own blocker** — its status reads "PROPS
+       NOT WIRED — the source emits nothing", and `#455` is a stuck all-null
+       skeleton, which is exactly what a prop consumer reads as nothing.
+    **If this lane wants the file back, this note is the record.**
 - **DONE — game lines.** `attach_live_gamelines_for_sport` was gated
   `if sport != "mlb"` on a docstring claim that WNBA "has no live tier at all",
   which had gone stale: the live-lens loop already ran for wnba on a 60s tick,
@@ -2936,3 +2955,21 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
   against OUTCOMES and sidesteps that; if it ever reaches for a close, read that
   note first.
 - Blocked by: none. First step is Route 3.
+
+#### game-shape-capture — `#455` FIXED UNDER A LOGGED CLAIM OVERRIDE `[2026-08-16 ~20:2x CDT]`
+
+**Override taken on explicit user instruction** — "take the override and fix it - i dont think its actually being worked on by any other lane" — on `syndicate/features/wnba/cards.py`, ONE function (`build_live_pbp_stats_payload`). Recorded in `wnba-live-tier`'s own Files block, phrased as a release the guard recognises rather than bypassed. Coordination had been attempted three times: fork 2 archived before replying to two handoffs; a third went to fork 4 (running) and is unanswered.
+
+**THE FIX, two halves:**
+1. The stored-payload short-circuit required `bool(games)` — and a skeleton HAS games. Now requires `any(_has_pbp_signal(g))`.
+2. The skeleton was PERSISTED, which is what made it sticky: the stored copy then satisfied the short-circuit on every later request. Now gated on the same predicate, so it can never be written.
+
+**FOUR SIGNAL SOURCES, and the fourth was missing from my first attempt.** The existing `test_live_pbp_stats_payload_uses_local_snapshot` stores a real snapshot whose games carry ONLY `pbp_recent.points_total` (9 and 14). My predicate ignored `pbp_recent`, rejected that snapshot, and the test failed. **The suite caught a genuine gap in the fix, not a stale expectation.** Its own trap: the skeleton hardcodes `window_sec: 180`, so counting that field would make every skeleton read as real and silently undo the change — excluded explicitly, pinned by a test.
+
+**THE `Mapping` NEAR-MISS, AGAIN, IN THE SAME FILE.** My first draft used `isinstance(x, Mapping)` in a module that does not import it — a `NameError` on the FIRST record, which would have taken the endpoint down. `lanes.md` already records `wnba-live-tier` hitting the identical thing here. Caught the same way both times: by running it.
+
+**TWO VACUOUS TESTS OF MY OWN, CAUGHT BY MUTATION.** W1 (revert the short-circuit to `bool(games)` — the original defect) and W3 (count `home`/`away` as signal) both passed against a broken implementation. A replayed skeleton and a freshly built one are both all-null, so "no signal" cannot tell them apart — the stored fixture now carries a sentinel and the test asserts its ABSENCE. W3 was the same vacuity already fixed once this session in `scripts/wnba_pbp_possessions.py` and reintroduced here. **After fixing both: 5 of 5 mutations fire.**
+
+**13 tests green. Full WNBA suite: 405 passed, 4 failed — all 4 PRE-EXISTING**, verified by re-running against `origin/main`'s `cards.py` (4 fail there too). My one real regression was the `pbp_recent` gap and it is closed.
+
+**NOT DEPLOYED.** No deploy requested. The fix changes what a live endpoint serves; it needs a web deploy to take effect, and that is a decision, not a formality.
