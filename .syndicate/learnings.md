@@ -3703,6 +3703,7 @@ files to the index exactly as they were.
 **Every git write against a worktree must carry `git -C <worktree>`.** A bare
 `git` in a chained command inherits the shell's directory, and the shell's
 directory is the one place the files are not yours.
+<<<<<<< HEAD
 
 ### 2026-08-16 — A PLAN'S FIELD LIST WRITTEN FROM GREPS WAS WRONG FOR ALL FOUR SPORTS. Greps find NAMES; only the payload has the data
 
@@ -3879,3 +3880,41 @@ rather than with a force-push, so the bad commit remains in history as a record.
 the *wrong* baseline and read the pass as safety. A verification is only as good
 as the thing it is compared against, and a baseline captured in an earlier tool
 call is not a constant in a repo other people are pushing to.
+=======
+### 2026-08-16 — A KEY NAME THAT MATCHES ANOTHER SPORT'S CONTRACT IS NOT A CONTRACT. WNBA publishes `run_margin_dist` and `total_runs_dist` — the exact keys MLB prices from — carrying a three-point quantile summary MLB's reader cannot parse, and the failure is SILENT
+- **The rule going forward:** before wiring a producer to a consumer on the
+  strength of a matching key name, **read the VALUE's shape, not the key**.
+  `vendor/wnba_betting_repo/app.py:7477-7478` emits `score.total_q` /
+  `score.margin_q` under MLB's key names. `_quantiles` returns
+  `{"p10": -8.0, "p50": 1.5, "p90": 11.0}`. MLB's `_dist_prob_over` iterates the
+  dict treating each KEY as an outcome value and each VALUE as a count, so
+  `float("p10")` raises, the entry is skipped, `total` stays 0, and it returns
+  `None`. **A board that stays exactly as blank as before, with nothing saying
+  why.** The matching name is worse than a mismatched one: it invites the wiring
+  and then swallows the result.
+- *(evidence: `.syndicate/deploys.md`, "outstanding #3, WNBA distribution")*
+
+### 2026-08-16 — "THE ONLY OPEN WORK IS VERIFICATION" WAS FALSE, AND A CONTENT CENSUS ACROSS ALL THREE SERVICES IS WHAT CAUGHT IT
+- **The rule going forward:** when a lane claims its code work is done and only
+  verification remains, **count the defect by content at EVERY live service SHA
+  before believing it.** `clamp-fix-to-workers` read that way for a day; the
+  census found web 0, refresh-worker 0, **live-odds-worker 2** — one of them
+  reachable (`_american_from_prob` → `home_ml`/`away_ml` on the WNBA cards that
+  service publishes). A per-service census is three commands and it converts
+  "should be fine" into a number.
+- **And the second half:** the site that was dormant was dormant only because
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on that service.
+  **Dormant is not fixed** — loop ownership is an env flag that moves with no
+  diff, so a clamp behind a flag is a latent re-arm, not an absence.
+- *(evidence: `.syndicate/deploys.md`, clamp census 2026-08-16 23:5xZ / 00:0xZ)*
+
+### 2026-08-16 — RE-READ THE LIVE SHA IMMEDIATELY BEFORE CUTTING, NOT WHEN YOU DECIDED TO
+- **The rule going forward:** the gap between "I measured the live SHA" and "I
+  cut a branch on it" is where another session deploys. Authorised to ship the
+  deferred clamp fix to live-odds-worker, I re-read the SHA first and found it
+  had moved `16a898ef` → `c348da53` five minutes earlier, with the work already
+  in it. **Cutting on the stale SHA would have re-applied a change that was
+  already live.** Same session, the reverse case also bit: a `git commit` was
+  refused because HEAD moved mid-sequence.
+- *(evidence: `.syndicate/deploys.md`, clamp closure)*
+>>>>>>> 9012facf (checkpoint: layer1 board audit -- 4 lanes closed, 5 fixes live, 2 things unproven)

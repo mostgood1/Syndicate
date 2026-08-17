@@ -2797,3 +2797,35 @@ supplied "a safety guard was removed" without opening the diff. Read the lines
 before naming the damage — the same rule already written for the `wnba/cards.py`
 `american_price` scare earlier this session, which I got right and then did not
 apply an hour later.
+
+## LIVE TIER AND EDGE ATTRIBUTION — VERIFIED 2026-08-16/17 (lane `layer1-board-coverage`)
+
+- **The ±4900 clamp is GONE platform-wide.** 0 clamp sites by content at all
+  three live SHAs (web `9f617f34`, refresh-worker `fdc72dd0`, live-odds-worker
+  `c348da53`), and **7,002 served `fair_price` values across mlb+wnba+soccer
+  carry 0 at ±4900**. `[measured 00:0xZ]` The last piece shipped via another
+  session's converge deploy, not by the clamp lane.
+- **Soccer was serving bettable edges on FINISHED matches, and no longer is.**
+  27 rows on `state: final` plus 9 live-from-pregame → **0**, confirmed by the
+  enforcement counter `live_edge_enforced_rows: 36` matching the pre-fix count
+  exactly. Two causes, both fixed: soccer published no structured liveness
+  (every game read `pregame`), and the producer's own refusal was unreachable
+  behind an early return. `[measured 18:38–18:56Z]`
+- **`live_edge_policy` is now enforced at `attach_projections`**, over the
+  finished grid, where no producer's control flow can route around it. Producers
+  that already refuse correctly hit 0 rows (MLB reads 0).
+- **WNBA has a live GAME-LINE tier**: 218 of 321 game rows `live_aware` on a live
+  slate, edges withheld by `sim_count_unusable` because wnba publishes no
+  `simsRun` — an `n` was NOT invented. **WNBA PROPS DO NOT**: `actual` /
+  `live_projection` / `live_total` are NULL in all 24 rows at the source.
+  `[measured 22:2x–23:3xZ]`
+- **A finished game retains NO model probability on any served surface**
+  (`{final: 14, live: 1}` → model_prob rows `{live: 12}`). Live projections
+  exist only in `live_gameline_ledger`, which is on the worker's disk and
+  matches **zero** `HOT_ARTIFACT_PATTERNS`. **Scoring live edges is blocked on
+  transport, not on method.** `[measured 01:02Z]`
+- **NFL slate window is 7 days**, not 5: the preseason week starts at +5 from a
+  Sunday anchor, one day past the old edge. Measured — width 7 reaches 15
+  preseason games vs 1, and is the widest that does not pull a second
+  regular-season week onto a today board. Widens Layer 2's NFL horizon by
+  construction (shared `slate_window_days`).

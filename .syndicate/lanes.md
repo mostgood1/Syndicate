@@ -3057,3 +3057,13 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
   already paid for once.
 - Next session's first action: pick route 1 or 2. If 1, the claim on
   `artifact_publisher.py` must be released first.
+
+### wnba-live-tier — CHECKPOINT 2026-08-17 01:1xZ — status unchanged, recorded for the next session
+- Game lines DONE and verified twice (149 then **218 of 321** rows live_aware).
+- Live_state carry-forward SHIPPED (`16a898ef`) and **its trigger has never
+  fired** — 0 log matches since 23:38Z. Unit-verified only.
+- Props NOT wired and wiring them would be INERT: all 24 live prop fields are
+  NULL at the source. Producer gap in `wnba/live_lens.py`.
+- Tick-over-tick movement UNPROVEN — second tick had no live rows.
+- **Next action:** re-read on the next live WNBA slate (~21:00Z) for both the
+  movement diff and the carry-forward trigger.
