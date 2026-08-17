@@ -265,6 +265,40 @@ def build_book_grid_artifact(
     from syndicate.features.shared.live_gameline_ledger import record_live_gamelines
 
     live_gameline_ledger = record_live_gamelines(grid, sport=sport, date_str=date_str)
+
+    # SCORE THE LEDGER HERE, because here is the only place the sample and the
+    # outcomes are both in hand. Measured 2026-08-17 01:0xZ: the ledger matches
+    # zero `HOT_ARTIFACT_PATTERNS`, so nothing off-worker can read it, and a
+    # FINISHED game retains no model probability on any served surface -- there
+    # is no retrospective path. Riding this already-published artifact avoids a
+    # new publish pattern and an edit to `artifact_publisher.py`, which an OPEN
+    # lane holds.
+    #
+    # NEVER RAISES, same rule as the recorder above: the board is the product
+    # and this is instrumentation. A failure is reported in the payload rather
+    # than logged only, so a silent zero cannot be mistaken for "model scored
+    # nothing".
+    live_gameline_score: dict[str, Any] = {"enabled": False, "reason": "not_attempted"}
+    try:
+        from syndicate.features.shared.live_gameline_ledger import ledger_path, read_records
+        from syndicate.features.shared.live_gameline_score import (
+            build_finals_index,
+            score_ledger_records,
+        )
+
+        finals = build_finals_index(grid)
+        if not finals:
+            # No final game on this grid is the NORMAL state mid-slate, and it
+            # is not a failure. Saying so keeps it distinct from a scorer that
+            # ran and found the model worthless.
+            live_gameline_score = {"enabled": True, "reason": "no_final_games_on_this_grid",
+                                   "games_with_outcome": 0}
+        else:
+            records = read_records(ledger_path(sport, date_str))
+            live_gameline_score = {"enabled": True, **score_ledger_records(records, finals)}
+    except Exception as exc:  # pragma: no cover - instrumentation must not break the board
+        live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200]}
+
     margin_coverage = attach_margin_model(grid)
 
     # Market taxonomy, served rather than re-derived on the client -- the serve
@@ -313,6 +347,10 @@ def build_book_grid_artifact(
         "live_gamelines": live_gameline_coverage,
         # Counters only -- the records themselves are JSONL on the worker's disk.
         "live_gameline_ledger": live_gameline_ledger,
+        # The SCORE of those records against realised outcomes. This is the only
+        # way the sample leaves the worker: model vs market Brier on identical
+        # rows, so "is the model worth anything" is answerable off a served API.
+        "live_gameline_score": live_gameline_score,
         "margin_model": margin_coverage,
         "market_kinds": market_kinds,
         "rows": bounded,

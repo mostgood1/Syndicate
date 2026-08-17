@@ -217,6 +217,39 @@ def build_records(
 _SHARP_BOOKS = frozenset({"pinnacle", "betfair_ex_eu", "matchbook", "novig", "prophetx"})
 
 
+def read_records(path: Path) -> list[dict[str, Any]]:
+    """EVERY record, in file order. Missing file -> empty list.
+
+    Distinct from `read_last_by_key` on purpose. That one collapses to the last
+    record per market because it exists to DEDUPLICATE writes. Scoring wants the
+    opposite: every forecast the model made, including the superseded ones,
+    because calibration over a slate is exactly the question "were the
+    intermediate numbers right too".
+
+    Same tolerance for a truncated final line as the dedup reader, and for the
+    same reason -- a SIGKILL mid-append is expected on this worker and must not
+    discard the day's history.
+    """
+    out: list[dict[str, Any]] = []
+    try:
+        if not path.is_file():
+            return out
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(rec, dict):
+                    out.append(rec)
+    except Exception:
+        return out
+    return out
+
+
 def read_last_by_key(path: Path) -> dict[tuple, dict[str, Any]]:
     """Last record per market key, for deduplication. Missing file -> empty."""
     out: dict[tuple, dict[str, Any]] = {}
