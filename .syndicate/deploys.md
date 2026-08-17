@@ -10316,3 +10316,54 @@ on the 2026-08-17 row and states CONFIRMED / FAILED / STILL UNMEASURED.
   (`export-force-refresh-escape`). Findings go to `deploys.md` only.
 - **It must NOT deploy.** Deploys are coordinator-owned as of the 2026-08-17
   protocol change.
+
+## 2026-08-17 ~18:3xZ — CADENCE FLIP FIRED ON live-odds-worker — **GATE VERIFIED RUNNING; EFFECT NOT YET MEASURED**
+
+Lane `convergence-phase7-crps`. Fired on explicit user instruction after the
+preflight above returned FAIL on the measurement item. **That FAIL is not
+retracted** — the 08-18 read is still unassigned, and this entry records the
+deploy as UNMEASURED rather than as a fix.
+
+- **Service:** live-odds-worker `srv-d91dpertqb8s73co8lt0`.
+- **Change:** `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true`, set through the
+  **single-key env endpoint**. `render.yaml` untouched, so **no `blueprint_sync`,
+  no whole-env rewrite, no 502 window.**
+- **Code shipped: NONE.** Redeployed the service's OWN live SHA `abc9987515`, not
+  `main`, per `state.md`'s "Do not deploy main's tree to these services". The env
+  var is the only change. **`bafb4fb2` (monotone props seal) did NOT ship and
+  remains inert.**
+- **Deploy `dep-…` reached `live` after ~410s** (build ~300s, update ~110s).
+- **Env confirmed by RE-READ after the PUT**, not by the PUT's status code.
+
+### VERIFICATION — reachability, not presence `[Render logs API, 18:36–18:37Z]`
+
+    FIXTURE_CADENCE sport=wnba   interval=7200 reason=near:7h_out
+    FIXTURE_CADENCE sport=soccer league=championship due:imminent_handoff_to_t_window:1338s
+    FIXTURE_CADENCE sport=soccer league=epl        skip:far:96h_out:age=48461s<86400s
+
+The tier table is being **applied**: `near`, `far`, and the
+`imminent_handoff_to_t_window` hand-off all fire. Per-league scoping (1c) is
+live too. The env var alone would have proved only configuration.
+
+### WHAT IS **NOT** VERIFIED, STATED PLAINLY
+
+- **No `FIXTURE_CADENCE sport=mlb` line is in this sample**, and MLB is the sport
+  this whole lane cares about. The likely reason is benign and is the branch I
+  traced: `_filter_sports_for_pregame_sweep` keeps a **live** sport
+  unconditionally, so the interval gate is never reached during a slate. **That
+  is an inference, not a measurement.** Confirm it off-slate before claiming MLB
+  is gated.
+- **THE EFFECT IS UNMEASURED.** The deploy changes *when* sweeps happen; whether
+  that yields a pre-first-pitch props capture is a 2026-08-18 question.
+- **OWED, UNASSIGNED:** on 2026-08-18 run
+  `py -3 scripts/grade_production_outs_betting.py`. PASS = props `retrieved_at`
+  before first pitch and **>=8 pitchers carrying an outs line** (baseline: 5 of
+  29 dates cleared that). Until then this is a deploy with no measurement.
+
+### ROLLBACK (one call, no code)
+
+Single-key endpoint `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=false` on
+`srv-d91dpertqb8s73co8lt0`, redeploy the same SHA. Watch item: live-odds-worker
+headroom was **257–415 MB** (peak 1855/2048 = 90.6%) and this changes sweep
+frequency near first pitch — `#241` is the precedent for periodic work causing a
+restart loop.
