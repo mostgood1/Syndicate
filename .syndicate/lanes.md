@@ -3449,3 +3449,56 @@ game_cards_2026-08-16.csv          1 row
   for a writer emitting `pred_margin` AND `bookmaker` AND `home_tri` together;
   that column set is the fingerprint. `cli.py:13470` and `app.py:6800` first.
   **Do not attribute again without matching the columns.**
+
+### wnba-live-tier - **REAL WRITER FOUND BY COLUMN FINGERPRINT. SPEC GATE §1 FAILS: `game_id` IS UNSTABLE ACRO§ CONSECUTIVE DATES. Per the spec's own instruction, STOP - do not build §3.**
+
+**1. The writer, identified by OUTPUT SHAPE (the method that works).**
+`scripts/refresh_wnba_oddsapi_props.py::_build_local_game_cards_artifact`
+(`:2262`) - NOT `vendor/.../cli.py::export_game_cards_cmd`. Confirmed three
+ways: the artifact's `bookmaker=oddsapi_consensus` + `home_tri`/`away_tri` +
+`pred_margin`/`pred_total` column set is this function's, its historic log line
+is `Built local game_cards from game_odds fallback`, and it already carries a
+`#375` census built for exactly this question. **Both my earlier attributions
+(odds branch, then PBP fallback) are retracted; both were name-matches.**
+
+**2. THIS EXACT DEFECT WAS FIXED ONCE ALREADY.** `docs/fix_notes_log.md:191`,
+2026-07-07: *"predictions and smart-sim contained 3 WNBA games, but
+`game_cards_2026-07-06.csv` collapsed to 1 game"* - identical symptom, identical
+collapse-to-1. Root cause then: `_build_local_game_cards_artifact` restricted
+the `game_odds` fallback through `allowed_matchups` from a partial props
+snapshot. **It has regressed or was fixed incompletely.** `tests/
+test_wnba_game_cards_census.py` and `test_wnba_refresh_runner.py::
+test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial`
+already exist - **start there, not from a blank spec.**
+
+**3. THE GATE FAILS - `game_id` IS NOT STABLE. Measured on PRODUCTION.**
+```
+game_cards_2026-08-16.csv  game_id = 1                                  <- sequential index
+game_cards_2026-08-17.csv  game_id = 0f160b99581637ed10718a0bf90a33d38  <- hash
+```
+**Two consecutive dates, two incompatible id schemes**, so different branches
+wrote them. The spec §1 says verbatim: *"If the ids are unstable or absent, the
+fix is NOT 'walk the schedule' - it is 'establish a stable fixture identity
+first', which is a larger job and a different spec. Say so and stop."*
+**Saying so. §3 must not be built until identity is settled.**
+
+**4. THE DEFECT IS 08-16 ONLY, AND IT IS A ONE-DATE SAMPLE.**
+- 2026-08-16: **1 row of 3 fixtures** (sims exist for ATL_IND, PHX_POR, SEA_CHI) - **the defect.** No prices on the row.
+- 2026-08-17: **1 row of 1 fixture - CORRECT.** Fully priced, hash id.
+A one-date defect sample. **Do not size the fix off it; get a second multi-game
+date first.**
+
+**5. The `#375` census is deployed but was never observed - and this is a WEAK
+negative, stated as such.** `GAME_CARDS_CENSUS` is present in the live code of
+both workers (`8e3d2f95` refresh-worker, `cc0f7605` live-odds-worker, checked by
+content), yet 0 hits, as is `Built local game_cards`. **My first control was a
+FALSE POSITIVE**: `text=wnba_cards` returned 5 hits that were
+`wnba_cards_context_*.json` keyvalue writes - a different emitter matching as a
+substring. The real retained window was only ~16:18-16:47Z (`hasMore=true`), so
+this says *the builder did not run in a 30-minute window*, *not* that it never
+runs. **To see the census, re-read logs right after a WNBA refresh tick.**
+
+**6. Host, for the next session:** production web is
+**`https://syndicate-an21.onrender.com`** - not `syndicate.onrender.com` or
+`syndicate-api.onrender.com`; both 404 and cost me three calls. Local has **no**
+`game_cards_2026-08-1*.csv` at all, so every number above is production-only.

@@ -1,5 +1,13 @@
 # SPEC — WNBA `game_cards` fixture coverage + distribution publish
 
+> **⚠⚠ GATE §1 FAILED 2026-08-17 - DO NOT BUILD §3.** `game_id` is UNSTABLE:
+> `game_cards_2026-08-16.csv` uses `1` (sequential), `game_cards_2026-08-17.csv`
+> uses `0f160b99581637ed10718a0bf90a33d38` (hash). Per §1's own instruction the
+> fix is "establish a stable fixture identity first" - a different spec.
+> The real writer is `scripts/refresh_wnba_oddsapi_props.py:2262`, NOT the
+> vendor CLI, and this defect was already fixed once on 2026-07-07
+> (`docs/fix_notes_log.md:191`) with tests that still exist. See `lanes.md`.
+>
 > **⚠ PREMISE FALSIFIED 2026-08-17 16:2xZ - DO NOT BUILD FROM §0 YET.**
 > Every input to `export_game_cards_cmd` is ABSENT on the worker (odds,
 > boxscores, and all three PBP files), so BOTH its branches would emit zero
