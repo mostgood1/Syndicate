@@ -33240,3 +33240,67 @@ live on this service is UNVERIFIED by me.
    period is suspiciously close to the sim's cycle.
 3. Only then read memory samples. `ALL_PROCESS_MEMORY` will look healthy; that is
    the trap, not the answer.
+
+### `#455` — **WNBA `/api/live_pbp_stats` SERVES A FROZEN ALL-NULL SKELETON FOR GAMES THAT ARE LIVE AND FINAL, AND IT READS AS `ok: True`** — FOUND 2026-08-16, NOT STARTED, no owner
+
+**Reported by the user from the board, then reproduced against production.** On
+2026-08-16 with three WNBA games — **two final and one live** — the endpoint
+returned three records with `pbp_quarters` all null, no possessions, no
+attempts, and `ok: True`.
+
+    python scripts/capture_wnba_pbp.py --date 2026-08-16 --probe
+    [1] generated_at=2026-08-16T16:14:21-05:00 games=3 with_signal=0 skeleton=3 written=0
+
+**The `generated_at` is the tell: 16:14 CDT, re-read unchanged at ~19:2x CDT
+with `ttl=1`. The payload is FROZEN ~3 hours.**
+
+### Mechanism — read `syndicate/features/wnba/cards.py:6390-6425`
+
+`build_live_pbp_stats_payload` **never computes pbp.** It:
+1. reads a stored snapshot via `_filtered_local_live_snapshot_payload`;
+2. **returns it whenever its `games` list is non-empty** (`:6401`);
+3. otherwise emits a **hardcoded all-null skeleton**, one entry per requested
+   event id, and persists it via
+   `_maybe_persist_current_day_live_snapshot_artifact` (`:6403`).
+
+The real computation — `_live_pbp_possession_stats`, `poss_est = FGA + TOV +
+0.44*FTA - OREB` — lives in `vendor/wnba_betting_repo/app.py:3572`, **not in
+Syndicate**.
+
+**THE STICKINESS IS THE BUG, not the skeleton itself.** A skeleton has a
+NON-EMPTY `games` list, so once one is persisted (e.g. pregame, when the slate
+has event ids but no plays) step 2 serves it in preference to anything else for
+the rest of the day. Nothing re-checks whether the games have since started.
+
+**Consistent with the corpus:** of 120 game records in the tracked mirror,
+**103 carry no possession data**. That population looks like stored skeletons,
+not like games with no plays.
+
+### Why this is worse than a plain outage
+
+`ok: True` with a complete, well-formed structure reads as an ANSWER. Every
+consumer sees "the pbp says nothing happened" rather than "there is no pbp
+here". This is the instrument-blindness shape the ledger already records
+several times: a healthy-looking empty reading.
+
+### What is NOT established
+
+- **Whether the vendor computation is reachable from Syndicate at all**, or
+  whether pbp only ever populated when the source app wrote the snapshot. This
+  decides whether the fix is a wiring job or a build.
+- Whether NBA (`syndicate/blueprints/nba.py:797`, same endpoint shape via
+  `read_latest_live_pbp_stats_payload`) has the same defect. **Check it — the
+  two modules mirror each other.**
+
+### First steps
+
+1. Confirm the stickiness directly: find whether a `live_pbp_stats_2026-08-16`
+   snapshot exists on the worker disk and what time it was written.
+2. Make the skeleton **refuse to persist itself** — an all-null record should
+   never be stored, and should never satisfy the `games`-non-empty test at
+   `:6401`. `scripts/capture_wnba_pbp.py:has_pbp_signal` already implements the
+   predicate that distinguishes them.
+3. Only then is a WNBA pbp corpus possible; see `#454`.
+
+**Related:** `#454` (pbp as modelling substrate — this is why WNBA has no
+corpus), lane `game-shape-capture`.
