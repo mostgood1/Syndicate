@@ -3529,3 +3529,37 @@ touch that.
    dated item.
 4. MLB + WNBA emits blocked behind `Layer 1 board coverage audit (fork 4)`.
 5. Source the RE reference table; re-adjudicate the two >3 SE cells.
+
+### wnba-live-tier — DEFECT 3 DEPLOYED 2026-08-17 14:43Z — **live-odds-worker `cc0f7605`. Verified by CONTENT; the BEHAVIOURAL test is PENDING and I am not claiming it.**
+- **Deployed:** `cc0f7605` to live-odds-worker (live 14:43:08Z), cut on live
+  `c348da53`, deploy gated on the test exit code in the same shell
+  (16 passed, 1 xfailed). Target is live-odds-worker because
+  `start_live_lens_loop()` is called only from `run_live_odds_refresh_worker.py`.
+- **VERIFIED BY CONTENT** at the deployed SHA: `FINAL WINS OVER LIVE` ×1,
+  `_text_says_final` ×2.
+- **VERIFIED NO REGRESSION on the pregame case**, which is all today's slate can
+  exercise: `DAL@GSV status='9:00 PM CT' final=False inprog=False`, chip
+  `state=pregame`. A one-directional text rule must not invent `final` on a
+  scheduled game, and it does not.
+- **PENDING — the case the fix exists for has not occurred yet.** Today's WNBA
+  slate is a SINGLE game, DAL @ GSV, tipping 9:00 PM CT (02:00Z). The
+  finished-overtime contradiction cannot be observed until it ends, ~04:30Z.
+  **Until then this fix is deployed and unproven.**
+- **Yesterday's stuck record is NOT corrected, and I did not establish why.**
+  `/api/board/game-chips?date=2026-08-16` still returns POR @ PHX `pregame`.
+  Two candidates, unmeasured: a past date may be served from a stored snapshot
+  rather than re-derived through the changed parser, or the chip for that date is
+  cached upstream of it. **Do not read this as the fix failing** — it may simply
+  never run on a past date. It also is not evidence the fix works.
+- **DEFECT 1 IS UNTOUCHED AND STILL VISIBLE.** The 08-16 chips return ONE game
+  (POR @ PHX) where the lens had three; `IND@ATL` and `CHI@SEA`, the two with
+  NUMERIC ESPN gamePks, are still absent. That is the identity-key mismatch, and
+  it is the one that restores two thirds of a slate.
+- **Today cannot test defect 1 either** — a one-game slate has no second fixture
+  to lose.
+- **Next action, after ~04:30Z tonight:** read
+  `/wnba/api/live-lens` for DAL @ GSV once it finishes. Expect
+  `final=True, in_progress=False`. If its status text arrives as `Final/OT` and
+  it reports final, defect 3 is proven; if it reports `Final` (no overtime) the
+  test is weaker but still confirms no regression, and the OT path stays
+  unproven until an overtime game occurs.
