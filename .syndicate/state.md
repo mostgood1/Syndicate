@@ -2961,3 +2961,20 @@ file revert. No-op until an artifact exists.
 
 **`#449` is ONGOING** — kills at 01:07:16, 01:21:07, 01:46:59Z, cadence unbroken
 by two full container replacements. Owned by `Worker memory watchdog logs`.
+
+## LIVE GAME-LINE MODEL — SCORED 2026-08-17 (lane `score-live-gameline-edges`)
+
+- **The live game-line model LOSES TO THE MARKET on every population**, measured
+  on the served `book_grid` artifact at 02:12:18Z over 14 finished MLB games:
+  `all_records` model Brier **0.26579** vs market **0.23923** (+0.02656, n=3,226);
+  `last_per_game` 0.27776 vs 0.20344 (+0.07432, n=14); `priceable_only` 0.28064
+  vs 0.24060 (**+0.04004**, n=2,081). Positive = market better.
+  **It is WORST on the rows the board actually shows.**
+- **ONE SLATE. `last_per_game` is n=14.** Do not act on this without a second
+  night. `all_records` is better-powered and agrees, but shares the slate.
+- **The score is readable from the API**: `live_gameline_score` on
+  `/api/board/book-grid?sport=<sport>&date=<date>`. The ledger itself remains
+  unpublished (zero `HOT_ARTIFACT_PATTERNS`), so this block is the ONLY way the
+  measurement leaves the worker.
+- Live: refresh-worker `9bff3cc1`, web `685ab3e9`; `origin/main d6264971` matches
+  both by content.

@@ -4071,3 +4071,29 @@ per-family-scheduled mirror rather than a snapshot of production.
 true and would have been badly misleading as a headline; the useful sentence is
 "the code steps pass and the local mirror is thin", which points at a mirror
 refresh rather than at a bug.
+
+### 2026-08-17 — A DEPLOY BRANCH THAT NEVER GOES BACK TO `main` IS A REGRESSION WAITING FOR THE NEXT DEPLOY. Three commits ran in production for an hour while `main` did not have them
+- **The rule going forward:** cutting a deploy branch on the LIVE SHA is correct
+  and this session did it six times. **The other half is pushing the same commit
+  to `main`, and it is easy to skip because production already works.** Measured
+  at checkpoint: `live_gameline_score.py`'s two join fixes and the
+  `blueprints/intelligence.py` reader line were live on refresh-worker and web
+  and **absent from `origin/main`** — the next deploy cut from main would have
+  silently reverted all three, and the symptom would have been the scorer
+  reporting zero again with no code change to blame.
+- **How to check, in one command per file:** `git show origin/main:<file> | grep
+  -c <marker>` against the deployed SHA's count. Ancestry is the wrong test —
+  these were cherry-picks, so their SHAs never appear on main at all.
+- *(evidence: `.syndicate/log/2026-08-16.md`, this session's closing block)*
+
+### 2026-08-17 — `a or b` IS NOT A FALLBACK WHEN `a` IS RELIABLY PRESENT AND RELIABLY WRONG
+- **The rule going forward:** to try several keys against an index, **try each
+  against the index** — `next(k for k in candidates if k in index)` — never
+  `a or b`, which picks the first TRUTHY value and then fails the lookup.
+  Measured: ledger records are written while a game is LIVE so they always carry
+  `game_pk`; a row that has since gone FINAL carries no `live_gameline` and is
+  indexed under `event_id` only. `game_pk or event_id` therefore chose the one
+  key the index never held, on all 3,727 records, while the key that WAS there
+  was never tried. **The first fix widened the INDEX and the bug survived,
+  because the defect was in the LOOKUP.**
+- *(evidence: `.syndicate/log/2026-08-16.md`)*

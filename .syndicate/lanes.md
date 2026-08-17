@@ -3282,3 +3282,20 @@ the commit count, the test count, or the fact that leverage now has a number.
   `wnba-live-tier` / `live-edge-basis` who hold those files.
 - Open and unowned: `#447` (6 red layer2 wiring tests), `#448` (unattended tasks
   wedging deploy claims), the soccer `unknown`-state fixture.
+
+### score-live-gameline-edges — CLOSED-VERIFIED 2026-08-17 02:1xZ — the live edges are SCORED, and the model loses to the market on every population
+- **Route 2 delivered end to end.** Scorer computes worker-side and rides the
+  already-published `book_grid` artifact — no new publish pattern, no
+  `artifact_publisher.py`.
+- **RESULT, production artifact 02:12:18Z, 14 finished MLB games:**
+  `all_records` model 0.26579 vs market 0.23923 (**+0.02656**, n=3,226);
+  `last_per_game` 0.27776 vs 0.20344 (+0.07432, n=14); `priceable_only` 0.28064
+  vs 0.24060 (**+0.04004**, n=2,081). Positive = the market won.
+- **ONE SLATE, n=14 per game. Not a verdict.** Recorded in `state.md` with that
+  caveat attached.
+- Two join bugs found and fixed, both surfaced by the counter refusing to serve
+  a confident null (`no_final_outcome_for_game` 3,727 times). See learnings.
+- Files: `live_gameline_score.py` (new), `live_gameline_ledger.read_records`,
+  `book_grid_artifact.py`, `blueprints/intelligence.py` (one line, taken on the
+  user's statement that no Layer 2 session is active and released in this file).
+- **Next:** re-read on a second slate before anyone acts on the number.
