@@ -3703,7 +3703,6 @@ files to the index exactly as they were.
 **Every git write against a worktree must carry `git -C <worktree>`.** A bare
 `git` in a chained command inherits the shell's directory, and the shell's
 directory is the one place the files are not yours.
-<<<<<<< HEAD
 
 ### 2026-08-16 — A PLAN'S FIELD LIST WRITTEN FROM GREPS WAS WRONG FOR ALL FOUR SPORTS. Greps find NAMES; only the payload has the data
 
@@ -3880,7 +3879,6 @@ rather than with a force-push, so the bad commit remains in history as a record.
 the *wrong* baseline and read the pass as safety. A verification is only as good
 as the thing it is compared against, and a baseline captured in an earlier tool
 call is not a constant in a repo other people are pushing to.
-=======
 ### 2026-08-16 — A KEY NAME THAT MATCHES ANOTHER SPORT'S CONTRACT IS NOT A CONTRACT. WNBA publishes `run_margin_dist` and `total_runs_dist` — the exact keys MLB prices from — carrying a three-point quantile summary MLB's reader cannot parse, and the failure is SILENT
 - **The rule going forward:** before wiring a producer to a consumer on the
   strength of a matching key name, **read the VALUE's shape, not the key**.
@@ -3917,4 +3915,3 @@ call is not a constant in a repo other people are pushing to.
   already live.** Same session, the reverse case also bit: a `git commit` was
   refused because HEAD moved mid-sequence.
 - *(evidence: `.syndicate/deploys.md`, clamp closure)*
->>>>>>> 9012facf (checkpoint: layer1 board audit -- 4 lanes closed, 5 fixes live, 2 things unproven)
