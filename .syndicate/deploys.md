@@ -13340,3 +13340,71 @@ still with no populator on the worker.
 73 starter splits now cached prove the DATA exists and is rich (whiff 1.55 vs
 0.65 across pitch types). They do not prove anything about Render, and the effect
 measurement now running is an offline experiment, not a production preview.
+
+## 2026-08-17 — PITCH-TYPE SPLITS **WIRED FOR PRODUCTION** (artifact + loader, tested). Effect measurement is **INCONCLUSIVE at 12.7% coverage.**
+
+Lane `convergence-phase7-crps`. Local only, **no deploy**.
+
+### What is now built — this closes 2 of the 3 Render blockers
+
+**1. A publishable ARTIFACT replaces the un-shippable cache.**
+`scripts/build_mlb_pitch_splits_artifact.py` reads the hash-keyed `DiskCache`
+and writes ONE document keyed by pitcher id to
+`data/mlb_source/source_artifacts/data/pitch_splits/pitch_splits_2026.json`,
+resolved through **`SYNDICATE_DATA_ROOT`** — the mounted disk on Render, not the
+ephemeral checkout. **73 pitchers published**, all clearing a 200-pitch floor;
+the builder REFUSES to write an empty artifact.
+
+**2. The loader now reads the ARTIFACT FIRST**, falling back to the cache.
+`statcast_pitch_splits.fetch_pitcher_pitch_splits` was **cache-only**, and the
+cache is gitignored AND inside the ephemeral checkout — so on a worker it always
+missed and every multiplier silently resolved to 1.0.
+
+**5 tests pass, and the one that matters is the WORKER case:** an **empty
+DiskCache** still yields real splits when the artifact is present. A test passing
+only with a warm local cache would have proved nothing about production. Also
+asserted: multipliers actually DIFFER by pitch type and none is the inert 1.0.
+
+### STILL OPEN — one line, blocked by lane ownership
+
+`HOT_ARTIFACT_PATTERNS` needs
+`"*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json"`, but
+`syndicate/features/shared/artifact_publisher.py` is claimed by **OPEN lane
+`clv-without-settlement`**. I had already taken one file under override today and
+**did not reach across a second time.** Without it the artifact will not mirror
+or export — it is a one-line change for that lane's owner.
+
+**Blocker 3 also remains:** nothing on the worker POPULATES the splits. The x64
+populator is manual and outside the daily pipeline, and pitch mix drifts through
+a season, so this needs a scheduled job.
+
+### THE EFFECT — flat, and INCONCLUSIVE, and I am not reading it as "no effect"
+
+45 games x 120 sims per arm, 2,415 scored rows:
+
+| market | n | splits OFF | splits ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24461 | 0.23077 | −0.00058 worse |
+| batter_rbis | 663 | 0.22211 | 0.21899 | 0.20959 | +0.00312 better |
+| batter_runs_scored | 651 | 0.23974 | 0.24058 | 0.23377 | −0.00084 worse |
+| batter_total_bases | 442 | 0.26177 | 0.26093 | 0.24510 | +0.00084 better |
+
+2 better, 2 worse, every effect <= 0.003, market still wins all four.
+
+**COVERAGE WAS 102 of 806 pitcher-slots = 12.7%.** I fetched the **73 starters
+only**; the 241 distinct bullpen arms were never fetched. **By the same standard
+that made me discard the 2.8% smoke, this is inconclusive.**
+
+**One nuance in its favour, stated as reasoning not measurement:** a starter is
+one slot per team but faces the majority of plate appearances, so PA-weighted
+coverage is far above 12.7% — plausibly ~60%. That makes the flat result
+*suggestive* that starter splits alone do not carry a large prop effect. It does
+NOT settle it, because relievers own the late innings where prop outcomes are
+decided.
+
+### Honest status of the research prediction
+
+The 2026-08-17 research ranked pitch-type matchup as the **most likely route to a
+market beat**. **That prediction is not yet supported by measurement.** The
+wiring is real and tested; the payoff is unproven and needs bullpen coverage
+before anyone concludes either way.
