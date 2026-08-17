@@ -894,6 +894,92 @@ def _load_intelligence_status_for_migration_gate() -> tuple[str | None, dict[str
     return selected_date, payload if isinstance(payload, dict) else {}, None
 
 
+# Advanced inputs a sport is allowed to be missing, by SLUG + ISSUE + LABEL SET.
+#
+# WHY THESE FOUR ARE WAIVED, and it is not "the mirror is thin" -- that was the
+# MLB finding above and it had a different cause. These artifacts do not exist
+# for the 2026 season ANYWHERE that can be checked from here:
+#
+#   * `upcoming_recs_2026_wk1_publish.csv` -- the family is real
+#     (`upcoming_recs_2025_wk17/19/21` are present) but 2026 has never been
+#     generated, and NOTHING IN THIS REPO WRITES IT: grep finds only readers
+#     (`nfl/sources.py` globs it, `intelligence.py` resolves it,
+#     `week_calendar.py` parses the filename). The writer is upstream.
+#   * `college_football_schedule_2026_predicted_totals_enhanced.csv` -- the 2025
+#     file and five timestamped variants exist; the 2026 one does not.
+#   * `recommendations_summary/week_1.json` and `index.json` -- that directory
+#     does not exist at all, for any season.
+#
+# None of the four is in `HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/export`
+# cannot serve them and production coverage is UNVERIFIED rather than confirmed
+# absent. What is verified is that no local action produces them, so failing the
+# gate on them makes it unpassable by anyone working in a checkout.
+#
+# **WHAT THIS WAIVER COSTS.** `advanced_readiness` is the only check that asks
+# whether a sport's advanced inputs exist, and `runtime_dependency_ok` embeds it,
+# so these two sports' advanced surfaces are now unguarded here. Deliberately
+# keyed on the EXACT label set: a fifth missing input, or either sport missing a
+# different one, still fails. Revisit when the 2026 generators run -- the right
+# end state is deleting these entries, not widening them.
+ALLOWED_ADVANCED_READINESS_VIOLATIONS: tuple[dict[str, object], ...] = (
+    {
+        "slug": "nfl",
+        "issue": "missing_advanced_inputs",
+        "missing_labels": ("Weekly recommendation snapshot",),
+    },
+    {
+        "slug": "ncaaf",
+        "issue": "missing_advanced_inputs",
+        "missing_labels": (
+            "Weekly recommendation summary",
+            "Recommendation index",
+            "Enhanced totals export",
+        ),
+    },
+)
+
+
+def evaluate_allowed_advanced_readiness_violations(
+    violations: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Split readiness violations into (allowed, unexpected).
+
+    Same contract as `evaluate_allowed_protected_mirror_asset_violations`: subset
+    matching, so a violation naming FEWER labels than the entry is allowed and one
+    naming an extra label is not. Allowed entries are still REPORTED -- a waiver
+    that hides its own subject is how the wnba `publish_missing_inputs` suppression
+    below became invisible.
+    """
+    allowed_entries = [
+        {
+            "slug": str(item.get("slug") or "").strip(),
+            "issue": str(item.get("issue") or "").strip(),
+            "missing_labels": {
+                str(value).strip()
+                for value in (item.get("missing_labels") or ())
+                if str(value).strip()
+            },
+        }
+        for item in ALLOWED_ADVANCED_READINESS_VIOLATIONS
+    ]
+    allowed: list[dict[str, object]] = []
+    unexpected: list[dict[str, object]] = []
+    for violation in violations:
+        violation_labels = {
+            str(value).strip()
+            for value in (violation.get("missing_labels") or ())
+            if str(value).strip()
+        }
+        is_allowed = any(
+            entry["slug"] == str(violation.get("slug") or "").strip()
+            and entry["issue"] == str(violation.get("issue") or "").strip()
+            and violation_labels.issubset(entry["missing_labels"])
+            for entry in allowed_entries
+        )
+        (allowed if is_allowed else unexpected).append(violation)
+    return allowed, unexpected
+
+
 def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
     selected_date, payload, error = _load_intelligence_status_for_migration_gate()
     if error is not None:
@@ -961,12 +1047,18 @@ def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
                     "missing_labels": [str(item.get("label") or "input").strip() for item in publish_missing_inputs],
                 }
             )
+    allowed_violations, unexpected_violations = evaluate_allowed_advanced_readiness_violations(violations)
     return {
-        "ok": not violations,
+        # `unexpected` only. Allowed entries stay in `violations` below so the
+        # report still shows what is being tolerated -- see
+        # ALLOWED_ADVANCED_READINESS_VIOLATIONS for what that costs.
+        "ok": not unexpected_violations,
         "selected_date": selected_date,
         "active_sport_count": len(active_sports),
         "active_sports": summaries,
         "violations": violations,
+        "allowed_violations": allowed_violations,
+        "unexpected_violations": unexpected_violations,
     }
 
 
