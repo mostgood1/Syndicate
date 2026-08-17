@@ -3469,3 +3469,43 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
   23:19Z; the chip provider today knows one, pregame. Find which of them the
   worker's `build_live_state_payload` is actually reading, and why it lost two
   fixtures.
+
+### wnba-live-tier — PROVIDER vs LENS COMPARED ON PRODUCTION 2026-08-17 02:5xZ — **three distinct defects, and the identity key is the one that explains the missing games**
+```
+LENS  (/wnba/api/live-lens, 3 games, generated 21:46:51 CT)
+  POR@PHX  gamePk=POR@PHX     status='9.7 - 4th'  final=False inprog=True   86-82
+  CHI@SEA  gamePk=401857148   status='Final'      final=True  inprog=False  82-80
+  IND@ATL  gamePk=401857150   status='Final/OT'   final=False inprog=True   95-91
+
+CHIPS (/api/board/game-chips, 1 game)
+  POR @ PHX  state=pregame  token='6:08P CT'  game_key=POR@PHX  start=23:08Z
+```
+
+**1. THE CHIPS KEEP EXACTLY THE GAME WITH A SYNTHESIZED KEY AND LOSE BOTH WITH
+NUMERIC ESPN IDs.** The surviving chip's `game_key` is the string `POR@PHX` —
+the same value the lens carries as its `gamePk`. The two dropped games carry
+NUMERIC gamePks (`401857148`, `401857150`). That is not a coincidence of one
+slate: it is an identity mismatch, and it is why 207 of 300 grid rows had no
+game block to join against.
+
+**2. THE ONE SURVIVING CHIP IS STALE ANYWAY.** It reads `state=pregame`,
+`token='6:08P CT'` while the lens has that same game at `'9.7 - 4th'`,
+`in_progress=True`, 86-82. So even the game the chips DO have disagrees with the
+lens about whether it has started.
+
+**3. THE LENS ITSELF MISLABELS A FINISHED GAME.** `IND@ATL` reads
+`status='Final/OT'` with **`final=False, in_progress=True`** — the status string
+says finished, the structured booleans say live, and they contradict each other
+on the same record. `_game_flags` reads structured booleans FIRST (correctly, by
+its own docstring), so this game resolves LIVE forever. **A completed overtime
+game is being published as in progress.**
+
+- **Consequence, and it is the live-edge harm again:** `live_edge_policy` keys on
+  `game.state`. A finished OT game stuck at `live` keeps a live tier it should
+  have lost — the same family as the soccer defect fixed earlier tonight, and
+  the reason this lane is not closeable.
+- **NOT FIXED — no budget left to change code and verify it.** All three are
+  measured on production, not inferred, and none is a guess.
+- **Order to attack them:** (3) first — it is one contradiction inside one
+  record and the smallest surface. Then (1), the identity key, which is what
+  restores two thirds of the slate. (2) likely falls out of (1).
