@@ -4024,3 +4024,50 @@ archived) -> **fork 4, running**. The lane was actively held.
   `include_archived: true` and look for a SUCCESSOR BY TITLE, not only for the
   session named in the lane. Archived means that session ended, not that the work
   stopped.
+
+## 2026-08-17 — CHECKPOINT 10: the kill command was the unreliable instrument
+
+### FORBIDDEN: trusting `pkill` / `pgrep` in Git Bash on this box
+
+They do not see or terminate Windows `python.exe` processes here, **and they exit
+0 either way.** I reported a full pytest run "stopped" and a gate "killed"; a
+`Get-CimInstance Win32_Process` listing showed both still alive — the pytest at
+**1.6 GB** — plus my restarted gate, so **three heavy runs were competing** on a
+box already at 423 processes and ~26 GB accounted.
+
+Two costs, and the second is the expensive one: the measurement I was trying to
+take was contention-contaminated, and I told the user twice that things were
+stopped when they were not.
+
+**Use `Stop-Process -Id` and verify by RE-LISTING.** A kill is not an event you
+can assume; it is a state you check. Every other instrument rule in this file
+says a null reading is about the instrument — this is the same rule applied to a
+command that *acts* rather than reads, and it is the first one tonight where the
+faulty instrument was my own write, not my own read.
+
+### FORBIDDEN: a completion watcher that greps the process's own log text
+
+My first waiter looked for `GATE|FAIL|PASS|Traceback` in the gate's output and
+fired **while the gate was still running** — those words appear in the
+diagnostic firehose. It sent a "MIGRATION GATE FINISHED" notification for a run
+that had not started its write step, and I relayed it.
+
+Compounding it: the same waiter's `pgrep` guard was the broken instrument above,
+so both halves of the condition were wrong at once.
+
+**Watch the process, not its words:** poll the pid and treat a written artifact
+as the completion signal. And launch through the real interpreter
+(`python.exe ...`), not the `py` launcher — otherwise the pid you watch is a
+shim and its exit says nothing about the child.
+
+### A gate that FAILs on mirror coverage is not a statement about the code
+
+The migration gate returned FAIL on `origin/main` with **all three code steps
+passing** (audit, module tracker, the archive suite CI runs). Both failures were
+missing `data/**` artifacts — and CLAUDE.md already says that tree is a lossy,
+per-family-scheduled mirror rather than a snapshot of production.
+
+**Read a gate's sections before quoting its verdict.** "Migration gate: FAIL" is
+true and would have been badly misleading as a headline; the useful sentence is
+"the code steps pass and the local mirror is thin", which points at a mirror
+refresh rather than at a bug.

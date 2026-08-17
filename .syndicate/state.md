@@ -1320,6 +1320,21 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   verification is owed and recorded in `deploys.md`.
   **A RENAME TO `live_edge_vs_market_pct` IS FORBIDDEN** — `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a
   rename makes the board price LIVE rows off a PREGAME edge. Pinned by test.
+- **MIGRATION GATE ON `origin/main` `ea9340f2` (2026-08-17 01:50Z, `--skip-smoke`):
+  FAIL — and the failure is DATA COVERAGE, not code.** All three command steps
+  PASS: `audit_migration.py` (6 findings / 4 allowed, inside tolerance),
+  `module_tracker_snapshot.py`, and `unittest tests.test_archives` — the one CI
+  actually runs. The two failing sections are:
+  **runtime dependency** — protected mirror assets missing (`mlb` daily manifest
+  breadth `daily/daily_summary_` + `daily/sims/`; `nba` betting-card breadth
+  `season_betting_card_manifest_` + `season_betting_card_day_`); and
+  **advanced readiness** for 2026-08-16 — `nfl` missing its weekly recommendation
+  snapshot (2/3), `ncaaf` missing weekly summary + recommendation index +
+  enhanced totals export (0/3).
+  **DO NOT QUOTE THIS AS "main is broken".** Both failures are artifacts absent
+  from the CHECKOUT, and `data/**` in git is a lossy per-family mirror, not a
+  snapshot of production. Whether production has them was NOT checked. The
+  browser parity smoke was skipped, so nothing here speaks to client parity.
 - **`.syndicate/lanes.md`'s STRUCTURAL INVARIANTS ARE CHECKABLE IN ONE
   COMMAND, and both hold as of 2026-08-17 01:0xZ** (17 headings, 8 OPEN
   lanes, 40 claims):
