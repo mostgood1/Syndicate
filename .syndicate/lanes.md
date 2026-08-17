@@ -2896,3 +2896,44 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 - Verification: game-line half MET (two independent live slates). Props half and
   movement UNMET. Lane stays OPEN for those.
 - Blocked by: none.
+
+#### game-shape-capture — WNBA pbp CAPTURE BUILT; THE SOURCE IS SERVING A FROZEN SKELETON (`#455`) `[2026-08-16 ~19:3x CDT]`
+
+**The user corrected me and the correction found a production defect.** I had
+reported "no WNBA pbp corpus exists on Render" and, when asked "did you check
+render disk", had to answer no — I inferred unreachability from
+`HOT_ARTIFACT_PATTERNS` without checking whether the data was there.
+
+**Two of my own claims were wrong:**
+1. "Production has been accumulating all season" — **false**. The endpoint
+   returns 0 games for 2026-06-27 and 2026-07-15; it serves live only.
+2. "The allowlist is the root cause" — **not the binding constraint**. Adding
+   the pattern would export an empty set. I had proposed a fix that would have
+   cost a web deploy and changed nothing.
+
+**What the checkout files actually are:** cached API responses. The
+`payload`/`ttl`/`ok`/`generated_at` wrapper is an HTTP cache envelope, not a
+data record — which explains all three anomalies at once (17 records on 2 dates,
+test fixtures `0000000001` mixed in, mid-game partials beside completed games).
+
+**THEN THE USER SAID: 2 of today's 3 games are FINAL and one is LIVE.** The
+endpoint returned all-null for all three. Reproduced and filed as **`#455`**:
+`build_live_pbp_stats_payload` (`wnba/cards.py:6390`) never computes pbp — it
+replays a stored snapshot and otherwise emits a hardcoded all-null skeleton,
+**and a skeleton has a non-empty `games` list, so once persisted it is served in
+preference to real data all day** (`:6401`). `generated_at` read
+**16:14:21 CDT, frozen ~3 hours** on a `ttl=1` re-fetch.
+
+**BUILT:** `scripts/capture_wnba_pbp.py` + `tests/test_capture_wnba_pbp.py`.
+Its defining rule is a REFUSAL: it never stores a skeleton, counts them
+separately, and **exits 2** when every record is one, so "captured nothing"
+cannot read as "nothing happened". Storing what the endpoint returns would have
+industrialised the defect — a corpus of confident nulls with a fake denominator.
+`--probe` reports without writing.
+
+**12 tests, 5 of 5 mutations caught** (skeleton counted as signal, zero-valued
+home/away counted as signal, storing with no signal, probe mode writing,
+possessions-only detection dropping early live ticks).
+
+**Deliberately NOT done:** no second implementation of the `poss_est` formula.
+Inventing one is how two numbers that should agree start disagreeing.
