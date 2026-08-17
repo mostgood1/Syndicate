@@ -2829,3 +2829,34 @@ apply an hour later.
   preseason games vs 1, and is the widest that does not pull a second
   regular-season week onto a today board. Widens Layer 2's NFL horizon by
   construction (shared `slate_window_days`).
+
+## 2026-08-17 01:3xZ — VERIFIED (sim-scheduling): the real MLB re-sim rules
+
+`_mlb_daily_sim_decision()` (`live_refresh_loop.py`, 230 lines, every tick).
+Blocks first: `disabled` / pipeline deferral / `previous_run_still_active` /
+`odds_refresh_active` / `insufficient_memory_headroom`. Then, first match wins:
+`no_games_scheduled` -> `first_appearance` (own backoff) -> `tip_off_window`
+(default 30 min, **once per game**, deliberately falls through) ->
+`within_check_interval` (**default 600s, floor 60s**) -> merged
+`fingerprint_change` / `join_mismatch` / `board_missing` / `props_now_available`
+-> `evening_next_day_sim` (**default OFF**).
+
+**THE 600s INTERVAL IS A FLOOR, NOT A SCHEDULE.** Past it, any input-hash diff
+relaunches. Measured triggers 23:03:50 / 23:17:31 / 23:32:20 / 23:44:11 /
+23:56:58, all `fingerprint_change`, ~12-14 min apart. Nothing is clock-anchored.
+
+**A `fingerprint_change` launch is SCOPED to changed games and never reaches the
+top-props stage** — the function's own comment records `daily_top_props` holding
+zero rows for 11+ hours because of it. The trigger that fires most often
+regenerates least.
+
+**THE MEMORY GATE NEVER FIRES.** 12 parsed `MLB_SIM_TICK` decisions from 23:00Z:
+`insufficient_memory_headroom` **0**, and no decision carries a `memory` payload
+— on a service OOM-killed every ~12 min (`#449`). The dominant suppressor is
+`intelligence_pipeline_busy`, checked ABOVE the memory gate, so the gate is
+usually unreachable. **Unresolved:** unreachable vs miscalibrated. Do not assume
+that guard is doing work.
+
+**Deployed:** web `763a2f66`, live-odds-worker `c348da53`, refresh-worker
+`4ec66498` (01:23:37Z, another session) — which DESCENDS from my `7623a233` and
+retains Phase 1c and the reconciliation guard. The convergence held.

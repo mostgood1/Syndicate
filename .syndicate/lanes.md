@@ -3114,3 +3114,17 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 **14 tests, 5 of 5 mutations caught** (extra-innings constant ignored, a tie counted as a home win, thin states estimated instead of omitted, the inning term dropped, convolution dropping the carry). Reuses `mlb_run_expectancy`'s replay rather than writing a second base-state reconstruction — the one over there is the one whose phantom-runner bug was already found and fixed.
 
 **`game_shape.py`'s leverage refusal now has BOTH halves.** Leverage is the swing in WE across outcomes from a state; RE and WE are the inputs. **Wiring it in is a separate change and is NOT done** — and the honest caveat travels with it: this WE is a league-average composition under i.i.d. innings, not an empirical win probability.
+
+#### PHASE 2 / 2b — **NOT STARTED, BLOCKED BY DESIGN 2026-08-17 01:3xZ**
+- Phase 2's BOTH moves edit files claimed by OPEN lane
+  `refresh-worker-oom-recurrence`: `live_refresh_loop.py` (MLB sim -> 09:00-13:00
+  band) and `run_refresh_worker.py` (pin NFL/NCAAF projections). Both change WHEN
+  heavy jobs run on refresh-worker — the variable that lane is measuring.
+  **Surfaced to them rather than edited.** Default position: theirs.
+- **Phase 2b added to the plan** (redefine the re-sim rule set) with the incident
+  evidence, the trigger/scope decoupling, and a falsification test for the
+  redesign itself. Written down, deliberately unbuilt.
+- **Phase 3e added** — soccer, which the plan had omitted entirely.
+- Phase 1 remains COMPLETE and verified (1a/1b 05:51Z, 1c 00:11:36Z).
+- `scripts/pick_mlb_build_hour.py` already computes Phase 2's band input; only
+  the wiring is blocked.
