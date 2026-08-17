@@ -2149,6 +2149,27 @@ def _load_chunk_records_for_window(since: str, until: str, ledger_path: Path | s
     return records
 
 
+def _bundle_ledger_window_days() -> int:
+    """Days of ledger history the evaluation bundle loads on the hot path.
+
+    Env-tunable so the window can be widened without a code deploy if a consumer
+    turns out to need more, and so it can be narrowed FAST if 14 days is still
+    too much for a 4GiB worker. Default matches
+    `load_recent_evaluation_records`' own default rather than inventing a second
+    number -- a constant that disagrees with the function it feeds is how the
+    3000MB/1500MB headroom floors drifted out of meaning.
+
+    Guarded to >=1: a zero or negative window would silently load nothing and
+    the bundle would report empty analytics as though the ledger were empty,
+    which is indistinguishable from a broken ledger.
+    """
+    try:
+        raw = str(os.environ.get("SYNDICATE_BUNDLE_LEDGER_WINDOW_DAYS") or "").strip()
+        return max(1, int(raw)) if raw else 14
+    except Exception:
+        return 14
+
+
 def load_recent_evaluation_records(
     *,
     days: int = 14,
@@ -2320,8 +2341,57 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     # both passes. (Its positional `fallback_N` keys are regenerated on a second
     # reduction, but the surviving RECORD SET is the same, which is what the
     # consumers read.)
+    # BOUND THE LOAD. This was `_stream_record_payloads(ledger_path=...)` --
+    # unbounded, every chunk in the manifest.
+    #
+    # NAMED BY STACK DUMP, 2026-08-17 03:48:28-33Z. Three dumps inside one
+    # excursion put the intelligence-state background loop here, twice, in two
+    # frames of this exact chain, while anon climbed at 100+ MB/s:
+    #     _latest_by_recommendation_id (:1464) <- _stream_record_payloads (:1406)
+    #         <- _stream_chunked_ledger_records (:706)          [dump n=2, 3168MB]
+    #     _aggregate_performance_rows (:1992)
+    #         <- build_recommendation_performance_analytics      [dump n=3, 3399MB]
+    #     both <- build_intelligence_evaluation_bundle
+    #         <- maybe_record_board_state_to_evaluation_ledger (intelligence_state.py:2054)
+    # Region #1 grew 764.7 -> 1041.3 -> 1260.4 MB across those three samples
+    # while every other mapping stayed static.
+    #
+    # WHAT THE UNBOUNDED LOAD BOUGHT: `LEDGER_CHUNKS_ACCEPTED count=8
+    # bytes=830,832,574 records=22,078` feeding a bundle that reports
+    # `recommendation_count=60` and `sample_size=0` with
+    # `reliability_multiplier=1.0` -- the neutral value -- in `duration_ms=49706`.
+    # 22,078 records reduced and aggregated to serve 60 recommendations, deriving
+    # nothing. It is not merely expensive; it is expensive for no output.
+    #
+    # `load_recent_evaluation_records` was written for exactly this and this
+    # caller was not using it. Its own docstring: "Bounded, safe evaluation-record
+    # load for hot paths (the board's scoring/ranking pass) ... reading one of
+    # those inside the refresh-worker's board loop is an instant OOM. Callers that
+    # need full history should use the explicit window/report functions, not
+    # this." The bundle is a hot path -- it runs on every board-state record.
+    #
+    # TWO BOUNDS, and the second matters as much as the first: `days` limits the
+    # date range, and `max_chunk_bytes=64MB` is FOUR TIMES tighter than the 256MB
+    # global ceiling that currently lets 830MB through. The oversized chunks this
+    # worker skips at 256MB are 305/324/367/480MB; the eight it ACCEPTS average
+    # ~104MB each and are exactly what a 64MB ceiling is meant to refuse on a hot
+    # path.
+    #
+    # CONSEQUENCE, STATED RATHER THAN DISCOVERED: `performance_analytics.summary.
+    # publish_count` will fall from 22,078 to the windowed count, and the `by_*`
+    # aggregations narrow with it. That is a REPORTED METRIC visible on
+    # `/api/intelligence`. It is the intended trade -- a lifetime-of-the-ledger
+    # publish_count computed on the board's hot path, at 830MB and 49s per cycle,
+    # is not worth a 4GiB worker. Full-history consumers already have their own
+    # unbounded path (`build_recommendation_performance_analytics_for_window`,
+    # used by `opportunity_board.py:75`) and are untouched by this.
+    #
+    # `sample_size` was ALREADY 0 before this change (verified in pre-fix windows
+    # 23:52, 01:54, 02:34), so the history summary loses nothing it was using.
     shared_ledger_records = _latest_by_recommendation_id(
-        _stream_record_payloads(ledger_path=ledger_path)
+        load_recent_evaluation_records(
+            days=_bundle_ledger_window_days(), ledger_path=ledger_path
+        )
     )
     history_summary = build_evaluation_history_summary(
         records=shared_ledger_records,
