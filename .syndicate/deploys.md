@@ -13633,3 +13633,56 @@ artifact-first loader and 5 tests are the mechanism any future pitch-level
 feature needs, and the 305-pitcher artifact is real data. **But it should not be
 deployed on these numbers** — a ~0.001 Brier move does not justify a scheduled
 populator and a new mirrored artifact family.
+
+## 2026-08-17 — BATTED-BALL DATA PASSES THE PREDICTIVE GATE (leak-free), and two thirds of its apparent edge WAS the leak
+
+Lane `convergence-phase7-crps`. Read-only. 90,970 raw statcast pitches over the
+first-half window, 15,858 batted balls, **218 qualifying players**.
+
+**All predictors computed from the FIRST HALF ONLY** — same information window
+for every arm, no season aggregate.
+
+| predictor | vs future HR/PA | vs future TB/AB |
+|---|---|---|
+| `hr_rate` (what the sim uses today) | 0.312 | 0.126 |
+| **barrel%** | **0.387** | 0.178 |
+| **hard-hit% (EV>=95)** | 0.363 | **0.235** |
+
+### The leak was two thirds of it
+
+    LEAKED (season aggregate)   hr_rate 0.301   barrel 0.507   gap 0.206
+    CLEAN  (first half only)    hr_rate 0.312   barrel 0.387   gap 0.075
+
+I pre-committed to calling a leaked barrel win **inconclusive**, and that was
+right: the honest edge is **0.075, not 0.206**. Reporting the leaderboard number
+would have overstated the case by ~3x. This is the same shape as the
+re-projection smoke run overstating by 3x earlier today — **season-aggregate
+inputs scored against in-season outcomes are leaked by construction.**
+
+### What survives, and it is real
+
+- **Barrel% out-predicts `hr_rate` on future HR** (0.387 vs 0.312).
+- **Hard-hit% out-predicts `hr_rate` on future TB/AB by ~1.9x** (0.235 vs 0.126)
+  — the largest clean margin in the table.
+- **The split is mechanically sensible**: barrels predict HOME RUNS, hard contact
+  predicts EXTRA BASES. Different inputs for different markets, which is what a
+  batted-ball model is for.
+
+**Significance is NOT formally tested.** These are dependent correlations on
+n=218; the HR gap (0.075) is marginal, the TB gap (0.109) is the more likely
+real one. A Steiger test is owed before anyone quotes a magnitude.
+
+### THE GATE THIS PASSES, AND THE ONE IT DOES NOT
+
+**Passes:** batted-ball data carries incremental predictive signal over the
+outcome rates already in the engine. That is the prior question, and pitch-type
+splits were never subjected to it.
+
+**Does NOT pass, and must not be assumed:** that wiring it moves Brier against
+the market. **Pitch-type splits had real data, real spread, real signal — and
+delivered +0.001 at the scoreboard.** Predictive superiority over an internal
+input is a different claim from beating a price.
+
+**So batted-ball data is now the best-evidenced next wiring target** — it cleared
+a gate nothing else has — but the expectation should be set by the pitch-splits
+precedent, not by the correlation table.
