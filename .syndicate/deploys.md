@@ -9589,3 +9589,62 @@ after.**
   thread-scoped attributes nothing in a multi-threaded process. I had the field
   in front of me all session and never asked what its scope was — the same shape
   as `feedback_read_the_field_you_already_have`, one level deeper.
+## 2026-08-16 21:58 CDT (02:58:34Z) — web `60cdf8eb` — `#455` + `#456`, SCOPED — one MEASURED, one NOT
+
+**Deploy** `dep-da17ekm7bikc738hcisg`, service `syndicate` (web,
+`srv-d88ahvrbc2fs73eodu30`). Triggered 21:52 CDT, live **21:58:44 CDT /
+02:58:34Z**. Live commit verified `60cdf8eb…` against the version endpoint.
+
+**SCOPED ON PURPOSE, and this is the part worth reusing.** `origin/main` carried
+**14 pending code commits from six lanes** — a versioned-profile seam across all
+three sim engines, four live-gameline-score changes, an intelligence-evaluation
+trace, and others, several of which their own lanes describe as unverified.
+Deploying main would have shipped all of them on their first ever deployment and
+made attribution impossible.
+
+So the deploy was parented on the **LIVE** web SHA `685ab3e9` — which is NOT an
+ancestor of `main` (web's configured branch IS `main`; previously-deployed SHAs
+fall out of its history when sessions rewrite it, the same orphaning that hit two
+of my own commits earlier today). Built with plumbing into an isolated index,
+carrying exactly two files, each blob-identical to `origin/main`'s version:
+
+    53   1  syndicate/features/nba/live_lens.py
+    111  3  syndicate/features/wnba/cards.py
+
+Verified before pushing: **no commit other than `ea9a2be8` and `0fcdefa4`
+touches either file** between the live SHA and main. Pushed to
+`origin/deploy/web-455-456` so it cannot be orphaned.
+
+### `#456` — **MEASURED, PASS** `[02:59Z, immediately after live]`
+
+| request | payload `date` | `empty_reason` | `snapshot_date` |
+|---|---|---|---|
+| `?date=2025-12-25` | `2025-12-25` | `snapshot_date_mismatch` | `2026-06-13` |
+| `?date=2026-03-01` | `2026-03-01` | `snapshot_date_mismatch` | `2026-06-13` |
+| **`?date=2026-06-13`** | `2026-06-13` | **`None`** | **`None`** |
+
+Before the fix all three returned payload date `2026-06-13` regardless of what
+was asked for. **The third row is the control and it is what makes this a pass
+rather than "it returns empty now"** — the MATCHING date is still served with no
+refusal, so the fix discriminates instead of just emptying the endpoint.
+
+### `#455` — **NOT MEASURED. Do not read this deploy as evidence for it.**
+
+`generated_at` now reads `2026-08-16T21:59:32-05:00` — current, where it had been
+frozen at `16:14:21` for three hours. **That is NOT attribution.** The deploy
+restarted the service, and a restart alone clears the replayed snapshot and would
+produce exactly this reading. `#455`'s claim is about STICKINESS, and stickiness
+cannot be observed in the first minute after a restart.
+
+**What would actually measure it, and nobody owns it:** on a LIVE WNBA slate,
+`generated_at` must ADVANCE between successive `ttl=1` fetches rather than
+freezing, and no all-null record may be persisted. WNBA games were over before
+this deploy landed, so the earliest read is the next slate.
+`scripts/capture_wnba_pbp.py --date <d> --probe` is the instrument; it exits 2
+when every record is a skeleton.
+
+**Health after deploy:** `/healthz` OK; WNBA and NBA pbp endpoints both return
+`ok: true` with no 5xx. (`/api/ops/version` returning 401 without the admin token
+is correct, not a defect.)
+
+**Rollback:** redeploy `685ab3e9`.
