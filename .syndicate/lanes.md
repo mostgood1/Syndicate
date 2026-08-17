@@ -6102,3 +6102,45 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 - **SINGLE NEXT ACTION:** read the 18:40 CDT check's result. If
   `ODDS_SWEEP_OUTCOME` landed on live-odds-worker, close the `20025cc4` row.
   Phase 2 is the coordinator's call on their own window.
+
+### modelled-fair-edge - SHIPPED AND MEASURED ON PRODUCTION DATA (not deployed) - 2026-08-17
+- **USER DECISION TAKEN:** *"yes, allow book_margin_model edges with their own
+  column"* - recommendation 4 of the Layer 1 audit, which had been blocking
+  1,416 rows since 2026-08-16.
+- **NEW:** `book_margin_model.modelled_fair_edge()` + 4 fields
+  (`edge_vs_modelled_fair_pct` / `_method` / `_basis` / `_hold_pct`).
+  Wired into BOTH producers - `prop_projections` (MLB/WNBA) and
+  `soccer_projections` - from ONE implementation, per `#340`'s rule that a
+  per-sport copy is a rule the next sport will miss.
+- **22 new tests + 49 existing pass.** The audit's own worked example
+  reproduces: Matt Olson `batter_home_runs` 0.5, model 0.2087 vs modelled fair
+  0.2334 -> **-2.47pp**, against the audit's predicted "-2.5 pp read".
+
+**MEASURED ON THE REAL SERVED PAYLOAD** (`/api/board/book-grid`, production):
+```
+mlb  market=batter_home_runs   sampled 300
+     with modelled_fair  300 | with model_prob_over 258
+     BOTH terms + no edge 258 -> NEWLY PRICED 228
+```
+**All 30 refusals are `model_prob = 0.0`** - the sentinel case
+`_finite_probability` rejects on purpose. Pricing an exact 0.0 against a 0.13
+fair would manufacture a -13pp edge on a row where the sim has no view.
+**That refusal ALSO surfaces an upstream defect: 30 MLB home-run rows carry
+`model_prob_over: 0.0`.** Not mine, not fixed here, and worth a look.
+
+**FULL-BOARD DENOMINATOR** (from each payload's own `margin_model` block, not my
+sample): **1,731 rows carry a `modelled_fair`** - mlb 588, soccer 1,120, wnba 23,
+all `pct_modelled: 100.0`.
+
+**SOCCER IS CURRENTLY INERT FOR THIS CHANGE, and that is a finding of its own.**
+Its rows carry `modelled_fair` (1,120) but `projection: null` - measured on
+`player_goal_scorer_anytime`, 124 rows, **0 with `model_prob_over`**. The audit
+recorded 1,176 soccer rows WITH `model_prob_over` on 2026-08-16. **So soccer's
+projections have gone away since, and my column has nothing to price there
+until they return.** I did not chase it - separate defect, separate owner.
+
+- **NOT DEPLOYED.** `autoDeploy = no` for code; deploys are coordinator-owned.
+- **Verification after any deploy:** on a served MLB payload, count rows with
+  `edge_vs_modelled_fair_pct` populated - expect ~228 on `batter_home_runs`
+  alone - and assert **`edge_vs_market_pct` is unchanged on every row.** The
+  second half is the one that matters: this must never have moved the real edge.
