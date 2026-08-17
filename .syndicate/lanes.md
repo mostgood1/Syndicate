@@ -442,6 +442,33 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
 ### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+
+**YOU NOW HAVE A POPULATION. 3,748 live game-line rows, 2026-08-16 MLB.**
+`[measured 2026-08-17 02:2x–02:3xZ by the scheduled `live-gameline-ledger-check`;
+full working in `deploys.md` under that date]`
+- **File:** `data/mlb_source/data/live_gameline_ledger/live_gameline_ledger_2026-08-16.jsonl`
+  on **refresh-worker's disk only**. It matches no `HOT_ARTIFACT_PATTERNS` entry,
+  so `/api/ops/artifacts/stream` returns **403** and nothing off-worker can read
+  it. Allowlist `*_source/data/live_gameline_ledger/*.jsonl` if you need the rows
+  themselves rather than the aggregates.
+- **Row count is readable without the file**, via
+  `live_gameline_score.records_considered` on
+  `/api/board/book-grid?sport=mlb&date=<d>` — that field is literally
+  `len(read_records(ledger_path(...)))`.
+- **2,409 of 3,748 (64.3%) carry `priceable: true`**, so the self-selected-sample
+  worry that motivated ledger v2 is real but not fatal — both the gated and
+  ungated populations are large enough to score separately.
+- **Every record joined to a final** (`games_with_outcome 15`, no
+  `no_final_outcome_for_game` bucket), so the identity join is sound as of
+  `9bff3cc1`.
+- **The first scored reading has the model BEHIND the market** on Brier across
+  all three populations (`+0.038` all-records, `+0.058` last-per-game, `+0.056`
+  priceable-only; positive = model worse). One slate, scorer 45 min old,
+  confounded by an OOM loop — a first reading, not a verdict.
+- **Still open and NOT answered by this:** whether the ledger deduplicates on
+  movement. Tonight's slate ended before the check fired, so `candidates` was 0
+  on all three builds sampled. See `deploys.md` for the method that would
+  measure it.
 - **SETTLED CLV READING 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read,
   taken after the last two first pitches at 01:38Z and 01:40Z).**
   - **mlb headline: `avg_clv_pct = −0.3165` over `same_book_n = 126`,
