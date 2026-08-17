@@ -12779,3 +12779,51 @@ whose own `battingOrder` field ends in `"00"`). Fixed, and the builder now
 The artifact is inert until `simulate.py` consumes it. That is P2 step 2 and it
 is real engine surgery — a removal roll per starter per half-inning, with the
 substitute inheriting the slot.
+
+## 2026-08-17 — NFL SIM-COUNT CURVE COMPLETE: **knee is <=100, not 406. My scaling law was wrong, and I said in advance this is how I would read it.**
+
+Lane `convergence-phase7-crps`. `scripts/sweep_nfl_sim_count.py`, 72 generator
+runs over 2025 regular season, scored on 272 games. Production artifacts never
+touched (writes redirected per seed level; verified by md5).
+
+    margin    50 +3.10%   100 +3.70%   300 +3.22%   1000 +3.32%
+    total     50 -0.95%   100 -0.27%   300 -0.27%   1000 -0.37%
+
+**FLAT AFTER 100, and non-monotonic** — 100 is the best point for margin and
+300/1000 are slightly worse. The ±0.5pp wobble across 100/300/1000 is run-to-run
+noise, not a curve. **The knee is <=100, plausibly <=50.**
+
+### THIS CORRECTS A TABLE I ALREADY PUBLISHED
+
+`sim_count_requirement.py` anchored every sport off MLB's measured knee (300) via
+`sigma / CRPS_climatology` and produced **"nfl margin: required 406, current 300
+-> TOO THIN"**. That verdict is **WRONG** and so is the one for NFL total.
+**NFL and NCAAF at 300 are comfortable, not thin. No change is needed there.**
+
+### WHY THE LAW FAILED — it is the FORECAST REPRESENTATION, not the sport
+
+The `MD / 2n` penalty applies to a forecast scored as an **empirical CDF**. MLB's
+outs PMF *is* the draws, so it pays that penalty in full and needs hundreds.
+
+**NFL does not do that.** It summarises its draws into `margin_mean` +
+`margin_stdev` and is scored with `crps_normal`. The seed count only affects the
+ESTIMATES of two parameters, each converging at 1/sqrt(n) and then smoothed
+through a parametric form. That is a large variance reduction and it makes CRPS
+nearly insensitive to n.
+
+**So required sim count is set by HOW THE OUTPUT IS REPRESENTED, a pipeline
+property, not by the sport:**
+
+- **empirical / PMF forecasts** (MLB outs, NHL sim samples) -> hundreds of draws
+- **parametric summaries** (NFL, NCAAF: mean + sigma) -> tens
+
+### I PRE-COMMITTED TO THIS READING
+
+Before the sweep completed I wrote: *"the NFL knee may come back well below 300,
+contradicting the anchored prediction of ~406. If it does, the honest reading is
+that the sigma/CRPS_clim scaling is wrong or incomplete — not that NFL is a
+special case."* It did, and it is. Recording that the pre-commitment is what made
+accepting this automatic rather than a negotiation.
+
+**The second anchor did NOT fit the law — it broke it, which is more useful.**
+One measured knee plus one falsification beats two knees that happened to agree.
