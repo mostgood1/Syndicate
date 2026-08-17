@@ -9166,3 +9166,104 @@ was attempted and **refused by the transport**. The file was released in
 The push and the deploy were **gated on the test exit code in the same shell**
 this time (`RC=$?; if [ "$RC" -ne 0 ]; then ... exit 1; fi`), after chaining them
 ungated an hour earlier and having to cancel a deploy mid-build.
+
+### board_contract_end — the instrument that names the allocator (refresh-worker)
+- Deployed: 2026-08-17 00:04:08Z — `dep-da14vu3l550s73ermc0g`, commit `94447830`,
+  trigger `api`. Service `srv-d91dpertqb8s73co8ls0` (refresh-worker).
+  Branch `deploy/board-contract-end-marker`, parented on the LIVE SHA `fdc72dd0`
+  (which is off-main, on `deploy/wnba-live-tier`) — **not** on `main`, which sits
+  639 commits / 106,125 insertions away and would have been a branch swap.
+- Change: ONE stage marker. `board_contract_end` emitted immediately before the
+  single `return out` of `apply_game_board_contract`
+  (`syndicate/features/shared/game_board_contract.py`). 5 functional lines,
+  additive; `return out` unchanged, no path's behaviour differs. Placed in the
+  SHARED builder all 8 sports call, because `_log_cards_context_memory` exists
+  only for MLB — the other seven hydrate with no stage markers at all.
+- Expected: **this is an INSTRUMENT, not a fix. It will not reduce memory and
+  must not be read as if it might.** Expected effect is a READING: on the next
+  `oomKilled`, the `MEMORY_WATCHDOG` `last_stage` field resolves to one of
+  exactly two values —
+    `board_contract_end`                -> builder returned; allocator is
+                                           DOWNSTREAM, in the caller.
+    `board_contract_games_normalized`   -> excursion is inside :850-:911, and
+                                           this lane's reasoning is WRONG.
+  Window: 5 kills tonight (23:03:50, 23:16:51, 23:32:18, 23:43:11, 23:56:00Z),
+  ~11-13 min apart, so >=1 reading expected within ~1 hour of deploy.
+- Measured: `<pending>`
+- Rollback: redeploy `fdc72dd0` (the pre-deploy live SHA) on
+  `srv-d91dpertqb8s73co8ls0`. Additive change, no data migration, no config.
+- **Preflight: FAILED, then half-cleared, then the remainder OVERRIDDEN BY THE
+  USER — recorded so nobody later reads this as a clean gate.**
+  - Scope FAIL (deploy would have carried 639 commits) — RESOLVED by parenting
+    on the live SHA. Cherry-pick tested via `git merge-tree` (no worktree, no
+    index) because the shared tree held another live lane's 1,599 staged
+    insertions.
+  - live-odds-worker concurrent build — CLEARED on its own at 23:57:12Z.
+  - **In-flight MLB sim — NOT cleared. Deployed anyway, on an explicit user
+    decision**, on the argument that the ~12-minute OOM cadence was already
+    killing that sim repeatedly (a container-level 4Gi kill takes the whole
+    instance, children included), so the guardrail's premise was largely spent.
+    That argument is recorded because it is the thing to re-check if it turns out
+    to be wrong.
+- **BOOT-CONFOUNDING WARNING for whoever reads this next:** the deploy restarts
+  the worker and memory resets to ~16%. It will look healthy for several minutes
+  REGARDLESS. The deploy proves nothing by itself; only the next kill's
+  `last_stage` is evidence.
+- Verdict: `<pending — instrument only, no fix claimed>`
+
+---
+
+## 2026-08-17 00:2xZ — lane archive — **ALREADY DONE UPSTREAM. My version was NOT pushed, and that is the result.**
+
+Asked to archive the closed lanes. The digest has been reporting
+`LANE ARCHIVE OWED: 23 closed/orphaned lanes` and `lanes.md 304KB > 117KB`.
+
+### What I built, and why it is not being shipped
+Transformed the shared worktree's `lanes.md` (310KB, 39 slugs, 23 CLOSED):
+moved every closed lane's body to `lanes_closed.md`, left 23 one-line pointers,
+`310KB -> 208KB`. Verified before writing: **1,401 distinct lines left
+`lanes.md`, 0 missing from the archive**; archive strictly additive (+3,113/-0);
+OPEN 12->12 and UNMARKED 4->4 untouched.
+
+**Then the cherry-pick onto `origin/main` conflicted, and the conflict was the
+finding.** `origin/main` ALREADY carries the archive — another session did this
+job and pushed it. Probed七 closed slugs: each appears **once** in origin's
+`lanes_closed.md` and **zero** times as a body in origin's `lanes.md`. Origin
+also carries 65 lines mine lacked, including its own pointer lines in a
+different format (`` - `ncaaf-schedule-fallback` — ... CLOSED-VERIFIED ``).
+
+Pushing mine would have **duplicated 3,113 lines** into `lanes_closed.md` and
+overwritten their pointers with mine. Commit `45ff3332` exists locally and is
+**deliberately unpushed**.
+
+### The digest was measuring the wrong file
+`LANE ARCHIVE OWED: 23` is computed from the **shared worktree copy**, which is
+a pre-archive snapshot. Origin's `lanes.md` is 183KB with 1 closed slug (the
+`clamp-fix-to-workers` I closed minutes earlier). The worktree also holds ~256
+lines of genuinely unpushed lane content from other live sessions, so it is
+**stale-plus-in-flight**, not simply stale — which is why it must not be reset
+to origin wholesale.
+
+### Repair of my own damage, and the near-miss
+Writing my archived `lanes_closed.md` (built from ORIGIN's copy + the 23 moved
+bodies) put every one of those bodies in the file **twice**, since origin had
+already archived them. Confirmed by probe (`2x` each), then repaired by
+resetting `lanes_closed.md` to origin's version — safe only because the local
+baseline was verified a strict subset first (**0 baseline lines missing from
+origin's archive**).
+
+**The near-miss worth keeping:** I overwrote a 597KB shared ledger file from a
+version built off `origin`, not off the file itself. Had the worktree's copy
+carried content origin lacked, that write would have destroyed it silently. It
+did not (verified 0 lines lost), but the check was run AFTER the write, not
+before. **Back up or diff a shared ledger file before overwriting it, not
+after.**
+
+### Net state
+- Local worktree: `lanes.md` 208KB (closed bodies out, 14 OPEN preserved, the
+  other sessions' in-flight content intact), `lanes_closed.md` 712KB = origin's,
+  each body once.
+- `origin/main`: unchanged by this task. Nothing was pushed.
+- Remaining bulk in `lanes.md` is long OPEN lane bodies, not closed ones —
+  archiving cannot get it under the 117KB budget; that needs open lanes trimmed
+  or closed.
