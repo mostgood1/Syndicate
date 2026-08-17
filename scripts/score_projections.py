@@ -41,9 +41,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import re
 import sys
+import urllib.parse
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -60,6 +63,19 @@ from syndicate.features.shared.projection_score import (  # noqa: E402
 
 MLB_DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
 DATE_RE = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
+
+BASE = "https://syndicate-an21.onrender.com"
+ARTIFACT_PREFIX = "mlb_source/source_artifacts/data"
+CACHE = REPO_ROOT / "reports/phase7_cache"
+
+# THE TWO SOURCES ARE NEARLY DISJOINT IN TIME, and that is the opposite of what
+# "production has more history than the checkout" would lead you to expect.
+# Measured 2026-08-17: production's game logs hold 2026-07-19..08-16 (29 dates)
+# and the checkout's hold 2026-05-28..07-14 (47 dates). The logs are a ROLLING
+# WINDOW that production trims, and the mirror is preserving history production
+# has already dropped. So `--source both` is not redundancy -- it is two
+# independent samples separated in time, and a finding that reproduces across
+# them is far stronger than one that does not.
 
 # artifact dist key -> (market label, game-log column)
 PITCHER_MARKETS = {
@@ -87,61 +103,131 @@ def _to_float(value: Any) -> float | None:
     return result
 
 
-def load_outcomes() -> tuple[dict, dict, dict, dict]:
+def _admin_token() -> str:
+    env = REPO_ROOT / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("ADMIN_TOKEN="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise SystemExit("ADMIN_TOKEN not found in .env -- needed for --source production")
+
+
+def _stream(path: str, token: str, timeout: int = 180) -> bytes:
+    url = f"{BASE}/api/ops/artifacts/stream?path={urllib.parse.quote(path)}"
+    return urllib.request.urlopen(
+        urllib.request.Request(url, headers={"X-Admin-Token": token}), timeout=timeout
+    ).read()
+
+
+def _cached_stream(path: str, token: str) -> bytes | None:
+    """Production reads are cached on disk: the artifacts are megabytes each and
+    a re-run should not re-spend the egress."""
+    target = CACHE / path.replace("/", "__")
+    if target.is_file():
+        return target.read_bytes()
+    try:
+        raw = _stream(path, token)
+    except Exception:  # noqa: BLE001
+        return None
+    CACHE.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(raw)
+    return raw
+
+
+def _accumulate_outcomes(text: str, pitcher_rows, pitcher_runs, batter_runs, dates, *, is_pitcher):
+    for row in csv.DictReader(io.StringIO(text)):
+        date, game_pk = row.get("date"), row.get("game_pk")
+        if not (date and game_pk):
+            continue
+        runs = _to_float(row.get("r"))
+        if is_pitcher:
+            player_id = row.get("player_id")
+            if not player_id:
+                continue
+            dates.add(date)
+            pitcher_rows[(date, game_pk, player_id)] = row
+            if runs is not None:
+                pitcher_runs[(date, game_pk)] += runs
+        elif runs is not None:
+            batter_runs[(date, game_pk)] += runs
+
+
+def load_outcomes(source: str, token: str | None) -> tuple[dict, dict, dict, set]:
     """Returns (pitcher_rows, pitcher_runs_by_game, batter_runs_by_game, dates)."""
     pitcher_rows: dict[tuple[str, str, str], dict[str, Any]] = {}
     pitcher_runs: dict[tuple[str, str], float] = defaultdict(float)
     batter_runs: dict[tuple[str, str], float] = defaultdict(float)
     dates: set[str] = set()
 
-    pitcher_log = MLB_DATA / "processed/mlb_pitcher_game_log.csv"
-    if pitcher_log.exists():
-        with pitcher_log.open(encoding="utf-8", newline="") as handle:
-            for row in csv.DictReader(handle):
-                date, game_pk, player_id = row.get("date"), row.get("game_pk"), row.get("player_id")
-                if not (date and game_pk and player_id):
-                    continue
-                dates.add(date)
-                pitcher_rows[(date, game_pk, player_id)] = row
-                runs = _to_float(row.get("r"))
-                if runs is not None:
-                    pitcher_runs[(date, game_pk)] += runs
-
-    batter_log = MLB_DATA / "processed/mlb_batter_game_log.csv"
-    if batter_log.exists():
-        with batter_log.open(encoding="utf-8", newline="") as handle:
-            for row in csv.DictReader(handle):
-                date, game_pk = row.get("date"), row.get("game_pk")
-                if not (date and game_pk):
-                    continue
-                runs = _to_float(row.get("r"))
-                if runs is not None:
-                    batter_runs[(date, game_pk)] += runs
+    for name, is_pitcher in (("mlb_pitcher_game_log.csv", True), ("mlb_batter_game_log.csv", False)):
+        text = None
+        if source == "local":
+            path = MLB_DATA / "processed" / name
+            if path.exists():
+                text = path.read_text(encoding="utf-8")
+        else:
+            raw = _cached_stream(f"{ARTIFACT_PREFIX}/processed/{name}", token or "")
+            if raw is not None:
+                text = raw.decode("utf-8", errors="replace")
+        if text:
+            _accumulate_outcomes(
+                text, pitcher_rows, pitcher_runs, batter_runs, dates, is_pitcher=is_pitcher
+            )
 
     return pitcher_rows, dict(pitcher_runs), dict(batter_runs), dates
 
 
-def artifact_paths() -> list[Path]:
-    paths: list[Path] = []
+def local_artifact_paths() -> dict[str, Path]:
+    by_date: dict[str, Path] = {}
     for family in ("daily", "daily_pitcher_props"):
         base = MLB_DATA / family
-        if base.exists():
-            paths.extend(p for p in base.glob("daily_summary_*.json") if _date_from(p.name))
-    # One artifact per date wins; `daily` is the full-season family.
-    by_date: dict[str, Path] = {}
-    for path in sorted(paths):
-        date = _date_from(path.name)
-        if date:
-            by_date.setdefault(date, path)
-    return [by_date[d] for d in sorted(by_date)]
+        if not base.exists():
+            continue
+        for path in sorted(base.glob("daily_summary_*.json")):
+            date = _date_from(path.name)
+            if date:
+                by_date.setdefault(date, path)
+    return by_date
 
 
-def build_observations(min_sample: int) -> tuple[list[ProjectionObservation], dict[str, Any]]:
-    pitcher_rows, pitcher_runs, batter_runs, outcome_dates = load_outcomes()
-    paths = artifact_paths()
-    artifact_dates = {d for p in paths if (d := _date_from(p.name))}
+def load_artifact(source: str, date: str, local_paths: dict[str, Path], token: str | None):
+    if source == "local":
+        path = local_paths.get(date)
+        if path is None:
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return None
+    raw = _cached_stream(
+        f"{ARTIFACT_PREFIX}/daily/daily_summary_{date.replace('-', '_')}.json", token or ""
+    )
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw.decode("utf-8", errors="replace"))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def build_observations(
+    min_sample: int, source: str
+) -> tuple[list[ProjectionObservation], dict[str, Any]]:
+    token = _admin_token() if source == "production" else None
+    pitcher_rows, pitcher_runs, batter_runs, outcome_dates = load_outcomes(source, token)
+    local_paths = local_artifact_paths()
+
+    if source == "local":
+        artifact_dates = set(local_paths)
+    else:
+        # No cheap listing endpoint; the outcome dates bound the work, and a
+        # date whose artifact 404s is COUNTED rather than silently skipped.
+        artifact_dates = set(outcome_dates)
 
     counters: dict[str, Any] = {
+        "source": source,
+        "artifact_loaded": 0,
+        "artifact_unavailable": 0,
         "artifact_dates": len(artifact_dates),
         "outcome_dates": len(outcome_dates),
         "intersection_dates": len(artifact_dates & outcome_dates),
@@ -158,16 +244,13 @@ def build_observations(min_sample: int) -> tuple[list[ProjectionObservation], di
 
     observations: list[ProjectionObservation] = []
     usable = sorted(artifact_dates & outcome_dates)
-    usable_set = set(usable)
 
-    for path in paths:
-        date = _date_from(path.name)
-        if date not in usable_set:
+    for date in usable:
+        payload = load_artifact(source, date, local_paths, token)
+        if payload is None:
+            counters["artifact_unavailable"] += 1
             continue
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            continue
+        counters["artifact_loaded"] += 1
         for game in payload.get("outputs") or []:
             counters["games_seen"] += 1
             game_pk = str(game.get("game_pk") or "")
@@ -232,21 +315,21 @@ def build_observations(min_sample: int) -> tuple[list[ProjectionObservation], di
     return observations, counters
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--min-sample", type=int, default=DEFAULT_MIN_SAMPLE)
-    parser.add_argument("--json", type=Path, default=None)
-    args = parser.parse_args()
+def run_one(source: str, min_sample: int) -> dict[str, Any]:
+    observations, counters = build_observations(min_sample, source)
 
-    observations, counters = build_observations(args.min_sample)
-
-    print("=" * 96)
-    print("PHASE 7 -- MLB PROJECTION SCORING  [source: LOCAL MIRROR -- a lower bound, not production]")
-    print("=" * 96)
+    label = {
+        "local": "LOCAL MIRROR -- lossy, a lower bound, NOT what production computed",
+        "production": "PRODUCTION via /api/ops/artifacts/stream -- citable",
+    }[source]
+    print("\n" + "=" * 104)
+    print(f"PHASE 7 -- MLB PROJECTION SCORING  [{label}]")
+    print("=" * 104)
     print("\nCOVERAGE FIRST (the denominator, per CLAUDE.md's intersection trap)")
     print(f"  artifact dates       {counters['artifact_dates']}")
     print(f"  outcome dates        {counters['outcome_dates']}")
     print(f"  INTERSECTION         {counters['intersection_dates']}   span={counters['date_span_scored']}")
+    print(f"  artifacts loaded     {counters['artifact_loaded']}   unavailable={counters['artifact_unavailable']}")
     print(f"  games seen           {counters['games_seen']}")
     print("\nJOIN COUNTERS (what was dropped is reported, not only what was kept)")
     for key in (
@@ -261,7 +344,7 @@ def main() -> int:
     for key, reason in counters["markets_unjoinable"].items():
         print(f"  UNJOINABLE {key:32s} {reason}")
 
-    result = score_projections(observations, min_sample=args.min_sample)
+    result = score_projections(observations, min_sample=min_sample)
 
     print("\nSCORED CELLS")
     header = (
@@ -292,13 +375,63 @@ def main() -> int:
     print("  gap   = CRPSn - CRPS. Large => the predictive distribution is materially non-Normal.")
     print(f"  disp  = mean|error|/sigma; a calibrated sigma sits near {result['cells'][0]['expected_dispersion_ratio'] if result['cells'] else 0.7979}")
     print(f"\nCOUNTERS {json.dumps(result['counters'])}")
+    return {"source": source, "join_counters": counters, **result}
+
+
+def compare(runs: list[dict[str, Any]]) -> None:
+    """Does the finding REPRODUCE across two near-disjoint time windows?
+
+    This is the whole value of running both: a bias that shows up in
+    2026-05/07 and again in 2026-07/08, on samples that barely share a date,
+    is not an artefact of one stretch of baseball.
+    """
+    if len(runs) < 2:
+        return
+    print("\n" + "=" * 104)
+    print("REPRODUCIBILITY ACROSS TWO NEAR-DISJOINT WINDOWS")
+    print("=" * 104)
+    by_source = {
+        run["source"]: {c["market"]: c for c in run["cells"] if c["verdict"] == "measured"}
+        for run in runs
+    }
+    spans = {run["source"]: run["join_counters"]["date_span_scored"] for run in runs}
+    for source, span in spans.items():
+        print(f"  {source:11s} span={span}")
+    markets = sorted(set().union(*(set(cells) for cells in by_source.values())))
+    print(f"\n  {'market':26s} {'bias(local)':>12s} {'bias(prod)':>12s} {'same sign?':>11s} "
+          f"{'disp(local)':>12s} {'disp(prod)':>11s}")
+    print("  " + "-" * 90)
+    for market in markets:
+        local = by_source.get("local", {}).get(market)
+        prod = by_source.get("production", {}).get(market)
+        lb = local["mean_signed_error"] if local else None
+        pb = prod["mean_signed_error"] if prod else None
+        agree = "-"
+        if isinstance(lb, (int, float)) and isinstance(pb, (int, float)):
+            agree = "YES" if (lb < 0) == (pb < 0) else "** NO **"
+
+        def cell(value, width=12):
+            return f"{value:>{width}.3f}" if isinstance(value, (int, float)) else f"{'-':>{width}}"
+
+        print(f"  {market:26s} {cell(lb)} {cell(pb)} {agree:>11s} "
+              f"{cell(local['dispersion_ratio'] if local else None)} "
+              f"{cell(prod['dispersion_ratio'] if prod else None, 11)}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--min-sample", type=int, default=DEFAULT_MIN_SAMPLE)
+    parser.add_argument("--source", choices=("local", "production", "both"), default="local")
+    parser.add_argument("--json", type=Path, default=None)
+    args = parser.parse_args()
+
+    sources = ["local", "production"] if args.source == "both" else [args.source]
+    runs = [run_one(source, args.min_sample) for source in sources]
+    compare(runs)
 
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(
-            json.dumps({"join_counters": counters, **result}, indent=2, default=str),
-            encoding="utf-8",
-        )
+        args.json.write_text(json.dumps(runs, indent=2, default=str), encoding="utf-8")
         print(f"\nwrote {args.json}")
     return 0
 

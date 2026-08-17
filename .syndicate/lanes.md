@@ -3381,3 +3381,34 @@ in NO OPEN lane's claim set. Justification: the repo's own
 approximation"* for this same PMF, and the 2026-08-16 FORBIDDEN rule says a
 model-free measurement outranks a fitted one. Putting the empirical form
 anywhere but next to `crps_normal` would be the "fourth copy" this repo punishes.
+
+#### convergence-phase7-crps â€” **PRODUCTION RUN DONE 2026-08-17. The instrument works; the mirror-only finding is PARTLY WITHDRAWN.**
+
+- **Shipped and pushed:** `origin/main` `91be99e6` â€” `crps_empirical` +
+  `distribution_moments` in `model_scoring`, `projection_score.py`,
+  `scripts/score_projections.py`, tests. Verified after the push by blob
+  (5/5 match disk, 0 carriage returns). **NO DEPLOY** â€” local tooling.
+- **Lane goal MET:** a proper scoring rule runs over continuous projections
+  joined to outcomes, with zero dependency on settlement/grading/a placed bet.
+  **12k observations across two windows** where settlement has produced 0.
+- **THE FALSIFICATION TEST DID NOT FIRE** on the sport hypothesis: 2 sports
+  carry a spread, not 7. NHL/soccer/NCAAF remain **UNMEASURED, not absent.**
+- **A SECOND, UNANTICIPATED RESULT â€” the two sources barely overlap in time.**
+  production game logs 2026-07-19..08-16 (29 dates); mirror 05-28..07-12 (46).
+  The logs are a ROLLING WINDOW production trims. "Production has more history"
+  is FALSE for this family. Recorded in `deploys.md`; the scorer now reports a
+  reproducibility table because of it.
+- **I OVERSTATED THE FIRST RESULT.** "Every pitcher market is biased high" was
+  true of the mirror window only; 3 of 7 markets flip sign on production. What
+  reproduces: `outs`, `hits_allowed`, `earned_runs` all biased high, and `outs`
+  overconfident, in BOTH windows. The `#428` opportunity thesis is corroborated
+  through `outs`; the blanket claim is withdrawn.
+- **NEXT, in order:** (1) `--source production` for WNBA/NBA â€” the other sport
+  confirmed to carry a spread; (2) settle whether NHL/soccer carry one, from
+  production, before anyone writes "no spread"; (3) trace the `outs`
+  over-projection to the sim's starter-depth logic â€” that is the model fix and
+  it is upstream of `hits_allowed` and `earned_runs`; (4) `#440` D4, an
+  out-of-sample baseline split.
+- **STILL NOT TAKEN:** `shared/intelligence_evaluation.py` and the prediction
+  ledger write path. Phase 7 did not need either. Phase 6 still does, and still
+  needs an owner agreed with the betting-engine track.

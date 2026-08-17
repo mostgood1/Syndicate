@@ -9743,3 +9743,74 @@ was measured on these 7 markets only.
 - **4 of 4 mutants caught** (strict-vs-non-strict indicator, dropped interval
   width, missing outcome breakpoint, absolute instead of squared error). A
   passing suite that no mutant fails is decoration.
+
+## 2026-08-17 â€” PHASE 7 ON PRODUCTION â€” **THE MIRROR RESULT IS PARTLY WITHDRAWN**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/score_projections.py --source both`.
+Code on `origin/main` `91be99e6` + the `--source` addition. **Still no deploy.**
+
+### FIRST, A CORRECTION TO THE ENTRY ABOVE
+
+That entry said **"EVERY pitcher market is biased high"** and read it as
+corroborating `#428`. **On production that claim does not hold.** It was true of
+the mirror window and I generalised it. Three of seven markets change sign
+between windows.
+
+### AND A FACT ABOUT THE TWO SOURCES THAT INVERTS THE USUAL WARNING
+
+The standing rule is "production has far more history than the checkout". **For
+the MLB game logs it is the opposite, and the windows barely overlap:**
+
+| source | dates | span |
+|---|---|---|
+| production | 29 | 2026-07-19 .. 2026-08-16 |
+| local mirror | 46 | 2026-05-28 .. 2026-07-12 |
+
+The logs are a **rolling window production trims**, and the mirror is holding
+history production has already dropped. Neither is a superset. That makes them
+**two nearly independent samples**, which is why the scorer now reports a
+reproducibility table instead of one number â€” and it is a better instrument for
+the accident.
+
+### REPRODUCIBILITY (bias = actual âˆ’ mean; negative = THE SIM RUNS HIGH)
+
+| market | bias local | bias prod | same sign | disp local | disp prod |
+|---|---|---|---|---|---|
+| **pitcher_outs** | âˆ’5.139 | âˆ’2.031 | **YES** | 1.537 | 1.105 |
+| **pitcher_hits_allowed** | âˆ’1.901 | âˆ’1.592 | **YES** | 0.874 | 0.794 |
+| **pitcher_earned_runs** | âˆ’0.486 | âˆ’0.694 | **YES** | 0.721 | 0.661 |
+| pitcher_strikeouts | âˆ’0.593 | âˆ’0.005 | yes, but collapses to ZERO | 1.022 | 1.016 |
+| pitcher_pitches | âˆ’6.828 | **+4.313** | **NO** | 1.231 | 1.575 |
+| pitcher_walks_allowed | âˆ’0.148 | +0.137 | **NO** (both ~0, so noise) | 0.783 | 0.772 |
+| game_total_runs | +0.797 | **âˆ’1.230** | **NO** | 0.752 | 0.726 |
+
+Production n = 4,695 observations / 29 dates / 370 games.
+
+### WHAT SURVIVES BOTH WINDOWS â€” this is the real finding
+
+1. **The sim over-projects how deep a starter goes, in both windows.** `outs`
+   is negative in both (âˆ’5.14, âˆ’2.03) and is the largest bias in both. **The
+   `#428` OPPORTUNITY thesis is corroborated** â€” `outs` IS the pitcher-side
+   opportunity variable, and the hitter side showed the same sign via
+   `pa_mean`/`ab_mean`. What is NOT corroborated is a blanket "all markets high".
+2. **`outs` is overconfident in both** (1.54, 1.10 against a calibrated 0.798),
+   so it needs an additive shift AND a Ïƒ scale. `strikeouts` dispersion is
+   1.02 in BOTH windows â€” the most stable number in the table.
+3. **Runs allowed is over-projected in both** (`hits_allowed`, `earned_runs`),
+   consistent with over-projecting workload.
+4. **On production, 5 of 7 markets lose to the constant baseline** â€” only
+   `strikeouts` and `walks_allowed` beat it. Worse than the mirror window.
+5. **The empirical-vs-Normal gap stays under 1% in BOTH windows** (â‰¤0.085). A
+   Gaussian calibration term in Phase 8 is defensible, now on two samples.
+
+### WHAT MUST NOT BE READ INTO THIS
+
+- **The `outs` bias HALVED between windows** (âˆ’5.14 â†’ âˆ’2.03). That could be a
+  real improvement, a seasonal effect, or sampling. **Not attributed.** Nobody
+  should claim a fix caused it without finding the fix.
+- **`pitches` is unstable** â€” sign flipped and dispersion worsened (1.23 â†’
+  1.58). Do not calibrate it on either window alone.
+- The baseline is **in-sample** in both runs (`#440` D4 not done).
+- Two windows is not a time series. Three of seven signs flipping on ~4.7k
+  observations says the per-market numbers are noisier than their n suggests,
+  because observations within a start are not independent.
