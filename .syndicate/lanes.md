@@ -3450,55 +3450,146 @@ game_cards_2026-08-16.csv          1 row
   that column set is the fingerprint. `cli.py:13470` and `app.py:6800` first.
   **Do not attribute again without matching the columns.**
 
-### wnba-live-tier - **REAL WRITER FOUND BY COLUMN FINGERPRINT. SPEC GATE §1 FAILS: `game_id` IS UNSTABLE ACRO§ CONSECUTIVE DATES. Per the spec's own instruction, STOP - do not build §3.**
+#### convergence-phase7-crps — HYPOTHESIS RECORDED BEFORE TESTING 2026-08-17 — the `outs` over-projection is a FIVE-INNING LEASH
 
-**1. The writer, identified by OUTPUT SHAPE (the method that works).**
-`scripts/refresh_wnba_oddsapi_props.py::_build_local_game_cards_artifact`
-(`:2262`) - NOT `vendor/.../cli.py::export_game_cards_cmd`. Confirmed three
-ways: the artifact's `bookmaker=oddsapi_consensus` + `home_tri`/`away_tri` +
-`pred_margin`/`pred_total` column set is this function's, its historic log line
-is `Built local game_cards from game_odds fallback`, and it already carries a
-`#375` census built for exactly this question. **Both my earlier attributions
-(odds branch, then PBP fallback) are retracted; both were name-matches.**
+Written before the test is run, per protocol. `[from-code]` unless marked.
 
-**2. THIS EXACT DEFECT WAS FIXED ONCE ALREADY.** `docs/fix_notes_log.md:191`,
-2026-07-07: *"predictions and smart-sim contained 3 WNBA games, but
-`game_cards_2026-07-06.csv` collapsed to 1 game"* - identical symptom, identical
-collapse-to-1. Root cause then: `_build_local_game_cards_artifact` restricted
-the `game_odds` fallback through `allowed_matchups` from a partial props
-snapshot. **It has regressed or was fixed incompletely.** `tests/
-test_wnba_game_cards_census.py` and `test_wnba_refresh_runner.py::
-test_build_local_game_cards_artifact_promotes_full_slate_when_snapshot_is_partial`
-already exist - **start there, not from a blank spec.**
+**Mechanism proposed.** `ManagerProfile.starter_min_innings = 5`
+(`vendor/mlb_bettingv2/sim_engine/models.py:368`), commented *"Keep starters in
+longer early (useful for F5 markets) unless they blow up."* Both hook
+implementations gate on it identically:
 
-**3. THE GATE FAILS - `game_id` IS NOT STABLE. Measured on PRODUCTION.**
-```
-game_cards_2026-08-16.csv  game_id = 1                                  <- sequential index
-game_cards_2026-08-17.csv  game_id = 0f160b99581637ed10718a0bf90a33d38  <- hash
-```
-**Two consecutive dates, two incompatible id schemes**, so different branches
-wrote them. The spec §1 says verbatim: *"If the ids are unstable or absent, the
-fix is NOT 'walk the schedule' - it is 'establish a stable fixture identity
-first', which is a larger job and a different spec. Say so and stop."*
-**Saying so. §3 must not be built until identity is settled.**
+    in_leash_window = state.inning <= max(1, starter_min_innings)      # = 5
+    if in_leash_window and (not blowout) and pc < (pull_starter_pitch_count + 15):
+        return current      # keep the starter, unconditionally
 
-**4. THE DEFECT IS 08-16 ONLY, AND IT IS A ONE-DATE SAMPLE.**
-- 2026-08-16: **1 row of 3 fixtures** (sims exist for ATL_IND, PHX_POR, SEA_CHI) - **the defect.** No prices on the row.
-- 2026-08-17: **1 row of 1 fixture - CORRECT.** Fully priced, hash id.
-A one-date defect sample. **Do not size the fix off it; get a second multi-game
-date first.**
+`pull_starter_pitch_count = 95`, so inside the leash the starter is kept unless
+he is at **110+ pitches** or trailing/leading by **6+**. That is a near-hard
+floor of **15 outs** on every start.
 
-**5. The `#375` census is deployed but was never observed - and this is a WEAK
-negative, stated as such.** `GAME_CARDS_CENSUS` is present in the live code of
-both workers (`8e3d2f95` refresh-worker, `cc0f7605` live-odds-worker, checked by
-content), yet 0 hits, as is `Built local game_cards`. **My first control was a
-FALSE POSITIVE**: `text=wnba_cards` returned 5 hits that were
-`wnba_cards_context_*.json` keyvalue writes - a different emitter matching as a
-substring. The real retained window was only ~16:18-16:47Z (`hasMore=true`), so
-this says *the builder did not run in a 30-minute window*, *not* that it never
-runs. **To see the census, re-read logs right after a WNBA refresh tick.**
+**And the controls that would break the leash are DEFAULTED INERT** — the same
+built-and-unreachable pattern this repo keeps finding. The V2 hook's own
+comment says so: *"Defaults preserve the existing behavior (i.e., 'always keep'
+within leash unless blowout)"* — `starter_leash_lev_max=1.0`,
+`starter_leash_runner_max=1.0`, `starter_leash_tto_max=99.0`. Likewise
+`starter_tto_quality_scaling=0.0` and `starter_quality_hook_weight=0.0` both
+return a no-op at their defaults, so **starters of different true talent derive
+to nearly the same hook** — which is a mechanism for the σ defect specifically.
 
-**6. Host, for the next session:** production web is
-**`https://syndicate-an21.onrender.com`** - not `syndicate.onrender.com` or
-`syndicate-api.onrender.com`; both 404 and cost me three calls. Local has **no**
-`game_cards_2026-08-1*.csv` at all, so every number above is production-only.
+**THIS DEFECT IS ALREADY KNOWN AND PARTIALLY MITIGATED.** `starter_short_start_prob
+= 0.06` / `starter_short_start_hook_delta = -32` carries the comment *"Promoted
+default: rare large negative hook shift to prevent pathological overconfidence
+in starter outs-at-line."* Someone measured this before and injected a 6% short
+start as a patch. **My measurement says it is still there**, so the question is
+not "does the leash exist" but "is 6% enough". Do not re-report the mechanism as
+a discovery.
+
+**Why this explains BOTH measured symptoms with one cause** — the thing a
+bias-only or dispersion-only story cannot do:
+- **bias high** (`outs` −5.14 mirror / −2.03 production): a floor raises the mean.
+- **σ too narrow** (dispersion 1.54 / 1.10 vs a calibrated 0.798): a floor
+  TRUNCATES THE LEFT TAIL. Short starts are the bulk of real outs variance, and
+  the sim can barely produce one.
+
+**FALSIFIABLE TEST (decisive, needs no deploy, data already cached):** compare
+**P(outs < 15)** in the sim's own `outs_dist` against the empirical rate of
+sub-15-out starts in `mlb_pitcher_game_log`, on the same starts.
+
+- **Confirms** if sim P(outs<15) is materially BELOW the actual rate.
+- **REFUTES** if the two are close — then the leash is not binding in practice
+  (the pitch-count term may be pulling starters before inning 5 anyway) and the
+  bias lives somewhere else, most likely the per-batter pitch model. I will
+  report a refutation as such rather than hunting for a second story.
+- Also report the FULL simulated vs actual outs distribution, not just the tail,
+  so a single-number match cannot hide a wrong shape.
+
+#### convergence-phase7-crps — **LEASH HYPOTHESIS CONFIRMED 2026-08-17, AND MY OWN HYPOTHESIS WAS PARTLY WRONG**
+
+**FIRST, TWO CORRECTIONS TO THE HYPOTHESIS I RECORDED AN HOUR AGO.** I called
+three terms "defaulted inert". Read from the LIVE overrides file
+(`vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json`),
+that is wrong:
+- **`starter_quality_hook_weight` IS PROMOTED TO 1.0**, not 0.0. It is live.
+- **`starter_tto_quality_scaling = 0.0` is a DELIBERATE, EVIDENCE-BASED REVERT**,
+  not neglect: promoted then reverted the same session because it made the
+  betting hit rate on strikeouts WORSE (55.78% -> 54.65%), the very market it
+  targeted. Do not "re-enable" it; that decision is documented and correct.
+
+I read code defaults and called them production. **The overrides file is the
+configuration.** Same class of error as reading a stale ledger.
+
+**THE TEST RESULT — CONFIRMED, and the shape is the evidence, not the mean.**
+`[measured, production cache, 726 starts / 29 dates]`
+
+    sim  P(outs < 15)   0.1036
+    ACTUAL rate         0.2961      <- 2.86x more short starts than the sim makes
+    mean outs   sim 17.53 (5.84 IP)   actual 15.50 (5.17 IP)   diff +2.03
+
+That +2.03 **independently reproduces the −2.031 bias** measured by the scorer
+through a completely different route. Two methods, one number.
+
+**THE SMOKING GUN IS A POINT MASS AT EXACTLY THE PARAMETER BOUNDARY:**
+
+    outs   IP    sim %   actual %
+      12  4.0     2.10      7.58     <- sim makes 1/3.6 as many
+      13  4.3     1.61      4.13
+      15  5.0   *26.78*    16.25     <- 27% OF ALL MASS AT EXACTLY 5.0 IP
+      18  6.0    18.79     24.66     <- reality's mode is 6.0 IP; the sim's is 5.0
+      23  7.7     3.08      0.14     <- and the long tail is over-produced 22x
+
+The sim is wrong in BOTH tails: too few short starts, too many very long ones,
+and a spike at the leash boundary. A bias-only measurement cannot see this.
+
+**THE CAUSAL CHAIN, END TO END** `[from-code]`
+
+1. `build_roster.py:2506` — every team gets `ManagerProfile()`, i.e. DEFAULTS:
+   `starter_min_innings = 5`, `pull_starter_pitch_count = 95`.
+2. It then tries per-team tendencies from `data/manager/manager_tendencies.json`
+   (`build_roster.py:529`). **That file does not exist anywhere in the repo**
+   (`Glob **/manager_tendencies*` -> no files). The loader returns `{}`,
+   **caches it**, and the call site is wrapped in `try/except: pass`. So all 30
+   teams silently share one hardcoded manager.
+3. Its generator, `tools/datasets/build_manager_tendencies_from_feed_live.py`,
+   **is referenced only from `bootstrap_prior_season_artifacts.py`** — never
+   from the daily pipeline. Built, has a generator, never run.
+4. `_select_pitcher_v2:1755` — inside innings 1-5 the starter is KEPT unless
+   blowout, or `pc >= eff_hook + 20`, or one of three leash-break conditions
+   that ARE at inert code defaults (`lev < 1.0`, `runner_pressure < 1.0`,
+   `tto < 99.0` — none of these is in the promoted overrides file).
+
+**THE STRUCTURAL POINT, and it is the part worth acting on.** All four promoted
+tunings (`starter_hook_add_pitches = -13`, `stamina_excess_weight = 0.75`,
+`quality_hook_weight = 1.0`, `tto_quality_scaling = 0.0`) act on **`eff_hook`,
+the pitch-count hook**. Inside the leash window the hook is bypassed unless
+`pc >= eff_hook + 20`. **So the leash sits ABOVE every knob that has been
+tuned, and it is the one parameter nobody has touched** — it is not even
+exposed as a `manager_pitching_overrides` key. A −13 pitch hook reduction can
+only bite on a starter already past ~102 pitches inside five innings, which is
+rare. That is why careful hook tuning has not closed the sub-15-out deficit:
+**it structurally cannot.**
+
+**CREDIT WHERE DUE — DO NOT RE-REPORT THIS AS A DISCOVERY.** The team already
+measured this bias by market tier and partly fixed it (elite −0.46, mid-high
++0.73, mid +1.78, back-end +2.66 after `quality_hook_weight`; their sign
+convention is `sim − actual`, opposite to the scorer's). **The over-projection
+is concentrated in mid and back-end starters; elite starters are slightly
+UNDER-projected.** My pooled −2.03 averages across a tier structure that flips
+sign, so a single global shift would make aces worse.
+
+**WHAT I HAVE NOT ESTABLISHED**
+- **That the tendencies file is absent IN PRODUCTION.** It is absent from the
+  repo and its path is code-adjacent (resolved from `__file__`), so it almost
+  certainly ships absent — but I did not read the Render disk. Confirm before
+  acting.
+- Whether the 15-out spike survives per-tier. The tier structure is theirs,
+  measured; the distribution is mine, pooled. They have not been crossed.
+- Nothing was changed. **No code edit, no config edit, no deploy.**
+
+**RECOMMENDED NEXT STEP, and the reason it is not "lower the leash":** the fix
+is not a global constant change — the tier data says that would hurt elite
+starters. It is (a) expose `starter_min_innings` as a `manager_pitching_overrides`
+key so it can be swept like everything else, then (b) sweep it against the SAME
+35-tune/11-holdout harness the other four went through, grading on betting hit
+rate and not only on bias — that harness's own lesson, recorded in the
+overrides file, is that statistical-bias improvements do not reliably translate
+to betting-accuracy improvements.
