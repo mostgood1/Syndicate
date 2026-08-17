@@ -635,6 +635,49 @@ on a 60s tick unconditionally: it needs a **shortlist gate** — only sim games
 carrying a live edge candidate — before the first line of engine code is worth
 writing.
 
+**3e. SOCCER — IN SEASON NOW, AND THIS PLAN OMITTED IT.** Added 2026-08-17 after
+the user asked why a live MLS match was unsupported. The omission was a real
+defect in Part 3: 3a-3d cover NFL/NCAAF, WNBA/NBA, NHL and NCAAB, and soccer —
+the only sport with fixtures across ten leagues *tonight* — had no item at all.
+
+**Measured on the served payload 2026-08-16 22:1xZ**, live game vs live game at
+the same instant:
+
+| | live MLS | live MLB |
+|---|---|---|
+| rows | 321 | 233 |
+| rows_with_projection | **5 (1.6%)** | **193 (83%)** |
+| live_aware | **0** | 8-18 |
+
+Soccer's rows are overwhelmingly unprojected player props
+(`shots_on_target` 58, `goal_scorer_anytime` 37, `first_goal_scorer` 36) and it
+serves **0 edges across all 18 games** — unknown, live and final alike. The
+`#413`-shaped edge leak is closed, but it closed by withholding everything, so
+soccer currently produces no bettable output.
+
+**Tooling gap:** soccer has ONE `live_*` module (`live_lens.py`) against NBA/WNBA
+5, NHL 3, MLB 2. It has live STATE ingestion already
+(`poll_soccer_live_state.py`, `_soccer_has_live_game_via_artifact`) — what is
+missing is a live SIM path, not live data.
+
+**What it inherits:** SoccerSim is event/possession based (§2), so a live variant
+re-seeds from current score + minute + red cards and runs the existing model
+forward — structurally the same move `estimate_live` is for MLB. Needs the
+builder/validator/snapshot-path trio plus a registry entry, per the contract below.
+
+**Sequencing — do NOT simply put it first.** Soccer is in season now, which
+argues for priority, but its slate is the widest here (ten leagues, up to ~18
+concurrent fixtures measured 2026-08-16) and Phase 4's capacity question is
+unsettled while refresh-worker is OOM-looping (`#449`). Treat it as the natural
+FIRST candidate once Phase 4 lands, ahead of 3c/3d which are October/November,
+and gate it per-league using the Phase 1c machinery that already exists
+(`_due_leagues_for_sport`) rather than sport-wide.
+
+**Open defect adjacent to this, not fixed by a live sim:** one fixture
+(CA Osasuna @ Celta Vigo, la_liga) sat `state=unknown` with `status_token=None`
+and no score **2h50m after kickoff**, while a different 19:30Z fixture resolved
+`FINAL`. A live sim cannot help a game whose state never resolves.
+
 **Contract every addition must satisfy** (enforced by
 `tests/test_live_lens_active_sports.py`): builder + validator + snapshot path,
 all three registered, plus a per-sport memory gate **calibrated from a real
