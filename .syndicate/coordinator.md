@@ -9,6 +9,29 @@ This file is the contract. If you are a working session, you only need §2 and �
 
 ---
 
+## 0. THE FIRST THING THE COORDINATOR DOES, EVERY TURN
+
+```
+py -3 scripts/coordinator_inbox.py --since <last-ref>
+```
+
+**Before any deploy work. Not after, not "when I think of it."**
+
+Unattended sessions cannot send or receive messages (§4a), so writing a file is
+their ONLY channel. That makes "has a lane asked me something?" a question the
+coordinator must actively ask — and on 2026-08-17 it was not asked twice, while
+the answers sat in the ledger the whole time. The second miss had a cost: a lane
+had written **"PRIORITY CALL COMMUNICATED TO THE COORDINATOR"** naming one deploy
+as zero-urgency and stating that *an in-flight MLB sim outranks this deadline* —
+and the coordinator, not having read it, bundled that deploy in and killed a
+running sim.
+
+**A lane's written priority outranks the coordinator's scheduling convenience.**
+Saving a restart is an optimisation; "do not land this before the 08-19 read" is
+the requester's measurement design. The requester wins. If their priority and the
+user's instruction conflict, say so to the user *before* acting — they can only
+decide well if they know what the lane asked for.
+
 ## 1. What the coordinator owns
 
 - **Every production deploy, to all three services.** No session fires
