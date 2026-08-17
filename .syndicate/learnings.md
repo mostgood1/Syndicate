@@ -3703,3 +3703,179 @@ files to the index exactly as they were.
 **Every git write against a worktree must carry `git -C <worktree>`.** A bare
 `git` in a chained command inherits the shell's directory, and the shell's
 directory is the one place the files are not yours.
+
+### 2026-08-16 — A PLAN'S FIELD LIST WRITTEN FROM GREPS WAS WRONG FOR ALL FOUR SPORTS. Greps find NAMES; only the payload has the data
+
+`plan_2026-08-16_state_conditional_learning.md` promised, per sport, a concrete
+field list. Measured against real artifacts, **it was wrong every single time,
+and wrong in a DIFFERENT direction each time** — which is why "check the plan
+against reality" cannot be a one-off:
+
+| sport | the plan said | measured |
+|---|---|---|
+| MLB | build a state vector | it **already existed** in full (`LiveSituation`) and was discarded — serialisation, not derivation |
+| WNBA | "needs a possession count" | possessions are **underivable** — no FGA/TOV/OREB/FTA anywhere |
+| NFL | down/distance/field position/`pace_secs_play` | **none captured**; `situation` sits in the fetched payload unread, and `pace_features.py` is SEASON-level, not live |
+| soccer | minute/score/red cards | far richer (shots, SOT, corners) **and it embeds the model's own projection** |
+
+- **The rule going forward:** before designing an extractor, **open a populated
+  artifact and read it.** The grep that produced each of those lists found a
+  field NAME in a file somewhere in the tree — in a sim engine's internal state,
+  a historical loader, a season-level feature builder — none of which is the
+  live payload. A name in the repo is not a field on the record.
+- Corollary that paid off four times: the measurement changes the DESIGN, not
+  just the field list. MLB became a one-line serialisation, WNBA became an
+  honest refusal, NFL became a capture fix, soccer became an exclusion problem.
+
+### 2026-08-16 — STATE THAT EMBEDS THE MODEL'S OWN OUTPUT MAKES CONDITIONING CIRCULAR. Soccer is the only sport here that does it
+
+`soccer/ingestion/espn_live_state.py`'s record carries a `projection` block
+(`home_win_probability`, `projected_final_total`) and `goal_windows` inline,
+alongside the real state. Folding those into a game-shape record would mean
+scoring the model's error against a variable that CONTAINS the model.
+
+- **The rule going forward:** a conditioning variable must be derivable from
+  observable state ALONE. When a payload mixes state and prediction, split them
+  explicitly and say so on the record. **The test for this is cheap and
+  worth writing:** assert the model's field names are absent from the shape.
+- No other sport's live_state carries its projection, so nothing else in the
+  module guards it — a trap that exists in exactly one place is the kind that
+  survives review.
+
+### 2026-08-16 — A RESERVATION IS A READING WITH A TIMESTAMP. Three different kinds went stale in ONE session
+
+Already recorded for lane claims. It happened in **three distinct systems**
+within a few hours, which makes it a general property of this worktree, not a
+lane-file quirk:
+
+1. **Lane claim** — `mlb-live-gameline-distributions` read `CLOSED-VERIFIED` at
+   lane open and was re-opened before my edit. `lane-guard` was right.
+2. **Shared git index** — held revert-shaped entries against a HEAD that had
+   moved; `commit-guard` blocked twice and its fix list was incomplete BOTH
+   times.
+3. **Todo IDs** — this session's plan reserved `#447`/`#448`; other sessions
+   filed unrelated items under both before it was filed.
+
+- **The rule going forward:** re-read the authority immediately before the
+  action that depends on it — the claim before the edit, the index before the
+  commit, the ID before filing. Never carry a reading across a turn boundary.
+
+### 2026-08-16 — A DIRECTORY NAMED `pbp` CAN CONTAIN MODELS, NOT PLAY-BY-PLAY
+
+`vendor/wnba_betting_repo/models/pbp/` holds `.joblib`/`.onnx` files
+(`early_threes_gbr`, `first_basket_lr`, `tip_winner_lr`) — artefacts TRAINED
+from pbp. A coverage census by path would have counted WNBA twice and, worse,
+would have reported coverage for a sport on the strength of a filename.
+
+- **The rule going forward:** a coverage census must open a file and check its
+  SHAPE, not match its path. The same pass corrected "we have pbp for every
+  sport" to **5 of 8** (`#454`) — and the three without it (soccer, NHL, NCAAB)
+  are the same three modules that are weakest everywhere else, which is a
+  finding in itself rather than a coincidence.
+
+## 2026-08-17 — FORBIDDEN: deploying `main`'s TREE to a service that runs a curated deploy branch
+
+Every one of the three services held commits `main` had never received —
+live-odds-worker 21, web 52, refresh-worker 40. Deploying main's tree would have
+reverted all of them, silently, in the name of "shipping the pending work".
+
+**The tell is per-file, and it is cheap:** for each conflicted path compute
+`live-only` and `main-only` line counts. **`main-only == 0` means production is
+AHEAD there** and taking main is a revert. Measured tonight on
+`refresh_nba_oddsapi_props.py`, `refresh_wnba_oddsapi_props.py` and
+`test_win_prob_null_counter.py` — three files, on two separate services, where
+the obvious move was the wrong one.
+
+**THE RULE.** Converge with a real merge commit (two parents) cut on the
+service's own live SHA. Resolve each conflict by MEASURING which side is ahead,
+never by preferring a branch. Then verify on the merged tree BEFORE pushing:
+the live-wins files lose 0 lines, no conflict markers survive, and `render.yaml`
+is byte-identical to live.
+
+**Use `git merge-tree --write-tree`, not `read-tree -m`.** `read-tree -m` is a
+trivial merge: it flagged 12 paths where either side changed, including files
+that needed CONTENT merging, and picking a side there would have dropped the
+other side's work. `merge-tree` does real 3-way content merges and found 6 true
+conflicts. It also needs no worktree, which matters here because `git worktree
+add` fails outright on this repo.
+
+**One apparent loss was a supersession, and checking cost two minutes:**
+`wnba/cards.py` "lost" 7 lines that turned out to be an inline `american_price`
+clamping to `[0.02, 0.98]`, which main deliberately replaced. Do not report a
+diff as a regression before reading what the lines say.
+
+## 2026-08-17 — FORBIDDEN: gating a deploy on "no jobs running" for a continuously-busy worker
+
+live-odds-worker's idle window is **under 25 seconds** and appeared once in an
+hour of polling. Waiting for `jobs == 0` there is waiting for a condition that
+effectively never holds, and a 90s poll steps straight over it.
+
+**Worse, the gate measures the wrong moment.** Render BUILDS first and stops the
+service after (`build_started 21:13:49 -> build_ended 21:18:29 -> live 21:21:05`).
+What dies is whatever runs at the STOP, ~5 minutes after the trigger — not what
+preflight saw when you fired.
+
+**THE RULE.** Gate on the EXPENSIVE job, not on all jobs. On refresh-worker that
+is `run_mlb_daily_sim_job`: a killed odds refresh re-runs in minutes, a killed
+MLB sim can run long with no ETA and the board depends on it. Gating on "no MLB
+sim" caught a window in 35 seconds that "no jobs" would have waited for
+indefinitely. And have the poller watch the BASE too — refresh-worker moved
+`fdc72dd0 -> 94447830` mid-build, which silently invalidates a pushed branch.
+
+## 2026-08-17 — FORBIDDEN: resolving the SAME symbolic ref in two git calls. A stale tree on a current parent is a fast-forward, and git cannot tell it from a deliberate revert.
+
+I pushed `c0fe1257` to `main` intending to add one 5-line instrument. It also
+DELETED `scripts/capture_wnba_pbp.py` and `tests/test_capture_wnba_pbp.py`
+outright and dropped 41 lines of `lanes.md` and 64 of `todo.md` — **514
+deletions I did not author and did not intend**, wiping a parallel session's
+work that had been pushed ~1 minute earlier.
+
+**The mechanism, which is the part worth memorising:**
+
+    git merge-tree --write-tree --merge-base=B origin/main MINE   -> read origin/main = 16a7f261
+    ... a PARALLEL SESSION's fetch advanced origin/main to a5ff7a6f ...
+    git commit-tree $TREE -p origin/main                          -> read origin/main = a5ff7a6f
+
+The commit got the **NEW parent** and the **OLD tree**. That is a perfectly
+valid fast-forward — the parent is the remote tip — so **`git push` accepted it
+with no `--force` and no warning.** Every safety net I had been relying on all
+session was blind to it:
+
+- `git push` non-fast-forward rejection: PASSED it. The parent was current.
+- `--force-with-lease`: would also have passed. The lease is on the REF, and the
+  ref was exactly what I expected.
+- The pre-push verification I DID run: I diffed `origin/main..$TREE` and saw
+  "only my 2 files, 0 deletions". **That diff was against 16a7f261 — the stale
+  value.** I verified the right property against the wrong baseline, which is
+  worse than not verifying, because it produced confidence.
+
+**The rule: pin every ref to a literal SHA ONCE, and pass that SHA to every
+subsequent call.** Never let two git invocations resolve the same symbolic ref —
+in a repo with parallel sessions the second resolution is a different commit.
+
+    OURS=$(git rev-parse origin/main)     # once
+    T=$(git merge-tree --write-tree --merge-base=$BASE $OURS $MINE)
+    NEW=$(git commit-tree $T -p $OURS)    # SAME literal
+
+**And the verification that actually catches it** — diff the finished commit
+against the LITERAL SHA you built on, immediately before pushing, and require
+zero deletions:
+
+    git diff --name-status $OURS $NEW | grep -c '^D'    # must be 0
+
+**Why the existing rules did not cover this.** `project_shared_index_can_hold_a_revert`
+and "run `git diff --cached --stat` before every commit" both govern the INDEX,
+and I followed them — I used the pathspec commit form and never ran `git add -A`.
+This failure has nothing to do with the index; it is in ref resolution between
+calls, and it bypassed a clean index entirely. `feedback_never_chain_add_and_commit`
+says separate the calls — here **separating the calls is what caused it.**
+
+**Blast radius:** `origin/main` carried the reverted state for ~2 minutes
+(`c0fe1257` -> `55586571`). Any session that pulled in that window has the
+deletions locally and will re-introduce them if it pushes. Repaired forward
+rather than with a force-push, so the bad commit remains in history as a record.
+
+**Second-order lesson, the one I keep relearning:** I ran the *right* check with
+the *wrong* baseline and read the pass as safety. A verification is only as good
+as the thing it is compared against, and a baseline captured in an earlier tool
+call is not a constant in a repo other people are pushing to.
