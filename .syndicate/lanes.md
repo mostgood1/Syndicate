@@ -3128,3 +3128,30 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 - Phase 1 remains COMPLETE and verified (1a/1b 05:51Z, 1c 00:11:36Z).
 - `scripts/pick_mlb_build_hour.py` already computes Phase 2's band input; only
   the wiring is blocked.
+
+#### game-shape-capture — LEVERAGE WIRED INTO `game_shape` (`#454` complete) `[2026-08-16 ~21:4x CDT]`
+
+**The refusal is lifted because the premise changed, not because the bar moved.** `game_shape.py` refused a leverage index on the grounds that a real one needs a fitted win-expectancy table this repo did not have. `#454` built both halves from `feed_live`; the docstring now records that history rather than deleting it.
+
+**NEW:** `scripts/mlb_leverage_index.py` (transition matrix + LI + generator), `syndicate/features/shared/mlb_leverage_table.py` (GENERATED, 5,382 cells, 205 KB of literals).
+
+`LI = E|dWE| from the state / E|dWE| averaged over all plate appearances`. The transition matrix is the new estimable piece — the same replay already observes `(state -> runs, state_after)` for every PA: **~53,000 transitions over 24 states, ~2,200 each**, the same order as the run distributions and nowhere near the 4-per-cell that killed the empirical WE table.
+
+**AGREES WITH PUBLISHED LI:**
+
+| situation | this table | published |
+|---|---|---|
+| start of game | **0.93** | ~0.9-1.0 |
+| bottom 9, tied, bases empty | **2.36** | ~2.2-2.5 |
+| bottom 9, tied, bases loaded, 2 out | **10.61** | ~10-11 (near the max) |
+| bottom 9, up 6 | **0.00** | dead |
+
+**A NORMALISATION ERROR OF MINE, FOUND BY A SANITY CHECK.** The first version weighted by STATE frequency only, treating every (inning, half, margin) combination as equally likely — so 6-run blowouts counted as heavily as tied middle innings. That deflates the mean swing and inflates everything: **start-of-game read 1.14 when an average plate appearance is 1.00 by definition.** Fixed by weighting on the observed frequency of the FULL cell, which the scan now counts. 1.14 -> 0.93.
+
+**PURITY PRESERVED.** The table is a generated module of literals, imported function-locally, so `game_shape` still does no I/O and loads nothing fitted at import. Records carry `leverage_index` AND `leverage_source`, the latter present even when the value is `None`, so provenance is never inferred from the presence of a number.
+
+**A THIRD VACUOUS TEST OF MINE, CAUGHT BY MUTATION.** `test_leverage_never_defaults_to_one_on_a_miss` passed with the lookup changed to `.get(key, 1.0)` — every input in it was rejected by a guard clause BEFORE the dict was touched, so it tested validation, not the default. The separating case is a state that passes every check and is genuinely absent: **`1-3` with 0 outs, the one base-out combination below the n>=100 floor (n=90)**. A defaulted 1.0 there would populate exactly the cell the corpus could not support, with the most innocuous-looking value available. Split into two tests; L1 now fires.
+
+**65 tests, 5 of 5 mutations caught** (default-to-1.0 on a miss, extras reusing the 9th, `leverage_source` dropped, margin not clipped, margin sign inverted).
+
+**WHAT IS STILL NOT TRUE, and it travels on the record:** these are LEAGUE-AVERAGE values under i.i.d. innings, one shared run distribution, no team or park term, extras as a constant, and a start-of-game WE of 0.500 against a published ~0.540 — that gap IS the omitted home-field advantage. Wrong for a specific matchup. **Also unchanged: no production slate has run through `game_shape` for any sport. n = 0 remains n = 0.**

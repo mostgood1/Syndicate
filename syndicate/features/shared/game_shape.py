@@ -33,13 +33,28 @@ THREE DESIGN DECISIONS, each with a reason that is not stylistic.
    finer cut can re-bucket from stored records -- **re-bucketing must never
    require re-capturing.** That asymmetry is the whole point of the split.
 
-2. **NO LEVERAGE INDEX.** A real leverage index needs a fitted win-expectancy
-   table, and this repo does not have one. Emitting a plausible-looking
-   `leverage` computed from a formula nobody validated is precisely `#377`'s
-   failure -- an authoritative-looking number that means nothing -- committed by
-   the module written to enable measurement. The INPUTS to leverage
-   (`base_out_state`, `home_margin`, `phase`) are all here; a caller that
-   acquires a real table can compute it. This module refuses to guess.
+2. **LEVERAGE INDEX -- THE REFUSAL IS NOW LIFTED, AND ONLY BECAUSE THE TABLE
+   EXISTS.** This module used to refuse a leverage index outright: a real one
+   needs a fitted win-expectancy table, this repo had none, and emitting a
+   plausible-looking number from an unvalidated formula is precisely `#377`'s
+   failure. That premise changed. `#454` built both halves from `feed_live` --
+   run expectancy (`scripts/mlb_run_expectancy.py`, 53,049 plate appearances
+   over 47 dates, reproducing published RE24 under a single +14.6%
+   run-environment factor) and win expectancy by composition
+   (`scripts/mlb_win_expectancy.py`) -- and `scripts/mlb_leverage_index.py`
+   turns them into `shared/mlb_leverage_table.py`, a generated module of plain
+   literals. So the lookup here is a dict access: **this module is still pure,
+   with no I/O and nothing fitted at import time.**
+
+   **THE CAVEAT TRAVELS ON THE RECORD, NOT JUST IN THIS COMMENT.** Every value
+   inherits the composition's assumptions -- i.i.d. innings, one league-average
+   run distribution for BOTH sides, no team or park term, extra innings as a
+   constant, and a start-of-game win expectancy of 0.500 where published tables
+   show ~0.540 (that gap IS the omitted home-field advantage). So
+   `leverage_index` describes a LEAGUE-AVERAGE situation and is wrong for the
+   specific matchup in front of you. Records carry `leverage_source` so a
+   consumer can tell where it came from, and an absent lookup is `None` --
+   never an interpolation, never a default of 1.0.
 
 3. **NO VENDOR IMPORT.** `shared/` must not depend on `vendor/mlb_bettingv2`.
    Every accessor here is duck-typed over attribute *or* mapping access, so the
@@ -172,6 +187,45 @@ def _lookup_by_id(mapping: Any, pitcher_id: Any) -> int | None:
     return None
 
 
+# Leverage margins are clipped to this band in the generated table -- beyond
+# six runs the situation is dead and the extra resolution buys nothing.
+_LEVERAGE_MARGIN_CLIP = 6
+
+
+def mlb_leverage_index(*, inning: Any, half: Any, bases: Any, outs: Any,
+                       home_margin: Any) -> float | None:
+    """League-average leverage for this state, or None.
+
+    `#454`. A dict lookup into a GENERATED table of literals
+    (`shared/mlb_leverage_table.py`), so this stays pure. **`None` on any miss
+    -- never interpolated, never defaulted to 1.0.** A defaulted average would
+    be indistinguishable from a real average and would quietly populate the
+    exact cells the table could not support.
+
+    The import is function-local: the table is ~200 KB of literals and this runs
+    on a memory-constrained worker, so it is paid for only by callers that ask.
+    """
+    inning_int = _as_int(inning)
+    outs_int = _as_int(outs)
+    margin_int = _as_int(home_margin)
+    if inning_int is None or outs_int is None or margin_int is None:
+        return None
+    if half not in ("top", "bottom") or bases not in _VALID_BASE_STATES:
+        return None
+    # Extra innings are not modelled by the composition; the table stops at 9.
+    if not (1 <= inning_int <= 9) or not (0 <= outs_int <= 2):
+        return None
+    margin_int = max(-_LEVERAGE_MARGIN_CLIP, min(_LEVERAGE_MARGIN_CLIP, margin_int))
+    try:
+        from syndicate.features.shared.mlb_leverage_table import MLB_LEVERAGE_INDEX
+
+        return MLB_LEVERAGE_INDEX.get((inning_int, half, str(bases), outs_int, margin_int))
+    except Exception:
+        # The table is generated; a missing or malformed one must cost the
+        # leverage field and nothing else.
+        return None
+
+
 def _invalid(reason: str) -> dict[str, Any]:
     return {
         "shape_version": SHAPE_VERSION,
@@ -298,6 +352,14 @@ def mlb_game_shape(situation: Any) -> dict[str, Any]:
         "strikes": strikes,
         "count": f"{balls}-{strikes}",
     }
+    # --- leverage: DERIVED, league-average, and labelled as such ---
+    # Kept distinct from the raw state above. `leverage_source` is on every
+    # record (including when the value is None) so a consumer never has to infer
+    # provenance from the presence of a number.
+    shape["leverage_index"] = mlb_leverage_index(
+        inning=inning, half=half, bases=base_state, outs=outs, home_margin=home_margin
+    )
+    shape["leverage_source"] = "mlb_leverage_table/league_average_composition"
     shape["bucket"] = mlb_shape_bucket(shape)
     return shape
 

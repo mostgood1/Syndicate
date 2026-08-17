@@ -858,3 +858,86 @@ def test_soccer_bucket_space_stays_coarse():
                 labels.add(shape["bucket"])
     assert len(labels) <= 13, f"bucket space grew to {len(labels)}: {sorted(labels)}"
     assert "unknown" not in labels
+
+# ==========================================================================
+# LEVERAGE (#454) -- the refusal that got lifted, and its guardrails
+# ==========================================================================
+
+from syndicate.features.shared.game_shape import mlb_leverage_index  # noqa: E402
+
+
+def test_leverage_is_on_the_record_with_its_source():
+    shape = mlb_game_shape(_SituationLike())
+    assert shape["leverage_index"] == 0.933
+    assert shape["leverage_source"] == "mlb_leverage_table/league_average_composition"
+
+
+def test_leverage_source_is_present_even_when_the_value_is_none():
+    """A consumer must never infer provenance from the presence of a number."""
+    shape = mlb_game_shape(_SituationLike(inning=10))   # extras are not modelled
+    assert shape["leverage_index"] is None
+    assert shape["leverage_source"]
+
+
+def test_leverage_ranks_situations_the_way_baseball_does():
+    def li(**kw):
+        return mlb_game_shape(_SituationLike(**kw))["leverage_index"]
+
+    start = li()
+    tied_bot9 = li(inning=9, top=False)
+    loaded_bot9 = li(inning=9, top=False, outs=2, bases=_BaseStateLike.LOADED)
+    blowout = li(inning=9, top=False, home_score=6)
+
+    assert loaded_bot9 > tied_bot9 > start > blowout
+    assert blowout == 0.0            # a six-run 9th is dead, not "low"
+    assert 0.8 < start < 1.1         # an average PA is ~1.0 by construction
+
+
+def test_extra_innings_return_none_rather_than_the_ninth_inning_value():
+    """The composition stops at 9. Reusing the 9th would be a silent guess."""
+    assert mlb_leverage_index(inning=10, half="top", bases="---", outs=0, home_margin=0) is None
+    assert mlb_leverage_index(inning=9, half="top", bases="---", outs=0, home_margin=0) is not None
+
+
+def test_a_valid_state_absent_from_the_table_returns_none_not_one():
+    """THE GUARD THAT MATTERED, and my first version of it was vacuous.
+
+    Caught by mutation (L1): changing the lookup to `.get(key, 1.0)` changed
+    nothing, because every input in the test below is rejected by a guard clause
+    BEFORE the dict is touched. Those test the validation, not the default.
+
+    The separating case is a state that passes every check and is genuinely
+    absent from the table: `1-3` with 0 outs is the one base-out combination
+    that fell below the n>=100 floor (n=90). A defaulted 1.0 there is
+    indistinguishable from a real league-average leverage, which is precisely
+    the failure this module's leverage refusal existed to prevent -- it would
+    populate the cells the corpus could NOT support, and populate them with the
+    most innocuous-looking value available.
+    """
+    assert mlb_leverage_index(inning=5, half="top", bases="1-3", outs=0, home_margin=0) is None
+    # ...while its neighbours, which cleared the floor, do resolve.
+    assert mlb_leverage_index(inning=5, half="top", bases="1-3", outs=1, home_margin=0) is not None
+
+
+def test_leverage_rejects_malformed_input_before_the_lookup():
+    """Validation, distinct from the default-on-miss case above."""
+    for bad in (
+        {"inning": None, "half": "top", "bases": "---", "outs": 0, "home_margin": 0},
+        {"inning": 5, "half": "sideways", "bases": "---", "outs": 0, "home_margin": 0},
+        {"inning": 5, "half": "top", "bases": "banana", "outs": 0, "home_margin": 0},
+        {"inning": 5, "half": "top", "bases": "---", "outs": 7, "home_margin": 0},
+        {"inning": 0, "half": "top", "bases": "---", "outs": 0, "home_margin": 0},
+    ):
+        assert mlb_leverage_index(**bad) is None
+
+
+def test_margins_beyond_the_clip_reuse_the_edge_rather_than_missing():
+    """Past six runs the situation is dead; the table clips instead of thinning."""
+    edge = mlb_leverage_index(inning=9, half="top", bases="---", outs=0, home_margin=6)
+    beyond = mlb_leverage_index(inning=9, half="top", bases="---", outs=0, home_margin=25)
+    assert beyond is not None and beyond == edge
+
+
+def test_leverage_never_raises():
+    for bad in (None, "", 0, [], object()):
+        assert mlb_leverage_index(inning=bad, half=bad, bases=bad, outs=bad, home_margin=bad) is None
