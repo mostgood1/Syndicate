@@ -9330,7 +9330,7 @@ named above so neither disappears with the lane.
 
 ---
 
-### live-edge-basis — `28b03fef` on `main` — **LANDED, NOT DEPLOYED (open obligation, deliberate)**
+### live-edge-basis — refresh-worker `b20072cd` — **MEASURED AND CLOSED**
 
 - Committed 2026-08-17 01:4xZ. **No deploy fired**, by owner instruction: it
   rides a CONSOLIDATED deploy rather than a ninth one tonight.
@@ -9359,7 +9359,59 @@ named above so neither disappears with the lane.
   on `full/*` live rows of `/api/board/layer2-shortlist`, `"live"` where
   `live_aware` is true. **Until then this row stays an open obligation and
   `edge_basis` has never been seen on a served row.**
-- Rollback: revert `28b03fef`. Nothing reads the key yet, so reverting is inert.
+- Rollback: revert `28b03fef`. Nothing reads the key yet, so reverting is inert. (Now deployed — a rollback
+  means redeploying refresh-worker at `8e3d2f95`, which would also drop the wnba
+  and game_shape entries that shipped in the same batch.)
+- **MEASURED 2026-08-17 17:44:30Z — OBLIGATION CLOSED.** Deployed to
+  refresh-worker as part of the consolidated batch in
+  `.syndicate/deploy_manifest_refresh_worker.md` (`dep-da1jkhm417fc73akijag`,
+  live 16:50:48Z, target `b20072cd`, cut from the service's own live SHA
+  `8e3d2f95`). Shipped alongside `wnba/cards.py` (`ea9a2be8`, `a3cecedd`) and
+  `game_shape.py` (`28cc8814`).
+- **`edge_basis` OBSERVED ON SERVED ROWS.** On the 17:44:30Z shortlist build,
+  9 `live_aware` rows:
+
+      edge_basis   edge_vs_market_pct   edge_unavailable_reason      market
+      None         None                 live re-sim produced no…     strikeouts
+      None         None                 prob_interval_swamps_edge    totals
+      None         None                 prob_interval_swamps_edge    totals
+      None         None                 live re-sim produced no…     batter_rbis
+      pregame      21.99                None                         h2h
+      live         20.54                None                         spreads
+      live         10.69                None                         totals
+      live         10.69                None                         totals
+      pregame      21.99                None                         h2h
+
+  **Perfect separation, 9 of 9: `edge_basis` is set IFF the edge is priceable.**
+  All 5 rows carrying it have a real `edge_vs_market_pct`; all 4 without it have
+  `None` plus a stated `edge_unavailable_reason`. Both values appear and both are
+  right — `spreads`/`totals` read `live` where a live projection exists, `h2h`
+  reads `pregame` where it does not.
+- **THE WATCHER REPORTED FAIL AND THE WATCHER WAS WRONG.** It asserted "every
+  `live_aware` row carries `edge_basis`" and exited 1 on the four withheld rows.
+  The code sets the key only on the `priceable` branch — deliberately, and
+  `tests/test_live_gameline_edge_basis.py::test_a_withheld_edge_carries_no_basis`
+  pins exactly that ("no edge, no basis; describing the vintage of a `None` is
+  noise"). **I wrote a production check that contradicted my own test.** Caught by
+  reading `edge_unavailable_reason` on the four rows instead of trusting the
+  pass/fail branch. Had the exit code been taken at face value it would have
+  reported a just-shipped deploy as broken — the mirror image of the
+  absence-proves-nothing trap the watcher existed to avoid. **Do not reuse that
+  assertion as written; the correct one is "every PRICEABLE `live_aware` row
+  carries `edge_basis`".**
+- Two earlier reads were correctly discarded rather than reported: 16:48:20Z
+  (artifact predates the 16:50:48Z deploy) and 16:58:13Z (post-deploy but 0 live
+  rows, so the live-join path never ran). A zero from either would have been
+  uninformative.
+- Deploy cost, as predicted and accepted: a board build 2.3 min in was killed and
+  re-ran. The MLB sim had already finished — it was the blocker two hours
+  earlier, which is why this waited.
+- Measured before firing, because refresh-worker carries an open OOM lane: the
+  new `mlb_leverage_table.py` (5,416 lines) is **function-locally imported** and
+  costs **1.14 MiB resident / 8 MiB RSS / 30.9 MiB transient import peak** —
+  negligible against the ~2 GB transient `refresh-worker-oom-recurrence` is
+  chasing.
+
 
 ### board_contract_end — the instrument that names the allocator (refresh-worker)
 - Deployed: 2026-08-17 00:04:08Z — `dep-da14vu3l550s73ermc0g`, commit `94447830`,
