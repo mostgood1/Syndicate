@@ -3431,3 +3431,41 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
   against `live/wnba_live_lens.json`'s `live_state.final`. If the chip says
   final and the row says live, `attach_live_game_state_from_lens` is the writer
   and the lens is the stale input.
+
+### wnba-live-tier — **CORRECTION 2026-08-17 02:5xZ. My previous entry said "the chips are CORRECT" — THAT IS FALSE IN PRODUCTION, and I proved it locally.**
+- **The user caught it: I checked local, not production.** The local run took
+  `build_live_state_payload_fallback_return` (a stored snapshot); the worker
+  takes the live ESPN path. I even wrote that caveat down and then let "chips
+  are CORRECT / two suspects eliminated" stand as the headline anyway. **A code
+  path exercised with different inputs than production proves the MAPPING and
+  nothing else.**
+- **PRODUCTION, `/api/board/game-chips?date=2026-08-16` 02:5xZ:**
+  ```
+  wnba chips: 1        POR @ PHX   state=pregame   token='6:08P CT'
+  mlb:   15 final
+  soccer: 52 pregame, 37 final, 1 live
+  ```
+  **ONE WNBA chip, and it reads `pregame`** — hours after all three games
+  finished. Locally the same call returned **3 chips, all `final`** with correct
+  scores. The two environments disagree completely.
+- **THIS EXPLAINS BOTH WNBA SYMPTOMS AT ONCE, and my earlier reading of them
+  was wrong:**
+  - **207 of 300 grid rows had NO game block** because production has only ONE
+    chip to join against. Two of three fixtures have no chip at all.
+  - **93 rows read `live`** — that state does NOT come from the chips (which say
+    pregame). It comes from the lens overlay,
+    `attach_live_game_state_from_lens`, running after `attach_game_state`.
+  - So the grid is **not** "stuck on live" as I wrote. It is *unjoined* for two
+    games and *lens-overlaid* for the third.
+- **STILL EXONERATED, because those were CODE arguments and hold in either
+  environment:** the 180s carry-forward (bound far too short, and it never
+  re-stores so it cannot ratchet) and the 30s chip cache.
+- **NOW SUSPECT, and unmeasured:** whatever feeds the WNBA provider on the
+  worker returns 1 fixture instead of 3, stale at `pregame`. Note soccer on the
+  SAME call returns 37 final — so the chip pipeline as a whole is not broken;
+  this is WNBA-specific.
+- **Next action:** compare the WNBA provider's game list on the worker against
+  the WNBA live lens for the same date. The lens knew all three were Final at
+  23:19Z; the chip provider today knows one, pregame. Find which of them the
+  worker's `build_live_state_payload` is actually reading, and why it lost two
+  fixtures.
