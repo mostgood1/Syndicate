@@ -910,7 +910,32 @@ does not hold.** `[measured 08-14]`
   lane opened. Taken for this lane and the holding session notified; they must
   re-write it before editing the adapter.
 
-### soccer-model-coverage — OPEN — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+### soccer-model-coverage — CLOSED — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+- **CLOSED / FILES RELEASED 2026-08-17 ~15:1x CDT by the `wnba-fixture-identity`
+  session, on explicit user instruction.** Closing this lane is safe because the
+  work it was protecting was ALREADY SAFE - measured, not assumed:
+  - **Fix #1 (seed bootstrap): ON MAIN.** Test committed (108 lines) plus source
+    references in `run_live_odds_refresh_worker.py`.
+  - **Fix #3 (accent join): ON MAIN, VERIFIED THREE WAYS** - committed,
+    functional on nine accented club names, and REACHABLE
+    (`soccer_projections.py:126` and `team_aliases.py:238/244` both call
+    `fold_accents`). See `a0b87e14`.
+  - `git status --porcelain` across every file this lane named: **EMPTY.**
+  - **This lane's "built and tested, never committed / the only work at risk of
+    being lost" warning was STALE.** It is the reason nothing needed rescuing.
+- **FIX #2 (3-way de-vig) - THE HOLD SURVIVES THIS CLOSE, AND ITS STATE IS
+  UNKNOWN.** It was marked DELIBERATELY HELD, and closing a lane does not
+  reverse a modelling decision. **`tests/test_soccer_three_way_devig.py` is
+  ABSENT from disk**, so #2 is EITHER committed elsewhere, OR never written, OR
+  genuinely lost - **I could not tell which, and did not try to.** Anyone
+  reviving #2 must establish that first, and must not read this close as the
+  hold having been lifted.
+- **Released files** (now free to take, `lane-guard` will stop blocking them):
+  `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
+  `scripts/backtest_soccer_live_lens.py`, `syndicate/features/shared/soccer_projections.py`,
+  `scripts/run_live_odds_refresh_worker.py`, and this lane's soccer test files.
+  **`run_live_odds_refresh_worker.py` is the one Phase 2 was blocked on.**
+- **I did not touch any soccer CODE** - this close is a ledger action only.
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner, and the claims were
 > RELEASED deliberately at session archive.** Anyone may take these files.
 > **SINGLE NEXT ACTION:** commit fixes #1 (seed bootstrap, unblocks 107 of 123
