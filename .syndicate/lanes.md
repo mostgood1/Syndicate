@@ -3606,3 +3606,44 @@ touch that.
   filter and the caller passing TODAY's value for a requested date is the bug.
   If they match, the list is short before that parameter and the cause is in how
   the provider resolves its context.
+
+### wnba-live-tier — DEFECT 1: `is_active_today` CANDIDATE IS DEAD 2026-08-17 15:0xZ
+- **Ran the measurement.** `WNBAProvider.games(ctx, is_active_today=...)` with
+  both values, both dates:
+  ```
+  central_today_iso() = 2026-08-17
+  date=2026-08-16  context_label='2026-08-16'  is_active(today)=False
+                   games(True)=3   games(False)=3   DIFFER=False
+  date=2026-08-17  context_label='2026-08-17'  is_active(today)=True
+                   games(True)=1   games(False)=1   DIFFER=False
+  ```
+- **`is_active_today` HAS NO EFFECT ON THE COUNT. The candidate is ELIMINATED**,
+  and so is the "caller passes TODAY's flag for a requested date" theory built on
+  it. The flag is threaded through and does not filter. Recorded so nobody
+  re-derives it; the reasoning was plausible and simply wrong.
+- **AND THE SAME RUN NARROWS WHAT IS LEFT.** For 2026-08-16 the provider returns
+  **3 games** — the full slate, matching the lens. So the provider code is not
+  short-listing; the LIST ITSELF is complete where this ran.
+- **WHICH LEAVES A DATA DIFFERENCE, NOT A CODE BRANCH.** Production's provider
+  returned **1** game for 08-16 while this returns **3**. Nothing in the
+  parameter explains it, so the divergence is in what the two environments have
+  to read.
+- **CAVEAT, AND IT IS THE ONE I ALREADY GOT WRONG ONCE THIS SESSION: THIS RAN
+  LOCALLY.** Its verdict on the FLAG is environment-independent — a parameter
+  that does not filter a list cannot start filtering on another host. Its
+  verdict on the COUNT is not: local reads a git-tracked mirror, the worker reads
+  its own disk. **"The provider returns 3" is a statement about this checkout,
+  not about production.**
+- **This also re-frames the numeric-vs-synthesized gamePk observation.** The
+  survivor on production carried a synthesized `POR@PHX` key and the two losses
+  carried numeric ESPN ids — consistent with the games arriving from DIFFERENT
+  SOURCES, and production holding only the source that yields synthesized keys.
+  Still a hypothesis.
+- **Next action:** stop measuring code and measure the worker's DATA. Compare the
+  WNBA schedule/cards artifacts the provider reads for 2026-08-16 on the worker
+  against this checkout — count fixtures and check which carry numeric event ids.
+  Reachable via `/api/ops/artifacts/export` for any path in
+  `HOT_ARTIFACT_PATTERNS`; if the relevant one is not published, that absence is
+  itself the finding.
+- **Unobservable until a multi-game WNBA date** either way: 2026-08-17 has one
+  fixture and production returns exactly one, which is correct.
