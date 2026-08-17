@@ -3832,3 +3832,62 @@ from the service.**
   schema-v4 `roster_obj_*.json`; production 404s at every root and the sim's
   loader rejects the raw bundle (`schema_version=None`).
 
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+## MLB PITCHER-OUTS MODEL AND ITS INPUTS — verified 2026-08-17 (lane `convergence-phase7-crps`)
+
+- **The `outs` over-projection is the F5 STARTER LEASH.** 267 starts / 13 dates /
+  87,500 game-sims replayed from archived roster artifacts. Every metric improves
+  monotonically as the leash shortens; dispersion **1.002 → 0.791 against a
+  calibrated 0.7979**, short-start gap **−0.1778 → −0.0266**. Replay at the
+  current leash reproduces production (P(outs<15) 0.0965 vs 0.104 on 726 starts).
+- **`starter_min_innings` is now a `manager_pitching_overrides` key** (v2 hook).
+  Absent = the manager profile's value = byte-for-byte no-op. `0` disables the
+  leash; the old `max(1, …)` silently promoted 0 to 1.
+- **NO LEASH VALUE IS PROMOTED.** The model loses to a CONSTANT baseline at every
+  grid point (baseline MAE 3.0912 vs best 3.1852), and residual bias at leash 0
+  is still −1.470 — the leash is the largest term, not the only one.
+- **THE BETTING GRADE IS CONFOUNDED. Do not re-run it without the side-blind
+  baseline.** On 148 starts ALWAYS OVER returned **58.78% / +8.16% with no
+  model**; the grid varied only how often it bet the over (106→146 of 148); the
+  whole spread was **1.49 SE**. Taken naively it endorses the over-projection
+  defect. **Standing rule: print ALWAYS OVER / ALWAYS UNDER beside any prop hit
+  rate.**
+- **ARCHIVED LINE COVERAGE: only 5 of 29 dates carry >=8 pitchers with an `outs`
+  line; 12 of 29 carry ZERO.** The discriminator is `retrieved_at` INSIDE the
+  artifact: same-day-afternoon fetches carry 26–30 pitchers, fetches after
+  ~02:00Z the next day carry 0, because books pull player-prop markets once games
+  end. `mode` is `live` on every file including the `_pregame` ones.
+- **`betting_accuracy.py` is ABSENT from this checkout** — the overrides file's
+  55.78%/54.65% came from an instrument that is not here. Do not compare to it.
+- **Re-simulating the leash grid on PRODUCTION data is impossible** — it needs
+  schema-v4 `roster_obj_*.json`; production 404s at every root and the sim's
+  loader rejects the raw bundle (`schema_version=None`).
+
+## ODDS-SWEEP OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER `[measured 2026-08-17 19:2xZ, by content]`
+
+- **`20025cc4` (`_sweep_ownership_exclusion`) is absent from both workers' live
+  SHAs** — refresh-worker `8c0bd8e6` and live-odds-worker `abc9987515`, checked
+  by CONTENT (`git show <sha>:<path>`), not by ancestry. **The starvation it
+  fixes is live in production.**
+- The defect: `_live_refresh_loop_effective_sports` fell back to "every
+  season-active sport" when `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` was unset,
+  ignoring BOTH `SYNDICATE_ACTIVE_SPORTS` and the ownership flags. refresh-worker
+  swept mlb/nfl/soccer/wnba owning only nfl; live-odds-worker swept NOTHING. The
+  non-owner wins the shared cadence marker and starves the owner.
+- **DO NOT NAMESPACE THE CADENCE MARKER.** Rejected in code by the authoring
+  lane: the ownership flags are the intended mutex. With the gate deployed the
+  shared marker is a SAFETY NET — namespacing alone lets two services sweep the
+  same sport independently and doubles OddsAPI spend (cap ~62.7%, MLB 93% of it).
+- **Weekly sports are deliberately NOT gated** by it — gating them broke
+  `test_run_tick_claims_weekly_sports_on_game_days` and would reintroduce the 24h
+  NFL capture gap measured 2026-08-07.
+- Verify after deploy is TWO-SIDED: `SWEEP_OWNERSHIP_EXCLUDED` on refresh-worker
+  naming `mlb` in `dropped`, **and** an MLB pregame sweep appearing on
+  live-odds-worker. Half one proves the non-owner stopped, not that the owner
+  started.
+

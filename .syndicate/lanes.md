@@ -6376,3 +6376,377 @@ Taken on explicit user instruction ("now take the cadence lever too").
 - **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
   contention first; then let the coordinator ship the seal.
 
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+### quote-join-enrich-cost — FOLLOW-UP 2026-08-14 04:37Z — the fix HOLDS, the workload OUTGREW it
+
+- **UNION-NARROWING ANALYSIS 2026-08-14 05:0xZ — TRACED, NOT SHIPPED. Read the
+  equivalence warning before writing any of it.**
+  - **Where the ~12k rows/call come from.** The union is
+    `by_event | by_player | team_groups`
+    (`odds_book_quotes.py` ~1292-1307). For a GAME row, `wanted_teams` pulls in
+    **every quote row for that game** — every market x every book x every
+    selection. That branch dominates; `by_event` and `by_player` are narrow.
+  - **OPTION A — market prefilter.** The caller already passes `market`. A
+    `by_market` index intersected with the union would cut it by roughly the
+    markets-per-game factor (potentially 10x+).
+    **NOT equivalence-preserving.** Today the order is identity FIRST, then
+    market narrowing with `candidates = narrowed or candidates`. That trailing
+    `or` means a market-vocabulary mismatch **falls back to every row of the
+    game**. Prefiltering by market removes that fallback: rows that today
+    return a same-game quote would return `None`.
+    Arguably MORE correct — but it is a silent-failure join, and the decision
+    to drop the fallback must be made deliberately, not as a side effect of an
+    optimisation.
+  - **OPTION B — skip `team_groups` when `by_event` or `by_player` already hit.**
+    Team matching is the FALLBACK identity signal; when `event_id` matched, its
+    rows are the same game anyway. Same objection: it changes which rows reach
+    `identified`, so it is not equivalence-preserving either.
+  - **WHY NEITHER WAS SHIPPED TONIGHT.** The original `#414` index was safe
+    because it was PROVABLY equivalent — 30+ query shapes asserted identical
+    against a full-scan reference, exercising `by_event`, `by_player`,
+    `by_teams_fallthrough` AND `no_identity`. Both options above deliberately
+    change the identified set, so a differential test cannot pass; they need a
+    test that PINS the new semantics, plus an explicit answer to "is losing the
+    market fallback intended?".
+  - This function's own docstring is the reason for the caution: *"a missing
+    quote is visibly missing, a wrong one silently misprices the card and, once
+    `#213` records it at bet time, poisons CLV."*
+  - **RECOMMENDED ORDER for whoever takes it:** (1) decide the fallback
+    question — it is a product call, not a performance one; (2) write the test
+    that pins the chosen semantics; (3) then implement. Doing 3 first is how a
+    silent mispricing ships.
+
+- **The `#414` index is still doing its job.** 833,619 rows walked against a
+  13,215,068-row shard = **6.3% scanned**, ~16x reduction, consistent with the
+  21.5x measured at 00:18Z. It has not degraded.
+- **But per-game cost is climbing again: 7-8s -> 14.70s.** Fresh MLB readings:
+  ```
+  04:37:09  total 14.70s  walked  833,619  shard 13,215,068  calls 69
+  04:29:34  total  9.12s  walked  760,417  shard 12,832,072  calls 44
+  04:15:55  total  4.76s  walked   16,642  shard     49,172  calls  2
+  ```
+- **TWO separable drivers, and neither is the index failing:**
+  1. **Call count 20 -> 69 per game.** More candidates enriched — good for board
+     richness, linear in cost.
+  2. **Cost per call 0.2755 -> 0.7346s (2.7x).** The shard grew again:
+     **~191k rows/call now**, against ~216k earlier and ~83k yesterday
+     afternoon. 6.3% of a bigger shard is still more rows.
+- `join` is **14.69 of 14.70s**; `post`, `score` and `unattributed_s` are all
+  0.00. The segment split is clean and the join is the entire cost — same shape
+  as before the fix, at a lower level.
+- The two small games at 04:15 (3.95s / 4.76s on a 49,172-row shard) confirm
+  cost tracks shard size closely, which is what a join-dominated profile
+  predicts.
+- **NEXT LEVER, unchanged from what this lane already named: the residual ~12k
+  rows walked PER CALL.** Indexing removed the full-shard scan; what remains is
+  a linear pass over the candidate union, and at 69 calls a game that is ~833k
+  row visits per game. Narrowing the union, or making the per-row test cheaper,
+  is the remaining work.
+- **Do not read this as a regression of the fix.** Without the index those same
+  games would walk 13.2M rows instead of 833k. The lane's verification stands;
+  this records that the win is real and eroding under growth.
+
+### quote-join-enrich-cost — PRODUCTION RESULT IN 2026-08-14 00:18Z — the index works, 21.5x measured
+
+- **Both profilers fired at 00:11:15 and 00:18:46Z**, after
+  `SYNDICATE_SLOW_ROW_TOTAL_SECONDS=1` / `SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS=1`
+  were set on refresh-worker (both were absent, defaulting to 5s — at which the
+  instruments could never fire if the fix worked).
+  ```
+  SLOW_SEGMENT_PROFILE  total_s=7.17 tail_s=7.17 enrich_block=7.17
+                        rows_walked=502,157  shard_rows=10,806,750  calls=50
+  SLOW_ENRICH_PROFILE   total_s=7.17 join_s=7.16 post_s=0.00 score_s=0.00
+                        accounted_s=7.17 unattributed_s=0.00
+                        candidates=26 join_calls=26 join_s_per_call=0.2755
+  ```
+- **READ THESE COUNTERS AS CUMULATIVE, NOT PER-CALL.** `_bump` accumulates
+  across the window, so `shard_rows` is 50 calls x ~216k, not a 10.8M-row
+  shard. Per call: **216,135 rows before -> 10,043 walked now = 21.5x
+  reduction, measured in production.**
+- **Board-build cost 21-54s -> 7-8s.** The `#414` cause is fixed.
+- **Not the 130x measured locally, and the same line says why: the shard GREW.**
+  ~83k rows/call this afternoon -> ~216k now (2.6x). The index is working
+  against a target that got bigger. Quote the 21.5x, not the 130x.
+- `unattributed_s=0.00` — the segment accounting is complete, so the split is
+  trustworthy.
+- **`join_s` is still 7.16 of 7.17s.** The join remains essentially the entire
+  cost; it is just 3-7x less of it. **The next lever is the residual ~10k
+  rows/call, not the scan that is already gone.** Do not re-optimise the scan.
+- Verification for this lane is now MET in production. What remains open is
+  only whether 7-8s is acceptable, which is a different question.
+
+#### game-shape-capture — `#455` FIXED UNDER A LOGGED CLAIM OVERRIDE `[2026-08-16 ~20:2x CDT]`
+
+**Override taken on explicit user instruction** — "take the override and fix it - i dont think its actually being worked on by any other lane" — on `syndicate/features/wnba/cards.py`, ONE function (`build_live_pbp_stats_payload`). Recorded in `wnba-live-tier`'s own Files block, phrased as a release the guard recognises rather than bypassed. Coordination had been attempted three times: fork 2 archived before replying to two handoffs; a third went to fork 4 (running) and is unanswered.
+
+**THE FIX, two halves:**
+1. The stored-payload short-circuit required `bool(games)` — and a skeleton HAS games. Now requires `any(_has_pbp_signal(g))`.
+2. The skeleton was PERSISTED, which is what made it sticky: the stored copy then satisfied the short-circuit on every later request. Now gated on the same predicate, so it can never be written.
+
+**FOUR SIGNAL SOURCES, and the fourth was missing from my first attempt.** The existing `test_live_pbp_stats_payload_uses_local_snapshot` stores a real snapshot whose games carry ONLY `pbp_recent.points_total` (9 and 14). My predicate ignored `pbp_recent`, rejected that snapshot, and the test failed. **The suite caught a genuine gap in the fix, not a stale expectation.** Its own trap: the skeleton hardcodes `window_sec: 180`, so counting that field would make every skeleton read as real and silently undo the change — excluded explicitly, pinned by a test.
+
+**THE `Mapping` NEAR-MISS, AGAIN, IN THE SAME FILE.** My first draft used `isinstance(x, Mapping)` in a module that does not import it — a `NameError` on the FIRST record, which would have taken the endpoint down. `lanes.md` already records `wnba-live-tier` hitting the identical thing here. Caught the same way both times: by running it.
+
+**TWO VACUOUS TESTS OF MY OWN, CAUGHT BY MUTATION.** W1 (revert the short-circuit to `bool(games)` — the original defect) and W3 (count `home`/`away` as signal) both passed against a broken implementation. A replayed skeleton and a freshly built one are both all-null, so "no signal" cannot tell them apart — the stored fixture now carries a sentinel and the test asserts its ABSENCE. W3 was the same vacuity already fixed once this session in `scripts/wnba_pbp_possessions.py` and reintroduced here. **After fixing both: 5 of 5 mutations fire.**
+
+**13 tests green. Full WNBA suite: 405 passed, 4 failed — all 4 PRE-EXISTING**, verified by re-running against `origin/main`'s `cards.py` (4 fail there too). My one real regression was the `pbp_recent` gap and it is closed.
+
+**NOT DEPLOYED.** No deploy requested. The fix changes what a live endpoint serves; it needs a web deploy to take effect, and that is a decision, not a formality.
+
+### score-live-gameline-edges — UPDATE 2026-08-17 01:0xZ — **ROUTE 3 IS DEAD. The sample cannot be pulled, and the reason is now measured, not assumed.**
+- **Route 3 ("pull a copy and score offline, needs no deploy") DOES NOT EXIST.**
+  Checked all three ways in:
+  1. `find`/glob for `**/live_gameline_ledger/*.jsonl` anywhere in the checkout:
+     **no files**. There is no git-tracked mirror of this ledger.
+  2. `/api/ops/artifacts/export?pattern=mlb_source/data/live_gameline_ledger/*`
+     → `count 0, bytes 0`.
+  3. `/api/ops/artifacts/stream?path=...` → both endpoints gate on
+     `is_hot_artifact_relative_path`, and the ledger matches **zero** patterns.
+     Both also read the SERVING service's disk, which never has the worker's file
+     regardless of the allowlist.
+- **AND THE RETROSPECTIVE SHORTCUT IS ALSO DEAD — this is the load-bearing new
+  measurement.** Read at 01:02:26Z with `by_state {final: 14, live: 1}`:
+  **rows carrying a `live_gameline.model_prob` = `{live: 12}`, and NOTHING for
+  the 14 final games.** A finished game retains no model probability on the
+  served board at all. So the day's projections are *only* in the ledger; there
+  is no way to reconstruct them after the fact from any served surface. **That is
+  precisely why the ledger exists, and why publishing it is not optional.**
+- **THE BLOCKER IS ONE FILE, AND ITS CLAIM IS CURRENT — I re-read it and
+  corrected myself.** `clv-without-settlement` says at one point *"Handed back:
+  lane left OPEN and unclaimed... `artifact_publisher.py` is free"* — but a
+  LATER block in the same lane re-claims it: *"Files (exclusive to this lane):
+  `syndicate/features/shared/artifact_publisher.py`"*. Line order settles it
+  (718 vs 751): the claim is the newer statement. **NOT taken.** Its session is
+  not in the live roster, so it is unowned but still claimed.
+- **Remaining routes, in preference order:**
+  1. **Publish the ledger** — add its pattern to `HOT_ARTIFACT_PATTERNS`, deploy
+     refresh-worker (the publisher runs there), wait one publish cycle, pull,
+     score. Needs `artifact_publisher.py` → needs the claim released.
+  2. **Score worker-side and ride an artifact that is ALREADY published.** The
+     `book_grid` artifact already carries a `live_gameline_ledger` counters block
+     and is already published to web. A `live_gameline_score` block alongside it
+     needs no new publish pattern and no `artifact_publisher.py`. **This is the
+     route that avoids the collision entirely** and is the recommended one.
+  3. Prospective capture: poll the board and build a parallel sample. Works with
+     no deploy, but duplicates a ledger that already functions correctly — the
+     problem is transport, not collection.
+- **NOT STARTED, deliberately.** Either surviving route is deploy-and-wait
+  (edit → refresh-worker deploy → publish cycle → pull → score). Beginning that
+  chain without the budget to finish and verify it would leave a half-applied
+  change on a shared worker, which is the failure mode this ledger's own lane
+  already paid for once.
+- Next session's first action: pick route 1 or 2. If 1, the claim on
+  `artifact_publisher.py` must be released first.
+
+### score-live-gameline-edges — UPDATE 2026-08-17 01:3xZ — **ROUTE 2 BUILT, TESTED AND DEPLOYED. The score is COMPUTED in production and NOT YET READABLE — one line, in a file another lane holds.**
+- **SHIPPED** `e63bee63` to refresh-worker (live 01:35:06Z), cut on live
+  `4ec66498`, deploy gated on the test exit code in the same shell.
+  - `syndicate/features/shared/live_gameline_score.py` (new) — model vs market
+    Brier/MAE on **identical rows**, over three populations (`all_records`,
+    `last_per_game` chosen by `recorded_at` not file order, `priceable_only`).
+  - `live_gameline_ledger.read_records()` (new) — every forecast, distinct from
+    `read_last_by_key` which collapses to one per market for DEDUP.
+  - `book_grid_artifact.py` — computes the score at build time and puts
+    `live_gameline_score` on the artifact. Never raises; the board is the
+    product.
+  - 14 tests pass.
+- **VERIFIED THE PRODUCER RAN:** artifact `01:36:25Z` (post-deploy) carries
+  `live_gameline_ledger {candidates: 11, written: 11}`.
+- **BLOCKED ON ONE LINE, AND IT IS THE READER.** `/api/board/book-grid` forwards
+  an EXPLICIT key allowlist (`blueprints/intelligence.py:2339`), so
+  `live_gameline_score` served **`null`** — the artifact has it, the endpoint
+  does not forward it. Producer wired, reader not: the
+  presence-is-not-reachability trap, caught by reading the served payload rather
+  than trusting the deploy.
+- **THE FIX IS ONE LINE**, beside the existing `live_gameline_ledger` entry:
+  ```python
+  "live_gameline_score": precomputed.get("live_gameline_score"),
+  ```
+  Then a **web** deploy (that endpoint is web-served).
+- **NOT TAKEN.** `syndicate/blueprints/intelligence.py` is claimed by OPEN
+  `layer2-board-quality`, which was actively worked tonight — a live lane, not
+  an orphan. Handing it over rather than overriding.
+- **Next action:** ask `layer2-board-quality` to add that line (or release the
+  file), deploy web, then read `live_gameline_score` off
+  `/api/board/book-grid?sport=mlb&date=<date>`. The score itself needs a slate
+  with FINAL games in the same artifact as ledger records — mid-slate it
+  correctly reports `no_final_games_on_this_grid`.
+
+#### game-shape-capture — FINAL CHECKPOINT 2026-08-16 ~20:3x CDT — **`#454` COMPLETE; LANE STAYS OPEN ON n = 0**
+
+13 commits, all verified reachable from `origin/main` (`28cc8814` latest).
+**95 tests** across game_shape / run-expectancy / win-expectancy.
+
+Shipped this session: game-shape contracts for MLB, WNBA/NBA, NFL/NCAAF and
+soccer; live emits for NFL and soccer; WNBA pbp coverage tooling; `#454` (RE, WE,
+leverage) complete; `#455` and `#456` found, filed and FIXED.
+
+**WHY IT IS STILL OPEN — unchanged from every previous checkpoint:** the
+verification is one live slate with a non-zero bucket distribution, read across
+two builds. **That has never run. n = 0 for every sport.** Do not close this on
+the commit count, the test count, or the fact that leverage now has a number.
+
+**NEXT ACTIONS, in order:**
+1. Deploy decisions for `#455`, `#456` and the NFL/soccer emits. All four change
+   live behaviour; none is deployed and none has been requested.
+2. Read `game_shape` off a live NFL or soccer fixture — the only step that turns
+   any of this from prepared into measured.
+3. NCAAF needs a live-state PRODUCER built. Season opens **2026-08-29** — still
+   the only dated item in the lane.
+4. Source the RE reference table, then re-adjudicate the two >3 SE cells.
+5. Owed: `wnba/cards.py:891` should delegate to `basketball_elapsed_minutes`.
+
+### score-live-gameline-edges — CLOSED-VERIFIED 2026-08-17 02:1xZ — the live edges are SCORED, and the model loses to the market on every population
+- **Route 2 delivered end to end.** Scorer computes worker-side and rides the
+  already-published `book_grid` artifact — no new publish pattern, no
+  `artifact_publisher.py`.
+- **RESULT, production artifact 02:12:18Z, 14 finished MLB games:**
+  `all_records` model 0.26579 vs market 0.23923 (**+0.02656**, n=3,226);
+  `last_per_game` 0.27776 vs 0.20344 (+0.07432, n=14); `priceable_only` 0.28064
+  vs 0.24060 (**+0.04004**, n=2,081). Positive = the market won.
+- **ONE SLATE, n=14 per game. Not a verdict.** Recorded in `state.md` with that
+  caveat attached.
+- Two join bugs found and fixed, both surfaced by the counter refusing to serve
+  a confident null (`no_final_outcome_for_game` 3,727 times). See learnings.
+- Files: `live_gameline_score.py` (new), `live_gameline_ledger.read_records`,
+  `book_grid_artifact.py`, `blueprints/intelligence.py` (one line, taken on the
+  user's statement that no Layer 2 session is active and released in this file).
+- **Next:** re-read on a second slate before anyone acts on the number.
+
+### score-live-gameline-edges — CROSS-SPORT + PLAN 2026-08-17 02:3xZ
+
+**(1) TOMORROW'S SLATE — nothing to schedule. It scores itself.** The scorer runs
+inside `build_book_grid_artifact`, so every build of every sport already emits
+`live_gameline_score`. What is owed is a READ, not a run:
+`/api/board/book-grid?sport=<sport>&date=<date>` after the slate completes.
+**Read it AFTER the last game is final** — measured tonight, the count read
+`no_final_outcome_for_game: 416` at 02:12Z with one game still live and resolved
+to **0** at 02:28Z on its own.
+
+**(2) ACROSS ALL SPORTS — measured 02:3xZ, and the answer is "two sports have
+anything to score".** The scorer is sport-generic by construction
+(`record_live_gamelines(sport=...)`, `ledger_path(sport, ...)`, per-sport
+artifact build), so the block is emitted everywhere. What differs is the input:
+
+| sport | records | games | scored |
+|---|---|---|---|
+| mlb | 3,748 | 15 | **yes** — `all_records` +0.03842 |
+| wnba | — | 0 | **no** — scorer ran, found **no final games on its grid**, took the `no_final_games_on_this_grid` branch |
+| soccer, nfl, others | 0 | 0 | **no ledger records at all** |
+
+- **soccer/nfl/etc is EXPECTED, not a defect.** Only `mlb` and `wnba` are in
+  `_LIVE_GAMELINE_SPORTS`; the rest have no live game-line join, so there is no
+  projection to record and nothing to score.
+- **WNBA IS THE ONE REAL GAP AND IT IS UNDIAGNOSED.** Its games went final
+  tonight (CHI @ SEA 82-80 observed), and its live tier now populates 218/321
+  rows — yet its grid yielded an empty finals index. **One check:** does the
+  wnba `book_grid` grid carry `game.state == "final"` rows for that date, or is
+  its artifact keyed on a different date? Do NOT assume it is the same join bug
+  MLB had; that one is fixed and this may be date-scoping.
+
+**(3) PLAN — how to get better, in dependency order.** The model loses to the
+market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
+(+0.056)** — i.e. the disagreements the board publishes are its worst ones.
+
+1. **Get a second slate before changing anything.** One night. Everything below
+   is wasted if the sign flips. Cost: a read.
+2. **Split the loss by game state.** The ledger already carries `game_state`,
+   `home_score`, `away_score`, `sims_run` and `prob_std_err` per record. Score
+   by inning/margin bucket. **The likeliest story is that the re-sim is worst
+   early**, when 120 sims off a thin state carry the widest interval — and that
+   is testable with data already on disk, no deploy.
+3. **Raise `MLB_LIVE_GAME_MC_SIMS`.** At n=120 the standard error is ±4.56 pp at
+   p=0.5, so `PRICEABLE_SIGMA=2.0` demands a ~9.1 pp edge before publishing. If
+   step 2 shows the loss concentrated where the interval is widest, this is the
+   lever the module's own docstring names — and it is costed by the worker's
+   memory budget, so it belongs to the OOM lane's window.
+4. **Consider calibrating rather than replacing.** A model that loses on Brier
+   can still carry ranking signal; `projection_skill` already records
+   `correlation` and a `verdict` per sport. If correlation is positive while
+   Brier is worse, the fix is a calibration map, not a new model.
+5. **Only then touch the model.** Anything before this is guessing at which of
+   its parts is wrong.
+
+**Do not act on +0.038 yet. It is one slate.**
+
+### mlb-tie-spread-baseline — CLOSED 2026-08-17 — **MLB ARMED on both widths. Pre-game slate read 86px desktop / 43px mobile BIT-IDENTICAL across 5 production runs; the 2026-08-16 instability was the slate, not the metric. Shipped `2882ad11`.** — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+- **Goal:** answer the question `2026-08-16` left open — is MLB's
+  `identicalContentSpread` stable on a **pre-game** slate? If yes, add `"mlb"` to
+  `TIE_SPREAD_BASELINED` in `scripts/ui_layout_probe.py` so a change in that
+  number FAILS a run instead of being watch-only. **Testable outcome:** three
+  probe runs against production on an all-`Preview` slate, readings recorded per
+  width, judged against a ~1.2x rule fixed in advance; then either the sport is
+  armed with a fresh passing baseline, or the negative result is recorded and
+  nothing changes.
+- **Files:** `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `reports/ui_layout/baseline_2026-08-17.json`, `.syndicate/log/2026-08-17.md`,
+  `.syndicate/lanes.md`
+- **Hypothesis:** MLB's 2026-08-16 instability (81/109/123/164/193px across one
+  day) was **the slate, not the metric** — MLB enriches continuously while games
+  are live, whereas the nfl/ncaaf slates that earned baselining were static. On a
+  slate where every card is in `Preview`, the number should hold.
+- **Falsification test:** three runs on an all-`Preview` slate spreading beyond
+  ~1.2x on either width. That would mean the metric itself is noisy and MLB must
+  stay watch-only regardless of slate state.
+- **Verification:** `cardHeightByState` shows exactly one state (`Preview`)
+  covering all cards on both widths; three `worstGroupPx`/`spreadPct` readings
+  per width inside the rule; if armed, a fresh baseline that **exits 0**, the
+  probe suite green, and a re-run reporting mlb `unchanged (baselined)`.
+- **Blocked by:** none
+
+#### convergence-phase7-crps — CHECKPOINT 2026-08-17 ~19:0xZ — **instrument built, defect traced and quantified, both halves of the fix in flight, NEITHER MEASURED**
+
+- **Shipped and on `origin/main`:** Phase 7 CRPS/bias-dispersion instrument;
+  `starter_min_innings` exposed + swept; two betting graders; monotone props seal
+  (`bafb4fb2`).
+- **Verified:** the `outs` over-projection IS the F5 leash (dispersion
+  1.002→0.791 vs a 0.7979 target; short-start gap −0.1778→−0.0266 over 267
+  starts / 87,500 sims), the replay reproduces production, and the seal is on
+  `origin/main` by content.
+- **Verified negative, and it matters more than the positive:** the model still
+  loses to a constant baseline at EVERY leash value (3.0912 vs best 3.1852), and
+  the betting grade is CONFOUNDED — ALWAYS OVER returns 58.78%/+8.16% on the same
+  148 starts, the grid varies only over-propensity, spread is 1.49 SE. **Nothing
+  is promoted. No leash value is recommended.**
+- **In flight, both unmeasured:**
+  1. cadence flag LIVE on live-odds-worker (gate verified running; effect read
+     by `outs-props-coverage-check`, fires 2026-08-19 07:00 CT for date 08-18);
+  2. seal QUEUED as a deploy request for refresh-worker, cut on `8c0bd8e6`.
+- **TOP RISK TO THE 08-19 READING, found in another session's commit
+  `7c4439f4` AFTER my flip went live:** refresh-worker sweeps mlb/wnba/soccer/nfl
+  while owning only nfl, is gated by neither the ownership flags nor
+  ACTIVE_SPORTS, **wins the shared unnamespaced cadence marker and starves the
+  designated owner**. My flag is set on live-odds-worker ONLY. So a FAIL on 08-19
+  may be MARKER CONTENTION, not the cadence mechanism — and the scheduled reader
+  does not know this. Whoever reads it must rule that out before concluding.
+- **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
+  contention first; then let the coordinator ship the seal.
+
+#### convergence-phase7-crps — CHECKPOINT 2 2026-08-17 ~19:3xZ — **nothing left in flight on my side; three things queued, one live and unmeasured**
+
+Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
+
+- **Queued for the coordinator (messaged, session live 19:18Z):**
+  1. `20025cc4` ownership gate, **BOTH workers**, soft deadline before the 08-18
+     slate — measured absent from both live SHAs by content.
+  2. `bafb4fb2` monotone props seal, refresh-worker, **no deadline**, ideally
+     AFTER the 08-19 cadence result so the two do not confound.
+- **Live and unmeasured:** the fixture-aware cadence flag on live-odds-worker.
+  Reader `outs-props-coverage-check` fires 2026-08-19 07:00 CT and now carries
+  **Gate B** (marker contention) plus the undeployed-seal caveat, so it can
+  return INCONCLUSIVE instead of wrongly FAILing a starved mechanism.
+- **NOT DONE, DELIBERATELY: the cadence marker is NOT namespaced.** Asked for,
+  and refused after reading the code — the authoring lane rejected it hours
+  earlier in the docstring of the function I was about to edit, and with the gate
+  deployed the shared marker is a safety net whose removal would double MLB
+  OddsAPI spend. Recorded in `state.md` and `learnings.md`.
+- **Next action for whoever picks this up:** get `20025cc4` deployed to both
+  workers, then read `outs-props-coverage-check` on 08-19 working Gate B first.
+  Do not promote any leash value — the model still loses to a constant baseline
+  at every grid point.
+

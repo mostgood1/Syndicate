@@ -11471,3 +11471,151 @@ sweeping" is also what a broken gate looks like.
 today, both workers' behaviour is the exact inverse of their env. I nearly
 deployed to one worker on that assumption and would have shipped an inert fix.
 
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+### WHAT A VALID GRADE NEEDS
+
+1. **Far more than 148 bets.** At 4.09pp SE nothing under ~5pp is readable.
+   Production has 29 dates the mirror does not.
+2. **Control the over-rate.** Compare grid points at a matched number of
+   over-picks, or grade over and under separately, or report ROI against the
+   always-over baseline rather than against zero.
+3. **Report the side-blind baseline every time.** A grade without it read as a
+   +12.40% model edge when +8.16% of it was available with no model.
+4. `betting_accuracy.py` is ABSENT from this checkout, so none of this is
+   comparable to the overrides file's 55.78%/54.65%.
+
+### ANSWERED 2026-08-17 ~14:50 CDT - **YES. live-odds-worker IS supposed to sweep. The config is CORRECT and the behaviour is a REGRESSION against it. This also RETRACTS my "maybe the shared marker is a good mutex" caution.**
+
+**THE INTENT IS EXPLICIT**, `render.yaml` on live-odds-worker's
+`SYNDICATE_MLB_REFRESH_TICK_OWNER: "true"`:
+> `#129`: reverted back to "true" -- refresh-worker's competing
+> `MLB_ENABLE_REFRESH_WORKER_AUTORUN` path (set "false" there now) is fully
+> disabled, **so this worker is the sole MLB odds-refresh owner again, not just
+> nominally excluded from a race with another owner.**
+
+The architecture split (2026-07-20): **MLB SIM moved to refresh-worker; ODDS
+REFRESH stayed here.** live-odds-worker is the odds owner by design.
+
+**THE CONFIG IS SET CORRECTLY. I checked for a misconfiguration and there is none:**
+```
+                                    refresh-worker   live-odds-worker
+SYNDICATE_MLB_REFRESH_TICK_OWNER    false            true
+MLB_ENABLE_REFRESH_WORKER_AUTORUN   false            <ABSENT>
+WEEKLY_SPORTS_REFRESH_TICK_OWNER    true             false
+```
+Exactly the ownership split `#129` describes. **Nobody fat-fingered a flag.**
+
+**THE DEFECT, now sharp: refresh-worker sweeps `mlb`, `wnba`, `soccer` AND `nfl`
+- and it explicitly does NOT own three of them.** Its `ACTIVE_SPORTS=nfl` and its
+`MLB_REFRESH_TICK_OWNER=false`. **So the odds-sweep path is gated by NEITHER the
+ownership flags NOR `SYNDICATE_ACTIVE_SPORTS`.** It sweeps regardless, wins the
+shared unnamespaced cadence marker, and starves the designated owner.
+
+**RETRACTION - my previous caution was wrong.** I wrote that namespacing the
+marker "would let BOTH sweep" and warned about doubling the OddsAPI burn against
+the 5M cap. **That reasoning assumed the marker was the cross-service mutex. It
+is not** - the OWNERSHIP FLAGS are, and they are already set correctly. With the
+sweep path properly gated, only one service would sweep each sport regardless of
+the marker. **The burn risk I raised was against a design that does not exist.**
+The real risk runs the other way: the intended owner is doing nothing while a
+service that was deliberately taken OFF these sports does all of it.
+
+**WHY THIS MATTERS BEYOND TIDINESS.** `#129`'s own words are that the previous
+fix left this worker *"nominally excluded from a race"* - i.e. someone fought
+exactly this race, believed they had won it, and wrote it down. **It is back, by
+a different mechanism** (the marker, not the autorun flag), which is why the
+flag-level fix did not hold.
+
+**THE FIX IS IN THE SWEEP'S GATE, NOT IN THE MARKER.** Make the odds sweep honour
+the same ownership flags the tick already does, so refresh-worker declines
+`mlb`/`wnba`/`soccer`. **Do NOT namespace the marker as the fix** - that treats
+the symptom and leaves an ungated sweep running on the wrong service.
+**Not started; it is a code change plus a production deploy, and deploys are
+coordinator-owned.**
+
+**AND IT UNBLOCKS THE WNBA QUESTION.** If the sweep is re-gated to its owner,
+live-odds-worker resumes WNBA odds work - which is where a WNBA full-refresh
+owner most naturally belongs, making option 1 (finish the migration onto the
+odds owner) the coherent choice rather than option 2.
+
+### COORDINATION 2026-08-17 ~14:15 CDT - request handed to the coordinator, and `.syndicate/coordinator.id` IS STALE
+
+**`.syndicate/coordinator.id` holds `9ed7fd89-6696-4d42-9681-39c1a5b78a46`,
+which matches NO SESSION in the roster** - checked with archived included.
+Routed by TITLE instead, to `Deploy and Document Coordinator`
+(`local_1d6f136e-...`, running, active 19:12Z). **`coordinator.md` says the
+off-switch is DELETING that file, so a stale id is ambiguous between
+"coordinator is gone" and "coordinator moved" - it reads as an ACTIVE
+coordinator that cannot be reached.** Same failure shape as the unattended lane
+that blocked this work earlier today: a marker outliving the thing it points at.
+
+**HANDED OVER** (deploy request `2026-08-17T2000Z-wnba-fixture-identity.md`,
+commit `20025cc4`, 245 tests): both services must ship together; branches must be
+cut from each LIVE SHA because neither is an ancestor of `main` and main's copy
+of `refresh_wnba_oddsapi_props.py` lacks a readable-channel block that is live on
+both workers; and the verify needs BOTH halves, because "refresh-worker stopped
+sweeping" is also what a broken gate looks like.
+
+**DISCLOSED, unprompted, so the ledger is not reconstructed later:**
+1. **I deployed twice today** (17:52Z, 18:00Z) **before the coordinator rule
+   reached my digest.** Both rows sit in `deploys.md` with EMPTY measurement.
+2. **I closed another session's lane by override** (`export-force-refresh-escape`,
+   user-authorized) - **its effect measurement is still OWED, not discharged.**
+3. **Three ledger entries are falsified by today's measurements** - `#378`
+   (WNBA does launch and write), `#382` (the marker advances because ANOTHER
+   SERVICE advances it, not because a launch dies), `#129` (regressed by a new
+   mechanism). These are the coordinator's to correct; I did not edit them.
+
+**PROPOSED FOR `learnings.md`, from a near-miss of my own:** *a service's
+`SYNDICATE_ACTIVE_SPORTS` is NOT evidence of what that service does.* Measured
+today, both workers' behaviour is the exact inverse of their env. I nearly
+deployed to one worker on that assumption and would have shipped an inert fix.
+
+
+
+## MERGED FROM origin/main - backstop pass
+
+Blocks the block-union pass missed. Appended verbatim.
+
+### RETRACTION 2026-08-17 ~14:25 CDT - **`coordinator.id` IS NOT STALE. I was wrong, `coordinator.md` documents this exact mistake, and editing the file would have BROKEN THE DEPLOY HOOK. NOTHING WAS CHANGED.**
+
+I reported the register as stale because `9ed7fd89-...` matched no roster entry.
+**`coordinator.md:139-168` already answers this**, under the heading *"The
+register holds ONE of this session's TWO ids - do not read it as stale"*:
+```
+hook payload / scratchpad path / coordinator.id   9ed7fd89-6696-4d42-9681-39c1a5b78a46
+list_sessions roster id                           local_1d6f136e-be80-4799-adff-b9f7071871f7
+roster title                                      "Deploy and Document Coordinator"
+```
+> *"This is not a bug to fix by editing the file. The hook must match the payload
+> id or it stops working; the roster cannot see that id at all... Never conclude
+> the role is unheld from a roster lookup alone, and never delete
+> `coordinator.id` to 'clean up' - that is the off switch, not a tidy."*
+
+**Asked to fix it, I read the contract first and did not touch it.** No edit, no
+delete. Had I "fixed" it, the hook would have stopped matching and **the deploy
+gate would have silently opened for every session** - the failure mode the file
+exists to prevent, caused by tidying it.
+
+**THE EVIDENCE WAS IN MY OWN HANDS ALL SESSION.** This session ALSO has two ids:
+`7c041356-...` in the hook payload I fed `lane-guard`, and `bd97b64e-...` in my
+scratchpad path. **I used both, in the same session, and still read a two-id
+system as a broken one-id system.**
+
+**THE PATTERN, third instance today, and it is worth naming:** I diagnosed a
+DEFECT from a null lookup three times - the `pid=890` "stuck lock" (transient,
+already self-healed), `#378`'s "WNBA never launches" (it launches), and now
+this. **Each time the null was a property of the INSTRUMENT, not the subject.**
+The rule I already hold - *absence in a window is not absence* - generalises:
+**an identifier that does not resolve is not thereby dead.** Ask what would make
+the lookup fail for a HEALTHY subject before calling it broken.
+
+**Nothing else changes.** The deploy request, the two deploy disclosures, and the
+`#378`/`#382`/`#129` corrections all stand; the retraction is scoped to this one
+claim and was sent to the coordinator as its own message.
+
