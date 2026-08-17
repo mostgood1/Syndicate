@@ -4025,3 +4025,30 @@ named `render_logs.py` as unable to give one; this is that tool.
 
 ---
 
+## MLB IN-SIM SUBSTITUTION — BUILT, MEASURED, **OFF** `[2026-08-17, lane convergence-phase7-crps]`
+
+- **The engine now HAS a position-player substitution model.** It never did:
+  `bench` appeared once, building a lookup cache. Behind
+  **`GameConfig.position_substitutions`, default False. NOT DEPLOYED.**
+- **Hazard fitted from 618 `feed_live` games / 10,728 starter-innings.** Inning
+  hazard peaks **0.0509 at the 8th** and is ~0 before the 5th; slot multiplier
+  **0.71 → 1.55**; team spread **2.0x** (Houston 1.33, Boston 0.66).
+- **Opportunity: 34.3% of the gap closed.** Starter AB 3.985 → 3.817 against an
+  actual 3.495, measured on real roster artifacts.
+- **Accuracy vs market (45 games x 120 sims/arm, 2,415 rows):** hits +0.00209,
+  RBI +0.00573, runs +0.00146, **total_bases −0.00154 WORSE**. **The market wins
+  all four.** P2 improved the engine and produced NO edge.
+- **DO NOT DEPLOY until the total-bases regression is understood.** Likely cause:
+  bench selection is **next-available**, not platoon/position aware, and total
+  bases is power-weighted so the substitute's identity matters most there.
+- **`scripts/reproject_mlb_props_with_subs.py` is now the scoreboard** — it
+  scores any MLB engine change against the market end-to-end from archived
+  rosters. Both arms are the sim's own empirical distribution over identical
+  seeds; only the flag differs.
+- **`pinch_hit_aggressiveness` is loaded onto `ManagerProfile` and read by
+  NOTHING.** The tendencies file's absence was a symptom; the missing consumer
+  was the cause.
+- **Sim-count requirement depends on FORECAST REPRESENTATION, not sport.**
+  Empirical/PMF forecasts (MLB outs) need hundreds; parametric mean+sigma
+  summaries (NFL, NCAAF) need tens — NFL's measured knee is **<=100**, so
+  **NFL/NCAAF at 300 are fine** and the earlier "TOO THIN" verdicts were wrong.

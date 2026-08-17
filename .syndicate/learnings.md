@@ -4852,3 +4852,43 @@ verified 92->93->94 keys) but **false of the restart**. The service redeploys.
 **So an env write IS a production event.** It is still far safer than a
 `render.yaml` push, but "I only set one variable, nothing will happen" is wrong,
 and on a service with an in-flight job it would have killed it.
+
+## 2026-08-17 — RULE: the FIRST test for any flagged feature is "does enabling it change anything"
+
+**I built three inert things today.** Not three bugs — three pieces of work that
+existed, looked complete, passed their obvious tests, and did nothing:
+
+1. **A `manager_tendencies.json` at the wrong path, wrong key, and wrong
+   schema.** I announced it as fixing the root cause.
+2. **`GameConfig.position_substitutions` set with `setattr`.**
+   `dataclasses.replace()` rebuilds from DECLARED FIELDS ONLY, and the sim calls
+   `replace(cfg, rng_seed=...)` on every run — so the attribute was discarded
+   before the first pitch and the feature was permanently off.
+3. Earlier, a **leash test reading `stats["outs"]` where the key is `"OUTS"`** —
+   which made three no-op tests pass on `0.0 == 0.0`.
+
+**Every one was caught by the same thing: a test that asserts ENABLING IT CHANGES
+THE OUTPUT.** No amount of "the code is present", "the file exists" or "the
+no-op case passes" would have found any of them. Two would have shipped as
+completed work.
+
+**RULE: for any feature behind a flag, artifact, or config key, write the
+reachability assertion FIRST —**
+
+    assert run(enabled=False) != run(enabled=True)
+
+**— and only then write the correctness tests.** If that assertion cannot be
+written, the feature has no observable effect and there is nothing to test.
+
+**The corollary that bit hardest:** a no-op test and a reachability test look
+like a pair, but they FAIL INDEPENDENTLY and the no-op half passes vacuously
+when the feature is dead. Three green no-op tests are evidence of nothing on
+their own.
+
+**Specific trap worth naming: `dataclasses.replace()` silently drops
+monkey-patched attributes.** Any config that is `replace()`d in a loop must
+carry its flags as DECLARED FIELDS. An instance attribute survives exactly until
+the first `replace()`, which in a simulator is before the first event.
+
+Related: the standing "presence is not reachability" rule — this is its
+test-shaped form, and today produced four fresh instances.
