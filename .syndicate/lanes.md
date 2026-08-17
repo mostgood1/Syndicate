@@ -1186,8 +1186,13 @@ needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
   - this lane reads `OPEN, UNOWNED` since the 15:2xZ checkpoint, and its own
     stated SINGLE NEXT ACTION is a READ of `/api/board/book-grid` — finishing it
     requires no edit here.
+  **HOLDER CHANGED WITHIN THE HOUR, 2026-08-17 00:3xZ:**
+  `mlb-live-gameline-distributions` went **CLOSED-VERIFIED** and
+  **`wnba-live-tier`** (restored, same work family) now holds this path. Still exactly
+  one holder, which is the point — but the counterpart to coordinate with is now
+  `wnba-live-tier`, not the closed lane.
   **TO RE-TAKE:** put the path back on the `- Files:` line above and tell
-  `mlb-live-gameline-distributions`. The release is a coordination decision
+  `wnba-live-tier`. The release is a coordination decision
   between two unattended lanes, not a judgement that this lane's interest was
   invalid — it wrote the `edge_vs_market_pct` line that sits there.
 - Collision check at re-take: no OPEN lane claims any of the four above.
