@@ -10716,3 +10716,41 @@ the lookup fail for a HEALTHY subject before calling it broken.
 **Nothing else changes.** The deploy request, the two deploy disclosures, and the
 `#378`/`#382`/`#129` corrections all stand; the retraction is scoped to this one
 claim and was sent to the coordinator as its own message.
+
+## 2026-08-17 19:4xZ — COORDINATION STATE for the two `convergence-phase7-crps` requests
+
+Written so the next session does not re-derive it. **Nothing has been deployed.**
+
+**Re-measured 19:4xZ, by CONTENT against each live SHA:**
+
+    refresh-worker    live=8c0bd8e6 (17:48:53Z)   ownership_gate=False  monotone_seal=False
+    live-odds-worker  live=abc9987515 (18:40:57Z)  ownership_gate=False  monotone_seal=False
+
+**Queue is backed up:** 4 requests pending, oldest `2026-08-15T2350Z-smaps-reconciliation`
+is **two days old**; `done/` has nothing since 08-16. Do not read "my request is
+pending" as "the coordinator is ignoring it".
+
+### PRIORITY CALL COMMUNICATED TO THE COORDINATOR — honour it if you pick this up
+
+- **`20025cc4` ownership gate — the one that matters.** Both workers. Soft
+  deadline before the 08-18 slate.
+- **`bafb4fb2` monotone seal — URGENCY FORMALLY DROPPED TO ZERO by its own
+  requester (me).** It should not land before the 08-19 cadence result anyway,
+  because its reading is uninterpretable until cadence is known good. Leaving it
+  queued past 08-19 regresses nothing.
+- **If neither fits a safe window, take neither.** The deadline is soft: the
+  scheduled reader's Gate B returns INCONCLUSIVE rather than FAIL, so a starved
+  mechanism cannot be wrongly rolled back. Missing it costs one day of
+  measurement, not correctness. **An in-flight MLB sim on refresh-worker outranks
+  this deadline.**
+
+### If both land in one window
+
+**Record that fact in this file.** Two changes in one window means neither
+result is attributable, and the 08-19 read must not be credited to the wrong
+change. This lane has already been burned twice by confounded measurements
+(the leash sweep vs the betting grade; the cadence flip vs the undeployed seal).
+
+**Requester is out of context and cannot answer follow-ups.** Everything needed
+is in the two request files, this section, and `state.md` under "ODDS-SWEEP
+OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER".
