@@ -12975,3 +12975,65 @@ accepting this automatic rather than a negotiation.
 **The second anchor did NOT fit the law — it broke it, which is more useful.**
 One measured knee plus one falsification beats two knees that happened to agree.
 
+## 2026-08-17 — **CORRECTION: my P2 step-1 artifact was INERT THREE WAYS, and the real blocker is not the missing file**
+
+Lane `convergence-phase7-crps`. **This retracts the operative claim of the "P2
+STEP 1" entry above.** The fitted numbers there are sound; what I said they would
+DO is wrong.
+
+### What I got wrong
+
+I wrote `data/manager/manager_tendencies.json` at the **repo root** and announced
+"the file whose absence is the root cause NOW EXISTS". It is inert three ways:
+
+1. **WRONG PATH.** `_load_manager_tendencies_anykey`
+   (`sim_engine/data/build_roster.py:523`) resolves
+   `Path(build_roster.py).parents[2] / "data" / "manager" / …` =
+   **`vendor/mlb_bettingv2/data/manager/`**. Nothing reads the repo root.
+2. **WRONG KEY.** The loader does
+   `m.get(str(team.team_id)) or m.get(str(team.abbreviation))`. My artifact is
+   keyed by **full team name** ("Boston Red Sox") and would never match.
+3. **WRONG SCHEMA.** The loader applies exactly six fields —
+   `pull_starter_pitch_count`, `starter_min_innings`, `starter_blowup_run_diff`,
+   `closer_leverage_max_run_diff`, `use_closer_in_9th_only`,
+   `pinch_hit_aggressiveness`. My `inning_hazard` / `slot_multiplier` /
+   `margin_multiplier` are in **none** of them. Worse, the loader iterates
+   `raw.items()` treating every top-level key as a team, so my
+   `schema_version` / `source` / `league` / `teams` would be read as four teams.
+
+**I also duplicated existing work:**
+`vendor/mlb_bettingv2/tools/datasets/build_manager_tendencies_from_feed_live.py`
+already generates this artifact in the correct schema and location.
+
+**Remediation:** the file has been MOVED to
+`reports/phase7/mlb_removal_hazards.json`. Leaving it at
+`data/manager/manager_tendencies.json` was the dangerous option — it looks
+exactly like the production artifact.
+
+### THE FINDING THAT MATTERS MORE, and it reframes P2
+
+**`pinch_hit_aggressiveness` is defined on `ManagerProfile` (default 0.15),
+loaded from the artifact, set on the profile — and READ BY NOTHING in the sim
+engine.** Verified: the only hit in `sim_engine/*.py` is its definition.
+
+So even a **correct** artifact, at the **correct** path, in the **correct**
+schema, keyed **correctly**, would produce **zero** substitution behaviour.
+
+**P2's blocker was never the missing data file. It is that the simulation has no
+code path that consumes a substitution knob.** The file's absence is a symptom;
+the absent CONSUMER is the cause. My framing — repeated several times in this
+ledger — had it backwards.
+
+This is the fourth "presence is not reachability" instance I have hit personally
+today, and the first where I was the one who created the inert thing.
+
+### P2, restated correctly
+
+1. **Write the sim logic first** — a removal roll per starter per half-inning in
+   `simulate.py`, with per-game state (NOT roster mutation: the roster is shared
+   across sims and caches `_batter_by_id`, so mutating it leaks between runs).
+2. **Then feed it**, via the EXISTING generator and schema, at the vendor path,
+   keyed by `team_id`/`abbreviation`.
+3. The fitted hazards in `reports/phase7/mlb_removal_hazards.json` remain valid
+   as the empirical basis — inning hazard peaking 0.0509 at the 8th, slot
+   multiplier 0.71→1.55, team spread 2.0x. They just have no consumer yet.
