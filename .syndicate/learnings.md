@@ -4144,3 +4144,64 @@ predict the identical observation.
   you know what makes it read unhealthy — but sharper: **here the restart
   GUARANTEES the healthy reading**, so the observation carries no information at
   all.
+
+## 2026-08-17 — CHECKPOINT 11: a green gate that asks less
+
+### A gate turned green by WAIVING is not the same fact as a gate turned green by FIXING
+
+The migration gate went FAIL → PASS tonight across three waivers and zero fixes.
+Every waived finding is defensible in isolation — dev-checkout artifact coverage,
+not code defects — and the three command steps genuinely pass. But **the sentence
+"the gate passes" now means less than it did this morning**, and nothing in the
+report says so.
+
+What makes it survivable rather than a lie: waived findings stay in `violations`
+and only `unexpected` drives `ok`, so a reader can still see what is tolerated.
+That is the property to preserve. This file already contained the opposite
+pattern — a bare `if slug == "wnba": publish_missing_inputs = []` that suppresses
+silently — and copying it would have been faster and wrong.
+
+**How to apply: when you waive, say in the commit message and the code comment
+what the waiver COSTS, and name the check that no longer exists.** For these two
+that is: nothing now verifies the MLB daily mirror has data, and NFL/NCAAF
+advanced surfaces are unguarded. **The right end state is DELETING the entries
+when the generators run, not widening them.**
+
+### Build a work queue from CONTENT, never from commit subjects
+
+Seeding the refresh-worker deploy manifest, 10 commits since the live SHA touched
+worker-run code. **Seven were already present in the live SHA as cherry-picks.**
+A subject-based queue would have listed four entries that need no deploy — and
+one of those subjects is **verbatim the live SHA's own subject**, so it would have
+looked entirely plausible on review.
+
+The service runs a deploy branch of cherry-picks, so `git log A..B` describes
+*history*, not *difference*. `git diff --name-only <LIVE> origin/main` describes
+difference. **Where a service runs cherry-picks, only content answers "what still
+needs shipping" — and `--is-ancestor` is actively misleading.**
+
+### `.gitignore` does not untrack, so "I added files" and "git sees files" are different questions
+
+I pulled 255 artifacts (186 MiB) into `data/mlb_source/source_artifacts/` and
+`git status` showed **zero** changes. `.gitignore:36` ignores that whole subtree,
+yet 1,977 files in it are already tracked — ignore rules never untrack what is
+already in the index. So the pre-existing files are tracked and every new one is
+invisible.
+
+**Consequence I nearly reported wrongly:** I had described the pull as improving
+the repo's cold-start safety net. It improves **this checkout only** and will not
+survive a fresh clone. **Before claiming a data fetch helped anyone else, check
+`git check-ignore` on the destination.**
+
+### A deploy that kills work is a different decision from a deploy that costs downtime
+
+Eight web deploys tonight each cost ~1–2 min of 502s and killed nothing — every
+`check_deploy_safety.py` blocker was on a worker I was not touching. The ninth
+target was refresh-worker, where the same NOT CLEAR verdict meant an **MLB sim
+11 minutes in, and a board build, would die**.
+
+Same tool, same wording, categorically different cost. **Read WHICH service the
+in-flight work is on before treating a safety verdict as boilerplate** — and for
+an additive change nothing reads yet, queueing beats killing. Second cost, easy
+to miss: a worker deploy reboots the container and resets the memory floor that
+`refresh-worker-oom-recurrence` needs deploy-free windows to measure.

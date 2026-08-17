@@ -1869,7 +1869,7 @@ and then failed the thing it was checking, which is the point of running it.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
 
-### live-edge-basis — OPEN — **SHIPPED TO `main` (`28b03fef`), NOT DEPLOYED by owner instruction (rides a consolidated deploy); refresh-worker also had a documented hold and a held claim. `edge_basis` NEVER OBSERVED ON A SERVED ROW — verification owed in `deploys.md`.** — opened 2026-08-17 — session: ask-answer-substance
+### live-edge-basis — OPEN — **CODE ON `main` (`28b03fef`), QUEUED NOT DEPLOYED. Held for a consolidated refresh-worker deploy per owner instruction — an MLB sim was 11 min in and would have died for a key nothing reads yet. Queue: `.syndicate/deploy_manifest_refresh_worker.md`. `edge_basis` NEVER OBSERVED ON A SERVED ROW; verification owed in `deploys.md`.** — opened 2026-08-17 — session: ask-answer-substance
 - Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
   refers to. **Testable outcome:** on a live-joined game row,
   `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live

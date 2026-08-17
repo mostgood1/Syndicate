@@ -1305,21 +1305,43 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
-- **BOARD FINDING 3 IS FIXED IN CODE AND NOT YET DEPLOYED (`28b03fef` on
-  `main`).** `live_gameline_join._apply_verdict` now sets
-  `projection["edge_basis"] = "live" | "pregame"`, so a consumer can tell
-  which probability `edge_vs_market_pct` was computed against — it is the
-  live one, while `model_prob_over` beside it stays pregame (7/7 separation
-  on `live_aware`; stated `-39.93` = `(0.1917 - 0.591) x 100` vs `+27.46`
-  for the pregame pairing). **Additive: no existing value moves.**
-  It is the fix `layer2_board` asked for beside `_MODEL_EDGE_MAX_POINTS =
-  15.0`, and that bound is NOT relaxed.
-  **`edge_basis` has never been observed on a served row** — it is emitted by
-  the artifact build on refresh-worker, which was not deployed (documented
-  hold + the claim was held mid-ship). It rides a consolidated deploy;
-  verification is owed and recorded in `deploys.md`.
-  **A RENAME TO `live_edge_vs_market_pct` IS FORBIDDEN** — `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a
-  rename makes the board price LIVE rows off a PREGAME edge. Pinned by test.
+- **BOARD FINDING 3 IS FIXED IN CODE, ON `main`, AND QUEUED — NOT DEPLOYED
+  (`28b03fef`).** `live_gameline_join._apply_verdict` sets
+  `projection["edge_basis"] = "live" | "pregame"`, so a consumer can tell which
+  probability `edge_vs_market_pct` was computed against — the live one, while
+  `model_prob_over` beside it stays pregame (7/7 separation on `live_aware`;
+  stated `-39.93` = `(0.1917 - 0.591) x 100` vs `+27.46` pregame). **Additive:
+  no existing value moves.** It supplies what `layer2_board` asked for beside
+  `_MODEL_EDGE_MAX_POINTS = 15.0`, and that bound is NOT relaxed.
+  **A RENAME TO `live_edge_vs_market_pct` IS FORBIDDEN** —
+  `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a
+  rename prices LIVE rows off a PREGAME edge. Pinned by test.
+  **QUEUED in `.syndicate/deploy_manifest_refresh_worker.md`** rather than
+  shipped: an MLB sim was 11 min in and would have died for a key nothing
+  reads yet. **`edge_basis` has never been observed on a served row.**
+- **THE MIGRATION GATE PASSES, AND IT PASSES BECAUSE IT ASKS LESS.** FAIL ->
+  PASS on 2026-08-17 via THREE WAIVERS AND ZERO FIXES: MLB daily manifest
+  breadth (`cda5ffdb`), NFL/NCAAF advanced inputs (`411977fd`), plus the
+  pre-existing nba/wnba entries. Waived findings still appear in `violations`;
+  only `unexpected` drives `ok`, so what is tolerated stays visible.
+  **Two checks no longer exist:** nothing verifies the MLB daily mirror has
+  DATA (`PROTECTED_LOCAL_RESOLVER_CHECKS` runs against a TemporaryDirectory
+  with patched roots and passes on an empty mirror), and NFL/NCAAF advanced
+  surfaces are unguarded. Delete the entries when the generators run.
+- **THE MLB MIRROR MANIFEST CHECK DOES NOT READ THE FILES.** Pulling 255
+  artifacts (186 MiB) took the mirror 161 -> 416 `daily_summary` files matching
+  production exactly (79 dates, 2026-05-28..08-17) and the violation did not
+  move: it reads `mirror_refresh_latest.json`, CI-written and dated
+  2026-07-14. **And that pull is invisible to git** — `.gitignore:36` ignores
+  `data/*_source/source_artifacts/` while 1,977 files there are already
+  tracked, so the new ones are ignored. It improves THIS CHECKOUT ONLY and
+  will not survive a fresh clone.
+- **THE FOUR NFL/NCAAF 2026 ADVANCED INPUTS WERE NEVER GENERATED.** Prior
+  seasons exist (`upcoming_recs_2025_wk17/19/21`, the 2025 enhanced-totals CSV);
+  `recommendations_summary/` exists for no season. **Nothing in this repo
+  writes `upcoming_recs_*`** — only readers. None of the four is in
+  `HOT_ARTIFACT_PATTERNS`, so **whether production has them is UNKNOWN**; do
+  not read their local absence as absence there.
 - **MIGRATION GATE ON `origin/main` `ea9340f2` (2026-08-17 01:50Z, `--skip-smoke`):
   FAIL — and the failure is DATA COVERAGE, not code.** All three command steps
   PASS: `audit_migration.py` (6 findings / 4 allowed, inside tolerance),
