@@ -4779,3 +4779,41 @@ long session.
 least.** The check that catches it is cheap: before reporting a commit as done,
 name the test that covers it. If that sentence cannot be written, the commit is
 not done.
+
+## 2026-08-17 — RULE: an aggregate dispersion check cannot see an UNINFORMATIVE CENTRE
+
+**What happened.** Phase 7's bias/dispersion decomposition reported MLB pitcher
+outs at **dispersion 0.791 against a 0.798 target** — as close to perfect as that
+metric gets. I read it as "the shape is right, only the location is off" and went
+looking for a calibration fix.
+
+**The shape was NOT right in the way that matters.** Dispersion scores
+`sd(actual − mean) / mean(sigma)`. It asks whether the stated UNCERTAINTY matches
+the realised error. It says nothing about whether the per-item MEAN carries
+information. Measured directly:
+
+    corr(sim_mean, actual) = +0.05
+    sim_mean spread sd     =  1.19
+    actual spread   sd     =  4.06
+
+The engine predicts nearly the same value for every start. Its per-start sigma
+(~5) is genuinely well-calibrated **around a centre that does not move**, and
+that combination passes a dispersion check cleanly.
+
+**RULE: alongside bias and dispersion, always report the CORRELATION between the
+forecast and the outcome, and the RATIO of forecast spread to outcome spread.**
+A model can be perfectly calibrated and completely uninformative; those two
+numbers separate the cases and neither bias nor dispersion will.
+
+**The tell to watch for:** `sd(forecast) << sd(actual)`. Here it was 3.4x
+narrower. That is near-degeneracy, and `#425`'s degeneracy detector only fires on
+FULL collapse to a single value, so it did not trip.
+
+**Why this matters beyond one market:** the remedy differs completely.
+Miscalibration is fixed by a profile; an uninformative centre is not fixable at
+all at the calibration layer, and shipping a profile for it burns a promotion
+cycle to change nothing. I nearly recommended exactly that.
+
+Related: `learnings.md` 2026-08-17 on matching the baseline's FORM, and the
+`#428` rule about decomposing bias before publishing a skill verdict — which I
+had ALSO skipped on this same model before catching it here.

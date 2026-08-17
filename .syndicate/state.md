@@ -3937,3 +3937,29 @@ on the swept side. Appended verbatim, nothing edited, nothing reordered.
   released lane still blocks every session. Cost 2 of 3 blocks this session.
 - **`game_cards` coverage fix is DEPLOYED but its EFFECT is UNMEASURED**, and
   cannot be measured until Phase 2 is enabled.
+
+## MLB PITCHER OUTS — ROOT CAUSE FOUND `[measured 2026-08-17, n=267, 1000 sims]`
+
+Supersedes the "loses to climatology" line above with the REASON.
+
+- **`corr(sim_mean, actual) = +0.05`.** The engine's per-start expectation varies
+  by **sd 1.19 outs** while actual outcomes vary by **sd 4.06** — 3.4x wider —
+  and that variation is uncorrelated with the outcome.
+- **MLB's outs forecast is a BIASED NEAR-CONSTANT** (sim mean 17.21 vs actual
+  15.90). Climatology is an unbiased constant with the right spread, which is the
+  entire −6.74% deficit.
+- **A calibration layer CANNOT fix this.** Hold-out test: at production's leash a
+  scalar shift recovers +3.08 skill points; at the best leash it makes it WORSE
+  (−0.48), because the residual bias is date-to-date noise. **Do not ship a
+  calibration profile for MLB outs.**
+- **The aggregate dispersion check (0.791 vs 0.798) is BLIND to this.** It scores
+  `sd(actual−mean)/mean(sigma)`; per-start sigma is ~right, the per-start MEAN is
+  what does not move. A calibrated width around an uninformative centre passes.
+- **Removing the F5 leash raises differentiation 21%** (sd 0.98 → 1.19). Real,
+  and far short of the 4.06 needed to matter.
+- **DO NOT GENERALISE TO "MLB HAS NO SIGNAL".** The same engine's HITTER PROPS
+  are measured at r = 0.13–0.16 with de-biasing flipping 5 of 7 markets. Outs is
+  dominated by MANAGER HOOK BEHAVIOUR — a human decision the plate-appearance
+  simulator has no information about.
+- **Consequence:** MLB outs should be served `unmeasured` or withheld, not
+  calibrated. Effort belongs on hitter props.

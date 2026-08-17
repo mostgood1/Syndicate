@@ -12005,3 +12005,78 @@ call-site regime applies is still unconfirmed.**
 Note: the script prints "psutil available: NO". That is a bug in its own check
 (it calls `rss_mb()` twice and compares, and RSS legitimately moves between
 calls). psutil works and the RSS column is real.
+
+## 2026-08-17 — WHY MLB LOSES ON PITCHER OUTS: **the engine barely differentiates starts, and what it does is uncorrelated with reality**
+
+Lane `convergence-phase7-crps`. `scripts/diagnose_mlb_outs_deficit.py` + a
+correlation read. Read-only, no deploy. **This answers "MLB is the most mature
+engine — if it is not helping, identify why."**
+
+### First, the mistake I made
+
+I published **−6.74% vs climatology** and moved on **without decomposing the
+bias**. The 2026-08-14 audit demands the opposite in as many words: *"'No
+measured skill' would have been the WRONG conclusion and would have suppressed a
+model that needs calibrating rather than retiring. ALWAYS decompose bias before
+publishing a skill verdict."* Same rule, same repo, ignored by me.
+
+### The decomposition (hold-out, split BY DATE so no game is in both halves)
+
+| leash | forecast | CRPS | skill vs climatology |
+|---|---|---|---|
+| 5 (production) | raw | 2.2423 | −12.31% |
+| 5 | + shift fitted on TRAIN | 2.1809 | **−9.23%** (+3.08 pp) |
+| 0 (best shape) | raw | 2.1637 | −8.37% |
+| 0 | + shift fitted on TRAIN | 2.1732 | **−8.85%** (−0.48 pp) |
+
+**At production's leash a scalar shift recovers 3.08 points; at the best leash it
+makes things WORSE.** That asymmetry is itself the finding: the leash imposes a
+*systematic* truncation a constant can correct, and once it is gone the residual
+bias is date-to-date NOISE, so fitting it just adds variance.
+
+### THE ROOT CAUSE `[measured, n=267, 1000 sims]`
+
+    corr(sim_mean, actual)  = +0.0485   (leash 0)   +0.0448 (leash 5)
+    sim_mean spread   sd    =  1.188 outs
+    actual spread     sd    =  4.061 outs      <- 3.4x wider
+    sim mean 17.21   actual mean 15.90         <- biased high
+
+**The engine predicts nearly the same thing for every start.** It varies its
+expectation by 1.19 outs across 267 starts while reality varies by 4.06, and that
+variation is **uncorrelated with the outcome (r = 0.05)**.
+
+So MLB's outs forecast is **a biased near-constant**. Climatology is an
+**unbiased** constant with the correct spread. That is the whole deficit, and
+**no calibration layer fixes an r of 0.05.**
+
+**Why the aggregate dispersion metric (0.791 vs a 0.798 target) looked healthy:**
+it scores `sd(actual − mean) / mean(sigma)`. The per-start SIGMA is about right
+(~5). It is the per-start MEAN that does not move. A well-calibrated width around
+an uninformative centre passes that check.
+
+**One real signal in it:** removing the leash raises differentiation by **21%**
+(sd 0.98 → 1.19). The leash WAS suppressing start-to-start signal — 1.19 against
+a required 4.06 is simply nowhere near enough for that to matter.
+
+### DO NOT GENERALISE THIS TO "MLB IS NOT HELPING"
+
+The **same engine's hitter props carry measured signal**: r = 0.13–0.16 across
+markets, and de-biasing flips 5 of 7 to beating a constant baseline
+`[measured 08-14]`. That is real conditional information.
+
+The finding is narrower and more useful: **the engine has signal on hitter props
+and essentially none on pitcher outs.** Outs is dominated by MANAGER HOOK
+BEHAVIOUR — a human decision — which a plate-appearance simulator has no
+information about. `#425`'s degeneracy detector exists for this failure mode;
+outs is near-degenerate without quite tripping it.
+
+### What follows
+
+1. **Do not ship a calibration profile for MLB outs.** It cannot work; r = 0.05.
+2. **Consider whether outs should be published at all**, or served as
+   `unmeasured` — `projection_skill` already treats that as first-class.
+3. **The leash fix remains worth having** (+5 pp of CRPS and +21% differentiation)
+   but must not be sold as making outs useful.
+4. **Raise the degeneracy detector's sensitivity**: a forecast whose spread is
+   3.4x narrower than the outcome's should be flagged before a human notices.
+5. **Hitter props are where MLB's signal is** — direct effort there.
