@@ -4717,3 +4717,40 @@ retiring."*
 1000, and a thin empirical PMF inflates CRPS. A distributional metric is
 sensitive to the ESTIMATOR of the distribution, not only to the distribution —
 so sim count is part of the measurement, not just part of the model.
+
+## 2026-08-17 — RULE: a LEAKED backtest number is an UPPER BOUND, not merely an untrustworthy one
+
+**Standing practice here is to mark a leaky backtest "not citable" and stop.**
+`plan_2026-08-14_models.md` D1 did exactly that for the soccer validation CSVs.
+That is right as far as it goes and it throws away information.
+
+**A forecast that saw its own outcome should FLATTER itself.** So the leaked
+number bounds the honest one from above:
+
+    true out-of-sample skill  <=  leaked in-sample skill
+
+**Measured today on NCAAF** (`rating_source=cfbd_ppa_season_2025` predicting
+season-2025 games, `generated_at` 2026-07-16, 761 of 761 rows):
+
+    margin  +1.72%  [+0.20%, +3.24%]   -> true skill is AT BEST +1.72%
+    total   -3.65%  [-6.94%, -0.36%]   -> true skill is AT BEST -3.65%
+
+So NCAAF total is **known to be bad** without any clean data at all, and NCAAF
+margin is **known not to be good** — plausibly zero. "Not citable" would have
+recorded both as unknown, and they are not unknown; they are bounded.
+
+**How to apply.** When a leak is found: (a) refuse to call it skill, (b) still
+compute it, (c) report it as a CEILING with the direction of the bias stated. A
+leaked number that is already weak is a strong negative result. A leaked number
+that is strong tells you nothing and must wait for clean data.
+
+**The corollary that decides what to do next.** Do not repair a leak by
+regenerating history with a better rating source — that just moves the leak
+somewhere harder to see. Score FORWARD instead. NCAAF's 2026 projections already
+carry the correct pattern (`cfbd_ppa_season_2025_fallback_for_2026`, prior-season
+ratings), the season opens 2026-08-29, and 761 projections are written and
+waiting for outcomes. The clean measurement costs nothing but time.
+
+Related: `learnings.md` 2026-08-17 on matching the baseline's FORM to the
+forecast's form. Both are the same underlying discipline — say precisely what a
+number can and cannot support, rather than binning it as good or unusable.

@@ -58,13 +58,18 @@ PROJ_RE = re.compile(r"smartsim2_(preseason_)?projections_(\d{4})_wk(\d+)\.csv$"
 # observation record
 # --------------------------------------------------------------------------
 class Obs:
-    __slots__ = ("sport", "market", "segment", "actual", "mean", "sigma", "samples", "key")
+    __slots__ = ("sport", "market", "segment", "actual", "mean", "sigma", "samples",
+                 "key", "leak")
 
     def __init__(self, sport, market, segment, actual, *, mean=None, sigma=None,
-                 samples=None, key=None):
+                 samples=None, key=None, leak=None):
         self.sport, self.market, self.segment = sport, market, segment
         self.actual, self.mean, self.sigma, self.samples, self.key = (
             actual, mean, sigma, samples, key)
+        # None = point-in-time clean. A string = why this observation's forecast
+        # saw its own outcome, carried on the RECORD so it cannot be lost when
+        # cells are aggregated.
+        self.leak = leak
 
     def model_crps(self) -> float | None:
         if self.samples:
@@ -105,6 +110,75 @@ def _nflverse_finals(seasons: set[int], sport: str) -> dict[str, tuple[float, fl
     return out
 
 
+def _cfbd_finals(seasons: set[int], sport: str) -> dict[str, tuple[float, float]]:
+    """game id -> (home_points, away_points), from CFBD `games_<season>.json.gz`.
+
+    NCAAF truth is NOT nflverse. `_nflverse_finals` looks for
+    `play_by_play_<season>.csv.gz` and found zero NCAAF matches, which the census
+    correctly reported as UNMEASURED rather than as a skill of zero. CFBD ships a
+    game-level file, so no play aggregation is needed: `homePoints`/`awayPoints`
+    are the finals, and `id` is the same ESPN-style key the projections carry.
+
+    Only `completed` games with both scores present are returned -- a scheduled
+    or in-progress game must not enter a backtest as a 0-0 outcome.
+    """
+    out: dict[str, tuple[float, float]] = {}
+    base = DATA / f"{sport}_source" / "historical_truth"
+    for season in sorted(seasons):
+        path = base / f"games_{season}.json.gz"
+        if not path.is_file():
+            continue
+        try:
+            with gzip.open(path, "rt", encoding="utf-8") as handle:
+                games = json.load(handle)
+        except Exception as exc:  # noqa: BLE001
+            print(f"    [warn] {path.name}: {type(exc).__name__}: {exc}")
+            continue
+        for game in games if isinstance(games, list) else []:
+            if not game.get("completed"):
+                continue
+            home, away = game.get("homePoints"), game.get("awayPoints")
+            if home is None or away is None:
+                continue
+            gid = str(game.get("id") or "").strip()
+            if gid:
+                try:
+                    out[gid] = (float(home), float(away))
+                except (TypeError, ValueError):
+                    continue
+    return out
+
+
+_RATING_SEASON_RE = re.compile(r"season_(\d{4})")
+
+
+def _leak_reason(rating_source: str, game_season: int) -> str | None:
+    """Did this forecast's inputs include the season it is predicting?
+
+    Measured 2026-08-17: NCAAF's 2025 projection files carry
+    `rating_source=cfbd_ppa_season_2025` and `generated_at=2026-07-16` -- FULL
+    2025 season PPA, computed after the season ended, used to predict 2025
+    games. A week-11 game is therefore predicted using ratings that include that
+    very game and every game after it.
+
+    This is the same shape the 2026-08-14 model audit found in the soccer
+    backtests ("a season-to-date aggregate recomputed from a current table") and
+    the same one `plan_2026-08-14_models.md` D1 marked NOT CITABLE.
+
+    The 2026 files show the CORRECT pattern for contrast:
+    `cfbd_ppa_season_2025_fallback_for_2026` -- prior-season ratings, which is
+    point-in-time safe.
+    """
+    match = _RATING_SEASON_RE.search(str(rating_source or ""))
+    if not match:
+        return None
+    rating_season = int(match.group(1))
+    if rating_season >= game_season:
+        return (f"rating_source={rating_source} supplies season-{rating_season} ratings "
+                f"to a season-{game_season} game (in-sample)")
+    return None
+
+
 def collect_football(sport: str) -> tuple[list[Obs], dict]:
     src = DATA / f"{sport}_source"
     proj_files = sorted(p for p in src.rglob("smartsim2_*projections_*.csv") if PROJ_RE.search(p.name))
@@ -128,13 +202,16 @@ def collect_football(sport: str) -> tuple[list[Obs], dict]:
         except Exception:  # noqa: BLE001
             continue
 
-    finals = _nflverse_finals(seasons, sport)
+    # Truth format is per-sport: nflverse pbp CSV for NFL, CFBD game JSON for NCAAF.
+    finals = _cfbd_finals(seasons, sport) if sport == "ncaaf" else _nflverse_finals(seasons, sport)
+    meta["truth_source"] = "cfbd_games" if sport == "ncaaf" else "nflverse_pbp"
     meta["seasons"] = sorted(seasons)
     meta["projection_rows"] = len(rows)
     meta["truth_games"] = len(finals)
 
     out: list[Obs] = []
     joined = 0
+    leaks: Counter = Counter()
     for row in rows:
         gid = (row.get("game_id") or "").strip()
         final = finals.get(gid)
@@ -143,6 +220,9 @@ def collect_football(sport: str) -> tuple[list[Obs], dict]:
         joined += 1
         home, away = final
         seg = f"{row['_segment']}"
+        leak = _leak_reason(row.get("rating_source", ""), int(row["_season"]))
+        if leak:
+            leaks[leak] += 1
         for market, actual, mean_key, sd_key in (
             ("margin", home - away, "margin_mean", "margin_stdev"),
             ("total", home + away, "total_mean", "total_stdev"),
@@ -154,8 +234,11 @@ def collect_football(sport: str) -> tuple[list[Obs], dict]:
                 continue
             if sigma <= 0:
                 continue
-            out.append(Obs(sport, market, seg, float(actual), mean=mean, sigma=sigma, key=gid))
+            out.append(Obs(sport, market, seg, float(actual), mean=mean, sigma=sigma,
+                           key=gid, leak=leak))
     meta["joined_games"] = joined
+    if leaks:
+        meta["leaked_rows"] = dict(leaks)
     if not out:
         meta["reason"] = (f"{len(rows)} projection rows and {len(finals)} truth games, "
                           "but ZERO game_id matches -- the two families do not overlap locally")
@@ -274,6 +357,13 @@ def score(observations: list[Obs], min_n: int) -> list[dict]:
         model = [s for s in (o.model_crps() for o in group) if s is not None]
         n = min(len(clim), len(model))
         row = {"sport": sport, "market": market, "segment": segment, "n": n}
+        # A cell whose forecasts saw their own outcomes is NOT a skill
+        # measurement, however large n is. The number is still computed and
+        # shown -- so it is visible what a naive backtest would have claimed --
+        # but it is never labelled skill and never counted in the totals.
+        leaked = {o.leak for o in group if o.leak}
+        if leaked:
+            row["leak"] = sorted(leaked)[0]
         if n < min_n:
             row["verdict"] = "unmeasured"
             row["reason"] = f"n={n} < min_n={min_n}"
@@ -295,7 +385,9 @@ def score(observations: list[Obs], min_n: int) -> list[dict]:
                         "skill_lo": (lo / cc) if cc > 0 else 0.0,
                         "skill_hi": (hi / cc) if cc > 0 else 0.0,
                         "significant": lo > 0 or hi < 0})
-            if not row["significant"]:
+            if leaked:
+                row["verdict"] = "LEAKY — NOT CITABLE as skill"
+            elif not row["significant"]:
                 row["verdict"] = "INDISTINGUISHABLE from climatology"
             elif skill > 0:
                 row["verdict"] = "BEATS climatology"
@@ -349,12 +441,16 @@ def main() -> int:
                   f"{r['verdict']}")
             print(f"  {'':7s} {'':10s} {'':11s} {'':6s} {'':9s} {'':10s} {'95% CI':>9s}  {ci}")
 
-    scored = [r for r in rows if r["verdict"] != "unmeasured"]
+    scored = [r for r in rows if r["verdict"] != "unmeasured" and not r.get("leak")]
+    leaky = [r for r in rows if r.get("leak")]
     beat = [r for r in scored if r.get("significant") and r["skill"] > 0]
     lose = [r for r in scored if r.get("significant") and r["skill"] <= 0]
     tied = [r for r in scored if not r.get("significant")]
     print(f"\n  cells scored {len(scored)}   BEAT {len(beat)}   lose {len(lose)}   "
-          f"indistinguishable {len(tied)}   unmeasured {len(rows) - len(scored)}")
+          f"indistinguishable {len(tied)}   LEAKY {len(leaky)}   "
+          f"unmeasured {len([r for r in rows if r['verdict'] == 'unmeasured'])}")
+    for r in leaky:
+        print(f"    LEAK  {r['sport']}/{r['market']}: {r['leak']}")
     print("  'indistinguishable' is a THIRD outcome, not a rounding of 'loses': a CI")
     print("  spanning zero means the sample cannot tell, which is not the same finding.")
     print("  Climatology is computed WITHIN segment and IN-SAMPLE, so it is a hard")

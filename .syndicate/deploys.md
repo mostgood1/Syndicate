@@ -11796,3 +11796,64 @@ number computed from team aggregates.
 - NFL n=273 games across 2023–2025 regular seasons.
 - Climatology is a WITHIN-SEGMENT marginal; pooling preseason with regular would
   have credited the model for knowing the schedule, which is not skill.
+
+## 2026-08-17 — CFBD READER ADDED — NCAAF now joins (761 games) and is **LEAKY, NOT CITABLE**
+
+Lane `convergence-phase7-crps`. `scripts/skill_census_crps.py`. Read-only, no deploy.
+
+**The reader works.** NCAAF truth is CFBD `games_<season>.json.gz`, not nflverse
+pbp — game-level, so `homePoints`/`awayPoints` are the finals directly and `id`
+is the same ESPN-style key the projections carry. `completed` games only, so a
+scheduled game cannot enter as a 0-0 outcome.
+
+    ncaaf  truth_source=cfbd_games  projection_rows=1522  truth_games=888  joined_games=761
+
+That is **2.8x the NFL sample**. And it cannot be used.
+
+### THE LEAK, detected automatically and carried on every record
+
+    rating_source = cfbd_ppa_season_2025   ->  season-2025 games
+    generated_at  = 2026-07-16
+
+**Full-season 2025 PPA ratings, computed after the 2025 season ended, used to
+predict 2025 games.** A week-11 game is forecast using ratings that include that
+game and every game after it. Same shape as the soccer backtest leak the
+2026-08-14 audit found ("a season-to-date aggregate recomputed from a current
+table"), which `plan_2026-08-14_models.md` D1 marked NOT CITABLE. 761 of 761
+rows affected.
+
+| sport | market | n | skill | 95% CI | verdict |
+|---|---|---|---|---|---|
+| ncaaf | margin | 761 | +1.72% | [+0.20%, +3.24%] | **LEAKY — NOT CITABLE** |
+| ncaaf | total | 761 | −3.65% | [−6.94%, −0.36%] | **LEAKY — NOT CITABLE** |
+
+### THE POINT THAT MATTERS MOST — a leaked number is an UPPER BOUND
+
+A backtest that lets the model see its own outcomes should FLATTER it. NCAAF
+margin manages only **+1.72% even with the leak**, and total is **−3.65% even
+with the leak**. So the honest out-of-sample numbers are **at best** these, and
+realistically worse:
+
+- **NCAAF margin: true skill <= +1.72%** — i.e. plausibly zero or negative.
+- **NCAAF total: true skill <= −3.65%** — bad, and the leak is hiding how bad.
+
+This is more informative than "unmeasurable". A leaky cell still bounds the
+answer, and this one bounds it low.
+
+### THE CLEAN MEASUREMENT IS 12 DAYS AWAY, and the 2026 files already do it right
+
+The 2026 projections carry `rating_source=cfbd_ppa_season_2025_fallback_for_2026`
+— **prior-season ratings, which is point-in-time correct.** NCAAF opens
+**2026-08-29**. So from week 1 the census can score NCAAF honestly with no code
+change: 761 projections are already written and waiting for outcomes.
+
+**Do not "fix" the 2025 leak by regenerating those projections** — the fix is to
+score the 2026 season forward, not to re-derive history with a better rating
+source, which would just move the leak.
+
+### Census state after this change
+
+    cells scored 2   BEAT 1   lose 0   indistinguishable 1   LEAKY 2   unmeasured 1
+
+Still exactly **one** forecast in this platform with proven distributional skill:
+NFL margin, +3.20% [+1.10%, +5.31%].
