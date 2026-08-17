@@ -3946,3 +3946,44 @@ then log correlation is EXHAUSTED and no further study of it will help. Reach
 for something that does not require the code to volunteer a line:
 `faulthandler.dump_traceback(all_threads=True)` named the allocator in one
 excursion after six failed attributions.
+
+
+## 2026-08-17 — RULE: committing through an ISOLATED index ARMS the shared index with a revert of that commit. Disarm after, not just before
+
+**The recipe is still right; it has a second half nobody had written down.**
+Committing via `GIT_INDEX_FILE` protects a peer's staged work from being swept
+into your commit. But the shared index was populated from the OLD `HEAD`, so
+the moment your commit moves `HEAD`, every path you just committed is staged in
+the shared index **at its pre-commit content**. `git diff --cached` then reads
+as the exact inverse of what you shipped:
+
+    0    786   .syndicate/deploys.md          <- 786 deletions, seconds after
+    657  1288  .syndicate/lanes.md               committing 786 insertions
+
+A bare `git commit` by any of the other sessions would have reverted the whole
+sweep, with a clean worktree and nothing visibly wrong. This is the same
+mechanism recorded four times before, except **this time the session that armed
+it was the one that had just spent an hour disarming it** — I disarmed a
+1,110-line revert-in-waiting on `lanes.md` before committing, then created a
+seven-file one by committing.
+
+**How to apply.** After ANY isolated-index commit, path-scope-reset the same
+paths in the shared index and re-read it:
+
+```
+git reset -q -- <the exact paths you committed>
+git diff --cached --numstat          # must show only OTHER lanes' work
+```
+
+`git reset -- <path>` resets that path's index entry to `HEAD` and **touches no
+file**, so it cannot lose worktree content. Leave every path you did not commit
+alone — another lane's staged adds are theirs.
+
+**The generalisation, which is the part worth keeping:** the shared index is
+state shared between processes with no lock and no notification, and `HEAD`
+moving under it silently changes what it MEANS. It is never enough to check it
+before an operation; anything that moves `HEAD` invalidates the check. Read
+`git diff --cached --numstat` **after** you commit, not only before.
+
+**Related:** [stale shared index holds a revert], [never chain add and commit],
+[blob-stage against HEAD].
