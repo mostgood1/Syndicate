@@ -1121,7 +1121,7 @@ the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
 needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 — original re-take header follows —
-### live-game-line-projection — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`)
+### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 - Goal: make the ledger capable of producing a sample at all, and make its
   counters readable without streaming a 10 MB artifact. Success = one live slate
   where `live_gameline_ledger.written > 0` and the counters are reachable from
@@ -1129,9 +1129,13 @@ needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 - Files: `syndicate/features/shared/live_gameline_ledger.py`,
   `syndicate/features/shared/live_gameline_join.py`,
   `syndicate/blueprints/intelligence.py`, `tests/test_live_gameline_ledger.py`.
-  Checked against every OPEN lane's `- Files:` at re-take: no lane claims any of
-  them. `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py`
-  as an expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
+- Collision check at re-take: no OPEN lane claims any of the four above.
+  `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py` as an
+  expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
+  **Kept OUT of the `- Files:` block on purpose:** `_claims()` reads every nested
+  line under `- Files:` as a CLAIM, so a disclaimer written there becomes a
+  PHANTOM claim on a file this lane does not hold. `ask-sport-coverage` was bitten
+  by exactly this and it blocked another lane's one-line fix.
 - Deploy intent: **PREPARE ONLY.** The recorder runs on refresh-worker, and
   `refresh-worker-oom-recurrence` has an explicit hold on deploys to that service
   until its attribution is written. Request file, not a deploy.
@@ -2286,8 +2290,6 @@ and then failed the thing it was checking, which is the point of running it.
 - Full measurement in `deploys.md`; unrelated defect found while measuring
   Phase 2's premise is filed as `#441` (NFL week-1 projection unwritten 2.36 days,
   relaunching ~107x/day).
-
-### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 
 ### refresh-worker-oom-recurrence — OPEN — **MECHANISM SETTLED, ALLOCATOR STILL UNNAMED. `#435` did NOT regress (scope error: book_quotes READ vs container anon). The failure is a ~2GB TRANSIENT in the PARENT process (pid 39, children <54MB), decided by evictable page cache (inactive_file 26.3/42.2 at kills vs 164-240 surviving), climbing 51s with NO stage marker. THREE fixes shipped and exercised in live `d72d670c` — odds-shard duplicate `51ae7218`, ledger streaming `21f8a165`, 3-ledger-loads-to-1 `aa190d58` — and NONE has been shown to move the transient. deepcopy EXONERATED by measurement (0.54MB peak). Daytime windows are worthless as evidence; the live-slate band 22:00Z-05:00Z is scheduled via `scripts/oom_band_report.py` + two one-time tasks. OPEN pending that result** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
 - **HANDED IN 2026-08-16 ~19:55Z by `branch-overlap-baseline-watch` (scheduled
