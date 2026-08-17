@@ -823,52 +823,112 @@ def _reason(row):
     ) or ""
 
 
-def test_a_prop_projection_states_the_relationship_without_claiming_the_side():
-    """The served defect, and the OVER-CORRECTION that replaced it.
+def test_a_clear_gap_licenses_the_directional_claim_on_a_prop():
+    """1.396 against a 0.5 line is a 0.896 gap -- `P(>=1) ~ 75%`, so the sim
+    genuinely argues against an under, and saying so is correct.
 
-    Original: "projects 1.396 batter hits against a line of 0.5, which is why it
-    lands on the under" -- false causation. First fix: "which does NOT support
-    the under" -- the same category error pointing the other way, because
-    `projected` is a MEAN and what picks a side is P(X > line). On a low-line
-    count prop those diverge legitimately.
+    The ORIGINAL defect was claiming this projection was the REASON FOR the
+    under. Claiming it argues AGAINST the under is the opposite, and true.
     """
     text = _reason(MECKLER_ROW)
-    assert "which is why it lands on the under" not in text   # the original bug
-    assert "does NOT support" not in text                     # the over-correction
-    assert "above the 0.5 line" in text                       # the fact, plainly
+    assert "which is why it lands on the under" not in text
+    assert "which does NOT support the under" in text
     assert "1.396" in text
 
 
-def test_a_low_mean_prop_is_not_called_unsupported():
-    """mean 0.214 vs a 0.5 line still implies P(>=1) ~ 19%, which can beat the
-    market. Calling that "unsupported" is wrong."""
+def test_a_narrow_gap_claims_nothing_about_the_side():
+    """mean 0.214 vs a 0.5 line is a 0.286 gap -- inside the band where the
+    Poisson median can sit on the other side of the line from the mean."""
     row = dict(MECKLER_ROW, side="over",
                projection=dict(MECKLER_ROW["projection"], projected=0.214))
     text = _reason(row)
     assert "does NOT support" not in text
+    assert "which is why it lands" not in text
     assert "below the 0.5 line" in text
+    assert "too close to call" in text
 
 
-def test_an_agreeing_prop_also_drops_the_causal_claim():
-    """Consistency: the mean does not explain the side in EITHER direction."""
-    text = _reason(ISBEL_ROW)
-    assert "which is why it lands on the under" not in text
-    assert "below the 0.5 line" in text
+def test_the_soccer_shape_the_player_name_split_got_wrong():
+    """A 2.6 mean against a 2.5 goal line: `P(over) = 48.2%`, so the mean says
+    over and the probability says under. The previous rule classified this as a
+    GAME row (no `player_name`) and made the claim. It must not."""
+    soccer = {
+        "player_name": None, "market": "totals", "line": 2.5, "side": "over",
+        "sport": "soccer", "ev_pct": 3.0, "model_edge_pct": None,
+        "projection": {"projected": 2.6, "side": "over", "basis": "full/goals_dist",
+                       "model_prob_over": None, "market_fair_prob_over": None},
+        "quote": {"price": 105, "bookmaker": "betmgm", "books_quoting": 4,
+                  "quote_seen_age_seconds": 60.0},
+    }
+    text = _reason(soccer)
+    assert "which is why it lands on the over" not in text
+    assert "does NOT support" not in text
+    assert "too close to call" in text
+
+
+def test_a_wide_soccer_gap_still_gets_its_claim():
+    """3.1 against 2.5 is a 0.6 gap -- `P(over) = 59.9%`, mean and probability
+    agree, so the claim is licensed."""
+    soccer = {
+        "player_name": None, "market": "totals", "line": 2.5, "side": "over",
+        "sport": "soccer", "ev_pct": 3.0, "model_edge_pct": None,
+        "projection": {"projected": 3.1, "side": "over", "basis": "full/goals_dist",
+                       "model_prob_over": None, "market_fair_prob_over": None},
+        "quote": {"price": 105, "bookmaker": "betmgm", "books_quoting": 4,
+                  "quote_seen_age_seconds": 60.0},
+    }
+    assert "which is why it lands on the over" in _reason(soccer)
 
 
 def test_a_game_row_keeps_the_directional_claim():
-    """On totals/margins the mean IS the right statistic -- the comparison the
-    MLB game lens makes, and the reference this generator was modelled on."""
+    """Both served MLB rows, and both directions."""
     game = {
-        "player_name": None, "market": "totals", "line": 5.0, "side": "over",
+        "player_name": None, "market": "totals", "line": 8.0, "side": "over",
         "sport": "mlb", "ev_pct": 2.4, "model_edge_pct": None,
-        "projection": {"projected": 7.42, "side": "over", "basis": "full/total_runs_dist",
+        "projection": {"projected": 9.988, "side": "over", "basis": "full/total_runs_dist",
                        "model_prob_over": None, "market_fair_prob_over": None},
         "quote": {"price": -104, "bookmaker": "novig", "books_quoting": 5,
                   "quote_seen_age_seconds": 60.0},
     }
     assert "which is why it lands on the over" in _reason(game)
-    assert "which does NOT support the under" in _reason(dict(game, side="under"))
+    other = dict(game, line=7.5,
+                 projection=dict(game["projection"], projected=5.446))
+    assert "which does NOT support the over" in _reason(other)
+
+
+@pytest.mark.parametrize("projected,line,expect_claim", [
+    (2.60, 2.5, False),   # soccer band -- P(over) 48.2%
+    (2.55, 2.5, False),
+    (2.40, 2.5, False),   # 0.1 gap, still inside the margin
+    (3.10, 2.5, True),    # 0.6 gap
+    (8.00, 7.5, True),    # exactly 0.5 -- the boundary is inclusive
+    (7.20, 7.5, False),   # 0.3 gap
+    (9.988, 8.0, True),
+])
+def test_the_margin_is_what_decides(projected, line, expect_claim):
+    row = {
+        "player_name": None, "market": "totals", "line": line, "side": "over",
+        "sport": "mlb", "ev_pct": 2.0, "model_edge_pct": None,
+        "projection": {"projected": projected, "side": "over", "basis": "full/total_runs_dist",
+                       "model_prob_over": None, "market_fair_prob_over": None},
+        "quote": {"price": -110, "bookmaker": "novig", "books_quoting": 3,
+                  "quote_seen_age_seconds": 60.0},
+    }
+    text = _reason(row)
+    claimed = ("which is why it lands" in text) or ("does NOT support" in text)
+    assert claimed is expect_claim
+
+
+def test_a_projection_level_with_the_line_does_not_say_above_or_below():
+    row = {
+        "player_name": None, "market": "totals", "line": 7.5, "side": "over",
+        "sport": "mlb", "ev_pct": 2.0, "model_edge_pct": None,
+        "projection": {"projected": 7.5, "side": "over", "basis": "full/total_runs_dist",
+                       "model_prob_over": None, "market_fair_prob_over": None},
+        "quote": {"price": -110, "bookmaker": "novig", "books_quoting": 3,
+                  "quote_seen_age_seconds": 60.0},
+    }
+    assert "level with the 7.5 line" in _reason(row)
 
 
 def test_one_book_is_singular():

@@ -3289,13 +3289,90 @@ def _live_refresh_loop_sports() -> str | None:
 	return raw or None
 
 
+def _sweep_ownership_exclusion(sport: str) -> str | None:
+	"""Why THIS service must not sweep `sport`, or None to sweep it.
+
+	WHY THIS EXISTS (2026-08-17). `_live_refresh_loop_effective_sports` fell back
+	to "every season-active sport" whenever `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS`
+	was unset, which ignored BOTH `SYNDICATE_ACTIVE_SPORTS` and the per-sport
+	ownership flags. Measured over 30h:
+
+	    refresh-worker    swept mlb, nfl, soccer, wnba   (ACTIVE_SPORTS=nfl,
+	                                                      MLB_REFRESH_TICK_OWNER=false)
+	    live-odds-worker  swept NOTHING, for any sport   (ACTIVE_SPORTS=mlb,wnba,soccer,
+	                                                      MLB_REFRESH_TICK_OWNER=true)
+
+	Both services' behaviour was the exact inverse of their config. The
+	ownership flags were set correctly -- `#129` had already fought this race
+	once and written down that live-odds-worker is "the sole MLB odds-refresh
+	owner again, not just nominally excluded from a race with another owner" --
+	but the SWEEP path never consulted them, so refresh-worker swept everything,
+	won the shared unnamespaced pregame cadence marker, and starved the
+	designated owner permanently.
+
+	EXCLUSION IS ONLY EVER ON EXPLICIT CONFIG. A service with no opinion keeps
+	today's behaviour exactly:
+
+	  * `SYNDICATE_ACTIVE_SPORTS` filters only when it is SET and non-empty.
+	    Absent means "no opinion", not "nothing".
+	  * `mlb` defers to `_mlb_refresh_tick_owner_here()`, which already defaults
+	    TRUE when absent -- so only an explicit `false` excludes.
+
+	WEEKLY SPORTS ARE DELIBERATELY NOT GATED HERE, and this was a correction:
+	the first cut also applied `_weekly_sports_refresh_tick_owner_here()` and
+	broke `test_run_tick_claims_weekly_sports_on_game_days`. Weekly ownership is
+	DYNAMIC, not the static flag -- on a game day the fast tick CLAIMS
+	nfl/ncaaf/ncaab even with the flag false, because refresh-worker's
+	`_active_weekly_sports_for_date` drops them on the same predicate so exactly
+	one owner still writes. Re-applying the raw flag here double-gates that and
+	silently reintroduces the 24-hour NFL capture gap measured 2026-08-07.
+	The existing test caught it; leaving weekly sports alone is the fix.
+
+	This deliberately does NOT namespace the cadence marker. That would treat
+	the symptom and leave an ungated sweep running on the wrong service; the
+	ownership flags are the intended mutex and they are already correct.
+	"""
+	normalized = str(sport or "").strip().lower()
+	if not normalized:
+		return None
+	raw_active = str(os.environ.get("SYNDICATE_ACTIVE_SPORTS") or "").strip()
+	if raw_active:
+		active = {piece.strip().lower() for piece in raw_active.split(",") if piece.strip()}
+		if active and normalized not in active:
+			return "not_in_SYNDICATE_ACTIVE_SPORTS"
+	if normalized == "mlb" and not _mlb_refresh_tick_owner_here():
+		return "SYNDICATE_MLB_REFRESH_TICK_OWNER=false"
+	return None
+
+
 def _live_refresh_loop_effective_sports(selected_date: str) -> list[str]:
 	# Mirrors launch_refresh_run's own sports resolution (configured override,
 	# else season-active-for-date) so the WNBA-exclusion split below sees
 	# exactly the same sport set the unscoped call would have covered.
 	configured = _live_refresh_loop_sports()
 	resolved = configured if configured else _active_sports_for_date(selected_date)
-	return [piece.strip().lower() for piece in resolved.split(",") if piece.strip()]
+	candidates = [piece.strip().lower() for piece in resolved.split(",") if piece.strip()]
+
+	kept: list[str] = []
+	dropped: list[str] = []
+	for sport in candidates:
+		reason = _sweep_ownership_exclusion(sport)
+		if reason is None:
+			kept.append(sport)
+		else:
+			dropped.append(f"{sport}:{reason}")
+	if dropped:
+		# NEVER DROP A SPORT SILENTLY. The failure this fixes was invisible for
+		# weeks precisely because a sport that is skipped emits nothing, so the
+		# only readable symptom was a sweep happening on the wrong service. An
+		# empty `kept` is a legitimate answer (a service whose owned sports are
+		# all out of season) and is allowed -- but it is never silent.
+		print(
+			f"[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date={selected_date} "
+			f"kept={','.join(kept) or '<none>'} dropped={' '.join(dropped)}",
+			flush=True,
+		)
+	return kept
 
 
 def _live_refresh_loop_sports_excluding_wnba(selected_date: str) -> str | None:

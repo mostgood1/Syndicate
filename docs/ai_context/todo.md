@@ -33059,3 +33059,303 @@ Instrument note for whoever checks: read these lines with
 `--width 200000`. I truncated one at 125 chars and read `interval_s=8640`
 instead of `86400` — a 10x error that would have predicted the relaunch 18 hours
 early.
+
+### `#448` — **AN UNATTENDED SCHEDULED TASK CAN TAKE THE DEPLOY CLAIM ON EVERY SERVICE AND THEN END** — FOUND 2026-08-16, NOT STARTED, no owner
+
+Not a hypothetical. Measured tonight, and it blocked a ready, tested deploy.
+
+**WHAT HAPPENED, 2026-08-16:**
+
+- 22:39:29Z — lane `grading-blocker-settled-zero` acquired the deploy claim on
+  **BOTH** `refresh-worker` and `live-odds-worker` ("freeze fix `426bbd70`").
+- 22:46:40Z — its owning session, **`Alt line shortlist watch`**, went quiet.
+  That session is an **unattended scheduled-task run**.
+- Result: the claim sat held on two services by a session that had ended.
+
+**Why this is worse than a person holding a claim too long:**
+
+1. **You cannot ask for it back.** `send_message` refuses: *"Session is
+   unattended (a scheduled-task run or dispatched session); messages can't be
+   delivered there."* There is no negotiation path at all.
+2. **Finding the owner is not obvious.** The claim names a LANE
+   (`grading-blocker-settled-zero`), not a session. Resolving it took a
+   transcript search — and the first session the search returned was **archived**,
+   which looks identical to "dead" and sent me down a wrong path. See
+   `feedback_session_roster_hides_archived`.
+3. **It claims services it may not need.** This run held BOTH workers; I needed
+   exactly one.
+4. **`--force` is not universally available.** The permission classifier here
+   blocks `deploy_claim.py acquire --force` outright (twice, this session), so
+   "just force it" is not the escape hatch the tool's own message suggests.
+
+**WHAT IS NOT BROKEN — do not over-fix this.** The claim is NOT a permanent
+wedge. `deploy_claim.py` carries a **45-minute default TTL**, preflight reports an
+aged claim as `EXPIRED (does not block)` rather than honouring it, and `acquire`
+takes over an expired claim **without** `--force` (`if not expired and not
+args.force`). So this self-heals at `acquired_at + 45min` — here ~23:24Z. The
+defect is the **45-minute blind window**, not a deadlock.
+
+**Why the window still matters:** it is 45 minutes in which no other lane can
+deploy, including an incident response, held by nobody, releasable by nobody, and
+with the usual escape hatch unavailable. It is also silent — nothing announces
+that the holder has exited.
+
+**Candidate fixes, in rough order of cost:**
+- A shorter TTL when the acquirer is an unattended run (it knows: the same
+  runtime that refuses message delivery could stamp `unattended: true`).
+- Release-on-exit for scheduled tasks — the strongest fix, and the one that
+  removes the class rather than shrinking it.
+- Claim only the service being deployed. Two claims for a one-service deploy is
+  the multiplier here.
+- Record the SESSION id alongside the lane in the claim, so the owner is
+  resolvable without a transcript search.
+- Have `deploy_claim.py status` show time-to-expiry, so a blocked lane can see
+  "clears in 26 min" instead of inferring the TTL by reading the source.
+
+**Prior art:** `live-odds-worker EXPIRED (does not block) by snapshot-freshness
+69.4 min` was observed earlier the same evening — the same shape, already
+self-healed, and nobody wrote it down.
+
+### `#454` — **PLAY-BY-PLAY IS THE OFFLINE MODELING SUBSTRATE WE ALREADY HAVE AND DO NOT USE — AND IT IS 5 SPORTS, NOT 8** — FOUND 2026-08-17, NOT STARTED, no owner
+
+**The premise that prompted this was "we have pbp files for every sport". We do
+not.** Census run 2026-08-17 against the checkout:
+
+| sport | pbp | form | files |
+|---|---|---|---|
+| NFL | YES | nflverse CSV — **372 columns, already carrying `epa`, `wp`, `wpa`** | 4 season files (2025 = 46,452 REG plays, 97 MB) |
+| MLB | YES | statsapi `feed_live` JSON | 618 + 105 |
+| NCAAF | YES | CFBD `plays_<season>_wk##.json.gz` | 51, seasons 2023+ |
+| WNBA | YES | `live_pbp_stats_<date>.jsonl` | 53 |
+| NBA | YES | same | 11 |
+| **soccer** | **NO** | — | 0 |
+| **NHL** | **NO** | — | 0 |
+| **NCAAB** | **NO** | — | 0 |
+
+**A directory-name trap worth recording:** `vendor/wnba_betting_repo/models/pbp/`
+holds `.joblib`/`.onnx` files (`early_threes_gbr`, `first_basket_lr`,
+`tip_winner_lr`) — **models trained FROM pbp, not pbp data.** A scan by path
+would count it as coverage.
+
+**Note which three are missing: NHL, NCAAB and soccer** — the same three modules
+that are weakest elsewhere (NCAAB has no sim engine at all; soccer's model loses
+to the market). Any pbp-powered design is 5 of 8 and must degrade honestly
+rather than silently cover a subset.
+
+### Why this matters, stated as a job separation rather than a wish
+
+**pbp is NOT a substitute for `game_shape` and must not be merged into it.**
+- `game_shape` (`shared/game_shape.py`, lane `game-shape-capture`) is the
+  conditioning variable available **at prediction time** — thin, live, in-game.
+- **pbp is the OFFLINE substrate**: what you fit tables and priors from.
+Conflating them is how leakage gets in. Keep the seam.
+
+**It unblocks two refusals that are ALREADY IN THE CODE, by name:**
+1. **MLB leverage index.** `game_shape.py` refuses to emit one because a real
+   leverage index needs a fitted win-expectancy table this repo does not have.
+   `feed_live` is exactly where that table comes from — run expectancy by
+   base-out state is a direct aggregation over those 618 files.
+2. **Football down/distance value.** NFL pbp **already ships `epa`, `wp` and
+   `wpa` as columns.** Nothing needs fitting; nflverse computed them.
+
+**It also closes the basketball possession gap.** `game_shape` refuses to
+publish possession pace because the live CARD artifact carries no box stats —
+but `live_pbp_stats` has the events to derive possessions
+(FGA − OREB + TOV + 0.44·FTA). That would be a NEW field, never a redefinition
+of `points_per_minute`.
+
+**And it attacks the sample-starvation problem directly.** The learning loop's
+binding constraint is thin samples (settlement autorun off; every `game_shape`
+bucket is currently n=0). pbp yields thousands of state transitions per game, so
+a live win-probability path can be scored at **every play** rather than once per
+game.
+
+### Two constraints that must be designed in, not discovered
+
+- **POINT-IN-TIME SAFETY.** This repo has already shipped a leaking backtest —
+  soccer ratings computed from the full season and applied to matches inside it.
+  Any pbp-derived feature needs an explicit as-of filter, and the backtest must
+  state the number of dates it actually rests on.
+- **OFFLINE ONLY.** NFL pbp alone is 97 MB/season at 372 columns and MLB is 618
+  JSON files, against a 4 GB worker with an active OOM lane
+  (`refresh-worker-oom-recurrence`). This is a batch job. It must never run in a
+  request path or inside a worker tick — `#241` caused a production restart loop
+  for far less.
+
+**First step for whoever takes it, and it is cheap:** build the MLB base-out run
+expectancy table from `feed_live` offline and compare it to the published
+reference values. If it reproduces them, the pipeline is trustworthy and the
+leverage index becomes available; if it does not, the join is wrong and that is
+worth knowing before anything is built on it.
+
+**Related:** lane `game-shape-capture`;
+`.syndicate/plan_2026-08-16_state_conditional_learning.md` (Phase 3b);
+`#441` (which is why NFL pbp exists at all).
+
+### `#449` — **refresh-worker IS IN AN OOM CRASH LOOP AND HAS BEEN FOR ~8 HOURS** — FOUND 2026-08-17 00:2xZ, NOT STARTED, no owner
+
+Found incidentally while deploying something unrelated. **Nobody was watching for
+this**, and it does not announce itself: the service restarts and keeps serving,
+so every spot-check looks healthy.
+
+**MEASURED from the Render events API (`render_events.py --failures-only`):**
+
+    23 oomKilled events since 2026-08-16T12:00:00Z, first at 16:34:32Z.
+    Recent cadence has TIGHTENED to ~11-15 minutes:
+      22:41:52  23:03:50  23:16:51  23:32:18
+      23:43:11  23:56:00  00:08:54  00:19:48
+
+`memoryLimit=4Gi` on every one. Each is followed within ~1s by
+`server_available` -- so the loop is invisible in "is it up" terms.
+
+**IT IS A SPIKE, NOT A LEAK.** Post-restart samples sit at ~510 MB of 4096
+(`container_memory_headroom_mb` ~3250). Whatever consumes the other 3.5 GB does
+so fast enough to be missed between `ALL_PROCESS_MEMORY` samples -- which is
+exactly the failure mode `#435` was filed for ("sample memory on a CLOCK, because
+the kills happen between stage samples").
+
+**WHY THIS MATTERS BEYOND THE RESTARTS:** every kill takes whatever job was
+running with it. This service runs the MLB daily sim, `daily_update --workflow
+ui-daily`, and the season/preseason projections. A ~12-minute kill cycle means
+any job longer than ~12 minutes may NEVER complete. That is a candidate
+explanation for unrelated symptoms elsewhere, and it should be checked before
+those are diagnosed on their own terms.
+
+**NOT CAUSED BY TONIGHT'S CONVERGENCE DEPLOY.** The loop starts at 16:34Z; the
+deploy was triggered at 00:18:07Z, and the 00:19:48 kill sits exactly on the
+pre-existing ~11-minute cadence. Stated explicitly because the temporal
+coincidence is otherwise inviting.
+
+**Prior art, and why this is still unowned:** lane `refresh-worker-oom-recurrence`
+is OPEN and marked **"ATTRIBUTED, NO DEPLOY MADE"** -- an attribution was reached
+and nothing shipped. `#435` (clock-based memory sampling) and `#423` (malloc_info
+/ tracemalloc wiring) are the instrumentation for exactly this. Whether they are
+live on this service is UNVERIFIED by me.
+
+**FIRST STEPS for whoever takes it, in order:**
+1. Confirm the cadence is still running (`render_events.py --service
+   refresh-worker --failures-only`). A null here means fixed, not absent -- kills
+   are EVENTS, never log lines.
+2. Correlate kill times against `run_mlb_daily_sim_job` starts. The ~12-minute
+   period is suspiciously close to the sim's cycle.
+3. Only then read memory samples. `ALL_PROCESS_MEMORY` will look healthy; that is
+   the trap, not the answer.
+
+### `#455` — **WNBA `/api/live_pbp_stats` SERVES A FROZEN ALL-NULL SKELETON FOR GAMES THAT ARE LIVE AND FINAL, AND IT READS AS `ok: True`** — FOUND 2026-08-16, NOT STARTED, no owner
+
+**Reported by the user from the board, then reproduced against production.** On
+2026-08-16 with three WNBA games — **two final and one live** — the endpoint
+returned three records with `pbp_quarters` all null, no possessions, no
+attempts, and `ok: True`.
+
+    python scripts/capture_wnba_pbp.py --date 2026-08-16 --probe
+    [1] generated_at=2026-08-16T16:14:21-05:00 games=3 with_signal=0 skeleton=3 written=0
+
+**The `generated_at` is the tell: 16:14 CDT, re-read unchanged at ~19:2x CDT
+with `ttl=1`. The payload is FROZEN ~3 hours.**
+
+### Mechanism — read `syndicate/features/wnba/cards.py:6390-6425`
+
+`build_live_pbp_stats_payload` **never computes pbp.** It:
+1. reads a stored snapshot via `_filtered_local_live_snapshot_payload`;
+2. **returns it whenever its `games` list is non-empty** (`:6401`);
+3. otherwise emits a **hardcoded all-null skeleton**, one entry per requested
+   event id, and persists it via
+   `_maybe_persist_current_day_live_snapshot_artifact` (`:6403`).
+
+The real computation — `_live_pbp_possession_stats`, `poss_est = FGA + TOV +
+0.44*FTA - OREB` — lives in `vendor/wnba_betting_repo/app.py:3572`, **not in
+Syndicate**.
+
+**THE STICKINESS IS THE BUG, not the skeleton itself.** A skeleton has a
+NON-EMPTY `games` list, so once one is persisted (e.g. pregame, when the slate
+has event ids but no plays) step 2 serves it in preference to anything else for
+the rest of the day. Nothing re-checks whether the games have since started.
+
+**Consistent with the corpus:** of 120 game records in the tracked mirror,
+**103 carry no possession data**. That population looks like stored skeletons,
+not like games with no plays.
+
+### Why this is worse than a plain outage
+
+`ok: True` with a complete, well-formed structure reads as an ANSWER. Every
+consumer sees "the pbp says nothing happened" rather than "there is no pbp
+here". This is the instrument-blindness shape the ledger already records
+several times: a healthy-looking empty reading.
+
+### What is NOT established
+
+- **Whether the vendor computation is reachable from Syndicate at all**, or
+  whether pbp only ever populated when the source app wrote the snapshot. This
+  decides whether the fix is a wiring job or a build.
+- Whether NBA (`syndicate/blueprints/nba.py:797`, same endpoint shape via
+  `read_latest_live_pbp_stats_payload`) has the same defect. **Check it — the
+  two modules mirror each other.**
+
+### First steps
+
+1. Confirm the stickiness directly: find whether a `live_pbp_stats_2026-08-16`
+   snapshot exists on the worker disk and what time it was written.
+2. Make the skeleton **refuse to persist itself** — an all-null record should
+   never be stored, and should never satisfy the `games`-non-empty test at
+   `:6401`. `scripts/capture_wnba_pbp.py:has_pbp_signal` already implements the
+   predicate that distinguishes them.
+3. Only then is a WNBA pbp corpus possible; see `#454`.
+
+**Related:** `#454` (pbp as modelling substrate — this is why WNBA has no
+corpus), lane `game-shape-capture`.
+
+### `#456` — **NBA `/api/live_pbp_stats` SERVES A SNAPSHOT FROM A DIFFERENT DAY, UNDER THE REQUESTED DAY'S LABEL** — FOUND 2026-08-16, **FIX BUILT + TESTED, NOT DEPLOYED**
+
+Found while checking whether NBA shared `#455` (WNBA's sticky skeleton). **It does not** — NBA never persists, so that mechanism cannot occur. It has a different defect.
+
+**MEASURED IN PRODUCTION 2026-08-16:**
+
+    /nba/api/live_pbp_stats?date=2026-08-16 -> payload date 2026-06-13
+    /nba/api/live_pbp_stats?date=2026-03-01 -> payload date 2026-06-13
+    /nba/api/live_pbp_stats?date=2025-12-25 -> payload date 2026-06-13
+
+Every request returned the same **two-month-stale** snapshot, labelled with a date nobody asked for.
+
+**Mechanism** (`syndicate/features/nba/live_lens.py`):
+- `_load_live_lens_snapshot()` reads `live_lens_snapshot_path()` — **one undated path**, so it returns whatever was written last.
+- `allow_stored_date_fallback` was **discarded outright** (`_ = allow_stored_date_fallback`).
+- `_filter_games_payload` with no event ids — **the endpoint's default** — returns ALL games from that snapshot (`:476-478`).
+
+So `selected_date` only ever shaped the EMPTY payload; it never constrained what was served.
+
+**WHY IT LOOKS HARMLESS AND IS NOT.** `games=0` today because the offseason snapshot has none — so the DATE leak is demonstrated and the GAME leak is not. The code path guarantees the game leak whenever the snapshot has games: in season, one day's games are served under another day's label. **Checking this in August is exactly the "absence in a window is not absence" trap**; do not read today's clean result as health.
+
+**FIX BUILT, NOT DEPLOYED.** `_snapshot_date_matches()` compares the snapshot's own `date` to the request. On mismatch with `allow_stored_date_fallback=False` — **the branch the live endpoint takes**, since `nba.py:_allow_stored_date_fallback()` returns `False` — it returns the empty payload with `empty_reason="snapshot_date_mismatch"` and the `snapshot_date`, so the emptiness is diagnosable rather than silent. With the flag `True` the payload is still served but marked `stored_date_fallback`. An absent date on either side is NOT a mismatch — there is nothing to compare, and refusing there would empty the endpoint for every dateless caller.
+
+**9 tests, 5 of 5 mutations caught** (refusal removed, fallback flag ignored, absent date treated as mismatch, prefix instead of exact comparison, refusal leaking the payload anyway).
+
+**NOT DEPLOYED and no deploy requested.** Whether the same undated-snapshot pattern affects NBA's sibling readers (`build_live_player_lens_payload`, `build_live_lines_payload` — both call `_load_live_lens_snapshot()` the same way and both discard `allow_stored_date_fallback`) is **UNCHECKED**. Likely the same shape; that is a lead, not a finding.
+
+**Related:** `#455` (WNBA, a DIFFERENT defect — do not merge them), `#454`.
+
+#### `#449` OWNERSHIP 2026-08-17 01:0xZ — **NOT MINE. Owned by session `Worker memory watchdog logs`. Fold in or close as a duplicate.**
+
+I filed `#449` after finding the OOM loop incidentally during a deploy, without
+knowing the work was already underway. It was already owned:
+
+- **`Worker memory watchdog logs`** (`local_462ec2a8`) — active, owns the OOM work.
+- **`Layer 1 board coverage audit (fork 6)`** reports *"29/29 known `oomKilled`
+  reproduced for 2026-08-14 CT, and the unpaged control returns 20/29"* — i.e. a
+  reproducer AND a pagination fix. **My raw counts may therefore be LOW**, since
+  they come from unpaged `render_events.py --failures-only`.
+- **`Sports pregame/live model learning plan`** has the cross-service control:
+  *"live-odds-worker fails at a comparable count and not one is a kill"*.
+
+**The one datum I contributed that may be additive — handed over:** the loop
+**survived a full service replacement**. I deployed two complete convergence
+merges to refresh-worker (`7c2b1a17` 00:24:01Z, `7623a233` 00:53:29Z, 650+
+commits of other lanes' code reaching the service for the first time) and the
+cadence did not break across either — 00:19:48, 00:32:32 (+12m44s), 00:49:05
+(+16m33s). So the driver is **not** a stale-process or code-state condition that
+a restart clears, and it is insensitive to a large code change. That is evidence
+against any hypothesis a redeploy would reset.
+
+**Do not let this ticket read as unowned.** If `Worker memory watchdog logs` has
+a ticket already, close `#449` as a duplicate and keep theirs — an id is cheap,
+a split investigation is not.
