@@ -3647,3 +3647,47 @@ touch that.
   itself the finding.
 - **Unobservable until a multi-game WNBA date** either way: 2026-08-17 has one
   fixture and production returns exactly one, which is correct.
+
+### wnba-live-tier — **DEFECT 1 ATTRIBUTED 2026-08-17 15:1xZ. The worker's own artifact holds ONE of three fixtures. Nothing was dropping games — there was only ever one.**
+- **MEASURED on the worker via `/api/ops/artifacts/export`:**
+  ```
+  wnba_source/data/processed/game_cards_2026-08-16.csv   1 row
+      game_id='1'  POR@PHX  pred_margin=11.52
+  wnba_source/data/processed/cards_props_snapshot_2026-08-16.json   1 game
+      POR@PHX (id=1)
+  ```
+  `IND@ATL` and `CHI@SEA` are **absent from the worker's `game_cards` for that
+  date.** One chip appeared because one fixture existed.
+- **`game_id='1'` IS A SEQUENTIAL INDEX, NOT AN ESPN EVENT ID.** That is why the
+  survivor carried a synthesized `POR@PHX` key while the two the LENS knew about
+  carried numeric ids (`401857148`, `401857150`) — **they came from a different
+  source and never reached this artifact.**
+- **THE FULL CHAIN IS NOW ATTRIBUTED, and three layers are exonerated:**
+  | layer | verdict |
+  |---|---|
+  | chip builder | EXONERATED — one chip per provider game, no dedup (`:460-462`) |
+  | `is_active_today` | EXONERATED BY MEASUREMENT — `games(True)==games(False)` |
+  | provider code | EXONERATED — returns whatever the artifact holds |
+  | **`game_cards_<date>.csv` on the worker** | **THE DEFECT — 1 of 3 fixtures** |
+- **THIS RE-ATTRIBUTES A SYMPTOM I GOT WRONG.** The **207 unjoined grid rows** are
+  NOT a join failure. Two thirds of the slate has no `game_cards` row, so those
+  rows have nothing to join against. **The artifact is short; the matcher is
+  fine.** My earlier note calling it a join-coverage gap is superseded.
+- **IT ALSO MERGES WITH THE WNBA DISTRIBUTION GAP.** That same CSV is the WNBA
+  sim's output surface — the one carrying `pred_margin`/`pred_total` as MEANS
+  (outstanding item #3). **The missing-fixtures defect and the means-only defect
+  live in the same file**, so whoever fixes the writer should fix both at once.
+- **TWO HONEST LIMITS ON THIS FINDING:**
+  1. I compared the worker against a git copy that **does not exist**
+     (`HEAD:data/wnba_source/data/processed/game_cards_2026-08-16.csv` is
+     ABSENT). So the local "3 games" came from the provider reading some OTHER
+     source, and **I have not identified which.** The worker/local asymmetry is
+     therefore real but only half explained.
+  2. **WHY the builder wrote one row is NOT established.** Two candidates,
+     unmeasured: the props-driven build only emits games with prop coverage, or
+     the writer overwrites per game instead of appending.
+- **Next action:** find the writer of `game_cards_<date>.csv` and read what it
+  iterates. If it walks the props pool rather than the schedule, that is both
+  defects at once — and the WNBA schedule artifact
+  (`vendor/wnba_betting_repo/data/processed/schedule_2026.*`, which IS
+  git-tracked) is the correct denominator to walk instead.

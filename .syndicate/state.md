@@ -3018,3 +3018,23 @@ branch is `main`, and its live SHA was nonetheless NOT an ancestor of `main`.
 Previously-deployed commits fall out of `main`'s history when sessions rewrite
 it. **Never infer the deploy base from the branch setting — read the live SHA
 from the service.**
+
+## WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`)
+
+- **The worker's WNBA `game_cards_<date>.csv` holds ONE fixture on a three-game
+  slate.** Measured 2026-08-17 via `/api/ops/artifacts/export`:
+  `game_cards_2026-08-16.csv` = 1 row (`game_id='1'`, POR@PHX);
+  `cards_props_snapshot_2026-08-16.json` = 1 game. `IND@ATL` and `CHI@SEA` are
+  absent. **`game_id` is a SEQUENTIAL INDEX, not an ESPN event id** — the two
+  missing games carry numeric ESPN ids and come from a different source.
+- **Chip builder, `is_active_today` and provider code are all EXONERATED by
+  measurement.** The defect is the artifact, not any consumer of it.
+- **The 207 unjoined WNBA grid rows are NOT a join failure** — two thirds of the
+  slate has no `game_cards` row to join against. Supersedes the earlier reading.
+- **This is the SAME FILE as the WNBA means-only distribution gap** (outstanding
+  #3): `pred_margin`/`pred_total` are written there as means. One writer owns
+  both defects.
+- **A completed overtime game was published as in progress** until `cc0f7605`
+  (live-odds-worker, 14:43:08Z): `_normalized_game_status` had no precedence
+  between its live and terminal text checks, and `"Final/OT"` trips both.
+  **Deployed, verified by content, behavioural test PENDING a finished OT game.**
