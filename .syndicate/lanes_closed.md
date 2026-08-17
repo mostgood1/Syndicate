@@ -11571,3 +11571,24 @@ sessions deploying, a two-file change should ride along, not chase.
   (b) production `view=live` shows non-zero live_aware + edge on totals/spreads;
   (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
 - Blocked by: none.
+
+### live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30Z, 9 live_aware rows, perfect separation: the key is set IFF the edge is priceable). Deploy row closed in `deploys.md`. Both file claims released; `live_gameline_join.py` returned to `wnba-live-tier`, which held it first.**
+- Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
+  refers to. **Testable outcome:** on a live-joined game row,
+  `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live
+  projection. No existing field changes value.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_gameline_join.py`
+  - `tests/test_live_gameline_edge_basis.py`
+- **TAKEN BY USER OVERRIDE from `wnba-live-tier`, whose session was LIVE.** See
+  the note under that lane. It keeps every other path it held.
+- Deploy intent: **NONE TAKEN.** This code runs in the artifact build on
+  refresh-worker, and at open time (a) `refresh-worker-oom-recurrence` has a
+  documented deploy hold on that service and (b) the deploy claim was HELD by
+  `sim-scheduling` mid-ship. Committed and landed on `main`, **UNDEPLOYED** and
+  recorded as such in `deploys.md`. Whoever next deploys refresh-worker carries
+  it.
+- Verification once deployed: `edge_basis` present on `full/*` live rows of
+  `/api/board/layer2-shortlist`, and `_board_row_probabilities` can then publish
+  a model/market pair on those rows instead of refusing.
+- Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.

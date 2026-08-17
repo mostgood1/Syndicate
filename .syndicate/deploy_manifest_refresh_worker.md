@@ -57,6 +57,25 @@ this is a courtesy, not a block. Tell them.
 
 ## Queued
 
+**EMPTY as of 2026-08-17 17:0xZ — all three entries SHIPPED.** Deployed together
+as `b20072cd` (`dep-da1jkhm417fc73akijag`, live 16:50:48Z), cut from the then-live
+`8e3d2f95`:
+
+| file | commits | outcome |
+|---|---|---|
+| `live_gameline_join.py` | `28b03fef` | **MEASURED** — `edge_basis` observed on served rows, 17:44:30Z. Row closed in `deploys.md`. |
+| `wnba/cards.py` | `ea9a2be8`, `a3cecedd` | shipped. **Verification owed by its owner** — I did not assess it. |
+| `game_shape.py` | `28cc8814` | shipped. **Verification owed by its owner** — I did not assess it. Brought a 5,416-line generated `mlb_leverage_table.py`, function-locally imported, measured at 1.14 MiB resident / 30.9 MiB transient import peak before firing. |
+
+**Two of the three carry unmeasured verification obligations that are not mine.**
+Shipping is not verifying; their lanes should confirm behaviour on a live slate.
+
+**Next deployer: re-derive from scratch.** Do not treat the table above as the
+queue — it is history now. Run the content diff at the top of this file against
+the then-current live SHA.
+
+## Previously queued (shipped, kept for the recipe)
+
 Determined **by content** (`git diff --name-only <LIVE_SHA> origin/main`, filtered
 to worker-run paths), not by reading commit subjects: of 10 commits touching
 worker code since the live SHA, **7 are already present** in `8e3d2f95` as

@@ -1305,20 +1305,18 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
-- **BOARD FINDING 3 IS FIXED IN CODE, ON `main`, AND QUEUED — NOT DEPLOYED
-  (`28b03fef`).** `live_gameline_join._apply_verdict` sets
-  `projection["edge_basis"] = "live" | "pregame"`, so a consumer can tell which
-  probability `edge_vs_market_pct` was computed against — the live one, while
-  `model_prob_over` beside it stays pregame (7/7 separation on `live_aware`;
-  stated `-39.93` = `(0.1917 - 0.591) x 100` vs `+27.46` pregame). **Additive:
-  no existing value moves.** It supplies what `layer2_board` asked for beside
-  `_MODEL_EDGE_MAX_POINTS = 15.0`, and that bound is NOT relaxed.
-  **A RENAME TO `live_edge_vs_market_pct` IS FORBIDDEN** —
-  `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a
-  rename prices LIVE rows off a PREGAME edge. Pinned by test.
-  **QUEUED in `.syndicate/deploy_manifest_refresh_worker.md`** rather than
-  shipped: an MLB sim was 11 min in and would have died for a key nothing
-  reads yet. **`edge_basis` has never been observed on a served row.**
+- **BOARD FINDING 3 IS FIXED, DEPLOYED AND MEASURED.** `edge_basis` is live on
+  refresh-worker `b20072cd` and OBSERVED ON SERVED ROWS (build 17:44:30Z, 9
+  `live_aware` rows): **the key is set IFF the edge is priceable** — 5 rows with a
+  real `edge_vs_market_pct` carry it (`live` on spreads/totals, `pregame` on h2h),
+  4 withheld rows carry `edge_unavailable_reason` instead. So a consumer can now
+  tell which probability `edge_vs_market_pct` was computed against.
+  **A RENAME TO `live_edge_vs_market_pct` REMAINS FORBIDDEN** —
+  `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a rename
+  prices LIVE rows off a PREGAME edge. Pinned by test.
+  **The correct assertion for any future check is "every PRICEABLE `live_aware`
+  row carries `edge_basis`"** — a watcher asserting it of EVERY `live_aware` row
+  reported a false FAIL on the withheld rows and contradicted the repo's own test.
 - **STANDING DECISION, 2026-08-17, FROM THE OWNER: KEEP THE GATE WAIVERS.**
   The three tolerated findings were put to the owner explicitly, together with
   the fact that the gate went FAIL -> PASS by waiving and not fixing, and the

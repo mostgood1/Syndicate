@@ -1889,28 +1889,8 @@ and then failed the thing it was checking, which is the point of running it.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
 
-### live-edge-basis — OPEN — **CODE ON `main` (`28b03fef`), QUEUED NOT DEPLOYED. Held for a consolidated refresh-worker deploy per owner instruction — an MLB sim was 11 min in and would have died for a key nothing reads yet. Queue: `.syndicate/deploy_manifest_refresh_worker.md`. `edge_basis` NEVER OBSERVED ON A SERVED ROW; verification owed in `deploys.md`.** — opened 2026-08-17 — session: ask-answer-substance
-- Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
-  refers to. **Testable outcome:** on a live-joined game row,
-  `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live
-  projection. No existing field changes value.
-- Files (exclusive to this lane):
-  - `syndicate/features/shared/live_gameline_join.py`
-  - `tests/test_live_gameline_edge_basis.py`
-- **TAKEN BY USER OVERRIDE from `wnba-live-tier`, whose session was LIVE.** See
-  the note under that lane. It keeps every other path it held.
-- Deploy intent: **NONE TAKEN.** This code runs in the artifact build on
-  refresh-worker, and at open time (a) `refresh-worker-oom-recurrence` has a
-  documented deploy hold on that service and (b) the deploy claim was HELD by
-  `sim-scheduling` mid-ship. Committed and landed on `main`, **UNDEPLOYED** and
-  recorded as such in `deploys.md`. Whoever next deploys refresh-worker carries
-  it.
-- Verification once deployed: `edge_basis` present on `full/*` live rows of
-  `/api/board/layer2-shortlist`, and `_board_row_probabilities` can then publish
-  a model/market pair on those rows instead of refusing.
-- Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.
-
 ### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+> **`live_gameline_join.py` RETURNED 2026-08-17 by `live-edge-basis`, which borrowed it under a user override and has now CLOSED.** The `edge_basis` change is shipped and measured on refresh-worker `b20072cd`. Nothing is left in flight on that file; it is yours again exactly as before.
 > **`syndicate/features/shared/live_gameline_join.py` TAKEN FROM THIS LANE
 > 2026-08-17 01:1xZ, BY EXPLICIT USER OVERRIDE, while this lane's session was
 > LIVE.** Not a silent cross-lane edit -- the claim moved in the ledger and this
@@ -1932,7 +1912,8 @@ and then failed the thing it was checking, which is the point of running it.
 
 - Goal: WNBA live games carry a live tier on the Layer 1 board, GAME LINES and
   PROPS. Baseline was **0 of 521 rows** across 2 live games.
-- Files: `syndicate/features/shared/board_enrichment.py`,
+- Files: `syndicate/features/shared/live_gameline_join.py`,
+  `syndicate/features/shared/board_enrichment.py`,
   `tests/test_wnba_live_tier.py`,
   `tests/test_wnba_scoreboard_carry_forward.py`.
   - **NOT claimed by this lane any more:** `syndicate/features/wnba/cards.py` is
@@ -2097,6 +2078,7 @@ Inventing one is how two numbers that should agree start disagreeing.
   scheduled tasks wedging deploy claims.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
+- `live-edge-basis` — live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30 → `lanes_closed.md`.
 - `nfl-pbp-root-resolution` — nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root caus → `lanes_closed.md`.
 - `render-events-reader` — render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this → `lanes_closed.md`.
 - `ui-probe-settle-plateau` — ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — → `lanes_closed.md`.
