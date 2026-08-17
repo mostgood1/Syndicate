@@ -3965,3 +3965,40 @@ Recorded so it can be judged rather than trusted.
   the slate; that is cadence, owned by `odds-cadence-off-the-mlb-peak`, and I am
   NOT taking it.
 - Trivially revertable: one guard, one helper.
+
+#### convergence-phase7-crps — CADENCE LEVER TAKEN 2026-08-17 — **it is a DARK FLAG, not code, and the flip is a PRODUCTION CONFIG CHANGE**
+
+Taken on explicit user instruction ("now take the cadence lever too").
+
+- **Claim:** `odds-cadence-off-the-mlb-peak` (OPEN, session `sim-engine-track`,
+  not in the live roster). Its Phase 1 is **COMPLETE and verified in production**
+  (`dd53d47c`, live-odds-worker, 2026-08-16 05:51:48Z). **I am not editing its
+  files** — there is nothing to write. The machinery is built.
+- **THE LEVER IS `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE`**, `default=False`
+  (`live_refresh_loop.py:4006`), and it is **NOT PRESENT IN `render.yaml`**, so
+  no service sets it. Shipped, verified, dark.
+- **TRACED: the flag DOES fix my props defect.** `_filter_sports_for_pregame_sweep`
+  (`:4605`) always keeps a sport **while it is live** — which is why the props doc
+  is rewritten during and after the slate — and applies the interval only when it
+  is not. With the gate on, `_FIXTURE_TIER_SECONDS` hands the final 3h to the
+  **T-75/T-10 ramp**, which guarantees a sweep before first pitch, hence a
+  pregame props fetch. **Paired with the monotone seal (`bafb4fb2`) the loop
+  closes: cadence makes the pregame capture happen, the seal makes it stick.**
+  Neither half works alone.
+- **THE OWNER SET A PRECONDITION AND I AM NOT OVERRIDING IT SILENTLY:** the flag's
+  own comment says *"Flip on per service once the `branch-overlap-baseline-watch`
+  distribution has a BEFORE to compare against."* Measured now:
+  `reports/branch_overlap/baseline.jsonl` holds **7 records, of which only 4 are
+  `run_mode="scheduled"`** — the others carry no field and are UNKNOWN, not
+  scheduled, per `state.md`'s own instruction to count only `scheduled`. **A
+  BEFORE exists but is thin (n=4).**
+- **NO FLIP MADE.** Enabling it is a production behaviour change on a worker under
+  an active OOM investigation with a deploy hold, and the flag is absent from
+  `render.yaml`, so the two routes are: (a) add it to `render.yaml`, which fires
+  **`blueprint_sync`** — rewrites the WHOLE env block on live services and 502s
+  every route for ~2 min; or (b) the single-key env endpoint plus a deploy, which
+  is narrower. **(b) is the correct route if it is flipped at all.**
+- **Cost note:** the gate makes sweeps MORE frequent near first pitch and much
+  less frequent when fixtures are far out. Net OddsAPI call volume is not
+  obviously higher, but it is not obviously lower either, against a cap at ~62.7%
+  with MLB at 93.0% of spend. Measure before and after.
