@@ -1174,8 +1174,22 @@ needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
   where `live_gameline_ledger.written > 0` and the counters are reachable from
   an API.
 - Files: `syndicate/features/shared/live_gameline_ledger.py`,
-  `syndicate/features/shared/live_gameline_join.py`,
   `syndicate/blueprints/intelligence.py`, `tests/test_live_gameline_ledger.py`.
+- **`syndicate/features/shared/live_gameline_join.py` RELEASED 2026-08-17 00:2xZ
+  — it was double-claimed, and this lane is the one that does not need it.**
+  Reconciled by the `ask-answer-substance` session (holds no claim on either
+  lane) on evidence, not preference:
+  - `mlb-live-gameline-distributions` also claims it, is the file's ACTIVE
+    EDITOR (`c7e39e58`, "the re-sim's own histograms, not just their means", is
+    its work and is already in the file), and its goal is literally "consume +
+    price" there. Its session is idle-but-resumable, last active 00:15Z.
+  - this lane reads `OPEN, UNOWNED` since the 15:2xZ checkpoint, and its own
+    stated SINGLE NEXT ACTION is a READ of `/api/board/book-grid` — finishing it
+    requires no edit here.
+  **TO RE-TAKE:** put the path back on the `- Files:` line above and tell
+  `mlb-live-gameline-distributions`. The release is a coordination decision
+  between two unattended lanes, not a judgement that this lane's interest was
+  invalid — it wrote the `edge_vs_market_pct` line that sits there.
 - Collision check at re-take: no OPEN lane claims any of the four above.
   `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py` as an
   expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
