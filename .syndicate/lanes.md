@@ -3299,3 +3299,59 @@ the commit count, the test count, or the fact that leverage now has a number.
   `book_grid_artifact.py`, `blueprints/intelligence.py` (one line, taken on the
   user's statement that no Layer 2 session is active and released in this file).
 - **Next:** re-read on a second slate before anyone acts on the number.
+
+### score-live-gameline-edges — CROSS-SPORT + PLAN 2026-08-17 02:3xZ
+
+**(1) TOMORROW'S SLATE — nothing to schedule. It scores itself.** The scorer runs
+inside `build_book_grid_artifact`, so every build of every sport already emits
+`live_gameline_score`. What is owed is a READ, not a run:
+`/api/board/book-grid?sport=<sport>&date=<date>` after the slate completes.
+**Read it AFTER the last game is final** — measured tonight, the count read
+`no_final_outcome_for_game: 416` at 02:12Z with one game still live and resolved
+to **0** at 02:28Z on its own.
+
+**(2) ACROSS ALL SPORTS — measured 02:3xZ, and the answer is "two sports have
+anything to score".** The scorer is sport-generic by construction
+(`record_live_gamelines(sport=...)`, `ledger_path(sport, ...)`, per-sport
+artifact build), so the block is emitted everywhere. What differs is the input:
+
+| sport | records | games | scored |
+|---|---|---|---|
+| mlb | 3,748 | 15 | **yes** — `all_records` +0.03842 |
+| wnba | — | 0 | **no** — scorer ran, found **no final games on its grid**, took the `no_final_games_on_this_grid` branch |
+| soccer, nfl, others | 0 | 0 | **no ledger records at all** |
+
+- **soccer/nfl/etc is EXPECTED, not a defect.** Only `mlb` and `wnba` are in
+  `_LIVE_GAMELINE_SPORTS`; the rest have no live game-line join, so there is no
+  projection to record and nothing to score.
+- **WNBA IS THE ONE REAL GAP AND IT IS UNDIAGNOSED.** Its games went final
+  tonight (CHI @ SEA 82-80 observed), and its live tier now populates 218/321
+  rows — yet its grid yielded an empty finals index. **One check:** does the
+  wnba `book_grid` grid carry `game.state == "final"` rows for that date, or is
+  its artifact keyed on a different date? Do NOT assume it is the same join bug
+  MLB had; that one is fixed and this may be date-scoping.
+
+**(3) PLAN — how to get better, in dependency order.** The model loses to the
+market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
+(+0.056)** — i.e. the disagreements the board publishes are its worst ones.
+
+1. **Get a second slate before changing anything.** One night. Everything below
+   is wasted if the sign flips. Cost: a read.
+2. **Split the loss by game state.** The ledger already carries `game_state`,
+   `home_score`, `away_score`, `sims_run` and `prob_std_err` per record. Score
+   by inning/margin bucket. **The likeliest story is that the re-sim is worst
+   early**, when 120 sims off a thin state carry the widest interval — and that
+   is testable with data already on disk, no deploy.
+3. **Raise `MLB_LIVE_GAME_MC_SIMS`.** At n=120 the standard error is ±4.56 pp at
+   p=0.5, so `PRICEABLE_SIGMA=2.0` demands a ~9.1 pp edge before publishing. If
+   step 2 shows the loss concentrated where the interval is widest, this is the
+   lever the module's own docstring names — and it is costed by the worker's
+   memory budget, so it belongs to the OOM lane's window.
+4. **Consider calibrating rather than replacing.** A model that loses on Brier
+   can still carry ranking signal; `projection_skill` already records
+   `correlation` and a `verdict` per sport. If correlation is positive while
+   Brier is worse, the fix is a calibration map, not a new model.
+5. **Only then touch the model.** Anything before this is guessing at which of
+   its parts is wrong.
+
+**Do not act on +0.038 yet. It is one slate.**
