@@ -3563,3 +3563,46 @@ touch that.
   it reports final, defect 3 is proven; if it reports `Final` (no overtime) the
   test is weaker but still confirms no regression, and the OT path stays
   unproven until an overtime game occurs.
+
+### wnba-live-tier — DEFECT 1 NARROWED 2026-08-17 14:5xZ — **the chip builder is EXONERATED and my "identity key" framing was WRONG. The provider returns one game.**
+- **I had this backwards, and correcting it matters because it points at a
+  different file.** I wrote that "the chips keep exactly the game with a
+  synthesized key and lose both with numeric ESPN ids", implying a keying or
+  dedup problem in the chip builder. **It cannot be.** `build_game_chips`
+  (`game_chip_scoreboard.py:460-462`) is:
+  ```python
+  for game in games or []:
+      if isinstance(game, dict):
+          chips.append(build_game_chip(slug, game))
+  ```
+  **One chip per provider game, unconditionally, no dedup and no keying.** So
+  1 chip means `provider.games(...)` returned **1 game**. The gamePk pattern I
+  noticed was a real observation and a false lead — it describes which game
+  survived, not why the others died.
+- **So the defect is upstream, in the WNBA provider's game list**, not in the
+  chip layer. That is a different file and a different fix from the one my
+  previous note pointed at.
+- **NAMED CANDIDATE, unmeasured:** the call is
+  ```python
+  is_active_today = provider.is_active(today_value=today_value, context_label=...)
+  games = provider.games(context, is_active_today=is_active_today)
+  ```
+  `today_value` is **`central_today_iso()` — TODAY — while `date_value` is the
+  REQUESTED date.** A provider asked for a past date is handed an
+  `is_active_today` computed against a different day, and `games()` takes it as
+  a parameter. Whether that reduces the list is **not established.**
+- **AND THAT CANDIDATE DOES NOT FULLY FIT, which is why it stays a candidate.**
+  The 1-of-3 reading was taken at 02:5xZ on 2026-08-17 UTC = **21:5x CT on
+  08-16**, i.e. the requested date WAS the current Central date at that moment.
+  So a past-date-only explanation is insufficient. Either the mechanism is
+  something else, or `is_active` disagrees with the Central date near rollover.
+  **Do not adopt this candidate without measuring it.**
+- **Today's slate cannot test it:** 2026-08-17 has ONE WNBA game (DAL @ GSV) and
+  the chips correctly return exactly one. A one-game slate has no second fixture
+  to lose, so defect 1 is unobservable until a multi-game WNBA date.
+- **Next action, and it is a measurement not a change:** call
+  `WNBAProvider.games(context, is_active_today=True)` and again with `False` for
+  a multi-game date, and count. If the counts differ, `is_active_today` is the
+  filter and the caller passing TODAY's value for a requested date is the bug.
+  If they match, the list is short before that parameter and the cause is in how
+  the provider resolves its context.
