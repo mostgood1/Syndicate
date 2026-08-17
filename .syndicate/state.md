@@ -3170,3 +3170,44 @@ they belong to a lane's commit.
 This is the **fifth** recorded occurrence of the stale-shared-index mechanism.
 The count is the finding: it is not rare, and a single disarm is not a fix.
 Re-check immediately before every commit.
+
+### ADDENDUM 3 2026-08-17 13:4x CDT — the deploy guard is INSTALLED and proven live
+
+`.claude/hooks/deploy-guard.py`, registered in `settings.json` on
+`Bash|PowerShell`. Deploy ownership stops being a convention as of now.
+
+**Proven in the live harness, both directions** — an ALLOW on its own is
+worthless here, since an unregistered hook produces the identical result:
+
+- `coordinator.id` pointed elsewhere → a command naming `render_deploy.py` was
+  BLOCKED by the real `PreToolUse:Bash` hook, message and all.
+- `coordinator.id` restored → the same command ran.
+
+That also settles, by measurement rather than inference, that this session's id
+really is the one in `coordinator.id`.
+
+**21 assertions across two suites, both committed next to the hook:**
+
+- `.claude/hooks/test_deploy_guard.py` — 17. Ordered MUST BLOCK first,
+  deliberately: a suite that only ever sees green cannot distinguish a working
+  guard from one that returns 0 unconditionally. It reads `coordinator.id`
+  rather than hardcoding a session id, so the "from the COORDINATOR" case cannot
+  silently decay into a second copy of the "another session" case.
+- `.claude/hooks/test_deploy_guard_render_yaml.py` — 4, in a throwaway git repo,
+  because the main suite only exercised the `render.yaml` branch in its ALLOW
+  direction. That branch is the one guarding the 2026-08-08 `blueprint_sync`
+  incident, so its positive case is shown, not assumed.
+
+**What is allowed on purpose, and it is most of the surface:**
+`render_events.py`, `render_logs.py`, `oom_band_report.py`,
+`check_deploy_safety.py`, and any GET of `/deploys` — the Render API is read
+constantly and a guard that blocks reads is one people disable. Only POST intent
+and `render_deploy.py` are deploys.
+
+**Fail-open is asserted, not assumed:** malformed payload, missing command, and
+a missing `coordinator.id` were each tested to return 0. Deleting
+`.syndicate/coordinator.id` remains the whole off switch.
+
+**Grants** (`.syndicate/deploy/grants/<session_id>.json`, `expires_epoch`) are
+tested in all three states: valid allows, expired does NOT, malformed does NOT.
+A grant that cannot be parsed is not a grant.

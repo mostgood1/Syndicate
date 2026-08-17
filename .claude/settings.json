@@ -37,6 +37,18 @@
             "statusMessage": "Checking the shared git index..."
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py",
+            "timeout": 15,
+            "statusMessage": "Checking deploy ownership..."
+          }
+        ]
       }
     ],
     "Stop": [
