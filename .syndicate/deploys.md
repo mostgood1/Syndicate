@@ -9955,3 +9955,78 @@ refuted by money.
    +12.40% model edge when +8.16% of it was available with no model.
 4. `betting_accuracy.py` is ABSENT from this checkout, so none of this is
    comparable to the overrides file's 55.78%/54.65%.
+
+## 2026-08-17 — PRODUCTION RE-RUN ATTEMPTED — **THE GRID CANNOT BE SWEPT ON PRODUCTION, AND THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS**
+
+Lane `convergence-phase7-crps`. **NO DEPLOY. Nothing promoted.**
+
+### THE REQUESTED RE-RUN IS BLOCKED, and the reason is data availability
+
+Re-simulating the leash grid needs the **schema-v4 `roster_obj_*.json`**
+(a serialized `TeamRoster`). **Production does not have it.** Verified by
+direct fetch, not by absence from a listing — the listing is filtered, so I
+tested the stream endpoint at every plausible root:
+
+    roster_obj_0_CWS_at_TOR_pk822786_g1.json   404 at mlb_source/data/...
+                                               404 at mlb_source/source_artifacts/data/...
+
+Only the RAW INPUT BUNDLE (`roster_0_*.json`, `schema_version=None`, carrying
+`pitch_model`/`statcast`/`umpire_factors`/`probable_pitcher`) is exposed, and
+the sim's own loader rejects it: `ValueError: Unsupported game roster artifact
+schema_version=None`. Rebuilding a `TeamRoster` from it would no longer be a
+frozen record of what production simulated, which is the property that made the
+June sweep trustworthy in the first place.
+
+**Path quirk worth not rediscovering — the two families sit under DIFFERENT
+stream roots:**
+
+    odds     mlb_source/data/daily/snapshots/<date>/...                     OK
+    rosters  mlb_source/source_artifacts/data/daily/snapshots/<date>/...    OK
+
+### WHAT WAS RUN INSTEAD, AND IT ANSWERS THE ACTUAL BLOCKER
+
+`scripts/grade_production_outs_betting.py` — grade **production's shipped**
+outs model on **its own window** (2026-07-19..08-16), using its published
+`outs_dist`. This does not sweep the leash; it tests whether the *confound*
+that invalidated the June grade is systemic.
+
+    dates 29   dates with usable odds 15   starts 342   no_line 246   graded 95
+
+| | hit rate | ROI/unit |
+|---|---|---|
+| outcomes over the line | 56.84% | — |
+| **ALWAYS OVER** (no model) | 56.84% | **+0.79%** |
+| ALWAYS UNDER (no model) | 43.16% | −18.44% |
+| **shipped model** (60% over-picks) | **48.42%** | **−10.15%** |
+
+Multiplicative and power devig agree exactly.
+
+### THREE FINDINGS
+
+**1. THE OVER-CONFOUND IS SYSTEMIC, NOT A JUNE ANOMALY.** Overs won 58.78% in
+the June window and **56.84%** in this independent one. Any future grid grade
+MUST control for over-rate; a configuration that bets over more will keep
+looking good for reasons unrelated to skill.
+
+**2. THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS.** June grid best:
+59.46% / **+12.40%**. Production window, shipped model: 48.42% / **−10.15%**.
+Two windows, opposite conclusions, n=148 and n=95. **Betting grades at this
+scale are not decision-grade for this question in EITHER direction** — which
+retroactively strengthens the refusal to promote a leash value on the June run.
+
+**3. On this window the shipped model LOSES to a side-blind baseline** by 8.4pp
+of hit rate and ~11 points of ROI. **n=95, SE 5.13pp, so that is 1.6 SE — NOT
+significant.** Stated as a direction to investigate, not a verdict.
+
+### WHY THE SAMPLE IS SO SMALL, MEASURED
+
+Only **15 of 29** dates carry a usable pitcher-props artifact — most in-window
+live files are 441–548 B stubs — and only **95 of 342** starts have a matching
+line. The binding constraint on grading outs props is **archived line coverage**,
+not simulation cost. Fixing that is upstream of any further betting grade.
+
+### STANDING RULE THIS CONFIRMS
+
+Report the side-blind baseline with every prop betting grade. Here it converted
+"the model returns −10.15%" into the far more useful "the model returns −10.15%
+where betting every over blind returned +0.79%".

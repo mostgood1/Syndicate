@@ -3863,3 +3863,61 @@ PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
 - **Owed for a valid grade:** production's 29 extra dates, an over-rate-matched
   or side-split comparison, and note that `betting_accuracy.py` is ABSENT here
   so none of this compares to the overrides file's 55.78%/54.65%.
+
+#### convergence-phase7-crps — PRODUCTION RE-RUN 2026-08-17 — **BLOCKED as asked; ran the answerable half instead**
+
+- **The grid CANNOT be swept on production.** Re-simulation needs schema-v4
+  `roster_obj_*.json`; production returns **404 at every stream root**. Only the
+  raw input bundle (`roster_0_*.json`, `schema_version=None`) exists and the
+  sim's loader rejects it. Verified by direct fetch, not by absence from the
+  (filtered) export listing.
+- **Stream-root quirk:** odds live under `mlb_source/data/...`, rosters under
+  `mlb_source/source_artifacts/data/...`. A path that 404s under one root can be
+  fine under the other — do not conclude "absent" from a single root.
+- **Ran instead:** `scripts/grade_production_outs_betting.py` — production's
+  SHIPPED outs model on its own 2026-07-19..08-16 window, 95 graded bets.
+- **THE OVER-CONFOUND IS SYSTEMIC:** overs won **56.84%** here vs 58.78% in
+  June. Any future grid grade must control for over-rate.
+- **THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS:** June grid best 59.46% /
+  +12.40%; production shipped model **48.42% / −10.15%**, against ALWAYS OVER at
+  56.84% / +0.79%. **n=148 and n=95, so neither is decision-grade.** This
+  retroactively strengthens the refusal to promote a leash value.
+- **1.6 SE, not significant.** The shipped model losing to a side-blind baseline
+  is a direction to investigate, not a verdict.
+- **THE BINDING CONSTRAINT IS ARCHIVED LINE COVERAGE, not sim cost:** only 15 of
+  29 dates carry a usable pitcher-props artifact (most live files are 441–548 B
+  stubs) and only 95 of 342 starts have a line. **Fix that before running
+  another betting grade** — more simulation cannot help.
+- Nothing promoted, nothing blocked, no production config changed.
+
+### tie-spread-membership-gap — OPEN — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+- **Goal:** `identicalContentSpread` must stop comparing two different groups and
+  calling the result "unchanged". **Testable outcome:** the comparison matches
+  tie groups on `(state, pair-count, n)` and fails on a change in any group that
+  is comparable on both sides; group membership changes are reported as NOT
+  COMPARABLE rather than silently passed. Re-running today's live slate against
+  `baseline_2026-08-17.json` must SURFACE the three mobile group moves it
+  currently hides.
+- **Files:** `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `.syndicate/log/2026-08-17.md`, `.syndicate/lanes.md`
+- **Hypothesis (already CONFIRMED on production data, 2026-08-17 12:37 CDT):**
+  `_cmp_value` reduces the whole tie block to `worstGroupPx`, a max over a set
+  whose membership moves with the slate. When a game goes live it leaves the
+  Preview pool, groups gain/lose members, and the max can land on a DIFFERENT
+  group while reading numerically identical.
+- **The measurement.** One game live, 10 Preview, vs an all-Preview baseline:
+  - mobile reported `43px unchanged (baselined)` — but the baseline's 43 came
+    from `u=45 n=3` and the current 43 comes from `u=53 n=3`, while **every**
+    matched group moved: `u=53` 30->43, `u=49` 32->15, `u=45` 43->36.
+  - desktop reported `86px unchanged` from `u=49 n=3` vs `u=49 n=2`, hiding
+    `u=45` moving 28->41.
+  This is a **false PASS**, not a false alarm — the dangerous direction, and the
+  same family as the standing rule that unknown must not default permissive.
+- **Falsification test:** if the per-group comparison, run against today's
+  baseline on the current live slate, still reports everything unchanged, the
+  diagnosis is wrong and the scalar is not the cause.
+- **Verification:** the live re-run names the moved groups and fails; an
+  all-Preview self-comparison still passes; a baseline with no per-group data
+  (`baseline_2026-08-16.json` and older carry `byState` but no `groups`) reports
+  NOT COMPARED rather than silently taking the weaker check; probe suite green.
+- **Blocked by:** none
