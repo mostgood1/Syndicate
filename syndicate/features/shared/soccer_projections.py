@@ -88,6 +88,25 @@ class SoccerProjectionIndex:
     # rendering it identically to a fresh one. Prices carry `age_seconds`;
     # projections carried nothing.
     generated_at_by_league: dict[str, str] = field(default_factory=dict)
+    # Which dates were actually read, so a zero is attributable to the slate
+    # rather than to a one-date read. Same reason `per_sport_ingest` carries
+    # `window_dates` for the quote side (`#379`).
+    dates: list[str] = field(default_factory=list)
+    # TEAM KEYS THAT NOW REFER TO MORE THAN ONE FIXTURE, and therefore to none.
+    #
+    # Load-bearing only since the index went multi-date. `match_for` documents
+    # that the two feeds use different id schemes (ESPN in the sim, OddsAPI on
+    # the board), so `by_event` "can never hit across these two feeds" and the
+    # join is in practice keyed on TEAM NAMES. Within one date that is safe: a
+    # club plays once. Across a 7-day window it is not -- a midweek cup tie and
+    # a weekend league game share (home, away), `by_teams` is a plain write, so
+    # the later file would silently overwrite the earlier and hand a row for one
+    # fixture the projection for the other.
+    #
+    # A wrong projection is far worse than a blank one (this module's own words,
+    # about the alias fallback). So a colliding key is REMOVED and recorded
+    # rather than resolved by guessing which fixture the row meant.
+    ambiguous_team_keys: set[tuple[str, str]] = field(default_factory=set)
 
     def match_for(self, row: Mapping[str, Any]) -> dict[str, Any] | None:
         """Find this row's projection: event id, exact names, then aliases.
@@ -158,6 +177,12 @@ class SoccerProjectionIndex:
         away = _norm_team(row.get("away_team"))
         if not (home and away):
             return None
+        # Checked BEFORE the exact lookup, not only in the alias fallback below.
+        # `_load_one` removes a colliding key from `by_teams`, so this is belt
+        # and braces -- but the exact path is the one that would return a wrong
+        # fixture silently, and it costs a set membership test.
+        if (home, away) in self.ambiguous_team_keys:
+            return None
         exact = self.by_teams.get((home, away))
         if exact is not None:
             return exact
@@ -165,6 +190,8 @@ class SoccerProjectionIndex:
         raw_away = row.get("away_team")
         hits = []
         for (index_home, index_away), match in self.by_teams.items():
+            if (index_home, index_away) in self.ambiguous_team_keys:
+                continue
             matchup = match.get("matchup") or {}
             source_home = matchup.get("home_team") or index_home
             source_away = matchup.get("away_team") or index_away
@@ -173,6 +200,29 @@ class SoccerProjectionIndex:
             ):
                 hits.append(match)
         return hits[0] if len(hits) == 1 else None
+
+
+def _same_fixture(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """Whether two indexed matches are the same fixture, not merely the same clubs.
+
+    Same league-date loaded twice (two roots, or a re-read) is NOT a collision
+    and must not blank a good key. A genuine repeat of the same clubs on two
+    dates inside the window IS. `event_id` decides it where both carry one --
+    ids are consistent WITHIN the sim feed even though they do not cross to the
+    board's feed -- and the fixture date is the fallback when one side has none.
+    """
+    left_id = str(left.get("event_id") or "").strip()
+    right_id = str(right.get("event_id") or "").strip()
+    if left_id and right_id:
+        return left_id == right_id
+    left_date = str(left.get("date") or left.get("kickoff") or "")[:10]
+    right_date = str(right.get("date") or right.get("kickoff") or "")[:10]
+    if left_date and right_date:
+        return left_date == right_date
+    # Neither identifiable. Treat as the same rather than poisoning the key:
+    # the pre-existing single-date behaviour was a plain overwrite, and an
+    # undated payload is the one case this widening did not change.
+    return True
 
 
 def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
@@ -207,7 +257,18 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
         if event_id:
             index.by_event[event_id] = dict(match)
         if home and away:
-            index.by_teams[(home, away)] = dict(match)
+            key = (home, away)
+            existing = index.by_teams.get(key)
+            if existing is not None and not _same_fixture(existing, match):
+                # Two DIFFERENT fixtures now answer to one team key. Drop it --
+                # see SoccerProjectionIndex.ambiguous_team_keys. Deliberately
+                # not "keep the earlier" or "keep the nearer date": the row
+                # being joined carries no date this index can compare against,
+                # so any tie-break here would be a guess dressed as a rule.
+                index.ambiguous_team_keys.add(key)
+                index.by_teams.pop(key, None)
+            elif key not in index.ambiguous_team_keys:
+                index.by_teams[key] = dict(match)
         index.matches += 1
 
     # Player props are keyed by match_id, so a name collision across two matches
@@ -227,8 +288,65 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
     return True
 
 
-def load_soccer_projections(roots: Iterable[Path], selected_date: str) -> SoccerProjectionIndex:
-    """Merge each league's recommendations file, taking the FIRST root that has it.
+def load_soccer_projections(
+    roots: Iterable[Path],
+    selected_date: str,
+    *,
+    window_dates: Iterable[str] | None = None,
+) -> SoccerProjectionIndex:
+    """Merge each league's recommendations files, taking the FIRST root that has each.
+
+    THE PROJECTION READ IS THE WINDOW, NOT ONE DATE -- and this is the second
+    half of `#379`.
+
+    That fix widened Layer 2's QUOTE read from `selected_date` to the sport's
+    whole slate window, because soccer shards by KICKOFF date and almost nothing
+    kicks off "today". It did not widen the projection read beside it, so the
+    board went on asking for `recommendations_<today>.json` alone while holding
+    quotes for seven days. Every row outside today was then structurally unable
+    to carry a model view, no matter how well the sim ran.
+
+    MEASURED ON PRODUCTION 2026-08-17 19:5xZ, soccer's `per_sport_ingest`:
+
+        window_dates    7   (08-17 .. 08-23)
+        dates_with_rows 6   (08-17, 08-19, 08-20, 08-21, 08-22, 08-23)
+        grid_rows           8,759
+        rows_with_projection    4      (pct_projected 0.0)
+        matches_in_source       3
+        unmatched_match_rows    8,755
+
+    and downstream: `rows_with_model_edge: 0`, soccer absent from `per_sport`,
+    0 rows on the board out of 5,527 opportunities. The A3 filter drops a row
+    whose `ev_pct` is a restatement of the book's hold UNLESS it has a
+    projection -- so a missing projection is not a cosmetic gap here, it is the
+    thing keeping soccer off the board entirely.
+
+    The three matches that DID load were today's, and all three were in play, so
+    their pregame projections were correctly withheld (`live_edge_enforced_rows:
+    1`). Today was never the problem. The other six dates were.
+
+    `window_dates` is passed in rather than resolved here, so this module keeps
+    knowing nothing about slate windows and the caller reuses
+    `resolve_window_dates` -- the same resolver Layer 2's quote read uses. Two
+    independent notions of "which dates is this sport's board" would drift, and
+    the drift is exactly what produced this defect.
+
+    COST, measured before shipping because `#241` is the standing reason to
+    check rather than assume: every tracked soccer recommendations file in the
+    repo is 22 files totalling **1.5 MB** (2 KB - 40 KB each). A full 10-league
+    x 7-date read is ~2.8 MB worst case, against the 8.8 MB soccer quote window
+    already being read beside it. The widened read is a fraction of the read it
+    accompanies.
+
+    Defaults to `[selected_date]` when no window is given, so every existing
+    caller behaves exactly as before.
+
+    ---
+
+    Note the first-root-wins claim key below is now (league, DATE), not league:
+    keying on league alone would let the first date read claim the league and
+    suppress every other date, quietly turning the widening above into a no-op
+    that still reported seven dates.
 
     `#360`. This used to load every matching file from every root, and `_load_one`
     assigns rather than merges -- `generated_at_by_league[league]`, `by_event[id]`
@@ -256,31 +374,39 @@ def load_soccer_projections(roots: Iterable[Path], selected_date: str) -> Soccer
     purpose -- it just can no longer overwrite live data.
     """
     index = SoccerProjectionIndex()
-    file_name = f"recommendations_{selected_date}.json"
+    dates = [str(d).strip() for d in (window_dates or [selected_date]) if str(d).strip()]
+    if not dates:
+        dates = [str(selected_date)]
+    index.dates = list(dates)
     seen: set[str] = set()
-    loaded_leagues: set[str] = set()
-    for root in roots:
-        try:
-            candidates = sorted(Path(root).glob(f"*/api/recommendations/{file_name}"))
-        except OSError:
-            continue
-        for candidate in candidates:
-            # <root>/<league>/api/recommendations/<file>. Taken from the PATH, not
-            # the payload, so a league is claimed without reading the loser's file.
+    # Keyed on (league, DATE), not league. Keying on league alone would let the
+    # first date read claim the league and suppress every other date's file --
+    # which would turn this widening into a no-op that still reports seven dates.
+    loaded_league_dates: set[tuple[str, str]] = set()
+    for date_str in dates:
+        file_name = f"recommendations_{date_str}.json"
+        for root in roots:
             try:
-                league_dir = candidate.parents[2].name
-            except IndexError:
-                league_dir = ""
-            if league_dir and league_dir in loaded_leagues:
+                candidates = sorted(Path(root).glob(f"*/api/recommendations/{file_name}"))
+            except OSError:
                 continue
-            key = str(candidate.resolve()) if candidate.exists() else str(candidate)
-            if key in seen:
-                continue
-            seen.add(key)
-            # Only a file that actually parsed claims its league -- an unreadable
-            # copy on the runtime disk must not suppress a good one in the mirror.
-            if _load_one(candidate, index) and league_dir:
-                loaded_leagues.add(league_dir)
+            for candidate in candidates:
+                # <root>/<league>/api/recommendations/<file>. Taken from the PATH, not
+                # the payload, so a league is claimed without reading the loser's file.
+                try:
+                    league_dir = candidate.parents[2].name
+                except IndexError:
+                    league_dir = ""
+                if league_dir and (league_dir, date_str) in loaded_league_dates:
+                    continue
+                key = str(candidate.resolve()) if candidate.exists() else str(candidate)
+                if key in seen:
+                    continue
+                seen.add(key)
+                # Only a file that actually parsed claims its league -- an unreadable
+                # copy on the runtime disk must not suppress a good one in the mirror.
+                if _load_one(candidate, index) and league_dir:
+                    loaded_league_dates.add((league_dir, date_str))
     return index
 
 
