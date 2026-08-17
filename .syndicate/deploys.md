@@ -11725,3 +11725,74 @@ This is exactly `#440` **Phase 9** ("re-score the same slate at several sim
 counts and read where CRPS stops improving"), which Phase 7 exists to make
 measurable. Running now at leash {0, 5} x sims {100, 300, 1000}, 490,000
 game-sims. **Treat the table above as provisional until that lands.**
+
+## 2026-08-17 — CRPS SKILL CENSUS vs CLIMATOLOGY — **the first cross-sport distributional skill measurement, and NFL margin PASSES**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/skill_census_crps.py`. Read-only
+over the local mirror. **No deploy.**
+
+The 2026-08-14 audit: 69 sport x market pairs ship a prediction, **2 have a
+backtest**. This asks the cheapest useful question of as many as the mirror can
+answer — does the forecast beat CLIMATOLOGY *as a distribution*?
+
+    skill = 1 - CRPS_model / CRPS_climatology
+
+| sport | market | segment | n | CRPS model | CRPS clim | skill | 95% CI | verdict |
+|---|---|---|---|---|---|---|---|---|
+| **nfl** | **margin** | regular | 273 | 7.7160 | 7.9713 | **+3.20%** | **[+1.10%, +5.31%]** | **BEATS climatology** |
+| nfl | total | regular | 273 | 7.7958 | 7.7692 | −0.34% | [−3.47%, +2.79%] | **INDISTINGUISHABLE** |
+| nhl | team_goals | full_game | 10 | — | — | — | — | unmeasured (n<30) |
+| mlb | pitcher outs | — | 267 | 2.3894 | 2.1927 | **−8.97%** | (see separate entry) | loses |
+
+### THE RESULT THAT MATTERS
+
+**NFL game margin is the FIRST forecast in this platform measured to have real
+distributional skill.** +3.20% with a **paired** 95% CI of [+1.10%, +5.31%] —
+excludes zero. The interval is paired (every game scored by both forecasts), so
+game-to-game variance is differenced out rather than swamping a few-percent
+effect.
+
+**And it is a conservative number:** climatology is computed **in-sample** and
+**within segment**, so the baseline is fitted to the test set while the model is
+not. Beating it is harder than beating an honest out-of-sample climatology.
+
+### THE THREE-WAY VERDICT IS DELIBERATE
+
+`INDISTINGUISHABLE` is not a rounding of "loses". NFL total's CI spans zero: the
+sample cannot tell, which is a different finding from "measured to be worse" and
+must not be reported as either skill or failure.
+
+**Read across the platform:** of everything measurable today, **one cell has
+proven skill, one is a coin flip, one is clearly negative (MLB outs), and the
+rest cannot be measured from the mirror at all.**
+
+### UNMEASURED, WITH REASONS — none of these is a silent zero
+
+- **NCAAF — truth is in a different FORMAT.** 30 projection files / 1,522 rows
+  present, but `_nflverse_finals` looks for `play_by_play_<season>.csv.gz` while
+  NCAAF truth is CFBD `plays_<season>_wk##.json.gz`. **0 game_id matches.**
+  Fixable: a CFBD reader. The projections are there and unscored.
+- **NHL — joins, but n=10.** 5 of 11 boxscore dates intersect the 9 sim dates.
+  The floor refused it. Not a defect; a coverage limit.
+- **NFL PRESEASON could not be scored at all** — and it is one of only two pairs
+  with a published backtest. nflverse `play_by_play_*.csv.gz` carries regular
+  season, so 725 projection rows joined 273 REGULAR games and **zero preseason**.
+  The existing `nfl_preseason_calibration.MEASURED_SKILL` therefore rests on a
+  truth source this census cannot reach — worth reconciling.
+
+### WHAT THE FILE ACTUALLY CONTAINED, vs what its name said
+
+`nhl_source/.../props_boxscores_sim_samples_*.csv` is **NOT player props**. All
+8,000 rows on 2026-06-02 carry `player_id=0` (TEAM) and the only market is
+GOALS. The scoreable quantity is **team goals with 2,000 draws per team-game** —
+the ideal shape for `crps_empirical`, just not the one the filename advertises.
+A census that trusted the filename would have reported a player-prop skill
+number computed from team aggregates.
+
+### CAVEATS
+
+- **Local mirror only**, which CLAUDE.md warns is lossy and whose per-family date
+  windows do not align. Coverage is printed before every score for that reason.
+- NFL n=273 games across 2023–2025 regular seasons.
+- Climatology is a WITHIN-SEGMENT marginal; pooling preseason with regular would
+  have credited the model for knowing the schedule, which is not skill.
