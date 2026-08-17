@@ -141,3 +141,51 @@ class BlendBehaviourTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProductionCallSiteTests(unittest.TestCase):
+    """The blend must be REACHED by the roster build, not merely importable.
+
+    This class exists because the first version of this module had ZERO
+    production callers: it was fully implemented, had nine passing tests, and
+    was wired to nothing. Every test above would have passed forever while the
+    feature did nothing in production.
+
+    `learnings.md` 2026-08-17 already carried the rule ("write the reachability
+    assertion FIRST") and I broke it anyway on the very next feature, so the
+    check is encoded here rather than left to discipline.
+    """
+
+    def test_build_roster_imports_and_calls_the_blend(self) -> None:
+        from pathlib import Path
+        src = Path("vendor/mlb_bettingv2/sim_engine/data/build_roster.py").read_text(
+            encoding="utf-8")
+        self.assertIn("from .batted_ball import apply_batted_ball_to_batter", src,
+                      "build_roster does not import the blend")
+        self.assertIn("apply_batted_ball_to_batter(", src,
+                      "build_roster imports the blend but never calls it")
+
+    def test_the_weight_gate_defaults_to_off(self) -> None:
+        import os
+        from unittest import mock
+        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_MLB_BATTED_BALL_WEIGHT", None)
+            self.assertEqual(_batted_ball_weight(), 0.0)
+
+    def test_a_malformed_weight_reads_as_off_not_on(self) -> None:
+        import os
+        from unittest import mock
+        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        for junk in ("banana", "", "  "):
+            with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": junk}):
+                self.assertEqual(_batted_ball_weight(), 0.0, f"junk {junk!r} enabled it")
+
+    def test_a_set_weight_is_honoured_and_clamped(self) -> None:
+        import os
+        from unittest import mock
+        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": "0.35"}):
+            self.assertAlmostEqual(_batted_ball_weight(), 0.35)
+        with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": "9.0"}):
+            self.assertEqual(_batted_ball_weight(), 1.0)

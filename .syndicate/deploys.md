@@ -13820,3 +13820,53 @@ flag-off.
 **The refit as specified is closed as unworkable.** The next question is not
 "which feature next" but **"why does a pitch-level sim under-produce K, BB and HR
 by a quarter to a third?"**
+
+## 2026-08-17 — **I BUILT A FOURTH INERT FEATURE.** The batted-ball blend had ZERO production callers until asked "shouldn't this all be feeding the sim?"
+
+Lane `convergence-phase7-crps`. Caught by the user, not by me.
+
+### The failure
+
+`sim_engine/data/batted_ball.py` was fully implemented, had **9 passing tests**,
+published a 450-player artifact — and `grep apply_batted_ball_to_batter` returned
+**only my own measurement script and its own tests.** `build_roster.py` contained
+no reference to `batted_ball` at all.
+
+**Every one of those 9 tests would have passed forever while the feature did
+nothing in production.**
+
+This is the FOURTH inert feature today (props seal predicate, misplaced
+tendencies artifact, `position_substitutions` via `setattr`, this) and the second
+I created myself. **I had already written the rule — "write the reachability
+assertion FIRST" — into `learnings.md` earlier today, and then broke it on the
+very next feature.** A rule in the ledger is not a control.
+
+### Fixed
+
+- `build_roster.py` now **imports and calls** `apply_batted_ball_to_batter`,
+  placed AFTER the recency hook so it adjusts the rate the pipeline actually
+  settles on rather than one recency then overwrites.
+- Gated by **`SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0** — an unconfigured
+  service is byte-for-byte unchanged, and a **malformed value reads as OFF**
+  (an unparseable knob must not silently become an active one).
+- **4 new tests encode the check as a control rather than a discipline**: the
+  call site must exist in `build_roster.py` source, the gate defaults off, junk
+  reads as off, and a set weight is honoured and clamped.
+- The call-site test also caught a real bug immediately: `_batted_ball_weight`
+  used `os.environ` in a module with no module-level `os` import.
+
+**13 blend tests pass; 23 pass across the substitution / pitch-splits / leash
+suites with no regression.**
+
+### What is now genuinely wired vs still dark
+
+| source | reaches the sim? | gate |
+|---|---|---|
+| pitch splits | **YES** — `build_roster:2141/2154` -> artifact-first loader | needs the artifact on disk |
+| batted-ball | **YES, now** — `build_roster` batter loop | `SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0 |
+| substitution | **YES** — `simulate.py` half-inning hook | `GameConfig.position_substitutions`, default False |
+| defence/OAA | **NO** — deliberately not built | — |
+
+**All three are OFF by default and nothing is deployed.** The distinction that
+matters is that they are now REACHABLE when enabled, which the batted-ball blend
+was not.
