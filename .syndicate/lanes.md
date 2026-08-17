@@ -3264,3 +3264,120 @@ else:
 - **DEFECT 1 IS NOW FULLY ATTRIBUTED.** Chip builder, `is_active_today`, provider
   code, `gid_map`/boxscores and the odds branch are all eliminated by
   measurement or by reading. The remaining work is the fix, not the diagnosis.
+
+### convergence-phase7-crps — OPEN — opened 2026-08-17 — session: model-sim-track
+- **Goal (single testable outcome):** a proper scoring rule runs over
+  CONTINUOUS projections joined to realized outcomes, with **no dependency on
+  settlement, grading, or a placed bet**, and emits a non-zero per-sport sample
+  with `n` attached to every statistic. This is `#440` Part 4 **Phase 7** — the
+  instrument Phases 8 and 9 are read with. Nothing downstream is attributable
+  until it exists.
+- **Why this phase:** Phase 5 shipped (`964c89a4`) and Phase 6 touches the
+  prediction-ledger write path, a seam the plan says needs an owner agreed with
+  the betting-engine track. Phase 7 as scoped below touches neither.
+- **Files (all NEW — collision-checked 2026-08-17 against all 14 OPEN lane
+  blocks on `origin/main`; zero overlap):**
+  - `syndicate/features/shared/projection_score.py` (NEW)
+  - `tests/test_projection_score.py` (NEW)
+  - `scripts/score_projections.py` (NEW)
+- **NOT claimed, deliberately:**
+  - `syndicate/features/shared/intelligence_evaluation.py` — IS claimed by an
+    OPEN lane, and is the **settled-bets** path this work exists to route
+    around. `model_scoring.py`'s own docstring says it "does not read the
+    ledger, the board, or any artifact itself" and names its intended callers as
+    a recalibration job or a backtest script. Phase 7 does not need this file.
+    **Raised, not taken** — per the Phase 5 close: *"Raise ownership before
+    writing code."* No live session holds the betting-engine track
+    (`clv-without-settlement`, `grading-blocker-settled-zero` are OPEN but their
+    sessions are stopped).
+  - `syndicate/features/shared/model_scoring.py` — READ-ONLY. Pure math, 0
+    non-test callers, verified on `origin/main` (not on this stale checkout).
+- **Hypothesis (stated before measuring):** the plan's claim that Phase 7
+  "works today on all seven sports that produce a mean and a spread" is
+  **BELIEVED, NOT VERIFIED**. I predict **fewer than seven** sports publish a
+  projection carrying BOTH a usable spread and an outcome join.
+- **Falsification test:** if ≥7 sports carry a joinable (mean, sigma, outcome),
+  the hypothesis is wrong and Phase 7 is a seven-sport instrument on day one.
+  If fewer, Phase 7 **re-scopes to bias/dispersion (signed error + MAE), which
+  needs no sigma** — and that re-scope gets recorded, NOT papered over by
+  fabricating a sigma from a fixed constant.
+- **DESIGN CONSTRAINT from `learnings.md` 2026-08-16 FORBIDDEN (letting a
+  FITTED MODEL judge when a model-free measurement is available):**
+  `crps_normal` imposes a **Normal** predictive distribution on what are
+  actually empirical Monte Carlo draws — and for low-scoring discrete outcomes
+  (runs, goals) that approximation is doing real work. Where the sim's own
+  distribution is available, the **empirical-CDF CRPS is the evidence and the
+  Normal closed form is the hypothesis.** Report both where both are
+  computable; never report the Normal one alone as "the" CRPS.
+- **Denominator discipline (CLAUDE.md standing trap + rule "a rate, not a
+  count"):** print per-family date coverage AND the intersection **first**, and
+  state the number of dates the result actually rests on. Do not scope the
+  sample from this checkout — production has far more history (81 WNBA dates vs
+  4 files locally).
+- **Verification:** a scored report with, per sport × market: `n`, the
+  bias/dispersion decomposition, CRPS where a spread exists, and — for any
+  binary companion — the **market's** number on the identical rows. A cell below
+  the sample floor reports `unmeasured`, following `projection_skill`'s existing
+  first-class `unmeasured` convention rather than inventing a second one. Result
+  written to `deploys.md` with the window and sample size.
+- **Blocked by:** none. Deliberately not touching Phase 2/2b files
+  (`live_refresh_loop.py`, `run_refresh_worker.py`) held by
+  `refresh-worker-oom-recurrence`.
+
+#### convergence-phase7-crps — SUBSTRATE MEASURED 2026-08-17 — **hypothesis CONFIRMED, and the coverage is INVERTED from what the plan assumes**
+
+`[measured from this checkout — a LOSSY MIRROR, so every count is a LOWER BOUND
+on production and the absences are NOT all established. Labelled per row.]`
+
+**The plan's claim that Phase 7 "works today on all seven sports that produce a
+mean and a spread" is NOT SUPPORTED.** Falsification test did not fire.
+
+| sport | spread in the artifact | status |
+|---|---|---|
+| **MLB** | **full 1000-draw empirical PMF** | **CONFIRMED** |
+| **WNBA / NBA** | `pts_sd`, `reb_sd`, `ast_sd`, `pra_sd`, … + `home_pts_sigma` / `away_pts_sigma` | **CONFIRMED** (56 wnba files, 21 dates) |
+| NFL | none, across **165 files / 160 dates** | **CONFIRMED ABSENT** |
+| NHL | none in the file sampled — but the sample was a 159-byte `odds_history.json` | **UNMEASURED, not absent** |
+| soccer | no pregame picks/projection files in the checkout at all | **UNMEASURED, not absent** |
+| NCAAF | 0 files locally; season opens 08-29 | **UNMEASURED** |
+| NCAAB | no engine exists (`state.md`) | n/a |
+
+So Phase 7 is a **2-sport instrument on day one**, not a 7-sport one. NHL and
+soccer must be re-checked against PRODUCTION before anyone writes "no spread" —
+this checkout is exactly the trap CLAUDE.md documents.
+
+**AND THE MLB COVERAGE IS INVERTED — this is the finding that shapes the build:**
+
+| MLB family | spread | markets | existing backtest? |
+|---|---|---|---|
+| **pitcher props** | **full PMF, 1000 draws** | so, outs, hits, earned_runs, walks, batters_faced, pitches (**7**) | **NONE** |
+| **game total / margin** | **full PMF, 1000 draws**, in 4 segments (`full`/`first1`/`first3`/`first5`) | total_runs, run_margin (**2 × 4**) | **NONE** |
+| hitter props | **mean only — NO distribution** | h, tb, rbi, r, hrr, 2b, 3b, sb, hr (9) | yes, `backtest_mlb_props.py`, n=2,487 |
+
+**The one MLB family that HAS a backtest is the only one that CANNOT be
+distributionally scored, and the two families carrying a full 1000-draw PMF have
+never been scored at all.** That is where Phase 7 goes.
+
+- **Denominator, stated:** ~30 pitchers/date × 7 markets over 78 local dates is
+  ~16k pitcher-market observations, against "a few dozen settled bets a week".
+  The plan's 10–100× claim is now MEASURED for MLB rather than asserted.
+- **OUTCOME JOIN ALREADY EXISTS AND IS EXACT.**
+  `processed/mlb_batter_game_log.csv` (12,185 rows) and
+  `mlb_pitcher_game_log.csv` (5,089 rows), keyed `date, game_pk, player_id`.
+  `feed_live` is **absent from this checkout (0 dates)** — the CLAUDE.md
+  intersection trap fired exactly as written, and the game logs are the way
+  around it.
+- **DO NOT BUILD A NEW JOIN.** `scripts/backtest_mlb_props.py` already solves
+  archive-replay-from-production, the exact `batter_id` join, per-market
+  denominators, DNP exclusion and baseline comparison. It reads **means only**
+  and never touches the `*_dist` sitting in the same artifact. Phase 7 is the
+  distribution half of a harness that already works, not a second harness.
+
+**CLAIM AMENDED:** this lane now also claims
+`syndicate/features/shared/model_scoring.py` — **additive only**, to add
+`crps_empirical` beside `crps_normal`. Re-checked 2026-08-17: the file appears
+in NO OPEN lane's claim set. Justification: the repo's own
+`prop_projections._dist_prob_over` docstring says *"Exact, not a normal
+approximation"* for this same PMF, and the 2026-08-16 FORBIDDEN rule says a
+model-free measurement outranks a fitted one. Putting the empirical form
+anywhere but next to `crps_normal` would be the "fourth copy" this repo punishes.

@@ -9648,3 +9648,98 @@ when every record is a skeleton.
 is correct, not a defect.)
 
 **Rollback:** redeploy `685ab3e9`.
+
+## 2026-08-17 — PHASE 7 MEASUREMENT (`#440` Part 4) — lane `convergence-phase7-crps`
+
+**NO DEPLOY. Local tooling only**, same class as `#442` — new module + script +
+tests on the tree. Nothing in a request path or a worker loop changed.
+
+**The instrument exists and has produced a number.** 7,242 scored observations
+across 7 markets and **46 dates (2026-05-28 .. 2026-07-12)**, with **zero**
+settled bets required. For scale: production settlement has produced 0 records
+since it was built. The plan's "10–100× more observations" is now measured for
+MLB rather than asserted.
+
+**SOURCE CAVEAT, load-bearing: read from the LOCAL MIRROR** (`data/mlb_source/**`),
+which is lossy and is NOT what production computed. 46 dates is a LOWER BOUND.
+**Re-run against production before citing any of this externally.**
+
+`py -3 scripts/score_projections.py`
+
+| market | n | CRPS(emp) | CRPS(norm) | gap | bias | MAE | baseline | beats? | disp |
+|---|---|---|---|---|---|---|---|---|---|
+| game_total_runs | 546 | 2.528 | 2.516 | −0.011 | +0.797 | 3.485 | 3.555 | **YES** | 0.75 |
+| pitcher_earned_runs | 1116 | 1.167 | 1.227 | 0.059 | −0.486 | 1.790 | 1.681 | no | 0.72 |
+| pitcher_hits_allowed | 1116 | 1.654 | 1.707 | 0.053 | −1.901 | 2.461 | 1.780 | no | 0.87 |
+| pitcher_outs | 1116 | 3.982 | 4.008 | 0.026 | **−5.139** | 5.377 | 3.158 | no | **1.54** |
+| pitcher_pitches | 1116 | 9.164 | 9.089 | −0.075 | −6.828 | 11.657 | 11.710 | YES | 1.23 |
+| pitcher_strikeouts | 1116 | 1.443 | 1.459 | 0.016 | −0.593 | 2.061 | 1.993 | no | 1.02 |
+| pitcher_walks_allowed | 1116 | 0.712 | 0.740 | 0.028 | −0.148 | 1.040 | 1.053 | YES | 0.78 |
+
+Sign convention is `model_scoring`'s: `bias = actual − mean`, so **negative =
+THE SIM RUNS HIGH**.
+
+### THREE FINDINGS
+
+**1. EVERY pitcher market is biased HIGH, and `outs` is the opportunity term.**
+All six are negative. `outs` is −5.139 — **the sim projects ~1.7 innings more
+per start than the pitcher actually records.** Every other pitcher market is
+downstream of workload (more outs → more pitches, more strikeouts, more hits),
+and their biases line up with that ordering.
+
+**This independently corroborates `#428` on a family that had NO backtest.**
+The 08-14 audit measured MLB *hitter* props as "biased, not blind — sitting
+high", with **55% of it attributable to OPPORTUNITY** (`pa_mean` +18.4%,
+`ab_mean` +17.2%). `outs` is the pitcher-side opportunity variable and it shows
+the same sign and a comparable relative magnitude. Two independent families,
+same defect: **the sim over-estimates playing time.** Fix opportunity first,
+then re-measure — exactly the order `#428` already prescribes.
+
+**2. Four of seven markets LOSE to a constant baseline** (earned_runs,
+hits_allowed, outs, strikeouts). The baseline is the pool's own mean and is
+therefore **in-sample, i.e. flattered** — the honest reading is "these markets
+do not clear a one-parameter competitor", not "these markets are worthless".
+An out-of-sample split is `#440` D4 and was NOT done here.
+
+**3. `outs` is BOTH centred wrong AND overconfident** — dispersion 1.54 against
+a calibrated 0.798, so σ is roughly half what it should be. `pitches` (1.23)
+and `strikeouts` (1.02) are also too narrow. **This is the distinction the
+whole phase exists to make**: bias needs an additive shift, dispersion needs a
+σ scale, and a single MAE cannot tell them apart. Phase 8 now has a target and
+a direction per market instead of one error number.
+
+### A RESULT THAT MAKES PHASE 8 EASIER, AND IS WORTH STATING
+
+**The empirical-vs-Normal gap is tiny everywhere** (|gap| ≤ 0.075 on CRPS of
+0.7–9.2, i.e. under 1%). The `crps_empirical` primitive was built because
+`learnings.md` 2026-08-16 forbids letting a fitted model judge when a
+model-free measurement exists — and having built it, **the measurement says the
+Normal summary is adequate for these markets.** That is a licence for a
+Gaussian calibration term in Phase 8, and it is a licence we now have EVIDENCE
+for rather than an assumption we never tested. Do not read it as general: it
+was measured on these 7 markets only.
+
+### WHAT WAS REFUSED RATHER THAN GUESSED
+
+- **`run_margin_dist` is NOT scored.** The PMF is there, but the artifact does
+  not state the sign convention (home−away vs away−home) and guessing it would
+  have produced a confident wrong number instead of an error.
+- **`batters_faced` is reported UNJOINABLE**, not silently dropped — there is
+  no such column in `mlb_pitcher_game_log.csv`.
+- **48 of 617 games dropped on a source disagreement.** Total runs is derived
+  (every run is charged to a pitcher), so it is cross-checked against the
+  batter log and any game where the two disagree is dropped and counted. That
+  check FIRED, so it is not vacuous.
+- **708 pitcher projections (9.6%) had no outcome row** — projected starters
+  who did not pitch. Excluded and counted, per `backtest_mlb_props`'s DNP rule.
+
+### VERIFICATION OF THE INSTRUMENT ITSELF
+
+- 66 tests pass, including the pre-existing `model_scoring` consumer
+  (`test_segmented_reliability_profile`, `test_build_accuracy_summary`).
+- `crps_empirical` verified **three independent ways** — closed-form point-mass
+  case, an independent sample-based estimator (`E|X−y| − ½E|X−X'|`), and
+  agreement with `crps_normal` on a finely discretised Normal.
+- **4 of 4 mutants caught** (strict-vs-non-strict indicator, dropped interval
+  width, missing outcome breakpoint, absolute instead of squared error). A
+  passing suite that no mutant fails is decoration.
