@@ -12541,3 +12541,65 @@ similar, do not build per-team tendencies" branch). It did not fire.
    618 games. Governs BOTH position-player substitution and the pitching hook,
    which is why P1 and P2 are one piece of work.
 4. Re-run `mlb_opportunity_haircut.py` after each. The scoreboard is the market.
+
+## 2026-08-17 — TOTALS BIAS CHECK: **my carry-over hypothesis is FALSIFIED, and that LOCALISES the bug**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_totals_bias_check.py`. n=158 games
+joined by `game_pk` (exact id join) to `feed_live` finals. Read-only.
+
+### The prediction, and the result
+
+**Predicted:** the engine over-projects plate appearances ~12-15% (no
+substitution model), so ~4.5 phantom PA/team at ~0.12 runs/PA should make game
+totals run **~+1.0 HIGH**.
+
+**Measured:**
+
+    TOTAL RUNS   model 8.563   actual 9.044   BIAS -0.481  (-5.3%)
+                 = -0.241 runs per team, i.e. LOW
+
+**Opposite sign. The hypothesis is dead.**
+
+### WHY THIS IS THE MOST USEFUL RESULT OF THE SEQUENCE
+
+If the GAME SIMULATION were producing 4.5 phantom plate appearances per team,
+totals would be high. **They are low.** So the game sim is very likely NOT
+inflating opportunity — **the ~15% PA inflation lives in the PROP PROJECTION
+path (`pa_mean`/`ab_mean`), not in the core simulation.**
+
+That is a much sharper localisation than anything the prop-side work produced,
+and it has direct consequences:
+
+1. **Fixing prop opportunity will NOT move game totals.** They are different code
+   paths with different opportunity handling. I assumed one root cause behind
+   both; there are two.
+2. **The substitution model is a PROP-SIDE fix.** Its value is the 0.0015-0.010
+   Brier gap on props, not game lines. My message to the user speculating that it
+   would help game betting was WRONG and is corrected here.
+3. **Game totals have their own, OPPOSITE defect** — under-projecting by 5.3%.
+   That needs its own diagnosis and is not addressed by anything done today.
+
+### TWO FURTHER READINGS WORTH KEEPING
+
+**MLB game totals BEAT CLIMATOLOGY: CRPS 2.4891 vs 2.5404 = +2.02% skill**
+(n=158, `total_runs_dist`). Only the second positive skill measurement in this
+platform, after NFL margin (+3.20%). **No CI computed — n=158 and this is
+INDICATIVE, not established.** It should be re-run through
+`skill_census_crps.py` to get a paired interval before anyone cites it.
+
+**The model under-projects home-field advantage:**
+
+    run margin (home - away)   model -0.187   actual +0.133   bias -0.320
+
+The sim has the home team as slight underdogs on average when they are in fact
+slight favourites. That is a separate, cheap, and probably fixable calibration
+target — and it is consistent with the totals being low.
+
+### Status of the MLB plan after this
+
+- **P1 (opportunity) stands** — it closes the market gap on PROPS, measured
+  out-of-sample, 3 of 3 families. Its scope is now correctly bounded to props.
+- **P2 (per-manager tendencies) stands** — managers differ 1.68x, measured.
+- **NEW: game totals under-projection (−5.3%) and home-field under-projection
+  (−0.32 runs) are separate defects**, unexplained, and are the natural next
+  diagnosis for anyone wanting to improve MLB game lines specifically.
