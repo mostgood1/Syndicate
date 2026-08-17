@@ -10161,3 +10161,52 @@ before sealing, and allow a strictly-richer re-seal while pregame; (c) backfill
 **Cost note before anyone acts:** OddsAPI is at ~62.7% of a 5M cap and MLB is
 93.0% of spend. Moving the props fetch earlier changes call timing, not
 necessarily volume, but the backfill does add calls — cost it first.
+
+## 2026-08-17 ~18:00Z - WNBA game_cards: schedule denominator + stable fixture id
+
+| service | deploy | commit | base | status | measurement |
+|---|---|---|---|---|---|
+| refresh-worker | `dep-da1kftnqj5pc73d8vvj0` | `8c0bd8e6` | live `b20072cd` | live 17:52Z | **EMPTY - not measured** |
+| live-odds-worker | `dep-da1kjb0jo6nc738s2p4g` | `abc99875` | live `cc0f7605` | live 18:00Z | **EMPTY - not measured** |
+
+**VERIFIED BY CONTENT on both** (not by ancestry): `"fixture_id"` in the header,
+`_finalize_and_write` x4 (one def + three write paths), `wnba_fixture_identity.py`
+PRESENT.
+
+**NEITHER LIVE SHA WAS AN ANCESTOR OF `main`.** refresh-worker's `b20072cd` had
+10+ commits absent from main (another lane's OOM instruments, and `898edfed`, the
+WNBA overtime fix); live-odds-worker's `cc0f7605` had 8. **Deploying `main` would
+have reverted them.** Both branches were cut from the LIVE SHA and my commit
+cherry-picked on, then checked: the other lane's `publish to the readable
+channel` block survives in both, and neither branch carries a conflict marker or
+a `.syndicate/` change.
+
+**THE EFFECT IS NOT MEASURED, AND THIS ROW STAYS OPEN UNTIL IT IS.**
+- **9 polls over ~8 minutes after the deploy: ZERO `GAME_CARDS_CENSUS` on either
+  service.**
+- **That is a REAL absence, not a blind instrument.** Control run in the same
+  window: both services returned live log lines (18:06:25Z, 18:06:28Z). And the
+  emitter was confirmed present in the deployed SHA before watching. Both halves
+  of the `absent-signal` rule were checked before reporting the null.
+- **It was ALSO zero for the ~2 days BEFORE the deploy**, with the emitter
+  present in `b20072cd` and `cc0f7605`. So this builder runs rarely - it is not
+  that the deploy broke it.
+- **live-odds-worker is BLOCKED on a stuck run:** `LIVE ODDS REFRESH
+  SKIP/ERROR DETAIL: A refresh run is already active (pid=890). Cancel it before
+  starting a new one.` **A new refresh cannot start there until that pid clears.**
+  Unresolved, and it is not mine - surfaced, not touched.
+- `WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS=21600` (6h) on refresh-worker.
+
+**WHAT WOULD ACTUALLY CLOSE THIS ROW - and today CANNOT.** 2026-08-17 has ONE
+WNBA fixture (DAL@GSV), and a 1-row file is CORRECT for a 1-game slate (pinned by
+test). **A single-game slate proves nothing.** The measurement needs the
+2026-08-18 slate: **4 fixtures** (LAS@CON, IND@TOR, NYL@CHI, ATL@LVA).
+1. Read `GAME_CARDS_CENSUS` after a WNBA tick; expect `scheduled=4 covered=4`
+   with `backfilled=` accounting for whatever odds missed.
+2. Or read `game_cards_2026-08-18.csv` and assert 4 rows and a `fixture_id`
+   column in the header.
+**Do not record this as fixed on the header alone** - `fixture_id` present with
+`covered<scheduled` would mean the id shipped and the coverage fix did not.
+
+Rollback, either service: redeploy the base SHA above via
+`POST /v1/services/<id>/deploys {"commitId": "<base>"}`.
