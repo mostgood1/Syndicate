@@ -6172,3 +6172,54 @@ until they return.** I did not chase it - separate defect, separate owner.
 - **Still open:** `hits_runs_rbis` extractor broken; MLB totals' +2.02% has no CI;
   two deploy requests queued and de-prioritised by me; `outs-props-coverage-check`
   fires 2026-08-19.
+
+### soccer-projection-collapse - OPEN, DIAGNOSED NOT FIXED - opened 2026-08-17 by `modelled-fair-edge`
+- **Symptom:** soccer serves `rows_with_projection: 4` of `rows_considered: 1142`
+  (**`pct_projected: 0.4`**). Found while measuring the new
+  `edge_vs_modelled_fair_pct` column, which is INERT for soccer as a result -
+  1,120 soccer rows carry a `modelled_fair` and have no model probability to
+  price against it.
+
+**NOT STALENESS, AND NOT THE SIM FAILING TO RUN.** All four leagues produced
+recommendations TODAY and the payload says so:
+```
+generated_at_by_league  championship 21:07  la_liga 21:11  mls 22:01  primeira_liga 21:06
+oldest_sim_age_hours    0.9
+matches_in_source       3
+rows_considered      1142
+rows_with_projection    4
+unmatched_match_rows 1138      <- the finding
+unsupported_market_rows 0      <- NOT a market-support problem
+```
+
+**EXONERATED, measured not assumed:**
+- **Accents.** `_norm_name` folds correctly now (`Deportivo La Coruna` ->
+  `deportivo la coruna`) and `teams_match` returns True for the accented/plain
+  pair. The `soccer_projections.match_for` docstring still claims `_norm_team`
+  "replaces a non-ASCII character with a SPACE" - **that claim is STALE**, the
+  fold was fixed in `_norm_name`. Do not re-chase it.
+- **Board-side names.** `game_state` matched **697 rows** on the SAME board, so
+  the board's team names join fine in a sibling join.
+- **Market support.** `unsupported_market_rows: 0`.
+
+**THE ARITHMETIC THAT SAYS THIS IS REAL AND NOT JUST A SMALL SLATE.** The board
+carries **5 distinct fixtures** (sampled) across the same 4 leagues; the source
+holds **3 matches**. Even if 2 fixtures were legitimately unsimulated, 3 matching
+fixtures should project a large fraction of 1,142 rows. **4 rows, and
+`rows_with_true_probability: 3`, means roughly ONE match actually joined.** So
+2 of 3 source matches do not join to the board.
+
+**WHAT I COULD NOT MEASURE, and why the next person hits the same wall:** which
+3 fixtures the source holds. **Soccer's per-league recommendations are NOT in
+`HOT_ARTIFACT_PATTERNS`** - the allowlist covers
+`*_source/source_artifacts/data/processed/recommendations*.json`, but soccer
+writes `soccer_source/<league>/api/recommendations/recommendations_<date>.json`.
+So `/api/ops/artifacts/export` returns `count=0` for them and the file cannot be
+inspected through ops at all. **The local mirror is useless here too: la_liga's
+copy is from 2026-07-20 and the other three are ABSENT.**
+
+**SINGLE NEXT ACTION:** get one production `recommendations_<date>.json` -
+either widen `HOT_ARTIFACT_PATTERNS` to cover the per-league path, or read it
+off the worker - and compare its 3 match identities against the board's 5
+fixtures. That comparison is the whole diagnosis; everything upstream of it is
+already exonerated above.
