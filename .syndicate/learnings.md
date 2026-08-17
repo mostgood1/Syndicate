@@ -3915,3 +3915,49 @@ call is not a constant in a repo other people are pushing to.
   already live.** Same session, the reverse case also bit: a `git commit` was
   refused because HEAD moved mid-sequence.
 - *(evidence: `.syndicate/deploys.md`, clamp closure)*
+
+## 2026-08-17 — CHECKPOINT 9: a green test that asserts nothing
+
+### FOUND: `for x in collection: assert ...` is VACUOUS on an empty collection
+
+`test_two_sided_fair_is_devigged_and_drives_ev` was **green for as long as the
+bug existed**. It loops over `result["opportunities"]` and asserts three things
+about each — and `opportunities` was `[]`, because the fixture's two sides came
+from different books and every candidate was dropped unscored. Nine of its
+neighbours failed; this one reported success while checking nothing.
+
+**Any test whose assertions live inside a loop needs a non-emptiness assertion
+first.** One line:
+
+    assert result["opportunities"], "fixture produced no scored candidates"
+
+The failure mode is worse than a missing test, because the green tick is
+evidence *against* looking. Same family as this repo's standing rule that a null
+reading is about the instrument until proven otherwise.
+
+### REFUTED: "the fixture was repaired, so the fixture is right"
+
+The same `_row()` fixture carried a comment from an EARLIER repair explaining
+that it had been changed to two different bettable books to satisfy
+`book_shortlist.DEFAULT_BOOKS`. That repair was correct about its gate and broke
+the next one: with no `cells`, the fair path requires both sides from ONE book,
+so the fixture satisfied gate A and failed gate B — and the tests failed for a
+reason neither the comment nor the assertions mentioned.
+
+**When a fixture carries a comment explaining a previous repair, treat it as
+evidence of a gate you have not met yet, not as evidence the fixture is
+current.** Production accumulates gates; a fixture only ever met the ones that
+existed when it was last touched.
+
+### THE CHECK THAT SEPARATES A REPAIR FROM A COVER-UP
+
+Making 9 red tests green is worthless if the fixtures now simply agree with
+themselves. Before committing, revert each repair IN MEMORY and re-run:
+
+    cross-book fixture   -> 4 failures   (CAUGHT)
+    missing event_id     -> 6 failures   (CAUGHT)
+
+If a reverted repair does not reproduce failures, the test no longer tests the
+gate and the repair was a cover-up. **Three lines of scripting, and it is the
+difference between fixing a suite and teaching it to lie more quietly** — which
+matters especially here, where one of these tests had been lying for a while.

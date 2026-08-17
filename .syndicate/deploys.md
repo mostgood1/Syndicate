@@ -9350,8 +9350,11 @@ named above so neither disappears with the lane.
   projection… Until projections carry it, this bound is the guard." **The bound
   is NOT relaxed here** and a test fails if it is.
 - Tests: 6 new; **114 green** across the touched file's suites in a clean
-  worktree. `test_layer2_board.py` is 9-fail/18-pass on clean `origin/main` and
-  identical with this change — pre-existing, not mine.
+  worktree. `test_layer2_board.py` was 9-fail/18-pass on clean `origin/main`
+  and identical with this change — pre-existing, not caused by it.
+  **THOSE 9 ARE NOW FIXED (`432e6e73`, 27 passed): all fixture staleness,
+  no source change.** Recorded here because a stale "the suite is broken"
+  reads as a live warning to whoever picks this row up.
 - **VERIFICATION OWED ON THE NEXT refresh-worker DEPLOY:** `edge_basis` present
   on `full/*` live rows of `/api/board/layer2-shortlist`, `"live"` where
   `live_aware` is true. **Until then this row stays an open obligation and
