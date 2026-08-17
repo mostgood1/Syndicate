@@ -3646,3 +3646,68 @@ key so it can be swept like everything else, then (b) sweep it against the SAME
 rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
+
+### wnba-fixture-identity - **BUILT AND TESTED (26 pass). The stable identity already existed and nobody was using it. Coverage defect now sized: 72.6%, season-long, FOUR distinct failure modes.**
+
+**THE IDENTITY: the ESPN event id, already in `schedule_2026.csv`.** No new
+scheme was minted - that would have been a fourth. Verified same-instant against
+ESPN's own scoreboard for 2026-08-16:
+```
+schedule_2026.csv          ESPN scoreboard?dates=20260816
+401857148 CHI @ SEA   ==   401857148 CHI @ SEA
+401857150 IND @ ATL   ==   401857150 IND @ ATL
+401857149 POR @ PHX   ==   401857149 POR @ PHX
+```
+**Pregame artifacts and the live lens therefore share one key for free.** The
+schedule covers 351 fixtures / 121 dates / 2026-04-25..09-24, and
+`"{city} {name}"` matches all 15 real team strings in the artifacts EXACTLY, so
+normalization is a lookup and not a fuzzy match.
+
+**NEW:** `syndicate/features/shared/wnba_fixture_identity.py` +
+`tests/test_wnba_fixture_identity.py` (26 pass). API: `fixtures_for_date`
+(the canonical denominator), `resolve_fixture_id`, `normalize_team`,
+`coverage_against_schedule`.
+
+**FIVE REFUSALS, each pinned by a test, each corresponding to a silent wrong join:**
+1. **Never invents an id** - unresolvable returns None. Inventing is exactly
+   what produced the 1395 sequential indices.
+2. **`Fixture` carries NO status field.** The schedule's `game_status_text` is
+   STALE - measured, it read "In Progress"/"Scheduled" for all three 08-16
+   games while ESPN had them Final. Not exposing it is the only way to
+   guarantee nobody joins a board to a dead status.
+3. **Orientation is part of the identity** - a swapped pair does NOT resolve,
+   because matching it flips the sign of every spread and margin.
+4. **Ambiguity refuses** rather than taking the first.
+5. **Missing/corrupt schedule -> empty, never raises.** It is imported by a
+   BUILD path; the `#375` lesson is that a diagnostic must not break its subject.
+
+**THE DEFECT IS SEASON-LONG, NOT A ONE-DATE SAMPLE.** My prior caveat said not
+to size the fix off 08-16 alone. Sized now, over 41 dates with a schedule:
+```
+TOTAL COVERAGE   82/113 fixtures = 72.6%
+SHORT DATES      16 of 41
+worst            2026-06-17 1/6 | 2026-06-28 0/4 | 2026-07-09 0/3
+```
+**CAVEAT, per the mirror rule: this is LOCAL git-tracked/mirror data of unknown
+vintage.** Production was spot-checked and agrees on both dates I could reach:
+08-16 = 1/3, 08-17 = 1/1.
+
+**FOUR DISTINCT FAILURE MODES, which "1 row" could never have distinguished:**
+- **partial coverage** - 16 dates, 31 fixtures missing.
+- **EMPTY FILE** - `2026-06-28` has 0 rows for 4 scheduled, `2026-07-09` 0 for 3.
+  A total-failure mode, not a degree of the first.
+- **WRONG-DATE ASSIGNMENT** - `game_cards_2026-06-30.csv` holds LAS@IND and
+  ATL@SEA while the schedule for that date is **only LVA@NYL**. Neither row
+  belongs to the date in its own filename. Plausibly the
+  `_commence_time_matches_slate_date` UTC/Central bug fixed 2026-07-21 - 06-30
+  predates that fix - **but that is a hypothesis, not measured.**
+- **orientation swap** - searched for, **none found.** Recording the exoneration.
+
+**NOT YET DONE - this module is not wired into anything.** It is a foundation
+with no callers. Next: `_build_local_game_cards_artifact`
+(`scripts/refresh_wnba_oddsapi_props.py:2262`) emits `fixture_id` and uses
+`fixtures_for_date` as its denominator, and the `#375` census reports
+`coverage_against_schedule` instead of a bare row count. **Start from the
+existing regression tests** (`test_wnba_game_cards_census.py`,
+`test_wnba_refresh_runner.py::...promotes_full_slate_when_snapshot_is_partial`)
+- this defect was already fixed once on 2026-07-07 and came back.
