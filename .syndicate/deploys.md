@@ -10210,3 +10210,39 @@ test). **A single-game slate proves nothing.** The measurement needs the
 
 Rollback, either service: redeploy the base SHA above via
 `POST /v1/services/<id>/deploys {"commitId": "<base>"}`.
+
+### CORRECTION 18:30Z / 13:30 CDT - "live-odds-worker is BLOCKED on a stuck run" was WRONG. Nothing was stuck; nothing to clear.
+
+I reported the `pid=890` lock as a live blocker and offered to clear it. **Asked
+to clear it, I checked first and it was already gone.** Measured:
+
+- **`pid=890` appears TWICE, both at 18:06:28Z, and NEVER AGAIN** - 23 minutes
+  clean at the time of writing. It was a transient collision while the container
+  was still coming up from MY OWN 18:00Z deploy, not a wedged lock.
+- **The loop is healthy right now**: `live_refresh_loop` emitted FIXTURE_CADENCE
+  and PREGAME_CADENCE lines at 18:28:49Z, and `run_refresh_odds_job` shows in
+  ALL_PROCESS_MEMORY at 18:28:31Z. A refresh IS running.
+- **The guard self-heals anyway** (`ops_refresh.py:645`): `state==running` with a
+  dead pid is rewritten to `failed` on the next read. A genuinely stale lock
+  could not have persisted. **I could have derived that from the code before
+  reporting it as a blocker, and did not.**
+
+**CLEARING IT WOULD HAVE BEEN A DESTRUCTIVE ACTION ON A HEALTHY LOCK** - breaking
+the mutex that stops two concurrent refresh runs, to fix a condition that had
+already resolved 20+ minutes earlier.
+
+**THE REAL REASON THE CENSUS HAS NOT FIRED - it is a cadence, not a fault:**
+```
+[live_refresh_loop] PREGAME_CADENCE_DETAIL wnba:marker_age_s=1618/interval_s=7200
+[live_refresh_loop] PREGAME_CADENCE_SKIPPED sports=wnba
+```
+WNBA pregame runs on a **7200s (2h)** interval; the marker was set 18:01:51Z, so
+the next WNBA pregame refresh is **~20:01:51Z = 15:01 CDT**. The builder was
+never going to run in the 8 minutes I watched. **My watch window was shorter
+than the cadence I was waiting on, which I should have read before watching.**
+
+**STATUS UNCHANGED AND STILL OPEN:** deployed + verified by content on both
+workers, effect NOT measured. Next natural chance ~20:01Z, but **2026-08-17 is a
+ONE-fixture slate and cannot prove coverage** - a 1-row file is correct there.
+The proof needs 2026-08-18 (4 fixtures: LAS@CON, IND@TOR, NYL@CHI, ATL@LVA),
+expecting `scheduled=4 covered=4`.
