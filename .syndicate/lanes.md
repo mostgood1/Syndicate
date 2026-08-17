@@ -2496,11 +2496,50 @@ and then failed the thing it was checking, which is the point of running it.
   (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
 - Blocked by: none.
 
+### live-edge-basis — OPEN — opened 2026-08-17 — session: ask-answer-substance
+- Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
+  refers to. **Testable outcome:** on a live-joined game row,
+  `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live
+  projection. No existing field changes value.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_gameline_join.py`
+  - `tests/test_live_gameline_edge_basis.py`
+- **TAKEN BY USER OVERRIDE from `wnba-live-tier`, whose session was LIVE.** See
+  the note under that lane. It keeps every other path it held.
+- Deploy intent: **NONE TAKEN.** This code runs in the artifact build on
+  refresh-worker, and at open time (a) `refresh-worker-oom-recurrence` has a
+  documented deploy hold on that service and (b) the deploy claim was HELD by
+  `sim-scheduling` mid-ship. Committed and landed on `main`, **UNDEPLOYED** and
+  recorded as such in `deploys.md`. Whoever next deploys refresh-worker carries
+  it.
+- Verification once deployed: `edge_basis` present on `full/*` live rows of
+  `/api/board/layer2-shortlist`, and `_board_row_probabilities` can then publish
+  a model/market pair on those rows instead of refusing.
+- Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.
+
 ### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+> **`syndicate/features/shared/live_gameline_join.py` TAKEN FROM THIS LANE
+> 2026-08-17 01:1xZ, BY EXPLICIT USER OVERRIDE, while this lane's session was
+> LIVE.** Not a silent cross-lane edit -- the claim moved in the ledger and this
+> note is the record. Owner notified in the same action.
+>
+> Taken by `live-edge-basis` to add ONE key, `projection["edge_basis"]`, at
+> `_apply_verdict` (~:643). It changes no existing value, so nothing this lane
+> ships moves. **The rest of your Files block is untouched.**
+>
+> Reason: `edge_vs_market_pct` is computed against `live_model_prob_over` while
+> `model_prob_over` beside it stays PREGAME, and nothing says so -- 7/7
+> separation on `live_aware`, stated `-39.93` vs `+27.46` for the pregame
+> pairing. **The rename I first suggested to you was WRONG** and would have made
+> `layer2_board._model_edge_for` price live rows off a pregame edge; `edge_basis`
+> is the corrected fix.
+>
+> **TO TAKE IT BACK:** put the path back on your `- Files:` line and tell
+> `live-edge-basis`. Nothing here is load-bearing for your WNBA work.
+
 - Goal: WNBA live games carry a live tier on the Layer 1 board, GAME LINES and
   PROPS. Baseline was **0 of 521 rows** across 2 live games.
-- Files: `syndicate/features/shared/live_gameline_join.py`,
-  `syndicate/features/shared/board_enrichment.py`,
+- Files: `syndicate/features/shared/board_enrichment.py`,
   `tests/test_wnba_live_tier.py`,
   `tests/test_wnba_scoreboard_carry_forward.py`.
   - **NOT claimed by this lane any more:** `syndicate/features/wnba/cards.py` is
