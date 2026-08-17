@@ -3834,11 +3834,17 @@ Taken on explicit user instruction ("now take the cadence lever too").
   real hook at rc=0 with the control still rc=2; exemption path 81 ms.
   `5fb52342` verified not to disturb another session's staged work, and to leave
   no revert armed for its own paths.
-- **NOT CLOSED because the work is not on `origin/main`.** ahead 32 / behind 148
-  at checkpoint; all 32 already exist on `origin/ledger/coordinator-2026-08-17`,
-  so nothing can be lost and this is a history question, not a safety one. No
-  `render.yaml` in the 32 → no `blueprint_sync` exposure. Push request is with
-  the coordinator (`local_1d6f136e-…`), three options offered, no reply yet.
+- **DELIVERED: `5fb52342` IS on `origin/main` as of ~14:35 CDT** (`origin/main`
+  = `5962900e`, `merge-base --is-ancestor` confirms). I did not push it —
+  another session landed `ledger/coordinator-2026-08-17` onto `main` while this
+  checkpoint was being written. The push request I filed with the coordinator is
+  therefore MOOT, not pending; if they reply to it, this is why.
+  *(Superseded reading, kept because it was true for ~40 min and a reader may
+  have acted on it: at 14:30 this was ahead 32 / behind 148 with the commit only
+  on the ledger branch. No `render.yaml` was in those 32 → no `blueprint_sync`
+  exposure either way.)*
+- **STILL UNPUSHED: `acad136f`**, this checkpoint. Not pushed by me — standing
+  instruction is that the coordinator is told before ANY push, not only deploys.
 - **CONFLICT, ADJUDICATED BY THE COORDINATOR, NOT BY ME:** another session's
   brief is to CLOSE the in-command `GIT_INDEX_FILE` escape this lane OPENED.
   Same predicate, opposite directions. The coordinator ruled **the escape stays
