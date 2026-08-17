@@ -646,20 +646,26 @@ def test_the_floor_never_fails_a_run_while_its_stability_is_unknown():
 
 
 def test_a_watch_metric_is_printed_even_when_it_did_not_move():
-    """A metric shown only when it moves can never be shown to be stable."""
+    """A metric shown only when it moves can never be shown to be stable.
+
+    On soccer, not the default mlb: mlb was baselined 2026-08-17 and now takes
+    the judged branch, so a sport that has NOT earned a baseline is what holds
+    this branch open."""
     tie = {"state": "Preview", "floorPx": 116, "atU": 33, "n": 5,
            "tiedGroups": 1, "cardsTied": 5}
-    base = _report(identicalContentSpread=dict(tie))
-    cur = _report(identicalContentSpread=dict(tie))
+    base = _report(sport="soccer", identicalContentSpread=dict(tie))
+    cur = _report(sport="soccer", identicalContentSpread=dict(tie))
     text, ok = _compare(base, cur)
     assert ok
     assert "watch (stability unknown): identicalContentSpread unchanged" in text
 
 
 def test_a_watch_metric_reports_movement_without_failing():
-    base = _report(identicalContentSpread={"state": "Preview", "floorPx": 116,
+    base = _report(sport="soccer",
+                   identicalContentSpread={"state": "Preview", "floorPx": 116,
                                            "atU": 33, "n": 5, "tiedGroups": 1, "cardsTied": 5})
-    cur = _report(identicalContentSpread={"state": "Preview", "floorPx": 402,
+    cur = _report(sport="soccer",
+                  identicalContentSpread={"state": "Preview", "floorPx": 402,
                                           "atU": 33, "n": 5, "tiedGroups": 1, "cardsTied": 5})
     text, ok = _compare(base, cur)
     assert ok, "movement is the DATA this lane is collecting, not a failure"
@@ -756,8 +762,10 @@ def test_the_comparison_diffs_the_worst_group():
         "state": "Preview", "spreadPx": 400, "worstGroupPx": 400,
         "largestGroupPx": 900, "atU": 41, "n": 2})
     text, ok = _compare(base, cur)
+    # mlb is baselined, so `ok` is load-bearing here: were `_cmp_value` to read
+    # `largestGroupPx`, this would not merely misprint, it would FAIL the run.
     assert ok
-    assert "identicalContentSpread unchanged" in text
+    assert "identicalContentSpread 400px unchanged (baselined)" in text
 
 
 def test_a_report_from_the_largest_group_window_compares_on_the_same_quantity():
@@ -772,7 +780,7 @@ def test_a_report_from_the_largest_group_window_compares_on_the_same_quantity():
     text, ok = _compare(_report(identicalContentSpread=old_era),
                         _report(identicalContentSpread=new_era))
     assert ok
-    assert "identicalContentSpread unchanged" in text
+    assert "identicalContentSpread 99px unchanged (baselined)" in text
 
 
 def test_an_older_report_using_floorPx_still_compares():
@@ -788,7 +796,7 @@ def test_an_older_report_using_floorPx_still_compares():
 
 
 
-# --- nfl/ncaaf baselined; mlb and soccer still only watched ----------------
+# --- nfl/ncaaf/mlb baselined; soccer still only watched ---------------------
 
 
 def _tie(px, state="Week 1"):
@@ -800,10 +808,34 @@ def _pair(sport, base_tie, cur_tie):
             _report(sport=sport, identicalContentSpread=cur_tie))
 
 
-def test_only_the_static_slates_are_baselined():
-    """mlb moved on every reading; nfl/ncaaf were bit-identical on 7+ runs."""
-    assert probe.TIE_SPREAD_BASELINED == frozenset({"nfl", "ncaaf"})
-    assert "mlb" not in probe.TIE_SPREAD_BASELINED
+def test_only_the_settled_slates_are_baselined():
+    """A sport is opted in BY NAME after several bit-identical runs, never in a
+    blanket promotion. nfl/ncaaf earned it on 7+ runs 2026-08-16; mlb earned it
+    2026-08-17 on a pre-game slate (below). soccer has not, and must stay out."""
+    assert probe.TIE_SPREAD_BASELINED == frozenset({"nfl", "ncaaf", "mlb"})
+    assert "soccer" not in probe.TIE_SPREAD_BASELINED
+
+
+def test_mlb_is_baselined_on_the_pregame_evidence():
+    """Refused 2026-08-16 (81/109/123/164/193px in one day), armed 2026-08-17.
+
+    Re-measured on an all-`Preview` slate -- 11 cards, one state, no game
+    started -- three consecutive production runs against
+    https://syndicate-an21.onrender.com were BIT-IDENTICAL on both widths, every
+    per-group figure included:
+
+        desktop  worstGroupPx 86, spreadPct 7.1   (3 cards at 49 pairs)
+        mobile   worstGroupPx 43, spreadPct 1.1   (3 cards at 45 pairs)
+
+    So the earlier instability was the SLATE, not the metric. The corollary is
+    that mlb is only baselineable PRE-GAME; a live slate will move this number,
+    and the per-state guard (see the state-change test below) is what keeps that
+    from reading as a layout regression.
+    """
+    assert "mlb" in probe.TIE_SPREAD_BASELINED
+    text, ok = _compare(*_pair("mlb", _tie(86, "Preview"), _tie(86, "Preview")))
+    assert ok, text
+    assert "identicalContentSpread 86px unchanged (baselined)" in text
 
 
 def test_a_baselined_sport_fails_on_drift():
@@ -821,12 +853,22 @@ def test_a_baselined_sport_passes_when_unchanged():
     assert "identicalContentSpread 45px unchanged (baselined)" in text
 
 
-def test_mlb_drift_is_still_only_watched():
-    """The same movement that fails nfl must not fail mlb -- mlb's slate is live
-    and its tie spread is not baselineable in any statistic."""
-    text, ok = _compare(*_pair("mlb", _tie(109, "Preview"), _tie(53, "Preview")))
+def test_mlb_drift_within_pregame_now_fails():
+    """The movement that used to be tolerated on mlb is now the finding: two
+    Preview readings that disagree mean cards with identical data changed
+    height, because the pre-game slate was measured as bit-identical."""
+    text, ok = _compare(*_pair("mlb", _tie(86, "Preview"), _tie(164, "Preview")))
+    assert not ok
+    assert "identicalContentSpread DRIFT 86px -> 164px" in text
+    assert "Check whether the slate went live" in text
+
+
+def test_mlb_first_pitch_is_not_comparable_rather_than_drift():
+    """The limit mlb's baseline carries, and the reason arming it is safe: mlb is
+    only stable PRE-GAME, so first pitch MUST NOT read as a layout regression."""
+    text, ok = _compare(*_pair("mlb", _tie(86, "Preview"), _tie(193, "Live")))
     assert ok, text
-    assert "watch (stability unknown): identicalContentSpread 109 -> 53" in text
+    assert "NOT COMPARABLE -- state moved 'Preview' -> 'Live'" in text
     assert "DRIFT" not in text
 
 

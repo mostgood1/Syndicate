@@ -3115,3 +3115,28 @@ touch that.
 - **Next action:** export `wnba_source/data/processed/game_odds_2026-08-16.csv`
   from the worker and count rows. One row confirms the whole chain; three would
   mean the loss happens inside this function and the read above is incomplete.
+
+### mlb-tie-spread-baseline — OPEN — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+- **Goal:** answer the question `2026-08-16` left open — is MLB's
+  `identicalContentSpread` stable on a **pre-game** slate? If yes, add `"mlb"` to
+  `TIE_SPREAD_BASELINED` in `scripts/ui_layout_probe.py` so a change in that
+  number FAILS a run instead of being watch-only. **Testable outcome:** three
+  probe runs against production on an all-`Preview` slate, readings recorded per
+  width, judged against a ~1.2x rule fixed in advance; then either the sport is
+  armed with a fresh passing baseline, or the negative result is recorded and
+  nothing changes.
+- **Files:** `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `reports/ui_layout/baseline_2026-08-17.json`, `.syndicate/log/2026-08-17.md`,
+  `.syndicate/lanes.md`
+- **Hypothesis:** MLB's 2026-08-16 instability (81/109/123/164/193px across one
+  day) was **the slate, not the metric** — MLB enriches continuously while games
+  are live, whereas the nfl/ncaaf slates that earned baselining were static. On a
+  slate where every card is in `Preview`, the number should hold.
+- **Falsification test:** three runs on an all-`Preview` slate spreading beyond
+  ~1.2x on either width. That would mean the metric itself is noisy and MLB must
+  stay watch-only regardless of slate state.
+- **Verification:** `cardHeightByState` shows exactly one state (`Preview`)
+  covering all cards on both widths; three `worstGroupPx`/`spreadPct` readings
+  per width inside the rule; if armed, a fresh baseline that **exits 0**, the
+  probe suite green, and a re-run reporting mlb `unchanged (baselined)`.
+- **Blocked by:** none

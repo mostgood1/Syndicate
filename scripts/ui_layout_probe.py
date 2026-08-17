@@ -1468,7 +1468,27 @@ WATCH_METRICS = ("identicalContentSpread",)
 # per-STATE, so the comparison below only fires when the state matches on both
 # sides, and a state change is reported as not-comparable instead. The failure
 # text names the slate as the first thing to check.
-TIE_SPREAD_BASELINED = frozenset({"nfl", "ncaaf"})
+#
+# mlb added 2026-08-17, and it is the case that PROVES the paragraph above.
+# It was refused on 2026-08-16 for reading 81/109/123/164/193px across one day.
+# Re-measured on a slate where every card was in `Preview` -- 11 cards, one
+# state, no game started -- three consecutive production runs were BIT-IDENTICAL
+# on both widths, down to every per-group figure:
+#
+#     desktop  worstGroupPx 86, spreadPct 7.1  (3 cards at 49 pairs)
+#     mobile   worstGroupPx 43, spreadPct 1.1  (3 cards at 45 pairs)
+#
+# So the 2026-08-16 instability was THE SLATE, NOT THE METRIC -- mlb enriches
+# continuously while games are in progress, and those readings were sampling a
+# board that was still moving.
+#
+# WHICH MEANS: mlb IS ONLY BASELINEABLE PRE-GAME. A live slate WILL move this
+# number, and that is expected rather than a regression. What stops first pitch
+# from reading as a layout failure is the per-state guard in `compare()` below:
+# once `Preview` becomes `Live`/`Final` the two sides are different quantities,
+# and that branch prints NOT COMPARABLE and leaves `ok` alone. Drift can only be
+# raised against a baseline captured in the SAME state. Re-baseline pre-game.
+TIE_SPREAD_BASELINED = frozenset({"nfl", "ncaaf", "mlb"})
 
 
 def _cmp_value(v):
