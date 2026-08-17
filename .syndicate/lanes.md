@@ -2496,7 +2496,7 @@ and then failed the thing it was checking, which is the point of running it.
   (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
 - Blocked by: none.
 
-### live-edge-basis — OPEN — opened 2026-08-17 — session: ask-answer-substance
+### live-edge-basis — OPEN — **SHIPPED TO `main` (`28b03fef`), NOT DEPLOYED by owner instruction (rides a consolidated deploy); refresh-worker also had a documented hold and a held claim. `edge_basis` NEVER OBSERVED ON A SERVED ROW — verification owed in `deploys.md`.** — opened 2026-08-17 — session: ask-answer-substance
 - Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
   refers to. **Testable outcome:** on a live-joined game row,
   `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live

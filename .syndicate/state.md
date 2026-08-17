@@ -1305,19 +1305,21 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
-- **BOARD FINDING 3 STANDS AND IS UNFIXED — `live_gameline_join.py:643`.**
-  It overwrites `projection["edge_vs_market_pct"]` with the LIVE edge while
-  deliberately leaving `model_prob_over` at its PREGAME value (the live
-  probability goes to a new `live_model_prob_over` key), so the edge refers to
-  a different probability than the one printed beside it, with nothing in the
-  field name to say so. **7/7 separation on `live_aware`**; arithmetic exact —
-  stated `-39.93` = `(0.1917 - 0.591) x 100`, where the pregame pairing gives
-  `+27.46`. Every number correct; only the PAIRING wrong, which is why it is
-  `full/*` only (segment bases are not live-joined and agree 3/3). Suggested
-  fix: rename to `live_edge_vs_market_pct` so the pairing cannot be got wrong
-  at the call site. **The file is now held by a single lane, `wnba-live-tier`**
-  (the earlier two-holder conflict was resolved 2026-08-17 00:4xZ), so there is
-  one owner to coordinate with.
+- **BOARD FINDING 3 IS FIXED IN CODE AND NOT YET DEPLOYED (`28b03fef` on
+  `main`).** `live_gameline_join._apply_verdict` now sets
+  `projection["edge_basis"] = "live" | "pregame"`, so a consumer can tell
+  which probability `edge_vs_market_pct` was computed against — it is the
+  live one, while `model_prob_over` beside it stays pregame (7/7 separation
+  on `live_aware`; stated `-39.93` = `(0.1917 - 0.591) x 100` vs `+27.46`
+  for the pregame pairing). **Additive: no existing value moves.**
+  It is the fix `layer2_board` asked for beside `_MODEL_EDGE_MAX_POINTS =
+  15.0`, and that bound is NOT relaxed.
+  **`edge_basis` has never been observed on a served row** — it is emitted by
+  the artifact build on refresh-worker, which was not deployed (documented
+  hold + the claim was held mid-ship). It rides a consolidated deploy;
+  verification is owed and recorded in `deploys.md`.
+  **A RENAME TO `live_edge_vs_market_pct` IS FORBIDDEN** — `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly, so a
+  rename makes the board price LIVE rows off a PREGAME edge. Pinned by test.
 - **`.syndicate/lanes.md`'s STRUCTURAL INVARIANTS ARE CHECKABLE IN ONE
   COMMAND, and both hold as of 2026-08-17 01:0xZ** (17 headings, 8 OPEN
   lanes, 40 claims):

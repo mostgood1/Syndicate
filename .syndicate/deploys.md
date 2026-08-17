@@ -9327,3 +9327,33 @@ false signal the lane named.
 
 Closed on the criterion the lane wrote for itself, with both unmet ambitions
 named above so neither disappears with the lane.
+
+---
+
+### live-edge-basis — `28b03fef` on `main` — **LANDED, NOT DEPLOYED (open obligation, deliberate)**
+
+- Committed 2026-08-17 01:4xZ. **No deploy fired**, by owner instruction: it
+  rides a CONSOLIDATED deploy rather than a ninth one tonight.
+- Two independent reasons it could not go alone anyway, both checked at the time:
+  `refresh-worker-oom-recurrence` has a documented deploy hold on that service,
+  and the refresh-worker deploy claim was **HELD by `sim-scheduling`** mid-ship.
+- Change: `_apply_verdict` sets `projection["edge_basis"] = "live" | "pregame"`,
+  so a consumer can tell WHICH probability `edge_vs_market_pct` was computed
+  against. **Additive — no existing value moves.**
+- Why it matters: the edge is computed against `live_model_prob_over` while
+  `model_prob_over` beside it stays PREGAME. Measured on the served shortlist,
+  13 rows with both an edge and the pair: the **7** that could not be reconciled
+  were all `live_aware`, all **6** that reconciled were not. Stated `−39.93`
+  reproduces exactly from the live pair; the pregame pairing gives `+27.46`.
+- **This is the fix `layer2_board` asked for in a comment** beside
+  `_MODEL_EDGE_MAX_POINTS = 15.0`: "The real fix is an explicit `basis` on the
+  projection… Until projections carry it, this bound is the guard." **The bound
+  is NOT relaxed here** and a test fails if it is.
+- Tests: 6 new; **114 green** across the touched file's suites in a clean
+  worktree. `test_layer2_board.py` is 9-fail/18-pass on clean `origin/main` and
+  identical with this change — pre-existing, not mine.
+- **VERIFICATION OWED ON THE NEXT refresh-worker DEPLOY:** `edge_basis` present
+  on `full/*` live rows of `/api/board/layer2-shortlist`, `"live"` where
+  `live_aware` is true. **Until then this row stays an open obligation and
+  `edge_basis` has never been seen on a served row.**
+- Rollback: revert `28b03fef`. Nothing reads the key yet, so reverting is inert.

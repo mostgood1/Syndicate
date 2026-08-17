@@ -3654,3 +3654,52 @@ supplied "a safety guard was removed" without opening the diff. Read the lines
 before naming the damage — the same rule already written for the `wnba/cards.py`
 `american_price` scare earlier this session, which I got right and then did not
 apply an hour later.
+
+## 2026-08-17 — CHECKPOINT 8: recommend only what you have traced
+
+### FORBIDDEN: proposing a field rename without tracing every consumer first
+
+I twice recommended renaming the live edge to `live_edge_vs_market_pct` "so the
+pairing cannot be got wrong at the call site". Tracing consumers while writing
+the patch: `layer2_board._model_edge_for` reads `edge_vs_market_pct` **directly**
+and that value becomes the board's `model_edge_pct`. The rename would have made
+the board price **live** rows off a **pregame** edge — worse than the defect it
+was meant to fix, and I had sent it to another session twice.
+
+**A rename is a contract change. Grep the field before proposing one, not before
+implementing one** — by implementation time the advice has already been acted on.
+The corrected fix adds a key and moves nothing, and a test now fails if the
+rename returns.
+
+Second-order: the file's own neighbourhood already contained the answer.
+`layer2_board`, beside `_MODEL_EDGE_MAX_POINTS = 15.0`: *"The real fix is an
+explicit `basis` on the projection… Until projections carry it, this bound is the
+guard."* **The correct design was written in a comment months earlier and I
+proposed something else without reading it.**
+
+### The lane guard reads the LOCAL ledger, not the one you pushed to
+
+I held the claim on `origin/main` and the guard still blocked the edit, because
+the working tree's `.syndicate/lanes.md` was ~40 commits stale and still showed
+the previous holder. **A claim is only enforced where the guard can see it.**
+
+The fix is to sync those lines locally. The temptation — editing in a throwaway
+worktree, where the hook cannot resolve the path to a claim — **is a bypass, not
+a workaround**, and it would have worked silently. If you find yourself choosing
+a location because the guard cannot see it, stop.
+
+### RECURRENCE: chaining `git add`/`commit` picked up another session's work AGAIN
+
+`project-shared-tree-commit-recipes` already records this. It happened anyway:
+a chained `... && git add ... && git commit` ran with the **shell's** cwd (the
+shared repo) rather than the worktree I had just written to, and produced a local
+commit containing another session's `game_shape.py` (+906) and
+`tests/test_game_shape.py` (+693).
+
+Nothing reached `origin` only because the push was rejected as non-fast-forward —
+**luck, not care**. Undone with `git reset --soft HEAD~1`, which restored their
+files to the index exactly as they were.
+
+**Every git write against a worktree must carry `git -C <worktree>`.** A bare
+`git` in a chained command inherits the shell's directory, and the shell's
+directory is the one place the files are not yours.
