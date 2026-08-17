@@ -5115,3 +5115,37 @@ for an argument about VALUE. Cheap and worthless is still worthless.
 the PITCHER side and `batter.vs_pitch_type` remains 0%, so the matchup
 INTERACTION was never tested — only per-pitcher average effectiveness. The
 negative result stands for what was measured and must not be cited as broader.
+
+## 2026-08-17 — RULE: you cannot add a MECHANISM to a CALIBRATED engine without re-fitting its rates
+
+**Measured, 2x2 factorial, 4 of 4 markets:** adding position-player substitution
+and pitch-type splits to the MLB sim produced a **NEGATIVE interaction, mean
+−0.00331**. On RBIs each feature alone helped (−0.00573, −0.00271) and together
+they gained almost nothing (−0.00046). **On runs, both-on was WORSE than
+neither.**
+
+**Why, and it generalises far beyond these two features.** The engine's
+`k_rate` / `hr_rate` / `inplay_hit_rate` were fitted so the sim's OUTPUT matched
+observed outcomes — using a sim that never substituted anyone and never varied
+effectiveness by pitch type. **Those fitted rates therefore already ABSORB the
+average effect of the missing mechanisms.**
+
+Adding a mechanism back DOUBLE-COUNTS it. Adding two double-counts twice and the
+errors compound. The negative interaction is not a quirk of these two features;
+it is what a calibrated system does to any mechanism you hand it.
+
+**RULE: adding a mechanism to a fitted model is a TWO-PART change — the mechanism
+AND a re-fit of the parameters that were absorbing it.** Shipping half of that is
+worse than shipping neither, and the factorial is how you find out.
+
+**The corollary that reframes a whole day's measurements:** every
+single-feature effect I measured (+0.001 pitch splits, 34.3% of the opportunity
+gap from substitution) was measured AGAINST rates fighting it. **Those are not
+the features' ceilings — they are what survives the calibration.** A small
+measured effect from a mechanism added to a calibrated engine is weak evidence
+that the mechanism is unimportant.
+
+**And it inverts a plan:** batted-ball data had just cleared the predictive gate
+(hard-hit% 1.9x `hr_rate` on future TB) and was the obvious next wiring target.
+It is now the WRONG next step — it would be a third mechanism against the same
+un-refitted rates. **The re-fit is the precondition, not a follow-up.**

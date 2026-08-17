@@ -13686,3 +13686,64 @@ input is a different claim from beating a price.
 **So batted-ball data is now the best-evidenced next wiring target** — it cleared
 a gate nothing else has — but the expectation should be set by the pitch-splits
 precedent, not by the correlation table.
+
+## 2026-08-17 — THE FEATURES INTERFERE. 2x2 factorial: interaction is NEGATIVE in 4 of 4 markets.
+
+Lane `convergence-phase7-crps`. Asked directly: *"are we sure wiring all of these
+together won't make a combined difference?"* **They make one. It is negative.**
+45 games x 120 sims x 4 arms, 2,415 scored rows.
+
+| market | 00 none | 10 subs | 01 splits | 11 BOTH | market | interaction |
+|---|---|---|---|---|---|---|
+| batter_hits | 0.24404 | 0.24195 | 0.24472 | 0.24343 | 0.23077 | −0.00080 |
+| batter_rbis | 0.22211 | **0.21638** | 0.21940 | 0.22165 | 0.20959 | **−0.00798** |
+| batter_runs_scored | 0.23974 | 0.23828 | 0.23844 | **0.24118** | 0.23377 | −0.00420 |
+| batter_total_bases | 0.26177 | 0.26331 | 0.26104 | 0.26283 | 0.24510 | −0.00025 |
+
+    mean interaction -0.00331, NEGATIVE in 4 of 4
+
+**On RBIs the combination erases both gains**: subs alone −0.00573, splits alone
+−0.00271, together only −0.00046. **On runs, BOTH-ON IS WORSE THAN NEITHER.**
+
+I pre-committed to the reading standard before running it — *"±0.002 is noise; a
+consistently-signed interaction across all four markets is what would convince"*
+— and a consistent negative across 4 of 4 clears that bar.
+
+### THE LIKELY MECHANISM, and it is the most important thing here
+
+**The engine's batter/pitcher rate parameters were FITTED IN THE ABSENCE of these
+mechanisms.** `k_rate`, `hr_rate`, `inplay_hit_rate` are calibrated to observed
+outcomes produced by a sim that never substituted anyone and never varied
+effectiveness by pitch type. Those fitted rates therefore already ABSORB the
+average effect of substitution and pitch-mix.
+
+Adding a mechanism back **double-counts** it. Adding two double-counts twice, and
+the errors compound rather than cancel — which is exactly the negative
+interaction, and it also explains why each feature alone measured so small.
+
+### WHAT THIS CHANGES — it is a precondition, not a detail
+
+**You cannot add mechanisms to a calibrated engine without RE-FITTING the rates.**
+That reorders everything:
+
+1. **Do NOT wire batted-ball data next.** It would be a third mechanism added to
+   the same un-refitted rates, and this result predicts it makes things worse in
+   combination — however well it passed the predictive gate.
+2. **The precondition is a re-fit**: with substitution and pitch splits ON,
+   re-derive the batter/pitcher rates so they no longer absorb those effects.
+3. **Only then** add batted-ball, and re-run this factorial rather than a
+   single-feature test.
+
+**This retroactively reframes the small individual effects.** +0.001 from pitch
+splits and 34.3% of the opportunity gap from substitution were never the ceiling
+of those features — they are what survives after the calibrated rates fight them.
+
+### Caveats
+
+- One window (45 games, June 2026), one engine, two features. The MECHANISM is an
+  inference; the negative interaction is measured.
+- The interaction is a difference-of-differences and therefore noisier than any
+  single arm. **Sign consistency across 4 of 4 is what makes it usable**, not any
+  individual magnitude.
+- This says nothing about batted-ball x park x defence, which remain unwired and
+  untested.
