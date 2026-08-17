@@ -790,6 +790,27 @@ def _normalized_game_status(
         live = True
     if _looks_terminal_status_text(status_raw, detail_raw):
         is_final = True
+    # FINAL WINS OVER LIVE. Both checks above can fire on the SAME text, and
+    # until this line the later one silently decided nothing -- `live` stayed
+    # True from the first.
+    #
+    # Measured on production 2026-08-17 02:5xZ, IND @ ATL: the lens published
+    # `status='Final/OT'` with `final=False, in_progress=True` -- one record
+    # contradicting itself. `"Final/OT"` satisfies the LIVE text check (the
+    # short-token trap `#160` records for soccer: "ot" matches inside ordinary
+    # prose) while also being unambiguously finished. A completed overtime game
+    # was therefore published as in progress, indefinitely.
+    #
+    # THE COST IS NOT COSMETIC. `live_edge_policy` keys on `game.state`, so a
+    # finished game stuck at `live` keeps a live tier it should have lost -- the
+    # same harm as the soccer defect fixed 2026-08-16, pointed the other way.
+    #
+    # This precedence is not invented here. `game_chip_scoreboard._game_flags`
+    # already ends with `if is_final: is_live = False`, and MLB's carry-forward
+    # already refuses to resurrect a settled game. Stating it here makes the
+    # producer agree with its consumers instead of handing them a contradiction.
+    if is_final:
+        live = False
 
     if not live and not is_final:
         start_dt = _parse_utc_datetime(start_time_utc)
@@ -3874,8 +3895,6 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         home_pts = _safe_float(home_row.get("score"))
         status = event.get("status") if isinstance(event.get("status"), dict) else {}
         status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
-        in_progress = str(status_type.get("state") or "").strip().lower() == "in"
-        final = bool(status_type.get("completed"))
         period = int(_safe_float(status_type.get("period")) or 0) or None
         clock = str(status_type.get("displayClock") or "").strip()
         status_text = (
@@ -3883,6 +3902,36 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
             or str(status_type.get("detail") or "").strip()
             or str(status_type.get("description") or "").strip()
             or "Scheduled"
+        )
+        # ESPN FLIPS ITS DISPLAY TEXT BEFORE ITS STATE FLAGS, AND A FINISHED GAME
+        # WAS BEING PUBLISHED AS IN PROGRESS BECAUSE OF IT.
+        #
+        # Measured on production 2026-08-17 02:5xZ, IND @ ATL:
+        #   status='Final/OT'   final=False   in_progress=True   95-91
+        # The record contradicted itself — the text said finished, the structured
+        # booleans said live. `_status_fields_from_value` passes these through
+        # faithfully, so the contradiction is ESPN's: `type.shortDetail` had
+        # already become "Final/OT" while `type.completed` was still false and
+        # `type.state` was still "in".
+        #
+        # THE COST IS NOT COSMETIC. `live_edge_policy` keys on `game.state`, so a
+        # completed overtime game stuck at `live` keeps a live tier it should
+        # have lost — the same harm as the soccer defect fixed 2026-08-16, in the
+        # opposite direction.
+        #
+        # So the TEXT corroborates `final`, and `final` wins over `in_progress`.
+        # That precedence is not invented here: `game_chip_scoreboard._game_flags`
+        # already scans its status text for "final" and already forces
+        # `is_live = False` when final is set. This makes the producer agree with
+        # the consumer instead of handing it a contradiction to resolve.
+        #
+        # ONE-DIRECTIONAL ON PURPOSE. Text can only ADD `final`, never remove it
+        # and never add `in_progress` — a heuristic that could mark a game LIVE
+        # off prose is how soccer's board once showed every game live (`#160`).
+        _text_says_final = status_text.strip().lower().startswith("final")
+        final = bool(status_type.get("completed")) or _text_says_final
+        in_progress = (
+            str(status_type.get("state") or "").strip().lower() == "in" and not final
         )
         inferred_period, inferred_clock = _infer_period_clock_from_status_text(status_text)
         if period is None and inferred_period is not None:
