@@ -10538,3 +10538,57 @@ which is the single item that made its preflight FAIL. That is now closed.
 
 **This does not make the deploy measured.** It makes it *scheduled to be
 measured*. The obligation closes when the reader reports.
+
+### ROOT CAUSE 2026-08-17 ~14:35 CDT - **live-odds-worker never sweeps because BOTH WORKERS SHARE ONE CADENCE MARKER, UNNAMESPACED. refresh-worker stamps it; live-odds-worker reads it and skips. Every time.**
+
+**THE MECHANISM, each link measured:**
+1. The pregame cadence marker is `_meta_dir()/last_pregame_refresh_launch.json`,
+   read via `read_json_file` and written via `write_json_file`
+   (`live_refresh_loop.py:3642-3670`) - **the refresh_state_store helpers, i.e.
+   SHARED state, not per-disk.**
+2. Both services are on the **SAME store, with NO namespace:**
+```
+                                    refresh-worker    live-odds-worker
+SYNDICATE_REFRESH_STATE_BACKEND     keyvalue          keyvalue
+SYNDICATE_REFRESH_STATE_URL         redis://red-d88bvljbc2fs73ep...  <-- IDENTICAL
+SYNDICATE_REFRESH_STATE_KEY_PREFIX  <ABSENT>          <ABSENT>
+SYNDICATE_ACTIVE_SPORTS             nfl               mlb,wnba,soccer
+```
+3. **Markers are stamped BEFORE the launch** (`#25`, so a dead launch costs one
+   window rather than a duplicate sweep).
+4. So: refresh-worker ticks, stamps the shared key, sweeps. live-odds-worker
+   ticks, reads **that same key**, sees `age < interval`, skips. **Permanently.**
+
+**THIS IS THE READING THAT PROVES IT** - live-odds-worker skipping on a marker
+it did not write, 18:28:49Z:
+```
+[live_refresh_loop] PREGAME_CADENCE_DETAIL wnba:marker_age_s=1618/interval_s=7200
+[live_refresh_loop] PREGAME_CADENCE_SKIPPED sports=wnba
+```
+Its loop is HEALTHY and running - it filters, then correctly skips a sport
+another service already claimed. **Nothing is crashed. The mutex is working
+exactly as written; it was just never scoped per service.**
+
+**`SYNDICATE_REFRESH_STATE_KEY_PREFIX` being ABSENT on both is the defect.** The
+marker is keyed per-SPORT and per-DATE but not per-SERVICE, so two services
+sharing a store means one starves the other. **`#382`'s "permanent stall" is
+real, but the cause is not a dying launch - it is a marker written by the OTHER
+worker.** The comment at `live_refresh_loop.py:4640` reasons "if the launch dies
+EVERY time, the marker advances forever" - **the marker does advance forever,
+but because a DIFFERENT SERVICE advances it.** Same symptom, wrong culprit.
+
+**CONSEQUENCE: the env is decorative.** `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`
+on live-odds-worker buys nothing, because it loses the race for all three.
+Whatever refresh-worker reaches first, it owns. **Never infer a service's
+workload from its ACTIVE_SPORTS again** - measured today, both services'
+behaviour is the inverse of their env.
+
+**NOT FIXED, AND DELIBERATELY NOT.** The fix is a config change (a per-service
+`SYNDICATE_REFRESH_STATE_KEY_PREFIX`, or making the marker key service-scoped in
+code). A `render.yaml` edit fires `blueprint_sync` and **applies to production
+regardless of `autoDeploy=no`** - and deploys are coordinator-owned as of today.
+**Also unresolved before anyone changes it: is the shared marker INTENTIONAL?**
+It is a perfectly good cross-service mutex preventing two workers from
+double-sweeping the same sport. Namespacing it would let BOTH sweep - which may
+be the bug, not the fix. **That is a design question with an owner, and doubling
+the sweep rate against a 5M OddsAPI cap is not something to discover by trying.**
