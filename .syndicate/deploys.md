@@ -9414,3 +9414,144 @@ Measured, not deployed. `py -3 scripts/oom_band_report.py --start
   3x→1x `rank_recommendations` ledger load were **not** the ~2 GB. No claim is
   made about whether any of the three helped at the margin; only that the 2 GB
   transient is still there.
+
+## 2026-08-16 22:2x–22:3x CDT (08-17 02:2x–02:3xZ) — `live-gameline-ledger-check`, scheduled run. **THE RECORDER WORKS: 3,748 ROWS ON A REAL SLATE. DEDUP IS UNMEASURED AND THE SCHEDULE IS WRONG FOR SUNDAYS.**
+
+Read-only run. No deploy, no source edit, no env change. Every number below was
+read by this session unless it names another lane as the source.
+
+**DEPLOY STATE, CONTENT-VERIFIED (not ancestry).**
+- refresh-worker `8999f033`, live 02:19:25Z — `record_live_gamelines` present in
+  `live_gameline_ledger.py`, `LEDGER_VERSION = 2`, and the call site present at
+  `book_grid_artifact.py:267`. (The join file itself contains no ledger
+  reference; the caller is the artifact builder. Checking `live_gameline_join.py`
+  for it, as the task brief said to, returns 0 and means nothing.)
+- live-odds-worker `c348da53`, live 2026-08-16T23:57:12Z — `lane_is_live_mc` × 3
+  in `vendor/mlb_bettingv2/tools/web/flask_frontend.py`.
+- `MLB_LIVE_GAMELINE_LEDGER_ENABLED` is ABSENT from refresh-worker's 100-key env
+  block = enabled, and the artifact agrees (`enabled: true`).
+
+**THE SLATE WAS OVER BEFORE THE TASK FIRED. The per-build counters are VOID.**
+`/mlb/api/live-lens` at 21:20 CDT: `live 0, pregame 0, final 15`, 15 games with
+first pitches 11:15 AM – 6:20 PM CDT. This is a Sunday day slate. The scheduled
+task fires 20:30 CDT, which is mid-slate on a weeknight and **after the last
+final on a Sunday.** Both artifact builds sampled read
+`live_gamelines` all-zero with `withheld_by_reason {}` and
+`live_gameline_ledger candidates 0 written 0 skipped_unchanged 0`. Those zeros
+carry no information about the recorder and must not be quoted as a negative.
+
+**(a) IS IT RECORDING? YES — MEASURED, 3,748 ROWS.** Not from the per-build
+counters, which are dead tonight, but from `live_gameline_score.records_considered`
+in the same artifact. That field is the return of `read_records(ledger_path(...))`,
+which parses `mlb_source/data/live_gameline_ledger/live_gameline_ledger_2026-08-16.jsonl`
+line by line and counts every parseable dict — so it IS the file's row count.
+**The recorder's first real slate produced 3,748 records.** This retires
+"it has never actually recorded a row" for good.
+
+**(b) IS DEDUP WORKING? UNMEASURED, AND NOT MEASURABLE BY THE METHOD THE BRIEF
+SPECIFIES.** Sampling the artifact across builds cannot answer it tonight,
+because `candidates` is 0 on every build with no live game — three samples of
+zero are three samples of nothing. And the ledger file itself **cannot be read
+off-worker**: `/api/ops/artifacts/stream` returns **HTTP 403 `path is not an
+allowed hot artifact`** for both 08-16 and 08-15, because the `.jsonl` matches
+no entry in `HOT_ARTIFACT_PATTERNS`. A parallel lane had already recorded this
+in a code comment at ~01:0xZ; this run confirms it from the outside.
+- What I did NOT do: infer dedup from 3,748 against a guessed build count. The
+  plausible range for builds × candidates over a 10-hour slate straddles 3,748
+  in both directions, so that inference cannot discriminate and would have been
+  a number dressed as a finding.
+- **One real negative control. Four reads over 02:20:2xZ–02:33:0xZ returned TWO
+  distinct builds — `generated_at` 02:20:14.771Z then 02:28:13.304Z — and
+  `records_considered` was FROZEN at 3,748 across both**, with
+  `candidates/written/skipped_unchanged` all 0 on each. The board is still
+  rebuilding and the ledger appends nothing when nothing is live. That refutes
+  "it appends per build unconditionally" but says nothing about the
+  changed-vs-unchanged discrimination, which is the actual claim.
+  (Three samples ~5 min apart were requested; at an ~8-minute build cadence
+  that yields two distinct builds, not three. The sampling interval should be
+  keyed to the build cadence, not to the clock.)
+- **`records_considered` IS the instrument that finally makes dedup measurable,
+  and it only became observable at 01:35Z tonight.** Its delta across two builds
+  IS `written` for that interval; paired with `candidates` from the same
+  payloads it gives the dedup ratio directly, with no need to read the file.
+  Next live-slate check should sample that pair, not `skipped_unchanged` alone.
+
+**(c) ARE EDGES SURVIVING BOTH GATES? THE `simsRun` STAMP HAS NOT REGRESSED —
+2,409 PRICEABLE ROWS SAY SO.** Tonight's `withheld_by_reason` is `{}` and
+useless. But `live_gameline_score.priceable_only.n = 2409` of 3,748 records
+(**64.3%**) is a whole-slate figure, and in `live_gameline_join.py` the
+`priceable: True` branch is reachable **only after** `n >= _min_sims()` and a
+non-None `prob_std_err` — both of which fail closed to `sim_count_unusable`.
+2,409 rows cleared that gate, so the stamp was present and adequate at scale.
+Had `simsRun` regressed, `priceable` would be ~0.
+- Per-reason counts for the refusals are **not available**: `withheld_reason` is
+  written on every record, but it lives in the unreadable file, and the
+  artifact's live block is empty tonight.
+
+**(d) NO ERROR, STILL ENABLED.** `live_gameline_ledger` carries no `error` key on
+either build; `enabled: true`; `truncated_build_cap 0`, `truncated_file_cap 0`
+— the 500/build and 20,000/file caps were never reached.
+
+**BONUS, AND IT IS THE MOST SUBSTANTIVE NUMBER HERE: the scorer's first reading
+has the model LOSING to the market.** `model_minus_market_brier` is **positive on
+all three populations**, and the code names the sign explicitly — negative means
+the model won.
+
+    population        model Brier   market Brier   delta      n
+    all_records         0.27725       0.23883      +0.03842   3638 / 3631
+    last_per_game       0.25925       0.20147      +0.05778   15
+    priceable_only      0.29694       0.24070      +0.05624   2409
+
+`games_with_outcome 15`, `unscored {record_carries_no_model_probability: 110}`
+and — importantly — **no `no_final_outcome_for_game` bucket at all**, so all
+3,748 records joined to a final. That is the join fix from tonight's
+`b30fdb6c`/`9bff3cc1` working: the same population was 3,727 records missing the
+index entirely a few hours earlier.
+**Treat this as a FIRST READING, not a verdict.** The scorer shipped 45 minutes
+before it was read, it is one slate, and `last_per_game` is n=15. It is also
+confounded by the OOM loop below, which interrupted board builds all evening.
+
+**REFRESH-WORKER IS IN AN OOM LOOP — CONFIRMING AN EXISTING HANDOFF, NOT A NEW
+FINDING.** Events API, refresh-worker, `oomKilled` `memoryLimit 4Gi`:
+
+    last 7h    24 kills / 7h  = 3.43/h
+    7–14h ago   3 kills / 7h  = 0.43/h
+    14–24h ago  2 kills / 10h = 0.20/h
+
+**~8× the immediately preceding baseline**, sustained. This is already owned:
+`.syndicate/handoff_2026-08-16_oom_22_kills.md` (written 01:30Z by
+`branch-overlap-baseline-watch`) and the `refresh-worker-oom-recurrence` entry
+immediately above in this file cover it in more depth than this run did. My only
+additions are the rate ratio and **one kill newer than both: 01:46:59Z.**
+- **On the brief's question "has the ledger grown large":** the file holds 3,748
+  records and neither cap fired. Its size in bytes is **unmeasured** — it cannot
+  be read off-worker. The brief's concern is that `read_last_by_key` parses the
+  whole file per board build; at 3,748 records that is a small-single-digit-MB
+  parse against a 4 GiB limit, so it is **implausible as the cause of a 4 GiB
+  kill** — but this is a bound from the row count, **not an exoneration**, and
+  it must not be cited as one. The kill loop also predates tonight's ledger and
+  scorer deploys (first kills 20:04Z; scorer landed 01:35Z).
+- **I did NOT throw `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0`.** The brief authorises
+  it if memory looks bad, and memory does look bad — but the switch needs a
+  deploy to take effect (env changes are not re-injected on restart), the brief
+  forbids deploying, and a ~3 MB parse is not a credible contributor to a 4 GiB
+  OOM. Disabling it would have destroyed the sample without touching the cause.
+
+**INCIDENTAL, AND IT IS THE DANGEROUS KIND.** At 02:2xZ the SHARED INDEX held
+`.syndicate/deploys.md` staged at **0 additions / 157 deletions** — a
+deletions-only stage against this very file, the exact revert-in-waiting shape
+`state.md` documents. A bare `git commit` by any session would have deleted 157
+lines of measurement log with a clean worktree. I did not touch the shared index;
+this entry was committed through `GIT_INDEX_FILE`. **The stale stage is still
+there — it was not mine to disarm and it is still armed.**
+
+**WHAT THE NEXT RUN SHOULD DO.**
+1. **Move the schedule.** 20:30 CDT is after the last final on Sunday day
+   slates. Either fire on a weeknight or move earlier — mid-slate is the only
+   time the counters mean anything.
+2. **Sample the `records_considered` delta paired with `candidates` across two
+   consecutive builds.** That is the dedup measurement, it needs no file access,
+   and it did not exist before tonight.
+3. **Allowlist the ledger** (`*_source/data/live_gameline_ledger/*.jsonl` in
+   `HOT_ARTIFACT_PATTERNS`) if the per-reason refusal breakdown is ever wanted
+   off-worker. Allowlisting permits a transfer; it does not make one happen.
