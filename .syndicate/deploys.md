@@ -10082,3 +10082,82 @@ not simulation cost. Fixing that is upstream of any further betting grade.
 Report the side-blind baseline with every prop betting grade. Here it converted
 "the model returns −10.15%" into the far more useful "the model returns −10.15%
 where betting every over blind returned +0.79%".
+
+## 2026-08-17 — ARCHIVED LINE COVERAGE DIAGNOSED — **THE FETCH IS RUNNING AFTER THE SLATE, AND THE FREEZE SEALS THE RESULT**
+
+Lane `convergence-phase7-crps`. **READ-ONLY. No code changed** — every file
+that could fix this is claimed by another OPEN lane (see hand-off below).
+
+The blocker on grading outs props is archived line coverage: only 15 of 29
+dates carry a usable pitcher-props artifact, and only **5 dates carry >= 8
+pitchers with an outs line**.
+
+### THE CAUSE IS THE RETRIEVAL CLOCK, and it is visible in the artifact itself
+
+`retrieved_at` inside each doc, against pitcher count:
+
+| date | variant | retrieved_at (UTC) | pitchers | with outs |
+|---|---|---|---|---|
+| 07-24 | live | **2026-07-24T19:13** *(same day, pregame)* | **30** | **26** |
+| 08-11 | pregame | **2026-08-11T22:41** *(same day)* | **30** | **30** |
+| 08-15 | pregame | **2026-08-15T23:33** *(same day)* | 19 | 17 |
+| 08-10 | pregame | 2026-08-11T01:34 | 12 | 12 |
+| 07-19 | live | 2026-07-**20**T04:31 *(next day)* | **0** | **0** |
+| 07-25 | live | 2026-07-**26**T04:59 *(next day)* | **0** | **0** |
+| 08-08 | pregame | 2026-08-**09**T02:42 *(next day)* | 1 | 1 |
+
+**The rule is exact: docs retrieved same-day afternoon/evening carry 26–30
+pitchers; docs retrieved after ~02:00Z the following day carry ZERO.** Books
+pull pitcher-props markets once games finish, so a post-slate fetch retrieves an
+empty market and there is nothing to archive. 12 of 29 dates have literally
+`pitchers: 0`.
+
+**`mode` is `live` on EVERY file, including the `_pregame` ones** — the freeze
+copies the live doc, so it can only ever seal what the fetch happened to hold.
+
+### TWO DISTINCT DEFECTS, and only the first is the big one
+
+**1. THE PITCHER-PROPS FETCH RUNS AFTER THE SLATE ON MOST DATES.** This is
+primary and upstream of everything else. No freeze can seal data that was never
+fetched while the market existed. This is the same root cause class as `#440`'s
+headline finding — *the system has almost no clock*, so work lands uniformly
+across 24h regardless of when the market is open.
+
+**2. THE FREEZE CANNOT PROVE IT IS PREGAME WHEN THE SLATE CLOCK IS MISSING.**
+`_freeze_oddsapi_pregame_markets` (`scripts/refresh_mlb_oddsapi.py:680`) gates
+on `if slate_started or (slate_start is None and already_frozen): continue`.
+When `slate_start` is None it is **first-write-wins**, so the first pass of the
+day seals whatever exists — including a post-slate empty doc, which is what
+08-08 (1 pitcher) and 08-09 (2 pitchers) look like. The seal then never
+improves, by design.
+
+### THE HISTORICAL HALF IS NOT RECOVERABLE FROM THE ARCHIVE
+
+The freeze was **unreachable before 2026-08-08** — its own docstring records
+production holding **zero** `*_pregame.json` on that date, and usable coverage
+in my sample begins exactly there. Before it, the live file was rewritten in
+place all night, so 07-19..08-07 is gone. **The only route to that history is
+OddsAPI's historical endpoints, which the ledger records as CHEAP** — that is a
+real backfill option, not a dead end, and it would roughly triple the gradeable
+sample.
+
+### HAND-OFF — I AM NOT TAKING THESE FILES
+
+Every lever is owned elsewhere and I have not edited any of them:
+
+- `scripts/refresh_mlb_oddsapi.py` — claimed (read-only) by OPEN
+  `grading-blocker-settled-zero`. Owns defect 2, and note this is the SAME file
+  whose freeze fix that lane already shipped.
+- `live_refresh_loop.py` / pregame cadence — OPEN `odds-cadence-off-the-mlb-peak`
+  and `refresh-worker-oom-recurrence`. Owns defect 1, and that lane's Phase 1
+  fixture-aware cadence is precisely the mechanism that would fix it: a props
+  fetch keyed to time-to-first-pitch instead of an elapsed-time counter.
+
+**Recommended, in order:** (a) make the props fetch fixture-relative so it lands
+pregame — defect 1 is most of the loss; (b) require positive proof of pregame
+before sealing, and allow a strictly-richer re-seal while pregame; (c) backfill
+07-19..08-07 from the historical endpoint.
+
+**Cost note before anyone acts:** OddsAPI is at ~62.7% of a 5M cap and MLB is
+93.0% of spend. Moving the props fetch earlier changes call timing, not
+necessarily volume, but the backfill does add calls — cost it first.

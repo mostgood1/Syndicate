@@ -3921,3 +3921,35 @@ PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
   (`baseline_2026-08-16.json` and older carry `byState` but no `groups`) reports
   NOT COMPARED rather than silently taking the weaker check; probe suite green.
 - **Blocked by:** none
+
+#### convergence-phase7-crps — ARCHIVED LINE COVERAGE DIAGNOSED 2026-08-17 — **cause found, fix HANDED OFF, no file taken**
+
+- **The cause is the retrieval clock, and it is in the artifact itself.** Docs
+  whose `retrieved_at` is same-day afternoon carry **26–30 pitchers**; docs
+  retrieved after ~02:00Z the next day carry **ZERO**. 12 of 29 dates have
+  `pitchers: 0`. Books pull pitcher-props markets when games end, so a
+  post-slate fetch archives an empty market. Only **5 of 29** dates carry >=8
+  pitchers with an outs line.
+- **Defect 1 (primary): the props fetch runs after the slate on most dates.**
+  Same root class as `#440`'s headline — the system has almost no clock, so work
+  lands uniformly across 24h regardless of when the market is open. No freeze can
+  seal what was never fetched.
+- **Defect 2: the freeze cannot prove it is pregame when the slate clock is
+  missing.** `_freeze_oddsapi_pregame_markets` (`refresh_mlb_oddsapi.py:680`) is
+  first-write-wins when `slate_start is None`, so it can seal a post-slate empty
+  doc and never improve it — consistent with 08-08 (1 pitcher) / 08-09 (2).
+- **`mode` is `live` on EVERY file including the `_pregame` ones** — the freeze
+  copies the live doc, so it can only seal what the fetch held.
+- **07-19..08-07 is unrecoverable from the archive.** The freeze was unreachable
+  before 2026-08-08 (its own docstring: production held ZERO `_pregame.json`
+  that day) and the live file was rewritten in place. **OddsAPI historical
+  endpoints are the route, and the ledger records them as cheap** — would roughly
+  triple the gradeable sample.
+- **NO FILE TAKEN, NOTHING EDITED.** Both levers are owned:
+  `scripts/refresh_mlb_oddsapi.py` by OPEN `grading-blocker-settled-zero`
+  (defect 2 — and it already shipped this file's freeze fix);
+  cadence by OPEN `odds-cadence-off-the-mlb-peak` (defect 1 — its Phase 1
+  fixture-aware cadence is exactly the mechanism that fixes it).
+- **Recommended order:** fixture-relative props fetch → positive pregame proof
+  before sealing, with a strictly-richer re-seal allowed → historical backfill.
+  Cost it first: OddsAPI ~62.7% of a 5M cap, MLB 93.0% of spend.
