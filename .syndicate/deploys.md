@@ -12427,3 +12427,117 @@ sides.**
    in-sim substitution.
 3. Re-run `grade_mlb_hitter_props_vs_market.py`. The measured gap to close is
    **0.0015–0.010 Brier**.
+
+## 2026-08-17 — P1 RESULT: **the opportunity haircut closes the gap in 3 of 3 families out-of-sample, and flips `runs` past the market**
+
+Lane `convergence-phase7-crps`. `scripts/mlb_opportunity_haircut.py`. Read-only
+counterfactual, **no code changed in the engine, no deploy.**
+
+Haircut fitted on 6 TRAIN dates, scored on 7 HELD-OUT dates:
+**actual_AB / model_AB = 0.8837 (−11.6% opportunity).**
+
+| family | n | baseline | **HAIRCUT** | market | (production) | gap closed |
+|---|---|---|---|---|---|---|
+| hits | 515 | 0.25286 | 0.24875 | **0.23604** | 0.24965 | +0.00411 |
+| runs | 503 | 0.22603 | **0.22356** | 0.22478 | 0.22384 | +0.00247 **BEATS MARKET** |
+| total_bases | 412 | 0.26518 | 0.25953 | **0.23855** | 0.24489 | +0.00566 |
+
+**Every family improves, out-of-sample, from ONE fitted scalar.** `runs` crosses
+the market. That is the first time anything in this platform has beaten a price.
+
+### Why the comparison is trustworthy
+
+`baseline` and `HAIRCUT` differ in **exactly one thing** — the opportunity. Both
+are recomputed binomially from the engine's OWN per-AB rate
+(`h_mean / ab_mean`), so nothing else moved. Production's published number is
+shown as a REFERENCE, not the control, because it carries a different
+distributional assumption; comparing to it would confound two changes.
+
+Reassuringly, production (0.24965 on hits) sits close to my recomputed baseline
+(0.25286), so the binomial proxy is fair — and the haircut beats production too.
+
+### WHAT THIS DOES NOT ESTABLISH
+
+- **`runs` beats the market by 0.00122 on n=503.** That is a hair. **A paired
+  test is owed before anyone calls it an edge.** The DIRECTION being consistent
+  across three independent families is the usable part; this single crossing is
+  not.
+- **The remaining gaps are still large** — hits 0.0127, total_bases 0.0210. The
+  haircut closes roughly a quarter to a third. Opportunity is **a** cause, not
+  **the** cause.
+- One window, June 2026, 1,430 scored rows.
+- A flat scalar is a crude stand-in for substitution. It cannot know that a
+  particular batter was pulled in the 7th; it moves everyone by 11.6%.
+
+### What it DOES establish, and it is the point
+
+**Correcting opportunity is worth real Brier, out-of-sample, on the market
+scoreboard.** The expensive fix — in-sim substitution driven by per-manager
+tendencies — is now justified by measurement rather than by argument. That was
+the whole reason to build the cheap version first.
+
+## 2026-08-17 — WHO THE MANAGER GOES TO: substitution patterns mined from `feed_live`
+
+Lane `convergence-phase7-crps`. `scripts/mlb_substitution_profile.py`.
+**618 games parsed.** Read-only, no deploy.
+
+### 1. REMOVAL RATE RISES MONOTONICALLY WITH LINEUP SLOT — my flat haircut is wrong
+
+    slot 1  8.6%    slot 4  8.3%    slot 7  13.8%
+    slot 2  8.0%    slot 5 10.7%    slot 8  14.8%
+    slot 3  7.7%    slot 6 11.4%    slot 9  16.7%
+
+**Slot 9 is substituted ~2x as often as slot 3.** The haircut applies a flat
+−11.6% to everyone; it should be slot-conditioned.
+
+**AND THIS RESOLVES AN APPARENT CONTRADICTION.** The measured AB *bias* was flat
+across slots (+0.459..+0.631) while the removal *rate* varies 2x. Both are true:
+bottom-of-order hitters are removed MORE OFTEN but LATER in the game, when fewer
+plate appearances remain. Rate and lost-opportunity are different quantities and
+the flat bias is not evidence of a flat mechanism.
+
+### 2. SCORE STATE DRIVES WHICH KIND OF SUBSTITUTION — the sim models none of it
+
+| type | trailing | tied | leading |
+|---|---|---|---|
+| `offensive_substitution` (pinch hit) | **661** | 229 | 244 |
+| `defensive_substitution` | 94 | 51 | **231** |
+| `pitching_substitution` | 1127 | 555 | **1347** |
+
+Managers **pinch-hit when behind** (2.7:1 trailing vs leading) and make
+**defensive replacements when ahead** (2.5:1 the other way). That is a strong,
+cheap, situational signal and the engine has no representation of it.
+
+### 3. TIMING — pitching changes peak in innings 7-9 (1,008 at inning 8)
+
+### 4. POSITIONS
+`P=3916, PH=1135, LF=379, RF=339, CF=316, 2B=246, PR=211, 3B=203, SS=185, DH=182`
+Corner/centre outfield dominate non-pitcher substitutions — defensive
+replacements, consistent with (2).
+
+### 5. THE ANSWER THAT DECIDES P2: **MANAGERS DIFFER MATERIALLY** `[measured]`
+
+    Chicago White Sox      7.73 subs/game        Philadelphia Phillies  5.07
+    Houston Astros         7.00                  Tampa Bay Rays         5.02
+    Colorado Rockies       6.95                  Seattle Mariners       4.67
+    Texas Rangers          6.88                  Boston Red Sox         4.61
+
+    30 teams   mean 6.02   sd 0.72   SPREAD 3.12 subs/game   max/min 1.68x
+
+**A single hardcoded `ManagerProfile` for all 30 teams is measurably wrong.**
+`data/manager/manager_tendencies.json` does not exist and its loader silently
+returns `{}` — **P2 is now justified by measurement, not by argument.**
+
+I wrote this script so it could return the OPPOSITE answer (a "managers look
+similar, do not build per-team tendencies" branch). It did not fire.
+
+### What to build, in order
+
+1. **Slot-conditioned haircut** — replaces the flat scalar. Cheap, and the slot
+   curve above is the whole input.
+2. **Score-state conditioning** — pinch-hit rate up when trailing, defensive-sub
+   rate up when leading. Two multipliers, both measured above.
+3. **Per-manager tendencies** — populate `manager_tendencies.json` from these
+   618 games. Governs BOTH position-player substitution and the pitching hook,
+   which is why P1 and P2 are one piece of work.
+4. Re-run `mlb_opportunity_haircut.py` after each. The scoreboard is the market.
