@@ -544,7 +544,61 @@ PROTECTED_MIRROR_DATA_FAMILIES = (
         ),
         "min_count": 1,
     },
+    # NBA and WNBA, closing the same gap for the two manifest-breadth waivers
+    # that predate mine. One entry per WAIVED PREFIX rather than one per sport,
+    # so a sport losing exactly one family still fails -- a per-sport entry would
+    # pass on five of six.
+    #
+    # Counts measured on a CLEAN `origin/main` worktree before these were added,
+    # because that is what a fresh clone has and the floor must hold there:
+    # manifest 8, day 6, game_cards 54, slate 53, projections 99, lines 48. Had
+    # any been zero it would have gone in the "not covered" note below instead of
+    # here -- a family added blind fails the gate on the first clean run, which is
+    # how the check this replaces died.
+    {
+        "slug": "nba",
+        "description": "season betting-card manifests on disk",
+        "globs": ("data/nba_source/**/season_betting_card_manifest_*",),
+        "min_count": 1,
+    },
+    {
+        "slug": "nba",
+        "description": "season betting-card day files on disk",
+        "globs": ("data/nba_source/**/season_betting_card_day_*",),
+        "min_count": 1,
+    },
+    {
+        "slug": "wnba",
+        "description": "game cards on disk",
+        "globs": ("data/wnba_source/**/game_cards_*",),
+        "min_count": 1,
+    },
+    {
+        "slug": "wnba",
+        "description": "slate recommendations on disk",
+        "globs": ("data/wnba_source/**/recommendations_slate_*",),
+        "min_count": 1,
+    },
+    {
+        "slug": "wnba",
+        "description": "live lens projections on disk",
+        "globs": ("data/wnba_source/**/live_lens_projections_*",),
+        "min_count": 1,
+    },
+    {
+        "slug": "wnba",
+        "description": "live line snapshots on disk",
+        "globs": ("data/wnba_source/**/live_lines_*",),
+        "min_count": 1,
+    },
 )
+
+# NOT COVERED, and deliberately named rather than left as a silent absence. The
+# `nba` waiver also lists `live_lens_projections_`, `live_lens_signals_`,
+# `live_snapshots\live_state_`, `recon_games_` and `recon_props_`, and the `wnba`
+# one lists `live_snapshots\live_state_`. Those were not measured on a clean
+# checkout, so adding them would be the blind-family mistake described above.
+# Measure each on a fresh clone first, then move it into the tuple.
 
 
 def evaluate_protected_mirror_data(root: Path | None = None) -> dict[str, object]:
