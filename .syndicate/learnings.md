@@ -3987,3 +3987,128 @@ before an operation; anything that moves `HEAD` invalidates the check. Read
 
 **Related:** [stale shared index holds a revert], [never chain add and commit],
 [blob-stage against HEAD].
+
+## 2026-08-17 — OVERTURNED: "a statistical win on a sim parameter can be graded by betting hit rate on the same sample"
+
+**Belief going in:** the overrides file records `starter_tto_quality_scaling`
+being reverted because it won statistically and lost money, so the correct gate
+on any sim-parameter change is a betting hit rate. I built that gate.
+
+**What actually happened:** the gate could not discriminate, and it pointed the
+wrong way. On 148 graded starts the leash grid read 53.38% → 59.46% hit rate and
++1.93% → +12.40% ROI, apparently reversing a clean statistical sweep. Three
+checks killed it:
+
+- **ALWAYS OVER returned 58.78% / +8.16% on the identical rows, with no model.**
+  The best grid point was barely above a side-blind strategy, and the longest
+  leash scored EXACTLY 58.78% because it picked over on 146 of 148 — it *was*
+  always-over.
+- The grid varied the **over-rate** monotonically (106 → 146 over-picks), so the
+  ordering followed from over-propensity in a window where overs won 58.78%.
+- The whole spread was **1.49 SE** (SE 4.09pp at n=148).
+
+**The trap, and it is the general form:** the parameter under test *shifts the
+mean of the projection*, which *shifts which side gets bet*. Any outcome window
+with a directional base rate then scores the parameter by its directional bias
+rather than its accuracy. Here that meant the grade would have **ENDORSED THE
+DEFECT** — the sim over-projects outs, so it bets over, and overs won.
+
+**RULE: never report a prop betting hit rate without the side-blind baseline
+(ALWAYS OVER / ALWAYS UNDER) computed on the same rows.** Without it a +12.40%
+"model edge" read as skill when +8.16% of it needed no model at all. A grade whose
+picks are not side-balanced is measuring direction, not skill.
+
+**Corollary, learned the same day:** a betting gate is not automatically stronger
+evidence than a statistical one just because it is denominated in money. It has
+its own confounds, and n is usually far smaller — 148 bets against 3,226 scored
+projections.
+
+## 2026-08-17 — RULE: before building a fix, check whether it was already considered and REJECTED in the code you are about to edit
+
+**What happened.** Asked to namespace the shared cadence marker — a real defect,
+correctly diagnosed, with a live production symptom. I opened the file to write
+it and found the authoring lane had rejected exactly that fix **hours earlier, in
+the docstring of the function I was about to change**:
+
+> "This deliberately does NOT namespace the cadence marker. That would treat the
+> symptom and leave an ungated sweep running on the wrong service; the ownership
+> flags are the intended mutex and they are already correct."
+
+**Why building it would have been actively harmful, not merely redundant.** The
+shared marker is what currently prevents two services sweeping the same sport.
+Namespacing it *without* the ownership gate deployed would have let refresh-worker
+and live-odds-worker sweep MLB on independent clocks — **doubling** MLB OddsAPI
+calls against a cap at ~62.7% with MLB already 93% of spend. The safe ordering is
+the exact reverse of the request: deploy the gate, and then the marker never
+matters.
+
+**The generalisable part.** A defect being real does not make the obvious fix
+right, and a rejected design usually leaves its reason near the code rather than
+in the ledger — `grep` over `lanes.md` found nothing, because the decision lived
+in a docstring. **Read the function you are about to edit before you edit it, and
+read it for prior decisions and not only for mechanism.**
+
+**Second-order:** the fix that WAS correct (`20025cc4`) turned out to be on `main`
+and deployed nowhere — measured by CONTENT against each service's live SHA. The
+real blocker was never missing code; it was an undeployed fix that everyone,
+including me, assumed was live because it was merged. *Merged is not deployed*
+already has a rule here; this is its fourth instance.
+
+### 2026-08-17 — A GUARD'S ESCAPE HATCH MUST BE REACHABLE FROM WHERE THE GUARD RUNS, and a PreToolUse hook runs BEFORE the shell
+
+- **What we believed:** `commit-guard.py` had three documented overrides —
+  `GIT_INDEX_FILE`, `SYNDICATE_ALLOW_STAGED_DELETES`,
+  `SYNDICATE_ALLOW_STAGED_REVERTS` — printed in its own refusal message as shell
+  assignments. They were written down, tested, and reviewed twice.
+- **What is actually true:** none of them could ever fire from a Bash call. All
+  three were `os.environ.get(...)`, the HOOK's process env, while every
+  documented spelling (`export VAR=…`, `VAR=1 git commit …`) lives in a command
+  string the hook gates and therefore runs AFTER it. A session that did exactly
+  what the refusal message instructed was refused again, by the same guard, over
+  the same stale blob it could not clear without disturbing another session.
+- **The rule going forward:** **an override is not an override until it has been
+  exercised through the real entry point.** For a hook, that means over stdin as
+  a payload — not by setting the variable in the test process, which is a
+  different environment than any user of the documented recipe will ever have.
+  Corollary: the test that would have caught this is the one that runs the
+  guard's own printed text verbatim. If a tool prints instructions, those
+  instructions are an interface and belong in the suite.
+- **Second thing this cost:** the printed recipe also told sessions to use
+  `GIT_INDEX_FILE=$(mktemp -u /tmp/idx.XXXX)`, which the 2026-08-15 FORBIDDEN
+  entry in this file rules out (per-shell value; an absent index file is an
+  EMPTY one). **The guard was printing an instruction this ledger forbids**, and
+  had been since it was written. A message is not documentation-adjacent; it is
+  the thing people actually follow.
+- *(evidence: `5fb52342`; lane `commit-guard-blind-to-own-recipe`; 19 cases run
+  through the pre-fix and post-fix guards together)*
+
+### 2026-08-17 — "IT MATCHES NO SESSION IN THE ROSTER" IS NOT "IT POINTS AT NOBODY". One session has two ids, and the register holds the one you cannot look up
+
+- **What I believed, and reported to the coordinator as a defect:**
+  `.syndicate/coordinator.id` was stale. `get_session` on it returned "not
+  found"; no roster entry matched in bare or `local_`-prefixed form with
+  `include_archived` on. I identified the coordinator by title instead and told
+  them their register pointed at nobody.
+- **What is actually true:** every observation was correct and the conclusion
+  was wrong. **A session has two ids** — one in the hook payload and the
+  scratchpad path (`9ed7fd89-…`), one in `list_sessions` (`local_1d6f136e-…`).
+  `.claude/hooks/deploy-guard.py:130-140` compares the register to
+  `payload["session_id"]`, so it MUST hold the payload form, which is precisely
+  the form the roster cannot see. `if not coordinator: return 0` — deleting the
+  file is the documented off switch, so acting on "stale" stands the whole
+  deploy-ownership role down.
+- **The rule going forward:** **before calling a register stale, find the reader
+  and see which id it compares.** The authority on an identifier's meaning is
+  the code that consumes it, never the directory you happened to query. A lookup
+  failure tells you about the LOOKUP's namespace, not about the referent — the
+  same shape as [[absence in a window isn't absence]].
+- **Why this is filed rather than shrugged off:** **two sessions reached this
+  conclusion independently on the same day**, and one of them pushed it to
+  `origin/main` — `52d45b10` writes "coordinator.id IS STALE" into `deploys.md`,
+  where it now sits as a falsified ledger entry next to an instruction to delete
+  the file. Neither of us deleted it; both were one step away. A wrong inference
+  that two people reach separately is a property of the evidence, not of either
+  reader, and the fix has to live where the evidence is — hence the comment now
+  at `deploy-guard.py:68-79` and the verification recipe in `coordinator.md`.
+- *(evidence: `deploy-guard.py:130-140` read directly; `52d45b10`; the
+  coordinator's own dual-id measurement)*

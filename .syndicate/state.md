@@ -1692,6 +1692,37 @@ the place to read it, and it carries the guard on its two shortlists.
   `--work-tree` remain a KNOWN GAP** — index and tree decouple, so "is it still
   on disk" has no single correct base. 13 tests on real repos
   (`tests/test_commit_guard_worktree_index.py`); pre-fix 7 fail, post-fix 13 pass.
+- **`commit-guard.py` reads the COMMAND, not a proxy for it, fixed `5fb52342`
+  2026-08-17.** Two exemptions, both measured:
+  (a) **all THREE documented overrides were unreachable.** They were
+  `os.environ.get(...)` — the HOOK's env — but a PreToolUse hook runs BEFORE the
+  shell, so the `export GIT_INDEX_FILE=…` in the recipe the guard PRINTS, and
+  the `SYNDICATE_ALLOW_STAGED_*=1 git commit` prefix it prints as the override,
+  were both invisible to it. A session that followed the refusal message was
+  refused again. Assignments are now parsed out of the command string,
+  last-write-wins against `unset`.
+  (b) **a pathspec-limited commit is exempt whole.** MEASURED 2026-08-17 against
+  an index holding a revert of `A.txt` plus a `D` of on-disk `C.txt`:
+  `git commit -m x -- C.txt` produced a tree keeping BOTH, `--stat` 1 file;
+  `--pathspec-from-file=` and `--amend -- <paths>` likewise. A partial commit
+  builds from HEAD plus the WORKING TREE content of the named paths and never
+  consults the index — not even for the named paths — so there is no path left
+  to evaluate. **`-i`/`--include` NOT exempt** (the revert landed).
+  **`-a` NOT exempt** (it kept the line but COMMITTED the deletion, so predicate
+  1 is live under it); `-a` remains a known false positive for predicate 2,
+  left alone because `-a` does not refresh `skip-worktree`/`assume-unchanged`
+  and that case is unmeasured. Unrecognised options fall through to "keep
+  guarding" — false positive, never false negative. Verified by running 19 cases
+  through the pre-fix and post-fix guards together: 10 flip 2→0, 8 hold at 2.
+  69 tests pass; exemption path 81 ms, short-circuiting before any git call.
+- **A PATHSPEC COMMIT NEEDS NO REPAIR STEP; THE ISOLATED-INDEX RECIPE DOES.**
+  Measured on `5fb52342`: the partial commit UPDATED the shared index for the
+  three paths it committed (`git diff --cached` for them empty afterwards) and
+  left another session's staged work untouched. The isolated-index route, by
+  contrast, is recorded in `learnings.md` 2026-08-15 as arming a revert of the
+  file you just committed, every time, requiring a follow-up
+  `git restore --staged`. The guard's refusal message now leads with the
+  pathspec form for this reason.
 - **`commit-guard` matches the COMMAND STRING**, so bundling a file write or a
   `git reset` into the same command as `git commit` blocks the whole thing.
   Separate them. `[recorded by another lane 2026-08-16]`
@@ -3186,6 +3217,26 @@ worthless here, since an unregistered hook produces the identical result:
 That also settles, by measurement rather than inference, that this session's id
 really is the one in `coordinator.id`.
 
+**`coordinator.id` IS NOT STALE, and the roster CANNOT be used to check it
+`[verified in code 2026-08-17]`.** `.claude/hooks/deploy-guard.py:130-140` reads
+the file and compares it to **`payload["session_id"]`** — the hook payload id —
+so the register must hold that form. `list_sessions` shows a DIFFERENT id for
+the same session (`9ed7fd89-…` to the hook and the scratchpad path,
+`local_1d6f136e-…` "Deploy and Document Coordinator" to the roster), and
+`get_session` on the registered id returns **"not found"** with archived
+included. All of that is true; **"therefore it is stale" is FALSE.**
+`if not coordinator: return 0` is a literal stand-down, so deleting the file on
+that inference stands the whole role down — the documented off switch, fired by
+accident. **TWO SESSIONS REACHED THIS WRONG CONCLUSION INDEPENDENTLY ON
+2026-08-17**, and one of them pushed it to `origin/main` (`52d45b10`, which
+writes "coordinator.id IS STALE" into `deploys.md`; it touched only that file —
+the register itself is intact, last modified by `8d8162ea`). **That deploys.md
+entry is falsified and is the coordinator's to correct.** To verify the
+register: match by TITLE via `list_sessions`, or use `get_session` on your own
+roster id returning *"Refusing to return the current session"* as the identity
+test. The dual-id fact is recorded in `deploy-guard.py:68-79`; read it before
+touching the file.
+
 **21 assertions across two suites, both committed next to the hook:**
 
 - `.claude/hooks/test_deploy_guard.py` — 17. Ordered MUST BLOCK first,
@@ -3245,3 +3296,56 @@ returning empty and `git log origin/main..HEAD -- render.yaml` returning nothing
 Second unanchored-pattern error of the day (the first was `[—-]` as a bracket
 range, which reported 12 open lanes as 1). **A `grep -c` answers "how many"
 when the question was "which one" — ask for the name.**
+
+## MLB PITCHER-OUTS MODEL AND ITS INPUTS — verified 2026-08-17 (lane `convergence-phase7-crps`)
+
+- **The `outs` over-projection is the F5 STARTER LEASH.** 267 starts / 13 dates /
+  87,500 game-sims replayed from archived roster artifacts. Every metric improves
+  monotonically as the leash shortens; dispersion **1.002 → 0.791 against a
+  calibrated 0.7979**, short-start gap **−0.1778 → −0.0266**. Replay at the
+  current leash reproduces production (P(outs<15) 0.0965 vs 0.104 on 726 starts).
+- **`starter_min_innings` is now a `manager_pitching_overrides` key** (v2 hook).
+  Absent = the manager profile's value = byte-for-byte no-op. `0` disables the
+  leash; the old `max(1, …)` silently promoted 0 to 1.
+- **NO LEASH VALUE IS PROMOTED.** The model loses to a CONSTANT baseline at every
+  grid point (baseline MAE 3.0912 vs best 3.1852), and residual bias at leash 0
+  is still −1.470 — the leash is the largest term, not the only one.
+- **THE BETTING GRADE IS CONFOUNDED. Do not re-run it without the side-blind
+  baseline.** On 148 starts ALWAYS OVER returned **58.78% / +8.16% with no
+  model**; the grid varied only how often it bet the over (106→146 of 148); the
+  whole spread was **1.49 SE**. Taken naively it endorses the over-projection
+  defect. **Standing rule: print ALWAYS OVER / ALWAYS UNDER beside any prop hit
+  rate.**
+- **ARCHIVED LINE COVERAGE: only 5 of 29 dates carry >=8 pitchers with an `outs`
+  line; 12 of 29 carry ZERO.** The discriminator is `retrieved_at` INSIDE the
+  artifact: same-day-afternoon fetches carry 26–30 pitchers, fetches after
+  ~02:00Z the next day carry 0, because books pull player-prop markets once games
+  end. `mode` is `live` on every file including the `_pregame` ones.
+- **`betting_accuracy.py` is ABSENT from this checkout** — the overrides file's
+  55.78%/54.65% came from an instrument that is not here. Do not compare to it.
+- **Re-simulating the leash grid on PRODUCTION data is impossible** — it needs
+  schema-v4 `roster_obj_*.json`; production 404s at every root and the sim's
+  loader rejects the raw bundle (`schema_version=None`).
+
+## ODDS-SWEEP OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER `[measured 2026-08-17 19:2xZ, by content]`
+
+- **`20025cc4` (`_sweep_ownership_exclusion`) is absent from both workers' live
+  SHAs** — refresh-worker `8c0bd8e6` and live-odds-worker `abc9987515`, checked
+  by CONTENT (`git show <sha>:<path>`), not by ancestry. **The starvation it
+  fixes is live in production.**
+- The defect: `_live_refresh_loop_effective_sports` fell back to "every
+  season-active sport" when `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` was unset,
+  ignoring BOTH `SYNDICATE_ACTIVE_SPORTS` and the ownership flags. refresh-worker
+  swept mlb/nfl/soccer/wnba owning only nfl; live-odds-worker swept NOTHING. The
+  non-owner wins the shared cadence marker and starves the owner.
+- **DO NOT NAMESPACE THE CADENCE MARKER.** Rejected in code by the authoring
+  lane: the ownership flags are the intended mutex. With the gate deployed the
+  shared marker is a SAFETY NET — namespacing alone lets two services sweep the
+  same sport independently and doubles OddsAPI spend (cap ~62.7%, MLB 93% of it).
+- **Weekly sports are deliberately NOT gated** by it — gating them broke
+  `test_run_tick_claims_weekly_sports_on_game_days` and would reintroduce the 24h
+  NFL capture gap measured 2026-08-07.
+- Verify after deploy is TWO-SIDED: `SWEEP_OWNERSHIP_EXCLUDED` on refresh-worker
+  naming `mlb` in `dropped`, **and** an MLB pregame sweep appearing on
+  live-odds-worker. Half one proves the non-owner stopped, not that the owner
+  started.

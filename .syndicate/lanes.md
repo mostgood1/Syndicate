@@ -3825,7 +3825,32 @@ Taken on explicit user instruction ("now take the cadence lever too").
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
 
-### commit-guard-blind-to-own-recipe — OPEN — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+### commit-guard-blind-to-own-recipe — OPEN — **BOTH GOALS SHIPPED AND MEASURED in `5fb52342`. NOT ON `origin/main` — it rides `origin/ledger/coordinator-2026-08-17`, and the push is with the coordinator. OPEN only for that.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+- **STATUS 2026-08-17 ~14:30 CDT.** Verification ran and both goals hold.
+  (a) in-command assignment of any of the three vars is honoured; (b) pathspec
+  commits exempt, `-i`/`-a`/pathspec-less unchanged. Evidence: 19 cases through
+  the pre-fix AND post-fix guards — 10 flip 2→0, 8 hold at 2, clean tree 0→0;
+  69 tests pass; every remedy the refusal message prints replayed through the
+  real hook at rc=0 with the control still rc=2; exemption path 81 ms.
+  `5fb52342` verified not to disturb another session's staged work, and to leave
+  no revert armed for its own paths.
+- **NOT CLOSED because the work is not on `origin/main`.** ahead 32 / behind 148
+  at checkpoint; all 32 already exist on `origin/ledger/coordinator-2026-08-17`,
+  so nothing can be lost and this is a history question, not a safety one. No
+  `render.yaml` in the 32 → no `blueprint_sync` exposure. Push request is with
+  the coordinator (`local_1d6f136e-…`), three options offered, no reply yet.
+- **CONFLICT, ADJUDICATED BY THE COORDINATOR, NOT BY ME:** another session's
+  brief is to CLOSE the in-command `GIT_INDEX_FILE` escape this lane OPENED.
+  Same predicate, opposite directions. The coordinator ruled **the escape stays
+  open** and retargeted that session, telling it to hold rather than edit the
+  shared hook. If that ruling is revisited, `5fb52342` is the commit to revisit.
+- **Known FP left in deliberately:** `-a` cannot trip predicate 2 but still
+  fires. Exempting it is unsound as measured — `-a` does not refresh
+  `skip-worktree`/`assume-unchanged` paths, unmeasured. Named in the docstring.
+- **Owed to the coordinator, not done by me:** a `learnings.md` rule that the
+  pathspec form is the default and the isolated-index form the fallback, since
+  the latter arms a revert every time and the former needs no repair step.
+  Relayed; `learnings.md` is theirs.
 - Goal: a session that follows the guard's OWN printed instructions is not blocked
   by it. Two testable outcomes: (a) a command that assigns `GIT_INDEX_FILE=` (or
   either `SYNDICATE_ALLOW_STAGED_*`) inside the command string is exempt, exactly
@@ -3976,3 +4001,54 @@ reason given: the slot held another session's slug and overwriting it can make
 
 `lanes.md` left uncommitted by that session on purpose, for the coordinator's
 sweep. Picked up here.
+
+#### convergence-phase7-crps — CHECKPOINT 2026-08-17 ~19:0xZ — **instrument built, defect traced and quantified, both halves of the fix in flight, NEITHER MEASURED**
+
+- **Shipped and on `origin/main`:** Phase 7 CRPS/bias-dispersion instrument;
+  `starter_min_innings` exposed + swept; two betting graders; monotone props seal
+  (`bafb4fb2`).
+- **Verified:** the `outs` over-projection IS the F5 leash (dispersion
+  1.002→0.791 vs a 0.7979 target; short-start gap −0.1778→−0.0266 over 267
+  starts / 87,500 sims), the replay reproduces production, and the seal is on
+  `origin/main` by content.
+- **Verified negative, and it matters more than the positive:** the model still
+  loses to a constant baseline at EVERY leash value (3.0912 vs best 3.1852), and
+  the betting grade is CONFOUNDED — ALWAYS OVER returns 58.78%/+8.16% on the same
+  148 starts, the grid varies only over-propensity, spread is 1.49 SE. **Nothing
+  is promoted. No leash value is recommended.**
+- **In flight, both unmeasured:**
+  1. cadence flag LIVE on live-odds-worker (gate verified running; effect read
+     by `outs-props-coverage-check`, fires 2026-08-19 07:00 CT for date 08-18);
+  2. seal QUEUED as a deploy request for refresh-worker, cut on `8c0bd8e6`.
+- **TOP RISK TO THE 08-19 READING, found in another session's commit
+  `7c4439f4` AFTER my flip went live:** refresh-worker sweeps mlb/wnba/soccer/nfl
+  while owning only nfl, is gated by neither the ownership flags nor
+  ACTIVE_SPORTS, **wins the shared unnamespaced cadence marker and starves the
+  designated owner**. My flag is set on live-odds-worker ONLY. So a FAIL on 08-19
+  may be MARKER CONTENTION, not the cadence mechanism — and the scheduled reader
+  does not know this. Whoever reads it must rule that out before concluding.
+- **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
+  contention first; then let the coordinator ship the seal.
+
+#### convergence-phase7-crps — CHECKPOINT 2 2026-08-17 ~19:3xZ — **nothing left in flight on my side; three things queued, one live and unmeasured**
+
+Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
+
+- **Queued for the coordinator (messaged, session live 19:18Z):**
+  1. `20025cc4` ownership gate, **BOTH workers**, soft deadline before the 08-18
+     slate — measured absent from both live SHAs by content.
+  2. `bafb4fb2` monotone props seal, refresh-worker, **no deadline**, ideally
+     AFTER the 08-19 cadence result so the two do not confound.
+- **Live and unmeasured:** the fixture-aware cadence flag on live-odds-worker.
+  Reader `outs-props-coverage-check` fires 2026-08-19 07:00 CT and now carries
+  **Gate B** (marker contention) plus the undeployed-seal caveat, so it can
+  return INCONCLUSIVE instead of wrongly FAILing a starved mechanism.
+- **NOT DONE, DELIBERATELY: the cadence marker is NOT namespaced.** Asked for,
+  and refused after reading the code — the authoring lane rejected it hours
+  earlier in the docstring of the function I was about to edit, and with the gate
+  deployed the shared marker is a safety net whose removal would double MLB
+  OddsAPI spend. Recorded in `state.md` and `learnings.md`.
+- **Next action for whoever picks this up:** get `20025cc4` deployed to both
+  workers, then read `outs-props-coverage-check` on 08-19 working Gate B first.
+  Do not promote any leash value — the model still loses to a constant baseline
+  at every grid point.
