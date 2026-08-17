@@ -2060,6 +2060,22 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
             },
             response={"recommendations": recommendations, "selected_date": selected_date},
             persist=True,
+            # THIS CALLER DOES NOT READ THEM. Its purpose is the `persist=True`
+            # side effect -- recording board state to the ledger. It then checks
+            # `if not recommendations` and returns; `bundle["history"]` and
+            # `bundle["performance_analytics"]` are never touched below.
+            #
+            # Named by stack dump 2026-08-17 03:48Z: this call chain WAS the
+            # allocator, in two frames (`_latest_by_recommendation_id` over the
+            # 830MB chunk stream, and `_aggregate_performance_rows`). It ran on
+            # every board cycle at ~49.7s and ~1.3GB to produce `sample_size=0`
+            # and `reliability_multiplier=1.0` for a result that is discarded.
+            #
+            # `persist` does NOT cover the analytics -- it flows only to
+            # `record_prediction` and the recommendation/portfolio-event writers
+            # -- so skipping them cannot change what reaches the ledger, which is
+            # the whole point of this call.
+            include_history_analytics=False,
         )
     except Exception as exc:
         print(f"[intelligence_state] BOARD_STATE_LEDGER_RECORD_FAILED selected_date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
