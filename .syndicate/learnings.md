@@ -4795,3 +4795,29 @@ Related: `learnings.md` 2026-08-17 on matching the baseline's FORM, and the
 `#428` rule about decomposing bias before publishing a skill verdict — which I
 had ALSO skipped on this same model before catching it here.
 
+## 2026-08-17 — RULE: a falsified prediction LOCALISES a bug; treat it as a measurement, not a miss
+
+**Three predictions were falsified today and each was worth more than the
+confirmation would have been.**
+
+1. **"Totals will run HIGH"** (from a measured +15% plate-appearance inflation).
+   They run **LOW, −0.481**. That single sign flip proved the opportunity bug is
+   in the PROP PROJECTION path and not the game simulation — a localisation no
+   amount of prop-side work had produced.
+2. **"The home team skips the bottom of the 9th"** (a textbook cause of exactly
+   the +0.5 AB signature). HOME +0.478 vs AWAY +0.535 — **flat**, so it is not
+   side-specific, which pointed at substitution instead.
+3. **"NFL's knee will be ~406"** (from the sigma/CRPS_clim scaling law). It is
+   **below 50**, because NFL summarises draws into a Normal while MLB scores the
+   empirical PMF — so the law applies to the FORECAST REPRESENTATION, not the
+   sport.
+
+**The rule:** state the prediction and its expected MAGNITUDE before running the
+check, so a wrong answer carries information. "Totals should be +1.0 high" fails
+informatively; "let us see if totals are biased" does not. All three of these
+narrowed the search; none of them cost anything beyond the run.
+
+**The discipline that makes it work:** say in advance what a negative result
+would mean. I wrote "if the NFL knee is below 300 the honest reading is that the
+scaling law is wrong, not that NFL is special" BEFORE seeing it — which made
+accepting the answer automatic rather than a negotiation with myself.
