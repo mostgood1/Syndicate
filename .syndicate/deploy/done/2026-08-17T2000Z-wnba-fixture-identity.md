@@ -55,3 +55,12 @@ Weekly sports are deliberately NOT gated (see below).
 **Cross-check before deploying:** `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` is unset
 on both services today. If someone sets it, it overrides the season list and the
 gate still filters it - intended, but worth knowing.
+
+
+---
+
+## CLOSED by the coordinator 2026-08-17 ~21:3xZ
+
+SAME FIX as the ownership-gate request (both are `20025cc4`), filed independently by two sessions. Closed by the same deploy and the same measurement: INERT. Full working under the ownership-gate request in done/.
+
+**Re-closed after a merge resurrected it.** The merge cycle's request-restore step existed to stop git's directory-rename heuristic filing new requests as done - but it had no exit condition and restored EVERY request origin/main held, including ones already delivered, deleting their done/ copies. That is the morning's failure inverted: delivered work marked pending. Fixed at the source; our done/ copy is now the evidence that wins.

@@ -103,3 +103,10 @@ ones. **Do not namespace the marker as part of this deploy.**
 
 Requested by lane `convergence-phase7-crps` (`#440` Phase 7), which is blocked on
 the measurement rather than on the code.
+
+
+---
+
+## EXECUTED by the coordinator 2026-08-17 20:29-20:37Z
+
+Deployed. refresh-worker `69607619` (live 20:35:44Z), live-odds-worker `9773713f` (live 20:36:50Z), each cut on that service's OWN live SHA. **MEASUREMENT PENDING the next sweep cycle** - see `deploys.md` under this date. Do not read this as verified.
