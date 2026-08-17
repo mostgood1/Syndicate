@@ -97,8 +97,14 @@ add() { BODY="${BODY}$1
 "; }
 
 add "=== SYNDICATE PROTOCOL (auto-loaded, bounded digest) ==="
-add "/lane before editing. /preflight before deploying. /checkpoint before ending."
+add "/lane before editing (EM-DASH headers only). /checkpoint before ending."
 add "Do NOT state system facts from memory — read .syndicate/state.md first."
+# The deploy line is printed only while a coordinator is registered, so deleting
+# .syndicate/coordinator.id turns the whole role off in one move -- here, in the
+# hook, and in the digest -- rather than leaving stale instructions in three files.
+if [ -s .syndicate/coordinator.id ]; then
+  add "DEPLOYS: not yours (incl. render.yaml). File .syndicate/deploy/requests/<ts>-<lane>.md — see coordinator.md."
+fi
 add ""
 
 if [ -f .syndicate/lanes.md ]; then

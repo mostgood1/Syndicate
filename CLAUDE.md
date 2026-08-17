@@ -235,7 +235,26 @@ contradicts `state.md`, say so before proceeding.
 
 ## Before any deploy
 
-Run `/preflight`. It is a hard gate, not a formality.
+**YOU DO NOT DEPLOY. A coordinator session owns every production deploy**
+`[2026-08-17, user decision]`. This includes `render.yaml` pushes, which
+fire `blueprint_sync` and apply to production regardless of `autoDeploy = no`.
+
+File a request and carry on with other work — do not block on a reply:
+
+```
+.syndicate/deploy/requests/<UTC-timestamp>-<lane>.md
+service: | sha: | reason: | verify: | rollback: | urgency:
+```
+
+`verify:` is the field that matters — name the READING that proves it worked,
+not the thing you will watch. The coordinator deploys into a safe window,
+measures it, writes `deploys.md`, and reports back to your session.
+
+Urgent is a reason to message the coordinator, never a reason to route around
+it. Full contract: `.syndicate/coordinator.md`.
+
+If you ARE the coordinator: run `/preflight`. It is a hard gate, not a
+formality.
 
 ## End of every session (or every ~30 min of real work)
 

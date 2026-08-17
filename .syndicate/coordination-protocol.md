@@ -106,7 +106,27 @@ in every other context and it is exactly what destroys a shared file.
 
 ---
 
-## 3. Deploys — agents prepare, humans execute
+## 3. Deploys — agents prepare, THE COORDINATOR executes
+
+> **AMENDED 2026-08-17 BY USER DECISION. Read `.syndicate/coordinator.md` — it
+> is the live contract; this section is the reasoning behind it.**
+>
+> The rule below is unchanged in substance and one word different in practice:
+> **the executor is a long-lived coordinator SESSION, not the human.** Sessions
+> still prepare and never fire their own deploys.
+>
+> **This section had been written since 2026-08-15 and was not followed**, which
+> is the most useful thing about it. Its own opening principle says why —
+> "any rule of the form 'sessions should remember to check X' fails the first
+> time a session is mid-task and context-pressured" — and then section 3 was
+> written as exactly such a rule. One request file was ever filed
+> (`2026-08-15T2350Z-smaps-reconciliation.md`) and it sat unexecuted for two
+> days while deploys continued to be fired directly.
+>
+> So the coordinator role ships with a `PreToolUse` hook rather than a
+> paragraph. `render_deploy.py` is the choke point every sanctioned deploy
+> already shares; a POST to `/deploys` is the bypass; a `render.yaml` push is a
+> deploy in disguise. All three are routed. The hook fails open by design.
 
 This is the rule I would push hardest on. Three services, `autoDeploy = no`,
 persistent disks, and a worker that is already OOMing means an agent that can

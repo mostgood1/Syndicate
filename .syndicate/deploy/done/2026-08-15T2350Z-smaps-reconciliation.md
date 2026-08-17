@@ -50,3 +50,32 @@ corrected self-check.
 11 in `tests/test_smaps_breakdown.py`, 46 with `test_memory_watchdog`, all green
 on this exact base. Both files byte-identical to the version tested on the two
 earlier bases.
+
+
+---
+
+## OUTCOME — closed by the coordinator 2026-08-17 13:1x CDT
+
+**EXECUTED, and it had been executed for two days.** Deployed
+2026-08-16 00:57:32Z as `ada731f5` on refresh-worker, measured 01:07:38Z:
+
+    reconciles               true      (was false, 27.0% off)
+    reconciles_within_pct    0.0
+    total_anon_mb          1,672.4     smaps, per-process
+    process_rss_anon_mb    1,672.6     RssAnon, per-process
+    other_processes_anon_mb    0.4     children, now a LABELLED figure
+
+Two independent kernel accountings of one process agreeing to 0.0%. Full record
+in `lanes_closed.md` under `smaps-anon-breakdown — DEPLOY LANDED`.
+
+**Why this file sat in `requests/` regardless:** nothing owned the queue, so the
+executing session recorded the result where it recorded everything else — its
+lane — and no one moved the request. The queue therefore read "one deploy
+pending" for two days while the truth was "zero pending, one delivered". That is
+the same failure shape as the `<pending>` markers in `deploys.md`: a status
+surface that only ever accumulates, because closing it was nobody's job.
+
+Moved to `done/` by the coordinator. **Had the SHA in this request been deployed
+today it would have been a two-day rollback of refresh-worker** — `c7747a29` is
+cut from `32186e28`, and live has since moved through `59c07221` and `8e3d2f95`.
+A stale request is not a harmless one.

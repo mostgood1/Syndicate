@@ -2153,7 +2153,15 @@ and then failed the thing it was checking, which is the point of running it.
 - Files:
   - `syndicate/features/shared/graded_outcomes.py`
   - `syndicate/features/shared/evaluation_settlement.py`
-  - `scripts/refresh_mlb_oddsapi.py` (read-only so far)
+  - `scripts/refresh_mlb_oddsapi.py` — **read-only dependency for this lane.** Its
+    props-freeze branch (`_freeze_oddsapi_pregame_markets`, props loop only) was
+    **REASSIGNED to `convergence-phase7-crps` on 2026-08-17**, on three grounds
+    stated so this can be judged: this lane is marked **ORPHANED — no live owner**
+    in its own header sweep; its claim here was explicitly *read-only so far*, i.e.
+    a declaration it is not editing the file; and the taking lane touches ONE
+    function and nothing on the grading/settlement path this lane cares about.
+    Notice was relayed to the live `Deploy and Document Coordinator` session.
+    **Revert by restoring this bullet to `(read-only so far)`.**
 - Hypothesis: the blocker is on the GRADED side, not the matching side.
 - Verification: per-date graded row counts off `/mlb/api/market-accuracy`, then a re-read of production `settled`.
 - Blocked by: none. `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN=false`, OFF BY USER DECISION (`todo.md:13464`).
@@ -3628,3 +3636,191 @@ to betting-accuracy improvements.
   (`scripts/ratchet_sample.py`, 7 tests). Whoever picks it up: the guard refusing
   a rate under 2h is load-bearing — a first attempt produced -17.63/+7.39 pts/h
   inside one hour.
+
+#### convergence-phase7-crps — PRODUCTION RE-RUN 2026-08-17 — **BLOCKED as asked; ran the answerable half instead**
+
+- **The grid CANNOT be swept on production.** Re-simulation needs schema-v4
+  `roster_obj_*.json`; production returns **404 at every stream root**. Only the
+  raw input bundle (`roster_0_*.json`, `schema_version=None`) exists and the
+  sim's loader rejects it. Verified by direct fetch, not by absence from the
+  (filtered) export listing.
+- **Stream-root quirk:** odds live under `mlb_source/data/...`, rosters under
+  `mlb_source/source_artifacts/data/...`. A path that 404s under one root can be
+  fine under the other — do not conclude "absent" from a single root.
+- **Ran instead:** `scripts/grade_production_outs_betting.py` — production's
+  SHIPPED outs model on its own 2026-07-19..08-16 window, 95 graded bets.
+- **THE OVER-CONFOUND IS SYSTEMIC:** overs won **56.84%** here vs 58.78% in
+  June. Any future grid grade must control for over-rate.
+- **THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS:** June grid best 59.46% /
+  +12.40%; production shipped model **48.42% / −10.15%**, against ALWAYS OVER at
+  56.84% / +0.79%. **n=148 and n=95, so neither is decision-grade.** This
+  retroactively strengthens the refusal to promote a leash value.
+- **1.6 SE, not significant.** The shipped model losing to a side-blind baseline
+  is a direction to investigate, not a verdict.
+- **THE BINDING CONSTRAINT IS ARCHIVED LINE COVERAGE, not sim cost:** only 15 of
+  29 dates carry a usable pitcher-props artifact (most live files are 441–548 B
+  stubs) and only 95 of 342 starts have a line. **Fix that before running
+  another betting grade** — more simulation cannot help.
+- Nothing promoted, nothing blocked, no production config changed.
+
+### tie-spread-membership-gap — CLOSED 2026-08-17 — **CONFIRMED ON PRODUCTION AND FIXED. The post-first-pitch run reported `unchanged (baselined)` while every comparable tie group had moved — a false PASS. Comparison is now per-group, matched on card identity.** — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+- **Goal:** `identicalContentSpread` must stop comparing two different groups and
+  calling the result "unchanged". **Testable outcome:** the comparison matches
+  tie groups on `(state, pair-count, n)` and fails on a change in any group that
+  is comparable on both sides; group membership changes are reported as NOT
+  COMPARABLE rather than silently passed. Re-running today's live slate against
+  `baseline_2026-08-17.json` must SURFACE the three mobile group moves it
+  currently hides.
+- **Files:** `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `.syndicate/log/2026-08-17.md`, `.syndicate/lanes.md`
+- **Hypothesis (already CONFIRMED on production data, 2026-08-17 12:37 CDT):**
+  `_cmp_value` reduces the whole tie block to `worstGroupPx`, a max over a set
+  whose membership moves with the slate. When a game goes live it leaves the
+  Preview pool, groups gain/lose members, and the max can land on a DIFFERENT
+  group while reading numerically identical.
+- **The measurement.** One game live, 10 Preview, vs an all-Preview baseline:
+  - mobile reported `43px unchanged (baselined)` — but the baseline's 43 came
+    from `u=45 n=3` and the current 43 comes from `u=53 n=3`, while **every**
+    matched group moved: `u=53` 30->43, `u=49` 32->15, `u=45` 43->36.
+  - desktop reported `86px unchanged` from `u=49 n=3` vs `u=49 n=2`, hiding
+    `u=45` moving 28->41.
+  This is a **false PASS**, not a false alarm — the dangerous direction, and the
+  same family as the standing rule that unknown must not default permissive.
+- **Falsification test:** if the per-group comparison, run against today's
+  baseline on the current live slate, still reports everything unchanged, the
+  diagnosis is wrong and the scalar is not the cause.
+- **Verification:** the live re-run names the moved groups and fails; an
+  all-Preview self-comparison still passes; a baseline with no per-group data
+  (`baseline_2026-08-16.json` and older carry `byState` but no `groups`) reports
+  NOT COMPARED rather than silently taking the weaker check; probe suite green.
+- **Blocked by:** none
+
+#### convergence-phase7-crps — ARCHIVED LINE COVERAGE DIAGNOSED 2026-08-17 — **cause found, fix HANDED OFF, no file taken**
+
+- **The cause is the retrieval clock, and it is in the artifact itself.** Docs
+  whose `retrieved_at` is same-day afternoon carry **26–30 pitchers**; docs
+  retrieved after ~02:00Z the next day carry **ZERO**. 12 of 29 dates have
+  `pitchers: 0`. Books pull pitcher-props markets when games end, so a
+  post-slate fetch archives an empty market. Only **5 of 29** dates carry >=8
+  pitchers with an outs line.
+- **Defect 1 (primary): the props fetch runs after the slate on most dates.**
+  Same root class as `#440`'s headline — the system has almost no clock, so work
+  lands uniformly across 24h regardless of when the market is open. No freeze can
+  seal what was never fetched.
+- **Defect 2: the freeze cannot prove it is pregame when the slate clock is
+  missing.** `_freeze_oddsapi_pregame_markets` (`refresh_mlb_oddsapi.py:680`) is
+  first-write-wins when `slate_start is None`, so it can seal a post-slate empty
+  doc and never improve it — consistent with 08-08 (1 pitcher) / 08-09 (2).
+- **`mode` is `live` on EVERY file including the `_pregame` ones** — the freeze
+  copies the live doc, so it can only seal what the fetch held.
+- **07-19..08-07 is unrecoverable from the archive.** The freeze was unreachable
+  before 2026-08-08 (its own docstring: production held ZERO `_pregame.json`
+  that day) and the live file was rewritten in place. **OddsAPI historical
+  endpoints are the route, and the ledger records them as cheap** — would roughly
+  triple the gradeable sample.
+- **NO FILE TAKEN, NOTHING EDITED.** Both levers are owned:
+  `scripts/refresh_mlb_oddsapi.py` by OPEN `grading-blocker-settled-zero`
+  (defect 2 — and it already shipped this file's freeze fix);
+  cadence by OPEN `odds-cadence-off-the-mlb-peak` (defect 1 — its Phase 1
+  fixture-aware cadence is exactly the mechanism that fixes it).
+- **Recommended order:** fixture-relative props fetch → positive pregame proof
+  before sealing, with a strictly-richer re-seal allowed → historical backfill.
+  Cost it first: OddsAPI ~62.7% of a 5M cap, MLB 93.0% of spend.
+
+#### convergence-phase7-crps — CLAIM OVERRIDE LOGGED 2026-08-17 — `scripts/refresh_mlb_oddsapi.py`, ONE FUNCTION
+
+Taken on explicit user instruction ("take the file and coordinate the claim").
+Recorded so it can be judged rather than trusted.
+
+- **Whose it is:** OPEN lane `grading-blocker-settled-zero` (session
+  `alt-line-shortlist-watch`) lists it as **"read-only so far"**.
+- **Coordination attempted and its limit stated honestly:** that session is
+  **not running and not in the recent roster**, so it could not be reached.
+  Notice relayed to the live `Deploy and Document Coordinator` session instead,
+  with the measurement and an explicit "object and I will back out".
+- **Scope taken: ONE function**, `_freeze_oddsapi_pregame_markets` (:680), and
+  within it only the **props-sealing branch**. NOT `_merge_pregame_game_lines`,
+  NOT the game-lines freeze, NOT anything on the grading/settlement path — which
+  is the half that lane actually cares about.
+- **This is ADDITIVE to their shipped freeze fix, not a revert.** Their fix made
+  the freeze reachable at all; this makes what it seals monotone.
+- **Not the bigger defect.** Most of the loss is that the props fetch runs after
+  the slate; that is cadence, owned by `odds-cadence-off-the-mlb-peak`, and I am
+  NOT taking it.
+- Trivially revertable: one guard, one helper.
+
+#### convergence-phase7-crps — CADENCE LEVER TAKEN 2026-08-17 — **it is a DARK FLAG, not code, and the flip is a PRODUCTION CONFIG CHANGE**
+
+Taken on explicit user instruction ("now take the cadence lever too").
+
+- **Claim:** `odds-cadence-off-the-mlb-peak` (OPEN, session `sim-engine-track`,
+  not in the live roster). Its Phase 1 is **COMPLETE and verified in production**
+  (`dd53d47c`, live-odds-worker, 2026-08-16 05:51:48Z). **I am not editing its
+  files** — there is nothing to write. The machinery is built.
+- **THE LEVER IS `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE`**, `default=False`
+  (`live_refresh_loop.py:4006`), and it is **NOT PRESENT IN `render.yaml`**, so
+  no service sets it. Shipped, verified, dark.
+- **TRACED: the flag DOES fix my props defect.** `_filter_sports_for_pregame_sweep`
+  (`:4605`) always keeps a sport **while it is live** — which is why the props doc
+  is rewritten during and after the slate — and applies the interval only when it
+  is not. With the gate on, `_FIXTURE_TIER_SECONDS` hands the final 3h to the
+  **T-75/T-10 ramp**, which guarantees a sweep before first pitch, hence a
+  pregame props fetch. **Paired with the monotone seal (`bafb4fb2`) the loop
+  closes: cadence makes the pregame capture happen, the seal makes it stick.**
+  Neither half works alone.
+- **THE OWNER SET A PRECONDITION AND I AM NOT OVERRIDING IT SILENTLY:** the flag's
+  own comment says *"Flip on per service once the `branch-overlap-baseline-watch`
+  distribution has a BEFORE to compare against."* Measured now:
+  `reports/branch_overlap/baseline.jsonl` holds **7 records, of which only 4 are
+  `run_mode="scheduled"`** — the others carry no field and are UNKNOWN, not
+  scheduled, per `state.md`'s own instruction to count only `scheduled`. **A
+  BEFORE exists but is thin (n=4).**
+- **NO FLIP MADE.** Enabling it is a production behaviour change on a worker under
+  an active OOM investigation with a deploy hold, and the flag is absent from
+  `render.yaml`, so the two routes are: (a) add it to `render.yaml`, which fires
+  **`blueprint_sync`** — rewrites the WHOLE env block on live services and 502s
+  every route for ~2 min; or (b) the single-key env endpoint plus a deploy, which
+  is narrower. **(b) is the correct route if it is flipped at all.**
+- **Cost note:** the gate makes sweeps MORE frequent near first pitch and much
+  less frequent when fixtures are far out. Net OddsAPI call volume is not
+  obviously higher, but it is not obviously lower either, against a cap at ~62.7%
+  with MLB at 93.0% of spend. Measure before and after.
+
+
+### syndicate-coordinator — OPEN — **STANDING LANE, NOT A TASK. Owns every production deploy, ledger upkeep, and cross-session organisation** — opened 2026-08-17 — session: syndicate-coordinator
+- **Established by user decision 2026-08-17.** Contract: `.syndicate/coordinator.md`.
+  Session id in `.syndicate/coordinator.id` — **delete that file and the role
+  stands down everywhere at once** (hook, digest line, and this lane's authority).
+- Goal, and it is a standing one rather than a testable outcome: no two sessions
+  deploy to one service in the same window, no lane is held by a session that no
+  longer exists, and no status surface reads as owed work that was already done.
+- **Files:** none claimed, and this is not an oversight. `lane-guard` explicitly
+  skips `.syndicate/**` and `.claude/**` ("Never guard the ledger or the harness
+  config itself"), so the ledger CANNOT be claimed. Coordination of the ledger is
+  by single-writer convention, not enforcement — which is exactly why this lane
+  exists rather than being spread across every session.
+
+- **STANDING STATE `[2026-08-17 13:1x CDT]`**
+  - Deploy queue: **0 pending**. The one request in it had been executed two days
+    earlier (`ada731f5`, 08-16 00:57:32Z) and never moved — the queue read "one
+    pending" while the truth was "zero pending, one delivered".
+  - Open lanes: **12 by em-dash header + 1 by hyphen** (`wnba-fixture-identity`,
+    whose files are consequently unguarded — its owner is notified).
+  - Orphaned lanes: **9**, each annotated with owner state and one next action.
+  - Deploy obligations: **0 owed** (14 of 14 markers reconciled).
+  - Live services last read 2026-08-17: refresh-worker on the bounded-ledger fix
+    (`8e3d2f95`), 10.5h clean; **the slow ratchet is still unmeasured past that**.
+
+- **OPEN DECISION FOR THE USER — the enforcement hook is NOT installed.**
+  `.claude/hooks/deploy-guard.py` was written and blocked by the permission
+  classifier before it could be created. Until it exists, deploy ownership is a
+  convention, and `coordination-protocol.md` §3 is the proof that conventions do
+  not hold here: it said "agents prepare, humans execute" on 2026-08-15, exactly
+  one request was ever filed, and direct deploys continued for two days.
+  The hook routes three shapes — `render_deploy.py`, a POST to `/deploys`, and a
+  push carrying `render.yaml` (`blueprint_sync` bypasses `autoDeploy = no`) —
+  allows read-only Render scripts, and fails open on every error.
+
+- **NOT CLAIMED:** that this role reviews or approves engineering decisions. It
+  serialises deploys, holds the guardrails, takes the measurement, and keeps the
+  ledger true. Correctness of a fix stays with the lane that wrote it.
