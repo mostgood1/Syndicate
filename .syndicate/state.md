@@ -2964,17 +2964,34 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
 
 ## LIVE GAME-LINE MODEL — SCORED 2026-08-17 (lane `score-live-gameline-edges`)
 
-- **The live game-line model LOSES TO THE MARKET on every population**, measured
-  on the served `book_grid` artifact at 02:12:18Z over 14 finished MLB games:
-  `all_records` model Brier **0.26579** vs market **0.23923** (+0.02656, n=3,226);
-  `last_per_game` 0.27776 vs 0.20344 (+0.07432, n=14); `priceable_only` 0.28064
-  vs 0.24060 (**+0.04004**, n=2,081). Positive = market better.
-  **It is WORST on the rows the board actually shows.**
-- **ONE SLATE. `last_per_game` is n=14.** Do not act on this without a second
-  night. `all_records` is better-powered and agrees, but shares the slate.
+- **The live game-line model LOSES TO THE MARKET on every population.** Measured
+  on the served `book_grid` artifact at **02:28:13Z, the COMPLETE 15-game MLB
+  slate** (`by_state {final: 15, live: 0}`):
+
+  | population | model Brier | market Brier | model − market | n |
+  |---|---|---|---|---|
+  | `all_records` | 0.27725 | **0.23883** | **+0.03842** | 3,638 |
+  | `last_per_game` | 0.25925 | **0.20147** | **+0.05778** | 15 |
+  | `priceable_only` | 0.29694 | **0.24070** | **+0.05624** | 2,409 |
+
+  Positive = the market is better calibrated. **It is worst on
+  `priceable_only` — the rows the board actually shows.**
+- **SUPERSEDES the 14-game figures written at 02:1xZ** (`all_records` +0.02656).
+  Those were taken while one game was still live; the gap WIDENED to +0.03842
+  once the slate completed. Do not quote the earlier numbers.
+- **ONE SLATE. `last_per_game` is n=15.** The direction is consistent across
+  three populations and 3,638 records, but the magnitude rests on a single
+  night. **Do not act on it without a second slate.**
+- **`no_final_outcome_for_game` resolved to ZERO and was never a defect.** It
+  read 416 at 02:12Z because one game was still in progress, and cleared itself
+  when that game went final — the counter correctly refusing to score a result
+  that did not exist yet. The only remaining unscored bucket is
+  `record_carries_no_model_probability: 110`, which is the live re-sim
+  publishing no probability (the same refusal surfacing as
+  `prob_interval_swamps_edge` on the board).
 - **The score is readable from the API**: `live_gameline_score` on
-  `/api/board/book-grid?sport=<sport>&date=<date>`. The ledger itself remains
+  `/api/board/book-grid?sport=<sport>&date=<date>`. The ledger itself stays
   unpublished (zero `HOT_ARTIFACT_PATTERNS`), so this block is the ONLY way the
   measurement leaves the worker.
-- Live: refresh-worker `9bff3cc1`, web `685ab3e9`; `origin/main d6264971` matches
-  both by content.
+- Live: refresh-worker `9bff3cc1`, web `685ab3e9`; `origin/main` matches both by
+  content.
