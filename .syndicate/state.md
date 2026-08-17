@@ -1305,16 +1305,37 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
-- **`syndicate/features/shared/live_gameline_join.py` IS CLAIMED BY TWO OPEN
-  LANES** — `live-game-line-projection` and `mlb-live-gameline-distributions`.
-  Verified on `origin/main` 2026-08-17 00:2xZ; the second claim predates
-  2026-08-16's ledger work (checked at `2dd384b0`), the first began being
-  enforced when that lane's stray `OPEN` stub heading was merged onto the
-  entry owning its `- Files:` block. **Neither lane has a live session.**
-  This is the file board finding 3 root-causes to (`:643` overwrites
-  `edge_vs_market_pct` with the LIVE edge while `model_prob_over` stays
-  PREGAME), so whoever fixes that must reconcile the two lanes first rather
-  than just satisfy `lane-guard`.
+- **BOARD FINDING 3 STANDS AND IS UNFIXED — `live_gameline_join.py:643`.**
+  It overwrites `projection["edge_vs_market_pct"]` with the LIVE edge while
+  deliberately leaving `model_prob_over` at its PREGAME value (the live
+  probability goes to a new `live_model_prob_over` key), so the edge refers to
+  a different probability than the one printed beside it, with nothing in the
+  field name to say so. **7/7 separation on `live_aware`**; arithmetic exact —
+  stated `-39.93` = `(0.1917 - 0.591) x 100`, where the pregame pairing gives
+  `+27.46`. Every number correct; only the PAIRING wrong, which is why it is
+  `full/*` only (segment bases are not live-joined and agree 3/3). Suggested
+  fix: rename to `live_edge_vs_market_pct` so the pairing cannot be got wrong
+  at the call site. **The file is now held by a single lane, `wnba-live-tier`**
+  (the earlier two-holder conflict was resolved 2026-08-17 00:4xZ), so there is
+  one owner to coordinate with.
+- **`.syndicate/lanes.md`'s STRUCTURAL INVARIANTS ARE CHECKABLE IN ONE
+  COMMAND, and both hold as of 2026-08-17 01:0xZ** (17 headings, 8 OPEN
+  lanes, 40 claims):
+
+      py -3 scripts/check_lane_invariants.py
+
+  It asserts (1) every claimed file has exactly ONE open holder and (2) no
+  OPEN lane sits under `## Archived lanes` — archiving one moves its body to
+  `lanes_closed.md`, which `lane-guard` never reads, so its file protection
+  disappears silently. It also HINTS at prose inside a `- Files:` block,
+  because `_claims()` reads every indented line there as a claim.
+  **It names no lane on purpose** — the roster turns over hourly and a check
+  naming a lane goes stale in hours.
+  **`lane-guard.py` cannot be imported to reuse its parser**: it runs
+  `main()` at import and `sys.exit()`s on EOF stdin, killing the caller with
+  exit code 0 and no output. The regexes are copied and pinned to the hook's
+  source by `tests/test_check_lane_invariants.py`.
+  `lanes.md` is 208KB, down from 310KB on 2026-08-16.
 - **The Ask sim-vs-line clause claims a direction ONLY when the mean clears
   the line by 0.5 (`_SIM_DIRECTION_MIN_MARGIN`).** The precondition is that
   the distribution's MEDIAN is on the same side as the mean; for Poisson

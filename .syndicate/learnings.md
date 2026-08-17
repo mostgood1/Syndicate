@@ -3565,3 +3565,54 @@ sim" caught a window in 35 seconds that "no jobs" would have waited for
 indefinitely. And have the poller watch the BASE too — refresh-worker moved
 `fdc72dd0 -> 94447830` mid-build, which silently invalidates a pushed branch.
 
+## 2026-08-17 — CHECKPOINT 7: a contested file is a symptom, not a diagnosis
+
+### REFUTED: "four contested files means four lanes disagree"
+
+`scripts/check_lane_invariants.py` reported four files claimed by two OPEN lanes
+each. Exactly **one** was a real disagreement:
+
+- **one PHANTOM** — five paths claimed from prose indented under a `- Files:`
+  line whose own text read "none claimed yet — this lane is diagnostic";
+- **two from ONE duplicated block** — a 92-line region pasted verbatim into two
+  unrelated lanes, each copy carrying its own `Files (exclusive to this lane)`;
+- **one genuine** conflict between two lanes that both meant it.
+
+**Read the Files block before adjudicating a claim.** Three of the four would
+have been "resolved" by taking a file away from a lane that never asked for it,
+and the duplication — the actual defect — would have survived untouched.
+
+### REFUTED: "the duplication is the one block I found"
+
+I reported a single duplicated block. A content scan for maximal runs of
+identical consecutive lines found **three**: 92 lines cross-lane, and 57 and 42
+lines duplicated *adjacently within a single lane* — invisible when reading,
+because a lane body repeated back-to-back just looks long.
+
+**When you find one copy-paste in a ledger, scan for all of them.** The scan is
+ten lines and it found twice as much as reading did.
+
+### THE CHECK THAT MAKES DELETING A LEDGER BODY SAFE
+
+Before removing 191 lines: assert that **every deleted line still appears
+elsewhere in the file**, line by line. Not a diff stat, not a heading count —
+those pass while a body is silently truncated. It is the only check that
+distinguishes de-duplication from data loss, and it is three lines of code.
+
+Corollary, learned twice tonight: **locate the region BY CONTENT at edit time,
+never by line numbers from an earlier read.** `lanes.md` moved four times in an
+hour; a stale offset would have cut a different 92 lines and every count would
+still have balanced.
+
+### A STALE SNAPSHOT REPORTS STALE RESULTS, AND THE TELL IS THAT NOTHING MOVED
+
+After deleting all three duplicated runs I re-ran the scanner and it reported all
+three still present. The scanner had a hardcoded path to the dump taken *before*
+the edit. The signature was that the numbers were **identical** to the previous
+run — not similar, identical. A real re-measure after a change essentially never
+reproduces the prior output exactly.
+
+**Give every analysis script its input as an argument.** Hardcoding a path makes
+it silently answer a question about the past. This is the third instrument
+misread of the session, after Git Bash's `rev:path` mangling and PowerShell's
+case-insensitive `Select-String`.
