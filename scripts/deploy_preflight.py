@@ -101,6 +101,23 @@ EXIT_CLEAR, EXIT_HOLD, EXIT_UNKNOWN = 0, 1, 2
 # after going live by a peer cutting from a stale live SHA. Anything already
 # treating non-zero as "do not deploy" keeps working unchanged.
 EXIT_CLAIMED = 3
+# 4 = the target commit is not contained in `origin/main`. Separate from HOLD
+# because the remedy is different again: HOLD means "wait", CLAIMED means "not
+# yours", OFF_MAIN means "this SHA cannot compose with anyone else's".
+#
+# WHY, and it is a specific incident. Services have historically run deploy
+# branches cut from the LIVE SHA rather than from main -- 170 `origin/deploy/*`
+# branches exist and the sampled tips are all off main. Two such deploys do not
+# contain each other, so the second silently reverts the first. Measured
+# 2026-08-15: a verified refresh-worker fix went live at 21:36:59Z and was gone
+# by 21:45:20Z because a peer cut from an earlier live SHA. Both deploys
+# "succeeded"; the deploy claim correctly serialised them; nothing warned.
+#
+# SERIALISATION IS NOT COMPOSITION. The claim orders deploys and cannot make
+# them cumulative. Requiring the target to be an ancestor of `origin/main` makes
+# every later main commit contain every earlier one, by construction, which is
+# the property the claim cannot provide.
+EXIT_OFF_MAIN = 4
 
 
 def _api_key() -> str:
@@ -338,6 +355,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--service", required=True, choices=sorted(SERVICE_IDS))
     parser.add_argument("--target-commit", default="", help="commit you intend to deploy; warns if already live")
+    parser.add_argument("--allow-off-main", action="store_true",
+                        help="permit a target commit that is NOT on origin/main. Such a "
+                             "deploy cannot compose with another session's -- whichever "
+                             "lands second silently reverts the first. Record why in deploys.md.")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -366,6 +387,15 @@ def main() -> int:
         report["target_commit"] = args.target_commit[:8]
         report["target_already_live"] = contained
         redundant = contained is True
+
+    # Composition check. `origin/main` is re-read from the local repo, so a stale
+    # fetch reads as off-main rather than as on-main: an unknown must not land on
+    # the permissive branch, and the remedy (`git fetch origin`) is in the reason.
+    off_main = False
+    if args.target_commit and not args.allow_off_main:
+        on_main = is_ancestor(args.target_commit, "origin/main")
+        report["target_on_main"] = on_main
+        off_main = on_main is not True
 
     sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
     parsed = parse_processes(sample[1]) if sample else None
@@ -411,7 +441,18 @@ def main() -> int:
     )
 
     stale = age is None or age > args.max_sample_age_seconds
-    if foreign_claim:
+    if off_main:
+        verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
+        on_main = report.get("target_on_main")
+        reason = (
+            f"{args.target_commit[:8]} is not contained in origin/main"
+            + (" (git could not say -- run `git fetch origin`)" if on_main is None else "")
+            + ". A SHA off main cannot compose with another session's deploy: whichever "
+              "lands second silently reverts the first. Rebase onto origin/main and "
+              "deploy a commit that is on it, or pass --allow-off-main and say why in "
+              "deploys.md."
+        )
+    elif foreign_claim:
         verdict, code = "CLAIMED", EXIT_CLAIMED
         reason = (
             f"deploy claim on {args.service} is held by {foreign_claim.get('holder')}"

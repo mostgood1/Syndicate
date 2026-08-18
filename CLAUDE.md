@@ -275,7 +275,17 @@ python scripts/deploy_preflight.py --service <svc> --holder <lane>
 
 Both must pass before `.claude/hooks/deploy-guard.py` will let a deploy
 through: an unexpired claim held by YOUR lane, plus a preflight that returned
-`CLEAR` within 15 minutes. A `render.yaml` push needs all three services locked,
+`CLEAR` within 15 minutes **for the exact SHA you are deploying**.
+
+**DEPLOY A COMMIT THAT IS ON `origin/main`** `[2026-08-18, user decision]`.
+Preflight returns `OFF_MAIN` (exit 4) for anything else. Services used to run
+deploy branches cut from the LIVE SHA — 170 `origin/deploy/*` branches exist and
+the sampled tips are all off main — and two such deploys do not contain each
+other, so the second silently reverts the first. Measured 2026-08-15: a verified
+refresh-worker fix went live at 21:36:59Z and was gone by 21:45:20Z. Both
+deploys succeeded and the claim correctly serialised them. **Serialisation is not
+composition** — the claim orders deploys, it cannot make them cumulative; being
+on `main` does. Escape hatch `--allow-off-main`, and say why in `deploys.md`. A `render.yaml` push needs all three services locked,
 because `blueprint_sync`'s blast radius is all three. The guard prints the exact
 command that clears it, so nothing ever waits on another session.
 

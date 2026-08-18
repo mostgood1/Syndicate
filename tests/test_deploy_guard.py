@@ -81,12 +81,14 @@ def give_claim(root: Path, service: str = "web", holder: str = LANE,
 
 
 def give_receipt(root: Path, service: str = "web", verdict: str = "CLEAR",
-                 age_seconds: float = 0.0) -> None:
+                 age_seconds: float = 0.0, target_commit: str | None = "abc1234") -> None:
     d = root / ".syndicate" / "deploy" / "preflight"
     d.mkdir(parents=True, exist_ok=True)
-    (d / f"{service}.json").write_text(json.dumps(
-        {"service": service, "verdict": verdict, "written_at": time.time() - age_seconds}),
-        encoding="utf-8")
+    payload = {"service": service, "verdict": verdict,
+               "written_at": time.time() - age_seconds}
+    if target_commit is not None:
+        payload["target_commit"] = target_commit
+    (d / f"{service}.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -282,6 +284,44 @@ def test_undeterminable_service_fails_open_loudly(root):
     result = run_hook(root, cmd)
     assert result.returncode == ALLOW
     assert b"could not determine the target service" in result.stderr
+
+
+# --------------------------------------------------------------------------
+# The receipt is bound to a SHA. Without this, one CLEAR authorises any deploy
+# for 15 minutes -- including a commit that is off main, which is precisely
+# what preflight's OFF_MAIN verdict exists to refuse.
+# --------------------------------------------------------------------------
+
+def test_receipt_for_a_different_commit_does_not_authorise_this_one(root):
+    give_claim(root)
+    give_receipt(root, target_commit="deadbee")
+    result = run_hook(root, DEPLOY_CMD)            # deploys abc1234
+    assert result.returncode == BLOCK
+    assert b"is for deadbee" in result.stderr
+
+
+def test_receipt_with_no_target_commit_vouches_for_nothing(root):
+    give_claim(root)
+    give_receipt(root, target_commit=None)
+    result = run_hook(root, DEPLOY_CMD)
+    assert result.returncode == BLOCK
+    assert b"without --target-commit" in result.stderr
+
+
+def test_abbreviated_and_full_sha_are_the_same_commit(root):
+    give_claim(root)
+    give_receipt(root, target_commit="abc1234def5678901234567890abcdef12345678")
+    result = run_hook(root, DEPLOY_CMD)            # deploys abc1234
+    assert result.returncode == ALLOW
+
+
+def test_render_yaml_push_needs_no_commit_binding(git_root):
+    """A blueprint push carries no --commit; the binding must not block it."""
+    _commit(git_root, "render.yaml", "services:\n  - name: web\n")
+    for service in ("web", "refresh-worker", "live-odds-worker"):
+        give_claim(git_root, service=service)
+        give_receipt(git_root, service=service, target_commit=None)
+    assert run_hook(git_root, "git push origin main").returncode == ALLOW
 
 
 # --------------------------------------------------------------------------

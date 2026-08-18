@@ -90,16 +90,29 @@ composing.**
 Cutting from the live SHA feels safer because `main` is not trusted. The cost of
 that instinct is measured and it is a lost shipped fix.
 
-**Proposed:** deploy a SHA that is a descendant of `origin/main`, never a branch
-cut from a live SHA. Then the later deploy contains the earlier one by
-construction, and the claim's serialization becomes sufficient. If `main` is not
-trustworthy enough to deploy, that is the thing to fix — not something to route
-around with per-session branches that silently revert each other.
+**DECIDED AND ENFORCED** `[2026-08-18, user decision: "deploy from main"]`.
+Deploy a SHA contained in `origin/main`, never a branch cut from a live SHA.
+The later deploy then contains the earlier one by construction, and the claim's
+serialization becomes sufficient.
 
-This is the part most likely to be argued with, and it should be: it trades
-"ship only my change" for "ship everything on main". Given the first option has
-already cost a verified fix, I would take the trade. But it is a decision, not a
-conclusion.
+`deploy_preflight.py` returns **`OFF_MAIN` (exit 4)** for a target commit that is
+not an ancestor of `origin/main`, and `deploy-guard.py` blocks on it like any
+other non-CLEAR verdict. Escape hatch: `--allow-off-main`, recorded in
+`deploys.md`.
+
+Two details that make the check real rather than decorative:
+
+- **The receipt is bound to its SHA.** A `CLEAR` taken for one commit no longer
+  authorises a deploy of any other for the next 15 minutes — otherwise the
+  OFF_MAIN verdict would be trivially sidestepped by preflighting a main commit
+  and deploying something else. Abbreviated and full SHAs compare by prefix.
+- **A stale fetch reads as off-main, not on-main.** `origin/main` is read from
+  the local repo, so "git could not say" lands on the blocking branch with
+  `git fetch origin` named in the reason. An unknown must not default permissive.
+
+This trades "ship only my change" for "ship everything on main", and that is a
+real cost — it is the reason cutting from the live SHA felt safer. The trade was
+taken because the alternative has already cost a verified fix in production.
 
 ---
 

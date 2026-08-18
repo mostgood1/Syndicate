@@ -98,6 +98,7 @@ GIT_PUSH = re.compile(r"\bgit\s+(?:-\S+\s+|--\S+\s+)*push\b", re.I)
 
 SERVICE_ARG = re.compile(r"--service[=\s]+['\"]?([A-Za-z0-9._-]+)", re.I)
 SRV_ID = re.compile(r"(srv-[A-Za-z0-9]+)", re.I)
+COMMIT_ARG = re.compile(r"--commit[=\s]+['\"]?([0-9a-f]{7,40})", re.I)
 
 SERVICE_BY_ID = {
     "srv-d88ahvrbc2fs73eodu30": "web",
@@ -178,7 +179,22 @@ def _claim(root, service):
     return None
 
 
-def _preflight(root, service):
+def _commits_agree(receipt_sha, deploy_sha):
+    """True when the receipt vouches for the SHA actually being deployed.
+
+    Either may be abbreviated, so this is a prefix comparison in whichever
+    direction is longer. Without this, a CLEAR taken for one commit authorises a
+    deploy of any OTHER commit for the next 15 minutes -- including one that is
+    off main, which is the exact thing preflight's OFF_MAIN verdict exists to
+    stop. The receipt has to be bound to its subject or it is just a timer.
+    """
+    a, b = str(receipt_sha or "").lower(), str(deploy_sha or "").lower()
+    if not a or not b:
+        return False
+    return a.startswith(b) or b.startswith(a)
+
+
+def _preflight(root, service, deploy_sha=None):
     """(ok, why_not) for a fresh CLEAR preflight receipt on `service`.
 
     ALIAS-AWARE, AND IT TAKES THE NEWEST RECEIPT RATHER THAN THE BEST ONE.
@@ -215,6 +231,15 @@ def _preflight(root, service):
     if age > PREFLIGHT_TTL_SECONDS:
         return False, "the last CLEAR preflight is %.0f min old (limit %.0f)" % (
             age / 60.0, PREFLIGHT_TTL_SECONDS / 60.0)
+    if deploy_sha:
+        receipt_sha = newest.get("target_commit")
+        if not receipt_sha:
+            return False, ("the CLEAR preflight was run without --target-commit, so it "
+                           "vouches for no particular SHA (re-run it with "
+                           "--target-commit %s)" % deploy_sha[:8])
+        if not _commits_agree(receipt_sha, deploy_sha):
+            return False, ("the CLEAR preflight is for %s but this deploys %s"
+                           % (str(receipt_sha)[:8], deploy_sha[:8]))
     return True, ""
 
 
@@ -369,6 +394,11 @@ def main():
         return 0
 
     lane = _lane(root, session_id)
+    # A render.yaml push carries no --commit; the receipt-to-SHA binding applies
+    # to service deploys only.
+    m = COMMIT_ARG.search(cmd)
+    deploy_sha = m.group(1) if (m and shape == "deploy") else None
+
     state, blocked = [], False
     for service in services:
         claim = _claim(root, service)
@@ -383,7 +413,7 @@ def main():
             claim_problem = "held by %s for %.0f min -- not yours" % (
                 claim.get("holder") or "<unnamed>", claim.get("_age_min") or 0.0)
 
-        preflight_ok, why = _preflight(root, service)
+        preflight_ok, why = _preflight(root, service, deploy_sha)
         preflight_problem = "" if preflight_ok else why
         if claim_problem or preflight_problem:
             blocked = True
