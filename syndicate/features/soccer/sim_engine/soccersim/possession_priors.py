@@ -151,7 +151,27 @@ def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Ma
     form_points = _first_float(form_metrics, ["points_per_match", "recent_points_per_match", "form_points"], side=side)
 
     score = 0.0
-    score += ((shots or 12.5) - 12.5) * 0.016
+    # WEIGHT SHRUNK FROM 0.016, AS A PROBE -- NOT A FITTED OR VALIDATED VALUE.
+    #
+    # `corr(xg_for, shots_per_match)` measured +0.895 on eredivisie (this lane's
+    # collinearity table, all nine leagues: +0.83..+0.93). Shots is the
+    # remaining term in this function most correlated with the rating that
+    # `94578cbc` stopped double-feeding -- the same "same evidence, second
+    # route" shape, just weaker than the xG term that was removed outright.
+    #
+    # Full nine-league backtest AFTER removing the xG terms, 2026-08-18:
+    # Brier gap improved in 7/9 leagues (mean -0.0062) but `model_home_prob_
+    # stdev` widened in ALL NINE (cross-league mean 0.1575 -> 0.1907, PAST
+    # market's 0.1811) -- the model overcorrected from under- to
+    # over-dispersed. This is the named next step: identify which surviving
+    # term is absorbing the removed weight and scale it down.
+    #
+    # sqrt(1 - r^2) is the fraction of a correlated predictor's spread that is
+    # NOT already explained by the correlated one -- a standard shrinkage
+    # heuristic, not a fitted regression coefficient. At r=0.895 that is 0.446,
+    # giving ~0.0071. THIS IS A PROBE: measure the eredivisie backtest again
+    # before trusting the number, and do not treat 0.446 as validated.
+    score += ((shots or 12.5) - 12.5) * 0.0071
     score += ((big_chances or 2.2) - 2.2) * 0.04
     score += ((goals or 1.35) - 1.35) * 0.14
     score += ((set_piece_share or 0.30) - 0.30) * 0.20
@@ -182,7 +202,14 @@ def _defense_strength(defensive_metrics: Mapping[str, Any], *, side: str | None 
     clean_sheet_rate = _first_float(defensive_metrics, ["clean_sheet_rate", "clean_sheets_per_match"], side=side)
 
     score = 0.0
-    score += (12.5 - (shots_allowed or 12.5)) * 0.016
+    # SAME PROBE AS THE ATTACK SIDE, SCALED SEPARATELY -- NOT BY THE SAME FACTOR.
+    #
+    # `corr(xg_against, shots_allowed_per_match)` measured +0.793 on
+    # eredivisie, MEASURABLY LOWER than attack's +0.895 -- shots conceded
+    # carries more information beyond xG conceded than shots taken does beyond
+    # xG for. Assuming symmetry with the attack side would have been wrong;
+    # this was measured, not copied. sqrt(1-0.793^2) = 0.609 -> ~0.0097.
+    score += (12.5 - (shots_allowed or 12.5)) * 0.0097
     score += (1.35 - (goals_against or 1.35)) * 0.14
     score += ((clean_sheet_rate or 0.30) - 0.30) * 0.30
     return _clamp(0.5 + score, 0.05, 0.95)
