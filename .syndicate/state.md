@@ -420,6 +420,24 @@ unsaved anywhere.
 
 ## [session-harness] SESSION HARNESS — what the hooks actually enforce
 
+- **THE LEDGERS ARE KEYED AND CHECKED** `[verified 2026-08-18]`. One checker per
+  ledger, all three ENFORCED in CI and reported at session start as
+  `LEDGER INCOHERENT`: `scripts/lane_identity_check.py` (slug, one OPEN block,
+  one home), `scripts/todo_id_reconcile.py` (numeric id in exactly one of
+  `todo.md`/`todo_closed.md`), `scripts/state_key_check.py` (every `## [slug]`
+  unique). All three verified to EXIT 1 on deliberately corrupted copies before
+  being wired in — the gate is not vacuous. Green at checkpoint: lanes 54 blocks
+  coherent, state 35 sections/35 subjects, todo 166 ids.
+- **`state.md` sections carry a subject key** `## [subject-slug] TITLE`. One
+  subject, one section; a shared slug IS the stacking failure. Added because "no
+  duplicate titles" was trivially true while sections were titled by date.
+- **`lane-guard.py` reads BOTH Files forms and wrapped continuation lines**
+  `[verified 2026-08-18: file-like claims 52 -> 80]`. It previously matched only
+  `- Files:`, so 5 lanes using `- **Files (...):**` declared paths NO HOOK COULD
+  SEE. A disclaimer now governs only what FOLLOWS it, not the whole line.
+  Claim matching is exact-or-suffix (`rel == f or rel.endswith("/"+f) or
+  f.endswith("/"+rel)`), never a directory prefix — so a non-path token claimed
+  out of prose is INERT.
 - **`lane-guard.py` (PreToolUse) enforces.** Blocks `Edit`/`Write` against a file
   claimed by another OPEN lane (exit 2); allows it when `.syndicate/.current-lane`
   names the claiming lane. **With the marker empty it blocks your OWN lane's
@@ -1932,6 +1950,24 @@ One line per item. Where a thing is live, the SHA is the one that carries it, no
 **There is no coordinator session.** `.syndicate/coordinator.id` is DELETED,
 `coordinator.md` is a tombstone, and `.syndicate/deploy/requests/` is retired
 (a README there names the two requests that were still pending).
+
+**DEPLOY A SHA CONTAINED IN `origin/main`** `[2026-08-18, user decision]`.
+`deploy_preflight.py` returns **`OFF_MAIN` (exit 4)** otherwise, and the guard
+blocks on it like any non-CLEAR verdict. Escape hatch `--allow-off-main`, said
+out loud in `deploys.md`. **Measured: 170 remote `origin/deploy/*` branches
+exist and every sampled tip is OFF main** — two such deploys do not contain each
+other, so the second silently reverts the first. Serialisation is not
+composition: the claim ORDERS deploys, only being on `main` makes them
+CUMULATIVE.
+
+**The preflight receipt is bound to its SHA.** A CLEAR taken for one commit does
+not authorise deploying another for the next 15 minutes, or `OFF_MAIN` would be
+sidestepped by preflighting a main commit and shipping something else.
+
+**UNVERIFIED and stated as such:** this predicate has never gated a real deploy.
+`OFF_MAIN` has not fired in anger and no receipt has been consumed live. The
+first real deploy is the test — treat a surprise there as expected, not as
+evidence the rule is wrong.
 
 **Any lane may deploy** once it holds, for the target service:
 

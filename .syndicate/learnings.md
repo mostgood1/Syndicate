@@ -3787,3 +3787,71 @@ a script I had not touched.
 **Guard that now exists:** any tuning script runs an EQUIVALENCE CHECK first —
 empty override dict vs a dict of explicit no-op values must agree exactly. It is
 two lines and it localises this class of fault immediately.
+
+
+---
+
+## 2026-08-18 — OVERTURNED: "the ledger files were fine, just big" — session `football-model-owner`
+
+**What was believed.** The session-start digest measured `LEDGER OVER BUDGET`
+and nothing else, which encoded a belief that SIZE was the ledgers' problem.
+
+**What is true.** Size and coherence are independent, and coherence was never
+measured. Measured this session: `#447` existed in NEITHER `todo.md` nor
+`todo_closed.md`; `lanes.md` had 7 slugs carrying two OPEN blocks each (two
+sessions could each read themselves as the holder of the same files); `state.md`
+had 5 sections stacked onto 2 subjects.
+
+**Why it went unnoticed for so long, which is the useful part.** `state.md` had
+NO DUPLICATE TITLES, and that read as health. It is trivially true when sections
+are titled by their DATE. A clean reading from an instrument that cannot express
+the failure is not evidence of health — the same shape as
+`feedback_instrument_blindness`, recurring on a different instrument.
+
+**Rule.** A ledger needs an IDENTITY before it can be checked. `todo.md` has ids,
+`lanes.md` has slugs, `state.md` now has `## [subject-slug]`. Enforced in CI and
+reported at session start.
+
+---
+
+## 2026-08-18 — OVERTURNED: "a guard that is present is a guard that is working" — session `football-model-owner`
+
+**Two instances in one session, on two different hooks.**
+
+1. **`deploy-guard.py` gated on `session_id in coordinator.id`.** Once the
+   coordinator session was archived that predicate had NO TRUE VALUE, so the
+   guard was not a throttle but a total block on all deploys, silently. Two
+   deploy requests sat queued and `deploy/grants/` was empty.
+2. **`lane-guard.py` matched only `- Files:`, never `- **Files (...):**`.** Five
+   lanes declared paths that NO HOOK COULD SEE — the ledger said a file was held
+   and the guard let anyone edit it. Claims went 52 -> 80 when fixed.
+
+**The common shape.** Both guards ran, exited cleanly, and reported nothing
+wrong. Presence and a zero exit are not evidence of enforcement. Ask what makes
+the guard SAY NO, and construct that input.
+
+**Applied, not just recorded:** all three ledger checkers were then run against
+deliberately corrupted copies and each exits 1 before being wired into CI.
+
+---
+
+## 2026-08-18 — FORBIDDEN: never apply a transform to a shared file by patching the transform's own source with `str.replace` — session `football-model-owner`
+
+**What happened.** To re-run a collapse against the WORKING copy instead of
+`HEAD`, I rewrote the script's input line with `str.replace` and `exec`'d it. The
+replacement DID NOT MATCH — whitespace differed — so the "worktree rebuild"
+silently re-ran the HEAD version, and writing the result destroyed another
+session's 31 uncommitted lines, including a deployed-and-measured NCAAF result.
+
+**The tell that was available and that I did read, late:** both runs produced
+files of EXACTLY 2202 lines. Identical output from supposedly different input is
+proof the input did not change.
+
+**Recovered** from unreachable blob `936d7e6a`, which existed only because of an
+earlier accidental `git add`. An exhaustive `git fsck` sweep later confirmed it
+was the ONLY other version in the object store.
+
+**Rule.** Parameterise a script with `sys.argv` and ASSERT the input loaded
+(`assert head.count("
+") > 2000`). Never mutate source text to change behaviour.
+A silent no-op replace is indistinguishable from success.

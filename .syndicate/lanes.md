@@ -5057,6 +5057,80 @@ are strong enough that other leagues are unlikely to differ, but **UNCHECKED**.
 **Clamp binds on 1 of 22 teams** — not saturating, so this is a weighting problem
 rather than a range problem.
 
+### nhl-model-owner — OPEN — opened 2026-08-18 — session: nhl-model-owner
+- Goal: NHL sim engine reaches the same deep-dive rigor MLB (`mlb_sim_engine_reference.md`
+  + `sim_input_checklist.py`) and soccer (`soccersim_phase1_build_report.md` +
+  `soccer_sim_input_checklist.py`) already have — a pipeline-trace/input-provenance
+  doc, a CONSUMED-vs-POPULATED gating script, and the live findings those produce
+  fixed, not just documented. **Testable outcome:** `python scripts/nhl_sim_input_checklist.py`
+  exits 0 (or documents/accepts every remaining gap explicitly); `elo_rating` is
+  either populated end-to-end or its read site is removed; NHL's Phase 3b
+  calibration report matches what `calibration_profile.py`/its versioned-profile
+  artifact actually resolves to in production.
+- Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
+  `scripts/nhl_sim_input_checklist.py` (new), `docs/ai_context/hockeysim_engine_reference.md`
+  (new), `syndicate/features/shared/artifact_publisher.py` (HOT_ARTIFACT_PATTERNS
+  additions only, if xG/lineup/goalie files need allowlisting)
+- Collision check run 2026-08-18 against all OPEN lanes: no active lane claims
+  `syndicate/features/nhl/sim_engine/**`. `convergence-phase5-profile-seam` touched
+  `hockeysim/calibration_profile.py` but is SHIPPED (`964c89a4`) and session-closed
+  2026-08-17 — its `load_versioned_profile` seam is a no-op until an artifact
+  exists, which this lane may be the one to create. Not a live conflict.
+- Hypothesis: n/a (mixed diagnostic + build) — sub-findings from the survey pass
+  (elo_rating CONSUMED+unpopulated, xG loader wired but unallowlisted and unfed,
+  Phase 3b deltas absent from the live constant per todo.md + grep) are logged as
+  hypotheses to confirm against Render before fixing, per `model_engine_standard.md`
+  §3b (local-checkout absence is not proof of production absence).
+- Falsification test: for each of the three findings above, if a Render check
+  shows the field/file IS actually populated/allowlisted/applied in production,
+  the finding is EXONERATED and the doc says so instead of "fixed".
+- Verification: checklist script run against a fresh checkout exits documenting
+  zero silent gaps; each fix has a stated production measurement in `deploys.md`
+  if it required a deploy.
+- Blocked by: none
+
+#### nhl-model-owner — PROGRESS 2026-08-18 — both docs shipped, checklist built and RUNS RED (16 alarms, correctly), 2 real fixes verified end-to-end, 1 stale claim corrected. NOT deployed. NOT closing the lane — special_teams/team-rates/xG remain genuinely absent and are the natural next pass.
+- **Shipped**: `docs/ai_context/hockeysim_engine_reference.md`, `docs/ai_context/nhl_model_inventory.md`,
+  `scripts/nhl_sim_input_checklist.py`, `scripts/build_nhl_elo_artifact.py`,
+  `historical_truth/elo_builder.py`. Full findings + evidence: see the reference
+  doc and `todo.md` `#463`.
+- **Fixed and tested (209 hockeysim/nhl tests pass, up from 198; new tests
+  added, not just old ones re-passing)**: `elo_rating` populated end-to-end from
+  real data (1,312 cached games) with a NEGATIVE/noise-level backtest result
+  correctly keeping `elo_blend_weight` at 0.0 rather than auto-promoting;
+  `goals_per_60` staleness in the props engine's `TeamRates` (was stuck at the
+  pre-Phase-3b vendor default `2.9` for every team, forever).
+  `HOT_ARTIFACT_PATTERNS` gained `team_xg_*.csv`/`team_elo_*.csv`.
+- **Corrected a stale `todo.md` claim** (`#440`'s "Phase 3b never applied" —
+  it was applied, in a different file than the one that had been grepped).
+- **`artifact_publisher.py` edited via a documented claim override**
+  (same precedent as `soccer-layer2-dates`, `clv-without-settlement` is
+  ORPHANED per the 2026-08-17 coordinator sweep) — lane-guard cannot see
+  sweep releases, so the override is recorded here and in the file diff itself.
+- **Falsification tests, resolved**: elo_rating and xG were both confirmed
+  genuinely absent from THIS CHECKOUT, consistent with what production serves
+  (spot-checked `syndicate-an21.onrender.com/nhl/api/cards?date=2026-06-09` —
+  real data, confirming NHL does NOT rely on the HOT_ARTIFACT_PATTERNS push
+  the way MLB does; see reference doc §7). Not exonerated as "actually fine" —
+  genuinely absent, documented, not fixed.
+- **NOT deployed, not pushed, not committed** — holding for the user's word on
+  committing (unrelated concurrent-session changes are present in the working
+  tree; only this lane's files would be staged, per `feedback_never_chain_add_and_commit`).
+- **Next priority for whoever picks this up**: `special_teams` (7 CONSUMED
+  keys, 0% populated, every PP/PK multiplier neutral for every team) — flagged
+  in both docs as the single highest-value remaining gap.
+
+#### nhl-model-owner — CLAIM OVERRIDE — taking `artifact_publisher.py` from the ORPHANED lane `clv-without-settlement`, same precedent as `soccer-layer2-dates` (line ~3052)
+- **Not an override.** That lane is marked ORPHANED by the 2026-08-17 coordinator
+  sweep — *"no live owner. Session `lane-cleanup` no longer exists in the
+  roster"* — and `lane-guard` cannot see sweep releases, so it still shows the
+  file as claimed.
+- Its own SINGLE NEXT ACTION is a different pattern (`*_source/data/live_gameline_ledger/*.jsonl`
+  for MLB). **Not touched.** Flagged, not taken — same discipline as the prior override.
+- Files taken: `syndicate/features/shared/artifact_publisher.py` — two added
+  `HOT_ARTIFACT_PATTERNS` entries (`nhl_source/**/data/processed/team_xg_*.csv`,
+  `nhl_source/**/data/processed/team_elo_*.csv`), nothing else in the file touched.
+
 ### football-model-owner — OPEN — opened 2026-08-18 — session: football-model-owner
 - **Goal (single testable outcome):** `scripts/football_sim_input_checklist.py`
   exists, enumerates the smartsim2 input surface STRUCTURALLY (not by name
@@ -5401,10 +5475,169 @@ queued behind anyone. The ordering constraint still holds — web `752a866d`
 first or together with `CFBD_API_KEY`; key-alone makes the board serve 16 of 51
 while `verify:` passes.
 
-### basketball-model-owner — OPEN — opened 2026-08-18 — session: basketball-model-owner
-- Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane.
-- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py, syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
-- Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path.
-- Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface."
-- Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md.
+### basketball-model-owner — OPEN — inventory pass SHIPPED (#460/#461/#462 filed); now fixing #461's root cause — opened 2026-08-18 — session: basketball-model-owner
+- Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane. Follow-on: fix `#461` (WNBA `team_advanced_stats.games` never populated) at its root cause, not just the symptom.
+- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path. **Follow-on hypothesis (#461):** the WNBA `team_advanced_stats_*_asof_*.csv` files missing `games`/`source` are stale-schema leftovers that `_ensure_team_advanced_stats_asof`'s non-zero-size-only cache check treats as fresh forever, blocking regeneration under the current (post-`games`-column) code.
+- Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface." **#461 falsification:** if the stale WNBA CSV's header already contains `games`/`source` (i.e. the columns are present but empty, not structurally absent), the cache-guard theory is wrong and the real cause is elsewhere in the producer function itself.
+- Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md. **#461:** the checklist's Level 2 WNBA `games` alarm clears (or is measurably explained) after the cache-freshness fix, verified by actually invoking the fixed function, not by code inspection alone.
 - Blocked by: none
+
+### football-model-owner — BOARD CAP FIX DEPLOYED AND MEASURED 2026-08-18 18:3xZ — **16 -> 51 on week 1, which is EXACTLY CFBD's FBS-vs-FBS count. Hypothesis confirmed, alternative dead.** — session: football-model-owner
+
+**MEASURED ON THE SERVED PAYLOAD** (`dep-da2a6ue`, web `5fdabc46`, live 18:33:35Z):
+
+| week | before | after |
+|---|---|---|
+| 1 | 16 | **51** |
+| 2 | 16 | 49 |
+| 3 | 16 | 57 |
+| 5 | 16 | 56 |
+| 8 | 16 | 56 |
+| 12 | 16 | **66** |
+
+**Week 1 = 51 = CFBD's independent FBS-vs-FBS count for that week.** That
+cross-source agreement is the corroboration, not the widening by itself. Week 12
+at 66 also rules out any residual cap below 66. **The summaries held 49-66
+matchups all along; six weeks reading exactly 16 was the cap.**
+
+**DEPLOY WAS SCOPED, NOT `main`.** `origin/main` was 351 commits / 241 files
+ahead of live. Built per the 2026-08-16 recipe (`read-tree` LIVE, `update-index`
+one file to `origin/main`'s blob, `commit-tree -p LIVE`), blob verified
+byte-identical. **The recipe's warning held: live `678e2f25` was NOT an ancestor
+of `origin/main`.**
+
+**BREAK-GLASS GRANT USED, user-authorised explicitly.** `deploy_preflight
+--service web` returns UNKNOWN **and always will** — web does not emit
+`ALL_PROCESS_MEMORY` at all (sample 3.9 days old, predating the live deploy).
+Positive control: refresh-worker, same instrument, **7s**. Widening
+`--max-sample-age-seconds` was refused as vacuous. Substituted a live
+`/api/ops/memory` read with every process identified **by cmdline**: 0 job
+processes. Full reasoning in `deploys.md`.
+
+**THE INSTRUMENT SHIPPED INERT — and it is the same defect as the cap.**
+`board_row_counts` was ABSENT from the payload even though the fix worked.
+`build_game_board_api_payload` **whitelists** response keys; I had checked
+`apply_game_board_contract`, confirmed it preserves extras via `dict(context)`,
+and stopped — **it is not the last hop.** Fixed in `9ab83058`, deployed scoped as
+`4c3b0aa5`. **Presence in the context is not reachability to the client**,
+exactly as presence in `_collapse_games` was not reachability to the board. Twice
+in one change.
+
+**MY OWN IDLE CHECK PRODUCED TWO FALSE "DO NOT DEPLOY"s**, both from classifying
+by process NAME rather than CMDLINE: pid 1 `bash` (container entrypoint) and pid
+38 `/portdetectorv2` (**Render's post-restart port check, which appears BECAUSE
+you just deployed** — so it would block the second deploy of every pair, the one
+carrying the fix to the first). `deploy_preflight` classes both `[infra]`.
+
+**OWED:** release the web claim, delete the grant, and **fix the root cause —
+make web emit `ALL_PROCESS_MEMORY`** so preflight can pass honestly rather than
+needing a grant every time. Also still owed from earlier: allowlist
+`recommendations_summary` in `HOT_ARTIFACT_PATTERNS`.
+
+**NOT DONE, AND NOT MINE TO DO:** `CFBD_API_KEY` is still ABSENT on
+refresh-worker. **I do not set API keys** — handed to the user. Note
+refresh-worker also showed `HOLD: 3 job(s) in flight` at 17:4xZ, so that half
+needs a clear window regardless.
+
+### football-model-owner — NFL PRESEASON AUDITED 2026-08-18 ~19:2xZ — **two real defects found and fixed; one systemic gap named. 3 commits, UNDEPLOYED.** — session: football-model-owner
+
+**Preseason is IN SEASON and its board is live**, so it was audited against the
+served payload first, per the Render-is-source-of-truth rule.
+
+**HEALTHY (stated because a null result is a result):** 16 of 16 games carry
+`home_mean`/`away_mean` and a real `home_win`. The pipeline RUNS, unlike NCAAF.
+`SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN='true'` on
+refresh-worker.
+
+**NOT A BUG, checked before publishing:** the board reads "Preseason Week 2
+(dress rehearsal)" while sourcing `..._wk3.csv`. `PRESEASON_WEEK_LABELS` maps
+ESPN week 1 to the Hall of Fame game, so file wk3 IS display wk2. **An apparent
+off-by-one that is a documented convention.**
+
+**DEFECT 1 — FIXED (`da0c89c5`): the board showed a projected score and NO
+spread or total.** Measured, BOTH NFL boards, 16 of 16 games:
+`home_mean` 100%, `away_mean` 100%, **`total_mean` 0%, `margin_mean` 0%.**
+`_shared_predictions` read `predictions` -> `sim.score` -> `score` and **never
+`sim.periods.full`**, where NFL's cards put all four; `sim.score` carries only
+two. **The two fields missing were exactly the two with no path.** The artifact
+had them as REQUIRED CSV columns the whole time. Fixed at the shared choke point
++ definitional derivation, ordered last so a producer's own (shrunk) margin
+always wins. 6 regression tests.
+
+**DEFECT 2 — FIXED (`63df7526`): no provenance on the board at all.** No
+`generated_at`/`profile_name`/`rating_source`/`seeds_used`, all required CSV
+columns. Combined with the allowlist gap below, **a three-week-stale projection
+and a fresh one were indistinguishable to every reader, including me.**
+
+**SYSTEMIC, OPEN — `smartsim2` artifacts are NOT allowlisted.** `/api/ops/artifacts/export`
+refuses `smartsim2_preseason_projections_*.csv`, `smartsim2_projections_*.csv`
+AND `ncaaf .../recommendations_summary/week_1.json`. **No `smartsim2*` or
+`*_projections_*.csv` pattern exists in `HOT_ARTIFACT_PATTERNS` at all.** Every
+football board renders from an artifact that cannot be audited on Render. **Owed.**
+
+**OPEN — cover/over/under probabilities are 0% on both NFL boards and are
+COMPUTABLE.** The projection carries `margin_stdev`/`total_stdev`; with the means
+that is a normal-approximation cover/total directly. Deliberately NOT smuggled
+into the means fix — new mechanism, §4.4 applies.
+
+**INPUT INVENTORY (272 real games, NFL):** `offensive_metrics`,
+`advanced_metrics`, `market_features` all **100% populated** — and all reach the
+sim **NOT AT ALL**, because **0 of 3 production entrypoints pass
+`feature_generation_payload`**. `pace` 0%, `player_usage` 0%.
+**`defensive_metrics` 0% OVERSTATES the gap** — `_defense_strength` also reads
+defensive EPA from `advanced_metrics` (100%), so defence is HALF-FED, not absent.
+
+**PRESEASON IS THE WRONG PLACE TO WIRE THE PAYLOAD FIRST.** `nfl_preseason_v1`
+deliberately shrinks toward league-neutral because preseason outcomes are driven
+by playing-time decisions, not team strength. Adding team-strength mechanisms to
+a model calibrated on that shrinkage is §4.4's negative-interaction trap with an
+obvious causal story. Regular season is where to test wiring.
+
+**ALSO:** `.syndicate/state.md` was found ALREADY STAGED in the shared index
+(219 lines, 137 deletions) when I staged my own files — **not mine**, unstaged
+and re-verified before every commit. Shared-index hazard, again.
+
+**LEDGER NOTE, not mine to fix:** `state_key_check.py` reports 2 STACKED
+subjects — `sim-scheduling-deploy-lineage` x2 and `wnba-sweep-ownership-gate` x3.
+Both belong to other lanes; collapsing them needs their context.
+
+
+### football-model-owner — CHECKPOINT 2026-08-18 ~15:0x CDT — **LANE GOAL UNSTARTED. Session spent on repo-wide coordination machinery at user direction; all of it SHIPPED to origin/main.** — session: football-model-owner
+
+**The lane's stated goal — `scripts/football_sim_input_checklist.py` +
+`docs/ai_context/football_sim_engine_reference.md` — is NOT DONE.** The lane
+still claims those paths. Whoever picks this up starts there, not here.
+
+**What this session actually shipped** (all on `origin/main`, `0 0` at
+checkpoint):
+
+- **Deploys are self-serve.** `deploy-guard.py` gates on claim + fresh CLEAR
+  preflight BOUND TO THE SHA, not on `session_id in coordinator.id`. The
+  coordinator role is retired; `.syndicate/coordinator.id` deleted.
+- **Deploys must compose.** `deploy_preflight.py` returns `OFF_MAIN` (exit 4)
+  for a target not contained in `origin/main`. 170 remote `deploy/*` branches
+  exist and every sampled tip is off main.
+- **Three ledger checkers**, all enforced in CI and reported at session start:
+  `lane_identity_check.py`, `todo_id_reconcile.py`, `state_key_check.py`.
+- **`lane-guard` sees 80 file claims where it saw 52** — 5 lanes' bold-form
+  `Files:` blocks were invisible to it.
+- **`state.md` is keyed** `## [subject-slug]`; two stacked subjects collapsed.
+- **Per-session worktrees ADOPTED** (`scripts/session_worktree.py`), `CLAUDE.md`
+  updated, 6 sessions messaged.
+
+**AT RISK — the migration, not the code.** The primary tree holds 44 modified /
+104 untracked / 3 deleted paths belonging to other lanes. A session that opens a
+worktree without running `adopt` first strands its work. And `adopt` is NOT
+exhaustive: it cannot see untracked files, and it returned 1 of ~4 dirty files
+for `nhl-model-owner` because that lane never declared the hockeysim internals it
+was editing.
+
+**UNVERIFIED, explicitly:** the new deploy-guard predicate has never gated a real
+deploy; `OFF_MAIN` has never fired in anger; no preflight receipt has been
+consumed live; CI has not yet run the new step (simulated locally only).
+
+**Files:** no new claims taken this session beyond the lane's existing block.
+Edits touched `.claude/hooks/**`, `scripts/**`, `.github/workflows/ci.yml`,
+`CLAUDE.md`, `docs/ai_context/**` and `.syndicate/**` — none of which any OPEN
+lane claimed at the time (collision-checked against `lane_identity_check.py`).
