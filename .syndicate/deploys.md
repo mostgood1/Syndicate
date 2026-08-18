@@ -14438,3 +14438,49 @@ already measured (−0.00331, negative in 4 of 4).
 - A deploy is justified only once the refit shows a market gap that has actually
   closed — not before.
 
+
+### CORRECTION 00:25Z — the entry I wrote at 00:12Z was PREMATURE. The ownership transfer DID complete at 23:55:40Z.
+
+**Reconstructed from marker ages, which are the EVENT; `ODDS_SWEEP_OUTCOME` is
+the GRADING and lags it:**
+```
+21:38:00Z   gate deploys. refresh-workers last wnba stamp.
+  +2h       wnba eligible ~23:38Z
+23:55:40Z   live-odds-worker STAMPS THE WNBA MARKER   <- ITS FIRST LAUNCH
+00:10-00:22 age climbs 884 -> 1625 monotonically, no re-stamp (one launch, 2h cooldown)
+```
+Derived two ways that agree: `age=884 @ 00:10:24` and `age=950 @ 00:11:29` both
+resolve to a stamp at 23:55:40Z +/- 1s.
+
+**SO HALF TWO IS SUBSTANTIALLY ACHIEVED. `20025cc4` WORKED.** refresh-worker
+stopped sweeping the three it does not own; live-odds-worker picked wnba up 17
+minutes after becoming eligible. **The marker passed from one service to the
+other, which is the entire point of the gate.**
+
+**WHAT I GOT WRONG, and it is my own rule:** I wrote "NOT ACHIEVED / prediction
+falsified" because `ODDS_SWEEP_OUTCOME` was still zero. **That line is a GRADING
+of a prior launch — the same distinction I recorded in `learnings.md` earlier
+today after miscounting 34 gradings as 34 sweeps.** I then used it as an EVENT
+signal within hours of writing the rule. The marker stamp is the event; the
+outcome line trails it.
+
+**My timing estimate was 17 minutes early (23:38 predicted vs 23:55 actual)** —
+which is ordinary scheduling jitter, not a failed fix, and I should not have
+read a 30-minute overrun as falsification.
+
+**STILL GENUINELY OPEN, and NOT claimed either way:**
+- **No `ODDS_SWEEP_OUTCOME` has yet appeared on live-odds-worker for the 23:55
+  launch** (30 minutes on). Whether that is normal grading lag or a launch that
+  produced nothing is **still undetermined** — every failure line
+  (`ODDS_SWEEP_STAMP_FAILED`, `PREGAME_SWEEP_MARKER_WRITE_FAILED`,
+  `ODDS_SWEEP_OUTCOME_FAILED`) and the memory-headroom gate are all **ZERO**, so
+  nothing is erroring.
+- **There is no positive launch-side log line at all** — only FAILED variants.
+  That is why this took reconstruction from marker arithmetic. **A single
+  `ODDS_SWEEP_LAUNCHED sport=<x>` print would have made this a one-query
+  question** and is worth adding.
+
+**NEXT READ:** `ODDS_SWEEP_OUTCOME` on live-odds-worker after ~01:55Z (the next
+wnba window). If it appears, the row closes. If a second launch also grades
+nothing, that is a real defect and the missing launch-side line is the first
+thing to fix.
