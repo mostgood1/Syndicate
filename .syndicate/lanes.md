@@ -5641,3 +5641,60 @@ consumed live; CI has not yet run the new step (simulated locally only).
 Edits touched `.claude/hooks/**`, `scripts/**`, `.github/workflows/ci.yml`,
 `CLAUDE.md`, `docs/ai_context/**` and `.syndicate/**` — none of which any OPEN
 lane claimed at the time (collision-checked against `lane_identity_check.py`).
+
+
+### football-model-owner — CORRECTION 2026-08-18 ~15:3x CDT — **MY OWN CHECKPOINT AN HOUR AGO SAID "LANE GOAL UNSTARTED". THAT WAS FALSE. Both deliverables were built and committed earlier in this lane.** — session: football-model-owner
+
+**What is actually on `origin/main`:**
+
+- `scripts/football_sim_input_checklist.py` — 518 lines, committed `418643a3`
+  ("the football engine reads 65 feature keys and every production caller passes
+  none") and `fa2433a7`.
+- `docs/ai_context/football_sim_engine_reference.md` — 33 KB, with §2's
+  file:line pipeline trace for NFL regular / NFL preseason / NCAAF, §0b on
+  Render as the artifact source of truth, and §3's input inventory.
+
+**Why the false claim happened, because it is the more useful part.** I wrote
+"UNSTARTED" from the lane's ORIGINAL goal text, which of course still describes
+the work as pending — a goal statement never updates itself. I did not run
+`git log -- <the deliverable>` before declaring it undone. **A lane's goal block
+is a statement of intent and is not evidence about the tree.** Check the
+artifact, not the plan. This is the same shape as `#87`/`#88` in
+`todo_closed.md`: closed-on-paper, unverified against the repo — inverted here,
+open-on-paper while shipped.
+
+**VERIFICATION THE LANE ASKED FOR, now recorded (this was the one thing genuinely
+outstanding — the goal required the first run's alarm count be written here):**
+
+    python scripts/football_sim_input_checklist.py --sport both   ->  EXIT 1, 9 alarms
+
+Exit code measured directly, not through a pipe — `... | tail` reports tail's
+status and read 0 the first time. `--skip-population` also exits 1, so levels 0
+and 1 fail on their own.
+
+**THE HYPOTHESIS IS CONFIRMED, AND WORSE THAN PREDICTED.** The lane predicted
+"the payload feeds materially fewer keys than `drive_priors` consumes". Measured:
+
+  - **0 of 3 production entrypoints pass `feature_generation_payload` AT ALL.**
+    `generate_smartsim2_nfl_projections.py`, `..._nfl_preseason_...`,
+    `..._ncaaf_...` each construct `SmartSim2SimulationInput` without it, so
+    every key `drive_priors.py:232` reads falls to its neutral default on every
+    game they project. The sixth site, `calibration/baseline_audit.py`, passes a
+    payload the engine cannot read (INERT).
+  - **NFL, 16 games, season 2026 wk1:** `offensive_metrics` 0.0% (18 keys
+    consumed), `player_usage` 0.0% (12), `advanced_metrics` 0.0% (7),
+    `defensive_metrics` 0.0% (7), `pace` 0.0% (4). Only `market_features` is fed,
+    at 100% (moneyline/spread/total).
+  - **3 blocks are EXPECTED_SPARSE and excluded from alarm** —
+    `returning_production`, `coach_continuity`, `transfer_impact` are NCAAF-only
+    concepts with no NFL analogue.
+
+**STILL UNMEASURED, and the checklist says so rather than reporting zero:**
+NCAAF population. The loader returns 0 games FROM THIS CHECKOUT, and per the
+`data/**` lossy-mirror rule that is not evidence about production. Resolve it
+against the served board — `GET /ncaaf/api/cards?week=1` — not against
+`data/ncaaf_source/`.
+
+**NOT DONE, and it is the actual product gap:** nothing is wired. The engine
+reads 65 feature keys and production passes none of them. Fixing that is a
+separate change from measuring it, and the measurement now gates it.
