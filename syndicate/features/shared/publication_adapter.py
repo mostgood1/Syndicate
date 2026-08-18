@@ -71,11 +71,53 @@ def _shared_predictions(game: dict[str, Any]) -> dict[str, Any]:
     probabilities = _copy_mapping(predictions.get("probabilities"))
     if not probabilities:
         probabilities = _probabilities_from_rows([row for row in period_rows if isinstance(row, Mapping)])
+    # THE FULL-GAME PERIOD IS A SOURCE OF RECORD AND WAS NOT BEING READ.
+    #
+    # This function looked in `predictions`, then `sim.score`, then `score` --
+    # but never in `sim.periods.full`, where several producers put the complete
+    # four-field projection. NFL's preseason and regular-season cards
+    # (`nfl/preseason_cards.py`, `nfl/cards.py`) set all four in
+    # `sim.periods.full` and only TWO -- away_mean/home_mean -- in `sim.score`.
+    #
+    # MEASURED ON PRODUCTION 2026-08-18, both NFL boards, 16 of 16 games each:
+    #   home_mean  100%   away_mean  100%
+    #   total_mean   0%   margin_mean  0%
+    #
+    # The artifact had them the whole time: `SmartSimNflPreseasonProjection`
+    # carries `margin_mean` and `total_mean` as required CSV columns. They were
+    # dropped in transit, so the board could show a projected SCORE but no
+    # projected SPREAD or TOTAL -- on a betting product, the two numbers a line
+    # is actually compared against.
+    full_period = {}
+    periods = sim.get("periods")
+    if isinstance(periods, Mapping):
+        candidate = periods.get("full")
+        if isinstance(candidate, Mapping):
+            full_period = dict(candidate)
+
+    away_mean = _first_number(predictions.get("away_mean"), score.get("away_mean"), score.get("away"), full_period.get("away_mean"))
+    home_mean = _first_number(predictions.get("home_mean"), score.get("home_mean"), score.get("home"), full_period.get("home_mean"))
+    total_mean = _first_number(predictions.get("total_mean"), score.get("total_mean"), score.get("total"), full_period.get("total_mean"))
+    margin_mean = _first_number(predictions.get("margin_mean"), score.get("margin_mean"), score.get("margin"), full_period.get("margin_mean"))
+
+    # Last resort, and DEFINITIONAL rather than a guess: a projected total is
+    # the sum of the two projected scores and a projected margin is their
+    # difference. `game_board_contract._normalize_game` already derives exactly
+    # this for its market tiles (both directions), so the arithmetic is settled
+    # in this codebase -- it simply never reached the published payload.
+    #
+    # Ordered AFTER every real source so a producer that supplies its own value
+    # always wins; this can only fill a hole, never overwrite.
+    if total_mean is None and away_mean is not None and home_mean is not None:
+        total_mean = round(away_mean + home_mean, 3)
+    if margin_mean is None and away_mean is not None and home_mean is not None:
+        margin_mean = round(home_mean - away_mean, 3)
+
     return {
-        "away_mean": _first_number(predictions.get("away_mean"), score.get("away_mean"), score.get("away")),
-        "home_mean": _first_number(predictions.get("home_mean"), score.get("home_mean"), score.get("home")),
-        "total_mean": _first_number(predictions.get("total_mean"), score.get("total_mean"), score.get("total")),
-        "margin_mean": _first_number(predictions.get("margin_mean"), score.get("margin_mean"), score.get("margin")),
+        "away_mean": away_mean,
+        "home_mean": home_mean,
+        "total_mean": total_mean,
+        "margin_mean": margin_mean,
         "probabilities": {
             "home_win": _first_number(probabilities.get("home_win"), predictions.get("home_win_prob"), predictions.get("p_home_win")),
             "away_win": _first_number(probabilities.get("away_win"), predictions.get("away_win_prob"), predictions.get("p_away_win")),
