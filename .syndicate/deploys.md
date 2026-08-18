@@ -15336,3 +15336,62 @@ refused all session.
    residual provably lives.
 2. Score candidates on `measure_all_inputs_effect.py`, not on the league mix.
 3. Only then consider a value change.
+
+## 2026-08-18 — COUNT PROGRESSION **MEASURED, not fitted**. The defect is first-pitch approach: 0-0 in-play is 2.3x too high.
+
+Lane `convergence-phase7-crps`. `scripts/measure_count_progression.py` (NEW).
+**895,320 real statcast pitches** vs 7,919 simulated. No values changed, no deploy.
+
+**On the suggestion to use pbp data — it was the right call and it replaced a
+grid search with a measurement.** Statcast raw pitches carry `balls`, `strikes`,
+`description` and `pitch_type` for every pitch, so P(outcome | count) is
+observable. I had been grid-searching a quantity that can simply be read.
+
+### THE DEFECT, per count (real / sim)
+
+    count |        BALL        CALLED       SWINGING        FOUL       IN_PLAY
+    0-0   | 38.4%/33.3%   29.6%/13.7%*   7.9%/12.2%  12.6%/12.6%  11.3%/25.9%*
+    0-2   | 45.5%/29.9%*   3.5%/10.1%*  13.1%/14.9%  20.1%/24.1%  17.5%/19.4%
+    2-1   | 29.2%/31.7%   12.8%/18.8%*  12.3%/12.0%  23.2%/11.2%* 22.2%/23.8%
+    3-2   | 23.4%/35.4%*   6.3%/ 8.9%   12.1%/13.8%  29.2%/18.7%* 28.8%/21.1%*
+
+    largest deviations: 0-0 (40.0%), 3-2 (34.4%), 0-2 (30.0%), 1-0 (28.3%)
+
+**THE 0-0 CELL IS THE WHOLE PROBLEM.** Real hitters TAKE the first pitch —
+29.6% called strikes, only 11.3% in play. The sim SWINGS: 13.7% called, **25.9%
+in play**. That is 2.3x too many first-pitch balls in play and 2.2x too few
+first-pitch takes.
+
+**Every downstream symptom follows from it:** PAs end on pitch one, so pitches/PA
+sits at 3.5 against 3.9, so counts reach two strikes too rarely, so K comes in
+low — and the two-strike terms cannot compensate because the PA is already over.
+
+### The same shape appears at both extremes
+
+- **0-2:** real pitchers WASTE (45.5% balls); the sim attacks (29.9%).
+- **3-2:** real hitters PROTECT (29.2% fouls); the sim fouls 18.7% and walks
+  instead (35.4% balls vs a real 23.4%).
+
+**`count_delta` is a single scalar** applied to `p_ball`/`p_called`/`p_foul`. It
+structurally cannot express take-early / attack-middle / protect-late, which is
+why no value of it fixed anything and why the joint grid ran out of room.
+
+### Why this was invisible until now
+
+Aggregate rates hid it. The sim's OVERALL in-play rate is fine (16.7% vs 17%) —
+it is **distributed wrongly across counts**, far too high at 0-0 and roughly
+right elsewhere. **An aggregate mix check passes while the count structure is
+badly wrong**, which is exactly why the mix-only fix overshot.
+
+### A silent-zero caught in this script
+
+The first run reported `sim: 0 pitches` and REFUSED rather than printing an empty
+comparison. Cause: the pbp count is NESTED (`{"count": {"balls": n}}`) and a flat
+`ev.get("balls")` returns None for every row. **The refusal is why it was caught
+in one run** instead of producing a confident all-zero matrix.
+
+### Next
+
+The fix is a count-dependent approach model — at minimum a first-pitch take
+term — not a scalar. **Score candidates on `measure_all_inputs_effect.py`**, with
+this matrix as the diagnostic. Values remain at originals.
