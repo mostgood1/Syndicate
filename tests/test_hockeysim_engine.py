@@ -120,6 +120,45 @@ class HockeySimEngineTest(unittest.TestCase):
             f"fails, st_home is present but not reachable, the exact defect this test exists to catch.",
         )
 
+    def test_special_teams_cal_pp_goal_mult_actually_changes_output(self) -> None:
+        """Reachability test for the OTHER special-teams parameter: `special_teams_cal`
+        (`pp_goal_cal_mult` etc, sourced from `SimConfig` via `player_props._special_teams_cal`).
+
+        This was CONSUMED with no caller anywhere supplying it a value -- UNREACHABLE, a stricter
+        defect than unpopulated (`hockeysim_engine_reference.md` §2b). Proves the NEW wiring
+        (SimConfig fields -> `player_props.build_prop_projections` -> `special_teams_cal=`) actually
+        changes simulated output, not just that the plumbing runs without raising.
+        """
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        low_cal = {"pp_shot_multiplier": 1.0, "pk_shot_multiplier": 1.0,
+                   "pp_goal_multiplier": 0.5, "pk_goal_multiplier": 1.0,
+                   "blocks_ev_rate": 0.45, "blocks_pk_rate": 0.55, "blocks_pp_def_rate": 0.35}
+        high_cal = dict(low_cal, pp_goal_multiplier=2.5)
+
+        def _mean_home_goals(cal: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, _ = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st, st_away=st, special_teams_cal=cal, seed=s,
+                )
+                totals.append(gs.home.score)
+            return statistics.mean(totals)
+
+        low_mean = _mean_home_goals(low_cal)
+        high_mean = _mean_home_goals(high_cal)
+        self.assertGreater(
+            high_mean, low_mean,
+            f"pp_goal_multiplier=2.5 must outscore pp_goal_multiplier=0.5 on average when nothing "
+            f"else differs -- got high={high_mean:.3f} low={low_mean:.3f}. If this fails, "
+            f"special_teams_cal is present but not reachable, the exact defect this test exists to "
+            f"catch.",
+        )
+
     def test_profile_seam_is_non_mutating(self) -> None:
         before = NHL_CALIBRATION_PROFILE.pp_shots_mult
         cfg = build_nhl_sim_config(seed=5, overrides={"pp_shots_mult": 9.9, "bogus": 1})

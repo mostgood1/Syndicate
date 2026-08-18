@@ -52,12 +52,12 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always. `elo_rating`, `goals_per_60`-staleness, and `special_teams` (PP%/PK%) FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights/`special_teams_cal` genuinely absent or unreachable** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), and `special_teams_cal`'s wiring all FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
-(exits 1, 16 alarms remaining after this session's fixes — same count as the
-first pass, but correctly reattributed; see below).
+(exits 1, **9 alarms** remaining, down from 16 once `special_teams_cal`
+became reachable — see below).
 
 **MID-SESSION SELF-CORRECTION, recorded so it is not repeated:** the first
 pass of this item (and the checklist that produced it) reported
@@ -130,10 +130,28 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   directly. The reachability test proves the DIRECTION is right; the effect
   SIZE has not been calibration-backtested the way Elo's Brier score was —
   worth a follow-up measurement before leaning on it at scale.
+- **`special_teams_cal`'s wiring** — was CONSUMED via 7 `.get(key, NEUTRAL)`
+  sites in `engine.py` but **UNREACHABLE from any real caller**, a stricter
+  defect than unpopulated: populating `HockeyTeamFeatures` could never have
+  fixed this even in principle. Fixed by moving the 7 values onto `SimConfig`
+  itself (`pp_shot_cal_mult`/`pk_shot_cal_mult`/`pp_goal_cal_mult`/
+  `pk_goal_cal_mult`/`block_rate_ev`/`block_rate_pk`/`block_rate_pp_def`,
+  `engine.py`) — the SAME calibration seam (`build_nhl_sim_config`, the
+  Phase-5 versioned-profile artifact) every other engine constant already
+  uses. `player_props._special_teams_cal(cfg)` maps those onto the 7
+  engine-facing key names and `build_prop_projections` now passes the
+  resolved dict at its `run_hockeysim_game(...)` call. **Values unchanged
+  from the old neutral defaults** — a wiring fix, not a calibration change
+  (confirmed: all 224 hockeysim/nhl tests pass unmodified).
+  **Reachability-tested**: `test_special_teams_cal_pp_goal_mult_actually_changes_output`
+  proves `pp_goal_cal_mult=2.5` outscores `pp_goal_cal_mult=0.5` on average,
+  80 seeded runs, everything else held identical. `nhl_sim_input_checklist.py`
+  now reports these 7 keys as reachable and explicitly labels each
+  "reachable, still at its neutral default — not yet calibrated" rather than
+  silently marking them `ok`.
 
-**NOT FIXED — genuinely absent, not merely unfed, or (for `special_teams_cal`)
-unreachable by construction (measured via the corrected checklist, 9 mirrored
-dates, 10 team-sides, 297 players):**
+**NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
+checklist, 9 mirrored dates, 10 team-sides, 297 players):**
 - `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct`
   (team) and `shot_weight`, `goal_weight`, `block_weight` (player) — **all
   0.0% populated.** `build_team_features`/`build_player_features` never set
@@ -155,7 +173,12 @@ dates, 10 team-sides, 297 players):**
   `shorthandedShotsAgainst`) — verified against a cached sample this session;
   only 11 of 1,312 games are cached locally, so a bulk fetch (rate-limited,
   same pattern the truth loader already uses) is the remaining step for PP/PK
-  shot rates specifically, not a new endpoint to discover.
+  SHOT rates specifically. This is now doubly relevant: `special_teams_cal`'s
+  `pp_shot_multiplier`/`pk_shot_multiplier` are wired and waiting for exactly
+  this data to calibrate them (see FIXED above) — a real per-team value for
+  these two, once the fetch happens, needs to avoid double-counting against
+  `pp_pct`/`pk_pct`'s already-real goal-rate signal (mechanism vs estimator,
+  `model_engine_standard.md` §4.4).
 - `xgf_per_60`/`xga_per_60` — loader (`load_team_xg_map`) and allowlist both
   exist now; **no producer of `team_xg_*.csv` exists anywhere** in this
   checkout or `vendor/`. The reader code was re-homed from
@@ -163,19 +186,6 @@ dates, 10 team-sides, 297 players):**
   shot-quality data never was. Falls back gracefully to `goals_per_60` (a
   legitimate, if cruder, proxy), so this degrades rather than breaks — but is
   genuinely absent, not merely unfed.
-- `special_teams_cal` (dict; SEPARATE parameter from `special_teams` — see the
-  correction above) — CONSUMED via 7 distinct `(special_teams_cal or {}).get(key, NEUTRAL)`
-  sites in `engine.py` (`pp_shot_multiplier`, `pk_shot_multiplier`,
-  `pp_goal_multiplier`, `pk_goal_multiplier`, `blocks_ev_rate`, `blocks_pk_rate`,
-  `blocks_pp_def_rate`) but **UNREACHABLE from any real caller** — plumbed
-  end-to-end (`runtime.py` → `engine.py`, twice) with no producer supplying it
-  a value anywhere. Populating `HockeyTeamFeatures` could never fix this even
-  in principle; it needs a call-site change threading a real value into
-  `special_teams_cal` at `player_props.py`'s `run_hockeysim_game(...)` call.
-  3 of the 7 keys (the `blocks_*` rates) read, by their own inline comment, as
-  a league-wide physics constant rather than a team-differentiating one — if
-  so the right fix is promoting them into `calibration_profile.py`'s
-  `SimConfig` as calibrated defaults, not a per-team artifact.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, FIXED AND PUSHED (`fcfb1e62`)
 

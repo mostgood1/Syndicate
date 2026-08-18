@@ -44,6 +44,31 @@ class SimConfig:
     # Additional goal conversion multipliers applied after PP/PK adjustments
     pp_goals_mult: float = 1.0
     pk_goals_mult: float = 1.0
+
+    # SECOND correction layer, multiplied on top of the four fields above (`pp_shots_mult` etc)
+    # AND, for the goal-rate pair, on top of the per-team `pp_pct`/`pk_pct` adjustment
+    # (`HockeyTeamFeatures.special_teams`, `_special_teams_builder.py`). Historically plumbed as a
+    # separate `special_teams_cal` dict argument that NOTHING ever supplied a value for -- CONSUMED
+    # but UNREACHABLE (`docs/ai_context/hockeysim_engine_reference.md` §2b/§5). Living here, on
+    # `SimConfig`, makes them reachable through the SAME calibration seam (`build_nhl_sim_config`,
+    # the Phase-5 versioned-profile artifact) every other engine-level constant already uses,
+    # instead of inventing a second one. Values below match the OLD inline `.get(key, DEFAULT)`
+    # fallbacks exactly, so wiring this in changes NOTHING behaviorally until a real calibration
+    # pass changes one of these -- see the population-progression discipline in
+    # `model_engine_standard.md` §4.4 (mechanism vs estimator): turning a parameter reachable and
+    # turning it on are two different, separately-justified steps.
+    pp_shot_cal_mult: float = 1.0
+    pk_shot_cal_mult: float = 1.0
+    pp_goal_cal_mult: float = 1.0
+    pk_goal_cal_mult: float = 1.0
+    # Probability a shot ATTEMPT gets blocked, by strength state. League-wide physics constants,
+    # not team-differentiating (`docs/ai_context/hockeysim_engine_reference.md` §2b) -- higher on
+    # the penalty kill (tighter defensive box), lower while defending shorthanded opponents (fewer
+    # bodies to block with). A blocked shot is recorded on a shot ATTEMPT, not a shot on goal; the
+    # sim's own "shot" event is closer to SOG, hence the elevated defaults vs. real block-rate stats.
+    block_rate_ev: float = 0.45
+    block_rate_pk: float = 0.55
+    block_rate_pp_def: float = 0.35
     # Score-state effects mode for play-level simulation.
     # - dynamic: time-remaining + score-diff dependent multipliers (default)
     # - legacy: fixed +/-10% based on start-of-period score diff

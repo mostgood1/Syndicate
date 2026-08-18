@@ -101,6 +101,33 @@ class HockeySimPropsTest(unittest.TestCase):
         bm = {(p.player_id, p.market): p.proj for p in b}
         self.assertEqual(am, bm)
 
+    def test_special_teams_cal_default_matches_old_inline_fallbacks(self) -> None:
+        """`special_teams_cal` was UNREACHABLE (`hockeysim_engine_reference.md` §2b) -- the fix
+        must not change default behavior. `_special_teams_cal(default SimConfig)` must reproduce
+        the exact values the old `.get(key, DEFAULT)` inline fallbacks used."""
+        from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+        from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
+
+        cal = _special_teams_cal(build_nhl_sim_config())
+        self.assertEqual(cal, {
+            "pp_shot_multiplier": 1.0, "pk_shot_multiplier": 1.0,
+            "pp_goal_multiplier": 1.0, "pk_goal_multiplier": 1.0,
+            "blocks_ev_rate": 0.45, "blocks_pk_rate": 0.55, "blocks_pp_def_rate": 0.35,
+        })
+
+    def test_special_teams_cal_reflects_a_custom_profile(self) -> None:
+        """A non-default `SimConfig` must actually change what `build_prop_projections` sends to
+        the engine -- not just the default-profile no-op case above."""
+        from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+        from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
+
+        cfg = build_nhl_sim_config(overrides={"pp_goal_cal_mult": 1.8, "block_rate_pk": 0.62})
+        cal = _special_teams_cal(cfg)
+        self.assertEqual(cal["pp_goal_multiplier"], 1.8)
+        self.assertEqual(cal["blocks_pk_rate"], 0.62)
+        # Untouched fields still match the default -- confirms this is an OVERRIDE, not a reset.
+        self.assertEqual(cal["pk_goal_multiplier"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

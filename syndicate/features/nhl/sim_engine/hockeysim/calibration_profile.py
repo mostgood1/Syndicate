@@ -37,6 +37,16 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     pk_shots_mult=0.7,
     pp_goals_mult=1.0,
     pk_goals_mult=1.0,
+    # Newly reachable this session (`docs/ai_context/hockeysim_engine_reference.md` §2b) -- values
+    # unchanged from the old inline `special_teams_cal.get(key, DEFAULT)` fallbacks, so wiring them
+    # through here is a no-op until a real calibration pass changes one.
+    pp_shot_cal_mult=1.0,
+    pk_shot_cal_mult=1.0,
+    pp_goal_cal_mult=1.0,
+    pk_goal_cal_mult=1.0,
+    block_rate_ev=0.45,
+    block_rate_pk=0.55,
+    block_rate_pp_def=0.35,
     score_effects="dynamic",
     goal_model="from_shots",
     assist_model="onice",

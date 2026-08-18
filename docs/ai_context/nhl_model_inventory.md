@@ -86,7 +86,7 @@ from its own vendor repos; NHL had none of that class of tool at all until
 
 | id | one-line | status |
 |---|---|---|
-| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (`pp_pct`/`pk_pct`/`committed_per_game`) FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player weights/`special_teams_cal` (7 keys, UNREACHABLE) genuinely absent, 16 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
+| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (`pp_pct`/`pk_pct`/`committed_per_game`) FIXED; `special_teams_cal` (7 keys) WIRED (reachable, not yet calibrated); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player weights genuinely absent, 9 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
 | `#454` | Play-by-play is an unused offline modelling substrate — NHL is one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | OPEN, unowned. Directly relevant to §3's finding: extending the truth-loader's parser (already done once this session, for penalties; team-rate data would need it extended further, reference doc §5) and building real pbp ingestion are related but not identical asks — pbp would give shot-by-shot/event-level detail this session's fixes don't touch at all. |
 | `#440` | Sim-engine track pin (cross-sport); this session's work is NHL's contribution to it | PLANNED, referenced throughout |
 
@@ -105,10 +105,14 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   parameter (`special_teams_cal`, corrected in reference doc §2b). Verified
   with a reachability test (elite PP outscores poor PP on average, 80 seeded
   runs) — not yet a calibration backtest of the effect SIZE.
-- Did not wire `special_teams_cal`'s 7 keys — that needs a call-site change
-  (thread a real value at `player_props.py`'s `run_hockeysim_game(...)` call),
-  not a data producer; 3 of the 7 look like league-wide physics constants that
-  belong in `SimConfig`, not a per-team artifact (reference doc §2b/§5).
+- **Did** wire `special_teams_cal`'s 7 keys (reference doc §2c) — moved onto
+  `SimConfig` (`pp_shot_cal_mult` etc), resolved via `build_nhl_sim_config`,
+  mapped and passed by `player_props._special_teams_cal`. Values unchanged
+  from the old neutral defaults (a wiring fix, not a calibration change);
+  reachability-tested the same way as `pp_pct` above. Did NOT calibrate any of
+  the 7 values away from neutral — that needs a truth-comparison pass (does
+  simulated PP-goal share match `TruthMetrics.pp_goal_share`), which risks
+  double-counting against `pp_pct`/`pk_pct` if done carelessly (reference doc §5).
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct` or player usage weights — needs the truth-loader's parser
   extended further (beyond the penalties extension already done this session)

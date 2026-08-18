@@ -345,6 +345,14 @@ def main() -> int:
     cal_keys, cal_reachable = special_teams_cal_reachability()
     print(f"  keys the engine reads via `(special_teams_cal or {{}}).get(...)`: {len(cal_keys)}")
     print(f"  reachable from any real caller (not just runtime.py/engine.py's own passthrough): {cal_reachable}")
+    resolved_cal: Dict[str, float] = {}
+    if cal_reachable:
+        try:
+            from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+            from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
+            resolved_cal = _special_teams_cal(build_nhl_sim_config())
+        except Exception as exc:  # reachable per the structural check but couldn't resolve -- say so
+            print(f"  (reachable structurally, but resolving a live value failed: {exc!r})")
     for key, default in cal_keys:
         label = f"special_teams_cal.{key}"
         if not cal_reachable:
@@ -354,6 +362,13 @@ def main() -> int:
             print(f"  {0.0:6.1%}   {label:34s} FAIL  consumed (default {default!r}), parameter UNREACHABLE -- "
                   f"no caller anywhere supplies it, so no producer could fix this by feeding "
                   f"HockeyTeamFeatures (wrong conduit; see the module docstring)")
+        elif key in resolved_cal:
+            live = resolved_cal[key]
+            calibrated = (default is None) or (abs(float(live) - float(default)) > 1e-9)
+            rows.append({"kind": "team", "field": label, "pct": 1.0, "consumed": True,
+                         "status": "ok", "note": f"live={live!r} default={default!r} calibrated={calibrated}"})
+            tag = "calibrated (differs from the old neutral default)" if calibrated else "reachable, still at its neutral default -- not yet calibrated"
+            print(f"  {'ok':>6}   {label:34s} live={live!r}  {tag}")
         else:
             print(f"  {'?':>6}   {label:34s} reachable now -- re-audit population, not just presence")
 

@@ -15,11 +15,38 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 from .adapters import game_seed
+from .calibration_profile import build_nhl_sim_config
 from .contracts import HockeyGameFeatures, HockeyPlayerFeatures, HockeyPropProjection
 from .engine import SimConfig
 from .models import RateModels, TeamRates
 from .props_boxscore import aggregate_events_to_boxscores_fast
 from .runtime import run_hockeysim_game
+
+# `SimConfig`'s pp_shot_cal_mult/pk_shot_cal_mult/pp_goal_cal_mult/pk_goal_cal_mult/block_rate_ev/
+# block_rate_pk/block_rate_pp_def -- the FIELD NAMES `special_teams_cal` reads under a different
+# name (`pp_shot_multiplier` etc, `docs/ai_context/hockeysim_engine_reference.md` §2b). Kept as an
+# explicit mapping rather than assuming both sides agree on order, so a rename on either side is a
+# loud KeyError/AttributeError here, not a silent mismatch.
+_SPECIAL_TEAMS_CAL_FIELDS: Dict[str, str] = {
+    "pp_shot_multiplier": "pp_shot_cal_mult",
+    "pk_shot_multiplier": "pk_shot_cal_mult",
+    "pp_goal_multiplier": "pp_goal_cal_mult",
+    "pk_goal_multiplier": "pk_goal_cal_mult",
+    "blocks_ev_rate": "block_rate_ev",
+    "blocks_pk_rate": "block_rate_pk",
+    "blocks_pp_def_rate": "block_rate_pp_def",
+}
+
+
+def _special_teams_cal(cfg: SimConfig) -> Dict[str, float]:
+    """Build the `special_teams_cal` dict `run_hockeysim_game` reads, from a resolved `SimConfig`.
+
+    Was CONSUMED by `engine.py` with no caller anywhere supplying it a value -- UNREACHABLE, not
+    merely unpopulated (`hockeysim_engine_reference.md` §2b/§5). This is that wiring: the seven
+    values now live on `SimConfig` (reachable through the same `build_nhl_sim_config`/versioned-
+    profile seam every other engine constant uses) instead of a second, disconnected mechanism.
+    """
+    return {engine_key: float(getattr(cfg, cfg_field)) for engine_key, cfg_field in _SPECIAL_TEAMS_CAL_FIELDS.items()}
 
 # Market -> index into the fast boxscore row tuple:
 # (shots, goals, assists, points, blocks, saves, toi_sec)
@@ -89,6 +116,11 @@ def build_prop_projections(
 
     st_home = dict(game.home.special_teams) or None
     st_away = dict(game.away.special_teams) or None
+    # Resolve ONCE per game (not per-sim -- these don't vary by seed) so `special_teams_cal` is
+    # finally reachable. `profile` may be None (caller didn't override); `build_nhl_sim_config`
+    # resolves it the same way `run_hockeysim_game` itself would, so this is the SAME effective
+    # config each sim call already uses, not a second, possibly-divergent resolution.
+    special_teams_cal = _special_teams_cal(build_nhl_sim_config(profile=profile))
 
     # player metadata lookup keyed by (team_name, player_id)
     meta: Dict[Tuple[str, int], HockeyPlayerFeatures] = {}
@@ -105,7 +137,8 @@ def build_prop_projections(
         gs, events = run_hockeysim_game(
             game.home.name, game.away.name, roster_home, roster_away, rates,
             lineup_home=lineup_home, lineup_away=lineup_away,
-            st_home=st_home, st_away=st_away, profile=profile, seed=seed0 + i,
+            st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal,
+            profile=profile, seed=seed0 + i,
         )
         box = aggregate_events_to_boxscores_fast(gs, events, starter_goalies)
         for (team, pid, period), row in box.items():
