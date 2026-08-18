@@ -5193,3 +5193,83 @@ main`'s 5,140 and local HEAD's 2,826. Three different numbers for one file at on
 moment. Check `git status --porcelain -- .syndicate/lanes.md` and `git rev-parse
 HEAD` vs `origin/main` before appending to the disk copy directly; if they disagree,
 append against `origin/main`'s content and push through a throwaway worktree instead.
+
+### soccer-model-dispersion — ALL NINE LEAGUES RESULT 2026-08-18 12:4xZ — improved but not proven; the dispersion overshoot is platform-wide, not eredivisie-specific — session: soccer-sport-owner
+
+**Backtest complete, all nine leagues, `--limit 120 --simulations 300`, same
+1,112-match control as the 2026-08-15 baseline.** `bm81lcof8` (eredivisie, 114 min)
++ `bw537l0u0` (other eight, parallel, 114-131 min each, ALL rc=0). Read with
+`scripts/compare_soccer_backtest.py --run reports/soccer_backtest/parallel`.
+Artifacts committed nowhere (untracked, as intended -- they're data, not code) but
+reproducible from the commits already on `origin/main`.
+
+**CONTROL: CLEAN ON ALL NINE.** `matches_scored` matches the baseline exactly per
+league (120/126/126/120/126/123/126/125/120) and `market_brier` is byte-identical in
+every league. The comparison is VALID, not void.
+
+**STEP 3 -- BRIER GAP: broad, consistent improvement, NOT a proven market win.**
+
+    improved  7 / 9     regressed  2 / 9     mean gap delta  -0.0062
+    sign test p = 0.180   (baseline was 8/9 WORSE, p=0.039 -- direction reversed)
+
+    league                base gap   new gap    verdict
+    belgian_pro_league     -0.0011   -0.0004   still beats market (by less)
+    bundesliga             +0.0187   +0.0153   improved
+    championship           +0.0097   +0.0002   improved
+    epl                    +0.0222   +0.0167   improved
+    eredivisie              +0.0147   +0.0017   improved
+    la_liga                 +0.0101   +0.0122   REGRESSED
+    ligue_1                  +0.0084   +0.0026   improved
+    primeira_liga            +0.0317   +0.0247   improved
+    serie_a                   +0.0101   -0.0040   NEW CROSSING -- now beats market
+
+**p=0.180 IS NOT SIGNIFICANT at conventional thresholds. Do not report "the model
+now beats the market."** What is true: serie_a is a genuine new crossing (+0.0101 ->
+-0.0040, not a tiny-n coin flip like belgian_pro_league's original -0.0011), the mean
+gap narrowed by a real amount, and the DIRECTION reversed from mostly-losing to
+mostly-improving across leagues that were not cherry-picked.
+
+**STEP 4 -- DISPERSION: the eredivisie overshoot IS PLATFORM-WIDE, not one league's
+noise.**
+
+    league                base    new    delta     market
+    belgian_pro_league   0.148   0.181   +0.033    0.170
+    bundesliga            0.190   0.219   +0.030    0.186
+    championship          0.124   0.154   +0.030    0.154
+    epl                   0.162   0.200   +0.038    0.202
+    eredivisie              0.189   0.237   +0.049    0.226
+    la_liga                 0.152   0.177   +0.025    0.155
+    ligue_1                   0.137   0.170   +0.034    0.157
+    primeira_liga             0.160   0.194   +0.034    0.209
+    serie_a                    0.157   0.184   +0.027    0.172
+
+    cross-league mean:  0.1575 -> 0.1907   (market 0.1811)
+    still narrower than market:  3 / 9   (baseline: 8 / 9)
+
+**EVERY LEAGUE WIDENED, by a similar magnitude (+0.025 to +0.049).** Consistent with
+the collinearity measured earlier being platform-wide (|corr| >= 0.98 on both
+attack/defence in all nine). The model crossed from systematically under-dispersed
+to, on average, slightly OVER-dispersed -- past the target, not onto it.
+
+**THE HONEST SYNTHESIS.** The three double-count fixes (`94578cbc`, and its
+antecedents) worked in the intended direction: removing genuinely duplicated
+evidence improved accuracy in most leagues and produced one real new market-beating
+result. They also overcorrected confidence -- exactly the risk named before this run
+("if the gap widens, suspect the un-re-fitted weights before the inputs"; here the
+gap mostly NARROWED but dispersion still overshot, a more nuanced outcome than that
+warning anticipated). **This is not evidence the fixes were wrong. It is evidence
+`_attack_strength`/`_defense_strength`'s remaining weights need a partial re-fit now
+that the double-counted term is gone** -- they were calibrated with it present, and
+removing 0.22-weight terms without adjusting the survivors is exactly the "mechanism
+vs estimator" hazard this lane has been tracking since the FINDING entry.
+
+**NOT A HELD-OUT TEST.** Same 1,112-match control as the diagnosis was built on. A
+genuine validation would need a different match set or a walk-forward split; this
+backtest answers "did removing the double-count help on the data that showed it was
+there", not "does the model generalise".
+
+**NEXT, if this lane continues:** identify which surviving term(s) in
+`_attack_strength`/`_defense_strength` are absorbing the removed weight and consider
+scaling them down -- shots (corr +0.83..+0.93 with xG, weight 0.016) is the most
+likely single lever, per the earlier collinearity table. Re-run eredivisie only
+(fastest single-league check, ~2h) before re-running all nine again.
