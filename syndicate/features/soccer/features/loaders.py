@@ -116,8 +116,37 @@ def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[
         if home_goals is None or away_goals is None:
             continue
         common = {"league": row.get("league"), "season": row.get("season"), "date": row.get("date")}
-        team_rows.append({**common, "team": row.get("home_team"), "xg_for": home_goals, "xg_against": away_goals})
-        team_rows.append({**common, "team": row.get("away_team"), "xg_for": away_goals, "xg_against": home_goals})
+
+        # THIS CONVERTER DISCARDED ELEVEN COLUMNS IT ALREADY HAD.
+        #
+        # It forwarded `xg_for`/`xg_against` (goals standing in for xG) and
+        # dropped the rest of the row, two lines before `compute_team_ratings`
+        # could aggregate them. Meanwhile `possession_priors` reads
+        # `shots_per_match`, `shots_allowed_per_match`, `goals_per_match`,
+        # `goals_against_per_match`, `clean_sheet_rate`, `corners_per_match` and
+        # `points_per_match` -- every one of which is derivable from columns
+        # already in `matches_*.csv`. Same shape as the xG defect fixed in
+        # `1834dd50`: present, correct, and thrown away before the consumer.
+        # `scripts/soccer_sim_input_checklist.py` is the gate that found both.
+        hs, aws = _safe_float(row.get("home_shots")), _safe_float(row.get("away_shots"))
+        hc, ac = _safe_float(row.get("home_corners")), _safe_float(row.get("away_corners"))
+
+        def _points(scored: float, conceded: float) -> float:
+            return 3.0 if scored > conceded else (1.0 if scored == conceded else 0.0)
+
+        team_rows.append({**common, "team": row.get("home_team"),
+                          "xg_for": home_goals, "xg_against": away_goals,
+                          "goals_for": home_goals, "goals_against": away_goals,
+                          "shots": hs, "shots_allowed": aws, "corners": hc,
+                          # A clean sheet is the OPPONENT failing to score.
+                          "clean_sheet": 1.0 if away_goals == 0 else 0.0,
+                          "points": _points(home_goals, away_goals)})
+        team_rows.append({**common, "team": row.get("away_team"),
+                          "xg_for": away_goals, "xg_against": home_goals,
+                          "goals_for": away_goals, "goals_against": home_goals,
+                          "shots": aws, "shots_allowed": hs, "corners": ac,
+                          "clean_sheet": 1.0 if home_goals == 0 else 0.0,
+                          "points": _points(away_goals, home_goals)})
     return team_rows
 
 
@@ -243,7 +272,19 @@ def compute_team_ratings(
         xg_for = mean(float(row["xg_for"]) for row in selected)
         xg_against = mean(float(row["xg_against"]) for row in selected)
         ppda_values = [value for value in (_safe_float(row.get("ppda")) for row in selected) if value is not None]
-        ratings[team] = {
+        def _mean_of(key: str) -> float | None:
+            """Mean over the rows that HAVE the column, or None.
+
+            None rather than 0.0 on purpose: `possession_priors` treats a
+            present-but-zero as a real reading (0 shots allowed reads as a
+            perfect defence), so an absent column must stay absent rather than
+            arrive as a fabricated extreme -- the same trap the ppda 0.0 filter
+            already guards.
+            """
+            vals = [v for v in (_safe_float(r.get(key)) for r in selected) if v is not None]
+            return round(mean(vals), 4) if vals else None
+
+        entry: dict[str, float] = {
             "attack_rating": round(_clamp((xg_for / league_mean - 1.0) * _RATING_SCALE, -_RATING_CAP, _RATING_CAP), 4),
             "defense_rating": round(_clamp((1.0 - xg_against / league_mean) * _RATING_SCALE, -_RATING_CAP, _RATING_CAP), 4),
             "xg_for_per_match": round(xg_for, 4),
@@ -251,6 +292,21 @@ def compute_team_ratings(
             "ppda": round(mean(ppda_values), 4) if ppda_values else 0.0,
             "matches": float(len(selected)),
         }
+        # Keyed with the engine's OWN names (`possession_priors._attack_strength`
+        # etc.) so the wiring below is a forward, not a translation.
+        for out_key, src in (
+            ("shots_per_match", "shots"),
+            ("shots_allowed_per_match", "shots_allowed"),
+            ("goals_for_per_match", "goals_for"),
+            ("goals_against_per_match", "goals_against"),
+            ("clean_sheet_rate", "clean_sheet"),
+            ("corners_per_match", "corners"),
+            ("points_per_match", "points"),
+        ):
+            value = _mean_of(src)
+            if value is not None:
+                entry[out_key] = value
+        ratings[team] = entry
     return ratings
 
 
@@ -316,6 +372,24 @@ def build_soccer_match_features(
         k: v for k, v in defensive_metrics.items()
         if v is not None and not (k.endswith("ppda") and float(v) == 0.0)
     }
+    # Forward every rating key the engine reads, prefixed per side. `_first_float`
+    # tries `{side}_{key}` first, so each team is scored with its own numbers.
+    # Attack/form/set-piece describe the team on the ball; defence describes the
+    # team it is playing against -- `build_possession_priors` picks the side.
+    _ATTACK = ("shots_per_match", "goals_for_per_match", "points_per_match")
+    _DEFEND = ("shots_allowed_per_match", "goals_against_per_match", "clean_sheet_rate")
+    _SET_PIECE = ("corners_per_match",)
+    set_piece_metrics: dict[str, Any] = {}
+    for side, rating in (("home", home_rating), ("away", away_rating)):
+        for key in _ATTACK:
+            if rating.get(key) is not None:
+                team_metrics[f"{side}_{key}"] = rating[key]
+        for key in _DEFEND:
+            if rating.get(key) is not None:
+                defensive_metrics[f"{side}_{key}"] = rating[key]
+        for key in _SET_PIECE:
+            if rating.get(key) is not None:
+                set_piece_metrics[f"{side}_{key}"] = rating[key]
     team_metrics = {k: v for k, v in team_metrics.items() if v is not None}
     return SoccerMatchFeatures(
         league=league,
@@ -325,6 +399,7 @@ def build_soccer_match_features(
         away_team=away_team,
         team_metrics=team_metrics,
         defensive_metrics=defensive_metrics,
+        set_piece_metrics=set_piece_metrics,
         market_features=dict(market_features or {}),
         knockout=knockout,
         home_starter_ids=tuple(home_starter_ids),
