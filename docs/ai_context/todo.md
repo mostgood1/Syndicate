@@ -13334,6 +13334,50 @@ measurement, not a fix.** Next step, if picked up: find where
 `locked_cards_retuned/daily_summary_*_locked_policy.json` is built and
 whether it is supposed to consume `oddsapi_game_lines_*_pregame.json` at all.
 
+##### TRACED 2026-08-18 (same session, `sim-vs-market-freeze-finding`, no code touched) — `locked_cards_retuned` has NO automatic trigger anywhere in production
+
+Followed the "next step" above. The builder is
+`vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py`,
+called two ways, **and neither runs automatically on Render**:
+
+1. **The routine (season-wide) path** — `daily_update.py::_publish_live_season_manifests()`,
+   which passes `--prefer-canonical-daily on` for the `retuned` profile. This
+   is only ever reached via `scripts/daily_update.ps1`, which **only runs from
+   GitHub Actions** (`.github/workflows/daily-update.yml`) — Render has no
+   entrypoint that calls `daily_update.py` at all.
+2. **The single-date backfill** inside `scripts/run_refresh_worker.py`
+   (`MLB_BETTING_DAY_BACKFILL_DATE`-gated) — already established above as
+   manual-only.
+
+**And the GHA workflow itself does not run the full pipeline by default
+either.** It has a `0 6 * * *` UTC cron, but the scheduled/default path is
+explicitly backup-only: it pulls Render's already-computed hot artifacts via
+`/api/ops/artifacts/export` and commits them to git as a cold-start safety
+net. Its own comment: *"Render's refresh-worker/live-odds-worker now generate
+this data live and continuously — this Action no longer regenerates it."*
+The full pipeline only runs behind a `workflow_dispatch` input,
+`run_full_pipeline`, **defaulting to `false`**, documented in the workflow as
+a "manual fallback for backfills/recovery; Render workers own the daily
+generation now." Even when a human does trigger it, it runs on the GHA
+runner, writes to git, and only reaches Render via a deploy-hook redeploy of
+**web** — never refresh-worker.
+
+**Net: `locked_cards_retuned` / `season_betting_day_*.json` has no automatic
+regeneration path in production at all**, on Render or on any GHA schedule.
+Both of its triggers require a human to act by hand. That is the root cause
+one level up from the read-side finding above — the freeze fix (1 → 11 → 15
+games) has nothing that would ever pick it up and rebuild the static payload
+that `/mlb/api/market-accuracy` actually reads.
+
+**Loose thread, not chased down:** `scripts/run_refresh_worker.py:1253`
+carries a comment claiming *"prediction reconciliation/grading never runs on
+Render today — it was only ever invoked from... the GHA pipeline,"*
+immediately followed by code implementing an in-process refresh-worker
+autorun for reconciliation (`RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN`).
+Reads like a stale comment surviving a later autorun addition. This is about
+*reconciliation*, a separate mechanism from `locked_cards_retuned` — flagged
+for whoever picks this up, not folded into the finding above.
+
 #### #266 — both prop families graded zero (`9f8489f3`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
 **Hitters:** `_extract_report_hitter_predictions` resolved team and lineup
