@@ -4130,3 +4130,33 @@ the entire `#379` diagnosis WITH today's numbers, and reading it earlier would
 have saved two wrong causes. **Read the docstring first for the diagnosis; then
 verify it against the code before acting on it.**
 
+## 2026-08-18 — RULE: a union merge CANNOT carry a deliberate deletion. A collapse pushed through one is undone, and comes back bigger
+
+**I collapsed `state.md` from 59 sections to 26, pushed it through the merge
+cycle, and `origin/main` came out with 87.** The collapse was reverted and my new
+sections were added on top, so the file ended up **larger than before I started**.
+
+**The mechanism is the merge resolver doing exactly its job.** The ledger files
+are append-only, so the cycle resolves them by UNION: take ours, then append any
+block from theirs that ours lacks. A deliberate deletion is indistinguishable
+from "ours is missing a block", so every collapsed section was restored from
+`origin/main` — and the invariant that guards the union reported *loss* when it
+saw the collapse, which is the same confusion from the other side.
+
+**The tell was in the numbers and I nearly missed it**: I checked
+`unpushed: 0` and the file list, and only caught it because the line count on
+main (3,763) was larger than the pre-collapse file (3,526). **A push that
+succeeds is not a push that did what you meant.**
+
+**How to apply.**
+- **A collapse or dedupe must be the LAST commit before the push, and the push
+  must be a fast-forward** — or it must be re-applied on top of the merge result.
+  Re-applying is what worked here: take the collapsed file, diff its sections
+  against the merged one, carry forward only sections that are in neither the
+  collapse nor the archive.
+- **Verify a size-reducing change by SIZE after pushing**, not by exit code.
+  Sections, lines, or bytes — whichever the change was measured in.
+- **Teach the invariant about the archive.** The check tracks six ledger files
+  and knew nothing about `state_archive_2026-08-18_full.md`, so it read 12
+  collapsed lines as lost. They were all in the archive; the override was
+  correct, but the checker should have known.
