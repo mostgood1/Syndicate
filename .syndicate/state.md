@@ -2412,3 +2412,44 @@ worker.
 **DO NOT ACT ON A CAUSE FROM THIS FILE UNTIL SOMEONE TRACES THE CALL SITES.**
 Acting on cause 2 would have shipped a `psutil` dependency that fixed nothing and
 looked exactly like a fix.
+
+### TRACE — web has NO CALLER for the emitter. **PROVISIONAL, not confirmed.** `[2026-08-18]`
+
+Answers the open question left by the RETRACTION above. **Marked provisional
+deliberately: this is the FOURTH cause proposed for this symptom today and three
+were wrong. The TRACE below is evidence; the CONCLUSION is not yet verified.**
+
+**EVIDENCE (file:line, all re-read, none inferred):**
+
+    log_and_persist_process_memory(...)  -> live_lens_loop.py :507 :578 :616
+                                            :767 :777 :840 :895
+    log_all_process_memory(...)          -> refresh_odds_sources.py :465 :2670 :2673
+
+    start_live_lens_loop  imported by  scripts/run_live_odds_refresh_worker.py:30
+                                       -- and by NOTHING ELSE
+    syndicate/app.py:36-37  starts  live_refresh_loop + intelligence_state
+                                    -- NOT the live-lens loop
+    render.yaml:1043  SYNDICATE_LIVE_LENS_INTERVAL_SECONDS  -- worker block
+
+**BOTH caller families are WORKER-ONLY.** `live_lens_loop` is started only by
+`run_live_odds_refresh_worker.py`; `refresh_odds_sources.py` is a worker script.
+
+**PROVISIONAL CONCLUSION: web does not emit because NOTHING ON WEB CALLS IT.**
+Not broken, not disabled, not deleted — the emitter lives inside worker loops.
+That also explains the asymmetry without needing a fault: worker loops run
+continuously (17s samples), web serves requests. **The 2026-08-14 sample was
+probably the last time web ran something that happened to call it, NOT the moment
+a healthy thing broke.**
+
+**IF THAT HOLDS, `deploy_preflight.py` gates EVERY service on a signal only
+WORKERS can produce, so web's preflight has never been satisfiable.**
+
+**Two candidate fixes — do NOT pick one until the conclusion is confirmed:**
+1. give web its own periodic emitter — subject to **worker periodic work is never
+   free** (`#241` caused a prod restart loop);
+2. **make preflight service-aware** — cheaper, and better matched to the real
+   risk: a web deploy has no long job to land on. That is precisely why tonight's
+   break-glass was safe, measured: 4 processes, all infra, zero jobs.
+
+**To confirm:** find any web-side call path to `log_all_process_memory`, or
+confirm none exists. If none, the fix is (2) and no emitter is missing.
