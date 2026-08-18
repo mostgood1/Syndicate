@@ -11137,7 +11137,9 @@ dropped from `lanes.md` rather than appended twice — the sweep record in
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+### live-game-line-projection — ARCHIVED-SNAPSHOT 2026-08-18 — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+
+> Demoted 2026-08-18: an archived snapshot must not read as a live lane. The live record for this slug is in lanes.md, which carries it as OPEN, UNOWNED. Nothing deleted.
 ### layer1-board-coverage — CLOSED-VERIFIED 2026-08-17 — all four goals answered, and the last unmet criterion was EXECUTED (it returned a defect, which was then fixed and verified)
 - **THE ONE OPEN CRITERION IS NOW MET.** This lane closed-refused twice for
   the same gap: the cross-sport LIVE A/B needed two sports live at once.

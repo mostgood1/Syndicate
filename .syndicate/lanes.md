@@ -2775,7 +2775,9 @@ to betting-accuracy improvements.
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
 
-### soccer-layer2-dates — OPEN — opened 2026-08-17 — session: soccer-sport-owner
+### soccer-layer2-dates — SUPERSEDED-BY-CLOSURE 2026-08-18 — opened 2026-08-17 — session: soccer-sport-owner
+
+> Demoted 2026-08-18: this lane's own later block reads CLOSED-VERIFIED 2026-08-18 02:3xZ. Both states cannot be current. Nothing deleted.
 - Goal: the Layer 2 compact-game rail shows ONLY today's soccer games, each with a
   state its kickoff time can support. **Testable outcome:** on production
   `/intelligence` with the DEFAULT day tab ("All"), the Games rail contains zero
@@ -2949,7 +2951,9 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 ## MERGED FROM origin/main - coordinator merge cycle
 
-### wnba-fixture-identity — OPEN — **stable fixture identity SHIPPED (`b2dbef5e`,
+### wnba-fixture-identity — SUPERSEDED-BY-CLOSURE 2026-08-18 — **stable fixture identity SHIPPED (`b2dbef5e`,
+
+> Demoted 2026-08-18: this lane's own later block reads CLOSED. Both states cannot be current. Nothing deleted.
 `ec5c9011`, 40 tests). Now wiring it into the game_cards builder.** - opened
 2026-08-17 - session: layer1-board-coverage
 - Goal: the WNBA `game_cards` writer uses the schedule as its denominator and
@@ -2990,7 +2994,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   wearing a measured number's clothes is the failure `#242` already caused
   once"*. A separate column IS the not-mixing, so the decision honours it.
 
-### soccer-layer2-dates â€” CHECKPOINT 2026-08-17 22:0xZ â€” 4 STRANDS ROOT-CAUSED, 4 COMMITTED + PUSHED, 1 DEPLOYED AND MEASURED, 1 AWAITING WEB, 1 INERT ON ANOTHER LANE â€” session: soccer-layer2-dates
+### soccer-layer2-dates — CHECKPOINT 2026-08-17 22:0xZ — 4 STRANDS ROOT-CAUSED, 4 COMMITTED + PUSHED, 1 DEPLOYED AND MEASURED, 1 AWAITING WEB, 1 INERT ON ANOTHER LANE — session: soccer-layer2-dates
 
 - Goal: soccer's Layer 2 surfaces tell the truth about WHEN a match is and WHETHER
   it is live, and soccer reaches the board with real projections.
@@ -3060,7 +3064,9 @@ actually in play â€” today's was `post` across all three leagues.
 
 ## MERGED FROM origin/main - coordinator merge cycle
 
-### soccer-model-coverage — OPEN — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+### soccer-model-coverage — SUPERSEDED-BY-CLOSURE 2026-08-18 — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+
+> Demoted 2026-08-18: this lane is recorded CLOSED in lanes_closed.md. Both states cannot be current, and a closed lane releases its files. Nothing deleted.
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner, and the claims were
 > RELEASED deliberately at session archive.** Anyone may take these files.
 > **SINGLE NEXT ACTION:** commit fixes #1 (seed bootstrap, unblocks 107 of 123
@@ -3180,7 +3186,9 @@ actually in play â€” today's was `post` across all three leagues.
 
 ## MERGED FROM origin/main - coordinator merge cycle
 
-### commit-guard-blind-to-own-recipe — OPEN — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+### commit-guard-blind-to-own-recipe — SUPERSEDED-BY-CLOSURE 2026-08-18 — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+
+> Demoted 2026-08-18: this lane is recorded CLOSED in lanes_closed.md. Both states cannot be current, and a closed lane releases its files. Nothing deleted.
 - Goal: a session that follows the guard's OWN printed instructions is not blocked
   by it. Two testable outcomes: (a) a command that assigns `GIT_INDEX_FILE=` (or
   either `SYNDICATE_ALLOW_STAGED_*`) inside the command string is exempt, exactly
@@ -3662,7 +3670,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
 
-### LANE RELEASE — session `bd97b64e` / `7c041356`, 2026-08-18 ~01:4xZ. **ALL HOLDS RELEASED. No file in this repo is claimed by this session any more.**
+#### LANE RELEASE — session `bd97b64e` / `7c041356`, 2026-08-18 ~01:4xZ. **ALL HOLDS RELEASED. No file in this repo is claimed by this session any more.**
 
 Released, with status:
 - **`wnba-fixture-identity` — CLOSED.** Identity module + 40 tests shipped and on

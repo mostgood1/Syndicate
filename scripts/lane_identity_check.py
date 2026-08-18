@@ -131,12 +131,19 @@ def main() -> int:
         elif "CLOSED" in status.upper():
             closed_in_lanes.add(slug)
 
-    archived = {s for s, _, _ in blocks(guard, _read(CLOSED)) if s}
+    closed_blocks = list(blocks(guard, _read(CLOSED)))
+    archived = {s for s, _, _ in closed_blocks if s}
+    # PRESENCE in the archive is not a contradiction. A lane can legitimately be
+    # closed, archived, and later RE-OPENED -- `live-game-line-projection` was --
+    # and flagging that would mark a correct ledger dirty forever, which is how a
+    # checker earns the reputation that gets it ignored. What is wrong is an
+    # ARCHIVED block still asserting OPEN: then the archive claims a live lane.
+    archived_open = {s for s, _, is_open in closed_blocks if s and is_open}
     in_history = {s for s, _, _ in blocks(guard, _read(HISTORY)) if s} if HISTORY.exists() else set()
 
     duplicate_open = sorted((s, n) for s, n in open_blocks.items() if n > 1)
     open_and_closed = sorted(set(open_blocks) & closed_in_lanes)
-    open_but_filed = sorted(set(open_blocks) & archived)
+    open_but_filed = sorted(set(open_blocks) & archived_open)
 
     report = {
         "blocks": sum(1 for _ in blocks(guard, lanes_text)),
@@ -172,8 +179,8 @@ def main() -> int:
             print(f"  {slug}")
 
     if open_but_filed:
-        print(f"\nOPEN BUT ALSO FILED -- {len(open_but_filed)} slug(s) OPEN in lanes.md")
-        print("while also present in lanes_closed.md:")
+        print(f"\nOPEN IN TWO FILES -- {len(open_but_filed)} slug(s) OPEN in lanes.md")
+        print("while lanes_closed.md ALSO carries an OPEN block for them:")
         for slug in open_but_filed:
             print(f"  {slug}")
 
