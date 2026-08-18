@@ -24,6 +24,8 @@ invented a slate, would be worse than the nulls being replaced.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 import syndicate.features.wnba.cards as cards
@@ -136,3 +138,60 @@ def test_a_200_with_no_events_is_NOT_carried(monkeypatch):
 
     monkeypatch.setattr(cards.urllib_request, "urlopen", lambda *a, **k: _Resp())
     assert cards._public_scoreboard_live_state_payload("2026-08-16") is None
+
+
+def _espn(short_detail, state, completed):
+    return json.dumps({"events": [{"id": "401857150", "competitions": [{"competitors": [
+        {"homeAway": "away", "score": "95", "team": {"abbreviation": "IND"}},
+        {"homeAway": "home", "score": "91", "team": {"abbreviation": "ATL"}}]}],
+        "status": {"type": {"state": state, "completed": completed,
+                            "shortDetail": short_detail, "period": 5}}}]}).encode()
+
+
+class _R:
+    def __init__(self, body): self._b = body
+    def read(self): return self._b
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+@pytest.mark.parametrize(
+    "short_detail,state,completed,want_final,want_live",
+    [
+        # THE PRODUCTION DEFECT, 2026-08-17 02:5xZ: IND @ ATL read
+        # status='Final/OT' with final=False, in_progress=True -- the record
+        # contradicted itself because ESPN flips its display text before its
+        # state flags. A completed overtime game was published as in progress.
+        ("Final/OT", "in", False, True, False),
+        ("Final/2OT", "in", False, True, False),
+        ("Final", "post", True, True, False),
+        # A genuinely live game must be UNTOUCHED.
+        ("9.7 - 4th", "in", False, False, True),
+        ("6:08P CT", "pre", False, False, False),
+        # KNOWN PRE-EXISTING BUG, SURFACED BY THIS TEST AND NOT FIXED HERE:
+        # `_looks_terminal_status_text` matches "final" as a SUBSTRING, so
+        # "Semifinal" reads as a finished game. My own ESPN-layer check uses
+        # `startswith` and is not the culprit; the shared helper is, and it is
+        # used by every sport. Marked xfail rather than silently dropped, and
+        # rather than patching a shared predicate blind at the end of a session.
+        pytest.param("Semifinal", "pre", False, False, False,
+                     marks=pytest.mark.xfail(reason="_looks_terminal_status_text matches 'final' inside 'Semifinal' (shared helper, pre-existing)", strict=True)),
+    ],
+)
+def test_final_text_corroborates_final_and_never_invents_live(
+    monkeypatch, short_detail, state, completed, want_final, want_live
+):
+    """Text can only ADD `final`, never remove it and never add `in_progress`.
+
+    A heuristic that could mark a game LIVE off prose is how soccer's board once
+    showed every game live (`#160`), so this direction is deliberate.
+    """
+    monkeypatch.setattr(
+        cards.urllib_request, "urlopen",
+        lambda *a, **k: _R(_espn(short_detail, state, completed)),
+    )
+    out = cards._public_scoreboard_live_state_payload("2026-08-16")
+    assert out is not None
+    game = out["games"][0]
+    assert bool(game["final"]) is want_final
+    assert bool(game["in_progress"]) is want_live
