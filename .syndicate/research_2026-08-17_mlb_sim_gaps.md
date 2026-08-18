@@ -87,7 +87,21 @@ This is the largest true modelling hole. Defence explains real, persistent
 variance in BABIP, and it is a team-level input the market prices and this engine
 cannot express.
 
-### 2b. **No batted-ball type model.** `[measured — no GB/FB/LD, no launch angle, no exit velocity]`
+### 2b. ~~**No batted-ball type model.**~~ **WRONG — CORRECTED 2026-08-17**
+
+**RETRACTED.** The model EXISTS and the sim CONSUMES it:
+`simulate.py:1120-1136` reads `bb_gb_rate` / `bb_fb_rate` / `bb_ld_rate` /
+`bb_pu_rate` for BOTH batter and pitcher, with league-average fallbacks
+(0.44/0.25/0.20/0.11). **All four are 0% populated on 720 batters and 717
+pitchers**, so every player runs on the same defaults — a ground-ball specialist
+and a fly-ball slugger are identical in the sim.
+
+I searched `ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate` and
+called it absent. The fields are prefixed **`bb_`**, my pattern missed them, and
+I reported an ABSENT MODEL where there is an UNFED one. **This belongs in §1
+(built and unfed), not §2 (absent).** The original text follows for the record.
+
+### 2b-original (superseded). **No batted-ball type model.** `[measured — no GB/FB/LD, no launch angle, no exit velocity]`
 
 `inplay_hit_rate` is a single scalar. There is no ground-ball / fly-ball /
 line-drive split, which has three consequences:

@@ -5149,3 +5149,38 @@ that the mechanism is unimportant.
 (hard-hit% 1.9x `hr_rate` on future TB) and was the obvious next wiring target.
 It is now the WRONG next step — it would be a third mechanism against the same
 un-refitted rates. **The re-fit is the precondition, not a follow-up.**
+
+## 2026-08-17 — RULE: "the model is absent" needs a FIELD AUDIT, not a name search
+
+**I published a research document stating the MLB sim has "no batted-ball type
+model — no GB/FB/LD". It was wrong.** The model exists and `simulate.py:1120-1136`
+consumes it for both batter and pitcher:
+
+    batter_bb_gb_rate=float(getattr(batter, "bb_gb_rate", 0.44))
+    batter_bb_fb_rate=...0.25   bb_ld_rate=...0.20   bb_pu_rate=...0.11
+
+**All four are 0% populated on 720 batters and 717 pitchers**, so every player
+runs the league-average defaults and a ground-ball specialist is identical to a
+fly-ball slugger.
+
+**How I got it wrong:** I grepped
+`ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate`. The fields are
+prefixed **`bb_`**, so every pattern missed. A negative grep became "the model is
+absent" in a document that then ranked work by that belief.
+
+**RULE: to claim a model is ABSENT, enumerate the fields of its data structures
+and measure their POPULATION — do not search for names you expect.** A name
+search can only prove *your vocabulary* is absent. `dataclasses.fields()` over
+the profile objects took one script and found **18 zero-population fields**,
+including five I had explicitly declared missing.
+
+**Why this matters more than a wording error:** ABSENT and UNFED have opposite
+remedies. Absent means design and build; unfed means populate a field that is
+already consumed. I recommended a modelling project where a data pipeline was
+needed, and then **built the wrong thing on top of it** — a multiplier hack on
+`hr_rate`/`inplay_hit_rate` when the engine had native GB/FB/LD fields waiting.
+
+**Companion to the 2026-08-17 rule about `.get(key, NEUTRAL)` defaults.** That
+one says a populated-looking feature can be inert. This one says an
+absent-looking feature can already exist. **Both are answered by the same
+action: measure the population rate of every field, never reason from a grep.**

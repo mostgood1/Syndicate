@@ -13870,3 +13870,121 @@ suites with no regression.**
 **All three are OFF by default and nothing is deployed.** The distinction that
 matters is that they are now REACHABLE when enabled, which the batted-ball blend
 was not.
+
+## 2026-08-17 — FULL INPUT AUDIT: **18 sim input fields are 0% populated, and my research doc was WRONG about batted-ball**
+
+Lane `convergence-phase7-crps`. Asked "are you sure we have ALL inputs in full".
+**No.** Audited EVERY field on `BatterProfile` / `PitcherProfile` against 40 real
+roster artifacts (n=720 batters, 717 pitchers) instead of spot-checking.
+
+### ZERO-POPULATION FIELDS
+
+**PitcherProfile (13):** `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult`, `statcast_splits_source/_n_pitches/_start_date/_end_date`,
+**`statcast_quality_mult`**, **`bb_gb_rate`**, **`bb_fb_rate`**, **`bb_ld_rate`**,
+**`bb_pu_rate`**, **`bb_inplay_n`**
+
+**BatterProfile (5):** `bb_gb_rate`, `bb_fb_rate`, `bb_ld_rate`, `bb_pu_rate`,
+`bb_inplay_n` (+ `vs_pitch_type`, `vs_pitch_type_hr` already recorded)
+
+**Thin, not zero:** `leverage_skill` 38.4%, `availability_mult` 50.1%,
+`sb_attempt_rate` 72.4%.
+
+### THE CORRECTION — I MIS-CLASSIFIED BATTED-BALL AS ABSENT
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` says *"No batted-ball type model
+— no GB/FB/LD"*. **That is WRONG.** The model EXISTS and the sim CONSUMES it:
+
+    simulate.py:1120  batter_bb_gb_rate=float(getattr(batter, "bb_gb_rate", 0.44))
+    simulate.py:1121  batter_bb_fb_rate=...0.25   :1122 ld 0.20   :1123 pu 0.11
+    simulate.py:1134  pitcher_bb_gb_rate=... (same four, pitcher side)
+
+**Every batter and every pitcher currently runs on the LEAGUE-AVERAGE DEFAULTS**
+(0.44 / 0.25 / 0.20 / 0.11). A ground-ball specialist and a fly-ball slugger have
+**identical** batted-ball distributions in the sim today.
+
+I searched for `ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate`
+and concluded "absent". The fields are named **`bb_gb_rate`** — my pattern missed
+the prefix, and I reported an ABSENT MODEL where there is an UNFED one. Same
+error class as everything else today: I checked for presence of a name, not
+population of a field.
+
+### THIS INVALIDATES MY OWN BATTED-BALL DESIGN
+
+I built `sim_engine/data/batted_ball.py` as a **multiplier hack** on `hr_rate` /
+`inplay_hit_rate`, because I believed no native model existed. **The engine has
+native GB/FB/LD fields it already reads.** Feeding those directly is strictly
+better than scaling a summary rate:
+
+- it drives the actual batted-ball mechanism rather than a proxy;
+- it lets park factors interact with a hitter's profile (the thing the research
+  doc correctly identified as blocked);
+- it needs no clamp, no invented weight, no unit-free multiplier.
+
+**And the data is already in the artifact I built** — `build_mlb_batted_ball_artifact.py`
+captures `gb`, `fbld` and `gb_share` for all 450 players.
+
+### Status
+
+- The multiplier blend is WIRED and OFF (`SYNDICATE_MLB_BATTED_BALL_WEIGHT=0.0`).
+  **Do not enable it.** Populate the native `bb_*` fields instead.
+- Research doc requires correction on this point.
+- `statcast_quality_mult` (consumed at `simulate.py:164` and `:1396`) is a
+  further 0% field nobody has looked at.
+
+## 2026-08-17 — SIM INPUT CHECKLIST: a runnable gate. **26 fields the engine reads and nothing feeds.**
+
+Lane `convergence-phase7-crps`. `scripts/sim_input_checklist.py`. Exits **1** on
+failure, so it can gate. Read-only.
+
+Asked for "almost a checklist of sorts for proper sim engine execution" — this is
+that, and it turns a day of ad-hoc discoveries into a repeatable control.
+
+### How it works, and why it finds what greps do not
+
+It cross-references TWO things per field, over `dataclasses.fields()` rather than
+name patterns:
+
+    is it CONSUMED by the engine?   (search all of sim_engine/ for the name)
+    is it POPULATED in real rosters? (measure against 40 artifacts)
+
+**CONSUMED + UNPOPULATED is the alarm** — a feature that cannot work, invisible
+to every other check in this repo because a `.get(key, 1.0)` default is
+indistinguishable from a working feature at every level except the data.
+
+### RESULT: 26 FAILING FIELDS (720 batters, 717 pitchers)
+
+**batter (13):** `bb_gb_rate` `bb_fb_rate` `bb_ld_rate` `bb_pu_rate`
+`bb_inplay_n` `statcast_quality_mult` `vs_pitch_type` `vs_pitch_type_hr`
+**`vs_pitcher_k_mult` `vs_pitcher_hr_mult` `vs_pitcher_bb_mult`
+`vs_pitcher_inplay_mult` `vs_pitcher_history`**
+
+**pitcher (13):** `bb_*` (5), `pitch_type_whiff_mult` `pitch_type_inplay_mult`
+`pitch_type_hr_mult` `statcast_quality_mult` `statcast_splits_*` (4)
+
+### A THIRD CORRECTION TO MY OWN RESEARCH
+
+I wrote that BVP (batter-vs-pitcher) *"is fetched daily and `simulate.py`
+contains no reference to bvp at all."* **Wrong again.** The engine reads it under
+different names — `simulate.py:1009, 1014, 1036, 1046` use
+`vs_pitcher_hr_mult` / `vs_pitcher_k_mult`. So BVP has:
+
+- a **model home** (5 fields on `BatterProfile`),
+- an **active consumer** (the sim),
+- **1,282 cached data files**,
+- and **0% population**.
+
+That is the strongest instance of the pattern found all day, and I had
+classified it as "not referenced" because I searched for the string `bvp`.
+
+**Three published claims of mine have now been corrected by measurement**
+(batted-ball "absent", BVP "not referenced", and the field count 18 -> 26). Every
+one came from searching for a NAME instead of enumerating FIELDS. The checklist
+exists so the next person does not have to be right about vocabulary.
+
+### Suggested use
+
+- Run before/after any roster-builder or profile change.
+- Add to `/preflight` or `migration_gate.py` — it is fast and exits non-zero.
+- `EXPECTED_SPARSE` documents the legitimately-thin fields, so a low number there
+  is not mistaken for a defect.
