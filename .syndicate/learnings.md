@@ -5253,3 +5253,37 @@ emitted BY and whether it lags what I am asking about.*
 I also published that wrong conclusion, then reported the correction as pushed
 when the push had silently failed — the wrong entry sat alone on `main` for ~15
 minutes. **Verify the CONTENT landed, not the commit line.**
+
+## 2026-08-18 — RULE: when a claim is corrected TWICE, stop asserting and run it
+
+**I made FOUR wrong calls about BVP in one session, alternating direction:**
+
+1. "already collected, needs only a mapping" — from a **file count**
+2. "needs a real fetch job" — from the **empty files**
+3. "cheap, just invalidate the cache" — right answer, **wrong reasoning**
+4. "invalidation will not help, nothing writes it" — from grepping
+   **`build_roster.py`**, the wrong file
+
+Each was a confident, specific, wrong claim, and each came from a **different
+cheap proxy**: a count, a sample, an assumption, a grep of one file.
+
+**The thing that settled it took one command:** move the cache aside, call the
+applier, count the populated fields. `0 -> 6 of 9`. That was available from the
+first minute.
+
+**RULE: the second time a claim about the same object is corrected, stop
+reasoning about it and EXECUTE it.** A third inference is not more likely to be
+right than the first two — the failure is the method, not the attempt.
+
+**Why this one was so persistent:** the object had FOUR independent failure modes
+(no data / stale cache / no applier / wrong file grepped), and each proxy could
+only see one of them. No single cheap check could have been right. **When an
+object has multiple independent ways to be broken, only running it end-to-end
+distinguishes them.**
+
+**Also learned, and it belongs with this:** `build_roster.py` had no BVP
+reference because BVP is applied one level up in `daily_update.py:7564`. **A
+negative grep in the file you expect proves nothing about a pipeline with three
+application sites.** The provenance table in
+`docs/ai_context/mlb_sim_engine_reference.md` exists so the next person reads
+where things ARE applied instead of guessing where they SHOULD be.

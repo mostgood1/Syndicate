@@ -4114,3 +4114,35 @@ named `render_logs.py` as unable to give one; this is that tool.
   around it.**
 - **`ODDS_SWEEP_LAUNCHED` now exists** — before it, every launch-side print was a
   `*_FAILED` variant and a successful launch was invisible.
+
+## MLB SIM INPUTS — **26 unfed -> 5**, all wiring OFF, nothing deployed `[measured 2026-08-18]`
+
+- **`scripts/sim_input_checklist.py` is the gate.** Cross-references *is this
+  field CONSUMED* against *is it POPULATED*, over `dataclasses.fields()`, exits 1.
+  **Run it with `--simulate-rebuild`** — a plain run audits SERIALISED artifacts
+  and reports the pre-wiring state (26) forever.
+- **5 genuinely unfed remain:** `statcast_quality_mult` (both sides — **no
+  producer anywhere in the repo**), `batter.vs_pitch_type` + `vs_pitch_type_hr`
+  (artifact is pitcher-side only), `pitcher.pitch_type_hr_mult`
+  (`PitcherPitchSplits` has no `hr_mult`).
+- **BVP is FIXED.** It was a stale-empty cache (1,282 files, 30-day TTL) serving
+  `{}` as authoritative while the raw corpus was present. Deleted; recomputes.
+  **13.9% coverage is CORRECT** — a batter only faces some starters — and the
+  five `vs_pitcher_*` fields are documented in `EXPECTED_SPARSE`.
+- **BVP is applied in `daily_update.py:7564`, NOT `build_roster.py`.** Grepping
+  build_roster returns nothing and suggests it is unwired. It is wired, on by
+  default. **Four wrong calls came from this**; see the provenance table in
+  `docs/ai_context/mlb_sim_engine_reference.md`.
+- **Effect of ALL inputs vs market:** mean **+0.0014** Brier; **the market still
+  wins all four markets by 0.007–0.013.** Wiring is plumbing, not an edge.
+- **`total_bases` reversed** — −0.00154 under substitution alone, **+0.00348**
+  with batted-ball data. The power/contact hypothesis held.
+- **Refit:** residuals hr −34.6%, k −24.5%, bb −31.3%, inplay +5.5%. Corrections
+  shrink 3 of 4; **`k_rate` DOES NOT RESPOND** — K comes from the pitch-level
+  model, not the summary rate, so a `k_rate` correction is the wrong lever.
+- **`--use-roster-artifacts` defaults ON**: publishing an input artifact changes
+  nothing without a roster REBUILD.
+- **PRODUCTION IS UNVERIFIED** — `/api/ops/artifacts/stream` 403s on
+  `roster_objs/`. Route is `sim_input_checklist.py --publish` run ON THE WORKER.
+- **Standard is now mandatory:** `docs/ai_context/model_engine_standard.md`,
+  referenced from `CLAUDE.md`, applies to every engine.
