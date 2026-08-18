@@ -15785,3 +15785,53 @@ as `convergence-phase7-crps`'s actual deploy target, and per this file's own
 standing rule the preflight/evidence read is bound to a SHA, not a general
 "safe right now" verdict. Whoever triggers the actual Render deploy must
 name the target commit first.
+
+| web | `055dfc67` | 2026-08-18T22:54:51Z | **403 -> 200 on all five, artifacts CONFIRMED IN PRODUCTION BY CONTENT** |
+
+**What shipped.** One file, **+11 insertions, ZERO deletions**: six patterns into
+`HOT_ARTIFACT_PATTERNS`. Cut from web's LIVE SHA `841b6d84` and verified
+cumulative by me — `merge-base(841b6d84, 055dfc67) == 841b6d84`, so live is an
+ancestor of the target and nothing live was dropped.
+
+**verify: MET.** The gate itself was the reading, watched through the cutover:
+
+    t+270s  live=841b6d84   publish=403     old instance
+    t+315s  live=unreachable publish=502    cutover (the ~2 min predicted)
+    t+450s  live=055dfc67   publish=200     TARGET LIVE, GATE OPEN
+
+All five then published and **read back BY CONTENT**, not by status code:
+`arsenal` 0.57MB, `quality` 0.08MB, `batted_ball` 0.23MB, `pitch_splits` 0.23MB,
+`conditional_mix` 0.48MB (476,461 bytes on the server, real JSON returned).
+`conditional_mix` failed once on an SSL EOF — transport, not rejection — and
+succeeded on retry.
+
+**BREAK-GLASS, user-authorized, relayed by lane `repo-coordination`.** Grant:
+`.syndicate/deploy/grants/abf487e4-....json`.
+- `--allow-off-main`: web already ran off-main content, so a main deploy would
+  have been the LARGER change — **1,042 commits / 451 files / +190,277** — not
+  the safer one.
+- Preflight `UNKNOWN` and cannot ever CLEAR on web. **I DECLINED to widen
+  `--max-sample-age-seconds`**: it produces no evidence, it relabels absence as
+  permission. Substitute measurement instead, re-derived by me from live
+  `/api/ops/memory`: **4 processes — gunicorn master, 2 workers, bash entrypoint.
+  ZERO job processes.**
+
+**ROOT CAUSE of the dead gate, and I had it too broad.** `ALL_PROCESS_MEMORY`
+has THREE consumers and ZERO emitters in the repo — but the emitter is alive on
+refresh-worker (**sample age 17s, CLEAR**) and dead only on **web**, where
+`psutil` is not installed. I told the user and the coordinator that "no session
+can obtain a CLEAR preflight for any service." **That was wrong** — it is
+web-only, and it is a missing dependency, not an architectural limit. **Until
+`psutil` is installed on web, every web deploy needs a break-glass, and a guard
+that must be broken every time has stopped being a guard.**
+
+**KNOWN RESIDUAL: a future main-based web deploy will DROP these six lines**,
+because `055dfc67` is off main. They exist on main in `c2030c72`, so a web
+deploy from main carries them — but any other off-main web branch will not.
+
+**NOT DONE — the sim still cannot see these artifacts.** They are on WEB's disk;
+the sim reads WORKER disk. Live refresh-worker `00e9a49f` is **420 commits / 260
+files** behind main and lacks `conditional_mix.py` and `pitch_codes.py`
+entirely. **A partial graft would be WORSE than nothing**: main's
+`build_roster.py` imports `conditional_mix`, so shipping the call site without
+the module is an ImportError in the roster build. Deferred deliberately.

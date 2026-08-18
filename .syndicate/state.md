@@ -2316,3 +2316,27 @@ against an OLDER web, and `deploy/clv-openings-allowlist` may now be redundant
 for that pattern. **It does NOT carry the five MLB sim patterns**, which are
 still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 /api/ops/artifacts/publish` still 403s.
+
+## WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]`
+
+- **`POST /api/ops/artifacts/publish` 403 -> 200.** All five published and read
+  back BY CONTENT: `arsenal` 0.57MB, `quality` 0.08MB, `batted_ball` 0.23MB,
+  `pitch_splits` 0.23MB, `conditional_mix` 0.48MB.
+- **THE SIM STILL CANNOT SEE THEM.** They are on WEB's disk; the sim reads
+  WORKER disk. Live refresh-worker `00e9a49f` is **420 commits behind main** and
+  **lacks `conditional_mix.py` and `pitch_codes.py` entirely.** A PARTIAL graft
+  is worse than none: main's `build_roster.py` imports `conditional_mix`, so the
+  call site without the module is an **ImportError in the roster build.**
+- **`pattern=` MATCHES THE FULL RELATIVE PATH.** `pattern=conditional_mix_2026.json`
+  returns `count: 0` **for a file that is present.** Use `*conditional_mix*` or
+  the full path. **Every `count: 0` I reported on 2026-08-18 came from this
+  malformed query and proved NOTHING** — the 403 carried the whole argument.
+- **`scripts/render_deploy.py --service <s> --commit <sha>`** is the deploy
+  entrypoint. Raw `curl` POSTs to `/v1/services/.../deploys` are refused.
+- **WEB PREFLIGHT CAN NEVER CLEAR: `psutil` is NOT INSTALLED on web**, so the
+  `ALL_PROCESS_MEMORY` emitter cannot run there. The sampler is HEALTHY on
+  refresh-worker (age 17s, CLEAR). **This is web-only and a missing dependency —
+  I earlier claimed it was global and architectural, and that was wrong.**
+  Install `psutil` on web and the break-glass stops being needed.
+- **Residual:** `055dfc67` is off main, so a future off-main web deploy drops
+  these six lines. They are on main in `c2030c72`.

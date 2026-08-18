@@ -1,0 +1,9 @@
+{
+  "service": "web",
+  "session_id": "abf487e4-8019-4e88-a78f-58e6178deea4",
+  "lane": "convergence-phase7-crps",
+  "target_commit": "055dfc67b19abe9834de2ef71c7a99ee78175d08",
+  "granted_epoch": 1787092240,
+  "expires_epoch": 1787094040,
+  "note": "BREAK-GLASS, user-authorized 2026-08-18, relayed by lane repo-coordination. Record: .syndicate/deploy/grants/AUTHORIZATION-2026-08-18-web-breakglass.md . WHY THE NORMAL GATE CANNOT PASS: deploy_preflight.py gates on an ALL_PROCESS_MEMORY log line that has THREE consumers and ZERO emitters anywhere in the repo, so the sample is frozen at 2026-08-14T18:55Z and only ages -- it is a missing producer, not a slow one. Widening --max-sample-age-seconds was REJECTED on purpose: it produces no evidence, it relabels absence as permission. SUBSTITUTE MEASUREMENT, re-derived by me from live GET /api/ops/memory rather than taken on trust: 4 processes -- gunicorn master, 2 gunicorn workers, bash entrypoint. ZERO job processes, so this deploy kills no work. OFF-MAIN VERIFIED CUMULATIVE by me: merge-base(841b6d84, 055dfc67) == 841b6d84, so the live SHA is an ancestor of the target and nothing live is dropped. Diff is 1 file, +11 insertions, ZERO deletions. FOLLOW-UP: psutil is not installed on web (psutil_available: false), which is why the emitter never runs there -- a missing dependency, not an architectural limit. Until it is fixed every web deploy needs a break-glass, and a guard that must be broken every time has stopped being a guard."
+}
