@@ -235,24 +235,84 @@ came back `0.0` in that aggregate — worth checking separately, not assumed bro
 
 ---
 
-## 4. NCAAF is UNMEASURED, and the season opens 2026-08-29
+## 4. NCAAF — the board is live, the model output is NULL, and one env var is why
 
-`FootballSimulationAdapter(sport="ncaaf").load_features(...)` returns **0 games**
-for both 2025 and 2026, week 1. Consistent with `state.md`: *"NCAAF has the
-contract and no producer."*
+**Season opens 2026-08-29.** Measured 2026-08-18 against production, not locally.
 
-**This is reported as UNMEASURED, never as 0% populated.** A gate that maps
-"could not measure" onto its permissive branch is not a gate — so the checklist
-raises an ALARM for it rather than a note.
+### RETRACTED: "the NCAAF feature loader returns zero games"
 
-Practical consequence: **every NCAAF statement in §3 is a projection from the NFL
-measurement, not a measurement.** Before the 08-29 opener, NCAAF needs its own
-run of the checklist against a real slate. The three NCAAF-only blocks
-(`returning_production`, `coach_continuity`, `transfer_impact`) have builders
-already — `build_ncaaf_returning_production_snapshot.py`,
-`build_ncaaf_coach_continuity_snapshot.py`,
-`build_ncaaf_transfer_portal_snapshot.py` — whose output has **never been shown
-to reach the engine**, because no NCAAF entrypoint passes a payload either.
+I wrote that earlier in this document. **It is true of a local checkout and false
+of production.** `FootballSimulationAdapter(sport="ncaaf").load_features(...)`
+returns 0 games here; `GET /ncaaf/api/cards?week=1` on production serves **16**,
+and all 16 are real games on the CFBD 2026 wk1 slate.
+
+That is the `data/**` lossy-mirror trap in CLAUDE.md, hit exactly as described. I
+nearly filed it as a production defect. **Do not diagnose NCAAF data from this
+checkout.** The checklist's level-2 message now says so in the failure text.
+
+### What IS wrong, measured
+
+**All 16 served NCAAF games carry an entirely null predictions block:**
+
+```json
+"predictions": {"home_mean": null, "away_mean": null, "margin_mean": null,
+                "total_mean": null,
+                "probabilities": {"home_win": null, "away_win": null,
+                                  "home_cover": null, "away_cover": null,
+                                  "total_over": null, "total_under": null}}
+```
+
+`smartsim_reasons` is `[]` on every one. **The NCAAF board renders and shows no
+model output at all.**
+
+**The cause is one absent env var.** `CFBD_API_KEY` is ABSENT on all three Render
+services (enumerated from the live `/v1/services/<id>/env-vars`, not from
+`render.yaml`). `generate_smartsim2_ncaaf_projections.py:57` raises on it, so the
+autorun dies before fetching a single game and the projection artifact is never
+written. Production logs, 06:00Z–15:34Z on 08-18: **21 of 21
+`SEASON_PROJECTION_ARTIFACT_MISSING` lines are `sport=ncaaf`, 0 are `sport=nfl`**
+— the same guard is silent for the football sport that works, which is the
+positive control that it is not misfiring.
+
+`interval_seconds=86400`, so this is a **once-daily** failure, **not** a relaunch
+loop — it is not burning worker cycles.
+
+**Two-arm test, run locally against the real CFBD API:**
+
+| arm | result |
+|---|---|
+| A — no key (= production today) | `RuntimeError: Missing CFBD API key.` Dies immediately. |
+| B — with the key | 99 CFBD games → **51 FBS-vs-FBS** rows via the `#445` fallback → **136** PPA teams (`cfbd_ppa_season_2025_fallback_for_2026`) → **50 of 51** home teams resolve to a non-zero rating. |
+
+**Everything downstream of the key already works**, including `#445`'s guard,
+confirmed present by content in the deployed blob (`00e9a49f`), not by ancestry.
+
+Deploy request filed: `.syndicate/deploy/requests/20260818T154432Z-football-model-owner.md`.
+Env-only, one key, one service. **`render.yaml` must not be touched** — that
+fires `blueprint_sync`.
+
+### Open, and NOT to be waved through
+
+**The board serves 16 games; CFBD lists 51 FBS-vs-FBS for the same week.** The
+cards context reads a saved recommendations summary (`cards.py:2196-2198`,
+`summary_path(week)`), not CFBD. So after the key lands, the projection artifact
+should carry ~51 rows while the board renders 16. **Whether those join, and what
+happens to the other 35, is unresolved** — `16 of 16` predictions populated is
+not proof the slate is covered.
+
+Also seen and NOT a Syndicate defect: USC, San José State and Eastern Michigan
+each appear twice in the served week. Both of each pair are present in CFBD's own
+week-1 response, so this is upstream schedule data for an unfinalised 2026
+season, not a bug here. Recorded because it looks like one.
+
+### Still genuinely unmeasured for NCAAF
+
+The three NCAAF-only input blocks (`returning_production`, `coach_continuity`,
+`transfer_impact`) have builders
+(`build_ncaaf_{returning_production,coach_continuity,transfer_portal}_snapshot.py`)
+whose output has **never been shown to reach the engine** — no NCAAF entrypoint
+passes a payload at all (§0). Their population is unmeasured against a real
+slate, and the checklist cannot measure it from this checkout.
 
 ---
 

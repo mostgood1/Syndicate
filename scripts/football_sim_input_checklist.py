@@ -333,10 +333,19 @@ def level2_population(sport: str, season: int | None, week: int, blocks: dict[st
     games = list(sim_input.games)
     if len(games) < MIN_GAMES_FOR_A_RATE:
         # NOT "0% populated". See MIN_GAMES_FOR_A_RATE -- too few games to divide by.
+        #
+        # AND THIS IS A STATEMENT ABOUT THIS CHECKOUT, NOT ABOUT PRODUCTION.
+        # `data/**` in git is a lossy mirror (see CLAUDE.md). Measured 2026-08-18:
+        # this loader returned 0 NCAAF games locally while production served 16
+        # on `GET /ncaaf/api/cards?week=1`. I filed that local zero as a
+        # production defect and had to retract it. The message says so explicitly
+        # because the retraction is the expensive part.
         return {"sport": sport, "season": season, "week": week, "games": len(games),
                 "load_error": (
-                    f"loader returned {len(games)} games (< {MIN_GAMES_FOR_A_RATE}); "
-                    f"population UNMEASURED, not zero -- check season/week resolve to a real slate"
+                    f"loader returned {len(games)} games (< {MIN_GAMES_FOR_A_RATE}) FROM THIS CHECKOUT; "
+                    f"population UNMEASURED, not zero. `data/**` is a lossy mirror -- this says "
+                    f"nothing about production. Check the served board before concluding anything: "
+                    f"GET /{sport}/api/cards?week={week}"
                 ),
                 "blocks": {}}
 
