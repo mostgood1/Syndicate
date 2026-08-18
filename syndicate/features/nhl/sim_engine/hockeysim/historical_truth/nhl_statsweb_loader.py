@@ -178,7 +178,7 @@ def parse_landing(landing: Dict) -> Optional[HistoricalGameRecord]:
     scoring = summary.get("scoring") or []
 
     period_goals: List[tuple] = []
-    pp_h = pp_a = en_h = en_a = 0
+    pp_h = pp_a = sh_h = sh_a = en_h = en_a = 0
     went_ot = went_so = False
 
     for period in scoring:
@@ -208,6 +208,11 @@ def parse_landing(landing: Dict) -> Optional[HistoricalGameRecord]:
                     pp_h += 1
                 else:
                     pp_a += 1
+            elif strength == "sh":
+                if is_home:
+                    sh_h += 1
+                else:
+                    sh_a += 1
             if modifier in ("empty-net", "empty_net", "emptynet"):
                 if is_home:
                     en_h += 1
@@ -251,6 +256,8 @@ def parse_landing(landing: Dict) -> Optional[HistoricalGameRecord]:
         period_goals=tuple(period_goals),
         pp_goals_home=pp_h,
         pp_goals_away=pp_a,
+        sh_goals_home=sh_h,
+        sh_goals_away=sh_a,
         en_goals_home=en_h,
         en_goals_away=en_a,
         penalties_committed_home=pen_h,

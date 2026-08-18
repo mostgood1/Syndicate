@@ -42,6 +42,7 @@ def build_truth_snapshot(
     away_goals = sum(r.away_goals for r in eligible)
     total_sog = sum(r.home_sog + r.away_sog for r in eligible)
     pp_goals = sum(r.pp_goals_home + r.pp_goals_away for r in eligible)
+    sh_goals = sum(r.sh_goals_home + r.sh_goals_away for r in eligible)
     en_goals = sum(r.en_goals_home + r.en_goals_away for r in eligible)
     home_wins = sum(1 for r in eligible if r.home_win)
     ot_games = sum(1 for r in eligible if r.went_ot)
@@ -63,6 +64,7 @@ def build_truth_snapshot(
         shooting_pct=round(_safe_div(total_goals, total_sog), 4),
         period_goal_share=(round(period_share[0], 4), round(period_share[1], 4), round(period_share[2], 4)),
         pp_goal_share=round(_safe_div(pp_goals, total_goals), 4),
+        sh_goal_share=round(_safe_div(sh_goals, total_goals), 4),
         empty_net_share=round(_safe_div(en_goals, total_goals), 4),
         home_win_pct=round(_safe_div(home_wins, n), 4),
         ot_rate=round(_safe_div(ot_games, n), 4),

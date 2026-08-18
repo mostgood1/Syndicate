@@ -25,6 +25,7 @@ _DEFAULT_TOLERANCES: Dict[str, float] = {
     "period2_share": 0.04,
     "period3_share": 0.04,
     "pp_goal_share": 0.04,
+    "sh_goal_share": 0.01,          # ~2-3% of a baseline near 0.03 -- a tight absolute tolerance
     "empty_net_share": 0.02,
     "home_win_pct": 0.05,
     "ot_rate": 0.05,

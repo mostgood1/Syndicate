@@ -135,7 +135,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), and `special_teams_cal`'s wiring all FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals at 2x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), `special_teams_cal`'s wiring, and `pk_goal_cal_mult`'s calibration all FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -232,6 +232,24 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   now reports these 7 keys as reachable and explicitly labels each
   "reachable, still at its neutral default — not yet calibrated" rather than
   silently marking them `ok`.
+- **`pp_goal_cal_mult`/`pk_goal_cal_mult` calibrated against real truth** —
+  the follow-up the previous bullet flagged. Full report:
+  `docs/reports/hockeysim_special_teams_goal_cal_report.md`. Added a new
+  truth metric first (`sh_goal_share` — `HistoricalGameRecord.sh_goals_home/away`,
+  parsed from the landing feed's `strength == "sh"` goals, no new fetch), then
+  ran `scripts/calibrate_nhl_special_teams_goal_mult.py`: the REAL engine
+  (not a formula approximation), thousands of simulated games, real per-team
+  `pp_pct`/`pk_pct`, league-average base rates, searching for the multiplier
+  that matches simulated `pp_goal_share`/`sh_goal_share` to truth.
+  **`pp_goal_cal_mult` needed NO correction** — measured 1.0021 against truth
+  0.1944, statistically indistinguishable from neutral (the `pp_pct` mechanism
+  + existing `pp_shots_mult=1.4` were already doing their job); left at `1.0`
+  rather than encoding sampling noise as a "fix." **`pk_goal_cal_mult` needed
+  a real one** — uncalibrated, the engine simulated shorthanded goals at
+  0.0538 vs a real 0.0250, MORE THAN DOUBLE. Corrected to `0.4645`, verified
+  by a fresh joint run reproducing both targets simultaneously (pp 0.1971 vs
+  0.1944, sh 0.0246 vs 0.0250), and locked in a test so a future profile edit
+  fails a test rather than silently drifting.
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**

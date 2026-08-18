@@ -120,7 +120,7 @@ first read, from the right AST technique pointed at the wrong variable name.
 
 ---
 
-## 2c. `special_teams_cal` wired — reachable, not yet calibrated
+## 2c. `special_teams_cal` wired — reachable (calibration is §2d)
 
 Fixing an UNREACHABLE parameter needs a call-site change, not a data producer — done by moving the
 seven values onto `SimConfig` itself (`pp_shot_cal_mult`/`pk_shot_cal_mult`/`pp_goal_cal_mult`/
@@ -145,11 +145,46 @@ fields rather than something a future per-team producer should target.
 **Reachability tested** (§4.3, not just "it runs without raising"):
 `tests/test_hockeysim_engine.py::test_special_teams_cal_pp_goal_mult_actually_changes_output`
 proves `pp_goal_cal_mult=2.5` outscores `pp_goal_cal_mult=0.5` on average across 80 seeded runs,
-everything else held identical. `scripts/nhl_sim_input_checklist.py` now reports `special_teams_cal`
-as reachable and, since nothing has changed a value away from its default yet, explicitly labels
-each key "reachable, still at its neutral default — not yet calibrated" rather than silently
-passing it as `ok` — the population-vs-calibration distinction stays visible instead of collapsing
-into a single boolean.
+everything else held identical. `scripts/nhl_sim_input_checklist.py` reports `special_teams_cal`
+as reachable and, per key, whether its live value still matches the old neutral default or has
+since been calibrated — the population-vs-calibration distinction stays visible instead of
+collapsing into a single boolean (see §2d for which key changed).
+
+---
+
+## 2d. `pp_goal_cal_mult`/`pk_goal_cal_mult` calibrated against real truth
+
+Full report: `docs/reports/hockeysim_special_teams_goal_cal_report.md`. Summary:
+`scripts/calibrate_nhl_special_teams_goal_mult.py` runs the REAL engine (synthetic-but-neutral
+rosters, real per-team `pp_pct`/`pk_pct`, league-average base rates) over thousands of simulated
+games and searches for the multiplier that makes simulated `pp_goal_share`/`sh_goal_share` match
+the real truth values — a new truth metric added this pass (`sh_goal_share`, from a new
+`sh_goals_home`/`sh_goals_away` field on `HistoricalGameRecord`, parsed from the landing feed's
+`strength == "sh"` goals; did not exist as a measurable target before).
+
+| multiplier | truth target | before (mult=1.0) | after | verdict |
+|---|---|---|---|---|
+| `pp_goal_cal_mult` | `pp_goal_share` 0.1944 | 0.1938 | — | **already correct.** The `pp_pct` mechanism + existing `pp_shots_mult=1.4` were doing their job; the fitted correction (1.0013-1.0029 across iterations) is noise, not signal. Left at `1.0`. |
+| `pk_goal_cal_mult` | `sh_goal_share` 0.0250 | 0.0538 | **0.4645** | **real, substantial correction.** Uncalibrated, the engine simulated shorthanded goals at MORE THAN DOUBLE the real rate. Converged and stable across iterations. |
+
+**Why one needed a correction and the other didn't**: `cal_pp_gl_mult` scales the attacking team's
+PP-goal rate — the primary, well-modeled event. `cal_pk_gl_mult` scales the defending
+(shorthanded) team's OWN goal rate during that same segment — shorthanded goals, a rare event
+whose base formula (`0.9 * pk_pct`, `engine.py:1000`) was evidently never fit against a real rate
+(there was no truth metric to fit it against until this session).
+
+**What this does NOT cover**, deliberately: `pp_shot_cal_mult`/`pk_shot_cal_mult` (no truth target
+for PP/PK shot volume specifically — needs the boxscore endpoint's per-goalie strength-state shot
+splits, §5) and the three `block_rate_*` keys (no truth target for blocked-shot rate by strength
+state). Per-team differentiation of these two calibrated multipliers was deliberately NOT
+attempted — they are league-wide correction constants layered on top of the already-per-team
+`pp_pct`/`pk_pct` signal; making them per-team too would double-count against that signal
+(`model_engine_standard.md` §4.4).
+
+**Locked in a test**, not just a doc claim:
+`tests/test_hockeysim_props.py::test_special_teams_cal_production_default_carries_the_calibration`
+asserts `_special_teams_cal(build_nhl_sim_config())["pk_goal_multiplier"] == 0.4645` — a future
+edit to the profile constant fails a test, not silently drifts.
 
 ---
 
@@ -163,7 +198,7 @@ into a single boolean.
 | `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct` | **no producer exists** — `build_team_features` never sets them | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% — genuinely absent, §5 |
 | `shot_weight`, `goal_weight`, `block_weight` (player) | **no producer exists** — `build_player_features` never sets them | player-level allocation weighting inside `engine.py` | 0% — genuinely absent, §5 |
 | `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
-| `special_teams_cal` (7 keys — separate parameter, see §2b/§2c) | **NEW**: `SimConfig`'s 7 new fields, resolved via `build_nhl_sim_config` and mapped by `player_props._special_teams_cal` | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | reachable now (§2c); values unchanged from the old neutral defaults — wired, not yet calibrated |
+| `special_teams_cal` (7 keys — separate parameter, see §2b/§2c/§2d) | **NEW**: `SimConfig`'s 7 new fields, resolved via `build_nhl_sim_config` and mapped by `player_props._special_teams_cal` | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | reachable (§2c); `pk_goal_cal_mult` truth-calibrated to `0.4645` (§2d), the other 6 still at neutral defaults |
 | `period_goal_lambdas` | `apply_projection`, from the (now-corrected) projection | `game_market_sim.py` — the **main board's** ML/spread/total | 100%, and this is what makes the main board unaffected by everything else in this table |
 
 **The main-board / props-engine split is the load-bearing fact in this
@@ -194,6 +229,8 @@ concept.
 | `special_teams_map` wiring — `loaders.load_team_special_teams_map` → `build_team_features` → `build_game_features` → `build_slate_features` | built, tested end-to-end (`test_build_game_features_populates_special_teams_end_to_end`) | reachable by default, no flag |
 | `HOT_ARTIFACT_PATTERNS`: `team_xg_*.csv`, `team_elo_*.csv`, `team_special_teams_*.csv` | added | makes all three auditable via `/api/ops/artifacts/*`; does not by itself produce xG data |
 | `SimConfig`'s 7 new fields + `player_props._special_teams_cal` — wires `special_teams_cal` (§2c) | built, tested (2 new reachability/mapping-fidelity tests) | reachable by default now; values unchanged, so no behavior change until a future calibration pass |
+| `sh_goals_home`/`sh_goals_away` on `HistoricalGameRecord` + `TruthMetrics.sh_goal_share` — new truth metric, parsed from `strength == "sh"` goals | built, tested (isolated fixture; existing `_landing()` fixture untouched) | feeds the calibration below; no new fetch, same 1,312-game cache |
+| `scripts/calibrate_nhl_special_teams_goal_mult.py` + calibrated `pk_goal_cal_mult=0.4645` (§2d) | built, run, applied to `NHL_CALIBRATION_PROFILE_DEFAULT`, locked in a test | reachable by default; a REAL behavior change (shorthanded-goal rate roughly halved to match truth) |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**9 alarms**, down from 16 once `special_teams_cal` became reachable) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
 
 **All of it is additive and reachable-by-default** — no new flag was

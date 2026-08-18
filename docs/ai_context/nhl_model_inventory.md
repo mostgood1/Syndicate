@@ -107,12 +107,20 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   runs) — not yet a calibration backtest of the effect SIZE.
 - **Did** wire `special_teams_cal`'s 7 keys (reference doc §2c) — moved onto
   `SimConfig` (`pp_shot_cal_mult` etc), resolved via `build_nhl_sim_config`,
-  mapped and passed by `player_props._special_teams_cal`. Values unchanged
-  from the old neutral defaults (a wiring fix, not a calibration change);
-  reachability-tested the same way as `pp_pct` above. Did NOT calibrate any of
-  the 7 values away from neutral — that needs a truth-comparison pass (does
-  simulated PP-goal share match `TruthMetrics.pp_goal_share`), which risks
-  double-counting against `pp_pct`/`pk_pct` if done carelessly (reference doc §5).
+  mapped and passed by `player_props._special_teams_cal`. Values initially
+  unchanged from the old neutral defaults (a wiring fix, not yet a calibration
+  change); reachability-tested the same way as `pp_pct` above.
+- **Did** calibrate `pp_goal_cal_mult`/`pk_goal_cal_mult` against real truth
+  (reference doc §2d, full report `docs/reports/hockeysim_special_teams_goal_cal_report.md`).
+  Added a new truth metric (`sh_goal_share`, from a new `sh_goals_home/away`
+  parser extension — no new fetch) and ran the REAL engine over thousands of
+  simulated games to search for the multiplier matching it. Result:
+  `pp_goal_cal_mult` needed no correction (the existing mechanism was already
+  accurate); `pk_goal_cal_mult` needed a real one — uncalibrated, the engine
+  simulated shorthanded goals at more than double the real rate. Corrected to
+  `0.4645`, locked in a test. Deliberately did NOT attempt per-team
+  differentiation of either multiplier — that would double-count against the
+  already-per-team `pp_pct`/`pk_pct` signal (reference doc §2d/§5).
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct` or player usage weights — needs the truth-loader's parser
   extended further (beyond the penalties extension already done this session)

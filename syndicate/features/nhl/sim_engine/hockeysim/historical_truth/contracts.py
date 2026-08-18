@@ -34,6 +34,11 @@ class HistoricalGameRecord:
     period_goals: Tuple[Tuple[int, int], ...] = ()
     pp_goals_home: int = 0
     pp_goals_away: int = 0
+    # Shorthanded goals -- the counterpart PP goals need for a real pp_goal_cal_mult/pk_goal_cal_mult
+    # calibration (`docs/ai_context/hockeysim_engine_reference.md` §2c/§2d): cal_pk_gl_mult governs
+    # the RARE event of a shorthanded team scoring, which pp_goal_share alone says nothing about.
+    sh_goals_home: int = 0
+    sh_goals_away: int = 0
     en_goals_home: int = 0
     en_goals_away: int = 0
     # Minor penalties (2-min, incl. double-minors) COMMITTED by each team -- i.e. the OPPONENT's
@@ -75,6 +80,7 @@ class TruthMetrics:
     shooting_pct: float
     period_goal_share: Tuple[float, float, float]  # P1, P2, P3 fraction of regulation goals
     pp_goal_share: float        # fraction of goals scored on the power play
+    sh_goal_share: float        # fraction of goals scored shorthanded
     empty_net_share: float      # fraction of goals that were empty-net
     home_win_pct: float
     ot_rate: float              # fraction of games reaching overtime
@@ -130,6 +136,7 @@ class TruthSnapshot:
             "period2_share": m.period_goal_share[1],
             "period3_share": m.period_goal_share[2],
             "pp_goal_share": m.pp_goal_share,
+            "sh_goal_share": m.sh_goal_share,
             "empty_net_share": m.empty_net_share,
             "home_win_pct": m.home_win_pct,
             "ot_rate": m.ot_rate,

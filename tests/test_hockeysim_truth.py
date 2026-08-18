@@ -63,6 +63,28 @@ def test_parse_landing_basic():
     assert rec.went_ot is False and rec.went_shootout is False
 
 
+def test_parse_landing_captures_shorthanded_goals():
+    """`sh_goals_*` -- the counterpart PP goals need to calibrate `pk_goal_cal_mult`
+    (`docs/ai_context/hockeysim_engine_reference.md` §2d). Isolated fixture, not `_landing()`,
+    since adding a goal there would also shift the fixture's period-goal/score-total assertions."""
+    payload = {
+        "id": 1, "gameDate": "2026-01-15", "season": "20252026", "gameType": 2, "gameState": "OFF",
+        "homeTeam": {"abbrev": "BUF", "score": 2, "sog": 20},
+        "awayTeam": {"abbrev": "MTL", "score": 1, "sog": 15},
+        "periodDescriptor": {"number": 3, "periodType": "REG"},
+        "summary": {"scoring": [
+            {"periodDescriptor": {"number": 1, "periodType": "REG"}, "goals": [
+                {"isHome": True, "strength": "ev"},
+                {"isHome": True, "strength": "sh"},
+                {"isHome": False, "strength": "sh"},
+            ]},
+        ]},
+    }
+    rec = parse_landing(payload)
+    assert rec.sh_goals_home == 1
+    assert rec.sh_goals_away == 1
+
+
 def test_parse_landing_ignores_unfinished():
     assert parse_landing(_landing(state="LIVE")) is None
     assert parse_landing({}) is None
@@ -104,7 +126,7 @@ def _rec(**kw) -> HistoricalGameRecord:
 def test_build_truth_snapshot_math():
     recs = [
         _rec(home_goals=3, away_goals=2, home_sog=30, away_sog=20, pp_goals_home=1, went_ot=False),
-        _rec(home_goals=1, away_goals=4, home_sog=25, away_sog=25, en_goals_away=1, went_ot=True),
+        _rec(home_goals=1, away_goals=4, home_sog=25, away_sog=25, en_goals_away=1, sh_goals_home=1, went_ot=True),
     ]
     snap = build_truth_snapshot(recs)
     m = snap.metrics
@@ -116,6 +138,7 @@ def test_build_truth_snapshot_math():
     assert m.home_win_pct == pytest.approx(0.5)                    # game1 home win, game2 away win
     assert m.ot_rate == pytest.approx(0.5)
     assert m.pp_goal_share == pytest.approx(1 / 10)
+    assert m.sh_goal_share == pytest.approx(1 / 10)
     assert m.empty_net_share == pytest.approx(1 / 10)
     # period shares sum to ~1
     assert sum(m.period_goal_share) == pytest.approx(1.0, abs=1e-3)
@@ -141,7 +164,7 @@ def test_calibration_snapshot_keys():
     assert set(cal) == {
         "goals_per_game", "home_goals_per_game", "away_goals_per_game", "shots_per_game",
         "shooting_pct", "period1_share", "period2_share", "period3_share",
-        "pp_goal_share", "empty_net_share", "home_win_pct", "ot_rate", "shootout_rate",
+        "pp_goal_share", "sh_goal_share", "empty_net_share", "home_win_pct", "ot_rate", "shootout_rate",
     }
     assert all(isinstance(v, float) for v in cal.values())
 

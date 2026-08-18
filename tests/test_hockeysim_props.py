@@ -101,19 +101,37 @@ class HockeySimPropsTest(unittest.TestCase):
         bm = {(p.player_id, p.market): p.proj for p in b}
         self.assertEqual(am, bm)
 
-    def test_special_teams_cal_default_matches_old_inline_fallbacks(self) -> None:
-        """`special_teams_cal` was UNREACHABLE (`hockeysim_engine_reference.md` §2b) -- the fix
-        must not change default behavior. `_special_teams_cal(default SimConfig)` must reproduce
-        the exact values the old `.get(key, DEFAULT)` inline fallbacks used."""
-        from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+    def test_special_teams_cal_bare_sim_config_is_the_old_neutral_fallback(self) -> None:
+        """The WIRING itself (`hockeysim_engine_reference.md` §2b/§2c) must not invent behavior: a
+        bare, uncalibrated `SimConfig()` must reproduce the exact values the old
+        `.get(key, DEFAULT)` inline fallbacks used -- the wiring is mechanically a no-op, only the
+        separate calibration pass below changes a value."""
+        from syndicate.features.nhl.sim_engine.hockeysim.engine import SimConfig
         from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
 
-        cal = _special_teams_cal(build_nhl_sim_config())
+        cal = _special_teams_cal(SimConfig())
         self.assertEqual(cal, {
             "pp_shot_multiplier": 1.0, "pk_shot_multiplier": 1.0,
             "pp_goal_multiplier": 1.0, "pk_goal_multiplier": 1.0,
             "blocks_ev_rate": 0.45, "blocks_pk_rate": 0.55, "blocks_pp_def_rate": 0.35,
         })
+
+    def test_special_teams_cal_production_default_carries_the_calibration(self) -> None:
+        """`build_nhl_sim_config()` (what production actually resolves) reflects
+        `scripts/calibrate_nhl_special_teams_goal_mult.py`'s result (§2d): `pk_goal_cal_mult`
+        measurably corrected against real `sh_goal_share` truth, `pp_goal_cal_mult` left at
+        neutral (measured statistically indistinguishable from 1.0). Locks the calibrated value in
+        place so a future edit to the profile constant fails a test, not silently drifts."""
+        from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+        from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
+
+        cal = _special_teams_cal(build_nhl_sim_config())
+        self.assertEqual(cal["pp_goal_multiplier"], 1.0)
+        self.assertEqual(cal["pk_goal_multiplier"], 0.4645)
+        # Shot multipliers and block rates are NOT part of this calibration pass (no truth target
+        # for PP/PK shot volume or block rate specifically yet) -- still neutral.
+        self.assertEqual(cal["pp_shot_multiplier"], 1.0)
+        self.assertEqual(cal["pk_shot_multiplier"], 1.0)
 
     def test_special_teams_cal_reflects_a_custom_profile(self) -> None:
         """A non-default `SimConfig` must actually change what `build_prop_projections` sends to
@@ -125,8 +143,10 @@ class HockeySimPropsTest(unittest.TestCase):
         cal = _special_teams_cal(cfg)
         self.assertEqual(cal["pp_goal_multiplier"], 1.8)
         self.assertEqual(cal["blocks_pk_rate"], 0.62)
-        # Untouched fields still match the default -- confirms this is an OVERRIDE, not a reset.
-        self.assertEqual(cal["pk_goal_multiplier"], 1.0)
+        # Untouched field still matches the CALIBRATED default (0.4645, not the bare-dataclass 1.0
+        # -- see test_special_teams_cal_production_default_carries_the_calibration) -- confirms
+        # this is an OVERRIDE on top of the real production baseline, not a reset to neutral.
+        self.assertEqual(cal["pk_goal_multiplier"], 0.4645)
 
 
 if __name__ == "__main__":

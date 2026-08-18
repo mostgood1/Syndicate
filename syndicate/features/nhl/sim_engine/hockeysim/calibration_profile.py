@@ -37,13 +37,22 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     pk_shots_mult=0.7,
     pp_goals_mult=1.0,
     pk_goals_mult=1.0,
-    # Newly reachable this session (`docs/ai_context/hockeysim_engine_reference.md` §2b) -- values
-    # unchanged from the old inline `special_teams_cal.get(key, DEFAULT)` fallbacks, so wiring them
-    # through here is a no-op until a real calibration pass changes one.
+    # Newly reachable this session (`docs/ai_context/hockeysim_engine_reference.md` §2c) via
+    # `scripts/calibrate_nhl_special_teams_goal_mult.py` against the 1,312-game truth snapshot
+    # (§2d). Shot multipliers and block rates unchanged (no truth target exists yet for PP/PK shot
+    # volume or block rate specifically -- see §5).
     pp_shot_cal_mult=1.0,
     pk_shot_cal_mult=1.0,
+    # pp_goal_cal_mult: measured 1.0021 against real pp_goal_share (0.1944) -- statistically
+    # indistinguishable from neutral (iteration range 1.0013-1.0029 on a 2,000-game/iter sample).
+    # The PP-goal mechanism (pp_pct + the existing pp_shots_mult=1.4) was ALREADY well-calibrated;
+    # left at 1.0 rather than encoding sampling noise as a "correction."
     pp_goal_cal_mult=1.0,
-    pk_goal_cal_mult=1.0,
+    # pk_goal_cal_mult: measured 0.4645 against real sh_goal_share (0.0250) -- a real, substantial,
+    # converged correction. Uncalibrated (1.0), the engine simulated shorthanded goals at MORE THAN
+    # DOUBLE the real rate (0.0538 vs 0.0250 truth). Verified: final joint run at both fitted
+    # values reproduces both targets simultaneously (pp 0.1971 vs 0.1944, sh 0.0246 vs 0.0250).
+    pk_goal_cal_mult=0.4645,
     block_rate_ev=0.45,
     block_rate_pk=0.55,
     block_rate_pp_def=0.35,
