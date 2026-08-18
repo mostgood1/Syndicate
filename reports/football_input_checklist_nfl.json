@@ -1,0 +1,462 @@
+{
+  "entrypoints": [
+    {
+      "entrypoint": "scripts/generate_smartsim2_nfl_projections.py",
+      "kind": "production",
+      "purpose": "NFL regular season -> smartsim2_projections_<season>_wk<week>.csv",
+      "passes_payload": false,
+      "payload_keys": null,
+      "reachable_blocks": null,
+      "verdict": "NO PAYLOAD",
+      "missing_model_fields": [
+        "pace_seconds_per_play",
+        "feature_generation_payload"
+      ]
+    },
+    {
+      "entrypoint": "scripts/generate_smartsim2_nfl_preseason_projections.py",
+      "kind": "production",
+      "purpose": "NFL preseason -> smartsim2_preseason_projections_<season>_wk<week>.csv",
+      "passes_payload": false,
+      "payload_keys": null,
+      "reachable_blocks": null,
+      "verdict": "NO PAYLOAD",
+      "missing_model_fields": [
+        "pace_seconds_per_play",
+        "feature_generation_payload"
+      ]
+    },
+    {
+      "entrypoint": "scripts/generate_smartsim2_ncaaf_projections.py",
+      "kind": "production",
+      "purpose": "NCAAF -> smartsim2_ncaaf_projections_<season>_wk<week>.csv",
+      "passes_payload": false,
+      "payload_keys": null,
+      "reachable_blocks": null,
+      "verdict": "NO PAYLOAD",
+      "missing_model_fields": [
+        "pace_seconds_per_play",
+        "feature_generation_payload"
+      ]
+    },
+    {
+      "entrypoint": "scripts/backtest_nfl_preseason_projection.py",
+      "kind": "analysis",
+      "purpose": "preseason backtest",
+      "passes_payload": false,
+      "payload_keys": null,
+      "reachable_blocks": null,
+      "verdict": "NO PAYLOAD",
+      "missing_model_fields": [
+        "pace_seconds_per_play",
+        "feature_generation_payload"
+      ]
+    },
+    {
+      "entrypoint": "scripts/analyze_nfl_injury_adjustment_sides.py",
+      "kind": "analysis",
+      "purpose": "injury-adjustment side analysis",
+      "passes_payload": false,
+      "payload_keys": null,
+      "reachable_blocks": null,
+      "verdict": "NO PAYLOAD",
+      "missing_model_fields": [
+        "pace_seconds_per_play",
+        "feature_generation_payload"
+      ]
+    },
+    {
+      "entrypoint": "syndicate/features/football/sim_engine/smartsim2/calibration/baseline_audit.py",
+      "kind": "analysis",
+      "purpose": "calibration baseline audit",
+      "passes_payload": true,
+      "payload_keys": [
+        "game_id",
+        "season",
+        "week",
+        "market_total",
+        "market_spread_home"
+      ],
+      "reachable_blocks": [],
+      "verdict": "INERT PAYLOAD",
+      "missing_model_fields": []
+    }
+  ],
+  "consumed_blocks": {
+    "advanced_metrics": {
+      "aliases": [
+        "advanced_metrics",
+        "advanced",
+        "game_metrics"
+      ],
+      "keys": [
+        "away_defensive_epa",
+        "away_offensive_epa",
+        "def_pressure_avg",
+        "defensive_epa",
+        "home_defensive_epa",
+        "home_offensive_epa",
+        "offensive_epa"
+      ]
+    },
+    "coach_continuity": {
+      "aliases": [
+        "coach_continuity",
+        "coach",
+        "continuity"
+      ],
+      "keys": [
+        "continuity_score",
+        "score"
+      ]
+    },
+    "defensive_metrics": {
+      "aliases": [
+        "defensive_metrics",
+        "defense_metrics",
+        "defense",
+        "defensive"
+      ],
+      "keys": [
+        "away_defensive_epa",
+        "away_success_rate_allowed",
+        "defensive_epa",
+        "epa_allowed",
+        "home_defensive_epa",
+        "home_success_rate_allowed",
+        "success_rate_allowed"
+      ]
+    },
+    "market_features": {
+      "aliases": [
+        "market_features",
+        "market",
+        "betting"
+      ],
+      "keys": [
+        "confidence",
+        "edge",
+        "model_probability",
+        "moneyline",
+        "spread",
+        "total"
+      ]
+    },
+    "offensive_metrics": {
+      "aliases": [
+        "offensive_metrics",
+        "offense_metrics",
+        "team_metrics",
+        "offense",
+        "offensive"
+      ],
+      "keys": [
+        "away_explosive_pass_rate",
+        "away_offensive_epa",
+        "away_pass_rate",
+        "away_red_zone_efficiency",
+        "away_success_rate",
+        "epa",
+        "epa_play",
+        "explosive_play_rate",
+        "home_explosive_pass_rate",
+        "home_offensive_epa",
+        "home_pass_rate",
+        "home_red_zone_efficiency",
+        "home_success_rate",
+        "offensive_epa",
+        "pass_rate_over_expectation",
+        "proe",
+        "red_zone_efficiency",
+        "success_rate"
+      ]
+    },
+    "pace": {
+      "aliases": [
+        "pace",
+        "pace_features",
+        "tempo",
+        "clock"
+      ],
+      "keys": [
+        "away_pace_secs_play",
+        "home_pace_secs_play",
+        "pace_seconds_per_play",
+        "secs_per_play"
+      ]
+    },
+    "player_usage": {
+      "aliases": [
+        "player_usage",
+        "usage",
+        "players"
+      ],
+      "keys": [
+        "air_yard_share",
+        "air_yards_pct",
+        "carry_share",
+        "route_participation",
+        "route_pct",
+        "rush_pct",
+        "snap_pct",
+        "snap_rate",
+        "snap_share",
+        "target_pct",
+        "target_share",
+        "usage_index"
+      ]
+    },
+    "returning_production": {
+      "aliases": [
+        "returning_production",
+        "returning",
+        "returning_metrics"
+      ],
+      "keys": [
+        "percent_ppa",
+        "returning_production",
+        "summary_value"
+      ]
+    },
+    "transfer_impact": {
+      "aliases": [
+        "transfer_impact",
+        "transfer",
+        "portal"
+      ],
+      "keys": [
+        "impact",
+        "incoming",
+        "net",
+        "outgoing",
+        "transfer_net",
+        "volatility"
+      ]
+    }
+  },
+  "population": [
+    {
+      "sport": "nfl",
+      "season": 2025,
+      "week": 1,
+      "games": 272,
+      "load_error": null,
+      "blocks": {
+        "advanced_metrics": {
+          "aliases_accepted": [
+            "advanced_metrics",
+            "advanced",
+            "game_metrics"
+          ],
+          "keys_consumed": [
+            "away_defensive_epa",
+            "away_offensive_epa",
+            "def_pressure_avg",
+            "defensive_epa",
+            "home_defensive_epa",
+            "home_offensive_epa",
+            "offensive_epa"
+          ],
+          "games_with_any_key": 272,
+          "populated_pct": 100.0,
+          "per_key_pct": {
+            "away_defensive_epa": 100.0,
+            "away_offensive_epa": 100.0,
+            "home_defensive_epa": 100.0,
+            "home_offensive_epa": 100.0
+          }
+        },
+        "coach_continuity": {
+          "aliases_accepted": [
+            "coach_continuity",
+            "coach",
+            "continuity"
+          ],
+          "keys_consumed": [
+            "continuity_score",
+            "score"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        },
+        "defensive_metrics": {
+          "aliases_accepted": [
+            "defensive_metrics",
+            "defense_metrics",
+            "defense",
+            "defensive"
+          ],
+          "keys_consumed": [
+            "away_defensive_epa",
+            "away_success_rate_allowed",
+            "defensive_epa",
+            "epa_allowed",
+            "home_defensive_epa",
+            "home_success_rate_allowed",
+            "success_rate_allowed"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        },
+        "market_features": {
+          "aliases_accepted": [
+            "market_features",
+            "market",
+            "betting"
+          ],
+          "keys_consumed": [
+            "confidence",
+            "edge",
+            "model_probability",
+            "moneyline",
+            "spread",
+            "total"
+          ],
+          "games_with_any_key": 272,
+          "populated_pct": 100.0,
+          "per_key_pct": {
+            "moneyline": 100.0,
+            "spread": 100.0,
+            "total": 100.0
+          }
+        },
+        "offensive_metrics": {
+          "aliases_accepted": [
+            "offensive_metrics",
+            "offense_metrics",
+            "team_metrics",
+            "offense",
+            "offensive"
+          ],
+          "keys_consumed": [
+            "away_explosive_pass_rate",
+            "away_offensive_epa",
+            "away_pass_rate",
+            "away_red_zone_efficiency",
+            "away_success_rate",
+            "epa",
+            "epa_play",
+            "explosive_play_rate",
+            "home_explosive_pass_rate",
+            "home_offensive_epa",
+            "home_pass_rate",
+            "home_red_zone_efficiency",
+            "home_success_rate",
+            "offensive_epa",
+            "pass_rate_over_expectation",
+            "proe",
+            "red_zone_efficiency",
+            "success_rate"
+          ],
+          "games_with_any_key": 272,
+          "populated_pct": 100.0,
+          "per_key_pct": {
+            "away_offensive_epa": 100.0,
+            "away_pass_rate": 100.0,
+            "away_success_rate": 100.0,
+            "epa_play": 100.0,
+            "home_offensive_epa": 100.0,
+            "home_pass_rate": 100.0,
+            "home_success_rate": 100.0,
+            "offensive_epa": 100.0,
+            "pass_rate_over_expectation": 100.0,
+            "proe": 100.0,
+            "success_rate": 100.0
+          }
+        },
+        "pace": {
+          "aliases_accepted": [
+            "pace",
+            "pace_features",
+            "tempo",
+            "clock"
+          ],
+          "keys_consumed": [
+            "away_pace_secs_play",
+            "home_pace_secs_play",
+            "pace_seconds_per_play",
+            "secs_per_play"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        },
+        "player_usage": {
+          "aliases_accepted": [
+            "player_usage",
+            "usage",
+            "players"
+          ],
+          "keys_consumed": [
+            "air_yard_share",
+            "air_yards_pct",
+            "carry_share",
+            "route_participation",
+            "route_pct",
+            "rush_pct",
+            "snap_pct",
+            "snap_rate",
+            "snap_share",
+            "target_pct",
+            "target_share",
+            "usage_index"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        },
+        "returning_production": {
+          "aliases_accepted": [
+            "returning_production",
+            "returning",
+            "returning_metrics"
+          ],
+          "keys_consumed": [
+            "percent_ppa",
+            "returning_production",
+            "summary_value"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        },
+        "transfer_impact": {
+          "aliases_accepted": [
+            "transfer_impact",
+            "transfer",
+            "portal"
+          ],
+          "keys_consumed": [
+            "impact",
+            "incoming",
+            "net",
+            "outgoing",
+            "transfer_net",
+            "volatility"
+          ],
+          "games_with_any_key": 0,
+          "populated_pct": 0.0,
+          "per_key_pct": {}
+        }
+      }
+    }
+  ],
+  "expected_sparse": {
+    "returning_production": "NCAAF-only: returning production is a college roster-churn concept; the NFL has no equivalent and `build_ncaaf_returning_production_snapshot.py` is the only producer",
+    "coach_continuity": "NCAAF-only: `build_ncaaf_coach_continuity_snapshot.py` is the only producer",
+    "transfer_impact": "NCAAF-only: the transfer portal has no NFL analogue; `build_ncaaf_transfer_portal_snapshot.py` is the only producer"
+  },
+  "population_floor": 0.5,
+  "alarms": [
+    "UNWIRED PAYLOAD: scripts/generate_smartsim2_nfl_projections.py constructs SmartSim2SimulationInput without `feature_generation_payload`, so every key `drive_priors.py` reads falls to its neutral default on every game this script projects",
+    "UNWIRED PAYLOAD: scripts/generate_smartsim2_nfl_preseason_projections.py constructs SmartSim2SimulationInput without `feature_generation_payload`, so every key `drive_priors.py` reads falls to its neutral default on every game this script projects",
+    "UNWIRED PAYLOAD: scripts/generate_smartsim2_ncaaf_projections.py constructs SmartSim2SimulationInput without `feature_generation_payload`, so every key `drive_priors.py` reads falls to its neutral default on every game this script projects",
+    "UNFED: nfl `defensive_metrics` populated on 0.0% of 272 games (floor 50%); the engine consumes 7 keys from it",
+    "UNFED: nfl `pace` populated on 0.0% of 272 games (floor 50%); the engine consumes 4 keys from it",
+    "UNFED: nfl `player_usage` populated on 0.0% of 272 games (floor 50%); the engine consumes 12 keys from it"
+  ],
+  "notes": [],
+  "status": "fail"
+}
