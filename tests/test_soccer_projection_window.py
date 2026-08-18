@@ -187,3 +187,51 @@ class TestOneTeamPairCannotMeanTwoFixtures:
         _write(tmp_path, "epl", "2026-08-23", home="Arsenal", away="Chelsea", event_id="c")
         index = load_soccer_projections([tmp_path], "2026-08-17", window_dates=WINDOW)
         assert index.match_for({"home_team": "Arsenal", "away_team": "Chelsea"}) is None
+
+
+def test_the_production_caller_actually_passes_a_multi_date_window():
+    """THE FIX MUST REACH PRODUCTION, which is how it failed the first time.
+
+    `load_soccer_projections` gained `window_dates` and defaults to
+    `[selected_date]` "so every existing caller behaves exactly as before" --
+    and the only production caller never passed one. The merge logic, its cost
+    analysis and its documentation all shipped while production read one date:
+    8,759 grid rows, `rows_with_projection: 4`, `unmatched_match_rows: 8,755`
+    (measured 2026-08-17).
+
+    THIS TEST PINS THE CALL SITE, NOT THE FUNCTION. A test of the merge alone
+    passes happily while the caller ignores it -- that is precisely the state
+    this repairs.
+
+    It also pins `window="slate"` specifically. The resolver DEFAULTS to
+    `window="day"`, which returns a single date, so a bare
+    `resolve_window_dates("soccer", selected_date)` would leave the fix exactly
+    as inert as the bug. I made that mistake writing it and caught it by
+    reading the returned value.
+    """
+    import inspect
+
+    from syndicate.features.shared import board_enrichment
+    from syndicate.features.shared.layer1_board import resolve_window_dates
+
+    src = inspect.getsource(board_enrichment)
+    assert "window_dates=soccer_window" in src, (
+        "the soccer projection load must pass a window; without it #379 is inert"
+    )
+    assert 'resolve_window_dates("soccer", selected_date, window="slate")' in src, (
+        'the window must be "slate" -- the resolver defaults to "day", which is one date'
+    )
+
+    # And the window that call produces must genuinely span more than a day.
+    window = resolve_window_dates("soccer", "2026-08-17", window="slate")
+    assert len(window) > 1, "a one-date window is the defect, not the fix"
+    assert window[0] == "2026-08-17"
+
+
+def test_the_soccer_window_matches_the_quote_read_it_accompanies():
+    """Two independent notions of "which dates is this sport's board" would
+    drift, and that drift IS the defect -- so the projection read must use the
+    same resolver and span as the quote read, not a hand-rolled number."""
+    from syndicate.features.shared.layer1_board import resolve_window_dates, slate_window_days
+
+    assert len(resolve_window_dates("soccer", "2026-08-17", window="slate")) == slate_window_days("soccer")
