@@ -32,7 +32,8 @@ from syndicate.features.mlb.player_game_log import bootstrap_mlb_player_game_log
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
-from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import (publish_changed_hot_artifacts,
+                                                          pull_season_artifacts)
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file
@@ -290,6 +291,20 @@ def main() -> int:
         # container already running the sim itself that is pure overhead --
         # and this wrapper only ever needs a tail of it for the ops log below.
         #
+        # PULL THE SEASON-SCOPED SIM INPUTS FIRST. The per-cycle
+        # pull_hot_artifacts() scopes every request to *<date>*, and every input
+        # this engine consumes is season-scoped (arsenal/quality/batted_ball/
+        # pitch_splits/conditional_mix are all *_<season>.json), so that pull
+        # matches NONE of them. Without this call the artifacts are built,
+        # allowlisted, published -- and never reach the disk the sim reads.
+        # Cheap: five narrow requests for files that change a few times a season.
+        try:
+            _season_pulled = pull_season_artifacts()
+            print(f"[mlb_sim_job] season_artifacts_pulled={_season_pulled}", flush=True)
+        except Exception as _exc:
+            # degrade to whatever is already on disk; never block the sim
+            print(f"[mlb_sim_job] season_artifact_pull_failed error={type(_exc).__name__}", flush=True)
+
         # Popen + a wait-with-timeout poll loop, not subprocess.run(timeout=):
         # confirmed live 2026-08-02, a scoped run sat at "state": "running"
         # for 49+ minutes with absolutely no signal whether it was making

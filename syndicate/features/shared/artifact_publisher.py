@@ -1813,6 +1813,67 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
             pass
 
 
+# Season-scoped sim inputs. **These are the files `pull_hot_artifacts` cannot
+# reach**, and its own docstring says so: it scopes every request to
+# `*<date>*`, and "a handful of non-dated files ... are out of scope for this
+# per-cycle pull and would need a separate, infrequent full sync." This is that
+# sync.
+#
+# Measured 2026-08-18: every input the MLB sim engine consumes is season-scoped,
+# not date-scoped -- arsenal, quality, batted-ball, pitch-splits and the
+# conditional pitch mix are all `*_<season>.json`. So the per-cycle pull, which
+# is the ONLY web -> worker direction that exists, matched none of them. The
+# artifacts were built, allowlisted, published, and unreachable by the process
+# that needs them. Publishing is not delivery.
+#
+# `refresh-worker` runs no HTTP server, so a push cannot reach it -- pulling is
+# the only option, and it has to be asked for explicitly.
+_SEASON_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    "arsenal_*.json",
+    "quality_*.json",
+    "batted_ball_*.json",
+    "pitch_splits_*.json",
+    "conditional_mix_*.json",
+)
+
+
+def pull_season_artifacts(*, timeout_seconds: int = 60) -> int:
+    """Pull the non-dated, season-scoped sim inputs onto this process's disk.
+
+    Call this BEFORE a roster build, not on a per-cycle schedule: these files
+    change a few times a season, and the reason `pull_hot_artifacts` is date
+    scoped in the first place is that unfiltered pulls hit Render's proxy
+    timeout once enough artifacts accumulated. One narrow request per pattern
+    keeps each response small.
+
+    Never raises. Returns the number of files written. **A return of 0 is not
+    proof of success** -- it is equally consistent with "already current" and
+    with "nothing matched"; the caller that needs certainty should check the
+    file on disk, which is what `sim_input_checklist.py` does.
+    """
+    token = _admin_token()
+    if not _publish_url() and not _env("SYNDICATE_WEB_PUBLISH_URL"):
+        print("[artifact_publisher] SEASON_PULL_SKIP_NOT_CONFIGURED", flush=True)
+        return 0
+    if not token:
+        print("[artifact_publisher] SEASON_PULL_SKIP_NO_TOKEN", flush=True)
+        return 0
+    written = 0
+    for pattern in _SEASON_ARTIFACT_PATTERNS:
+        try:
+            # no `since_epoch`: these are infrequent and a watermark that
+            # skipped one would leave the engine silently on a stale input
+            ok, n = _pull_hot_artifacts_request(
+                _export_url(pattern), token, timeout_seconds=timeout_seconds
+            )
+            written += int(n or 0)
+            print(f"[artifact_publisher] SEASON_PULL pattern={pattern} ok={ok} written={n}", flush=True)
+        except Exception as exc:
+            print(f"[artifact_publisher] SEASON_PULL_FAILED pattern={pattern} "
+                  f"error={type(exc).__name__}", flush=True)
+    return written
+
+
 def pull_odds_history_artifacts(
     *, date_str: str, sports: tuple[str, ...] | None = None, timeout_seconds: int = 120
 ) -> int:
