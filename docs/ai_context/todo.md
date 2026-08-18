@@ -1,11 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#466` — **`## Archived lanes` is not the last heading in `lanes.md`, so every newly opened lane lands BELOW it and will be silently un-guarded by the next archive pass — a section-ordering defect that trimming can never fix** — FOUND AND MEASURED 2026-08-18, lane `ledger-coherence-sweep`, GROWING (7 → 11 in one session)
+### `#466` — **7 OPEN lanes sit INSIDE the two `## Archived lanes` sections of `lanes.md` and would be silently un-guarded by the next archive pass** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **RE-MEASURED AND PARTLY RETRACTED SAME DAY — the count was 7, not 11, and the stated mechanism was WRONG**
 
-**The invariant that fails**, `scripts/check_lane_invariants.py`:
+> **CORRECTION 2026-08-18, before anyone acts on the original text below.**
+> Two claims in the first version of this item are disproved. Both are left
+> visible rather than edited away, because the wrong version is the one that
+> reads as more alarming and would have sent the next reader at the wrong file.
+>
+> **RETRACTED 1 — "7 → 11, growing, because four other sessions opened lanes."**
+> The count never grew. `check_lane_invariants.py` matched the marker with
+> `text.index("## Archived lanes")`, a plain SUBSTRING search, and **this lane
+> wrote that literal string into PROSE at the top of `lanes.md`** (an
+> orphan-sweep record: "THE 7 REMAINING `OPEN`-UNDER-`## Archived lanes` ARE NOT
+> MINE TO FIX", lines 56 and 58). The slice therefore began above `## OPEN`, and
+> three correctly-filed lanes — `ask-sport-coverage`,
+> `live-game-line-projection` (counted twice) and
+> `refresh-worker-oom-recurrence` — were reported as strays. **Self-inflicted,
+> by the same session that then explained the jump with a story about other
+> sessions.** Fixed by matching `(?m)^## Archived lanes`, a heading, which prose
+> cannot accidentally be; falsified against a planted canary lane, which the
+> fixed check still catches. Live count after the fix: **7**.
+>
+> **RETRACTED 2 — "the `## MERGED FROM origin/main` sections are the problem."**
+> They are not. Measured by mapping every OPEN lane to its enclosing section:
+> the merged band (then lines 1469–2081) contains **ZERO** OPEN lanes. Moving
+> those ~613 lines above the marker — the fix the original text prescribes —
+> changes the violation count by **0**. It is pure churn on a contended file.
+>
+> **WHAT IS ACTUALLY TRUE, and is the real item:** 7 OPEN lanes sit *inside the
+> two `## Archived lanes` sections themselves* — 4 in the first, 3 in the
+> second. The hazard below is real and unchanged; only the location and the
+> remedy were wrong.
+>
+>     FIRST  Archived section : grading-blocker-settled-zero, live-edge-basis,
+>                               convergence-phase7-crps, soccer-model-dispersion
+>     SECOND Archived section : nhl-model-owner, basketball-model-owner,
+>                               repo-coordination
+>
+> **The lesson worth keeping:** the instrument failed in the REASSURING
+> direction. A check reporting MORE violations than exist reads as vigilance, so
+> nobody doubts it — and a plausible narrative ("other sessions opened lanes")
+> was available for a number that had a purely mechanical cause. Verify an
+> alarming reading as hard as a comforting one.
+
+**The invariant that fails**, `scripts/check_lane_invariants.py` (post-fix):
 
     [FAIL] no OPEN lane under '## Archived lanes'
-    VIOLATED: 11 OPEN lane(s) under Archived
+    VIOLATED: 7 OPEN lane(s) under Archived
 
 **Why it matters, in the checker's own words:** archiving moves a lane's body to
 `lanes_closed.md`, which **`lane-guard` never reads** — it opens `lanes.md` and
@@ -14,6 +55,14 @@ protection **silently**, and the guard reports nothing because from its side the
 claim simply ceased to exist. This is the same class of failure as a
 claim-bearing opening block being archived, which `lanes_history.md`'s header
 already warns about.
+
+> ---
+> **EVERYTHING FROM HERE TO THE END OF THIS ITEM IS THE SUPERSEDED ORIGINAL.**
+> Kept verbatim for the record. Do NOT action it: the two paragraphs below
+> prescribe moving the `## MERGED FROM origin/main` sections, which is measured
+> to change nothing, and cite the retracted 7 → 11 growth. Read the correction
+> above instead.
+> ---
 
 **IT IS A SECTION-ORDERING DEFECT, NOT A SIZE ONE, AND THIS IS THE WHOLE POINT.**
 `lanes.md` has `## Archived lanes` at line ~1457 with **`## MERGED FROM
