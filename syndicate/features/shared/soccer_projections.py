@@ -35,6 +35,10 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.prop_projections import _norm_name
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+from syndicate.features.shared.book_margin_model import (
+    EDGE_FIELD as MODELLED_EDGE_FIELD,
+    modelled_fair_edge,
+)
 
 # Player-prop market -> field on the player_props entry, and whether that field
 # is a PROBABILITY or a MEAN. Getting this wrong in either direction is the
@@ -541,11 +545,35 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
         # an h2h row whose draw price simply failed to arrive -- and a wrong
         # reason is worse than a blank one, because it sends the next reader to
         # the wrong subsystem.
-        projection["edge_unavailable_reason"] = (
+        reason = (
             "3-way market: incomplete price set, no fair to price against"
             if market in _THREE_WAY_GAME_MARKETS
             else "one-sided market: no two-sided fair to price against"
         )
+        # USER DECISION 2026-08-17, audit recommendation 4. 1,131 soccer rows
+        # land here carrying a `model_prob_over` AND a modelled fair, and served
+        # no edge of any kind. They may now be priced against the MODELLED fair,
+        # in its own column.
+        #
+        # `edge_vs_market_pct` stays None above and is never written here: this
+        # is a separate, weaker claim (one book's measured hold, not a two-sided
+        # de-vig), and `book_margin_model` forbids the two being mixed.
+        #
+        # DELIBERATELY NOT wired into the `live_reason` branch above. That
+        # refusal is about the row being LIVE, and it holds whichever fair is
+        # used -- a modelled fair does not make a live pregame projection
+        # priceable. Adding it there would reintroduce exactly the live-edge
+        # leak `#340` fixed across three sports.
+        modelled_edge = modelled_fair_edge(
+            row, model_prob=model_prob, side=projection.get("side")
+        )
+        if modelled_edge:
+            projection.update(modelled_edge)
+            reason = (
+                f"{reason}; priced against the modelled fair instead "
+                f"(see {MODELLED_EDGE_FIELD})"
+            )
+        projection["edge_unavailable_reason"] = reason
         return
     projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
 
