@@ -5138,3 +5138,58 @@ suspect the un-re-fitted weights before suspecting the inputs.**
 the market by -0.0011 at n=120 and that lane wrote "noise at n=120 and must not be
 reported as a win." The same applies to `bm81lcof8`. **Only the nine-league run
 carries the sign test.**
+
+### soccer-model-dispersion — CORRECTION 2026-08-18 12:3xZ — the "dispersion overshoot" was a summary-statistic artifact; the real picture is mixed, not clearly worse — session: soccer-sport-owner
+
+**First real backtest result, eredivisie n=126 (`bm81lcof8`), pushed as `4d1abeb4`'s
+comparator confirmed by content on `origin/main`:**
+
+    Brier gap     +0.0147 -> +0.0017   (-0.0130, 89% reduction, still losing)
+    model stdev    0.1886 ->  0.2373   (baseline's OWN row, not the cross-league mean)
+    market stdev             0.2257
+
+**MY EARLIER READ WAS INCOMPLETE.** I reported the stdev move as the model
+overshooting from under- to over-dispersed and flagged it as the first concrete
+evidence the un-re-fitted `_attack_strength` weights are miscalibrated. Reading the
+full reliability curve (not just its summary stdev) shows something messier:
+
+    bucket      base n  new n   base gap   new gap
+    0.0-0.2       12     22      +0.061    +0.017
+    0.2-0.4       40     34      +0.091    +0.098
+    0.4-0.6       46     32      -0.071    -0.101
+    0.6-0.8       23     25      -0.065    +0.030   FLIPPED SIGN
+    0.8-1.0        5     13      -0.168    -0.135
+
+    weighted |pred-actual| total:  base 9.98  ->  new 9.47
+
+Market reliability is BYTE-IDENTICAL across all five buckets, independently
+confirming the same-match-set control beyond `matches_scored` alone.
+
+**Bucket MEMBERSHIP shifted, not just calibration** — the extreme buckets
+(0.0-0.2, 0.8-1.0) roughly doubled in size. That is the mechanical cause of the
+higher stdev: predictions spread out, more matches landed in the confident tails.
+**Overall calibration error moved the RIGHT way (9.98 -> 9.47), not the wrong one.**
+The extreme buckets calibrated BETTER (0.0-0.2 gap +0.061 -> +0.017). The one real
+flag is the 0.6-0.8 bucket flipping from underconfident to overconfident — genuinely
+new, or n=25 noise; one league cannot tell which.
+
+**THE CORRECTED CLAIM:** "the model overshot into overconfidence" was reading one
+aggregate number without checking whether the extra confidence was earned. It is NOT
+obviously worse. It is mixed, with one specific instability worth watching (the
+0.6-0.8 flip) and an aggregate accuracy measure that improved. **Do not carry
+forward "overshoot = bad" from my prior entry** — this supersedes that framing, not
+the underlying numbers, which are unchanged and correctly reported there.
+
+**Still true, unchanged: one league, n=126, cannot settle this.** The other eight
+are running (`bw537l0u0`, started 10:40, ETA ~13:00-13:10, 0 errors on any log as of
+12:31). Read them with `scripts/compare_soccer_backtest.py --run
+reports/soccer_backtest/parallel`, self-tested by identity against the baseline.
+
+**PROCESS NOTE, for whoever appends here next.** This entry was written against
+`origin/main`'s copy via an isolated worktree, NOT the disk copy in the shared
+working tree — at write time local `main` was at `2ec1a171` (another session's
+commit, unrelated to this lane) and disk `lanes.md` was 5,273 lines against `origin/
+main`'s 5,140 and local HEAD's 2,826. Three different numbers for one file at one
+moment. Check `git status --porcelain -- .syndicate/lanes.md` and `git rev-parse
+HEAD` vs `origin/main` before appending to the disk copy directly; if they disagree,
+append against `origin/main`'s content and push through a throwaway worktree instead.
