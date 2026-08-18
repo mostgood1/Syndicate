@@ -11915,3 +11915,537 @@ sessions deploying, a two-file change should ride along, not chase.
     refresh-worker is clean would falsify the intelligence-state attribution —
     that is this lane's stated falsification test, and it is still live.
   - Session log: `.syndicate/log/2026-08-15.md`, final section.
+
+
+
+## SWEPT FROM `lanes.md` — 2026-08-18 (coordinator)
+
+Closed lanes archived out of the OPEN file. Moved verbatim, nothing edited.
+Each was read individually first: the "no OPEN block" predicate alone cannot
+tell a closed lane from one whose header was destroyed, and it flagged three
+LIVE lanes an hour earlier whose slugs a bad `sed` backreference had eaten.
+
+`game-shape-capture` was deliberately NOT archived -- its latest block reads
+"EMIT STILL BLOCKED; HANDOFF SENT", which is unfinished work with no owner,
+and that is exactly what an archive hides best.
+
+Archived in this pass:
+  - soccer-model-coverage — CLOSED  (explicit CLOSED, backtest delivered)
+  - tie-spread-membership-gap — CLOSED 2026-08-17  (explicit CLOSED, fixed in production)
+  - commit-guard-blind-to-own-recipe — CLOSED 2026-08-17  (explicit CLOSED, delivered in 5fb52342)
+  - render-events-read-label — CLOSED 2026-08-17  (explicit CLOSED, shipped)
+  - COORDINATOR ADJUDICATION 2026-08-17  (a coordinator record, not a lane; historical)
+
+### soccer-model-coverage — CLOSED — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+- **CLOSED / FILES RELEASED 2026-08-17 ~15:1x CDT by the `wnba-fixture-identity`
+  session, on explicit user instruction.** Closing this lane is safe because the
+  work it was protecting was ALREADY SAFE - measured, not assumed:
+  - **Fix #1 (seed bootstrap): ON MAIN.** Test committed (108 lines) plus source
+    references in `run_live_odds_refresh_worker.py`.
+  - **Fix #3 (accent join): ON MAIN, VERIFIED THREE WAYS** - committed,
+    functional on nine accented club names, and REACHABLE
+    (`soccer_projections.py:126` and `team_aliases.py:238/244` both call
+    `fold_accents`). See `a0b87e14`.
+  - `git status --porcelain` across every file this lane named: **EMPTY.**
+  - **This lane's "built and tested, never committed / the only work at risk of
+    being lost" warning was STALE.** It is the reason nothing needed rescuing.
+- **FIX #2 (3-way de-vig) - THE HOLD SURVIVES THIS CLOSE, AND ITS STATE IS
+  UNKNOWN.** It was marked DELIBERATELY HELD, and closing a lane does not
+  reverse a modelling decision. **`tests/test_soccer_three_way_devig.py` is
+  ABSENT from disk**, so #2 is EITHER committed elsewhere, OR never written, OR
+  genuinely lost - **I could not tell which, and did not try to.** Anyone
+  reviving #2 must establish that first, and must not read this close as the
+  hold having been lifted.
+- **Released files** (now free to take, `lane-guard` will stop blocking them):
+  `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
+  `scripts/backtest_soccer_live_lens.py`, `syndicate/features/shared/soccer_projections.py`,
+  `scripts/run_live_odds_refresh_worker.py`, and this lane's soccer test files.
+  **`run_live_odds_refresh_worker.py` is the one Phase 2 was blocked on.**
+- **I did not touch any soccer CODE** - this close is a ledger action only.
+> **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner, and the claims were
+> RELEASED deliberately at session archive.** Anyone may take these files.
+> **SINGLE NEXT ACTION:** commit fixes #1 (seed bootstrap, unblocks 107 of 123
+> board rows) and #3 (accent join, 9 clubs / 5 leagues). Both are built and
+> tested and have never been committed — they are the only work in this lane
+> that is at risk of being lost. **#2 (3-way de-vig) stays HELD by user
+> decision**; the model loses to the market and its errors sit on favourites.
+> **DEPLOY STATUS UPDATE 2026-08-15 22:3xZ (coordinating session, no claim).**
+> The **soccer as-of pair IS NOW LIVE** on live-odds-worker (`25774aaf`,
+> 22:09:15Z) — `allow_undated` present in 5 places in
+> `soccer/features/loaders.py`, verified by content in the deployed tree, with
+> `191a001b` an ancestor so nothing was dropped. Both halves shipped together,
+> so `50fd7fe2`'s MLS-emptying regression cannot recur. This supersedes the
+> earlier note here saying it was built but undeployed.
+> **Unchanged:** fixes #1 (seed bootstrap) and #3 (accent join) are still NOT
+> committed by this lane, and **#2 (3-way de-vig) remains deliberately HELD** by
+> user decision — the model measures worse than the market (Brier 0.5875 vs
+> 0.5737, worse in 8 of 9 leagues) and its errors sit on favourites.
+> **CROSS-LANE, added 2026-08-15 ~21:5xZ by the coordinating session (no claim).**
+> The soccer **as-of pair** (`0b0d44d9` + `f05a21c4`, audit §7 #6) is on
+> `origin/main` and is built into `deploy/low-props-soccer-asof-2026-08-15`
+> (`25774aaf`) together with the prop `0.5` fix — but **it is NOT deployed**.
+> live-odds-worker has been `HOLD` for 26+ minutes (odds refresh + rolling
+> soccer builds) so no lull was found. **Take both commits or neither**:
+> `50fd7fe2`, the first half, once emptied MLS ratings in production on its own.
+> Route one (warm the mirror, then deploy) is armed for that service and is the
+> proven technique — see `state.md`.
+> **CLAIMS RELEASED 2026-08-15 AT SESSION ARCHIVE — the lane is NOT done.**
+> Owning session `soccer-model` is being archived deliberately, so its file
+> claims are released rather than left as an orphaned lock. This is the same
+> failure mode this lane inherited from `soccer-projection-gap`; releasing on
+> the way out is the fix.
+> **THE WORK IS UNFINISHED AND LIVES UNCOMMITTED IN THE SHARED WORKTREE** — 9
+> files, listed in `log/2026-08-15.md`. Anyone taking these files must read the
+> RECONCILIATION and RECIPE CORRECTION blocks below first: `loaders.py` depends
+> on the orphaned `soccer-backtest-leakage` as-of work, which `origin/main` does
+> not have. **Do not `git checkout` or revert these paths casually** — that
+> discards a day of tested work that no branch holds.
+> **To resume: `/lane open soccer-model-coverage` and re-take the files.**
+> Everything below is measured unless labelled otherwise, but re-verify before
+> relying on it.
+- Goal: soccer carries a REAL model on the published board. **Testable outcome:**
+  `/api/board/layer2-shortlist` reports soccer rows with `model_edge_pct`
+  non-null at a rate > 0 (today: `rows_with_model_edge: 0`,
+  `unmatched_match_rows: 8,393` against `matches_in_source: 4`), AND a
+  leak-free soccer backtest number exists for at least one league.
+- **FIRST QUESTION, BEFORE ANY BUILD — the headline number is disputed 250x.**
+  Two production endpoints, same sport, same date, 45s apart `[measured
+  2026-08-14 19:1xZ by session model-audit]`:
+  - `/api/board/layer1?sport=soccer` — rows 8,456, `rows_with_projection` 2,504 = **29.6%**
+  - `/api/board/layer2-shortlist` — rows 8,512, `rows_with_projection` **12** = **0.1%**,
+    `rows_with_model_edge` 0, `matches_in_source` 4, `unmatched_match_rows` 8,393
+  These are two different joins and **at most one describes the board a user
+  sees.** Settle which before building. If the defect is the layer2 join rather
+  than projection coverage, raising coverage fixes nothing and this lane's
+  shape changes.
+- Hypothesis (H1): the layer2 ingest's match-key join is broken/starved
+  (`matches_in_source: 4` is not a coverage number, it is an empty source), and
+  projection COVERAGE at 29.6% is a separate, less urgent fact.
+- Hypothesis (H2): `SOCCER_PLAYER_ROWS_MISSING league=eredivisie|primeira_liga|
+  championship` `[live-odds-worker logs 19:25Z, observed once, LEAD not finding]`
+  means the sim's own input is absent, so the projections that would feed either
+  join are not being produced for those leagues.
+- Falsification test: for H1 — if `matches_in_source` rises with no change to
+  projection coverage and `rows_with_model_edge` stays 0, the join is not the
+  binding constraint. For H2 — if a league that DOES project has an equally
+  empty `players/` dir, the log line is not diagnostic.
+- Verification: production `layer2-shortlist` counters re-read after the change,
+  plus a leak-free backtest number computed with per-match as-of ratings and its
+  per-family date coverage + intersection printed alongside.
+- Blocked by: none. **Coordinate with UI Lane G (soccer card end-to-end) — the
+  UI plan's G4 says to run these together.**
+- **SCOPE FENCES, measured, do not rediscover:**
+  - `player_shots` / `player_shots_on_target` map to a **mean**;
+    `soccer_projections` refuses by design to derive a probability from a mean,
+    and the rows are 100% one-sided so `_no_vig_over_probability` returns None.
+    `player_to_receive_red_card` / `player_assists` are not in the market map.
+    **These markets can never carry an edge.** Scope around, not into.
+  - **MLS cannot be backtested from its current source at all** —
+    `fetch_asa_mls_team_history` returns undated season aggregates; a season
+    average already contains the season. Needs a per-match source that does not
+    exist here.
+  - **Soccer `game` odds are frozen platform-wide** (stop at 2026-08-10T20:54:06,
+    all leagues); only `prop` rows are fresh, from a different producer.
+  - `data/soccer_source/*/validation/*_backtest_*.csv` are **NOT CITABLE**
+    (leakage, retired). Soccer backtest accuracy is **unmeasured** until this
+    lane produces a leak-free number.
+  - The models lane's uninformative-EV filter keys on
+    `fair_method == "book_margin_model"` and **self-heals** — do not try to
+    defeat it.
+- Files (exclusive to this lane):
+  - `syndicate/features/soccer/`
+  - `scripts/build_soccer_artifacts.py`
+  - `scripts/validate_soccer_vs_market.py`
+  - `scripts/backtest_soccer_live_lens.py`
+  - `tests/test_soccer_feature_loaders.py`
+  - `tests/test_soccer_projections.py`
+  - `tests/test_soccer_adapter.py`
+  - `tests/test_build_soccer_artifacts.py`
+  - `syndicate/features/shared/soccer_projections.py`
+  - `scripts/run_live_odds_refresh_worker.py`
+  - `tests/test_soccer_three_way_devig.py`
+  - `tests/test_soccer_seed_bootstrap.py`
+
+- CLAIM WIDENED 2026-08-15 02:5xZ: `soccer_projections.py` lives under
+  `features/shared/`, not `features/soccer/`, and the player-props root cause is
+  in the live-odds-worker ENTRYPOINT. Checked against every OPEN lane's parsed
+  claims before taking them: neither is claimed. `run_refresh_worker.py` is
+  deliberately NOT claimed — the `#435` session is live on that service.
+
+- NOT this lane's files (held by live sessions, read-only here):**
+  `syndicate/features/shared/recommendation_engine.py`,
+  `syndicate/features/shared/layer2_board.py`,
+  `syndicate/features/shared/layer1_board.py`,
+  `syndicate/features/shared/opportunity_signals.py`,
+  `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
+
+### tie-spread-membership-gap — CLOSED 2026-08-17 — **CONFIRMED ON PRODUCTION AND FIXED. The post-first-pitch run reported `unchanged (baselined)` while every comparable tie group had moved — a false PASS. Comparison is now per-group, matched on card identity.** — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+- **Goal:** `identicalContentSpread` must stop comparing two different groups and
+  calling the result "unchanged". **Testable outcome:** the comparison matches
+  tie groups on `(state, pair-count, n)` and fails on a change in any group that
+  is comparable on both sides; group membership changes are reported as NOT
+  COMPARABLE rather than silently passed. Re-running today's live slate against
+  `baseline_2026-08-17.json` must SURFACE the three mobile group moves it
+  currently hides.
+- **Files:** `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `.syndicate/log/2026-08-17.md`, `.syndicate/lanes.md`
+- **Hypothesis (already CONFIRMED on production data, 2026-08-17 12:37 CDT):**
+  `_cmp_value` reduces the whole tie block to `worstGroupPx`, a max over a set
+  whose membership moves with the slate. When a game goes live it leaves the
+  Preview pool, groups gain/lose members, and the max can land on a DIFFERENT
+  group while reading numerically identical.
+- **The measurement.** One game live, 10 Preview, vs an all-Preview baseline:
+  - mobile reported `43px unchanged (baselined)` — but the baseline's 43 came
+    from `u=45 n=3` and the current 43 comes from `u=53 n=3`, while **every**
+    matched group moved: `u=53` 30->43, `u=49` 32->15, `u=45` 43->36.
+  - desktop reported `86px unchanged` from `u=49 n=3` vs `u=49 n=2`, hiding
+    `u=45` moving 28->41.
+  This is a **false PASS**, not a false alarm — the dangerous direction, and the
+  same family as the standing rule that unknown must not default permissive.
+- **Falsification test:** if the per-group comparison, run against today's
+  baseline on the current live slate, still reports everything unchanged, the
+  diagnosis is wrong and the scalar is not the cause.
+- **Verification:** the live re-run names the moved groups and fails; an
+  all-Preview self-comparison still passes; a baseline with no per-group data
+  (`baseline_2026-08-16.json` and older carry `byState` but no `groups`) reports
+  NOT COMPARED rather than silently taking the weaker check; probe suite green.
+- **Blocked by:** none
+
+#### convergence-phase7-crps — ARCHIVED LINE COVERAGE DIAGNOSED 2026-08-17 — **cause found, fix HANDED OFF, no file taken**
+
+- **The cause is the retrieval clock, and it is in the artifact itself.** Docs
+  whose `retrieved_at` is same-day afternoon carry **26–30 pitchers**; docs
+  retrieved after ~02:00Z the next day carry **ZERO**. 12 of 29 dates have
+  `pitchers: 0`. Books pull pitcher-props markets when games end, so a
+  post-slate fetch archives an empty market. Only **5 of 29** dates carry >=8
+  pitchers with an outs line.
+- **Defect 1 (primary): the props fetch runs after the slate on most dates.**
+  Same root class as `#440`'s headline — the system has almost no clock, so work
+  lands uniformly across 24h regardless of when the market is open. No freeze can
+  seal what was never fetched.
+- **Defect 2: the freeze cannot prove it is pregame when the slate clock is
+  missing.** `_freeze_oddsapi_pregame_markets` (`refresh_mlb_oddsapi.py:680`) is
+  first-write-wins when `slate_start is None`, so it can seal a post-slate empty
+  doc and never improve it — consistent with 08-08 (1 pitcher) / 08-09 (2).
+- **`mode` is `live` on EVERY file including the `_pregame` ones** — the freeze
+  copies the live doc, so it can only seal what the fetch held.
+- **07-19..08-07 is unrecoverable from the archive.** The freeze was unreachable
+  before 2026-08-08 (its own docstring: production held ZERO `_pregame.json`
+  that day) and the live file was rewritten in place. **OddsAPI historical
+  endpoints are the route, and the ledger records them as cheap** — would roughly
+  triple the gradeable sample.
+- **NO FILE TAKEN, NOTHING EDITED.** Both levers are owned:
+  `scripts/refresh_mlb_oddsapi.py` by OPEN `grading-blocker-settled-zero`
+  (defect 2 — and it already shipped this file's freeze fix);
+  cadence by OPEN `odds-cadence-off-the-mlb-peak` (defect 1 — its Phase 1
+  fixture-aware cadence is exactly the mechanism that fixes it).
+- **Recommended order:** fixture-relative props fetch → positive pregame proof
+  before sealing, with a strictly-richer re-seal allowed → historical backfill.
+  Cost it first: OddsAPI ~62.7% of a 5M cap, MLB 93.0% of spend.
+
+#### convergence-phase7-crps — CLAIM OVERRIDE LOGGED 2026-08-17 — `scripts/refresh_mlb_oddsapi.py`, ONE FUNCTION
+
+Taken on explicit user instruction ("take the file and coordinate the claim").
+Recorded so it can be judged rather than trusted.
+
+- **Whose it is:** OPEN lane `grading-blocker-settled-zero` (session
+  `alt-line-shortlist-watch`) lists it as **"read-only so far"**.
+- **Coordination attempted and its limit stated honestly:** that session is
+  **not running and not in the recent roster**, so it could not be reached.
+  Notice relayed to the live `Deploy and Document Coordinator` session instead,
+  with the measurement and an explicit "object and I will back out".
+- **Scope taken: ONE function**, `_freeze_oddsapi_pregame_markets` (:680), and
+  within it only the **props-sealing branch**. NOT `_merge_pregame_game_lines`,
+  NOT the game-lines freeze, NOT anything on the grading/settlement path — which
+  is the half that lane actually cares about.
+- **This is ADDITIVE to their shipped freeze fix, not a revert.** Their fix made
+  the freeze reachable at all; this makes what it seals monotone.
+- **Not the bigger defect.** Most of the loss is that the props fetch runs after
+  the slate; that is cadence, owned by `odds-cadence-off-the-mlb-peak`, and I am
+  NOT taking it.
+- Trivially revertable: one guard, one helper.
+
+#### convergence-phase7-crps — CADENCE LEVER TAKEN 2026-08-17 — **it is a DARK FLAG, not code, and the flip is a PRODUCTION CONFIG CHANGE**
+
+Taken on explicit user instruction ("now take the cadence lever too").
+
+- **Claim:** `odds-cadence-off-the-mlb-peak` (OPEN, session `sim-engine-track`,
+  not in the live roster). Its Phase 1 is **COMPLETE and verified in production**
+  (`dd53d47c`, live-odds-worker, 2026-08-16 05:51:48Z). **I am not editing its
+  files** — there is nothing to write. The machinery is built.
+- **THE LEVER IS `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE`**, `default=False`
+  (`live_refresh_loop.py:4006`), and it is **NOT PRESENT IN `render.yaml`**, so
+  no service sets it. Shipped, verified, dark.
+- **TRACED: the flag DOES fix my props defect.** `_filter_sports_for_pregame_sweep`
+  (`:4605`) always keeps a sport **while it is live** — which is why the props doc
+  is rewritten during and after the slate — and applies the interval only when it
+  is not. With the gate on, `_FIXTURE_TIER_SECONDS` hands the final 3h to the
+  **T-75/T-10 ramp**, which guarantees a sweep before first pitch, hence a
+  pregame props fetch. **Paired with the monotone seal (`bafb4fb2`) the loop
+  closes: cadence makes the pregame capture happen, the seal makes it stick.**
+  Neither half works alone.
+- **THE OWNER SET A PRECONDITION AND I AM NOT OVERRIDING IT SILENTLY:** the flag's
+  own comment says *"Flip on per service once the `branch-overlap-baseline-watch`
+  distribution has a BEFORE to compare against."* Measured now:
+  `reports/branch_overlap/baseline.jsonl` holds **7 records, of which only 4 are
+  `run_mode="scheduled"`** — the others carry no field and are UNKNOWN, not
+  scheduled, per `state.md`'s own instruction to count only `scheduled`. **A
+  BEFORE exists but is thin (n=4).**
+- **NO FLIP MADE.** Enabling it is a production behaviour change on a worker under
+  an active OOM investigation with a deploy hold, and the flag is absent from
+  `render.yaml`, so the two routes are: (a) add it to `render.yaml`, which fires
+  **`blueprint_sync`** — rewrites the WHOLE env block on live services and 502s
+  every route for ~2 min; or (b) the single-key env endpoint plus a deploy, which
+  is narrower. **(b) is the correct route if it is flipped at all.**
+- **Cost note:** the gate makes sweeps MORE frequent near first pitch and much
+  less frequent when fixtures are far out. Net OddsAPI call volume is not
+  obviously higher, but it is not obviously lower either, against a cap at ~62.7%
+  with MLB at 93.0% of spend. Measure before and after.
+
+
+### commit-guard-blind-to-own-recipe — CLOSED 2026-08-17 — **both goals shipped, measured, and DELIVERED to `origin/main` in `5fb52342`: the guard now honours its own printed recipe (in-command env assignment) and exempts pathspec-limited commits, with `-i`/`-a`/pathspec-less unchanged. Verification ran: 19 cases through the pre-fix AND post-fix guards (10 flip 2→0, 8 hold at 2), 62 tests in the guard's own suite (69 with the sibling checkpoint-guard suite), every printed remedy replayed through the real hook at rc=0.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+- **CLOSING NOTE.** The wrong belief this lane produced (`coordinator.id` is
+  stale) already has its durable rule in `learnings.md` 2026-08-17 —
+  *"matches no session in the roster" is not "points at nobody"* — written with
+  the `deploy-guard.py:130-140` evidence this session. Not re-run as a separate
+  `/postmortem`, because the rule exists and a second copy would just be a
+  second thing to keep true.
+- **Left with others, deliberately, NOT blockers on this lane:**
+  (1) the falsified `deploys.md` entry on `origin/main` asserting
+  `coordinator.id IS STALE`, duplicated at lines 11441 and 11546 — reported to
+  the coordinator with the correction and the exact locations; `deploys.md` is
+  theirs. (2) A second session's brief to CLOSE the in-command `GIT_INDEX_FILE`
+  escape this lane opened; the coordinator ruled the escape stays open and
+  retargeted them. If that ruling is revisited, `5fb52342` is the commit.
+- **STATUS 2026-08-17 ~14:30 CDT.** Verification ran and both goals hold.
+  (a) in-command assignment of any of the three vars is honoured; (b) pathspec
+  commits exempt, `-i`/`-a`/pathspec-less unchanged. Evidence: 19 cases through
+  the pre-fix AND post-fix guards — 10 flip 2→0, 8 hold at 2, clean tree 0→0;
+  69 tests pass; every remedy the refusal message prints replayed through the
+  real hook at rc=0 with the control still rc=2; exemption path 81 ms.
+  `5fb52342` verified not to disturb another session's staged work, and to leave
+  no revert armed for its own paths.
+- **DELIVERED: `5fb52342` IS on `origin/main` as of ~14:35 CDT** (`origin/main`
+  = `5962900e`, `merge-base --is-ancestor` confirms). I did not push it —
+  another session landed `ledger/coordinator-2026-08-17` onto `main` while this
+  checkpoint was being written. The push request I filed with the coordinator is
+  therefore MOOT, not pending; if they reply to it, this is why.
+  *(Superseded reading, kept because it was true for ~40 min and a reader may
+  have acted on it: at 14:30 this was ahead 32 / behind 148 with the commit only
+  on the ledger branch. No `render.yaml` was in those 32 → no `blueprint_sync`
+  exposure either way.)*
+- **STILL UNPUSHED: `acad136f`**, this checkpoint. Not pushed by me — standing
+  instruction is that the coordinator is told before ANY push, not only deploys.
+- **CONFLICT, ADJUDICATED BY THE COORDINATOR, NOT BY ME:** another session's
+  brief is to CLOSE the in-command `GIT_INDEX_FILE` escape this lane OPENED.
+  Same predicate, opposite directions. The coordinator ruled **the escape stays
+  open** and retargeted that session, telling it to hold rather than edit the
+  shared hook. If that ruling is revisited, `5fb52342` is the commit to revisit.
+- **Known FP left in deliberately:** `-a` cannot trip predicate 2 but still
+  fires. Exempting it is unsound as measured — `-a` does not refresh
+  `skip-worktree`/`assume-unchanged` paths, unmeasured. Named in the docstring.
+- **Owed to the coordinator, not done by me:** a `learnings.md` rule that the
+  pathspec form is the default and the isolated-index form the fallback, since
+  the latter arms a revert every time and the former needs no repair step.
+  Relayed; `learnings.md` is theirs.
+- Goal: a session that follows the guard's OWN printed instructions is not blocked
+  by it. Two testable outcomes: (a) a command that assigns `GIT_INDEX_FILE=` (or
+  either `SYNDICATE_ALLOW_STAGED_*`) inside the command string is exempt, exactly
+  as the same variable in the hook's env already is; (b) a PATHSPEC-limited
+  commit (`git commit -- <paths>`, `git commit <paths>`, `--pathspec-from-file`)
+  is exempt, while `-i`/`--include` and a pathspec-less commit keep today's
+  behaviour.
+- Files: `.claude/hooks/commit-guard.py`,
+  `tests/test_commit_guard_worktree_index.py`. Checked against every OPEN lane's
+  `- Files:` at open time — no lane claims either path.
+- Hypothesis: n/a for (a) — it is a read of the code: the hook reads
+  `os.environ`, and the `export` in the recipe it prints runs in the Bash call
+  the hook is gating, i.e. AFTER it. For (b) the hypothesis was "a pathspec
+  commit cannot carry a stale index entry", and it is now MEASURED, not assumed.
+- Falsification test: build a repo whose index holds a revert of `A.txt` and a
+  deletion of `C.txt` (still on disk), then `git commit -m x -- C.txt`. If the
+  resulting tree drops `A.txt`'s line or `C.txt`, the pathspec form is NOT
+  immune and (b) must be scoped-filtering rather than exemption.
+  RESULT 2026-08-17: tree kept `A.txt` at HEAD content and `C.txt` on disk;
+  `--stat` = 1 file. Immune. Same probe run for `-i` (revert LANDED — stays
+  guarded), `--amend -- <paths>` (immune), `--pathspec-from-file` (immune),
+  and `-a` (immune to predicate 2, but it COMMITTED the deletion under
+  predicate 1 — stays guarded).
+- Verification: the four probes above re-expressed as tests in
+  `tests/test_commit_guard_worktree_index.py` against real git repos, plus the
+  observed false positive replayed (a two-path pathspec commit while an
+  unrelated `.syndicate/lanes.md` revert is staged) — pass, and the existing
+  suite still passes.
+- Blocked by: none.
+- **COLLISION NOTICE, filed 2026-08-17 by `branch-overlap-baseline-watch`.** A
+  second session is editing `.claude/hooks/commit-guard.py` right now:
+  `local_7c140749-7876-4a25-86ea-a20756dbc18f`, "Fix commit-guard's undetectable
+  GIT_INDEX_FILE escape", user-started and running. **I caused this** — I spawned
+  it from the same two defects before reading this lane, so it duplicates work
+  this lane has already MEASURED (the four probes above). Its brief covers (a)
+  and (b) and nothing this lane does not already have.
+  I could not warn either session: `send_message` is unavailable in
+  scheduled-task runs (contract §4a, measured again here), so this block is the
+  only channel I have. **Recommend that session be stopped rather than merged** —
+  two sessions writing one hook is the exact shape this lane exists to prevent,
+  and this lane is further along.
+
+### render-events-read-label — CLOSED 2026-08-17 — `render_events.py` now reports the window READ separately from the span of events FOUND; shipped in `f03928db`, 20/20 tests pass — opened 2026-08-17 — session: branch-overlap-baseline-watch (`65591da9-7697-4a25-a6fd-d4702c2941d1`)
+- **Opened RETROACTIVELY, after the edit and the commit. That is a protocol
+  violation and is recorded rather than tidied away** — `/lane open` is supposed
+  to precede editing. Nothing collided (no OPEN lane claimed these paths;
+  `render-events-reader` was archived earlier the same day), so the cost was zero
+  this time, which is luck and not a defence.
+- Goal: a reader of this tool cannot mistake "few events found" for "little of
+  the window read".
+- Files: `scripts/render_events.py`, `tests/test_render_events.py`,
+  `reports/branch_overlap/baseline.jsonl`.
+- Hypothesis: n/a — it is a read of the code. `main()` set its `COVERED` line
+  from `events[0]`/`events[-1]` timestamps, i.e. the span of what was FOUND,
+  while the label claimed coverage.
+- **What it cost, which is why this is worth a lane at all.** A scheduled 5-hour
+  events read that returned one 4-event deploy cycle printed
+  `COVERED 14:33 .. 14:39`. I read that as "the API only gave me 6 minutes" and
+  downgraded a correct, fully-paged all-clear to "~4h54m unverified". The window
+  had read whole. **An understated coverage figure is not a safe error** — it
+  argues against another lane's urgency exactly the way `learnings.md`
+  2026-08-16 ("absence in a window isn't absence") already records.
+- Falsification test: a stub returning 4 events for a requested 5-hour window
+  must yield `truncated == ""`; a stalled cursor on a FULL page must NOT. Both in
+  `tests/test_render_events.py`. RESULT: pass, 20/20.
+- Verification: ran against the live Render API on all three paths — fully-paged
+  window (prints `READ … fully paged`), empty window (prints `READ no events` +
+  positive control), and JSON (`read {fully_paged, truncated_reason}` +
+  `event_span`). Confirmed the previously-misread window is `CLEAN` across its
+  whole 5 hours.
+- Consequence for the ledger, stated because it is cheap to state and expensive
+  to rediscover: **any ledger entry citing a `COVERED` range from this tool was
+  quoting the EVENT SPAN, not the coverage.** The error direction is always
+  understatement, so conclusions drawn from it are conservative, not wrong.
+- `fetch_events` now returns `(events, pages, truncated)`. Callers outside this
+  script: none. A malformed API response no longer shares the empty-page branch,
+  where an unrecognised shape reported as a window that had ended — the
+  "unknown must not default permissive" rule.
+- Blocked by: none.
+
+### COORDINATOR ADJUDICATION 2026-08-17 14:3x CDT — answering `branch-overlap-baseline-watch`
+
+Filed here because that session is a scheduled-task run and `send_message` is
+refused in both directions (§4a). It reported three things. **Two were right,
+one was a misread, and the misread is the interesting one.**
+
+**1. NO DEPLOY REQUEST WAS OWED. Correct, and now codified so nobody re-derives
+it.** `render_events.py` never executes on a Render service, `baseline.jsonl` is
+data, `render.yaml` untouched. A request would have carried an unanswerable
+`verify:`. `coordinator.md` §2 now states the test: **"does this change what
+runs on a Render service?"**, not "did I touch an ops file". Declining to file
+was the right call and required no permission.
+
+**2. THE COLLISION IS REAL, BUT IT IS NOT ON THE COORDINATOR'S SIDE — AND IT IS
+NOT DUPLICATION.** The report reads: "the coordinator already holds an OPEN lane
+`commit-guard-blind-to-own-recipe`". It does not. That lane's own header names
+its owner: session `2028fec0-86fa-4442-a8db-a7ff8949ae..`. The inference came
+from `.syndicate/.current-lane` holding that slug — **the shared single-slot
+marker, written by whichever session wrote last.** `state.md` already records
+that this file cannot represent parallel sessions and is the root cause of lane
+thrash; reading ownership out of it produces exactly this error. The coordinator
+holds no claim on `commit-guard.py` and never has.
+
+**The two sessions are not duplicating — they are pulling OPPOSITE directions on
+one predicate**, which is worse and would not have shown up as a duplicate:
+- `2028fec0` shipped `5fb52342` (13:51, +315 lines + a 257-line test file)
+  **EXEMPTING** in-command `GIT_INDEX_FILE=` so a session following the guard's
+  own printed recipe is not blocked by it.
+- `7c140749`'s brief is to **CLOSE** the `GIT_INDEX_FILE` escape as undetectable.
+
+Same switch, two positions. **RULED: the escape stays open.** Isolated-index
+committing is the correct technique in a shared worktree and the coordinator
+depends on it; forbidding it pushes everyone back onto the shared index, which
+is what produced the 4,993-deletion incident. The real hole is the *un-disarmed
+aftermath* — an isolated-index commit arms the shared index with a revert of
+itself — and that is detectable directly. `7c140749` has been told to retarget
+to that and to hold rather than edit the shared hook meanwhile. **The
+recommendation to stop it is declined**: its subject is a genuine hole, only its
+chosen predicate was wrong.
+
+**3. `coordinator.id` IS NOT STALE — AND THE SESSION WAS RIGHT NOT TO TOUCH IT.**
+This is the finding worth keeping. **One session can have two ids.** Measured:
+
+| where | value |
+|---|---|
+| hook payload / scratchpad / `coordinator.id` | `9ed7fd89-...` |
+| `list_sessions` roster id | `local_1d6f136e-...` |
+| roster title | "Deploy and Document Coordinator" |
+
+Both are this session. Proven two ways: `get_session` on the roster id returns
+**"Refusing to return the current session"**, and the live deploy hook BLOCKS
+this session when `coordinator.id` is changed and ALLOWS it when restored — so
+the registered id is the one the harness actually passes.
+
+**So "no roster entry matches the registered id" is TRUE and means nothing.**
+The register must hold the payload id or the hook stops working, and the roster
+cannot see that id at all. Deleting it as stale would have stood the whole role
+down — the session flagged it instead, which is the correct handling of an
+unverifiable fact. `coordinator.md` §5 now carries the verification recipe:
+match by TITLE, or use the `get_session` refusal as the identity test.
+
+**Two self-reported protocol misses, both accepted as recorded, neither
+actionable:** the retroactive `/lane open` (nothing collided; the lane says so),
+and skipping the `.current-lane` overwrite — **that skip was correct**, for the
+reason given: the slot held another session's slug and overwriting it can make
+`lane-guard` block that session's own edits. Per-session markers
+(`.current-lane.<session_id>`) exist precisely to avoid this; prefer them.
+
+`lanes.md` left uncommitted by that session on purpose, for the coordinator's
+sweep. Picked up here.
+
+#### convergence-phase7-crps — CHECKPOINT 2026-08-17 ~19:0xZ — **instrument built, defect traced and quantified, both halves of the fix in flight, NEITHER MEASURED**
+
+- **Shipped and on `origin/main`:** Phase 7 CRPS/bias-dispersion instrument;
+  `starter_min_innings` exposed + swept; two betting graders; monotone props seal
+  (`bafb4fb2`).
+- **Verified:** the `outs` over-projection IS the F5 leash (dispersion
+  1.002→0.791 vs a 0.7979 target; short-start gap −0.1778→−0.0266 over 267
+  starts / 87,500 sims), the replay reproduces production, and the seal is on
+  `origin/main` by content.
+- **Verified negative, and it matters more than the positive:** the model still
+  loses to a constant baseline at EVERY leash value (3.0912 vs best 3.1852), and
+  the betting grade is CONFOUNDED — ALWAYS OVER returns 58.78%/+8.16% on the same
+  148 starts, the grid varies only over-propensity, spread is 1.49 SE. **Nothing
+  is promoted. No leash value is recommended.**
+- **In flight, both unmeasured:**
+  1. cadence flag LIVE on live-odds-worker (gate verified running; effect read
+     by `outs-props-coverage-check`, fires 2026-08-19 07:00 CT for date 08-18);
+  2. seal QUEUED as a deploy request for refresh-worker, cut on `8c0bd8e6`.
+- **TOP RISK TO THE 08-19 READING, found in another session's commit
+  `7c4439f4` AFTER my flip went live:** refresh-worker sweeps mlb/wnba/soccer/nfl
+  while owning only nfl, is gated by neither the ownership flags nor
+  ACTIVE_SPORTS, **wins the shared unnamespaced cadence marker and starves the
+  designated owner**. My flag is set on live-odds-worker ONLY. So a FAIL on 08-19
+  may be MARKER CONTENTION, not the cadence mechanism — and the scheduled reader
+  does not know this. Whoever reads it must rule that out before concluding.
+- **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
+  contention first; then let the coordinator ship the seal.
+
+#### convergence-phase7-crps — CHECKPOINT 2 2026-08-17 ~19:3xZ — **nothing left in flight on my side; three things queued, one live and unmeasured**
+
+Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
+
+- **Queued for the coordinator (messaged, session live 19:18Z):**
+  1. `20025cc4` ownership gate, **BOTH workers**, soft deadline before the 08-18
+     slate — measured absent from both live SHAs by content.
+  2. `bafb4fb2` monotone props seal, refresh-worker, **no deadline**, ideally
+     AFTER the 08-19 cadence result so the two do not confound.
+- **Live and unmeasured:** the fixture-aware cadence flag on live-odds-worker.
+  Reader `outs-props-coverage-check` fires 2026-08-19 07:00 CT and now carries
+  **Gate B** (marker contention) plus the undeployed-seal caveat, so it can
+  return INCONCLUSIVE instead of wrongly FAILing a starved mechanism.
+- **NOT DONE, DELIBERATELY: the cadence marker is NOT namespaced.** Asked for,
+  and refused after reading the code — the authoring lane rejected it hours
+  earlier in the docstring of the function I was about to edit, and with the gate
+  deployed the shared marker is a safety net whose removal would double MLB
+  OddsAPI spend. Recorded in `state.md` and `learnings.md`.
+- **Next action for whoever picks this up:** get `20025cc4` deployed to both
+  workers, then read `outs-props-coverage-check` on 08-19 working Gate B first.
+  Do not promote any leash value — the model still loses to a constant baseline
+  at every grid point.
