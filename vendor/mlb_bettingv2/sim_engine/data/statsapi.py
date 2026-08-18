@@ -938,16 +938,10 @@ def fetch_person_pitch_arsenal(client: StatsApiClient, person_id: int, season: i
         return {}, 0
 
     def canon(code: str) -> PitchType:
-        code = (code or "").strip().upper()
-        try:
-            return PitchType(code)
-        except Exception:
-            # Map a couple known alternates
-            if code in ("FT",):
-                return PitchType.SI
-            if code in ("FA",):
-                return PitchType.FF
-            return PitchType.OTHER
+        # Shared map: this local version handled FT/FA and nothing else, so the
+        # sweeper -- 8.20% of 2026 pitches -- became OTHER in every arsenal.
+        from .pitch_codes import canon_pitch_type
+        return canon_pitch_type(code) or PitchType.OTHER
 
     mix: Dict[PitchType, float] = {}
     total_pitches = 0

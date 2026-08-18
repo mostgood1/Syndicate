@@ -52,6 +52,24 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # result -- web cannot do that pivot, one read is ~1.3GB resident on a 2GB
     # container. Allowlisting PERMITS the transfer; the worker autorun is what
     # makes one happen (#208).
+    # `#440`: MLB sim INPUT artifacts. The sim consumes pitch-type and
+    # batted-ball fields via `.get(key, NEUTRAL)`, so an unfed field is a silent
+    # no-op -- measured 2026-08-17, **26 consumed fields at 0% population**.
+    # These carry the data that feeds them. They are per-SEASON single documents
+    # (73 pitchers / 450 batters), not per-date, so the egress cost is one small
+    # file each, unlike the roster objects they feed.
+    "*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json",
+    "*_source/source_artifacts/data/batted_ball/batted_ball_*.json",
+    "*_source/source_artifacts/data/arsenal/arsenal_*.json",
+    "*_source/source_artifacts/data/quality/quality_*.json",
+    # Conditional pitch mix: pitcher x count-bucket x batter hand, 0.48 MB for
+    # 728 pitchers. Same per-season single-document shape as the two above.
+    "*_source/source_artifacts/data/conditional_mix/conditional_mix_*.json",
+    # The checklist's own REPORT. Roster objects are deliberately NOT
+    # allowlisted -- hundreds of large files per date, and this allowlist drives
+    # publishing as well as reading. The worker runs the audit and publishes the
+    # bounded result instead, the same shape as book_grid above.
+    "*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json",
     "*_source/data/book_grid/book_grid_*.json",
     "settlement_inputs/closing_lines_*.csv",
     "settlement_inputs/finals_*.json",
