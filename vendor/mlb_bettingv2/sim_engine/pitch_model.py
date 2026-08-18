@@ -38,6 +38,47 @@ class PitchModelConfig:
     name: str = "pitch_model_v1_tuned_20260308_hrcluster_sigma008_hrw135"
 
     # Baseline call mix; these are used as priors then adjusted by count and rates.
+    #
+    # `#440` 2026-08-18: RE-BASED AGAINST THE REAL LEAGUE MIX. The engine
+    # under-produced strikeouts by 27% (K/PA 0.179 vs 0.226) and `k_rate` could
+    # not fix it -- a 1.368x correction moved the residual 0.6pp, because K is a
+    # CONSEQUENCE of plate-appearance length, not a per-PA target.
+    #
+    # Measured sim vs MLB, 17,660 simulated pitches:
+    #     IN_PLAY   23.3%  vs  ~17%   <- 37% too many; every one ENDS the PA
+    #     FOUL      15.9%  vs  ~18%   <- too few; a 2-strike foul EXTENDS the PA
+    #     CALLED    13.9%  vs  ~17%
+    #     WHIFF     12.3%  vs  ~11%   <- already ABOVE league, not the problem
+    #     pitches/PA 2.97  vs  ~3.9   <- 24% short
+    #
+    # PAs were ending before they could reach three strikes. The whiff rate was
+    # never the deficit; the CONTACT rate was. base_in_play and base_foul are the
+    # two constants furthest from reality, and they move PA length in opposite
+    # directions, so both are corrected together.
+    #
+    # base_hbp 0.01 also produces 2.3% HBP against a league ~0.5% -- roughly 4x
+    # too many hit batsmen.
+    #
+    # *** VALUES DELIBERATELY LEFT AT THE ORIGINALS. NOT FIXED. ***
+    #
+    # Correcting the mix ALONE makes the engine WORSE in the other direction.
+    # Measured with base_foul=0.14 / base_called_strike=0.22, which lands the
+    # mix almost exactly on the league (FOUL 18.8%, CALLED 17.5%, IN_PLAY 17.3%):
+    #
+    #     K/PA 0.2837  against an actual 0.226  -- 26% TOO HIGH
+    #
+    # So the 27% K DEFICIT was the NET OF TWO OPPOSING ERRORS: a contact rate
+    # that ended PAs early (suppressing K) masking a strike->strikeout conversion
+    # that is ~26% too efficient. Fixing one exposes the other, and shipping the
+    # mix fix alone would trade a 27% shortfall for a 26% surplus.
+    #
+    # pitches/PA also stays short (3.45 vs ~3.9) even with a correct mix, which
+    # points at PA structure -- count progression / two-strike behaviour -- as
+    # the second defect rather than the call priors.
+    #
+    # This needs JOINT calibration of the mix and the conversion, with the market
+    # scoreboard (`measure_all_inputs_effect.py`) as arbiter rather than the
+    # league mix alone. One-at-a-time tuning cannot get there.
     base_ball: float = 0.34
     base_called_strike: float = 0.18
     base_swinging_strike: float = 0.12

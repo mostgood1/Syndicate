@@ -15221,3 +15221,63 @@ ages (23:55:40Z +/- 1s). **Two independent derivations of the same launch.**
 **STILL TRUE AND UNCHANGED:** do NOT gate `launch_refresh_run` (correction #3) —
 refresh-worker's MLB autorun is a designed 60s path and a central gate would
 kill it. The tick gate is correctly placed.
+
+## 2026-08-18 — K DEFICIT DIAGNOSED, **NOT FIXED**. It is TWO OPPOSING ERRORS that cancel, and fixing one alone makes the engine worse.
+
+Lane `convergence-phase7-crps`. Values reverted to originals; the diagnosis is
+in the code comments. No deploy.
+
+### The deficit is in the CONTACT rate, not the whiff rate
+
+Measured over 17,660 simulated pitches:
+
+    call              sim      MLB     delta
+    IN_PLAY          23.3%    ~17%    +6.3pp   <- every one ENDS the PA
+    FOUL             15.9%    ~18%    -2.1
+    CALLED_STRIKE    13.9%    ~17%    -3.1
+    SWINGING_STRIKE  12.3%    ~11%    +1.3     <- ABOVE league already
+    HIT_BY_PITCH      2.3%    ~0.5%   +1.8     <- 4x too many
+    pitches/PA        2.97    ~3.9    -24%
+
+**Whiffs were never the problem — they are above league.** Plate appearances were
+ending 24% early because balls went in play 37% too often, so they could not
+accumulate three strikes. `base_in_play = 0.23` against a league ~0.17, and
+`base_foul = 0.12` against ~0.18, are the two constants furthest from reality
+and they move PA length in OPPOSITE directions.
+
+### AND THAT IS WHY THE OBVIOUS FIX IS WRONG
+
+Re-basing the mix onto the league (`base_foul=0.14`, `base_called_strike=0.22`)
+lands it almost exactly: FOUL 18.8%, CALLED 17.5%, IN_PLAY 17.3%.
+
+**And K/PA goes to 0.2837 against an actual 0.226 — 26% TOO HIGH.**
+
+    original mix (wrong)  ->  K/PA 0.179   27% LOW
+    league mix (correct)  ->  K/PA 0.284   26% HIGH
+
+**The 27% K deficit was the NET of two opposing errors**: a contact rate that
+truncated PAs (suppressing K) masking a strike->strikeout conversion that is
+~26% too efficient. Fixing the mix alone trades a shortfall for a surplus of
+almost identical size. **Shipping it would look like a fix and be a wash.**
+
+`pitches/PA` also stays short (3.45 vs ~3.9) even with a correct mix, which puts
+the second defect in **PA STRUCTURE** — count progression, two-strike behaviour —
+rather than in the call priors.
+
+### Left at the originals, deliberately
+
+The values are reverted. The full diagnosis lives in `pitch_model.py` beside the
+constants so the next person does not re-run this and ship the half-fix.
+
+**What it needs: JOINT calibration of the mix and the conversion, with the market
+scoreboard as arbiter rather than the league mix alone.** One-at-a-time tuning
+provably cannot get there — that is what these four grid rows demonstrate.
+
+### A tooling failure worth recording
+
+My first grid returned **nine identical rows**. I was mutating
+`PitchModelConfig.__dataclass_fields__[...].default`, which does not affect how
+the config is actually constructed — so every trial ran the file's values and the
+"search" measured nothing. **Identical rows across a varied grid is the tell**,
+and it is the same class as every silent no-op found this session. The working
+harness edits the file per trial.
