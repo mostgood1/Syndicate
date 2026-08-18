@@ -30,29 +30,49 @@ produced a **negative interaction in 4 of 4 markets**.
 
 ---
 
-## 1. STOP CONDITION — read this before writing code
+## 1. SAMPLE — corrected 2026-08-18, my first figure was wrong
 
-**The usable sample is ONE SEASON, and it may not be enough.**
+**RETRACTED: "the usable sample is ONE SEASON, n=272."** That was an artifact of
+the LOADER I measured through, not of the data. `FootballSimulationAdapter.
+load_features` routes via `build_cards_page_context`, whose season list comes from
+`week_summaries()` — which globs **`upcoming_recs_*.csv`, the legacy UI
+recommendation snapshots**. Those exist only for 2025/2026. It never consulted
+play-by-play at all.
 
-Measured 2026-08-18 through the production feature loader:
+**What is actually present AND reachable** (verified by calling
+`load_nflverse_rows`, not by listing files — presence is not reachability):
 
-| season | games returned | features fed | market line | usable |
-|---|---|---|---|---|
-| 2023 | **1** | 0 | 0 | **0** |
-| 2024 | **1** | 0 | 0 | **0** |
-| 2025 | 272 | 272 | 272 | **272** |
+| season | pbp rows | games |
+|---|---|---|
+| 2022 | 49,434 | 284 |
+| 2023 | 49,665 | 285 |
+| 2024 | 49,492 | 285 |
+| 2025 | 48,771 | 285 |
+| **total** | **197,362** | **1,139** |
 
-2023/2024 return a **single degenerate game** — the same failure mode
-`MIN_GAMES_FOR_A_RATE` exists to catch. **n = 272, one season.**
+**No pbp fetch is required.** Substrate: the local git-tracked mirror
+(`data/nfl_source/tracking/nflverse/pbp/`), which is legitimate for a BACKTEST —
+§3b forbids drawing *production* conclusions from local, not offline model
+testing. Any production claim still goes to Render.
 
-### What 272 games can and cannot detect
+### The real constraint is CLOSING LINES, not features
 
-| metric | SE at n=272 | detectable effect (2 SE) | verdict |
+`real_betting_lines_*.json` runs **2025-09-01 → 2026-08-01** (160 files). So:
+
+| metric | needs | usable n |
+|---|---|---|
+| **paired ΔCRPS on margin vs OUTCOMES** (primary) | features + result | **1,139** |
+| market-relative CRPS vs the closing line (§5 goal) | + closing line | **~285, 2025 only** |
+| ATS hit rate / ROI | + closing line | ~285 — **still unusable** |
+
+### Revised power
+
+| metric | SE | detectable (2 SE) | verdict |
 |---|---|---|---|
-| **ATS hit rate** | `sqrt(.25/272)` = **3.03 pts** | **~6 pts** of ATS edge | **UNUSABLE.** No realistic model change clears it. |
-| **ROI** | worse — adds price variance | — | **UNUSABLE** |
-| **paired ΔMAE on margin** | ~**0.30 pts** | ~**0.6 pts** | usable |
-| **paired ΔCRPS on margin** | ~0.25 pts | ~0.5 pts | **usable — the primary** |
+| paired ΔCRPS, n=1,139 | ~**0.12 pts** | ~**0.25 pts** | **good — 2× better than first stated** |
+| paired ΔMAE, n=1,139 | ~0.15 pts | ~0.30 pts | usable |
+| market-relative CRPS, n=285 | ~0.25 pts | ~0.5 pts | usable |
+| **ATS hit rate, n=285** | **2.96 pts** | **~6 pts of edge** | **UNUSABLE** |
 
 **Therefore ATS hit rate and ROI are FORBIDDEN as the decision rule for this
 experiment.** They are reported as descriptive context only. This is the
@@ -84,10 +104,17 @@ this at 300 seeds and reporting "no effect" would be measuring the RNG.
 ## 2. Phases, in order. Each gates the next.
 
 ### Phase 0 — Coverage, stated not assumed
-Print the per-family date coverage and the **intersection** of (features,
-outcomes, closing line), per the `data/**` rule. **Report the number of games the
-result actually rests on.** If the intersection is < 200, **STOP** and widen the
-source before modelling.
+Done, above. **1,139 games** for the primary metric; **~285** for anything
+market-relative. Report which of the two any given statistic rests on — they are
+not interchangeable, and quoting the 1,139 beside a market-relative number would
+overstate it by 4×.
+
+**OPEN DECISION — historical closing lines for 2022–2024.** Backfilling them would
+lift the market-relative arm from ~285 to ~1,139 and is the ONLY thing that makes
+ATS/ROI testable (SE 2.96 → 1.48 pts). OddsAPI historical endpoints are cheap
+against the 5M cap, and `scripts/backfill_mlb_historical_odds.py` is a working
+precedent to copy. **Not done unilaterally — it spends API budget and belongs to
+whoever owns that budget.**
 
 ### Phase 1 — Reachability, BEFORE correctness (§4.3)
 Flag `SYNDICATE_SMARTSIM2_FEATURE_PAYLOAD`, as a **declared dataclass field** —
@@ -118,7 +145,7 @@ Re-fit the `CalibrationProfile` rates that were absorbing the mechanism, on
 **training games only**. Hold out a test set fixed **before** any fitting.
 
 **Do not grid-search.** 2026-08-18 rule: measure the count matrix, don't sweep
-it. A sweep on 272 games will fit noise.
+it. A sweep on 1,139 games still fits noise when the candidate grid is wide.
 
 ### Phase 5 — Judge, market-relative
 Primary: **paired ΔCRPS on margin, held-out games, vs the closing line as the
@@ -156,14 +183,17 @@ that has been open since the engine was built.
 - **The unfed terms themselves** (player usage, pace, red zone). Population is
   NOT the binding constraint — **wiring is.** Fixing population before wiring
   changes no output. Revisit only after Phase 5.
-- **ATS/ROI as a decision rule.** Underpowered at n=272; see §1.
+- **ATS/ROI as a decision rule.** Underpowered at n=285 (the market-relative
+  sample, NOT the 1,139); see §1. Revisit only if 2022-2024 closing lines are
+  backfilled.
 
 ---
 
 ## 5. Cost, honestly
 
-Phase 2 alone is 272 games × 2 arms × ≥2,000 seeds. Phases 2–4 re-run that
-several times. **This is a sim-heavy job and belongs on refresh-worker as a
+Phase 2 alone is **1,139 games × 2 arms × ≥2,000 seeds = ~4.6M game-sims**, and
+phases 2-4 re-run that several times. **This is roughly 4x what the original
+n=272 figure implied** — re-estimate before committing worker time. **This is a sim-heavy job and belongs on refresh-worker as a
 detached run, never in a request path** — and it must not collide with the MLB
 daily sim, which was measured holding 2 in-flight jobs on 2026-08-18.
 
