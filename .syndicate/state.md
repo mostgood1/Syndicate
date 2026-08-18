@@ -24,14 +24,32 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
-## HOW TO USE THIS FILE
+## [how-to-use] HOW TO USE THIS FILE
 
 Facts only, grouped by subject. If a subject has an owning lane, it is named.
 `lanes.md` says who holds what; `learnings.md` carries the rules;
 `deploys.md` carries every measurement with its working.
 
+**EVERY SECTION CARRIES A SUBJECT KEY** `[added 2026-08-18]`:
 
-## MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
+    ## [subject-slug] TITLE — whatever else
+
+One subject, one section. The slug is the identity, mirroring `lanes.md`'s
+`### slug — STATUS`, so there is one convention here and not two. To record
+something new about a subject that already has a section, **edit that section**
+— do not add a second one. Adding a section that shares a slug is the stacking
+failure this file has now been collapsed for twice, and it is what
+`scripts/state_key_check.py` reports.
+
+The key exists because "no duplicate titles" looked like health and was the
+opposite: it is trivially true when sections are titled by their DATE. Two
+subjects are deliberately left stacked so the checker fails on a real thing —
+`sim-scheduling-deploy-lineage` (x2) and `wnba-sweep-ownership-gate` (x3).
+Collapsing those is owed work, not a bug in the tool.
+
+
+
+## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.
 That story ended; do not re-open it from the archive.**
@@ -65,7 +83,7 @@ That story ended; do not re-open it from the archive.**
   96.8% while anon was 41%, and a rollback was fired on that misreading.
 
 
-## USER DECISIONS `[2026-08-14 ~21:5x CDT]`
+## [user-decisions] USER DECISIONS `[2026-08-14 ~21:5x CDT]`
 
 - **2026-08-16 — DO NOT BUMP THE refresh-worker PLAN. Reduce instead.** Asked
   directly, with the numbers: peak 3,518MB = 85.9% of the 4,096MB `pro` ceiling,
@@ -118,7 +136,7 @@ Product decisions, not engineering ones. Do not re-take them.
 **Nothing is currently owed by the user.**
 
 
-## DEPLOY DISCIPLINE — read before any deploy
+## [deploy-discipline] DEPLOY DISCIPLINE — read before any deploy
 
 - **`autoDeploy = no` on all three services, so pushing `.py` ships nothing.
   Pushing `render.yaml` DOES apply to production** via `blueprint_sync`, which
@@ -350,7 +368,7 @@ unsaved anywhere.
 ---
 
 
-## SERVICES, CONFIG, PLATFORM
+## [services-config-platform] SERVICES, CONFIG, PLATFORM
 
 - Web is **`https://syndicate-an21.onrender.com`** (`srv-d88ahvrbc2fs73eodu30`).
   `syndicate.onrender.com` 404s.
@@ -401,7 +419,7 @@ unsaved anywhere.
 ---
 
 
-## SESSION HARNESS — what the hooks actually enforce
+## [session-harness] SESSION HARNESS — what the hooks actually enforce
 
 - **`lane-guard.py` (PreToolUse) enforces.** Blocks `Edit`/`Write` against a file
   claimed by another OPEN lane (exit 2); allows it when `.syndicate/.current-lane`
@@ -494,7 +512,7 @@ unsaved anywhere.
 ---
 
 
-## KILLS ARE EVENTS — there is now a tool, and a census `[measured 08-16 17:5xZ]`
+## [oom-kills-census] KILLS ARE EVENTS — there is now a tool, and a census `[measured 08-16 17:5xZ]`
 
 `scripts/render_events.py` (`#442`, `f4627832` on `origin/main`, local tooling,
 nothing deployed). **`d72a3f66` — the `_deploy_trigger` fix — was ORPHANED by a
@@ -523,7 +541,7 @@ named `render_logs.py` as unable to give one; this is that tool.
   cache; the ceiling was reached and nothing died.
 
 
-## BOARD FRESHNESS AND STALENESS
+## [board-freshness] BOARD FRESHNESS AND STALENESS
 
 **THE BOARD HAS TWO INDEPENDENT CAUSES, and fixing one is not enough.**
 
@@ -583,7 +601,7 @@ named `render_logs.py` as unable to give one; this is that tool.
 ---
 
 
-## ODDS CADENCE AND CAPTURE
+## [odds-cadence] ODDS CADENCE AND CAPTURE
 
 - **MLB quote capture has THREE regimes, not one beat. `[measured 08-15 02:5xZ,
   supersedes the single-cadence reading of 08-14 16:3xZ]`** All 371,567 rows of
@@ -689,7 +707,7 @@ named `render_logs.py` as unable to give one; this is that tool.
 ---
 
 
-## PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]`
+## [probability-statistic-ownership] PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]`
 
 - **THE AUDIT'S "TWO DE-VIG ORDERINGS" IS FALSIFIED. In the BOARD/ODDS path
   there is ONE, and `book_grid` is not a second.** `book_grid` never de-vigs — its whole import
@@ -863,7 +881,7 @@ named `render_logs.py` as unable to give one; this is that tool.
   same as working.
 
 
-## THE PUBLISHED SHORTLIST — edges, EV, CLV
+## [published-shortlist] THE PUBLISHED SHORTLIST — edges, EV, CLV
 
 **Owner: `recommendation-lane-correctness` (model-audit session).**
 
@@ -1059,7 +1077,7 @@ named `render_logs.py` as unable to give one; this is that tool.
 ---
 
 
-## MLB SIM — INPUTS FULLY FED, STILL NO MARKET EDGE `[measured 2026-08-18, lane convergence-phase7-crps; supersedes seven earlier sim sections]`
+## [mlb-sim-engine] MLB SIM — INPUTS FULLY FED, STILL NO MARKET EDGE `[measured 2026-08-18, lane convergence-phase7-crps; supersedes seven earlier sim sections]`
 
 - **`sim_input_checklist.py --simulate-rebuild` PASSES, exit 0** — every field the
   engine reads is fed (26 unfed → 0). **A plain run still reports 26**: it audits
@@ -1097,7 +1115,7 @@ named `render_logs.py` as unable to give one; this is that tool.
   and UNFED. Modelling of neither is present in the served path.
 
 
-## MODEL SKILL (`#428`) — measured vs not
+## [model-skill] MODEL SKILL (`#428`) — measured vs not
 
 - **`#428` IS FOUR MODELS, NOT SIX.** `live_projection_join` is a JOIN and
   `game_board_contract` is a passthrough; neither is backtestable. Real targets:
@@ -1137,7 +1155,7 @@ named `render_logs.py` as unable to give one; this is that tool.
 ---
 
 
-## THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]`
+## [live-surface-tier5] THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]`
 
 Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md`.
 
@@ -1334,7 +1352,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 ---
 
 
-## ASK THE SYNDICATE
+## [ask-the-syndicate] ASK THE SYNDICATE
 
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
@@ -1483,7 +1501,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 ---
 
 
-## UI / BOARD CARDS
+## [ui-board-cards] UI / BOARD CARDS
 
 - **Lane E is CLOSED-VERIFIED in production** (web `aadcde77`, live 21:42:56Z):
   horizontal overflow 28px desktop / 20–40px mobile → **0 at both widths** on
@@ -1523,7 +1541,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 ---
 
 
-## SOCCER
+## [soccer] SOCCER
 
 **Owner: `soccer-model-coverage` (new) for the model; UI Lane G for the card.**
 
@@ -1586,7 +1604,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 ---
 
 
-## SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE.
+## [sharp-reference-price] SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE.
 
 **The models audit's "no Pinnacle, Circa or exchange in the feed" was true when
 measured and is FALSE now.** The feed widened between 08-05 and 08-09 and nobody
@@ -1627,7 +1645,7 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 ---
 
 
-## LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT, NOT a production measurement]`
+## [layer1-layer2-boards] LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT, NOT a production measurement]`
 
 Full briefs: `.syndicate/brief_2026-08-16_layer1_board.md`,
 `.syndicate/brief_2026-08-16_layer2_board.md` (commit `01c53f56`). Lane names
@@ -1654,7 +1672,7 @@ list IS confirmed (`DEFAULT_BOOKS`, `templates/shared/layer1_board.html:267`,
 client-side JS). Trace the served `book` field to its writer before acting.
 
 
-## BOARD / INTELLIGENCE ENGINE — structural facts, archived
+## [board-intelligence-engine] BOARD / INTELLIGENCE ENGINE — structural facts, archived
 
 Moved to `state_archive.md` 2026-08-15. Every figure in it is also in
 `audit_2026-08-14_board_engine_SYNTHESIS.md` (verified by spot-checking
@@ -1662,7 +1680,7 @@ Moved to `state_archive.md` 2026-08-15. Every figure in it is also in
 the place to read it, and it carries the guard on its two shortlists.
 
 
-## FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]`
+## [football-smartsim2] FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]`
 
 **Owner: `football-model-owner`.** Full reference:
 `docs/ai_context/football_sim_engine_reference.md`. Gate:
@@ -1738,13 +1756,13 @@ the place to read it, and it carries the guard on its two shortlists.
 market-relative scoreboard.
 
 
-## NFL — earlier closed work, archived
+## [nfl-archived] NFL — earlier closed work, archived
 
 Moved to `state_archive.md` 2026-08-15. Closed work; the rules it records
 generalise but are not current state. `#377`, `#425`, `#429`.
 
 
-## TEST BASELINES
+## [test-baselines] TEST BASELINES
 
 - **`tests/test_intelligence_state.py` is NOT "224 green" — that line was wrong
   and is corrected here.** It carries **2 pre-existing failures on BOTH sides of
@@ -1771,7 +1789,7 @@ generalise but are not current state. `#377`, `#425`, `#429`.
 ---
 
 
-## OPEN PROBLEMS
+## [open-problems] OPEN PROBLEMS
 
 - **The refresh-worker anon floor is UNNAMED** (`#423`). Allocator, GC-tracked
   objects, the board build and the MLB cards cache are all eliminated.
@@ -1840,7 +1858,7 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   per-session naming a different lane still blocks.
 
 
-## SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]`
+## [shipped-verified] SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]`
 
 One line per item. Where a thing is live, the SHA is the one that carries it, not
 `main` — the three services run separate lineages and `main` is on none of them.
@@ -1862,13 +1880,13 @@ One line per item. Where a thing is live, the SHA is the one that carries it, no
 | play-by-play coverage | **5 sports of 8** |
 | WNBA pbp | **not a corpus** |
 
-## FLEET `[2026-08-18 02:1xZ — goes stale in minutes; re-read before deploying]`
+## [fleet] FLEET `[2026-08-18 02:1xZ — goes stale in minutes; re-read before deploying]`
 
     web               e5107913
     refresh-worker    00e9a49f
     live-odds-worker  cdaeaa58
 
-## DEPLOY OWNERSHIP — SELF-SERVE BEHIND TWO LOCKS `[verified 2026-08-18, user decision, REPLACES the coordinator role]`
+## [deploy-ownership] DEPLOY OWNERSHIP — SELF-SERVE BEHIND TWO LOCKS `[verified 2026-08-18, user decision, REPLACES the coordinator role]`
 
 **There is no coordinator session.** `.syndicate/coordinator.id` is DELETED,
 `coordinator.md` is a tombstone, and `.syndicate/deploy/requests/` is retired
@@ -1904,14 +1922,14 @@ Process records — sweeps, adjudications, corrections — live in `deploys.md` 
   overriding an older `CLEAR` BLOCKED.
 
 
-## LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE
+## [lane-state-carried] LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE
 
 Sections that arrived from other lanes AFTER the collapse was written, so
 they are neither in the collapsed file nor in the archive. Carried verbatim
 rather than dropped. Several are dated snapshots and belong in `deploys.md`;
 they stay here until their lane moves them.
 
-## 2026-08-17 00:4xZ — LIVE HAZARD (sim-scheduling): refresh-worker's deploy lineage is POISONED until `d9088741` ships
+## [sim-scheduling-deploy-lineage] 2026-08-17 00:4xZ — LIVE HAZARD (sim-scheduling): refresh-worker's deploy lineage is POISONED until `d9088741` ships
 
 **Do not deploy refresh-worker from `7c2b1a17` + `main`. It will silently
 re-revert 10 lines of `memory_observability.py`.**
@@ -1956,7 +1974,7 @@ the broken commit. Only counting deletions against the main parent sees it.
 And resolve `origin/main` EXACTLY ONCE per build — never re-read a symbolic ref
 in a later call.
 
-## 2026-08-17 00:5xZ — CORRECTION: the "silent revert" was a LAG, not a removal. I overstated it twice.
+## [sim-scheduling-deploy-lineage] 2026-08-17 00:5xZ — CORRECTION: the "silent revert" was a LAG, not a removal. I overstated it twice.
 
 **What I claimed** (in `state.md`'s POISONED-lineage block, in commits
 `d9088741` / `7623a233`, and to the user): `7c2b1a17` "reverted 10 lines of
@@ -1994,7 +2012,7 @@ before naming the damage — the same rule already written for the `wnba/cards.p
 `american_price` scare earlier this session, which I got right and then did not
 apply an hour later.
 
-## 2026-08-17 01:3xZ — VERIFIED (sim-scheduling): the real MLB re-sim rules
+## [mlb-resim-rules] 2026-08-17 01:3xZ — VERIFIED (sim-scheduling): the real MLB re-sim rules
 
 `_mlb_daily_sim_decision()` (`live_refresh_loop.py`, 230 lines, every tick).
 Blocks first: `disabled` / pipeline deferral / `previous_run_still_active` /
@@ -2025,7 +2043,7 @@ that guard is doing work.
 `4ec66498` (01:23:37Z, another session) — which DESCENDS from my `7623a233` and
 retains Phase 1c and the reconciliation guard. The convergence held.
 
-## 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker
+## [sim-scheduling-blocker] 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker
 
 **`#440`'s goal is "live sims for every sport". Every route to it ends at
 refresh-worker/live-odds-worker CAPACITY, which is `#449`.** Not at engine work,
@@ -2062,7 +2080,7 @@ file revert. No-op until an artifact exists.
 **`#449` is ONGOING** — kills at 01:07:16, 01:21:07, 01:46:59Z, cadence unbroken
 by two full container replacements. Owned by `Worker memory watchdog logs`.
 
-## WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`)
+## [wnba-game-state] WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`)
 
 - **The worker's WNBA `game_cards_<date>.csv` holds ONE fixture on a three-game
   slate.** Measured 2026-08-17 via `/api/ops/artifacts/export`:
@@ -2082,7 +2100,7 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   between its live and terminal text checks, and `"Final/OT"` trips both.
   **Deployed, verified by content, behavioural test PENDING a finished OT game.**
 
-## WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17
+## [wnba-fixture-identity] WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17
 
 - **The stable WNBA fixture identity is the ESPN event id, already present in
   `schedule_2026.csv`** - verified same-instant against ESPN scoreboard; all
@@ -2109,7 +2127,7 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   still could not save the role — an id that survives a resume does not survive
   the session being archived.
 
-## Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
+## [wnba-sweep-ownership-gate] Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
 
 - **The WNBA full refresh had NO scheduled owner.** `MAIN_ENTRY` 0 hits/8h on
   both workers. GHA `RUN_FULL_PIPELINE` reads `github.event.inputs`, empty on the
@@ -2132,7 +2150,7 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
 - **`game_cards` coverage fix is DEPLOYED but its EFFECT is UNMEASURED**, and
   cannot be measured until Phase 2 is enabled.
 
-## Sweep ownership gate + Phase 2 - STATE 2026-08-17 ~22:00Z
+## [wnba-sweep-ownership-gate] Sweep ownership gate + Phase 2 - STATE 2026-08-17 ~22:00Z
 
 - **THE SWEEP GATE IS DEPLOYED** (`20025cc4`, ~20:35Z, by the coordinator) and
   **confirmed present by CONTENT on all four deploy branches**, including the
@@ -2156,7 +2174,7 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
 - **`wnba_forced_through` fired 0 times in 24h on both services** - that
   carve-out is INERT and is not what gates WNBA.
 
-## Sweep gate, modelled-fair edge, soccer window — STATE 2026-08-18 ~01:00Z
+## [wnba-sweep-ownership-gate] Sweep gate, modelled-fair edge, soccer window — STATE 2026-08-18 ~01:00Z
 
 - **SWEEP OWNERSHIP GATE `20025cc4` IS DEPLOYED AND WORKING.** Partition live on
   live-odds-worker every tick; refresh-worker stopped sweeping mlb/soccer/wnba;
@@ -2180,7 +2198,7 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   `*_FAILED` variant and a successful launch was invisible.
 
 
-## MLB CONDITIONAL PITCH MIX — MECHANISM VALIDATED, MARKET SILENT `[2026-08-18]`
+## [mlb-pitch-mix] MLB CONDITIONAL PITCH MIX — MECHANISM VALIDATED, MARKET SILENT `[2026-08-18]`
 
 - **Engine picks pitches by count bucket and batter hand**, not one season vector.
   `simulate.py` both selection sites; artifact
