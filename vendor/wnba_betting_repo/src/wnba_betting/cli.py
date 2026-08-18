@@ -1881,6 +1881,25 @@ def _resolve_smart_sim_roster_mode(date_str: str, roster_mode: str | None) -> st
     return mode
 
 
+# Columns `compute_team_advanced_stats_from_boxscores`/`_from_player_logs` have
+# always emitted since they were introduced -- a cached CSV missing either one
+# predates that schema and is stale, not merely absent. Checked at
+# `docs/ai_context/todo.md` #461: WNBA as-of files built before this column
+# existed sat non-zero-size forever and the old exists()-only guard below
+# never rebuilt them, so `games` read CONSUMED+UNPOPULATED indefinitely.
+_TEAM_ADV_STATS_REQUIRED_COLUMNS = ("games", "source")
+
+
+def _team_adv_stats_cache_is_fresh(path: Path) -> bool:
+    """True only if `path`'s header has the current schema. Cheap (header-only
+    read) so callers can use it on every cache hit, not just on first build."""
+    try:
+        header = pd.read_csv(path, nrows=0)
+    except Exception:
+        return False
+    return all(c in header.columns for c in _TEAM_ADV_STATS_REQUIRED_COLUMNS)
+
+
 def _ensure_team_advanced_stats_asof(season: int, as_of: str) -> Path | None:
     """Ensure an as-of team advanced stats file exists (built from cached boxscores).
 
@@ -1893,7 +1912,10 @@ def _ensure_team_advanced_stats_asof(season: int, as_of: str) -> Path | None:
         # A bare exists() check let a 0-byte leftover (from a partial/failed
         # write) permanently block the rebuild -- every downstream consumer
         # then read an empty file and ran teams at league-baseline ratings.
-        if out_path.is_file() and out_path.stat().st_size > 0:
+        # A non-zero size alone isn't enough either: a valid CSV written
+        # under an older schema (missing `games`/`source`) would pass this
+        # check forever too, so the freshness check below is required.
+        if out_path.is_file() and out_path.stat().st_size > 0 and _team_adv_stats_cache_is_fresh(out_path):
             return out_path
     except OSError:
         pass
