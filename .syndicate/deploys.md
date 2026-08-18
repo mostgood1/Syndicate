@@ -15073,3 +15073,48 @@ any more.** The next lever is the refit, whose residuals (hr −34.6%, k −24.5
 bb −31.3%) are an order of magnitude larger than anything the inputs moved —
 and which must now be re-run, because every correction it computed earlier was
 fitted against a HALF-FED engine.
+
+### CORRECTION #3, 01:1xZ — **DO NOT GATE `launch_refresh_run`. I MISREAD THE OWNERSHIP FLAG, and the change I was asked to make would have killed a 60-SECOND PRODUCTION MLB REFRESH.**
+
+**THE MISREADING.** I treated `SYNDICATE_MLB_REFRESH_TICK_OWNER=false` on
+refresh-worker as *"this service must not refresh MLB"*. Its own docstring says
+the opposite of that:
+
+> *"Whether THIS SERVICE'S TICK should include 'mlb' among the sports it
+> launches ... **vs. leaving that entirely to refresh-worker's own purpose-built
+> MLB autorun** (`_launch_autorun_mlb_refresh` in `run_refresh_worker.py`)"*
+
+**The flag says the TICK should not, BECAUSE THE AUTORUN DOES.** It is a
+which-path flag, not a which-service flag.
+
+**AND THE AUTORUN IS REAL AND HOT.** `_launch_autorun_mlb_refresh` is gated by
+`_mlb_auto_refresh_enabled()` on a **60-second** interval keyed to the live-lens
+report age (`MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS`, default 60). **A central
+gate in `launch_refresh_run` would have filtered it out and silently stopped
+MLB's fastest refresh path in production.**
+
+**SO CORRECTION #2 WAS WRONG IN ITS FRAMING.** I called the gate "unreachable on
+refresh-worker / half-effective". In fact **the gate applies exactly where the
+flag is about — the TICK — and that is correct.** refresh-worker's autoruns are a
+SEPARATE, INTENDED path, and its `ODDS_SWEEP_OUTCOME` lines for mlb/soccer are
+that intended work, not a bypass.
+
+**WHAT REMAINS GENUINELY UNEXPLAINED, and it is now small and specific:**
+refresh-worker graded a **wnba** launch at 23:55:36. There is **no
+`_launch_autorun_wnba_refresh`** in `run_refresh_worker.py` — its autoruns are
+mlb, soccer pregame, soccer weekly, reconciliation, evaluation settlement, nfl
+pbp, and the projections pair. **So which path launched wnba there is the one
+real open question**, and it is a much narrower question than "the gate is
+broken".
+
+**WHY I STOPPED RATHER THAN BUILT IT.** The request was reasonable given what I
+had told the user — but I had told them something wrong. Gating the shared
+launch entry point for every sport on both services, on a premise I had already
+been wrong about three times tonight, against a 60s production path, is not a
+change to make at the end of a long session. **`launch_refresh_run` needs no
+gate. My tick gate is already correct.**
+
+**NEXT ACTION:** find the caller behind refresh-worker's 23:55:36 wnba launch —
+now cheap, because `ODDS_SWEEP_LAUNCHED` (`63fc2c84`) will name the sports and
+count on the tick path, so a wnba launch that appears WITHOUT that line came
+from somewhere else. **Do not touch `launch_refresh_run` to find out.**
