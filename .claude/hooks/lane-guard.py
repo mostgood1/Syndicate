@@ -166,7 +166,19 @@ def _claims(text):
         if m:
             in_files = True
             if open_lane:
-                for f in _paths_in(m.group(1)):
+                # THE SAME DISCLAIMER-STRIPPING CONTINUATION LINES ALREADY GET.
+                # Measured 2026-08-18: `basketball-model-owner`'s Files line ran
+                # "- Files: <real paths>. ... Collision check: no other OPEN lane
+                # claims any `data/wnba_source/**` path (grepped `lanes.md`,
+                # clean)." all on ONE physical line (no colon before "Files:",
+                # so [^:]* stops at the FIRST colon and (.*) swallows the whole
+                # rest of the line, disclaimer included). `lanes.md` -- mentioned
+                # only as the file that WAS grepped, not a claim -- got read as
+                # this lane's own path and blocked an unrelated worktree session
+                # from writing `.syndicate/lanes.md` at all. Continuation lines
+                # already run through `_claimable_prefix` for exactly this
+                # reason; the initial line never did, which is the gap.
+                for f in _paths_in(_claimable_prefix(m.group(1))):
                     yield slug, f
             continue
 
@@ -242,7 +254,25 @@ def main():
         return 0
 
     # Never guard the ledger or the harness config itself.
-    if rel.startswith(".syndicate") or rel.startswith(".claude"):
+    #
+    # `rel` is root-relative, so this ONLY caught the primary tree. A session
+    # editing the SAME logical `.syndicate/lanes.md` from an isolated worktree
+    # (`C:/tmp/syndicate-sessions/<lane>/.syndicate/lanes.md`, per
+    # `session_worktree.py`) gets a `rel` like
+    # `../../../../tmp/syndicate-sessions/<lane>/.syndicate/lanes.md` -- it
+    # does not start with ".syndicate", so the exemption silently failed to
+    # apply and the file fell through to ordinary claim-checking. Measured
+    # 2026-08-18: this is what let a false claim on `lanes.md` (see the
+    # `_claimable_prefix` fix above) block a worktree session from closing its
+    # own lane, on a file this guard was never supposed to check at all.
+    # Check the PATH ITSELF for a `.syndicate`/`.claude` segment, not its
+    # position relative to `root` -- true in both the primary tree and any
+    # worktree, since both mirror the same internal layout.
+    norm_path = _norm(path)
+    if any(
+        norm_path == marker or norm_path.startswith(marker + "/") or ("/" + marker + "/") in ("/" + norm_path)
+        for marker in (".syndicate", ".claude")
+    ):
         return 0
 
     # PER-SESSION MARKER, falling back to the global one.
