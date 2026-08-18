@@ -14845,3 +14845,50 @@ it before that is settled would satisfy the checklist and mean nothing.
 `expected_stats` for xwoba, `exitvelo_barrels` for ev_mean/ev_max — the last
 already in the batted-ball artifact). **The work is deciding the contract, not
 finding the data.**
+
+### CORRECTION #2, 01:00Z — **THE GATE IS HALF-EFFECTIVE BY CONSTRUCTION. It is UNREACHABLE on refresh-worker, and my "ownership transferred at 23:55:40Z" was WRONG.**
+
+**This is the third revision of the same claim tonight. The first two were mine
+and both were premature. The evidence now:**
+```
+23:59:25  refresh-worker    ODDS_SWEEP_OUTCOME sport=wnba wrote=True since_launch_s=229
+                            -> that launch was at 23:55:36
+00:30:12  refresh-worker    nfl, soccer, mlb outcomes    <- still sweeping ALL FOUR
+  (any)   live-odds-worker  ODDS_SWEEP_OUTCOME: ZERO, still
+  (ever)  refresh-worker    SWEEP_OWNERSHIP_EXCLUDED: ZERO
+```
+**`since_launch_s=229` puts refresh-worker's graded launch at 23:55:36 — the SAME
+launch I attributed to live-odds-worker.** refresh-worker made it. The marker
+never changed hands.
+
+**WHY, and it is structural rather than a bug in the gate.** The gate lives in
+`live_refresh_loop._live_refresh_loop_effective_sports`, on the LIVE ODDS TICK
+path. **`run_refresh_worker.py` calls `launch_refresh_run` DIRECTLY from its own
+autoruns** (`_launch_autorun_mlb_refresh`, `_launch_autorun_soccer_pregame_refresh`,
+`_launch_autorun_soccer_weekly_refresh`, ...) and never calls that resolver. So:
+- **live-odds-worker** runs the tick -> gate applies -> correctly keeps
+  `mlb,wnba,soccer`. **Working exactly as designed.**
+- **refresh-worker** launches through its own autoruns -> **the gate is never
+  consulted** -> it keeps sweeping all four and keeps winning the marker.
+
+That is why refresh-worker has emitted `ODDS_SWEEP_OUTCOME` for four sports and
+`SWEEP_OWNERSHIP_EXCLUDED` exactly zero times: it runs the module's GRADING code
+but not its SPORT-RESOLUTION code.
+
+**WHAT THIS MEANS FOR `20025cc4`.** Half one (live-odds-worker partitions
+correctly) is real and holds. **Half two cannot happen while refresh-worker
+bypasses the gate.** The deploy did not fail — **the fix was incomplete, and I
+did not check that both services reach the code before claiming the partition
+would hold.** That is the `presence != reachability` rule, which I have now
+missed twice in one day on my own changes.
+
+**NOT DIAGNOSED, and I am not asserting it:** whether live-odds-worker's
+permitted sports are additionally blocked by the cross-service refresh-run lock
+(`ops_refresh._refresh_run_still_active`). It emitted `A refresh run is already
+active (pid=890)` earlier tonight, so it is a live candidate for why even its
+NON-skipped sport (mlb) produces no launch. **Unmeasured.**
+
+**NEXT ACTION — a real fix, not a re-verify.** The sports gate must be applied
+where refresh-worker actually launches: inside `launch_refresh_run`, or at each
+`_launch_autorun_*` call site in `run_refresh_worker.py`. Gating one of the two
+launch paths was never going to partition anything.
