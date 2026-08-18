@@ -128,8 +128,54 @@ class PitchModelConfig:
     #                 11.3%. `two_strike_foul_boost` only ever fixed 2-strike
     #                 counts, so every other count stayed at ~half of reality.
     #   0 strikes, behind -- real pitchers throw STRIKES. 1-0: CALLED 23.0% vs 13.9%.
+    # *** BOTH STAY 1.0. The two-strike cells are NOT fixable this way, and the
+    # reason is structural rather than a matter of finding better values. ***
+    #
+    # Measured 2026-08-18, 16 combinations, 8 games x 30 sims, K/PA guard +-0.010:
+    #
+    #   damp   K/PA           damp   K/PA
+    #   1.00   0.2260         0.40   0.1886
+    #   0.60   0.2009         0.25   0.1747
+    #
+    # EVERY value below 1.0 wrecks K/PA, because AT TWO STRIKES A CALLED STRIKE
+    # *IS* A STRIKEOUT. `two_strike_called_damp` and K/PA are not two quantities
+    # that can be traded off -- they are the same quantity. The sim shows 12.1%
+    # called strikes at 0-2 against a real 3.5%, and it NEEDS them to reach 0.226.
+    #
+    # So the engine arrives at a correct K/PA through a compensating error: too
+    # many called strikes at two strikes, too few balls (31.5% vs a real 45.5%)
+    # and too few fouls. Closing the cell requires the strikeouts to come from
+    # SWINGING strikes instead, which no scalar on the existing terms expresses.
+    #
+    # The only admissible option in the whole sweep was waste_ball=1.2 with
+    # damp=1.0: two-strike deviation 0.4033 -> 0.3982, a 1.3% gain, in exchange
+    # for K/PA 0.2260 -> 0.2214. **Rejected** -- it gives back the exact K/PA
+    # this lane just achieved to buy almost nothing.
+    two_strike_whiff_boost: float = 1.0   # PAIRS with two_strike_called_damp
     two_strike_waste_ball_boost: float = 1.0
     two_strike_called_damp: float = 1.0
+    # *** THE HEADLINE NUMBER FOR THIS TERM WAS WRONG. CORRECTED 2026-08-18. ***
+    #
+    # Committed as "K/PA 0.1859 -> 0.2260, exactly the real 0.226". **That does
+    # not reproduce.** Re-measured on the same 8 games x 30 sims immediately
+    # afterwards:
+    #
+    #     early_count_foul_boost = 1.0    K/PA 0.1269
+    #     early_count_foul_boost = 2.05   K/PA 0.1606
+    #
+    # The term is REAL and the direction is right -- +27% on K/PA, measured twice
+    # consistently -- but it does NOT reach 0.226, and the K deficit is NOT
+    # closed. The value is kept because 2.05 beats 1.0 on the reproducible
+    # numbers; the claim attached to it is withdrawn.
+    #
+    # WORSE, AND UNRESOLVED: passing the five-key override dict with every value
+    # at 1.0 -- which should be identical to passing nothing -- gives K/PA 0.3584
+    # against 0.1606 for `{}`. Explicit no-op values are NOT no-ops through
+    # `GameConfig.pitch_model_overrides`, so **every number produced by
+    # `calibrate_count_shape.py` is suspect**, including the fit that chose 2.05
+    # and the sweep that rejected the two-strike terms. Do not trust that harness
+    # until this is explained.
+    #
     # FITTED 2.05 -- and this one term closes the whole K deficit.
     # K/PA 0.1859 -> 0.2260 against a real 0.226. Verified an INTERIOR optimum,
     # not a grid boundary: joint score 0.5912 at 1.8, 0.5659 at 2.05, 0.5933 at
@@ -643,6 +689,13 @@ def simulate_pitch(
         _cd = _cfg_float(cfg, "two_strike_called_damp", 1.0)
         if _cd != 1.0:
             p_called *= _cd
+        # Damping called strikes ALONE cannot work -- at two strikes a called
+        # strike IS a strikeout, so cutting it just deletes strikeouts (measured:
+        # K/PA 0.2260 -> 0.1747 as damp went 1.0 -> 0.25). This term is the other
+        # half: the strike mass has to MOVE to swinging strikes, not shrink.
+        _wb = _cfg_float(cfg, "two_strike_whiff_boost", 1.0)
+        if _wb != 1.0:
+            p_whiff *= _wb
     else:
         # NOT an else-branch on convenience: `two_strike_foul_boost` already
         # owns 2-strike fouls, and stacking both would double-count there.
