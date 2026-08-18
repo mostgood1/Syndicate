@@ -33112,6 +33112,59 @@ Prior art: `lanes.md` already records "test_layer2_shortlist_wiring — found an
 PARTLY fixed on the way, handed on" from the `layer2-board-quality` lane. This
 ticket is that hand-off, made explicit and measured.
 
+### `#447` — **6 LAYER-2 SHORTLIST WIRING TESTS ARE RED IN PRODUCTION AND UNOWNED** — FOUND 2026-08-16, NOT STARTED, no owner
+
+Found while validating a deploy payload, not by a test run in anger — which is
+the point: nothing in the daily loop reads this file's result, so it has been
+red for an unknown length of time without anyone noticing.
+
+**MEASURED 2026-08-16 20:2xZ, `tests/test_layer2_shortlist_wiring.py`:**
+
+| content | failed | passed |
+|---|---|---|
+| live `415e23cb` | **7** | 7 |
+| `main` | **6** | 8 |
+
+Failing on both: `test_a_priced_market_becomes_ranked_candidates`,
+`test_each_row_carries_the_price_it_recommends`,
+`test_ingest_stats_do_not_clobber_the_selection_report`,
+`test_one_sport_failing_does_not_lose_the_others`,
+`test_multiple_sports_are_bucketed_separately`, `test_forward_view_is_reachable`.
+`main` additionally FIXES `test_only_requested_sports_are_read`.
+
+**Do NOT read this as "main is fine."** `main`'s failing set is a strict subset
+of live's, which is only enough to clear a deploy of `layer2_shortlist.py` as
+"not a regression". It is NOT evidence the wiring is correct. Six assertions
+about the core board path — a two-sided market yielding one candidate per side,
+each row carrying the price it recommends, sports bucketed separately — do not
+hold.
+
+**The shape of the failure:** `per_sport_ingest.mlb.grid_rows == 1` and
+`sides_priced == 2` PASS while `len(out["rows"]) == 0`. Ingest counts the market;
+row-building emits nothing. The test also hydrates REAL MLB artifacts
+(`MLB_GAME_MARKET_ROWS_DIAG` on live `game_pk`s), so the fixture is not isolating
+the path the code actually takes — the shard injection is being bypassed.
+
+**How to reproduce a worktree at all in this repo** (this cost time; write it
+down): `git worktree add` fails outright with `Filename too long` under
+`data/mlb_source/source_artifacts/`. Use
+`git worktree add --no-checkout`, then `git sparse-checkout init --cone`, then
+`sparse-checkout set pipeline syndicate scripts tests router tools utils vendor docs`,
+then `git checkout`. Omitting `router` gives a misleading
+`ModuleNotFoundError: No module named 'router'` on every test.
+
+**Caveat for whoever takes it:** a sparse tree has no `data/`, so results there
+are RELATIVE only. Decide first whether these tests are meant to run hermetically;
+if so, the real defect may be that they reach the filesystem at all.
+
+Prior art: `lanes.md` already records "test_layer2_shortlist_wiring — found and
+PARTLY fixed on the way, handed on" from the `layer2-board-quality` lane. This
+ticket is that hand-off, made explicit and measured.
+
+#### `#447` RESTORED 2026-08-18 — it was removed from `todo.md` by commit `2ec1a171` (a de-dup pass that took this item along with a duplicated `#445` block) and never archived to `todo_closed.md`, so for a while it existed in NEITHER file on `main`. Re-added verbatim from `3ce9fb67`.
+
+**Restoring it is not progress on it** — still FOUND 2026-08-16, NOT STARTED, no owner. Item ids are stable and never reused, and an item leaves `todo.md` only by landing in `todo_closed.md`; disappearing from both is how open work stops being counted.
+
 #### `#445` UPDATE 2026-08-16 21:2xZ — SHIPPED, AND **NOT VERIFIABLE TODAY**. Do not close it.
 
 Live on refresh-worker (`c324447d` -> `a9e5d3d6`, marker `ENGINE_SCHEDULE_ABSENT`
