@@ -60,11 +60,6 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # file each, unlike the roster objects they feed.
     "*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json",
     "*_source/source_artifacts/data/batted_ball/batted_ball_*.json",
-    "*_source/source_artifacts/data/arsenal/arsenal_*.json",
-    "*_source/source_artifacts/data/quality/quality_*.json",
-    # Conditional pitch mix: pitcher x count-bucket x batter hand, 0.48 MB for
-    # 728 pitchers. Same per-season single-document shape as the two above.
-    "*_source/source_artifacts/data/conditional_mix/conditional_mix_*.json",
     # The checklist's own REPORT. Roster objects are deliberately NOT
     # allowlisted -- hundreds of large files per date, and this allowlist drives
     # publishing as well as reading. The worker runs the audit and publishes the

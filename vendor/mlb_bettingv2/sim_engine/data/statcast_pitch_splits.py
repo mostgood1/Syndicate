@@ -21,17 +21,26 @@ class PitcherPitchSplits:
     end_date: str = ""
 
 
-# Canonical mapping lives in pitch_codes.py -- ONE map for the engine. The
-# local table here knew nothing of the sweeper (8.20% of 2026 pitches), which
-# fell through to OTHER and a 1.00 whiff multiplier.
-from .pitch_codes import canon_pitch_type as _canon
+_SC_TO_CANON: Dict[str, PitchType] = {
+    "FF": PitchType.FF,
+    "FA": PitchType.FF,
+    "FT": PitchType.SI,
+    "SI": PitchType.SI,
+    "FC": PitchType.FC,
+    "SL": PitchType.SL,
+    "CU": PitchType.CU,
+    "KC": PitchType.KC,
+    "CS": PitchType.CU,
+    "CH": PitchType.CH,
+    "FS": PitchType.FS,
+    "FO": PitchType.CH,  # forkball-ish; treat as CH bucket
+    "KN": PitchType.KN,
+}
 
 
 def _canon_pitch_type(code: str) -> PitchType:
-    """Statcast code -> canonical PitchType. Non-pitches fall back to OTHER
-    here, because this module's callers key dicts by the result and cannot
-    represent 'drop it'."""
-    return _canon(code) or PitchType.OTHER
+    code = (code or "").strip().upper()
+    return _SC_TO_CANON.get(code, PitchType.OTHER)
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -108,7 +117,10 @@ def _splits_from_artifact(pitcher_id: int, season: int) -> Optional["PitcherPitc
 
 
 def _canon_pt(code: str) -> PitchType:
-    return _canon_pitch_type(code)
+    try:
+        return PitchType(str(code).strip().upper())
+    except Exception:
+        return _SC_TO_CANON.get(str(code).strip().upper(), PitchType.OTHER)
 
 
 def fetch_pitcher_pitch_splits(
