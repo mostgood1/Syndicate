@@ -675,7 +675,46 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                     __file__, env_var="SYNDICATE_SOCCER_SOURCE_ROOT", local_dir_name="soccer_source"
                 )
             )
-            index = load_soccer_projections(roots, selected_date)
+            # THE `#379` WIDENING SHIPPED INERT, AND THIS LINE WAS WHY.
+            #
+            # `load_soccer_projections` grew a `window_dates` parameter -- with a
+            # measured cost analysis and the failure numbers in its own docstring
+            # -- so the projection read could span the same slate window the
+            # QUOTE read already spans. It defaults to `[selected_date]` "so
+            # every existing caller behaves exactly as before", and this is the
+            # ONLY production caller. It never passed a window, so the merge
+            # logic, its tests and its documentation all shipped while
+            # production went on reading exactly one date.
+            #
+            # Soccer shards by KICKOFF date and almost nothing kicks off
+            # "today", so that is not a small gap. Measured 2026-08-17: window
+            # 08-17..08-23, 8,759 grid rows, `rows_with_projection: 4`,
+            # `matches_in_source: 3`, `unmatched_match_rows: 8,755`. The three
+            # matches that DID load were today's and IN PLAY, so their pregame
+            # projections were correctly withheld -- today was never the
+            # problem, the other six dates were never read at all.
+            #
+            # `resolve_window_dates` is the resolver Layer 2's quote read uses
+            # and the one that docstring names for exactly this call. Using the
+            # same one is the point: two independent notions of "which dates is
+            # this sport's board" would drift, and that drift IS this defect.
+            from syndicate.features.shared.layer1_board import resolve_window_dates
+
+            # `window="slate"` IS LOAD-BEARING, NOT A DEFAULT. The resolver
+            # defaults to `window="day"`, which returns `[selected_date]` -- so
+            # calling it bare would have passed a one-date window and left this
+            # fix exactly as inert as the bug it repairs. Caught by reading the
+            # returned value rather than trusting the call. `"slate"` resolves
+            # via `slate_window_days("soccer")` = 7, giving 08-17..08-23, which
+            # is the window `#379` measured and the one the quote read spans.
+            try:
+                soccer_window = resolve_window_dates("soccer", selected_date, window="slate")
+            except Exception:
+                # Never let the window resolver take down the join it widens.
+                # Falling back to one date restores exactly the old behaviour,
+                # which is a degraded read rather than a broken one.
+                soccer_window = [selected_date]
+            index = load_soccer_projections(roots, selected_date, window_dates=soccer_window)
             if not index.matches:
                 return {
                     "supported": True,

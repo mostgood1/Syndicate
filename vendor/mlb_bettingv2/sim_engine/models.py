@@ -259,8 +259,29 @@ class BatterProfile:
     vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
     vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
 
-    # Statcast-derived quality multipliers applied to baseline rates.
-    # Keys: "k", "bb", "hr", "inplay".
+    # Statcast quality bag. `#440` -- CONTRACT SETTLED 2026-08-18.
+    #
+    # This is a UNION, not a fixed schema, and it is PARTIAL BY DESIGN. Three
+    # consumers read it and each takes only the keys it recognises:
+    #
+    #   simulate.py:163  _statcast_shape_rate_mults  reads the RAW metrics and
+    #                    DERIVES {k,bb,hr,inplay,pitch_count,xb} from them
+    #   simulate.py:1400 lookahead pressure          reads BOTH raw metrics and
+    #                    the derived multipliers, guarding each with isinstance
+    #
+    # Every read is guarded and `_rate_ratio_mult` returns 1.0 for a missing or
+    # non-numeric value, so supplying a SUBSET is legal and safe. The old comment
+    # here listed only k/bb/hr/inplay, which described the DERIVED OUTPUT and led
+    # to a hunt for a producer that could never have existed.
+    #
+    # RAW metrics (feed these):
+    #   chase_swing_rate  zone_rate  csw_rate  contact_rate  xwoba
+    #   ev_mean  ev_max  pulled_air_rate  pitch_velo_mean  pitch_extension_mean
+    #
+    # DERIVED multipliers (k/bb/hr/inplay): DO NOT FEED alongside the raw
+    # metrics. `_statcast_shape_rate_mults` already derives them, and supplying
+    # both makes the lookahead add pressure from a value the shape function has
+    # separately applied -- double-counting, the failure measured 2026-08-17.
     statcast_quality_mult: Dict[str, float] = field(default_factory=dict)
 
     # Optional: batter-vs-pitcher head-to-head multipliers keyed by pitcher MLBAM id.
@@ -329,8 +350,29 @@ class PitcherProfile:
     vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
     vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
 
-    # Statcast-derived quality multipliers applied to baseline rates.
-    # Keys: "k", "bb", "hr", "inplay".
+    # Statcast quality bag. `#440` -- CONTRACT SETTLED 2026-08-18.
+    #
+    # This is a UNION, not a fixed schema, and it is PARTIAL BY DESIGN. Three
+    # consumers read it and each takes only the keys it recognises:
+    #
+    #   simulate.py:163  _statcast_shape_rate_mults  reads the RAW metrics and
+    #                    DERIVES {k,bb,hr,inplay,pitch_count,xb} from them
+    #   simulate.py:1400 lookahead pressure          reads BOTH raw metrics and
+    #                    the derived multipliers, guarding each with isinstance
+    #
+    # Every read is guarded and `_rate_ratio_mult` returns 1.0 for a missing or
+    # non-numeric value, so supplying a SUBSET is legal and safe. The old comment
+    # here listed only k/bb/hr/inplay, which described the DERIVED OUTPUT and led
+    # to a hunt for a producer that could never have existed.
+    #
+    # RAW metrics (feed these):
+    #   chase_swing_rate  zone_rate  csw_rate  contact_rate  xwoba
+    #   ev_mean  ev_max  pulled_air_rate  pitch_velo_mean  pitch_extension_mean
+    #
+    # DERIVED multipliers (k/bb/hr/inplay): DO NOT FEED alongside the raw
+    # metrics. `_statcast_shape_rate_mults` already derives them, and supplying
+    # both makes the lookahead add pressure from a value the shape function has
+    # separately applied -- double-counting, the failure measured 2026-08-17.
     statcast_quality_mult: Dict[str, float] = field(default_factory=dict)
 
     # Batted-ball type tendencies (share of balls in play allowed).
@@ -437,6 +479,15 @@ class GameConfig:
     park_hr_weight: float = 1.0
     park_inplay_hit_weight: float = 1.0
     park_xb_share_weight: float = 1.0
+    # `#440` P2: in-sim POSITION-PLAYER substitution (pinch hitters, defensive
+    # replacements). Dark-launched OFF, like every other behaviour change here.
+    #
+    # THIS MUST BE A DECLARED FIELD, not an attribute set on an instance.
+    # `dataclasses.replace()` rebuilds a GameConfig from its declared fields
+    # only, and the sim calls `replace(cfg, rng_seed=...)` on every run -- so a
+    # monkey-patched attribute is silently discarded before the first pitch and
+    # the feature reads as permanently disabled. Caught by the reachability test.
+    position_substitutions: bool = False
     # Toggle batted-ball-informed baserunning: DP, sac flies, and runner advancement.
     # When False, falls back to a simpler forced-advance baserunning model.
     bip_baserunning: bool = True

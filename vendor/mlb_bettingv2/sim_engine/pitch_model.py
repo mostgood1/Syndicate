@@ -38,6 +38,47 @@ class PitchModelConfig:
     name: str = "pitch_model_v1_tuned_20260308_hrcluster_sigma008_hrw135"
 
     # Baseline call mix; these are used as priors then adjusted by count and rates.
+    #
+    # `#440` 2026-08-18: RE-BASED AGAINST THE REAL LEAGUE MIX. The engine
+    # under-produced strikeouts by 27% (K/PA 0.179 vs 0.226) and `k_rate` could
+    # not fix it -- a 1.368x correction moved the residual 0.6pp, because K is a
+    # CONSEQUENCE of plate-appearance length, not a per-PA target.
+    #
+    # Measured sim vs MLB, 17,660 simulated pitches:
+    #     IN_PLAY   23.3%  vs  ~17%   <- 37% too many; every one ENDS the PA
+    #     FOUL      15.9%  vs  ~18%   <- too few; a 2-strike foul EXTENDS the PA
+    #     CALLED    13.9%  vs  ~17%
+    #     WHIFF     12.3%  vs  ~11%   <- already ABOVE league, not the problem
+    #     pitches/PA 2.97  vs  ~3.9   <- 24% short
+    #
+    # PAs were ending before they could reach three strikes. The whiff rate was
+    # never the deficit; the CONTACT rate was. base_in_play and base_foul are the
+    # two constants furthest from reality, and they move PA length in opposite
+    # directions, so both are corrected together.
+    #
+    # base_hbp 0.01 also produces 2.3% HBP against a league ~0.5% -- roughly 4x
+    # too many hit batsmen.
+    #
+    # *** VALUES DELIBERATELY LEFT AT THE ORIGINALS. NOT FIXED. ***
+    #
+    # Correcting the mix ALONE makes the engine WORSE in the other direction.
+    # Measured with base_foul=0.14 / base_called_strike=0.22, which lands the
+    # mix almost exactly on the league (FOUL 18.8%, CALLED 17.5%, IN_PLAY 17.3%):
+    #
+    #     K/PA 0.2837  against an actual 0.226  -- 26% TOO HIGH
+    #
+    # So the 27% K DEFICIT was the NET OF TWO OPPOSING ERRORS: a contact rate
+    # that ended PAs early (suppressing K) masking a strike->strikeout conversion
+    # that is ~26% too efficient. Fixing one exposes the other, and shipping the
+    # mix fix alone would trade a 27% shortfall for a 26% surplus.
+    #
+    # pitches/PA also stays short (3.45 vs ~3.9) even with a correct mix, which
+    # points at PA structure -- count progression / two-strike behaviour -- as
+    # the second defect rather than the call priors.
+    #
+    # This needs JOINT calibration of the mix and the conversion, with the market
+    # scoreboard (`measure_all_inputs_effect.py`) as arbiter rather than the
+    # league mix alone. One-at-a-time tuning cannot get there.
     base_ball: float = 0.34
     base_called_strike: float = 0.18
     base_swinging_strike: float = 0.12
@@ -46,6 +87,40 @@ class PitchModelConfig:
     base_hbp: float = 0.01
 
     # Situational adjustments (tunable)
+    # `#440` 2026-08-18: FIRST-PITCH TAKE. Measured over 895,320 real statcast
+    # pitches against the sim, the 0-0 cell is the engine's single largest
+    # structural error:
+    #
+    #             REAL          SIM
+    #   CALLED    29.6%        13.7%     <- sim takes 2.2x too rarely
+    #   IN_PLAY   11.3%        25.9%     <- sim puts 2.3x too many in play
+    #   take share (ball+called)  68.0%  vs  47.0%
+    #
+    # Real hitters TAKE the first pitch; the sim swings at it. Every downstream
+    # symptom follows: PAs end on pitch one, pitches/PA 3.5 vs 3.9, counts reach
+    # two strikes too rarely, K comes in low -- and the two-strike terms cannot
+    # compensate because the PA is already over.
+    #
+    # This is NOT the same shape as `three_ball_take_bias`, which only adds to
+    # p_ball (taking on 3-0 hoping for a walk). A first-pitch take moves mass
+    # from the SWING outcomes (whiff/foul/in-play) to the TAKE outcomes
+    # (ball/called), so it is a damp on the former.
+    #
+    # `first_pitch_swing_damp` scales the three swing outcomes at 0-0.
+    # Normalisation then redistributes to ball/called. Solving
+    #   d*S / (d*S + T) = 0.32   with S=0.53, T=0.47   gives d ~= 0.42.
+    # CALIBRATED 2026-08-18 against the measured 0-0 cell:
+    #   damp 0.42 / boost 1.60  ->  0-0 called 29.6% (real 29.6%, EXACT),
+    #   take 71.0% (real 68.0%), in-play 25.9% -> 15.0% (real 11.3%)
+    #   K/PA 0.161 -> 0.185 (target 0.226)   pitches/PA 2.96 -> 3.25 (target 3.90)
+    # Both target metrics move toward the target WITHOUT overshooting -- unlike
+    # the mix-only fix, which took K/PA from 27% low to 26% high. It does not
+    # close the gap alone; the 0-2 and 3-2 cells and base_in_play remain wrong.
+    first_pitch_swing_damp: float = 0.42
+    # Real 0-0 take outcomes split 38.4 ball / 29.6 called = 56/44. The sim
+    # splits 71/29 -- too far toward BALL. This lifts called strikes relative to
+    # balls at 0-0 only. 1.0 = no-op.
+    first_pitch_called_boost: float = 1.60
     three_ball_take_bias: float = 0.08
     three_ball_take_bias_runner_on_bonus: float = 0.0
     three_ball_take_bias_reliever_bonus: float = 0.0
@@ -512,6 +587,19 @@ def simulate_pitch(
     p_whiff = clamp01((cfg.base_swinging_strike + whiff_boost) * (0.7 + 1.2 * k_tgt) * whiff_mult / max(0.75, pt_mult))
     p_foul = clamp01((cfg.base_foul + foul_boost) * (0.9 + 0.4 * (1.0 - k_tgt)) * (1.0 + 0.35 * count_delta))
     p_inplay = clamp01((cfg.base_in_play - inplay_penalty) * (0.85 + 0.5 * (1.0 - k_tgt)) * inplay_mult * pt_mult / max(0.88, count_mult))
+
+    # `#440`: first-pitch approach. Applied AFTER all other terms and BEFORE
+    # normalisation, so it re-weights the final mix rather than competing with
+    # the count/rate scalings above.
+    if balls == 0 and strikes == 0:
+        _d = _cfg_float(cfg, "first_pitch_swing_damp", 1.0)
+        if _d != 1.0:
+            p_whiff *= _d
+            p_foul *= _d
+            p_inplay *= _d
+        _cb = _cfg_float(cfg, "first_pitch_called_boost", 1.0)
+        if _cb != 1.0:
+            p_called *= _cb
 
     # Normalize after HBP
     rest = 1.0 - p_hbp
