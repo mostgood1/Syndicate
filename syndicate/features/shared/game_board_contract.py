@@ -1023,6 +1023,13 @@ def build_game_board_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         # The context carried the counter the whole time; the API boundary
         # dropped it. Presence in the context is not reachability to the client.
         "board_row_counts",
+        # Which model run produced the projections on this board -- generated_at,
+        # profile_name, rating_source, seeds_used, projection_rows. NFL preseason
+        # sets it. Added because `smartsim2_preseason_projections_*.csv` is NOT
+        # in HOT_ARTIFACT_PATTERNS, so the artifact's own stamp is unreadable
+        # from outside and the served board is the only surface that can carry
+        # it. Same reason as `board_row_counts` directly above.
+        "projection_provenance",
         "app",
         "dataRoot",
         "liveLensDir",

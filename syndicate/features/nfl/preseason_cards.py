@@ -398,8 +398,38 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
     ]
     week_label = PRESEASON_WEEK_LABELS.get(resolved_week, f"Preseason Week {resolved_week}")
     source_path = str(preseason_projection_artifact_path(season=season, week=resolved_week, data_root=default_nfl_source_root()))
+
+    # PROVENANCE, BECAUSE THE ARTIFACT CANNOT BE READ FROM OUTSIDE.
+    #
+    # `smartsim2_preseason_projections_*.csv` is NOT in `HOT_ARTIFACT_PATTERNS`
+    # (verified 2026-08-18: `/api/ops/artifacts/export` answers "path is not an
+    # allowed hot artifact"), so there is no way to ask production how old these
+    # projections are. The served board was the only readable surface and it
+    # carried no `generated_at` at all -- meaning a three-week-stale preseason
+    # projection and a fresh one were INDISTINGUISHABLE to every reader,
+    # including me.
+    #
+    # Every value here is already a required CSV column on
+    # `SmartSimNflPreseasonProjection`; none is new data. `generated_at` is
+    # already in `build_game_board_api_payload`'s `optional_keys`, so it reaches
+    # the payload as soon as it is set.
+    #
+    # Taken from the FIRST projection rather than an aggregate: one artifact is
+    # written by one run, so the rows share a stamp. If they ever do not, that
+    # is itself a defect and a single stamp is the honest thing to report.
+    first_projection = projections[0] if projections else None
+    projection_provenance = {
+        "generated_at": getattr(first_projection, "generated_at", None),
+        "profile_name": getattr(first_projection, "profile_name", None),
+        "rating_source": getattr(first_projection, "rating_source", None),
+        "seeds_used": getattr(first_projection, "seeds_used", None),
+        "projection_rows": len(projections),
+    }
+
     return apply_game_board_contract(
         {
+            "generated_at": projection_provenance["generated_at"],
+            "projection_provenance": projection_provenance,
             "date": f"{season} {week_label}",
             "requested_date": f"{season} Preseason Week {selected_week}",
             "prev_date": str(prev_week),
