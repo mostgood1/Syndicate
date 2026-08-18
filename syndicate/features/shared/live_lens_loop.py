@@ -527,6 +527,29 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				meta["skipped"] = True
 				meta["reason"] = "low_headroom"
 				meta["memoryHeadroom"] = headroom_snapshot
+				# THE ONLY ONE OF THREE GATES THAT FIRED SILENTLY.
+				#
+				# MLB prints this line above and WNBA prints it below; soccer
+				# returned bare. WNBA's own comment in this same block states the
+				# rule -- "a gate that fires silently cannot be told from a builder
+				# that never ran" -- and soccer was the instance that rule describes
+				# and did not cover.
+				#
+				# It cost real time on 2026-08-17. The soccer live lens was dead for
+				# every league with a match in play (a `TypeError` in the poller,
+				# fixed in `6bdc50de`), and this gate was a live suspect that could
+				# not be cleared from the logs -- `SYNDICATE_SOCCER_LIVE_LENS_MEMORY_
+				# GATE_ENABLED` is ABSENT on all three services, which means ENABLED
+				# (`_env_bool(default=True)`) at a 300MB floor, so "the gate is
+				# tripping" was the reasonable first hypothesis. Falsifying it needed
+				# the keyvalue tick state; one log line would have done it.
+				#
+				# print, not logger.info: `logger.info` does not reach Render's
+				# collector (CLAUDE.md). Same shape as its two siblings so all three
+				# grep alike -- deliberately NOT marked TEMPORARY like MLB's, because
+				# this one is not a diagnostic for a specific incident: an unobservable
+				# skip is a permanent defect in a gate whose whole job is to skip.
+				print(f"[LIVE_LENS_TICK_DIAG] sport=soccer ok=False reason=low_headroom headroom={headroom_snapshot}", flush=True)
 				return meta
 		if sport == "wnba":
 			# The LAST ungated builder, and measurement showed it is the most
