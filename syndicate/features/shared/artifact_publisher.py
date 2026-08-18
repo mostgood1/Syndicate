@@ -306,6 +306,32 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/data/processed/boxscores_history.csv",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
+    # `docs/ai_context/basketball_sim_engine_reference.md` Sec7 / `todo.md`
+    # `#462`: the NBA/WNBA smart-sim engine's own INPUT artifacts had zero
+    # `HOT_ARTIFACT_PATTERNS` coverage -- only the final `smart_sim_*.json`
+    # OUTPUT (already allowlisted, :95/:173 above) was visible via
+    # `/api/ops/artifacts/*`. `team_advanced_stats_*.csv` is read on every
+    # smart-sim call (Sec4) and is the file `#461`'s fix rebuilds. The four
+    # calibration JSONs are currently ABSENT for both leagues (Sec5, unwired
+    # builders) -- allowlisted anyway, per `model_engine_standard.md` Sec3:
+    # allowlisting PERMITS a transfer, it does not require the file to exist
+    # yet. `player_logs`/`player_priors` (also named in `#462`'s original
+    # grep) are NOT separate artifacts: priors are computed in-memory per call
+    # from `boxscores_history.csv`, already allowlisted for WNBA (a few lines
+    # up) and deliberately excluded for NBA (~20MB, rides the git+bootstrap
+    # lane instead -- confirmed git-tracked at
+    # `data/nba_source/source_artifacts/data/processed/boxscores_history.csv`)
+    # -- so no new pattern is needed for either name.
+    "*_source/source_artifacts/data/processed/team_advanced_stats_*.csv",
+    "*_source/data/processed/team_advanced_stats_*.csv",
+    "*_source/source_artifacts/data/processed/smart_sim_total_calibration.json",
+    "*_source/data/processed/smart_sim_total_calibration.json",
+    "*_source/source_artifacts/data/processed/intervals_band_calibration.json",
+    "*_source/data/processed/intervals_band_calibration.json",
+    "*_source/source_artifacts/data/processed/intervals_time_profile.json",
+    "*_source/data/processed/intervals_time_profile.json",
+    "*_source/source_artifacts/data/processed/player_stat_calibration.json",
+    "*_source/data/processed/player_stat_calibration.json",
     # `docs/ai_context/hockeysim_engine_reference.md`: two hockeysim engine inputs
     # (`HockeyTeamFeatures.xgf_per_60`/`xga_per_60` and `.elo_rating`) had loaders
     # (`load_team_xg_map`, `load_team_elo_map`) but no allowlist entry -- per
