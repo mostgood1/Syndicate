@@ -605,6 +605,83 @@ Two moves that belong here regardless of Phase 1:
 - **Pin NFL/NCAAF season projections to the same band.** 45-minute jobs on a
   staleness gate with no clock; no reason for them to land at 20:00 on a Sunday.
 
+### Phase 2b — redefine the re-sim rule set
+
+Added 2026-08-17. **This is a redesign, not a tuning pass**, and it should be
+written down before it is built: `_mlb_daily_sim_decision()` in
+`live_refresh_loop.py` is 230 lines evaluated every tick, and every branch in it
+carries a comment naming the incident that created it. That is accretion, and it
+has a structural defect underneath it.
+
+**THE EVIDENCE THAT IT IS ACCRETION** (all from the function's own comments):
+
+- `tip_off_window` was once-per-tick until a staggered slate produced **10
+  launches / 49 game-sims in a 3-hour window**; it is now once-per-game with a
+  deliberate fall-through.
+- `board_missing_game_pks` exists because the guard `if not changed_game_pks and
+  ...` reasoned "no point paying that when we're launching anyway" — and that was
+  wrong.
+- `props_now_available` exists for the same reason, and records the cost: a
+  scoped `fingerprint_change` launch **resims only the changed games and never
+  reaches the top-props stage**, so `daily_top_props_2026-08-04.json` held zero
+  rows for **11+ hours** while the board served MLB moneylines only.
+- A **second** memory check had to be added inside the `join_mismatch` path,
+  because the central one is passed before that work is computed.
+- Both the main trigger (`SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER`) and the
+  evening one (`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED`) are **default-off
+  dark launches** that were never turned on.
+
+**THE STRUCTURAL DEFECT: trigger and scope are fused.** `fingerprint_change`
+means both *"these games changed"* AND *"therefore run a scoped sim"*. That single
+coupling is why the sim can fire every 12 minutes and still leave props empty —
+the trigger that fires most often is the one that regenerates least.
+
+**MEASURED 2026-08-16/17, and it is what prompted this phase:**
+
+    MLB_DAILY_SIM_TRIGGERED  23:03:50, 23:17:31, 23:32:20, 23:44:11, 23:56:58
+                             all reason=fingerprint_change  (~12-14 min apart)
+
+The 600s `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS` is a **floor, not a
+schedule**: past it, any input hash diff relaunches. On a live slate with
+lineups, injuries and odds moving, that is a continuous relaunch loop with
+nothing anchored to a clock.
+
+**AND THE GUARD MEANT TO STOP IT NEVER FIRES.** Parsing `MLB_SIM_TICK` decisions
+(12 ticks, 23:00Z on): `insufficient_memory_headroom` appears **zero** times and
+no decision carries a `memory` payload — on a service being OOM-killed every ~12
+minutes (`#449`). The dominant suppressor is `intelligence_pipeline_busy`, a
+deferral checked ABOVE the memory gate, so on most ticks the gate is never
+reached. Prior art for the other reading is already in `learnings.md`: *a 900MB
+floor guarding an 1873MB stage.*
+
+**THE REDESIGN — five properties, in priority order:**
+
+1. **Decouple trigger from scope.** A trigger states WHAT CHANGED. A separate
+   scope policy states WHAT WORK THAT IMPLIES (scoped resim / full slate /
+   top-props regen). The `props_now_available` and `board_missing` branches
+   disappear as branches — they become scope outcomes.
+2. **Clock-anchored baseline** (Phase 2's band), with event-driven re-sims as
+   EXCEPTIONS rather than the normal path.
+3. **One prioritised queue, not an early-returning precedence chain.** The chain
+   is why `intelligence_pipeline_busy` masks whether the memory gate would even
+   have fired — you cannot observe a guard that sits below an early return.
+4. **Every suppression emits WHAT IT MEASURED**, not just a reason string. A
+   memory gate reporting `sufficient` invisibly on an OOM-looping service is the
+   current cost.
+5. **No default-off triggers left dark.** Decide or delete: a dark launch that
+   outlives the investigation that justified it is a branch nobody has tested.
+
+**SEQUENCING AND OWNERSHIP.** `live_refresh_loop.py` is claimed by OPEN lane
+`refresh-worker-oom-recurrence`, which owns `#449` and whose status reads
+"MECHANISM SETTLED". **Do not build this into their file while that is open** —
+their remedy may already change these rules, and Phase 2's banding may be
+superseded by it. Write the design, agree it with that lane, then build.
+
+**Falsification for the redesign itself:** if, after decoupling, the re-sim rate
+on a live slate is unchanged AND top-props still goes stale, then the trigger set
+is not the problem and the cost is in the sim itself — stop and re-measure rather
+than adding a ninth branch.
+
 ### Phase 3 — live sims for every sport
 
 Ordered so the work lands before the season does. Every addition inherits the
@@ -634,6 +711,121 @@ skeleton (§2). It is also the largest slate (300+ games/night), so it cannot go
 on a 60s tick unconditionally: it needs a **shortlist gate** — only sim games
 carrying a live edge candidate — before the first line of engine code is worth
 writing.
+
+**3e. SOCCER — IN SEASON NOW, AND THIS PLAN OMITTED IT.** Added 2026-08-17 after
+the user asked why a live MLS match was unsupported. The omission was a real
+defect in Part 3: 3a-3d cover NFL/NCAAF, WNBA/NBA, NHL and NCAAB, and soccer —
+the only sport with fixtures across ten leagues *tonight* — had no item at all.
+
+**Measured on the served payload 2026-08-16 22:1xZ**, live game vs live game at
+the same instant:
+
+| | live MLS | live MLB |
+|---|---|---|
+| rows | 321 | 233 |
+| rows_with_projection | **5 (1.6%)** | **193 (83%)** |
+| live_aware | **0** | 8-18 |
+
+Soccer's rows are overwhelmingly unprojected player props
+(`shots_on_target` 58, `goal_scorer_anytime` 37, `first_goal_scorer` 36) and it
+serves **0 edges across all 18 games** — unknown, live and final alike. The
+`#413`-shaped edge leak is closed, but it closed by withholding everything, so
+soccer currently produces no bettable output.
+
+**Tooling gap:** soccer has ONE `live_*` module (`live_lens.py`) against NBA/WNBA
+5, NHL 3, MLB 2. It has live STATE ingestion already
+(`poll_soccer_live_state.py`, `_soccer_has_live_game_via_artifact`) — what is
+missing is a live SIM path, not live data.
+
+**What it inherits:** SoccerSim is event/possession based (§2), so a live variant
+re-seeds from current score + minute + red cards and runs the existing model
+forward — structurally the same move `estimate_live` is for MLB. Needs the
+builder/validator/snapshot-path trio plus a registry entry, per the contract below.
+
+**Sequencing — do NOT simply put it first.** Soccer is in season now, which
+argues for priority, but its slate is the widest here (ten leagues, up to ~18
+concurrent fixtures measured 2026-08-16) and Phase 4's capacity question is
+unsettled while refresh-worker is OOM-looping (`#449`). Treat it as the natural
+FIRST candidate once Phase 4 lands, ahead of 3c/3d which are October/November,
+and gate it per-league using the Phase 1c machinery that already exists
+(`_due_leagues_for_sport`) rather than sport-wide.
+
+**Open defect adjacent to this, not fixed by a live sim:** one fixture
+(CA Osasuna @ Celta Vigo, la_liga) sat `state=unknown` with `status_token=None`
+and no score **2h50m after kickoff**, while a different 19:30Z fixture resolved
+`FINAL`. A live sim cannot help a game whose state never resolves.
+
+**3e UPDATE 2026-08-17 02:0xZ — THE PHASE-3e TEXT ABOVE IS WRONG, AND THE REAL
+BLOCKER IS CAPACITY, NOT CODE.** Corrected after tracing the actual pipeline
+rather than reasoning from the board's output.
+
+**SOCCER'S LIVE SIM ALREADY EXISTS, RUNS EVERY 60s, AND PUBLISHES.** The text
+above says it "needs a live variant that re-seeds from current score + minute +
+red cards". That is `soccer/features/live_lens.py`, built on
+`match_simulator.simulate_match`'s `initial_state` hook, with
+`build_resume_state()` and `apply_red_card_penalty()`. It has been shipped since
+`df96c3fb`. The published `data/live/soccer_live_lens.json` already carries a
+full live game-line projection per match:
+
+    home_win_probability  away_win_probability  draw_probability
+    over_2_5_probability  both_teams_scored_probability
+    projected_final_home_goals / away_goals / total   corners   simulations
+
+**WHAT IS ACTUALLY MISSING IS THE BOARD JOIN.** Three named gates exclude soccer,
+which is why the board reads `live_aware: 0` on a live MLS match:
+
+    board_enrichment.attach_live_projections_for_sport   `if sport != "mlb"`
+    board_enrichment._LIVE_GAMELINE_SPORTS               frozenset({"mlb","wnba"})
+    live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT        has mlb, wnba; no soccer
+
+Fourth "presence is not reachability" instance of the 2026-08-16 session, and the
+largest: an entire live sim running, publishing every tick, read by nothing.
+
+**BUT WIRING IT TODAY WOULD PRODUCE JOINED-BUT-UNPRICEABLE ROWS.** The join
+releases an edge only when it clears `PRICEABLE_SIGMA = 2.0` standard errors,
+`prob_std_err = sqrt(p(1-p)/n)` (Agresti-Coull). Soccer's live TICK runs at **80
+sims** — deliberately, not by oversight (`_soccer_live_lens_tick_simulations`,
+default 80; the standalone script's 300 is for one-off runs):
+
+    sims | std_err @ p=.50 | min releasable edge
+      80 |      5.46 pp    |   **10.91 pp**      <- soccer today
+     120 |      4.49 pp    |     8.98 pp         <- MLB live
+     300 |      2.87 pp    |     5.74 pp
+    1000 |      1.58 pp    |     3.16 pp
+
+For soccer's THREE-WAY market (p nearer 0.33 per outcome) the bar is ~10.3 pp. A
+live edge that large is rare, so `live_aware` would go 0 -> non-zero while edges
+stayed ~0, and it would look like the wiring failed when the gate was working.
+
+**AND 300 SIMS IS NOT AFFORDABLE ON THAT SERVICE TODAY. MEASURED 2026-08-17
+01:49-01:56Z on live-odds-worker (2048 MB cap), STILL AT 80 SIMS:**
+
+    peak container_memory_mb   1855.2 of 2048   (90.6%)
+    headroom at recent ticks   257-415 MB
+    samples                    127
+
+Soccer runs **4 separate Monte Carlo passes per in-progress match**
+(`project_live_match` + 2x `goal_in_window_probability` +
+`project_live_player_props`), on a 60s cadence, across up to ~18 concurrent
+fixtures (measured 2026-08-16). 80 -> 300 is 3.75x on each pass, into 257 MB of
+headroom — on the same 2 GB service where WNBA's builder once allocated
+**+1,062 MB in a single step** and crash-looped the container (boots 03:07:56,
+03:09:09, 03:10:31, 03:12:07 on 2026-08-08). **Do not set
+`SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS=300` on live-odds-worker as it
+stands.**
+
+**SO PHASE 3e REDUCES TO PHASE 4.** Soccer's live tier is blocked by neither
+engine work nor wiring; it is blocked by memory on a 2 GB service. That is
+exactly the capacity question Phase 4 exists to settle, and Phase 4 is stuck
+behind `#449`. **The primary goal has ONE blocker, not several** — every route to
+"live sims for every sport" arrives at the same wall.
+
+**When capacity is settled, the remaining work is small and known:** add soccer
+to the two gates and to `LIVE_LENS_SOURCES_BY_SPORT`, with a THREE-WAY-aware
+index shape (`draw_probability` has no counterpart in MLB's 2-way moneyline
+index), then raise the tick sim count. Both join files are held by OPEN lanes
+(`board_enrichment.py` by `wnba-live-tier`, `live_gameline_join.py` by
+`live-edge-basis`), so agree the claim before editing.
 
 **Contract every addition must satisfy** (enforced by
 `tests/test_live_lens_active_sports.py`): builder + validator + snapshot path,

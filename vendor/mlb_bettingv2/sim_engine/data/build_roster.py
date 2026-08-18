@@ -30,6 +30,9 @@ from .recency import batter_recent_rates, pitcher_recent_rates
 from ..features import RecencyConfig, apply_recency_to_batter, apply_recency_to_pitcher
 from .disk_cache import DiskCache
 from .statsapi import fetch_person_pitch_arsenal
+from .arsenal import apply_arsenal_to_batter, apply_arsenal_to_pitcher
+from .batted_ball import apply_batted_ball_to_batter, apply_batted_ball_to_pitcher
+from .quality import apply_quality
 from .statcast_pitch_splits import fetch_pitcher_pitch_splits
 
 
@@ -518,6 +521,24 @@ def _pprof_from_cached(player: Player, row: Dict[str, Any]) -> PitcherProfile:
     # Keep arsenal a sane default; starter arsenal enrichment happens later.
     prof.arsenal = dict(_DEFAULT_ARSENAL)
     return prof
+
+
+def _batted_ball_weight() -> float:
+    """Pull toward batted-ball contact quality. 0.0 = OFF, and that is the default.
+
+    `#440`. Env-gated rather than a constant so the blend can be turned on per
+    service without a code change, and so an unconfigured service is unchanged.
+    A malformed value reads as OFF -- an unparseable knob must not silently
+    become an active one.
+    """
+    import os  # function-local: this module has no module-level `os` import
+    raw = str(os.environ.get("SYNDICATE_MLB_BATTED_BALL_WEIGHT") or "").strip()
+    if not raw:
+        return 0.0
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _load_manager_tendencies_anykey() -> Dict[str, Dict[str, Any]]:
@@ -2082,6 +2103,38 @@ def build_team_roster(
             except Exception:
                 pass
 
+            # `#440`: batted-ball quality blend. AFTER recency, so it adjusts the
+            # rate the rest of the pipeline actually settled on rather than a
+            # value recency then overwrites.
+            #
+            # Measured leak-free (n=218, all predictors first-half only): barrel%
+            # predicts future HR at 0.387 vs this profile's own `hr_rate` at
+            # 0.312, and hard-hit% predicts future TB at 0.235 vs 0.126. So this
+            # is a better ESTIMATOR of parameters the sim already has -- not a new
+            # mechanism, and therefore not subject to the calibration-absorption
+            # that made substitution and pitch splits interfere.
+            #
+            # DARK BY DEFAULT: weight comes from the environment and is 0.0 unless
+            # set, so an unconfigured service is byte-for-byte unchanged. It is
+            # wired here because a module with no production caller is inert
+            # however well it is tested -- which is exactly how this one shipped
+            # the first time.
+            try:
+                if _batted_ball_weight() > 0.0:
+                    apply_batted_ball_to_batter(
+                        prof, season=season, weight=_batted_ball_weight())
+            except Exception:
+                pass
+
+            # `#440`: batter performance BY PITCH TYPE. Unconditional -- these
+            # fields have no fitted value competing with them; they sit empty and
+            # resolve to 1.0, so an observed multiplier replaces a placeholder.
+            try:
+                apply_arsenal_to_batter(prof, season=season)
+                apply_quality(prof, season=season, side="batters")
+            except Exception:
+                pass
+
     # Choose starter
     starter: Optional[PitcherProfile] = None
     starter_selection_source = ""
@@ -2144,6 +2197,16 @@ def build_team_roster(
                 statcast_cache=statcast_cache,
                 statcast_ttl_seconds=statcast_ttl_seconds,
             )
+            # `#440`: native batted-ball rates. Unconditional -- these fields sit
+            # at a hardcoded league constant, so an observed rate replaces a
+            # placeholder rather than competing with a fitted estimate.
+            apply_batted_ball_to_pitcher(starter, season=season)
+            # `#440`: arsenal AFTER pitch splits -- it is the better source (two
+            # leaderboard calls vs 309 per-pitcher fetches, 466 pitchers vs 305,
+            # and it fills pitch_type_hr_mult which pitch splits cannot). The
+            # older path stays as a fallback for pitchers the leaderboard drops.
+            apply_arsenal_to_pitcher(starter, season=season)
+            apply_quality(starter, season=season, side="pitchers")
         except Exception:
             pass
 
@@ -2157,6 +2220,9 @@ def build_team_roster(
                 statcast_cache=statcast_cache,
                 statcast_ttl_seconds=statcast_ttl_seconds,
             )
+            apply_batted_ball_to_pitcher(p, season=season)
+            apply_arsenal_to_pitcher(p, season=season)
+            apply_quality(p, season=season, side="pitchers")
     if starter.player.mlbam_id:
         starter.role = "SP"
     try:

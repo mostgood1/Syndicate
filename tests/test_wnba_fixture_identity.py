@@ -1,0 +1,371 @@
+"""The stable WNBA fixture identity.
+
+WHY THIS EXISTS. `game_cards_<date>.csv` carried three incompatible `game_id`
+schemes -- 1395 sequential indices, 39 hex hashes, 16 long numerics across 62
+local files -- and two CONSECUTIVE production dates disagreed. Nothing could
+join on it. `schedule_2026.csv` already held the ESPN event id, the same
+namespace the live feed uses, and nobody was using it.
+
+Most of these tests pin REFUSALS rather than lookups. That is deliberate: a
+resolver that answers generously is how the sequential-index scheme survived,
+and every refusal below corresponds to a wrong join that would otherwise be
+silent.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from syndicate.features.shared import wnba_fixture_identity as ident
+
+
+@pytest.fixture(autouse=True)
+def _clean():
+    ident._clear_cache()
+    yield
+    ident._clear_cache()
+
+
+def _has_schedule() -> bool:
+    return ident.schedule_path() is not None
+
+
+requires_schedule = pytest.mark.skipif(
+    not _has_schedule(), reason="schedule_2026.csv not present in this checkout"
+)
+
+
+# --------------------------------------------------------------------------
+# The claim the whole design rests on.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+def test_the_schedule_ids_are_the_espn_event_ids():
+    """Measured 2026-08-17 against ESPN's own scoreboard for the same date.
+
+    If this ever fails, the pregame/live join is broken at the root and the
+    identity is no longer shared -- which is the entire reason this module
+    chose the schedule's id over minting a new one.
+    """
+    fixtures = ident.fixtures_for_date("2026-08-16")
+    assert {f.fixture_id for f in fixtures} == {"401857148", "401857150", "401857149"}
+    by_id = {f.fixture_id: f for f in fixtures}
+    assert (by_id["401857148"].away_tricode, by_id["401857148"].home_tricode) == ("CHI", "SEA")
+    assert (by_id["401857150"].away_tricode, by_id["401857150"].home_tricode) == ("IND", "ATL")
+    assert (by_id["401857149"].away_tricode, by_id["401857149"].home_tricode) == ("POR", "PHX")
+
+
+@requires_schedule
+def test_the_denominator_is_three_on_the_date_game_cards_wrote_one():
+    """The coverage defect, stated as a ratio.
+
+    `game_cards_2026-08-16.csv` held 1 row while the sim had run for all three
+    fixtures. A bare row count could not say that; this can.
+    """
+    assert len(ident.fixtures_for_date("2026-08-16")) == 3
+    # ...and the neighbouring date is genuinely a one-game slate, so "1 row" is
+    # CORRECT there. Pinned so nobody "fixes" a date that was never broken.
+    assert len(ident.fixtures_for_date("2026-08-17")) == 1
+
+
+# --------------------------------------------------------------------------
+# Refusals.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+def test_orientation_is_part_of_the_identity():
+    """A swapped home/away must NOT resolve.
+
+    Matching it would join the row to the right game with the sides reversed,
+    flipping the sign of every spread and margin -- a real number against the
+    wrong side, which the repo already treats as worse than a blank.
+    """
+    right = ident.resolve_fixture_id("2026-08-16", "Phoenix Mercury", "Portland Fire")
+    assert right == "401857149"
+    assert ident.resolve_fixture_id("2026-08-16", "Portland Fire", "Phoenix Mercury") is None
+
+
+@requires_schedule
+def test_nba_contamination_resolves_to_none_rather_than_a_nearest_match():
+    """Both of these really appear in WNBA `game_cards`, one row each.
+
+    A permissive matcher would silently absorb them. None is the correct answer
+    and lets the caller report genuine upstream contamination.
+    """
+    assert ident.normalize_team("Oklahoma City Thunder") is None
+    assert ident.normalize_team("San Antonio Spurs") is None
+
+
+@requires_schedule
+def test_a_team_playing_itself_is_refused():
+    assert ident.resolve_fixture_id("2026-08-16", "Phoenix Mercury", "Phoenix Mercury") is None
+
+
+@requires_schedule
+def test_a_date_with_no_fixtures_is_empty_not_an_error():
+    assert ident.fixtures_for_date("2026-12-25") == ()
+    assert ident.fixtures_for_date("") == ()
+    assert ident.fixtures_for_date(None) == ()
+
+
+def test_a_missing_schedule_yields_empty_and_never_raises(monkeypatch, tmp_path):
+    """This module is imported by an artifact BUILD path.
+
+    A lookup that raises would take down the build it exists to serve, which is
+    the `#375` census lesson: a diagnostic must never break its subject.
+    """
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(tmp_path / "nope.csv"))
+    ident._clear_cache()
+    assert ident.schedule_path() is None
+    assert ident.load_schedule() == ()
+    assert ident.fixtures_for_date("2026-08-16") == ()
+    assert ident.resolve_fixture_id("2026-08-16", "Phoenix Mercury", "Portland Fire") is None
+    assert ident.normalize_team("Phoenix Mercury") is None
+
+
+def test_a_corrupt_schedule_yields_empty_and_never_raises(monkeypatch, tmp_path):
+    bad = tmp_path / "schedule_2026.csv"
+    bad.write_bytes(b"\xff\xfe not,a,valid\x00 csv\nrow")
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(bad))
+    ident._clear_cache()
+    assert ident.load_schedule() == ()
+
+
+def test_rows_missing_any_part_of_their_identity_are_dropped(monkeypatch, tmp_path):
+    """A fixture with no id is exactly what this module exists to stop."""
+    csv_path = tmp_path / "schedule_2026.csv"
+    csv_path.write_text(
+        "game_id,date_est,home_tricode,away_tricode,home_city,home_name,"
+        "away_city,away_name,datetime_utc,season_type_slug\n"
+        ",2026-08-16,PHX,POR,Phoenix,Mercury,Portland,Fire,2026-08-16 23:00:00+00:00,regular-season\n"
+        "401857149,2026-08-16,PHX,POR,Phoenix,Mercury,Portland,Fire,2026-08-16 23:00:00+00:00,regular-season\n"
+        "401857999,,PHX,SEA,Phoenix,Mercury,Seattle,Storm,2026-08-16 23:00:00+00:00,regular-season\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(csv_path))
+    ident._clear_cache()
+    fixtures = ident.load_schedule()
+    assert [f.fixture_id for f in fixtures] == ["401857149"]
+
+
+def test_a_duplicated_matchup_refuses_rather_than_picking_one(monkeypatch, tmp_path):
+    """Ambiguity is not resolved by taking the first.
+
+    Same rule `wnba_game_projections.lookup` already uses: two candidates means
+    the join cannot know which, and a wrong fixture is worse than none.
+    """
+    csv_path = tmp_path / "schedule_2026.csv"
+    header = (
+        "game_id,date_est,home_tricode,away_tricode,home_city,home_name,"
+        "away_city,away_name,datetime_utc,season_type_slug\n"
+    )
+    row = "{gid},2026-08-16,PHX,POR,Phoenix,Mercury,Portland,Fire,2026-08-16 23:00:00+00:00,regular-season\n"
+    csv_path.write_text(header + row.format(gid="1001") + row.format(gid="1002"), encoding="utf-8")
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(csv_path))
+    ident._clear_cache()
+    assert len(ident.fixtures_for_date("2026-08-16")) == 2
+    assert ident.resolve_fixture_id("2026-08-16", "Phoenix Mercury", "Portland Fire") is None
+
+
+@requires_schedule
+def test_the_fixture_carries_no_status_field():
+    """THE MOST IMPORTANT REFUSAL HERE.
+
+    `schedule_2026.csv` has a `game_status_text` column and it is STALE:
+    measured 2026-08-17 it read "In Progress" for CHI@SEA and IND@ATL and
+    "Scheduled" for POR@PHX while ESPN had all three Final. The only way to
+    guarantee nobody joins a board to a dead status is not to expose it.
+    """
+    fixture = ident.fixtures_for_date("2026-08-16")[0]
+    for banned in ("status", "game_status", "game_status_text", "state", "is_final"):
+        assert not hasattr(fixture, banned), f"{banned} must not be reachable from Fixture"
+
+
+# --------------------------------------------------------------------------
+# Lookups.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+@pytest.mark.parametrize(
+    "spelling,expected",
+    [
+        ("Phoenix Mercury", "PHX"),
+        ("phoenix mercury", "PHX"),
+        ("  Phoenix   Mercury  ", "PHX"),
+        ("PHX", "PHX"),
+        ("phx", "PHX"),
+        ("Golden State Valkyries", "GSV"),
+        ("Las Vegas Aces", "LVA"),
+        ("Washington Mystics", "WSH"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_team_spellings_that_appear_in_real_artifacts_resolve(spelling, expected):
+    assert ident.normalize_team(spelling) == expected
+
+
+@requires_schedule
+def test_resolve_accepts_tricodes_as_well_as_full_names():
+    assert ident.resolve_fixture_id("2026-08-16", "PHX", "POR") == "401857149"
+    assert ident.resolve_fixture_id("2026-08-16", "Phoenix Mercury", "POR") == "401857149"
+
+
+@requires_schedule
+def test_season_type_is_exposed_so_preseason_can_be_excluded():
+    fixtures = ident.load_schedule()
+    assert any(f.season_type == "preseason" for f in fixtures)
+    assert all(f.is_regular_season for f in ident.fixtures_for_date("2026-08-16", regular_season_only=True))
+
+
+# --------------------------------------------------------------------------
+# Coverage reporting.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+def test_coverage_reports_the_real_defect_as_a_ratio():
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"}]
+    out = ident.coverage_against_schedule("2026-08-16", rows)
+    assert out["scheduled"] == 3
+    assert out["covered"] == 1
+    assert sorted(out["missing_matchups"]) == ["CHI@SEA", "IND@ATL"]
+    assert out["unresolved_rows"] == []
+
+
+@requires_schedule
+def test_coverage_separates_a_missing_fixture_from_an_unresolvable_row():
+    """Two different bugs with two different fixes; they must not look alike."""
+    rows = [
+        {"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"},
+        {"home_team": "Oklahoma City Thunder", "visitor_team": "San Antonio Spurs"},
+    ]
+    out = ident.coverage_against_schedule("2026-08-16", rows)
+    assert out["covered"] == 1
+    assert len(out["missing_fixture_ids"]) == 2
+    assert out["unresolved_rows"] == [
+        {"home": "Oklahoma City Thunder", "away": "San Antonio Spurs"}
+    ]
+
+
+@requires_schedule
+def test_coverage_does_not_double_count_a_repeated_fixture():
+    rows = [{"home_team": "PHX", "visitor_team": "POR"}] * 4
+    assert ident.coverage_against_schedule("2026-08-16", rows)["covered"] == 1
+
+
+# --------------------------------------------------------------------------
+# The coverage fix itself.
+# --------------------------------------------------------------------------
+
+
+@requires_schedule
+def test_backfill_turns_the_real_defect_into_full_coverage(monkeypatch):
+    """2026-08-16, the measured defect: one row for a three-fixture slate."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire", "total": "163.5"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert (report["scheduled"], report["covered"], report["backfilled"]) == (3, 1, 2)
+    assert len(out) == 3
+    assert {r["fixture_id"] for r in out} == {"401857148", "401857150", "401857149"}
+
+
+@requires_schedule
+def test_the_original_row_keeps_its_market_data_and_gains_an_id(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire", "total": "163.5", "game_id": "1"}]
+    out, _ = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    original = [r for r in out if r.get("total") == "163.5"]
+    assert len(original) == 1
+    assert original[0]["fixture_id"] == "401857149"
+    # The pre-existing (bad) game_id is NOT rewritten -- only new rows get the
+    # stable one. Rewriting it could break a caller mid-migration.
+    assert original[0]["game_id"] == "1"
+
+
+@requires_schedule
+def test_backfilled_rows_carry_no_market_or_projection_columns(monkeypatch):
+    """Inventing a price would be far worse than a missing game."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    out, _ = ident.stamp_and_backfill_game_cards_rows("2026-08-16", [])
+    assert len(out) == 3
+    for row in out:
+        for banned in ("total", "home_ml", "away_ml", "home_spread", "pred_margin", "pred_total", "bookmaker"):
+            assert banned not in row, f"{banned} must not be invented on a backfilled row"
+        assert row["commence_time"].endswith("Z"), "must match the artifact's ISO spelling"
+        assert "+00:00" not in row["commence_time"]
+        assert row["game_id"] == row["fixture_id"]
+
+
+@requires_schedule
+def test_an_empty_schedule_backfills_nothing(monkeypatch, tmp_path):
+    """Out of season must not have a slate invented for it."""
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(tmp_path / "missing.csv"))
+    ident._clear_cache()
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", [])
+    assert out == []
+    assert report["scheduled"] == 0 and report["backfilled"] == 0
+
+
+@requires_schedule
+@pytest.mark.parametrize("value", ["0", "false", "no", "off", "OFF"])
+def test_the_kill_switch_restores_the_old_behaviour_exactly(monkeypatch, value):
+    monkeypatch.setenv(ident.GAME_CARDS_BACKFILL_ENV, value)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert len(out) == 1, "kill switch must stop the backfill"
+    assert report["backfilled"] == 0
+    # Identity stamping is pure metadata and stays on -- it cannot add a row.
+    assert out[0]["fixture_id"] == "401857149"
+
+
+@requires_schedule
+def test_absent_means_enabled(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    assert ident.backfill_enabled() is True
+    monkeypatch.setenv(ident.GAME_CARDS_BACKFILL_ENV, "1")
+    assert ident.backfill_enabled() is True
+
+
+@requires_schedule
+def test_an_unresolvable_row_is_counted_and_kept_never_dropped(monkeypatch):
+    """Losing it would hide genuine upstream contamination."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Oklahoma City Thunder", "visitor_team": "San Antonio Spurs", "total": "9"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert report["unresolved"] == 1
+    kept = [r for r in out if r.get("total") == "9"]
+    assert len(kept) == 1 and kept[0]["fixture_id"] == ""
+    assert len(out) == 4, "the bad row is kept AND all three fixtures are covered"
+
+
+@requires_schedule
+def test_the_input_rows_are_not_mutated(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_team": "Phoenix Mercury", "visitor_team": "Portland Fire"}]
+    ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert "fixture_id" not in rows[0], "caller's rows must not be mutated in place"
+
+
+@requires_schedule
+def test_rows_resolve_by_tricode_when_team_names_are_absent(monkeypatch):
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [{"home_tri": "PHX", "away_tri": "POR"}]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert report["covered"] == 1 and report["unresolved"] == 0
+
+
+@requires_schedule
+def test_a_full_slate_backfills_nothing_and_is_left_alone(monkeypatch):
+    """The no-op case. A healthy date must not be churned."""
+    monkeypatch.delenv(ident.GAME_CARDS_BACKFILL_ENV, raising=False)
+    rows = [
+        {"home_team": f.home_team, "visitor_team": f.away_team}
+        for f in ident.fixtures_for_date("2026-08-16")
+    ]
+    out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
+    assert (report["covered"], report["backfilled"], report["unresolved"]) == (3, 0, 0)
+    assert len(out) == 3
