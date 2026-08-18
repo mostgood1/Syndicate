@@ -14039,3 +14039,62 @@ small file answers the production question without moving the rosters.
   THE WORKER for that, which needs a deploy — filed, not fired.
 - 18 tests pass across the blend and pitch-splits suites; the local report is
   written and allowlist-valid.
+
+## 2026-08-18 — THE IN-FLIGHT WORKER PATH, TRACED. **The wiring is live end-to-end — but `--use-roster-artifacts=on` would have made it inert.**
+
+Lane `convergence-phase7-crps`. Read from source, no deploy. Traced on the
+instruction to check what the worker sim script actually creates and writes.
+
+### The chain, end to end
+
+    live_refresh_loop._run_mlb_sim_tick
+      -> scripts/run_mlb_daily_sim_job.py           (detached subprocess)
+        -> vendor/mlb_bettingv2/tools/daily_update.py   (:236, NOT multi_profile)
+          -> build_roster (statcast_cache passed)
+            -> _apply_cached_statcast_pitch_splits
+              -> fetch_pitcher_pitch_splits  -> **artifact-first read (mine)**
+
+### GOOD NEWS: the cache is ON by default, and bullpen is included
+
+    --statcast-starter-splits   choices ["off","starter"]   default "starter"
+
+`daily_update.py:5859` creates `statcast_cache` whenever that is **not** "off",
+so **production does pass a cache** and `_apply_cached_statcast_pitch_splits`
+IS reached. **The pitch-splits artifact will be read in production** once it is
+on the worker's disk — the wiring is live, not theoretical.
+
+Despite the flag being named "starter", `build_roster` applies splits to the
+starter AND to `bullpen_all` (`:2141`, `:2154`) once the cache exists. **The 236
+bullpen fetches were not wasted.**
+
+### THE TRAP, and it would have wasted the whole exercise
+
+    --use-roster-artifacts    default "on"   reuse roster_objs when present
+    --write-roster-artifacts  default "on"   write them
+
+`run_mlb_daily_sim_job.py` **overrides neither** — it takes both defaults.
+
+**So the worker REUSES roster artifacts built earlier.** Those were serialised
+BEFORE the pitch-splits artifact existed, with every `pitch_type_*` field empty.
+Publishing the artifact to the worker disk would change **nothing** on any date
+whose `roster_objs/` already exist — the build that would read it never runs.
+
+**Publishing the artifact is necessary and NOT sufficient. The roster artifacts
+must be REBUILT.** Either run a date with `--use-roster-artifacts=off`, or clear
+`roster_objs/` for the target date first.
+
+Nothing in the artifact work so far accounts for this, and it is exactly the
+shape of thing that produces a confident "we shipped it" followed by a flat
+measurement.
+
+### What the job writes in flight
+
+    snapshot_dir/roster_objs/roster_obj_*.json   <- the profiles the sim uses
+    snapshot_dir/schedule_raw.json
+    snapshot_dir/team_rosters_raw.json
+    snapshot_dir/injuries_raw.json
+    snapshot_dir/roster_events.json
+    data/daily/daily_summary_<date>.json         <- the projections
+
+**`roster_objs/` is the file the checklist audits** — so a production checklist
+run reads exactly what the sim consumed, provided the rebuild actually happened.
