@@ -4146,3 +4146,32 @@ named `render_logs.py` as unable to give one; this is that tool.
   `roster_objs/`. Route is `sim_input_checklist.py --publish` run ON THE WORKER.
 - **Standard is now mandatory:** `docs/ai_context/model_engine_standard.md`,
   referenced from `CLAUDE.md`, applies to every engine.
+
+## MLB SIM — **INPUTS FULLY FED (checklist 26 -> 0)**, still no market edge `[measured 2026-08-18]`
+
+- **`sim_input_checklist.py --simulate-rebuild` PASSES**, exit 0. Every field the
+  engine reads is fed. **A plain run still reports 26** — it audits SERIALISED
+  artifacts, i.e. pre-wiring history. Always use `--simulate-rebuild`.
+- **Arsenal leaderboards are the source of record**, superseding the per-pitcher
+  pitch-splits pipeline: **2 calls vs 309**, 551 pitchers vs 305, and 450 batters
+  vs none. `statcast_{pitcher_arsenal_stats,batter_pitch_arsenal}`; `player_id`
+  IS mlbam_id. Multipliers are normalised per-player (level-neutral), NOT vs the
+  league — league normalisation would double-count `k_rate`/`hr_rate`.
+- **`statcast_quality_mult` contract: a UNION bag, PARTIAL BY DESIGN.** Feed RAW
+  metrics only (`xwoba`, `ev_mean`, `ev_max` supplied); **never** k/bb/hr/inplay,
+  which `simulate.py:163` derives. Seven keys deliberately absent.
+- **FULLY FED vs market:** 4 of 4 better; mean gap **0.01071 -> 0.00732 (32%
+  closed)**; the `runs` regression is fixed. **The market still wins all four by
+  0.0048–0.0105 — NO EDGE.**
+- **Refit, fully fed:** 4 of 4 residuals shrink. `hr` and `inplay` corrections are
+  shippable; **`k_rate` and `bb_rate` are NOT** — a 1.368x `k_rate` correction
+  moved the residual 0.6pp. **K is produced by the pitch-level model, not the
+  per-PA target.**
+- **THE K DEFICIT IS TWO OPPOSING ERRORS AND IS NOT FIXED.** Sim `IN_PLAY` 23.3%
+  vs ~17% and pitches/PA 2.97 vs 3.9 truncate PAs (K 27% LOW); correcting the mix
+  gives K/PA 0.284 vs 0.226 (26% HIGH). **Fixing either alone is a wash.** Values
+  left at originals; diagnosis in `pitch_model.py`. Needs JOINT calibration with
+  the market scoreboard as arbiter.
+- **Whiffs were never the problem** — 12.3% vs a league ~11%.
+- **Nothing is deployed.** Production population remains UNVERIFIED (403 on
+  `roster_objs/`); route is `sim_input_checklist.py --publish` on the worker.

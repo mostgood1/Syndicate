@@ -6405,3 +6405,22 @@ nothing of mine is deployed and there is no deadline.
   soccer, and they had a modelled fair with no model probability.
 
 ### wnba-live-tier — **`board_enrichment.py` was edited under this lane** on explicit user instruction ("no one has it"), via the per-session marker rather than a `lanes.md` edit, because edits were not sticking. One file, one call site. Nothing else in this lane was touched.
+
+#### convergence-phase7-crps — CHECKPOINT 6 (FINAL) 2026-08-18 — **inputs 26 -> 0 fed, gap to market closed 32%, still no edge, K deficit characterised not fixed**
+
+- **Checklist PASSES.** Every consumed field is fed, via arsenal + quality +
+  batted-ball + BVP. The arsenal leaderboards replaced a 309-call pipeline with
+  two calls and cover both sides of the matchup.
+- **Fully fed vs market: 4 of 4 better, 32% of the gap closed, `runs` regression
+  fixed.** Mean improvement +0.00478. **The market still wins all four. No edge.**
+- **K deficit diagnosed and DELIBERATELY NOT FIXED** — two opposing errors of
+  almost equal size; fixing the mix alone trades a 27% shortfall for a 26%
+  surplus. Values reverted, diagnosis in the code.
+- **Refit:** only `hr_rate`/`inplay_hit_rate` corrections are shippable.
+  `k_rate`/`bb_rate` are fitted against quantities they cannot move.
+- **Four more of my claims corrected by measurement** this stretch, including two
+  "unfixable" fields that the provider's leaderboards fill outright.
+- **NEXT ACTION:** joint calibration of the pitch mix AND the strike->K
+  conversion, scored on `measure_all_inputs_effect.py` rather than the league mix.
+  That is the largest remaining modelling defect and the only one big enough to
+  matter against a 0.0073 market gap.

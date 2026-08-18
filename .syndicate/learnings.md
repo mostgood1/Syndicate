@@ -5287,3 +5287,36 @@ negative grep in the file you expect proves nothing about a pipeline with three
 application sites.** The provenance table in
 `docs/ai_context/mlb_sim_engine_reference.md` exists so the next person reads
 where things ARE applied instead of guessing where they SHOULD be.
+
+## 2026-08-18 — RULE: a bias can be the NET of two opposing errors, and fixing one is a wash
+
+**Measured:** the MLB engine under-produced strikeouts by **27%** (K/PA 0.179 vs
+0.226). The obvious cause was the pitch-outcome mix — `base_in_play` 0.23 against
+a league ~0.17, `base_foul` 0.12 against ~0.18 — and correcting it lands the mix
+almost exactly on the league.
+
+**And K/PA goes to 0.284 — 26% TOO HIGH.**
+
+The deficit was never one error. A contact rate that truncated plate appearances
+(suppressing K) was **masking a strike->strikeout conversion ~26% too efficient**.
+The two were within a few points of cancelling, so the engine looked like it had
+a single tidy bug.
+
+**RULE: before fixing a measured bias, check whether the fix moves the metric
+PAST the target.** A correction that overshoots by roughly the amount it was
+meant to close is the signature of two opposing errors, and shipping it converts
+a shortfall into a surplus while looking like a fix.
+
+**The tell that separates them:** an auxiliary metric that stays wrong after the
+fix. Here `pitches/PA` remained short (3.45 vs 3.9) even with a correct call mix
+— so PA STRUCTURE was a second, independent defect, and the mix was never going
+to reach the target alone.
+
+**Corollary on method:** one-at-a-time tuning cannot solve a two-error system —
+each parameter looks wrong in isolation and each single fix overshoots. It needs
+JOINT calibration against an outcome the errors cannot both satisfy. Here that
+means the market scoreboard rather than the league mix.
+
+**And the thing I nearly did:** ship the mix fix, see the league mix match
+beautifully, and report the K deficit as closed. Every intermediate check would
+have agreed with me.
