@@ -15,7 +15,24 @@ Request: `$ARGUMENTS`
    and report the conflict. Do not open the lane.
 4. Check `learnings.md` for a FORBIDDEN or EXONERATED rule covering this
    work. If one exists, surface it and ask for explicit override.
-5. Append the lane:
+5. **Insert the lane at the END of the `## OPEN` section — NOT at the end of
+   the file.** Find the `## OPEN` heading, scan to the next `## ` heading, and
+   put the block immediately before it.
+
+   **"Append the lane" is what this step used to say, and it is how `#466`
+   happened.** A bare "append" lands at EOF, which in `lanes.md` is *below*
+   `## Archived lanes` — and `lane-guard` reads `lanes.md` and nothing else, so
+   the next archive pass moves that block to `lanes_closed.md` and the lane's
+   file claims stop being enforced **silently**, with nothing reporting it.
+   Measured 2026-08-18: **7 OPEN lanes** were sitting inside the two archived
+   sections, three of them owned by sessions that were running at the time.
+
+   If the invariant has already regressed, `py -3 scripts/hoist_open_lanes.py`
+   moves stray OPEN blocks back under `## OPEN` (dry run by default; it verifies
+   the claim set is unchanged before writing). `py -3
+   scripts/check_lane_invariants.py` is the check, and it runs at session start.
+
+   The block to insert:
 
 ```
 ### <slug> — OPEN — opened <date> — session <id or name>
