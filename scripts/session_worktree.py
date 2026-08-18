@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -142,6 +143,71 @@ def cmd_open(args) -> int:
         print("\nNOTE: data/ is absent by design. It is a lossy mirror, never evidence")
         print("about production. Re-run with --with-data if you genuinely need it.")
     print(f"\n  cd {path}")
+    return 0
+
+
+def _lane_claims(slug: str) -> set[str]:
+    """Paths `lanes.md` says this lane holds, via lane-guard's own parser.
+
+    Reusing the hook rather than re-parsing: it is what actually enforces claims,
+    and a second parser that disagreed would hand a session the wrong file list
+    at exactly the moment it is deciding what to commit.
+    """
+    import importlib.util
+    guard_path = REPO_ROOT / ".claude" / "hooks" / "lane-guard.py"
+    spec = importlib.util.spec_from_file_location("lane_guard_adopt", guard_path)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except SystemExit:
+        pass                                   # it is a hook: importing runs it
+    if not hasattr(module, "_claims"):
+        return set()
+    lanes = (REPO_ROOT / ".syndicate" / "lanes.md").read_text(encoding="utf-8-sig")
+    return {p for s, p in module._claims(lanes) if s == slug}
+
+
+def cmd_adopt(args) -> int:
+    """What is uncommitted in the PRIMARY tree that belongs to this lane.
+
+    THE MIGRATION HAZARD THIS EXISTS FOR. Moving to per-session worktrees does
+    not carry the primary tree's uncommitted work with it. Measured 2026-08-18 at
+    adoption: 47 modified tracked files there, including real code from at least
+    two lanes -- NHL hockeysim (`loaders.py`, `projection.py`,
+    `test_hockeysim_loaders.py`) and the MLB/NBA/WNBA vendor trees -- plus new
+    untracked files. A session that opens a fresh worktree and carries on leaves
+    all of it behind, in a tree everyone has agreed to stop looking at.
+
+    So: land your files from the primary tree FIRST, then open a worktree. This
+    lists what is yours by lane claim, and says plainly that it cannot see
+    untracked files or work your lane never declared.
+    """
+    slug = _slug(args.lane)
+    claims = _lane_claims(slug)
+    dirty = [l[3:] for l in git("status", "--porcelain").stdout.splitlines() if l[:2] != "??"]
+    untracked = [l[3:] for l in git("status", "--porcelain").stdout.splitlines() if l[:2] == "??"]
+
+    def owned(path):
+        rel = path.replace("\\", "/").strip('"')
+        return any(rel == c or rel.endswith("/" + c) or c.endswith("/" + rel) for c in claims)
+
+    mine = sorted(p for p in dirty if owned(p))
+    others = len(dirty) - len(mine)
+
+    print(f"lane {slug}: {len(claims)} claimed path(s) in lanes.md")
+    print(f"primary tree: {len(dirty)} modified, {len(untracked)} untracked\n")
+    if mine:
+        print(f"YOURS by lane claim ({len(mine)}) -- land these before you move:")
+        for p in mine:
+            print(f"  {p}")
+        print("\n  git add " + " ".join(mine[:6]) + (" ..." if len(mine) > 6 else ""))
+        print("  git commit      # then: session_worktree.py open --lane " + slug)
+    else:
+        print("nothing modified in the primary tree matches this lane's claims.")
+    print(f"\n{others} modified path(s) belong to other lanes or no lane. NOT yours to commit.")
+    print(f"{len(untracked)} untracked path(s) are INVISIBLE to this check -- a new file")
+    print("your lane never declared in `Files:` cannot be matched to you. Check")
+    print("`git status --porcelain` yourself before concluding you are done.")
     return 0
 
 
@@ -250,7 +316,21 @@ def cmd_close(args) -> int:
         print("from another session -- this worktree's index is its own.")
         return 1
 
-    git("worktree", "remove", "--force", str(path), check=True)
+    # `git worktree remove` fails on this machine when anything still holds a
+    # handle under the checkout -- OneDrive's scanner and a just-exited python
+    # both do. Observed twice at adoption: "Permission denied", then exit 255.
+    # Falling back to a plain delete + prune is safe because at this point the
+    # refusal checks above have already passed: the tree is clean and its
+    # commits are on origin/main, so there is nothing in it that git needs.
+    removed = git("worktree", "remove", "--force", str(path))
+    if removed.returncode != 0:
+        shutil.rmtree(path, ignore_errors=True)
+        if path.exists():
+            print(f"could not delete {path} -- something is holding it open.")
+            print("Close anything using it and re-run; the branch is left intact.")
+            return 1
+        print(f"note: `git worktree remove` failed ({removed.returncode}); "
+              "deleted the directory and pruned instead.")
     git("branch", "-D", branch)
     git("worktree", "prune")
     print(f"closed {slug}")
@@ -268,6 +348,10 @@ def main() -> int:
     p.add_argument("--with-data", action="store_true",
                    help="check out data/ too (+34,690 files); say why in your lane")
     p.set_defaults(func=cmd_open)
+
+    p = sub.add_parser("adopt", help="what this lane must land from the primary tree first")
+    p.add_argument("--lane", required=True)
+    p.set_defaults(func=cmd_adopt)
 
     p = sub.add_parser("list", help="show session worktrees")
     p.set_defaults(func=cmd_list)

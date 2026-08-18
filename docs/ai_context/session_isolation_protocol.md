@@ -1,8 +1,15 @@
 # Session isolation — one worktree per session, and deploys that compose
 
-**Status: PROPOSED, with a working prototype (`scripts/session_worktree.py`).**
-Written 2026-08-18 by lane `football-model-owner`. Nothing here is in force yet;
-the current protocol is still `CLAUDE.md` → "Before touching code".
+**Status: ADOPTED** `[2026-08-18, user decision: "adopt the worktree flow for all
+sessions"]`. `CLAUDE.md` → "Before touching code" now requires it. Written by
+lane `football-model-owner`; tooling is `scripts/session_worktree.py`.
+
+**Read "Migration" before opening a worktree.** Adoption does NOT carry the
+primary tree's uncommitted work with it, and at adoption there were **48
+modified tracked files and 104 untracked paths** in there, including real code
+from at least two lanes. Opening a fresh worktree and carrying on strands all of
+it in a tree everyone has just agreed to stop looking at. Land your files first;
+`session_worktree.py adopt --lane <slug>` tells you which are yours.
 
 ---
 
@@ -145,16 +152,47 @@ not cause, and a gate that blocks all work is removed the same afternoon.
 
 ## Migration
 
-1. **Adopt for new lanes first.** Existing sessions keep working in the primary
-   tree; nothing breaks. The two models coexist — a worktree is just a checkout.
-2. **The primary tree becomes reference/read-only by convention** once lanes have
-   moved. It is still where the ledger is most convenient to read.
-3. **Reap the ~100 stale worktrees under `C:/tmp`.** Some may still be in use;
-   `session_worktree.py list` only shows `session/*` ones, so the legacy ones
-   need a human pass. Do not bulk-delete — at least one holds a named deploy
-   branch.
-4. **Retire `commit-guard.py` last, if at all.** It costs little and catches the
-   case where someone works in the primary tree anyway.
+**The order matters. Step 1 is not optional and is not a formality.**
+
+1. **LAND YOUR EXISTING WORK FROM THE PRIMARY TREE FIRST.**
+
+       python scripts/session_worktree.py adopt --lane <slug>
+
+   Measured at adoption: **48 modified tracked files, 104 untracked** in the
+   primary tree, including NHL hockeysim code (`loaders.py`, `projection.py`,
+   `test_hockeysim_loaders.py`), `artifact_publisher.py`, and the MLB/NBA/WNBA
+   vendor trees. A fresh worktree does not carry any of it.
+
+   `adopt` matches dirty paths against your lane's `Files:` claims using
+   `lane-guard.py`'s own parser, so it hands you the same list the guard
+   enforces. **It has two blind spots and says so on every run:** it cannot see
+   UNTRACKED files (a new file your lane never declared cannot be matched to
+   you), and it cannot see work your lane never claimed. Running it on
+   `nhl-model-owner` at adoption returned **1 of that lane's ~4 dirty files**,
+   because the lane declared its docs and checklist but never declared the
+   hockeysim internals it was editing. Read `git status --porcelain` yourself
+   before concluding you are done.
+
+2. **Then open your worktree.** `session_worktree.py open --lane <slug>`.
+   New lanes skip step 1 — they have nothing stranded.
+
+3. **The primary tree becomes reference/read-only by convention** once lanes
+   have moved. It stays the convenient place to READ the ledger, and
+   `.syndicate/` edits are least painful there while several sessions append.
+
+4. **Reap the ~100 stale worktrees under `C:/tmp`.** Some may still be in use;
+   `session_worktree.py list` shows only `session/*` ones, so legacy ones need a
+   human pass. Do not bulk-delete — at least one holds a named deploy branch.
+
+5. **Keep `commit-guard.py`.** Isolation makes cross-session staging impossible
+   only for sessions that actually moved; until the primary tree is clean and
+   quiet, it is still the thing standing between a tidy and a silent revert.
+
+**What adoption does not make safe.** A worktree isolates the INDEX, not the
+ledger. `.syndicate/*` and `docs/ai_context/todo.md` are still one shared
+sequence of appends, and per-session copies turn today's silent last-writer-wins
+into merge conflicts at `land` time. That is the better failure, not the absent
+one. `merge=union` remains FORBIDDEN as a way to make it quiet.
 
 ## Open questions for the user
 

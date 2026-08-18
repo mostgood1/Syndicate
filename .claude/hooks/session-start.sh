@@ -105,6 +105,15 @@ add "Do NOT state system facts from memory — read .syndicate/state.md first."
 # are now self-serve behind two locks that cannot be archived. Printed
 # unconditionally: there is no register left to gate on.
 add "DEPLOYS: yours, behind two locks. deploy_claim.py acquire + deploy_preflight.py (CLEAR, <15min), then deploy."
+# Which tree am I in? A session cannot answer this by looking at the files --
+# a worktree is a normal-looking checkout -- and the answer decides whether
+# `git add` is safe. `git rev-parse --git-dir` returns a path under
+# `.git/worktrees/<name>` in a linked worktree and plain `.git` in the primary.
+GITDIR=$(git rev-parse --git-dir 2>/dev/null || echo "")
+case "$GITDIR" in
+  *worktrees*) add "TREE: your own worktree — its index is yours; \`git add\` touches no other session." ;;
+  *)           add "TREE: the PRIMARY, SHARED tree — \`git add\` here writes the index EVERY session shares. Move: scripts/session_worktree.py adopt --lane <slug>, then open." ;;
+esac
 add ""
 
 if [ -f .syndicate/lanes.md ]; then

@@ -256,6 +256,29 @@ contradicts `state.md`, say so before proceeding.
 ## Before touching code
 
 - Claim a lane: `/lane open <slug> "<goal>"`.
+- **Work in YOUR OWN worktree** `[2026-08-18, user decision]`:
+
+      python scripts/session_worktree.py adopt --lane <slug>   # FIRST, see below
+      python scripts/session_worktree.py open  --lane <slug>
+      python scripts/session_worktree.py land  --lane <slug>   # rebase + push
+
+  Sessions used to share one working tree and one git index, so `git add` was a
+  global mutation. That produced 4,993 staged deletions sitting in the index
+  while the tree matched HEAD, the staged deletion of the only copy of a ledger
+  archive, and — on 2026-08-18 — a `todo.md` that would have dropped five open
+  items to zero copies. A worktree has its own index; those become impossible
+  rather than caught by review. Full reasoning:
+  `docs/ai_context/session_isolation_protocol.md`.
+
+  **`adopt` FIRST if your lane already has uncommitted work in the primary
+  tree** — a fresh worktree does not carry it, and there were 48 modified and
+  104 untracked paths there at adoption. `adopt` cannot see untracked files or
+  work your lane never declared in `Files:`, so read `git status --porcelain`
+  yourself too.
+
+  `data/` is excluded by default (34,690 of 37,745 tracked files, and a lossy
+  mirror that is never evidence about production). `--with-data` if you truly
+  need it.
 - If another OPEN lane lists a file you need, stop and surface the
   conflict. Do not edit across lanes.
 - If the task is diagnostic, write the hypothesis into the lane
