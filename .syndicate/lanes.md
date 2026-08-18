@@ -6078,3 +6078,11 @@ different lever (re-fit rather than a correlation heuristic) or acceptance that
 post-`94578cbc`'s state (gap +0.0017, dispersion 0.2373 on eredivisie) is the better
 checkpoint even with its overshoot, since accuracy is the primary objective and this
 probe shows the two are not always aligned.
+
+### season-betting-reader-freshness — OPEN — opened 2026-08-18 — session: season-betting-reader-freshness
+- Goal: a historical `season_betting_day_*.json` static payload that carries SOME settlement, but strictly less than the canonical daily settlement already on disk for that date, gets re-derived instead of served forever. Fixes the read-side half of the `#265`/`locked_cards_retuned` gap traced in `docs/ai_context/todo.md` (sessions `sim-vs-market-freeze-finding`, 2026-08-18) -- user chose this half over the writer-side autorun.
+- Files: `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (read-only elsewhere in this vendor tree)
+- Hypothesis: the gate at `_season_betting_day_payload` (`if historical_date and not _payload_has_row_settlement(...)`) only re-derives on ZERO settlement, so a payload with e.g. 1 of ~15 games settled is treated as final forever, even when the canonical daily card already has richer settlement for the same date.
+- Falsification test: a unit test constructing a static_payload with 1 settled row and a canonical_settlement with more `selected_counts.combined` should show the new helper (`_static_season_payload_is_stale_vs_canonical`) returning True; a static_payload whose settlement already matches or exceeds canonical should return False (no regression on the common case).
+- Verification: new unit test passes; existing test suite for this file (if any) still passes; change is additive-only to the gate condition, `_finalize_from_card`'s own internal comparison logic is untouched.
+- Blocked by: none.
