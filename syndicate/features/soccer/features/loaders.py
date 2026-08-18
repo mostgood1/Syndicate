@@ -276,12 +276,47 @@ def build_soccer_match_features(
 ) -> SoccerMatchFeatures:
     home_rating, home_matched = _rating_for(ratings, home_team)
     away_rating, away_matched = _rating_for(ratings, away_team)
+    # THE ENGINE READS xG AND PPDA AND THIS FUNCTION WAS THE REASON IT NEVER
+    # SAW THEM.
+    #
+    # `compute_team_ratings` already emits `xg_for_per_match`,
+    # `xg_against_per_match` and `ppda` per team, under exactly the key names
+    # `possession_priors` looks for -- and they were routed into
+    # `adapter_metadata.*_rating_detail`, which the engine never opens. The data
+    # was computed, correct, and filed where the simulation could not see it.
+    # `scripts/soccer_sim_input_checklist.py` reported 20 of 20 read sites
+    # CONSUMED + UNPOPULATED because of this and the empty containers below.
+    #
+    # Prefixed `home_`/`away_` because `feature_generation_payload` is ONE dict
+    # for the match while `build_possession_priors` runs per possession owner.
+    # `_first_float(..., side=owner)` now prefers `{side}_{key}`, so each team is
+    # scored with its own xG instead of both being scored with the home side's.
+    # Unprefixed keys are left for genuinely match-level metrics (tempo, market).
     team_metrics = {
         "home_attack_rating": home_rating.get("attack_rating", 0.0),
         "home_defense_rating": home_rating.get("defense_rating", 0.0),
         "away_attack_rating": away_rating.get("attack_rating", 0.0),
         "away_defense_rating": away_rating.get("defense_rating", 0.0),
+        "home_xg_for_per_match": home_rating.get("xg_for_per_match"),
+        "away_xg_for_per_match": away_rating.get("xg_for_per_match"),
     }
+    # Defence is read for the team being attacked, so both sides' numbers go in
+    # and `side=opponent` picks the right one.
+    defensive_metrics = {
+        "home_xg_against_per_match": home_rating.get("xg_against_per_match"),
+        "away_xg_against_per_match": away_rating.get("xg_against_per_match"),
+        "home_ppda": home_rating.get("ppda"),
+        "away_ppda": away_rating.get("ppda"),
+    }
+    # `compute_team_ratings` emits ppda 0.0 when a league's history carries none.
+    # 0.0 is not "no pressing" -- it is a MISSING value that would read as the
+    # most aggressive press possible (`_pressing_index` maps low ppda -> high
+    # press). Drop it rather than feed a fabricated extreme.
+    defensive_metrics = {
+        k: v for k, v in defensive_metrics.items()
+        if v is not None and not (k.endswith("ppda") and float(v) == 0.0)
+    }
+    team_metrics = {k: v for k, v in team_metrics.items() if v is not None}
     return SoccerMatchFeatures(
         league=league,
         date=date,
@@ -289,6 +324,7 @@ def build_soccer_match_features(
         home_team=home_team,
         away_team=away_team,
         team_metrics=team_metrics,
+        defensive_metrics=defensive_metrics,
         market_features=dict(market_features or {}),
         knockout=knockout,
         home_starter_ids=tuple(home_starter_ids),
