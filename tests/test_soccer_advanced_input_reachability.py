@@ -135,3 +135,49 @@ def test_a_missing_ppda_is_dropped_not_fed_as_zero():
     assert "away_ppda" not in match.defensive_metrics
     # The real xG must survive the ppda filter.
     assert match.defensive_metrics.get("home_xg_against_per_match") == 0.94
+
+
+def test_the_goals_as_xg_path_does_not_feed_goals_twice():
+    """A DUPLICATED TERM PASSES EVERY REACHABILITY TEST THERE IS.
+
+    `team_rows_from_match_history` uses goals as the xG stand-in
+    (`xg_for = home_goals`). Emitting `goals_for` beside it puts the SAME number
+    into `_attack_strength` twice -- `(xg_for - 1.35) * 0.22` and
+    `(goals - 1.35) * 0.14` -- silently weighting goals at 0.36 instead of 0.22
+    for every league on football-data, and the same on defence.
+
+    Nothing else in this file catches it: the field IS consumed, IS populated,
+    and DOES move output. It was caught by an A/B artifact build, where one
+    eredivisie fixture's `total_mean` read 3.39 against 3.32 once corrected, and
+    `win_probability.home` moved the WRONG WAY (0.49 vs 0.46) -- the duplicate
+    was not merely inflating magnitude, it was flipping the converter's
+    direction on that fixture.
+
+    A real xG source whose xG differs from goals may legitimately emit both;
+    this pins only the goals-as-xG path.
+    """
+    from syndicate.features.soccer.features.loaders import team_rows_from_match_history
+
+    rows = team_rows_from_match_history([{
+        "league": "eredivisie", "season": 2025, "date": "2025-09-01",
+        "home_team": "Ajax", "away_team": "PSV",
+        "home_goals": 3, "away_goals": 1,
+        "home_shots": 15, "away_shots": 9,
+        "home_corners": 7, "away_corners": 3,
+    }])
+    assert len(rows) == 2
+    for row in rows:
+        assert "goals_for" not in row, (
+            "goals_for duplicates xg_for on the goals-as-xG path -- "
+            "`_attack_strength` would weight goals at 0.36 instead of 0.22"
+        )
+        assert "goals_against" not in row, "goals_against duplicates xg_against"
+    # The genuinely-new columns must still come through.
+    home = rows[0]
+    assert home["xg_for"] == 3 and home["xg_against"] == 1
+    assert home["shots"] == 15 and home["shots_allowed"] == 9
+    assert home["corners"] == 7
+    assert home["clean_sheet"] == 0.0     # PSV scored
+    assert home["points"] == 3.0          # Ajax won
+    away = rows[1]
+    assert away["clean_sheet"] == 0.0 and away["points"] == 0.0

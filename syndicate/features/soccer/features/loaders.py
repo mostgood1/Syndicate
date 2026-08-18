@@ -134,16 +134,38 @@ def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[
         def _points(scored: float, conceded: float) -> float:
             return 3.0 if scored > conceded else (1.0 if scored == conceded else 0.0)
 
+        # NO `goals_for` / `goals_against` ON THIS PATH, DELIBERATELY.
+        #
+        # This converter uses GOALS AS THE xG STAND-IN (`xg_for = home_goals`,
+        # see the docstring). Emitting a goals field beside it would feed the
+        # SAME NUMBER into `_attack_strength` twice -- once as
+        # `((xg_for or 1.35) - 1.35) * 0.22` and again as
+        # `((goals or 1.35) - 1.35) * 0.14` -- silently weighting goals at 0.36
+        # instead of 0.22 for every league on football-data. Defence doubles the
+        # same way (0.22 + 0.14 on `xg_against`).
+        #
+        # Caught by an A/B artifact build, not by a test: `total_mean` went
+        # 3.16 -> 3.39 and `home_mean` 1.71 -> 1.89 on one eredivisie fixture,
+        # which is too large a step for a corners-and-shots change. The fields
+        # are genuinely consumed and were genuinely unfed, so the wiring stands
+        # -- what was wrong was feeding a duplicate of a term already present.
+        #
+        # `goals_per_match` therefore stays an HONEST ALARM on this path. A real
+        # xG source (Understat, ASA) whose xG differs from goals may emit both,
+        # and `compute_team_ratings` forwards `goals_for`/`goals_against`
+        # whenever a row carries them -- so nothing here blocks that.
+        #
+        # This is the "mechanism vs estimator" hazard in CLAUDE.md: adding a
+        # mechanism to a calibrated engine without re-fitting the rates that
+        # were already absorbing it.
         team_rows.append({**common, "team": row.get("home_team"),
                           "xg_for": home_goals, "xg_against": away_goals,
-                          "goals_for": home_goals, "goals_against": away_goals,
                           "shots": hs, "shots_allowed": aws, "corners": hc,
                           # A clean sheet is the OPPONENT failing to score.
                           "clean_sheet": 1.0 if away_goals == 0 else 0.0,
                           "points": _points(home_goals, away_goals)})
         team_rows.append({**common, "team": row.get("away_team"),
                           "xg_for": away_goals, "xg_against": home_goals,
-                          "goals_for": away_goals, "goals_against": home_goals,
                           "shots": aws, "shots_allowed": hs, "corners": ac,
                           "clean_sheet": 1.0 if home_goals == 0 else 0.0,
                           "points": _points(away_goals, home_goals)})
