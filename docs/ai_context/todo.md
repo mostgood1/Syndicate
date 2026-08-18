@@ -114,8 +114,30 @@ or an explicit cross-lane mandate.
 > that produced the `## MERGED FROM origin/main` sections) is what needs
 > changing.
 >
-> **Also still true and unaddressed:** `lanes.md` is 2.05x over its 120,000-byte
-> cap.
+> **THE BYTE CAP IS NOW MET — `lanes.md` reads `ok` in the digest's own bloat
+> check for the first time.** `scripts/trim_lane_blocks.py` moved **45
+> superseded blocks / 141,812 bytes** to `lanes_history.md`:
+>
+>     lanes.md   253,880 -> 112,068 B      2.12x -> 0.93x of the 120,000 cap
+>     claims     65 -> 65, LOST none, GAINED none, contested 0
+>     lines      conserved across lanes.md + lanes_history.md
+>     invariants INVARIANTS HOLD
+>
+> A block was kept if it is **claim-bearing** (`lane-guard` reads `lanes.md` and
+> nothing else) **or its header reads OPEN** (an open lane that vanishes from
+> the file also vanishes from the session-start digest, and a lane nobody can
+> see is one two sessions will collide on). 12 lanes left `lanes.md` entirely —
+> every one verified to hold **zero claims** and to be non-OPEN first.
+>
+> **THE HEADROOM IS THIN AND THIS WILL RECUR.** It measured 115,193 B within
+> minutes of the trim — **96% of cap, ~4.8 KB of slack** — because several live
+> sessions append continuously. This is a periodic operation, not a repair: run
+> `trim_lane_blocks.py` when the digest reports `LEDGER OVER BUDGET`.
+>
+> **The other two weighed files are still over and are NOT addressed here:**
+> `state.md` 160,909 / 60,000 (2.68x) and `learnings.md` 252,020 / 120,000
+> (2.10x). Both are prose-collapse jobs rather than block moves — `state.md` has
+> been collapsed twice already — so neither is mechanical the way this was.
 >
 > **THE "ALREADY UN-GUARDED?" QUESTION IS NOW ANSWERED: NO.**
 > `scripts/audit_lane_unguarding.py` walked **all 344 commits** touching
