@@ -231,11 +231,63 @@ fix (56.1% / 82.7% flat across all keys), which is the expected shape once
 population is measured correctly: it is one binary gate (cleared threshold or
 not), not 13 independent ones.
 
-**The WNBA/NBA gap (56.1% vs 82.7%) is real and unexplained here** — could be
-season-length/roster-churn differences (WNBA's shorter season and smaller
-per-team rosters plausibly produce more below-threshold two-way/injury-
-replacement entries per capita), could be a mirror-completeness difference.
-**Not investigated further in this pass; flagged in Sec6.**
+**The WNBA/NBA gap (56.1% vs 82.7%) is now explained and measured, 2026-08-18.**
+`compute_player_priors_local` draws from two pools per player: the current
+21-day window, and — only for a player with ZERO games in that window — a
+**prior-season fallback** (`basketball_props_onnx.py:265-283`, filtered to
+that player's own most recent `__season_year`). Splitting the 321/611 "rated
+rows" by which pool actually produced them (reproducing the function's exact
+key-set union, not a guess) isolates the gap completely to the fallback pool:
+
+| league | pool | n (team, player) | rated | rate | mean games in pool | mean min in pool |
+|---|---|---|---|---|---|---|
+| WNBA | current-window | 183 | 158 | **86.3%** | 5.7 | 19.1 |
+| WNBA | prior-fallback | 138 | 22 | **15.9%** | 2.1 | 12.7 |
+| NBA | current-window | 115 | 97 | **84.3%** | 5.6 | 18.4 |
+| NBA | prior-fallback | 496 | 408 | **82.3%** | 19.5 | 18.8 |
+
+**Current-window rating quality is essentially identical between leagues**
+(86.3% vs 84.3%) — that pool is not the gap. The gap is entirely in
+**prior-fallback quality**: an NBA player who fell out of the current window
+still has, on average, **19.5 games** to fall back on (a real prior season) and
+clears the floor 82.3% of the time; a WNBA player falling back has only **2.1
+games** on average and clears it 15.9% of the time — barely more than the
+current-window players who happened to sit for most of three weeks.
+
+**Root cause is the mirror's historical depth, not the algorithm or a WNBA
+data-quality defect.** This checkout's WNBA `boxscores_history.csv` covers
+**2026-04-25 through 2026-07-07 only** (418,877 bytes) — no prior season at
+all, so a "prior-fallback" WNBA player is drawing from whatever thin sliver
+of THIS season predates the 21-day window, which for a player who has since
+gone inactive (waived, injured, two-way sent down) can be as little as 1-2
+games before they stopped appearing. NBA's `boxscores_history.csv` spans
+**2023-04-01 through 2026-05-24** (20,545,464 bytes, ~49x larger) — a
+fallback NBA player typically has most of a full prior season to draw from.
+Git history confirms this is not a stale-mirror-refresh artifact: WNBA's file
+was first added to this repo at `98909137`/`276eb7cc` (basketball artifacts
+publish), already dated to the 2026 season only — there is no earlier WNBA
+season's boxscore history anywhere in this checkout to backfill from that
+this pass could find.
+
+**Classification: EXPECTED_SPARSE, with an open question, not a code
+defect.** The `min_games=3`/`min_minutes_avg=4.0` floor is doing exactly its
+job on both leagues' fallback pools — refusing to rate a WNBA call-up who
+played 1 game in April on the same footing as a rostered NBA veteran with a
+full prior season is the CORRECT behavior, not a bug to route around by
+lowering the floor for one league only. The open question this pass could
+not resolve: **is `2026-04-25` genuinely WNBA's full captured history in
+this pipeline (a real, permanent depth asymmetry vs. NBA), or does
+`SYNDICATE_DATA_ROOT`/`WNBA_BETTING_DATA_ROOT` on Render carry an earlier
+season's boxscore history that never reached this git-tracked mirror?**
+Per `model_engine_standard.md` Sec3b, local-checkout absence is not proof of
+production absence — this was **not verified against Render** (502'd
+throughout this session, same limitation as Sec2/Sec0b). If production's
+disk does carry deeper WNBA history, the fix is a mirror-refresh scope
+change (widen what `refresh_wnba_source_mirror.ps1` pulls), not a code
+change. If it does not, the gap is a genuine, permanent characteristic of
+this league's shorter operational history in the app and there is nothing
+to fix — only to keep documented so nobody mistakes it for a regression
+later.
 
 Below-threshold players are the correct, by-design analogue of MLB's
 `EXPECTED_SPARSE` fields (`availability_mult`, `vs_pitcher_*`): a real
@@ -394,8 +446,16 @@ recorded as an open item (Sec6) rather than fixed, per the lane's scope.
    wrong number) but recorded because "builder exists, never runs" is exactly
    football's `#457` shape and worth a deliberate decision rather than
    quietly staying that way.
-4. **Not investigated in this pass**: why WNBA's player-priors population
-   rate (56.1%) is meaningfully lower than NBA's (82.7%) — Sec3.
+4. **Investigated and explained, 2026-08-18** (Sec3): the WNBA/NBA
+   player-priors gap (56.1% vs 82.7%) is entirely in the prior-season
+   fallback pool (WNBA 15.9% vs NBA 82.3%; current-window rating quality is
+   equal, 86.3% vs 84.3%) — caused by WNBA's `boxscores_history.csv` mirror
+   covering only 2026-04-25 onward (no prior season) vs NBA's 2023-2026.
+   Classified EXPECTED_SPARSE, not a code defect. **Still open**: whether
+   Render's live disk carries deeper WNBA history than this git-tracked
+   mirror (unverified, 502 throughout this session) — if so this is a
+   mirror-refresh-scope fix; if not, it is a permanent, documented
+   characteristic. Filed as `todo.md` `#464`.
 5. **Not investigated in this pass**: `_simulate_pbp_game_boxscore_local`'s
    fallback reachability independent of the game-level fallback (Sec2, last
    bullet) — same import mechanism is likely but not confirmed to behave

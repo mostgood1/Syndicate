@@ -1,5 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#464` — **WNBA's player-priors population rate (56.1%) is meaningfully below NBA's (82.7%) -- explained and measured, root cause is mirror historical depth not the algorithm; whether Render's live disk has the same gap is UNVERIFIED** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, EXPECTED_SPARSE not a defect, one question open
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec3.
+Gate: `py -3 scripts/basketball_sim_input_checklist.py` Level 1 (both leagues
+currently PASS the checklist's 50% floor; this item documents WHY the two
+leagues differ, not a checklist failure).
+
+`compute_player_priors_local` rates a (team, player) row from one of two
+pools: the current 21-day window, or — only when a player has zero games in
+that window — a prior-season fallback. Splitting the checklist's 321/611
+"rated rows" by which pool actually produced them (reproducing the
+function's exact key-set-union logic, not a name grep) isolates the gap
+completely:
+
+    WNBA  current-window   n=183  rated=158 (86.3%)  mean_games=5.7  mean_min=19.1
+    WNBA  prior-fallback   n=138  rated= 22 (15.9%)  mean_games=2.1  mean_min=12.7
+    NBA   current-window   n=115  rated= 97 (84.3%)  mean_games=5.6  mean_min=18.4
+    NBA   prior-fallback   n=496  rated=408 (82.3%)  mean_games=19.5  mean_min=18.8
+
+Current-window rating quality is essentially equal between leagues (86.3% vs
+84.3%) -- **not** the gap. The gap is entirely in prior-fallback quality: an
+NBA player who fell out of the current window still averages 19.5 games to
+fall back on (a real prior season); a WNBA player falling back averages only
+2.1 games.
+
+**Root cause, confirmed by git history, not inferred**: this checkout's WNBA
+`boxscores_history.csv` covers 2026-04-25..2026-07-07 only (418,877 bytes,
+first added at `98909137`/`276eb7cc`, already 2026-season-only at that
+commit) -- no prior WNBA season exists anywhere in this checkout to fall
+back to. NBA's equivalent file spans 2023-04-01..2026-05-24 (20,545,464
+bytes, ~49x larger).
+
+**Classified EXPECTED_SPARSE, not a code defect.** The `min_games=3`/
+`min_minutes_avg=4.0` floor is doing its job correctly on both leagues'
+fallback pools -- refusing to rate a WNBA call-up who played once in April
+the same as an NBA veteran with a full prior season is correct behavior, not
+something to fix by loosening the floor for one league.
+
+**One question left open, NOT resolved this pass**: is `2026-04-25` WNBA's
+genuine full history in this pipeline (permanent, documented asymmetry vs
+NBA), or does Render's live `WNBA_BETTING_DATA_ROOT` disk carry earlier
+seasons that never reached this git-tracked mirror? Per
+`model_engine_standard.md` Sec3b, local-checkout absence is not proof of
+production absence -- `syndicate-an21.onrender.com` 502'd throughout this
+session (same limitation already recorded against `#460`'s Sec2/Sec0b
+reachability checks), so this could not be checked live. If production DOES
+carry deeper history, the fix is widening what `refresh_wnba_source_mirror.ps1`
+pulls, not a code change. If it does not, this is a genuine, permanent
+characteristic of WNBA's shorter operational history in this app and there
+is nothing to fix -- only to keep documented so it is not mistaken for a
+regression later.
+
 ### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always. `elo_rating`, `goals_per_60`-staleness, and `special_teams` (PP%/PK%) FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights/`special_teams_cal` genuinely absent or unreachable** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
