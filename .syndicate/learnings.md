@@ -5575,3 +5575,46 @@ minutes. **Verify the CONTENT landed, not the commit line.**
 
 
 
+
+## 2026-08-18 — A VERIFICATION CRITERION MUST NAME A SIGNAL THE SUBJECT ACTUALLY EMITS
+
+I wrote **three** deploy requests and **three** coordinator messages whose proof
+was *"`ODDS_SWEEP_OUTCOME` appearing on live-odds-worker."* **That reading cannot
+occur.** The launcher and the grader are different services: live-odds-worker
+launches, refresh-worker grades off the shared keyvalue markers. live-odds-worker
+can work perfectly and never emit that line.
+
+I had checked the emitter EXISTED in the deployed code. I never checked **WHICH
+SERVICE EMITS IT.**
+
+**THE RULE, in three parts, because I failed each separately tonight:**
+1. **Does the line exist in the deployed code?** (I did check this.)
+2. **Which service emits it?** (I did not — this cost three written requests.)
+3. **Does it describe the moment I am asking about, or grade an earlier one?**
+   (`ODDS_SWEEP_OUTCOME` carries `since_launch_s` up to 42 hours.)
+
+**A grading line is not an event line, and I missed that THREE TIMES in one
+evening after writing the rule down that same evening** — once counting 34
+gradings as 34 sweeps, once declaring the gate falsified, once concluding
+refresh-worker was bypassing the gate. **Writing a rule down does not install
+it.** The check has to be mechanical and run before the claim, not after.
+
+**COROLLARY — the cheapest instrument is the one that does not exist yet.** The
+whole chain was reconstructed from marker-age arithmetic because there was NO
+positive launch-side log line, only `*_FAILED` variants. A successful launch was
+invisible. `ODDS_SWEEP_LAUNCHED` now exists; it should have from the start.
+
+## 2026-08-18 — READ THE DOCSTRING BEFORE THE CODE, AND DISTRUST IT AFTER
+
+Two stale docstrings cost real time tonight:
+- `soccer_projections.match_for` claims `_norm_team` "replaces a non-ASCII
+  character with a SPACE". **It folds correctly now.** I chased accents on that
+  claim; `teams_match` had handled it all along.
+- My OWN `test_sweep_ownership_gate` docstring asserted "refresh-worker swept
+  everything and starved the owner" — **which I disproved hours later.** A stale
+  docstring on a PASSING test reads as established fact.
+
+Conversely, `soccer_projections.load_soccer_projections`'s docstring contained
+the entire `#379` diagnosis WITH today's numbers, and reading it earlier would
+have saved two wrong causes. **Read the docstring first for the diagnosis; then
+verify it against the code before acting on it.**

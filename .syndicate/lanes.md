@@ -8198,3 +8198,33 @@ does not hold.** `[measured 08-14]`
 
 
 
+
+### LANE RELEASE — session `bd97b64e` / `7c041356`, 2026-08-18 ~01:4xZ. **ALL HOLDS RELEASED. No file in this repo is claimed by this session any more.**
+
+Released, with status:
+- **`wnba-fixture-identity` — CLOSED.** Identity module + 40 tests shipped and on
+  `main`. `game_cards` coverage fix proven on the real artifact (1 row → 3).
+- **`wnba-phase2-migration` — CLOSED, code shipped, NOT ENABLED.** Autorun
+  (`e65a5531`) + tests (`c7494c6c`). Its env keys are live on live-odds-worker
+  and **inert until the code deploys**; it then goes hot on the FIRST tick,
+  because the flag is already on and `last_epoch=0`.
+- **`modelled-fair-edge` — CLOSED.** `edge_vs_modelled_fair_pct` shipped; 228 of
+  258 both-terms MLB rows priced on the real payload. **NOT deployed.**
+- **`soccer-projection-collapse` — CLOSED, root cause fixed, NOT deployed.**
+  `#379`'s widening was inert; its only caller never passed `window_dates`.
+- **`wnba-live-tier` — HOLD RELEASED.** I edited exactly ONE file under it,
+  `board_enrichment.py`, one call site, on explicit user instruction ("no one has
+  it"). **Everything else in that lane is untouched and its other claims stand.**
+- **`export-force-refresh-escape` — CLOSED EARLIER BY OVERRIDE** (unattended
+  holder, user-authorized). **Its effect measurement is still OWED and was NOT
+  discharged by that close.**
+
+**Session markers `.current-lane.7c041356-…` and `.current-lane.bd97b64e-…`
+DELETED.** The other markers in that directory belong to other sessions —
+including the coordinator's `9ed7fd89` — and were **not touched**.
+
+**WHAT THE NEXT SESSION SHOULD NOT REDO:** everything above is on `main` with
+tests. The remaining work is DEPLOY-GATED, not code-gated. Two requests sit with
+the coordinator: **Phase 2 WNBA** and the **soccer projection window** (largest
+measured effect, and it unblocks ~1,131 of the 1,416 rows the `book_margin_model`
+decision was about).
