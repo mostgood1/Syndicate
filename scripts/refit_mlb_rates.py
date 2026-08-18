@@ -82,8 +82,14 @@ def load_actual_rates() -> dict:
 
 
 def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
+    from datetime import date as _dt_date
+    from sim_engine.data.arsenal import (apply_arsenal_to_batter,
+                                         apply_arsenal_to_pitcher)
     from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                              apply_batted_ball_to_pitcher)
+    from sim_engine.data.quality import apply_quality
+    from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
+                                              default_bvp_cache)
     from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.data.statcast_pitch_splits import default_statcast_cache
@@ -91,6 +97,7 @@ def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
     from sim_engine.simulate import simulate_game
 
     cache = default_statcast_cache()
+    bvp_cache = default_bvp_cache()
     tot = defaultdict(float)
     for _date, path in jobs:
         try:
@@ -98,6 +105,17 @@ def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
         except Exception:
             continue
         away, home = raw["away"], raw["home"]
+        # BVP once per GAME (each side vs the opposing starter), before the
+        # per-roster loop -- it is applied by daily_update.py, not build_roster.
+        for _bat_side, _pit_side in (("away", "home"), ("home", "away")):
+            try:
+                apply_starter_bvp_hr_multipliers(
+                    batting_roster=raw[_bat_side],
+                    pitcher_id=int(raw[_pit_side].lineup.pitcher.player.mlbam_id),
+                    season=season, start_date=_dt_date(season, 3, 1),
+                    end_date=_dt_date(season, 7, 30), cache=bvp_cache)
+            except Exception:
+                pass
         for r in (away, home):
             for p in [r.lineup.pitcher] + list(r.lineup.bullpen or []):
                 _apply_cached_statcast_pitch_splits(
@@ -109,8 +127,17 @@ def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
                 # populated. A refit is only valid for the input set it was run
                 # against.
                 apply_batted_ball_to_pitcher(p, season=season)
+                # `#440`: the FULL input set. A refit against a half-fed engine
+                # derives corrections that absorb the absence of fields which are
+                # about to be populated -- measured 2026-08-18, when the earlier
+                # run lacked arsenal, quality and BVP and its corrections are
+                # therefore stale by construction.
+                apply_arsenal_to_pitcher(p, season=season)
+                apply_quality(p, season=season, side="pitchers")
             for b in list(r.lineup.batters) + list(r.lineup.bench or []):
                 apply_batted_ball_to_batter(b, season=season, weight=weight)
+                apply_arsenal_to_batter(b, season=season)
+                apply_quality(b, season=season, side="batters")
                 # apply the refit corrections on top of every other source
                 for rate, mult in (corrections or {}).items():
                     try:

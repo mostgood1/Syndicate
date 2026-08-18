@@ -15118,3 +15118,59 @@ gate. My tick gate is already correct.**
 now cheap, because `ODDS_SWEEP_LAUNCHED` (`63fc2c84`) will name the sports and
 count on the tick path, so a wnba launch that appears WITHOUT that line came
 from somewhere else. **Do not touch `launch_refresh_run` to find out.**
+
+## 2026-08-18 — REFIT, FULLY FED. **4 of 4 residuals shrink — but the sim under-produces STRIKEOUTS by 27% and `k_rate` cannot fix it.**
+
+Lane `convergence-phase7-crps`. `refit_mlb_rates.py` now applies the FULL input
+set (pitch splits, batted-ball both sides, arsenal both sides, quality both
+sides, BVP). 40 games x 100 sims. No deploy.
+
+| rate | simulated | actual | residual | after correction |
+|---|---|---|---|---|
+| `hr_rate` | 0.02427 | 0.03547 | −31.6% | **+6.3%** |
+| `inplay_hit_rate` | 0.26388 | 0.24848 | +6.2% | **+3.5%** |
+| `bb_rate` | 0.05956 | 0.08784 | −32.2% | **+23.6%** |
+| `k_rate` | 0.16514 | 0.22590 | −26.9% | **+26.3%** |
+
+**4 of 4 shrank**, against 3 of 4 half-fed — `k_rate` at least moves now instead
+of going the wrong way.
+
+### Feeding the inputs did NOT reduce the level bias, and that is CORRECT
+
+    rate      half-fed        fully-fed
+    hr        -34.6% -> -31.6%
+    k         -24.5% -> -26.9%
+    bb        -31.3% -> -32.2%
+    inplay     +5.5% ->  +6.2%
+
+Broadly unchanged, and **this is the expected result, not a disappointment**:
+the arsenal multipliers are **level-neutral by construction** (normalised against
+each player's own usage-weighted mean) and the batted-ball blend is centred on
+the league. They redistribute WITHIN a player's profile; they were never going to
+move the aggregate level. **A design intent, confirmed by measurement.**
+
+### THE FINDING: a 27% STRIKEOUT DEFICIT THAT `k_rate` DOES NOT TOUCH
+
+**A 1.368x correction to `k_rate` moved the residual from 26.9% to 26.3% — 0.6
+percentage points.** The parameter is not the lever.
+
+Simulated K is produced by the **pitch-level model** — pitch selection, whiff
+multipliers, count progression — not by the per-PA `k_rate` target. So the
+engine's largest remaining bias is in a mechanism the calibration layer has no
+handle on, and **shipping a `k_rate` correction would be applying force to a
+disconnected control.**
+
+`bb_rate` is the same shape but milder: a 1.475x correction closed 32.2% -> 23.6%,
+so roughly a quarter of the intended effect landed.
+
+**Only `hr_rate` and `inplay_hit_rate` respond properly** (−31.6% → +6.3%, +6.2%
+→ +3.5%). Those two corrections are shippable; the other two are not.
+
+### What to do with this
+
+1. **Do NOT ship the `k_rate` / `bb_rate` corrections.** They are fitted against
+   a quantity they cannot move, which is the definition of the wrong lever.
+2. **The K deficit is now the largest single modelling defect in the engine** —
+   27%, structural, and untouched by everything done this session.
+3. `hr_rate` / `inplay_hit_rate` corrections are candidates for a real refit
+   profile, subject to the usual shadow-then-promote gate.
