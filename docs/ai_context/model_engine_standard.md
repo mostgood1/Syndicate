@@ -117,6 +117,64 @@ just a publish.** Every engine must document its equivalent reuse flag.
 
 ---
 
+## 3b. MANDATORY: RENDER IS THE ARTIFACT SOURCE OF TRUTH. NOTHING MAY RELY ON LOCAL.
+
+**`[user directive, 2026-08-18]` — this applies to every engine, every audit,
+every backtest, and every gate.**
+
+Model *testing* may run locally. Model *facts* may not come from there. The
+`data/**` trees in git are a **cold-start safety net**, refreshed per-family on
+unrelated schedules — not a snapshot of what production computed. A local read
+answers a question about the checkout and nothing else.
+
+### The rule
+
+**Every claim about what an engine has, produces, or is missing must name the
+SUBSTRATE it was read from, and that substrate must be Render** — the served
+payload, the worker disk via `/api/ops/artifacts/*`, or the live env-vars API.
+A claim that does not name its substrate is not yet a claim.
+
+| question | read this | NEVER this |
+|---|---|---|
+| does the model output reach users? | the **served payload** (`GET /<sport>/api/cards?...`) | a local artifact file |
+| does an input artifact exist? | `/api/ops/artifacts/export?path=...` | `ls data/<sport>_source/` |
+| is a config key set? | live `/v1/services/<id>/env-vars`, paginated | `render.yaml` |
+| which code is running? | the **content** of the deployed blob | ancestry from `main` |
+
+### Why this is stated at this length
+
+Measured twice in one session, on the same engine:
+
+- `FootballSimulationAdapter(sport="ncaaf").load_features(...)` returns **0
+  games** locally. Production serves **16**. That local zero was written into
+  `todo.md` and a reference doc as a production defect, and had to be retracted.
+- The same checklist's population level, run against a local mirror, reported
+  **"0.0% populated"** on nine input blocks — from a **1-game** degenerate load.
+  The real load is **272 games** with three blocks at **100%**.
+
+Both readings were correct about the laptop and wrong about the system. **The
+dangerous case is when the local reading AGREES with something true** — NCAAF
+genuinely produces no model output — because then a second "nothing" reads as
+corroboration instead of as a measurement of a different subject.
+
+### Requirements for a gate
+
+- A gate that measures population **must** report **UNMEASURED** — never `0%` —
+  when its substrate is a local checkout, and must say so in the failure text.
+  `scripts/football_sim_input_checklist.py` emits *"FROM THIS CHECKOUT ...
+  `data/**` is a lossy mirror ... check the served board"*.
+- **Every model input must be in `HOT_ARTIFACT_PATTERNS`**, or it cannot be read
+  or published through `/api/ops/artifacts/*` — which means it cannot be
+  audited on Render at all, and every question about it falls back to the local
+  guess this rule forbids. Measured: NCAAF's `recommendations_summary/week_N.json`
+  — **the artifact its board renders from** — is not allowlisted, so its row
+  count was unanswerable from outside and had to be instrumented in the payload
+  instead.
+- **Maintaining that allowlist is part of shipping an input**, not follow-up
+  work. An unallowlisted artifact is an unauditable one.
+
+---
+
 ## 4. The five rules, each earned by a measured failure
 
 ### 4.1 "Absent" needs a field audit, not a name search
@@ -167,7 +225,9 @@ Before an engine is considered production-ready:
 - [ ] **Gating checklist script**, exits 1, in `/preflight` or the migration gate
 - [ ] **Pipeline trace documented**, file:line at each hop, including what it writes
 - [ ] **Every input disk-backed** via `SYNDICATE_DATA_ROOT`, never the source tree
-- [ ] **Every input allowlisted** in `HOT_ARTIFACT_PATTERNS`
+- [ ] **Every input allowlisted** in `HOT_ARTIFACT_PATTERNS` — and therefore
+      readable through `/api/ops/artifacts/*`. Unallowlisted = unauditable (§3b)
+- [ ] **Every claim names its substrate**, and the substrate is Render (§3b)
 - [ ] **Reuse/caching flags documented**, with the rebuild procedure for a new input
 - [ ] **Reachability test per flagged feature** (`off != on`)
 - [ ] **Mechanisms distinguished from estimators**, with the re-fit obligation stated

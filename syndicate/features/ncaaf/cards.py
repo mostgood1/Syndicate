@@ -1584,7 +1584,70 @@ def _week1_publication_profile(away_team: str, home_team: str, week: int) -> dic
     return {}
 
 
-def _collapse_games(summary: dict[str, Any], week: int, *, limit: int = 16) -> list[dict[str, Any]]:
+# An NFL-shaped number applied to a sport that is not NFL-shaped.
+#
+# `_collapse_games` capped the NCAAF board at 16 games. The NFL plays exactly 16
+# games a week (32 teams / 2), so on that board 16 is the natural slate and the
+# cap never binds. FBS plays 50-60. Measured 2026-08-18 on production: weeks
+# 1, 2, 3, 5, 8 and 12 ALL served exactly 16 games, while CFBD lists 51
+# FBS-vs-FBS for week 1 alone. Six weeks landing on the cap exactly is the cap
+# binding, not six coincidences.
+#
+# Worse, the truncation keeps the top rows by `edge` -- and with no SmartSim2
+# projection artifact the edges are absent, so the surviving 16 were an
+# ARBITRARY 16, presented as the board.
+#
+# NOT REMOVED, DEFENDED. An unbounded board is a memory and payload risk on a
+# 2GB display service (~9.8 KB/game measured, so 60 games is ~590 KB). The cap
+# stays as a real guard at a size the sport can actually reach, and -- per the
+# "no silent caps" rule -- it now SAYS SO when it bites, in the payload itself
+# rather than only in a log the web service may or may not surface.
+_NCAAF_BOARD_GAME_LIMIT = 80
+
+# Set on the context by `build_cards_page_context` so the truncation is readable
+# with curl. This ALSO answers a question that could not be answered from
+# outside: the `recommendations_summary` artifact is NOT in
+# `HOT_ARTIFACT_PATTERNS`, so it cannot be read through `/api/ops/artifacts/*`
+# and there is no local copy -- meaning "does the summary hold more than 16
+# rows?" was unanswerable by inspection. `rows_before_limit` answers it from the
+# served payload on the next request.
+_NCAAF_BOARD_COUNTS_KEY = "board_row_counts"
+
+
+def _note_board_truncation(counts: dict[str, Any], source: str, rows: list[Any], week: int) -> None:
+    """Record (and announce) a board truncation for the non-legacy row paths.
+
+    THE CHOKE POINT MATTERS HERE. `blueprints/ncaaf.py:85,91` route to
+    `build_smartsim_cards_page_context`, NOT to `build_cards_page_context` --
+    so a fix applied only to `_collapse_games` reaches the board solely on the
+    fallback branch. There were THREE 16-caps on this module and they are on
+    different branches of the same page:
+
+        _collapse_games(limit=)      legacy recommendations_summary  (fallback)
+        runtime_rows[:16]            legacy Enhanced Totals Engine rows
+        runtime_rows[:16]            SmartSim2 standalone rows
+
+    The third is the one that bites NEXT: it is empty today only because the
+    SmartSim2 NCAAF projection artifact is missing (`CFBD_API_KEY` absent), and
+    the moment that key lands it returns ~51 rows -- which the old `[:16]` would
+    have silently cut back to 16, re-breaking the board at the exact moment it
+    started working.
+    """
+    total = len(rows)
+    counts["source"] = source
+    counts["runtime_rows"] = total
+    counts["limit"] = _NCAAF_BOARD_GAME_LIMIT
+    counts["truncated"] = total > _NCAAF_BOARD_GAME_LIMIT
+    counts["dropped"] = max(0, total - _NCAAF_BOARD_GAME_LIMIT)
+    if counts["truncated"]:
+        print(
+            f"NCAAF_BOARD_TRUNCATED week={week} source={source} "
+            f"rows={total} limit={_NCAAF_BOARD_GAME_LIMIT} dropped={counts['dropped']}",
+            flush=True,
+        )
+
+
+def _collapse_games(summary: dict[str, Any], week: int, *, limit: int = _NCAAF_BOARD_GAME_LIMIT, counts: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     results = summary.get("results") if isinstance(summary.get("results"), list) else []
     best_rows: dict[tuple[str, str], dict[str, Any]] = {}
     for row in results:
@@ -1614,6 +1677,15 @@ def _collapse_games(summary: dict[str, Any], week: int, *, limit: int = 16) -> l
         key=lambda row: ((_safe_float(row.get("edge")) or 0.0), (_safe_float(row.get("stake")) or 0.0)),
         reverse=True,
     )
+    if counts is not None:
+        # Recorded BEFORE the slice, which is the only point at which the
+        # dropped rows are still countable.
+        counts["summary_result_rows"] = len(results)
+        counts["distinct_matchups"] = len(ordered_rows)
+        counts["limit"] = limit
+        counts["truncated"] = len(ordered_rows) > limit
+        counts["dropped"] = max(0, len(ordered_rows) - limit)
+
     games: list[dict[str, Any]] = []
     for row in ordered_rows[:limit]:
         home_team = str(row.get("home_team") or "Home").strip() or "Home"
@@ -2082,6 +2154,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
     requested_week = int(selected_week or default_active_week)
     resolved_week = resolve_selected_value(requested_week, runtime_weeks, default_active_week)
 
+    board_row_counts: dict[str, Any] = {}
     engine_rows = _engine_rows_for_season_week(season, resolved_week)
     if engine_rows:
         # Unchanged path: real Enhanced Totals Engine data exists for this
@@ -2090,8 +2163,9 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
         runtime_rows = engine_rows
         games = [
             _build_smartsim_ncaaf_card_contract(row, resolved_week, season=season)
-            for row in runtime_rows[:16]
+            for row in runtime_rows[:_NCAAF_BOARD_GAME_LIMIT]
         ]
+        _note_board_truncation(board_row_counts, "legacy_engine", runtime_rows, resolved_week)
         source_label_for_page = LEGACY_ENGINE_SOURCE_LABEL
     else:
         # No engine row for this season/week (e.g. 2026, while NCAAFCompare
@@ -2102,8 +2176,9 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
             return build_cards_page_context(selected_week)
         games = [
             _build_smartsim2_standalone_ncaaf_card_contract(row, resolved_week, season=season)
-            for row in runtime_rows[:16]
+            for row in runtime_rows[:_NCAAF_BOARD_GAME_LIMIT]
         ]
+        _note_board_truncation(board_row_counts, "smartsim2_standalone", runtime_rows, resolved_week)
         source_label_for_page = SMARTSIM2_PUBLIC_LABEL
 
     record_trial_page_view(
@@ -2135,6 +2210,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
             "control_value": str(resolved_week),
             "module_links": build_module_links(resolved_week, "Cards"),
             "games": games,
+            _NCAAF_BOARD_COUNTS_KEY: board_row_counts,
             "scoreboard_items": [
                 {
                     "target_id": f"game-{game['gamePk']}",
@@ -2195,7 +2271,19 @@ def build_cards_page_context(selected_week: int) -> dict[str, Any]:
     betting_href = f"/ncaaf/season/{season}/betting-card?week={resolved_week}"
     path = summary_path(resolved_week)
     summary = load_json(path) or {}
-    games = _collapse_games(summary, resolved_week)
+    board_row_counts: dict[str, Any] = {}
+    games = _collapse_games(summary, resolved_week, counts=board_row_counts)
+    if board_row_counts.get("truncated"):
+        # A cap that bites must announce it. Web's own stdout IS collected by
+        # Render (unlike a worker's detached child), and `logger.info` is not --
+        # hence print/flush.
+        print(
+            f"NCAAF_BOARD_TRUNCATED week={resolved_week} "
+            f"matchups={board_row_counts.get('distinct_matchups')} "
+            f"limit={board_row_counts.get('limit')} "
+            f"dropped={board_row_counts.get('dropped')}",
+            flush=True,
+        )
     using_sample_data = False
 
     weeks = available_weeks()
@@ -2215,6 +2303,7 @@ def build_cards_page_context(selected_week: int) -> dict[str, Any]:
             "control_value": str(resolved_week),
             "module_links": build_module_links(resolved_week, "Cards"),
             "games": games,
+            _NCAAF_BOARD_COUNTS_KEY: board_row_counts,
             "scoreboard_items": [
                 {
                     "target_id": f"game-{game['gamePk']}",

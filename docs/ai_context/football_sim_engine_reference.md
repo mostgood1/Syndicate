@@ -92,6 +92,46 @@ wiring it in is adding mechanisms to a calibrated engine. See §5.
 
 ---
 
+## 0b. RENDER IS THE SOURCE OF TRUTH FOR THIS ENGINE. Read `model_engine_standard.md` §3b first.
+
+**Every number in this document that describes production was read from Render** —
+the served payload, the live env-vars API, or the deployed blob's content. Where a
+number came from a local checkout it is labelled as such and is a statement about
+the checkout only.
+
+**This engine is where that rule was earned.** Twice in one session a local read
+produced a confident, wrong, published claim:
+
+- *"the NCAAF feature loader returns zero games"* — true locally, **false in
+  production**, which serves 16. Retracted (§4).
+- *"every input block is 0% populated"* — a **1-game** degenerate load. The real
+  load is **272 games**, three blocks at **100%** (§3).
+
+**Reading football facts, correctly:**
+
+| question | command |
+|---|---|
+| what the board serves | `curl -s "https://syndicate-an21.onrender.com/ncaaf/api/cards?week=1"` |
+| whether the model reached it | `.games[].predictions.home_mean` non-null on that payload |
+| whether the board truncated | `.board_row_counts` on that payload (`truncated`, `dropped`) |
+| whether an input artifact exists | `/api/ops/artifacts/export?path=...` with `ADMIN_TOKEN` |
+| whether a key is set | live `/v1/services/<id>/env-vars`, paginated — **not `render.yaml`** |
+| which code is live | the **content** of the deployed blob, never ancestry from `main` |
+
+**Known gap:** NCAAF's `recommendations_summary/week_N.json` — the artifact the
+board renders from — is **not in `HOT_ARTIFACT_PATTERNS`**, so it cannot be read
+through `/api/ops/artifacts/*` and there is no local copy either. Its row count
+was unanswerable from outside; that is why `board_row_counts` now ships in the
+payload. **Allowlisting it is owed work**, not a nicety — an unauditable
+artifact forces exactly the local guessing this rule forbids.
+
+`scripts/football_sim_input_checklist.py` reads the local feature loader by
+design (it is a code-and-population gate, not a production probe) and therefore
+reports **UNMEASURED**, never 0%, below `MIN_GAMES_FOR_A_RATE`, naming the mirror
+in its failure text.
+
+---
+
 ## 1. There are TWO football models and they are unrelated
 
 This is the fact that makes every other football question confusing until you
@@ -291,14 +331,64 @@ Deploy request filed: `.syndicate/deploy/requests/20260818T154432Z-football-mode
 Env-only, one key, one service. **`render.yaml` must not be touched** — that
 fires `blueprint_sync`.
 
-### Open, and NOT to be waved through
+### FIXED: the board was capping the slate at 16 — an NFL-shaped number
 
-**The board serves 16 games; CFBD lists 51 FBS-vs-FBS for the same week.** The
-cards context reads a saved recommendations summary (`cards.py:2196-2198`,
-`summary_path(week)`), not CFBD. So after the key lands, the projection artifact
-should carry ~51 rows while the board renders 16. **Whether those join, and what
-happens to the other 35, is unresolved** — `16 of 16` predictions populated is
-not proof the slate is covered.
+**The board served 16 games because of a hardcoded cap, not because the data
+held 16.** Production evidence: weeks **1, 2, 3, 5, 8 and 12 ALL served exactly
+16** while CFBD lists **51** FBS-vs-FBS for week 1 alone. Six weeks landing on
+the cap exactly is the cap binding.
+
+16 is the NFL's natural weekly slate (32 teams / 2), where such a cap can never
+bind. FBS plays 50–60. Worse, the truncation kept the top rows **by `edge`** —
+and with no projection artifact the edges are absent, so the surviving 16 were an
+**arbitrary** 16 presented as the board.
+
+**There were THREE caps, on three branches of the same page**, and the one that
+mattered most was not the one serving the board that day:
+
+| site | branch | status |
+|---|---|---|
+| `_collapse_games(limit=16)` | legacy `recommendations_summary` — the **fallback**, active today | fixed |
+| `runtime_rows[:16]` | legacy Enhanced Totals Engine rows | fixed |
+| `runtime_rows[:16]` | **SmartSim2 standalone rows** | fixed — **this is the one that bites next** |
+
+**The route calls `build_smartsim_cards_page_context`, not
+`build_cards_page_context`** (`blueprints/ncaaf.py:85,91`). A fix applied only to
+`_collapse_games` would have been inert on the served path — and the SmartSim2
+branch returns zero rows today *only* because the projection artifact is missing.
+**The moment `CFBD_API_KEY` lands, that branch returns ~51 rows and the old
+`[:16]` would have cut them straight back to 16 — re-breaking the board at the
+exact moment it started working.**
+
+**Raised, not removed.** `_NCAAF_BOARD_GAME_LIMIT = 80`. An unbounded board is a
+real memory and payload risk on a 2 GB display service (~9.8 KB/game measured, so
+60 games ≈ 590 KB). The cap stays as a guard at a size the sport can actually
+reach.
+
+**And it now announces itself** — per the no-silent-caps rule. Every context
+carries `board_row_counts` (`runtime_rows`/`distinct_matchups`, `limit`,
+`truncated`, `dropped`, `source`), present **whether or not** it truncated, so
+"not truncated" is a reading rather than an absent key. A bite also prints
+`NCAAF_BOARD_TRUNCATED` to web's stdout, which Render does collect.
+
+This doubles as the instrument for a question that could not be answered from
+outside: with the summary artifact unallowlisted and no local copy, "does the
+summary hold more than 16 rows?" was uninspectable. `board_row_counts` answers it
+on the next request.
+
+Regression cover: `tests/test_ncaaf_board_slate_coverage.py` (7 tests) — asserts
+the limit clears a real FBS week, that the old cap *would* have dropped 35 of 51
+(so the fix is not vacuous), that the guard still bites and reports above its
+threshold, and — **via AST, not a text search** — that no board-sized hardcoded
+slice returns. The text-search version of that last test failed against the
+module's own docstrings, which quote the removed cap while explaining it.
+
+### Still open, NOT to be waved through
+
+After the key lands, the projection artifact should carry ~51 rows. **Confirm the
+board then serves ~51 and not 16** — read `board_row_counts` and the game count,
+not just `predictions.home_mean`. A populated `16 of 16` would mean the join, not
+the cap, is now the constraint.
 
 Also seen and NOT a Syndicate defect: USC, San José State and Eastern Michigan
 each appear twice in the served week. Both of each pair are present in CFBD's own
