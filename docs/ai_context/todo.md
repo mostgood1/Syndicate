@@ -569,7 +569,7 @@ untouched. Recorded so a partially-right hypothesis is not banked as the answer.
   may not display a pregame projection as current — the latter was offered to
   the user and NOT selected.
 
-### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
+#### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
 
 **MEASURED 2026-08-14 18:0xZ ON THE DEPLOYED CODE (`294f9ca9`), refresh-worker,
 4h window. This is the end-to-end timing the ticket asked for, taken from the
@@ -2356,7 +2356,7 @@ Related: the board audit (six bespoke builders, five ranking paths, four
 `build_book_grid` call sites), `#329` (which replaced the HTML page and left the
 builders live).
 
-### `#414` — ROOT CAUSE FOUND. The 25-minute board build is not a leak: it re-reads and re-indexes a 57 MB odds-history shard that grows all day, up to 3x per build
+#### `#414` — ROOT CAUSE FOUND. The 25-minute board build is not a leak: it re-reads and re-indexes a 57 MB odds-history shard that grows all day, up to 3x per build
 
 **`collect_candidates` degraded 7.5x in eleven hours** — measured 2026-08-12/13
 from `COLLECT_SPAN_EXIT`, every non-zero sample:
@@ -2476,7 +2476,7 @@ all sat inside one plateau. **A measured number is a timestamp, not a fact** —
 both of us sampled a flat stretch in the middle of a climb, in opposite
 directions.
 
-### `#414` CORRECTED — my root cause was HALF right and my fix is INERT. The cost is a full linear scan of `unattributed` PER CANDIDATE, not an index rebuild
+#### `#414` CORRECTED — my root cause was HALF right and my fix is INERT. The cost is a full linear scan of `unattributed` PER CANDIDATE, not an index rebuild
 
 **Confirmed inert in production.** Same slate date, shard not reset:
 
@@ -2532,7 +2532,7 @@ zero hits is right. The conclusive evidence is the duration, not that pair.
 
 Related: `#372` and `#376` both hit this same scan and treated it as local cost.
 
-### `#414` — THIRD CORRECTION. My event-bucket fix targets the wrong SHAPE and is NOT deployed. The cost is ONE pathological loop iteration per game
+#### `#414` — THIRD CORRECTION. My event-bucket fix targets the wrong SHAPE and is NOT deployed. The cost is ONE pathological loop iteration per game
 
 **Withdrawn: the ~8-10 s/row figure I called "the finding that survived every
 reframing".** It divided game-elapsed by CANDIDATES EMITTED, not by loop
@@ -4056,7 +4056,7 @@ loop and the wrong shape long-term.
   a bootstrap.
 - **`features.csv` is still 2017 until a refresh runs** with the new gate.
 
-### `#351` — OPEN, UNOWNED. The WNBA history fetch asks for 10 seasons, cannot finish 10 seasons, and its designed escape hatch is seeded from a file that guarantees it asks for 10 seasons
+#### `#351` — OPEN, UNOWNED. The WNBA history fetch asks for 10 seasons, cannot finish 10 seasons, and its designed escape hatch is seeded from a file that guarantees it asks for 10 seasons
 
 **A self-sustaining loop that burns ~45 minutes of refresh-worker time and a
 season's worth of ESPN requests per attempt, and can never make progress.**
@@ -4237,7 +4237,7 @@ stream` 403s on it. The deployed `RECONCILIATION_AUTORUN_GATED` line prints
 - This is the second time tonight that a pagination direction turned a real
   window into a much shorter one without saying so.
 
-### `#341` — COMMITTED, NOT DEPLOYED. The settlement autorun was ENABLED, correctly configured, and structurally unable to run: 6th in an exclusive `if/elif` chain behind three high-frequency branches
+#### `#341` — COMMITTED, NOT DEPLOYED. The settlement autorun was ENABLED, correctly configured, and structurally unable to run: 6th in an exclusive `if/elif` chain behind three high-frequency branches
 
 **`/api/portfolio/summary` has read `settled_count: 0, avg_clv: null` for weeks,
 and the cause is not settlement, capture, or the emitter. All three work.**
@@ -4771,7 +4771,7 @@ Capture health across the deploy, for the record: newest quote **9.4 min old
 immediately before**, **0.5–0.7 min after** — the restart improved it, and the gate
 re-evaluated cold with four games live and returned True.
 
-### `#339` — COMMITTED, NOT DEPLOYED. The MLB liveness gate returns a bare False from EIGHT paths, and it has cost a live slate twice
+#### `#339` — COMMITTED, NOT DEPLOYED. The MLB liveness gate returns a bare False from EIGHT paths, and it has cost a live slate twice
 
 `879afbfd` (message says `#338`; see collision note above).
 
@@ -4874,7 +4874,7 @@ Board game data may now be up to 900s stale rather than up to 300s. That was the
 user's call, made explicitly, against a board that was previously freezing for
 68+ minutes at a time when the memory floor bit.
 
-### `#336` — OWNED. ROOT-CAUSED, AND IT IS `#285`: the 3000MB overview headroom floor is firing on every cycle. NOT an independent defect, and the "not a memory problem" exclusion used a token this path never emits. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
+#### `#336` — OWNED. ROOT-CAUSED, AND IT IS `#285`: the 3000MB overview headroom floor is firing on every cycle. NOT an independent defect, and the "not a memory problem" exclusion used a token this path never emits. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
 
 **This is upstream of `#308` and is NOT the same defect.** `#308` is 156 merged
 candidates becoming 0 promoted cards. Here there are no candidates AT ALL: the

@@ -50,7 +50,9 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   (a scheduled-task run), and `send_message` refuses to send from those. The
   ledger is the channel; that is why this is here and not a DM.
 
-### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — SUPERSEDED-COPY 2026-08-18 — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `layer2-board-quality` and both forks are archived or gone from the roster.
 > File claims left ENFORCED deliberately (the header still reads OPEN), so
@@ -348,7 +350,9 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   were outside the 3h window. `steam 0` is correct behaviour, not evidence.
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
-### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+### clv-without-settlement — SUPERSEDED-COPY 2026-08-18 — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `lane-cleanup` no longer exists in the roster (`get_session` → not found).
 > **SINGLE NEXT ACTION:** the population this lane was waiting on now EXISTS —
@@ -1979,7 +1983,9 @@ and then failed the thing it was checking, which is the point of running it.
   a model/market pair on those rows instead of refusing.
 - Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.
 
-### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+### wnba-live-tier — SUPERSEDED-COPY 2026-08-18 — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 > **[SWEEP 2026-08-17 12:1x CDT] OWNER LIVE VIA FORK.** The lane's last claim
 > file belongs to an ARCHIVED fork, but `layer1-board-coverage` fork 6 is
 > running, so this lane is recoverable in-session rather than orphaned.
@@ -2595,7 +2601,9 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### wnba-fixture-identity — OPEN — **stable fixture identity SHIPPED (`b2dbef5e`,
+### wnba-fixture-identity — SUPERSEDED-COPY 2026-08-18 — **stable fixture identity SHIPPED (`b2dbef5e`,
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 `ec5c9011`, 40 tests). Now wiring it into the game_cards builder.** - opened
 2026-08-17 - session: layer1-board-coverage
 - Goal: the WNBA `game_cards` writer uses the schedule as its denominator and
@@ -2767,18 +2775,6 @@ to betting-accuracy improvements.
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
 
-### wnba-phase2-migration — OPEN — **taking `run_live_odds_refresh_worker.py` from the RELEASED orphan `soccer-model-coverage`** - opened 2026-08-17 - session: layer1-board-coverage
-- Goal: re-home the WNBA full refresh onto a worker autorun (Phase 2 of the
-  migration off the daily-update GHA cron), so something actually calls
-  `refresh_wnba_oddsapi_props.main()` on a cadence.
-- Files (exclusive to this lane):
-  - `scripts/run_live_odds_refresh_worker.py`
-- **Not an override.** `soccer-model-coverage` is marked ORPHANED by the
-  2026-08-17 coordinator sweep, which states the claims were RELEASED at
-  session archive and anyone may take the files. `lane-guard` cannot see that
-  release, so this entry registers the take. **Its uncommitted fixes #1 and #3
-  are NOT mine and remain at risk** - I am not touching soccer code.
-
 ### soccer-layer2-dates — OPEN — opened 2026-08-17 — session: soccer-sport-owner
 - Goal: the Layer 2 compact-game rail shows ONLY today's soccer games, each with a
   state its kickoff time can support. **Testable outcome:** on production
@@ -2833,22 +2829,6 @@ to betting-accuracy improvements.
   an impossible state: 1 -> 0. Numbers written to `.syndicate/deploys.md`.
 - Blocked by: `intelligence.html` release from `layer2-board-quality` (requested, not
   blocking the H2 work or the soccer pipeline/live-lens strands).
-
-### modelled-fair-edge — OPEN — **user decision taken 2026-08-17: allow `book_margin_model` edges, in their own column** - opened 2026-08-17 - session: layer1-board-coverage
-- Goal: the 1,416 rows carrying BOTH `model_prob` and
-  `modelled_fair.*.fair_probability` serve an edge - in a SEPARATE, labelled
-  column that never mixes with `edge_vs_market_pct`.
-- **THE USER DECISION** (recommendation 4 of the Layer 1 audit, previously
-  blocking): *"yes, allow book_margin_model edges with their own column"*.
-- Files (exclusive to this lane):
-  - `syndicate/features/shared/book_margin_model.py`
-  - `syndicate/features/shared/prop_projections.py`
-  - `syndicate/features/shared/soccer_projections.py`
-  - `tests/test_modelled_fair_edge.py`
-- **Constraint from the module's own docstring:** a modelled fair *"must never
-  be silently mixed with a real two-sided fair value -- a modelled number
-  wearing a measured number's clothes is the failure `#242` already caused
-  once"*. A separate column IS the not-mixing, so the decision honours it.
 
 ### soccer-layer2-dates — CLOSED-VERIFIED 2026-08-18 02:3xZ — 8/8 commits on `origin/main`, all deployed and measured; one proof scheduled — session: soccer-layer2-dates
 
@@ -3718,7 +3698,9 @@ decision was about).
 
 Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
 
-### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — SUPERSEDED-COPY 2026-08-18 — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `layer2-board-quality` and both forks are archived or gone from the roster.
 > File claims left ENFORCED deliberately (the header still reads OPEN), so
@@ -3999,6 +3981,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
 ### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+- Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim): `artifact_publisher.py`
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `lane-cleanup` no longer exists in the roster (`get_session` → not found).
 > **SINGLE NEXT ACTION:** the population this lane was waiting on now EXISTS —
@@ -4820,7 +4803,9 @@ does not hold.** `[measured 08-14]`
   were outside the 3h window. `steam 0` is correct behaviour, not evidence.
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
-### refresh-worker-oom-recurrence — OPEN — **ATTRIBUTED, NO DEPLOY MADE. `#435` did NOT regress (`c67f7373` is an ancestor of live `f8ca54e1`; the ledger's `2,869 -> 1,071` is the book_quotes READ, not container anon — different quantities). The kill is a ~2 GB TRANSIENT, not a leak: 22 excursions over 5 deploy-free windows, amplitude FLAT all night, every cycle reaches headroom 0.0, and the two kills are the two thinnest-page-cache cycles (inactive_file 26.3 / 42.2 MB vs 164–240 MB surviving). Measurement in `deploys.md`. ALSO THIS SESSION: adjudicated the stale shared index (3 revert-in-waiting blobs disarmed, incl. one that would have stripped the LIVE Drop 3 hook), notified the 2 reachable live sessions, and FIXED `commit-guard.py` to gate on the staged BLOB rather than name-status — 4-case falsification suite passes, 5273ms -> 659ms. OPEN because the allocator inside the 2 GB pass is still UNNAMED and needs an in-pass measurement, which needs a deploy, which needs the clean window (42.8 min at 03:19Z) to mature first** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+### refresh-worker-oom-recurrence — SUPERSEDED-COPY 2026-08-18 — **ATTRIBUTED, NO DEPLOY MADE. `#435` did NOT regress (`c67f7373` is an ancestor of live `f8ca54e1`; the ledger's `2,869 -> 1,071` is the book_quotes READ, not container anon — different quantities). The kill is a ~2 GB TRANSIENT, not a leak: 22 excursions over 5 deploy-free windows, amplitude FLAT all night, every cycle reaches headroom 0.0, and the two kills are the two thinnest-page-cache cycles (inactive_file 26.3 / 42.2 MB vs 164–240 MB surviving). Measurement in `deploys.md`. ALSO THIS SESSION: adjudicated the stale shared index (3 revert-in-waiting blobs disarmed, incl. one that would have stripped the LIVE Drop 3 hook), notified the 2 reachable live sessions, and FIXED `commit-guard.py` to gate on the staged BLOB rather than name-status — 4-case falsification suite passes, 5273ms -> 659ms. OPEN because the allocator inside the 2 GB pass is still UNNAMED and needs an in-pass measurement, which needs a deploy, which needs the clean window (42.8 min at 03:19Z) to mature first** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+
+> Demoted 2026-08-18: this slug had several blocks reading OPEN, so two sessions could each read themselves as the holder. The block retained as OPEN is the one claiming the most files. Nothing here was deleted.
 - Goal: Decide, on evidence, whether the two `oomKilled` events (02:11:34Z,
   02:37:06Z, `memoryLimit 4Gi`, refresh-worker only — live-odds-worker zero in
   the same window) mean `#435` REGRESSED or that `#435` fixed one contributor
@@ -4863,6 +4848,7 @@ does not hold.** `[measured 08-14]`
 - Blocked by: none.
 
 ### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+- Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim): `syndicate/features/shared/board_enrichment.py`
 > **`live_gameline_join.py` RETURNED 2026-08-17 by `live-edge-basis`, which borrowed it under a user override and has now CLOSED.** The `edge_basis` change is shipped and measured on refresh-worker `b20072cd`. Nothing is left in flight on that file; it is yours again exactly as before.
 > **`syndicate/features/shared/live_gameline_join.py` TAKEN FROM THIS LANE
 > 2026-08-17 01:1xZ, BY EXPLICIT USER OVERRIDE, while this lane's session was
@@ -5273,3 +5259,144 @@ there", not "does the model generalise".
 scaling them down -- shots (corr +0.83..+0.93 with xG, weight 0.016) is the most
 likely single lever, per the earlier collinearity table. Re-run eredivisie only
 (fastest single-league check, ~2h) before re-running all nine again.
+
+### football-model-owner — BOARD CAP FIXED 2026-08-18 ~16:4xZ — **the NCAAF board was serving 16 of 51; three caps, and the one that mattered was on the branch that is empty TODAY** — session: football-model-owner
+
+**User directive taken:** *"nothing should rely on local ... Render is the
+artifact source of truth and must be maintained as such — this absolutely needs
+to be in the model documentation."* Now `model_engine_standard.md` **§3b**
+(cross-engine, mandatory) + `football_sim_engine_reference.md` **§0b**, and two
+new boxes in the §5 new-engine checklist.
+
+**THE FIX (`752a866d`):** `_NCAAF_BOARD_GAME_LIMIT = 80`, replacing a hardcoded
+16 in **three** places.
+
+**Evidence the cap was binding (production, not local):** weeks **1, 2, 3, 5, 8,
+12 ALL served exactly 16**, while CFBD lists **51** FBS-vs-FBS for wk1 alone.
+Six weeks on the cap exactly is the cap, not six coincidences. 16 = 32 teams / 2
+— **an NFL-shaped number on a sport that plays 50-60.** NFL's board also serves
+16 and for NFL that is *correct*, which is exactly why it was invisible.
+
+**THE TRAP, and I nearly shipped an inert fix.** The route
+(`blueprints/ncaaf.py:85,91`) calls `build_smartsim_cards_page_context`, **not**
+`build_cards_page_context`. I had already edited `_collapse_games` and was about
+to stop. The caller census found two more `runtime_rows[:16]`:
+
+| site | branch | note |
+|---|---|---|
+| `_collapse_games(limit=16)` | legacy summary — **the fallback, live today** | what I found first |
+| `runtime_rows[:16]` | legacy Enhanced Totals Engine | |
+| `runtime_rows[:16]` | **SmartSim2 standalone** | **the one that bites NEXT** |
+
+The third returns zero rows today *only* because the projection artifact is
+missing. **The moment `CFBD_API_KEY` lands it returns ~51 and the old `[:16]`
+would have cut them back to 16 — re-breaking the board at the exact moment it
+started working, with `verify:` passing.** Deploy request now carries an explicit
+ORDERING constraint: **web first (or together); key-alone is the one combination
+to avoid.**
+
+**Raised, NOT removed** — ~9.8 KB/game measured, so 60 games ≈ 590 KB on a 2GB
+display service. The cap is a real guard at a size the sport can reach.
+
+**It now announces itself.** `board_row_counts` on every context
+(`runtime_rows`, `limit`, `truncated`, `dropped`, `source`) — **present whether
+or not it truncated**, so "not truncated" is a reading and not an absent key —
+plus `NCAAF_BOARD_TRUNCATED` on web stdout (which Render collects). This also
+**answers a question that was uninspectable from outside**: the
+`recommendations_summary` artifact is **not in `HOT_ARTIFACT_PATTERNS`** and has
+no local copy, so "does it hold >16 rows?" could not be read. It can now.
+
+**Tests: 74 passing** across 7 NCAAF surface files, incl. new
+`tests/test_ncaaf_board_slate_coverage.py` (7). It asserts the old cap *would*
+have dropped 35 of 51, so the fix is provably not vacuous.
+
+**A test bug worth recording:** my first anti-regression test text-searched for
+`[:16]` and **failed against the module's own docstrings**, which quote the
+removed cap while explaining it. Rewritten with AST over `ast.Slice`. First AST
+version was then too broad — it flagged legitimate `[:2]`/`[:3]`/`[:5]` prose and
+abbreviation slices — so it is scoped to **board-sized** (`>= 10`) constants, with
+the threshold's reasoning in the test. *A test that flags legitimate code gets
+deleted, not fixed.*
+
+**Commits `418643a3`, `fa2433a7`, `752a866d` — LOCAL, UNPUSHED.** Coordinator
+session is ARCHIVED; no live deploy owner. Deploy request updated to two-part.
+
+**STILL OPEN:** after the key lands, confirm the board serves **~51, not 16** —
+read `board_row_counts`, not just `predictions.home_mean`. A populated `16 of 16`
+would mean the join, not the cap, is the constraint. And **allowlist
+`recommendations_summary` in `HOT_ARTIFACT_PATTERNS`** — owed, per §3b.
+
+### deploy-coordination-mechanism — CLOSED-VERIFIED 2026-08-18 ~17:0xZ — **the coordinator ROLE is retired and replaced by two locks; 33-case falsification suite passes** — session: football-model-owner
+
+**User decision:** *"there is no coordinator anymore - it wasnt working ... if
+you have a better idea tell me"* → *"yes do both"*.
+
+**What was actually wrong, and it is not "the role was a bad idea".** The guard
+allowed a deploy when `session_id in .syndicate/coordinator.id`. That register
+was carefully built — a LIST, because a resume reassigns the id, which was a real
+bug really fixed. Every defence protected the id against CHANGING; none protected
+against the holder CEASING TO EXIST. The last coordinator was found ARCHIVED, so
+the allow-branch became unreachable and the guard blocked **every** deploy from
+**every** session while still reading as a routing rule. Two requests pending,
+`grants/` empty, 11 days to the NCAAF opener.
+
+**The mechanism it wrapped was already better than it.** `deploy_claim.py` is an
+atomic `O_CREAT|O_EXCL` mutex with a 45-min expiry — a dead holder frees itself,
+which is the one thing the role could not do. Its own docstring had argued
+against the role from the start: *"Coordination by MESSAGE cannot fix either: a
+cross-session message waits for the target's current turn to end, while firing a
+deploy takes seconds."*
+
+**THE NEW PREDICATE — state, not identity.** To deploy service S: an unexpired
+claim on S held by YOUR lane, plus a `deploy_preflight` receipt of `CLEAR` under
+15 min old. `render.yaml` pushes need all three services locked, since
+`blueprint_sync`'s blast radius is all three. Every refusal prints the literal
+command that clears it, so nothing waits on another session.
+
+**Three bugs found while rewriting, each of which would have survived a review:**
+
+| bug | consequence |
+|---|---|
+| pattern was a bare substring of the entrypoint filename | blocked `sed`/`cat` on that file — **and blocked the heredoc that would have fixed it**, twice, in this session |
+| `web` and `syndicate` are aliases for one service in `deploy_claim.py` | two sessions could each hold "the" web lock under a different name and both read as unclaimed |
+| receipts written only on CLEAR | a stale CLEAR would outlive a later HOLD; now written on **every** verdict, so a HOLD revokes the CLEAR before it |
+
+**Files:** `.claude/hooks/deploy-guard.py` (rewritten), `scripts/deploy_preflight.py`
+(+`_write_receipt`), `tests/test_deploy_guard.py` (NEW, 33 cases),
+`.claude/hooks/session-start.sh`, `.claude/commands/preflight.md`, `CLAUDE.md`,
+`.syndicate/state.md`, `.syndicate/coordinator.md` (tombstoned),
+`.syndicate/deploy/requests/README.md` (NEW). **DELETED:**
+`.syndicate/coordinator.id`, `.claude/hooks/test_deploy_guard.py`,
+`.claude/hooks/test_deploy_guard_render_yaml.py` — the last two tested the
+retired predicate; their render.yaml-push coverage was PORTED into the new suite
+rather than lost.
+
+**Verification — both directions, because a suite that only goes green is
+indistinguishable from one that returns 0:**
+- 33/33 pass. Reads of the entrypoint ALLOWED; unlocked deploy BLOCKED; foreign
+  claim under the SIBLING alias BLOCKED; expired claim BLOCKED; stale CLEAR
+  BLOCKED; fresh HOLD over an older CLEAR BLOCKED; corrupt claim BLOCKED (not
+  read as free); claim+preflight ALLOWED.
+- **The render.yaml blocking test is provably non-vacuous:** it FAILED (exit 0)
+  before I fixed my own fixture, which had stripped `PATH` so the hook's `git`
+  subprocess could not run — the guard read that as "cannot prove" and allowed.
+  Passing only after the fixture was corrected is the evidence the branch runs.
+- Live in-repo check: the guard reads this session's real lane
+  (`football-model-owner`) and blocks a real deploy command with exit 2, naming
+  both missing locks.
+
+**NOT deployed and nothing to deploy** — hooks and tests are local tooling; no
+service runs this code.
+
+**Consequence for `football-model-owner`:** its deploy request is no longer
+queued behind anyone. The ordering constraint still holds — web `752a866d`
+first or together with `CFBD_API_KEY`; key-alone makes the board serve 16 of 51
+while `verify:` passes.
+
+### basketball-model-owner — OPEN — opened 2026-08-18 — session: basketball-model-owner
+- Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane.
+- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py, syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path.
+- Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface."
+- Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md.
+- Blocked by: none
