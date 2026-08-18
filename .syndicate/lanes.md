@@ -6166,7 +6166,7 @@ post-`94578cbc`'s state (gap +0.0017, dispersion 0.2373 on eredivisie) is the be
 checkpoint even with its overshoot, since accuracy is the primary objective and this
 probe shows the two are not always aligned.
 
-### season-betting-reader-freshness — OPEN — opened 2026-08-18 — session: season-betting-reader-freshness
+### season-betting-reader-freshness — SUPERSEDED-COPY — see the CLOSED block below for current state — opened 2026-08-18 — session: season-betting-reader-freshness
 - Goal: a historical `season_betting_day_*.json` static payload that carries SOME settlement, but strictly less than the canonical daily settlement already on disk for that date, gets re-derived instead of served forever. Fixes the read-side half of the `#265`/`locked_cards_retuned` gap traced in `docs/ai_context/todo.md` (sessions `sim-vs-market-freeze-finding`, 2026-08-18) -- user chose this half over the writer-side autorun.
 - Files: `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (read-only elsewhere in this vendor tree)
 - Hypothesis: the gate at `_season_betting_day_payload` (`if historical_date and not _payload_has_row_settlement(...)`) only re-derives on ZERO settlement, so a payload with e.g. 1 of ~15 games settled is treated as final forever, even when the canonical daily card already has richer settlement for the same date.
@@ -6248,7 +6248,7 @@ and a comparable n to what actually decided the shots-revert (126, or at minimum
 Appended against `origin/main`'s tree via a throwaway worktree, not the local disk
 copy -- fourth time this session that check has mattered.
 
-### lane-guard-disclaimer-exemption-fix — OPEN — opened 2026-08-18 — session: lane-guard-disclaimer-exemption-fix
+### lane-guard-disclaimer-exemption-fix — CLOSED 2026-08-18 — both bugs fixed + regression-tested, landed `20eabd94` on `origin/main` — opened 2026-08-18 — session: lane-guard-disclaimer-exemption-fix
 - Goal: `.claude/hooks/lane-guard.py` false-blocked a worktree session from closing its own `season-betting-reader-freshness` lane, reporting `.syndicate/lanes.md` as claimed by `basketball-model-owner`. Chase it down and fix it in the guard itself, not by editing around it.
 - Files: `.claude/hooks/lane-guard.py` (guard-exempt from claim-checking by its own design, documented here for the record anyway), `tests/test_lane_guard_files_forms.py`
 - Hypothesis: two independent bugs, both confirmed by direct simulation before any fix was written:
