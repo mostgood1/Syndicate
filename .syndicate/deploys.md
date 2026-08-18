@@ -15694,3 +15694,37 @@ the accident.
 
 
 
+
+### deploy attempt HELD — refresh-worker — 2026-08-18 ~21:53Z — lane `basketball-model-owner`
+
+**Goal:** deploy `#461`'s code fix (`9075d3eb`, `9d60656d`, both on `origin/main`
+-- the `_ensure_team_advanced_stats_asof` cache-freshness guard, NBA+WNBA
+`cli.py`) to refresh-worker so it starts producing correct-schema
+`team_advanced_stats_*_asof_*.csv` files with `games`/`source` populated.
+
+**Two-lock protocol run for real, both scripts, not skipped:**
+
+    py -3 scripts/deploy_claim.py acquire --service refresh-worker --holder basketball-model-owner
+      -> ACQUIRED, token 48d8597856b83da2, ttl 2700s
+    py -3 scripts/deploy_preflight.py --service refresh-worker --holder basketball-model-owner
+      -> HOLD: 10 job(s) in flight; a deploy kills them
+
+**Preflight is correct to HOLD.** Live commit `00e9a49f` (refresh-worker),
+sampled 8s old. 10 real processes reported, not idle daemons:
+`run_mlb_daily_sim_job.py`, `daily_update.py --workflow ui-daily`,
+`refresh_odds_sources.py`, `build_soccer_artifacts.py --league ligue_1`,
+two `vendor/mlb_bettingv2/tools/daily_update` processes, plus multiprocessing
+spawn children. This is the exact "deploy kills an in-flight MLB sim, no
+idle window" case `state.md` already documents. **Not deployed. Claim
+released** (`py -3 scripts/deploy_claim.py release --service refresh-worker
+--token 48d8597856b83da2` -> `released refresh-worker (was
+basketball-model-owner)`) rather than held past this check, so another lane
+isn't blocked waiting on a deploy that isn't happening right now.
+
+**Next attempt:** re-run `deploy_preflight.py` later when the MLB sim window
+is idle (per `state.md`, there is reportedly no clean idle window most of the
+day -- re-check rather than assume a fixed clock time). `#461`'s code fix
+remains committed and pushed but NOT live; the mirror/checkout-level fixes
+(`#461` asof cache-freshness code, the season-file regeneration) are real and
+verified locally, but production still serves the pre-fix behavior until this
+deploy actually lands.
