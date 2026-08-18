@@ -3855,3 +3855,83 @@ was the ONLY other version in the object store.
 (`assert head.count("
 ") > 2000`). Never mutate source text to change behaviour.
 A silent no-op replace is indistinguishable from success.
+
+## 2026-08-18 — RULE: before wiring ANY feature into a model, check whether the feature is computed FROM THE THING BEING PREDICTED. Ask what WINDOW it covers, not what it is named.
+
+**Evidence.** `smartsim2` reads 33 alias-terms out of `feature_generation_payload`
+and no production entrypoint passes it. Wiring it moved **21 of 21** drive-prior
+fields and **1.125 pts** of margin — a large, clean, entirely spurious effect.
+
+`build_nflverse_game_metrics` computes `home_offensive_epa`, `success_rate`,
+`pass_rate` and the rest from **the game being predicted**. `_match_game_rows`
+(`nflverse_ingestion.py:151`) filters play-by-play to rows where
+`home_team == home AND away_team == away` for that season and week — one game's
+plays. `home_defensive_epa` is literally the opponent's offensive EPA in the
+same game.
+
+**The falsification test, stated before running it:** prior-form team strength
+should correlate with a single NFL game's final margin at roughly **r = 0.3–0.5**;
+in-game EPA would exceed **0.8**, because EPA accumulated during a game nearly
+restates who won it. **Measured over 285 games of 2023: r = 0.988.**
+
+### Why every other check passed
+
+The field NAMES are perfectly reasonable — `offensive_epa`, `success_rate`,
+`pass_rate_over_expectation` are exactly what a legitimate prior-form feature set
+would be called. **Population was 100%.** The input checklist passed them as FED.
+The reachability test passed (`off != on`). Unit tests passed. **Nothing in this
+repo could distinguish "team EPA" from "team EPA in this game" — because the
+distinction is not in the name, the type, the population rate, or the code that
+consumes it. It is only in the WINDOW the producer selected over.**
+
+### The rule going forward
+
+- **For every model input, name the window explicitly**: as-of-before-kickoff,
+  season-to-date-excluding-this-game, or in-game. If the answer is not written
+  down next to the field, it has not been established.
+- **A population checklist cannot detect leakage** — a leaked field is 100%
+  populated, by construction, and looks maximally healthy.
+- **Run the correlation-with-outcome test on any feature block before wiring
+  it.** It is two minutes of work and it is the only check here that fires.
+- **An effect that looks large and clean on first wiring is a leakage SUSPECT,
+  not a win.** The 1.125-pt movement was the tell, read the wrong way round.
+- Same family as *"a LEAKED backtest number is an UPPER BOUND, not merely an
+  untrustworthy one"* (2026-08-17) and the soccer
+  `*_backtest_*.csv` NOT-CITABLE finding — but earlier in the pipeline: this one
+  would have leaked into the MODEL, not merely into a report about it.
+
+**Cost of catching it here rather than later:** the prereg was written, the power
+analysis done, and a **19,959-credit** odds backfill spent to power a
+market-relative arm. All of it carries over. Had the builder not been read before
+wiring, the output would have been a leaked model with a spectacular backtest.
+
+## 2026-08-18 — A TRUNCATED READING IS NOT A COMPLETE ONE
+
+Five wrong claims in one session, **every one from treating a partial or
+authoritative-looking reading as the whole picture.** Not one came from a
+measurement I took carefully.
+
+    a dated deploy record       read as CURRENT STATE      -> told 2 sessions the ledger was stale
+    `git grep -l ... | head -4` read as EXHAUSTIVE         -> "the emitter was deleted"; it was at :1952
+    `pattern=<bare filename>`   read as PROOF OF ABSENCE   -> count:0 for a file that was present
+    one seed at 120 sims        read as A RESULT           -> "4 of 4 better"; reversed at seed 2
+    another lane's aside        read as A ROOT CAUSE       -> nearly shipped a useless `psutil` dep
+
+**RULE: before reporting a null or an absence, prove the query can return a
+non-null.** A control that must succeed. `pattern=*conditional_mix*` returns
+count:1 where `pattern=conditional_mix_2026.json` returns count:0 for the SAME
+file — and I ran the bad form five times and quoted it to two other sessions.
+
+**RULE: `head` on a grep whose purpose is "does this exist anywhere" is a BUG.**
+Count first, or drop the pipe.
+
+**THE EXPENSIVE PART IS THE INFERENCE, NOT THE READING.** Three times a single
+bad reading became a sweeping verdict — "the harness is unsound", "the emitter
+was deleted", "no session can get a CLEAR preflight for any service" — and twice
+I broadcast it before checking. **Scope a conclusion to the evidence's actual
+reach: one service is not all services, one seed is not an effect, one file is
+not a codebase.**
+
+**What held:** everything I re-derived. The 403->200 cutover watched through,
+the merge-base ancestry, the artifacts read back BY CONTENT. **The failures were
+uniformly in what I did NOT re-derive.**
