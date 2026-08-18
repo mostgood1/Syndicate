@@ -14715,3 +14715,67 @@ checklist should keep failing until they are fed or explicitly excused.
 
 **Nothing here is deployed.** The 5 are the honest remaining surface; the earlier
 26 was the pre-wiring state and should not be quoted as current.
+
+## 2026-08-18 — **THE ARSENAL LEADERBOARDS SUPERSEDE MY PITCH-SPLITS PIPELINE**, and can fill 3 of the 5 remaining fields
+
+Lane `convergence-phase7-crps`. Asked: should we be pulling THOSE statcast data
+points instead? **Yes, decisively** — and it obsoletes work I did an hour earlier.
+
+### The definitions, recovered from code first
+
+`statcast_quality_mult` is documented on both models as *"quality multipliers …
+Keys: k, bb, hr, inplay"*. **That comment is STALE and describes the OUTPUT.**
+`_statcast_shape_rate_mults` (`simulate.py:163`) actually consumes **10 raw
+metrics**:
+
+    chase_swing_rate (league ref 0.30)   zone_rate (0.49)   csw_rate (0.275)
+    contact_rate (0.74)   xwoba   ev_mean   ev_max
+    pulled_air_rate   pitch_velo_mean   pitch_extension_mean
+
+and DERIVES k/bb/hr/inplay/pitch_count/xb from them via `_rate_ratio_mult`.
+**The field holds inputs; the comment describes returns.** A third consumer
+(`:1400`) reads `quality.get("hr")` directly, which agrees with neither.
+
+### The better source, verified
+
+`statcast_pitcher_arsenal_stats(2026)` and `statcast_batter_pitch_arsenal(2026)`:
+
+    pitcher   1,673 rows   551 distinct pitchers
+    batter    1,999 rows   450 distinct batters
+    columns   pitch_type, pitch_usage, whiff_percent, k_percent,
+              ba, slg, est_ba, est_slg, woba, pa
+    join      player_id IS mlbam_id -- 301 of our 305 overlap
+
+| | my pitch-splits pipeline | arsenal leaderboards |
+|---|---|---|
+| network calls | **309** per-pitcher, ~80 min | **1 each** |
+| pitchers | 305 | **551** |
+| batters | **0** (pitcher-side only) | **450** |
+| metrics | whiff, inplay | whiff%, k%, ba, slg, est_slg, woba, usage |
+| fields fillable | 2 | **5** |
+
+### What this closes
+
+- **`pitcher.pitch_type_hr_mult`** — I declared this *"not fixable from this
+  source"*. True of `PitcherPitchSplits`; **false of Statcast.** `slg` / `est_slg`
+  BY PITCH TYPE is exactly the power-allowed signal that field wants.
+- **`batter.vs_pitch_type`** and **`vs_pitch_type_hr`** — I said *"no source
+  built"*. The batter arsenal leaderboard IS that source, and it already exists.
+- Plus a **better** source for the two pitch-type fields already filled.
+
+**Remaining after that: only `statcast_quality_mult` x2**, whose 10 metrics are
+obtainable from `statcast_batter_percentile_ranks` / `expected_stats` (xwoba) /
+`exitvelo_barrels` (**ev_mean, ev_max — already in my batted-ball artifact**).
+
+### The honest assessment of my own work
+
+I built a 309-call, ~80-minute per-pitcher pipeline **without checking whether a
+single-call leaderboard covered the same ground.** It does, with more metrics,
+more players, and both sides of the matchup. The pitch-splits artifact is not
+wrong — it works and is wired — but it is **the inferior source**, and I reached
+for the tool that was already in the repo (`fetch_pitcher_pitch_splits_x64.py`)
+instead of asking what the data provider offers.
+
+**Rule this earns: before building a fetch pipeline, enumerate the provider's
+leaderboard endpoints.** A per-entity loop is the expensive answer to a question
+the provider usually answers in one call.
