@@ -456,6 +456,29 @@ class InningHalfState:
 
 @dataclass
 class GameConfig:
+    # COMMON RANDOM NUMBERS. Re-seed the game RNG at the start of every plate
+    # appearance from (seed, batting team, that team's PA index) rather than
+    # letting one stream run the whole game.
+    #
+    # Why: with a single per-game stream, comparing two engine configurations is
+    # far noisier than it looks. The first pitch whose outcome differs shifts
+    # every subsequent draw, so the two arms are effectively running different
+    # games from that point on. Measured 2026-08-18, the market harness had a
+    # seed-to-seed noise floor of 0.00326 Brier against effects of ~0.00138 --
+    # noise 2.4x the effect, and the sign flipped in 3 of 4 markets between two
+    # seeds. Sharing a seed across arms LOOKS like common random numbers and is
+    # not, because control flow depends on the RNG.
+    #
+    # A team's Nth plate appearance is the same logical event in both arms by
+    # definition of a batting order, so seeding on it re-synchronises the arms
+    # after any divergence instead of letting one early difference randomise the
+    # rest of the game. Inning is deliberately NOT in the key: it shifts when
+    # scoring differs, which would break the alignment this exists to create.
+    #
+    # DEFAULT OFF. It changes every simulated result (different draws), so it is
+    # a measurement tool to be switched on for BOTH arms of a comparison, never
+    # a silent change to what production simulates.
+    crn_pa_seeding: bool = False
     innings: int = 9
     extra_innings: int = 3
     # Baseball full-game markets settle to a winner. Keep tied finals opt-in only.

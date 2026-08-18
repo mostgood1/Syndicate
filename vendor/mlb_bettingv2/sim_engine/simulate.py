@@ -2503,6 +2503,7 @@ def simulate_game(
         fielding_roster = state.fielding_roster()
         half = state.half
 
+        _pa_batter_index = int(half.next_batter_index)
         batter_prof = _batter_profile(batting_roster, half.next_batter_index, state)
         prev_pitcher_id = state.current_pitcher_by_team.get(fielding_roster.team.team_id)
 
@@ -2648,6 +2649,16 @@ def simulate_game(
         state.pitcher_batters_faced[pitcher_id] = state.pitcher_batters_faced.get(pitcher_id, 0) + 1
         state.pitcher_batters_faced_inning[pitcher_id] = state.pitcher_batters_faced_inning.get(pitcher_id, 0) + 1
         starter_pitcher_id = int(getattr(getattr(fielding_roster.lineup.pitcher, "player", None), "mlbam_id", 0) or 0)
+
+        if getattr(cfg, "crn_pa_seeding", False):
+            # 64-bit avalanche (splitmix64 finaliser) rather than a plain
+            # multiply: successive Mersenne Twister seeds that differ in low
+            # bits produce correlated early output, and consecutive PA indices
+            # differ by exactly 1.
+            _h = ((int(cfg.rng_seed) & 0xFFFFFFFF) << 32) ^                  ((int(batting_roster.team.team_id) & 0xFFFF) << 16) ^                  (_pa_batter_index & 0xFFFF)
+            _h = (_h ^ (_h >> 30)) * 0xBF58476D1CE4E5B9 & 0xFFFFFFFFFFFFFFFF
+            _h = (_h ^ (_h >> 27)) * 0x94D049BB133111EB & 0xFFFFFFFFFFFFFFFF
+            rng.seed(_h ^ (_h >> 31))
 
         pa_ended = False
         pa_result: Optional[str] = None
