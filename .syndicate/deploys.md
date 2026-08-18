@@ -15281,3 +15281,58 @@ the config is actually constructed — so every trial ran the file's values and 
 "search" measured nothing. **Identical rows across a varied grid is the tell**,
 and it is the same class as every silent no-op found this session. The working
 harness edits the file per trial.
+
+## 2026-08-18 — JOINT CALIBRATION RUN. **It does NOT reach target — three parameters are insufficient, and that is the finding.**
+
+Lane `convergence-phase7-crps`. `pitch_model.py` **restored to originals**;
+nothing shipped. No deploy.
+
+### What was fitted, and why jointly
+
+The mix sets how often a PA reaches two strikes; the two-strike terms set what
+happens then. Fitting either alone provably fails — correcting the mix takes K/PA
+from 27% LOW to 26% HIGH. So `base_foul` (mix) was varied against
+`two_strike_foul_boost` and `two_strike_whiff_boost` (conversion), with
+`base_in_play` held at the league-correct 0.17, scored on K/PA, pitches/PA,
+FOUL, CALLED, IN_PLAY and BB together.
+
+### RESULT: THE TARGET IS UNREACHABLE WITH THESE PARAMETERS
+
+    best         K/PA 0.2559   p/PA 3.55   FOUL 21.7%  CALL 16.7%  INPL 16.7%  BB 9.5%
+    target       K/PA 0.2260   p/PA 3.90   FOUL 18.0%  CALL 17.0%  INPL 17.0%  BB 8.5%
+
+**K/PA is still +13% and pitches/PA still −9%**, and the parameter that moves
+both (`two_strike_foul_boost`, 0.072 → 0.26) **runs out of room**: it drags FOUL
+to 21.7% against an 18% target before K gets close. **pitches/PA never exceeds
+3.55 under ANY combination tried.**
+
+### The arithmetic says where the remaining error lives
+
+    best joint   K 0.256 + BB 0.095 + HBP 0.010 = 0.361  ->  in-play PA share 0.639
+    MLB          K 0.226 + BB 0.085 + HBP 0.010 = 0.321  ->  in-play PA share 0.679
+
+**The sim ends 4 percentage points fewer PAs in play than reality.** With the
+per-pitch IN_PLAY rate correct (16.7% vs 17%), a PA-level in-play deficit means
+the error is in **how counts evolve**, not in the per-pitch call priors — PAs are
+reaching two strikes too often and then, correctly, striking out.
+
+**So the third defect is COUNT PROGRESSION** (`count_delta`, the count-dependent
+scaling in `p_ball`/`p_called`/`p_foul`), which no parameter in this grid touches.
+
+### Why nothing was shipped
+
+The best joint point IS better on the diagnostics than the original (K error 21%
+low → 13% high; mix close to league). **But the arbiter is the market scoreboard,
+not the league mix**, and that has not been run on it. Shipping a
+diagnostics-better/market-unknown change is precisely the trade this lane has
+refused all session.
+
+**Values restored to originals** (verified: `base_foul` 0.12, `base_in_play` 0.23,
+`two_strike_foul_boost` 0.0720, `two_strike_whiff_boost` 0.0409).
+
+### Next, precisely
+
+1. Extend the joint fit to the **count-progression terms** — that is where the
+   residual provably lives.
+2. Score candidates on `measure_all_inputs_effect.py`, not on the league mix.
+3. Only then consider a value change.
