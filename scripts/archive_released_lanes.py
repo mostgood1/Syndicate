@@ -34,6 +34,30 @@ workaround `check_lane_invariants.py` documents having been bitten by twice.
     py -3 scripts/archive_released_lanes.py --slug foo --slug bar --apply
 
 Exit 0 = clean (or nothing to do), 1 = refused, 2 = could not read/verify.
+
+FIRST RUN -- 2026-08-18, 8 RELEASED lanes / 17 blocks, lane `ledger-coherence-sweep`:
+
+    lanes.md          450,927 -> 246,582 B   (204,345 reclaimed, 45%)
+    lanes_history.md  176,574 -> 381,408 B   (204,834 added)
+    cap 120,000       3.76x   -> 2.05x over
+    claims            65      -> 65, NONE lost, contested files 0
+
+Verified three ways, because "the script said so" is not a measurement:
+2,685 distinct lines left `lanes.md` and **0** of them were absent from
+`lanes_history.md`; the claim set was recomputed from `lane-guard.py`'s own
+`_claims()` over the before and after files and compared as a set, not a count;
+and `check_lane_invariants.py`'s contested-file invariant still passed after.
+
+TWO THINGS THE FIRST RUN DID NOT FIX, so nobody reads 45% as "done":
+
+- **`lanes.md` is still 2.05x over cap.** Getting under 120,000 needs the LIVE
+  lanes' superseded blocks moved too, and those are their owners' to move --
+  this tool deliberately refuses to touch a slug with any block reading OPEN.
+- **`OPEN`-under-`## Archived lanes` is untouched and still growing** (7 -> 11
+  during the same session). That is a SECTION-ORDERING defect, not a size one:
+  `## Archived lanes` is not the last heading, so every newly appended lane
+  lands below it and is silently un-guarded by any future archive pass. Filed
+  as `#466`. Trimming will never fix it and this tool does not try.
 """
 from __future__ import annotations
 

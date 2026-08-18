@@ -1,5 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#466` — **`## Archived lanes` is not the last heading in `lanes.md`, so every newly opened lane lands BELOW it and will be silently un-guarded by the next archive pass — a section-ordering defect that trimming can never fix** — FOUND AND MEASURED 2026-08-18, lane `ledger-coherence-sweep`, GROWING (7 → 11 in one session)
+
+**The invariant that fails**, `scripts/check_lane_invariants.py`:
+
+    [FAIL] no OPEN lane under '## Archived lanes'
+    VIOLATED: 11 OPEN lane(s) under Archived
+
+**Why it matters, in the checker's own words:** archiving moves a lane's body to
+`lanes_closed.md`, which **`lane-guard` never reads** — it opens `lanes.md` and
+nothing else. So a future archive pass over these lanes drops their file
+protection **silently**, and the guard reports nothing because from its side the
+claim simply ceased to exist. This is the same class of failure as a
+claim-bearing opening block being archived, which `lanes_history.md`'s header
+already warns about.
+
+**IT IS A SECTION-ORDERING DEFECT, NOT A SIZE ONE, AND THIS IS THE WHOLE POINT.**
+`lanes.md` has `## Archived lanes` at line ~1457 with **`## MERGED FROM
+origin/main` sections appended after it** by successive merge/reconciliation
+cycles. The checker slices from the first `## Archived lanes` marker to EOF, so
+everything appended below — including every genuinely new lane — reads as
+"under Archived". Measured 2026-08-18 in a single session: **7 → 11**, purely
+because four other sessions opened lanes while the count was being watched.
+Every append lands on the wrong side of the marker.
+
+**Trimming does not touch it.** `scripts/archive_released_lanes.py` moved 17
+blocks and 204,345 bytes out the same evening (`lanes.md` 3.76x → 2.05x over
+cap) and the stray count went **up**, not down, because the two are unrelated
+quantities. Do not expect a size fix to close this item.
+
+**The fix is to make `## Archived lanes` the last section and keep it there:**
+move the trailing `## MERGED FROM origin/main` sections and every genuinely-open
+lane block above the marker, then have whatever appends lanes insert them under
+`## OPEN` rather than at EOF. The append site is the durable half — without it
+the count regrows within hours, which is exactly what was observed.
+
+**NOT DONE IN THE FINDING SESSION, DELIBERATELY.** Every one of the 11 belongs
+to a live or uncertain lane, and moving another lane's block is editing across
+lanes, which the protocol forbids. It needs either each owner to move their own,
+or an explicit cross-lane mandate.
+
+**What is NOT established:** whether any lane has ALREADY been silently
+un-guarded this way. That would need a diff of `lanes_closed.md` against the
+claims that existed before each past archive pass, which nobody has run. The
+count above is exposure, not damage — do not report it as a breach without that
+check.
+
 ### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web: no web code path emits `ALL_PROCESS_MEMORY`, so every web deploy requires a break-glass — and a guard broken on every use is not a guard** — FOUND AND MEASURED 2026-08-18, lane `repo-coordination`, ROOT CAUSE CONFIRMED BY CALLER TRACE (a first hypothesis was WRONG — see below)
 
 **Symptom, measured on the live receipt** `.syndicate/deploy/preflight/web.json`,
