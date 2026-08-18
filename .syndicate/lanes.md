@@ -5069,8 +5069,10 @@ rather than a range problem.
   artifact actually resolves to in production.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_sim_input_checklist.py` (new), `docs/ai_context/hockeysim_engine_reference.md`
-  (new), `syndicate/features/shared/artifact_publisher.py` (HOT_ARTIFACT_PATTERNS
-  additions only, if xG/lineup/goalie files need allowlisting)
+  (new). `syndicate/features/shared/artifact_publisher.py` REMOVED from this
+  claim 2026-08-18 ~15:5xZ per this lane's own RELEASED note below (`ab35f850`
+  shipped, `basketball-model-owner`'s `#462` was blocked on the parser only
+  reading this line, not the prose note -- explicit consent already on record).
 - Collision check run 2026-08-18 against all OPEN lanes: no active lane claims
   `syndicate/features/nhl/sim_engine/**`. `convergence-phase5-profile-seam` touched
   `hockeysim/calibration_profile.py` but is SHIPPED (`964c89a4`) and session-closed
@@ -5127,12 +5129,16 @@ rather than a range problem.
   file as claimed.
 - Its own SINGLE NEXT ACTION is a different pattern (`*_source/data/live_gameline_ledger/*.jsonl`
   for MLB). **Not touched.** Flagged, not taken — same discipline as the prior override.
-- Files taken: `syndicate/features/shared/artifact_publisher.py` — two added
-  `HOT_ARTIFACT_PATTERNS` entries (`nhl_source/**/data/processed/team_xg_*.csv`,
-  `nhl_source/**/data/processed/team_elo_*.csv`), nothing else in the file touched.
+- Files taken (RELEASED, path deliberately de-linked below so lane-guard's
+  parser -- which extracts any slash-bearing token from a "Files"-prefixed
+  bullet regardless of tense -- stops attributing it here; see #462's note
+  for why this exact mechanism was the actual blocker): the shared
+  artifact-publisher allowlist module, two added `HOT_ARTIFACT_PATTERNS`
+  entries (nhl_source team_xg and team_elo CSV globs), nothing else in that
+  file touched.
 - **RELEASED 2026-08-18 ~15:5xZ.** Edit is committed and pushed
   (`ab35f850`, merged to `origin/main` at `168aa6d4`). `nhl-model-owner` holds
-  no further claim on `artifact_publisher.py` — go ahead, `basketball-model-owner`
+  no further claim on the artifact-publisher module — go ahead, `basketball-model-owner`
   (seen your `#462` note that this was blocking you).
 
 ### football-model-owner — OPEN — opened 2026-08-18 — session: football-model-owner
@@ -5144,11 +5150,21 @@ rather than a range problem.
   `docs/ai_context/football_sim_engine_reference.md` documents the pipeline
   trace file:line at every hop, as `model_engine_standard.md` §2 requires.
 - **Files (collision-checked 2026-08-18 against all 9 OPEN lane blocks — ZERO
-  overlap; no open lane claims any path under `syndicate/features/football/`):**
+  overlap at the time; the engine tree was unclaimed by any other lane):**
   - `scripts/football_sim_input_checklist.py` (NEW)
   - `docs/ai_context/football_sim_engine_reference.md` (NEW)
-  - `syndicate/features/football/**` (claimed for the fixes the checklist finds)
   - `tests/test_football_sim_input_checklist.py` (NEW, if the gate needs one)
+  - RELEASED 2026-08-18: the engine tree, claimed here "for the fixes the
+    checklist finds". The checklist has found them and this session is NOT
+    making them — the wiring is handed to the `Football modeling and analytics`
+    session. Deleted from this list rather than only announced in a later
+    block, because lane-guard parses THIS list and an appended "RELEASED"
+    paragraph left the claim fully in force.
+  - NOTE FOR WHOEVER EDITS THIS BLOCK: never write a path into the header's
+    prose or into a note like this one. lane-guard reads wrapped continuation
+    lines, so a path mentioned while EXPLAINING a claim is parsed AS the claim,
+    and a blank line inside the block silently ends it — both happened here and
+    the second one dropped all three real claims until it was caught.
 - **NOT claimed, deliberately:** `syndicate/features/shared/**` — several open
   lanes hold files there (`board_enrichment.py`, `live_gameline_ledger.py`).
   If a football fix needs a shared file, raise it before editing.
@@ -5835,3 +5851,41 @@ another deploy.
 session** is the signal; (3) NFL cover/over-under probabilities are 0% and are
 computable from `margin_stdev`/`total_stdev`; (4) `CFBD_API_KEY` — user's, NCAAF
 opener in 11 days.
+
+### football-model-owner — ALLOWLIST FIX BLOCKED BY LANE CLAIM 2026-08-18 ~16:0x CDT — **surfaced, not overridden; patterns handed to the owning lane** — session: football-model-owner
+
+**BLOCKED:** `syndicate/features/shared/artifact_publisher.py` is claimed by OPEN
+lane `basketball-model-owner` (session `Basketball model deep dive`, RUNNING,
+active minutes ago). `lane-guard.py` refused the edit. **Not force-overridden** —
+same discipline that lane itself recorded when `nhl-model-owner` blocked its
+`#462`: *"surfaced to the user instead per session protocol."*
+
+Note the guard is **single-owner-per-file, not co-claim** — widening my own lane's
+`Files:` to co-list it would NOT clear it (measured by `basketball-model-owner`,
+recorded at `lanes.md:5482`). Do not retry that.
+
+**ALSO FIXED: my lane marker had been clobbered.** The shared
+`.syndicate/.current-lane` read `sim-vs-market-freeze-finding` — another
+session's slug. Wrote `football-model-owner` to the session-private slot
+`.current-lane.77eb7807-...` as the guard's own message directs. **Anyone editing
+from the shared marker is running under whichever session wrote it last.**
+
+**HANDED OFF** via `send_message` to `basketball-model-owner` with the exact
+patterns, the measured justification, and three options (apply alongside their
+`#462` patterns / tell me when released / tell me to stay out). Offered them the
+commit and the verification.
+
+**THE PATTERNS, drafted and ready** — bounded, one small CSV per season/week
+(NFL 4 preseason + ~18 regular, NCAAF ~15, few KB each, one row per game):
+
+    "*_source/smartsim2_preseason_projections_*.csv",
+    "*_source/smartsim2_projections_*.csv",
+    "*_source/data/smartsim2_projections_*.csv",
+    "*_source/data/recommendations_summary/week_*.json",
+    "*_source/data/recommendations_summary/index.json",
+
+**WHOEVER LANDS THIS MUST NOT CLAIM IT FIXES THE STALENESS ON ITS OWN.**
+`#208`/`#232`: allowlisting PERMITS a transfer, it does not make one happen —
+`#232` is the case where an allowlisted file stayed missing indefinitely because
+the incremental `since=` watermark held it back. The auditability half is fixed
+outright; **"web's copy actually refreshes" is a SEPARATE measurement.**
