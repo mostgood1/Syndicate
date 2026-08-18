@@ -48,7 +48,6 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
-
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.
@@ -1076,6 +1075,10 @@ named `render_logs.py` as unable to give one; this is that tool.
 
 ---
 
+- **`edge_vs_modelled_fair_pct` EXISTS AND IS COMMITTED, NOT DEPLOYED**
+  `[user decision 2026-08-17; moved here 2026-08-18 from a WNBA state snapshot]`.
+  Measured on the real payload: 228 of 258 both-terms MLB rows priced. It never
+  writes `edge_vs_market_pct`.
 
 ## [mlb-sim-engine] MLB SIM — INPUTS FULLY FED, STILL NO MARKET EDGE `[measured 2026-08-18, lane convergence-phase7-crps; supersedes seven earlier sim sections]`
 
@@ -1603,6 +1606,14 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ---
 
+- **The soccer projection read was ONE DATE against a SEVEN-DATE quote window**
+  `[moved here 2026-08-18 from a WNBA state snapshot]`. `#379`'s widening shipped
+  inert — its only caller never passed `window_dates`. Fixed (`b4d82364`), **NOT
+  deployed**. `window="slate"` is required; the resolver defaults to `"day"`.
+- **Soccer's `recommendations_<date>.json` is NOT in `HOT_ARTIFACT_PATTERNS`** —
+  it lives under `soccer_source/<league>/api/recommendations/` while the allowlist
+  covers `source_artifacts/data/processed/`. `/api/ops/artifacts/export` returns
+  `count=0` for it. **`/soccer/<league>/api/cards` is the readable substitute.**
 
 ## [sharp-reference-price] SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE.
 
@@ -1725,7 +1736,37 @@ the place to read it, and it carries the guard on its two shortlists.
   returns **0 games locally** while production serves 16. I filed that local zero
   as a production defect and retracted it. `data/**` lossy mirror, as CLAUDE.md
   says.
-- **FIXED (`752a866d`, UNDEPLOYED): the NCAAF board was capping the slate at 16.**
+- **FIXED, DEPLOYED AND MEASURED 2026-08-18 18:48Z: the NCAAF board was capping
+  the slate at 16.** Live on web as `5fdabc46` (cap) + `4c3b0aa5` (its counter).
+  **Served payload, six weeks: 16 -> 51 / 49 / 57 / 56 / 56 / 66, with
+  `games == runtime_rows`, `truncated: false`, `dropped: 0` on every one.**
+  **Week 1 = 51 = CFBD's independent FBS-vs-FBS count** — cross-source
+  agreement, not merely a bigger number. Max slate 66 vs the 80 guard.
+  **The alternative is dead:** `runtime_rows` of 49-66 proves the summaries
+  always held a full slate, so the 16 was entirely the cap. Had `runtime_rows`
+  read 16, the cap would have been exonerated — which is why the counter shipped
+  WITH the change, not after it.
+- **The cap fix's own INSTRUMENT shipped inert, and it was the SAME defect.**
+  `board_row_counts` was absent from the payload while the fix worked, because
+  `build_game_board_api_payload` **whitelists** response keys.
+  `apply_game_board_contract` does preserve extras (`dict(context)`) — **it is
+  not the last hop.** Presence in the context is not reachability to the client,
+  exactly as presence in `_collapse_games` was not reachability to the board.
+  Twice in one change.
+- **`deploy_preflight --service web` can NEVER return CLEAR** — web does not emit
+  `ALL_PROCESS_MEMORY` at all (sample 3.9 days old, predating the live deploy).
+  Positive control: refresh-worker on the same instrument reads **7s**. A
+  break-glass grant was used, user-authorised, with a live `/api/ops/memory`
+  process read substituted as better evidence. **OWED: make web emit it** so this
+  does not need a grant every time.
+- **`/portdetectorv2` is RENDER PLATFORM INFRA, not a job**, and it appears
+  *because* you just deployed — so a name-based idle check blocks the second
+  deploy of every pair. `deploy_preflight` classes it `[infra]`. Same for pid 1
+  `bash /home/render/graceful-shell-command.sh`. **Classify by cmdline.**
+- **SUPERSEDED (was: the deploy-ordering hazard).** The board fix is live BEFORE
+  the key, which is the order that was required. The SmartSim2-standalone branch
+  can no longer truncate ~51 rows to 16 when the artifact starts existing.
+- ~~**FIXED (`752a866d`, UNDEPLOYED): the NCAAF board was capping the slate at 16.**~~
   Weeks 1/2/3/5/8/12 all served exactly 16; CFBD lists **51** FBS-vs-FBS for wk1.
   16 = 32 teams / 2 — an **NFL-shaped number**, correct for NFL, wrong for a
   50-60 game sport, which is why it was invisible. **THREE caps on three branches
@@ -1929,88 +1970,56 @@ they are neither in the collapsed file nor in the archive. Carried verbatim
 rather than dropped. Several are dated snapshots and belong in `deploys.md`;
 they stay here until their lane moves them.
 
-## [sim-scheduling-deploy-lineage] 2026-08-17 00:4xZ — LIVE HAZARD (sim-scheduling): refresh-worker's deploy lineage is POISONED until `d9088741` ships
+## [sim-scheduling-deploy-lineage] STALE-TREE DEPLOY LINEAGE — the MECHANISM is real, the SEVERITY I first reported was wrong `[collapsed 2026-08-18 from two 2026-08-17 sections]`
 
-**Do not deploy refresh-worker from `7c2b1a17` + `main`. It will silently
-re-revert 10 lines of `memory_observability.py`.**
+**Largely superseded by the deploy-from-main rule** (see `[deploy-ownership]`):
+`deploy_preflight.py` now returns `OFF_MAIN` for any target not contained in
+`origin/main`, which is the class this incident belongs to. Kept because the
+mechanism and the assertion generalise.
 
-`7c2b1a17` (live since 00:24:01Z) was built with its tree computed against
-`origin/main=7eb5fb28` while its `-p` parent re-resolved to `40c3c44b` in a later
-git call. New parent, old tree — a valid fast-forward, so `git push` accepted it
-with no force and no warning.
+**THE MECHANISM, and it is real.** `7c2b1a17` (refresh-worker, live 00:24:01Z
+2026-08-17) was built with its tree computed against `origin/main=7eb5fb28`
+while its `-p` parent re-resolved to `40c3c44b` in a later git call. New parent,
+old tree — a valid fast-forward, so `git push` accepted it with **no force and
+no warning**. `origin/main` was never damaged; the divergence existed only on
+the deployed service.
 
-It reverted, on the deployed service only (`origin/main` is intact; `40c3c44b`
-and `2aa30b7a` remain ancestors of main):
-
-| path | lines | matters? |
-|---|---|---|
-| `syndicate/features/shared/memory_observability.py` | **-10** | **YES, code** |
-| `.syndicate/{deploys,learnings,log/2026-08-16,state}` | -229 | no, inert on a service |
-
-The code is the smaps-vs-cgroup **reconciliation guard** (`cgroup_anon_mb`,
-`reconciles_within_pct`, `reconciles`) — removed from the one service that is
-OOM crash-looping (`#449`), while `#449` was open.
-
-**WHY A PLAIN RE-MERGE WILL NOT FIX IT.** The bad merge recorded the removals as
-INTENTIONAL EDITS on the live side. A fresh `merge-tree` therefore sees "live
-changed, main did not" and preserves the deletion. Re-merging returned
-`deletions=239` a second time. The five paths must be restored from `main`
-EXPLICITLY, which is what `d9088741` does.
-
-**THE FIX IS BUILT AND PUSHED: `d9088741` on branch `deploy/rw-converge-fix`.**
-It descends from live `7c2b1a17`, restores the five paths from main, keeps the
-three LIVE-wins resolutions (0 lines lost), and asserts `deletions vs the main
-parent == 0`. **It is deliberately NOT deployed — it is to ride the next
-refresh-worker ship, not to justify one of its own.** Whoever ships next: base on
-`d9088741`, not on `7c2b1a17`.
-
-**THE ASSERTION THAT CATCHES THIS CLASS, and nothing else does:**
-
-    DEL=$(git diff --numstat "$MAIN" "$SHA" | awk '{d+=$2} END {print d+0}')
-    [ "$DEL" -eq 0 ] || refuse
-
-Ancestry checks, conflict-marker scans and the `render.yaml` guard ALL PASSED on
-the broken commit. Only counting deletions against the main parent sees it.
-And resolve `origin/main` EXACTLY ONCE per build — never re-read a symbolic ref
-in a later call.
-
-## [sim-scheduling-deploy-lineage] 2026-08-17 00:5xZ — CORRECTION: the "silent revert" was a LAG, not a removal. I overstated it twice.
-
-**What I claimed** (in `state.md`'s POISONED-lineage block, in commits
-`d9088741` / `7623a233`, and to the user): `7c2b1a17` "reverted 10 lines of
-`memory_observability.py` — the smaps-vs-cgroup RECONCILIATION guard — on the one
-service that is OOM crash-looping, while `#449` was open."
-
-**What is actually true, measured:**
+**THE SEVERITY WAS WRONG, and this is the part worth keeping.** I reported that
+it "reverted the smaps-vs-cgroup reconciliation guard from the one service that
+was OOM crash-looping, while `#449` was open" — in this file, in commits
+`d9088741`/`7623a233`, and to the user. Measured:
 
     git diff --numstat 7c2b1a17 40c3c44b -- syndicate/features/shared/memory_observability.py
     -> +10  -49
 
-It is a **refactor**, not a deletion. `7c2b1a17` carried the OLDER implementation
-(`_process_rss_anon_bytes()`, reading `RssAnon` from `/proc/self/status`); main
-had replaced it with cgroup-based accounting (`cgroup_anon_mb`). **`grep -c
-reconciles_within_pct` returns 1 on BOTH trees.** The guard was never absent.
+A **refactor, not a deletion**. `7c2b1a17` carried the older
+`_process_rss_anon_bytes()` implementation; main had replaced it with
+cgroup-based accounting. `grep -c reconciles_within_pct` returns **1 on BOTH
+trees — the guard was never absent.** The service was LAGGING main's improved
+instrumentation, which `7623a233` fixed. Of the 239 deleted lines, 229 were
+ledger and the 10 code lines were one side of a refactor.
 
 **The tell I nearly walked past:** a `SMAPS_ANON` line emitting
-`reconciles_within_pct` at **00:48:32Z** — five minutes BEFORE my ship landed, so
-emitted by `7c2b1a17` itself. If that SHA had truly lacked the field it could not
-have printed it. I found this only because a follow-up query for the field's
-VALUES came back empty and I chased the discrepancy instead of banking the
-watcher's "1 line" count.
+`reconciles_within_pct` at 00:48:32Z — five minutes BEFORE my ship landed, so
+emitted by `7c2b1a17` itself. A SHA lacking the field could not have printed it.
+Found only because a follow-up query for the field's VALUES came back empty and
+I chased the discrepancy instead of banking the watcher's "1 line" count.
 
-**Corrected severity.** The deployed service was LAGGING main's improved memory
-instrumentation, which is worth fixing and was fixed by `7623a233`. It was not
-"instrumentation removed during an incident". The stale-tree MECHANISM is real
-and the `deletions vs the main parent == 0` assertion still stands — what was
-wrong was my reading of WHAT the 239 lines contained. 229 of them were ledger;
-the 10 code lines were one side of a refactor.
+**THE ASSERTION STILL STANDS** — ancestry checks, conflict-marker scans and the
+`render.yaml` guard ALL PASSED on the broken commit:
 
-**The lesson, which is not the one I thought I was recording:** a `numstat`
-deletion count tells you SIZE, never MEANING. I read `-10 code lines` and
-supplied "a safety guard was removed" without opening the diff. Read the lines
-before naming the damage — the same rule already written for the `wnba/cards.py`
-`american_price` scare earlier this session, which I got right and then did not
-apply an hour later.
+    DEL=$(git diff --numstat "$MAIN" "$SHA" | awk '{d+=$2} END {print d+0}')
+    [ "$DEL" -eq 0 ] || refuse
+
+And resolve `origin/main` EXACTLY ONCE per build — never re-read a symbolic ref
+in a later call. A plain re-merge does NOT fix a tree already poisoned this way:
+the bad merge records the removals as intentional edits, so `merge-tree` sees
+"live changed, main did not" and preserves them (`deletions=239` twice). Paths
+must be restored from `main` explicitly, which is what `d9088741` did.
+
+**THE LESSON, which is not the one I thought I was recording:** a `numstat`
+deletion count tells you SIZE, never MEANING. I read "-10 code lines" and
+supplied "a safety guard was removed" without opening the diff.
 
 ## [mlb-resim-rules] 2026-08-17 01:3xZ — VERIFIED (sim-scheduling): the real MLB re-sim rules
 
@@ -2127,76 +2136,49 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   still could not save the role — an id that survives a resume does not survive
   the session being archived.
 
-## [wnba-sweep-ownership-gate] Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
+## [wnba-sweep-ownership-gate] WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest reading wins]`
 
-- **The WNBA full refresh had NO scheduled owner.** `MAIN_ENTRY` 0 hits/8h on
-  both workers. GHA `RUN_FULL_PIPELINE` reads `github.event.inputs`, empty on the
-  `schedule` trigger; Phase 1 re-homed only NFL/NCAAF/NCAAB. **Phase 2 autorun
-  now EXISTS (`e65a5531`) and is TESTED (`c7494c6c`) but is NOT ENABLED** -
-  `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` is unset, so it is INERT.
-- **`phase="pregame"` is the memory-safety property**, pinned by test:
-  live-odds-worker is 2GB, the WNBA refresh leg measures ~1.3-1.5GB RSS, and
-  pregame excludes the sim leg.
-- **The odds sweep ignored the ownership flags.** refresh-worker swept four
-  sports with `ACTIVE_SPORTS=nfl`; live-odds-worker swept ZERO with three
-  claimed. Gate committed `20025cc4`, **NOT DEPLOYED**.
-- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.**
-- ~~**`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design.~~
-  **SUPERSEDED 2026-08-18: the file is DELETED and the role is retired.** See
-  "DEPLOY OWNERSHIP" above.
-- **`lane-guard` cannot see the coordinator's sweep releases.**
-  `_is_disclaimer()` matches only "not claimed"/"claimed by"/"held by", so a
-  released lane still blocks every session. Cost 2 of 3 blocks this session.
-- **`game_cards` coverage fix is DEPLOYED but its EFFECT is UNMEASURED**, and
-  cannot be measured until Phase 2 is enabled.
-
-## [wnba-sweep-ownership-gate] Sweep ownership gate + Phase 2 - STATE 2026-08-17 ~22:00Z
-
-- **THE SWEEP GATE IS DEPLOYED** (`20025cc4`, ~20:35Z, by the coordinator) and
-  **confirmed present by CONTENT on all four deploy branches**, including the
-  later `soccer-lens` pair - another lane's deploy carried it forward rather
-  than reverting it.
-- **Partition CONFIRMED on live-odds-worker** 21:38:32Z:
-  `kept=mlb,wnba,soccer dropped=nfl,ncaaf`. **refresh-worker has not yet emitted
-  its own gate line** - code present, path infrequent, unresolved either way.
-- **`ODDS_SWEEP_OUTCOME` on live-odds-worker is STILL 0** against a hard-zero
-  30h baseline. Pending the shared cadence marker ageing past 2h. Scheduled
-  check `sweep-gate-verification-check` fires 18:40 CDT.
-- **PHASE 2 HAS NEVER SHIPPED** - `wnba_autorun=0` on all four deploy branches.
-  Its env keys on live-odds-worker (`=true`, `=7200`) are therefore **INERT**.
-  **When it does ship it goes HOT IMMEDIATELY** - the flag is already on and
-  `last_epoch=0` means the interval gate does not hold on first run.
-- **live-odds-worker: 293MB RSS / 1237MB headroom** on 2GB (21:38Z). But it
-  reports `psutil_unavailable:ImportError`, so **its memory instrumentation is
-  degraded** - the very signal one would use to abort a Phase 2 rollout.
-- **Pregame cadence: WNBA and MLB are ALREADY identical at 2h.** Only soccer
-  differs (8h). The live path differs by a deliberate memory carve-out, not cadence.
-- **`wnba_forced_through` fired 0 times in 24h on both services** - that
-  carve-out is INERT and is not what gates WNBA.
-
-## [wnba-sweep-ownership-gate] Sweep gate, modelled-fair edge, soccer window — STATE 2026-08-18 ~01:00Z
-
-- **SWEEP OWNERSHIP GATE `20025cc4` IS DEPLOYED AND WORKING.** Partition live on
+- **THE SWEEP GATE `20025cc4` IS DEPLOYED AND WORKING.** Partition live on
   live-odds-worker every tick; refresh-worker stopped sweeping mlb/soccer/wnba;
-  **marker ownership transferred at 23:55:40Z**. `ODDS_SWEEP_OUTCOME` on
-  live-odds-worker is still zero — grading lag vs dead launch **UNDETERMINED**.
-- **`edge_vs_modelled_fair_pct` EXISTS AND IS COMMITTED, NOT DEPLOYED.** Measured
-  on the real payload: 228 of 258 both-terms MLB rows priced. Never writes
-  `edge_vs_market_pct`. User decision, taken 2026-08-17.
-- **The soccer projection read was ONE DATE against a SEVEN-DATE quote window.**
-  `#379`'s widening shipped inert — its only caller never passed `window_dates`.
-  Fixed (`b4d82364`), **NOT deployed**. `window="slate"` is required; the
-  resolver defaults to `"day"` = one date.
-- **Soccer's `recommendations_<date>.json` is NOT in `HOT_ARTIFACT_PATTERNS`** —
-  it lives under `soccer_source/<league>/api/recommendations/`, the allowlist
-  covers `source_artifacts/data/processed/`. `/api/ops/artifacts/export` returns
-  `count=0` for it. **`/soccer/<league>/api/cards` is the readable substitute.**
-- **THE LOCAL `lanes.md` IS 123 KB / 27 HEADERS BEHIND THE COMMITTED ONE**, and
-  `lane-guard` reads the local copy. Handed to the coordinator; **do not patch
-  around it.**
-- **`ODDS_SWEEP_LAUNCHED` now exists** — before it, every launch-side print was a
-  `*_FAILED` variant and a successful launch was invisible.
+  **marker ownership transferred 23:55:40Z**. Confirmed by CONTENT on all four
+  deploy branches — another lane's deploy carried it forward rather than
+  reverting it.
+- **`ODDS_SWEEP_OUTCOME` on live-odds-worker is STILL ZERO** against a hard-zero
+  30h baseline. Grading lag vs dead launch is **UNDETERMINED** — do not report
+  the gate as proven end-to-end on the partition line alone.
+- **PHASE 2 AUTORUN HAS NEVER SHIPPED.** It EXISTS (`e65a5531`) and is TESTED
+  (`c7494c6c`), but `wnba_autorun=0` on all four deploy branches, so its env keys
+  on live-odds-worker (`=true`, `=7200`) are **INERT**. **When it ships it goes
+  HOT IMMEDIATELY** — the flag is already on and `last_epoch=0` means the
+  interval gate does not hold on the first run.
+- **`phase="pregame"` is the memory-safety property**, pinned by test:
+  live-odds-worker is 2GB, the WNBA refresh leg measures ~1.3–1.5GB RSS, and
+  pregame excludes the sim leg.
+- **live-odds-worker reports `psutil_unavailable:ImportError`**, so its memory
+  instrumentation is DEGRADED — the very signal one would use to abort a Phase 2
+  rollout. 293MB RSS / 1237MB headroom at 21:38Z is a reading from a degraded
+  instrument.
+- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.**
+- **Pregame cadence: WNBA and MLB are ALREADY identical at 2h.** Only soccer
+  differs (8h). The live path differs by a deliberate memory carve-out, not
+  cadence. **`wnba_forced_through` fired 0 times in 24h on both services** — that
+  carve-out is INERT and is not what gates WNBA.
+- **`game_cards` coverage fix is DEPLOYED, EFFECT UNMEASURED**, and cannot be
+  measured until Phase 2 is enabled.
+- ~~`.syndicate/coordinator.id` is CORRECT, not stale.~~ **SUPERSEDED 2026-08-18:
+  the file is DELETED and the role retired.** See `[deploy-ownership]`.
+- ~~`lane-guard` cannot see the coordinator's sweep releases; a released lane
+  still blocks every session.~~ **PARTLY SUPERSEDED 2026-08-18:** the disclaimer
+  handling was reworked and `lane_identity_check.py` reports the ledger coherent.
+  The released-lane case is **UNVERIFIED** — re-test before relying on it.
+- ~~THE LOCAL `lanes.md` IS 123 KB / 27 HEADERS BEHIND THE COMMITTED ONE.~~
+  **STALE 2026-08-18** — the coordinator it was handed to no longer exists, and
+  the local ledger now reads coherent. Re-measure before re-raising.
 
+**Three facts carried in these snapshots were NOT this subject** and have been
+moved: `edge_vs_modelled_fair_pct` to `[published-shortlist]`, both soccer
+findings to `[soccer]`. A dated "STATE" snapshot that sweeps up whatever was true
+that hour is how this subject came to have three sections.
 
 ## [mlb-pitch-mix] MLB CONDITIONAL PITCH MIX — MECHANISM VALIDATED, MARKET SILENT `[2026-08-18]`
 
