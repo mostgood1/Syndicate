@@ -33,6 +33,49 @@ import pytest
 from syndicate.features.shared.layer1_board import resolve_window_dates
 
 
+# `#435` RENAMED THE FUNCTION THESE TESTS PATCH, AND THEY WENT ON PASSING.
+#
+# Production reads quotes through `read_book_quotes_latest`
+# (`pipeline/layer2_shortlist.py:176`) and has since `#435`. These tests patched
+# `read_book_quotes` -- which still exists, so nothing errored; the patch simply
+# bound to a function nobody calls. `asked` stayed empty and the two tests that
+# assert on it failed, while `test_a_zero_records_which_dates_were_asked` kept
+# PASSING VACUOUSLY: it asserts `quote_rows == 0`, which is trivially true when
+# the read is never intercepted at all.
+#
+# `raising=False` is what made it silent. It was there so the patch would tolerate
+# the attribute being absent -- but "tolerate absent" and "silently bind to
+# nothing after a rename" are the same behaviour, and the second is exactly the
+# failure this file exists to catch. These now patch with `raising=True` (the
+# default): if the production name moves again, the patch RAISES here instead of
+# quietly measuring nothing.
+#
+# The import in `layer2_shortlist` is inside the function body, so setting the
+# attribute on the module is what production actually resolves at call time.
+_QUOTE_READER = "read_book_quotes_latest"
+
+
+def test_the_patched_name_is_the_one_production_calls():
+    """The guard that would have caught `#435` the day it landed.
+
+    Asserting the two names agree is cheap and is the only thing standing between
+    a rename and three tests that measure nothing. Reads the source rather than
+    the attribute because the import is function-local.
+    """
+    import inspect
+
+    import pipeline.layer2_shortlist as mod
+    import syndicate.features.shared.odds_book_quotes as quotes
+
+    assert hasattr(quotes, _QUOTE_READER), f"{_QUOTE_READER} no longer exists on odds_book_quotes"
+    source = inspect.getsource(mod.build_layer2_shortlist)
+    assert f"{_QUOTE_READER}(" in source, (
+        f"layer2_shortlist no longer calls {_QUOTE_READER} -- the monkeypatches in "
+        "this file are now measuring a function production does not use. Update "
+        "_QUOTE_READER to whatever it calls now."
+    )
+
+
 def test_soccer_resolves_a_multi_day_window():
     dates = resolve_window_dates("soccer", "2026-08-12", window="slate")
     assert len(dates) == 7, dates
@@ -76,8 +119,8 @@ def test_the_shortlist_reads_every_window_date(monkeypatch):
             return [{"sport": sport, "date": date_str}]
         return []
 
-    monkeypatch.setattr(quotes, "read_book_quotes", _fake_read, raising=False)
-    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {}, raising=False)
+    monkeypatch.setattr(quotes, _QUOTE_READER, _fake_read)
+    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {})
 
     # Never raises by contract, so a failure downstream cannot mask the read.
     result = mod.build_layer2_shortlist("2026-08-12", ["soccer"])
@@ -95,8 +138,8 @@ def test_a_zero_records_which_dates_were_asked(monkeypatch):
     import pipeline.layer2_shortlist as mod
     import syndicate.features.shared.odds_book_quotes as quotes
 
-    monkeypatch.setattr(quotes, "read_book_quotes", lambda *a, **k: [], raising=False)
-    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {}, raising=False)
+    monkeypatch.setattr(quotes, _QUOTE_READER, lambda *a, **k: [])
+    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {})
     result = mod.build_layer2_shortlist("2026-08-12", ["soccer"])
     stats = (result.get("per_sport_ingest") or {}).get("soccer") or {}
     assert stats.get("quote_rows") == 0
@@ -114,8 +157,8 @@ def test_one_unreadable_date_does_not_lose_the_others(monkeypatch):
             raise OSError("shard vanished mid-read")
         return [{"sport": sport, "date": date_str}] if str(date_str) == "2026-08-15" else []
 
-    monkeypatch.setattr(quotes, "read_book_quotes", _flaky, raising=False)
-    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {}, raising=False)
+    monkeypatch.setattr(quotes, _QUOTE_READER, _flaky)
+    monkeypatch.setattr(quotes, "read_quote_last_seen", lambda *a, **k: {})
     result = mod.build_layer2_shortlist("2026-08-12", ["soccer"])
     stats = (result.get("per_sport_ingest") or {}).get("soccer") or {}
     assert stats.get("quote_rows", 0) > 0, "a mid-window read error swallowed the whole sport"
