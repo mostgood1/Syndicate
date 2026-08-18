@@ -1,5 +1,119 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#459` — **the deploy coordinator role is RETIRED; deploys are self-serve behind two locks** — SHIPPED AND TESTED 2026-08-18, lane `football-model-owner`, commit `a4c48437`
+
+`.claude/hooks/deploy-guard.py` gated on `session_id in .syndicate/coordinator.id`.
+The coordinator was a session; it was archived; the allow-branch became
+unreachable and the guard blocked **every** deploy from **every** session while
+still reading as a routing rule. Two requests pending, `deploy/grants/` empty.
+
+**Now:** an unexpired `deploy_claim` on the service held by YOUR lane, plus a
+`deploy_preflight` verdict of `CLEAR` under 15 min old. `render.yaml` pushes need
+all three services locked. Off switch `SYNDICATE_DEPLOY_GUARD=off`.
+
+```
+python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
+python scripts/deploy_preflight.py --service <svc> --holder <lane>
+```
+
+**Three bugs fixed on the way:** the guard matched its own entrypoint filename as
+a substring (blocked reads of it, and blocked its own fix); `web`/`syndicate` are
+claim aliases for one service, so two sessions could each hold "the" web lock;
+preflight wrote a receipt only on `CLEAR`, so a stale `CLEAR` outlived a later
+`HOLD`.
+
+`tests/test_deploy_guard.py`, 33 cases, both directions. **Deleted:**
+`.syndicate/coordinator.id` and the two hook tests for the retired predicate
+(their render.yaml coverage ported, not lost).
+
+**Still owed:** nothing for this item. Note that `.syndicate/deploy/requests/` is
+retired — its README names the two requests that were pending, one of which
+(`football-model-owner`, NCAAF `CFBD_API_KEY` + web `752a866d`) is still owed by
+its own lane with an 11-day clock.
+
+### `#457` — **smartsim2 consumes 65 feature keys and all 3 production entrypoints pass NONE of them** — FOUND AND MEASURED 2026-08-18, lane `football-model-owner`, NOT FIXED
+
+Full write-up: `docs/ai_context/football_sim_engine_reference.md`. Gate:
+`py -3 scripts/football_sim_input_checklist.py --season 2025 --week 1` (exits 1).
+
+`drive_priors.py` reads **9 blocks / 65 keys** out of `feature_generation_payload`.
+`generate_smartsim2_nfl_projections.py:414`,
+`generate_smartsim2_nfl_preseason_projections.py:165` and
+`generate_smartsim2_ncaaf_projections.py:199` all construct
+`SmartSim2SimulationInput` **without it**. Production runs on four rating scalars.
+
+**Measured, not inferred:** feeding the payload moves **21 of 21** drive-prior
+fields; at 400 seeds/arm, margin **−1.125**, total **−1.685**, home win%
+**−6.50 pts**. `returning_production_index` 0.5, `coach_continuity_index` 0.5,
+`player_usage_index` 0.25, `market_prior_index` 0.5 are hardcoded constants
+carried identically by **every NFL and NCAAF game in production**.
+
+**DO NOT JUST WIRE IT.** Both calibration profiles were fit against a payload
+the engine cannot read, so this is a mechanism added to a calibrated engine and
+owes a re-fit (`model_engine_standard.md` §4.4 — measured elsewhere as a
+**negative interaction in 4 of 4 markets**). The deltas above are the
+DISTURBANCE, not the improvement.
+
+Three unfed blocks, **three different remedies** — do not batch them:
+- `defensive_metrics` **MISROUTED** — all 7 keys sit in `team_metrics` at 100%.
+- `pace` **NULL AT SOURCE** — `pace_features == {'pace': None}`; all four
+  pace keys are `None` on 272 games. A data-pipeline job, not a wiring one.
+- `player_usage` **WRONG GRAIN** — 19,400 player rows exist;
+  `FootballGameFeatures` has no game-level block. `adapters.py:_team_player_usage`
+  already aggregates correctly and nothing consumes its output.
+
+### `#458` — **NCAAF serves 16 games with a NULL model on every one; ONE absent env var is why. Opener 2026-08-29** — ROOT-CAUSED AND MEASURED 2026-08-18, lane `football-model-owner`, DEPLOY REQUEST FILED
+
+**CORRECTION — the first version of this item was WRONG.** It said "the NCAAF
+feature loader returns zero games". That is true of a **local checkout** and
+**false of production**, which serves **16** on `GET /ncaaf/api/cards?week=1`,
+all of them real games on the CFBD 2026 wk1 slate. The `data/**` lossy-mirror
+trap, hit exactly as CLAUDE.md describes. The checklist's level-2 failure message
+now names the trap so it cannot recur.
+
+**What is actually wrong:** all 16 served games carry an entirely null
+`predictions` block — `home_mean`, `away_mean`, `margin_mean`, `total_mean` and
+all six probabilities `null`, `smartsim_reasons` `[]`. **The NCAAF board renders
+and shows no model output at all.**
+
+**Cause: `CFBD_API_KEY` is ABSENT on all three Render services** (enumerated from
+live `/v1/services/<id>/env-vars`, not from `render.yaml`).
+`generate_smartsim2_ncaaf_projections.py:57` raises on it, the autorun dies before
+fetching a game, the projection artifact is never written.
+
+Production logs 06:00Z–15:34Z 08-18: **21 of 21 `SEASON_PROJECTION_ARTIFACT_MISSING`
+are `sport=ncaaf`, 0 `sport=nfl`** — positive control that the guard is not
+misfiring. `interval_seconds=86400`, so a **once-daily** failure, **not** a
+relaunch loop; it is not burning worker cycles.
+
+**Two-arm test against the real CFBD API:** without the key, immediate
+`RuntimeError`. With it — 99 CFBD games → **51 FBS-vs-FBS** rows via the `#445`
+fallback → **136** PPA teams (`cfbd_ppa_season_2025_fallback_for_2026`) → **50 of
+51** home teams resolve to a non-zero rating. **Everything downstream of the key
+already works**, including `#445`'s guard (confirmed by content in the deployed
+blob `00e9a49f`, not by ancestry).
+
+**Deploy request filed:** `.syndicate/deploy/requests/20260818T154432Z-football-model-owner.md`.
+Env-only, one key, one service. **Do not touch `render.yaml`** — `blueprint_sync`.
+**Verify on the served payload, not a log line:** `predictions.home_mean` non-null
+on `/ncaaf/api/cards?week=1`. Today that is `0 of 16`.
+
+**OPEN sub-question, do not wave through:** the board serves **16** while CFBD
+lists **51** FBS-vs-FBS for the same week. The cards context reads a saved
+recommendations summary (`ncaaf/cards.py:2196-2198`), not CFBD, so after the key
+lands the artifact should carry ~51 rows against a 16-game board. `16 of 16`
+populated is **not** proof the slate is covered.
+
+**Not a defect, recorded because it looks like one:** USC, San José State and
+Eastern Michigan each appear twice in the served week. Both of each pair are in
+CFBD's own week-1 response — upstream schedule data for an unfinalised 2026
+season.
+
+**Still unmeasured for NCAAF:** the three NCAAF-only blocks
+(`returning_production`, `coach_continuity`, `transfer_impact`) have builders
+whose output has never been shown to reach the engine — no NCAAF entrypoint
+passes a payload at all (`#457`).
+
 ### `#444` — **`live-odds-worker` has exited early 20 times in 7.6 days and nobody owns it. Zero of them are OOM** — FOUND 2026-08-16, NOT STARTED, no owner
 
 **Why this has stayed invisible:** every memory investigation this month has been
@@ -32949,7 +33063,7 @@ and includes page cache. The branch-overlap baseline read **4096.0 MB = 100% of
 cap** on 2026-08-16 05:09–10:09 CT with **zero kill events in that window** — the
 ceiling was touched and nothing died. A cap-touch is not a kill.
 
-### `#447` — **6 LAYER-2 SHORTLIST WIRING TESTS ARE RED IN PRODUCTION AND UNOWNED** — FOUND 2026-08-16, NOT STARTED, no owner
+### `#446` — **6 LAYER-2 SHORTLIST WIRING TESTS ARE RED IN PRODUCTION AND UNOWNED** — FOUND 2026-08-16, NOT STARTED, no owner
 
 Found while validating a deploy payload, not by a test run in anger — which is
 the point: nothing in the daily loop reads this file's result, so it has been

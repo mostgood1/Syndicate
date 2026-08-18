@@ -124,6 +124,17 @@ def score(real, sim) -> float:
     return dev
 
 
+def joint(dev: float, kpa: float, target: float, weight: float) -> float:
+    """Matrix deviation AND the K/PA miss, in one number.
+
+    Scoring the matrix ALONE let the fit trade K/PA away. Scoring K/PA ALONE is
+    what failed three times earlier in this lane, because many wrong matrices
+    produce the right K/PA. Neither is sufficient by itself, so both are in the
+    objective and the weight is stated rather than tuned until it looks good.
+    """
+    return dev + weight * abs(kpa - target)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--games", type=int, default=4)
@@ -131,6 +142,11 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=404)
     ap.add_argument("--max-files", type=int, default=999)
     ap.add_argument("--rounds", type=int, default=2)
+    ap.add_argument("--kpa-target", type=float, default=0.226)
+    ap.add_argument("--kpa-weight", type=float, default=4.0,
+                    help="matrix deviation moves ~0.04 over the useful range "
+                         "and the K/PA gap is ~0.04, so weight 4 makes a 0.01 "
+                         "K/PA miss cost about as much as a 0.04 matrix miss")
     args = ap.parse_args()
 
     from sim_engine.data.roster_artifact import read_game_roster_artifact
@@ -162,14 +178,18 @@ def main() -> int:
     # (no set_param: overrides travel through GameConfig, see sim_matrix)
 
     GRID = {
-        "two_strike_waste_ball_boost": [1.0, 1.15, 1.3, 1.45, 1.6],
+        "two_strike_waste_ball_boost": [1.0, 1.15, 1.3, 1.5, 1.75, 2.0],
         "two_strike_called_damp":      [1.0, 0.55, 0.42, 0.32, 0.24],
         "early_count_foul_boost":      [1.0, 1.3, 1.55, 1.8, 2.05],
         "behind_count_called_boost":   [1.0, 1.25, 1.5, 1.75],
     }
     best = {k: 1.0 for k in GRID}
     m, kpa, ppa = sim_matrix(games, args.sims, args.seed, best)
-    cur = score(real, m)
+    dev0 = score(real, m)
+    kpa0 = kpa
+    cur = joint(dev0, kpa, args.kpa_target, args.kpa_weight)
+    print("")
+    print(f"baseline: joint {cur:.4f}   dev {dev0:.4f}   K/PA {kpa:.4f}   p/PA {ppa:.2f}", flush=True)
 
     # REACHABILITY before correctness: if a deliberately extreme override does
     # not move the score, the injection is not reaching the engine and every
@@ -177,11 +197,11 @@ def main() -> int:
     # first run reported a perfect 0.0000 on an empty sim side.
     probe = dict(best, two_strike_called_damp=0.10, early_count_foul_boost=2.5)
     pm, _pk, _pp = sim_matrix(games, args.sims, args.seed, probe)
-    if abs(score(real, pm) - cur) < 1e-9:
+    if abs(joint(score(real, pm), _pk, args.kpa_target, args.kpa_weight) - cur) < 1e-9:
         print("REFUSED: overrides do not reach the engine (probe changed nothing)")
         return 1
-    print(f"  reachability OK: probe moved dev {cur:.4f} -> {score(real, pm):.4f}", flush=True)
-    print(f"\nbaseline (all no-op): dev {cur:.4f}   K/PA {kpa:.4f}   pitches/PA {ppa:.2f}", flush=True)
+    _pj = joint(score(real, pm), _pk, args.kpa_target, args.kpa_weight)
+    print(f"  reachability OK: probe moved joint {cur:.4f} -> {_pj:.4f}", flush=True)
 
     for rnd in range(args.rounds):
         print(f"\n--- round {rnd+1} ---", flush=True)
@@ -192,11 +212,11 @@ def main() -> int:
                     continue
                 trial = dict(best, **{name: v})
                 m, kpa, ppa = sim_matrix(games, args.sims, args.seed, trial)
-                sc = score(real, m)
+                sc = joint(score(real, m), kpa, args.kpa_target, args.kpa_weight)
                 if sc < best_s:
                     best_v, best_s, best_k, best_p = v, sc, kpa, ppa
             if best_v != best[name]:
-                print(f"  {name:<30} {best[name]} -> {best_v}   dev {cur:.4f} -> {best_s:.4f}"
+                print(f"  {name:<30} {best[name]} -> {best_v}   joint {cur:.4f} -> {best_s:.4f}"
                       f"   K/PA {best_k:.4f}  p/PA {best_p:.2f}", flush=True)
                 best[name] = best_v
                 cur = best_s
@@ -204,12 +224,15 @@ def main() -> int:
                 print(f"  {name:<30} unchanged at {best[name]}", flush=True)
 
     m, kpa, ppa = sim_matrix(games, args.sims, args.seed, best)
+    final_dev = score(real, m)
     print("\n" + "=" * 62)
     print("FITTED")
     for k, v in best.items():
         print(f"  {k:<32} {v}")
-    print(f"\n  weighted matrix deviation {cur:.4f}")
-    print(f"  K/PA        {kpa:.4f}   (real 0.226)")
+    print("")
+    print(f"  joint score               {cur:.4f}")
+    print(f"  matrix deviation          {final_dev:.4f}   (baseline {dev0:.4f})")
+    print(f"  K/PA                      {kpa:.4f}   (baseline {kpa0:.4f}, real {args.kpa_target})")
     print(f"  pitches/PA  {ppa:.2f}   (real ~3.90)")
     print("\n  K/PA is a CONSEQUENCE here, not the target -- reported to catch a")
     print("  fit that improved the summary while making the matrix worse.")

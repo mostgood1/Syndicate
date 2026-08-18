@@ -130,7 +130,23 @@ class PitchModelConfig:
     #   0 strikes, behind -- real pitchers throw STRIKES. 1-0: CALLED 23.0% vs 13.9%.
     two_strike_waste_ball_boost: float = 1.0
     two_strike_called_damp: float = 1.0
-    early_count_foul_boost: float = 1.0
+    # FITTED 2.05 -- and this one term closes the whole K deficit.
+    # K/PA 0.1859 -> 0.2260 against a real 0.226. Verified an INTERIOR optimum,
+    # not a grid boundary: joint score 0.5912 at 1.8, 0.5659 at 2.05, 0.5933 at
+    # 2.3, 0.6470 at 2.6.
+    #
+    # Why a foul rate fixes strikeouts: a foul below two strikes is contact that
+    # does NOT end the plate appearance. The sim fouled off about half as often
+    # as real hitters at every count `two_strike_foul_boost` did not own, so PAs
+    # ended early and never reached a third strike. That is the same diagnosis
+    # this lane reached in August by arithmetic -- the per-pitch in-play rate was
+    # correct while the in-play PA SHARE was too high -- and this is the term
+    # that acts on it.
+    #
+    # HONEST TRADE: matrix deviation alone is minimised at 1.8 (0.5609 vs 0.5657
+    # here). 2.05 gives up 0.0048 of matrix fit to take K/PA from 3.4% low to
+    # exact. That trade is the reason the objective scores both.
+    early_count_foul_boost: float = 2.05
     behind_count_called_boost: float = 1.0
     first_pitch_swing_damp: float = 0.42
     # Real 0-0 take outcomes split 38.4 ball / 29.6 called = 56/44. The sim
