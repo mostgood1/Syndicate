@@ -14378,3 +14378,79 @@ OPEN again, not answered.
 **Owed next:** why `main()` is not reached from a launch that reports ok. That is
 the lane's, not the coordinator's — but the silent `launched=ok` is the same
 family of handler the soccer observability request is fixing two files away.
+
+## 2026-08-18 02:05:40Z / 02:06:08Z — refresh-worker `00e9a49f` + live-odds-worker `cdaeaa58` — soccer live-lens observability (`481de91d`, `461774cb`) — MEASURED, ALL THREE CRITERIA PASS
+
+Both carry the diagnostics BY CONTENT (`LEAGUE_POLL_FAILED` in
+`poll_soccer_live_state.py`, `TICK_DIAG] sport=soccer` in `live_lens_loop.py`) —
+detected that way on purpose, ancestry has misreported a shipped fix three times
+in 24h here.
+
+**THE PASS CONDITION IS INVERTED AND THAT IS NOT A TYPO.** These commits change no
+behaviour, only what a failure looks like. Quiet is the pass. Window
+02:06:15Z–02:14:59Z, live-odds-worker, 7 ticks:
+
+| criterion | target | measured |
+|---|---|---|
+| `LEAGUE_POLL_FAILED` lines | 0 | **0** |
+| `[LIVE_LENS_TICK_DIAG] sport=soccer` lines | 0 | **0** |
+| leagues per tick | 10 | **10 on all 7** |
+
+The ten-league poll from `6bdc50de` is intact; this deploy did not disturb it.
+
+**A FALSE REGRESSION I ALMOST FILED, recorded because the next person will hit it.**
+The first pass of the check reported leagues-per-tick as `[1, 3, 6, 10]` and flagged
+INVESTIGATE — which reads as three-quarters of the leagues dropping out. **It was the
+measurement, not the system.** The grouping key truncated timestamps to the second,
+which held pre-deploy because a tick completed inside one second. The tick at
+02:13:32.980–02:13:34.983 took ~2s and was split across three buckets. Raw lines show
+all **10 distinct leagues** in normal order (epl -> belgian_pro_league), and the
+arithmetic closes: 6 ticks x10 + that one = 70 = the actual line total.
+**Never group these logs by second; group by the league sequence or by contiguity.**
+
+**WHAT THIS DOES NOT ESTABLISH.** Zero diagnostic lines is consistent with "nothing
+failed" AND with "the print is unreachable in production". Both firing directions
+were verified locally before shipping (gate: trips -> line + `{'ok': False,
+'skipped': True, 'reason': 'low_headroom'}`, passes -> 0 lines; poller: outage shape
+reproduced -> 3 failures logged with traceback, other leagues still processed).
+The production POSITIVE case can only be seen when something actually fails.
+
+**NEW FACT, and it narrows a question that was open all evening:** `refresh-worker`
+produced **ZERO soccer ticks** across the whole window despite carrying
+`SYNDICATE_ENABLE_LIVE_LENS_LOOP = 'true'`. **live-odds-worker is the effective owner
+of the soccer live-lens loop.** Not conclusive — refresh-worker may tick on a
+different cadence — but it is the first evidence either way, and it means deploying
+live-odds-worker alone would likely have sufficed.
+
+**STILL OWED, unaffected by this deploy:** the live lens is UNVERIFIED END-TO-END.
+Every league correctly wrote `(0 live games)` because ESPN reported all three of
+08-17's matches `post`. Needs a slate with a match in play. **Not banked.**
+
+## VERIFIED LANDED + a REPRODUCTION of the MAIN_ENTRY failure `[2026-08-18 ~02:2xZ]`
+
+Ride-along live on both workers:
+
+    live-odds-worker  cdaeaa58  finished 02:06:08Z
+    refresh-worker    00e9a49f  finished 02:05:40Z
+
+**THE AUTORUN FAILURE REPRODUCES ACROSS A SECOND, INDEPENDENT BOOT.** On the
+fresh 02:06 boot of live-odds-worker, exactly as on the 00:55 boot:
+
+    WNBA_PREGAME_AUTORUN_PREV ... launched=ok runStamp=None artifactsDir=None
+    MAIN_ENTRY   nothing matched since 02:06
+
+**That upgrades the finding from an observation to a reproduction.** It is not a
+flaky first-boot artifact or a race with startup — two boots, two clean
+reproductions, same signature. Whoever debugs it can rely on it happening every
+time rather than hunting an intermittent.
+
+**The soccer observability changes have emitted NOTHING, and that is EXPECTED,
+not a negative result.** Both alter what a FAILURE looks like: the poller names
+a league and prints a traceback when its poll raises, and the headroom gate
+prints `reason=low_headroom` when it trips. Neither emits on the happy path. No
+soccer league has failed since 02:06, so there is nothing to say.
+
+**A clean log here is not evidence of anything.** Recording that explicitly
+because this ledger has twice today mistaken an absent signal for a healthy one
+— the blind memory watcher, and my own "inert" verdict taken from one service.
+The reading for these two commits lands the next time soccer actually fails.
