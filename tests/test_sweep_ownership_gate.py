@@ -1,21 +1,43 @@
 """The odds sweep must honour the ownership flags the tick already honours.
 
-WHY THIS EXISTS. Measured in production 2026-08-17 over 30h:
+WHY THIS EXISTS. Measured in production 2026-08-17:
 
-    refresh-worker    swept mlb, nfl, soccer, wnba   ACTIVE_SPORTS=nfl
-                                                     MLB_REFRESH_TICK_OWNER=false
-    live-odds-worker  swept NOTHING, any sport       ACTIVE_SPORTS=mlb,wnba,soccer
-                                                     MLB_REFRESH_TICK_OWNER=true
+    live-odds-worker  ODDS_SWEEP_OUTCOME: ZERO across 30h,
+                      >=100 PREGAME_CADENCE_SKIPPED per 24h
+                      ACTIVE_SPORTS=mlb,wnba,soccer  MLB_REFRESH_TICK_OWNER=true
 
-Both services behaved as the exact inverse of their config. The flags were set
-correctly -- `#129` had already fought this race and recorded that
-live-odds-worker is "the sole MLB odds-refresh owner again, not just nominally
-excluded from a race with another owner" -- but the sweep path never read them.
-refresh-worker swept everything, won the shared pregame cadence marker, and
-starved the designated owner permanently.
+The designated owner was skipping continuously and sweeping nothing, because
+`_live_refresh_loop_effective_sports` fell back to "every season-active sport"
+whenever `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` was unset and read NEITHER
+`SYNDICATE_ACTIVE_SPORTS` nor the per-sport ownership flags. `#129` had already
+fought this race and recorded live-odds-worker as "the sole MLB odds-refresh
+owner again, not just nominally excluded" -- and the sweep path never read that.
 
-The two headline tests below pin the REAL env of each service, so this cannot
-regress back into the inverted state without failing loudly.
+THE GATE IS DEPLOYED AND VERIFIED (`20025cc4`). live-odds-worker now emits
+`kept=mlb,wnba,soccer dropped=nfl,ncaaf` every tick, and it launched wnba at
+23:55:36Z -- confirmed two ways, from a marker stamp derived off two cadence
+ages and from refresh-worker's grading at 23:59:25Z (`since_launch_s=229`).
+
+TWO CORRECTIONS TO THE ORIGINAL FRAMING, both mine, both worth stating because
+the first version of this docstring asserted them and they are FALSE:
+
+  * **"refresh-worker swept everything and starved the owner."** WRONG. Its
+    `ODDS_SWEEP_OUTCOME` lines are GRADINGS of launches made elsewhere (it reads
+    the shared keyvalue markers) plus its OWN purpose-built autoruns. It does
+    not run `_run_live_refresh_tick` at all -- that is imported only by
+    `run_live_odds_refresh_worker`. I read a grading line as an event line.
+
+  * **"refresh-worker should not refresh mlb."** WRONG.
+    `SYNDICATE_MLB_REFRESH_TICK_OWNER=false` means its TICK should not, BECAUSE
+    `_launch_autorun_mlb_refresh` does -- a designed 60-second path. It is a
+    which-PATH flag, not a which-SERVICE flag. Gating `launch_refresh_run`
+    centrally on that misreading would have silently killed it.
+
+So this gate is correctly scoped to the TICK, which is the only place that
+resolves a sport list, and it runs on the only service that executes that tick.
+
+The two headline tests below pin the REAL env of each service, so the
+configuration can never silently return to being ignored.
 """
 
 from __future__ import annotations
@@ -52,7 +74,7 @@ def _effective(monkeypatch, capsys, **env):
 # --------------------------------------------------------------------------
 
 
-def test_refresh_workers_real_env_stops_it_sweeping_three_sports_it_does_not_own(monkeypatch, capsys):
+def test_refresh_workers_real_env_keeps_only_the_weekly_sports_on_the_tick(monkeypatch, capsys):
     kept, printed = _effective(
         monkeypatch,
         capsys,
@@ -61,7 +83,10 @@ def test_refresh_workers_real_env_stops_it_sweeping_three_sports_it_does_not_own
         SYNDICATE_MLB_REFRESH_TICK_OWNER="false",
         WEEKLY_SPORTS_REFRESH_TICK_OWNER="true",
     )
-    assert kept == ["nfl"], "refresh-worker owns only the weekly sports"
+    # Its TICK keeps only nfl. This says nothing about refresh-worker as a
+    # SERVICE: its purpose-built autoruns (mlb on a 60s cadence, soccer) are a
+    # separate path that this gate does not and must not touch.
+    assert kept == ["nfl"], "the tick keeps only the weekly sports here"
     assert "SWEEP_OWNERSHIP_EXCLUDED" in printed
     for sport in ("mlb", "soccer", "wnba"):
         assert sport in printed, f"{sport} was dropped without saying so"
