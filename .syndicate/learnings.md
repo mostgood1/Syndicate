@@ -5184,3 +5184,32 @@ needed, and then **built the wrong thing on top of it** — a multiplier hack on
 one says a populated-looking feature can be inert. This one says an
 absent-looking feature can already exist. **Both are answered by the same
 action: measure the population rate of every field, never reason from a grep.**
+
+## 2026-08-18 — RULE: a cache with a TTL can serve EMPTINESS as authoritative
+
+**Measured:** 1,282 BVP cache files, every one `by_batter: {}`. I concluded twice
+from the file COUNT — first "the data is already collected, it just needs
+mapping", then "it needs a real fetch job". **Both wrong, in opposite
+directions.** Computing fresh returned 117-170 batter entries for 5 of 5
+pitchers.
+
+The raw corpus was present the whole time (39 files, 2026-03-11..07-30). Some
+earlier run cached an EMPTY result — corpus absent or unreachable at that moment
+— and the **30-day TTL has been serving that emptiness as a valid answer ever
+since.** No error, no retry, no staleness signal: a cache hit on `{}` is
+indistinguishable from a cache hit on real data.
+
+**RULE: when a cached value is empty, verify by COMPUTING IT FRESH before
+concluding anything about the source.** An empty cache entry is evidence about
+the moment it was written, not about the data.
+
+**And the specific trap: a TTL turns a transient failure into a persistent one.**
+The longer the TTL, the longer a single bad fetch is indistinguishable from a
+genuine absence — here, 30 days. Caches of *derived* values should record
+whether the input corpus was present when they were written; without that, an
+empty result is unfalsifiable from the outside.
+
+**Companion to the 2026-08-17 field-population rule.** That one says: measure
+whether a MODEL FIELD is fed, never infer from code presence. This says: measure
+whether a CACHE holds data, never infer from file count. Same failure, one layer
+apart — and I made it four times in two days before writing it down.

@@ -82,7 +82,8 @@ def load_actual_rates() -> dict:
 
 
 def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
-    from sim_engine.data.batted_ball import apply_batted_ball_to_batter
+    from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
+                                             apply_batted_ball_to_pitcher)
     from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.data.statcast_pitch_splits import default_statcast_cache
@@ -101,6 +102,13 @@ def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
             for p in [r.lineup.pitcher] + list(r.lineup.bullpen or []):
                 _apply_cached_statcast_pitch_splits(
                     p, season=season, statcast_cache=cache, statcast_ttl_seconds=None)
+                # PITCHER batted-ball rates. Added 2026-08-18 -- without this the
+                # refit fits against a HALF-FED engine (pitchers keeping the
+                # league-default 0.44 GB rate) and every correction it derives
+                # would be absorbing the absence of a field that is about to be
+                # populated. A refit is only valid for the input set it was run
+                # against.
+                apply_batted_ball_to_pitcher(p, season=season)
             for b in list(r.lineup.batters) + list(r.lineup.bench or []):
                 apply_batted_ball_to_batter(b, season=season, weight=weight)
                 # apply the refit corrections on top of every other source
