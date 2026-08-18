@@ -116,6 +116,22 @@ class PitchModelConfig:
     # Both target metrics move toward the target WITHOUT overshooting -- unlike
     # the mix-only fix, which took K/PA from 27% low to 26% high. It does not
     # close the gap alone; the 0-2 and 3-2 cells and base_in_play remain wrong.
+    # `#440` COUNT-SHAPE TERMS, each fitted to the real matrix (895,320 pitches).
+    # The engine had ONE count knob (`count_delta`, a scalar) and it structurally
+    # cannot express take-early / waste-ahead / protect-late, which is why three
+    # earlier calibrations failed. These are separate because the real behaviours
+    # are separate and move in OPPOSITE directions.
+    #
+    #   2 strikes  -- real pitchers WASTE. Measured 0-2: BALL 45.5% real vs 31.5%
+    #                 sim, CALLED 3.5% vs 12.1%. The sim keeps attacking.
+    #   <2 strikes -- real hitters FOUL OFF far more than the sim. 2-1: 23.2% vs
+    #                 11.3%. `two_strike_foul_boost` only ever fixed 2-strike
+    #                 counts, so every other count stayed at ~half of reality.
+    #   0 strikes, behind -- real pitchers throw STRIKES. 1-0: CALLED 23.0% vs 13.9%.
+    two_strike_waste_ball_boost: float = 1.0
+    two_strike_called_damp: float = 1.0
+    early_count_foul_boost: float = 1.0
+    behind_count_called_boost: float = 1.0
     first_pitch_swing_damp: float = 0.42
     # Real 0-0 take outcomes split 38.4 ball / 29.6 called = 56/44. The sim
     # splits 71/29 -- too far toward BALL. This lifts called strikes relative to
@@ -600,6 +616,27 @@ def simulate_pitch(
         _cb = _cfg_float(cfg, "first_pitch_called_boost", 1.0)
         if _cb != 1.0:
             p_called *= _cb
+
+    # `#440`: count-shape corrections. Same placement as the first-pitch term --
+    # after the rate/count scalings, before normalisation -- so they re-weight
+    # the final mix instead of competing with the terms above.
+    if strikes >= 2:
+        _w = _cfg_float(cfg, "two_strike_waste_ball_boost", 1.0)
+        if _w != 1.0:
+            p_ball *= _w
+        _cd = _cfg_float(cfg, "two_strike_called_damp", 1.0)
+        if _cd != 1.0:
+            p_called *= _cd
+    else:
+        # NOT an else-branch on convenience: `two_strike_foul_boost` already
+        # owns 2-strike fouls, and stacking both would double-count there.
+        _fb = _cfg_float(cfg, "early_count_foul_boost", 1.0)
+        if _fb != 1.0:
+            p_foul *= _fb
+    if strikes == 0 and balls >= 1:
+        _bc = _cfg_float(cfg, "behind_count_called_boost", 1.0)
+        if _bc != 1.0:
+            p_called *= _bc
 
     # Normalize after HBP
     rest = 1.0 - p_hbp
