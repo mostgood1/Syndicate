@@ -17,12 +17,15 @@ from __future__ import annotations
 from dataclasses import fields, replace
 from typing import Any, Dict, Optional
 
+from syndicate.features.shared.calibration_profile_paths import calibration_profile_path
+from syndicate.features.shared.calibration_profile_store import load_versioned_profile
+
 from .engine import SimConfig
 
 # Canonical NHL baseline. These are exactly the defaults the absorbed engine shipped with;
 # keeping them as an explicit named profile makes future truth-calibrated overrides auditable
 # (each changed field gets a provenance comment, e.g. "# +X% shots vs 2023-25 truth").
-NHL_CALIBRATION_PROFILE: SimConfig = SimConfig(
+NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     periods=3,
     seconds_per_period=20 * 60,
     overtime_seconds=5 * 60,
@@ -45,6 +48,23 @@ NHL_CALIBRATION_PROFILE: SimConfig = SimConfig(
     faceoff_mult_clip_low=0.90,
     faceoff_mult_clip_high=1.10,
     faceoff_ev_only=True,
+)
+
+# `#440` Part 4 Phase 5 -- the versioned-profile seam.
+#
+# This engine is the one that proves the seam is GENERIC: football and soccer
+# resolve a `CalibrationProfile` dataclass, hockey resolves a `SimConfig`. The
+# store is written against `dataclasses.fields`/`replace`, so all three work
+# through it unchanged. Phase 5's falsification test was "if wiring an engine
+# requires changing the store, stop" -- it did not, for any of the three.
+#
+# NO-OP WHILE NO ARTIFACT EXISTS: `load_versioned_profile` returns
+# `default_profile` ITSELF when the file is absent, invalid or unreadable, and
+# never raises. `build_nhl_sim_config()` defaults to this constant, so resolving
+# the constant reaches every caller without touching the builder's signature.
+NHL_CALIBRATION_PROFILE, NHL_CALIBRATION_PROFILE_METADATA = load_versioned_profile(
+    default_profile=NHL_CALIBRATION_PROFILE_DEFAULT,
+    artifact_path=calibration_profile_path("nhl"),
 )
 
 _PROFILE_FIELD_NAMES = {f.name for f in fields(SimConfig)}

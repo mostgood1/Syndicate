@@ -12449,3 +12449,277 @@ Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
   workers, then read `outs-props-coverage-check` on 08-19 working Gate B first.
   Do not promote any leash value — the model still loses to a constant baseline
   at every grid point.
+
+
+## MERGED FROM origin/main - coordinator merge cycle
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+## Archived from lanes.md 2026-08-17
+
+### live-game-line-projection — CLOSED-VERIFIED 2026-08-17 00:4xZ — v2 EXERCISED on a live slate: `written=13` across two builds, 2 of them NON-priceable — opened 2026-08-15 — session: live-gameline-eval (closed by `layer1-board-coverage`)
+- **The lane's own SINGLE NEXT ACTION was run, verbatim:** read
+  `live_gameline_ledger` off `/api/board/book-grid?sport=mlb&date=2026-08-16`
+  during a live slate, **across two builds, never one.**
+- **Its stated success criterion — quoted — is MET:** *"one live slate where
+  `live_gameline_ledger.written > 0` and the counters are reachable from an
+  API."*
+  ```
+  BUILD 1  00:37:48.762827Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  BUILD 2  00:39:58.257836Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  ```
+  Counters served on the API, no 10 MB artifact stream needed — the second
+  half of the goal.
+- **The v2 discriminator held, and it is the part that could have been
+  faked.** The lane warned that `skipped_unchanged > 0` is NOT the signal
+  (seen under v1 at 04:22:51Z, which refuted this lane's own earlier claim).
+  Here `skipped_unchanged` is **0** and `written 13` exceeds `priceable 11`,
+  so **2 rows that v1 could never have written were recorded** — on both
+  builds. Withheld: `segment_is_not_full_game` 49,
+  `prob_interval_swamps_edge` 2, of 62 considered.
+- Measurement in `deploys.md` with the window stated, which was this lane's
+  literal Verification line.
+- **TWO THINGS THIS DOES NOT ESTABLISH, carried forward so they do not
+  disappear with the lane:**
+  1. **The edges are still UNSCORED.** The old heading's "THE EDGES ARE
+     UNEVALUATED" is a broader ambition than the Goal this lane actually
+     stated. The ledger can now produce a sample; nobody has measured
+     whether those 11 edged rows were RIGHT. **Needs its own lane.**
+  2. **The ledger's RSS was never measured.** This lane records an
+     `oomKilled` at 04:46:44Z, 22 min after its deploy added work to
+     refresh-worker, and says plainly it is *not* claiming exoneration.
+     **That debt is NOT discharged here** — it stays with
+     `refresh-worker-oom-recurrence` (OPEN). Kill switch, no deploy:
+     `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+**STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
+`origin/main` and content-verified there. web `ebd5f677` live 03:38:07Z,
+refresh-worker `5c419007` live 04:24:33Z — and `LEDGER_VERSION = 2` is
+content-verified on the CURRENTLY live `d72d670c`, which another lane deployed
+at 06:01:34Z and carried it forward. Board at 15:17Z reads `index_size 0,
+considered 0` — Sunday pregame, nothing live yet.
+
+**THE SINGLE NEXT ACTION:** read `live_gameline_ledger` off
+`/api/board/book-grid?sport=mlb&date=2026-08-16` during tonight's slate
+(scheduled `live-gameline-ledger-check`, 20:30 Central). **The discriminator
+for v2 is `written` rising on rows that are NOT priceable.**
+`skipped_unchanged > 0` is NOT it — that was already observed under v1 at
+04:22:51Z, which is what refuted this lane's own "never recorded a row".
+Read across two builds, never one.
+
+**ONE UNPAID DEBT:** an `oomKilled` fired at 04:46:44Z, 22 min after my
+deploy added work to refresh-worker. Recorded by `refresh-worker-oom-recurrence`,
+and `44ad2f9d` reports `d72d670c` as 9h clean since — **but I never measured
+the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
+needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+— original re-take header follows —
+### live-game-line-projection — SUPERSEDED (see CLOSED-VERIFIED 2026-08-17 00:4xZ above) — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+- Goal: make the ledger capable of producing a sample at all, and make its
+  counters readable without streaming a 10 MB artifact. Success = one live slate
+  where `live_gameline_ledger.written > 0` and the counters are reachable from
+  an API.
+- Files: `syndicate/features/shared/live_gameline_ledger.py`,
+  `tests/test_live_gameline_ledger.py`.
+- **`syndicate/blueprints/intelligence.py` RELEASED 2026-08-17 00:4xZ — second
+  double-claim on this lane, resolved the same way as the first.** It was
+  contested with `layer2-board-quality`, which holds it in a nine-path list and
+  reads **ALL 8 GOALS SHIPPED**; this lane is `OPEN, UNOWNED` since 15:2xZ and its
+  own stated single next action is a READ of `/api/board/book-grid`. Finishing it
+  needs no edit here. **TO RE-TAKE:** put the path back and tell
+  `layer2-board-quality`.
+- **`syndicate/features/shared/live_gameline_join.py` RELEASED 2026-08-17 00:2xZ
+  — it was double-claimed, and this lane is the one that does not need it.**
+  Reconciled by the `ask-answer-substance` session (holds no claim on either
+  lane) on evidence, not preference:
+  - `mlb-live-gameline-distributions` also claims it, is the file's ACTIVE
+    EDITOR (`c7e39e58`, "the re-sim's own histograms, not just their means", is
+    its work and is already in the file), and its goal is literally "consume +
+    price" there. Its session is idle-but-resumable, last active 00:15Z.
+  - this lane reads `OPEN, UNOWNED` since the 15:2xZ checkpoint, and its own
+    stated SINGLE NEXT ACTION is a READ of `/api/board/book-grid` — finishing it
+    requires no edit here.
+  **HOLDER CHANGED WITHIN THE HOUR, 2026-08-17 00:3xZ:**
+  `mlb-live-gameline-distributions` went **CLOSED-VERIFIED** and
+  **`wnba-live-tier`** (restored, same work family) now holds this path. Still exactly
+  one holder, which is the point — but the counterpart to coordinate with is now
+  `wnba-live-tier`, not the closed lane.
+  **TO RE-TAKE:** put the path back on the `- Files:` line above and tell
+  `wnba-live-tier`. The release is a coordination decision
+  between two unattended lanes, not a judgement that this lane's interest was
+  invalid — it wrote the `edge_vs_market_pct` line that sits there.
+- Collision check at re-take: no OPEN lane claims any of the four above.
+  `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py` as an
+  expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
+  **Kept OUT of the `- Files:` block on purpose:** `_claims()` reads every nested
+  line under `- Files:` as a CLAIM, so a disclaimer written there becomes a
+  PHANTOM claim on a file this lane does not hold. `ask-sport-coverage` was bitten
+  by exactly this and it blocked another lane's one-line fix.
+- Deploy intent: **PREPARE ONLY.** The recorder runs on refresh-worker, and
+  `refresh-worker-oom-recurrence` has an explicit hold on deploys to that service
+  until its attribution is written. Request file, not a deploy.
+- Verification: written to `deploys.md` with the window stated.
+- Blocked by: refresh-worker deploy hold (`refresh-worker-oom-recurrence`) for
+  the recorder half only. The web half is unblocked.
+- **Took `.syndicate/.current-lane` from `refresh-worker-oom-recurrence`** — one
+  single-valued marker, N sessions, the known root cause. That lane claims no
+  files, so the cost is bounded.
+
+**MEASURED 2026-08-16 03:00–03:1xZ on a LIVE slate (2 games live, 13 final).**
+Source: the `book_grid_2026-08-15.json` artifact streamed from web
+(`/api/ops/artifacts/stream`, 9,953,474 bytes, `generated_at 03:00:00.538Z`) and
+`/mlb/api/live-lens` at 03:00Z. Both read at the same instant, both post-date
+`f8ca54e1`.
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+                         index_size 10
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+1. **`index_size` IS EXPLAINED. It is not a live-game count and nothing is
+   wrong.** It counts snapshot games carrying a `live_mc` lens. Census at 03:0xZ:
+   **10 of 15 games carry one — 8 FINAL and 2 LIVE.** A Final keeps its last
+   `live_mc` lens, so the number is monotone through a slate: 3 → 8 → 10 is just
+   how many games had gone live-or-through-live by each read. **The join loop
+   filters on `game.state == live` on the GRID side, so the Final entries are
+   never used** — the counter is misleading, not the join. Retire the "unexplained"
+   framing; the defect, if any, is that this is the one counter in the block with
+   no denominator, which is exactly what invited the wrong reading.
+2. **THE RECORDER CANNOT PRODUCE A SAMPLE, AND THIS IS THE REAL BLOCKER.**
+   `build_records` skips any row that is not `priceable`; `priceable` requires the
+   edge to clear a 2σ bar at 120 sims. Tonight that is **0 of 8**, so
+   `candidates: 0` — the ledger was never asked to write anything. **The
+   scheduled `live-gameline-ledger-check` will very likely read `written: 0`
+   again tomorrow, and that will mean neither "broken" nor "working."**
+3. **The filter's stated justification is wrong by three orders of magnitude.**
+   The docstring refuses non-priceable rows because "recording thousands of
+   refusals per build would bury the handful CLV can score." The measured
+   population is **8 rows per build, 2 of them projected.** There are no
+   thousands. Recording every PROJECTED row costs ~2 records/build against a
+   20,000-record file cap, and it is the difference between a sample and none.
+4. **`liveStateAsOf` and `liveStateCarriedForward` are `None` on all 10 lensed
+   games, including the 2 live ones.** Consistent with "Drop 2's carry-forward has
+   never fired" AND with "the stamp is only applied on the carry-forward path."
+   **Not disambiguated — do not record either as established.**
+
+**BOTH HALVES ARE NOW DEPLOYED — 2026-08-16 04:2xZ. `DEPLOYED NOWHERE` below is
+SUPERSEDED; the rest of that block still reads true.**
+- web `ebd5f677` live 03:38:07Z — the counters are served. Measured null -> object
+  across two artifacts.
+- refresh-worker `5c419007` live 04:24:33Z — ledger v2. **Deployed and NOT YET
+  EXERCISED:** the slate ended between the last pre-deploy build and the first
+  post-deploy one, so `considered` went 4 -> 0 and v2 has had no live row to act
+  on. Both parented on their service's LIVE SHA, never on main.
+- The `refresh-worker-oom-recurrence` hold cleared on its own evidence
+  (`9ed17262`: a ~2 GB transient, not a leak) rather than being overridden. I
+  asked that session first; it archived between the question and the answer.
+
+**CORRECTION TO THIS LANE'S OWN FINDING #2 ABOVE — read it before quoting the
+arc.** "The recorder has never recorded a row" is **FALSE**. The 04:22:51Z
+pre-deploy build read `priceable 1, candidates 1, skipped_unchanged 1`, and
+`skipped_unchanged` cannot be non-zero unless a matching record already sits on
+disk — an empty file always writes, because `_moved(None, rec)` is True. **v1
+wrote at least one row tonight**, between 02:4xZ and 04:22Z. The 03:00Z reading
+was real and I generalised it to a night. v2's premise survives (1 priceable of 4
+considered is a self-selected sample), but "it structurally could not write" was
+an overclaim.
+
+**NEXT ACTION is now purely measurement, and the plumbing question is closed.**
+`live-gameline-ledger-check`, 20:30 Central 08-16, on a full slate:
+`written > 0` on one build, then **`skipped_unchanged > 0` on a later one** —
+the second is the real test, and note it has ALREADY been observed once under
+v1, so the discriminator for v2 is `written` rising on rows that are NOT
+priceable. Read across two builds, never once.
+
+**CHECKPOINT 2026-08-16 03:4xZ.** Shipped to `origin/main`, DEPLOYED NOWHERE:
+`c87f6634` (ledger v2 + the book-grid pass-through + 2 test files),
+`bbc70d16` (the two deploy requests), `4e82d4b7` (the learnings rule).
+97 tests pass, and the pass-through was falsified first — commenting out the two
+served keys fails all 6 new tests.
+
+**THE ONE THING THAT DECIDES WHETHER TOMORROW IS A TEST:** the v2 recorder must
+be on refresh-worker before the scheduled `live-gameline-ledger-check` fires at
+**08-16 20:30 Central**. Against v1 it reads `written: 0` again and means nothing.
+That deploy is HELD by `refresh-worker-oom-recurrence`, deliberately — the hold is
+correct and the deadline is real, and only the user can trade them off.
+
+**NEXT ACTION for whoever picks this up:** not code. Get the refresh-worker
+deploy decided. Everything after it is measurement:
+`live_gameline_ledger.written > 0` on one build, then `skipped_unchanged > 0` on
+a later one — **the second is the real test**, because the append proving it
+writes is not the dedup proving it writes only on movement. Read it across two
+builds, never once.
+**Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
+
+**SHIPPED AND LIVE (content-verified per service, not by ancestry):**
+- live-odds-worker `c4116ab6` — the live MC stamps `simsRun`.
+- refresh-worker `f8ca54e1` — the game-line join, the segment filter, the
+  Agresti-Coull boundary, and the CLV recorder.
+- web carries D1+D2; it needs neither the vendor stamp nor the join.
+
+**THE ARC, in measured numbers:**
+
+    baseline   index 3   projected 12  edged 0   (sim_count_unusable 12)
+    +simsRun   index 8   projected 32  edged 25  <- FIRST EVER, and WRONG
+    +segment   index 10  projected  5  edged 4   <- first credible ones
+    tail       index 10  projected  2  edged 0   (slate over; ledger written 0)
+
+**THE 25 WERE FAKE AND I RETRACTED THEM MYSELF**, caught while packaging them
+for handoff: Wald `sqrt(p(1-p)/n)` is **0.0 at p in {0,1}**, so the 2-sigma bar
+was ZERO and everything cleared it; and the full-game projection was priced
+against every SEGMENT (SD @ CLE `first1` gave **+42.43 pp**). Both fixed.
+
+**WHAT IS NOT ESTABLISHED — do not let the arc imply otherwise:**
+- **No CLV, no settlement, no backtest.** Surviving means an edge exceeds the
+  ESTIMATOR'S OWN NOISE at 120 sims. It says nothing about the model.
+- **The recorder has never recorded a row** — it went live on a finished slate.
+  `written: 0` with `enabled: true` proves wiring, not behaviour.
+- **`index_size` 3 -> 8 -> 10 across the night is unexplained.**
+- **Drop 2's carry-forward has never been observed firing.**
+- The tally is MLB-only; soccer/wnba report `liveMcSources: null`.
+
+**HANDOFFS, all verified present in HEAD:**
+- `clv-without-settlement` — the rows are TRANSIENT (edged 25→4→1 on one slate);
+  the recorder is the prerequisite, and `clv_join.py` was deliberately untouched.
+  Carries two corrections: **Pinnacle is 15/30 in production** (the sharp SET is
+  30/30), and "close" is ill-defined for a live market.
+- `memory-watchdog-435` — a **2,092 MB** in-process excursion, pid 39, 34 s,
+  children proven flat. ~3x `#327`'s largest.
+- `soccer-model-coverage` — `SOCCER_PREGAME_AUTORUN_FAILED` lock contention.
+
+**COSTS I IMPOSED, recorded rather than netted out:** three soccer runs killed,
+one wrong rollback of a working fix, and two deploys fired over another
+session's claim. **No claims held; refresh-worker and live-odds-worker are free.**
+
+**NEXT SESSION STARTS HERE:** tomorrow's live slate is the first real test —
+does the ledger grow only on movement, and do the surviving edges beat a sharp
+close. **That is evaluation, not plumbing.** The plumbing is done.
+
+### live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30Z, 9 live_aware rows, perfect separation: the key is set IFF the edge is priceable). Deploy row closed in `deploys.md`. Both file claims released; `live_gameline_join.py` returned to `wnba-live-tier`, which held it first.**
+- Goal: a consumer can tell WHICH probability `projection["edge_vs_market_pct"]`
+  refers to. **Testable outcome:** on a live-joined game row,
+  `projection["edge_basis"] == "live"`, and `"pregame"` on a row with no live
+  projection. No existing field changes value.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_gameline_join.py`
+  - `tests/test_live_gameline_edge_basis.py`
+- **TAKEN BY USER OVERRIDE from `wnba-live-tier`, whose session was LIVE.** See
+  the note under that lane. It keeps every other path it held.
+- Deploy intent: **NONE TAKEN.** This code runs in the artifact build on
+  refresh-worker, and at open time (a) `refresh-worker-oom-recurrence` has a
+  documented deploy hold on that service and (b) the deploy claim was HELD by
+  `sim-scheduling` mid-ship. Committed and landed on `main`, **UNDEPLOYED** and
+  recorded as such in `deploys.md`. Whoever next deploys refresh-worker carries
+  it.
+- Verification once deployed: `edge_basis` present on `full/*` live rows of
+  `/api/board/layer2-shortlist`, and `_board_row_probabilities` can then publish
+  a model/market pair on those rows instead of refusing.
+- Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.
+
+
