@@ -97,6 +97,34 @@ mix git-tracked and untracked on-disk files.
 - Fixing thin coverage means refreshing the mirror from Render or widening
   `HOT_ARTIFACT_PATTERNS` — not quietly falling back to whatever is on disk.
 
+## Model engines — a mandatory standard
+
+**Any work on a sim/model engine must follow
+`docs/ai_context/model_engine_standard.md`.** It is short, and it exists because
+a 2026-08-18 audit of the platform's MOST MATURE engine found **26 input fields
+the simulation reads and nothing feeds** — every one silent, with passing tests
+and no log line. A neutral default (`.get(key, 1.0)`) makes an unfed field
+indistinguishable from a working feature at every level except the data.
+
+Non-negotiable for every engine, current and future:
+
+- **A gating input checklist** (`scripts/sim_input_checklist.py` is the reference)
+  that cross-references *is this field CONSUMED* against *is it POPULATED*, over
+  `dataclasses.fields()` — **never a name grep** — and exits non-zero.
+- **A documented pipeline trace**, file:line at each hop, including what it writes.
+- **Every input disk-backed** via `SYNDICATE_DATA_ROOT` and **allowlisted** in
+  `HOT_ARTIFACT_PATTERNS`. A local cache cannot reach Render: `vendor/*/data/` is
+  gitignored AND inside the ephemeral checkout.
+- **Publishing is not sufficient** — MLB's `--use-roster-artifacts` defaults to
+  `on`, so a new input needs a roster REBUILD or it is silently ignored.
+- **Reachability test before correctness tests** (`off != on`) for anything behind
+  a flag. Four inert features in one session were caught by that and nothing else.
+- **Mechanism vs estimator:** adding a MECHANISM to a calibrated engine requires
+  re-fitting the rates that were absorbing it. Measured: two mechanisms together
+  produced a NEGATIVE interaction in 4 of 4 markets.
+
+MLB's worked example: `docs/ai_context/mlb_sim_engine_reference.md`.
+
 ## Commands
 
 Run the app locally:

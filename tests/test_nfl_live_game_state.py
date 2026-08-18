@@ -239,3 +239,106 @@ def test_fetch_failure_yields_empty_index_not_an_exception(monkeypatch):
     monkeypatch.setattr(mod, "_fetch_scoreboard", lambda *a, **k: None)
     mod._cache.clear()
     assert mod.nfl_game_state_index(2026, 2, seasontype=SEASONTYPE_PRESEASON) == {}
+
+
+# --------------------------------------------------------------------------
+# game shape (lane `game-shape-capture`)
+# --------------------------------------------------------------------------
+#
+# Same discipline as the consumer tests above: asserting the field is SET would
+# only prove presence. What has to be true is that the shape contract actually
+# parses the stamped state, so these read the values back through
+# `shared/game_shape.py` rather than checking for a non-null key.
+
+
+def _situation_event(event_id, away, home, **situation):
+    event = _event(event_id, away, home, "in", period=3, clock="8:05",
+                   away_score="14", home_score="17")
+    event["competitions"][0]["situation"] = situation
+    return event
+
+
+def test_live_card_carries_a_parsed_game_shape():
+    index = {"401873275": _state_from_event(
+        _event("401873275", "GB", "PIT", "in", period=3, clock="8:05",
+               away_score="14", home_score="17"))}
+    cards = [_card("401873275", "GB", "PIT")]
+    attach_nfl_live_game_state(cards, index)
+
+    shape = cards[0]["live_state"]["game_shape"]
+    assert shape["valid"] is True
+    assert shape["sport"] == "nfl"
+    assert shape["period"] == 3
+    # 2 completed 15-minute quarters + 6:55 elapsed in the third.
+    assert shape["elapsed_minutes"] == round(30.0 + (15.0 - (8 + 5 / 60)), 4)
+    assert shape["home_margin"] == 3.0
+    assert shape["bucket"] == "third_quarter|one_score"
+
+
+def test_the_discarded_situation_block_now_reaches_the_shape():
+    """Down/distance/field position were in the payload and thrown away.
+
+    This is the whole point of the capture change -- it costs no extra fetch,
+    it stops discarding what the scoreboard already returns.
+    """
+    index = {"401873275": _state_from_event(
+        _situation_event("401873275", "GB", "PIT",
+                         down=3, distance=7, yardLine=12, possession="PIT"))}
+    cards = [_card("401873275", "GB", "PIT")]
+    attach_nfl_live_game_state(cards, index)
+
+    shape = cards[0]["live_state"]["game_shape"]
+    assert shape["situation_available"] is True
+    assert shape["down"] == 3
+    assert shape["distance"] == 7
+    assert shape["yard_line"] == 12
+    assert shape["possession_team"] == "PIT"
+    assert shape["red_zone"] is True
+
+
+def test_a_finished_game_carries_no_stale_situation():
+    """A `situation` on a completed game is a feed artefact.
+
+    Storing it would render "3rd and 7" on a game that ended hours ago -- the
+    same class of defect as the 0-0 placeholder score on a pregame card.
+    """
+    event = _event("401873275", "GB", "PIT", "post", completed=True, period=4,
+                   away_score="20", home_score="17")
+    event["competitions"][0]["situation"] = {"down": 3, "distance": 7, "yardLine": 12}
+    state = _state_from_event(event)
+    assert state["situation"] is None
+
+    cards = [_card("401873275", "GB", "PIT")]
+    attach_nfl_live_game_state(cards, {"401873275": state})
+    shape = cards[0]["live_state"]["game_shape"]
+    assert shape["situation_available"] is False
+    assert shape.get("red_zone") is None
+    assert shape["final"] is True
+
+
+def test_absent_situation_does_not_read_as_not_in_the_red_zone():
+    """Unknown must not default onto the permissive branch."""
+    index = {"401873275": _state_from_event(
+        _event("401873275", "GB", "PIT", "in", period=1, clock="7:53"))}
+    cards = [_card("401873275", "GB", "PIT")]
+    attach_nfl_live_game_state(cards, index)
+    shape = cards[0]["live_state"]["game_shape"]
+    assert shape["situation_available"] is False
+    assert shape.get("red_zone") is None
+    assert shape.get("down") is None
+
+
+def test_shape_is_present_but_invalid_on_a_pregame_card_rather_than_fabricated():
+    """A scheduled game has no period and no score, by design upstream.
+
+    The shape must say so (`valid: False`) instead of inventing a 0-0 first
+    quarter -- otherwise every pregame card would land in the `first_half|one_score`
+    bucket and pollute the denominator.
+    """
+    index = {"401873275": _state_from_event(
+        _event("401873275", "GB", "PIT", "pre"))}
+    cards = [_card("401873275", "GB", "PIT")]
+    attach_nfl_live_game_state(cards, index)
+    shape = cards[0]["live_state"]["game_shape"]
+    assert shape["valid"] is False
+    assert shape["bucket"] == "unknown"

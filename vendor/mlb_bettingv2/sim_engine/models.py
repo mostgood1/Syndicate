@@ -437,6 +437,15 @@ class GameConfig:
     park_hr_weight: float = 1.0
     park_inplay_hit_weight: float = 1.0
     park_xb_share_weight: float = 1.0
+    # `#440` P2: in-sim POSITION-PLAYER substitution (pinch hitters, defensive
+    # replacements). Dark-launched OFF, like every other behaviour change here.
+    #
+    # THIS MUST BE A DECLARED FIELD, not an attribute set on an instance.
+    # `dataclasses.replace()` rebuilds a GameConfig from its declared fields
+    # only, and the sim calls `replace(cfg, rng_seed=...)` on every run -- so a
+    # monkey-patched attribute is silently discarded before the first pitch and
+    # the feature reads as permanently disabled. Caught by the reachability test.
+    position_substitutions: bool = False
     # Toggle batted-ball-informed baserunning: DP, sac flies, and runner advancement.
     # When False, falls back to a simpler forced-advance baserunning model.
     bip_baserunning: bool = True
