@@ -81,3 +81,45 @@ priceable. That is the worker request, still held.
 **Cost recorded, not netted out:** fired 22:31 Central with 2 MLB games live, so
 the board 502'd for part of a ~7-minute swap. No worker restarted; the OOM lane's
 hold was not crossed and no in-flight sim was killed.
+
+---
+
+## OUTCOME — EXECUTED AND MEASURED. Recorded 2026-08-18 by the coordinator.
+
+**This outcome was reconstructed, not written at the time.** The deploy happened
+and was measured on 2026-08-16; the request file was moved to `done/` without
+carrying the result back. Every number below is quoted from the `deploys.md` rows
+named at the end, except the 2026-08-18 re-read, which I took.
+
+**DEPLOYED** as `ebd5f677`, `dep-da0itvpt0dsc739pj3n0`, fired 2026-08-16
+03:31:11Z, live **03:38:07.648Z** (6m56s), gated on the affirmative token `live`.
+
+**NOT deployed from `main`.** The first preflight candidate was `639ecce0`
+(= `origin/main`) and it was REFUSED: web was running `fa1871cf`, with **33
+commits live on the service and absent from `origin/main`**. Shipping main would
+have reverted another session's work the same night. Re-parented on the live SHA
+and verified by CONTENT, not ancestry.
+
+**MEASURED 03:38–03:40Z — PASS.** Pre-state was `null` for both keys at 03:0xZ.
+After: `live_gamelines` and `live_gameline_ledger` both served as objects across
+**two different artifacts** (`generated_at` 03:37:13.853Z and 03:39:36.922Z), so
+two builds, not two reads of one.
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+`written: 0` was correct and NOT this deploy's business — refresh-worker still
+ran the v1 recorder at that moment. The worker half is the sibling request.
+
+**STILL TRUE 2026-08-18** (re-read by the coordinator against web `e5107913`,
+`/api/board/book-grid?sport=mlb&date=2026-08-17`): `live_gamelines`,
+`live_gameline_ledger` and `live_gameline_score` all present as objects. The
+pass-through did not regress across the deploys since.
+
+**COST, recorded because it was real:** fired 22:31 Central with 2 MLB games
+live; the board 502'd during the deploy.
+
+**Rows:** `deploys.md` — `2026-08-16 03:31:11Z — web ebd5f677` (pending) and
+`### MEASURED 2026-08-16 03:38–03:40Z — web ebd5f677 — PASS`.

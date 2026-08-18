@@ -103,3 +103,69 @@ write was wrong, and it was wrong because I generalised one build to a night.**
 `{"commitId": "f8ca54e18a1b5cfd43107521729c25f19433a415"}` — the SHA live at
 04:18Z. Feature-only kill needs no deploy: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0`
 (currently ABSENT on the service, which the code reads as ENABLED).
+
+---
+
+## OUTCOME — EXECUTED. v2 SHIPPED AND IS NOW PROVEN TO RECORD. TWO CAVEATS ARE STILL OPEN. Recorded 2026-08-18 by the coordinator.
+
+**This outcome was reconstructed, not written at the time.** Everything below is
+quoted from the `deploys.md` rows named at the end, except the 2026-08-18 read,
+which I took.
+
+**THE HOLD WAS CLEARED BY EVIDENCE, NOT OVERRIDDEN.** The request named
+`refresh-worker-oom-recurrence` as a deliberate block. That lane banked its
+attribution (`9ed17262`, a ~2GB **transient**, not a leak; `#435` did not
+regress) and archived. Permission was asked for first; the reply was "session is
+archived". **Residual cost recorded at the time:** its clean window was 70
+minutes old and this deploy reset it to zero, which is what its still-open
+second question needed.
+
+**DEPLOYED** as `5c419007`, `dep-da0jk261egvs738t0d10`, fired 2026-08-16
+04:18:16Z, live **04:24:33.598Z** (6m17s). Parented on the live SHA `f8ca54e1`,
+**not on main** — 13 commits were live on this service and absent from
+`origin/main`. Sims were launching back to back; deploy went into the 04:17:23Z
+gap, polled on `check_deploy_safety.py` **exit code 0** rather than a string
+(because `NOT CLEAR` contains `CLEAR`). **No sim killed.**
+
+**THE TIME-BOX WAS MET.** The request's whole argument was that shipping before
+the 20:30 Central `live-gameline-ledger-check` is what turns that check into a
+test. It shipped ~16 hours ahead of it.
+
+**AT DEPLOY TIME: NOT EXERCISED, and that was stated honestly.** The slate ended
+between the two sampled builds — post-deploy build read considered 0 / projected
+0 / candidates 0. Those zeros carried no information about the recorder.
+
+**MEASURED ON THE FIRST REAL SLATE — THE RECORDER WORKS, 3,748 ROWS.**
+`live-gameline-ledger-check`, scheduled run, 2026-08-17 02:2x–02:3xZ, against
+refresh-worker `8999f033` (content-verified: `LEDGER_VERSION = 2`, call site at
+`book_grid_artifact.py:267`). The count came from
+`live_gameline_score.records_considered` — the return of
+`read_records(ledger_path(...))`, i.e. the file's own row count — **not** from
+the per-build counters, which were dead that night because the Sunday day slate
+had finished before the task fired. This retires "it has never recorded a row".
+
+**TWO CAVEATS THAT THE MEASUREMENT LEFT OPEN, and both are still open today:**
+
+1. **DEDUP IS UNMEASURED.** It is not measurable by sampling the artifact across
+   builds (candidates is 0 on a dead slate), and the ledger file cannot be read
+   off-worker: `/api/ops/artifacts/stream` returns **HTTP 403 `path is not an
+   allowed hot artifact`**. **Re-verified 2026-08-18:** no entry in
+   `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py:35`) matches
+   `*_source/data/live_gameline_ledger/live_gameline_ledger_*.jsonl`. Still 403.
+   Deliberately NOT inferred from 3,748 against a guessed build count.
+2. **THE SCHEDULE IS WRONG FOR SUNDAYS.** 20:30 Central is mid-slate on a
+   weeknight and after the last final on a Sunday day slate.
+
+**2026-08-18 read** (`/api/board/book-grid?sport=mlb&date=2026-08-17`):
+`enabled true, candidates 0, written 0, skipped_unchanged 0`. **This says
+nothing** — same dead-slate condition as above. Quoting it as a negative would
+repeat the exact error the 08-17 run warned against.
+
+**WHERE THE RESIDUAL LIVES:** lane `live-game-line-projection`, **OPEN and
+UNOWNED** in `lanes.md:931`. Its header still reads "v2 STILL UNEXERCISED",
+which the 3,748-row measurement disproves; corrected in the same pass as this
+outcome. The evaluation half of that lane has still not started.
+
+**Rows:** `deploys.md` — `2026-08-16 04:24:33Z — refresh-worker 5c419007 — ledger
+v2 — DEPLOYED, NOT YET EXERCISED` and `2026-08-16 22:2x–22:3x CDT —
+live-gameline-ledger-check, scheduled run`.
