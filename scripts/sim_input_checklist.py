@@ -151,6 +151,8 @@ def main() -> int:
         # its own call here; see the provenance table in
         # docs/ai_context/mlb_sim_engine_reference.md.
         from datetime import date as _date
+        from sim_engine.data.arsenal import (apply_arsenal_to_batter,
+                                             apply_arsenal_to_pitcher)
         from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                                  apply_batted_ball_to_pitcher)
         from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
@@ -179,6 +181,7 @@ def main() -> int:
                 for _b in list(_lu.batters) + list(_lu.bench or []):
                     try:
                         apply_batted_ball_to_batter(_b, season=2026, weight=0.35)
+                        apply_arsenal_to_batter(_b, season=2026)
                     except Exception:
                         pass
                 for _p in [_lu.pitcher] + list(_lu.bullpen or []):
@@ -186,6 +189,7 @@ def main() -> int:
                         _apply_cached_statcast_pitch_splits(
                             _p, season=2026, statcast_cache=_sc, statcast_ttl_seconds=None)
                         apply_batted_ball_to_pitcher(_p, season=2026)
+                        apply_arsenal_to_pitcher(_p, season=2026)
                     except Exception:
                         pass
         for side in ("away", "home"):

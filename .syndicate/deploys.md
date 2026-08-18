@@ -14779,3 +14779,69 @@ instead of asking what the data provider offers.
 **Rule this earns: before building a fetch pipeline, enumerate the provider's
 leaderboard endpoints.** A per-entity loop is the expensive answer to a question
 the provider usually answers in one call.
+
+## 2026-08-18 — ARSENAL ARTIFACT BUILT AND WIRED. **FAIL 26 -> 2**, and the two survivors are a DEFINITION problem, not a data problem.
+
+Lane `convergence-phase7-crps`. 27 tests pass. No deploy.
+
+### Built
+
+`scripts/build_mlb_arsenal_artifact.py` — **two leaderboard calls** replacing a
+309-call, ~80-minute per-pitcher pipeline:
+
+    pitcher rows 1,673 -> 466 pitchers published (85 skipped: single pitch type)
+    batter  rows 1,999 -> 384 batters  published (66 skipped)
+
+`sim_engine/data/arsenal.py` wired into `build_roster` at three sites (starter,
+bullpen, batter). **Applied AFTER pitch splits so it wins where both have data**;
+the older path is kept as a fallback for pitchers the leaderboard drops.
+
+### THE NORMALISATION IS THE LOAD-BEARING CHOICE, and it is NOT against the league
+
+Each multiplier is normalised against **that player's own usage-weighted mean**,
+so his multipliers average ~1.0 across his arsenal. Normalising against the
+league would encode the pitcher's OVERALL quality into every pitch multiplier —
+and `k_rate`/`hr_rate` already carry that level. That is double-counting, i.e.
+exactly the calibration-absorption failure measured 2026-08-17 (interaction
+−0.00331, negative in 4 of 4).
+
+**So these multipliers are LEVEL-NEUTRAL by construction** and say only "this
+pitch is better or worse than this player's average pitch" — the one thing the
+summary rates cannot express. `est_ba`/`est_slg` are preferred over `ba`/`slg`
+because expected stats strip defence and park from the observation.
+
+Sanity of the output: sample pitcher FF `whiff_mult` 0.65, FS 1.459 — a splitter
+misses more bats than a fastball. Correct sign, correct magnitude.
+
+### RESULT
+
+    26 -> 20 -> 15 -> 10 -> 5 -> **2**
+
+    pitcher whiff_mult     642/717  (89.5%)
+    pitcher hr_mult        642/717  (89.5%)   <- I declared this "NOT FIXABLE"
+    batter  vs_pitch_type  858/1047 (81.9%)   <- I declared this "NO SOURCE"
+
+Both of those verdicts were wrong, and wrong the same way: **true of the source I
+happened to be holding, false of the data provider.**
+
+### THE REMAINING 2 ARE NOT A DATA PROBLEM
+
+`batter.statcast_quality_mult` and `pitcher.statcast_quality_mult` are the ONLY
+consumed-but-unfed fields left, and the blocker is **definitional**:
+
+- `models.py:262/332` documents them as *"quality multipliers … Keys: k, bb, hr,
+  inplay"*.
+- `_statcast_shape_rate_mults` (`simulate.py:163`) actually reads **ten raw
+  metrics** — `chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`,
+  `xwoba`, `ev_mean`, `ev_max`, `pulled_air_rate`, `pitch_velo_mean`,
+  `pitch_extension_mean` — and DERIVES k/bb/hr/inplay from them.
+- A third consumer (`:1400`) reads `quality.get("hr")` directly, agreeing with
+  neither.
+
+**Three parts of the codebase disagree about what this field contains.** Feeding
+it before that is settled would satisfy the checklist and mean nothing.
+
+**Sources exist for the ten** (`statcast_batter_percentile_ranks`,
+`expected_stats` for xwoba, `exitvelo_barrels` for ev_mean/ev_max — the last
+already in the batted-ball artifact). **The work is deciding the contract, not
+finding the data.**
