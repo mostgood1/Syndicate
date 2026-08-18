@@ -15728,3 +15728,17 @@ remains committed and pushed but NOT live; the mirror/checkout-level fixes
 (`#461` asof cache-freshness code, the season-file regeneration) are real and
 verified locally, but production still serves the pre-fix behavior until this
 deploy actually lands.
+
+### deploy attempt HELD (2nd) — refresh-worker — 2026-08-18 ~22:12Z — lane `basketball-model-owner`
+
+Re-checked after Render came back up (web confirmed HTTP 200 on real routes).
+Same two-lock sequence: `deploy_claim.py acquire` -> ACQUIRED (token
+`24db7f58...`), `deploy_preflight.py` -> still **HOLD: 10 job(s) in flight**
+(`run_mlb_daily_sim_job.py`, `daily_update.py --workflow ui-daily`,
+`refresh_odds_sources.py`, `build_soccer_artifacts.py --league la_liga`,
+two `vendor/mlb_bettingv2/tools/daily_update` processes, spawn children) —
+same shape as the first HELD attempt ~19 minutes earlier. Not deployed.
+Claim released (`deploy_claim.py release --token 24db7f58...` ->
+`released refresh-worker (was basketball-model-owner)`). `#461`'s code fix
+remains committed and pushed, not yet live; still waiting for a genuinely
+idle refresh-worker window.
