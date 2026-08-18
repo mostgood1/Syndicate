@@ -4933,3 +4933,44 @@ either party forces exactly the archaeology this rule exists to prevent.
 **What this did NOT break:** the guard held correctly for every other session
 throughout. The failure mode is the coordinator locking itself out, which is the
 safe direction — but it is invisible until someone tries to deploy.
+
+## 2026-08-18 — THE MARKET HARNESS HAS A NOISE FLOOR 2.4x THE EFFECTS IT WAS USED TO JUDGE
+
+`convergence-phase7-crps`, `#440`. `scripts/measure_all_inputs_effect.py`,
+45 games x 120 sims, 2,415 scored rows.
+
+**Same configuration, two seeds, nothing else changed:**
+
+    market                seed 1337   seed 4242    |diff|
+    batter_hits             0.23786     0.23660   0.00126
+    batter_rbis             0.21717     0.21495   0.00222
+    batter_runs_scored      0.23674     0.23248   0.00427
+    batter_total_bases      0.25460     0.24932   0.00527
+    MEAN                                          0.00326   <- pure RNG
+
+The conditional-mix effect measured at seed 1337 was **-0.00138**. **Noise /
+effect = 2.4x.** At the second seed the sign flipped in **3 of 4 markets** and
+the mean went from -0.00138 (better) to +0.00185 (worse).
+
+**RULE: a single-seed run of this harness cannot resolve anything smaller than
+~0.003 Brier.** Every conclusion this lane drew from ONE seed is therefore
+uncertain, including ones I reported as measured:
+
+- "fully fed: 4 of 4 better, mean +0.00478" — marginally above the floor;
+- "first-pitch take term: market-neutral, -0.00013" — **far below it**; that
+  claim is not supported, in either direction;
+- "two mechanisms interact, -0.00331, negative in 4 of 4" — **at the floor**.
+
+**WHY 'same seed for both arms' BUYS NOTHING.** It looks like common random
+numbers, and is not. Changing the pitch mix changes *how many* RNG draws a PA
+consumes, so the two arms desynchronise on the first divergent pitch and every
+downstream draw differs. Paired variance reduction requires the streams to stay
+aligned — separate RNG streams per decision type, or antithetic/CRN structure.
+A shared seed across arms whose control flow depends on the RNG is cosmetic.
+
+**HOW TO USE IT PROPERLY:** report the mean over k seeds WITH the across-seed
+standard error, or raise sims until the floor is below the effect (variance goes
+as 1/sims, so resolving ~0.001 from 120 sims needs roughly 16x). **Never report
+a single-seed delta as a result again.** A run that "beats the market" at one
+seed — seed 4242 showed `runs_scored` beating the market in the arm WITHOUT the
+feature — is a coin flip presented as a finding.

@@ -1,0 +1,480 @@
+{
+  "rosters": 40,
+  "counts": {
+    "batter": 1047,
+    "pitcher": 717
+  },
+  "failures": 5,
+  "warnings": 0,
+  "rows": [
+    {
+      "kind": "batter",
+      "field": "statcast_quality_mult",
+      "pct": 0.0,
+      "consumed": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitch_type",
+      "pct": 0.0,
+      "consumed": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitch_type_hr",
+      "pct": 0.0,
+      "consumed": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitcher_bb_mult",
+      "pct": 0.1394,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitcher_hr_mult",
+      "pct": 0.1394,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitcher_inplay_mult",
+      "pct": 0.1394,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitcher_k_mult",
+      "pct": 0.1394,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_pitcher_history",
+      "pct": 0.638,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "sb_attempt_rate",
+      "pct": 0.724,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "sb_success_rate",
+      "pct": 0.724,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_fb_rate",
+      "pct": 0.9064,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_gb_rate",
+      "pct": 0.9064,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_inplay_n",
+      "pct": 0.9064,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_ld_rate",
+      "pct": 0.9064,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_pu_rate",
+      "pct": 0.9064,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "triple_share_of_xb",
+      "pct": 0.9093,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_venue_bb_mult",
+      "pct": 0.9293,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_venue_history",
+      "pct": 0.9293,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_venue_hr_mult",
+      "pct": 0.9293,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_venue_inplay_mult",
+      "pct": 0.9293,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "vs_venue_k_mult",
+      "pct": 0.9293,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "venue_mult_home",
+      "pct": 0.9694,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "xb_hit_share",
+      "pct": 0.9771,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "venue_mult_away",
+      "pct": 0.978,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "platoon_mult_vs_lhp",
+      "pct": 0.979,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "platoon_mult_vs_rhp",
+      "pct": 0.9895,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "bb_rate",
+      "pct": 0.9904,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "hbp_rate",
+      "pct": 0.9904,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "k_rate",
+      "pct": 0.9904,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "hr_rate",
+      "pct": 0.9933,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "batter",
+      "field": "inplay_hit_rate",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "pitch_type_hr_mult",
+      "pct": 0.0,
+      "consumed": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "pitcher",
+      "field": "statcast_quality_mult",
+      "pct": 0.0,
+      "consumed": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "pitcher",
+      "field": "leverage_skill",
+      "pct": 0.3835,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "availability_mult",
+      "pct": 0.5007,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "vs_venue_bb_mult",
+      "pct": 0.8787,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "vs_venue_history",
+      "pct": 0.8787,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "vs_venue_hr_mult",
+      "pct": 0.8787,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "vs_venue_inplay_mult",
+      "pct": 0.8787,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "vs_venue_k_mult",
+      "pct": 0.8787,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_fb_rate",
+      "pct": 0.94,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_gb_rate",
+      "pct": 0.94,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_inplay_n",
+      "pct": 0.94,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_ld_rate",
+      "pct": 0.94,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_pu_rate",
+      "pct": 0.94,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "venue_mult_home",
+      "pct": 0.9609,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "pitch_type_inplay_mult",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "pitch_type_whiff_mult",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "statcast_splits_end_date",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "statcast_splits_n_pitches",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "statcast_splits_source",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "statcast_splits_start_date",
+      "pct": 0.9819,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "venue_mult_away",
+      "pct": 0.9888,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "bb_rate",
+      "pct": 0.9916,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "platoon_mult_vs_rhb",
+      "pct": 0.9916,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "hbp_rate",
+      "pct": 0.993,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "arsenal_sample_size",
+      "pct": 0.9958,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "batters_faced",
+      "pct": 0.9958,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "hr_rate",
+      "pct": 0.9958,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "k_rate",
+      "pct": 0.9958,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "platoon_mult_vs_lhb",
+      "pct": 0.9958,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "arsenal",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "arsenal_source",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "balls_in_play",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "inplay_hit_rate",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "role",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    },
+    {
+      "kind": "pitcher",
+      "field": "stamina_pitches",
+      "pct": 1.0,
+      "consumed": true,
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "counters": {
+    "dates": 29,
+    "dates_with_odds": 15,
+    "starts_seen": 342,
+    "no_line": 246,
+    "no_name": 0,
+    "push": 1,
+    "graded": 95
+  },
+  "n": 95,
+  "over_base_rate": 0.5684210526315789,
+  "rows": [
+    {
+      "method": "multiplicative",
+      "bets": 95,
+      "hit_rate": 0.4842105263157895,
+      "roi": -0.10154543566069311,
+      "over_picks": 57
+    },
+    {
+      "method": "power",
+      "bets": 95,
+      "hit_rate": 0.4842105263157895,
+      "roi": -0.10154543566069311,
+      "over_picks": 57
+    }
+  ]
+}

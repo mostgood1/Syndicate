@@ -1,0 +1,72 @@
+{
+  "tolerance": 0.01,
+  "rows": [
+    {
+      "sport": "nfl",
+      "market": "margin",
+      "sigma": 16.472961379310345,
+      "crps_clim": 7.9713400152960565,
+      "ratio": 2.0665234888614314,
+      "formula_n": 116.59110265723875,
+      "anchored_n": 405.65509559988107,
+      "current": 300,
+      "verdict": "TOO THIN"
+    },
+    {
+      "sport": "nfl",
+      "market": "total",
+      "sigma": 14.200198620689655,
+      "crps_clim": 7.769190516443259,
+      "ratio": 1.8277578070244718,
+      "formula_n": 103.12019159712972,
+      "anchored_n": 358.78579263110305,
+      "current": 300,
+      "verdict": "TOO THIN"
+    },
+    {
+      "sport": "ncaaf",
+      "market": "margin",
+      "sigma": 13.695109067017082,
+      "crps_clim": 11.484770885531695,
+      "ratio": 1.1924581868907747,
+      "formula_n": 67.27724878600188,
+      "anchored_n": 234.07754250523973,
+      "current": 300,
+      "verdict": "OK"
+    },
+    {
+      "sport": "ncaaf",
+      "market": "total",
+      "sigma": 12.81860446780552,
+      "crps_clim": 9.20845902669735,
+      "ratio": 1.3920466421842745,
+      "formula_n": 78.53782153329985,
+      "anchored_n": 273.2564215981288,
+      "current": 300,
+      "verdict": "OK"
+    },
+    {
+      "sport": "mlb",
+      "market": "outs",
+      "sigma": 3.3510729458425588,
+      "crps_clim": 2.1927,
+      "ratio": 1.528286106554731,
+      "formula_n": 86.22431019989357,
+      "anchored_n": 300.0,
+      "current": 1000,
+      "verdict": "OK"
+    }
+  ],
+  "validation": {
+    "sigma_by_n": {
+      "100": 3.3514248165014773,
+      "300": 3.355787008043576,
+      "1000": 3.346007012982623
+    },
+    "crps_by_n": {
+      "100": 2.511,
+      "300": 2.4516,
+      "1000": 2.4498
+    }
+  }
+}

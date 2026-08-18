@@ -5038,3 +5038,98 @@ cut by measured TVD similarity, not by intuition.
 
 **Still unfalsified, not yet proven:** that this moves the MARKET. Same standard
 as everything else in this lane — the scoreboard decides, not the TVD.
+
+### soccer-layer2-dates — CLOSED 2026-08-18 02:2xZ — **all three goals met and verified in production; 8 commits shipped; one proof owed and named** — session: soccer-layer2-dates
+
+- Goal: soccer's Layer 2 surfaces tell the truth about WHEN a match is and WHETHER it
+  is live, and soccer reaches the board with real projections.
+
+| goal | measured outcome | state |
+|---|---|---|
+| (a) rail shows only today's Central date | rendered rail **15 cards, all today** (was ~60 across 08-15..08-28) | **MET** |
+| (b) no chip reports `live` for a `post` match | **0** stale-live (was 1) | **MET** |
+| (c) soccer `pct_projected` materially above 0.0 | **0.0 -> 53.8**, 4 -> **4,738 / 8,808** rows, 3 -> **99** matches, 4 -> **9** leagues | **MET** |
+
+**COMMITS — all 8 on `origin/main`, all deployed and measured.**
+
+| commit | scope | verified |
+|---|---|---|
+| `cd46b403` | rail dates + stale-live guard | web `e5107913`, 78/78 markers, criteria measured 23:47Z |
+| `6bdc50de` | live-lens `as_of` TypeError | live-odds-worker, **7 -> 10 leagues/tick** |
+| `6aaa11af` | projection loader window | shipped; its caller wired by `b4d82364` (another session) |
+| `18c5ecb9` | caller-census test | found 4 broken call sites a string-match could not |
+| `9e052dfe` | stale monkeypatch + rename guard | 0 -> 7 interceptions |
+| `ec8c3beb` | shard read-error reporting | partial-failure branch verified by construction |
+| `481de91d` `461774cb` | gate + poller diagnostics | workers `00e9a49f` / `cdaeaa58`, quiet-case PASS over 7 ticks |
+
+**THE ONE THING OWED, and it cannot be forced.** The live lens is **UNVERIFIED
+END-TO-END**. `6bdc50de`'s primary criterion is measured, but every league correctly
+wrote `(0 live games)` because ESPN reported all three of 08-17's matches `post`.
+**Next slate with a soccer match in play:** confirm one of la_liga / primeira_liga /
+championship writes `count > 0`, and `/soccer/<league>/api/live-lens` leaves
+`Live matches: 0 / Source: No data`. **A league with nothing in play writing
+`(0 live games)` is CORRECT and is not a failure.**
+
+**THREE TRAPS THIS LANE PAID FOR — read before re-measuring any of it.**
+1. **`pct_projected: 53.8` IS NOT BOARD PRESENCE.** Same instant: `active_sports:
+   ["mlb","nfl","wnba"]`, soccer selected rows **0**. That is grid coverage. Soccer
+   serving zero shortlist rows remains intended (decision 7).
+2. **Test deployment BY CONTENT, never ancestry.** Three deploys today carried a fix
+   that `merge-base --is-ancestor` reported absent. And never grep a symbol that
+   exists on both sides — `railDate` reads "present" on the stale build.
+3. **Never group the soccer poll logs by second.** A slower tick splits across
+   buckets and reads as leagues dropping out; it produced a false `[1,3,6,10]`
+   regression at 02:13:3x that was 10 leagues in one tick.
+
+**Files released:** `scripts/poll_soccer_live_state.py`,
+`syndicate/features/shared/live_lens_loop.py`, `pipeline/layer2_shortlist.py`,
+`syndicate/templates/intelligence.html`, `syndicate/features/shared/soccer_projections.py`,
+and the five test files. Nothing of mine is uncommitted.
+
+**NOT MINE, still uncommitted in the shared tree — do not sweep into a soccer
+commit:** `soccer_projections.py` + `book_margin_model.py` (`modelled-fair-edge`
+lane), `board_enrichment.py` (content-identical to `origin/main`, vanishes on
+reconcile), and `game_shape.py` + `tests/test_game_shape.py` staged in the shared
+index by another session.
+
+#### convergence-phase7-crps — MEASURED 2026-08-18 — **consumer wired and REACHABLE; market verdict INCONCLUSIVE because the harness is under-powered**
+
+Commits `c2030c72` (recovery + sweeper), `f4d9e865` (consumer). **Nothing shipped
+on the market's say-so, because the market did not say anything resolvable.**
+
+**WIRING — verified, not assumed**
+- Both selection sites resolve a CDF per (pitcher, count bucket, batter hand);
+  fallback returns the SAME OBJECT as the season CDF, so a missing artifact
+  degrades to today's behaviour rather than to an empty mix (an empty mix does
+  not raise — it falls through `_sample_weight_cdf`'s default to 100% FF).
+- **Reachability PASSES**: one pitcher, `3-0` FF **94.9%** vs `0-2` FF **30.3%**.
+- **Two near-inert traps caught:** `_simulate_pitch` has no `balls`/`strikes`
+  locals (count is a tuple param) — would have raised; and `roster_artifact`
+  serialises an EXPLICIT field list, so the fields would have vanished through
+  the artifact **the worker reads**. Both now covered by tests.
+- **Real rosters, 40 artifacts:** pitcher conditional mix **80/80 (100%)**, 798
+  cells. Hitter `vs_pitch_type` **0%** on ARCHIVED rosters — the documented
+  rebuild trap, not a gap; after applying the applier, **91%**, and the full
+  chain (pitcher pitching to the count vs a hitter with real ability against
+  that pitch type) is live on **80/80 team-sides**.
+
+**MARKET — INCONCLUSIVE, and this is the important entry**
+
+    seed 1337   mean -0.00138   gap 0.00678 -> 0.00540   (20.4% closed)
+    seed 4242   mean +0.00185   gap 0.00353 -> 0.00538   (52.5% WORSE)
+    sign agreement across seeds: 1 of 4 markets
+
+**NOISE FLOOR of the harness, same config two seeds: 0.00326. Effect: 0.00138.
+Noise is 2.4x the effect.** The seed-1337 result measured the RNG.
+
+**This reaches BACKWARD.** Single-seed deltas this lane already reported —
+fully-fed +0.00478, first-pitch -0.00013, mechanism interaction -0.00331 — are
+at or below the floor. The first-pitch "market-neutral" verdict in `d8bf0b04` is
+**not supported in either direction**; I stated it as measured and it was not.
+See `learnings.md` for why a shared seed across arms is NOT common random
+numbers when control flow depends on the RNG.
+
+**NOT SHIPPED. NOT REFUTED.** The conditional mix stays in the tree, wired and
+tested, with no market claim attached. Resolving it needs ~16x the sims or a
+k-seed mean with a standard error — that is the next measurement, and it is a
+measurement of the INSTRUMENT before it is one of the feature.

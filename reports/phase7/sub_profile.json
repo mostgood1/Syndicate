@@ -1,0 +1,152 @@
+{
+  "games": 618,
+  "by_type": {
+    "defensive_switch": 1614,
+    "defensive_substitution": 591,
+    "pitching_substitution": 3916,
+    "offensive_substitution": 1346
+  },
+  "by_inning": {
+    "defensive_switch": {
+      "7": 374,
+      "8": 530,
+      "9": 413,
+      "6": 147,
+      "10": 58,
+      "3": 17,
+      "4": 15,
+      "5": 47,
+      "11": 1,
+      "12": 2,
+      "2": 8,
+      "1": 2
+    },
+    "defensive_substitution": {
+      "7": 116,
+      "9": 170,
+      "4": 11,
+      "6": 40,
+      "10": 8,
+      "8": 200,
+      "5": 22,
+      "3": 17,
+      "11": 1,
+      "2": 5,
+      "1": 1
+    },
+    "pitching_substitution": {
+      "7": 910,
+      "8": 1008,
+      "9": 762,
+      "6": 641,
+      "3": 46,
+      "5": 276,
+      "2": 65,
+      "4": 116,
+      "10": 78,
+      "1": 8,
+      "11": 5,
+      "12": 1
+    },
+    "offensive_substitution": {
+      "7": 356,
+      "8": 390,
+      "6": 185,
+      "9": 309,
+      "10": 39,
+      "3": 8,
+      "5": 36,
+      "4": 14,
+      "11": 1,
+      "1": 2,
+      "2": 6
+    }
+  },
+  "by_slot": {
+    "4": 301,
+    "7": 499,
+    "8": 535,
+    "1": 312,
+    "2": 287,
+    "5": 385,
+    "9": 601,
+    "3": 276,
+    "6": 411
+  },
+  "by_score_band": {
+    "defensive_switch": {
+      "leading": 480,
+      "trailing": 494,
+      "leading_big": 203,
+      "trailing_big": 184,
+      "tied": 253
+    },
+    "defensive_substitution": {
+      "leading": 231,
+      "tied": 51,
+      "leading_big": 109,
+      "trailing": 94,
+      "trailing_big": 106
+    },
+    "pitching_substitution": {
+      "leading": 1347,
+      "trailing": 1127,
+      "leading_big": 471,
+      "trailing_big": 416,
+      "tied": 555
+    },
+    "offensive_substitution": {
+      "trailing": 661,
+      "leading": 244,
+      "trailing_big": 136,
+      "leading_big": 76,
+      "tied": 229
+    }
+  },
+  "by_position": {
+    "LF": 379,
+    "2B": 246,
+    "CF": 316,
+    "P": 3916,
+    "PH": 1135,
+    "DH": 182,
+    "3B": 203,
+    "PR": 211,
+    "C": 177,
+    "RF": 339,
+    "SS": 185,
+    "1B": 178
+  },
+  "per_team_rate": {
+    "Texas Rangers": 6.878048780487805,
+    "Houston Astros": 7.0,
+    "Pittsburgh Pirates": 5.880952380952381,
+    "Chicago Cubs": 5.642857142857143,
+    "Detroit Tigers": 6.658536585365853,
+    "Los Angeles Angels": 5.463414634146342,
+    "Chicago White Sox": 7.7317073170731705,
+    "Minnesota Twins": 6.609756097560975,
+    "Boston Red Sox": 4.609756097560975,
+    "Atlanta Braves": 5.380952380952381,
+    "Baltimore Orioles": 5.682926829268292,
+    "Toronto Blue Jays": 6.463414634146342,
+    "Washington Nationals": 6.225,
+    "San Diego Padres": 5.926829268292683,
+    "Kansas City Royals": 5.926829268292683,
+    "Tampa Bay Rays": 5.024390243902439,
+    "St. Louis Cardinals": 5.571428571428571,
+    "Seattle Mariners": 4.675,
+    "Arizona Diamondbacks": 5.4523809523809526,
+    "New York Mets": 5.785714285714286,
+    "Miami Marlins": 6.525,
+    "Los Angeles Dodgers": 6.2682926829268295,
+    "Philadelphia Phillies": 5.073170731707317,
+    "Milwaukee Brewers": 6.75,
+    "Colorado Rockies": 6.951219512195122,
+    "San Francisco Giants": 5.5,
+    "Cleveland Guardians": 6.55,
+    "Cincinnati Reds": 5.625,
+    "Athletics": 6.525,
+    "New York Yankees": 6.097560975609756
+  }
+}

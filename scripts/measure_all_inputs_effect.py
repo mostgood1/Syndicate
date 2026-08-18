@@ -129,6 +129,9 @@ def main() -> int:
     ap.add_argument("--games", type=int, default=45)
     ap.add_argument("--sims", type=int, default=120)
     ap.add_argument("--seed", type=int, default=2026)
+    ap.add_argument("--no-conditional-mix", action="store_true",
+                    help="omit the count x hand mix from the ON arm (the previous "
+                         "fully-fed configuration), to isolate its marginal effect")
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--json", type=Path, default=None)
     args = ap.parse_args()
@@ -139,6 +142,7 @@ def main() -> int:
     from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                              apply_batted_ball_to_pitcher)
     from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+    from sim_engine.data.conditional_mix import apply_conditional_mix_to_pitcher
     from sim_engine.data.quality import apply_quality
     from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
                                               default_bvp_cache)
@@ -165,7 +169,7 @@ def main() -> int:
 
     scored = defaultdict(lambda: defaultdict(list))
     counters = Counter()
-    applied_total = pitchers_total = 0
+    applied_total = pitchers_total = cond_applied = 0
 
     for date, path in jobs:
         odds = load_odds(date)
@@ -209,6 +213,13 @@ def main() -> int:
                         apply_batted_ball_to_pitcher(p_, season=args.season)
                         apply_arsenal_to_pitcher(p_, season=args.season)
                         apply_quality(p_, season=args.season, side="pitchers")
+                        # Count x hand conditional mix. Gated so the SAME harness
+                        # can isolate its marginal effect against the identical
+                        # market rows -- the arm without it is the previous
+                        # fully-fed configuration, not a different measurement.
+                        if not args.no_conditional_mix:
+                            if apply_conditional_mix_to_pitcher(p_, season=args.season):
+                                cond_applied += 1
                 # apply the builder's OWN applier -- this is what a rebuilt
                 # roster would carry, not a reimplementation
                 for r in (away, home):

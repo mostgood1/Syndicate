@@ -1,0 +1,44 @@
+{
+  "applied": 793,
+  "pitcher_slots": 806,
+  "counters": {
+    "scored": 2415,
+    "no_market": 931,
+    "no_actual": 305,
+    "no_pmf": 142
+  },
+  "rows": [
+    {
+      "market": "batter_hits",
+      "n": 659,
+      "splits_off": 0.23897266481200471,
+      "splits_on": 0.23785681166750972,
+      "market_brier": 0.2307738810588,
+      "improvement": 0.0011158531444949993
+    },
+    {
+      "market": "batter_rbis",
+      "n": 663,
+      "splits_off": 0.2189832621082621,
+      "splits_on": 0.217170060331825,
+      "market_brier": 0.2095920078491925,
+      "improvement": 0.0018132017764370956
+    },
+    {
+      "market": "batter_runs_scored",
+      "n": 651,
+      "splits_off": 0.2369665258576549,
+      "splits_on": 0.2367411247653183,
+      "market_brier": 0.23377344641826875,
+      "improvement": 0.00022540109233659678
+    },
+    {
+      "market": "batter_total_bases",
+      "n": 442,
+      "splits_off": 0.2588486676721971,
+      "splits_on": 0.2545959024635495,
+      "market_brier": 0.24509664735050207,
+      "improvement": 0.004252765208647591
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "counters": {
+    "records": 1750,
+    "no_actual": 415,
+    "no_name": 0,
+    "no_line": 570,
+    "no_model_prob": 0,
+    "graded": 740,
+    "push": 25
+  },
+  "rows": [
+    {
+      "leash": 0,
+      "method": "multiplicative",
+      "bets": 148,
+      "hit_rate": 0.5337837837837838,
+      "roi": 0.01928073997986194
+    },
+    {
+      "leash": 0,
+      "method": "power",
+      "bets": 148,
+      "hit_rate": 0.5337837837837838,
+      "roi": 0.01928073997986194
+    },
+    {
+      "leash": 3,
+      "method": "multiplicative",
+      "bets": 148,
+      "hit_rate": 0.5337837837837838,
+      "roi": 0.015626375941088917
+    },
+    {
+      "leash": 3,
+      "method": "power",
+      "bets": 148,
+      "hit_rate": 0.5405405405405406,
+      "roi": 0.028258573355895027
+    },
+    {
+      "leash": 4,
+      "method": "multiplicative",
+      "bets": 148,
+      "hit_rate": 0.5945945945945946,
+      "roi": 0.12401583628003754
+    },
+    {
+      "leash": 4,
+      "method": "power",
+      "bets": 148,
+      "hit_rate": 0.5945945945945946,
+      "roi": 0.12401583628003754
+    },
+    {
+      "leash": 5,
+      "method": "multiplicative",
+      "bets": 148,
+      "hit_rate": 0.5945945945945946,
+      "roi": 0.11838625393228719
+    },
+    {
+      "leash": 5,
+      "method": "power",
+      "bets": 148,
+      "hit_rate": 0.5945945945945946,
+      "roi": 0.11838625393228719
+    },
+    {
+      "leash": 6,
+      "method": "multiplicative",
+      "bets": 148,
+      "hit_rate": 0.5878378378378378,
+      "roi": 0.07882590797034873
+    },
+    {
+      "leash": 6,
+      "method": "power",
+      "bets": 148,
+      "hit_rate": 0.5878378378378378,
+      "roi": 0.07882590797034873
+    }
+  ]
+}

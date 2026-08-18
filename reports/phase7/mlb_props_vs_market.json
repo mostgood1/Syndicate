@@ -1,0 +1,49 @@
+{
+  "counters": {
+    "dates_used": 12,
+    "projection_rows": 43200,
+    "scored": 5437,
+    "no_market": 17867,
+    "line_mismatch": 18664,
+    "no_actual": 1232,
+    "dates_skipped": 1
+  },
+  "rows": [
+    {
+      "family": "hits",
+      "n": 1529,
+      "brier_market": 0.23315034224933,
+      "brier_model_raw": 0.2431753302812296,
+      "brier_model_cal": 0.2431753302812296,
+      "base_rate": 0.5742315238718116,
+      "verdict": "market wins"
+    },
+    {
+      "family": "hits_runs_rbis",
+      "n": 1305,
+      "brier_market": 0.24656254632851693,
+      "brier_model_raw": 0.46206896551724136,
+      "brier_model_cal": 0.46206896551724136,
+      "base_rate": 0.46206896551724136,
+      "verdict": "market wins"
+    },
+    {
+      "family": "runs",
+      "n": 1442,
+      "brier_market": 0.2308128060912862,
+      "brier_model_raw": 0.2323043876560333,
+      "brier_model_cal": 0.2323043876560333,
+      "base_rate": 0.3723994452149792,
+      "verdict": "market wins"
+    },
+    {
+      "family": "total_bases",
+      "n": 1161,
+      "brier_market": 0.24188087758191332,
+      "brier_model_raw": 0.24854229371231698,
+      "brier_model_cal": 0.24854229371231698,
+      "base_rate": 0.4272179155900086,
+      "verdict": "market wins"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "haircut": 0.8837313979266791,
+  "rows": [
+    {
+      "family": "hits",
+      "n": 515,
+      "base_rate": 0.5592233009708738,
+      "baseline": 0.25285830926707525,
+      "haircut_flat": 0.24875265234195748,
+      "haircut_slot": 0.24755450122034553,
+      "market": 0.23604460493014728,
+      "production": 0.2496490524271845,
+      "slot_minus_flat": 0.0011981511216119511
+    },
+    {
+      "family": "runs",
+      "n": 503,
+      "base_rate": 0.33399602385685884,
+      "baseline": 0.22603191059931768,
+      "haircut_flat": 0.22356032499562317,
+      "haircut_slot": 0.22352031786889884,
+      "market": 0.22477712142001305,
+      "production": 0.22384344930417494,
+      "slot_minus_flat": 4.000712672433404e-05
+    },
+    {
+      "family": "total_bases",
+      "n": 412,
+      "base_rate": 0.41019417475728154,
+      "baseline": 0.2651825862634747,
+      "haircut_flat": 0.2595272398762351,
+      "haircut_slot": 0.25668736416571303,
+      "market": 0.23854659670812653,
+      "production": 0.2448863519417476,
+      "slot_minus_flat": 0.0028398757105220773
+    }
+  ],
+  "counters": {
+    "no_market": 8859,
+    "scored": 1430,
+    "line_mismatch": 5460,
+    "no_actual": 685,
+    "dates_no_odds": 1
+  }
+}

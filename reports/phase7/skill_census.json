@@ -1,0 +1,75 @@
+{
+  "rows": [
+    {
+      "sport": "ncaaf",
+      "market": "margin",
+      "segment": "regular",
+      "n": 761,
+      "leak": "rating_source=cfbd_ppa_season_2025 supplies season-2025 ratings to a season-2025 game (in-sample)",
+      "crps_model": 11.287480151149255,
+      "crps_climatology": 11.484770885531695,
+      "skill": 0.017178464973209295,
+      "paired_mean_gain": 0.19729073438244393,
+      "paired_se": 0.08899169915359416,
+      "skill_lo": 0.001991071852396012,
+      "skill_hi": 0.03236585809402324,
+      "significant": true,
+      "verdict": "LEAKY \u2014 NOT CITABLE as skill"
+    },
+    {
+      "sport": "ncaaf",
+      "market": "total",
+      "segment": "regular",
+      "n": 761,
+      "leak": "rating_source=cfbd_ppa_season_2025 supplies season-2025 ratings to a season-2025 game (in-sample)",
+      "crps_model": 9.544911339329703,
+      "crps_climatology": 9.20845902669735,
+      "skill": -0.036537308973944915,
+      "paired_mean_gain": -0.3364523126323542,
+      "paired_se": 0.15461576549220363,
+      "skill_lo": -0.06944693038683501,
+      "skill_hi": -0.003627687561055054,
+      "significant": true,
+      "verdict": "LEAKY \u2014 NOT CITABLE as skill"
+    },
+    {
+      "sport": "nfl",
+      "market": "margin",
+      "segment": "regular",
+      "n": 273,
+      "crps_model": 7.715951389882429,
+      "crps_climatology": 7.9713400152960565,
+      "skill": 0.03203835552411105,
+      "paired_mean_gain": 0.2553886254136323,
+      "paired_se": 0.0857349813101902,
+      "skill_lo": 0.010957763924013895,
+      "skill_hi": 0.05311894712420931,
+      "significant": true,
+      "verdict": "BEATS climatology"
+    },
+    {
+      "sport": "nfl",
+      "market": "total",
+      "segment": "regular",
+      "n": 273,
+      "crps_model": 7.795774852159483,
+      "crps_climatology": 7.769190516443259,
+      "skill": -0.003421763909632558,
+      "paired_mean_gain": -0.026584335716216937,
+      "paired_se": 0.12408966362181632,
+      "skill_lo": -0.034726922430844395,
+      "skill_hi": 0.02788339461158137,
+      "significant": false,
+      "verdict": "INDISTINGUISHABLE from climatology"
+    },
+    {
+      "sport": "nhl",
+      "market": "team_goals",
+      "segment": "full_game",
+      "n": 10,
+      "verdict": "unmeasured",
+      "reason": "n=10 < min_n=30"
+    }
+  ],
+  "unmeasured": []
+}

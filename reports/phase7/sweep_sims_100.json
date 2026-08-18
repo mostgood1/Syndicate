@@ -1,0 +1,65 @@
+{
+  "grid": [
+    0,
+    5
+  ],
+  "sims": 100,
+  "dates": [
+    "2026-06-15",
+    "2026-06-16",
+    "2026-06-17",
+    "2026-06-18",
+    "2026-06-19",
+    "2026-06-20",
+    "2026-06-21",
+    "2026-06-22",
+    "2026-06-23",
+    "2026-06-24",
+    "2026-06-25",
+    "2026-06-26",
+    "2026-06-27"
+  ],
+  "actual_p_short": 0.26591760299625467,
+  "rows": [
+    {
+      "leash": 0,
+      "sim_p_short": 0.23936329588014985,
+      "sample_size": 267,
+      "min_sample": 30,
+      "verdict": "measured",
+      "crps_empirical": 2.3894,
+      "crps_empirical_n": 267,
+      "crps_normal_approx": 2.39,
+      "crps_normal_n": 267,
+      "normal_minus_empirical": 0.0006,
+      "mean_signed_error": -1.4699,
+      "mean_absolute_error": 3.1852,
+      "dispersion_ratio": 0.7913,
+      "expected_dispersion_ratio": 0.7979,
+      "dispersion_verdict": "sigma_calibrated",
+      "baseline_constant_mae": 3.0912,
+      "beats_constant_baseline": false,
+      "sim_draws_median": 100
+    },
+    {
+      "leash": 5,
+      "sim_p_short": 0.08808988764044935,
+      "sample_size": 267,
+      "min_sample": 30,
+      "verdict": "measured",
+      "crps_empirical": 2.511,
+      "crps_empirical_n": 267,
+      "crps_normal_approx": 2.5325,
+      "crps_normal_n": 267,
+      "normal_minus_empirical": 0.0215,
+      "mean_signed_error": -2.1973,
+      "mean_absolute_error": 3.3515,
+      "dispersion_ratio": 1.0024,
+      "expected_dispersion_ratio": 0.7979,
+      "dispersion_verdict": "sigma_too_narrow",
+      "baseline_constant_mae": 3.0912,
+      "beats_constant_baseline": false,
+      "sim_draws_median": 100
+    }
+  ]
+}

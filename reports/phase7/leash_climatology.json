@@ -1,0 +1,41 @@
+{
+  "n_starts": 267,
+  "crps_climatology": 2.192652442873378,
+  "rows": [
+    {
+      "leash": 0,
+      "n": 267,
+      "crps_model": 2.3894258426966255,
+      "crps_climatology": 2.192652442873378,
+      "skill_score": -0.08974217526485151
+    },
+    {
+      "leash": 3,
+      "n": 267,
+      "crps_model": 2.411416853932585,
+      "crps_climatology": 2.192652442873378,
+      "skill_score": -0.09977158567480293
+    },
+    {
+      "leash": 4,
+      "n": 267,
+      "crps_model": 2.4355217228464414,
+      "crps_climatology": 2.192652442873378,
+      "skill_score": -0.11076506026408528
+    },
+    {
+      "leash": 5,
+      "n": 267,
+      "crps_model": 2.510958426966294,
+      "crps_climatology": 2.192652442873378,
+      "skill_score": -0.14516937471211344
+    },
+    {
+      "leash": 6,
+      "n": 267,
+      "crps_model": 2.858472284644196,
+      "crps_climatology": 2.192652442873378,
+      "skill_score": -0.30365954437279163
+    }
+  ]
+}
