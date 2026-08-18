@@ -84,7 +84,41 @@ checklist, 9 mirrored dates, 10 team-sides, 297 players):**
   the most bettor-differentiating dimensions in hockey and currently carries
   zero team-level signal anywhere in the props engine.
 
-### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, NOT FIXED
+### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, FIXED AND PUSHED (`fcfb1e62`)
+
+**Fix shipped**: added `team_advanced_stats_*.csv` (both directory-nesting
+variants) and the four calibration JSON filenames
+(`smart_sim_total_calibration.json`, `intervals_band_calibration.json`,
+`intervals_time_profile.json`, `player_stat_calibration.json`, also both
+variants) to `HOT_ARTIFACT_PATTERNS`. The calibration files are currently
+ABSENT for both leagues (Sec5 of the reference doc — unwired builders) and
+were allowlisted anyway, per `model_engine_standard.md` Sec3: allowlisting
+PERMITS a transfer, it does not require the file to exist first.
+`player_logs`/`player_priors` (also named in the original grep below) turned
+out not to be separate artifacts — priors are computed in-memory per call
+from `boxscores_history.csv`, already allowlisted for WNBA and deliberately
+excluded for NBA (rides the git+bootstrap lane instead, confirmed
+git-tracked at `data/nba_source/source_artifacts/data/processed/
+boxscores_history.csv`) — so no new pattern was needed for either name.
+Verified `scripts/basketball_sim_input_checklist.py` still runs clean
+end-to-end after the change (same single pre-existing `#461`-mirror alarm,
+unrelated to this fix).
+
+**Cross-lane collision hit and resolved while shipping this**: the edit was
+blocked by `lane-guard.py` five separate times against five different stale
+or self-inflicted claims on the same file (`nhl-model-owner`'s own claim,
+released via live cross-session coordination; `clv-without-settlement`, an
+ORPHANED lane with two separate stale claims 340 lines apart; and this
+lane's own explanatory prose about being blocked, which itself re-claimed
+the file and in turn blocked `football-model-owner`). Root mechanism: the
+guard's parser extracts any slash-bearing token from a `Files:`-block
+continuation line regardless of what the surrounding prose says — a
+"RELEASED"/"NOT claimed" note in English does not clear a claim, only
+removing the literal path token does. Fixed in `lanes.md`
+(`118a5087`) by de-linking the literal path in all five locations without
+deleting any of the underlying history.
+
+Original finding, unchanged:
 
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec7,
 `docs/ai_context/basketball_model_inventory.md`. Gate:
