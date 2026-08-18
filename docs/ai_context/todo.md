@@ -1,5 +1,76 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web: no web code path emits `ALL_PROCESS_MEMORY`, so every web deploy requires a break-glass — and a guard broken on every use is not a guard** — FOUND AND MEASURED 2026-08-18, lane `repo-coordination`, ROOT CAUSE CONFIRMED BY CALLER TRACE (a first hypothesis was WRONG — see below)
+
+**Symptom, measured on the live receipt** `.syndicate/deploy/preflight/web.json`,
+2026-08-18 22:0xZ, holder `convergence-phase7-crps`:
+
+    verdict UNKNOWN   reason: sample is 356656s old (limit 180s)
+
+356,656s is **4.1 days**. It is a FROZEN sample, not a slow one: the football
+lane read the same sample as "3.9 days old" at ~18:4xZ the same day, and
+3.9 days + the ~3.2h between the two readings ≈ 4.1. It only ages. `deploy-guard.py`
+requires a CLEAR within 15 min, so **the guard is permanently unsatisfiable on
+web** and every web deploy today needs a break-glass grant.
+
+**ROOT CAUSE — nothing on the web path CALLS the emitter.** `log_all_process_memory`
+(`syndicate/features/shared/memory_observability.py:1944`, which prints the
+`ALL_PROCESS_MEMORY` line at :1952) has callers in exactly four places, all of
+them worker-side:
+
+    scripts/run_refresh_worker.py            (refresh-worker)
+    scripts/run_live_odds_refresh_worker.py  (live-odds-worker)
+    scripts/refresh_odds_sources.py          (worker/offline orchestrator)
+    pipeline/intelligence_state.py           (worker-owned loop)
+
+`syndicate/app.py`, `wsgi.py` and every file under `syndicate/blueprints/` have
+**zero** occurrences. Web runs `gunicorn wsgi:application` — it never executes
+any of the four. This is a straightforward consequence of the worker-split rule
+in `CLAUDE.md` (web does no heavy computation, so nobody instrumented it); the
+preflight tool was simply built against an instrument that only workers carry.
+
+**A FIRST HYPOTHESIS WAS WRONG AND IS RECORDED BECAUSE IT IS THE MORE TEMPTING
+ONE.** The same `/api/ops/memory` payload carries
+`"psutil_available": false, "errors": ["psutil_unavailable:ImportError"]`, and
+`psutil` is genuinely absent from every `requirements*.txt`. I concluded from
+that pair that the missing dependency was the cause. **It is not.** The
+enumeration debug block also shows `procfs_iterated_count: 4` against
+`psutil_iterated_count: 0` — the procfs fallback enumerated **all four**
+processes successfully, cmdlines and RSS included. psutil's absence degrades
+nothing that this symptom depends on. Installing psutil on web would NOT make
+preflight work. The discriminating evidence was the CALLER TRACE, not the
+endpoint payload — *check that the line is emitted before concluding it is lost*.
+
+**THE DATA IS ALREADY AVAILABLE THROUGH A WORKING CHANNEL.** `GET /api/ops/memory`
+on live web returns a complete, FRESH enumeration — verified 2026-08-18 22:0xZ,
+4 processes (1 entrypoint bash, 1 gunicorn master, 2 gunicorn workers), every
+one identified by cmdline, 0 job processes. It is only the *log-line* channel
+that is absent. This is what makes the item cheap.
+
+**Two fixes, either sufficient; the second is better:**
+
+1. Emit `ALL_PROCESS_MEMORY` periodically from the web app. Rejected as the
+   default — it puts recurring work on the request path, which the worker-split
+   rule exists to prevent, and `#241` already caused a production restart loop
+   by adding periodic worker work.
+2. **Teach `deploy_preflight.py` to read `/api/ops/memory` for web** instead of
+   scraping logs for `ALL_PROCESS_MEMORY`. The endpoint already returns exactly
+   what the verdict needs (process list + cmdlines), it is fresh, and it is
+   *already what every break-glass on web does by hand* — the football lane at
+   18:3xZ and this lane at 22:0xZ both substituted precisely this reading. The
+   fix is to make the break-glass path the NORMAL path for web.
+
+**Do NOT "fix" this by widening `--max-sample-age-seconds`.** It was proposed
+once and refused as vacuous, correctly: it manufactures no evidence, it relabels
+absence as permission — the `unknown must not default permissive` failure.
+
+**What is NOT established:** whether live-odds-worker has the same gap. It has a
+caller (`run_live_odds_refresh_worker.py:541,604`) but those are `startup` and
+`before_exit` only, so its sample could be arbitrarily stale between boots
+without anyone noticing. refresh-worker is the only service PROVEN to emit
+continuously (positive control: 7-16s sample age, measured twice on 2026-08-18).
+Check live-odds-worker before assuming its preflight means anything.
+
 ### `#464` — **WNBA's player-priors population rate (56.1%) is meaningfully below NBA's (82.7%) -- explained and measured, root cause is mirror historical depth not the algorithm; production CONFIRMED to match the mirror, so this is a permanent characteristic** — FOUND, MEASURED, AND CLOSED 2026-08-18, lane `basketball-model-owner`, EXPECTED_SPARSE not a defect
 
 **Open question resolved same day, Render back up:** queried
