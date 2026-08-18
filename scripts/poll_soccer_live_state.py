@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from datetime import date as date_cls
 from pathlib import Path
 from typing import Any
@@ -208,6 +209,40 @@ def poll_active_leagues_for_tick(
             )
         except Exception as error:
             errors[league] = f"{type(error).__name__}: {error}"
+            # A SWALLOWED LEAGUE WAS INDISTINGUISHABLE FROM AN INACTIVE ONE, and
+            # on this path those are opposites.
+            #
+            # This is the handler that hid the 2026-08-17 outage. `poll_league`
+            # raised `TypeError: _load_team_ratings() missing 1 required
+            # positional argument: 'as_of'` (fixed in `6bdc50de`) and it was
+            # caught here, recorded into `errors`, and never seen: that dict
+            # reaches only `data/live/soccer_live_lens.json`, which is NOT in
+            # `artifact_publisher`'s allowlist, so it is unreadable from web.
+            #
+            # WHY IT WAS TOTAL AND STILL INVISIBLE: everything expensive in
+            # `poll_league` sits behind `if live_events:`, so only a league WITH a
+            # match in play can reach the throwing code. Production wrote
+            # `(0 live games)` for SEVEN leagues while `active_leagues_for_date`
+            # returned TEN, and the three missing were exactly the three with
+            # matches in play. The soccer live lens read "Live matches: 0 /
+            # Source: No data" for all of them. Nothing in any log said why.
+            #
+            # The tick still reported `ok: true` throughout, because
+            # `validate_live_lens_snapshot` accepts an EMPTY games list. Three
+            # instruments read healthy while the feature was dead.
+            #
+            # print, not logger.info: `logger.info` does not reach Render's
+            # collector (CLAUDE.md). flush=True because stdout is block-buffered
+            # off a tty and an exception path is exactly where a buffered line is
+            # lost. Traceback included because the exception message alone names
+            # the callee, not the CALL SITE -- and the call site was the bug.
+            print(
+                f"[soccer_live_state] LEAGUE_POLL_FAILED league={league} "
+                f"date={iso_date} error={type(error).__name__}: {error}",
+                flush=True,
+            )
+            traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
             continue
         league_games = payload.get("games") if isinstance(payload, dict) else None
         if isinstance(league_games, dict) and league_games:
