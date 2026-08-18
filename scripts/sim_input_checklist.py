@@ -66,6 +66,16 @@ EXPECTED_SPARSE = {
     "batted_ball_source": "provenance stamp, only when the blend is enabled",
     "batted_ball_bbe": "same",
     "batted_ball_weight": "same",
+    # BVP is SPARSE BY NATURE, not by defect. A batter only has history against
+    # starters he has actually faced, so ~14% coverage is the correct answer and
+    # 100% would be impossible. Measured 13.9% after the 2026-08-18 cache fix.
+    # Listing these matters: a checklist that flags correct behaviour as FAILURE
+    # gets ignored, and then it misses the real ones.
+    "vs_pitcher_hr_mult": "batter has history only vs starters actually faced",
+    "vs_pitcher_k_mult": "same",
+    "vs_pitcher_bb_mult": "same",
+    "vs_pitcher_inplay_mult": "same",
+    "vs_pitcher_history": "same",
 }
 SPARSE_FLOOR = 0.20
 POPULATED_FLOOR = 0.50
@@ -112,6 +122,11 @@ def main() -> int:
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--warn-only", action="store_true",
                     help="report without failing, for exploratory runs")
+    ap.add_argument("--simulate-rebuild", action="store_true",
+                    help="apply the BUILD-TIME appliers before auditing. Without this the "
+                         "checklist can only see what was SERIALISED -- i.e. history. Archived "
+                         "rosters were written before any current wiring existed, so a plain run "
+                         "reports the pre-wiring state forever and cannot validate a fix.")
     ap.add_argument("--publish", action="store_true",
                     help="write the report into the artifact tree so PRODUCTION can be audited. Roster objects are not allowlisted (hundreds of large files per date); the worker runs this and publishes the bounded result instead -- the book_grid pattern.")
     args = ap.parse_args()
@@ -130,11 +145,49 @@ def main() -> int:
     bdef = {f.name: f.default for f in fields(BatterProfile)}
     pdef = {f.name: f.default for f in fields(PitcherProfile)}
 
+    if args.simulate_rebuild:
+        # Everything the real build applies, in the same order. BVP is applied by
+        # `daily_update.py:7564` -- NOT by build_roster -- which is why it needs
+        # its own call here; see the provenance table in
+        # docs/ai_context/mlb_sim_engine_reference.md.
+        from datetime import date as _date
+        from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
+                                                 apply_batted_ball_to_pitcher)
+        from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+        from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
+                                                  default_bvp_cache)
+        from sim_engine.data.statcast_pitch_splits import default_statcast_cache
+        _sc, _bc = default_statcast_cache(), default_bvp_cache()
+
     for path in paths:
         try:
             roster = read_game_roster_artifact(Path(path))
         except Exception:
             continue
+        if args.simulate_rebuild:
+            for _bat, _pit in (("away", "home"), ("home", "away")):
+                try:
+                    apply_starter_bvp_hr_multipliers(
+                        batting_roster=roster[_bat],
+                        pitcher_id=int(roster[_pit].lineup.pitcher.player.mlbam_id),
+                        season=2026, start_date=_date(2026, 3, 1),
+                        end_date=_date(2026, 7, 30), cache=_bc)
+                except Exception:
+                    pass
+            for _side in ("away", "home"):
+                _lu = roster[_side].lineup
+                for _b in list(_lu.batters) + list(_lu.bench or []):
+                    try:
+                        apply_batted_ball_to_batter(_b, season=2026, weight=0.35)
+                    except Exception:
+                        pass
+                for _p in [_lu.pitcher] + list(_lu.bullpen or []):
+                    try:
+                        _apply_cached_statcast_pitch_splits(
+                            _p, season=2026, statcast_cache=_sc, statcast_ttl_seconds=None)
+                        apply_batted_ball_to_pitcher(_p, season=2026)
+                    except Exception:
+                        pass
         for side in ("away", "home"):
             lineup = roster[side].lineup
             for b in list(lineup.batters) + list(lineup.bench or []):
@@ -167,6 +220,8 @@ def main() -> int:
             sparse = name in EXPECTED_SPARSE
             bucket = None
             if is_consumed and pct == 0.0:
+                # zero is a failure even for an expected-sparse field: "sometimes
+                # absent" and "never present" are different claims.
                 status, bucket = "FAIL  consumed but NEVER populated", failures
             elif is_consumed and pct < SPARSE_FLOOR and not sparse:
                 status, bucket = "FAIL  consumed, almost never populated", failures

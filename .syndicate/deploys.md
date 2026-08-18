@@ -14667,3 +14667,51 @@ settled it took one call: compute the value fresh and compare.**
 `learnings.md` already carries "measure population, never infer from presence"
 for MODEL FIELDS. **It applies identically to CACHES**, and a TTL makes it worse:
 an empty result caches as authoritative and hides the corpus that would fill it.
+
+## 2026-08-18 — STALE BVP CACHE DELETED. Checklist gains `--simulate-rebuild`. **FAIL: 26 -> 5.**
+
+Lane `convergence-phase7-crps`. Local only, no deploy.
+
+**Deleted 1,282 empty BVP cache files.** The namespace has repopulated from the
+raw corpus.
+
+### The checklist had a real limitation, now fixed
+
+A plain run audits **stored artifacts**, so it can only ever see what was
+SERIALISED — i.e. history. Archived rosters were written before any current
+wiring existed, so it reported **26 forever** and could not validate a fix.
+
+`--simulate-rebuild` applies the build-time appliers before auditing, so it
+reports **what a rebuild would produce**. It must call BVP separately because
+`daily_update.py:7564` applies it, not `build_roster` — the trap already
+documented in the provenance table.
+
+    plain run          26 failures   (pre-wiring history)
+    --simulate-rebuild  5 failures   (what a rebuild produces)
+
+### A checklist that flags CORRECT behaviour as failure gets ignored
+
+The first `--simulate-rebuild` run reported **9**, of which **4 were BVP at
+13.9%** — flagged only because that is under the 20% sparse floor.
+
+**13.9% is the correct answer, not a defect.** A batter only has history against
+starters he has actually faced; 100% is impossible. The five `vs_pitcher_*`
+fields are now documented in `EXPECTED_SPARSE` with that reason.
+
+**But sparsity is not immunity:** a field at exactly 0.0% still FAILS even when
+expected-sparse. *"Sometimes absent"* and *"never present"* are different claims,
+and only the second is a wiring defect.
+
+### FINAL STATE — 5 genuinely unfed, all with known causes
+
+    batter   statcast_quality_mult    no producer anywhere in the repo
+    batter   vs_pitch_type            artifact is PITCHER-side only
+    batter   vs_pitch_type_hr         same
+    pitcher  pitch_type_hr_mult       PitcherPitchSplits has no hr_mult
+    pitcher  statcast_quality_mult    no producer anywhere in the repo
+
+**Gate still exits 1**, correctly — five consumed fields remain unfed and the
+checklist should keep failing until they are fed or explicitly excused.
+
+**Nothing here is deployed.** The 5 are the honest remaining surface; the earlier
+26 was the pre-wiring state and should not be quoted as current.
