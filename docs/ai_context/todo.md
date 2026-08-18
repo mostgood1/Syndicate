@@ -1,6 +1,18 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#464` — **WNBA's player-priors population rate (56.1%) is meaningfully below NBA's (82.7%) -- explained and measured, root cause is mirror historical depth not the algorithm; whether Render's live disk has the same gap is UNVERIFIED** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, EXPECTED_SPARSE not a defect, one question open
+### `#464` — **WNBA's player-priors population rate (56.1%) is meaningfully below NBA's (82.7%) -- explained and measured, root cause is mirror historical depth not the algorithm; production CONFIRMED to match the mirror, so this is a permanent characteristic** — FOUND, MEASURED, AND CLOSED 2026-08-18, lane `basketball-model-owner`, EXPECTED_SPARSE not a defect
+
+**Open question resolved same day, Render back up:** queried
+`/api/ops/artifacts/export?path=wnba_source/source_artifacts/data/processed/boxscores_history.csv`
+on production directly (`X-Admin-Token`, from `.env`) — live disk returns
+**415,038 bytes, 3838 data rows, 2026-04-25..2026-07-07**, matching this
+checkout's git-tracked mirror (418,877 bytes, same date range) almost byte
+for byte. Production does NOT carry deeper WNBA history than the mirror.
+This closes the open question from the same day's earlier write-up:
+`2026-04-25` is WNBA's genuine full captured history in this pipeline, not
+a mirror-refresh gap. No fix needed or possible without a real WNBA
+historical-data backfill (out of scope for this lane) — this is a
+permanent, documented characteristic, not a bug.
 
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec3.
 Gate: `py -3 scripts/basketball_sim_input_checklist.py` Level 1 (both leagues

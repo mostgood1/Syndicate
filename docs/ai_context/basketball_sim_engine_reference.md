@@ -446,16 +446,18 @@ recorded as an open item (Sec6) rather than fixed, per the lane's scope.
    wrong number) but recorded because "builder exists, never runs" is exactly
    football's `#457` shape and worth a deliberate decision rather than
    quietly staying that way.
-4. **Investigated and explained, 2026-08-18** (Sec3): the WNBA/NBA
+4. **Investigated, explained, and CLOSED, 2026-08-18** (Sec3): the WNBA/NBA
    player-priors gap (56.1% vs 82.7%) is entirely in the prior-season
    fallback pool (WNBA 15.9% vs NBA 82.3%; current-window rating quality is
    equal, 86.3% vs 84.3%) — caused by WNBA's `boxscores_history.csv` mirror
    covering only 2026-04-25 onward (no prior season) vs NBA's 2023-2026.
-   Classified EXPECTED_SPARSE, not a code defect. **Still open**: whether
-   Render's live disk carries deeper WNBA history than this git-tracked
-   mirror (unverified, 502 throughout this session) — if so this is a
-   mirror-refresh-scope fix; if not, it is a permanent, documented
-   characteristic. Filed as `todo.md` `#464`.
+   Classified EXPECTED_SPARSE, not a code defect. **Production check, same
+   day, once Render came back up**: `/api/ops/artifacts/export?path=...`
+   against the live disk returned 415,038 bytes / 3838 rows / the same
+   2026-04-25..2026-07-07 range as this checkout's mirror — production does
+   NOT carry deeper WNBA history. `2026-04-25` is confirmed WNBA's genuine
+   full captured history in this pipeline, a permanent characteristic, not a
+   mirror-refresh gap. Filed and closed as `todo.md` `#464`.
 5. **Not investigated in this pass**: `_simulate_pbp_game_boxscore_local`'s
    fallback reachability independent of the game-level fallback (Sec2, last
    bullet) — same import mechanism is likely but not confirmed to behave
