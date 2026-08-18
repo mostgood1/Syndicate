@@ -2375,3 +2375,40 @@ this.
 line `deploy_preflight.py:parse_processes` can parse into `{pid, ppid, rss, cmd}`.
 Re-adding the periodic call must respect the standing rule that **worker periodic
 work is never free** (`#241` caused a production restart loop; ~1.4GB headroom).
+
+## RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
+
+**Supersedes the CORRECTION section immediately above.** That section says the
+`ALL_PROCESS_MEMORY` emitter was deleted from `memory_observability.py`.
+**It was not. It is intact on main**, byte-identical to the 420-commit-old worker:
+
+    memory_observability.py:1944  def log_all_process_memory(...)
+    memory_observability.py:1952  print(f"ALL_PROCESS_MEMORY {json.dumps(...)}",
+                                        file=sys.stderr, flush=True)
+
+**HOW I GOT IT WRONG:** `git grep -l 'ALL_PROCESS_MEMORY' origin/main -- '*.py'`
+piped through `head -4` returned four `scripts/` paths. **I read a TRUNCATED list
+as an EXHAUSTIVE one** and concluded the file was absent from it.
+
+**FOUR ROOT CAUSES CLAIMED FOR ONE SYMPTOM, THREE OF THEM WRONG:**
+
+    1. "the sampler is broken"        NO
+    2. "psutil is not installed"      NO -- real, but incidental; procfs works
+    3. "the emitter was deleted"      NO -- it is at :1952, intact
+    4. actual cause                   **UNKNOWN. Do not add a fifth guess.**
+
+**WHAT IS ACTUALLY ESTABLISHED**, and it is only this:
+- the emitter exists and prints when called;
+- `log_all_process_memory()` is called from live-lens loops,
+  `scripts/refresh_odds_sources.py`, and elsewhere;
+- **refresh-worker emits every ~17s. Web has not emitted since 2026-08-14.**
+
+**THE QUESTION IS WHICH CALLER RUNS ON WEB AND WHY IT STOPPED** — not whether the
+code exists. First place to look: **loop ownership moves between services via env
+flags with NO DIFF** (`_mlb_refresh_tick_owner_here` and friends), which is
+already a recorded trap. A web-side caller may simply have been handed to a
+worker.
+
+**DO NOT ACT ON A CAUSE FROM THIS FILE UNTIL SOMEONE TRACES THE CALL SITES.**
+Acting on cause 2 would have shipped a `psutil` dependency that fixed nothing and
+looked exactly like a fix.

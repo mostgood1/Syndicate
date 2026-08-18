@@ -15886,3 +15886,5 @@ synchronous, checkable the moment the deploy finishes.
 
 MEASUREMENT: <pending -- fill in after deploy + verification curl>
 REMINDER: verify within 15 min of deploy finishing, ~22:5xZ.
+
+**RETRACTION 2026-08-18:** the "deleted emitter" cause recorded above is **WRONG**. The emitter is INTACT at `memory_observability.py:1952`, byte-identical to the old worker's. I read a `head -4` truncated grep as an exhaustive one. **Three causes have now been claimed and refuted for this one symptom (broken sampler / missing psutil / deleted emitter); the real cause is UNKNOWN.** What is established: the emitter exists, refresh-worker emits every ~17s, web has not since 2026-08-14. The open question is WHICH CALLER runs on web and why it stopped. See the RETRACTION section in `state.md`. **Do not act on a cause from these files until the call sites are traced.**
