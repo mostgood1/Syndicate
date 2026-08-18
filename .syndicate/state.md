@@ -2072,3 +2072,29 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
 - **`ODDS_SWEEP_LAUNCHED` now exists** — before it, every launch-side print was a
   `*_FAILED` variant and a successful launch was invisible.
 
+
+## MLB CONDITIONAL PITCH MIX — MECHANISM VALIDATED, MARKET SILENT `[2026-08-18]`
+
+- **Engine picks pitches by count bucket and batter hand**, not one season vector.
+  `simulate.py` both selection sites; artifact
+  `data/conditional_mix/conditional_mix_<season>.json`; Dirichlet shrinkage
+  toward (own season mix x league cell tilt), **k fitted out-of-sample**, builder
+  REFUSES to write if it loses to either baseline.
+- **VALIDATED ON REAL GAMES, no RNG anywhere**: out-of-sample (built through
+  06-30, scored on games from 07-01), **395/512 pitchers (77.1%)** beat the
+  season vector; log-loss **-6.21%**; within-count TVD median 0.3064 -> 0.2542.
+  **Reproducible to the digit.**
+- **MARKET: NO DETECTABLE EFFECT.** Two seed pairs at 1920 sims: mean -0.00097
+  and +0.00001. **Measured** noise floor 0.00064; effect/floor **0.75**.
+  Resolving it needs ~112x the original volume for <=0.0005 Brier. **Not worth
+  buying.** Both statements are true — the engine pitches like reality, and the
+  price does not notice.
+- **THE SWEEPER HAD NO HOME.** `ST` (8.20% of pitches) mapped to `OTHER` or was
+  DROPPED in all three code->PitchType maps. **34.5% of pitchers lost a pitch
+  type carrying ~23.8 usage points** — often their primary breaking ball. One map
+  now: `sim_engine/data/pitch_codes.py`. Appliers merge on collision —
+  **probabilities SUM, multipliers AVERAGE by usage.**
+- **`GameConfig.crn_pa_seeding` IS BROKEN — DO NOT ENABLE.** Inflates run scoring
+  8-35%. Default off, marked in place.
+- **The market harness cannot resolve <~0.003 Brier at 120 sims.** Never report a
+  single-seed delta from it as a result.
