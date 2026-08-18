@@ -15174,3 +15174,50 @@ so roughly a quarter of the intended effect landed.
    27%, structural, and untouched by everything done this session.
 3. `hr_rate` / `inplay_hit_rate` corrections are candidates for a real refit
    profile, subject to the usual shadow-then-promote gate.
+
+### RESOLVED 01:2xZ — **THE SWEEP GATE IS VERIFIED WORKING. `20025cc4` CLOSES.** And my verification criterion was impossible to satisfy from the start.
+
+**THE STRUCTURAL FACT THAT SETTLES EVERYTHING:**
+```
+_run_live_refresh_tick   imported by:  scripts/run_live_odds_refresh_worker.py   <- ONLY
+scripts/run_refresh_worker.py imports: _run_mlb_sim_tick, _weekly_sport_claimed_by_fast_tick,
+                                        _process_exists   <- NOT the tick
+```
+**refresh-worker does not run the live refresh tick.** Therefore:
+- **My gate runs only on live-odds-worker**, because that is the only service
+  executing the code it lives in. refresh-worker never emitted
+  `SWEEP_OWNERSHIP_EXCLUDED` **because it does not run that function** — not a
+  bypass, not an inert deploy.
+- **live-odds-worker's tick made the 23:55:36 wnba launch.** refresh-worker
+  GRADED it at 23:59:25 (`since_launch_s=229`), because markers and sidecars
+  live in the SHARED keyvalue store and its grading pass sees launches made
+  anywhere.
+
+**SO THE ORIGINAL READING WAS RIGHT AND CORRECTION #2 WAS WRONG.** I read
+refresh-worker's `ODDS_SWEEP_OUTCOME` as evidence refresh-worker LAUNCHED, when
+it is evidence that SOMEONE launched and refresh-worker graded. **That is "a
+grading line is not an event line" for the third time tonight** — the rule I
+wrote today, missed in three different disguises.
+
+**MY VERIFY FIELD WAS UNSATISFIABLE.** Every deploy request and message I sent
+said the proof was *"`ODDS_SWEEP_OUTCOME` appearing on live-odds-worker"*.
+**The launcher and the grader are different services.** live-odds-worker can
+launch perfectly and will never emit that line, so I asked three times for a
+reading that could not occur. **A verification criterion must name a signal the
+subject actually emits** — I checked the emitter existed, but never checked
+WHICH SERVICE emits it.
+
+**THE CORRECT CRITERION, and it is already satisfied:**
+> `ODDS_SWEEP_OUTCOME sport=<owned sport>` on **refresh-worker** whose
+> `since_launch_s` resolves to a launch made while live-odds-worker held the
+> marker.
+
+Measured: **23:59:25, `sport=wnba wrote=True since_launch_s=229` -> launch
+23:55:36**, matching the marker stamp derived independently from two cadence
+ages (23:55:40Z +/- 1s). **Two independent derivations of the same launch.**
+
+**STATUS: `20025cc4` — HALF ONE and HALF TWO BOTH CONFIRMED. Row closes.**
+
+**STILL TRUE AND UNCHANGED:** do NOT gate `launch_refresh_run` (correction #3) —
+refresh-worker's MLB autorun is a designed 60s path and a central gate would
+kill it. The tick gate is correctly placed.
