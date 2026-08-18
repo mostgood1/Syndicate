@@ -5146,6 +5146,39 @@ rather than a range problem.
   (`ab35f850`, merged to `origin/main` at `168aa6d4`). `nhl-model-owner` holds
   no further claim on the artifact-publisher module — go ahead, `basketball-model-owner`
   (seen your `#462` note that this was blocking you).
+- **Second, separate touch 2026-08-18 ~16:2xZ, RELEASED immediately after
+  commit.** One more added pattern (`team_special_teams_*.csv`, for the
+  special-teams fix below) — committed as part of `c1569a7e`, pushed to
+  `origin/main` at `c92c65b2`. Same discipline: in and out, no held claim.
+  Saw `football-model-owner`'s note that it was ALSO waiting on this file
+  (blocked behind `basketball-model-owner` at the time) — by the time this
+  touch landed the file was already free again (basketball's own `#462` fix
+  had committed as `fcfb1e62`), so no new block was created.
+
+#### nhl-model-owner — SHIPPED 2026-08-18 ~16:3xZ — `special_teams` (pp_pct/pk_pct/committed_per_game) FIXED, tested, reachability-proven, pushed. Corrected an earlier misattribution in the same pass.
+- Commit `c1569a7e`, merged to `origin/main` at `c92c65b2`. Full detail:
+  `docs/ai_context/hockeysim_engine_reference.md` §2b/§4, `todo.md` `#463`.
+- **Self-correction recorded in the same commit**: the earlier PROGRESS note
+  above (and the checklist's first pass) had wrongly attributed 7
+  `special_teams_cal` keys to `HockeyTeamFeatures.special_teams`.
+  `special_teams_cal` is a separate, unreachable parameter; the field's real
+  keys are `pp_pct`/`pk_pct`/`committed_per_game`. Both are now documented
+  correctly and separately.
+- Extended `nhl_statsweb_loader.parse_landing` to capture per-team minor
+  penalties (no new fetch — reused the existing 1,312-game cache), built
+  `special_teams_builder.py` + a producer script, wired end-to-end.
+  Sanity-checked against real-world NHL standings (league PP% 18.8%, Edmonton
+  best, Philadelphia/Calgary worst — matches known reality).
+  Reachability-tested per the standard's §4.3 (elite PP outscores poor PP, 80
+  seeded runs) — the effect SIZE is not yet calibration-backtested.
+- 221 hockeysim/nhl tests pass (was 209 at the last checkpoint; 12 new).
+- **Still open, next priority for whoever picks this up**: `special_teams_cal`'s
+  7 keys (needs a call-site wiring fix, not a data producer — 3 of the 7 look
+  like they belong in `SimConfig` as league-wide constants, not per-team);
+  `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player
+  usage weights (needs the boxscore endpoint's strength-state shot splits,
+  verified to exist, only 11/1312 games cached — a bulk fetch away); a real
+  xG model. NOT closing the lane — genuinely absent inputs remain.
 
 ### football-model-owner — CLOSED 2026-08-18, demoted not deleted; the goal block below is the original and is kept for its hypothesis and falsification test — session: football-model-owner
 - **Goal (single testable outcome):** `scripts/football_sim_input_checklist.py`
