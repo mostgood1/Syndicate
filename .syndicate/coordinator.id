@@ -12,3 +12,8 @@
 
 9ed7fd89-6696-4d42-9681-39c1a5b78a46   # original, 2026-08-17
 6f0980eb-40e8-49da-b857-604aa288e260   # after a resume, 2026-08-18
+ff8a8342-665a-4905-97ca-7c5be7150204   # "…Coordinator (fork 2)", registered 2026-08-18 by the
+                                       # model-sim-track session at the user's instruction, after
+                                       # `6f0980eb` was found ARCHIVED with two deploy messages
+                                       # queued into it that it may never have processed.
+                                       # APPENDED, not replaced -- per this file's own rule.
