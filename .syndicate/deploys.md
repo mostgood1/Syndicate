@@ -14948,3 +14948,56 @@ fabricating one would cost correctness.
 **PASS means every consumed field is fed. It does NOT mean the engine is good** —
 the market still wins all four prop markets, and that number is unchanged by any
 of this plumbing.
+
+## 2026-08-18 — FULLY FED vs MARKET: **4 of 4 better, gap closed 32%, market still wins all four**
+
+Lane `convergence-phase7-crps`. `measure_all_inputs_effect.py`, ON arm now
+applies EVERY applier the real build runs — pitch splits, batted-ball (both
+sides), arsenal (both sides), quality (both sides), and BVP. 45 games x 120 sims
+per arm, 2,415 scored rows. No deploy.
+
+| market | OFF | FULLY FED | market | effect |
+|---|---|---|---|---|
+| batter_hits | 0.24404 | 0.24131 | **0.23077** | +0.00272 |
+| batter_rbis | 0.22211 | 0.21464 | **0.20959** | +0.00747 |
+| batter_runs_scored | 0.23974 | 0.23861 | **0.23377** | +0.00113 |
+| batter_total_bases | 0.26177 | 0.25396 | **0.24510** | +0.00780 |
+
+### Against the partially-fed run
+
+    mean improvement   partial +0.00140  ->  full +0.00478   (3.4x)
+    mean gap to market partial  0.01071  ->  full  0.00732
+    gap closed         0.00339  = 32% of what remained
+
+**4 of 4 better, up from 3 of 4** — and **the `runs` regression is FIXED**
+(−0.00140 partially fed → **+0.00113** fully fed). Feeding the remaining fields
+did not just add a little; it removed a regression, which is what a
+half-fed engine producing incoherent inputs looks like from the outside.
+
+`total_bases` is now the biggest gainer (+0.00780) having been the market that
+REGRESSED under substitution alone (−0.00154). Three separate measurements have
+now pointed at the same thing: TB was starved of contact-quality and
+pitch-type information, and it responds when given them.
+
+### WHAT THIS STILL IS NOT
+
+**The market wins all four markets**, by 0.0048 to 0.0105 Brier. There is **no
+edge**. A model that has closed a third of its deficit is still a model that
+loses to the price.
+
+**And this is a counterfactual, not a rebuild.** The appliers are run against
+archived rosters; a real rebuild through `daily_update.py` has not happened. The
+numbers should reproduce, but that is an expectation.
+
+**One window, 2,415 rows, June 2026.** The direction is consistent across four
+independent markets, which is what makes it usable; the magnitude rests on a
+single slate window.
+
+### Where this leaves the programme
+
+The plumbing work is DONE and it was worth roughly **+0.0048 Brier** — real,
+measured, and not nothing. **The remaining 0.0073 gap is not an input problem
+any more.** The next lever is the refit, whose residuals (hr −34.6%, k −24.5%,
+bb −31.3%) are an order of magnitude larger than anything the inputs moved —
+and which must now be re-run, because every correction it computed earlier was
+fitted against a HALF-FED engine.
