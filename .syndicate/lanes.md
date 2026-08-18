@@ -4947,3 +4947,94 @@ largest single cell, not the whole defect.**
 `roster_objs/`; route is `sim_input_checklist.py --publish` on the worker). Two
 deploy requests remain queued and de-prioritised by me — monotone seal
 `bafb4fb2`, ownership gate `20025cc4`.
+
+#### convergence-phase7-crps — HYPOTHESIS RECORDED BEFORE TESTING 2026-08-18 — **pitch mix is unconditional; the user's per-player/per-count/per-hand model is the missing conditioning**
+
+**THE GAP, verified in code (not grepped for absence):** both pitch-selection
+sites draw from ONE distribution —
+
+    simulate.py:1066  pitch_type = _weighted_choice(rng, pitcher.arsenal, PitchType.FF)
+    simulate.py:2803  pitch_type = _sample_weight_cdf(rng, pitch_types, pitch_cdf, ...)
+
+`PitcherProfile.arsenal` (models.py:318) is `Dict[PitchType, float]` — **a single
+season-long usage vector. Not conditioned on count. Not conditioned on batter
+handedness.** The batter side IS now fed (`vs_pitch_type`, `vs_pitch_type_hr`
+from the arsenal artifact) — so the engine already knows a hitter's BA by pitch
+type, and applies it against **the wrong mix**.
+
+**HYPOTHESIS (recorded before measuring):** the two count cells left broken after
+`d8bf0b04` are MIX effects, not outcome-probability effects.
+- **0-2 waste cell** (real 45.5% ball vs sim 29.9%): real pitchers throw
+  **breaking balls out of the zone** at 0-2. The sim throws its season mix.
+- **3-2 protect cell** (real 29.2% foul vs sim 18.7%): real pitchers go
+  **fastball in the zone** at 3-2 and hitters protect.
+If true, `base_in_play` 0.23-vs-0.17 is partly the same artefact — a season mix
+applied uniformly over counts.
+
+**WHY THIS MAY SUCCEED WHERE `d8bf0b04` WAS MARKET-NEUTRAL** (and this is the
+part to hold myself to): the first-pitch term is a **league-wide constant** — it
+moves every hitter and pitcher identically, which is exactly the kind of
+correction a market has already priced. **Count/hand-conditional mix is
+PLAYER-SPECIFIC**: it changes WHICH `vs_pitch_type` multiplier applies to WHICH
+matchup. A slider-heavy reliever vs a slider-weak hitter with two strikes is a
+matchup the season mix cannot express. **That is a differential edge or it is
+nothing.**
+
+**FALSIFIABLE:** if conditional mix moves the market no more than the league
+constant did, the player-specific argument is wrong and I will say so.
+
+**MEASURABLE — same corpus, no new source.** `vendor/mlb_bettingv2/data/raw/
+statcast/pitches/*/*.csv.gz`, 62 files, ~895k pitches, all six required columns
+present and verified: `pitch_type balls strikes stand p_throws pitcher batter`.
+
+#### convergence-phase7-crps — MEASURED 2026-08-18 — **hypothesis CONFIRMED: conditional mix is 55-86% PER-PITCHER, not a league constant**
+
+`scripts/measure_pitch_mix_conditioning.py`, **1,472,453 pitches, 1,297
+pitchers.** Two measurements, the second one decisive.
+
+**1. The league pattern is real and large.**
+
+    count      n        FB     BR     OS     TVD vs season
+    ALL    1,472,453   55.2%  30.6%  14.1%     ---
+    3-0       15,596   94.5%   4.1%   1.4%    0.4165
+    3-1       31,960   77.7%  15.8%   6.5%    0.2245
+    0-2       99,361   42.5%  39.1%  18.4%    0.1370
+    1-2      143,361   43.4%  37.7%  18.9%    0.1189
+
+    LHP vs LHB  57.5% FB / 38.8% BR / **3.8% OS**   TVD 0.2106
+
+3-0 is 94.5% fastball against a 55.2% season mix. **The engine throws the season
+mix in a 3-0 count.** Lefty-on-lefty, the changeup essentially vanishes (14.1% ->
+3.8%) and the engine still throws it.
+
+**2. THE DECISIVE ONE — a single global count rule does NOT recover it.** For
+each pitcher/count cell, his true conditional mix vs (a) his own season vector
+[what the engine has] and (b) his season vector tilted by the LEAGUE count shift
+[the best a global rule can do]:
+
+    count   cells   (a) own season   (b) + league tilt   explained by league
+    0-2      495       0.2047            0.1284               37.3%
+    1-2      565       0.1717            0.1133               34.0%
+    2-0      305       0.2144            0.1465               31.7%
+    3-2      432       0.1422            0.1226               13.8%
+    0-0      708       0.1043            0.0771               26.1%
+
+**A global count rule removes only 14-45% (median ~30%) of the deviation.
+55-86% is irreducibly PER-PITCHER.** At 0-2 the residual is still TVD 0.128 —
+**12.8 points of probability mass** that no league-wide correction can reach.
+
+**THIS IS THE DISTINCTION THAT MATTERS vs `d8bf0b04`.** The first-pitch take term
+was a league constant and came back market-neutral — consistent with "already
+priced". Conditional mix is **majority per-pitcher**, so it changes WHICH
+`vs_pitch_type` multiplier lands on WHICH matchup. That is differential
+information; the earlier null does not predict this one.
+
+**Sample-size constraint, stated before building:** 1.47M pitches / 1,297
+pitchers ~ 1,135 each. A full count x hand cross is 24 cells ~ **47 pitches per
+cell — too thin to use raw.** The build must be **empirical-Bayes shrinkage
+toward (own season mix x league cell tilt)**, weighted by cell sample. Using raw
+per-pitcher cells would fit noise and is FORBIDDEN here. Count buckets should be
+cut by measured TVD similarity, not by intuition.
+
+**Still unfalsified, not yet proven:** that this moves the MARKET. Same standard
+as everything else in this lane — the scoreboard decides, not the TVD.
