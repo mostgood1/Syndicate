@@ -5133,3 +5133,58 @@ numbers when control flow depends on the RNG.
 tested, with no market claim attached. Resolving it needs ~16x the sims or a
 k-seed mean with a standard error — that is the next measurement, and it is a
 measurement of the INSTRUMENT before it is one of the feature.
+
+#### convergence-phase7-crps — MEASURED 2026-08-18 — **REAL-GAME TEST: the conditional mix predicts what pitchers actually threw. Out-of-sample, no RNG, decisive.**
+
+`scripts/test_conditional_mix_real_games.py`. The user's call — the market
+harness could not resolve this (noise 2.4x the effect), so test the **mechanism
+against reality** instead of a downstream binary through a Monte Carlo.
+
+**Design — out-of-sample BY CONSTRUCTION.** Artifact rebuilt from files 1..31
+(through 2026-06-30) to `reports/phase7/conditional_mix_TRAIN_ONLY.json`; every
+game scored starts **on or after 2026-07-01**. Season vectors for the baseline
+are rebuilt from the SAME train window, so A and C see identical evidence and
+differ only in conditioning. **162,798 held-out pitches, 346 real games, 537
+pitchers. Nothing is sampled — re-running gives identical numbers.**
+
+**LOG-LOSS PER HELD-OUT PITCH** (what probability did the model give the pitch he
+actually threw?)
+
+    A season vector      (the engine before this lane)   1.39716
+    B season x league    (best single global rule)       1.36318   +2.43% vs A
+    C conditional mix                                    1.31035   +6.21% vs A
+    C vs B -- the part no global rule can reach:                   +3.88%
+    conditional coverage: 95.3% of held-out pitches
+
+**WITHIN-COUNT TVD**, 6,474 pitcher-game-count cells with >=8 real pitches:
+
+    model              median    mean     p90
+    A season vector    0.3064  0.3260  0.5295
+    B global rule      0.2912  0.3109  0.5059
+    C conditional      0.2542  0.2776  0.4704
+    C closer than A in 4,240/6,474 cells (65.5%)
+
+**CLUSTERED BY PITCHER — one verdict each, which is the honest unit because
+cells within a pitcher are not independent: C beats A for 395/512 pitchers
+(77.1%).** Clustering makes it STRONGER, not weaker.
+
+**A METRIC I HAD TO THROW AWAY.** My first per-game TVD compared the model's mix
+AGGREGATED over the counts he faced against his whole-game mix, and showed 50.4%
+— a coin flip. That metric is **weak by construction**: summing a conditional
+model over observed cell frequencies reconstructs the MARGINAL mix, which all
+three models already agree on. It cannot see conditioning. Kept in the script
+with that written on it, so nobody re-derives the null.
+
+**A REAL FAILURE MODE, from the single-game view** (`--show-game`, game 823844,
+pitcher 691587, 297 pitches): he threw **SI 47.6% vs LHB** and BOTH models say
+**~5-7%** — his season vector is simply wrong for that day. C was WORSE than A
+against LHB (0.460 vs 0.438) and BETTER against RHB (0.276 vs 0.435).
+**Conditioning cannot repair a wrong base rate; it amplifies it.** Where the
+season vector is badly off, this feature makes it worse.
+
+**SCOPE — what this does and does not establish.** It establishes that the
+engine now selects pitches the way real pitchers actually do, out-of-sample and
+reproducibly. **It does NOT establish a betting edge.** A better-simulated pitch
+mix is a precondition for pitch-type-sensitive markets, not a demonstration of
+one, and the market question remains unresolved because the harness that would
+answer it cannot resolve effects this size.
