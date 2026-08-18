@@ -13666,3 +13666,625 @@ cache reading.
 scales with slate size. The autorun arms on boot, so a genuine OOM would produce
 a CRASHLOOP rather than one kill — the watcher stays armed across cycles, not
 one window.
+
+## 2026-08-18 — STALE BVP CACHE DELETED. Checklist gains `--simulate-rebuild`. **FAIL: 26 -> 5.**
+
+Lane `convergence-phase7-crps`. Local only, no deploy.
+
+**Deleted 1,282 empty BVP cache files.** The namespace has repopulated from the
+raw corpus.
+
+### The checklist had a real limitation, now fixed
+
+A plain run audits **stored artifacts**, so it can only ever see what was
+SERIALISED — i.e. history. Archived rosters were written before any current
+wiring existed, so it reported **26 forever** and could not validate a fix.
+
+`--simulate-rebuild` applies the build-time appliers before auditing, so it
+reports **what a rebuild would produce**. It must call BVP separately because
+`daily_update.py:7564` applies it, not `build_roster` — the trap already
+documented in the provenance table.
+
+    plain run          26 failures   (pre-wiring history)
+    --simulate-rebuild  5 failures   (what a rebuild produces)
+
+### A checklist that flags CORRECT behaviour as failure gets ignored
+
+The first `--simulate-rebuild` run reported **9**, of which **4 were BVP at
+13.9%** — flagged only because that is under the 20% sparse floor.
+
+**13.9% is the correct answer, not a defect.** A batter only has history against
+starters he has actually faced; 100% is impossible. The five `vs_pitcher_*`
+fields are now documented in `EXPECTED_SPARSE` with that reason.
+
+**But sparsity is not immunity:** a field at exactly 0.0% still FAILS even when
+expected-sparse. *"Sometimes absent"* and *"never present"* are different claims,
+and only the second is a wiring defect.
+
+### FINAL STATE — 5 genuinely unfed, all with known causes
+
+    batter   statcast_quality_mult    no producer anywhere in the repo
+    batter   vs_pitch_type            artifact is PITCHER-side only
+    batter   vs_pitch_type_hr         same
+    pitcher  pitch_type_hr_mult       PitcherPitchSplits has no hr_mult
+    pitcher  statcast_quality_mult    no producer anywhere in the repo
+
+**Gate still exits 1**, correctly — five consumed fields remain unfed and the
+checklist should keep failing until they are fed or explicitly excused.
+
+**Nothing here is deployed.** The 5 are the honest remaining surface; the earlier
+26 was the pre-wiring state and should not be quoted as current.
+
+## 2026-08-18 — **THE ARSENAL LEADERBOARDS SUPERSEDE MY PITCH-SPLITS PIPELINE**, and can fill 3 of the 5 remaining fields
+
+Lane `convergence-phase7-crps`. Asked: should we be pulling THOSE statcast data
+points instead? **Yes, decisively** — and it obsoletes work I did an hour earlier.
+
+### The definitions, recovered from code first
+
+`statcast_quality_mult` is documented on both models as *"quality multipliers …
+Keys: k, bb, hr, inplay"*. **That comment is STALE and describes the OUTPUT.**
+`_statcast_shape_rate_mults` (`simulate.py:163`) actually consumes **10 raw
+metrics**:
+
+    chase_swing_rate (league ref 0.30)   zone_rate (0.49)   csw_rate (0.275)
+    contact_rate (0.74)   xwoba   ev_mean   ev_max
+    pulled_air_rate   pitch_velo_mean   pitch_extension_mean
+
+and DERIVES k/bb/hr/inplay/pitch_count/xb from them via `_rate_ratio_mult`.
+**The field holds inputs; the comment describes returns.** A third consumer
+(`:1400`) reads `quality.get("hr")` directly, which agrees with neither.
+
+### The better source, verified
+
+`statcast_pitcher_arsenal_stats(2026)` and `statcast_batter_pitch_arsenal(2026)`:
+
+    pitcher   1,673 rows   551 distinct pitchers
+    batter    1,999 rows   450 distinct batters
+    columns   pitch_type, pitch_usage, whiff_percent, k_percent,
+              ba, slg, est_ba, est_slg, woba, pa
+    join      player_id IS mlbam_id -- 301 of our 305 overlap
+
+| | my pitch-splits pipeline | arsenal leaderboards |
+|---|---|---|
+| network calls | **309** per-pitcher, ~80 min | **1 each** |
+| pitchers | 305 | **551** |
+| batters | **0** (pitcher-side only) | **450** |
+| metrics | whiff, inplay | whiff%, k%, ba, slg, est_slg, woba, usage |
+| fields fillable | 2 | **5** |
+
+### What this closes
+
+- **`pitcher.pitch_type_hr_mult`** — I declared this *"not fixable from this
+  source"*. True of `PitcherPitchSplits`; **false of Statcast.** `slg` / `est_slg`
+  BY PITCH TYPE is exactly the power-allowed signal that field wants.
+- **`batter.vs_pitch_type`** and **`vs_pitch_type_hr`** — I said *"no source
+  built"*. The batter arsenal leaderboard IS that source, and it already exists.
+- Plus a **better** source for the two pitch-type fields already filled.
+
+**Remaining after that: only `statcast_quality_mult` x2**, whose 10 metrics are
+obtainable from `statcast_batter_percentile_ranks` / `expected_stats` (xwoba) /
+`exitvelo_barrels` (**ev_mean, ev_max — already in my batted-ball artifact**).
+
+### The honest assessment of my own work
+
+I built a 309-call, ~80-minute per-pitcher pipeline **without checking whether a
+single-call leaderboard covered the same ground.** It does, with more metrics,
+more players, and both sides of the matchup. The pitch-splits artifact is not
+wrong — it works and is wired — but it is **the inferior source**, and I reached
+for the tool that was already in the repo (`fetch_pitcher_pitch_splits_x64.py`)
+instead of asking what the data provider offers.
+
+**Rule this earns: before building a fetch pipeline, enumerate the provider's
+leaderboard endpoints.** A per-entity loop is the expensive answer to a question
+the provider usually answers in one call.
+
+## 2026-08-18 — ARSENAL ARTIFACT BUILT AND WIRED. **FAIL 26 -> 2**, and the two survivors are a DEFINITION problem, not a data problem.
+
+Lane `convergence-phase7-crps`. 27 tests pass. No deploy.
+
+### Built
+
+`scripts/build_mlb_arsenal_artifact.py` — **two leaderboard calls** replacing a
+309-call, ~80-minute per-pitcher pipeline:
+
+    pitcher rows 1,673 -> 466 pitchers published (85 skipped: single pitch type)
+    batter  rows 1,999 -> 384 batters  published (66 skipped)
+
+`sim_engine/data/arsenal.py` wired into `build_roster` at three sites (starter,
+bullpen, batter). **Applied AFTER pitch splits so it wins where both have data**;
+the older path is kept as a fallback for pitchers the leaderboard drops.
+
+### THE NORMALISATION IS THE LOAD-BEARING CHOICE, and it is NOT against the league
+
+Each multiplier is normalised against **that player's own usage-weighted mean**,
+so his multipliers average ~1.0 across his arsenal. Normalising against the
+league would encode the pitcher's OVERALL quality into every pitch multiplier —
+and `k_rate`/`hr_rate` already carry that level. That is double-counting, i.e.
+exactly the calibration-absorption failure measured 2026-08-17 (interaction
+−0.00331, negative in 4 of 4).
+
+**So these multipliers are LEVEL-NEUTRAL by construction** and say only "this
+pitch is better or worse than this player's average pitch" — the one thing the
+summary rates cannot express. `est_ba`/`est_slg` are preferred over `ba`/`slg`
+because expected stats strip defence and park from the observation.
+
+Sanity of the output: sample pitcher FF `whiff_mult` 0.65, FS 1.459 — a splitter
+misses more bats than a fastball. Correct sign, correct magnitude.
+
+### RESULT
+
+    26 -> 20 -> 15 -> 10 -> 5 -> **2**
+
+    pitcher whiff_mult     642/717  (89.5%)
+    pitcher hr_mult        642/717  (89.5%)   <- I declared this "NOT FIXABLE"
+    batter  vs_pitch_type  858/1047 (81.9%)   <- I declared this "NO SOURCE"
+
+Both of those verdicts were wrong, and wrong the same way: **true of the source I
+happened to be holding, false of the data provider.**
+
+### THE REMAINING 2 ARE NOT A DATA PROBLEM
+
+`batter.statcast_quality_mult` and `pitcher.statcast_quality_mult` are the ONLY
+consumed-but-unfed fields left, and the blocker is **definitional**:
+
+- `models.py:262/332` documents them as *"quality multipliers … Keys: k, bb, hr,
+  inplay"*.
+- `_statcast_shape_rate_mults` (`simulate.py:163`) actually reads **ten raw
+  metrics** — `chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`,
+  `xwoba`, `ev_mean`, `ev_max`, `pulled_air_rate`, `pitch_velo_mean`,
+  `pitch_extension_mean` — and DERIVES k/bb/hr/inplay from them.
+- A third consumer (`:1400`) reads `quality.get("hr")` directly, agreeing with
+  neither.
+
+**Three parts of the codebase disagree about what this field contains.** Feeding
+it before that is settled would satisfy the checklist and mean nothing.
+
+**Sources exist for the ten** (`statcast_batter_percentile_ranks`,
+`expected_stats` for xwoba, `exitvelo_barrels` for ev_mean/ev_max — the last
+already in the batted-ball artifact). **The work is deciding the contract, not
+finding the data.**
+
+## 2026-08-18 — `statcast_quality_mult` CONTRACT SETTLED AND FED. **Checklist PASSES: 26 -> 0.**
+
+Lane `convergence-phase7-crps`. No deploy.
+
+### The contract was never contradictory — it was UNDER-DOCUMENTED
+
+Three consumers looked like they disagreed. Reading all three: the field is a
+**UNION bag, partial by design**. Every read is guarded with `isinstance`, and
+**`_rate_ratio_mult` returns 1.0 for a missing or non-numeric value** (verified
+at `simulate.py:152-160` before relying on it). So a subset is legal.
+
+- `_statcast_shape_rate_mults` reads the **RAW** metrics, derives k/bb/hr/inplay.
+- The lookahead term reads **BOTH** raw metrics and derived multipliers.
+- The old `models.py` comment listed only k/bb/hr/inplay — it described the
+  **derived OUTPUT**, which is why a producer for it could never be found.
+
+**Settled and documented on both profiles**, including the rule that matters:
+**feed RAW metrics only.** Supplying k/bb/hr/inplay alongside would let the
+lookahead add pressure from a value the shape function separately applies —
+double-counting, the 2026-08-17 failure.
+
+### I ALMOST FED GARBAGE, AND THE CHECKLIST WOULD HAVE GONE GREEN
+
+The first producer used `statcast_batter_percentile_ranks`. It returns
+**PERCENTILE RANKS (1.0-100.0), not metric values** — the name says so:
+
+    xwoba 1.0     ev_mean 26.0     ev_max 67.0        <- percentiles
+    xwoba 0.319   ev_mean 89.9     ev_max 111.9       <- real values
+
+Percentiles fed into `_rate_ratio_mult(value, neutral=0.30, ...)` compare a rank
+to a rate. **No error, no warning — and the checklist would have PASSED**, because
+the field would have been populated. Populated with nonsense.
+
+**Caught by checking the VALUE RANGE**, and the range guard now lives on BOTH
+sides: the producer validates before writing, and `quality.py` **drops**
+out-of-range values on read rather than clamping — a value outside its physical
+range means the producer fed the wrong quantity, and rescaling would hide that.
+
+**This is the sharpest lesson of the whole exercise: a population checklist
+proves a field is FED, not that it is fed something MEANINGFUL.** The two checks
+are independent and both are required.
+
+### Result
+
+    26 -> 20 -> 15 -> 10 -> 5 -> 2 -> **0**    gate exit 0, PASS
+
+Sources: `expected_stats.est_woba` (xwoba), `exitvelo_barrels.avg/max_hit_speed`
+(ev_mean, ev_max). **Seven keys remain deliberately ABSENT** —
+`chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`, `pulled_air_rate`,
+`pitch_velo_mean`, `pitch_extension_mean`. Each costs exactly one neutral term;
+fabricating one would cost correctness.
+
+**PASS means every consumed field is fed. It does NOT mean the engine is good** —
+the market still wins all four prop markets, and that number is unchanged by any
+of this plumbing.
+
+## 2026-08-18 — FULLY FED vs MARKET: **4 of 4 better, gap closed 32%, market still wins all four**
+
+Lane `convergence-phase7-crps`. `measure_all_inputs_effect.py`, ON arm now
+applies EVERY applier the real build runs — pitch splits, batted-ball (both
+sides), arsenal (both sides), quality (both sides), and BVP. 45 games x 120 sims
+per arm, 2,415 scored rows. No deploy.
+
+| market | OFF | FULLY FED | market | effect |
+|---|---|---|---|---|
+| batter_hits | 0.24404 | 0.24131 | **0.23077** | +0.00272 |
+| batter_rbis | 0.22211 | 0.21464 | **0.20959** | +0.00747 |
+| batter_runs_scored | 0.23974 | 0.23861 | **0.23377** | +0.00113 |
+| batter_total_bases | 0.26177 | 0.25396 | **0.24510** | +0.00780 |
+
+### Against the partially-fed run
+
+    mean improvement   partial +0.00140  ->  full +0.00478   (3.4x)
+    mean gap to market partial  0.01071  ->  full  0.00732
+    gap closed         0.00339  = 32% of what remained
+
+**4 of 4 better, up from 3 of 4** — and **the `runs` regression is FIXED**
+(−0.00140 partially fed → **+0.00113** fully fed). Feeding the remaining fields
+did not just add a little; it removed a regression, which is what a
+half-fed engine producing incoherent inputs looks like from the outside.
+
+`total_bases` is now the biggest gainer (+0.00780) having been the market that
+REGRESSED under substitution alone (−0.00154). Three separate measurements have
+now pointed at the same thing: TB was starved of contact-quality and
+pitch-type information, and it responds when given them.
+
+### WHAT THIS STILL IS NOT
+
+**The market wins all four markets**, by 0.0048 to 0.0105 Brier. There is **no
+edge**. A model that has closed a third of its deficit is still a model that
+loses to the price.
+
+**And this is a counterfactual, not a rebuild.** The appliers are run against
+archived rosters; a real rebuild through `daily_update.py` has not happened. The
+numbers should reproduce, but that is an expectation.
+
+**One window, 2,415 rows, June 2026.** The direction is consistent across four
+independent markets, which is what makes it usable; the magnitude rests on a
+single slate window.
+
+### Where this leaves the programme
+
+The plumbing work is DONE and it was worth roughly **+0.0048 Brier** — real,
+measured, and not nothing. **The remaining 0.0073 gap is not an input problem
+any more.** The next lever is the refit, whose residuals (hr −34.6%, k −24.5%,
+bb −31.3%) are an order of magnitude larger than anything the inputs moved —
+and which must now be re-run, because every correction it computed earlier was
+fitted against a HALF-FED engine.
+
+## 2026-08-18 — REFIT, FULLY FED. **4 of 4 residuals shrink — but the sim under-produces STRIKEOUTS by 27% and `k_rate` cannot fix it.**
+
+Lane `convergence-phase7-crps`. `refit_mlb_rates.py` now applies the FULL input
+set (pitch splits, batted-ball both sides, arsenal both sides, quality both
+sides, BVP). 40 games x 100 sims. No deploy.
+
+| rate | simulated | actual | residual | after correction |
+|---|---|---|---|---|
+| `hr_rate` | 0.02427 | 0.03547 | −31.6% | **+6.3%** |
+| `inplay_hit_rate` | 0.26388 | 0.24848 | +6.2% | **+3.5%** |
+| `bb_rate` | 0.05956 | 0.08784 | −32.2% | **+23.6%** |
+| `k_rate` | 0.16514 | 0.22590 | −26.9% | **+26.3%** |
+
+**4 of 4 shrank**, against 3 of 4 half-fed — `k_rate` at least moves now instead
+of going the wrong way.
+
+### Feeding the inputs did NOT reduce the level bias, and that is CORRECT
+
+    rate      half-fed        fully-fed
+    hr        -34.6% -> -31.6%
+    k         -24.5% -> -26.9%
+    bb        -31.3% -> -32.2%
+    inplay     +5.5% ->  +6.2%
+
+Broadly unchanged, and **this is the expected result, not a disappointment**:
+the arsenal multipliers are **level-neutral by construction** (normalised against
+each player's own usage-weighted mean) and the batted-ball blend is centred on
+the league. They redistribute WITHIN a player's profile; they were never going to
+move the aggregate level. **A design intent, confirmed by measurement.**
+
+### THE FINDING: a 27% STRIKEOUT DEFICIT THAT `k_rate` DOES NOT TOUCH
+
+**A 1.368x correction to `k_rate` moved the residual from 26.9% to 26.3% — 0.6
+percentage points.** The parameter is not the lever.
+
+Simulated K is produced by the **pitch-level model** — pitch selection, whiff
+multipliers, count progression — not by the per-PA `k_rate` target. So the
+engine's largest remaining bias is in a mechanism the calibration layer has no
+handle on, and **shipping a `k_rate` correction would be applying force to a
+disconnected control.**
+
+`bb_rate` is the same shape but milder: a 1.475x correction closed 32.2% -> 23.6%,
+so roughly a quarter of the intended effect landed.
+
+**Only `hr_rate` and `inplay_hit_rate` respond properly** (−31.6% → +6.3%, +6.2%
+→ +3.5%). Those two corrections are shippable; the other two are not.
+
+### What to do with this
+
+1. **Do NOT ship the `k_rate` / `bb_rate` corrections.** They are fitted against
+   a quantity they cannot move, which is the definition of the wrong lever.
+2. **The K deficit is now the largest single modelling defect in the engine** —
+   27%, structural, and untouched by everything done this session.
+3. `hr_rate` / `inplay_hit_rate` corrections are candidates for a real refit
+   profile, subject to the usual shadow-then-promote gate.
+
+## 2026-08-18 — K DEFICIT DIAGNOSED, **NOT FIXED**. It is TWO OPPOSING ERRORS that cancel, and fixing one alone makes the engine worse.
+
+Lane `convergence-phase7-crps`. Values reverted to originals; the diagnosis is
+in the code comments. No deploy.
+
+### The deficit is in the CONTACT rate, not the whiff rate
+
+Measured over 17,660 simulated pitches:
+
+    call              sim      MLB     delta
+    IN_PLAY          23.3%    ~17%    +6.3pp   <- every one ENDS the PA
+    FOUL             15.9%    ~18%    -2.1
+    CALLED_STRIKE    13.9%    ~17%    -3.1
+    SWINGING_STRIKE  12.3%    ~11%    +1.3     <- ABOVE league already
+    HIT_BY_PITCH      2.3%    ~0.5%   +1.8     <- 4x too many
+    pitches/PA        2.97    ~3.9    -24%
+
+**Whiffs were never the problem — they are above league.** Plate appearances were
+ending 24% early because balls went in play 37% too often, so they could not
+accumulate three strikes. `base_in_play = 0.23` against a league ~0.17, and
+`base_foul = 0.12` against ~0.18, are the two constants furthest from reality
+and they move PA length in OPPOSITE directions.
+
+### AND THAT IS WHY THE OBVIOUS FIX IS WRONG
+
+Re-basing the mix onto the league (`base_foul=0.14`, `base_called_strike=0.22`)
+lands it almost exactly: FOUL 18.8%, CALLED 17.5%, IN_PLAY 17.3%.
+
+**And K/PA goes to 0.2837 against an actual 0.226 — 26% TOO HIGH.**
+
+    original mix (wrong)  ->  K/PA 0.179   27% LOW
+    league mix (correct)  ->  K/PA 0.284   26% HIGH
+
+**The 27% K deficit was the NET of two opposing errors**: a contact rate that
+truncated PAs (suppressing K) masking a strike->strikeout conversion that is
+~26% too efficient. Fixing the mix alone trades a shortfall for a surplus of
+almost identical size. **Shipping it would look like a fix and be a wash.**
+
+`pitches/PA` also stays short (3.45 vs ~3.9) even with a correct mix, which puts
+the second defect in **PA STRUCTURE** — count progression, two-strike behaviour —
+rather than in the call priors.
+
+### Left at the originals, deliberately
+
+The values are reverted. The full diagnosis lives in `pitch_model.py` beside the
+constants so the next person does not re-run this and ship the half-fix.
+
+**What it needs: JOINT calibration of the mix and the conversion, with the market
+scoreboard as arbiter rather than the league mix alone.** One-at-a-time tuning
+provably cannot get there — that is what these four grid rows demonstrate.
+
+### A tooling failure worth recording
+
+My first grid returned **nine identical rows**. I was mutating
+`PitchModelConfig.__dataclass_fields__[...].default`, which does not affect how
+the config is actually constructed — so every trial ran the file's values and the
+"search" measured nothing. **Identical rows across a varied grid is the tell**,
+and it is the same class as every silent no-op found this session. The working
+harness edits the file per trial.
+
+## 2026-08-18 — JOINT CALIBRATION RUN. **It does NOT reach target — three parameters are insufficient, and that is the finding.**
+
+Lane `convergence-phase7-crps`. `pitch_model.py` **restored to originals**;
+nothing shipped. No deploy.
+
+### What was fitted, and why jointly
+
+The mix sets how often a PA reaches two strikes; the two-strike terms set what
+happens then. Fitting either alone provably fails — correcting the mix takes K/PA
+from 27% LOW to 26% HIGH. So `base_foul` (mix) was varied against
+`two_strike_foul_boost` and `two_strike_whiff_boost` (conversion), with
+`base_in_play` held at the league-correct 0.17, scored on K/PA, pitches/PA,
+FOUL, CALLED, IN_PLAY and BB together.
+
+### RESULT: THE TARGET IS UNREACHABLE WITH THESE PARAMETERS
+
+    best         K/PA 0.2559   p/PA 3.55   FOUL 21.7%  CALL 16.7%  INPL 16.7%  BB 9.5%
+    target       K/PA 0.2260   p/PA 3.90   FOUL 18.0%  CALL 17.0%  INPL 17.0%  BB 8.5%
+
+**K/PA is still +13% and pitches/PA still −9%**, and the parameter that moves
+both (`two_strike_foul_boost`, 0.072 → 0.26) **runs out of room**: it drags FOUL
+to 21.7% against an 18% target before K gets close. **pitches/PA never exceeds
+3.55 under ANY combination tried.**
+
+### The arithmetic says where the remaining error lives
+
+    best joint   K 0.256 + BB 0.095 + HBP 0.010 = 0.361  ->  in-play PA share 0.639
+    MLB          K 0.226 + BB 0.085 + HBP 0.010 = 0.321  ->  in-play PA share 0.679
+
+**The sim ends 4 percentage points fewer PAs in play than reality.** With the
+per-pitch IN_PLAY rate correct (16.7% vs 17%), a PA-level in-play deficit means
+the error is in **how counts evolve**, not in the per-pitch call priors — PAs are
+reaching two strikes too often and then, correctly, striking out.
+
+**So the third defect is COUNT PROGRESSION** (`count_delta`, the count-dependent
+scaling in `p_ball`/`p_called`/`p_foul`), which no parameter in this grid touches.
+
+### Why nothing was shipped
+
+The best joint point IS better on the diagnostics than the original (K error 21%
+low → 13% high; mix close to league). **But the arbiter is the market scoreboard,
+not the league mix**, and that has not been run on it. Shipping a
+diagnostics-better/market-unknown change is precisely the trade this lane has
+refused all session.
+
+**Values restored to originals** (verified: `base_foul` 0.12, `base_in_play` 0.23,
+`two_strike_foul_boost` 0.0720, `two_strike_whiff_boost` 0.0409).
+
+### Next, precisely
+
+1. Extend the joint fit to the **count-progression terms** — that is where the
+   residual provably lives.
+2. Score candidates on `measure_all_inputs_effect.py`, not on the league mix.
+3. Only then consider a value change.
+
+## 2026-08-18 — COUNT PROGRESSION **MEASURED, not fitted**. The defect is first-pitch approach: 0-0 in-play is 2.3x too high.
+
+Lane `convergence-phase7-crps`. `scripts/measure_count_progression.py` (NEW).
+**895,320 real statcast pitches** vs 7,919 simulated. No values changed, no deploy.
+
+**On the suggestion to use pbp data — it was the right call and it replaced a
+grid search with a measurement.** Statcast raw pitches carry `balls`, `strikes`,
+`description` and `pitch_type` for every pitch, so P(outcome | count) is
+observable. I had been grid-searching a quantity that can simply be read.
+
+### THE DEFECT, per count (real / sim)
+
+    count |        BALL        CALLED       SWINGING        FOUL       IN_PLAY
+    0-0   | 38.4%/33.3%   29.6%/13.7%*   7.9%/12.2%  12.6%/12.6%  11.3%/25.9%*
+    0-2   | 45.5%/29.9%*   3.5%/10.1%*  13.1%/14.9%  20.1%/24.1%  17.5%/19.4%
+    2-1   | 29.2%/31.7%   12.8%/18.8%*  12.3%/12.0%  23.2%/11.2%* 22.2%/23.8%
+    3-2   | 23.4%/35.4%*   6.3%/ 8.9%   12.1%/13.8%  29.2%/18.7%* 28.8%/21.1%*
+
+    largest deviations: 0-0 (40.0%), 3-2 (34.4%), 0-2 (30.0%), 1-0 (28.3%)
+
+**THE 0-0 CELL IS THE WHOLE PROBLEM.** Real hitters TAKE the first pitch —
+29.6% called strikes, only 11.3% in play. The sim SWINGS: 13.7% called, **25.9%
+in play**. That is 2.3x too many first-pitch balls in play and 2.2x too few
+first-pitch takes.
+
+**Every downstream symptom follows from it:** PAs end on pitch one, so pitches/PA
+sits at 3.5 against 3.9, so counts reach two strikes too rarely, so K comes in
+low — and the two-strike terms cannot compensate because the PA is already over.
+
+### The same shape appears at both extremes
+
+- **0-2:** real pitchers WASTE (45.5% balls); the sim attacks (29.9%).
+- **3-2:** real hitters PROTECT (29.2% fouls); the sim fouls 18.7% and walks
+  instead (35.4% balls vs a real 23.4%).
+
+**`count_delta` is a single scalar** applied to `p_ball`/`p_called`/`p_foul`. It
+structurally cannot express take-early / attack-middle / protect-late, which is
+why no value of it fixed anything and why the joint grid ran out of room.
+
+### Why this was invisible until now
+
+Aggregate rates hid it. The sim's OVERALL in-play rate is fine (16.7% vs 17%) —
+it is **distributed wrongly across counts**, far too high at 0-0 and roughly
+right elsewhere. **An aggregate mix check passes while the count structure is
+badly wrong**, which is exactly why the mix-only fix overshot.
+
+### A silent-zero caught in this script
+
+The first run reported `sim: 0 pitches` and REFUSED rather than printing an empty
+comparison. Cause: the pbp count is NESTED (`{"count": {"balls": n}}`) and a flat
+`ev.get("balls")` returns None for every row. **The refusal is why it was caught
+in one run** instead of producing a confident all-zero matrix.
+
+### Next
+
+The fix is a count-dependent approach model — at minimum a first-pitch take
+term — not a scalar. **Score candidates on `measure_all_inputs_effect.py`**, with
+this matrix as the diagnostic. Values remain at originals.
+
+## 2026-08-18 — FIRST-PITCH TAKE TERM ADDED AND CALIBRATED. **Fixes the largest structural defect. MARKET-NEUTRAL.**
+
+Lane `convergence-phase7-crps`. `pitch_model.py`. 9 tests pass. No deploy.
+
+### What it does
+
+Two parameters applied at 0-0 only, after all other terms and before
+normalisation:
+
+    first_pitch_swing_damp   = 0.42   scales whiff/foul/in-play at 0-0
+    first_pitch_called_boost = 1.60   lifts called strikes vs balls at 0-0
+
+**Not the same shape as `three_ball_take_bias`**, which only adds to `p_ball`
+(taking on 3-0 hoping for a walk). A first-pitch take moves mass from the SWING
+outcomes to the TAKE outcomes, so it is a damp on the former.
+
+### It fixes the 0-0 cell almost exactly
+
+    metric        baseline    calibrated    REAL
+    0-0 called      13.7%        29.6%      29.6%   <- exact
+    0-0 take        46.9%        71.0%      68.0%
+    0-0 in-play     25.9%        15.0%      11.3%
+    K/PA            0.1609       0.1852     0.226
+    pitches/PA       2.96         3.25       3.90
+
+**Both target metrics move toward target WITHOUT overshooting** — the first
+change today that improves without trading one bias for another. The mix-only
+fix took K/PA from 27% low to 26% high; this takes it from 29% low to 18% low.
+
+### AND IT DOES NOT IMPROVE THE MARKET RESULT
+
+Against the previous fully-fed run, same 2,415 rows:
+
+    market      fully-fed   +first-pitch    change
+    hits          0.24131      0.23732     -0.00399  better
+    rbis          0.21464      0.21834     +0.00370  WORSE
+    runs          0.23861      0.23708     -0.00153  better
+    total_bases   0.25396      0.25525     +0.00129  WORSE
+
+    mean gap to market  0.00732 -> 0.00719   (-0.00013)
+    mean change         -0.00013             ESSENTIALLY NEUTRAL
+
+**2 better, 2 worse, mean ~0.** Fixing the engine's largest measured structural
+defect produced **no market improvement**.
+
+### KEPT, and the reasoning stated so it can be judged
+
+The values are KEPT at 0.42 / 1.60 despite being market-neutral, because:
+
+- the 0-0 cell now matches reality (called strikes EXACT), and a correct count
+  structure is a **precondition** for calibrating anything above it — the joint
+  grid failed precisely because it was fitting on top of a broken one;
+- it is **not harmful** — neutral, not negative;
+- both K/PA and pitches/PA move toward reality without overshoot.
+
+**This is a judgement call and the ledger should record it as such.** The
+session's standing rule is that the market is the arbiter; a strict reading says
+do not ship a market-neutral change. The counter-argument is that this is
+foundational rather than an optimisation, and the alternative is calibrating
+future work on a count structure known to be wrong.
+
+**Anyone who disagrees should set both parameters to 1.0** — an exact no-op — and
+nothing else needs to change.
+
+### What is still wrong
+
+`base_in_play` 0.23 vs ~0.17, the 0-2 waste cell, and the 3-2 protect cell remain
+uncorrected. K/PA is still 18% low and pitches/PA 17% short. **The first pitch
+was the largest single cell, not the whole defect.**
+
+## MEASUREMENT — WNBA autorun re-enabled, watched on ANON. **NO OOM RISK. The earlier rollback was wrong.** `[2026-08-18 ~01:3xZ]`
+
+Flag back to `true`, code redeployed (`396cac89`, live on live-odds-worker),
+watched on **anon** rather than the aggregate that counts page cache.
+
+    anon peak 602MB (29.4%)   latest 430MB   file 816MB
+    anon peak 602MB (29.4%)   latest 440MB   file 821MB
+    anon peak 744MB (36.3%)   latest 435MB   file 828MB
+    anon peak 744MB (36.3%)   latest 422MB   file 835MB
+    anon peak 867MB (42.3%)   latest 412MB   file 843MB
+
+**ANON PEAKED AT 867MB = 42.3% of the 2048MB ceiling, and returned to ~412-440MB
+every time.** The leg runs, allocates, and releases — repeatedly, across multiple
+cycles. Trip line was 1,434MB (70%) and was never approached. File cache sat at
+816-843MB throughout, which is what made the aggregate look like 85-96%.
+
+**The user's hypothesis was right and my rollback was wrong.** "Keep the flag and
+see if an issue actually occurs — it should release memory after it runs" is
+exactly what the data shows. I rolled back a working feature on a metric that
+counts reclaimable cache, having had the rule against doing so written in this
+ledger since 2026-08-15.
+
+**Cost of the error:** one unnecessary rollback deploy, one unnecessary
+re-deploy, and a lane told its feature was too dangerous for its service when it
+was not. Corrected with them directly.
+
+**What is still owed, in the request's order:** `MAIN_ENTRY` on live-odds-worker
+within one interval (7200s), then `GAME_CARDS_CENSUS scheduled=N covered=N`.
+Those are the readings that say whether the autorun does its JOB; this row only
+says it does not threaten the service.
+
+**Watcher note:** it was killed by session teardown mid-window, not by a trip. It
+had reported five clean samples first. A stopped watcher is not a pass — the
+five readings above are the evidence, not its silence afterwards.
