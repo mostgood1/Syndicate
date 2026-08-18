@@ -6019,3 +6019,63 @@ UNCOMPUTED OUTPUT (here, and the `defensive_metrics` 0% that `advanced_metrics`
 half-covers). Both times the remedy I implied — "compute it" — was wrong, and the
 real remedy was upstream. `model_engine_standard.md` §4.1 is exactly this and I
 still walked into it twice in one session.
+
+### soccer-model-dispersion — SHOTS SHRINK REVERTED 2026-08-18 16:3xZ — a paired test falsified the sqrt(1-r^2) heuristic; the dispersion overshoot stays unaddressed — session: soccer-sport-owner
+
+**`b69c5277` (landed as `87b26496`) reverts `f1bece5a`.** Both shots weights back to
+0.016 in `_attack_strength` and `_defense_strength`.
+
+**WHY: a PAIRED test, not the aggregate comparison that raised the question.**
+Two eredivisie backtests on the IDENTICAL 126 matches (`--dump-matches`, joined by
+fixture, `actual` outcomes verified equal so this is provably the same match set) —
+one at the shrunk weight, one at 0.016:
+
+    per-match Brier delta (unshrunk - shrunk), n=126
+      mean   -0.0098
+      SE      0.0047
+      t      -2.06
+      95% CI -0.0191 .. -0.0005   entirely below zero
+
+**Unshrunk scored lower (better) Brier on the same fixtures.** Real, though modest
+(t=-2.06 against a ~1.98 threshold) — not the overwhelming result a bigger sample
+would give, but not noise either. The AGGREGATE comparison alone (gap +0.0017
+unshrunk vs +0.0115 shrunk) could not distinguish signal from independent-sample
+noise; pairing on identical fixtures is what resolved it.
+
+**THE HEURISTIC'S ASSUMPTION WAS WRONG, NOT JUST ITS NUMBER.** `sqrt(1-r^2)` treats
+the correlated fraction of a predictor as pure redundancy with zero marginal value.
+Shots carries real predictive signal beyond what the rating already encodes —
+shrinking it removed information, not noise.
+
+**CONSEQUENCE FOR THE TWO STAGED-BUT-UNAPPLIED SHRINKS: STAY UNAPPLIED.**
+`form_points` (corr 0.90-0.96) and `clean_sheet_rate` (corr 0.82-0.98) were computed
+under the identical heuristic and never applied. This result is reason to distrust
+the METHOD, not just the one number it produced — do not apply either without its
+own separate evidence, and do not assume a higher correlation means a worse outcome
+from shrinking (shots' 0.895 corr and the falsified shrink don't establish a
+threshold; only a paired test would).
+
+**THE DISPERSION OVERSHOOT IS REAL AND STILL UNADDRESSED.** Platform-wide (all nine
+leagues, cross-league mean stdev 0.1575 -> 0.1907, past market's 0.1811). This was
+the wrong lever for it, not proof no lever exists. The 7/9-leagues Brier improvement
+that motivated this whole probe (mean gap delta -0.0062) came from `94578cbc` alone
+(the xG-term removal) — that result stands, unaffected by this revert.
+
+**MECHANICAL NOTE for reproducibility:** the paired dumps live at
+`/c/tmp/soccer_paired_evidence/{shrunk,unshrunk}_matches.jsonl` — LOCAL TO THIS
+MACHINE, not in the repo (`reports/soccer_backtest/` is untracked scratch output by
+convention, matching the rest of `reports/`'s "regenerated, not hand-edited" status).
+Re-derivable in ~1h per side from `scripts/backtest_soccer_h2h_calibration.py
+--league eredivisie --limit 120 --simulations 300 --dump-matches <path>` against the
+two code states (0.016 vs the reverted value), joined by (home_team, away_team, date).
+
+**PROCESS NOTE, same lesson as the last entry:** local `main` was behind
+`origin/main` when this was recorded. Appended against `origin/main`'s tree via a
+throwaway worktree rather than the local disk copy, for the same reason as before —
+check `git rev-parse main` vs `origin/main` before trusting a local ledger file.
+
+**NEXT, unchanged from before this probe:** the dispersion overshoot needs either a
+different lever (re-fit rather than a correlation heuristic) or acceptance that
+post-`94578cbc`'s state (gap +0.0017, dispersion 0.2373 on eredivisie) is the better
+checkpoint even with its overshoot, since accuracy is the primary objective and this
+probe shows the two are not always aligned.
