@@ -115,9 +115,54 @@ or an explicit cross-lane mandate.
 > changing.
 >
 > **Also still true and unaddressed:** `lanes.md` is 2.05x over its 120,000-byte
-> cap, and nobody has checked whether a lane was ALREADY silently un-guarded by
-> a past archive pass — that needs a diff of `lanes_closed.md` against the
-> claims present before each pass. The count fixed here was exposure, not damage.
+> cap.
+>
+> **THE "ALREADY UN-GUARDED?" QUESTION IS NOW ANSWERED: NO.**
+> `scripts/audit_lane_unguarding.py` walked **all 344 commits** touching
+> `lanes.md` (2026-08-13 → 08-18), recomputing the claim set at each with
+> `lane-guard.py`'s own `_claims()` and classifying every claim that
+> disappeared:
+>
+>     ARCHIVED (moved out of lanes.md while still OPEN)   0   <-- the feared case
+>     VANISHED (block gone, not OPEN in either archive)   1
+>     RELEASED (lane closed/released, block still there)  3
+>     REWORDED (lane narrowed its own Files line)         0
+>
+> **No archive pass ever cost a lane its protection.** Every claim that stopped
+> being enforced belonged to a lane that had been released or closed.
+>
+> **The single VANISHED event is real but is NOT an archive pass, and it is
+> already repaired.** Commit `63fc2c84` (2026-08-17 19:33) — whose message reads
+> *"my lane headers are parseable"* — ran a hyphen→em-dash header rewrite that
+> wrote **corrupt bytes**: the headers became
+> `### \x01 <bad> \x02 <bad> **stable fixture identity SHIPPED...`, with literal
+> control characters where the slug and status belong. `LANE_RE` cannot parse
+> that, so slug and status were destroyed on **12 headers across 4 lanes**
+> (`wnba-fixture-identity`, `wnba-phase2-migration`, `modelled-fair-edge`,
+> `soccer-projection-collapse`) and `wnba-fixture-identity`'s 3 claims went dark
+> —`scripts/refresh_wnba_oddsapi_props.py`,
+> `syndicate/features/shared/wnba_fixture_identity.py`,
+> `tests/test_wnba_fixture_identity.py`.
+>
+> **No harm resulted, and the reason matters.** That lane had already recorded
+> "CLOSED / FILES RELEASED 2026-08-17 ~15:1x CDT" — about four hours BEFORE the
+> corruption. The guard was still enforcing the claims at 18:00 because the
+> release was written in PROSE and the OPEN block still carried the `Files:`
+> line, which is the only thing `lane-guard` reads. The corruption then dropped
+> claims that were already stale by intent. It did the right thing for the wrong
+> reason, which is not a defence of the mechanism.
+>
+> **Current state is clean, measured across the whole ledger:** 0 control
+> characters and 0 invalid UTF-8 in `lanes.md`, `lanes_closed.md`,
+> `lanes_history.md`, `state.md`, `learnings.md` and `deploys.md`, live and on
+> `origin/main`. The affected headers now carry proper slugs.
+>
+> **What this changes about the risk model.** The danger `#466` was filed for —
+> an archive pass silently dropping a live claim — has never once occurred in
+> this repo's history. The mechanism that DID cost a lane its guard was a
+> careless bulk rewrite of header lines, which no invariant check would have
+> caught either, because the file stayed well-formed markdown. Worth a
+> `git diff` check on any future bulk edit of `lanes.md` headers.
 
 **What is NOT established:** whether any lane has ALREADY been silently
 un-guarded this way. That would need a diff of `lanes_closed.md` against the
