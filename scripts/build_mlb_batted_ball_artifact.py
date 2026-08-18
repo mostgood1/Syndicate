@@ -62,7 +62,18 @@ def main() -> int:
         return 1
 
     df = pb.statcast_batter_exitvelo_barrels(args.season, minBBE=args.min_bbe)
-    print(f"leaderboard rows at minBBE={args.min_bbe}: {len(df)}")
+    print(f"batter leaderboard rows at minBBE={args.min_bbe}: {len(df)}")
+    # PITCHERS TOO. The sim reads `bb_gb_rate` on BOTH profiles
+    # (`simulate.py:1134-1136`), and the first version of this artifact covered
+    # only batters -- leaving five consumed pitcher fields unfed. A pitcher's
+    # ground-ball tendency is a large, well-known, persistent skill; treating
+    # every pitcher as league-average is exactly the defect this file exists for.
+    try:
+        pdf = pb.statcast_pitcher_exitvelo_barrels(args.season, minBBE=args.min_bbe)
+        print(f"pitcher leaderboard rows: {len(pdf)}")
+    except Exception as exc:
+        print(f"pitcher leaderboard unavailable ({type(exc).__name__}) -- batters only")
+        pdf = None
 
     players: dict[str, dict] = {}
     skipped = 0
@@ -116,9 +127,37 @@ def main() -> int:
             e["gb_share"] = round(gb / (gb + fbld), 4)
             with_gb += 1
 
+    pitchers: dict[str, dict] = {}
+    if pdf is not None:
+        for _, r in pdf.iterrows():
+            try:
+                pid = int(r["player_id"]); attempts = int(r["attempts"])
+            except Exception:
+                continue
+            if pid <= 0 or attempts < args.min_bbe:
+                continue
+
+            def pf(col):
+                try:
+                    v = float(r[col]); return None if v != v else v
+                except Exception:
+                    return None
+
+            gb, fbld = pf("gb"), pf("fbld")
+            entry = {"bbe": attempts, "barrel_pct": pf("brl_percent"),
+                     "hard_hit_pct": pf("ev95percent"), "avg_exit_velo": pf("avg_hit_speed"),
+                     "gb": gb, "fbld": fbld}
+            if gb is not None and fbld is not None and (gb + fbld) > 0:
+                entry["gb_share"] = round(gb / (gb + fbld), 4)
+            if entry.get("gb_share") is None and entry["barrel_pct"] is None:
+                continue
+            pitchers[str(pid)] = entry
+    print(f"pitchers published: {len(pitchers)}")
+
     artifact = {
-        "schema_version": 1,
+        "schema_version": 2,
         "season": args.season,
+        "pitchers": pitchers,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "statcast batter exit-velo/barrels leaderboard (pybaseball)",
         "min_bbe": args.min_bbe,

@@ -171,4 +171,46 @@ def apply_batted_ball_to_batter(prof: Any, *, season: int, weight: float = 0.35)
     return changed
 
 
-__all__ = ["apply_batted_ball_to_batter", "load_batted_ball"]
+def apply_batted_ball_to_pitcher(prof: Any, *, season: int) -> bool:
+    """Populate a PITCHER's native batted-ball rates. `#440`.
+
+    The sim reads `bb_gb_rate` on BOTH profiles (`simulate.py:1134-1136`), and the
+    first version of this module covered only batters -- leaving five consumed
+    pitcher fields at league defaults, i.e. every pitcher with an identical
+    ground-ball tendency. That is one of the best-established persistent pitcher
+    skills, so treating it as league-average is a real loss.
+
+    NO `weight` PARAMETER, deliberately. The batter path BLENDS (it nudges
+    `hr_rate`/`inplay_hit_rate`, which are fitted outcome rates that already carry
+    information). These `bb_*` fields are not fitted to anything -- they sit at a
+    hardcoded league constant -- so an observed rate REPLACES a placeholder rather
+    than competing with an estimate. There is nothing to blend against.
+    """
+    art = load_batted_ball(season)
+    if not art:
+        return False
+    entry = (art.get("pitchers") or {}).get(
+        str(int(getattr(getattr(prof, "player", None), "mlbam_id", 0) or 0)))
+    if not isinstance(entry, dict):
+        return False
+    gb_share = entry.get("gb_share")
+    if not isinstance(gb_share, (int, float)) or not (0.0 < float(gb_share) < 1.0):
+        return False
+    try:
+        gb = float(gb_share)
+        rest = 1.0 - gb
+        total_air = 0.25 + 0.20 + 0.11
+        prof.bb_gb_rate = gb
+        prof.bb_fb_rate = rest * (0.25 / total_air)
+        prof.bb_ld_rate = rest * (0.20 / total_air)
+        prof.bb_pu_rate = rest * (0.11 / total_air)
+        bbe = entry.get("bbe")
+        if isinstance(bbe, (int, float)) and bbe > 0:
+            prof.bb_inplay_n = int(bbe)
+        return True
+    except Exception:
+        return False
+
+
+__all__ = ["apply_batted_ball_to_batter", "apply_batted_ball_to_pitcher",
+           "load_batted_ball"]

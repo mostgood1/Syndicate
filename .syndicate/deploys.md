@@ -14205,3 +14205,63 @@ enough. **Both are consistent with these readings and I did not distinguish them
 line) in the window a marker was stamped — around 00:10Z, marker age 884s. That
 separates "launched and died" from "not yet graded", and it is the whole
 remaining question.
+
+## 2026-08-18 — FAIL LIST **26 -> 10**. One cheap closure landed; the other was NOT cheap and the claim was wrong.
+
+Lane `convergence-phase7-crps`. No deploy.
+
+### CORRECTION: BVP is not a cheap closure. **All 1,282 cached files are EMPTY.**
+
+I wrote that BVP "is already collected daily, 1,282 cached files, needing only a
+mapping into `vs_pitcher_*`". **Measured across the whole cache:**
+
+    BVP cache files       1282
+    EMPTY by_batter       1282     <- every single one
+    populated                0
+    batter entries           0
+
+They are empty envelopes — the same shape as the `pitcher_pitch_splits` namespace
+that had never been written. **BVP requires a real fetch job, not a mapping.**
+That is the fourth claim of mine corrected by measurement today, and again it
+came from trusting a file COUNT instead of reading the contents.
+
+### DONE: pitcher batted-ball rates
+
+`statcast_pitcher_exitvelo_barrels` — the same one-call leaderboard, pitcher side.
+**509 pitchers** published into the artifact (schema v2 now carries `pitchers`
+alongside `players`). `apply_batted_ball_to_pitcher` added and wired into
+`build_roster` for the starter and every bullpen arm.
+
+**No `weight` parameter on the pitcher path, deliberately.** The batter path
+BLENDS because `hr_rate`/`inplay_hit_rate` are fitted rates carrying real
+information. The `bb_*` fields are not fitted to anything — they sit at a
+hardcoded league constant — so an observed rate REPLACES a placeholder rather
+than competing with an estimate. There is nothing to blend against.
+
+### RESULT
+
+    26  as archived
+    20  after pitch splits + batter blend
+    15  after native batter bb_* population
+    10  after pitcher bb_* population        <- now
+
+    pitcher bb_gb_rate  674/717 (94%)
+    batter  bb_gb_rate  949/1047 (91%)
+
+### THE REMAINING 10, with honest causes
+
+| fields | cause | cost |
+|---|---|---|
+| 5x `vs_pitcher_*` (BVP) | **cache is empty** — needs a real fetch, not a mapping | real job |
+| 2x batter `vs_pitch_type*` | no source built | moderate |
+| 2x `statcast_quality_mult` | **no source exists anywhere in the repo** | unknown |
+| 1x `pitch_type_hr_mult` | `PitcherPitchSplits` has no `hr_mult` | not from this source |
+
+**None of the remaining 10 is cheap.** The cheap work is done.
+
+### Ready to rebuild for real
+
+Every applier `build_roster` runs is now exercised, and the simulated rebuild is
+the number a real rebuild should reproduce. **A deploy request is now
+justifiable** with a verify step of "checklist reports <= 10 consumed-but-unfed
+on the worker", where before it would have claimed far more than it delivered.

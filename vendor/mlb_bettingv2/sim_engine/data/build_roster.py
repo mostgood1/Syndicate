@@ -30,7 +30,7 @@ from .recency import batter_recent_rates, pitcher_recent_rates
 from ..features import RecencyConfig, apply_recency_to_batter, apply_recency_to_pitcher
 from .disk_cache import DiskCache
 from .statsapi import fetch_person_pitch_arsenal
-from .batted_ball import apply_batted_ball_to_batter
+from .batted_ball import apply_batted_ball_to_batter, apply_batted_ball_to_pitcher
 from .statcast_pitch_splits import fetch_pitcher_pitch_splits
 
 
@@ -2186,6 +2186,10 @@ def build_team_roster(
                 statcast_cache=statcast_cache,
                 statcast_ttl_seconds=statcast_ttl_seconds,
             )
+            # `#440`: native batted-ball rates. Unconditional -- these fields sit
+            # at a hardcoded league constant, so an observed rate replaces a
+            # placeholder rather than competing with a fitted estimate.
+            apply_batted_ball_to_pitcher(starter, season=season)
         except Exception:
             pass
 
@@ -2199,6 +2203,7 @@ def build_team_roster(
                 statcast_cache=statcast_cache,
                 statcast_ttl_seconds=statcast_ttl_seconds,
             )
+            apply_batted_ball_to_pitcher(p, season=season)
     if starter.player.mlbam_id:
         starter.role = "SP"
     try:
