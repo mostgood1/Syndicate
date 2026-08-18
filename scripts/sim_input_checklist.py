@@ -156,6 +156,7 @@ def main() -> int:
         from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                                  apply_batted_ball_to_pitcher)
         from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+        from sim_engine.data.quality import apply_quality
         from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
                                                   default_bvp_cache)
         from sim_engine.data.statcast_pitch_splits import default_statcast_cache
@@ -182,6 +183,7 @@ def main() -> int:
                     try:
                         apply_batted_ball_to_batter(_b, season=2026, weight=0.35)
                         apply_arsenal_to_batter(_b, season=2026)
+                        apply_quality(_b, season=2026, side="batters")
                     except Exception:
                         pass
                 for _p in [_lu.pitcher] + list(_lu.bullpen or []):
@@ -190,6 +192,7 @@ def main() -> int:
                             _p, season=2026, statcast_cache=_sc, statcast_ttl_seconds=None)
                         apply_batted_ball_to_pitcher(_p, season=2026)
                         apply_arsenal_to_pitcher(_p, season=2026)
+                        apply_quality(_p, season=2026, side="pitchers")
                     except Exception:
                         pass
         for side in ("away", "home"):

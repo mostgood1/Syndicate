@@ -14892,3 +14892,59 @@ NON-skipped sport (mlb) produces no launch. **Unmeasured.**
 where refresh-worker actually launches: inside `launch_refresh_run`, or at each
 `_launch_autorun_*` call site in `run_refresh_worker.py`. Gating one of the two
 launch paths was never going to partition anything.
+
+## 2026-08-18 — `statcast_quality_mult` CONTRACT SETTLED AND FED. **Checklist PASSES: 26 -> 0.**
+
+Lane `convergence-phase7-crps`. No deploy.
+
+### The contract was never contradictory — it was UNDER-DOCUMENTED
+
+Three consumers looked like they disagreed. Reading all three: the field is a
+**UNION bag, partial by design**. Every read is guarded with `isinstance`, and
+**`_rate_ratio_mult` returns 1.0 for a missing or non-numeric value** (verified
+at `simulate.py:152-160` before relying on it). So a subset is legal.
+
+- `_statcast_shape_rate_mults` reads the **RAW** metrics, derives k/bb/hr/inplay.
+- The lookahead term reads **BOTH** raw metrics and derived multipliers.
+- The old `models.py` comment listed only k/bb/hr/inplay — it described the
+  **derived OUTPUT**, which is why a producer for it could never be found.
+
+**Settled and documented on both profiles**, including the rule that matters:
+**feed RAW metrics only.** Supplying k/bb/hr/inplay alongside would let the
+lookahead add pressure from a value the shape function separately applies —
+double-counting, the 2026-08-17 failure.
+
+### I ALMOST FED GARBAGE, AND THE CHECKLIST WOULD HAVE GONE GREEN
+
+The first producer used `statcast_batter_percentile_ranks`. It returns
+**PERCENTILE RANKS (1.0-100.0), not metric values** — the name says so:
+
+    xwoba 1.0     ev_mean 26.0     ev_max 67.0        <- percentiles
+    xwoba 0.319   ev_mean 89.9     ev_max 111.9       <- real values
+
+Percentiles fed into `_rate_ratio_mult(value, neutral=0.30, ...)` compare a rank
+to a rate. **No error, no warning — and the checklist would have PASSED**, because
+the field would have been populated. Populated with nonsense.
+
+**Caught by checking the VALUE RANGE**, and the range guard now lives on BOTH
+sides: the producer validates before writing, and `quality.py` **drops**
+out-of-range values on read rather than clamping — a value outside its physical
+range means the producer fed the wrong quantity, and rescaling would hide that.
+
+**This is the sharpest lesson of the whole exercise: a population checklist
+proves a field is FED, not that it is fed something MEANINGFUL.** The two checks
+are independent and both are required.
+
+### Result
+
+    26 -> 20 -> 15 -> 10 -> 5 -> 2 -> **0**    gate exit 0, PASS
+
+Sources: `expected_stats.est_woba` (xwoba), `exitvelo_barrels.avg/max_hit_speed`
+(ev_mean, ev_max). **Seven keys remain deliberately ABSENT** —
+`chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`, `pulled_air_rate`,
+`pitch_velo_mean`, `pitch_extension_mean`. Each costs exactly one neutral term;
+fabricating one would cost correctness.
+
+**PASS means every consumed field is fed. It does NOT mean the engine is good** —
+the market still wins all four prop markets, and that number is unchanged by any
+of this plumbing.
