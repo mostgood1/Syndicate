@@ -3572,7 +3572,7 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-###  —  — **stable fixture identity SHIPPED (`b2dbef5e`,
+### wnba-fixture-identity — OPEN — **stable fixture identity SHIPPED (`b2dbef5e`,
 `ec5c9011`, 40 tests). Now wiring it into the game_cards builder.** - opened
 2026-08-17 - session: layer1-board-coverage
 - Goal: the WNBA `game_cards` writer uses the schedule as its denominator and
@@ -4115,7 +4115,7 @@ Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
   Do not promote any leash value — the model still loses to a constant baseline
   at every grid point.
 
-###  —  — **taking `run_live_odds_refresh_worker.py` from the RELEASED orphan `soccer-model-coverage`** - opened 2026-08-17 - session: layer1-board-coverage
+### wnba-phase2-migration — OPEN — **taking `run_live_odds_refresh_worker.py` from the RELEASED orphan `soccer-model-coverage`** - opened 2026-08-17 - session: layer1-board-coverage
 - Goal: re-home the WNBA full refresh onto a worker autorun (Phase 2 of the
   migration off the daily-update GHA cron), so something actually calls
   `refresh_wnba_oddsapi_props.main()` on a cadence.
@@ -4507,7 +4507,7 @@ releasing `board_enrichment.py:678`) · `6bdc50de` (live lens, worker).
   and in `deploys.md`), then re-run `mlb_opportunity_haircut.py`. The scoreboard
   is the market, and it is now a single command.
 
-###  —  — **user decision taken 2026-08-17: allow `book_margin_model` edges, in their own column** - opened 2026-08-17 - session: layer1-board-coverage
+### modelled-fair-edge — OPEN — **user decision taken 2026-08-17: allow `book_margin_model` edges, in their own column** - opened 2026-08-17 - session: layer1-board-coverage
 - Goal: the 1,416 rows carrying BOTH `model_prob` and
   `modelled_fair.*.fair_probability` serve an edge - in a SEPARATE, labelled
   column that never mixes with `edge_vs_market_pct`.
@@ -4523,7 +4523,7 @@ releasing `board_enrichment.py:678`) · `6bdc50de` (live lens, worker).
   wearing a measured number's clothes is the failure `#242` already caused
   once"*. A separate column IS the not-mixing, so the decision honours it.
 
-### soccer-layer2-dates â€” CHECKPOINT 2026-08-17 22:0xZ â€” 4 STRANDS ROOT-CAUSED, 4 COMMITTED + PUSHED, 1 DEPLOYED AND MEASURED, 1 AWAITING WEB, 1 INERT ON ANOTHER LANE â€” session: soccer-layer2-dates
+### soccer-layer2-dates — CHECKPOINT 2026-08-17 22:0xZ — 4 STRANDS ROOT-CAUSED, 4 COMMITTED + PUSHED, 1 DEPLOYED AND MEASURED, 1 AWAITING WEB, 1 INERT ON ANOTHER LANE — session: soccer-layer2-dates
 
 - Goal: soccer's Layer 2 surfaces tell the truth about WHEN a match is and WHETHER
   it is live, and soccer reaches the board with real projections.
@@ -4538,10 +4538,10 @@ releasing `board_enrichment.py:678`) · `6bdc50de` (live lens, worker).
 |---|---|---|
 | live-lens `TypeError` | `6bdc50de` | **DEPLOYED + MEASURED** (7 -> 10 leagues/tick, 21:38:37Z) |
 | rail dates + stale-live guard | `cd46b403` | pushed, **WEB NOT DEPLOYED** (asked twice) |
-| projection window | `6aaa11af` | pushed, **INERT** â€” blocked on `board_enrichment.py:678` |
+| projection window | `6aaa11af` | pushed, **INERT** — blocked on `board_enrichment.py:678` |
 | caller-census test | `18c5ecb9` | pushed |
 
-**(a) and (b) are NOT met in production** â€” web is still `60cdf8eb` from 02:52:02Z.
+**(a) and (b) are NOT met in production** — web is still `60cdf8eb` from 02:52:02Z.
 Verified 21:55:10Z by three independent means (deploy API row; **1 of 79**
 `cd46b403` template lines on the served page; criterion 1 still failing).
 **(c) is NOT met** and cannot be until the wiring below lands.
@@ -4554,16 +4554,16 @@ The file is claimed by OPEN lane `wnba-live-tier` (session `layer1-board-coverag
 file, or they say it conflicts and we sequence. No reply yet.** The new kwarg is
 keyword-only with a default, so taking it cannot break their in-flight work.
 
-**DO NOT REPEAT THESE â€” settled this session.**
+**DO NOT REPEAT THESE — settled this session.**
 - The soccer memory gate is EXONERATED (absent env = ENABLED, but it never fired).
 - The disk split / publisher is EXONERATED for live-lens; files are written to the
   correct path every ~70s.
 - Stale `status_state` on the worker is NOT the live-lens cause. The status bug and
-  the live-lens bug are unrelated â€” do not credit `cd46b403` with fixing the lens.
+  the live-lens bug are unrelated — do not credit `cd46b403` with fixing the lens.
 - `.claude/worktrees/*` had no broken call sites; that was a sweep artefact. Both
   pruned.
 
-**FOR WHOEVER PICKS THIS UP â€” the two traps that cost time here.**
+**FOR WHOEVER PICKS THIS UP — the two traps that cost time here.**
 1. **Test deployment by CONTENT, not ancestry.** `7470939b` does NOT contain
    `6bdc50de` as an ancestor yet ships the fix (deploy branch). Ancestry said
    ABSENT; `git show <sha>:<path>` said PRESENT.
@@ -4572,10 +4572,10 @@ keyword-only with a default, so taking it cannot break their in-flight work.
    reports success. Derive markers from the actual diff.
 
 **NEXT ACTION, in order:** (1) chase `wnba-live-tier` for `board_enrichment.py:678`
-â€” it is the only thing blocking (c) and the only blocker that is a person, not a
+— it is the only thing blocking (c) and the only blocker that is a person, not a
 deploy window; (2) get `cd46b403` onto web and run the three criteria (I can run
 them in ~1 min); (3) re-verify the live lens end-to-end on a slate with a match
-actually in play â€” today's was `post` across all three leagues.
+actually in play — today's was `post` across all three leagues.
 
 
 #### convergence-phase7-crps — CHECKPOINT 4 (FINAL) 2026-08-17 — **P2 shipped to the tree, measured against the market, and DELIBERATELY NOT DEPLOYED**
@@ -4606,7 +4606,7 @@ actually in play â€” today's was `post` across all three leagues.
   two deploy requests queued and de-prioritised by me; `outs-props-coverage-check`
   fires 2026-08-19.
 
-###  — taking `artifact_publisher.py` from the ORPHANED lane `clv-without-settlement`
+#### soccer-layer2-dates — CLAIM OVERRIDE — taking `artifact_publisher.py` from the ORPHANED lane `clv-without-settlement`
 - **Not an override.** That lane is marked ORPHANED by the 2026-08-17
   coordinator sweep - *"no live owner. Session `lane-cleanup` no longer exists
   in the roster"* - and `lane-guard` cannot see sweep releases.
@@ -5188,3 +5188,119 @@ reproducibly. **It does NOT establish a betting edge.** A better-simulated pitch
 mix is a precondition for pitch-type-sensitive markets, not a demonstration of
 one, and the market question remains unresolved because the harness that would
 answer it cannot resolve effects this size.
+
+### soccer-layer2-dates — CLOSED-VERIFIED 2026-08-18 02:3xZ — 8/8 commits on `origin/main`, all deployed and measured; one proof scheduled — session: soccer-layer2-dates
+
+Supersedes the CLOSED entry above with the deploy measurement it was missing.
+
+**Final deploy:** refresh-worker `00e9a49f` + live-odds-worker `cdaeaa58`, 02:05–02:06Z,
+carrying `481de91d` + `461774cb` by content. 7 ticks measured: 0 / 0 / 10-per-tick.
+Written up in `deploys.md`.
+
+**8/8 commits confirmed on `origin/main`.** `main` is 5 ahead / 254 behind and **all 5
+ahead belong to other sessions** (sim-engine lane). Nothing of mine is unpushed or
+uncommitted.
+
+**THE ONE PROOF OWED IS NOW SCHEDULED, NOT FORGOTTEN.**
+`verify-soccer-live-lens-end-to-end`, one-time **2026-08-19 19:15 CT**. ESPN confirms
+**2026-08-18 has ZERO soccer fixtures** and 08-19 has 16; 19:15 CT is the day's peak
+concurrency (**8 matches live**). A 14:45 slot would have rested the whole proof on a
+single la_liga fixture.
+
+**LEFT FOR ITS AUTHOR, uncommitted in a file this lane owns:**
+`tests/test_soccer_projection_window.py` +48 lines —
+`test_the_production_caller_actually_passes_a_multi_date_window`, a reachability guard
+for the `board_enrichment` wiring. **It passes (13 tests).** Not mine; not swept in.
+
+**NEW FACT WORTH CARRYING:** `live-odds-worker` is the effective owner of the soccer
+live-lens loop — `refresh-worker` produced zero soccer ticks in a 9-minute window
+despite carrying the loop flag.
+
+### soccer-model-dispersion — OPEN — opened 2026-08-18 — session: soccer-sport-owner
+
+- Goal: soccer's model stops losing to the closing line on at least one league.
+  **Testable outcome:** `scripts/backtest_soccer_h2h_calibration.py` re-run over the
+  SAME 1,112 matches / 9 leagues reports model multiclass Brier **<= market** on at
+  least one league that is not `belgian_pro_league`, and mean model `stdev(P home)`
+  rises from **0.1575** toward market's **0.1811**. Baseline to beat is committed:
+  `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+- Files:
+  - `scripts/backtest_soccer_h2h_calibration.py`
+  - `scripts/build_soccer_artifacts.py`
+  - `scripts/validate_soccer_vs_market.py`
+  - `syndicate/features/soccer/` (sim engine, adapters, ratings)
+  - `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
+    `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`
+  - `reports/soccer_backtest/`
+- **NOT IN THIS LANE, and the reason matters:**
+  `syndicate/features/shared/soccer_projections.py` and
+  `syndicate/features/shared/book_margin_model.py` are being edited RIGHT NOW by
+  session `7c041356` under informal lane `modelled-fair-edge` (uncommitted work,
+  `.current-lane` marker, no lane header). They are the BOARD-side adapter; this lane
+  is the SIM side. Do not take them.
+- Hypothesis: the model is UNDER-DISPERSED, not merely inaccurate. Measured
+  2026-08-15: mean model `stdev(P home)` **0.1575** vs market **0.1811**, narrower in
+  **8 of 9** leagues; eredivisie's reliability curve is too timid at both ends
+  (predicted 0.144 -> actual 0.000; predicted 0.823 -> actual 1.000). Two independent
+  routes agree on the shape (production artifact stdev 0.1364 / 166 rows).
+- Falsification test: sharpen the distribution and re-run. **If the Brier gap does not
+  close while stdev rises to market's, under-dispersion is NOT the binding constraint**
+  and the cause is the ratings/inputs, not the spread. That is a real outcome and must
+  be recorded, not retried with a bigger knob.
+  Second, cheaper falsifier first: `adapters._DEFAULT_SIMULATIONS` is **300**, which is
+  **+/-2.9pp of pure Monte Carlo noise** against a gap of **+0.0139**. **Raise the sim
+  count and re-run BEFORE changing any model term** — if the gap moves on sim count
+  alone, the 2026-08-15 number was partly noise and every conclusion drawn from it
+  needs re-reading.
+- Verification: the re-run's own JSON in `reports/soccer_backtest/`, compared
+  league-by-league against the 08-15 baseline on the same match set. **A gap that
+  improves on a DIFFERENT match set proves nothing** — the 1,112 are the control.
+- Blocked by: none.
+
+**INHERITED, DO NOT RE-DERIVE:**
+- **A leak-free backtest ALREADY EXISTS** — `backtest_soccer_h2h_calibration.py`,
+  committed `5a94b134`. The retired-for-leakage artifacts are
+  `data/soccer_source/*/validation/*_backtest_*.csv`, a DIFFERENT thing. I generalised
+  those into "soccer accuracy is unmeasured" earlier today and was wrong.
+- **MLS CANNOT be backtested from its current source** — `fetch_asa_mls_team_history`
+  returns undated season aggregates; no `as_of` can repair it. Non-MLS leagues only.
+- **Do not publish `model_edge_pct` on the strength of a partial win.** Standing
+  decision: a model that loses to the closing line emits edges that are noise, and its
+  errors are systematically on favourites, so those edges point at underdogs.
+  Publishing is a SEPARATE decision from closing the gap.
+- Fixes #1 (seeds), #3 (accent join), #4 (as-of) were built and tested and are safe to
+  ship; **#2 removes a stale BLOCK and does not make the number publishable.**
+
+#### convergence-phase7-crps — BUILT 2026-08-18, **VALIDATION IN FLIGHT** — per-PA common random numbers
+
+`GameConfig.crn_pa_seeding`, **default OFF**. Re-seeds the game RNG at every
+plate appearance from `(rng_seed, batting team_id, that team's PA index)`.
+
+**The problem it targets, measured:** the market harness had a seed-to-seed
+noise floor of **0.00326 Brier against effects of ~0.00138**. Cause: one RNG
+stream per game, so the first pitch whose outcome differs shifts every
+subsequent draw and the two arms are running different games from that point on.
+**Sharing a seed across arms LOOKS like common random numbers and is not**, when
+control flow depends on the RNG.
+
+**The design decision:** a team's Nth plate appearance is the same logical event
+in both arms *by definition of a batting order*, so seeding on it re-synchronises
+after any divergence. **Inning is deliberately NOT in the key** — it shifts when
+scoring differs, which would break the alignment the flag exists to create.
+
+**Seeds pass through a splitmix64 avalanche, not a plain multiply.** Consecutive
+PA indices differ by 1 and Mersenne Twister seeds differing in low bits give
+correlated early output — the naive version introduces exactly the correlation
+it is meant to remove.
+
+**DEFAULT OFF and it must be ON FOR BOTH ARMS of a comparison.** It changes every
+simulated result, so it is a measurement instrument, never a silent change to
+what production simulates.
+
+**CLAIMED, NOT YET MEASURED.** `scripts/validate_crn_pa_seeding.py` is running
+and checks, in order: (1) determinism preserved with the flag off — a variance
+fix that broke reproducibility would be worse than the problem; (2) reachability,
+on != off; (3) **the only claim that matters — the spread of `(mix ON - mix OFF)`
+across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will not
+improve; reporting it would look like a result and mean nothing. **If the ratio
+comes back ~1.0 the flag is not worth using and this entry says so.**

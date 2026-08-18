@@ -4974,3 +4974,40 @@ as 1/sims, so resolving ~0.001 from 120 sims needs roughly 16x). **Never report
 a single-seed delta as a result again.** A run that "beats the market" at one
 seed — seed 4242 showed `runs_scored` beating the market in the arm WITHOUT the
 feature — is a coin flip presented as a finding.
+
+## 2026-08-18 — RULE: a `sed` backreference that does not match writes a RAW CONTROL BYTE, and it ate three lane slugs
+
+**Three OPEN lanes lost their names entirely.** Their headers read
+`###  \x01  —  \x02  — **body` — the literal bytes `\x01` and `\x02` where the
+slug and status should be. A session correcting the ASCII-hyphen headers ran a
+substitution with `\1`/`\2` backreferences whose capture groups did not match,
+and `sed` wrote the escape sequences as raw control characters instead of the
+captured text.
+
+**Why it was nearly invisible.** The rendered line looks like a header with two
+em-dashes and a bold body — `###  —  — **stable fixture identity SHIPPED`. The
+missing slug reads as spacing. It took `od -c` on the raw bytes to see it, after
+a regex repair silently failed to match the line it was written for.
+
+**The damage was not cosmetic.** With no slug:
+- `lane-guard` attributed the lane's claims to nothing, so
+  `wnba_fixture_identity.py`, `run_live_odds_refresh_worker.py`,
+  `book_margin_model.py` and their siblings were UNGUARDED again — the exact
+  state the em-dash fix was made to repair;
+- a ledger sweep reads a slugless header as a closed lane and **archives it**. It
+  was one command away from three live lanes being filed as history.
+
+**How to apply.**
+- **After any bulk header rewrite, grep for control bytes**:
+  `grep -nP '^###.*[\x00-\x08\x0e-\x1f]'` (or `od -c` a sample). A rendered line
+  that "looks right" is not evidence about its bytes.
+- **Prefer a parser to a regex for structured lines.** The repair that worked
+  read each header, identified the lane from its own BODY text, and rebuilt the
+  header — it did not pattern-match the damage.
+- **Never sweep on "has no OPEN block" alone.** That predicate cannot tell a
+  closed lane from a lane whose header was destroyed. Read every candidate header
+  before archiving it; this sweep found the damage precisely because it did.
+
+Related: the em-dash-is-syntax rule, whose fix caused this; and the sweep rule
+that a status surface must be advanced one item at a time against its own
+evidence.
