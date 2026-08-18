@@ -256,3 +256,57 @@ detached run, never in a request path** — and it must not collide with the MLB
 daily sim, which was measured holding 2 in-flight jobs on 2026-08-18.
 
 **Estimate the wall-clock from a single-game timing before launching a full arm.**
+
+
+---
+
+## PHASE 1 COMPLETE — 2026-08-19. Reachability PASSES, and the required re-fit is now MEASURED rather than assumed.
+
+**20 games, weeks 6-7 of 2023, 300 seeds/arm, as-of payload vs empty.**
+
+| metric | units-buggy | units-fixed |
+|---|---|---|
+| mean \|Δ margin\| | 0.463 | **0.544** |
+| mean signed Δ margin | +0.309 | +0.300 (SE 0.119) |
+| mean \|Δ total\| | 8.024 | **3.563** |
+| mean signed Δ total | — | **−2.644 (SE 0.695)** |
+| total/margin asymmetry | 17.3× | **6.5×** |
+
+**Prediction stated before the run — margin rises, total falls sharply — held on
+both counts.**
+
+### The residual −2.6 total shift is BIAS, and it is the ENGINE's baselines
+
+`_offense_strength` centres each term on a hardcoded constant. Those constants
+do not match real NFL distributions:
+
+| term | engine baseline | real league mean | bias per team |
+|---|---|---|---|
+| `success_rate` | 0.500 | **0.422** | **−0.094** |
+| `explosive_play_rate` | 0.100 | **0.066** | −0.031 |
+| `red_zone_efficiency` | 0.500 | 0.575 | +0.060 |
+| `pass_rate` | 0.500 | 0.496 | −0.002 |
+| `offensive_epa` | 0.000 | −0.034 | −0.030 |
+| **net** | | | **−0.097** |
+
+**League mean `offense_index` = 0.405 against an engine neutral of 0.500.** Every
+team is pushed below neutral, so every game's scoring environment drops — which
+is exactly the −2.644 signed total shift, and why 17 of 20 games moved down.
+
+### This is §4.4, measured
+
+**The engine's rates were fitted with these terms ABSENT — so the defaults ARE
+the calibration.** Feeding real data that sits below an assumed baseline
+systematically suppresses scoring. That is the mechanism-vs-estimator trap, no
+longer a warning but a number: **−0.097 of index, ≈ −2.6 points of total.**
+
+**Phase 4 is therefore not optional and its target is known:** re-centre each
+term on its real league mean (or re-fit the profile rates around the new index
+distribution). Shipping the mechanism without it ships a systematic under-total.
+
+### Verdict
+
+- **Phase 1: PASS.** The leak-free payload reaches the engine and discriminates
+  (`offense_index` 0.050–0.825, 30 distinct values, ranking football-accurate).
+- **Phase 3 must not be judged before Phase 4.** A −2.6-point total bias would
+  dominate any CRPS result and read as a model finding.
