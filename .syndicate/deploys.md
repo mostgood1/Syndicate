@@ -13543,3 +13543,88 @@ marker — which I had just recorded as `#382`'s correction, hours earlier.
 consult `_live_refresh_loop_effective_sports`. That trace is still the right
 starting point for the remaining half, and the reachability framing was right —
 it was the scope of the word "inert" that was wrong.
+
+## 2026-08-18 — WHY THE 10 REMAIN UNFED, answered per field. **BVP was a STALE-EMPTY CACHE, not a missing fetch.**
+
+Lane `convergence-phase7-crps`. Asked directly why these stay unfed. "No source"
+was a restatement, not an answer. Traced each.
+
+### BVP (5 fields) — **I was wrong TWICE, in opposite directions**
+
+- First I said *"already collected daily, 1,282 files, needs only a mapping"* —
+  wrong, every file has `by_batter: {}`.
+- Then I said *"needs a real fetch job"* — **also wrong.**
+
+**Computed FRESH against the current corpus, bypassing the cache:**
+
+    pitcher 642207   140 batter entries
+    pitcher 656492   165
+    pitcher 663687   170
+    pitcher 641329   129
+    pitcher 646241   117
+    -> 5/5 pitchers return real BVP data
+
+The raw corpus is present — `data/raw/statcast/pitches/2026/` holds **39 files
+from 2026-03-11 to 2026-07-30** (and 23 for 2025). BVP is COMPUTED from those,
+not fetched.
+
+**The 1,282 empty files are a STALE-EMPTY CACHE**, written 2026-07-19 with a
+**30-day TTL**, so it will not recompute until ~2026-08-18. Something cached an
+empty result when the corpus was absent or unreachable, and the TTL has been
+serving that emptiness ever since.
+
+**So BVP is the CHEAPEST remaining item, not the most expensive** — it needs a
+cache invalidation, not a fetch. **Delete the `bvp` namespace and it recomputes.**
+
+### The other 5, with real causes
+
+| fields | why | fixable |
+|---|---|---|
+| batter `vs_pitch_type` x2 | the pitch-splits artifact is PITCHER-side only; a batter-vs-pitch-type source was never built | yes, another leaderboard/query |
+| `statcast_quality_mult` x2 | **no producer anywhere in the repo** — only `getattr` reads | unknown, needs a definition first |
+| `pitch_type_hr_mult` | `PitcherPitchSplits` carries `whiff_mult` + `inplay_mult` only; the x64 tool computes no HR-by-pitch-type | not from this source |
+
+### THE LESSON, and it is the same one a fourth time
+
+A cache file that EXISTS is not data. I read a file COUNT (1,282) and inferred
+content, twice, in opposite directions, without opening one. **The check that
+settled it took one call: compute the value fresh and compare.**
+
+`learnings.md` already carries "measure population, never infer from presence"
+for MODEL FIELDS. **It applies identically to CACHES**, and a TTL makes it worse:
+an empty result caches as authoritative and hides the corpus that would fill it.
+
+## ENV CHANGE — `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` true -> false on live-odds-worker `[2026-08-18 ~01:0xZ, user instruction]`
+
+**Single-key endpoint, NOT `render.yaml`.** `PUT /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/<key>`
+returned 200 and the new value was **verified by re-reading the key**, not by
+trusting the status code. A `blueprint_sync` would have rewritten the whole env
+block on live services; it 502'd every route for ~2 minutes on 2026-08-08.
+
+**Why `"false"` and not a deletion.** The predicate is
+`raw_value in {"1","true","yes","on"}` — read from the code, not assumed — so
+`"false"`, `"0"` and absent are all off. An explicit `false` is visible to the
+next reader; an absent key is indistinguishable from one nobody ever set, and
+this ledger's standing rule is that **absent != off**. It also matches the
+sibling flags (`SYNDICATE_MLB_REFRESH_TICK_OWNER=false`).
+
+**NO DEPLOY FIRED, deliberately.** A restart does not re-inject env vars, but the
+autorun CODE is not on the live SHA (`7470939b`, rolled back), so nothing is
+running it. The flag matters for the NEXT deploy that carries that code, and that
+deploy will read the new value at boot. Firing one now would be churn on a 2GB
+service for no effect.
+
+**What this closes:** the live trap recorded at the rollback — any redeploy of
+live-odds-worker re-arming an autorun that reached 85.3% of 2048MB, +380MB in 13
+minutes. That can no longer happen by accident.
+
+**What it does NOT do:** it does not re-stage Phase 2. Enabling it remains
+`wnba-phase2-migration`'s decision, and the memory question is unresolved — the
+leg is sized at 1.3-1.5GB against measured headroom of ~1,186MB. Re-homing to
+refresh-worker's 4GB is still the coordinator's recommendation. **This change
+restores exactly the staging the request originally asked for and could not have:
+deploy inert, then enable in a watched window.**
+
+**`render.yaml` now differs from live env on this key.** That reconciliation is
+owed and is not done here — same trade-off the request itself named when it
+insisted on the single-key endpoint.
