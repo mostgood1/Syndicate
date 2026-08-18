@@ -35,7 +35,11 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from syndicate.features.soccer.contracts import SoccerMatchFeatures  # noqa: E402
-from syndicate.features.soccer.features.loaders import build_soccer_match_features  # noqa: E402
+from syndicate.features.soccer.features.loaders import (  # noqa: E402
+    build_soccer_match_features,
+    compute_team_ratings,
+    team_rows_from_match_history,
+)
 
 ENGINE = REPO / "syndicate/features/soccer/sim_engine/soccersim/possession_priors.py"
 
@@ -78,19 +82,38 @@ def consumed_keys() -> dict[str, list[list[str]]]:
 def main() -> int:
     # A REAL feature payload from the production constructor -- not a fixture.
     # Ratings shaped like `compute_team_ratings` output so the call is honest.
-    # Shaped EXACTLY as `compute_team_ratings` emits (loaders.py:241-248), so an
-    # alarm here means the wiring is missing rather than the fixture being thin.
-    ratings = {
-        "ajax": {"attack_rating": 0.31, "defense_rating": -0.12,
-                 "xg_for_per_match": 1.92, "xg_against_per_match": 0.94,
-                 "ppda": 9.6, "matches": 34.0},
-        "psv": {"attack_rating": 0.28, "defense_rating": -0.09,
-                "xg_for_per_match": 1.81, "xg_against_per_match": 1.02,
-                "ppda": 10.4, "matches": 34.0},
-    }
+    # RATINGS COME FROM REAL HISTORY, NOT A HAND FIXTURE.
+    #
+    # A hand-written ratings dict drifts from what `compute_team_ratings`
+    # actually emits, and then this gate reports correctly-wired fields as
+    # unfed -- which it did twice on 2026-08-18, once after the xG wiring and
+    # once after the converter wiring. A checklist that can be wrong in the
+    # ALARMING direction is survivable; one that can be wrong in the reassuring
+    # direction is not, and a stale fixture can do both.
+    import csv
+
+    hist = sorted((REPO / "data/soccer_source/eredivisie/history").glob("matches_*.csv"))
+    if not hist:
+        print("  cannot run: no eredivisie match history on disk")
+        return 2
+    rows: list[dict] = []
+    for path in hist:
+        with path.open(encoding="utf-8", newline="") as fh:
+            rows.extend(dict(r) for r in csv.DictReader(fh))
+    ratings = compute_team_ratings(
+        team_rows_from_match_history(rows), as_of="2026-08-19", allow_undated=False
+    )
+    if len(ratings) < 2:
+        print(f"  cannot run: only {len(ratings)} rated teams from {len(rows)} history rows")
+        return 2
+    home, away = sorted(ratings)[:2]
+    print(f"  ratings source: {len(hist)} history file(s), {len(rows)} rows, {len(ratings)} rated teams")
+    print(f"  fixture: {home} vs {away}")
+    print()
+
     match = build_soccer_match_features(
         league="eredivisie", date="2026-08-19",
-        home_team="Ajax", away_team="PSV", ratings=ratings,
+        home_team=home, away_team=away, ratings=ratings,
     )
 
     print("SOCCER SIM INPUT CHECKLIST")
