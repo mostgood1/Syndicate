@@ -141,3 +141,50 @@ class BuildLiveStateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GameShapeEmitTests(unittest.TestCase):
+    """Lane `game-shape-capture`.
+
+    These call the real `build_live_state`, not a stub -- asserting a key is
+    present would only prove presence, so each one reads a value back that the
+    shape contract had to actually derive.
+    """
+
+    def test_live_state_carries_a_parsed_game_shape(self) -> None:
+        state = build_live_state(_summary(), event_id="e1", as_of_seconds=4200.0)
+        shape = state["game_shape"]
+        self.assertTrue(shape["valid"])
+        self.assertEqual(shape["sport"], "soccer")
+        # as_of 4200s -> half 2, 1200s remaining -> the 70th minute.
+        self.assertEqual(state["half"], 2)
+        self.assertEqual(shape["match_minute"], 70.0)
+        self.assertEqual(shape["minutes_remaining_regulation"], 20.0)
+
+    def test_shape_agrees_with_the_state_it_was_built_from(self) -> None:
+        """Guards against the shape being built from a different object."""
+        state = build_live_state(_summary(), event_id="e1")
+        shape = state["game_shape"]
+        self.assertEqual(shape["home_margin"], state["score_home"] - state["score_away"])
+        self.assertEqual(shape["home_shots"], state["home_shots_so_far"])
+        self.assertEqual(shape["total_shots"], state["home_shots_so_far"] + state["away_shots_so_far"])
+        self.assertEqual(shape["red_card_diff"], state["home_red_cards"] - state["away_red_cards"])
+
+    def test_shape_carries_no_model_output(self) -> None:
+        """The projection is attached to this record by the CALLER, later.
+
+        The shape must stay free of it or the error analysis it feeds is
+        circular. This pins the ordering: shape is built before any projection
+        is merged in.
+        """
+        state = build_live_state(_summary(), event_id="e1")
+        for leaked in ("projection", "goal_windows", "home_win_probability"):
+            self.assertNotIn(leaked, state["game_shape"])
+
+    def test_cutoff_before_kickoff_still_produces_a_valid_shape(self) -> None:
+        state = build_live_state(_summary(), event_id="e1", as_of_seconds=0.0)
+        shape = state["game_shape"]
+        self.assertTrue(shape["valid"])
+        self.assertEqual(shape["match_minute"], 0.0)
+        self.assertIsNone(shape["shot_dominance"])   # nobody has shot yet
+        self.assertEqual(shape["bucket"], "first_half|level")

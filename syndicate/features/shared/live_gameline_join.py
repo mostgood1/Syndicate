@@ -641,6 +641,37 @@ def _apply_verdict(
             updated["live_projected"] = live_projected
         if verdict.get("priceable"):
             updated["edge_vs_market_pct"] = verdict.get("edge_pp")
+            # **WHICH PROBABILITY THIS EDGE IS COMPUTED AGAINST.** On a
+            # live-joined row it is `live_model_prob_over`, NOT the pregame
+            # `model_prob_over` set a few lines above -- different vintages, and
+            # pairing them is wrong by tens of points.
+            #
+            # Measured on the served shortlist 2026-08-16: of 13 rows carrying
+            # both an edge and the probability pair, the 7 whose
+            # `edge_vs_market_pct` could NOT be reproduced from
+            # `(model_prob_over - market_fair_prob_over)` were all `live_aware`,
+            # and all 6 that reconciled were not -- 7/7 separation. On one row
+            # the stated edge was `-39.93`, which is exactly
+            # `(live_model_prob_over 0.1917 - market_fair_prob_over 0.591) * 100`;
+            # the pregame pairing gives `+27.46`. Every number is correct. Only
+            # the pairing is unstated, and a reader cannot recover it.
+            #
+            # **THIS IS THE FIX `layer2_board` SAYS IT IS WAITING FOR.** Beside
+            # `_MODEL_EDGE_MAX_POINTS = 15.0` it reads: "The real fix is an
+            # explicit `basis` on the projection... Until projections carry it,
+            # this bound is the guard -- and it is a GUARD, not a calibration."
+            # That 15-point bound is why the worst of these rows are dropped
+            # rather than mispriced: the `-39.93` above never reaches the board.
+            # `edge_basis` is what a future change would need before that bound
+            # could be relaxed. Relaxing it is NOT part of this change.
+            #
+            # **This ADDS a key and changes no existing value, deliberately.**
+            # `layer2_board._model_edge_for` reads `edge_vs_market_pct` directly
+            # and it becomes the board's `model_edge_pct`, so moving the live
+            # edge to a differently-named field would make the board price LIVE
+            # rows off a PREGAME edge -- worse than the defect it fixes. That was
+            # the first proposal here and it was withdrawn for exactly that.
+            updated["edge_basis"] = "live" if live_projected is not None else "pregame"
             updated["edge_unavailable_reason"] = None
         else:
             updated["edge_vs_market_pct"] = None

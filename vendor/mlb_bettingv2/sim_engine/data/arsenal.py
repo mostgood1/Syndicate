@@ -59,34 +59,12 @@ def load_arsenal(season: int) -> Optional[dict]:
 
 
 def _pt(code: str):
-    """Canonical PitchType, or None when the code is not a pitch to model.
-
-    Previously `PitchType(code)` directly, which raised on any Statcast code the
-    engine's small enum does not name -- so the SWEEPER, 8.20% of 2026 pitches,
-    had its whole row DISCARDED. A sweeper-first pitcher's primary breaking ball
-    reached the sim with no whiff, in-play or HR multiplier at all.
-    """
-    from .pitch_codes import canon_pitch_type
-    return canon_pitch_type(code)
-
-
-def _merge(target: dict, pt, value: float, weight: float) -> None:
-    """Accumulate a usage-weighted value under `pt`.
-
-    **Collisions are now possible and must not overwrite.** ST and SL both
-    canonicalise to SL, so a pitcher who throws a slider AND a sweeper has two
-    source rows landing on one key. Taking the last row would silently pick
-    whichever the dict happened to yield second; averaging by usage keeps both.
-    """
-    if weight <= 0:
-        weight = 1e-6
-    acc = target.setdefault(pt, [0.0, 0.0])
-    acc[0] += float(value) * weight
-    acc[1] += weight
-
-
-def _finish(acc: dict) -> dict:
-    return {pt: (num / den) for pt, (num, den) in acc.items() if den > 0}
+    """Canonical PitchType, or None when the code is unknown to the engine."""
+    from ..models import PitchType
+    try:
+        return PitchType(str(code).strip().upper())
+    except Exception:
+        return None
 
 
 def _entry_for(prof: Any, season: int, side: str) -> Optional[dict]:
@@ -105,19 +83,17 @@ def apply_arsenal_to_pitcher(prof: Any, *, season: int) -> bool:
     entry = _entry_for(prof, season, "pitchers")
     if entry is None:
         return False
-    a_whiff, a_inplay, a_hr = {}, {}, {}
+    whiff, inplay, hr = {}, {}, {}
     for code, vals in entry.items():
         pt = _pt(code)
         if pt is None or not isinstance(vals, dict):
             continue
-        w = float(vals.get("usage") or 0.0)
         if isinstance(vals.get("whiff_mult"), (int, float)):
-            _merge(a_whiff, pt, vals["whiff_mult"], w)
+            whiff[pt] = float(vals["whiff_mult"])
         if isinstance(vals.get("inplay_mult"), (int, float)):
-            _merge(a_inplay, pt, vals["inplay_mult"], w)
+            inplay[pt] = float(vals["inplay_mult"])
         if isinstance(vals.get("hr_mult"), (int, float)):
-            _merge(a_hr, pt, vals["hr_mult"], w)
-    whiff, inplay, hr = _finish(a_whiff), _finish(a_inplay), _finish(a_hr)
+            hr[pt] = float(vals["hr_mult"])
     if not (whiff or inplay or hr):
         return False
     try:
@@ -143,17 +119,15 @@ def apply_arsenal_to_batter(prof: Any, *, season: int) -> bool:
     entry = _entry_for(prof, season, "batters")
     if entry is None:
         return False
-    a_contact, a_power = {}, {}
+    contact, power = {}, {}
     for code, vals in entry.items():
         pt = _pt(code)
         if pt is None or not isinstance(vals, dict):
             continue
-        w = float(vals.get("usage") or 0.0)
         if isinstance(vals.get("inplay_mult"), (int, float)):
-            _merge(a_contact, pt, vals["inplay_mult"], w)
+            contact[pt] = float(vals["inplay_mult"])
         if isinstance(vals.get("hr_mult"), (int, float)):
-            _merge(a_power, pt, vals["hr_mult"], w)
-    contact, power = _finish(a_contact), _finish(a_power)
+            power[pt] = float(vals["hr_mult"])
     if not (contact or power):
         return False
     try:

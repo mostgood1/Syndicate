@@ -21,6 +21,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from syndicate.features.shared.calibration_profile_paths import calibration_profile_path
+from syndicate.features.shared.calibration_profile_store import load_versioned_profile
+
 
 @dataclass(frozen=True)
 class CalibrationProfile:
@@ -118,6 +121,35 @@ class CalibrationProfile:
 # hardcoded in play_simulator.py/drive_simulator.py before this profile seam
 # existed. Passing this profile (or no profile at all, since call sites
 # default to it) reproduces the frozen NFL Production Candidate exactly.
-NFL_CALIBRATION_PROFILE = CalibrationProfile(name="nfl")
+NFL_CALIBRATION_PROFILE_DEFAULT = CalibrationProfile(name="nfl")
 
-__all__ = ["CalibrationProfile", "NFL_CALIBRATION_PROFILE"]
+# `#440` Part 4 Phase 5 -- the versioned-profile seam. See the soccer engine's
+# copy of this comment for the full reasoning; the short version:
+#
+# RESOLVED AT IMPORT because every consumer takes this constant as a DEFAULT
+# ARGUMENT (`simulate_game(sim_input, profile=NFL_CALIBRATION_PROFILE)` in the
+# four generate/backtest scripts, and the engine's own defaults), and Python
+# evaluates those once at import. Resolving the CONSTANT reaches every call site
+# with no churn; a separate `resolve_...()` helper would have required editing
+# each one, and any site missed keeps reading the frozen default -- which is
+# exactly how `load_versioned_profile` came to be "complete and unreachable".
+#
+# NO-OP WHILE NO ARTIFACT EXISTS: the loader returns `default_profile` ITSELF
+# when the file is absent, invalid or unreadable, and never raises. The comment
+# above still holds verbatim -- passing this profile, or none, reproduces the
+# frozen NFL Production Candidate exactly.
+#
+# NOTE FOR PHASE 8: this profile is currently ALL 1.0 MULTIPLIERS, i.e. NFL has
+# never had a real calibration. That is what makes it the cheapest Phase 8
+# target, and this seam is what lets it ship as a file rather than a code change.
+NFL_CALIBRATION_PROFILE, NFL_CALIBRATION_PROFILE_METADATA = load_versioned_profile(
+    default_profile=NFL_CALIBRATION_PROFILE_DEFAULT,
+    artifact_path=calibration_profile_path("nfl"),
+)
+
+__all__ = [
+    "CalibrationProfile",
+    "NFL_CALIBRATION_PROFILE",
+    "NFL_CALIBRATION_PROFILE_DEFAULT",
+    "NFL_CALIBRATION_PROFILE_METADATA",
+]

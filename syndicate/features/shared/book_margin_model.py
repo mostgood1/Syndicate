@@ -217,3 +217,98 @@ def apply_margin_model(
         "pct_modelled": round(100.0 * filled / considered, 1) if considered else 0.0,
         "profile": profile.summary(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Pricing a model view against the MODELLED fair -- its own column, never the
+# real one.
+# ---------------------------------------------------------------------------
+#
+# USER DECISION 2026-08-17: "yes, allow book_margin_model edges with their own
+# column." This is recommendation 4 of the Layer 1 audit, which surfaced it
+# rather than taking it: 1,416 rows (285 MLB, 1,131 soccer) carry BOTH a
+# `model_prob` and a `modelled_fair.<side>.fair_probability` and served no edge
+# at all, because the only edge field on the board is priced against a REAL
+# two-sided de-vig that a one-sided market cannot produce.
+#
+# THE SEPARATE COLUMN IS THE WHOLE POINT, not packaging. This module's own
+# docstring forbids the alternative: a modelled fair "must never be silently
+# mixed with a real two-sided fair value -- a modelled number wearing a measured
+# number's clothes is the failure #242 already caused once". So this writes
+# `edge_vs_modelled_fair_pct` and NEVER touches `edge_vs_market_pct`, and it
+# carries the provenance (method, which book, what hold) onto the row so a
+# reader can see the weaker claim for what it is without opening the code.
+#
+# IT IS A WEAKER CLAIM AND THE FIELD NAMES SAY SO. `edge_vs_market_pct` prices
+# against a fair derived from two real opposing prices. This prices against a
+# fair ESTIMATED from one book's measured hold for that market family. Same
+# units, different confidence, different question.
+
+EDGE_FIELD = "edge_vs_modelled_fair_pct"
+EDGE_METHOD_FIELD = "edge_vs_modelled_fair_method"
+EDGE_BASIS_FIELD = "edge_vs_modelled_fair_basis"
+EDGE_HOLD_FIELD = "edge_vs_modelled_fair_hold_pct"
+
+
+def _finite_probability(value: Any) -> float | None:
+    """A probability strictly inside (0, 1), or None.
+
+    Bounds are EXCLUSIVE for the same reason `live_gameline_score` uses them:
+    a stored 0.0 or 1.0 is a certainty no estimator expresses, so it is far more
+    likely a sentinel or a unit error than a forecast, and pricing against it
+    would manufacture a huge edge from a bad row.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    probability = float(value)
+    if probability != probability or probability <= 0.0 or probability >= 1.0:
+        return None
+    return probability
+
+
+def modelled_fair_edge(row: Any, *, model_prob: Any, side: Any) -> dict[str, Any] | None:
+    """Fields for an edge against the MODELLED fair, or None if it cannot be priced.
+
+    Returns a dict to merge onto the projection rather than mutating, so a
+    caller can decide placement and so this is testable without a grid.
+
+    REFUSALS, each of which would otherwise put a confident number on a bad row:
+
+    * **Not a `book_margin_model` fair.** If `fair_method` is anything else --
+      including a real `two_sided_consensus` that arrived in this block -- this
+      returns None. Pricing a two-sided fair here would duplicate
+      `edge_vs_market_pct` under a name that says it is modelled, which is the
+      mixing the module forbids, just in the other direction.
+    * **Either probability outside (0, 1).** See `_finite_probability`.
+    * **No side, or no entry for that side.** A prop's modelled fair is keyed by
+      side; guessing which one would silently price the wrong leg.
+    """
+    if not isinstance(row, Mapping):
+        return None
+    side_key = str(side or "").strip().lower()
+    if not side_key:
+        return None
+    modelled = row.get("modelled_fair")
+    if not isinstance(modelled, Mapping):
+        return None
+    entry = modelled.get(side_key)
+    if not isinstance(entry, Mapping):
+        # Tolerate case differences in the stored key without guessing a side.
+        entry = next(
+            (v for k, v in modelled.items() if str(k).strip().lower() == side_key and isinstance(v, Mapping)),
+            None,
+        )
+    if not isinstance(entry, Mapping):
+        return None
+    if str(entry.get("fair_method") or "").strip() != "book_margin_model":
+        return None
+    fair = _finite_probability(entry.get("fair_probability"))
+    model = _finite_probability(model_prob)
+    if fair is None or model is None:
+        return None
+    return {
+        EDGE_FIELD: round((model - fair) * 100.0, 2),
+        EDGE_METHOD_FIELD: "book_margin_model",
+        EDGE_BASIS_FIELD: entry.get("basis"),
+        EDGE_HOLD_FIELD: entry.get("assumed_hold_pct"),
+    }
