@@ -15866,3 +15866,23 @@ of `STREAM_PULL_ABSENT` / `PULL_REPAIR_MISSING ok=False written=0` for
 season so absent book quotes are unsurprising, but the repair path retrying
 every tick and reporting `ok=False` is worth someone's attention — it is not
 this lane's file.
+
+### deploy PENDING — web — 2026-08-18 ~22:37Z — lane `basketball-model-owner`
+
+`/preflight web` PASS. Candidate `b775255a` (branch
+`deploy/basketball-artifact-allowlist`), parented on web's re-verified live
+SHA `055dfc67` (`GET /api/ops/version` immediately before cutting, per
+state.md's own rule -- the first cut, off `841b6d84`, was already stale by
+the time it was built). Scope: 1 file, 26 insertions, 0 deletions --
+`syndicate/features/shared/artifact_publisher.py`, `#462`'s
+`HOT_ARTIFACT_PATTERNS` additions for basketball smart-sim inputs only.
+Deliberately does NOT reintroduce NHL's own not-yet-live `team_xg`/`team_elo`
+allowlist entries (`055dfc67` predates `ab35f850`) -- that gap is real but a
+different lane's scope.
+
+Expected effect: `GET /api/ops/artifacts/export?path=<team_advanced_stats
+or calibration file>` returns `count:1` instead of `403` -- immediate,
+synchronous, checkable the moment the deploy finishes.
+
+MEASUREMENT: <pending -- fill in after deploy + verification curl>
+REMINDER: verify within 15 min of deploy finishing, ~22:5xZ.
