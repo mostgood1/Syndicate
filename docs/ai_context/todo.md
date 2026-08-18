@@ -30738,6 +30738,18 @@ above, same baseline, now 40.1h total:**
 > misconfiguration goes; if burn climbs again in a future reading it is a
 > new question, not a reopening of this one.
 
+> **Steady-state check, 2026-08-18T15:46Z, same baseline, now 87.7h total:**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 315,785s (87.7h, 261,419 obs) | 269,116 | 3,068.0 | **2.21M** | **44.2%** |
+>
+> Essentially flat vs the prior reading (45.1% → 44.2%), and marginal rate
+> over just the newest ~47.6h (≈ 3,014cr/hour) matches the whole-window
+> average almost exactly — genuine steady-state, not still-decaying. Three
+> consecutive post-fix readings now: 54.9% → 45.1% → 44.2%. Nothing further
+> to do here.
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
