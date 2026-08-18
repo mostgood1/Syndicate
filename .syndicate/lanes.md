@@ -5477,7 +5477,7 @@ while `verify:` passes.
 
 ### basketball-model-owner — OPEN — **#461 FIXED AND PUSHED 2026-08-18 (`9075d3eb`, `9d60656d`): stale-schema cache guard was the real cause, not the producer; fix verified by direct invocation against real cached WNBA boxscores (14/14 columns, games 6-8/team). Mirror/production not yet regenerated — needs a refresh-worker deploy.** inventory pass SHIPPED (#460/#461/#462 filed) — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane. Follow-on: fix `#461` (WNBA `team_advanced_stats.games` never populated) at its root cause, not just the symptom.
-- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). **#462 attempt BLOCKED 2026-08-18** by `lane-guard.py`: `syndicate/features/shared/artifact_publisher.py` is claimed by OPEN lane `nhl-model-owner` (scoped there to "`HOT_ARTIFACT_PATTERNS` additions only, if xG/lineup/goalie files need allowlisting"). Widening THIS lane's own claim to co-list the file did not clear the guard — it blocks on any OTHER open lane's claim regardless of whether the current lane also claims it, i.e. single-owner-per-file, not co-claim. No edit was made (blocked before write); nothing to revert. Not force-overridden — surfaced to the user instead per session protocol ("stop and report the conflict, do not edit across lanes"). The intended patterns (`team_advanced_stats_*.csv` + four calibration JSONs, both directory-nesting variants) are drafted and ready; applying them needs either `nhl-model-owner` to close/narrow its claim, or explicit cross-lane coordination. Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
 - Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path. **Follow-on hypothesis (#461):** the WNBA `team_advanced_stats_*_asof_*.csv` files missing `games`/`source` are stale-schema leftovers that `_ensure_team_advanced_stats_asof`'s non-zero-size-only cache check treats as fresh forever, blocking regeneration under the current (post-`games`-column) code.
 - Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface." **#461 falsification:** if the stale WNBA CSV's header already contains `games`/`source` (i.e. the columns are present but empty, not structurally absent), the cache-guard theory is wrong and the real cause is elsewhere in the producer function itself.
 - Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md. **#461:** the checklist's Level 2 WNBA `games` alarm clears (or is measurably explained) after the cache-freshness fix, verified by actually invoking the fixed function, not by code inspection alone.
@@ -5698,3 +5698,136 @@ against the served board — `GET /ncaaf/api/cards?week=1` — not against
 **NOT DONE, and it is the actual product gap:** nothing is wired. The engine
 reads 65 feature keys and production passes none of them. Fixing that is a
 separate change from measuring it, and the measurement now gates it.
+
+
+### football-model-owner — HANDOFF 2026-08-18 ~15:5x CDT — **THE WIRING FIX IS HANDED TO THE `Football modeling and analytics` SESSION. `syndicate/features/football/**` IS RELEASED.** — session: football-model-owner
+
+**CLAIM CHANGE — read this before editing football code.** This lane now claims
+ONLY:
+
+  - `scripts/football_sim_input_checklist.py`
+  - `docs/ai_context/football_sim_engine_reference.md`
+  - `tests/test_football_sim_input_checklist.py`
+
+**RELEASED:** `syndicate/features/football/**`. It was claimed for "the fixes the
+checklist finds"; the checklist has now found them and this session is not the
+one making them. Anyone editing the engine no longer collides with this lane.
+
+**NEVER CLAIMED BY THIS LANE, and worth saying explicitly because I nearly edited
+them anyway:** `scripts/generate_smartsim2_nfl_projections.py`,
+`scripts/generate_smartsim2_nfl_preseason_projections.py`,
+`scripts/generate_smartsim2_ncaaf_projections.py`. The three production
+entrypoints are where the fix lands and this lane never held them.
+
+### What is MEASURED and hands over as fact
+
+    python scripts/football_sim_input_checklist.py --sport both   ->  EXIT 1, 9 alarms
+
+- **0 of 3 production entrypoints pass `feature_generation_payload` at all.** Not
+  "passes a thin one" — the kwarg is absent, so every key `drive_priors.py:232`
+  reads takes its neutral default on every projected game.
+- **NFL wk1, 16 games:** `offensive_metrics` 0.0% (18 keys consumed),
+  `player_usage` 0.0% (12), `advanced_metrics` 0.0% (7), `defensive_metrics`
+  0.0% (7), `pace` 0.0% (4). `market_features` 100%.
+- **NCAAF population is UNMEASURED, not zero** — loader returns 0 games from this
+  checkout; `data/**` is a lossy mirror. Resolve on the served board:
+  `GET /ncaaf/api/cards?week=1`.
+- **3 blocks are EXPECTED_SPARSE** and excluded from alarm by design:
+  `returning_production`, `coach_continuity`, `transfer_impact` are NCAAF-only.
+
+### Constraints the fix must respect — these are not style preferences
+
+1. **ONE SHARED BUILDER, not three edits.** `FootballGameFeatures` already
+   carries `team_metrics`, `defensive_metrics`, `advanced_metrics`,
+   `market_features`, `pace_features` — 5 of the 9 blocks, under alias names
+   `_extract_block` already accepts (`team_metrics` IS an alias of the offensive
+   block). Fix the choke point all three callers share.
+2. **FLAG-GATED, DEFAULT OFF.** `drive_priors` returns a neutral profile for
+   every game today, and `NFL_CALIBRATION_PROFILE` was fitted with that neutral
+   profile in place. Turning on 65 keys at once is not a wiring change, it is a
+   MECHANISM change to a calibrated engine — `model_engine_standard.md` records
+   two mechanisms together producing a NEGATIVE interaction in 4 of 4 markets.
+3. **REACHABILITY BEFORE CORRECTNESS.** Prove `off != on` on a real game before
+   any accuracy claim. An inert flag and a working one look identical in a
+   passing test suite.
+4. **HOLD A BASELINE.** Capture current projections before flipping anything;
+   without it there is nothing to compare a re-fit against.
+5. **The checklist is the gate.** It must go from 9 alarms to fewer, and the
+   remaining ones must be the EXPECTED_SPARSE / UNMEASURED kind, not UNFED.
+
+### What this lane keeps
+
+The NCAAF population measurement against the SERVED board (not the local tree).
+That is the one honest gap left in the checklist's output and it needs no engine
+edit.
+
+### sim-vs-market-freeze-finding — CLOSED 2026-08-18 — finding recorded in `docs/ai_context/todo.md` (`668e746a`, pushed to `origin/main`), no further digging tonight per user instruction — opened 2026-08-18 — session: sim-vs-market-freeze-finding
+- Goal: record a measured, currently-untracked disconnect in `docs/ai_context/todo.md` (documentation only, no code change).
+- Files: `docs/ai_context/todo.md`
+- Hypothesis: n/a — this lane only records a finding, does not diagnose further tonight.
+- Falsification test: n/a
+- Verification: the `todo.md` entry exists and cites the measurements below; no code or ledger state beyond that file is touched.
+- Blocked by: none.
+
+**Finding, measured live against production 2026-08-18 (not from any local mirror):**
+- The MLB pregame odds freeze (`#265`, mode-bug fix `908f96d1` 2026-08-08; `#440` Phase 7, monotone-seal fix `bafb4fb2` 2026-08-17) is now measurably capturing far more of the slate than it was: `oddsapi_game_lines_<date>_pregame.json` game counts, pulled via `/api/ops/artifacts/export`, went **1 (08-16) → 11 (08-17) → 15 (08-18, slate in progress)**.
+- But `/mlb/api/market-accuracy` still reports Moneyline pinned at **exactly 1 resolved bet/day** on both 08-16 and 08-17 — unchanged despite the freeze improvement.
+- Root of the mismatch, confirmed by reading the manifest directly: `season_betting_day_2026_08_17.json` (`source_kind: "season_manifest_static"`, built from `locked_cards_retuned/daily_summary_2026_08_17_locked_policy.json`) has a `games` object with **exactly 2 keys**, against the 11-game freeze that existed for that same date. This manifest looks like a separate, static/locked artifact that does not consume the (now-fixed) live pregame freeze at all.
+- **Not yet diagnosed further:** where `locked_cards_retuned` is built and whether it is supposed to read the freeze. That is the next concrete step, explicitly deferred — not investigated tonight per user instruction.
+
+### football-model-owner — NFL PRESEASON FIXES DEPLOYED AND MEASURED 2026-08-18 ~15:4x CDT — **both boards fixed; the new instrument's FIRST reading found a 13-day-stale artifact and its cause** — session: football-model-owner
+
+**DEPLOYED `841b6d84` (web, scoped, 3 files on the live SHA).** Measured on the
+served payloads:
+
+| board | total_mean | margin_mean |
+|---|---|---|
+| nfl preseason | **0% -> 100%** | **0% -> 100%** |
+| nfl regular | **0% -> 100%** | **0% -> 100%** |
+
+**The regular-season board moving was the stronger test** — it was not the
+surface being audited, and the fix is in shared code, so preseason-only movement
+would have meant a narrower fix than claimed. Both boards now serve a projected
+spread and total for the first time.
+
+**THE PROVENANCE FIELD PAID FOR ITSELF ON ITS FIRST REQUEST:**
+
+    generated_at    2026-08-05 12:19 CDT   (served 2026-08-18 15:40 CDT)
+    AGE             13.1 DAYS, while preseason is IN SEASON
+    rating_source   ...[prior_season_fallback/prior_season_fallback]
+    seeds_used      200
+
+Invisible before this deploy: no `generated_at` on the board, and the artifact is
+not allowlisted, so **no reader could have known.**
+
+**HYPOTHESIS FALSIFIED — do not re-test it.** "The autorun gates on MISSING, not
+STALE" is **DEAD**: `run_refresh_worker.py:2705-2710` reads age FIRST and returns
+`artifact_stale -> should_launch=True`. The gate is not the cause.
+
+**THE VERIFIED MECHANISM:** there is **NO PUBLISH PATH for smartsim2 projections
+between worker and web.** No pattern in `HOT_ARTIFACT_PATTERNS`; no entry in
+`artifact_publisher`'s per-sport repair list either (the exact-`?path=` mechanism
+`#232` added for `book_quotes`). **So web's copy cannot be refreshed by the
+worker's autorun at all**, whether or not that autorun works.
+
+**AND THE GATE READS THE WRONG DISK from the board's point of view** — the worker
+checks ITS copy; if that is fresh it correctly declines to relaunch, while web
+serves a stale copy it cannot update.
+
+**NOT MEASURED (scope stated):** whether the worker's own copy is fresh. Worker
+disk is unreadable from web and these artifacts are not allowlisted, so
+`/api/ops/artifacts/*` cannot answer it — **the same gap blocks the diagnosis AND
+causes the defect.**
+
+**This promotes the allowlist from housekeeping to the likely ROOT CAUSE of stale
+NFL projections.** Deserves its own change + verification, NOT folded into
+another deploy.
+
+**Obligations discharged:** claim released, grant deleted, measurement in
+`deploys.md`.
+
+**OWED:** (1) allowlist smartsim2 artifacts — now root-cause work, not tidying;
+(2) make web emit `ALL_PROCESS_MEMORY` — **three break-glass grants in one
+session** is the signal; (3) NFL cover/over-under probabilities are 0% and are
+computable from `margin_stdev`/`total_stdev`; (4) `CFBD_API_KEY` — user's, NCAAF
+opener in 11 days.
