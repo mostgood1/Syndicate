@@ -5506,7 +5506,7 @@ while `verify:` passes.
 
 ### basketball-model-owner — OPEN — **#461 FIXED AND PUSHED 2026-08-18 (`9075d3eb`, `9d60656d`): stale-schema cache guard was the real cause, not the producer; fix verified by direct invocation against real cached WNBA boxscores (14/14 columns, games 6-8/team). Mirror/production not yet regenerated — needs a refresh-worker deploy.** inventory pass SHIPPED (#460/#461/#462 filed) — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane. Follow-on: fix `#461` (WNBA `team_advanced_stats.games` never populated) at its root cause, not just the symptom.
-- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). **#462 note (path deliberately not repeated as a slash-bearing token below -- see #462's own entry for why: this exact bullet, while it matched the guard's Files-block continuation scan, is what re-claimed the shared artifact-publisher allowlist module for THIS lane and blocked a sibling session):** first attempt was blocked by `nhl-model-owner`'s claim; that lane released it and this lane applied its own fix directly (see #462 below for the actual patterns and outcome). Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). **#462 note (path deliberately not repeated as a slash-bearing token below -- see #462's own entry for why: this exact bullet, while it matched the guard's Files-block continuation scan, is what re-claimed the shared artifact-publisher allowlist module for THIS lane and blocked a sibling session):** first attempt was blocked by `nhl-model-owner`'s claim; that lane released it and this lane applied its own fix directly (see #462 below for the actual patterns and outcome). Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration). **Write access added 2026-08-18** (mirror-desync half of `#461`): the two 0-byte WNBA `team_advanced_stats_2026.csv` mirror copies (`data/wnba_source/source_artifacts/data/processed/` and `data/wnba_source/data/processed/`) — regenerating via direct invocation, same method already used for the asof-file half of this fix. Collision check: no other OPEN lane claims any `data/wnba_source/**` path (grepped `lanes.md`, clean).
 - Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path. **Follow-on hypothesis (#461):** the WNBA `team_advanced_stats_*_asof_*.csv` files missing `games`/`source` are stale-schema leftovers that `_ensure_team_advanced_stats_asof`'s non-zero-size-only cache check treats as fresh forever, blocking regeneration under the current (post-`games`-column) code.
 - Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface." **#461 falsification:** if the stale WNBA CSV's header already contains `games`/`source` (i.e. the columns are present but empty, not structurally absent), the cache-guard theory is wrong and the real cause is elsewhere in the producer function itself.
 - Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md. **#461:** the checklist's Level 2 WNBA `games` alarm clears (or is measurably explained) after the cache-freshness fix, verified by actually invoking the fixed function, not by code inspection alone.
@@ -5972,3 +5972,50 @@ owner with the constraints for the fix.
   - `deploys.md` (834 KB) and `lanes_closed.md` (838 KB) have no size discipline
     and no checker.
 - **Blocked by:** none.
+
+### football-model-owner — CORRECTION 2026-08-18 ~16:2x CDT — **I was wrong about the NFL cover/total probabilities. They are not "computable and uncomputed" — there is no LINE to compute them against.** — session: football-model-owner
+
+**What I said earlier and am retracting:** *"cover/over-under probabilities are
+0% and are COMPUTABLE — the projection carries `margin_stdev`/`total_stdev`, so
+with the means that is a normal-approximation cover directly."* **The stdevs were
+never the blocker.** `_nfl_cover_probability(line=, mean=, stdev=)` needs a
+LINE, and there isn't one.
+
+**The chain, worked backward to the first zero:**
+
+| stage | reading |
+|---|---|
+| preseason cards `betting` | **`{"p_home_win": 0.615}` only** — model's own number, NO market line |
+| `markets.moneyline` | `{away: null, home: null}` |
+| `/nfl/preseason/market-board` | 16 games, **0 rows on every one** |
+| `_nfl_cover_probability` | never callable — no `line` |
+
+**NOT a join bug and NOT a deploy failure.** The 2026-08-13 book-grid fallback IS
+deployed — verified BY CONTENT in the live web blob `4c3b0aa5`
+(`read_book_grid_artifact` present). It behaves exactly as designed.
+
+**THE ACTUAL CAUSE — a forward-window gap, and it is nobody's bug:**
+
+    preseason wk3 game dates : 2026-08-21, 08-22, 08-23, 08-24   (3-6 days FUTURE)
+    NFL book_grid on web     : 2026-08-09 .. 2026-08-18          (today, backward)
+
+The fallback reads `read_book_grid_artifact("nfl", <game date>)` per game date.
+**All four dates are in the future; the book grid is built per-slate-date and does
+not extend forward.** So it returns `{}` and the board is empty — correctly, given
+its input.
+
+**Consequence worth someone's attention:** a board whose entire purpose is
+UPCOMING games can never carry market lines from a backward-looking artifact.
+NFL preseason's market board is **structurally empty until game day.** That is a
+design question about the book grid's forward window, not a football fix, and
+`book_grid` is very likely another lane's producer — **flagged, not taken.**
+
+**Positive control that this reasoning is sound:** the 08-13 note records week 1
+still rendering its 6 rows from the static CSV while weeks 2-4 showed 0. Same
+board, same join, different input availability.
+
+**Standing correction for this lane:** I twice framed a MISSING INPUT as an
+UNCOMPUTED OUTPUT (here, and the `defensive_metrics` 0% that `advanced_metrics`
+half-covers). Both times the remedy I implied — "compute it" — was wrong, and the
+real remedy was upstream. `model_engine_standard.md` §4.1 is exactly this and I
+still walked into it twice in one session.
