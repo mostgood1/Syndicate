@@ -446,9 +446,20 @@ unsaved anywhere.
 - **`Bash` bypasses it entirely** — the matcher is
   `Edit|Write|MultiEdit|NotebookEdit`. The guard bounds the file tools, not the
   session.
-- **`lane-guard` is blind to `.claude/**` by design**, so the enforcement layer
-  cannot protect the directory it lives in — and every real collision has
-  happened there.
+- **`lane-guard` is blind to `.claude/**` AND `.syndicate/**` by design**
+  (`lane-guard.py:244`, one `rel.startswith` test covering both), so the
+  enforcement layer cannot protect the directory it lives in — and every real
+  collision has happened there. **The `.syndicate/**` half matters just as much
+  and was missing from this line until 2026-08-18:** no lane claim can ever
+  guard `lanes.md`, `state.md`, `deploys.md` or `learnings.md`, so concurrent
+  ledger writes are unprotected by design and a phantom claim on a ledger file
+  is inert rather than a lock. Measured during the 2026-08-18 orphan sweep:
+  `basketball-model-owner`'s Files block claims bare `lanes.md` (a prose
+  collision-check sentence the parser reads as a claim) and it blocks nobody —
+  while an unrelated session's write to `lanes.md` landed **between** two of
+  that sweep's own edits, reported by the Edit tool as "modified on disk since
+  you last read it". Anchor ledger edits on unique strings, never on line
+  numbers, and re-read before any edit that depends on surrounding content.
 - **`commit-guard.py` (PreToolUse) reads the index the COMMIT will use, fixed
   `a52a2b64` 2026-08-16.** It previously evaluated both predicates against
   `CLAUDE_PROJECT_DIR` — the MAIN worktree — while the commit runs wherever the
@@ -2266,7 +2277,7 @@ that hour is how this subject came to have three sections.
   band (0.1133..0.2397) contains both — the effect is smaller than the instrument's
   noise. **Do not cite 0.1765 as evidence the under-dispersion is fixed.**
 
-## LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
+## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
 **`GET /api/ops/version` on the running service is the ONLY authority.** It
 reports what is executing. Everything else in this file is a record of a deploy
