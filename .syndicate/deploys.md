@@ -15395,3 +15395,73 @@ in one run** instead of producing a confident all-zero matrix.
 The fix is a count-dependent approach model — at minimum a first-pitch take
 term — not a scalar. **Score candidates on `measure_all_inputs_effect.py`**, with
 this matrix as the diagnostic. Values remain at originals.
+
+## 2026-08-18 — FIRST-PITCH TAKE TERM ADDED AND CALIBRATED. **Fixes the largest structural defect. MARKET-NEUTRAL.**
+
+Lane `convergence-phase7-crps`. `pitch_model.py`. 9 tests pass. No deploy.
+
+### What it does
+
+Two parameters applied at 0-0 only, after all other terms and before
+normalisation:
+
+    first_pitch_swing_damp   = 0.42   scales whiff/foul/in-play at 0-0
+    first_pitch_called_boost = 1.60   lifts called strikes vs balls at 0-0
+
+**Not the same shape as `three_ball_take_bias`**, which only adds to `p_ball`
+(taking on 3-0 hoping for a walk). A first-pitch take moves mass from the SWING
+outcomes to the TAKE outcomes, so it is a damp on the former.
+
+### It fixes the 0-0 cell almost exactly
+
+    metric        baseline    calibrated    REAL
+    0-0 called      13.7%        29.6%      29.6%   <- exact
+    0-0 take        46.9%        71.0%      68.0%
+    0-0 in-play     25.9%        15.0%      11.3%
+    K/PA            0.1609       0.1852     0.226
+    pitches/PA       2.96         3.25       3.90
+
+**Both target metrics move toward target WITHOUT overshooting** — the first
+change today that improves without trading one bias for another. The mix-only
+fix took K/PA from 27% low to 26% high; this takes it from 29% low to 18% low.
+
+### AND IT DOES NOT IMPROVE THE MARKET RESULT
+
+Against the previous fully-fed run, same 2,415 rows:
+
+    market      fully-fed   +first-pitch    change
+    hits          0.24131      0.23732     -0.00399  better
+    rbis          0.21464      0.21834     +0.00370  WORSE
+    runs          0.23861      0.23708     -0.00153  better
+    total_bases   0.25396      0.25525     +0.00129  WORSE
+
+    mean gap to market  0.00732 -> 0.00719   (-0.00013)
+    mean change         -0.00013             ESSENTIALLY NEUTRAL
+
+**2 better, 2 worse, mean ~0.** Fixing the engine's largest measured structural
+defect produced **no market improvement**.
+
+### KEPT, and the reasoning stated so it can be judged
+
+The values are KEPT at 0.42 / 1.60 despite being market-neutral, because:
+
+- the 0-0 cell now matches reality (called strikes EXACT), and a correct count
+  structure is a **precondition** for calibrating anything above it — the joint
+  grid failed precisely because it was fitting on top of a broken one;
+- it is **not harmful** — neutral, not negative;
+- both K/PA and pitches/PA move toward reality without overshoot.
+
+**This is a judgement call and the ledger should record it as such.** The
+session's standing rule is that the market is the arbiter; a strict reading says
+do not ship a market-neutral change. The counter-argument is that this is
+foundational rather than an optimisation, and the alternative is calibrating
+future work on a count structure known to be wrong.
+
+**Anyone who disagrees should set both parameters to 1.0** — an exact no-op — and
+nothing else needs to change.
+
+### What is still wrong
+
+`base_in_play` 0.23 vs ~0.17, the 0-2 waste cell, and the 3-2 protect cell remain
+uncorrected. K/PA is still 18% low and pitches/PA 17% short. **The first pitch
+was the largest single cell, not the whole defect.**
