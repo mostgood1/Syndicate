@@ -163,6 +163,43 @@ for f in state.md:60000 lanes.md:120000 learnings.md:120000; do
 done
 [ -n "$BLOAT" ] && add "LEDGER OVER BUDGET: ${BLOAT%, } — these are read every session."
 
+# --- Ledger COHERENCE (size is not health) ---
+# Over-budget measures how BIG the ledgers are. It says nothing about whether
+# they still mean anything, and 2026-08-18 showed the difference: todo.md was
+# within nobody's definition of broken while #447 sat in NEITHER it nor the
+# archive, and lanes.md had 7 slugs with two OPEN blocks each -- two sessions
+# could each read themselves as the holder of the same files.
+#
+# Each checker is a one-liner here BECAUSE the detail belongs in the tool. The
+# digest says only "something is wrong and here is what to run": a session-start
+# banner that prints twelve findings is one people learn to scroll past.
+#
+# --no-history on the todo check: its default pass is `git log -p` over 738
+# commits (~10s) to recover ids that were only ever legacy table rows. That is
+# right for an audit and wrong for something on the session-start path.
+#
+# FAILS OPEN, like every other guard here: no python, a missing script, or a
+# crashing checker leaves the line off entirely rather than blocking a session.
+INCOHERENT=""
+if command -v python >/dev/null 2>&1; then
+  for c in "lane_identity_check.py:lanes.md" \
+           "state_key_check.py:state.md" \
+           "todo_id_reconcile.py --no-history:todo.md"; do
+    script=${c%%:*}; label=${c##*:}
+    [ -f "scripts/${script%% *}" ] || continue
+    if ! python scripts/$script >/dev/null 2>&1; then
+      INCOHERENT="${INCOHERENT}${label} (scripts/${script%% *}), "
+    fi
+  done
+fi
+# NOT via `add`. The body is hard-capped (`head -c "$BUDGET"`) and this section
+# sits at the tail, so the first version of this line was emitted as
+# "LEDGER INCOHERENT: state.md (scripts/state_key_" -- cut mid-word. This file
+# already states the principle for exactly that failure: "a truncation warning
+# that gets truncated is worse than none: it reads as a clean run." A coherence
+# warning has the same property, so it is emitted OUTSIDE the budget, next to
+# DIGEST OVERFLOW.
+
 # The actionable half: closed lanes retained in lanes.md. Archiving them is
 # mechanical and lossless (.syndicate/lanes_closed.md), unlike trimming prose.
 if [ -f .syndicate/lanes.md ]; then
@@ -183,6 +220,7 @@ if [ "${LEN:-0}" -gt "$BUDGET" ]; then
   echo "DIGEST OVERFLOW: ${LEN}B body > ${BUDGET}B budget — tail cut. Trim .syndicate/ or raise BUDGET."
 fi
 [ -n "$NOTES" ] && echo "DIGEST NOTES: ${NOTES}"
+[ -n "$INCOHERENT" ] && echo "LEDGER INCOHERENT: ${INCOHERENT%, } — the file's own rules are being broken; run it before trusting what the file says."
 
 printf '%s' "$BODY" | head -c "$BUDGET"
 echo

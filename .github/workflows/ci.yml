@@ -35,3 +35,31 @@ jobs:
 
       - name: Run archive regression suite
         run: python -m unittest tests.test_archives
+
+      # Ledger coherence. Split into ENFORCED and REPORTED deliberately, because
+      # a check that is red on arrival is a check people learn to ignore, and
+      # then it is worth less than nothing -- it looks like coverage.
+      #
+      # ENFORCED covers the two ledgers that are coherent TODAY, so they cannot
+      # silently regress. Both were repaired on 2026-08-18 after `#447` was found
+      # in neither todo.md nor its archive, and after lanes.md was found with 7
+      # slugs carrying two OPEN blocks each -- two sessions could each read
+      # themselves as holding the same files.
+      #
+      # --no-history: the default todo pass runs `git log -p` over 700+ commits
+      # to recover ids that only ever existed as legacy table rows. That is an
+      # audit, not a CI gate, and CI checks out a shallow clone anyway.
+      - name: Ledger coherence (enforced -- lanes.md, todo.md)
+        run: |
+          python scripts/lane_identity_check.py
+          python scripts/todo_id_reconcile.py --no-history
+
+      # REPORTED, not enforced: state.md carries two knowingly-stacked subjects
+      # (sim-scheduling-deploy-lineage x2, wnba-sweep-ownership-gate x3). They
+      # were keyed to the SAME slug on purpose so the checker fails on a real
+      # thing rather than being keyed apart into a passing grade. Collapsing
+      # them is owed work; until it lands this must not block every PR.
+      # Promote to the enforced step above once it exits 0.
+      - name: Ledger coherence (reported -- state.md)
+        continue-on-error: true
+        run: python scripts/state_key_check.py
