@@ -5213,3 +5213,43 @@ empty result is unfalsifiable from the outside.
 whether a MODEL FIELD is fed, never infer from code presence. This says: measure
 whether a CACHE holds data, never infer from file count. Same failure, one layer
 apart — and I made it four times in two days before writing it down.
+
+## 2026-08-18 — THE LEDGER'S WORKING COPY CAN DIVERGE FROM THE COMMITTED ONE, AND THE GUARD READS THE WORKING COPY
+
+Measured:
+```
+local  .syndicate/lanes.md   332,617 bytes   38 headers    0 of my 4 lanes
+origin/main   same file      455,816 bytes   65 headers   12 entries of mine
+```
+**123 KB and 27 lane headers apart.** `lane-guard` reads the LOCAL file, so it
+enforced against a stale view all evening: four blocked edits where the guard's
+**own parser** reported no claim while the hook reported one; two lane releases
+written, verified, then gone; a header fix confirmed written and absent on the
+next read.
+
+**THE RULE: when a guard and your own reading of its input disagree, suspect the
+INPUT, not the guard.** I twice reported a `lane-guard` bug to the coordinator
+(first `_is_disclaimer`, then read-modify-write loss) before measuring the file
+itself. Both were wrong. The guard was correct about what it read.
+
+**COROLLARY, and it cost me the whole evening's lane friction:** work committed
+through a detached worktree lands on `main` and **does not appear in the working
+copy**. So "I wrote it and it is gone" had two different causes tonight and I
+conflated them.
+
+## 2026-08-18 — I USED A GRADING LINE AS AN EVENT LINE HOURS AFTER WRITING THE RULE AGAINST IT
+
+I recorded in `learnings.md` that `ODDS_SWEEP_OUTCOME` GRADES a prior launch and
+carries `since_launch_s` up to 42 hours, after miscounting 34 gradings as 34
+sweeps. **Then, the same evening, I declared the sweep gate's second half
+"NOT ACHIEVED / prediction falsified" because that same line read zero** — when
+the marker stamp showed the launch had happened at 23:55:40Z and my estimate was
+merely 17 minutes early.
+
+**Writing a rule down does not install it.** The check that would have caught it
+is mechanical: *before treating absence as evidence, ask what the line is
+emitted BY and whether it lags what I am asking about.*
+
+I also published that wrong conclusion, then reported the correction as pushed
+when the push had silently failed — the wrong entry sat alone on `main` for ~15
+minutes. **Verify the CONTENT landed, not the commit line.**

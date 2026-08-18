@@ -6378,3 +6378,30 @@ nothing of mine is deployed and there is no deadline.
   `measure_pitch_splits_effect.py --games 45 --sims 120`. If it is still flat at
   high coverage, **retire the research prediction that pitch-type matchup is the
   most likely market beat** before anyone builds a scheduled populator.
+
+### soccer-projection-collapse — CHECKPOINT 2026-08-18 ~01:00Z — **root cause found and FIXED; not deployed. Session closing at context exhaustion.**
+- **`#379`'s widening shipped INERT** — `load_soccer_projections` grew
+  `window_dates`, defaults to one date "so every existing caller behaves exactly
+  as before", and its ONLY production caller never passed one. Fixed at
+  `board_enrichment.py:678` (`b4d82364`), `window="slate"` = 7 dates.
+- **`window="slate"` is required.** The resolver defaults to `"day"` = ONE date.
+  **My first cut called it bare and was itself inert**; caught by printing the
+  returned value. Two tests pin the call site and the argument by name.
+- **Deploy request `2026-08-18T0010Z-soccer-projection-window.md` filed**, both
+  web AND refresh-worker (`attach_projections` has a caller on each; web alone
+  is the misleading half). Verify BOTH: `rows_with_projection` 4 → thousands AND
+  `unmatched_match_rows` 8,755 → low.
+- **Disproved along the way, do not re-chase:** accents, club-name suffixes
+  (`teams_match` handles them), the sim missing fixtures, market support, and
+  `predictions.probabilities` nulls (that is correct in-play withholding).
+- **NEXT ACTION:** none from me. Deploy is the coordinator's; the reading above
+  closes it.
+
+### modelled-fair-edge — CHECKPOINT — **SHIPPED, MEASURED ON PRODUCTION DATA, NOT DEPLOYED**
+- User decision taken: `book_margin_model` edges allowed in their own column.
+  228 of 258 both-terms MLB rows newly priced on the real payload; 30 refusals
+  all `model_prob == 0.0` by design. **Never writes `edge_vs_market_pct`.**
+- **Most of its value is gated on the soccer fix** — ~1,131 of the 1,416 rows are
+  soccer, and they had a modelled fair with no model probability.
+
+### wnba-live-tier — **`board_enrichment.py` was edited under this lane** on explicit user instruction ("no one has it"), via the per-session marker rather than a `lanes.md` edit, because edits were not sticking. One file, one call site. Nothing else in this lane was touched.

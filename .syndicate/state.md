@@ -4091,3 +4091,26 @@ named `render_logs.py` as unable to give one; this is that tool.
 - **BVP is fetched daily and `simulate.py` never references it** — evaluation
   tooling only, 1,282 cached files.
 - Full write-up: `.syndicate/research_2026-08-17_mlb_sim_gaps.md`.
+
+## Sweep gate, modelled-fair edge, soccer window — STATE 2026-08-18 ~01:00Z
+
+- **SWEEP OWNERSHIP GATE `20025cc4` IS DEPLOYED AND WORKING.** Partition live on
+  live-odds-worker every tick; refresh-worker stopped sweeping mlb/soccer/wnba;
+  **marker ownership transferred at 23:55:40Z**. `ODDS_SWEEP_OUTCOME` on
+  live-odds-worker is still zero — grading lag vs dead launch **UNDETERMINED**.
+- **`edge_vs_modelled_fair_pct` EXISTS AND IS COMMITTED, NOT DEPLOYED.** Measured
+  on the real payload: 228 of 258 both-terms MLB rows priced. Never writes
+  `edge_vs_market_pct`. User decision, taken 2026-08-17.
+- **The soccer projection read was ONE DATE against a SEVEN-DATE quote window.**
+  `#379`'s widening shipped inert — its only caller never passed `window_dates`.
+  Fixed (`b4d82364`), **NOT deployed**. `window="slate"` is required; the
+  resolver defaults to `"day"` = one date.
+- **Soccer's `recommendations_<date>.json` is NOT in `HOT_ARTIFACT_PATTERNS`** —
+  it lives under `soccer_source/<league>/api/recommendations/`, the allowlist
+  covers `source_artifacts/data/processed/`. `/api/ops/artifacts/export` returns
+  `count=0` for it. **`/soccer/<league>/api/cards` is the readable substitute.**
+- **THE LOCAL `lanes.md` IS 123 KB / 27 HEADERS BEHIND THE COMMITTED ONE**, and
+  `lane-guard` reads the local copy. Handed to the coordinator; **do not patch
+  around it.**
+- **`ODDS_SWEEP_LAUNCHED` now exists** — before it, every launch-side print was a
+  `*_FAILED` variant and a successful launch was invisible.
