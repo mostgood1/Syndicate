@@ -3989,7 +3989,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
 ### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
-- Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim): `artifact_publisher.py`
+- Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim -- was the shared artifact-publisher allowlist module; de-linked here 2026-08-18 per `basketball-model-owner`'s `#462`, same precedent `nhl-model-owner` already used on this exact file/lane pair below: session `lane-cleanup` no longer exists in the roster (ORPHANED sweep below), and this lane's own SINGLE NEXT ACTION targets a different file entirely, so the claim was vestigial): n/a
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `lane-cleanup` no longer exists in the roster (`get_session` → not found).
 > **SINGLE NEXT ACTION:** the population this lane was waiting on now EXISTS —
@@ -4330,7 +4330,11 @@ full working in `deploys.md` under that date]`
   `"reports/intelligence/clv_openings/*.jsonl"`. The working tree is
   byte-identical to the worker's deployed blob (`ee94fe6b`), so shipping it to
   web makes sender and receiver agree.
-- Files (exclusive to this lane): `syndicate/features/shared/artifact_publisher.py`.
+- Files (exclusive to this lane, HISTORICAL -- lane handed back at line ~4301
+  above; path deliberately not repeated as a slash-bearing token here, 2026-08-18,
+  because this exact line was still re-claiming the shared artifact-publisher
+  allowlist module for an already-released lane and blocking `basketball-model-owner`'s
+  `#462`): n/a.
   Collision check RUN via `lane-guard.py`'s own `_claims()`: CLEAR.
   **NOT claimed:** `syndicate/blueprints/ops.py` (held by `quote-feed-age-alarm`)
   — no edit needed there, the receiver logic is already correct.
@@ -5069,10 +5073,12 @@ rather than a range problem.
   artifact actually resolves to in production.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_sim_input_checklist.py` (new), `docs/ai_context/hockeysim_engine_reference.md`
-  (new). `syndicate/features/shared/artifact_publisher.py` REMOVED from this
-  claim 2026-08-18 ~15:5xZ per this lane's own RELEASED note below (`ab35f850`
-  shipped, `basketball-model-owner`'s `#462` was blocked on the parser only
-  reading this line, not the prose note -- explicit consent already on record).
+  (new). The shared artifact-publisher allowlist module (its own name
+  deliberately not repeated here as a slash-bearing token -- see the file's
+  own path-extraction mechanism this triggered) is REMOVED from this claim as
+  of 2026-08-18 ~15:5xZ; see this lane's RELEASED note further below for the
+  full record, which for the same reason also avoids repeating the literal
+  path.
 - Collision check run 2026-08-18 against all OPEN lanes: no active lane claims
   `syndicate/features/nhl/sim_engine/**`. `convergence-phase5-profile-seam` touched
   `hockeysim/calibration_profile.py` but is SHIPPED (`964c89a4`) and session-closed
@@ -5497,7 +5503,7 @@ while `verify:` passes.
 
 ### basketball-model-owner — OPEN — **#461 FIXED AND PUSHED 2026-08-18 (`9075d3eb`, `9d60656d`): stale-schema cache guard was the real cause, not the producer; fix verified by direct invocation against real cached WNBA boxscores (14/14 columns, games 6-8/team). Mirror/production not yet regenerated — needs a refresh-worker deploy.** inventory pass SHIPPED (#460/#461/#462 filed) — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine (`vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py`, `syndicate/features/shared/basketball_props_*.py`) up to `docs/ai_context/model_engine_standard.md`: a CONSUMED x POPULATED gating input checklist over `dataclasses.fields()` (never a name grep), a documented pipeline-trace reference doc (file:line per hop), and a first reachability audit of the known silent no-sampling fallback (`basketball_props_smart_sim` -> `_simulate_smart_game_local` on bare `except`, per `todo.md` #440). NCAAB has no sim engine at all — document that explicitly as a design gap, not an input-population gap, and do not attempt to backfill it inside this lane. Follow-on: fix `#461` (WNBA `team_advanced_stats.games` never populated) at its root cause, not just the symptom.
-- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). **#462 attempt BLOCKED 2026-08-18** by `lane-guard.py`: `syndicate/features/shared/artifact_publisher.py` is claimed by OPEN lane `nhl-model-owner` (scoped there to "`HOT_ARTIFACT_PATTERNS` additions only, if xG/lineup/goalie files need allowlisting"). Widening THIS lane's own claim to co-list the file did not clear the guard — it blocks on any OTHER open lane's claim regardless of whether the current lane also claims it, i.e. single-owner-per-file, not co-claim. No edit was made (blocked before write); nothing to revert. Not force-overridden — surfaced to the user instead per session protocol ("stop and report the conflict, do not edit across lanes"). The intended patterns (`team_advanced_stats_*.csv` + four calibration JSONs, both directory-nesting variants) are drafted and ready; applying them needs either `nhl-model-owner` to close/narrow its claim, or explicit cross-lane coordination. Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Files: scripts/basketball_sim_input_checklist.py (new), scripts/nba_sim_input_checklist.py / scripts/wnba_sim_input_checklist.py (new, if a per-sport split proves necessary), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). Read-only over syndicate/features/shared/basketball_props_smart_sim.py, basketball_props_edges.py, basketball_props_predictions.py, basketball_props_calibration.py, basketball_market_board.py, basketball_live_artifacts.py, basketball_boxscores_history.py, basketball_props_onnx.py, syndicate/features/nba/**, syndicate/features/wnba/**, syndicate/features/ncaab/**. **Write access added 2026-08-18** (widened for the #461 fix): `vendor/wnba_betting_repo/src/wnba_betting/cli.py`, `vendor/nba_betting_repo/src/nba_betting/cli.py` (`_ensure_team_advanced_stats_asof`'s cache-freshness guard only — same latent bug in both leagues' identical code). **#462 note (path deliberately not repeated as a slash-bearing token below -- see #462's own entry for why: this exact bullet, while it matched the guard's Files-block continuation scan, is what re-claimed the shared artifact-publisher allowlist module for THIS lane and blocked a sibling session):** first attempt was blocked by `nhl-model-owner`'s claim; that lane released it and this lane applied its own fix directly (see #462 below for the actual patterns and outcome). Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
 - Hypothesis: basketball has the same silent-unfed-field shape MLB (#26 fields) and football (#457, 65 keys) both had, concentrated first in the known `_simulate_smart_game_local` fallback path. **Follow-on hypothesis (#461):** the WNBA `team_advanced_stats_*_asof_*.csv` files missing `games`/`source` are stale-schema leftovers that `_ensure_team_advanced_stats_asof`'s non-zero-size-only cache check treats as fresh forever, blocking regeneration under the current (post-`games`-column) code.
 - Falsification test: the checklist runs clean (CONSUMED fields all POPULATED, no fallback triggers observed in a sampled window of real artifact reads) — hypothesis would be wrong and the lane's finding becomes "basketball is clean," not "basketball has an unfed surface." **#461 falsification:** if the stale WNBA CSV's header already contains `games`/`source` (i.e. the columns are present but empty, not structurally absent), the cache-guard theory is wrong and the real cause is elsewhere in the producer function itself.
 - Verification: `python scripts/basketball_sim_input_checklist.py` (or per-sport variants) exits 0/non-zero on real production artifacts, with the alarm list and EXPECTED_SPARSE reasons documented in docs/ai_context/basketball_sim_engine_reference.md. **#461:** the checklist's Level 2 WNBA `games` alarm clears (or is measurably explained) after the cache-freshness fix, verified by actually invoking the fixed function, not by code inspection alone.
@@ -5889,3 +5895,77 @@ commit and the verification.
 `#232` is the case where an allowlisted file stayed missing indefinitely because
 the incremental `since=` watermark held it back. The auditability half is fixed
 outright; **"web's copy actually refreshes" is a SEPARATE measurement.**
+
+
+### football-model-owner — CLOSED 2026-08-18 ~16:1x CDT — **FULLY HANDED OFF. This session's job is deployment, assignment and documentation; football is not it.** — session: football-model-owner
+
+**User correction, taken 2026-08-18:** *"this is still not your job. your job is
+to clean up and organize deployment, assignment, and documentation."* Correct.
+I drifted into engine work twice in one hour — first starting to wire the
+payload into three entrypoints this lane never claimed, then, after being pulled
+back, still reserving the NCAAF population measurement. That second one was the
+same error in a smaller box: a measurement of a model's inputs is model work.
+
+**ALL CLAIMS RELEASED.** This lane now holds NOTHING:
+
+  - `scripts/football_sim_input_checklist.py` — RELEASED to the engine owner
+  - `docs/ai_context/football_sim_engine_reference.md` — RELEASED
+  - `tests/test_football_sim_input_checklist.py` — RELEASED
+  - `syndicate/features/football/` — already released earlier today
+
+**The NCAAF population measurement is HANDED OFF too**, not retained: the
+checklist reports NCAAF as UNMEASURED (loader returns 0 games from this
+checkout; `data/**` is a lossy mirror). Resolving it means `GET
+/ncaaf/api/cards?week=1` against the served board and reading a model's input
+coverage — engine work, owned by `Football modeling and analytics`.
+
+**What this lane actually delivered, all shipped and measured:**
+`scripts/football_sim_input_checklist.py` (exit 1, 9 alarms; 0 of 3 production
+entrypoints pass a payload; 48 consumed keys at 0.0% over 16 NFL games) and
+`docs/ai_context/football_sim_engine_reference.md`. Both handed to the engine
+owner with the constraints for the fix.
+
+**Nothing is owed by this lane.** Its successor is `repo-coordination` below.
+
+
+### repo-coordination — OPEN — **deployment, assignment and documentation. NOT any sport, model or engine.** — opened 2026-08-18 — session: repo-coordination
+
+- **Goal (single testable outcome):** the machinery that decides WHO deploys,
+  WHO owns which files, and WHERE a fact is written stays coherent and
+  self-checking, with every rule enforced by something that cannot be archived
+  or forgotten. Testable: `lane_identity_check.py`, `todo_id_reconcile.py` and
+  `state_key_check.py` all exit 0, CI enforces all three, and every deploy goes
+  through claim + preflight.
+- **Scope, stated as a boundary because this session already crossed it twice:**
+  hooks, guards, the deploy path, the four ledgers, `CLAUDE.md`, and the
+  session/worktree protocol. **NOT** sport features, sim engines, model inputs,
+  backtests, or measuring any model's coverage — including "just reading a
+  board to see if a model is fed". If a task's outcome is a statement about a
+  MODEL, it belongs to that sport's lane.
+- **Files:**
+  - `.claude/hooks/` (deploy-guard, lane-guard, commit-guard, session-start)
+  - `scripts/session_worktree.py`
+  - `scripts/lane_identity_check.py`
+  - `scripts/todo_id_reconcile.py`
+  - `scripts/state_key_check.py`
+  - `scripts/deploy_claim.py`
+  - `scripts/deploy_preflight.py`
+  - `docs/ai_context/session_isolation_protocol.md`
+  - `.github/workflows/ci.yml`
+- **NOT claimed, deliberately:** every `syndicate/features/**` path, every
+  `scripts/generate_*` and `scripts/backtest_*` entrypoint, and every per-sport
+  checklist or engine reference. Those belong to sport lanes.
+- **Shipped under this remit today** (all on `origin/main`, all measured):
+  deploy-guard gates on claim + SHA-bound CLEAR preflight instead of a session
+  id; `OFF_MAIN` (exit 4) so deploys compose; coordinator role retired; three
+  ledger checkers built, wired into CI and the session digest; lane-guard's
+  claim parsing fixed (52 -> 80 file claims); `state.md` keyed and its two
+  stacked subjects collapsed; per-session worktrees adopted.
+- **Known open, in remit:**
+  - `land` reports the ledger checkers rather than gating on them.
+  - The new deploy predicate has never gated a real deploy; `OFF_MAIN` has never
+    fired in anger; no preflight receipt consumed live. First real deploy tests it.
+  - ~100 stale worktrees under `C:/tmp` need a human pass before reaping.
+  - `deploys.md` (834 KB) and `lanes_closed.md` (838 KB) have no size discipline
+    and no checker.
+- **Blocked by:** none.
