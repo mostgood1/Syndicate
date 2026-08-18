@@ -115,20 +115,47 @@ the effects it was used to judge**.
 cancels and the SD of the *difference* is what matters, not the ~13.5-pt SD of
 NFL margins.
 
-### The Monte Carlo noise floor may exceed the effect
+### Monte Carlo noise — MEASURED, and my earlier reasoning was wrong
 
-Per-game MC standard error on the margin mean is `13.5 / sqrt(seeds)`:
+**Phase 2 ran 2026-08-18.** Two identical arms, disjoint seed blocks, one game:
 
-| seeds/game | per-game MC noise | vs the 1.1-pt observed effect |
+| seeds | arm A | arm B | \|A−B\| |
+|---|---|---|---|
+| 200 | 2.600 | 2.550 | 0.050 |
+| 500 | 1.874 | 1.728 | 0.146 |
+| 1,000 | 1.800 | 1.263 | **0.537** |
+| 2,000 | 1.245 | 1.025 | 0.220 |
+
+**Read the non-monotonicity, do not average it away.** 1,000 seeds showing a
+*larger* gap than 500 is not a property of the engine — a single |A−B| draw is
+itself a random variable, so ONE pair cannot estimate a floor. **This table is
+four noisy draws, not four floors.** Estimating it properly needs k repeats per
+seed count; that is owed work. Magnitudes agree with theory (13.5/√2,000 = 0.30
+vs 0.22–0.54 observed), which is all that can honestly be claimed.
+
+**AND THE CONCLUSION I DREW BEFORE MEASURING WAS WRONG.** I wrote that "at 300
+seeds the RNG noise swamps the effect." That is true PER GAME and irrelevant to
+this experiment, which compares an AGGREGATE over ~1,139 games. Monte Carlo error
+on an aggregate falls as `13.5/√(seeds × games)`:
+
+| seeds | per-game noise | aggregate over 1,139 games |
 |---|---|---|
-| 200 (preseason default) | **0.95 pts** | noise ≈ effect — **hopeless** |
-| 300 (NCAAF default) | 0.78 pts | still swamped |
-| 2,000 | 0.30 pts | workable |
-| 5,000 | **0.19 pts** | comfortable |
+| 300 | 0.78 | **0.023** |
+| 500 | 0.60 | 0.018 |
+| 2,000 | 0.30 | 0.009 |
 
-**Phase 2 must measure this rather than trust the formula**, but the design
-implication is already clear: **raise seeds before judging anything.** Running
-this at 300 seeds and reporting "no effect" would be measuring the RNG.
+Against a ~1.1-pt effect, **even 300 seeds leaves aggregate MC noise ~50× smaller
+than the signal.** MC noise is NOT the binding constraint; sampling error across
+games (SE ~0.12) is, and that is 5× larger than the MC term at 300 seeds.
+
+**Cost consequence.** Phase 2 at 2,000 seeds is **38.8 hours** for two arms
+(measured: 8.5 ms/sim). At 500 seeds it is **~9.7 hours** for a distributional
+score that is still well-resolved. **The 2,000 figure was over-specified by my
+own bad reasoning and would have burned ~29 hours of worker time for nothing.**
+
+Use **500 seeds** for mean-based scoring. CRPS needs each game's predictive
+distribution, not just its mean, so if CRPS is primary, justify the seed count
+against the CRPS estimator's own convergence rather than reusing this table.
 
 ---
 
