@@ -65,18 +65,46 @@ def _read(path):
         return ""
 
 
-# NOTE -- ONE SESSION CAN HAVE TWO IDS, and `coordinator.id` holds only one.
-# The id in the hook payload (and in the scratchpad path) is NOT necessarily the
-# `sessionId` other sessions see in `list_sessions`: on 2026-08-17 this session
-# was `9ed7fd89-...` to the hook and `local_1d6f136e-...` to the roster. A
-# scheduled-task session checked the roster, found no match for the registered
-# id, and correctly reported the register as unverifiable -- one step from
-# deleting the file and standing the whole role down.
+# NOTE -- ONE SESSION CAN HAVE SEVERAL IDS OVER ITS LIFE, which is why this file
+# is a LIST (see `_coordinator_ids`). The id in the hook payload is not the
+# `sessionId` other sessions see in `list_sessions`, AND it is reassigned when
+# the session is resumed. Both bit this role on 2026-08-17/18: a peer session
+# reported the register "stale" because the roster could not see the id, and then
+# the coordinator's own deploys started being blocked after a resume.
 #
-# The file therefore stays SINGLE-LINE and holds the id the hook actually
-# compares. The roster id and title are recorded in `.syndicate/coordinator.md`
-# so the register can be verified without guessing. Do not add comments to
-# `coordinator.id` unless this reader learns to strip them.
+# The roster id and title are recorded in `.syndicate/coordinator.md` so the
+# register can be verified from outside without guessing.
+
+
+def _coordinator_ids(path):
+    """Every id accepted as the coordinator. One per line; `#` comments ignored.
+
+    A SINGLE-VALUE REGISTER BROKE THREE SEPARATE WAYS IN TWO DAYS:
+
+      1. the roster id differs from the payload id, so another session checking
+         `list_sessions` found no match and reported the register stale;
+      2. it was therefore unverifiable from anywhere except the hook itself;
+      3. a session RESUME reassigned the payload id, silently standing the role
+         down -- the coordinator's own deploys started being blocked and the
+         message named neither id.
+
+    (3) is the one that matters here: the id is not stable for the life of the
+    role, so a register holding exactly one is guaranteed to go wrong eventually.
+    A list survives a resume, because the previous id stays valid and the new one
+    is appended.
+
+    Stale entries are safe to leave. Session ids are UUIDs and are not reused, so
+    an id that no longer exists matches nothing. Prune for tidiness, never for
+    correctness.
+
+    Backwards compatible: a one-line file is a one-element list.
+    """
+    out = set()
+    for line in _read(path).splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            out.add(line)
+    return out
 
 
 def _push_carries_render_yaml(root):
@@ -127,13 +155,13 @@ def main():
         return 0
 
     root = _root()
-    coordinator = _read(os.path.join(root, ".syndicate", "coordinator.id"))
+    coordinator = _coordinator_ids(os.path.join(root, ".syndicate", "coordinator.id"))
     if not coordinator:
         return 0                       # no coordinator registered: stand down
 
     session_id = re.sub(r"[^A-Za-z0-9._-]", "",
                         str(payload.get("session_id") or ""))[:128]
-    if session_id and session_id == coordinator:
+    if session_id and session_id in coordinator:
         return 0                       # this IS the coordinator
 
     if RENDER_DEPLOY_SCRIPT.search(cmd):
@@ -159,7 +187,7 @@ def main():
     sys.stderr.write(
         f"BLOCKED: this command is {kind}.\n"
         f"  this session:           {session_id or '<none>'}\n"
-        f"  registered coordinator: {coordinator}\n"
+        f"  registered coordinator: {', '.join(sorted(coordinator)) or '<none>'}\n"
         "\n"
         "Deploys are owned by the COORDINATOR session, which serialises them "
         "across all sessions, holds the sim-in-flight and blueprint_sync "

@@ -23,7 +23,12 @@ GRANTS = os.path.join(ROOT, ".syndicate", "deploy", "grants")
 # "from the COORDINATOR" case into a second copy of the "another session" case
 # -- i.e. a test that passes for the wrong reason.
 with open(os.path.join(ROOT, ".syndicate", "coordinator.id"), encoding="utf-8-sig") as _fh:
-    COORD = _fh.read().strip()
+    # Parse the register the SAME WAY the hook does. A raw read was fine while
+    # it held one bare id; it is now a commented LIST, and a raw read would hand
+    # the tests a whole file as a session id -- a green suite proving nothing.
+    COORD_IDS = [l.split('#', 1)[0].strip() for l in _fh]
+    COORD_IDS = [x for x in COORD_IDS if x]
+    COORD = COORD_IDS[0] if COORD_IDS else ''
 assert COORD, "no coordinator registered; this suite has nothing to test"
 OTHER = "definitely-not-the-coordinator-session"
 
@@ -115,6 +120,35 @@ try:
 finally:
     if os.path.exists(gpath):
         os.remove(gpath)
+
+print("\nMULTI-ID REGISTER (a resume appends an id; the old one must keep working):")
+
+
+def run_with_register(register_text, session):
+    """Run the guard against a throwaway repo whose register we control."""
+    root = tempfile.mkdtemp(prefix="lgreg")
+    os.makedirs(os.path.join(root, ".syndicate"), exist_ok=True)
+    with open(os.path.join(root, ".syndicate", "coordinator.id"), "w",
+              encoding="utf-8", newline="") as fh:
+        fh.write(register_text)
+    payload = json.dumps({"tool_name": "Bash", "session_id": session,
+                          "tool_input": {"command": DEPLOY}})
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=root.replace("\\", "/"))
+    p = subprocess.run([sys.executable, HOOK], input=payload.encode(),
+                       capture_output=True, env=env)
+    return p.returncode
+
+
+MULTI = "# a comment\n\nid-one\nid-two   # trailing comment\n\n"
+check("first id in the list allowed", run_with_register(MULTI, "id-one"), 0)
+check("SECOND id allowed (the resume case)", run_with_register(MULTI, "id-two"), 0)
+check("an id NOT in the list still blocked", run_with_register(MULTI, "id-three"), 2)
+check("a comment line is not an id", run_with_register(MULTI, "a comment"), 2)
+check("the '#' marker itself is not an id", run_with_register(MULTI, "#"), 2)
+check("single bare id still works (back-compat)",
+      run_with_register("solo-id\n", "solo-id"), 0)
+check("comments-only register = NO coordinator, guard stands down",
+      run_with_register("# nobody\n\n", "anyone"), 0)
 
 bad = [r for r in results if not r[0]]
 print(f"\n{len(results) - len(bad)}/{len(results)} passed")

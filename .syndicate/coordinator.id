@@ -1,1 +1,14 @@
-6f0980eb-40e8-49da-b857-604aa288e260
+# Accepted coordinator session ids, one per line. `#` comments are ignored.
+#
+# A session's id is NOT stable: a resume reassigns it. Append the new id rather
+# than replacing, so a resume cannot silently stand the role down. Stale entries
+# are harmless -- session ids are UUIDs and are never reused.
+#
+# Roster view (what `list_sessions` shows other sessions, and how they should
+# verify the coordinator): title "Deploy and Document Coordinator",
+# sessionId local_1d6f136e-be80-4799-adff-b9f7071871f7
+#
+# Deleting this whole file is the OFF SWITCH for the role.
+
+9ed7fd89-6696-4d42-9681-39c1a5b78a46   # original, 2026-08-17
+6f0980eb-40e8-49da-b857-604aa288e260   # after a resume, 2026-08-18

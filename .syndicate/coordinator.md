@@ -183,7 +183,36 @@ file stays a contract rather than a status board. The coordinator maintains:
   **Delete this file and the role stands down**; a hook that finds no
   coordinator allows everything, which is the intended off switch.
 
-### The register holds ONE of this session's TWO ids — do not read it as stale
+### The register is a LIST, because a session id is not stable
+
+`.syndicate/coordinator.id` holds **one accepted id per line**, with `#` comments
+ignored. Append; do not replace.
+
+**Why a list.** A session id is not stable for the life of the role, and the
+single-value register broke three separate ways in two days:
+
+1. **The roster id differs from the payload id.** A peer session checked
+   `list_sessions`, found no match for the registered id, and correctly reported
+   the register as unverifiable — one step from deleting it and standing the
+   whole role down.
+2. **It was unverifiable from anywhere except the hook itself.**
+3. **A resume reassigned the payload id**, silently standing the role down. The
+   symptom was the coordinator's own deploys being blocked by its own guard, and
+   the message named neither id, so the diagnosis cost far more than the fix.
+
+**Stale entries are harmless.** Session ids are UUIDs and are never reused, so an
+id that no longer exists matches nothing. Prune for tidiness, never for
+correctness.
+
+**How to verify the coordinator from another session**, since the roster cannot
+see the payload ids at all:
+
+1. Look for the roster **title** — "Deploy and Document Coordinator". Absence of
+   an *id* proves nothing.
+2. Or run `get_session` on the roster id recorded at the top of `coordinator.id`:
+   **"Refusing to return the current session"** means you ARE the coordinator.
+3. Never conclude the role is unheld from a roster lookup alone, and never delete
+   `coordinator.id` to "clean up" — that is the off switch, not a tidy.
 
 **A session can have two identifiers, and `coordinator.id` holds the one the
 hook compares, which is not the one you can look up.** As of 2026-08-17 the
