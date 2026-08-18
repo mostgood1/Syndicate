@@ -13628,3 +13628,41 @@ deploy inert, then enable in a watched window.**
 **`render.yaml` now differs from live env on this key.** That reconciliation is
 owed and is not done here — same trade-off the request itself named when it
 insisted on the single-key endpoint.
+
+## CORRECTION — the WNBA autorun rollback was justified by the WRONG METRIC `[2026-08-18 ~01:2xZ]`
+
+**I rolled back on `container_memory_pct_of_max`, which counts PAGE CACHE.** This
+ledger already holds the rule — *"memory.current is page cache; split anon vs
+inactive_file before calling anything a leak"* — and I had it in front of me.
+
+**Split, over 262 samples across the climb (22:10-22:36Z):**
+
+    ANON   min 124   max 839 MB    = 41.0% of the 2048MB ceiling
+    FILE   min 337   max 984 MB    (reclaimable; the kernel evicts before OOM)
+
+    22:32:16   container 1,982   anon 839   file 975
+    22:33:29   container 1,566   anon 423   file 977   <- released on its own
+
+**It released, and the rollback had not landed yet at 22:33** — so that drop is
+the leg finishing and freeing, not a restart. Anon never exceeded 41% of the
+ceiling. **live-odds-worker has ZERO `oomKilled` events in 24h** (two
+`earlyExit`, neither an OOM).
+
+**So the pre-emptive rollback was probably unnecessary, and the "1,186MB headroom
+vs a 1.3-1.5GB leg" arithmetic in triage was comparing the wrong quantities** —
+the leg figure and the headroom figure were both aggregate-with-cache, so the
+sum looked impossible while anon had over a gigabyte to spare.
+
+**What was still right:** holding the deploy while a live MLB sim ran, and
+refusing to flip another lane's flag to make a deploy fit. What was wrong is the
+number the rollback rested on.
+
+**Reversing it, at user instruction:** flag back to `true`, autorun code
+redeployed, and this time watched on **ANON** rather than the aggregate. Trip
+line anon >= 70% of 2048MB (~1,434MB), which is a real OOM signal rather than a
+cache reading.
+
+**Caveats carried forward, not waved away:** n=1, one WNBA slate, and the leg
+scales with slate size. The autorun arms on boot, so a genuine OOM would produce
+a CRASHLOOP rather than one kill — the watcher stays armed across cycles, not
+one window.
