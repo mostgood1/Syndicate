@@ -2340,3 +2340,38 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   Install `psutil` on web and the break-glass stops being needed.
 - **Residual:** `055dfc67` is off main, so a future off-main web deploy drops
   these six lines. They are on main in `c2030c72`.
+
+## CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+
+**Supersedes what I wrote three times today** — in the break-glass grant, in the
+web-deploy state entry above, and in the session checkpoint. All three name
+`psutil` as the cause. **They are wrong.**
+
+**MEASURED:**
+
+    00e9a49f  (live refresh-worker, 420 commits old)
+        memory_observability.py -> 3 hits, INCLUDING print(f"ALL_PROCESS_MEMORY...
+    origin/main (what web runs after `055dfc67`)
+        memory_observability.py -> EMITTER GONE
+        survivors are CONSUMERS ONLY: deploy_preflight, check_worker_memory_gate,
+        diagnose_sim_pipeline
+
+**The emitter was DELETED somewhere in those 420 commits.** `psutil_available:
+false` on web is real but INCIDENTAL — procfs enumeration works there (4/4
+processes, and `/api/ops/memory` returned full process data to me). The signal is
+missing because **nothing prints the line any more.**
+
+**INSTALLING `psutil` WOULD HAVE CHANGED NOTHING** while looking exactly like a
+fix: a shipped dependency, a plausible story, and a gate still returning UNKNOWN.
+
+**THE TRAP THIS LEAVES.** refresh-worker's CLEAR preflight is an ARTEFACT OF
+STALENESS — it emits only because it runs old code. **The moment the worker is
+brought onto main (which is the correct thing to do), its preflight goes UNKNOWN
+too and NO service can gate a deploy.** Whoever modernises the worker walks into
+this.
+
+**THE ACTUAL FIX:** restore the emitter. It exists verbatim at
+`00e9a49f:syndicate/features/shared/memory_observability.py`. Contract: a log
+line `deploy_preflight.py:parse_processes` can parse into `{pid, ppid, rss, cmd}`.
+Re-adding the periodic call must respect the standing rule that **worker periodic
+work is never free** (`#241` caused a production restart loop; ~1.4GB headroom).

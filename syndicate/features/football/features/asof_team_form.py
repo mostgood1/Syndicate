@@ -92,24 +92,64 @@ def _pbp_path(season: int, pbp_dir: Path | None = None) -> Path:
     return (pbp_dir or DEFAULT_PBP_DIR) / ("pbp_%d.csv" % season)
 
 
+# Only these columns are read. Projecting at parse time is what makes a
+# multi-week backtest affordable: the full pbp row carries ~380 columns, and
+# keeping whole rows for four seasons is gigabytes. This is thirteen.
+_NEEDED = (
+    "game_id", "season", "week", "posteam", "defteam", "epa", "success",
+    "pass", "yards_gained", "yardline_100", "touchdown", "play_type", "pass_oe",
+)
+
+# season -> projected rows, parsed once. Keyed by resolved path so a caller
+# pointing at a fixture directory cannot collide with the real mirror.
+_ROW_CACHE: dict[str, list[dict[str, Any]]] = {}
+
+
+def _all_rows(season: int, pbp_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Every projected row for a season, parsed at most once per process.
+
+    ADDED AFTER A MEASURED FAILURE, not speculatively. The first version
+    re-read the 100 MB CSV on every `team_form_asof` call. A 40-game
+    reachability run spans ~13 distinct weeks and each week also probes the
+    prior season, so it performed ~26 full-file parses: 142 s of CPU across 32
+    minutes of wall clock, about 7% utilisation and entirely I/O bound. Over the
+    full 1,139-game experiment that pattern would have read the file hundreds of
+    times.
+    """
+    path = _pbp_path(season, pbp_dir)
+    key = str(path.resolve()) if path.exists() else str(path)
+    cached = _ROW_CACHE.get(key)
+    if cached is not None:
+        return cached
+    rows: list[dict[str, Any]] = []
+    if path.is_file():
+        with path.open("r", encoding="utf-8", errors="ignore", newline="") as fh:
+            for row in csv.DictReader(fh):
+                rows.append({c: row.get(c) for c in _NEEDED})
+    _ROW_CACHE[key] = rows
+    return rows
+
+
 def _read_rows(season: int, *, before_week: int | None, pbp_dir: Path | None = None) -> Iterable[dict[str, Any]]:
     """Rows for `season`, hard-filtered to `week < before_week`.
 
-    THE FILTER LIVES HERE, at the read, and that is deliberate. Aggregating
-    first and filtering later is how same-game rows creep back in during a
-    refactor; a row from the target week never enters the pipeline at all.
+    THE FILTER STILL LIVES HERE, at the point rows enter the pipeline, and that
+    is deliberate. Aggregating first and filtering later is how same-game rows
+    creep back in during a refactor. Caching changed WHERE THE BYTES COME FROM,
+    never which rows are eligible: the cache holds the whole season and the week
+    filter is applied on every read out of it, so a target-week row still never
+    reaches the aggregator. `test_target_week_rows_are_never_read` covers this
+    path unchanged.
     """
-    path = _pbp_path(season, pbp_dir)
-    if not path.is_file():
-        return []
+    rows = _all_rows(season, pbp_dir)
+    if before_week is None:
+        return rows
     out: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8", errors="ignore", newline="") as fh:
-        for row in csv.DictReader(fh):
-            if before_week is not None:
-                wk = _f(row.get("week"))
-                if wk is None or int(wk) >= int(before_week):
-                    continue
-            out.append(row)
+    for row in rows:
+        wk = _f(row.get("week"))
+        if wk is None or int(wk) >= int(before_week):
+            continue
+        out.append(row)
     return out
 
 

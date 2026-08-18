@@ -15818,8 +15818,12 @@ succeeded on retry.
 
 **ROOT CAUSE of the dead gate, and I had it too broad.** `ALL_PROCESS_MEMORY`
 has THREE consumers and ZERO emitters in the repo — but the emitter is alive on
-refresh-worker (**sample age 17s, CLEAR**) and dead only on **web**, where
-`psutil` is not installed. I told the user and the coordinator that "no session
+refresh-worker (**sample age 17s, CLEAR**) and dead only on **web** -- **and the cause I gave here was WRONG.** I said
+`psutil` is not installed. **It is a DELETED EMITTER**: the `print(f"ALL_PROCESS_MEMORY...` exists at `00e9a49f` (the 420-commit-old
+worker) and is GONE on main, which web now runs. `psutil_available: false`
+is real but incidental -- procfs enumeration works on web. Installing
+`psutil` would have shipped a dependency and fixed nothing. See the
+CORRECTION section in `state.md`. I told the user and the coordinator that "no session
 can obtain a CLEAR preflight for any service." **That was wrong** — it is
 web-only, and it is a missing dependency, not an architectural limit. **Until
 `psutil` is installed on web, every web deploy needs a break-glass, and a guard
@@ -15835,3 +15839,30 @@ files** behind main and lacks `conditional_mix.py` and `pitch_codes.py`
 entirely. **A partial graft would be WORSE than nothing**: main's
 `build_roster.py` imports `conditional_mix`, so shipping the call site without
 the module is an ImportError in the roster build. Deferred deliberately.
+
+
+### NCAAF status check 2026-08-18 23:1xZ — NOT YET RUN, not failed
+
+`GET /ncaaf/api/cards?week=1` still reports **0 of 51** with a model number.
+**That is expected and is not a failure.** refresh-worker log at 23:13:54Z:
+
+    SEASON_PROJECTION_ARTIFACT_MISSING sport=ncaaf artifact_missing_after_launch
+      since_launch_seconds=15933  interval_seconds=86400
+
+**`since_launch_seconds=15933` (4.4h) puts the last NCAAF launch at ~18:48Z —
+BEFORE the key was injected at 21:43Z.** So the generator has not been invoked
+since it gained the credential. The next launch is ~24h after 18:48Z.
+
+**This is exactly the discriminator the verify: note called for**, and it
+separates the two readings that look identical from the board: "the key did not
+help" versus "nothing has tried yet". It is the second.
+
+Watcher armed; PASS remains **51 of 51** carrying a non-null
+`predictions.home_mean`.
+
+**Unrelated but visible in the same window, flagged not taken:** a steady stream
+of `STREAM_PULL_ABSENT` / `PULL_REPAIR_MISSING ok=False written=0` for
+`ncaaf_source/tracking/book_quotes/*.jsonl` across 08-18..08-24. NCAAF is out of
+season so absent book quotes are unsurprising, but the repair path retrying
+every tick and reporting `ok=False` is worth someone's attention — it is not
+this lane's file.
