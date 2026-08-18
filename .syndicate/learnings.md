@@ -4894,3 +4894,42 @@ absorbs unrelated error.
 **Guardrail that paid:** the script's first run produced **0 sim pitches** (the
 pbp count is nested, `count.balls`, not flat). It **REFUSED** rather than
 printing an empty matrix. An empty matrix reads as "no difference."
+
+## 2026-08-18 — RULE: a session RESUME reassigns the session id, which silently stands the coordinator role down. The register must be re-verified, not assumed
+
+**My own deploy guard blocked me.** `coordinator.id` held
+`9ed7fd89-...` — correct when written at 13:36 — and the hook was being handed
+`6f0980eb-...`. Nothing edited the register; **the session id changed underneath
+it** when the session was resumed. The role had been silently unheld for an
+unknown stretch, and the first symptom was the coordinator being unable to
+deploy.
+
+**The diagnosis cost far more than the fix**, because the block message named
+neither id. I probed `lane-guard` twice (its block message DOES print the id),
+and both probes returned nothing — an `Edit` whose `old_string` does not match
+never reaches the `PreToolUse` hook, so that method cannot identify a session at
+all. Only after adding the ids to the guard's own message did one call answer it.
+
+**Fixed at the source:** `deploy-guard.py` now prints
+
+    this session:           <id>
+    registered coordinator: <id>
+
+on every block. A guard that says "you are not who I expected" without naming
+either party forces exactly the archaeology this rule exists to prevent.
+
+**How to apply.**
+- **Treat `coordinator.id` as verifiable state, not settled state.** Re-check it
+  after any resume, and whenever the guard behaves unexpectedly.
+- **The scratchpad path is a live signal:** it carries the CURRENT session id.
+  Mine moved from `9ed7fd89-...` to `6f0980eb-...` and I kept using the old path
+  for scratch files without noticing, because the old directory still existed.
+- **This is the third distinct id problem in two days** — the roster id differing
+  from the payload id, the register being unverifiable from another session, and
+  now the payload id changing under a resume. The single-value register is the
+  common weakness. It should hold a LIST of accepted ids; an attempt to make it
+  so was blocked mid-edit and reverted, and remains the right fix.
+
+**What this did NOT break:** the guard held correctly for every other session
+throughout. The failure mode is the coordinator locking itself out, which is the
+safe direction — but it is invisible until someone tries to deploy.

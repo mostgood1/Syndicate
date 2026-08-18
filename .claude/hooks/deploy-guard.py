@@ -158,6 +158,8 @@ def main():
 
     sys.stderr.write(
         f"BLOCKED: this command is {kind}.\n"
+        f"  this session:           {session_id or '<none>'}\n"
+        f"  registered coordinator: {coordinator}\n"
         "\n"
         "Deploys are owned by the COORDINATOR session, which serialises them "
         "across all sessions, holds the sim-in-flight and blueprint_sync "
