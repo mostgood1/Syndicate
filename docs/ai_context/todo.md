@@ -458,7 +458,17 @@ checklist, 9 mirrored dates, 10 team-sides, 297 players):**
   legitimate, if cruder, proxy), so this degrades rather than breaks — but is
   genuinely absent, not merely unfed.
 
-### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, FIXED AND PUSHED (`fcfb1e62`)
+### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
+
+**Deployed to web** (`b775255a`, break-glass authorized, see
+`.syndicate/deploys.md` "deploy MEASURED — web — #462"). Verified by content
+immediately after cutover: `GET /api/ops/artifacts/export?path=...` on all
+three sampled paths (WNBA/NBA `team_advanced_stats`, WNBA
+`smart_sim_total_calibration.json`) returned `200` where it previously 403'd.
+Not yet deployed to refresh-worker/live-odds-worker (not needed for this
+fix — `HOT_ARTIFACT_PATTERNS` gates the `/api/ops/artifacts/*` read/publish
+surface on whichever service serves the request; web is what
+`/api/ops/artifacts/export` runs on).
 
 **Fix shipped**: added `team_advanced_stats_*.csv` (both directory-nesting
 variants) and the four calibration JSON filenames
