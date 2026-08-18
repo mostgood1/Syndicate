@@ -151,10 +151,26 @@ class PitchModelConfig:
     # damp=1.0: two-strike deviation 0.4033 -> 0.3982, a 1.3% gain, in exchange
     # for K/PA 0.2260 -> 0.2214. **Rejected** -- it gives back the exact K/PA
     # this lane just achieved to buy almost nothing.
-    two_strike_whiff_boost: float = 1.0   # PAIRS with two_strike_called_damp
     two_strike_waste_ball_boost: float = 1.0
     two_strike_called_damp: float = 1.0
-    # *** THE HEADLINE NUMBER FOR THIS TERM WAS WRONG. CORRECTED 2026-08-18. ***
+    # *** THE WITHDRAWAL WAS WRONG. THE ORIGINAL NUMBER STANDS. 2026-08-18. ***
+    #
+    # I committed K/PA 0.1859 -> 0.2260, then withdrew it after re-measuring
+    # 0.1606. **The re-measurement was the broken one.** It was taken while a
+    # DUPLICATE `two_strike_whiff_boost` field existed in this class: the later
+    # definition (0.0409) shadowed my 1.0, and my second application multiplied
+    # it again. With the duplicate removed:
+    #
+    #     empty override dict   K/PA 0.2260
+    #     dict of 1.0s          K/PA 0.2260     <- MATCH, as it always should have
+    #     baseline (foul 2.05)  K/PA 0.2260     <- real 0.226
+    #
+    # So `early_count_foul_boost = 2.05` does land K/PA on target, the harness
+    # was never unsound, and the two-strike sweep it produced is valid after all.
+    # Three claims in a row here were wrong in alternating directions; the fixed
+    # point is the equivalence check above, which is why it now runs first.
+    #
+    # (original note follows)
     #
     # Committed as "K/PA 0.1859 -> 0.2260, exactly the real 0.226". **That does
     # not reproduce.** Re-measured on the same 8 games x 30 sims immediately
@@ -689,13 +705,13 @@ def simulate_pitch(
         _cd = _cfg_float(cfg, "two_strike_called_damp", 1.0)
         if _cd != 1.0:
             p_called *= _cd
-        # Damping called strikes ALONE cannot work -- at two strikes a called
-        # strike IS a strikeout, so cutting it just deletes strikeouts (measured:
-        # K/PA 0.2260 -> 0.1747 as damp went 1.0 -> 0.25). This term is the other
-        # half: the strike mass has to MOVE to swinging strikes, not shrink.
-        _wb = _cfg_float(cfg, "two_strike_whiff_boost", 1.0)
-        if _wb != 1.0:
-            p_whiff *= _wb
+        # NOTE: two-strike whiffs are NOT boosted here. `two_strike_whiff_boost`
+        # already exists (see the field below) and is already consumed, as
+        # `whiff_boost = cfg.two_strike_whiff_boost * two_strike`. Adding a
+        # second application here double-counted it: declaring the field twice
+        # let the later default (0.0409) win, so passing the "no-op" 1.0 raised
+        # two-strike whiffs 24x AND multiplied them again. That is what made a
+        # dict of 1.0s differ from an empty dict.
     else:
         # NOT an else-branch on convenience: `two_strike_foul_boost` already
         # owns 2-strike fouls, and stacking both would double-count there.
