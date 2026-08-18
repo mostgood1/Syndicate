@@ -3529,7 +3529,7 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### wnba-fixture-identity - OPEN - **stable fixture identity SHIPPED (`b2dbef5e`,
+###  —  — **stable fixture identity SHIPPED (`b2dbef5e`,
 `ec5c9011`, 40 tests). Now wiring it into the game_cards builder.** - opened
 2026-08-17 - session: layer1-board-coverage
 - Goal: the WNBA `game_cards` writer uses the schedule as its denominator and
@@ -4919,7 +4919,7 @@ runs. **To see the census, re-read logs right after a WNBA refresh tick.**
 `syndicate-api.onrender.com`; both 404 and cost me three calls. Local has **no**
 `game_cards_2026-08-1*.csv` at all, so every number above is production-only.
 
-### wnba-fixture-identity - **BUILT AND TESTED (26 pass). The stable identity already existed and nobody was using it. Coverage defect now sized: 72.6%, season-long, FOUR distinct failure modes.**
+###  — **BUILT AND TESTED (26 pass). The stable identity already existed and nobody was using it. Coverage defect now sized: 72.6%, season-long, FOUR distinct failure modes.**
 
 **THE IDENTITY: the ESPN event id, already in `schedule_2026.csv`.** No new
 scheme was minted - that would have been a fourth. Verified same-instant against
@@ -4984,7 +4984,7 @@ existing regression tests** (`test_wnba_game_cards_census.py`,
 `test_wnba_refresh_runner.py::...promotes_full_slate_when_snapshot_is_partial`)
 - this defect was already fixed once on 2026-07-07 and came back.
 
-### wnba-fixture-identity - **WIRING BUILT AND TESTED (40 pass), BUT BLOCKED AT THE LAST STEP BY A LANE CONFLICT. Needs a user decision, not more work.**
+###  — **WIRING BUILT AND TESTED (40 pass), BUT BLOCKED AT THE LAST STEP BY A LANE CONFLICT. Needs a user decision, not more work.**
 
 **BLOCKER.** `scripts/refresh_wnba_oddsapi_props.py` is claimed by OPEN lane
 `export-force-refresh-escape`. `lane-guard` blocked the edit and I did not
@@ -5034,7 +5034,7 @@ every `expected_matchups.issubset(...)` coverage gate passes **trivially** -
 the guard that was supposed to stop a partial slate is inert exactly when the
 slate is partial. This is the `unknown-must-not-default-permissive` shape again.
 
-### wnba-fixture-identity - CLOSED - **SHIPPED. Stable ESPN fixture identity + the
+###  —  — **SHIPPED. Stable ESPN fixture identity + the
 game_cards coverage fix, wired into the builder. 117 pass; the only 3 failures are
 PRE-EXISTING at origin/main (verified in a clean worktree).** - opened/closed
 2026-08-17 - session: layer1-board-coverage
@@ -5380,7 +5380,7 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
   probe suite green, and a re-run reporting mlb `unchanged (baselined)`.
 - **Blocked by:** none
 
-### wnba-fixture-identity - CHECKPOINT 2026-08-17 ~14:30 CDT - **all work COMMITTED AND PUSHED, nothing uncommitted. One deliverable shipped-but-unmeasured, one awaiting the coordinator.**
+###  — CHECKPOINT 2026-08-17 ~14:30 CDT - **all work COMMITTED AND PUSHED, nothing uncommitted. One deliverable shipped-but-unmeasured, one awaiting the coordinator.**
 - **Identity + coverage fix: deployed to both workers, verified BY CONTENT,
   EFFECT UNMEASURED.** It cannot be measured until something calls the builder.
 - **Sweep ownership gate: committed `20025cc4`, 245 tests, NOT DEPLOYED.**
@@ -5397,7 +5397,7 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
   `game_cards` is sweep-derived - **under which the coverage fix is dead code.**
   It gates whether the open deploy row can ever close.
 
-### wnba-phase2-migration - OPEN, NOT STARTED - **design settled and blocked-then-unblocked, but NO CODE WRITTEN. Handing off deliberately rather than half-building a production autorun.**
+###  —  — **design settled and blocked-then-unblocked, but NO CODE WRITTEN. Handing off deliberately rather than half-building a production autorun.**
 - Goal: Phase 2 of the migration off the daily-update GHA cron - re-home the
   WNBA full refresh onto a worker autorun so something actually calls
   `refresh_wnba_oddsapi_props.main()` on a cadence. Today nothing does
@@ -5522,7 +5522,7 @@ Borussia Monchengladbach -> borussia monchengladbach  OK
   Releasing this lane loses nothing. I still did not release it - #2 (3-way
   de-vig) is separately marked DELIBERATELY HELD and is not mine to judge.
 
-### wnba-phase2-migration - HANDED OFF 2026-08-17 ~16:2x CDT - **code SHIPPED and TESTED, flag NOT SET, deploy is the coordinator's. Session at context exhaustion.**
+###  — HANDED OFF 2026-08-17 ~16:2x CDT - **code SHIPPED and TESTED, flag NOT SET, deploy is the coordinator's. Session at context exhaustion.**
 - **`e65a5531`** Phase 2 WNBA pregame autorun on live-odds-worker.
   **`c7494c6c`** its five tests - `e65a5531` shipped UNTESTED and I added them
   after; that ordering was wrong and is recorded in `learnings.md`.
@@ -6085,7 +6085,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
   and in `deploys.md`), then re-run `mlb_opportunity_haircut.py`. The scoreboard
   is the market, and it is now a single command.
 
-### wnba-phase2-migration - HANDED OFF, COORDINATOR HOLDS THE ONLY REMAINING ACTION
+###  — HANDED OFF, COORDINATOR HOLDS THE ONLY REMAINING ACTION
 - **Sweep gate: DEPLOYED and HALF-VERIFIED.** Half one confirmed by
   live-odds-worker's own `SWEEP_OWNERSHIP_EXCLUDED` line. Half two
   (`ODDS_SWEEP_OUTCOME` on live-odds-worker) pending the cadence marker;
@@ -6103,7 +6103,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
   `ODDS_SWEEP_OUTCOME` landed on live-odds-worker, close the `20025cc4` row.
   Phase 2 is the coordinator's call on their own window.
 
-### modelled-fair-edge - SHIPPED AND MEASURED ON PRODUCTION DATA (not deployed) - 2026-08-17
+###  — SHIPPED AND MEASURED ON PRODUCTION DATA (not deployed) - 2026-08-17
 - **USER DECISION TAKEN:** *"yes, allow book_margin_model edges with their own
   column"* - recommendation 4 of the Layer 1 audit, which had been blocking
   1,416 rows since 2026-08-16.
@@ -6173,7 +6173,7 @@ until they return.** I did not chase it - separate defect, separate owner.
   two deploy requests queued and de-prioritised by me; `outs-props-coverage-check`
   fires 2026-08-19.
 
-### soccer-projection-collapse - OPEN, DIAGNOSED NOT FIXED - opened 2026-08-17 by `modelled-fair-edge`
+###  —  — opened 2026-08-17 by `modelled-fair-edge`
 - **Symptom:** soccer serves `rows_with_projection: 4` of `rows_considered: 1142`
   (**`pct_projected: 0.4`**). Found while measuring the new
   `edge_vs_modelled_fair_pct` column, which is INERT for soccer as a result -
@@ -6224,7 +6224,7 @@ off the worker - and compare its 3 match identities against the board's 5
 fixtures. That comparison is the whole diagnosis; everything upstream of it is
 already exonerated above.
 
-### soccer-projection-collapse - **ROOT CAUSE FOUND 2026-08-17 ~23:0xZ. The sim is FINE. `predictions.probabilities` is NULL for 4 of 5 fixtures while `sim.win_probability` is populated for all 5.**
+###  — **ROOT CAUSE FOUND 2026-08-17 ~23:0xZ. The sim is FINE. `predictions.probabilities` is NULL for 4 of 5 fixtures while `sim.win_probability` is populated for all 5.**
 
 **READ DIRECTLY off `/soccer/<league>/api/cards` - no deploy needed, and it
 answered what the unreadable `recommendations_<date>.json` would have:**
@@ -6268,7 +6268,7 @@ emits `null` where `sim.win_probability` has a value. Compare the two blocks for
 `lane-guard` blocks the file, and widening cannot be READ from anyway until the
 new pattern is DEPLOYED to web. It was never completable in one session.
 
-### soccer-projection-collapse - **ROOT CAUSE CONFIRMED AND THE PATCH IS WRITTEN. NOT APPLIED - `lanes.md` contention, not a code problem.**
+###  — **ROOT CAUSE CONFIRMED AND THE PATCH IS WRITTEN. NOT APPLIED - `lanes.md` contention, not a code problem.**
 
 **THE DEFECT: the `#379` widening shipped INERT.**
 `load_soccer_projections` grew a `window_dates` parameter so the projection read

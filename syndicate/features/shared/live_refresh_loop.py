@@ -5365,6 +5365,30 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# waits one interval, with the slate-end data still fresh).
 			_record_pregame_sport_sweep_epochs(tick_started_epoch, list(launched_sports))
 			_record_odds_sweep_launch(tick_started_epoch, list(launched_sports))
+			# THE EVENT LINE. Every other launch-side print in this file is a
+			# `*_FAILED` variant, so a launch that SUCCEEDED was invisible and
+			# only its side effects could be observed.
+			#
+			# Measured 2026-08-18: after the sweep-ownership gate shipped,
+			# answering "did live-odds-worker actually take the sweep over?"
+			# required reconstructing the launch time from two
+			# `PREGAME_CADENCE_DETAIL` marker ages (884s @ 00:10:24 and 950s @
+			# 00:11:29, both resolving to a 23:55:40Z stamp). That arithmetic
+			# should not be the only way to see a launch -- and reading the
+			# ABSENCE of `ODDS_SWEEP_OUTCOME` instead produced a WRONG conclusion
+			# first, because that line GRADES a prior launch and lags it, so it
+			# can never answer "did one start just now".
+			#
+			# Printed AFTER the markers are recorded, so it means "launched and
+			# stamped" rather than "about to try" -- a line that fires before the
+			# thing it reports would be the same false-signal problem in a new
+			# place.
+			print(
+				f"[live_refresh_loop] ODDS_SWEEP_LAUNCHED date={selected_date} "
+				f"sports={','.join(launched_sports) or '<none>'} "
+				f"count={len(launched_sports)} epoch={int(tick_started_epoch)}",
+				flush=True,
+			)
 		except Exception as exc:
 			# Resolving the sport list must never be the reason a refresh
 			# doesn't launch; the WNBA marker is only a gate input.

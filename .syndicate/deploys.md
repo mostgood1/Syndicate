@@ -14484,3 +14484,43 @@ read a 30-minute overrun as falsification.
 wnba window). If it appears, the row closes. If a second launch also grades
 nothing, that is a real defect and the missing launch-side line is the first
 thing to fix.
+
+### LEDGER INTEGRITY — the LOCAL `lanes.md` has diverged badly from the committed one, and `lane-guard` reads the LOCAL copy
+
+**Measured 2026-08-18 00:4xZ:**
+```
+local .syndicate/lanes.md    332,617 bytes   38 lane headers    0 of my 4 lanes
+origin/main   same file      455,816 bytes   65 lane headers   12 entries of mine
+```
+**The working copy is 123 KB smaller and missing 27 lane headers.** Work
+committed through a detached worktree survives on `main`; the working file does
+not have it. Something is repeatedly overwriting the local file with an older,
+narrower version.
+
+**THIS EXPLAINS EVERY LANE BLOCK TONIGHT.** `lane-guard` reads the LOCAL file,
+so it has been enforcing against a 27-header-stale view:
+- Four blocked edits where the guard's OWN parser reported **no claim** while
+  the hook still reported one.
+- Two lane RELEASES written, verified, and then gone from the file minutes later.
+- An ASCII-hyphen header fix applied to four of my lanes, reported as written by
+  the script, and **absent from the file on the very next read**.
+
+**IT IS NOT A GUARD BUG.** The guard is correct about what it reads; what it
+reads is stale.
+
+**SECOND, SMALLER FINDING — my own fault.** My lane headers use ASCII hyphens
+(`### slug - OPEN - ...`) where the guard and the session digest both parse on
+em-dash `U+2014`. The digest has been reporting *"5 lane header(s) have no
+parseable status and are NOT guarded"* and **those are largely mine** — so the
+files I claimed were never actually protected. Fixed on `main` in this commit;
+the local copy cannot be fixed durably until the overwriting stops.
+
+**WHY THIS MATTERS BEYOND TONIGHT.** Two sessions reading `lanes.md` are reading
+different documents. A session that opens a lane locally and never commits it
+has no claim anyone else can see, and a session that commits one has a claim
+its own guard cannot see. **The ledger's whole purpose is a shared view, and
+right now there is not one.**
+
+**NOT DIAGNOSED:** which process rewrites the local file, or whether it is a
+truncating write of a stale in-memory copy versus a checkout of an older
+revision. The 27 missing headers are the evidence; the writer is not identified.

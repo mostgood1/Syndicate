@@ -203,3 +203,51 @@ def test_every_dropped_sport_carries_a_reason(monkeypatch, capsys):
 def test_the_gate_itself_never_raises_on_junk(monkeypatch):
     for value in ("", "   ", None):
         assert loop._sweep_ownership_exclusion(value) is None
+
+
+# --------------------------------------------------------------------------
+# The launch must be VISIBLE, not reconstructed.
+# --------------------------------------------------------------------------
+
+
+def test_a_successful_launch_emits_its_own_line():
+    """Every other launch-side print in that file is a `*_FAILED` variant, so a
+    launch that SUCCEEDED was invisible.
+
+    Measured 2026-08-18: answering "did live-odds-worker take the sweep over?"
+    needed the launch time reconstructed from two `PREGAME_CADENCE_DETAIL`
+    marker ages. Worse, reading the ABSENCE of `ODDS_SWEEP_OUTCOME` instead
+    produced a WRONG conclusion first -- that line grades a PRIOR launch and
+    lags it, so it can never answer "did one start just now".
+    """
+    import inspect
+
+    src = inspect.getsource(loop)
+    assert "ODDS_SWEEP_LAUNCHED" in src, "a successful sweep launch must announce itself"
+
+
+def test_the_launch_line_reports_which_sports_and_how_many():
+    """"A launch happened" is not enough -- the whole ownership question is
+    WHICH sports this service claimed, which is what the gate decides."""
+    import inspect
+
+    src = inspect.getsource(loop)
+    block = src[src.index("ODDS_SWEEP_LAUNCHED"):][:400]
+    assert "sports=" in block
+    assert "count=" in block
+
+
+def test_the_launch_line_fires_after_the_markers_are_recorded():
+    """It must mean "launched and stamped", not "about to try".
+
+    A line that fires before the thing it reports is the same false-signal
+    problem in a new place -- and the markers are what the cadence filter
+    actually reads, so announcing a launch that failed to stamp would be worse
+    than the silence it replaces.
+    """
+    import inspect
+
+    src = inspect.getsource(loop)
+    assert src.index("_record_odds_sweep_launch(") < src.index("ODDS_SWEEP_LAUNCHED"), (
+        "the launch line must come after the marker records, not before"
+    )
