@@ -14948,3 +14948,75 @@ fabricating one would cost correctness.
 **PASS means every consumed field is fed. It does NOT mean the engine is good** —
 the market still wins all four prop markets, and that number is unchanged by any
 of this plumbing.
+## ENV CHANGE — `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` true -> false on live-odds-worker `[2026-08-18 ~01:0xZ, user instruction]`
+
+**Single-key endpoint, NOT `render.yaml`.** `PUT /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/<key>`
+returned 200 and the new value was **verified by re-reading the key**, not by
+trusting the status code. A `blueprint_sync` would have rewritten the whole env
+block on live services; it 502'd every route for ~2 minutes on 2026-08-08.
+
+**Why `"false"` and not a deletion.** The predicate is
+`raw_value in {"1","true","yes","on"}` — read from the code, not assumed — so
+`"false"`, `"0"` and absent are all off. An explicit `false` is visible to the
+next reader; an absent key is indistinguishable from one nobody ever set, and
+this ledger's standing rule is that **absent != off**. It also matches the
+sibling flags (`SYNDICATE_MLB_REFRESH_TICK_OWNER=false`).
+
+**NO DEPLOY FIRED, deliberately.** A restart does not re-inject env vars, but the
+autorun CODE is not on the live SHA (`7470939b`, rolled back), so nothing is
+running it. The flag matters for the NEXT deploy that carries that code, and that
+deploy will read the new value at boot. Firing one now would be churn on a 2GB
+service for no effect.
+
+**What this closes:** the live trap recorded at the rollback — any redeploy of
+live-odds-worker re-arming an autorun that reached 85.3% of 2048MB, +380MB in 13
+minutes. That can no longer happen by accident.
+
+**What it does NOT do:** it does not re-stage Phase 2. Enabling it remains
+`wnba-phase2-migration`'s decision, and the memory question is unresolved — the
+leg is sized at 1.3-1.5GB against measured headroom of ~1,186MB. Re-homing to
+refresh-worker's 4GB is still the coordinator's recommendation. **This change
+restores exactly the staging the request originally asked for and could not have:
+deploy inert, then enable in a watched window.**
+
+**`render.yaml` now differs from live env on this key.** That reconciliation is
+owed and is not done here — same trade-off the request itself named when it
+insisted on the single-key endpoint.
+
+## CORRECTION — the WNBA autorun rollback was justified by the WRONG METRIC `[2026-08-18 ~01:2xZ]`
+
+**I rolled back on `container_memory_pct_of_max`, which counts PAGE CACHE.** This
+ledger already holds the rule — *"memory.current is page cache; split anon vs
+inactive_file before calling anything a leak"* — and I had it in front of me.
+
+**Split, over 262 samples across the climb (22:10-22:36Z):**
+
+    ANON   min 124   max 839 MB    = 41.0% of the 2048MB ceiling
+    FILE   min 337   max 984 MB    (reclaimable; the kernel evicts before OOM)
+
+    22:32:16   container 1,982   anon 839   file 975
+    22:33:29   container 1,566   anon 423   file 977   <- released on its own
+
+**It released, and the rollback had not landed yet at 22:33** — so that drop is
+the leg finishing and freeing, not a restart. Anon never exceeded 41% of the
+ceiling. **live-odds-worker has ZERO `oomKilled` events in 24h** (two
+`earlyExit`, neither an OOM).
+
+**So the pre-emptive rollback was probably unnecessary, and the "1,186MB headroom
+vs a 1.3-1.5GB leg" arithmetic in triage was comparing the wrong quantities** —
+the leg figure and the headroom figure were both aggregate-with-cache, so the
+sum looked impossible while anon had over a gigabyte to spare.
+
+**What was still right:** holding the deploy while a live MLB sim ran, and
+refusing to flip another lane's flag to make a deploy fit. What was wrong is the
+number the rollback rested on.
+
+**Reversing it, at user instruction:** flag back to `true`, autorun code
+redeployed, and this time watched on **ANON** rather than the aggregate. Trip
+line anon >= 70% of 2048MB (~1,434MB), which is a real OOM signal rather than a
+cache reading.
+
+**Caveats carried forward, not waved away:** n=1, one WNBA slate, and the leg
+scales with slate size. The autorun arms on boot, so a genuine OOM would produce
+a CRASHLOOP rather than one kill — the watcher stays armed across cycles, not
+one window.
