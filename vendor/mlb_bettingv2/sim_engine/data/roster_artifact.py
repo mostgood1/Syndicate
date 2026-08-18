@@ -187,6 +187,14 @@ def roster_to_dict(roster: TeamRoster) -> Dict[str, Any]:
             "batters_faced": float(p.batters_faced),
             "balls_in_play": float(p.balls_in_play),
             "arsenal": _ser_pitchtype_map(p.arsenal),
+            # Serialisation here is an EXPLICIT list, not a dataclasses.fields()
+            # walk. A new field that is not added here survives in memory and
+            # vanishes through the artifact -- and the worker reads artifacts.
+            "conditional_arsenal": {
+                str(k): _ser_pitchtype_map(v)
+                for k, v in (getattr(p, "conditional_arsenal", None) or {}).items()
+            },
+            "count_bucket_map": dict(getattr(p, "count_bucket_map", None) or {}),
             "pitch_type_whiff_mult": _ser_pitchtype_map(p.pitch_type_whiff_mult),
             "pitch_type_inplay_mult": _ser_pitchtype_map(p.pitch_type_inplay_mult),
             "pitch_type_hr_mult": _ser_pitchtype_map(p.pitch_type_hr_mult),
@@ -315,7 +323,7 @@ def roster_from_dict(d: Dict[str, Any]) -> TeamRoster:
                     setattr(prof, k, float(p.get(k)))
                 except Exception:
                     pass
-        for k in ("statcast_splits_source", "statcast_splits_start_date", "statcast_splits_end_date", "arsenal_source", "role"):
+        for k in ("statcast_splits_source", "statcast_splits_start_date", "statcast_splits_end_date", "arsenal_source", "conditional_arsenal_source", "role"):
             if k in p:
                 try:
                     setattr(prof, k, str(p.get(k) or ""))
@@ -329,6 +337,11 @@ def roster_from_dict(d: Dict[str, Any]) -> TeamRoster:
                     pass
 
         prof.arsenal = _de_pitchtype_map(p.get("arsenal") or {})
+        prof.conditional_arsenal = {
+            str(k): _de_pitchtype_map(v or {})
+            for k, v in (p.get("conditional_arsenal") or {}).items()
+        }
+        prof.count_bucket_map = dict(p.get("count_bucket_map") or {})
         prof.pitch_type_whiff_mult = _de_pitchtype_map(p.get("pitch_type_whiff_mult") or {})
         prof.pitch_type_inplay_mult = _de_pitchtype_map(p.get("pitch_type_inplay_mult") or {})
         prof.pitch_type_hr_mult = _de_pitchtype_map(p.get("pitch_type_hr_mult") or {})

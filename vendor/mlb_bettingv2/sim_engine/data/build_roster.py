@@ -31,6 +31,7 @@ from ..features import RecencyConfig, apply_recency_to_batter, apply_recency_to_
 from .disk_cache import DiskCache
 from .statsapi import fetch_person_pitch_arsenal
 from .arsenal import apply_arsenal_to_batter, apply_arsenal_to_pitcher
+from .conditional_mix import apply_conditional_mix_to_pitcher
 from .batted_ball import apply_batted_ball_to_batter, apply_batted_ball_to_pitcher
 from .quality import apply_quality
 from .statcast_pitch_splits import fetch_pitcher_pitch_splits
@@ -2206,6 +2207,7 @@ def build_team_roster(
             # and it fills pitch_type_hr_mult which pitch splits cannot). The
             # older path stays as a fallback for pitchers the leaderboard drops.
             apply_arsenal_to_pitcher(starter, season=season)
+            apply_conditional_mix_to_pitcher(starter, season=season)
             apply_quality(starter, season=season, side="pitchers")
         except Exception:
             pass
@@ -2222,6 +2224,7 @@ def build_team_roster(
             )
             apply_batted_ball_to_pitcher(p, season=season)
             apply_arsenal_to_pitcher(p, season=season)
+            apply_conditional_mix_to_pitcher(p, season=season)
             apply_quality(p, season=season, side="pitchers")
     if starter.player.mlbam_id:
         starter.role = "SP"

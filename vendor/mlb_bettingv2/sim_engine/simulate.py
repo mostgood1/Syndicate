@@ -97,6 +97,27 @@ def _build_weight_cdf(weights: Dict[PitchType, float]) -> Tuple[List[PitchType],
     return (types, cdf, float(acc))
 
 
+def _conditional_cdf(pitcher, balls: int, strikes: int, eff_bat: str, fallback):
+    """CDF for this pitcher's mix in THIS count against THIS batter hand.
+
+    Falls back to the season-arsenal CDF whenever the pitcher, the count bucket
+    or the hand is not covered. A missing artifact therefore degrades to exactly
+    the previous behaviour rather than to an empty mix -- the failure mode that
+    matters, because an empty mix would silently become all-fastball via the
+    `default` argument of `_sample_weight_cdf`.
+    """
+    cells = getattr(pitcher, "conditional_arsenal", None)
+    if not cells:
+        return fallback
+    bucket = (getattr(pitcher, "count_bucket_map", None) or {}).get(f"{balls}-{strikes}")
+    if not bucket:
+        return fallback
+    mix = cells.get(f"{bucket}|{eff_bat}")
+    if not mix:
+        return fallback
+    return _build_weight_cdf(mix)
+
+
 def _sample_weight_cdf(rng: random.Random, types: List[PitchType], cdf: List[float], total: float, default: PitchType) -> PitchType:
     if total <= 0.0 or not types:
         return default
@@ -1063,7 +1084,13 @@ def _simulate_pitch(
     pitcher_hr = _clamp_rate(base_pitcher_hr * _m(p_mults, "hr") * float(pitcher_shape_mults.get("hr", 1.0)), 0.002, 0.14)
     pitcher_inplay = _clamp_rate(base_pitcher_inplay * _m(p_mults, "inplay") * float(pitcher_shape_mults.get("inplay", 1.0)), 0.10, 0.45)
 
-    pitch_type = _weighted_choice(rng, pitcher.arsenal, PitchType.FF)
+    # `_simulate_pitch` takes the count as a tuple param; there are no `balls` /
+    # `strikes` locals here (unlike the fast path).
+    _cb, _cs = (int(count[0]), int(count[1])) if count else (0, 0)
+    _season_cdf = _build_weight_cdf(pitcher.arsenal or {})
+    _c_types, _c_cdf, _c_total = _conditional_cdf(
+        pitcher, _cb, _cs, eff_bat, _season_cdf)
+    pitch_type = _sample_weight_cdf(rng, _c_types, _c_cdf, _c_total, PitchType.FF)
     raw_pt_mult = float((batter.vs_pitch_type or {}).get(pitch_type, 1.0))
     raw_pt_hr_mult = float((getattr(batter, "vs_pitch_type_hr", {}) or {}).get(pitch_type, 1.0))
     try:
@@ -2306,6 +2333,8 @@ def simulate_game(
 
     # Per-game cache: pitcher_id -> (pitch_types, cumulative_weights, total)
     pitch_cdf_cache: Dict[int, Tuple[List[PitchType], List[float], float]] = {}
+    # (pitcher_id, balls, strikes, eff_bat) -> CDF for the conditional mix
+    cond_cdf_cache: Dict[Tuple[int, int, int, str], Tuple[List[PitchType], List[float], float]] = {}
 
     def start_half_inning():
         batting = state.batting_roster().team
@@ -2629,6 +2658,7 @@ def simulate_game(
             cdf_entry = _build_weight_cdf(getattr(pitcher_prof, "arsenal", {}) or {})
             pitch_cdf_cache[int(pitcher_id)] = cdf_entry
         pitch_types, pitch_cdf, pitch_total = cdf_entry
+        season_cdf_entry = cdf_entry
 
         # Precompute matchup rates once per PA (platoon + per-game day rates)
         pit_hand = _hand(getattr(pitcher_prof.player, "throw_side", getattr(pitcher_prof, "throw_side", "R")))
@@ -2800,7 +2830,17 @@ def simulate_game(
             count_before = (int(balls), int(strikes))
             outs_before_pitch = int(half.outs)
             bases_before_pitch = str(half.bases.value)
-            pitch_type = _sample_weight_cdf(rng, pitch_types, pitch_cdf, pitch_total, PitchType.FF)
+            # Mix is conditional on the count and the batter hand. Cached per
+            # (pitcher, bucket, hand) -- ~5 buckets x 2 hands, so this is a
+            # handful of CDFs per pitcher per game, not one per pitch.
+            _cc_key = (int(pitcher_id), int(balls), int(strikes), eff_bat)
+            _cc = cond_cdf_cache.get(_cc_key)
+            if _cc is None:
+                _cc = _conditional_cdf(pitcher_prof, int(balls), int(strikes),
+                                       eff_bat, season_cdf_entry)
+                cond_cdf_cache[_cc_key] = _cc
+            _c_types, _c_cdf, _c_total = _cc
+            pitch_type = _sample_weight_cdf(rng, _c_types, _c_cdf, _c_total, PitchType.FF)
             raw_pt_mult = float(vs_pt.get(pitch_type, 1.0))
             raw_pt_hr_mult = float(vs_pt_hr.get(pitch_type, 1.0))
             try:

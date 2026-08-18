@@ -316,6 +316,13 @@ class PitcherProfile:
     balls_in_play: float = 0.0
 
     arsenal: Dict[PitchType, float] = field(default_factory=dict)  # usage probs
+    # Count x batter-hand conditional mixes, keyed "<bucket>|<hand>". Empty means
+    # "fall back to `arsenal`", which is exactly the pre-2026-08-18 behaviour.
+    # DECLARED, not setattr: `dataclasses.replace()` drops setattr attributes,
+    # which is how `position_substitutions` stayed permanently off.
+    conditional_arsenal: Dict[str, Dict[PitchType, float]] = field(default_factory=dict)
+    count_bucket_map: Dict[str, str] = field(default_factory=dict)  # "b-s" -> bucket
+    conditional_arsenal_source: str = ""
     # Optional pitch-type outcome multipliers (e.g., Statcast-derived vs global priors).
     pitch_type_whiff_mult: Dict[PitchType, float] = field(default_factory=dict)
     pitch_type_inplay_mult: Dict[PitchType, float] = field(default_factory=dict)
