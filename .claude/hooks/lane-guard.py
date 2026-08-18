@@ -37,8 +37,25 @@ OPEN_RE = re.compile(r"\bOPEN\b")
 # reported loudly, and the owning session is blocked from editing until it fixes
 # the separator. Protection first, pressure second.
 ASCII_LANE_RE = re.compile(r"^###\s+(\S+)\s+-\s*([^-]*)")
-FILES_RE = re.compile(r"^\s*-\s*Files\b[^:]*:(.*)$")
-FIELD_RE = re.compile(r"^-\s*\w")
+# `- Files:` and `- **Files (...):**` are the same field. Measured 2026-08-18:
+# 32 of 37 Files declarations used the bare form and 5 used the bold one, and
+# those 5 matched NOTHING -- they declared files that no hook could see, which is
+# the worst state available: the ledger says a file is held and the guard lets
+# anyone edit it.
+#
+# THE COLON IS OPTIONAL, because two of the five wrap the header across lines and
+# the colon lands on the second ("- **Files (all NEW -- collision-checked ...").
+# `[^:]*` cannot span a newline, so requiring it would still miss those two.
+# Continuation lines are picked up by the `in_files` loop either way.
+FILES_RE = re.compile(r"^\s*-\s*\*{0,2}Files\b[^:]*:?(.*)$")
+# FIELD_RE MUST learn the bold form at the same time, and this is the dangerous
+# half. It is what ENDS a claim block. Teaching FILES_RE about `- **Files` while
+# leaving this bare would start the block and never stop it: the fields in these
+# blocks run `- **Goal:**`, `- **Files:**`, `- **DELIBERATELY OUT OF SCOPE**`
+# with no blank line between them, so the parser would read every later bullet as
+# a claim. Over-claiming blocks sessions from files nobody holds, which is a
+# different failure and not a smaller one.
+FIELD_RE = re.compile(r"^-\s*\*{0,2}\w")
 PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 
 
@@ -75,6 +92,33 @@ def _is_disclaimer(line):
     """True when this Files-block bullet talks ABOUT a path instead of claiming it."""
     text = line.lstrip("- ").strip().strip("*_").lower()
     return any(marker in text for marker in _DISCLAIMER_MARKERS)
+
+
+def _claimable_prefix(line):
+    """The part of a Files line that still claims, i.e. everything BEFORE any
+    disclaimer marker.
+
+    A DISCLAIMER GOVERNS WHAT FOLLOWS IT, and treating it as a veto over the
+    whole line loses real claims. The ledger writes them in one breath:
+
+        - **Files (exclusive to this lane):** `live_refresh_loop.py`,
+          `tests/test_pregame_cadence_fixture_aware.py` (new). Collision check
+          RUN 2026-08-15 against all OPEN lanes: both CLEAR.
+
+    "Collision check ... CLEAR" is a marker, so a whole-line veto silently
+    dropped the test file sitting in front of it -- a file the lane plainly
+    claims. Cutting at the marker keeps that path and still discards everything
+    the sentence goes on to mention.
+
+    The 2026-08-15 incident is preserved exactly: "**NOT claimed, deliberately:**
+    `ask_the_syndicate_adapter.py`" puts the marker at the front, so the
+    claimable prefix is empty and the file stays unclaimed -- which is the whole
+    reason this machinery exists.
+    """
+    low = line.lower()
+    positions = [low.find(m) for m in _DISCLAIMER_MARKERS]
+    positions = [p for p in positions if p != -1]
+    return line[:min(positions)] if positions else line
 
 
 def _norm(p):
@@ -133,8 +177,25 @@ def _claims(text):
             if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
                 in_files = False
                 continue
-            if open_lane and stripped.startswith("-") and not _is_disclaimer(stripped):
-                for f in _paths_in(stripped.lstrip("- ")):
+            # WRAPPED CONTINUATION LINES COUNT, not just nested `-` bullets.
+            # Requiring a leading "-" missed the commonest shape in this file --
+            # a Files declaration wrapped across lines:
+            #
+            #   - Files (claimed 2026-08-15, collision check CLEAR via ...
+            #     own `_claims()`): `syndicate/features/shared/clv_join.py`,
+            #     `tests/test_clv_close_timing.py` (new).
+            #
+            # Both paths live on lines that begin with a word, so both were
+            # invisible. `clv_join.py` looked guarded only because the SAME name
+            # appears in prose further down under a `-`, which the block used to
+            # run into; the real declaration never parsed. An accidental claim
+            # from prose is not protection -- it moves the moment the prose does.
+            #
+            # Safe because the block is bounded: FIELD_RE ends it at the next
+            # top-level field, so only the declaration's own lines are read, and
+            # `_is_disclaimer` still skips "NOT claimed, deliberately" bullets.
+            if open_lane:
+                for f in _paths_in(_claimable_prefix(stripped).lstrip("- ")):
                     yield slug, f
 
 
