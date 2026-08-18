@@ -928,7 +928,7 @@ does not hold.** `[measured 08-14]`
   lane opened. Taken for this lane and the holding session notified; they must
   re-write it before editing the adapter.
 
-### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED AND v2 STILL UNEXERCISED. THE PLUMBING IS DONE TWICE OVER; THE EVALUATION HAS NOT STARTED.**
+### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED. v2 IS PROVEN TO RECORD — 3,748 ROWS, 2026-08-17. WHAT IS STILL UNMEASURED IS THE v2 DISCRIMINATOR AND DEDUP; THE EVALUATION HAS NOT STARTED.**
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED CONFIRMED** — session
 > `live-gameline-eval` no longer exists in the roster, so "UNOWNED" is now a
 > measured fact rather than a checkpoint note.
@@ -936,6 +936,25 @@ does not hold.** `[measured 08-14]`
 > `/api/board/book-grid?sport=mlb` across TWO builds. The v2 discriminator is
 > **`written` rising on rows that are NOT priceable** — `skipped_unchanged > 0`
 > is NOT it and was already seen under v1.
+> **[COORDINATOR 2026-08-18] THE HEADER ABOVE WAS STALE AND IS CORRECTED.**
+> "v2 STILL UNEXERCISED" is **FALSE** as of 2026-08-17 02:2x–02:3xZ: the
+> scheduled `live-gameline-ledger-check` measured **3,748 rows** on the first
+> real slate, via `live_gameline_score.records_considered` (the ledger file's
+> own row count), not via the per-build counters. Recorded in `deploys.md` and
+> now on both request files in `deploy/done/`, which had been closed with no
+> outcome carried back.
+> **THE NEXT ACTION SURVIVES, NARROWED.** What 3,748 proves is that the recorder
+> writes. It does **not** prove the v2 discriminator — `written` rising on rows
+> that are **NOT priceable** — because `candidates` was 0 on every build that
+> night (Sunday day slate, over before 20:30 Central fired). That still needs
+> two builds **inside a live window**, and 20:30 Central is the wrong hour to
+> get one on a Sunday.
+> **AND IT CANNOT BE READ OFF-WORKER.** `/api/ops/artifacts/stream` returns
+> **403 `path is not an allowed hot artifact`** for the ledger `.jsonl`;
+> re-verified 2026-08-18 — no entry in `HOT_ARTIFACT_PATTERNS`
+> (`artifact_publisher.py:35`) matches
+> `*_source/data/live_gameline_ledger/live_gameline_ledger_*.jsonl`. Whoever
+> takes this lane needs the artifact route, or the allowlist entry first.
 
 **STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
 `origin/main` and content-verified there. web `ebd5f677` live 03:38:07Z,
@@ -4790,3 +4809,222 @@ on != off; (3) **the only claim that matters — the spread of `(mix ON - mix OF
 across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will not
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
+
+### soccer-model-dispersion — CHECKPOINT 2026-08-18 03:5xZ — hypothesis SHARPENED, not yet tested: the model is unfed, not merely under-dispersed — session: soccer-sport-owner
+
+**The falsification test in this lane's charter ran and came back NO.** Sim count
+cannot close the gap: deterministic seeding makes ±2.9pp a binomial SE, worth ~6% of
+the +0.0139 gap. Recorded as a real outcome, not retried with a bigger knob.
+
+**What replaced it.** `scripts/soccer_sim_input_checklist.py` (new, `6ecc8f70`,
+pushed) found **20 of 20 engine read sites unfed** — worse than the MLB audit that
+produced the standard. That is a mechanism for under-dispersion: a model given four
+rating floats and neutral defaults for everything else has nothing to be confident
+with, so it regresses to the middle (0.1575 vs market 0.1811).
+
+**Shipped (`1834dd50`, UNPUSHED):** xG + PPDA wired, per-side lookup added to the
+engine, 4 reachability tests, checklist aligned to the engine. **20 -> 17 alarms.**
+Proven to reach published artifacts by a real A/B build (0.40 -> 0.48 home win).
+
+**NEXT — and the order matters:**
+1. **Push `1834dd50`.** Nothing is deployed. Worker/web unaffected until it is.
+2. **Before sourcing any new data, check each of the 17 for a MISROUTED PRODUCER.**
+   xG turned out to be computed, correct, and filed where the engine could not read
+   it. Assume nothing about the other 16 until checked the same way.
+3. Only then acquire: shots, big chances, clean sheets, possession share,
+   set-piece xG, corners, availability, form.
+4. **Re-run the backtest LAST**, once inputs are fed — it is **~22 hours** for the
+   1,112-match control at 300 sims and the same match set is the only valid control.
+
+**DO NOT REPEAT:** "no leak-free soccer backtest exists" — that was mine and it is
+wrong; one exists (`5a94b134`) and says the model loses 0.5875 vs 0.5737.
+
+### soccer-model-dispersion — CHECKPOINT 2026-08-18 05:0xZ — inputs 20 -> 11 alarms, ALL PUSHED; the charter goal is still UNTESTED — session: soccer-sport-owner
+
+**Shipped and on `origin/main` (`47e583ba`):** `6ecc8f70` (the gate), `1834dd50`
+(xG + PPDA + per-side engine lookup + 4 reachability tests), `00475bce` (history
+converter + gate now reads real history). **0 ahead / 261 behind; nothing of mine is
+uncommitted.**
+
+| | |
+|---|---|
+| checklist alarms | 20 -> **11** |
+| fields closed with NO new data | **9 of 9** |
+| reachability | proven per-side, both commits |
+| published artifacts | proven for xG only (`0.40 -> 0.48`), NOT re-run after `00475bce` |
+| model skill | **UNMEASURED** |
+| deployed | **nothing** |
+
+**THE CHARTER GOAL IS UNTESTED.** "Model Brier <= market on one non-belgian league,
+over the SAME 1,112 matches" has not been attempted. The inputs changed; whether that
+closes the +0.0139 gap is exactly the open question. **Do not infer skill from the
+alarm count.**
+
+**NEXT, in order:**
+1. **Re-run the A/B artifact build** to prove the nine converter fields reach
+   published output. `/tmp/ab.py` pattern: two `build_artifacts` runs, same
+   fixture/date/seed/sims, ratings stripped vs full. ~2 min for a 1-fixture slate.
+2. **Then the backtest** — `backtest_soccer_h2h_calibration.py --all --limit 120
+   --simulations 300`, **~22 hours**, same match set as the 08-15 baseline in
+   `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+   A gap that improves on a DIFFERENT match set proves nothing.
+3. Only then consider sourcing the four genuinely-missing fields.
+
+**DO NOT RE-RUN:** sim count as the lever (falsified, ~6% of the gap, deterministic
+seed). "No leak-free backtest exists" (wrong, `5a94b134` has one).
+
+### soccer-model-dispersion — CHECKPOINT 2026-08-18 05:3xZ — inputs done and pushed; a self-inflicted double-count found and fixed; the charter goal is STILL UNTESTED — session: soccer-sport-owner
+
+**All four commits on `origin/main` (`f5650ef2`). 0 ahead / 262 behind; nothing of
+mine uncommitted, unstaged or unpushed.**
+
+| commit | what |
+|---|---|
+| `6ecc8f70` | the gating checklist (now reads real history, cannot drift) |
+| `1834dd50` | xG + PPDA, per-side engine lookup, 4 reachability tests |
+| `00475bce` | history converter forwards 9 discarded columns |
+| `2d47a607` | **fixes a double-count I introduced in `00475bce`** + mutation-verified invariant test |
+
+    alarms: 20 -> 17 -> 11 -> 13     (13 is the BETTER number; see below)
+
+**I SHIPPED A DEFECT AND THE CHECKPOINT CALLED IT VERIFIED.** `goals_for` duplicated
+`xg_for` on the goals-as-xG path, weighting goals 0.36 instead of 0.22. It passed the
+checklist, 4 reachability tests, `off != on`, 31 unit tests AND an end-to-end artifact
+diff — every one correctly, because the field really was consumed, populated and
+reachable. Caught by `total_mean 3.39` looking implausible for eredivisie. Full
+writeup in `learnings.md` 2026-08-18.
+
+**11 -> 13 IS PROGRESS.** `goals_per_match` / `goals_against_per_match` are honest
+alarms again rather than silently satisfied by a duplicate.
+
+**NEXT, in order — and (1) is now mandatory, not optional:**
+1. **RE-FIT, or at least re-read, `_attack_strength`'s weights.** Its constants were
+   fitted when every term but the ratings was absent. Seven terms now feed it. CLAUDE.md
+   measured a NEGATIVE interaction from two mechanisms in 4 of 4 MLB markets; soccer
+   has seven and no re-fit. **The backtest may get WORSE, and that would be the
+   weights, not the inputs.**
+2. **Then the backtest** — `--all --limit 120 --simulations 300`, **~22 hours**, same
+   1,112-match control as `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+3. Only then source the four genuinely-missing fields — each carrying the same
+   re-fit hazard.
+
+**DO NOT RE-RUN:** sim count as the lever (falsified, ~6%). "No leak-free backtest
+exists" (wrong, `5a94b134`).
+
+### soccer-model-dispersion — FINDING 2026-08-18 05:4xZ — **xG IS 82% OF THE ATTACK INDEX, THROUGH TWO ROUTES. The weights are wrong before the backtest runs.** — session: soccer-sport-owner
+
+**Measured on eredivisie: 22 rated teams, 918 matches.** This predates tonight's
+work and is a structural double-count one level above the one `2d47a607` fixed.
+
+    attack_index = (metrics_index + fallback_attack) / 2
+
+      metrics_index   = 0.5 + xg_term(0.22) + shots(0.016) + form(0.06) + ...
+      fallback_attack = 0.5 + attack_rating
+
+`attack_rating` IS xG: `(xg_for/league_mean - 1) * scale`.
+**`corr(attack_rating, xg_for) = +0.984`.** So xG enters BOTH halves of the average.
+
+| | spread across 22 teams |
+|---|---|
+| combined `attack_index` | 0.6728 |
+| **xG-derived portion** | **0.5546 = 82%** |
+| shots (nominally independent) | 0.1813 |
+| form | 0.1071 |
+
+**SHOTS IS NOT INDEPENDENT EITHER: `corr(xg_for, shots) = +0.895`.** Its 0.016 weight
+adds correlated evidence, not new information.
+
+**WHY THIS PREDICTS THE BACKTEST GETS WORSE, NOT BETTER.** The measured defect is
+UNDER-DISPERSION — model stdev 0.1575 vs market 0.1811, too timid. Feeding correlated
+signals raises CONFIDENCE without adding INFORMATION: the spread moves the right way
+for the wrong reason, and calibration degrades. **If the backtest comes back worse,
+read the weights first, not the inputs.** This is CLAUDE.md's measured negative
+interaction (2 mechanisms, 4 of 4 MLB markets) with seven terms and no re-fit.
+
+**THE DECISION THIS FORCES — a modelling call, deliberately NOT guessed:**
+either (a) drop the xg term from `_attack_strength` because `attack_rating` already
+carries it, or (b) stop averaging with `fallback_attack` when metrics are present.
+Both are plausible; picking wrong makes it worse. **Do not run the 22-hour backtest
+before this is decided** — it would measure the blend, not the inputs.
+
+**SCOPE LIMIT, stated because it is one league:** eredivisie only. The correlations
+are strong enough that other leagues are unlikely to differ, but **UNCHECKED**.
+
+**Clamp binds on 1 of 22 teams** — not saturating, so this is a weighting problem
+rather than a range problem.
+
+### football-model-owner — OPEN — opened 2026-08-18 — session: football-model-owner
+- **Goal (single testable outcome):** `scripts/football_sim_input_checklist.py`
+  exists, enumerates the smartsim2 input surface STRUCTURALLY (not by name
+  grep), measures population over REAL football artifacts, exits non-zero on
+  CONSUMED+UNPOPULATED, and its first run's alarm count is recorded here — for
+  BOTH `nfl` and `ncaaf`, which are two profiles over one engine. Alongside it,
+  `docs/ai_context/football_sim_engine_reference.md` documents the pipeline
+  trace file:line at every hop, as `model_engine_standard.md` §2 requires.
+- **Files (collision-checked 2026-08-18 against all 9 OPEN lane blocks — ZERO
+  overlap; no open lane claims any path under `syndicate/features/football/`):**
+  - `scripts/football_sim_input_checklist.py` (NEW)
+  - `docs/ai_context/football_sim_engine_reference.md` (NEW)
+  - `syndicate/features/football/**` (claimed for the fixes the checklist finds)
+  - `tests/test_football_sim_input_checklist.py` (NEW, if the gate needs one)
+- **NOT claimed, deliberately:** `syndicate/features/shared/**` — several open
+  lanes hold files there (`board_enrichment.py`, `live_gameline_ledger.py`).
+  If a football fix needs a shared file, raise it before editing.
+- **Hypothesis (stated before measuring, per `model_engine_standard.md` §0):**
+  smartsim2 has the same silent-unfed shape MLB and soccer both had. Its
+  `SmartSim2SimulationInput` carries only 4 ratings + pace as typed fields and
+  one untyped `feature_generation_payload: dict`, and `drive_priors.py:232`
+  reads keys out of that dict — the exact soccer shape. I predict the payload
+  feeds materially fewer keys than `drive_priors` consumes, and that NCAAF is
+  worse fed than NFL.
+- **Falsification test:** if every key `drive_priors.py` reads is populated
+  above a floor on real artifacts for both sports, the hypothesis is wrong,
+  the engine is well fed, and this lane re-scopes to the market-relative
+  scoreboard (§5's last box) instead of a data-population project.
+- **Verification:** the checklist script runs, exits with a recorded status,
+  and its per-field `consumed?`/`populated%` table is pasted into this lane
+  with the artifact date-range it rests on (per the `data/**` lossy-mirror
+  rule — coverage stated, never assumed).
+- **Blocked by:** none.
+
+### soccer-model-dispersion — BACKTEST RUNNING 2026-08-18 06:0xZ — and a correction to how its control must be read — session: soccer-sport-owner
+
+**Three jobs in flight**, all `--limit 120 --simulations 300`, matching the baseline
+`reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`:
+
+| id | scope | est | output |
+|---|---|---|---|
+| `bm81lcof8` | eredivisie n=126 | ~2.5h | `post_xgdrop_eredivisie_s300.json` |
+| `bl0nycb10` | all nine n=1,112 | ~22h | `post_xgdrop_all9_s300.json` |
+| `bu19hv9g6` | dispersion probe, 16 fixtures | ~11m | stdout only |
+
+**CORRECTION — `market_brier` IS NOT AN UNCONDITIONAL CONTROL.** I said it involves
+no Monte Carlo so it must come back unchanged. Half right. `_market_probabilities`
+is model-independent per match, **but the match is only appended if the MODEL
+produced a parseable probability** (`backtest_soccer_h2h_calibration.py:228-241`:
+`KeyError/TypeError/ValueError -> continue`, `total <= 0 -> continue`). So the
+SCORED SET is gated on model success, and a model change that alters which matches
+score will move `market_brier` legitimately.
+
+**READ IT AS A PAIR:** `matches_scored` must be identical FIRST; only then is
+`market_brier` a valid control. `matches_scored` equal + `market_brier` moved =
+something is wrong. `matches_scored` differs = the two runs are on different sets
+and the Brier comparison is void, not merely noisy.
+
+**Baseline rows to compare against:** eredivisie model **0.5211** / market **0.5064**
+/ n **126**; all-nine model **0.5875** / market **0.5737** / gap **+0.0139**, worse in
+8 of 9, sign test p=0.039.
+
+**THE RESULT CAN LEGITIMATELY BE WORSE, and here is the specific mechanism to check
+first if it is.** Dropping the xG terms NARROWED `attack_index` spread
+0.6728 -> 0.4237 and `defense_index` 0.4181 -> 0.2999. The model's measured defect is
+UNDER-dispersion (0.1575 vs market 0.1811). A narrower index on an already-timid
+model is the wrong direction — the double-counted confidence was spurious, but
+removing it without re-fitting `_attack_strength`'s remaining weights (fitted when
+the 0.22 xG term was present) may leave the index under-powered. **If the gap widens,
+suspect the un-re-fitted weights before suspecting the inputs.**
+
+**Single-league caution, from the baseline's own analysis:** belgian_pro_league beat
+the market by -0.0011 at n=120 and that lane wrote "noise at n=120 and must not be
+reported as a win." The same applies to `bm81lcof8`. **Only the nine-league run
+carries the sign test.**
