@@ -202,8 +202,12 @@ def main() -> int:
         return 2
 
     est_a = total_dates * CREDITS_EVENTS_CALL
-    # ~5.2 distinct kickoff windows per NFL week; ~3.1 slate dates per week.
-    est_windows = int(round(total_dates * 1.7))
+    # 2.2 kickoff windows per slate date. MEASURED, not assumed: the 2022 run
+    # found 134 windows over 61 dates. The first version of this line guessed
+    # 1.7 and under-estimated the season by 28% (3,181 predicted vs 4,081
+    # actually billed). An estimate that reads low is the dangerous direction
+    # for a spend approval, so it is now anchored to a real run.
+    est_windows = int(round(total_dates * 2.2))
     est_b = est_windows * CREDITS_ODDS_CALL
     print("\nESTIMATE (prediction, not a bill -- headers are authoritative):")
     print("  phase A  %5d events calls  x %2d = %7d credits" % (total_dates, CREDITS_EVENTS_CALL, est_a))
