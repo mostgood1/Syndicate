@@ -679,12 +679,64 @@ def read_latest_live_lines_payload(selected_date: str, event_ids: list[str], ttl
     return filtered
 
 
+def _snapshot_date_matches(payload: Any, selected_date: str) -> tuple[bool, str | None]:
+    """Is this snapshot actually FOR the date that was asked for?
+
+    `#456`. The snapshot lives at ONE undated path (`live_lens_snapshot_path()`),
+    so `_load_live_lens_snapshot` returns whatever was written last regardless
+    of the request. Measured in production 2026-08-16:
+
+        /nba/api/live_pbp_stats?date=2026-08-16 -> payload date 2026-06-13
+        /nba/api/live_pbp_stats?date=2026-03-01 -> payload date 2026-06-13
+        /nba/api/live_pbp_stats?date=2025-12-25 -> payload date 2026-06-13
+
+    Every request got a snapshot two months stale, labelled with a date nobody
+    asked for. It read harmless only because the offseason snapshot carries no
+    games -- IN SEASON the same path returns one day's games under another
+    day's label, which is a wrong answer rather than an empty one.
+
+    Returns `(matches, snapshot_date)`. **An absent date on either side is NOT
+    treated as a match** -- but it is also not treated as a mismatch, because
+    there is nothing to compare; the caller keeps the payload and the reason
+    field records that the check could not run.
+    """
+    if not isinstance(payload, dict):
+        return False, None
+    snapshot_date = str(payload.get("date") or "").strip() or None
+    requested = str(selected_date or "").strip()
+    if not snapshot_date or not requested:
+        return True, snapshot_date
+    return snapshot_date == requested, snapshot_date
+
+
 def read_latest_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    _ = allow_stored_date_fallback
     snapshot = read_latest_live_lens_snapshot()
     payload = _coerce_snapshot_payload(snapshot, key="live_pbp_stats_payload") if snapshot is not None else None
     if payload is None:
         return _empty_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl)
+
+    # `#456`. Refuse a snapshot that belongs to a different day rather than
+    # serving it under the requested date's label. An honest empty is a
+    # degraded state the UI already handles; a wrong-date payload is a wrong
+    # answer that nothing downstream can detect.
+    #
+    # `allow_stored_date_fallback` is what a caller sets when it WANTS the most
+    # recent stored slate regardless of date (the archive/lookahead path). It
+    # used to be discarded outright (`_ = allow_stored_date_fallback`), which is
+    # why the refusal never existed. Honour it now: opt in to the old behaviour,
+    # and mark the payload so a reader can tell a fallback from a real match.
+    matches, snapshot_date = _snapshot_date_matches(payload, selected_date)
+    if not matches:
+        if not allow_stored_date_fallback:
+            empty = _empty_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl)
+            empty["empty_reason"] = "snapshot_date_mismatch"
+            empty["snapshot_date"] = snapshot_date
+            return empty
+        payload = dict(payload)
+        payload["stored_date_fallback"] = True
+        payload["snapshot_date"] = snapshot_date
+        payload["requested_date"] = selected_date
+
     return _filter_games_payload(payload, event_ids, default_factory=lambda requested_ids: _empty_live_pbp_stats_payload(selected_date, requested_ids, ttl=ttl))
 
 

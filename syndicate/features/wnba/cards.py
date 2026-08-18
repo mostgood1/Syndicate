@@ -790,6 +790,27 @@ def _normalized_game_status(
         live = True
     if _looks_terminal_status_text(status_raw, detail_raw):
         is_final = True
+    # FINAL WINS OVER LIVE. Both checks above can fire on the SAME text, and
+    # until this line the later one silently decided nothing -- `live` stayed
+    # True from the first.
+    #
+    # Measured on production 2026-08-17 02:5xZ, IND @ ATL: the lens published
+    # `status='Final/OT'` with `final=False, in_progress=True` -- one record
+    # contradicting itself. `"Final/OT"` satisfies the LIVE text check (the
+    # short-token trap `#160` records for soccer: "ot" matches inside ordinary
+    # prose) while also being unambiguously finished. A completed overtime game
+    # was therefore published as in progress, indefinitely.
+    #
+    # THE COST IS NOT COSMETIC. `live_edge_policy` keys on `game.state`, so a
+    # finished game stuck at `live` keeps a live tier it should have lost -- the
+    # same harm as the soccer defect fixed 2026-08-16, pointed the other way.
+    #
+    # This precedence is not invented here. `game_chip_scoreboard._game_flags`
+    # already ends with `if is_final: is_live = False`, and MLB's carry-forward
+    # already refuses to resurrect a settled game. Stating it here makes the
+    # producer agree with its consumers instead of handing them a contradiction.
+    if is_final:
+        live = False
 
     if not live and not is_final:
         start_dt = _parse_utc_datetime(start_time_utc)
@@ -3874,8 +3895,6 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         home_pts = _safe_float(home_row.get("score"))
         status = event.get("status") if isinstance(event.get("status"), dict) else {}
         status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
-        in_progress = str(status_type.get("state") or "").strip().lower() == "in"
-        final = bool(status_type.get("completed"))
         period = int(_safe_float(status_type.get("period")) or 0) or None
         clock = str(status_type.get("displayClock") or "").strip()
         status_text = (
@@ -3883,6 +3902,36 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
             or str(status_type.get("detail") or "").strip()
             or str(status_type.get("description") or "").strip()
             or "Scheduled"
+        )
+        # ESPN FLIPS ITS DISPLAY TEXT BEFORE ITS STATE FLAGS, AND A FINISHED GAME
+        # WAS BEING PUBLISHED AS IN PROGRESS BECAUSE OF IT.
+        #
+        # Measured on production 2026-08-17 02:5xZ, IND @ ATL:
+        #   status='Final/OT'   final=False   in_progress=True   95-91
+        # The record contradicted itself — the text said finished, the structured
+        # booleans said live. `_status_fields_from_value` passes these through
+        # faithfully, so the contradiction is ESPN's: `type.shortDetail` had
+        # already become "Final/OT" while `type.completed` was still false and
+        # `type.state` was still "in".
+        #
+        # THE COST IS NOT COSMETIC. `live_edge_policy` keys on `game.state`, so a
+        # completed overtime game stuck at `live` keeps a live tier it should
+        # have lost — the same harm as the soccer defect fixed 2026-08-16, in the
+        # opposite direction.
+        #
+        # So the TEXT corroborates `final`, and `final` wins over `in_progress`.
+        # That precedence is not invented here: `game_chip_scoreboard._game_flags`
+        # already scans its status text for "final" and already forces
+        # `is_live = False` when final is set. This makes the producer agree with
+        # the consumer instead of handing it a contradiction to resolve.
+        #
+        # ONE-DIRECTIONAL ON PURPOSE. Text can only ADD `final`, never remove it
+        # and never add `in_progress` — a heuristic that could mark a game LIVE
+        # off prose is how soccer's board once showed every game live (`#160`).
+        _text_says_final = status_text.strip().lower().startswith("final")
+        final = bool(status_type.get("completed")) or _text_says_final
+        in_progress = (
+            str(status_type.get("state") or "").strip().lower() == "in" and not final
         )
         inferred_period, inferred_clock = _infer_period_clock_from_status_text(status_text)
         if period is None and inferred_period is not None:
@@ -6387,6 +6436,84 @@ def build_live_lines_payload(
     }))
 
 
+# `#455`. Keys that exist on a pbp record but are structurally zero. The real
+# possession data is keyed by TEAM TRICODE; `home`/`away` read `poss_est: 0.0`
+# on **17 of 17** populated records measured 2026-08-16. A signal check that
+# looked at them would call every skeleton real and defeat the fix entirely.
+_PBP_NON_TEAM_KEYS = frozenset({"home", "away", "total", "unknown", "UNKNOWN"})
+
+
+def _has_pbp_signal(game: Any) -> bool:
+    """Does this record carry ANY real pbp content, or is it the skeleton?
+
+    `#455`. The skeleton is `ok`-shaped and structurally complete, so the
+    PRESENCE of these keys proves nothing -- only a non-null VALUE does.
+
+    Three sources, any one sufficient, because they populate at different
+    moments: a game can have attempts or a live period before any possession
+    estimate settles, and treating those as skeletons would discard the
+    earliest real ticks of every game.
+
+    Mirrors `scripts/capture_wnba_pbp.py:has_pbp_signal`, which is where this
+    predicate was first written and tested (12 tests, 5/5 mutations). Kept as a
+    second copy deliberately: `features/` must not import from `scripts/`, and
+    the alternative -- a shared module -- is a wider change than `#455` needs.
+    If a third caller appears, promote it to `shared/` then.
+    """
+    # `dict`, NOT `Mapping`: this module does not import `Mapping`, and the
+    # first draft of this function used it -- a `NameError` on the FIRST record,
+    # which would have taken the whole endpoint down. `lanes.md` already records
+    # the identical near-miss in this same file. Caught by running it, both times.
+    if not isinstance(game, dict):
+        return False
+    possessions = game.get("pbp_possessions")
+    if isinstance(possessions, dict):
+        for key, block in possessions.items():
+            if key in _PBP_NON_TEAM_KEYS or not isinstance(block, dict):
+                continue
+            try:
+                if float(block.get("poss_est") or 0) > 0:
+                    return True
+            except (TypeError, ValueError):
+                pass
+    attempts = game.get("pbp_attempts")
+    if isinstance(attempts, dict):
+        for key, block in attempts.items():
+            if key in _PBP_NON_TEAM_KEYS or not isinstance(block, dict):
+                continue
+            if any(value for value in block.values()):
+                return True
+    quarters = game.get("pbp_quarters")
+    if isinstance(quarters, dict):
+        totals = quarters.get("q_totals")
+        if isinstance(totals, dict) and any(value is not None for value in totals.values()):
+            return True
+        current = quarters.get("current")
+        if isinstance(current, dict) and current.get("period") is not None:
+            return True
+    # FOURTH SOURCE, and the fix was WRONG without it. The existing test
+    # `test_live_pbp_stats_payload_uses_local_snapshot` stores a real snapshot
+    # whose games carry ONLY `pbp_recent.points_total` (9 and 14) -- points
+    # actually scored, which is unambiguous signal. A predicate that ignored
+    # `pbp_recent` rejected that snapshot and the test failed. The suite caught
+    # a genuine gap in this fix, not a stale expectation.
+    #
+    # **`window_sec` MUST BE EXCLUDED**: the skeleton hardcodes it to 180, so
+    # counting it would make every skeleton read as real and silently undo the
+    # whole change.
+    recent = game.get("pbp_recent")
+    if isinstance(recent, dict):
+        for key, value in recent.items():
+            if key == "window_sec":
+                continue
+            if isinstance(value, dict):
+                if any(inner is not None for inner in value.values()):
+                    return True
+            elif value is not None:
+                return True
+    return False
+
+
 def build_live_pbp_stats_payload(
     selected_date: str,
     event_ids: list[str],
@@ -6398,9 +6525,26 @@ def build_live_pbp_stats_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+    # `#455`. **THE TEST USED TO BE `bool(games)`, AND A SKELETON HAS GAMES.**
+    # This function never computes pbp -- it replays a stored snapshot, and
+    # otherwise emits the all-null skeleton built below. That skeleton carries
+    # one entry per event id, so `bool(games)` was TRUE for it: a skeleton
+    # written pregame (slate has ids, no plays yet) was then served in
+    # preference to real data for the rest of the day, and nothing re-checked
+    # whether the games had since started.
+    #
+    # Measured in production 2026-08-16, on a slate that was two games FINAL and
+    # one LIVE: three all-null records with `ok: True`, and a `generated_at` of
+    # 16:14:21 CDT still unchanged on a `ttl=1` refetch three hours later. Of
+    # 120 game records in the tracked mirror, 103 carry no possession data --
+    # a population of stored skeletons, not of games without plays.
+    if (
+        isinstance(local_payload, dict)
+        and isinstance(local_payload.get("games"), list)
+        and any(_has_pbp_signal(game) for game in local_payload["games"])
+    ):
         return _attach_odds_refresh_timestamp(local_payload)
-    return _maybe_persist_current_day_live_snapshot_artifact("live_pbp_stats", resolved_date, _attach_odds_refresh_timestamp({
+    skeleton_payload = _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date or None,
@@ -6422,7 +6566,20 @@ def build_live_pbp_stats_payload(
             for event_id in normalized_event_ids
         ],
         "generated_at": _wnba_generated_at(),
-    }))
+    })
+    # `#455`, second half. **NEVER PERSIST A SKELETON.** The branch above builds
+    # an all-null payload by construction, so this gate can only ever decline --
+    # which is the point: writing it is what made the defect sticky, because the
+    # stored copy then satisfied the short-circuit on every later request.
+    #
+    # Written as a signal check rather than as an outright removal of the
+    # persist call, so that if this branch is ever given a real producer, its
+    # output still gets cached correctly instead of silently not being.
+    if any(_has_pbp_signal(game) for game in skeleton_payload.get("games") or []):
+        return _maybe_persist_current_day_live_snapshot_artifact(
+            "live_pbp_stats", resolved_date, skeleton_payload
+        )
+    return skeleton_payload
 
 
 def build_live_lens_tuning_payload(ttl: int = 300) -> dict[str, Any]:
