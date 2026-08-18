@@ -163,6 +163,21 @@ def build_layer2_shortlist(
             window_dates = resolve_window_dates(sport, selected_date, window="slate") or [selected_date]
             quote_rows = []
             dates_with_rows: list[str] = []
+            # A CORRUPT SHARD AND AN EMPTY ONE MUST NOT RENDER AS THE SAME ZERO.
+            #
+            # `#379` wrapped this read in a per-date `try/except: continue` so one
+            # bad date could not lose the other six -- correct, and still the
+            # behaviour below. But the exception it swallows used to propagate to
+            # the whole-sport handler, which records `{"error": ...}` into
+            # `per_sport_stats` (:387). Nothing recorded it after that, so a sport
+            # whose shard raised on EVERY date reported a clean `quote_rows: 0`
+            # and was indistinguishable from a sport with no slate.
+            #
+            # Caught by `test_one_sport_failing_does_not_lose_the_others`, which
+            # asserts both halves: the other sport survives AND the failure is
+            # visible. The first half passed throughout; only the reporting was
+            # lost.
+            read_errors: dict[str, str] = {}
             for window_date in window_dates:
                 try:
                     # `#435`. LATEST-PER-KEY. `build_book_grid` below already
@@ -174,7 +189,9 @@ def build_layer2_shortlist(
                     # This loop is why it matters here most: it EXTENDS across a
                     # window, so NFL accumulated five shards at once.
                     chunk = read_book_quotes_latest(sport, window_date)
-                except Exception:
+                except Exception as exc:
+                    # Recorded, then skipped -- resilience unchanged.
+                    read_errors[str(window_date)] = f"{type(exc).__name__}: {exc}"
                     continue
                 if chunk:
                     quote_rows.extend(chunk)
@@ -215,6 +232,18 @@ def build_layer2_shortlist(
                     # `rows_stale_kickoff` and audit_slate_coverage's THIN.
                     "sweep_state": "pending" if scheduled > 0 else "no_slate",
                 }
+                if read_errors:
+                    # `error` is the key the whole-sport handler (:387) uses, so a
+                    # consumer checks one key regardless of where the failure was
+                    # caught. `read_errors` keeps the per-date detail, because
+                    # "one date of seven failed" and "all seven failed" are
+                    # different operational facts.
+                    per_sport_stats[sport]["error"] = (
+                        f"quote read failed for {len(read_errors)} of "
+                        f"{len(window_dates)} window dates: "
+                        + "; ".join(f"{d} -> {e}" for d, e in sorted(read_errors.items()))
+                    )
+                    per_sport_stats[sport]["read_errors"] = dict(read_errors)
                 continue
             # Last-seen turns the grid's single age into two: time since the
             # price MOVED, and time since we LOOKED. Only the second is
@@ -338,6 +367,22 @@ def build_layer2_shortlist(
                 "quote_rows": len(quote_rows),
                 "window_dates": list(window_dates),
                 "dates_with_rows": list(dates_with_rows),
+                # Stated even when rows DID come back: a window that lost 3 of 7
+                # dates to unreadable shards still serves a board, and silently
+                # serving a partial one is the failure mode this whole block
+                # exists to prevent.
+                **(
+                    {
+                        "error": (
+                            f"quote read failed for {len(read_errors)} of "
+                            f"{len(window_dates)} window dates: "
+                            + "; ".join(f"{d} -> {e}" for d, e in sorted(read_errors.items()))
+                        ),
+                        "read_errors": dict(read_errors),
+                    }
+                    if read_errors
+                    else {}
+                ),
                 "grid_rows": int(result.get("rows_in") or 0),
                 # Stated on BOTH branches on purpose: a consumer that has to
                 # infer "swept" from the absence of a key cannot tell it from a

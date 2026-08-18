@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import pytest
 
+from datetime import datetime, timedelta, timezone
+
 from pipeline.layer2_shortlist import build_layer2_shortlist
 
 
@@ -27,6 +29,32 @@ def _quote(**overrides):
 
     Field is `selection`, NOT `side` -- a hand-rolled fixture using `side`
     produces zero grid rows and looks exactly like a broken join.
+
+    `snapshot_ts` IS RELATIVE TO NOW, AND THAT IS THE POINT.
+
+    It was pinned at "2026-08-08T19:55:00Z". `book_age_seconds` is derived from
+    it against the WALL CLOCK, and `opportunity_gate.PREGAME_MARKET_MAX_AGE_
+    SECONDS` is 86_400 -- so from 2026-08-09T19:55Z onward every row in this file
+    aged out and the gate returned `lane="dead"`, `reasons=("pregame_market_
+    stale",)` before any shortlist filter ran. Six tests failed with `0 == 2`,
+    which reads exactly like a broken join and is in fact the calendar. Measured
+    2026-08-17: the fixture was 9.2 days old against a 24-hour ceiling, and the
+    ingest report was perfectly healthy throughout (`grid_rows: 1`,
+    `sides_priced: 2`, `candidates: 2`, `scored: 2`, then `by_lane: {"dead": 2}`)
+    -- every shortlist exclusion counter read 0 because the rows never reached
+    the filters.
+
+    THIS IS THE FOURTH TIME THIS FILE HAS BROKEN ON THE CALENDAR, and the reason
+    `_no_quality_floor` below could not prevent it: that fixture pins the
+    shortlist's OWN age floors via env, but the gate carries a SEPARATE constant
+    in a different module with no env override. Pinning one more env var would
+    have left a fifth constant to discover next time.
+
+    A relative timestamp removes the dependency at its source: no age ceiling,
+    present or future, can age these rows out. `commence_time` stays pinned
+    because the horizon test asserts against a fixed far date, and the
+    stale-kickoff and unknown-game-state env pins in `_no_quality_floor` already
+    neutralise that side.
     """
     row = {
         "sport": "mlb",
@@ -42,7 +70,11 @@ def _quote(**overrides):
         "home_team": "Baltimore Orioles",
         "away_team": "Los Angeles Angels",
         "commence_time": "2026-08-08T23:05:00Z",
-        "snapshot_ts": "2026-08-08T19:55:00Z",
+        # Fresh by construction -- see the docstring. 60s, not 0, so the row
+        # is plainly "recently seen" rather than sitting on a boundary.
+        "snapshot_ts": (datetime.now(timezone.utc) - timedelta(seconds=60))
+        .isoformat()
+        .replace("+00:00", "Z"),
     }
     row.update(overrides)
     return row
