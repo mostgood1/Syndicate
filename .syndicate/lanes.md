@@ -6119,3 +6119,96 @@ probe shows the two are not always aligned.
 - Falsification test: a unit test constructing a static_payload with 1 settled row and a canonical_settlement with more `selected_counts.combined` should show the new helper (`_static_season_payload_is_stale_vs_canonical`) returning True; a static_payload whose settlement already matches or exceeds canonical should return False (no regression on the common case).
 - Verification: new unit test passes; existing test suite for this file (if any) still passes; change is additive-only to the gate condition, `_finalize_from_card`'s own internal comparison logic is untouched.
 - Blocked by: none.
+
+### soccer-model-dispersion — MECHANISM TRACE, STOPPED HONESTLY UNRESOLVED 2026-08-18 16:5xZ — the overshoot's origin inside the possession simulator is NOT explained; do not re-chase this without a real-scale probe — session: soccer-sport-owner
+
+**Attempted to trace WHY removing the xG terms (`94578cbc`) widens dispersion
+(0.1575 -> 0.1907 cross-league mean, `market_home_prob_stdev`), rather than just
+accept the effect and keep tuning weights against it. Partially succeeded, then hit
+a genuine unresolved contradiction. Recording both halves so nobody re-derives the
+solid half or re-trusts the inconclusive half.**
+
+**SOLID, exact arithmetic on real ratings, no simulation noise — the naive
+hypothesis is WRONG.** I assumed removing the xG term would let `fallback_attack`
+(still full-strength, still `0.5 + attack_rating`) dominate the average unopposed,
+widening `attack_index`. Measured directly (old vs new `possession_priors.py` on
+the same 16 real team pairings, `_attack_strength`/`_defense_strength` called
+outside any simulation):
+
+    term            OLD (xG present)   NEW (xG removed)
+    attack_index      spread 0.5749      spread 0.3737
+    defense_index     spread 0.4181      spread 0.3000
+    goal_conv         spread 0.0505      spread 0.0344
+    shot_gen          spread 0.1062      spread 0.0722
+    poss_retention    spread 0.1371      spread 0.0935
+
+**Every per-possession term got NARROWER, not wider, after `94578cbc`. Means barely
+moved** (goal_conv 0.0952->0.0929, shot_gen 0.1571->0.1525) -- not a level-shift
+into a more sensitive region either. `possession_priors.py`'s own formulas are
+EXONERATED: nothing in that file explains the final win-probability widening.
+
+**INCONCLUSIVE, and left that way rather than reported as settled.** The
+possession-to-match aggregation is genuinely nonlinear (`match_simulator.py`:
+`simulate_possession` called once per possession, ~130-140 possessions/match,
+final score = accumulated goals, win/draw/loss = a comparison of two accumulated
+counts) -- not worth reasoning about algebraically, so I ran
+`simulate_match_distribution` directly under OLD vs NEW priors (monkeypatched
+`possession_simulator.build_possession_priors`, VERIFIED the patch actually
+redirects calls -- 414 invocations across 3 test matches, confirmed real) on 16
+SYNTHETIC round-robin pairings (`teams[i]` vs `teams[i+7]`) at 100 sims:
+
+    OLD  stdev 0.2270      NEW  stdev 0.1879
+
+**OPPOSITE SIGN to the real backtest** (eredivisie: OLD 0.1886 -> NEW 0.2373).
+Most likely cause: at n=16 the SE on a stdev estimate is ~stdev/sqrt(2x15) ~= 0.04,
+almost exactly the size of the gap being read -- this probe is very plausibly noise,
+on top of using SYNTHETIC pairings rather than the real fixture list the backtest
+scores. **Do not cite either direction from this probe.** The mechanism-patch itself
+is confirmed sound (verified independently); the SAMPLE is not powerful enough to
+trust in either direction.
+
+**STOPPING POINT, by explicit user decision.** Settling this would need a much
+larger direct probe (tens of REAL scheduled fixtures, not synthetic pairings, at
+full sim count -- another hour-plus job) or accepting the full backtest's number
+without an explanation of its internal mechanism. **User chose to stop rather than
+keep spending compute at diminishing returns.**
+
+**WHAT THIS LEAVES TRUE, unchanged by the trace attempt:**
+- The dispersion overshoot is REAL (established by the full 9-league backtest,
+  n=126 per league, real fixtures -- the reliable number, not this probe).
+- It originates somewhere in `match_simulator.py`/`possession_simulator.py`'s
+  many-possession aggregation, NOT in `possession_priors.py`'s formulas (that part
+  IS now settled, by exact arithmetic, not simulation).
+- The shots-shrink revert (`b69c5277`) stands regardless -- that was a SEPARATE,
+  properly powered (n=126, paired, real fixtures) result and is unaffected by
+  whether this deeper mechanism trace succeeds.
+
+**IF THIS IS PICKED UP AGAIN:** do not repeat the 16-synthetic-fixture probe as
+currently built -- it has already been shown underpowered/unrepresentative. Use the
+REAL eredivisie fixture list (same one `backtest_soccer_h2h_calibration.py` scores)
+and a comparable n to what actually decided the shots-revert (126, or at minimum
+40-50) before trusting a directional read on the aggregation layer.
+
+**PROCESS NOTE, same as the last two entries:** local `main` was 3 ahead / 3 behind
+`origin/main` when this was recorded (diverged again since the last entry).
+Appended against `origin/main`'s tree via a throwaway worktree, not the local disk
+copy -- fourth time this session that check has mattered.
+
+### lane-guard-disclaimer-exemption-fix — OPEN — opened 2026-08-18 — session: lane-guard-disclaimer-exemption-fix
+- Goal: `.claude/hooks/lane-guard.py` false-blocked a worktree session from closing its own `season-betting-reader-freshness` lane, reporting `.syndicate/lanes.md` as claimed by `basketball-model-owner`. Chase it down and fix it in the guard itself, not by editing around it.
+- Files: `.claude/hooks/lane-guard.py` (guard-exempt from claim-checking by its own design, documented here for the record anyway), `tests/test_lane_guard_files_forms.py`
+- Hypothesis: two independent bugs, both confirmed by direct simulation before any fix was written:
+  (1) `_claims()`'s initial `- Files:` line is passed straight to `_paths_in()` without the `_claimable_prefix()` disclaimer-stripping continuation lines already get -- `basketball-model-owner`'s Files line has no colon before "Files:", so `[^:]*:?(.*)$` swallows the ENTIRE rest of a 1986-char line including a trailing "Collision check: ... (grepped `lanes.md`, clean)." aside, and "lanes.md" gets read as a claimed path.
+  (2) The `.syndicate`/`.claude` exemption checked `rel.startswith(...)` against a `root`-relative path, which only worked for the primary tree -- a worktree edit to the SAME logical `.syndicate/lanes.md` resolves to a long `../../../tmp/...` relative path that never starts with `.syndicate`, so the exemption silently failed to apply and the (buggy) claim from (1) got to matter at all.
+- Falsification test: `_claims()` over the real ledger should no longer yield `('basketball-model-owner', 'lanes.md')`; simulating the exact blocked hook call (`file_path` under a `syndicate-sessions/<lane>/.syndicate/lanes.md` worktree path) should exit 0, not 2.
+- Verification: **DONE.** Both re-verified directly post-fix (see this session's own record). Existing suites `tests/test_lane_guard_files_forms.py` + `tests/test_check_lane_invariants.py` run clean except ONE pre-existing, unrelated failure (`test_regex_matches_the_hook_source[FILES_RE]` -- `scripts/check_lane_invariants.py`'s COPIED regex has independently drifted from the hook's real one, missing the bold-Files/optional-colon support; confirmed identical on baseline via `git stash`, not touched by this lane, flagged separately). Two new regression tests added for both bugs.
+- Blocked by: none.
+
+### season-betting-reader-freshness — CLOSED 2026-08-18 — fix + test landed `54720386` on `origin/main`; NOT deployed and has NO effect in production yet (see note) — opened 2026-08-18 — session: season-betting-reader-freshness
+- Goal: a historical `season_betting_day_*.json` static payload that carries SOME settlement, but strictly less than the canonical daily settlement already on disk for that date, gets re-derived instead of served forever. Fixes the read-side half of the `#265`/`locked_cards_retuned` gap traced in `docs/ai_context/todo.md` (sessions `sim-vs-market-freeze-finding`, 2026-08-18) -- user chose this half over the writer-side autorun.
+- Files: `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (read-only elsewhere in this vendor tree)
+- Hypothesis: the gate at `_season_betting_day_payload` (`if historical_date and not _payload_has_row_settlement(...)`) only re-derives on ZERO settlement, so a payload with e.g. 1 of ~15 games settled is treated as final forever, even when the canonical daily card already has richer settlement for the same date.
+- Falsification test: a unit test constructing a static_payload with 1 settled row and a canonical_settlement with more `selected_counts.combined` should show the new helper (`_static_season_payload_is_stale_vs_canonical`) returning True; a static_payload whose settlement already matches or exceeds canonical should return False (no regression on the common case).
+- Verification: **DONE.** New unit test (`tests/test_season_betting_reader_freshness.py`, 4 cases) passes. Full `tests.test_archives` (what CI runs) run before AND after the change: 32 pre-existing failures, byte-identical list both times (verified by stashing the change and re-running one of the two nearest MLB tests), none touching this function. Change is additive-only to the gate condition; `_finalize_from_card`'s own internal comparison logic is untouched.
+- Blocked by: none.
+- **NOT DEPLOYED, and has NO EFFECT IN PRODUCTION as landed.** Per the same `docs/ai_context/todo.md` trace: `locked_cards_retuned`/the canonical daily settlement this fix reads has no automatic rebuild trigger on Render, so even once this code deploys, a historical date whose canonical settlement was never refreshed past its own thin state has nothing richer to fall through to. This fix closes the READ-side gap only; the WRITER-side autorun (declined by the user this round) is the other half and remains open, undone.

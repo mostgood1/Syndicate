@@ -19,6 +19,10 @@ disclaimer skip are pinned too.
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -116,3 +120,53 @@ def test_the_real_ledger_parses_and_claims_something(guard):
     got = claims(guard, lanes)
     assert len(got) > 50, f"only {len(got)} claims parsed from the real ledger"
     assert any(p.endswith(".py") for _, p in got)
+
+
+def test_disclaimer_on_the_initial_files_line_is_also_skipped(guard):
+    """2026-08-18: `basketball-model-owner` wrote its entire Files declaration
+    plus a trailing collision-check disclaimer on ONE physical line, no colon
+    before "Files:". `[^:]*:?(.*)$` then stops at the FIRST colon in the whole
+    line (the one inside "Collision check:") and hands `_paths_in` everything
+    after it, disclaimer included -- so "lanes.md", mentioned only as the file
+    that got grepped to RUN the collision check, was read as a claim on
+    `.syndicate/lanes.md` itself. Continuation lines already run through
+    `_claimable_prefix` for exactly this reason; the initial line must too."""
+    text = """\
+### demo-lane — OPEN — opened 2026-08-18 — session: demo
+- Files: `syndicate/features/shared/mine.py` (new). Collision check: no other \
+OPEN lane claims any `data/wnba_source/**` path (grepped `lanes.md`, clean).
+"""
+    got = {p for _, p in claims(guard, text)}
+    assert "syndicate/features/shared/mine.py" in got
+    assert "lanes.md" not in got
+
+
+def test_worktree_relative_syndicate_path_is_exempt():
+    """2026-08-18: the `.syndicate`/`.claude` exemption checked a path relative
+    to `CLAUDE_PROJECT_DIR`, which only ever equals ".syndicate/..." for edits
+    made IN the primary tree. A worktree session editing the same logical
+    `.syndicate/lanes.md` (`session_worktree.py`'s
+    `C:/tmp/syndicate-sessions/<lane>/.syndicate/lanes.md`) gets a `rel` full
+    of leading `../..` segments that never starts with ".syndicate", so the
+    exemption silently failed to apply -- combined with the disclaimer bug
+    above, this is what let a phantom claim block a worktree session from
+    ever closing its own lane. Runs the hook as a real subprocess (it exits at
+    import time, so it cannot be exercised via `_claims` alone)."""
+    payload = {
+        "tool_name": "Edit",
+        "session_id": "test-worktree-exempt",
+        "tool_input": {
+            "file_path": str(
+                Path("C:/tmp/syndicate-sessions/some-other-lane/.syndicate/lanes.md")
+            )
+        },
+    }
+    result = subprocess.run(
+        [sys.executable, str(GUARD)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(REPO_ROOT)},
+    )
+    assert result.returncode == 0, result.stderr

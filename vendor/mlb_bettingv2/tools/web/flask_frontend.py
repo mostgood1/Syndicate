@@ -11305,6 +11305,37 @@ def _payload_has_row_settlement(games: Any) -> bool:
     return False
 
 
+def _static_season_payload_is_stale_vs_canonical(
+    static_payload: Optional[Dict[str, Any]],
+    canonical_settlement: Optional[Dict[str, Any]],
+) -> bool:
+    """True when a historical static `season_betting_day_*.json` payload should
+    be treated as stale and re-derived from the canonical daily card, rather
+    than served as final because it happens to carry ANY settlement.
+
+    Measured 2026-08-18 (docs/ai_context/todo.md, "RE-MEASURED 2026-08-18 ...
+    READER WAS NEVER BUILT gap"): a static payload with exactly 1 graded
+    moneyline row was served unchanged for a date whose canonical daily
+    settlement, already on disk that day, covered far more of the slate. Zero
+    settlement already triggered a rebuild in the caller; this extends the
+    same idea to "settlement that is thinner than what canonical already has
+    for this date" -- using the same `selected_counts.combined` comparison
+    `_finalize_from_card`'s own `canonical_should_override` uses internally,
+    not a new metric, just checked one step earlier.
+    """
+    if not _payload_has_row_settlement((static_payload or {}).get("games")):
+        return True
+    if not isinstance(canonical_settlement, dict):
+        return False
+    static_counts = _betting_selected_counts_with_defaults(
+        ((static_payload or {}).get("summary") or {}).get("selected_counts") or {}
+    )
+    canonical_counts = _betting_selected_counts_with_defaults(
+        canonical_settlement.get("selected_counts") or {}
+    )
+    return int(canonical_counts.get("combined") or 0) > int(static_counts.get("combined") or 0)
+
+
 def _season_betting_day_payload(season: int, date_str: str, requested_profile: str) -> Dict[str, Any]:
     profile_name, manifest_path, manifest, available_profiles = _load_season_betting_manifest(
         int(season),
@@ -11552,7 +11583,7 @@ def _season_betting_day_payload(season: int, date_str: str, requested_profile: s
                 manifest_source=manifest_path,
                 source_kind="canonical_daily_override",
             )
-        if historical_date and not _payload_has_row_settlement(static_payload.get("games")):
+        if historical_date and _static_season_payload_is_stale_vs_canonical(static_payload, canonical_settlement):
             if static_card_path and isinstance(static_card_obj, dict):
                 return _finalize_from_card(
                     card_path=static_card_path,
