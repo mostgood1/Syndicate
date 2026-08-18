@@ -1011,6 +1011,18 @@ def build_game_board_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "live_lens_contract",
         "refresh_policy",
         "counts",
+        # Truncation telemetry for a board that caps its slate. NCAAF sets it
+        # (`ncaaf/cards.py::_NCAAF_BOARD_COUNTS_KEY`); every other sport simply
+        # does not, and an unset optional key is omitted rather than nulled.
+        #
+        # ADDED AFTER SHIPPING THE THING IT MEASURES, which is the lesson. The
+        # NCAAF 16-game cap fix went live in `5fdabc46` and worked -- the board
+        # went 16 -> 51 -- but `board_row_counts` was ABSENT from the payload,
+        # because THIS function whitelists keys and `apply_game_board_contract`
+        # (which does preserve extras, via `dict(context)`) is not the last hop.
+        # The context carried the counter the whole time; the API boundary
+        # dropped it. Presence in the context is not reachability to the client.
+        "board_row_counts",
         "app",
         "dataRoot",
         "liveLensDir",
