@@ -14158,3 +14158,50 @@ being described as fixing the pitch-type and batted-ball gaps.
 
 **No deploy request filed.** The right sequence is: close what is cheaply
 closable (pitcher `bb_*`, BVP mapping), then rebuild, then request.
+
+### MEASUREMENT — sweep ownership gate `20025cc4`, 2026-08-18 00:12Z (2h34m after deploy)
+
+**HALF ONE: CONFIRMED, and it is holding continuously.** live-odds-worker, every tick:
+```
+SWEEP_OWNERSHIP_EXCLUDED date=2026-08-17 kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+at 00:11:25 and 00:12:31. The ownership partition is exactly as designed.
+
+**refresh-worker has stopped sweeping the three it does not own.** Its 13
+`ODDS_SWEEP_OUTCOME` lines since the deploy are ALL stamped 21:38:30 — the deploy
+boundary — with `since_launch_s` 880..153497. **Those are GRADINGS of pre-deploy
+launches, not new sweeps.** (`since_launch_s=153497` is 42 hours.)
+
+**HALF TWO: NOT ACHIEVED, AND MY PREDICTION WAS WRONG.** I said live-odds-worker
+would sweep "within one interval (2h), i.e. by ~23:40Z". **It is 00:12Z and
+`ODDS_SWEEP_OUTCOME` on live-odds-worker is still a hard ZERO.** The interval has
+elapsed and the claim is falsified. **The `20025cc4` row does NOT close.**
+
+**AND THE SYMPTOM HAS CHANGED, which is the actual finding.** It is no longer
+starvation:
+```
+00:10:24  PREGAME_CADENCE_SKIPPED sports=soccer,wnba      <- mlb NOT skipped
+00:11:29  PREGAME_CADENCE_DETAIL  wnba:marker_age_s=950/interval_s=7200
+00:11:30  LIVE ODDS REFRESH TICK: True                     <- ticking fine
+```
+- **mlb is no longer skipped at all**, so it is eligible on every tick, and it
+  still produces no outcome line.
+- **The wnba marker is ~900s old and advancing.** refresh-worker has stopped
+  sweeping, so **live-odds-worker is the one stamping it** — and markers are
+  written BEFORE the launch (`#25`).
+
+**So live-odds-worker is now ATTEMPTING sweeps and none is completing.** That is
+the exact shape `#382` described — marker advances, launch produces nothing —
+except it has moved to the other service. **The gate did its job and revealed a
+second, independent defect underneath it.**
+
+**NOT CLAIMED:** that the launch is "dying". I have the marker advancing and no
+outcome line; I do not have the failure itself. `ODDS_SWEEP_OUTCOME` may also be
+emitted by a later grading pass, in which case 2h34m is simply not yet long
+enough. **Both are consistent with these readings and I did not distinguish them.**
+
+**NEXT ACTION:** read live-odds-worker for a launch-side line (not the outcome
+line) in the window a marker was stamped — around 00:10Z, marker age 884s. That
+separates "launched and died" from "not yet graded", and it is the whole
+remaining question.
