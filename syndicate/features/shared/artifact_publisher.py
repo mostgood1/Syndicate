@@ -60,6 +60,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # file each, unlike the roster objects they feed.
     "*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json",
     "*_source/source_artifacts/data/batted_ball/batted_ball_*.json",
+    "*_source/source_artifacts/data/arsenal/arsenal_*.json",
+    "*_source/source_artifacts/data/quality/quality_*.json",
+    # Conditional pitch mix: pitcher x count-bucket x batter hand, 0.48 MB for
+    # 728 pitchers. Same per-season single-document shape as the two above.
+    "*_source/source_artifacts/data/conditional_mix/conditional_mix_*.json",
     # The checklist's own REPORT. Roster objects are deliberately NOT
     # allowlisted -- hundreds of large files per date, and this allowlist drives
     # publishing as well as reading. The worker runs the audit and publishes the
@@ -301,6 +306,21 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/data/processed/boxscores_history.csv",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
+    # `docs/ai_context/hockeysim_engine_reference.md`: two hockeysim engine inputs
+    # (`HockeyTeamFeatures.xgf_per_60`/`xga_per_60` and `.elo_rating`) had loaders
+    # (`load_team_xg_map`, `load_team_elo_map`) but no allowlist entry -- per
+    # `model_engine_standard.md` §3, unallowlisted means unauditable via
+    # `/api/ops/artifacts/*` and, for any engine that DOES rely on the
+    # worker-writes/web-reads push (unlike `predictions_*.csv`, which this
+    # module self-generates per-service -- see the reference doc's pipeline
+    # trace), unreachable regardless of what produces it. `team_xg_*.csv` has no
+    # producer yet (genuinely absent, not merely unfed -- same doc). `team_elo_*.csv`
+    # is produced by `scripts/build_nhl_elo_artifact.py`; per-season single
+    # document, same bounded shape as the MLB `#440` entries above.
+    "nhl_source/source_artifacts/data/processed/team_xg_*.csv",
+    "nhl_source/data/processed/team_xg_*.csv",
+    "nhl_source/source_artifacts/data/processed/team_elo_*.csv",
+    "nhl_source/data/processed/team_elo_*.csv",
     # #163's MLB player game-log index (last-N starts/games, history vs
     # opponent -- syndicate/features/mlb/player_game_log.py, read by
     # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same

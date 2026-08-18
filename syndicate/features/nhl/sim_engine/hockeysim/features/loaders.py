@@ -78,6 +78,14 @@ def _season_code_for_date(date: str) -> str:
     return f"{start_year}-{start_year + 1}"
 
 
+# Public alias. `load_team_xg_map` and `load_team_elo_map` both key their artifact filename off
+# this convention (`team_{xg,elo}_{season}.csv`); a producer script needs the SAME convention to
+# name what it writes, not the raw NHL API `season` field (`"20252026"`, no dash) -- that mismatch
+# is exactly the kind of silent miss `model_engine_standard.md` §4.1 warns about ("absent" vs.
+# "named differently"). `scripts/build_nhl_elo_artifact.py` imports this rather than reimplementing it.
+season_code_for_date = _season_code_for_date
+
+
 def _to_float(value: object) -> Optional[float]:
     try:
         if value is None or str(value).strip() == "":
@@ -127,6 +135,40 @@ def load_team_xg_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dic
         if xa is not None:
             entry["xga60"] = xa
         out[key] = entry
+    return out
+
+
+def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, float]:
+    """Load ``{ABBR: elo}`` for a date.
+
+    Written by ``scripts/build_nhl_elo_artifact.py`` from real settled results
+    (`historical_truth.elo_builder`). Looks for ``team_elo_{season}.csv`` then
+    ``team_elo_latest.csv`` under the processed dir, mirroring :func:`load_team_xg_map`'s
+    candidate order exactly. Returns an empty map when unavailable so ``elo_rating`` stays
+    ``None`` and the projection's Elo blend (already gated at ``elo_blend_weight == 0.0`` by
+    default) has nothing to blend -- a missing file is a silent no-op here precisely because
+    the consumer already treats an absent rating as "no signal", not an error.
+    """
+    proc = _processed_dir(root)
+    season = _season_code_for_date(date)
+    candidates = [proc / f"team_elo_{season}.csv", proc / "team_elo_latest.csv"]
+    rows: List[Dict[str, str]] = []
+    for path in candidates:
+        rows = _read_csv_rows(path)
+        if rows:
+            break
+    if not rows:
+        return {}
+
+    out: Dict[str, float] = {}
+    for row in rows:
+        lower = {k.lower(): v for k, v in row.items()}
+        ab = lower.get("abbr") or lower.get("team") or lower.get("team_abbr")
+        elo = _to_float(lower.get("elo") or lower.get("rating"))
+        key = _abbr(ab) or (str(ab).upper() if ab else None)
+        if not key or elo is None:
+            continue
+        out[key] = elo
     return out
 
 
@@ -184,14 +226,16 @@ def build_team_features(
     *,
     abbrev: Optional[str] = None,
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
+    elo_map: Optional[Dict[str, float]] = None,
 ) -> HockeyTeamFeatures:
-    """Assemble one side's team-strength features, filling xGF/xGA from ``xg_map`` when present."""
+    """Assemble one side's team-strength features, filling xGF/xGA/Elo from the maps when present."""
     ab = abbrev or _abbr(name)
     xgf = xga = None
     if xg_map and ab and ab in xg_map:
         xgf = xg_map[ab].get("xgf60")
         xga = xg_map[ab].get("xga60")
-    return HockeyTeamFeatures(name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga)
+    elo = elo_map.get(ab) if (elo_map and ab) else None
+    return HockeyTeamFeatures(name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga, elo_rating=elo)
 
 
 def build_player_features(
@@ -244,6 +288,7 @@ def build_game_features(
     root: Optional[Path] = None,
     market: Optional[HockeyMarketLines] = None,
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
+    elo_map: Optional[Dict[str, float]] = None,
     lineups: Optional[Dict[str, List[Dict[str, str]]]] = None,
     goalies: Optional[Dict[str, Dict[str, str]]] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
@@ -262,13 +307,15 @@ def build_game_features(
     """
     if xg_map is None:
         xg_map = load_team_xg_map(date, root=root)
+    if elo_map is None:
+        elo_map = load_team_elo_map(date, root=root)
     if lineups is None:
         lineups = load_lineups(date, root=root)
     if goalies is None:
         goalies = load_starting_goalies(date, root=root)
 
-    home = build_team_features(home_name, xg_map=xg_map)
-    away = build_team_features(away_name, xg_map=xg_map)
+    home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map)
+    away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map)
 
     if project:
         home, away, _proj = apply_projection(home, away, profile=profile)
@@ -323,7 +370,7 @@ def build_slate_features(
 ) -> List[HockeyGameFeatures]:
     """Assemble projection-primed features for every game on a date's scoreboard.
 
-    Shared per-date maps (xG / lineups / goalies) are read once and reused across games.
+    Shared per-date maps (xG / Elo / lineups / goalies) are read once and reused across games.
     ``anchor_to_market`` opts into Phase-4 market anchoring per game (no-op without odds).
     Returns ``[]`` when no scoreboard is mirrored for the date.
     """
@@ -331,6 +378,7 @@ def build_slate_features(
     if not games:
         return []
     xg_map = load_team_xg_map(date, root=root)
+    elo_map = load_team_elo_map(date, root=root)
     lineups = load_lineups(date, root=root)
     goalies = load_starting_goalies(date, root=root)
     out: List[HockeyGameFeatures] = []
@@ -338,7 +386,7 @@ def build_slate_features(
         out.append(
             build_game_features(
                 pk, date, home_name, away_name,
-                root=root, xg_map=xg_map, lineups=lineups, goalies=goalies,
+                root=root, xg_map=xg_map, elo_map=elo_map, lineups=lineups, goalies=goalies,
                 profile=profile, project=project,
                 anchor_to_market=anchor_to_market, anchor_weight=anchor_weight,
             )

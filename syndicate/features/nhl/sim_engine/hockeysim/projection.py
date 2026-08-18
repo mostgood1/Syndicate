@@ -214,8 +214,18 @@ def apply_projection(
     Loaders call this so the downstream adapter (:func:`hockeysim.adapters.build_game_prediction`),
     which reads ``team.period_goal_lambdas``, transparently consumes the projection. Returns
     ``(home_with_lambdas, away_with_lambdas, projection)``.
+
+    Also back-fills ``goals_per_60`` from the projected (opponent- and home-ice-adjusted) goal
+    rate. Without this, ``goals_per_60`` sits at its dataclass default (2.9 -- the OLD, pre-Phase-3b
+    vendor constant, not the truth-calibrated ``league_baseline_goals_per_60`` of 3.1269) for EVERY
+    team, because nothing else on the loader path ever sets it (`docs/ai_context/hockeysim_engine_reference.md`
+    §CONSUMED+UNPOPULATED). That default is what ``player_props.py``'s ``TeamRates`` -- the boxscore
+    /props engine's actual rate input -- reads verbatim, so every team's shot/goal environment for
+    SOG, saves, and points props was identical and stale. This does not fix ``shots_per_60`` /
+    ``blocks_per_60`` / ``penalties_per_60`` / ``faceoff_win_pct`` -- those have no equivalent
+    projected value to back-fill from and remain a genuinely absent input, not merely an unfed one.
     """
     proj = project_game(home, away, profile=profile)
-    new_home = replace(home, period_goal_lambdas=proj.period_home_lambdas)
-    new_away = replace(away, period_goal_lambdas=proj.period_away_lambdas)
+    new_home = replace(home, period_goal_lambdas=proj.period_home_lambdas, goals_per_60=proj.proj_home_goals)
+    new_away = replace(away, period_goal_lambdas=proj.period_away_lambdas, goals_per_60=proj.proj_away_goals)
     return new_home, new_away, proj

@@ -1,5 +1,301 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always: `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct` were CONSUMED and had no producer. `elo_rating` and `goals_per_60`-staleness FIXED; the rest genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+
+Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
+`docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
+(exits 1, 16 alarms remaining after this session's fixes, down from 17+2 —
+see the doc's population-progression log).
+
+**FIXED this session:**
+- `elo_rating` — CONSUMED (`projection.py`'s `_elo_win_prob`) with **no producer
+  anywhere in the codebase**, the exact `model_engine_standard.md` §0 alarm.
+  Built the producer: `historical_truth/elo_builder.py` (chronological Elo,
+  no-lookahead pregame view) + `scripts/build_nhl_elo_artifact.py`, wired via
+  `loaders.load_team_elo_map` into `build_team_features`/`build_game_features`/
+  `build_slate_features`. Verified end-to-end against real cached truth data
+  (1,312 games) — `elo_rating` now populates on every team-side. **Backtested
+  before considering the mechanism itself, not just the plumbing**: a simple
+  win/loss Elo's Brier score (0.2506 at the profile's existing `elo_home_adv=50`)
+  is WORSE than a constant home-win-rate baseline (0.2495); the best swept
+  value (0.2487 at `home_advantage=25`) is noise-level over 1,312 games. Per
+  `model_engine_standard.md` §4.4 (mechanism vs estimator — don't turn on an
+  unvalidated mechanism against an already-calibrated baseline),
+  `elo_blend_weight` stays at its existing default `0.0`. Population fixed;
+  blending deliberately NOT turned on, with the measurement that says why.
+- **`goals_per_60` staleness** — `player_props.py`'s `TeamRates` (the actual
+  input to the props/boxscore engine, `engine.py`) reads `team.goals_per_60`
+  verbatim. Nothing set it, so it sat at its dataclass default (`2.9` — the
+  OLD pre-Phase-3b vendor constant) for every team, every game, diverging from
+  the truth-calibrated `league_baseline_goals_per_60` (`3.1269`) the main
+  board's projection already uses. `apply_projection` (`projection.py`) now
+  back-fills `goals_per_60` from the matchup-adjusted `proj_home_goals`/
+  `proj_away_goals` it already computes — no new data needed, and it makes the
+  props engine's goal rate consistent with the calibrated main board instead
+  of a stale, undifferentiated constant.
+- **Corrected a stale claim.** `#440`'s note (line ~19984 in this file) that
+  "hockeysim's Phase 3b calibrated deltas were computed and never applied" was
+  WRONG — the same "grepped the wrong file" trap as MLB's BVP row. The deltas
+  live in `projection.py`'s `ProjectionProfile`, not `calibration_profile.py`'s
+  `SimConfig`; confirmed applied via commit `29fac7ce` and reachable by default
+  (`project: bool = True`). See the correction inline at that line.
+- Allowlisted `nhl_source/**/data/processed/team_xg_*.csv` and `team_elo_*.csv`
+  in `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py`) — per `model_engine_standard.md`
+  §3, unallowlisted means unauditable via `/api/ops/artifacts/*` regardless of
+  whether a producer exists yet.
+
+**NOT FIXED — genuinely absent, not merely unfed (measured via the new
+checklist, 9 mirrored dates, 10 team-sides, 297 players):**
+- `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct`
+  (team) and `shot_weight`, `goal_weight`, `block_weight` (player) — **all
+  0.0% populated.** `build_team_features`/`build_player_features` never set
+  them; they are the direct, verbatim input to `player_props.py`'s `TeamRates`
+  construction, which `engine.py` (the boxscore/props sim — SOG, saves,
+  blocks, points markets) consumes. **The main board (moneyline/spread/total
+  in `predictions_{date}.csv`) is UNAFFECTED** — `game_market_sim.py` only
+  consumes `period_goal_lambdas`, which the (now-corrected) projection layer
+  already computes per-matchup. This gap is isolated to player props. Needs
+  real per-team/per-player game logs (shot volume, block volume, penalty
+  minutes, faceoff wins, usage share) that the current truth loader does not
+  capture (`HistoricalGameRecord` has goals/SOG/period splits, not
+  shots-by-strength-state or faceoffs) — a real data-pipeline build, not a
+  wiring fix. Matches this file's own framing for MLB's remaining 5 (`#440`):
+  "needs a definition first," not fixable by populating an existing field.
+- `xgf_per_60`/`xga_per_60` — loader (`load_team_xg_map`) and allowlist both
+  exist now; **no producer of `team_xg_*.csv` exists anywhere** in this
+  checkout or `vendor/`. The reader code was re-homed from
+  `vendor/nhl_betting_repo/nhl_betting/data/team_xg.py` but the underlying
+  shot-quality data never was. Falls back gracefully to `goals_per_60` (a
+  legitimate, if cruder, proxy), so this degrades rather than breaks — but is
+  genuinely absent, not merely unfed.
+- `HockeyTeamFeatures.special_teams` (dict) — CONSUMED via 7 distinct
+  `.get(key, NEUTRAL)` sites in `engine.py` (`pp_shot_multiplier`,
+  `pk_shot_multiplier`, `pp_goal_multiplier`, `pk_goal_multiplier`,
+  `blocks_ev_rate`, `blocks_pk_rate`, `blocks_pp_def_rate`, all AST-extracted
+  by the new checklist, not hand-listed) — **the dict is `{}` on 100% of
+  team-sides measured.** Every power-play/penalty-kill shot and goal
+  multiplier the props engine applies is at its hardcoded neutral default for
+  every team, always. Building this needs per-team PP%/PK% opportunity and
+  conversion data the truth loader does not currently parse out of the landing
+  feed's strength-state goal breakdown (it captures `pp_goals_home/away`
+  already — PP goals, not PP shots or PK opportunities/goals-against — so
+  extending the parser, not just aggregating what exists, is the first step).
+  **Likely the single highest-value remaining gap** — special teams is one of
+  the most bettor-differentiating dimensions in hockey and currently carries
+  zero team-level signal anywhere in the props engine.
+
+### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, NOT FIXED
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec7,
+`docs/ai_context/basketball_model_inventory.md`. Gate:
+`py -3 scripts/basketball_sim_input_checklist.py` (see `#460`/`#461` for what
+it found; this item is the separate, structural allowlist gap).
+
+Grepped `syndicate/features/shared/artifact_publisher.py` for
+`team_advanced_stats`, `player_logs`, `player_priors`, and all four optional
+calibration filenames (`smart_sim_total_calibration.json`,
+`intervals_band_calibration.json`, `intervals_time_profile.json`,
+`player_stat_calibration.json`): **zero matches for every one of them.** Only
+the final OUTPUT artifact, `smart_sim_<date>_<HOME>_<AWAY>.json`, is
+allowlisted (`artifact_publisher.py:95,173`). Every INPUT the smart-sim engine
+reads is invisible to `/api/ops/artifacts/*` — this is `model_engine_standard.md`
+Sec3b's requirement ("every input allowlisted... unallowlisted = unauditable")
+failing outright for this engine, the same shape as NCAAF's unallowlisted
+`recommendations_summary/week_N.json` in `#458`.
+
+**Consequence, concrete**: this lane could not have measured `#460`/`#461`
+below from Render even if the web service had not 502'd during this session
+(`syndicate-an21.onrender.com` was down throughout) — there is no allowlisted
+path to read `team_advanced_stats_*.csv` or the calibration JSONs on the live
+worker disk at all, local-mirror or otherwise. Every population number in the
+reference doc is checkout-only BY NECESSITY, not by convenience.
+
+### `#461` — **WNBA's `team_advanced_stats` producer never emits a `games` column; NBA's does — a real CONSUMED+UNPOPULATED field, currently inert only because nothing branches on it yet** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, ROOT-CAUSED AND CODE-FIXED 2026-08-18 (mirror/production artifacts not yet regenerated — see addendum below)
+
+**Addendum, same day, same lane — root cause was NOT the producer, it was a
+stale cache-guard, and the original title above is imprecise (kept verbatim
+for history; do not restate it as fact going forward).** Read both vendor
+compute functions in full for both leagues:
+`compute_team_advanced_stats_from_boxscores` and
+`compute_team_advanced_stats_from_player_logs`
+(`vendor/{nba,wnba}_betting_repo/src/{nba,wnba}_betting/advanced_stats_{boxscores,player_logs}.py`)
+are **byte-for-byte identical in logic between NBA and WNBA** and both emit
+`games`/`source` unconditionally in every code path. There is no
+league-specific omission in the producer. The real cause:
+`_ensure_team_advanced_stats_asof` (`vendor/{nba,wnba}_betting_repo/src/.../cli.py`,
+called automatically before every smart-sim run at both leagues' `smart-sim-date`
+and `smart-sim` call sites) treats **any non-zero-size file already on disk at
+the exact `team_advanced_stats_<season>_asof_<date>.csv` path as done** and
+returns it without rebuilding — a real, valid, non-empty CSV, just written
+under an OLDER schema from before `games`/`source` existed as columns. The
+WNBA as-of files in the mirror predate that schema addition and have sat
+"cached" (and therefore permanently stale) ever since; NBA's sampled file
+happened not to collide with a pre-existing stale path at the date checked.
+**Confirmed, not inferred:** direct header read of the stale WNBA file shows
+the `games`/`source` keys are structurally absent (not present-and-empty),
+consistent with a pre-schema file, not a per-row data gap.
+
+**Fix shipped** (both leagues, same latent bug, NBA not yet observed to have
+hit it but structurally identical — see `#461`'s lane note on scope): added
+`_team_adv_stats_cache_is_fresh()`, a cheap header-only read that checks for
+`games`+`source` before trusting a cached file; `_ensure_team_advanced_stats_asof`
+now rebuilds when the cache is present-but-stale-schema, not just when it's
+missing or 0 bytes. **Measured, real data, not simulated:** ran the fixed
+function directly against this checkout's real cached WNBA boxscores
+(`vendor/wnba_betting_repo/data/processed/`, the actual `paths.data_processed`
+production code path resolves to) for `season=2026, as_of=2026-07-15` — output
+now has all 14 columns including `games` (6-8 per team at that as-of date,
+`source=boxscores`) where the pre-fix cached file at the legacy filename had
+12. Re-running immediately after confirms the cache-hit path still short-circuits
+correctly (file mtime unchanged) — this is not a rebuild-every-call regression.
+`tests/test_basketball_props_smart_sim_advanced_stats.py` (5/5) and the
+targeted advanced-stats/cli test selection (6/6) still pass.
+
+**What is NOT yet fixed**: the code fix lives in this checkout only. It has
+not been committed, deployed, or run on Render's mounted disk, so the git-tracked
+mirror under `data/wnba_source/source_artifacts/data/processed/` still carries
+the pre-fix stale-schema files — per CLAUDE.md, hand-editing that mirror to
+"look" fixed would be fabricating a Render reading, so it was left untouched.
+The fix is live in production only after: commit -> deploy `refresh-worker`
+(behind the two-lock deploy protocol) -> the worker's next smart-sim run for a
+new or previously-uncached as-of date rebuilds correctly -> the mirror-refresh
+script pulls the corrected file down. Re-running
+`scripts/basketball_sim_input_checklist.py` against the mirror will keep
+reading the Level 2 WNBA alarm until that chain completes; that is expected,
+not a sign the fix didn't work.
+
+**The second, independent finding in this item (the 0-byte
+`data/wnba_source/data/processed/team_advanced_stats_2026*.csv` vs. the
+non-empty `source_artifacts/` copy) is untouched by this fix** — different
+mechanism, still open.
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec4. Gate:
+`py -3 scripts/basketball_sim_input_checklist.py` (Level 2; exits 1 on this
+alone as of 2026-08-18).
+
+`_team_adv_row_local` (`syndicate/features/shared/basketball_props_smart_sim.py
+:3535`, the monkeypatched local port that actually runs in production — see
+`#460`) reads 8 keys unconditionally into its output dict: `pace off_rtg
+def_rtg efg_pct tov_pct orb_pct ft_rate games`. Measured over the real local
+mirror (`data/wnba_source/source_artifacts/data/processed/team_advanced_stats_
+2026_asof_2026-07-08.csv`, 15 WNBA teams): the first 7 keys are **100%**
+populated, `games` is **0%** — confirmed by direct column inspection, not
+inference: the WNBA file has 12 columns (`team pace off_rtg def_rtg efg_pct
+tov_pct orb_pct ft_rate fg3a_rate fg3_pct ts_pct ast_per_100`), no `games`, no
+`source`. The equivalent NBA file (`data/nba_source/data/processed/
+team_advanced_stats_2026_asof_20260530.csv`, 30 teams) has the same 12 columns
+**plus `games` (100% populated, values like 82) and `source` (`player_logs`)**.
+
+**Not currently observed to cause a wrong number** — grepped
+`basketball_props_smart_sim.py` for any downstream read of the returned
+`games` value; zero matches, nothing branches on it today. That is exactly why
+this is worth filing rather than shrugging off: it is CONSUMED (read into the
+dict on every call, for every game, both leagues) and UNPOPULATED (for one of
+the two leagues, structurally — the producer never emits the column, not a
+data-freshness gap), and it is currently invisible because nothing uses the
+resulting `NaN` yet. The moment anything adds sample-size confidence-weighting
+on `games` — a plausible next step for 15-team advanced stats — it goes
+silently inert for WNBA only, `model_engine_standard.md`'s canonical failure
+shape, with no log line.
+
+**Two remedies, not one** (Sec4.1 of the standard — do not conflate):
+producing `games` for WNBA is a data-pipeline fix in whatever builds
+`team_advanced_stats_2026_asof_*.csv`; guarding the CURRENT unused read is a
+separate, much smaller no-op-safety fix. Neither was done in this pass.
+
+**Also recorded, a second and independent finding from the same investigation**:
+this checkout carries TWO git-tracked copies of the WNBA `team_advanced_stats`
+family, and they disagree. `data/wnba_source/data/processed/
+team_advanced_stats_2026*.csv` (both the season file and the one as-of file)
+are **0 bytes** — the "partial/failed write" case the loader's own code
+comment already anticipates (`basketball_props_smart_sim.py:3471-3478`).
+`data/wnba_source/source_artifacts/data/processed/` has real, non-empty as-of
+snapshots for 2026-07-03 through 2026-07-15 (byte-identical
+`boxscores_history.csv` between the two copies, confirmed by diff). This is
+CLAUDE.md's per-family mirror-desync trap, hit directly, inside a single
+sport's own artifact family rather than across families as the CLAUDE.md MLB
+example describes.
+
+### `#460` — **basketball smart-sim input checklist shipped; the #440 no-sampling-fallback hypothesis is now a runnable gate and reads negative twice, on two different methods, 3 days apart** — SHIPPED 2026-08-18, lane `basketball-model-owner`
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
+`docs/ai_context/basketball_model_inventory.md`. Gate:
+`py -3 scripts/basketball_sim_input_checklist.py --json reports/
+basketball_input_checklist.json` — **exit 1** as of 2026-08-18 (see `#461` for
+the one alarm; Levels 0 and 1 both PASS).
+
+**What the checklist found, per level:**
+- **Level 0 (bridge reachability, the `#440` hypothesis made runnable)**:
+  calling the actual bridge function
+  (`basketball_props_smart_sim._import_real_smart_sim_module_local`) for both
+  `wnba_betting` and `nba_betting` returns the REAL engine module for both, in
+  this checkout, 2026-08-18. This corroborates — via a different method
+  (direct import call vs. artifact-shape inference) and a different date — the
+  2026-08-15 production-artifact reading in
+  `.syndicate/plan_2026-08-16_sim_scheduling.md` (three real WNBA `smart_sim_*
+  .json` files pulled off the live web disk all carried the real engine's
+  `score`/`intervals` signature and none carried the flat stub's
+  `home_team_total_pts_mean` fingerprint). **Two independent negatives, not
+  yet three** — see the reference doc Sec2/Sec6 for what is still unproven
+  (a worker-specific reachability check, and the sibling `events`-module
+  fallback, structurally identical, never separately checked).
+- **Level 1 (PlayerPriors per-minute rate keys)**: PASS. All 13 `_pm` keys
+  `_apply_player_priors_local` consumes are exactly the 13
+  `compute_player_priors_local` produces (AST-verified both directions, no
+  drift). Population (real local mirror, `days_back=21`): WNBA 56.1% of 321
+  rated rows, NBA 82.7% of 611 — both well above the 50% floor. The
+  measurement method itself needed one fix worth recording: population must
+  be measured by dict-key MEMBERSHIP, not `value > 0.0` — a player who
+  genuinely blocked/stole/hit zero threes in the window has e.g. `blk_pm:
+  0.0`, a real present value, and a naive `> 0` test misread that as unfed
+  (first run reported `blk_pm` at 39.9%, `stl_pm` 49.2%, `threes_pm` 43.9%
+  before the fix; all three read 56.1%, identical to every other key, after
+  it). Exactly `model_engine_standard.md` Sec4.2's `.get(key, 1.0)` trap,
+  recurring at 0.0.
+- **Level 2**: FAIL — see `#461`.
+- **Level 3 (four optional per-game calibration artifacts)**: reported, not
+  gating (by design — these degrade gracefully by construction, unlike a
+  silent neutral-multiplier field). All four absent on both local mirrors.
+  Each has a builder tool in `vendor/{wnba,nba}_betting_repo/tools/` (three of
+  the four found by name: `build_intervals_band_calibration.py`,
+  `build_intervals_time_profile.py`, `build_player_stat_calibration.py`) and
+  **none is referenced anywhere under `scripts/` or in `live_refresh_loop.py`**
+  — grepped, zero matches. Football's `#457` "builder exists, never
+  scheduled" shape, lower severity here because the failure mode is graceful.
+
+**Also structural, not a population finding**: basketball's engine is a
+FOURTH shape of sim-input contract in this repo (flat dataclass for MLB, typed
+dataclass+payload for football, dict-in-dataclass for soccer, and for
+basketball: no per-entity dataclass at all — a `PlayerPriors.rates` dict and a
+plain DataFrame). **And nearly the entire input-computation surface of the
+"real" vendor module is monkeypatched at call time** —
+`_call_source_simulate_smart_game_local`
+(`basketball_props_smart_sim.py:3842-3995`) swaps ~20 of the vendor module's
+own named helpers (`_apply_player_priors`, `_team_adj_from_advanced_stats`,
+all four calibration loaders, the possession-engine entrypoints, and more) for
+Syndicate-local ports. So "the vendor import succeeded" does NOT mean vendor
+logic computed the inputs — only `simulate_smart_game`'s own orchestration
+loop is genuinely vendor code in production; the checklist therefore audits
+the LOCAL PORTS, which is where the real consumed-key lists actually live.
+Verified no drift between the local ports and the vendor originals' literal
+key lists (AST, not eye).
+
+**NCAAB confirmed to have no sim engine** (design gap, not an input gap —
+matches the existing note inside `#440`; NCAAB instead reads a pre-computed
+recommendations payload from an external mirror,
+`syndicate/features/ncaab/sources.py:151-158`). Not attempted to build one, per
+the lane's explicit scope.
+
+**RENDER COULD NOT BE READ LIVE DURING THIS SESSION** —
+`syndicate-an21.onrender.com` returned HTTP 502 throughout (both the base site
+and `/api/ops/artifacts/export`), for reasons outside this lane's scope and
+not diagnosed here. Every population number above is checkout-only and the
+checklist's own output says so explicitly on every run, per
+`model_engine_standard.md` Sec3b's requirement to name the substrate. See
+`#462` for the compounding fact that even a healthy Render could not have
+answered the Level 1/2 population questions today regardless, because none of
+the input artifacts are allowlisted.
+
 ### `#459` — **the deploy coordinator role is RETIRED; deploys are self-serve behind two locks** — SHIPPED AND TESTED 2026-08-18, lane `football-model-owner`, commit `a4c48437`
 
 `.claude/hooks/deploy-guard.py` gated on `session_id in .syndicate/coordinator.id`.
@@ -19825,8 +20121,20 @@ Layer 2's outcome loop is fully wired but carries zero records in prod (see
 "OPEN 2026-08-04 (2)" below), so `reliability_multiplier` is 1.0 everywhere,
 dynamic thresholds are inert and Kelly is pinned at the zero-evidence floor.
 Every other sport's sim runs on hand-authored frozen constants that nothing
-ever refits (NFL's profile is all 1.0 multipliers by construction; hockeysim's
-Phase 3b calibrated deltas were computed and never applied).
+ever refits (NFL's profile is all 1.0 multipliers by construction).
+**CORRECTION 2026-08-18, lane `nhl-model-owner`: the hockeysim clause above was
+WRONG -- the same "grepped the wrong file" trap MLB's BVP row warns about
+(`mlb_sim_engine_reference.md` §2b). Phase 3b's 5 deltas
+(`league_baseline_goals_per_60`, `league_xg_per_60`, `home_ice_attack_mult`,
+`away_ice_attack_mult`, `period_shares`) live in `projection.py`'s
+`ProjectionProfile`, not `calibration_profile.py`'s `SimConfig` -- two
+different profile objects. Confirmed applied: commit `29fac7ce` ("NHL revamp
+Phase 3b (applied): calibrate projection profile to full-season truth"), the
+values in `projection.py` match `docs/reports/hockeysim_phase3b_calibration_report.md`'s
+"Applied profile overrides" table exactly, and `apply_projection` is called
+from `loaders.build_game_features` with `project: bool = True` by DEFAULT --
+reachable, not just present. See
+`docs/ai_context/hockeysim_engine_reference.md` §2 for the full trace.**
 
 Findings from the initial audit, ALL fixed in this session's commits (kept
 here only as the record of what was wrong, not as open items):

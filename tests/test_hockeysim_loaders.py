@@ -38,6 +38,12 @@ def synth_root(tmp_path: Path) -> Path:
         "CHI,2.40,3.60\n",  # weak both ways
         encoding="utf-8",
     )
+    (proc / "team_elo_2025-2026.csv").write_text(
+        "abbr,elo\n"
+        "BOS,1560\n"
+        "CHI,1470\n",
+        encoding="utf-8",
+    )
     (proc / f"lineups_{date}.csv").write_text(
         "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
         "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n"
@@ -95,6 +101,46 @@ def test_build_team_features_uses_xg_map(synth_root):
 def test_build_team_features_without_xg_is_league_average(synth_root):
     bos = loaders.build_team_features("Boston Bruins", xg_map={})
     assert bos.xgf_per_60 is None and bos.xga_per_60 is None
+
+
+# ---------------------------------------------------------------------------
+# Elo — `docs/ai_context/hockeysim_engine_reference.md`: `elo_rating` was CONSUMED
+# (projection.py's `_elo_win_prob`) with no producer anywhere; these are the
+# reachability tests for the fix (`load_team_elo_map` + the wiring below), mirroring
+# the xG tests above exactly so the two inputs are held to the same bar.
+# ---------------------------------------------------------------------------
+
+
+def test_load_team_elo_map(synth_root):
+    m = loaders.load_team_elo_map("2026-03-15", root=synth_root)
+    assert m["BOS"] == 1560.0
+    assert m["CHI"] == 1470.0
+
+
+def test_load_team_elo_map_missing_is_empty(tmp_path):
+    assert loaders.load_team_elo_map("2026-03-15", root=tmp_path) == {}
+
+
+def test_build_team_features_uses_elo_map(synth_root):
+    m = loaders.load_team_elo_map("2026-03-15", root=synth_root)
+    bos = loaders.build_team_features("Boston Bruins", elo_map=m)
+    assert bos.abbrev == "BOS"
+    assert bos.elo_rating == 1560.0
+
+
+def test_build_team_features_without_elo_is_none(synth_root):
+    bos = loaders.build_team_features("Boston Bruins", elo_map={})
+    assert bos.elo_rating is None
+
+
+def test_build_game_features_populates_elo_end_to_end(synth_root):
+    """The full loader path (what `build_slate_features` drives in production) actually reaches
+    `elo_rating` -- population alone, not just the map/dataclass-level wiring above."""
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    assert game.home.elo_rating == 1560.0
+    assert game.away.elo_rating == 1470.0
 
 
 def test_build_player_features_flags_starting_goalie(synth_root):
