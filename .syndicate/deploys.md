@@ -14331,3 +14331,50 @@ worker deploy; do not open a window."* Agreed. But:
 first (due within one interval of the 01:2xZ boot), THEN deploy both workers with
 these two commits. If `MAIN_ENTRY` does not appear by the interval, that is
 itself the finding and the deploy still follows it.
+
+## MEASUREMENT — WNBA Phase 2 autorun: **`MAIN_ENTRY` NEVER APPEARED. The autorun launches, reports ok, and produces nothing.** `[2026-08-18 ~01:5xZ]`
+
+The reading the request asked for first, in its own stated order. Taken by the
+coordinator; the lane is idle.
+
+- RECONCILED: WNBA phase 2 autorun — MAIN_ENTRY measured ABSENT, 2026-08-18.
+
+**Boot 00:55:20Z on `396cac89`, flag `true`. What the logs actually contain:**
+
+    00:56:10  WNBA_PREGAME_AUTORUN_LAUNCHED date=2026-08-17 phase=pregame   (ONCE)
+    x51       WNBA_PREGAME_AUTORUN_PREV launched=ok runStamp=None artifactsDir=None
+    MAIN_ENTRY          nothing matched, 00:55Z..now
+    GAME_CARDS_CENSUS   nothing matched
+
+**The launcher fires. `refresh_wnba_oddsapi_props.main()` still does not run.**
+`launched=ok` reports that the LAUNCH succeeded, not that the work happened —
+and `runStamp=None artifactsDir=None`, repeated 51 times, says the child produced
+neither a run stamp nor an artifacts directory.
+
+**So Phase 2 is inert at the level that matters.** Its stated purpose was
+*"nothing on any cadence calls `refresh_wnba_oddsapi_props.main()`"* — measured
+`MAIN_ENTRY` 0 hits over 8h. It is now scheduled, launched, and still 0 hits.
+The gap moved from "nothing calls it" to "something calls it and it does not
+run", which is progress in diagnosis and zero progress in outcome.
+
+`GAME_CARDS_CENSUS` absent is EXPECTED and is not a second finding — the request
+says the census cannot appear before `MAIN_ENTRY` and warns against reading its
+absence as failure. Honouring that.
+
+### THIS ALSO WEAKENS MY OWN MEMORY VERDICT, and I am saying so before anyone else has to
+
+Earlier tonight I recorded *"anon peaked at 867MB = 42.3%, the leg allocates and
+releases, the autorun is safe."* **That attribution is now suspect.** If the WNBA
+leg produced no run stamp and no artifacts, it may have done little or no work —
+so the anon climb I measured may belong to the MLB/soccer legs running on the
+same service, not to the autorun at all.
+
+What survives: the service was healthy throughout, anon never exceeded 42%, and
+the aggregate-vs-anon correction stands — the original rollback did rest on page
+cache. **What does NOT survive: "the WNBA leg is safe on 2GB."** That was never
+tested, because the leg never ran. `wnba-phase2-migration`'s memory question is
+OPEN again, not answered.
+
+**Owed next:** why `main()` is not reached from a launch that reports ok. That is
+the lane's, not the coordinator's — but the silent `launched=ok` is the same
+family of handler the soccer observability request is fixing two files away.
