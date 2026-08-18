@@ -263,26 +263,39 @@ contradicts `state.md`, say so before proceeding.
 
 ## Before any deploy
 
-**YOU DO NOT DEPLOY. A coordinator session owns every production deploy**
-`[2026-08-17, user decision]`. This includes `render.yaml` pushes, which
-fire `blueprint_sync` and apply to production regardless of `autoDeploy = no`.
+**Deploys are yours to run, behind two locks you take yourself**
+`[2026-08-18, user decision — this REPLACES the coordinator-session role]`.
+This includes `render.yaml` pushes, which fire `blueprint_sync` and apply to
+production regardless of `autoDeploy = no`.
 
-File a request and carry on with other work — do not block on a reply:
-
+```bash
+python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
+python scripts/deploy_preflight.py --service <svc> --holder <lane>
 ```
-.syndicate/deploy/requests/<UTC-timestamp>-<lane>.md
-service: | sha: | reason: | verify: | rollback: | urgency:
-```
 
-`verify:` is the field that matters — name the READING that proves it worked,
-not the thing you will watch. The coordinator deploys into a safe window,
-measures it, writes `deploys.md`, and reports back to your session.
+Both must pass before `.claude/hooks/deploy-guard.py` will let a deploy
+through: an unexpired claim held by YOUR lane, plus a preflight that returned
+`CLEAR` within 15 minutes. A `render.yaml` push needs all three services locked,
+because `blueprint_sync`'s blast radius is all three. The guard prints the exact
+command that clears it, so nothing ever waits on another session.
 
-Urgent is a reason to message the coordinator, never a reason to route around
-it. Full contract: `.syndicate/coordinator.md`.
+Afterwards: record the MEASUREMENT in `.syndicate/deploys.md`, then
+`deploy_claim.py release --service <svc>`. `verify:` is the field that matters —
+name the READING that proves it worked, not the thing you will watch.
 
-If you ARE the coordinator: run `/preflight`. It is a hard gate, not a
-formality.
+**Why the coordinator role was retired.** One session owned every deploy. A
+session can be archived, and that one was — with two requests queued into it and
+`deploy/grants/` empty, while the guard gated on `session_id in coordinator.id`.
+That predicate had no true value any more, so the guard stopped being a throttle
+and became a total block on all deploys, silently. The locks it wrapped
+(`deploy_claim.py`, atomic `O_CREAT|O_EXCL` with a 45-min expiry) already
+enforced the same invariant and cannot be archived. `deploy_claim.py`'s own
+docstring had said so all along: *"Coordination by MESSAGE cannot fix either: a
+cross-session message waits for the target's current turn to end, while firing a
+deploy takes seconds."*
+
+If a claim is held by a session that is gone: `acquire ... --force`, and say so
+in `deploys.md`. Off switch for the guard: `SYNDICATE_DEPLOY_GUARD=off`.
 
 ## End of every session (or every ~30 min of real work)
 

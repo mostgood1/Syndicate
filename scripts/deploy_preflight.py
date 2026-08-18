@@ -291,6 +291,49 @@ def is_ancestor(candidate: str, descendant: str) -> bool | None:
         return None
 
 
+RECEIPT_DIR = REPO_ROOT / ".syndicate" / "deploy" / "preflight"
+
+
+def _write_receipt(args, report, verdict, reason, live_commit) -> None:
+    """Persist this verdict so `deploy-guard.py` can gate on it.
+
+    WHY A FILE. The guard runs in a different process, seconds-to-minutes later,
+    and cannot see this run's exit code. Before 2026-08-18 it gated on whether
+    your session id was the coordinator's; it now gates on whether a preflight
+    actually returned CLEAR recently, which is a property of the WORLD rather
+    than of who is asking.
+
+    WHY EVERY VERDICT AND NOT ONLY `CLEAR`. Writing only on CLEAR would leave a
+    stale CLEAR in place when a later run returns HOLD -- preflight, get CLEAR,
+    a sim starts, preflight again and get HOLD, and the guard would still be
+    reading the first receipt and let the deploy through. Overwriting on every
+    verdict makes the newest reading the one that counts, so a HOLD actively
+    REVOKES the CLEAR before it. An unknown must never leave the permissive
+    branch standing.
+
+    Never raises: a preflight that cannot write its receipt must still print its
+    verdict and return its exit code. The guard treats an absent receipt as
+    "not preflighted", which is the safe reading.
+    """
+    try:
+        RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "service": args.service,
+            "verdict": verdict,
+            "reason": reason,
+            "holder": args.holder or None,
+            "target_commit": args.target_commit or None,
+            "live_commit": live_commit or None,
+            "written_at": time.time(),
+            "written_at_iso": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "jobs_in_flight": len(report.get("jobs_in_flight") or []),
+        }
+        (RECEIPT_DIR / f"{args.service}.json").write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--service", required=True, choices=sorted(SERVICE_IDS))
@@ -394,6 +437,7 @@ def main() -> int:
         )
     report["verdict"] = verdict
     report["reason"] = reason
+    _write_receipt(args, report, verdict, reason, live_commit)
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

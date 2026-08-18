@@ -1662,7 +1662,83 @@ Moved to `state_archive.md` 2026-08-15. Every figure in it is also in
 the place to read it, and it carries the guard on its two shortlists.
 
 
-## NFL — CLOSED, archived
+## FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]`
+
+**Owner: `football-model-owner`.** Full reference:
+`docs/ai_context/football_sim_engine_reference.md`. Gate:
+`py -3 scripts/football_sim_input_checklist.py --season 2025 --week 1` (exits 1).
+
+- **The engine consumes 9 feature blocks / 65 keys out of
+  `feature_generation_payload`, and 0 of 3 production entrypoints pass one.**
+  Every NFL and NCAAF game served runs on `home/away_offense_rating`,
+  `home/away_defense_rating` and a hardcoded `pace_seconds_per_play=24.0`.
+  `returning_production_index` 0.5 / `coach_continuity_index` 0.5 /
+  `player_usage_index` 0.25 / `market_prior_index` 0.5 are constants carried
+  identically by every game.
+- **Reachability measured, not inferred:** 21 of 21 drive-prior fields move when
+  fed. 400 seeds/arm → margin −1.125, total −1.685, home win% **−6.50 pts**.
+- **DO NOT SIMPLY WIRE IT.** Both calibration profiles were fit against a payload
+  the engine cannot read, so this is a mechanism added to a calibrated engine and
+  owes a **re-fit** (`model_engine_standard.md` §4.4 — negative interaction in
+  4 of 4 markets measured elsewhere). Those deltas are the DISTURBANCE, not the
+  improvement. `#457`.
+- **Three unfed blocks, three DIFFERENT remedies — do not batch them.** Over 272
+  real NFL games: `defensive_metrics` **MISROUTED** (all 7 keys sit in
+  `team_metrics` at 100%), `pace` **NULL AT SOURCE** (all 4 keys `None`),
+  `player_usage` **WRONG GRAIN** (19,400 player rows exist; no game-level block;
+  `adapters.py:_team_player_usage` already aggregates correctly and nothing
+  consumes it). `offensive_metrics`/`advanced_metrics`/`market_features` are
+  **100% fed**.
+- **NCAAF SERVES 16 GAMES AND THE MODEL IS NULL ON ALL 16** `[measured against
+  PRODUCTION 2026-08-18]`. `predictions.home_mean/away_mean/margin_mean/
+  total_mean` and all six probabilities are `null`; `smartsim_reasons` `[]`.
+  **Cause: `CFBD_API_KEY` is ABSENT on all three services** (live env-vars, not
+  `render.yaml`); `generate_smartsim2_ncaaf_projections.py:57` raises, the
+  autorun dies, the artifact is never written. Logs: **21 of 21
+  `SEASON_PROJECTION_ARTIFACT_MISSING` are `sport=ncaaf`, 0 `sport=nfl`** —
+  positive control. `interval_seconds=86400` → **once-daily, NOT a relaunch
+  loop, not burning worker cycles.** Two-arm test: no key → `RuntimeError`;
+  with key → 99 games → 51 FBS-vs-FBS → 136 PPA teams → 50/51 rated.
+  **Everything downstream of the key works**, incl. `#445`'s guard (verified by
+  CONTENT in deployed blob `00e9a49f`). **Season opens 2026-08-29.** Deploy
+  request filed: `.syndicate/deploy/requests/20260818T154432Z-football-model-owner.md`.
+  `#458`.
+- **DO NOT diagnose NCAAF from a local checkout.** `load_features(sport="ncaaf")`
+  returns **0 games locally** while production serves 16. I filed that local zero
+  as a production defect and retracted it. `data/**` lossy mirror, as CLAUDE.md
+  says.
+- **FIXED (`752a866d`, UNDEPLOYED): the NCAAF board was capping the slate at 16.**
+  Weeks 1/2/3/5/8/12 all served exactly 16; CFBD lists **51** FBS-vs-FBS for wk1.
+  16 = 32 teams / 2 — an **NFL-shaped number**, correct for NFL, wrong for a
+  50-60 game sport, which is why it was invisible. **THREE caps on three branches
+  of the same page**; the route calls `build_smartsim_cards_page_context`, NOT
+  `build_cards_page_context`, so fixing `_collapse_games` alone would have been
+  INERT. `_NCAAF_BOARD_GAME_LIMIT = 80` — raised, not removed (~9.8 KB/game, 2GB
+  web service). Truncation now self-reports via `board_row_counts` on the payload
+  (present whether or not it bit) + `NCAAF_BOARD_TRUNCATED` on web stdout.
+- **DEPLOY ORDERING IS LOAD-BEARING: web (`752a866d`) FIRST or together, THEN the
+  key.** The SmartSim2-standalone branch is empty today only because the artifact
+  is missing; the moment the key lands it returns ~51 rows, and the old `[:16]`
+  would cut them back to 16 **with `verify:` passing**. Key-alone is the one
+  combination to avoid.
+- **RENDER IS THE SOURCE OF TRUTH — now MANDATORY in
+  `model_engine_standard.md` §3b** `[user directive 2026-08-18]`. Every claim
+  must name its substrate and that substrate must be Render. Also: an input NOT
+  in `HOT_ARTIFACT_PATTERNS` is UNAUDITABLE — NCAAF's `recommendations_summary`
+  (the artifact its board renders from) is not allowlisted. **Owed.**
+- **There are TWO unrelated football models.** `FootballSimulationAdapter`
+  (`adapters.py:110`) is a closed-form linear formula that **never calls
+  smartsim2**; its callers are all offline analysis. smartsim2 is the only
+  user-facing one. `NflAdapter`/`NcaafAdapter` have zero non-self callers.
+- **`smartsim2/calibration_profile.py` showing as `M` in `git status` is NOT
+  orphaned work** — it is `964c89a4`, already on `origin/main`.
+
+**NOT AUDITED** (so not a clean bill): `SYNDICATE_DATA_ROOT` backing,
+`HOT_ARTIFACT_PATTERNS` allowlisting, reuse-flag rebuild procedure, and a
+market-relative scoreboard.
+
+
+## NFL — earlier closed work, archived
 
 Moved to `state_archive.md` 2026-08-15. Closed work; the rules it records
 generalise but are not current state. `#377`, `#425`, `#429`.
@@ -1792,13 +1868,40 @@ One line per item. Where a thing is live, the SHA is the one that carries it, no
     refresh-worker    00e9a49f
     live-odds-worker  cdaeaa58
 
-## COORDINATOR
+## DEPLOY OWNERSHIP — SELF-SERVE BEHIND TWO LOCKS `[verified 2026-08-18, user decision, REPLACES the coordinator role]`
 
-The role, its contract and its limits live in `.syndicate/coordinator.md`.
-Accepted session ids are a LIST in `.syndicate/coordinator.id` — a resume
-reassigns the id, so append rather than replace. Deleting that file is the off
-switch. Process records — sweeps, adjudications, corrections — live in
-`deploys.md` and `lanes.md`, not here.
+**There is no coordinator session.** `.syndicate/coordinator.id` is DELETED,
+`coordinator.md` is a tombstone, and `.syndicate/deploy/requests/` is retired
+(a README there names the two requests that were still pending).
+
+**Any lane may deploy** once it holds, for the target service:
+
+1. an unexpired `scripts/deploy_claim.py` claim in its own lane name, and
+2. a `scripts/deploy_preflight.py` verdict of `CLEAR` less than 15 min old.
+
+`.claude/hooks/deploy-guard.py` enforces both and prints the exact command that
+clears each refusal. A `render.yaml` push needs all three services locked —
+`blueprint_sync`'s blast radius is all three. Off switch:
+`SYNDICATE_DEPLOY_GUARD=off`. Break glass:
+`.syndicate/deploy/grants/<session_id>.json` with `expires_epoch`, which any
+session may write — it is `--force` with an audit trail, not a permission.
+
+**Why the role ended, stated here because the failure is reusable:** the guard
+gated on `session_id in coordinator.id`. When the holder was archived that
+predicate had no true value, so the guard's allow-branch became unreachable and
+it blocked EVERY session's deploys silently — not a throttle, an outage. The
+lock it wrapped was always the better mechanism: `O_CREAT|O_EXCL` with a 45-min
+expiry frees itself when its holder dies, which is precisely what the role could
+not do.
+
+Process records — sweeps, adjudications, corrections — live in `deploys.md` and
+`lanes.md`, not here.
+
+- **Verified by test, not by belief:** `tests/test_deploy_guard.py`, 33 cases,
+  both directions — reads of the deploy entrypoint ALLOWED (the old guard blocked
+  them, including the edit that fixed it), unlocked deploys BLOCKED, foreign
+  claim under the sibling alias BLOCKED, stale `CLEAR` BLOCKED, fresh `HOLD`
+  overriding an older `CLEAR` BLOCKED.
 
 
 ## LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE
@@ -2000,8 +2103,11 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   **NOT deployed**.
 - **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.** Both
   workers behave as the inverse of their env.
-- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design, see
-  `coordinator.md:139`. **Do not edit or delete it.**
+- ~~**`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design.~~
+  **SUPERSEDED 2026-08-18: the file is DELETED and the role is retired.** See
+  "DEPLOY OWNERSHIP" above. The two-id design was a real fix to a real bug and
+  still could not save the role — an id that survives a resume does not survive
+  the session being archived.
 
 ## Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
 
@@ -2017,8 +2123,9 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   sports with `ACTIVE_SPORTS=nfl`; live-odds-worker swept ZERO with three
   claimed. Gate committed `20025cc4`, **NOT DEPLOYED**.
 - **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.**
-- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design,
-  `coordinator.md:139`. **Do not edit or delete it.**
+- ~~**`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design.~~
+  **SUPERSEDED 2026-08-18: the file is DELETED and the role is retired.** See
+  "DEPLOY OWNERSHIP" above.
 - **`lane-guard` cannot see the coordinator's sweep releases.**
   `_is_disclaimer()` matches only "not claimed"/"claimed by"/"held by", so a
   released lane still blocks every session. Cost 2 of 3 blocks this session.
@@ -2098,3 +2205,27 @@ by two full container replacements. Owned by `Worker memory watchdog logs`.
   8-35%. Default off, marked in place.
 - **The market harness cannot resolve <~0.003 Brier at 120 sims.** Never report a
   single-seed delta from it as a result.
+
+### SOCCER RATINGS ARE A DETERMINISTIC TRANSFORM OF xG — VERIFIED ALL NINE LEAGUES 2026-08-18
+
+- **`attack_rating` and `defense_rating` carry no information beyond `xg_for` /
+  `xg_against`.** Measured across every league with history: **|corr| >= 0.98 on both
+  sides in all nine, four at exactly +/-1.000**. The not-quite-1.000 values are the
+  `_RATING_CAP` clamp biting on outlier teams, not independent signal.
+- **CONSEQUENCE, and it generalises beyond the term already removed:** any feature
+  derived from goals or xG is ALREADY IN the ratings. `build_possession_priors`
+  averages its metrics index with `0.5 + attack_rating`, so such a feature enters
+  twice. `94578cbc` removed the two explicit xG terms; **check this before wiring any
+  further goal-derived metric into `possession_priors`.**
+- **`corr(xg_for, shots_per_match)` is +0.83..+0.93 in all nine leagues.** Shots is
+  the weakest surviving term in `_attack_strength` (weight 0.016) and is 83-93% the
+  same signal as the rating. Not removed — pending evidence it earns nothing.
+- **CAVEAT ON ALL OF THE ABOVE:** measured as the pipeline computes ratings TODAY,
+  where `xg_for` IS goals on the football-data path
+  (`team_rows_from_match_history`). A real xG source whose values diverge from goals
+  would weaken these correlations and could earn the dropped terms back. That is why
+  the now-unread `xg_for_per_match` / `xg_against_per_match` keys stay populated.
+- **The dispersion question is NOT yet answered.** A 16-fixture probe returned
+  stdev(P home) 0.1765 against baseline model 0.1575 / market 0.1811, but its 95%
+  band (0.1133..0.2397) contains both — the effect is smaller than the instrument's
+  noise. **Do not cite 0.1765 as evidence the under-dispersion is fixed.**

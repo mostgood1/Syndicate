@@ -99,12 +99,12 @@ add() { BODY="${BODY}$1
 add "=== SYNDICATE PROTOCOL (auto-loaded, bounded digest) ==="
 add "/lane before editing (EM-DASH headers only). /checkpoint before ending."
 add "Do NOT state system facts from memory — read .syndicate/state.md first."
-# The deploy line is printed only while a coordinator is registered, so deleting
-# .syndicate/coordinator.id turns the whole role off in one move -- here, in the
-# hook, and in the digest -- rather than leaving stale instructions in three files.
-if [ -s .syndicate/coordinator.id ]; then
-  add "DEPLOYS: not yours (incl. render.yaml). File .syndicate/deploy/requests/<ts>-<lane>.md — see coordinator.md."
-fi
+# DEPLOYS, 2026-08-18: the coordinator ROLE is retired. It was a session, and a
+# session can be archived -- which happened, with two requests queued into it and
+# none ever granted, leaving a guard whose allow-branch was unreachable. Deploys
+# are now self-serve behind two locks that cannot be archived. Printed
+# unconditionally: there is no register left to gate on.
+add "DEPLOYS: yours, behind two locks. deploy_claim.py acquire + deploy_preflight.py (CLEAR, <15min), then deploy."
 add ""
 
 if [ -f .syndicate/lanes.md ]; then

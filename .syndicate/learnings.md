@@ -4246,3 +4246,162 @@ output across many independently-seeded streams. The marginal uniforms are clean
 "biased head" hypothesis was tested and REFUTED. MT is built for one long stream,
 not many short ones. **Anyone revisiting this should use a counter-based
 generator with real substreams (PCG64 `.jumped(n)`, Philox), not reseed MT.**
+
+## 2026-08-18 — RULE: a wiring gate must ask whether the payload is READ, not whether a payload is PASSED
+
+**Lane `football-model-owner`. Caught by measurement, one step before it would
+have been published as a clean result.**
+
+Building smartsim2's input checklist, level 0 asked the obvious question of every
+`SmartSim2SimulationInput(...)` construction site: *does it pass a
+`feature_generation_payload`?* Five sites said no. One said **yes** —
+`smartsim2/calibration/baseline_audit.py:287` — and the gate reported it **wired**.
+
+Its payload is `{game_id, season, week, market_total, market_spread_home}`.
+**The engine reads none of them.** `drive_priors._extract_block` looks for a
+NESTED block named `market_features` / `market` / `betting`; a flat
+`market_total` sitting beside it is invisible. The payload is passed, and it is
+inert.
+
+### Why this is the dangerous direction of error
+
+The gate exists to catch a payload that never arrives. But the **likely shape of
+a careless fix** is not "forgot to pass it" — it is "passed something plausible
+that the consumer does not read." A presence check is blind to exactly the
+half-fix it will be used to sign off. It would have gone from FAIL to PASS while
+the engine still ran on its neutral defaults, and the PASS would have been
+*produced by the gate itself*, which is worse than no gate.
+
+This is `presence is not reachability` applied to an instrument rather than to a
+deploy. The same rule that says "a deployed fix can be inert" says "a passed
+argument can be inert", and the check has to reach the same depth as the claim.
+
+**RULE:** a gate asserting that X reaches Y must compare X's own CONTENT against
+what Y actually reads — structurally, from Y's call sites. `passed is not None`
+is not a wiring check. Where content is not statically knowable, report
+**unknown**; never let unknown render as wired.
+
+Encoded: `scripts/football_sim_input_checklist.py::_constructor_kwargs` returns
+the payload's literal keys, and level 0 emits `NO PAYLOAD` / `INERT PAYLOAD` /
+`WIRED (n blocks)` / `payload (keys not static)` as four distinct verdicts.
+
+### The sibling error the same session made, same shape
+
+Level 2's first run reported **"0.0% populated"** on all nine blocks. That is
+indistinguishable from a total data outage and was a **broken instrument**:
+`season=None` let the loader fall back to a **1-game** degenerate context. The
+real load is **272 games** with `team_metrics` carrying **28 keys**, and three
+blocks are **100% fed**. A one-game denominator is not a rate.
+
+Encoded as `MIN_GAMES_FOR_A_RATE = 8` → reports **UNMEASURED**, never 0%.
+
+**Both errors are the same failure:** a reading that LOOKS like the finding you
+went in expecting. The empty payload was real, so "everything reads 0%" felt
+like confirmation, and "one site is wired" felt like a reasonable exception.
+**A result that agrees with your hypothesis still has to survive the question of
+what would make the instrument produce it spuriously.**
+
+## 2026-08-18 — RULE: a zero from a LOCAL checkout is a statement about the mirror, never about production. I filed one as a defect
+
+**Lane `football-model-owner`. Caught by the repo's own rule, one step after I
+had already written the wrong claim into `todo.md` and a reference doc.**
+
+`FootballSimulationAdapter(sport="ncaaf").load_features(...)` returned **0 games**
+locally, on both 2025 and 2026, week 1. I recorded that as `#458`: *"NCAAF's
+feature loader returns ZERO games"* — phrased as a production defect, with the
+season opener eleven days out.
+
+`GET /ncaaf/api/cards?week=1` on production serves **16 games**, all of them real
+games on the CFBD 2026 wk1 slate. **The loader is fine. My checkout is empty.**
+
+CLAUDE.md says this in as many words — *"Don't diagnose 'missing data' from the
+local checkout — check production first"* — and I had read it that same session,
+in the same session that also re-derived the `data/**` lossy-mirror rule for the
+football artifact tree. Knowing the rule did not stop me applying it late.
+
+### Why it slipped through, which is the transferable part
+
+The local zero **agreed with a finding I had already confirmed by other means.**
+NCAAF genuinely does produce no model output — every one of those 16 served games
+carries an all-null `predictions` block. So "NCAAF returns nothing" was TRUE at
+the level I cared about, and a second reading that also said "nothing" read as
+corroboration rather than as a different measurement of a different thing.
+
+**Two true statements about different subjects, collapsed into one wrong one:**
+- *production serves NCAAF games with no model attached* — true, and the real bug
+- *my checkout has no NCAAF game data* — true, and completely uninteresting
+
+The wrong version named the wrong subsystem. The remedies are opposite: one is a
+missing env var on refresh-worker, the other is `git`-mirror coverage on my
+laptop. **A correct-sounding conclusion assembled from two correct observations
+is the hardest kind to catch, because every input checks out.**
+
+**RULE:** before any claim of the form "X produces nothing", state which
+SUBSTRATE was read — served payload, worker disk, or local checkout — and say so
+in the claim itself. A claim that does not name its substrate is not yet a claim.
+Where the substrate is the local checkout, it can only support a statement about
+the checkout.
+
+Encoded: `scripts/football_sim_input_checklist.py` level 2 now emits
+*"loader returned N games FROM THIS CHECKOUT ... `data/**` is a lossy mirror --
+this says nothing about production. Check the served board: GET
+/<sport>/api/cards?week=N"* instead of a bare count.
+
+**Related and already in this file:** *a rate, not a count* and *instrument
+blindness*. This is their sibling — **an instrument pointed at the wrong
+substrate**, which reads perfectly and answers a question nobody asked.
+
+
+## 2026-08-18 — RULE: a guard that gates on IDENTITY fails to a total block when the identity holder disappears. Gate on STATE
+
+**The failure.** `deploy-guard.py` allowed a deploy when
+`session_id in .syndicate/coordinator.id`. The coordinator was a session. The
+session was archived. From that moment the allow-branch was **unreachable**, and
+the guard blocked every deploy from every session — while presenting itself as a
+routing rule ("file a request, carry on"). Two requests sat in
+`deploy/requests/`, `deploy/grants/` was empty, and an 11-day clock ran on the
+NCAAF opener. Nobody had disabled anything; the predicate simply stopped having
+a true value.
+
+**Why it is worth a rule.** This is not "the coordinator was a bad idea". The
+role's own defences were well built and each fixed a real bug — the register was
+a LIST because a resume reassigns the id, and that fix worked. It still died,
+because every defence protected against the id CHANGING and none against the
+holder CEASING TO EXIST. A liveness assumption that is never stated is never
+tested.
+
+**The tell, generalised:** ask of any guard, *what makes the allow-branch
+reachable, and who has to be alive for that to be true?* If the answer names a
+process, a session, or a person, the guard has an outage mode that looks exactly
+like enforcement. Identity predicates have this shape. State predicates do not:
+a file on disk with an expiry is readable by anyone, at any time, and frees
+itself when its writer dies.
+
+**What replaced it,** as the worked example: an unexpired `deploy_claim`
+(`O_CREAT|O_EXCL`, 45-min TTL, `--force` to break a dead holder's) plus a
+`deploy_preflight` receipt reading `CLEAR` within 15 min. Same invariant, no
+liveness assumption.
+
+**Three sub-rules that fell out of the rewrite, each its own near-miss:**
+
+- **A guard must not match its own subject matter as a substring.** The old
+  pattern was the bare string of the entrypoint's filename, so it refused
+  `sed -n '1,22p'` on that file — and refused the heredoc that would have fixed
+  it, because the replacement text quotes the name. A guard that blocks reading
+  and editing itself cannot be repaired from inside the system it guards. Match
+  INVOCATION (a runner token in the same command segment), never mention.
+- **Aliases split a lock in two.** `deploy_claim.py` accepts both `web` and
+  `syndicate` for one service. Two sessions claiming different aliases would each
+  read as "unclaimed by a peer" and both proceed — the exact collision the lock
+  exists to prevent. Every lookup must scan the whole alias set.
+- **When several receipts could answer, take the NEWEST, not the best.** Scanning
+  aliases for "any receipt that says CLEAR" lets a stale CLEAR outvote a fresh
+  HOLD. Select by timestamp first, judge second. Same reason
+  `deploy_preflight.py` now writes a receipt on EVERY verdict and not only on
+  CLEAR: a HOLD must actively REVOKE the CLEAR before it, or the guard reads a
+  world that has already changed.
+
+**Related and already in this file:** *unknown must not default permissive* —
+this is its inverse and its equal, **a guard whose unknown defaults to BLOCKING
+EVERYTHING**. Both come from not asking what the predicate does when its inputs
+go missing.

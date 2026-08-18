@@ -1,4 +1,32 @@
-# The coordinator session — role, contract, and limits
+# The coordinator session — RETIRED 2026-08-18. HISTORY ONLY.
+
+> **THIS ROLE NO LONGER EXISTS. Do not file deploy requests. Do not wait for a
+> grant. Nothing below is a live instruction.**
+>
+> **Current contract:** `CLAUDE.md` → "Before any deploy". Deploys are self-serve
+> behind two locks — `scripts/deploy_claim.py acquire` and a `CLEAR`
+> `scripts/deploy_preflight.py` under 15 minutes old — enforced by
+> `.claude/hooks/deploy-guard.py`.
+>
+> **Why it was retired** `[2026-08-18, user decision: "there is no coordinator
+> anymore - it wasnt working"]`. The role was one session, and a session can be
+> archived. That is what happened: the register held three ids across two
+> resumes, the last holder was found ARCHIVED with two deploy requests queued
+> into it, `deploy/grants/` was empty, and the guard gated on
+> `session_id in coordinator.id` — a predicate with no true value once no
+> coordinator existed. The guard stopped throttling deploys and started blocking
+> all of them, silently, while an 11-day clock ran on the NCAAF opener.
+>
+> The mechanism it wrapped was already better than it: `deploy_claim.py` is an
+> atomic `O_CREAT|O_EXCL` mutex with a 45-minute expiry, so a dead holder frees
+> itself instead of wedging a service. Its own docstring had made the argument
+> against this role from the start — *"Coordination by MESSAGE cannot fix
+> either: a cross-session message waits for the target's current turn to end,
+> while firing a deploy takes seconds."*
+>
+> **Kept, not deleted,** because `lanes.md`, `deploys.md` and `learnings.md` all
+> cite this file, and a dangling reference reads as a lost document rather than
+> a closed decision. Read it as a record of what was tried.
 
 **Established 2026-08-17 by user decision.** One long-lived session owns
 deployments, documentation upkeep, and cross-session organisation for Syndicate.

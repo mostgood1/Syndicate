@@ -30,3 +30,17 @@ Answer every question. A missing answer is a FAIL, not a shrug.
 7. **Verdict.** PASS or FAIL. On PASS, append the pending row to
    `.syndicate/deploys.md` with the measurement column left empty and a
    reminder timestamp. On FAIL, list the shortest path to PASS.
+
+8. **Take the locks.** This checklist is the REASONING gate; it is not the
+   mechanical one, and passing it deploys nothing. `deploy-guard.py` wants two
+   readings that outlive this session:
+
+   ```bash
+   python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
+   python scripts/deploy_preflight.py --service <svc> --holder <lane>
+   ```
+
+   The claim answers "is this service mine"; the preflight answers "is anything
+   in flight right now", and its CLEAR expires in 15 minutes — so run it LAST,
+   immediately before deploying, not at the top of the checklist. Release the
+   claim once the measurement is written.
