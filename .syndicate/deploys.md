@@ -13374,3 +13374,35 @@ would then show projections the stored artifact does not have.
 commit its author was thinking about, not the set the deploy needs. Cherry-pick
 onto the ACTUAL live SHA and run the tests there. `main` passing proves nothing
 about a service whose lineage diverged.
+
+### ADDENDUM — the requesting session ARCHIVED mid-triage, and `f16214fe` is deliberately excluded `[2026-08-18 ~00:3xZ]`
+
+**The Soccer session archived while this was being triaged.** `send_message`
+refuses delivery, so the two confirmations asked for cannot be answered by their
+author. The request stands on its own terms; the lane is now ownerless.
+
+**`f16214fe` (the `edge_vs_modelled_fair_pct` column) is NOT in the built
+targets, and that is a decision rather than an oversight.** The request says the
+sha "also carries `f16214fe`", which is true of the BRANCH — it is an ancestor of
+`b4d82364` on `main`. It is not true of a CHERRY-PICK, which takes one commit's
+diff and none of its ancestors. Confirmed: `merge-base --is-ancestor f16214fe
+b4d82364` = yes; `... f16214fe 678e2f25` = no.
+
+Excluded on purpose, three reasons:
+1. **It is a different lane's work** — `modelled-fair-edge` owns
+   `book_margin_model.py`, `prop_projections.py`, `soccer_projections.py`. That
+   lane has filed no deploy request, and shipping another lane's feature on a
+   third party's say-so is exactly what this role exists to prevent.
+2. Its own tests (`tests/test_modelled_fair_edge.py`) were not run on either
+   deploy base. Only the projection-window tests were, 13/13.
+3. It is additive to the served payload. Additive is not free when nobody has
+   asked for it to appear.
+
+**Available on request:** if `modelled-fair-edge` wants it live, it is one more
+cherry-pick onto the same bases and its tests run there first.
+
+**Standing position on the projection-window deploy itself:** targets built,
+pushed and tested (`678e2f25` web / `455df34a` refresh-worker); HELD for a
+refresh-worker window; web must not go alone. With the requester gone, the
+"wait for a window you want" instruction is the last word it left, and it is
+being honoured.
