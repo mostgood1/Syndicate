@@ -1,12 +1,10 @@
 {
   "sport": "soccer",
-  "last_updated": "2026-07-21T14:09:07-05:00",
-  "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
-  ],
-  "status": "complete",
+  "last_updated": "2026-08-16T14:12:41-05:00",
+  "artifact_paths": [],
+  "status": "failed",
   "metadata": {
-    "date": "2026-07-21",
+    "date": "2026-08-05",
     "phase": "pregame",
     "execution_mode": "source",
     "refresh_mode": "full",
@@ -28,21 +26,21 @@
         "simulation_detail"
       ]
     },
-    "required_artifact_failures": [],
+    "required_artifact_failures": [
+      "soccer required artifact failure"
+    ],
     "optional_artifact_failures": [],
-    "ok": true,
-    "post_refresh_ok": null,
-    "mirror_ok": true,
+    "ok": false,
+    "post_refresh_ok": true,
+    "mirror_ok": null,
     "odds_control_plane": {
       "source_precedence": [
         "shared_history",
         "artifact_history",
         "tracking_history"
       ],
-      "artifact_paths": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
-      ],
-      "has_post_refresh": false
+      "artifact_paths": [],
+      "has_post_refresh": true
     }
   }
 }

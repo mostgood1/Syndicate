@@ -98,7 +98,16 @@ STEP 4 — ESCALATE only on this condition: if `WORST container (any sample)` is
 IMPORTANT INTERPRETATION LIMITS — do not overstate:
 - `container_memory_mb` is cgroup `memory.current`, which INCLUDES page cache. A high value is NOT by itself a leak or an imminent OOM. Split anon vs inactive_file before calling it either. This mistake has been made in this repo before.
 - **At-cap is not a kill.** Measured 2026-08-16: a 5-hour window with `WORST container = 4096.0 MB` contained **zero** OOM events. Reclaim succeeding at the cap is exactly what page cache looks like. Never report an at-cap reading as if a kill happened.
-- Never conclude "no OOM occurred" from a log search. Kills are EVENTS and appear in Render's events API, not in logs. The read-only tool for that is `py -3 scripts/render_events.py --service refresh-worker --failures-only --since <ISO>`; running it to state whether a kill did or did not occur in your covered window is in scope and does not make this a diagnosis.
+- Never conclude "no OOM occurred" from a log search. Kills are EVENTS and appear in Render's events API, not in logs. The read-only tool for that is `scripts/render_events.py`; running it to state whether a kill did or did not occur in your covered window is in scope and does not make this a diagnosis. **Bound it to the window you actually measured** — pass both stamps from the `COVERED` line `watch_branch_overlap.py` just printed, not a bare `--since` that runs to now:
+
+  ```bash
+  py -3 scripts/render_events.py --service refresh-worker --failures-only --since <COVERED-start-ISO> --end <COVERED-end-ISO>
+  ```
+
+  **Judge its coverage by the `READ` line, NEVER by the `EVENTS` line.** The script prints them separately for exactly this reason. `READ` is the window it paged; `EVENTS` is the span of the events it FOUND. A quiet window reads whole and still spans minutes, so a narrow `EVENTS` span is not a short read. On **2026-08-17** a full 5-hour read that found a single 4-event deploy cycle printed a span of `14:33..14:39`, was reported as "the API only gave me 6 minutes", and a correct all-clear was retracted as "unmeasured for the rest of the window". If `READ` matches what you requested and the output says `CLEAN`, that is a real all-clear for the whole window — say so plainly, without hedging it back into an unknown.
+
+  Note that `COVERED` means different things in the two tools: in `watch_branch_overlap.py` it IS the read window (STEP 3), in `render_events.py` the read window is `READ`. Do not carry one reading across to the other.
+- A deploy cycle inside your window is worth reporting even though it is not a failure. A deploy reboots the worker, so samples after `deploy_ended` start from a fresh memory floor — a lower worst-MB in that hour is boot-confounded, not evidence that pressure eased. `--failures-only` hides deploys; re-run without it to see them.
 - There is a separate open work lane `refresh-worker-oom-recurrence` owned by another session that owns diagnosing refresh-worker memory. This task MEASURES; it does not diagnose and must not change any code or config.
 
 DO NOT: deploy anything, edit any file other than the appended `reports/branch_overlap/baseline.jsonl`, or open/close any work lane.

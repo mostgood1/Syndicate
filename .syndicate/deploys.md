@@ -13666,3 +13666,237 @@ cache reading.
 scales with slate size. The autorun arms on boot, so a genuine OOM would produce
 a CRASHLOOP rather than one kill — the watcher stays armed across cycles, not
 one window.
+
+## 2026-08-18 — STALE BVP CACHE DELETED. Checklist gains `--simulate-rebuild`. **FAIL: 26 -> 5.**
+
+Lane `convergence-phase7-crps`. Local only, no deploy.
+
+**Deleted 1,282 empty BVP cache files.** The namespace has repopulated from the
+raw corpus.
+
+### The checklist had a real limitation, now fixed
+
+A plain run audits **stored artifacts**, so it can only ever see what was
+SERIALISED — i.e. history. Archived rosters were written before any current
+wiring existed, so it reported **26 forever** and could not validate a fix.
+
+`--simulate-rebuild` applies the build-time appliers before auditing, so it
+reports **what a rebuild would produce**. It must call BVP separately because
+`daily_update.py:7564` applies it, not `build_roster` — the trap already
+documented in the provenance table.
+
+    plain run          26 failures   (pre-wiring history)
+    --simulate-rebuild  5 failures   (what a rebuild produces)
+
+### A checklist that flags CORRECT behaviour as failure gets ignored
+
+The first `--simulate-rebuild` run reported **9**, of which **4 were BVP at
+13.9%** — flagged only because that is under the 20% sparse floor.
+
+**13.9% is the correct answer, not a defect.** A batter only has history against
+starters he has actually faced; 100% is impossible. The five `vs_pitcher_*`
+fields are now documented in `EXPECTED_SPARSE` with that reason.
+
+**But sparsity is not immunity:** a field at exactly 0.0% still FAILS even when
+expected-sparse. *"Sometimes absent"* and *"never present"* are different claims,
+and only the second is a wiring defect.
+
+### FINAL STATE — 5 genuinely unfed, all with known causes
+
+    batter   statcast_quality_mult    no producer anywhere in the repo
+    batter   vs_pitch_type            artifact is PITCHER-side only
+    batter   vs_pitch_type_hr         same
+    pitcher  pitch_type_hr_mult       PitcherPitchSplits has no hr_mult
+    pitcher  statcast_quality_mult    no producer anywhere in the repo
+
+**Gate still exits 1**, correctly — five consumed fields remain unfed and the
+checklist should keep failing until they are fed or explicitly excused.
+
+**Nothing here is deployed.** The 5 are the honest remaining surface; the earlier
+26 was the pre-wiring state and should not be quoted as current.
+
+## 2026-08-18 — **THE ARSENAL LEADERBOARDS SUPERSEDE MY PITCH-SPLITS PIPELINE**, and can fill 3 of the 5 remaining fields
+
+Lane `convergence-phase7-crps`. Asked: should we be pulling THOSE statcast data
+points instead? **Yes, decisively** — and it obsoletes work I did an hour earlier.
+
+### The definitions, recovered from code first
+
+`statcast_quality_mult` is documented on both models as *"quality multipliers …
+Keys: k, bb, hr, inplay"*. **That comment is STALE and describes the OUTPUT.**
+`_statcast_shape_rate_mults` (`simulate.py:163`) actually consumes **10 raw
+metrics**:
+
+    chase_swing_rate (league ref 0.30)   zone_rate (0.49)   csw_rate (0.275)
+    contact_rate (0.74)   xwoba   ev_mean   ev_max
+    pulled_air_rate   pitch_velo_mean   pitch_extension_mean
+
+and DERIVES k/bb/hr/inplay/pitch_count/xb from them via `_rate_ratio_mult`.
+**The field holds inputs; the comment describes returns.** A third consumer
+(`:1400`) reads `quality.get("hr")` directly, which agrees with neither.
+
+### The better source, verified
+
+`statcast_pitcher_arsenal_stats(2026)` and `statcast_batter_pitch_arsenal(2026)`:
+
+    pitcher   1,673 rows   551 distinct pitchers
+    batter    1,999 rows   450 distinct batters
+    columns   pitch_type, pitch_usage, whiff_percent, k_percent,
+              ba, slg, est_ba, est_slg, woba, pa
+    join      player_id IS mlbam_id -- 301 of our 305 overlap
+
+| | my pitch-splits pipeline | arsenal leaderboards |
+|---|---|---|
+| network calls | **309** per-pitcher, ~80 min | **1 each** |
+| pitchers | 305 | **551** |
+| batters | **0** (pitcher-side only) | **450** |
+| metrics | whiff, inplay | whiff%, k%, ba, slg, est_slg, woba, usage |
+| fields fillable | 2 | **5** |
+
+### What this closes
+
+- **`pitcher.pitch_type_hr_mult`** — I declared this *"not fixable from this
+  source"*. True of `PitcherPitchSplits`; **false of Statcast.** `slg` / `est_slg`
+  BY PITCH TYPE is exactly the power-allowed signal that field wants.
+- **`batter.vs_pitch_type`** and **`vs_pitch_type_hr`** — I said *"no source
+  built"*. The batter arsenal leaderboard IS that source, and it already exists.
+- Plus a **better** source for the two pitch-type fields already filled.
+
+**Remaining after that: only `statcast_quality_mult` x2**, whose 10 metrics are
+obtainable from `statcast_batter_percentile_ranks` / `expected_stats` (xwoba) /
+`exitvelo_barrels` (**ev_mean, ev_max — already in my batted-ball artifact**).
+
+### The honest assessment of my own work
+
+I built a 309-call, ~80-minute per-pitcher pipeline **without checking whether a
+single-call leaderboard covered the same ground.** It does, with more metrics,
+more players, and both sides of the matchup. The pitch-splits artifact is not
+wrong — it works and is wired — but it is **the inferior source**, and I reached
+for the tool that was already in the repo (`fetch_pitcher_pitch_splits_x64.py`)
+instead of asking what the data provider offers.
+
+**Rule this earns: before building a fetch pipeline, enumerate the provider's
+leaderboard endpoints.** A per-entity loop is the expensive answer to a question
+the provider usually answers in one call.
+
+## 2026-08-18 — ARSENAL ARTIFACT BUILT AND WIRED. **FAIL 26 -> 2**, and the two survivors are a DEFINITION problem, not a data problem.
+
+Lane `convergence-phase7-crps`. 27 tests pass. No deploy.
+
+### Built
+
+`scripts/build_mlb_arsenal_artifact.py` — **two leaderboard calls** replacing a
+309-call, ~80-minute per-pitcher pipeline:
+
+    pitcher rows 1,673 -> 466 pitchers published (85 skipped: single pitch type)
+    batter  rows 1,999 -> 384 batters  published (66 skipped)
+
+`sim_engine/data/arsenal.py` wired into `build_roster` at three sites (starter,
+bullpen, batter). **Applied AFTER pitch splits so it wins where both have data**;
+the older path is kept as a fallback for pitchers the leaderboard drops.
+
+### THE NORMALISATION IS THE LOAD-BEARING CHOICE, and it is NOT against the league
+
+Each multiplier is normalised against **that player's own usage-weighted mean**,
+so his multipliers average ~1.0 across his arsenal. Normalising against the
+league would encode the pitcher's OVERALL quality into every pitch multiplier —
+and `k_rate`/`hr_rate` already carry that level. That is double-counting, i.e.
+exactly the calibration-absorption failure measured 2026-08-17 (interaction
+−0.00331, negative in 4 of 4).
+
+**So these multipliers are LEVEL-NEUTRAL by construction** and say only "this
+pitch is better or worse than this player's average pitch" — the one thing the
+summary rates cannot express. `est_ba`/`est_slg` are preferred over `ba`/`slg`
+because expected stats strip defence and park from the observation.
+
+Sanity of the output: sample pitcher FF `whiff_mult` 0.65, FS 1.459 — a splitter
+misses more bats than a fastball. Correct sign, correct magnitude.
+
+### RESULT
+
+    26 -> 20 -> 15 -> 10 -> 5 -> **2**
+
+    pitcher whiff_mult     642/717  (89.5%)
+    pitcher hr_mult        642/717  (89.5%)   <- I declared this "NOT FIXABLE"
+    batter  vs_pitch_type  858/1047 (81.9%)   <- I declared this "NO SOURCE"
+
+Both of those verdicts were wrong, and wrong the same way: **true of the source I
+happened to be holding, false of the data provider.**
+
+### THE REMAINING 2 ARE NOT A DATA PROBLEM
+
+`batter.statcast_quality_mult` and `pitcher.statcast_quality_mult` are the ONLY
+consumed-but-unfed fields left, and the blocker is **definitional**:
+
+- `models.py:262/332` documents them as *"quality multipliers … Keys: k, bb, hr,
+  inplay"*.
+- `_statcast_shape_rate_mults` (`simulate.py:163`) actually reads **ten raw
+  metrics** — `chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`,
+  `xwoba`, `ev_mean`, `ev_max`, `pulled_air_rate`, `pitch_velo_mean`,
+  `pitch_extension_mean` — and DERIVES k/bb/hr/inplay from them.
+- A third consumer (`:1400`) reads `quality.get("hr")` directly, agreeing with
+  neither.
+
+**Three parts of the codebase disagree about what this field contains.** Feeding
+it before that is settled would satisfy the checklist and mean nothing.
+
+**Sources exist for the ten** (`statcast_batter_percentile_ranks`,
+`expected_stats` for xwoba, `exitvelo_barrels` for ev_mean/ev_max — the last
+already in the batted-ball artifact). **The work is deciding the contract, not
+finding the data.**
+
+## 2026-08-18 — `statcast_quality_mult` CONTRACT SETTLED AND FED. **Checklist PASSES: 26 -> 0.**
+
+Lane `convergence-phase7-crps`. No deploy.
+
+### The contract was never contradictory — it was UNDER-DOCUMENTED
+
+Three consumers looked like they disagreed. Reading all three: the field is a
+**UNION bag, partial by design**. Every read is guarded with `isinstance`, and
+**`_rate_ratio_mult` returns 1.0 for a missing or non-numeric value** (verified
+at `simulate.py:152-160` before relying on it). So a subset is legal.
+
+- `_statcast_shape_rate_mults` reads the **RAW** metrics, derives k/bb/hr/inplay.
+- The lookahead term reads **BOTH** raw metrics and derived multipliers.
+- The old `models.py` comment listed only k/bb/hr/inplay — it described the
+  **derived OUTPUT**, which is why a producer for it could never be found.
+
+**Settled and documented on both profiles**, including the rule that matters:
+**feed RAW metrics only.** Supplying k/bb/hr/inplay alongside would let the
+lookahead add pressure from a value the shape function separately applies —
+double-counting, the 2026-08-17 failure.
+
+### I ALMOST FED GARBAGE, AND THE CHECKLIST WOULD HAVE GONE GREEN
+
+The first producer used `statcast_batter_percentile_ranks`. It returns
+**PERCENTILE RANKS (1.0-100.0), not metric values** — the name says so:
+
+    xwoba 1.0     ev_mean 26.0     ev_max 67.0        <- percentiles
+    xwoba 0.319   ev_mean 89.9     ev_max 111.9       <- real values
+
+Percentiles fed into `_rate_ratio_mult(value, neutral=0.30, ...)` compare a rank
+to a rate. **No error, no warning — and the checklist would have PASSED**, because
+the field would have been populated. Populated with nonsense.
+
+**Caught by checking the VALUE RANGE**, and the range guard now lives on BOTH
+sides: the producer validates before writing, and `quality.py` **drops**
+out-of-range values on read rather than clamping — a value outside its physical
+range means the producer fed the wrong quantity, and rescaling would hide that.
+
+**This is the sharpest lesson of the whole exercise: a population checklist
+proves a field is FED, not that it is fed something MEANINGFUL.** The two checks
+are independent and both are required.
+
+### Result
+
+    26 -> 20 -> 15 -> 10 -> 5 -> 2 -> **0**    gate exit 0, PASS
+
+Sources: `expected_stats.est_woba` (xwoba), `exitvelo_barrels.avg/max_hit_speed`
+(ev_mean, ev_max). **Seven keys remain deliberately ABSENT** —
+`chase_swing_rate`, `zone_rate`, `csw_rate`, `contact_rate`, `pulled_air_rate`,
+`pitch_velo_mean`, `pitch_extension_mean`. Each costs exactly one neutral term;
+fabricating one would cost correctness.
+
+**PASS means every consumed field is fed. It does NOT mean the engine is good** —
+the market still wins all four prop markets, and that number is unchanged by any
+of this plumbing.

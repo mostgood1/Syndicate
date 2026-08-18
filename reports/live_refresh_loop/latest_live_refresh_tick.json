@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-08-05T02:31:21Z",
+  "startedAt": "2026-08-18T00:42:02Z",
   "date": "2026-07-19",
   "phase": "live",
   "adaptive": false,
@@ -9,22 +9,33 @@
   "mode": "fast",
   "simRerunTriggered": false,
   "skipMirror": true,
-  "sports": "mlb,wnba",
+  "sports": "wnba",
   "mlbStatcastRefresh": {
     "launched": false,
     "reason": "disabled"
   },
+  "oddsRefreshMemoryHeadroom": {
+    "current_mb": 1900.0,
+    "max_mb": 2048.0,
+    "headroom_mb": 148.0,
+    "min_required_mb": 1800.0,
+    "sufficient": false
+  },
   "oddsRefreshWnbaSkipped": {
     "reason": "mlb_daily_sim_still_running",
-    "headroom": null,
-    "skippedForSeconds": 99999.0,
+    "headroom": {
+      "current_mb": 1900.0,
+      "max_mb": 2048.0,
+      "headroom_mb": 148.0,
+      "min_required_mb": 1800.0,
+      "sufficient": false
+    },
+    "skippedForSeconds": 0.10610103607177734,
     "starvationOverrideEnabled": false,
     "forcedThrough": false
   },
-  "ok": true,
-  "result": {
-    "ok": true,
-    "pid": 4242
-  },
-  "finishedAt": "2026-08-04T21:31:22-05:00"
+  "ok": false,
+  "skipped": true,
+  "error": "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)",
+  "finishedAt": "2026-08-17T19:42:02-05:00"
 }

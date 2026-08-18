@@ -89,6 +89,99 @@ def mean_crps(pairs: Iterable[tuple[Any, Any, Any]]) -> dict[str, Any]:
     return {"mean_crps": sum(scores) / len(scores), "sample_size": len(scores)}
 
 
+def distribution_moments(distribution: Mapping[Any, Any]) -> dict[str, Any]:
+    """Mean/sigma/draw-count of a `{value: count}` empirical PMF.
+
+    The MLB sim persists exactly this shape (`so_dist`, `total_runs_dist`,
+    `run_margin_dist`, ...): integer-keyed counts summing to the sim's draw
+    count. `prop_projections._dist_mean` computes the mean of the same shape
+    for the projection layer; this is the scoring layer's version and it also
+    returns the SPREAD, which is the whole reason Phase 7 needs it -- a mean
+    alone cannot tell "centred wrong" from "too confident" apart.
+
+    sigma is the POPULATION standard deviation of the draws (the sim ran
+    `n_draws` simulations and we have all of them), not a sample estimate.
+    """
+    total = 0.0
+    weighted = 0.0
+    pairs: list[tuple[float, float]] = []
+    for raw_value, raw_count in (distribution or {}).items():
+        value = _to_float(raw_value)
+        count = _to_float(raw_count)
+        if value is None or count is None or count <= 0:
+            continue
+        pairs.append((value, count))
+        total += count
+        weighted += value * count
+    if total <= 0:
+        return {"mean": None, "sigma": None, "n_draws": 0, "support_size": 0}
+    mean = weighted / total
+    variance = sum(count * (value - mean) ** 2 for value, count in pairs) / total
+    return {
+        "mean": mean,
+        "sigma": math.sqrt(variance),
+        "n_draws": total,
+        "support_size": len(pairs),
+    }
+
+
+def crps_empirical(actual: Any, distribution: Mapping[Any, Any]) -> float | None:
+    """CRPS against the sim's OWN empirical distribution -- no Normal assumed.
+
+    Why this exists alongside `crps_normal`: `crps_normal` fits a Normal to
+    (mean, sigma) and scores that. For the quantities this repo actually
+    simulates -- strikeouts, earned runs, total runs, run margin -- the true
+    predictive distribution is discrete, bounded below at zero, and skewed, so
+    the Normal is a MODEL of the forecast rather than the forecast itself.
+    `learnings.md` 2026-08-16 (FORBIDDEN: letting a fitted model judge when a
+    model-free measurement is available) applies directly: where the sim's own
+    draws are on hand, THEY are the evidence and the Normal is a hypothesis.
+    `prop_projections._dist_prob_over` already takes this position for
+    probabilities -- "Exact, not a normal approximation".
+
+    Exact, by integrating the definition
+        CRPS(F, y) = integral (F(x) - 1{x >= y})^2 dx
+    over the step function F. The integrand is piecewise constant between
+    consecutive breakpoints (the support points plus y itself), and is
+    identically zero outside their range, so the sum below is the whole
+    integral -- not a discretisation of it.
+    """
+    actual_value = _to_float(actual)
+    if actual_value is None:
+        return None
+
+    weighted: dict[float, float] = {}
+    total = 0.0
+    for raw_value, raw_count in (distribution or {}).items():
+        value = _to_float(raw_value)
+        count = _to_float(raw_count)
+        if value is None or count is None or count <= 0:
+            continue
+        weighted[value] = weighted.get(value, 0.0) + count
+        total += count
+    if total <= 0:
+        return None
+
+    support = sorted(weighted)
+    breakpoints = sorted({*support, actual_value})
+
+    score = 0.0
+    cumulative = 0.0
+    support_index = 0
+    for index in range(len(breakpoints) - 1):
+        left = breakpoints[index]
+        right = breakpoints[index + 1]
+        # Advance the CDF past every support point at or below `left`; F is
+        # right-continuous, so mass exactly at `left` counts on [left, right).
+        while support_index < len(support) and support[support_index] <= left:
+            cumulative += weighted[support[support_index]]
+            support_index += 1
+        cdf = cumulative / total
+        indicator = 1.0 if left >= actual_value else 0.0
+        score += (right - left) * (cdf - indicator) ** 2
+    return score
+
+
 def pinball_loss(actual: Any, predicted_quantile: Any, quantile_level: float) -> float | None:
     """Quantile ("pinball") loss for a single quantile forecast -- the
     scoring rule for predictions expressed as a quantile (e.g. a player
@@ -256,6 +349,8 @@ EXPECTED_DISPERSION_RATIO = math.sqrt(2.0 / math.pi)
 __all__ = [
     "crps_normal",
     "mean_crps",
+    "crps_empirical",
+    "distribution_moments",
     "pinball_loss",
     "brier_score",
     "log_loss",

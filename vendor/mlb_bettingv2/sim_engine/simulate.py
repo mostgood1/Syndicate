@@ -1629,6 +1629,25 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
     starter_early_sample_hook_delta_max = max(0, _ov_i("starter_early_sample_hook_delta_max", 8))
     starter_early_sample_pull_bias_drop = _clamp01(_ov_f("starter_early_sample_pull_bias_drop", 0.04))
     starter_early_sample_short_start_boost = _clamp01(_ov_f("starter_early_sample_short_start_boost", 0.04))
+    # The F5 leash length itself, in innings. Until 2026-08-17 this was readable
+    # ONLY from ManagerProfile.starter_min_innings (hardcoded 5 for all 30 teams,
+    # since data/manager/manager_tendencies.json does not exist and its loader
+    # silently returns {}), which made it the one starter-depth parameter that
+    # could not be swept while every knob below it had been carefully fitted.
+    #
+    # It needed to be sweepable because it sits ABOVE those knobs: inside the
+    # leash window the pitch-count hook is bypassed unless pc >= eff_hook +
+    # starter_leash_pc_buffer, so `starter_hook_add_pitches` and friends cannot
+    # move short starts however they are tuned. Measured 2026-08-17 on 726
+    # production starts: the sim produces starts under 15 outs at 0.104 against
+    # an actual 0.296, and 26.78% of ALL simulated mass sits at exactly 15 outs
+    # -- a point mass on this parameter's boundary.
+    #
+    # Default is the manager profile's own value, so an absent override is a
+    # byte-for-byte no-op. 0 disables the leash entirely (inning <= 0 is never
+    # true); note this is the one input whose meaning changes, since the old
+    # max(1, ...) floor silently promoted 0 to 1.
+    starter_min_innings_eff = max(0, _ov_i("starter_min_innings", int(roster.manager.starter_min_innings)))
     # Starter leash-break controls (only relevant while inning <= starter_min_innings).
     # Defaults preserve the existing behavior (i.e., "always keep" within leash unless blowout).
     starter_leash_pc_buffer = max(0, _ov_i("starter_leash_pc_buffer", 20))
@@ -1734,7 +1753,7 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
 
         eff_hook = max(45, min(120, eff_hook))
 
-        in_leash_window = int(state.inning) <= max(1, int(roster.manager.starter_min_innings))
+        in_leash_window = int(state.inning) <= starter_min_innings_eff
         blowout = abs(int(fielding_diff)) >= int(roster.manager.starter_blowup_run_diff)
         runner_pressure = _runner_pressure(bases)
         third_time = bf >= 18
@@ -2014,8 +2033,121 @@ def _pitcher_profile(roster: TeamRoster, pitcher_id: int):
     return roster.lineup.pitcher
 
 
-def _batter_profile(roster: TeamRoster, batter_index: int):
-    return roster.lineup.batters[batter_index % len(roster.lineup.batters)]
+# ---------------------------------------------------------------------------
+# POSITION-PLAYER SUBSTITUTION  (`#440` P2)
+#
+# The engine had NO substitution model: `bench` appeared exactly once, building
+# a lookup cache. The nine listed starters batted all game, every game, which
+# inflated every batter's opportunity -- measured `ab_mean` +14.6%,
+# `pa_mean` +19.7% over 2,495 lineup player-games -- and every counting prop
+# inherits that, since props are rate x opportunity.
+#
+# Note this is NOT the pitching hook (`starter_min_innings`, handled far above);
+# it is position players leaving the lineup.
+#
+# HAZARD, fitted from 618 `feed_live` games / 10,728 starter-innings
+# (`scripts/build_mlb_manager_tendencies.py`, data in
+# `reports/phase7/mlb_removal_hazards.json`):
+#
+#     P(removed this inning | still in) = inning_hazard[inning]
+#                                       x slot_multiplier[slot]
+#                                       x team_multiplier
+#
+# Removals are concentrated in innings 6-9 and essentially absent before the
+# 5th. That SHAPE is the whole reason this exists: a flat opportunity haircut
+# spreads the same mass uniformly across nine innings, which is why the
+# haircut's returns collapsed (+0.0057 -> +0.0028 -> +0.0016 Brier).
+#
+# The margin term from that fit is DELIBERATELY OMITTED. Exposure by score band
+# is not observable -- a starter's band is known only at exit -- so it is a
+# normalised share rather than a hazard, and its direction disagreed with an
+# independent event count. Adding an unresolved term to a live model would be
+# guessing with extra steps.
+_SUB_INNING_HAZARD: dict[int, float] = {
+    1: 0.00028, 2: 0.00093, 3: 0.00233, 4: 0.00234, 5: 0.00525,
+    6: 0.01989, 7: 0.04183, 8: 0.05089, 9: 0.04632,
+}
+_SUB_SLOT_MULTIPLIER: dict[int, float] = {
+    1: 0.71, 2: 0.73, 3: 0.70, 4: 0.82, 5: 0.92, 6: 0.97, 7: 1.21, 8: 1.40, 9: 1.55,
+}
+
+
+def _position_subs_enabled(cfg: Any) -> bool:
+    """Dark-launched OFF, matching every other behaviour change in this file.
+
+    `getattr` rather than a new dataclass field so an old `GameConfig` -- including
+    every pickled or replayed one -- keeps working unchanged.
+    """
+    return bool(getattr(cfg, "position_substitutions", False))
+
+
+def _sub_state(state: Any) -> dict:
+    """Per-GAME substitution map: (team_id, slot) -> replacement profile.
+
+    ON THE STATE, NEVER ON THE ROSTER. `TeamRoster` objects are reused across
+    every simulation of a slate and cache `_batter_by_id` on themselves, so
+    mutating `lineup.batters` would leak substitutions from run N into run N+1
+    and silently corrupt the distribution the sim exists to produce.
+    """
+    subs = getattr(state, "_position_subs", None)
+    if subs is None:
+        subs = {}
+        try:
+            setattr(state, "_position_subs", subs)
+        except Exception:
+            return {}
+    return subs
+
+
+def _roll_position_substitutions(state: Any, roster: TeamRoster, cfg: Any, rng) -> None:
+    """At the top of a half-inning, decide which of THIS team's starters leave."""
+    if not _position_subs_enabled(cfg):
+        return
+    bench = list(getattr(roster.lineup, "bench", None) or [])
+    if not bench:
+        return  # no bench in the artifact -> nothing to substitute with
+    subs = _sub_state(state)
+    try:
+        team_id = int(roster.team.team_id)
+        inning = int(state.inning)
+    except Exception:
+        return
+    hazard = _SUB_INNING_HAZARD.get(min(max(inning, 1), 9), 0.0)
+    if hazard <= 0.0:
+        return
+    team_mult = float(getattr(roster.manager, "position_sub_multiplier", 1.0) or 1.0)
+    n_slots = len(roster.lineup.batters or [])
+    for slot_idx in range(n_slots):
+        key = (team_id, slot_idx)
+        if key in subs:
+            continue  # already replaced; a bench player is not re-rolled
+        p = hazard * _SUB_SLOT_MULTIPLIER.get(slot_idx + 1, 1.0) * team_mult
+        if p <= 0.0 or rng.random() >= p:
+            continue
+        # Pick the bench player not already used. Real selection is by position
+        # and platoon; this takes the next available, which is a KNOWN
+        # simplification -- it models the OPPORTUNITY loss (the measured defect)
+        # and not yet the identity of the replacement.
+        used = {id(v) for v in subs.values()}
+        pick = next((b for b in bench if id(b) not in used), None)
+        if pick is None:
+            return  # bench exhausted
+        subs[key] = pick
+
+
+def _batter_profile(roster: TeamRoster, batter_index: int, state: Any = None):
+    batters = roster.lineup.batters
+    slot_idx = batter_index % len(batters)
+    if state is not None:
+        subs = getattr(state, "_position_subs", None)
+        if subs:
+            try:
+                replacement = subs.get((int(roster.team.team_id), slot_idx))
+            except Exception:
+                replacement = None
+            if replacement is not None:
+                return replacement
+    return batters[slot_idx]
 
 
 def _batter_profile_by_id(roster: TeamRoster, batter_id: int):
@@ -2178,6 +2310,11 @@ def simulate_game(
     def start_half_inning():
         batting = state.batting_roster().team
         fielding = state.fielding_roster().team
+        # `#440` P2: decide this team's position-player removals before anyone
+        # bats. Rolled per half-inning rather than per plate appearance so a
+        # substitution takes effect at an inning boundary, which is when
+        # managers actually make them.
+        _roll_position_substitutions(state, state.batting_roster(), cfg, rng)
         try:
             next_idx = int(state.next_batter_index_by_team.get(int(batting.team_id), 0) or 0)
         except Exception:
@@ -2337,7 +2474,7 @@ def simulate_game(
         fielding_roster = state.fielding_roster()
         half = state.half
 
-        batter_prof = _batter_profile(batting_roster, half.next_batter_index)
+        batter_prof = _batter_profile(batting_roster, half.next_batter_index, state)
         prev_pitcher_id = state.current_pitcher_by_team.get(fielding_roster.team.team_id)
 
         mp = str(getattr(cfg, "manager_pitching", "legacy") or "legacy").lower()

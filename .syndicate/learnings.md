@@ -4527,3 +4527,263 @@ is **gitignored and inside Render's ephemeral checkout**. So even a correct loca
 fill could never reach production — *"I populated the cache"* and *"production
 has the data"* are unrelated statements. Check the SHIPPING PATH before
 celebrating a data fix.
+
+## 2026-08-17 — RULE: rank modelling gaps by how much the dimension DISCRIMINATES, not by how complete its machinery is
+
+**What I did.** Researching what the MLB sim was missing, I found pitch-type
+effectiveness fully built — model fields, four consumption sites, a loader, a
+cache, a fetch tool — and **0% populated**. I ranked it "where a market beat is
+most likely" *because everything existed and only needed wiring*, and spent
+**314 network calls and ~2 hours** filling it.
+
+**Result at 98.4% coverage: ~+0.001 mean Brier, 3 of 4 markets, no market beat.**
+The prediction was wrong and is retired.
+
+**What I should have measured first, and later did — in twelve calls:**
+
+    batted ball   barrel rate  p10  3.10%  ->  p90 13.85%     (4.5x spread)
+    defence OAA   outs         p10 -6.0    ->  p90 +7.4       (13.4 outs)
+    pitch splits  -- no spread probe was ever run --
+
+**Both of the dimensions I ranked BELOW pitch-type are ONE CALL EACH** (season
+leaderboards, not per-player) and have large, measured between-player spread. I
+ranked by machinery-completeness; machinery-completeness predicted nothing.
+
+**RULE: before investing in a modelling gap, measure the SPREAD of the input
+across the population it would distinguish.** A dimension where p10 and p90 are
+close cannot move a forecast however elegantly it is wired. A cheap spread probe
+is minutes; the wiring was hours.
+
+**The seductive part, and why this needs to be a rule rather than an
+observation:** "everything is built, it just needs data" feels like the highest
+expected value in the room. It is an argument about COST, and I let it stand in
+for an argument about VALUE. Cheap and worthless is still worthless.
+
+**Corollary:** state what fraction of a feature you actually tested. I populated
+the PITCHER side and `batter.vs_pitch_type` remains 0%, so the matchup
+INTERACTION was never tested — only per-pitcher average effectiveness. The
+negative result stands for what was measured and must not be cited as broader.
+
+## 2026-08-17 — RULE: you cannot add a MECHANISM to a CALIBRATED engine without re-fitting its rates
+
+**Measured, 2x2 factorial, 4 of 4 markets:** adding position-player substitution
+and pitch-type splits to the MLB sim produced a **NEGATIVE interaction, mean
+−0.00331**. On RBIs each feature alone helped (−0.00573, −0.00271) and together
+they gained almost nothing (−0.00046). **On runs, both-on was WORSE than
+neither.**
+
+**Why, and it generalises far beyond these two features.** The engine's
+`k_rate` / `hr_rate` / `inplay_hit_rate` were fitted so the sim's OUTPUT matched
+observed outcomes — using a sim that never substituted anyone and never varied
+effectiveness by pitch type. **Those fitted rates therefore already ABSORB the
+average effect of the missing mechanisms.**
+
+Adding a mechanism back DOUBLE-COUNTS it. Adding two double-counts twice and the
+errors compound. The negative interaction is not a quirk of these two features;
+it is what a calibrated system does to any mechanism you hand it.
+
+**RULE: adding a mechanism to a fitted model is a TWO-PART change — the mechanism
+AND a re-fit of the parameters that were absorbing it.** Shipping half of that is
+worse than shipping neither, and the factorial is how you find out.
+
+**The corollary that reframes a whole day's measurements:** every
+single-feature effect I measured (+0.001 pitch splits, 34.3% of the opportunity
+gap from substitution) was measured AGAINST rates fighting it. **Those are not
+the features' ceilings — they are what survives the calibration.** A small
+measured effect from a mechanism added to a calibrated engine is weak evidence
+that the mechanism is unimportant.
+
+**And it inverts a plan:** batted-ball data had just cleared the predictive gate
+(hard-hit% 1.9x `hr_rate` on future TB) and was the obvious next wiring target.
+It is now the WRONG next step — it would be a third mechanism against the same
+un-refitted rates. **The re-fit is the precondition, not a follow-up.**
+
+## 2026-08-17 — RULE: "the model is absent" needs a FIELD AUDIT, not a name search
+
+**I published a research document stating the MLB sim has "no batted-ball type
+model — no GB/FB/LD". It was wrong.** The model exists and `simulate.py:1120-1136`
+consumes it for both batter and pitcher:
+
+    batter_bb_gb_rate=float(getattr(batter, "bb_gb_rate", 0.44))
+    batter_bb_fb_rate=...0.25   bb_ld_rate=...0.20   bb_pu_rate=...0.11
+
+**All four are 0% populated on 720 batters and 717 pitchers**, so every player
+runs the league-average defaults and a ground-ball specialist is identical to a
+fly-ball slugger.
+
+**How I got it wrong:** I grepped
+`ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate`. The fields are
+prefixed **`bb_`**, so every pattern missed. A negative grep became "the model is
+absent" in a document that then ranked work by that belief.
+
+**RULE: to claim a model is ABSENT, enumerate the fields of its data structures
+and measure their POPULATION — do not search for names you expect.** A name
+search can only prove *your vocabulary* is absent. `dataclasses.fields()` over
+the profile objects took one script and found **18 zero-population fields**,
+including five I had explicitly declared missing.
+
+**Why this matters more than a wording error:** ABSENT and UNFED have opposite
+remedies. Absent means design and build; unfed means populate a field that is
+already consumed. I recommended a modelling project where a data pipeline was
+needed, and then **built the wrong thing on top of it** — a multiplier hack on
+`hr_rate`/`inplay_hit_rate` when the engine had native GB/FB/LD fields waiting.
+
+**Companion to the 2026-08-17 rule about `.get(key, NEUTRAL)` defaults.** That
+one says a populated-looking feature can be inert. This one says an
+absent-looking feature can already exist. **Both are answered by the same
+action: measure the population rate of every field, never reason from a grep.**
+
+## 2026-08-17 — FOUR DEFECTS IN ONE SESSION SHARED ONE SHAPE: THE ERROR PATH RENDERED AS THE SYSTEM'S OWN "NOTHING HERE"
+
+Not "errors were silent" — silence is common and usually harmless. In all four the
+failure output was **byte-identical to a legitimate empty state that the same
+system produces constantly**. That collision is what made each one survive, and in
+three of the four an instrument was actively reporting health while the feature was
+dead.
+
+| # | defect | the failure rendered as | how long it hid |
+|---|---|---|---|
+| 1 | `poll_soccer_live_state.py:75` passed 2 args to a 3-arg `_load_team_ratings` | a league that is **not active today** | as long as the `as_of` change had been in |
+| 2 | soccer's live-lens memory gate returns with no log line | a **builder that never ran** | still true; cost a hypothesis this session |
+| 3 | `test_layer2_soccer_window.py` patched a renamed function under `raising=False` | a **passing test** | since `#435` |
+| 4 | `#379`'s per-date `except: continue` swallowed shard read errors | a sport with **no slate** | since `#379` |
+
+### What each one actually looked like from outside
+
+**1.** `poll_active_leagues_for_tick` caught each league's exception into an
+`errors` dict and continued with no print. That dict reaches only
+`data/live/soccer_live_lens.json`, which is not in the publisher allowlist, so it
+is unreadable from web. Worse, the broken call sat behind `if live_events:` — so
+**only a league WITH a live match could reach it**. Silent on a quiet slate, total
+on a busy one. Three instruments read healthy simultaneously: the tick reported
+`ok: true` (because `validate_live_lens_snapshot` accepts an EMPTY games list),
+seven leagues wrote their files successfully, and no error appeared anywhere.
+
+**2.** MLB and WNBA both `print("[LIVE_LENS_TICK_DIAG] ... reason=low_headroom")`
+when their gate trips. Soccer's returns bare (`live_lens_loop.py:524-530`). WNBA's
+own comment in that same block says "a gate that fires silently cannot be told from
+a builder that never ran" — soccer is the instance that comment describes and does
+not cover. It cost a hypothesis a single log line would have settled.
+
+**3.** `#435` renamed the read to `read_book_quotes_latest`. The test patched
+`read_book_quotes`, which **still exists**, so nothing raised — the patch bound to
+a function nobody calls. `raising=False` is what made it silent: "tolerate absent"
+and "silently bind to nothing after a rename" are the same behaviour. One test kept
+PASSING VACUOUSLY (`assert quote_rows == 0`, trivially true when the read is never
+intercepted).
+
+**4.** The window loop's `except Exception: continue` absorbed the exception that
+used to propagate to the whole-sport handler, which records `{"error": ...}`. A
+sport whose shard raised on every date reported `quote_rows: 0, grid_rows: 0` and
+no error — identical to a sport with no slate.
+
+### THE DISCRIMINATOR WAS A RATIO IN EVERY CASE, AND NOBODY WAS PRINTING IT
+
+Each defect was invisible as an absolute and obvious as a fraction:
+
+    1.  7 leagues written  /  10 active          <- the 3 missing were exactly the 3 live
+    3.  0 interceptions    /  7 expected reads   <- patching the old name vs the new
+    4.  0 quote_rows       /  7 dates asked      <- and were any of them unreadable?
+
+**RULE: a count of successes is not a measurement until it is stated against what
+was attempted.** `#379` already established this for zeros (`window_dates` exists so
+"zero against seven dates" and "zero against one" differ). Extend it: emit the
+denominator for *partial* success too, not only for zero. Seven successes out of
+ten looks like success and is a 30% outage.
+
+### RULE: AN ERROR PATH MUST NOT LAND ON THE SYSTEM'S EXISTING EMPTY STATE
+
+When writing a handler, ask what the caller sees, and whether that is
+distinguishable from the ordinary nothing-to-do case. If it is not, the handler is
+not a handler.
+
+- Recording into a structure nobody can read is not recording (#1, #4). Check the
+  publisher allowlist / the reader's actual reach before counting it as observable.
+- A neighbouring implementation that DOES log is a specification, not a style
+  choice (#2). Diverging from it silently is the defect.
+- In tests, `raising=False` on a monkeypatch is this same anti-pattern: it converts
+  "the thing I am testing moved" into "the test passes" (#3). Default to
+  `raising=True`, and assert the patched name is the one production calls.
+
+### RULE: A GREEN/HEALTHY READING IS EVIDENCE ONLY ONCE YOU KNOW WHAT MAKES IT RED
+
+Already a standing rule (instrument blindness); this session produced four fresh
+instances in one lane, so it is not learned yet. Concretely, all of these were
+compatible with total failure: `ok: true` on a tick, a passing test, `quote_rows: 0`,
+and `(0 live games)`. Before trusting one, name the input that would make it fail —
+and if you cannot, the instrument is not measuring what you think.
+
+**Corollary that decided #1:** compare against a SIBLING measurement rather than a
+threshold. Soccer's tick ran in 1 second where MLB's took 7, doing work that is
+supposed to be 4 Monte Carlo passes per live match. Nothing was out of range; the
+ratio to its neighbour was the tell.
+
+### Fixed this session
+`6bdc50de` (#1, deployed and measured 7 -> 10 leagues/tick), `9e052dfe` (#3, with a
+guard asserting the patched name matches production), `ec8c3beb` (#4, `error` +
+`read_errors` on both branches, including the untested partial-failure branch).
+**#2 is NOT fixed** — soccer's gate still returns silently. One print, at
+`live_lens_loop.py:524-530`, mirroring the two beside it.
+
+## 2026-08-18 — RULE: a cache with a TTL can serve EMPTINESS as authoritative
+
+**Measured:** 1,282 BVP cache files, every one `by_batter: {}`. I concluded twice
+from the file COUNT — first "the data is already collected, it just needs
+mapping", then "it needs a real fetch job". **Both wrong, in opposite
+directions.** Computing fresh returned 117-170 batter entries for 5 of 5
+pitchers.
+
+The raw corpus was present the whole time (39 files, 2026-03-11..07-30). Some
+earlier run cached an EMPTY result — corpus absent or unreachable at that moment
+— and the **30-day TTL has been serving that emptiness as a valid answer ever
+since.** No error, no retry, no staleness signal: a cache hit on `{}` is
+indistinguishable from a cache hit on real data.
+
+**RULE: when a cached value is empty, verify by COMPUTING IT FRESH before
+concluding anything about the source.** An empty cache entry is evidence about
+the moment it was written, not about the data.
+
+**And the specific trap: a TTL turns a transient failure into a persistent one.**
+The longer the TTL, the longer a single bad fetch is indistinguishable from a
+genuine absence — here, 30 days. Caches of *derived* values should record
+whether the input corpus was present when they were written; without that, an
+empty result is unfalsifiable from the outside.
+
+**Companion to the 2026-08-17 field-population rule.** That one says: measure
+whether a MODEL FIELD is fed, never infer from code presence. This says: measure
+whether a CACHE holds data, never infer from file count. Same failure, one layer
+apart — and I made it four times in two days before writing it down.
+
+## 2026-08-18 — RULE: when a claim is corrected TWICE, stop asserting and run it
+
+**I made FOUR wrong calls about BVP in one session, alternating direction:**
+
+1. "already collected, needs only a mapping" — from a **file count**
+2. "needs a real fetch job" — from the **empty files**
+3. "cheap, just invalidate the cache" — right answer, **wrong reasoning**
+4. "invalidation will not help, nothing writes it" — from grepping
+   **`build_roster.py`**, the wrong file
+
+Each was a confident, specific, wrong claim, and each came from a **different
+cheap proxy**: a count, a sample, an assumption, a grep of one file.
+
+**The thing that settled it took one command:** move the cache aside, call the
+applier, count the populated fields. `0 -> 6 of 9`. That was available from the
+first minute.
+
+**RULE: the second time a claim about the same object is corrected, stop
+reasoning about it and EXECUTE it.** A third inference is not more likely to be
+right than the first two — the failure is the method, not the attempt.
+
+**Why this one was so persistent:** the object had FOUR independent failure modes
+(no data / stale cache / no applier / wrong file grepped), and each proxy could
+only see one of them. No single cheap check could have been right. **When an
+object has multiple independent ways to be broken, only running it end-to-end
+distinguishes them.**
+
+**Also learned, and it belongs with this:** `build_roster.py` had no BVP
+reference because BVP is applied one level up in `daily_update.py:7564`. **A
+negative grep in the file you expect proves nothing about a pipeline with three
+application sites.** The provenance table in
+`docs/ai_context/mlb_sim_engine_reference.md` exists so the next person reads
+where things ARE applied instead of guessing where they SHOULD be.

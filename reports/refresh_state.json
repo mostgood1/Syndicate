@@ -55,8 +55,8 @@
       }
     },
     "wnba_artifact_bundle::2026-05-22:1:1": {
-      "inputHash": "d1deb0b7254930f05f18803f49cfe4e83da4f9846d0e14f5dbc14680571895e2",
-      "updatedAt": "2026-08-05T02:32:36-05:00",
+      "inputHash": "8ef4466a8f101c42cd93e57f83948298e58895c84b4e0a5750ad95827d97c847",
+      "updatedAt": "2026-08-17T17:23:08-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -253,20 +253,20 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "6b651b92c283000eeecc4fe291e2b0c1209d48bbfee409c2c5581780ccbb28d2",
-      "updatedAt": "2026-08-03T15:56:12-05:00",
+      "inputHash": "2b68339fef4827c45345759783e63f3ffc4d1b1b019f5be30520da603e3fdf27",
+      "updatedAt": "2026-08-15T03:16:51-05:00",
       "outputs": [
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\current_week.json",
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\real_betting_lines_2026_10_01.json",
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\oddsapi_player_props_2026_wk4.csv"
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpylh1poez\\bundle\\current_week.json",
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpylh1poez\\bundle\\real_betting_lines_2026_10_01.json",
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpylh1poez\\bundle\\oddsapi_player_props_2026_wk4.csv"
       ],
       "metadata": {
-        "artifact_root": "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle"
+        "artifact_root": "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpylh1poez\\bundle"
       }
     },
     "nba_artifact_bundle::2026-05-22:1:1": {
-      "inputHash": "497109f04bc20997c737a42e82a9dc846556df12bdc42b99550027fc88f2de40",
-      "updatedAt": "2026-08-03T16:49:55-05:00",
+      "inputHash": "4510d33766c71d09becef5c7318214147a802a3031e97a3b9be998f665337a7c",
+      "updatedAt": "2026-08-17T00:35:21-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -375,17 +375,17 @@
       }
     },
     "mlb_live_lens:2026-05-22": {
-      "inputHash": "3f10207db9cc78db9e79b76d416c6ca2ffb346e6dca2904f261f1bb9e7ace335",
-      "updatedAt": "2026-08-05T02:07:40-05:00",
+      "inputHash": "39bd0a901ea5b5865ed8f5121ac471e94feb5735c25f50925bd79943bbf7bad0",
+      "updatedAt": "2026-08-16T19:13:31-05:00",
       "outputs": [
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsrz59i2a\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsrz59i2a\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsrz59i2a\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
       ],
       "metadata": {
         "date": "2026-05-22",
         "trigger": "syndicate_refresh",
-        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source"
+        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpsrz59i2a\\source"
       }
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp1_hka7q1\\bundle:2026-05-22:1:1": {
@@ -456,6 +456,318 @@
         "date": "2026-06-29",
         "reused": false,
         "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp9m8ygngq\\bundle"
+      }
+    },
+    "ncaab_odds_current:2026-05-22": {
+      "inputHash": "6be4503f50d2b5665237c1be5fbae5746d04c4bbdf73a998e9867069bf24fee0",
+      "updatedAt": "2026-08-13T02:05:13-05:00",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpkmwn7xd1\\odds_history\\odds_2026-05-22.csv"
+      ],
+      "metadata": {
+        "date": "2026-05-22",
+        "mode": "current",
+        "region": "us",
+        "bookmakers": "",
+        "markets": "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2",
+        "rows": 1
+      }
+    },
+    "ncaaf_artifact_bundle": {
+      "inputHash": "b5d025907434dd813c85c180a75d5171fa535b5933bfd2740e78761b375a70c8",
+      "updatedAt": "2026-08-16T19:36:16-05:00",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpcea9n9qe\\bundle\\college_football_schedule_2025_predicted_totals_enhanced.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpcea9n9qe\\bundle",
+        "season": 2025
+      }
+    },
+    "nhl_artifact_bundle:2026-05-22": {
+      "inputHash": "d6622282c6d9c5278905583324642266a0d6aba25bbb2df4264f8ddc23e27c26",
+      "updatedAt": "2026-08-13T02:05:15-05:00",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\predictions_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\recommendations_sim_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\props_recommendations_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\roster_snapshot_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\lineups_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle\\data\\processed\\starting_goalies_2026-05-22.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp679w_vpd\\bundle",
+        "date": "2026-05-22"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpo2_52vsx\\bundle:2026-05-22:1:1": {
+      "inputHash": "bac588c7ec07fc5e738b1b04a57eb2b473f6baf128be62ed0bdf0a26493cb239",
+      "updatedAt": "2026-08-09T19:29:22-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpo2_52vsx\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu3za48c7\\bundle:2026-05-22:1:1": {
+      "inputHash": "3da64975310f1e3d7f4d6c7dca473f8ad3c39a1191f8f658d3aeed375a8c1491",
+      "updatedAt": "2026-08-09T19:36:54-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu3za48c7\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpkkoqzwm5\\bundle:2026-05-22:1:1": {
+      "inputHash": "cf45ca605f02b359cf809932b1d9d3a06e837808e2948b3443b7377b6420c373",
+      "updatedAt": "2026-08-09T19:36:55-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpkkoqzwm5\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_er8d2ro\\bundle:2026-05-22:1:1": {
+      "inputHash": "c4f6b6e07c743280cad0c7f8bb8fff86dffe9d0f1d3e71e28ff7c707d6bfe866",
+      "updatedAt": "2026-08-09T19:36:57-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_er8d2ro\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpa670m1qo\\bundle:2026-05-22:1:1": {
+      "inputHash": "860cb6f814b0a17a5de29425008dd51c8dff1e51221455bcdbec0ef60fb455df",
+      "updatedAt": "2026-08-09T19:36:58-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpa670m1qo\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqoxqmfw3\\bundle:2026-05-22:1:1": {
+      "inputHash": "51d7d73022be81b8d81b2f373dbaf3dfec3a36f6212bdef37edf4351d3316fc0",
+      "updatedAt": "2026-08-09T19:36:59-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqoxqmfw3\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_izgzrde\\bundle:2026-06-22:1:1": {
+      "inputHash": "557178663946766365d22156b99d303589d06cbb2a190ca3a6ab583a587a9c86",
+      "updatedAt": "2026-08-09T19:37:07-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_izgzrde\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp74d13eoj\\bundle:2026-06-29:1:1": {
+      "inputHash": "e97e9d28e44381cda17c755a63dee7b2f8c5ec5b75fbd03a66bbe58735781723",
+      "updatedAt": "2026-08-09T19:37:09-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-29",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp74d13eoj\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpk_1wsi8w\\bundle:2026-05-22:1:1": {
+      "inputHash": "6cc05ce39ad9206fcea0e62224c34f0511e84fd9255c475e10f970b8c614d3e0",
+      "updatedAt": "2026-08-12T05:11:23-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpk_1wsi8w\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmplxvb0g_v\\bundle:2026-05-22:1:1": {
+      "inputHash": "2198259e65f2ea0367640b3b7fbf6b41b2b1fd594e4c93f8d8e08c2e4e2530bd",
+      "updatedAt": "2026-08-12T05:13:16-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmplxvb0g_v\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpc1c25nmz\\bundle:2026-05-22:1:1": {
+      "inputHash": "10cb422570d5749e224526ddc9d9ab311cf83572a2b4c31ad3f4f2dc1d6ac3c8",
+      "updatedAt": "2026-08-12T17:49:41-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpc1c25nmz\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp5f3f0y4l\\bundle:2026-05-22:1:1": {
+      "inputHash": "1c7a88c338cdf4ebb2ff965670eb54d6f6d5bff965ae3320b25e958daa826648",
+      "updatedAt": "2026-08-13T02:05:10-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp5f3f0y4l\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp9ysc9tbz\\bundle:2026-05-22:1:1": {
+      "inputHash": "33fad7d84517f559bcedcd09362dfb93f5c989d7071a1dc2fe40895b33969e72",
+      "updatedAt": "2026-08-13T02:05:10-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp9ysc9tbz\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp5ie0xr53\\bundle:2026-05-22:1:1": {
+      "inputHash": "c00abb3e4b77a1ab783828a753c07e452e4182755fc082effb9cbc5d1314e66d",
+      "updatedAt": "2026-08-13T02:05:11-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp5ie0xr53\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp12pci089\\bundle:2026-05-22:1:1": {
+      "inputHash": "23d7f4771984046ee3d29514feaf20a294f281a6592faadc75efd53437f48db3",
+      "updatedAt": "2026-08-13T02:08:13-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp12pci089\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjahmhv5y\\bundle:2026-06-22:1:1": {
+      "inputHash": "0ffacae987598a6dcb9eec664abd1a77ed2a7818504b6266cf44705ee825ffad",
+      "updatedAt": "2026-08-13T02:08:34-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpjahmhv5y\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpxc7ita68\\bundle:2026-06-29:1:1": {
+      "inputHash": "4eacf49eb6e45d5f0ab6d0291e5ae0ba9802993e6841fe4dc5a49564a3b77c87",
+      "updatedAt": "2026-08-13T02:08:39-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-29",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpxc7ita68\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpe6vsjxt0\\bundle:2026-05-22:1:1": {
+      "inputHash": "27ad66ec3f73653459d5752cf02bd8fa0eaaf5ac037d6b34e9f6280b6fcf0a4d",
+      "updatedAt": "2026-08-15T03:26:31-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpe6vsjxt0\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpn13hh_gy\\bundle:2026-06-22:1:1": {
+      "inputHash": "85564752019afeabd5d05cce850cf914815cc45db93b6dd1d654563b131b70d9",
+      "updatedAt": "2026-08-15T03:26:44-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpn13hh_gy\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpt4b8ct7g\\bundle:2026-06-29:1:1": {
+      "inputHash": "6aa86f040ea1b307cd26044f2954b3dbbe93a00349ac6955ed50e12c9a07ee37",
+      "updatedAt": "2026-08-15T03:26:47-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-29",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpt4b8ct7g\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmps6hbxd_7\\bundle:2026-05-22:1:1": {
+      "inputHash": "6d058740259a56490684dd5cdf0fc2a3fc9edbcb98c40a898586ef8f9e836279",
+      "updatedAt": "2026-08-15T20:48:05-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmps6hbxd_7\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpc38ls8_8\\bundle:2026-05-22:1:1": {
+      "inputHash": "f4189ee1f908631262212b5ac55d114a5c91f0f45517551a2d0f59f7f7472512",
+      "updatedAt": "2026-08-17T00:35:22-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpc38ls8_8\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpdojb7_vu\\bundle:2026-05-22:1:1": {
+      "inputHash": "eaec435f25c8442018384b01810b0b657608c923153c85c83486c4e510901c30",
+      "updatedAt": "2026-08-17T00:35:22-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpdojb7_vu\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp2hh1cp1u\\bundle:2026-06-22:1:1": {
+      "inputHash": "676797ead77d85b797d33aa2302a836508f438a9fe313937b006a6d60280728c",
+      "updatedAt": "2026-08-17T00:50:18-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp2hh1cp1u\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpv_hbvjxa\\bundle:2026-06-29:1:1": {
+      "inputHash": "1c4b90a5812ea72f1e796cf737584a707c489635e4a49ce948653301a03e3966",
+      "updatedAt": "2026-08-17T00:50:20-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-29",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpv_hbvjxa\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpntb2zufv\\bundle:2026-06-22:1:1": {
+      "inputHash": "c9c58687be8c4ddbdc54c698ab28e23eafc74c377ad93b11ea48537ae8dd3727",
+      "updatedAt": "2026-08-17T00:54:33-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpntb2zufv\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpz4yoe13r\\bundle:2026-06-29:1:1": {
+      "inputHash": "c86e5abcce74d42c11307be69904939d7ba13de84a2ce287bff8cccab170862c",
+      "updatedAt": "2026-08-17T00:54:35-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-29",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpz4yoe13r\\bundle"
       }
     }
   }
