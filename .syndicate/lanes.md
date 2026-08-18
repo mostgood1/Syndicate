@@ -11,6 +11,60 @@
 > verbatim on 2026-08-18. Nothing was summarised or deleted: if a lane's earlier
 > reasoning matters, it is there under the same slug.
 
+#### ORPHAN SWEEP 2026-08-18 ~21:4xZ — 8 lanes RELEASED, 32 claims dropped, contested-file invariant CLEARED
+
+**Measured with `lane-guard.py`'s OWN `_claims()`**, not the simplified copy in
+`check_lane_invariants.py` — the two disagree, and the difference decides
+outcomes. The checker lacks the guard's `_is_disclaimer` / `_claimable_prefix`
+handling, so it reported 70 claims / 12 OPEN lanes where the guard actually saw
+**102 claims / 17 OPEN lanes**. Read the guard when the question is "is this
+file guarded"; the checker answers a different, looser question.
+
+    claims         102 -> 70          OPEN lanes holding claims  17 -> 9
+    contested       1  -> 0           (live_gameline_join.py)
+    OPEN-under-Archived  15 -> 7
+
+**RELEASED (owner session archived or role retired, verified against the full
+roster INCLUDING archived — `include_archived: false` hides exactly the
+evidence this question needs):**
+
+| lane | owning session | why released |
+|---|---|---|
+| `syndicate-coordinator` | `syndicate-coordinator` | role RETIRED by user decision; all 3 "Deploy and Document Coordinator" sessions archived |
+| `clv-without-settlement` | `lane-cleanup` | = "Orphaned lanes cleanup", archived 08-16 01:14 |
+| `layer2-board-quality` | `layer2-board-quality` | all 3 "Layer 2 board audit" sessions archived; the block itself said claims "can be released on request" |
+| `wnba-live-tier` | `layer1-board-coverage` | all 6 "Layer 1 board coverage audit" forks archived — **this is what cleared the contested file** |
+| `wnba-phase2-migration` | `layer1-board-coverage` | same family, all archived |
+| `modelled-fair-edge` | `layer1-board-coverage` | same family, all archived |
+| `odds-cadence-off-the-mlb-peak` | `sim-engine-track` | all 5 "Sim engine scheduling assessment" forks archived |
+| `convergence-phase5-profile-seam` | `sim-scheduling` | same family, all archived |
+
+**NOT RELEASED, DELIBERATELY — a live or plausibly-live owner exists.** Releasing
+these would un-guard files a running session is editing, which is the exact
+failure the lane system exists to prevent:
+
+    basketball-model-owner    "Basketball model deep dive"   RUNNING
+    nhl-model-owner           "NHL hockey model deep dive"   RUNNING
+    soccer-model-dispersion   "Soccer Session (fork)"        RUNNING
+    convergence-phase7-crps   "Modeling Session (fork 2)"    active today 21:40Z
+    grading-blocker-settled-zero  "Betting settlement data"  RUNNING — plausible owner by SUBJECT, not by name; the header names `alt-line-shortlist-watch`. UNRESOLVED, left guarded.
+    refresh-worker-oom-recurrence "Oom band full report"     flagged running (stale 40h)
+    live-edge-basis           `ask-answer-substance`         no roster match; left guarded because it now SOLELY owns `live_gameline_join.py`
+    repo-coordination         unmapped                       holds the global `.current-lane`; 9 claims
+    ask-sport-coverage        `ask-sport-coverage`           owner family archived, but it sits correctly under `## OPEN` and is the digest's lead lane — flagged, not swept
+
+**THE 7 REMAINING `OPEN`-UNDER-`## Archived lanes` ARE NOT MINE TO FIX.** Every
+one belongs to a live or uncertain lane above, and the remedy is to MOVE the
+block above the `## Archived lanes` marker — which is editing another lane's
+block. Left for each owner. The hazard is real but latent: their claims work
+today and would be dropped silently by a future archive pass.
+
+**Method note for the next sweep.** `.syndicate/.current-lane.<uuid>` marker
+filenames match archived `sessionId`s exactly (6 of 13 did), so a marker whose
+id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
+markers for running sessions did NOT match any roster id, so the mapping proves
+death, never life — do not invert it.
+
 ## OPEN
 
 #### snapshot-freshness — ~~DEPLOY REQUEST~~ **WITHDRAWN 20:25Z — DONE, NOTHING IS ASKED OF YOU.** `2efe76b1` is live on refresh-worker (20:25:16Z), verified by content. Cut on YOUR `415e23cb`, deployed into a lull after `daily_update --workflow ui-daily` finished — your work was not killed. Original request kept below for the record.
@@ -6212,3 +6266,47 @@ copy -- fourth time this session that check has mattered.
 - Verification: **DONE.** New unit test (`tests/test_season_betting_reader_freshness.py`, 4 cases) passes. Full `tests.test_archives` (what CI runs) run before AND after the change: 32 pre-existing failures, byte-identical list both times (verified by stashing the change and re-running one of the two nearest MLB tests), none touching this function. Change is additive-only to the gate condition; `_finalize_from_card`'s own internal comparison logic is untouched.
 - Blocked by: none.
 - **NOT DEPLOYED, and has NO EFFECT IN PRODUCTION as landed.** Per the same `docs/ai_context/todo.md` trace: `locked_cards_retuned`/the canonical daily settlement this fix reads has no automatic rebuild trigger on Render, so even once this code deploys, a historical date whose canonical settlement was never refreshed past its own thin state has nothing richer to fall through to. This fix closes the READ-side gap only; the WRITER-side autorun (declined by the user this round) is the other half and remains open, undone.
+
+### football-model-owner — ADVANCED-DATA COVERAGE, ANSWERED AT TERM LEVEL 2026-08-18 ~22:0xZ — **NFL: 8 of ~20 real terms fed. And NONE of it reaches the sim.** — session: football-model-owner
+
+**The unit was wrong before and I am correcting it twice over.** The engine does
+not read BLOCKS, it reads TERMS, each via an alias list
+(`_first_float(block, [a1,a2,a3])`). A term is fed if ANY alias resolves. Measured
+per-term over **272 real NFL games**, aliases read structurally from the engine's
+own call sites.
+
+**FED (100% unless noted):** offensive EPA · success rate · PROE/pass rate ·
+advanced offensive EPA · **advanced DEFENSIVE EPA** · total line (97%) ·
+spread line · moneyline.
+
+**UNFED, genuinely:** red-zone efficiency · explosive-play rate ·
+`def_pressure_avg` · success-rate-allowed · pace seconds/play · **all six
+player-usage terms** (usage_index, snap/target/route/carry/air-yard share) ·
+market model-probability.
+
+**EXPECTED_SPARSE (NCAAF-only, correctly absent for NFL):** returning production
+· coach continuity · transfer impact.
+
+**CORRECTION 1 — defence is NOT unfed.** My block-level report said
+`defensive_metrics 0%`. `_defense_strength` also reads defensive EPA out of
+`advanced_metrics`, which is **100%**. The defensive EPA term IS fed; only
+`success_rate_allowed` and `def_pressure_avg` are missing. **Do not build a
+defensive-metrics pipeline on the strength of that 0%.**
+
+**CORRECTION 2 — market lines are NOT unfed.** My term script reported
+`total/spread/moneyline` at 0% because it could not descend into dicts NESTED
+inside `market_features`. Measured directly: `total.line` **97%**,
+`spread.home_line` **100%**, `moneyline.home` **100%**. **That was an INSTRUMENT
+LIMIT reported as a finding — the same error class as the 1-game 0% earlier.**
+
+**THE ANSWER TO "DO WE HAVE THE DATA": mostly yes, and it is irrelevant today.**
+**0 of 3 production entrypoints pass `feature_generation_payload` at all**, so
+every fed term above contributes exactly nothing. Measured earlier: feeding the
+payload moves 21 of 21 drive-prior fields, margin 1.1 pts, win prob 6.5 pts.
+**Population is not the binding constraint — WIRING is.** Fixing population first
+changes no output.
+
+**Order of work, if this is taken up:** (1) wire the payload on NFL REGULAR season
+(not preseason — `nfl_preseason_v1` is shrunk toward neutral, §4.4), (2) re-fit
+the calibration that absorbed the missing mechanisms, (3) only then chase
+player_usage/pace/red-zone, which are the largest remaining unfed group.
