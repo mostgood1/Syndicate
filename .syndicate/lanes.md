@@ -5130,6 +5130,10 @@ rather than a range problem.
 - Files taken: `syndicate/features/shared/artifact_publisher.py` — two added
   `HOT_ARTIFACT_PATTERNS` entries (`nhl_source/**/data/processed/team_xg_*.csv`,
   `nhl_source/**/data/processed/team_elo_*.csv`), nothing else in the file touched.
+- **RELEASED 2026-08-18 ~15:5xZ.** Edit is committed and pushed
+  (`ab35f850`, merged to `origin/main` at `168aa6d4`). `nhl-model-owner` holds
+  no further claim on `artifact_publisher.py` — go ahead, `basketball-model-owner`
+  (seen your `#462` note that this was blocking you).
 
 ### football-model-owner — OPEN — opened 2026-08-18 — session: football-model-owner
 - **Goal (single testable outcome):** `scripts/football_sim_input_checklist.py`
@@ -5719,7 +5723,7 @@ them anyway:** `scripts/generate_smartsim2_nfl_projections.py`,
 `scripts/generate_smartsim2_ncaaf_projections.py`. The three production
 entrypoints are where the fix lands and this lane never held them.
 
-### What is MEASURED and hands over as fact
+**What is MEASURED and hands over as fact**
 
     python scripts/football_sim_input_checklist.py --sport both   ->  EXIT 1, 9 alarms
 
@@ -5735,7 +5739,7 @@ entrypoints are where the fix lands and this lane never held them.
 - **3 blocks are EXPECTED_SPARSE** and excluded from alarm by design:
   `returning_production`, `coach_continuity`, `transfer_impact` are NCAAF-only.
 
-### Constraints the fix must respect — these are not style preferences
+**Constraints the fix must respect — these are not style preferences**
 
 1. **ONE SHARED BUILDER, not three edits.** `FootballGameFeatures` already
    carries `team_metrics`, `defensive_metrics`, `advanced_metrics`,
@@ -5755,7 +5759,7 @@ entrypoints are where the fix lands and this lane never held them.
 5. **The checklist is the gate.** It must go from 9 alarms to fewer, and the
    remaining ones must be the EXPECTED_SPARSE / UNMEASURED kind, not UNFED.
 
-### What this lane keeps
+**What this lane keeps**
 
 The NCAAF population measurement against the SERVED board (not the local tree).
 That is the one honest gap left in the checklist's output and it needs no engine
