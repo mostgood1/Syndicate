@@ -32,6 +32,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+from syndicate.features.shared.book_margin_model import (
+    EDGE_FIELD as MODELLED_EDGE_FIELD,
+    modelled_fair_edge,
+)
 
 # market (as it appears in book_quotes) -> the pitcher distribution that scores it
 _PITCHER_DISTS: dict[str, tuple[str, str]] = {
@@ -956,14 +960,38 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
             # `soccer_projections` has attributed this same refusal since it was
             # written; this is the sibling copy catching up, not a new policy.
             projection["edge_vs_market_pct"] = None
+            # USER DECISION 2026-08-17, audit recommendation 4: a one-sided
+            # market still has a MODELLED fair, and pricing against it is
+            # allowed -- in its own column. 285 MLB rows land here carrying both
+            # terms of that EV and served nothing at all.
+            #
+            # `edge_vs_market_pct` above stays None. This is deliberately NOT a
+            # fallback into that field: the two are different questions at
+            # different confidence, and `book_margin_model`'s docstring forbids
+            # letting a modelled number wear a measured one's clothes (`#242`).
+            modelled_edge = modelled_fair_edge(
+                row, model_prob=model_prob, side=projected_side
+            )
+            if modelled_edge:
+                projection.update(modelled_edge)
             # An edge may still exist under the OTHER contract. `_mean_projection`
             # sets `edge_vs_line` in stat units for mean-based sports (WNBA), and
             # stamping "unavailable" over a row that is carrying one would be a
             # reason that contradicts its own payload.
             if projection.get("edge_vs_line") is None:
-                projection["edge_unavailable_reason"] = _edge_unavailable_reason(
+                reason = _edge_unavailable_reason(
                     row, model_prob=model_prob, fair=fair
                 )
+                if modelled_edge:
+                    # Do not tell a reader "nothing could be priced" on a row
+                    # that is now serving a priced number two columns over --
+                    # that contradiction is the same shape as the blank-with-no-
+                    # reason this branch was written to fix.
+                    reason = (
+                        f"{reason}; priced against the modelled fair instead "
+                        f"(see {MODELLED_EDGE_FIELD})"
+                    )
+                projection["edge_unavailable_reason"] = reason
         row["projection"] = projection
         attached += 1
         if projection["edge_vs_market_pct"] is not None:

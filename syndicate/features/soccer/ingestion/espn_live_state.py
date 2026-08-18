@@ -164,7 +164,7 @@ def build_live_state(
         if shot["outcome"] == "goal" and assist_entry is not None:
             assist_entry["assists_so_far"] += 1
 
-    return {
+    state = {
         "event_id": event_id,
         "home_team": home_team,
         "away_team": away_team,
@@ -183,6 +183,27 @@ def build_live_state(
         "away_corners_so_far": sum(1 for e in corner_events if e["team"] == away_team),
         "player_stats": player_stats,
     }
+    # GAME SHAPE -- the state a live projection is computed FROM, kept rather
+    # than left implicit. Lane `game-shape-capture`; contract in
+    # `shared/game_shape.py`. Soccer is the only sport here whose live state
+    # carries real in-game EVENTS (shots, shots on target, corners, red cards),
+    # so it is the only one that can express a true event rate and a dominance
+    # share -- the things a 0-0 scoreline hides.
+    #
+    # Built from `state` and NOT from the projection: the shape must stay free
+    # of model output or the error analysis it feeds becomes circular. The
+    # caller attaches its `projection` block to this same record afterwards;
+    # this runs first, on purpose.
+    #
+    # Function-local import and a bare except: instrumentation must never take
+    # down the live-state build, which is the product.
+    try:
+        from syndicate.features.shared.game_shape import soccer_game_shape
+
+        state["game_shape"] = soccer_game_shape(state)
+    except Exception:
+        state["game_shape"] = None
+    return state
 
 
 __all__ = ["build_live_state"]

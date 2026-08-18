@@ -192,5 +192,121 @@ class BiasDispersionDecompositionTests(unittest.TestCase):
         self.assertIsNotNone(result["dispersion_ratio"])  # only the second pair contributes
 
 
+class CrpsEmpiricalTests(unittest.TestCase):
+    """`crps_empirical` scores against the sim's own {value: count} PMF with no
+    Normal assumed. Verified three independent ways -- a closed-form special
+    case, an independent sample-based estimator, and agreement with
+    `crps_normal` on a finely discretised Normal -- so an integration-bounds
+    error cannot hide behind one self-consistent check."""
+
+    def test_point_mass_reduces_to_absolute_error(self) -> None:
+        # F is a single step at m, so integral (F - 1{x>=y})^2 dx = |y - m|.
+        for actual, mean in ((7.0, 3.0), (3.0, 7.0), (0.0, 4.5)):
+            self.assertAlmostEqual(
+                scoring.crps_empirical(actual, {mean: 1000}), abs(actual - mean), places=9
+            )
+
+    def test_perfect_point_forecast_scores_zero(self) -> None:
+        self.assertAlmostEqual(scoring.crps_empirical(5.0, {5: 250}), 0.0, places=12)
+
+    def test_counts_need_not_be_normalised(self) -> None:
+        # Raw sim counts (mass 1000) and probabilities must score identically.
+        raw = {0: 250, 1: 500, 2: 250}
+        normalised = {0: 0.25, 1: 0.5, 2: 0.25}
+        self.assertAlmostEqual(
+            scoring.crps_empirical(1.0, raw), scoring.crps_empirical(1.0, normalised), places=12
+        )
+
+    def test_matches_sample_based_estimator(self) -> None:
+        # Independent form: CRPS = E|X - y| - 0.5 * E|X - X'|, over the same PMF.
+        pmf = {0: 120, 1: 300, 2: 260, 3: 180, 4: 90, 5: 50}
+        total = sum(pmf.values())
+        for actual in (0.0, 2.0, 3.0, 7.0):
+            expected_abs = sum(c * abs(v - actual) for v, c in pmf.items()) / total
+            pairwise = sum(
+                c1 * c2 * abs(v1 - v2) for v1, c1 in pmf.items() for v2, c2 in pmf.items()
+            ) / (total * total)
+            expected = expected_abs - 0.5 * pairwise
+            self.assertAlmostEqual(scoring.crps_empirical(actual, pmf), expected, places=9)
+
+    def test_agrees_with_closed_form_normal_on_a_fine_discretisation(self) -> None:
+        # The cross-check that matters: if the empirical integral is right, a
+        # densely discretised Normal must reproduce crps_normal.
+        from statistics import NormalDist
+
+        mean, sigma = 4.0, 1.5
+        dist = NormalDist(mean, sigma)
+        step = 0.01
+        pmf = {}
+        x = mean - 8 * sigma
+        while x <= mean + 8 * sigma:
+            pmf[round(x, 4)] = dist.pdf(x) * step
+            x += step
+        for actual in (4.0, 5.5, 2.0):
+            self.assertAlmostEqual(
+                scoring.crps_empirical(actual, pmf),
+                scoring.crps_normal(actual, mean, sigma),
+                places=3,
+            )
+
+    def test_is_never_negative_and_worsens_as_the_forecast_moves_away(self) -> None:
+        pmf = {2: 100, 3: 400, 4: 400, 5: 100}
+        near = scoring.crps_empirical(3.0, pmf)
+        far = scoring.crps_empirical(12.0, pmf)
+        self.assertGreaterEqual(near, 0.0)
+        self.assertGreater(far, near)
+
+    def test_a_tighter_distribution_wins_when_both_are_centred_correctly(self) -> None:
+        # The property plain MAE cannot see: same mean, different spread.
+        tight = {4: 800, 3: 100, 5: 100}
+        wide = {4: 200, 0: 200, 8: 200, 2: 200, 6: 200}
+        self.assertLess(scoring.crps_empirical(4.0, tight), scoring.crps_empirical(4.0, wide))
+
+    def test_refuses_malformed_input_instead_of_raising(self) -> None:
+        self.assertIsNone(scoring.crps_empirical(None, {1: 1}))
+        self.assertIsNone(scoring.crps_empirical("nope", {1: 1}))
+        self.assertIsNone(scoring.crps_empirical(1.0, {}))
+        self.assertIsNone(scoring.crps_empirical(1.0, None))
+        self.assertIsNone(scoring.crps_empirical(1.0, {"x": "y"}))
+        self.assertIsNone(scoring.crps_empirical(1.0, {1: 0, 2: -5}))
+
+    def test_skips_bad_entries_but_keeps_the_good_ones(self) -> None:
+        clean = scoring.crps_empirical(2.0, {1: 500, 3: 500})
+        dirty = scoring.crps_empirical(2.0, {1: 500, 3: 500, "bad": 10, 9: None, 7: -3})
+        self.assertAlmostEqual(clean, dirty, places=12)
+
+
+class DistributionMomentsTests(unittest.TestCase):
+    def test_reports_mean_sigma_and_draw_count(self) -> None:
+        result = scoring.distribution_moments({0: 250, 2: 500, 4: 250})
+        self.assertAlmostEqual(result["mean"], 2.0, places=9)
+        # Population sd of a symmetric 3-point PMF with weights .25/.5/.25.
+        self.assertAlmostEqual(result["sigma"], math.sqrt(2.0), places=9)
+        self.assertEqual(result["n_draws"], 1000)
+        self.assertEqual(result["support_size"], 3)
+
+    def test_point_mass_has_zero_spread(self) -> None:
+        result = scoring.distribution_moments({5: 1000})
+        self.assertAlmostEqual(result["sigma"], 0.0, places=12)
+
+    def test_mean_agrees_with_the_projection_layers_own_implementation(self) -> None:
+        # prop_projections._dist_mean is the same statistic one layer up; if
+        # these ever disagree the board and the scorer are describing different
+        # forecasts.
+        from syndicate.features.shared.prop_projections import _dist_mean
+
+        dist = {"0": 137, "1": 402, "2": 311, "3": 150}
+        self.assertAlmostEqual(
+            scoring.distribution_moments(dist)["mean"], _dist_mean(dist), places=3
+        )
+
+    def test_empty_and_malformed_return_zero_sample(self) -> None:
+        for bad in ({}, None, {"a": "b"}, {1: 0}):
+            result = scoring.distribution_moments(bad)
+            self.assertIsNone(result["mean"])
+            self.assertIsNone(result["sigma"])
+            self.assertEqual(result["n_draws"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
