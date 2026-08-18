@@ -130,6 +130,37 @@ def apply_batted_ball_to_batter(prof: Any, *, season: int, weight: float = 0.35)
         except Exception:
             pass
 
+    # NATIVE batted-ball rates -- the fields `simulate.py:1120-1123` actually
+    # reads. THIS IS THE POINT OF THE WHOLE ARTIFACT, and the first version of
+    # this module missed it entirely: it scaled `hr_rate`/`inplay_hit_rate` (a
+    # proxy) while `bb_gb_rate` and friends stayed at their league defaults, so
+    # every hitter kept an identical batted-ball profile. Measured after a
+    # simulated rebuild: 26 unfed fields -> 20, with all five `bb_*` still
+    # failing, which is what exposed it.
+    #
+    # The leaderboard gives a 2-way split (`gb` vs `fbld`); the sim wants 4. The
+    # player's REAL ground-ball share is the large, player-specific signal and is
+    # used directly; the air-ball remainder is divided using the league
+    # proportions the engine already defaults to (fb .25 / ld .20 / pu .11,
+    # renormalised within non-GB). Stated plainly: the GB/air split is measured
+    # per player, the split WITHIN air balls is not.
+    gb_share = entry.get("gb_share")
+    if isinstance(gb_share, (int, float)) and 0.0 < float(gb_share) < 1.0:
+        try:
+            gb = float(gb_share)
+            rest = 1.0 - gb
+            total_air = 0.25 + 0.20 + 0.11
+            prof.bb_gb_rate = gb
+            prof.bb_fb_rate = rest * (0.25 / total_air)
+            prof.bb_ld_rate = rest * (0.20 / total_air)
+            prof.bb_pu_rate = rest * (0.11 / total_air)
+            bbe = entry.get("bbe")
+            if isinstance(bbe, (int, float)) and bbe > 0:
+                prof.bb_inplay_n = int(bbe)
+            changed = True
+        except Exception:
+            pass
+
     if changed:
         try:
             setattr(prof, "batted_ball_source", "statcast_leaderboard")

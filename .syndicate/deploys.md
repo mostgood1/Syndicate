@@ -14098,3 +14098,63 @@ measurement.
 
 **`roster_objs/` is the file the checklist audits** — so a production checklist
 run reads exactly what the sim consumed, provided the rebuild actually happened.
+
+## 2026-08-18 — LOCAL-FIRST CAUGHT TWO DESIGN ERRORS. FAIL list **26 -> 20 -> 15**, and a deploy would have been premature.
+
+Lane `convergence-phase7-crps`. Asked "don't we want to run this locally with all
+the right data first?" — **yes, and it was the right call.** I was about to file a
+deploy request, skipping the rebuild step of the procedure I had just written.
+
+### The artifact -> profile link works `[measured locally]`
+
+    pitch splits   applied to 19/19 pitchers, 0 skipped
+                   whiff_mult 0 -> 7 entries, n_pitches=962
+    batted-ball    applied to 18/18 lineup batters
+                   hr_rate 0.04608 -> 0.03834, inplay 0.2501 -> 0.2272
+
+### But a SIMULATED REBUILD showed the fix was far smaller than assumed
+
+    BEFORE (as archived)          26 consumed-but-unfed
+    AFTER  (rebuild simulated)    20      <- only SIX fields fixed
+
+**Two of my own design errors, both invisible until this ran:**
+
+1. **`pitch_type_hr_mult` can never be fed by this artifact.** The
+   `PitcherPitchSplits` dataclass carries `whiff_mult` and `inplay_mult` only —
+   there is **no HR multiplier in the source**. I had assumed the pitch-splits
+   work covered all three pitch-type multipliers. It covers two.
+2. **The batted-ball blend never touched the NATIVE fields.** It scaled
+   `hr_rate` / `inplay_hit_rate` — a proxy — while `bb_gb_rate` and friends
+   stayed at league defaults, so **every hitter kept an identical batted-ball
+   profile**. This is the exact design error recorded earlier ("my multiplier
+   blend was the wrong design") which I then did not correct.
+
+### Fixed, and re-measured
+
+Native `bb_*` population added from the artifact's `gb_share`: the player's real
+ground-ball share is used directly (the large player-specific signal), and the
+air-ball remainder is split on the league proportions the engine already defaults
+to. **Stated plainly: GB/air is measured per player; the split WITHIN air balls
+is not.**
+
+    AFTER native bb_* fix          15 consumed-but-unfed
+
+### THE REMAINING 15, enumerated
+
+| fields | cause | fixable |
+|---|---|---|
+| 5x **pitcher** `bb_*` | only the batter side was written; pitchers have their own GB/FB profile | yes, needs a pitcher leaderboard call |
+| 5x `vs_pitcher_*` (BVP) | 1,282 files cached daily, never mapped into the fields | yes, data already exists |
+| 2x batter `vs_pitch_type*` | no source built | yes |
+| 2x `statcast_quality_mult` | no source anywhere | unknown |
+| 1x `pitch_type_hr_mult` | source dataclass lacks `hr_mult` | **no, not from this source** |
+
+### The lesson, which is procedural
+
+**I wrote the "publish -> rebuild -> checklist -> measure" procedure and then
+tried to skip to the deploy.** Running it locally cost one command and found two
+errors that would have produced a deployed change fixing 6 of 26 fields while
+being described as fixing the pitch-type and batted-ball gaps.
+
+**No deploy request filed.** The right sequence is: close what is cheaply
+closable (pitcher `bb_*`, BVP mapping), then rebuild, then request.
