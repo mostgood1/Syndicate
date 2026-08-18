@@ -224,6 +224,19 @@ def parse_landing(landing: Dict) -> Optional[HistoricalGameRecord]:
         went_ot = True
         went_so = True
 
+    # Minor penalties committed, by team -- the opponent's resulting PP opportunities. See the
+    # field's docstring on HistoricalGameRecord for why majors/misconducts are excluded.
+    pen_h = pen_a = 0
+    for period in (summary.get("penalties") or []):
+        for pen in (period.get("penalties") or []):
+            if str(pen.get("type") or "").upper() != "MIN":
+                continue
+            team_abbr = _abbr_of(pen.get("teamAbbrev"))
+            if team_abbr == home_abbr:
+                pen_h += 1
+            elif team_abbr == away_abbr:
+                pen_a += 1
+
     return HistoricalGameRecord(
         game_id=str(landing.get("id") or ""),
         date=str(landing.get("gameDate") or ""),
@@ -240,6 +253,8 @@ def parse_landing(landing: Dict) -> Optional[HistoricalGameRecord]:
         pp_goals_away=pp_a,
         en_goals_home=en_h,
         en_goals_away=en_a,
+        penalties_committed_home=pen_h,
+        penalties_committed_away=pen_a,
         went_ot=went_ot,
         went_shootout=went_so,
     )

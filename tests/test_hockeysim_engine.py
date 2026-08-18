@@ -86,6 +86,40 @@ class HockeySimEngineTest(unittest.TestCase):
         goals = sum(1 for e in events if e.kind == "goal" and e.team == "HOME")
         self.assertLessEqual(goals, shots)
 
+    def test_special_teams_pp_pct_actually_changes_output(self) -> None:
+        """Reachability test (`model_engine_standard.md` §4.3), not just presence: `st_home`'s
+        `pp_pct` must MEASURABLY change simulated output, not just sit on the dataclass unread.
+
+        Requires the lineup path (`lineup_home`/`lineup_away` not None) -- `st_home`/`st_away`
+        are ignored on the roster-only path (`runtime.run_hockeysim_game`).
+        """
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        elite_pp = {"pp_pct": 0.35, "pk_pct": 0.80, "committed_per_game": 3.0}
+        poor_pp = {"pp_pct": 0.08, "pk_pct": 0.80, "committed_per_game": 3.0}
+
+        def _mean_home_goals(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, _ = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away={"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0},
+                    seed=s,
+                )
+                totals.append(gs.home.score)
+            return statistics.mean(totals)
+
+        elite_mean = _mean_home_goals(elite_pp)
+        poor_mean = _mean_home_goals(poor_pp)
+        self.assertGreater(
+            elite_mean, poor_mean,
+            f"an elite power play (pp_pct=0.35) must outscore a poor one (pp_pct=0.08) on average "
+            f"when nothing else differs -- got elite={elite_mean:.3f} poor={poor_mean:.3f}. If this "
+            f"fails, st_home is present but not reachable, the exact defect this test exists to catch.",
+        )
+
     def test_profile_seam_is_non_mutating(self) -> None:
         before = NHL_CALIBRATION_PROFILE.pp_shots_mult
         cfg = build_nhl_sim_config(seed=5, overrides={"pp_shots_mult": 9.9, "bogus": 1})

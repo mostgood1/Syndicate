@@ -347,6 +347,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "nhl_source/data/processed/team_xg_*.csv",
     "nhl_source/source_artifacts/data/processed/team_elo_*.csv",
     "nhl_source/data/processed/team_elo_*.csv",
+    # Same category, added once `HockeyTeamFeatures.special_teams` (`pp_pct`/`pk_pct`/
+    # `committed_per_game`) got a real producer (`scripts/build_nhl_special_teams_artifact.py`).
+    "nhl_source/source_artifacts/data/processed/team_special_teams_*.csv",
+    "nhl_source/data/processed/team_special_teams_*.csv",
     # #163's MLB player game-log index (last-N starts/games, history vs
     # opponent -- syndicate/features/mlb/player_game_log.py, read by
     # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same

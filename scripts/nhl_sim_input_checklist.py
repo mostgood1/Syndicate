@@ -6,13 +6,30 @@ Mandated by `docs/ai_context/model_engine_standard.md` §1. Reference implementa
 failure shape was found here TWICE in one pass:
 
     elo_p = _elo_win_prob(home.elo_rating, away.elo_rating, profile)   # nothing populated elo_rating
-    cal_pp_sh_mult = _f((special_teams_cal or {}).get("pp_shot_multiplier", 1.0), 1.0)  # always {}
+    p_goal_home *= (1.0 + 1.5 * st_home.get("pp_pct", 0.2))            # st_home always {} -> 0.2
 
 If nothing populates a field a `.get(key, NEUTRAL)` default reads, the call returns the neutral
 value forever, the sim runs, the tests pass, and the output is identical to a build where the
-feature does not exist. `elo_rating` is now fixed (`historical_truth/elo_builder.py` +
-`scripts/build_nhl_elo_artifact.py`); `special_teams` is not — this script is what proves that,
-on real data, rather than by inspection.
+feature does not exist. `elo_rating` and `HockeyTeamFeatures.special_teams` (`pp_pct`/`pk_pct`/
+`committed_per_game`) are now fixed (`historical_truth/elo_builder.py` +
+`scripts/build_nhl_elo_artifact.py`; `historical_truth/special_teams_builder.py` +
+`scripts/build_nhl_special_teams_artifact.py`).
+
+CORRECTION, 2026-08-18: an earlier pass of this script AST-walked `engine.py`'s
+`(special_teams_cal or {}).get(...)` call sites and reported those 7 keys (`pp_shot_multiplier`,
+`pk_shot_multiplier`, `pp_goal_multiplier`, `pk_goal_multiplier`, `blocks_ev_rate`, `blocks_pk_rate`,
+`blocks_pp_def_rate`) as what `HockeyTeamFeatures.special_teams` needs to carry. **That was wrong.**
+`special_teams_cal` is a SEPARATE parameter from `st_home`/`st_away` — plumbed end-to-end
+(`runtime.py` -> `engine.py`, twice) but with **no caller anywhere that ever passes it a value**
+(checked: every call site either omits it or is itself a passthrough default of `None`). The dict
+`build_team_features` actually populates (`HockeyTeamFeatures.special_teams`) is threaded to
+`st_home`/`st_away` (`player_props.py:90-91`), whose real consumed keys are `pp_pct`, `pk_pct`,
+`committed_per_game` (`engine.py:677-678,973-980`) — three keys, not seven, and none of them
+overlap with `special_teams_cal`'s. This script now reports BOTH correctly and separately: Part A
+is the real, now-fixed `special_teams` alarm; Part B is `special_teams_cal`'s keys, reported as
+UNREACHABLE (a stricter alarm than unpopulated per the standard's §4.3 — populating
+`HockeyTeamFeatures` could never fix this even in principle, because nothing reads it into that
+parameter).
 
 `HockeyTeamFeatures`/`HockeyPlayerFeatures` are FLAT dataclasses (like MLB's `BatterProfile` /
 `PitcherProfile`) with exactly ONE dict-shaped exception (`special_teams`, like soccer's nested
@@ -21,8 +38,8 @@ name grep in either:
 
   1. `dataclasses.fields()` over `HockeyTeamFeatures` / `HockeyPlayerFeatures` -- the flat surface,
      measured over REAL built slates (`build_slate_features`), never a fixture.
-  2. AST over `engine.py`'s `(special_teams_cal or {}).get("key", default)` call sites -- the keys
-     actually read out of the one dict field, mirroring soccer's `_first_float` AST walk.
+  2. AST over `engine.py`'s `st_home.get("key", default)` / `st_away.get(...)` call sites -- the
+     keys `special_teams` actually feeds, mirroring soccer's `_first_float` AST walk.
 
 CONSUMED + UNPOPULATED is the alarm, and it exits non-zero.
 
@@ -110,19 +127,19 @@ def populated(value: object, default: object) -> bool:
     return True
 
 
-def special_teams_consumed_keys() -> List[Tuple[str, object]]:
-    """Every `(special_teams_cal or {}).get("key", default)` call site in `engine.py`.
+def _get_calls_on(varname: str, source_path: Path) -> List[Tuple[str, object]]:
+    """Every `(<varname> or {}).get("key", default)` / `<varname>.get("key", default)` call site.
 
     Structural (reads the call's own arguments), so a renamed/added key changes this report
     instead of silently passing -- the same discipline as soccer's `_first_float` AST walk.
     """
-    tree = ast.parse(ENGINE_FILE.read_text(encoding="utf-8"))
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
     out: List[Tuple[str, object]] = []
     seen = set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get"):
             continue
-        if "special_teams_cal" not in ast.dump(node.func.value):
+        if varname not in ast.dump(node.func.value):
             continue
         if not node.args or not isinstance(node.args[0], ast.Constant):
             continue
@@ -133,6 +150,41 @@ def special_teams_consumed_keys() -> List[Tuple[str, object]]:
         default = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else None
         out.append((key, default))
     return out
+
+
+def special_teams_consumed_keys() -> List[Tuple[str, object]]:
+    """The keys `HockeyTeamFeatures.special_teams` ACTUALLY reaches: `st_home.get(...)` /
+    `st_away.get(...)` in `engine.py` -- NOT `special_teams_cal`, a separate parameter (see
+    `special_teams_cal_reachability` below)."""
+    home = _get_calls_on("st_home", ENGINE_FILE)
+    away = _get_calls_on("st_away", ENGINE_FILE)
+    seen = {k for k, _ in home}
+    return home + [kv for kv in away if kv[0] not in seen]
+
+
+def special_teams_cal_reachability() -> Tuple[List[Tuple[str, object]], bool]:
+    """The 7 keys `special_teams_cal` is CONSUMED for, and whether anything outside
+    `runtime.py`/`engine.py` (i.e. any real caller) ever supplies it a value.
+
+    `runtime.run_hockeysim_game` and `engine.HockeySim` both default this parameter to `None` and
+    only pass it straight through internally -- so "reachable" means some EXTERNAL call site (a
+    real producer, not this plumbing) passes `special_teams_cal=` with a value. None does, checked
+    structurally: every `.py` under `syndicate/features/nhl/` for a `run_hockeysim_game(` /
+    `HockeySim(` call site that supplies the keyword at all.
+    """
+    keys = _get_calls_on("special_teams_cal", ENGINE_FILE)
+    reachable = False
+    for path in (ENGINE_DIR.parent.parent).rglob("*.py"):
+        if path in (ENGINE_FILE, ENGINE_DIR / "runtime.py"):
+            continue  # the plumbing itself, not a caller
+        try:
+            src = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "special_teams_cal" in src and ("run_hockeysim_game(" in src or "HockeySim(" in src):
+            reachable = True
+            break
+    return keys, reachable
 
 
 def _mirrored_dates() -> List[str]:
@@ -170,6 +222,7 @@ def main() -> int:
     n_teams = 0
     n_players = 0
     st_nonempty = 0
+    st_key_hits: Dict[str, int] = {}
 
     team_defaults = {f.name: f.default for f in fields(HockeyTeamFeatures)}
     player_defaults = {f.name: f.default for f in fields(HockeyPlayerFeatures)}
@@ -186,6 +239,9 @@ def main() -> int:
                         team_hits[f.name] = team_hits.get(f.name, 0) + 1
                 if team.special_teams:
                     st_nonempty += 1
+                for key in ("pp_pct", "pk_pct", "committed_per_game"):
+                    if team.special_teams.get(key) is not None:
+                        st_key_hits[key] = st_key_hits.get(key, 0) + 1
             for players in (game.home_players, game.away_players):
                 for p in players:
                     n_players += 1
@@ -263,21 +319,43 @@ def main() -> int:
             mark = "*" if sparse else " "
             print(f"  {pct:6.1%} {mark} {name:32s} {status}")
 
-    print("\n--- HockeyTeamFeatures.special_teams (dict; AST-walked keys) " + "-" * 25)
+    print("\n--- PART A: HockeyTeamFeatures.special_teams (dict; feeds st_home/st_away) " + "-" * 10)
     st_pct = st_nonempty / max(1, n_teams)
     st_keys = special_teams_consumed_keys()
     print(f"  dict populated (non-empty) on {st_pct:.1%} of team-sides")
-    print(f"  keys the engine actually reads via `.get(key, default)`: {len(st_keys)}")
+    print(f"  keys the engine actually reads via `st_home`/`st_away`.get(key, default): {len(st_keys)}")
     for key, default in st_keys:
-        # An empty container makes every key inside it 0% by definition -- the only case this
-        # script needs to resolve without re-reading each team's raw dict on every date.
-        if st_nonempty == 0:
+        pct = st_key_hits.get(key, 0) / max(1, n_teams)
+        if pct == 0.0:
             failures.append(("team", f"special_teams.{key}", 0.0))
             rows.append({"kind": "team", "field": f"special_teams.{key}", "pct": 0.0,
                           "consumed": True, "status": "FAIL"})
-            print(f"  {0.0:6.1%}   special_teams.{key:28s} FAIL  consumed (default {default!r}) but NEVER populated")
+            print(f"  {pct:6.1%}   special_teams.{key:28s} FAIL  consumed (default {default!r}) but NEVER populated")
+        elif pct < POPULATED_FLOOR:
+            warnings.append(("team", f"special_teams.{key}", pct))
+            rows.append({"kind": "team", "field": f"special_teams.{key}", "pct": round(pct, 4),
+                          "consumed": True, "status": "warn"})
+            print(f"  {pct:6.1%}   special_teams.{key:28s} warn  consumed, thinly populated")
         else:
-            print(f"  {'?':>6}   special_teams.{key:28s} dict is sometimes populated -- audit per-key rate manually")
+            rows.append({"kind": "team", "field": f"special_teams.{key}", "pct": round(pct, 4),
+                          "consumed": True, "status": "ok"})
+            print(f"  {pct:6.1%}   special_teams.{key:28s} ok")
+
+    print("\n--- PART B: special_teams_cal (SEPARATE parameter, not fed by HockeyTeamFeatures) " + "-" * 3)
+    cal_keys, cal_reachable = special_teams_cal_reachability()
+    print(f"  keys the engine reads via `(special_teams_cal or {{}}).get(...)`: {len(cal_keys)}")
+    print(f"  reachable from any real caller (not just runtime.py/engine.py's own passthrough): {cal_reachable}")
+    for key, default in cal_keys:
+        label = f"special_teams_cal.{key}"
+        if not cal_reachable:
+            failures.append(("team", label, 0.0))
+            rows.append({"kind": "team", "field": label, "pct": 0.0, "consumed": True,
+                          "status": "FAIL", "note": "unreachable, not just unpopulated"})
+            print(f"  {0.0:6.1%}   {label:34s} FAIL  consumed (default {default!r}), parameter UNREACHABLE -- "
+                  f"no caller anywhere supplies it, so no producer could fix this by feeding "
+                  f"HockeyTeamFeatures (wrong conduit; see the module docstring)")
+        else:
+            print(f"  {'?':>6}   {label:34s} reachable now -- re-audit population, not just presence")
 
     print("\n" + "=" * 88)
     if failures:

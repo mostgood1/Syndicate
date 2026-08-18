@@ -36,6 +36,14 @@ class HistoricalGameRecord:
     pp_goals_away: int = 0
     en_goals_home: int = 0
     en_goals_away: int = 0
+    # Minor penalties (2-min, incl. double-minors) COMMITTED by each team -- i.e. the OPPONENT's
+    # resulting power-play opportunities. Majors/misconducts are deliberately excluded: a fighting
+    # major is typically offset by a simultaneous major on the other team and creates no power
+    # play, and distinguishing an offsetting major from a standalone one needs same-timestamp
+    # matching this parser does not attempt. This undercounts the rarer standalone-major PP case;
+    # documented here rather than silently absorbed.
+    penalties_committed_home: int = 0
+    penalties_committed_away: int = 0
     went_ot: bool = False
     went_shootout: bool = False
 

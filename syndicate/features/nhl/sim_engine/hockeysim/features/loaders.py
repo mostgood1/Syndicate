@@ -172,6 +172,49 @@ def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, fl
     return out
 
 
+def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, float]]:
+    """Load ``{ABBR: {"pp_pct":..., "pk_pct":..., "committed_per_game":...}}`` for a date.
+
+    Written by ``scripts/build_nhl_special_teams_artifact.py`` from real settled results
+    (`historical_truth.special_teams_builder`). Same candidate-order convention as
+    :func:`load_team_xg_map`/:func:`load_team_elo_map`. Returns an empty map when unavailable, so
+    ``HockeyTeamFeatures.special_teams`` stays ``{}`` and the engine falls back to its own
+    league-average defaults (`engine.py:667-668`) exactly as it did before this producer existed --
+    a missing file degrades, it does not break.
+    """
+    proc = _processed_dir(root)
+    season = _season_code_for_date(date)
+    candidates = [proc / f"team_special_teams_{season}.csv", proc / "team_special_teams_latest.csv"]
+    rows: List[Dict[str, str]] = []
+    for path in candidates:
+        rows = _read_csv_rows(path)
+        if rows:
+            break
+    if not rows:
+        return {}
+
+    out: Dict[str, Dict[str, float]] = {}
+    for row in rows:
+        lower = {k.lower(): v for k, v in row.items()}
+        ab = lower.get("abbr") or lower.get("team")
+        key = _abbr(ab) or (str(ab).upper() if ab else None)
+        if not key:
+            continue
+        pp = _to_float(lower.get("pp_pct"))
+        pk = _to_float(lower.get("pk_pct"))
+        committed = _to_float(lower.get("committed_per_game"))
+        entry: Dict[str, float] = {}
+        if pp is not None:
+            entry["pp_pct"] = pp
+        if pk is not None:
+            entry["pk_pct"] = pk
+        if committed is not None:
+            entry["committed_per_game"] = committed
+        if entry:
+            out[key] = entry
+    return out
+
+
 def load_lineups(date: str, *, root: Optional[Path] = None) -> Dict[str, List[Dict[str, str]]]:
     """Load ``lineups_{date}.csv`` grouped by team abbreviation."""
     rows = _read_csv_rows(_processed_dir(root) / f"lineups_{date}.csv")
@@ -227,15 +270,20 @@ def build_team_features(
     abbrev: Optional[str] = None,
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
     elo_map: Optional[Dict[str, float]] = None,
+    special_teams_map: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> HockeyTeamFeatures:
-    """Assemble one side's team-strength features, filling xGF/xGA/Elo from the maps when present."""
+    """Assemble one side's team-strength features, filling xGF/xGA/Elo/special-teams when present."""
     ab = abbrev or _abbr(name)
     xgf = xga = None
     if xg_map and ab and ab in xg_map:
         xgf = xg_map[ab].get("xgf60")
         xga = xg_map[ab].get("xga60")
     elo = elo_map.get(ab) if (elo_map and ab) else None
-    return HockeyTeamFeatures(name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga, elo_rating=elo)
+    special_teams = dict(special_teams_map[ab]) if (special_teams_map and ab and ab in special_teams_map) else {}
+    return HockeyTeamFeatures(
+        name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga, elo_rating=elo,
+        special_teams=special_teams,
+    )
 
 
 def build_player_features(
@@ -289,6 +337,7 @@ def build_game_features(
     market: Optional[HockeyMarketLines] = None,
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
     elo_map: Optional[Dict[str, float]] = None,
+    special_teams_map: Optional[Dict[str, Dict[str, float]]] = None,
     lineups: Optional[Dict[str, List[Dict[str, str]]]] = None,
     goalies: Optional[Dict[str, Dict[str, str]]] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
@@ -309,13 +358,15 @@ def build_game_features(
         xg_map = load_team_xg_map(date, root=root)
     if elo_map is None:
         elo_map = load_team_elo_map(date, root=root)
+    if special_teams_map is None:
+        special_teams_map = load_team_special_teams_map(date, root=root)
     if lineups is None:
         lineups = load_lineups(date, root=root)
     if goalies is None:
         goalies = load_starting_goalies(date, root=root)
 
-    home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map)
-    away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map)
+    home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map)
+    away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map)
 
     if project:
         home, away, _proj = apply_projection(home, away, profile=profile)
@@ -370,15 +421,16 @@ def build_slate_features(
 ) -> List[HockeyGameFeatures]:
     """Assemble projection-primed features for every game on a date's scoreboard.
 
-    Shared per-date maps (xG / Elo / lineups / goalies) are read once and reused across games.
-    ``anchor_to_market`` opts into Phase-4 market anchoring per game (no-op without odds).
-    Returns ``[]`` when no scoreboard is mirrored for the date.
+    Shared per-date maps (xG / Elo / special-teams / lineups / goalies) are read once and reused
+    across games. ``anchor_to_market`` opts into Phase-4 market anchoring per game (no-op without
+    odds). Returns ``[]`` when no scoreboard is mirrored for the date.
     """
     games = _load_scoreboard_games(date, root=root)
     if not games:
         return []
     xg_map = load_team_xg_map(date, root=root)
     elo_map = load_team_elo_map(date, root=root)
+    special_teams_map = load_team_special_teams_map(date, root=root)
     lineups = load_lineups(date, root=root)
     goalies = load_starting_goalies(date, root=root)
     out: List[HockeyGameFeatures] = []
@@ -386,7 +438,8 @@ def build_slate_features(
         out.append(
             build_game_features(
                 pk, date, home_name, away_name,
-                root=root, xg_map=xg_map, elo_map=elo_map, lineups=lineups, goalies=goalies,
+                root=root, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map,
+                lineups=lineups, goalies=goalies,
                 profile=profile, project=project,
                 anchor_to_market=anchor_to_market, anchor_weight=anchor_weight,
             )

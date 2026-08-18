@@ -66,8 +66,9 @@ worker-push-to-web pattern MLB/basketball use).
 | `build_nhl_artifacts.py` | the daily producer — `build_predictions_for_date`, `build_recommendations_for_date`, `build_props_for_date` | no |
 | `refresh_nhl_oddsapi.py` | odds refresh + owns local-generation gating (`SYNDICATE_NHL_SOURCE_CLI_GENERATION`) | no |
 | `refresh_nhl_source_mirror.ps1` | cold-start mirror refresh | no |
-| `nhl_sim_input_checklist.py` | the CONSUMED-vs-POPULATED gate `model_engine_standard.md` §1 requires — **did not exist before this session** | **yes** |
+| `nhl_sim_input_checklist.py` | the CONSUMED-vs-POPULATED gate `model_engine_standard.md` §1 requires — **did not exist before this session**; corrected mid-session (reference doc §2b) | **yes** |
 | `build_nhl_elo_artifact.py` | Elo producer from cached truth data | **yes** |
+| `build_nhl_special_teams_artifact.py` | PP%/PK%/committed-per-game producer from cached truth data (extended `nhl_statsweb_loader.parse_landing` to capture penalties) | **yes** |
 
 **No dedicated audit/checklist tooling existed in the vendor tree before this
 session.** `vendor/nhl_betting_repo/nhl_betting/scripts/` holds
@@ -85,8 +86,8 @@ from its own vendor repos; NHL had none of that class of tool at all until
 
 | id | one-line | status |
 |---|---|---|
-| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player weights/`special_teams` (7 keys) genuinely absent, 16 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
-| `#454` | Play-by-play is an unused offline modelling substrate — NHL is one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | OPEN, unowned. Directly relevant to §3's finding: extending the truth-loader's parser (needed for `special_teams`/team-rate data, reference doc §5) and building real pbp ingestion are related but not identical asks — pbp would give shot-by-shot/event-level detail this session's fixes don't touch at all. |
+| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (`pp_pct`/`pk_pct`/`committed_per_game`) FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player weights/`special_teams_cal` (7 keys, UNREACHABLE) genuinely absent, 16 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
+| `#454` | Play-by-play is an unused offline modelling substrate — NHL is one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | OPEN, unowned. Directly relevant to §3's finding: extending the truth-loader's parser (already done once this session, for penalties; team-rate data would need it extended further, reference doc §5) and building real pbp ingestion are related but not identical asks — pbp would give shot-by-shot/event-level detail this session's fixes don't touch at all. |
 | `#440` | Sim-engine track pin (cross-sport); this session's work is NHL's contribution to it | PLANNED, referenced throughout |
 
 **`.syndicate/audit_2026-08-14_models.md`** (line 170/192) already flagged NHL's
@@ -98,12 +99,21 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
 
 ## 5. What this lane did NOT do
 
-- Did not build the `special_teams` per-team PP/PK data pipeline — flagged as
-  likely the single highest-value remaining gap (reference doc §5), but it
-  needs the truth-loader's landing-feed parser extended first, a real
-  data-pipeline build, not a wiring fix attempted or half-attempted here.
+- **Did** build the `HockeyTeamFeatures.special_teams` (`pp_pct`/`pk_pct`/
+  `committed_per_game`) PP/PK data pipeline — extending the earlier session's
+  framing, which had wrongly attributed this field to a different, unreachable
+  parameter (`special_teams_cal`, corrected in reference doc §2b). Verified
+  with a reachability test (elite PP outscores poor PP on average, 80 seeded
+  runs) — not yet a calibration backtest of the effect SIZE.
+- Did not wire `special_teams_cal`'s 7 keys — that needs a call-site change
+  (thread a real value at `player_props.py`'s `run_hockeysim_game(...)` call),
+  not a data producer; 3 of the 7 look like league-wide physics constants that
+  belong in `SimConfig`, not a per-team artifact (reference doc §2b/§5).
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
-  `faceoff_win_pct` or player usage weights — same reason.
+  `faceoff_win_pct` or player usage weights — needs the truth-loader's parser
+  extended further (beyond the penalties extension already done this session)
+  or the boxscore endpoint's per-goalie strength-state shot splits bulk-fetched
+  (verified the data exists; only 11 of 1,312 games are cached locally today).
 - Did not build a real xG (expected goals) model — the reader and allowlist
   exist; the shot-quality model producing the data does not, and building one
   is a distinct, substantial modelling project, not an input-population fix.

@@ -27,9 +27,9 @@ refresh_odds_sources._run_command  (odds-refresh step; sim_run_ledger.py:53 clas
          build_props_for_date                    -> props_recommendations_{date}.csv
       -> hockeysim/features/loaders.py
            build_slate_features(date)
-             load_team_xg_map / load_team_elo_map / load_lineups / load_starting_goalies
-             build_team_features(name, xg_map, elo_map)     :182
-             build_game_features(..., project=True)          :238 (project defaults True — reachable)
+             load_team_xg_map / load_team_elo_map / load_team_special_teams_map / load_lineups / load_starting_goalies
+             build_team_features(name, xg_map, elo_map, special_teams_map)     :267
+             build_game_features(..., project=True)          :330 (project defaults True — reachable)
                apply_projection(home, away)                  hockeysim/projection.py :206
                  project_game(...)                            Poisson / xG / Elo formulation
       -> hockeysim/adapters.py :: build_game_prediction        -> HockeyGamePrediction
@@ -48,6 +48,7 @@ refresh_odds_sources._run_command  (odds-refresh step; sim_run_ledger.py:53 clas
 | `lineups_{date}.csv`, `starting_goalies_{date}.csv`, `roster_snapshot_{date}.csv` | per-date roster inputs |
 | `team_xg_{season}.csv` / `team_xg_latest.csv` | xG input — **no producer writes this file; see §5** |
 | `team_elo_{season}.csv` / `team_elo_latest.csv` | Elo input — **new this session, see §4** |
+| `team_special_teams_{season}.csv` / `_latest.csv` | PP%/PK%/committed-per-game input — **new this session, see §4** |
 
 ---
 
@@ -93,6 +94,40 @@ exists if that future pass wants it.
 
 ---
 
+## 2b. A correction to THIS document's own first pass — `special_teams` is TWO unrelated things
+
+The first version of this document (and the checklist that produced its findings) reported
+`HockeyTeamFeatures.special_teams` as CONSUMED for 7 keys (`pp_shot_multiplier`, `pk_shot_multiplier`,
+`pp_goal_multiplier`, `pk_goal_multiplier`, `blocks_ev_rate`, `blocks_pk_rate`, `blocks_pp_def_rate`),
+AST-walked from `engine.py`'s `(special_teams_cal or {}).get(...)` call sites. **That attribution
+was wrong.** `special_teams_cal` is a SEPARATE parameter from `st_home`/`st_away` — the dict
+`build_team_features` actually populates is threaded to `st_home`/`st_away`
+(`player_props.py:90-91`), whose real consumed keys are `pp_pct`, `pk_pct`, `committed_per_game`
+(`engine.py:677-678,973-980`). `special_teams_cal` is plumbed end-to-end (`runtime.py` ->
+`engine.py`, twice, both defaulting to `None`) but **no caller anywhere ever passes it a value** —
+confirmed structurally (`scripts/nhl_sim_input_checklist.py`'s `special_teams_cal_reachability()`)
+and by direct grep across `syndicate/features/nhl/`. This is the exact same shape as the BVP trap
+in MLB's own reference doc and the `predictions_*.csv`/allowlist near-miss in §7 below: a plausible
+first read, from the right AST technique pointed at the wrong variable name.
+
+**The corrected picture:**
+- `HockeyTeamFeatures.special_teams` (`pp_pct`/`pk_pct`/`committed_per_game`) — genuinely
+  CONSUMED+UNPOPULATED, and now FIXED this session (§4).
+- `special_teams_cal` (the 7 multiplier/block-rate keys) — genuinely CONSUMED, but **UNREACHABLE**,
+  a stricter alarm than unpopulated per the standard's §4.3: populating `HockeyTeamFeatures` could
+  never have fixed this even in principle, because nothing reads it into that parameter. Fixing it
+  needs a call-site change (threading a real value into `special_teams_cal` at
+  `player_props.py`'s `run_hockeysim_game(...)` call and wherever else the boxscore engine is
+  invoked), not a data producer. Separately: three of its seven keys (`blocks_ev_rate`/
+  `blocks_pk_rate`/`blocks_pp_def_rate`) read, by their own inline comment ("higher block rate on
+  PK segments vs EV; lower on PP defending side"), as a **league-wide physics constant** (how much
+  more defenders block shots while shorthanded), not a team-differentiating input — if so, the
+  right fix for those three specifically is promoting them into `SimConfig`/`calibration_profile.py`
+  as calibrated defaults, not a per-team artifact. Not built this session; flagged precisely so the
+  next pass doesn't have to re-derive this distinction.
+
+---
+
 ## 3. Input provenance — where each input is produced and applied
 
 | input | produced by | applied in | population `[this checkout]` |
@@ -102,7 +137,8 @@ exists if that future pass wants it.
 | `goals_per_60` | `apply_projection` back-fills from `proj_home_goals`/`proj_away_goals` (**NEW** this session) | `player_props.py`'s `TeamRates` construction, then `engine.py` (shots/goals allocation, saves) | was 0% (stuck at the stale `2.9` default) → 100%, matchup-adjusted, after the fix |
 | `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct` | **no producer exists** — `build_team_features` never sets them | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% — genuinely absent, §5 |
 | `shot_weight`, `goal_weight`, `block_weight` (player) | **no producer exists** — `build_player_features` never sets them | player-level allocation weighting inside `engine.py` | 0% — genuinely absent, §5 |
-| `special_teams` (dict; 7 keys) | **no producer exists** | `player_props.py:90-91` → `engine.py`'s `special_teams_cal.get(key, NEUTRAL)`, 7 sites | 0% — every team, every game — genuinely absent, §5 |
+| `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
+| `special_teams_cal` (7 keys — separate parameter, see §2b) | **no producer, and unreachable regardless** — no caller passes it a value | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | 0% — CONSUMED but UNREACHABLE, not merely unpopulated; §2b/§5 |
 | `period_goal_lambdas` | `apply_projection`, from the (now-corrected) projection | `game_market_sim.py` — the **main board's** ML/spread/total | 100%, and this is what makes the main board unaffected by everything else in this table |
 
 **The main-board / props-engine split is the load-bearing fact in this
@@ -127,13 +163,28 @@ concept.
 | `scripts/build_nhl_elo_artifact.py` — producer, run against 1,312 cached real games | built, run: 32 teams rated | writes `team_elo_{season}.csv` / `team_elo_latest.csv` |
 | `elo_map` wiring — `loaders.load_team_elo_map` → `build_team_features` → `build_game_features` → `build_slate_features` | built, tested end-to-end against real mirrored data (`test_build_game_features_populates_elo_end_to_end`) | reachable by default, no flag |
 | `goals_per_60` back-fill in `apply_projection` | built, tested (56 existing projection/loaders/engine/props/adapter tests still pass) | reachable by default, no flag |
-| `HOT_ARTIFACT_PATTERNS`: `team_xg_*.csv`, `team_elo_*.csv` | added | makes both auditable via `/api/ops/artifacts/*`; does not by itself produce xG data |
-| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires | built, exits 1 (16 alarms) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
+| `historical_truth/special_teams_builder.py` — PP%/PK%/committed-per-game aggregation, small-sample floor (`MIN_OPPORTUNITIES_FOR_RATE=15`) | built, tested (`tests/test_hockeysim_special_teams_builder.py`) | pure function, no gate needed |
+| `scripts/build_nhl_special_teams_artifact.py` — producer, run against 1,312 cached real games | built, run: 32 teams rated, league avg PP% 18.8% — matches real-world NHL PP% range and reproduces known team tendencies (Edmonton highest, Philadelphia/Calgary lowest) as an external sanity check | writes `team_special_teams_{season}.csv` / `_latest.csv` |
+| `nhl_statsweb_loader.parse_landing` extended to capture minor-penalty counts per team | built, tested; league-wide implied PP% from the raw counts (18.8%) matches the builder's own output exactly | feeds the special-teams builder; no new fetch needed (used the existing 1,312-game cache) |
+| `special_teams_map` wiring — `loaders.load_team_special_teams_map` → `build_team_features` → `build_game_features` → `build_slate_features` | built, tested end-to-end (`test_build_game_features_populates_special_teams_end_to_end`) | reachable by default, no flag |
+| `HOT_ARTIFACT_PATTERNS`: `team_xg_*.csv`, `team_elo_*.csv`, `team_special_teams_*.csv` | added | makes all three auditable via `/api/ops/artifacts/*`; does not by itself produce xG data |
+| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b | built, exits 1 (16 alarms — same count as before the correction, but now correctly attributed: `special_teams`'s real 3 keys cleared, `special_teams_cal`'s 7 keys reported as UNREACHABLE instead) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
 
 **All of it is additive and reachable-by-default** — no new flag was
 introduced that needs to be flipped later. The one thing deliberately left OFF
 is `elo_blend_weight`, and §6 explains why with a measurement, not caution
-alone.
+alone. `special_teams`'s PP%/PK%/committed-per-game feed the engine's EXISTING
+goal-rate adjustment unconditionally (no new gate to flip), so populating it
+changes live output directly — unlike Elo, there is no separate blend weight
+to leave off. Per the standard's §4.3 ("presence is not reachability — write
+the reachability test FIRST"), `tests/test_hockeysim_engine.py::test_special_teams_pp_pct_actually_changes_output`
+proves the DIRECTION is right before trusting the magnitude: an elite power
+play (`pp_pct=0.35`) outscores a poor one (`pp_pct=0.08`) on average across 80
+seeded runs, holding every other input identical. That is a reachability
+proof, not a calibration backtest — unlike §6's Elo Brier-score measurement,
+nobody has yet measured whether the SIZE of this effect matches real NHL
+special-teams variance, only that the sign is correct. Worth a follow-up
+measurement before leaning on it for props at scale.
 
 ---
 
@@ -157,16 +208,22 @@ until checked there]`
   0.0%   goal_weight        FAIL  consumed but NEVER populated
   0.0%   shot_weight        FAIL  consumed but NEVER populated
 
---- special_teams (7 keys, AST-walked from engine.py, not hand-listed) ---
-  0.0%   pp_shot_multiplier    0.0%   pk_shot_multiplier
-  0.0%   pp_goal_multiplier    0.0%   pk_goal_multiplier
-  0.0%   blocks_ev_rate        0.0%   blocks_pk_rate     0.0%   blocks_pp_def_rate
+--- special_teams_cal (SEPARATE parameter from special_teams; §2b) ---
+  0.0%   pp_shot_multiplier    0.0%   pk_shot_multiplier    UNREACHABLE, not merely
+  0.0%   pp_goal_multiplier    0.0%   pk_goal_multiplier    unpopulated -- no caller
+  0.0%   blocks_ev_rate        0.0%   blocks_pk_rate        anywhere supplies this
+  0.0%   blocks_pp_def_rate                                 parameter a value at all
 ```
 
-Each of these needs **real per-team/per-player data the current truth loader
-does not capture**, not a wiring fix — the same "needs a definition first"
+(`HockeyTeamFeatures.special_teams`'s real 3 keys — `pp_pct`/`pk_pct`/`committed_per_game` —
+are FIXED this session, §4, and no longer appear above; see §2b for how an
+earlier pass of this document mis-attributed the 7 keys above to that field.)
+
+Each of the remaining fields needs **real per-team/per-player data the current
+truth loader does not capture, or (for `special_teams_cal`) a call-site
+wiring fix**, not a simple populate — the same "needs a definition first"
 class MLB's remaining 5 fall into, not the "just populate an existing pipe"
-class `elo_rating` and `goals_per_60` were:
+class `elo_rating`, `goals_per_60`, and `special_teams` were:
 
 - **Team rates** (`shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct`): `historical_truth.HistoricalGameRecord` captures goals,
@@ -182,15 +239,26 @@ class `elo_rating` and `goals_per_60` were:
 - **Player weights** (`shot_weight`/`goal_weight`/`block_weight`): usage-share
   weighting for the props allocator; needs per-player game logs the current
   loaders don't read.
-- **`special_teams`**: needs PP/PK opportunity and conversion data split by
-  strength state. `HistoricalGameRecord` already has `pp_goals_home/away` (PP
-  **goals**) but not PP **shots** or PK opportunities/goals-against — closer
-  to buildable than team rates, but still needs the parser extended, not just
-  the existing fields aggregated.
-  **This is likely the single highest-value remaining gap**: special-teams
-  differentiation is one of the most bettor-relevant dimensions in hockey, and
-  every multiplier the props engine applies for it is currently at its
-  hardcoded neutral default, for every team, unconditionally.
+- **`special_teams_cal`'s 7 keys**: needs a call-site fix (thread a real value
+  into `special_teams_cal` at every `run_hockeysim_game(...)`/`HockeySim(...)`
+  call site — currently only `player_props.py` calls it, and it never passes
+  this parameter), not new data for at least the 4 multiplier keys. The 3
+  block-rate keys read as a league-wide physics constant rather than a
+  team-differentiating one (§2b) — if so, they belong in
+  `calibration_profile.py` as calibrated `SimConfig` defaults, not a per-team
+  artifact, and building a per-team producer for them would be solving the
+  wrong problem.
+- **PP/PK SHOT rates specifically** (as opposed to the goal-rate signal
+  `special_teams` now carries): the `api-web.nhle.com` **boxscore** endpoint
+  (distinct from the **landing** endpoint the truth loader reads) carries
+  per-goalie `evenStrengthShotsAgainst`/`powerPlayShotsAgainst`/
+  `shorthandedShotsAgainst` splits — verified against one cached sample game
+  this session (`ingestion/nhl_web.py`'s existing `boxscore()` client already
+  fetches and caches this; only 11 games are cached locally today vs. 1,312
+  for `landing`). This is the real source for `pp_shot_multiplier`/
+  `pk_shot_multiplier` if `special_teams_cal` gets wired — a bulk fetch
+  (~1,300 games, rate-limited, same pattern as the truth loader) is the
+  remaining step, not a new endpoint to discover.
 
 ---
 

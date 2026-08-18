@@ -44,6 +44,12 @@ def synth_root(tmp_path: Path) -> Path:
         "CHI,1470\n",
         encoding="utf-8",
     )
+    (proc / "team_special_teams_2025-2026.csv").write_text(
+        "abbr,pp_pct,pk_pct,committed_per_game\n"
+        "BOS,0.23,0.83,2.9\n"
+        "CHI,0.14,0.79,3.3\n",
+        encoding="utf-8",
+    )
     (proc / f"lineups_{date}.csv").write_text(
         "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
         "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n"
@@ -141,6 +147,42 @@ def test_build_game_features_populates_elo_end_to_end(synth_root):
     )
     assert game.home.elo_rating == 1560.0
     assert game.away.elo_rating == 1470.0
+
+
+# ---------------------------------------------------------------------------
+# special_teams -- `docs/ai_context/hockeysim_engine_reference.md`: `pp_pct`/`pk_pct`/
+# `committed_per_game` are CONSUMED (via `st_home`/`st_away` in `engine.py`) and had no producer;
+# same reachability-test discipline as elo/xG above.
+# ---------------------------------------------------------------------------
+
+
+def test_load_team_special_teams_map(synth_root):
+    m = loaders.load_team_special_teams_map("2026-03-15", root=synth_root)
+    assert m["BOS"] == {"pp_pct": 0.23, "pk_pct": 0.83, "committed_per_game": 2.9}
+    assert m["CHI"]["pp_pct"] == 0.14
+
+
+def test_load_team_special_teams_map_missing_is_empty(tmp_path):
+    assert loaders.load_team_special_teams_map("2026-03-15", root=tmp_path) == {}
+
+
+def test_build_team_features_uses_special_teams_map(synth_root):
+    m = loaders.load_team_special_teams_map("2026-03-15", root=synth_root)
+    bos = loaders.build_team_features("Boston Bruins", special_teams_map=m)
+    assert bos.special_teams == {"pp_pct": 0.23, "pk_pct": 0.83, "committed_per_game": 2.9}
+
+
+def test_build_team_features_without_special_teams_is_empty_dict(synth_root):
+    bos = loaders.build_team_features("Boston Bruins", special_teams_map={})
+    assert bos.special_teams == {}
+
+
+def test_build_game_features_populates_special_teams_end_to_end(synth_root):
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    assert game.home.special_teams == {"pp_pct": 0.23, "pk_pct": 0.83, "committed_per_game": 2.9}
+    assert game.away.special_teams["pp_pct"] == 0.14
 
 
 def test_build_player_features_flags_starting_goalie(synth_root):
