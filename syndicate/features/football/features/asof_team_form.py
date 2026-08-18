@@ -98,6 +98,13 @@ def _pbp_path(season: int, pbp_dir: Path | None = None) -> Path:
 _NEEDED = (
     "game_id", "season", "week", "posteam", "defteam", "epa", "success",
     "pass", "yards_gained", "yardline_100", "touchdown", "play_type", "pass_oe",
+    # `drive` + `fixed_drive_result` power per-TRIP red-zone efficiency. Added
+    # after they were silently missing: the projection was written for the
+    # per-PLAY version, so the later per-trip fix read None from every row and
+    # emitted red_zone_efficiency=None league-wide. A projection list is a
+    # second place a field can go missing, and it fails quietly -- `row.get()`
+    # on an absent key is indistinguishable from an empty cell.
+    "drive", "fixed_drive_result",
 )
 
 # season -> projected rows, parsed once. Keyed by resolved path so a caller
@@ -157,8 +164,8 @@ def _aggregate(rows: Iterable[dict[str, Any]], source: str) -> dict[str, TeamFor
     off: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     dfn: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     games: dict[str, set[str]] = defaultdict(set)
-    rz_att: dict[str, int] = defaultdict(int)
-    rz_td: dict[str, int] = defaultdict(int)
+    rz_drives: dict[str, set] = {}
+    rz_td_drives: dict[str, set] = {}
 
     for row in rows:
         pos = str(row.get("posteam") or "").strip().upper()
@@ -188,11 +195,18 @@ def _aggregate(rows: Iterable[dict[str, Any]], source: str) -> dict[str, TeamFor
             thresh = 20.0 if (is_pass or 0.0) >= 1.0 else 10.0
             off[pos]["explosive"].append(1.0 if yards >= thresh else 0.0)
 
+        # RED ZONE IS PER TRIP, NOT PER PLAY. The engine baselines this term at
+        # 0.5 (`(red_zone_efficiency or 0.5) - 0.5`), which is only sensible for
+        # TD-per-red-zone-TRIP (~0.55-0.65 league-wide). Per-PLAY TD rate is
+        # ~0.21, and feeding that contributed -0.236 to the offense score for
+        # EVERY team -- one of two units bugs that pinned 30 of 32 teams to the
+        # clamp floor. Measured 2026-08-19.
         y100 = _f(row.get("yardline_100"))
-        if y100 is not None and y100 <= 20.0 and str(row.get("play_type") or "") in ("pass", "run"):
-            rz_att[pos] += 1
-            if (_f(row.get("touchdown")) or 0.0) >= 1.0:
-                rz_td[pos] += 1
+        drv = str(row.get("drive") or "")
+        if y100 is not None and y100 <= 20.0 and gid and drv:
+            rz_drives.setdefault(pos, set()).add((gid, drv))
+        if gid and drv and str(row.get("fixed_drive_result") or "") == "Touchdown":
+            rz_td_drives.setdefault(pos, set()).add((gid, drv))
 
         if def_:
             dfn[def_]["epa"].append(epa)
@@ -219,7 +233,10 @@ def _aggregate(rows: Iterable[dict[str, Any]], source: str) -> dict[str, TeamFor
             # to match the 0-1 scale the engine's other rate terms use.
             pass_rate_over_expectation=(lambda v: v / 100.0 if v is not None else None)(mean(o.get("pass_oe", []))),
             explosive_play_rate=mean(o.get("explosive", [])),
-            red_zone_efficiency=(rz_td[team] / rz_att[team]) if rz_att.get(team) else None,
+            red_zone_efficiency=(
+                len(rz_drives.get(team, set()) & rz_td_drives.get(team, set()))
+                / len(rz_drives[team])
+            ) if rz_drives.get(team) else None,
             defensive_epa=mean(d.get("epa", [])),
             success_rate_allowed=mean(d.get("success", [])),
             pace_seconds_per_play=None,  # see build_payload: needs drive timing, not per-play
@@ -296,7 +313,15 @@ def build_payload(
     put(offensive, "away_success_rate", a.success_rate)
     put(offensive, "red_zone_efficiency", h.red_zone_efficiency)
     put(offensive, "explosive_play_rate", h.explosive_play_rate)
-    put(offensive, "pass_rate_over_expectation", h.pass_rate_over_expectation)
+    # PROE IS DELIBERATELY NOT EMITTED, and this is an engine trap worth naming.
+    # `_offense_strength` reads
+    #   _first_float(offensive_metrics, ["pass_rate_over_expectation", "proe",
+    #                                    "home_pass_rate", "away_pass_rate"])
+    # and then evaluates `(value or 0.5) - 0.5`. That treats all four aliases as
+    # interchangeable, but they are NOT: PROE is a DIFFERENTIAL centered on 0,
+    # while a pass RATE is centered near 0.5. Feeding PROE cost -0.244 on the
+    # offense score for every team. Emitting only the true rate lets the alias
+    # chain fall through to `home_pass_rate`, which the 0.5 baseline fits.
     put(offensive, "home_pass_rate", h.pass_rate)
     put(offensive, "away_pass_rate", a.pass_rate)
 
