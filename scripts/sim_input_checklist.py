@@ -112,6 +112,8 @@ def main() -> int:
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--warn-only", action="store_true",
                     help="report without failing, for exploratory runs")
+    ap.add_argument("--publish", action="store_true",
+                    help="write the report into the artifact tree so PRODUCTION can be audited. Roster objects are not allowlisted (hundreds of large files per date); the worker runs this and publishes the bounded result instead -- the book_grid pattern.")
     args = ap.parse_args()
 
     from sim_engine.data.roster_artifact import read_game_roster_artifact
@@ -203,6 +205,30 @@ def main() -> int:
             {"rosters": len(paths), "counts": n, "failures": len(failures),
              "warnings": len(warnings), "rows": rows}, indent=2), encoding="utf-8")
         print(f"\nwrote {args.json}")
+
+    if args.publish:
+        import os
+        from datetime import datetime, timezone
+        root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+        base = Path(root).expanduser().resolve() if root else (REPO / "data")
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        out = (base / "mlb_source/source_artifacts/data/sim_input_report"
+               / f"sim_input_report_{stamp}.json")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "host": "worker" if root else "local",
+            "rosters": len(paths), "counts": n,
+            "failures": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in failures],
+            "warnings": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in warnings],
+            "rows": rows,
+        }, indent=2), encoding="utf-8")
+        print("")
+        print(f"published {out}")
+        print("  This is the ONLY way the production population is readable: the")
+        print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and roster_objs")
+        print("  is deliberately not on it.")
 
     return 1 if (failures and not args.warn_only) else 0
 

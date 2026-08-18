@@ -13988,3 +13988,54 @@ exists so the next person does not have to be right about vocabulary.
 - Add to `/preflight` or `migration_gate.py` — it is fast and exits non-zero.
 - `EXPECTED_SPARSE` documents the legitimately-thin fields, so a low number there
   is not mistaken for a defect.
+
+## 2026-08-18 — THE CHECKLIST CAN NOW REACH PRODUCTION. Allowlist opened for 3 input artifacts; roster objects deliberately NOT.
+
+Lane `convergence-phase7-crps`. `artifact_publisher.py` + `sim_input_checklist.py`.
+No deploy.
+
+### Why the production run could not happen, and what actually blocked it
+
+`/api/ops/artifacts/stream` gates on `is_hot_artifact_relative_path()`
+(`ops.py:1447`) — i.e. `HOT_ARTIFACT_PATTERNS`. **Roster objects are not on it,
+which is the 403**, not a token or a path-guess problem. Verified in code rather
+than inferred from failed requests.
+
+The SAME allowlist blocks the new input artifacts from reaching production. Both
+of the user's asks converged on one file.
+
+### `artifact_publisher.py` was FREE — the earlier block has cleared
+
+The lane guard blocked this file earlier today (`clv-without-settlement`). That
+lane is **no longer in `origin/main`'s `lanes.md` and no OPEN lane claims the
+file**. Taken without an override; re-verified before editing rather than
+assuming the earlier block still stood.
+
+### ALLOWLISTED (verified by calling the predicate)
+
+    True   pitch_splits/pitch_splits_*.json
+    True   batted_ball/batted_ball_*.json
+    True   sim_input_report/sim_input_report_*.json
+    False  daily_pitcher_props/snapshots/*/roster_objs/*      <- deliberate
+
+### ROSTER OBJECTS ARE DELIBERATELY EXCLUDED, and this is a judgement call
+
+Adding `roster_objs/*` would have let me stream production rosters and audit them
+directly. **I did not, and the reason is that this allowlist drives PUBLISHING as
+well as reading.** Roster objects are hundreds of large files per date; the
+egress history in this ledger (`#322`, the 207MB pivot, the live-odds-worker
+egress work) makes that an expensive unilateral change for what is, on my side,
+diagnostic convenience.
+
+**The `book_grid` pattern is the right one instead: the worker computes, and web
+reads a bounded result.** `sim_input_checklist.py --publish` now writes a small
+report artifact (per-field population + failures), which IS allowlisted. One
+small file answers the production question without moving the rosters.
+
+### Status
+
+- Checklist runs locally, gates at exit 1, publishes with `--publish`.
+- **The production numbers are still NOT MEASURED.** The checklist must RUN ON
+  THE WORKER for that, which needs a deploy — filed, not fired.
+- 18 tests pass across the blend and pitch-splits suites; the local report is
+  written and allowlist-valid.
