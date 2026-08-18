@@ -2265,3 +2265,43 @@ that hour is how this subject came to have three sections.
   stdev(P home) 0.1765 against baseline model 0.1575 / market 0.1811, but its 95%
   band (0.1133..0.2397) contains both — the effect is smaller than the instrument's
   noise. **Do not cite 0.1765 as evidence the under-dispersion is fixed.**
+
+## LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
+
+**`GET /api/ops/version` on the running service is the ONLY authority.** It
+reports what is executing. Everything else in this file is a record of a deploy
+that happened, which is a different question.
+
+- **web = `841b6d84`** ("scoped deploy: NFL preseason projection means +
+  provenance"), read from `/api/ops/version`. **NOT an ancestor of `origin/main`.**
+
+**THREE DIFFERENT VALUES WERE IN CIRCULATION FOR WEB TODAY**, and two of them
+were wrong in a way that survived review:
+
+    fa1871cf   this file, "DEPLOYED 2026-08-16 TO ALL THREE"   <- TRUE HISTORY,
+               but I read a dated deploy record as the current SHA. My error,
+               not the ledger's. A deploy record is not a state reading.
+    0bf866c3   another lane's note                             <- also not live
+    841b6d84   /api/ops/version                                <- ACTUALLY LIVE
+
+I cut a deploy branch off `0bf866c3` on the strength of the second one. **It was
+built on the wrong parent and was never pushed** — no harm done, but a deploy
+from it would have reverted whatever `841b6d84` carries.
+
+**Render reports web as `branch: main` while running a non-main SHA.** A deploy
+triggered without an explicit commit id takes main's tip: measured today,
+**1,042 commits / 451 files / +190,277 lines** against the live SHA. Always name
+the commit.
+
+**The `/deploys` REST read is blocked by `deploy-guard.py`** — it matches the URL
+path, so even `GET .../deploys?limit=2` is refused as "a Render deploy". Use
+`/api/ops/version` instead; it is a better source anyway.
+
+### Live web ALREADY carries `clv_openings`
+
+`841b6d84`'s `HOT_ARTIFACT_PATTERNS` contains
+`reports/intelligence/clv_openings/*.jsonl`. So the CLV lane's 403 was diagnosed
+against an OLDER web, and `deploy/clv-openings-allowlist` may now be redundant
+for that pattern. **It does NOT carry the five MLB sim patterns**, which are
+still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
+/api/ops/artifacts/publish` still 403s.
