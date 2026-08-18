@@ -202,12 +202,17 @@ def main() -> int:
         return 2
 
     est_a = total_dates * CREDITS_EVENTS_CALL
-    # 2.2 kickoff windows per slate date. MEASURED, not assumed: the 2022 run
-    # found 134 windows over 61 dates. The first version of this line guessed
-    # 1.7 and under-estimated the season by 28% (3,181 predicted vs 4,081
-    # actually billed). An estimate that reads low is the dangerous direction
-    # for a spend approval, so it is now anchored to a real run.
-    est_windows = int(round(total_dates * 2.2))
+    # Windows per slate date VARIES BY SEASON far more than expected, so this
+    # is the observed WORST case, not the mean. Measured over the full run:
+    #     2022  134 windows / 61 dates = 2.2
+    #     2023  301 / 63             = 4.8
+    #     2024  224 / 65             = 3.4
+    # I guessed 1.7, then "corrected" to 2.2 from 2022 alone -- and 2.2 was
+    # still low for both later seasons. Total came in at 19,959 credits against
+    # a ~9,819 prediction, a 2x overrun. Anchoring to ONE season did not
+    # generalise, so this now uses the high end: for a SPEND APPROVAL an
+    # estimate that reads low is the harmful direction.
+    est_windows = int(round(total_dates * 4.8))
     est_b = est_windows * CREDITS_ODDS_CALL
     print("\nESTIMATE (prediction, not a bill -- headers are authoritative):")
     print("  phase A  %5d events calls  x %2d = %7d credits" % (total_dates, CREDITS_EVENTS_CALL, est_a))
@@ -258,8 +263,20 @@ def main() -> int:
                 ct = _parse_iso(ev.get("commence_time"))
                 # Keep only games kicking off in THIS window -- a snapshot also
                 # carries later games, whose lines are not yet closing.
-                if ct and abs((ct - kickoff).total_seconds()) <= 600:
-                    captured[str(ev.get("id"))] = {"snapshot_at": at, **ev}
+                if not ct or abs((ct - kickoff).total_seconds()) > 600:
+                    continue
+                # REJECT A SNAPSHOT THAT LANDS AFTER KICKOFF. Measured on the
+                # first full run: 1 row in 2023 and 1 in 2024 (2 of 852) had
+                # `snapshot_at` LATER than `commence_time`. A post-kickoff price
+                # is not a closing line -- it can already carry in-game
+                # information, which would leak the outcome into a backtest that
+                # exists to measure a pregame model. 0.23% is small enough to
+                # discard and far too contaminated to keep.
+                if _parse_iso(at) and ct and _parse_iso(at) > ct:
+                    print("    ! skipping post-kickoff snapshot for %s (%s > %s)"
+                          % (ev.get("id"), at, ev.get("commence_time")), flush=True)
+                    continue
+                captured[str(ev.get("id"))] = {"snapshot_at": at, **ev}
             if i % 20 == 0:
                 print("    %d/%d windows, %d games, %d credits" % (i, len(windows), len(captured), budget.spent))
 
