@@ -78,9 +78,15 @@ def consumed_keys() -> dict[str, list[list[str]]]:
 def main() -> int:
     # A REAL feature payload from the production constructor -- not a fixture.
     # Ratings shaped like `compute_team_ratings` output so the call is honest.
+    # Shaped EXACTLY as `compute_team_ratings` emits (loaders.py:241-248), so an
+    # alarm here means the wiring is missing rather than the fixture being thin.
     ratings = {
-        "ajax": {"attack_rating": 0.31, "defense_rating": -0.12},
-        "psv": {"attack_rating": 0.28, "defense_rating": -0.09},
+        "ajax": {"attack_rating": 0.31, "defense_rating": -0.12,
+                 "xg_for_per_match": 1.92, "xg_against_per_match": 0.94,
+                 "ppda": 9.6, "matches": 34.0},
+        "psv": {"attack_rating": 0.28, "defense_rating": -0.09,
+                "xg_for_per_match": 1.81, "xg_against_per_match": 1.02,
+                "ppda": 10.4, "matches": 34.0},
     }
     match = build_soccer_match_features(
         league="eredivisie", date="2026-08-19",
@@ -108,7 +114,15 @@ def main() -> int:
             continue
         payload = getattr(match, target) or {}
         for keys in consumed[container]:
+            # MIRRORS THE ENGINE'S OWN LOOKUP. `_first_float(..., side=)` prefers
+            # `{side}_{key}` because the payload is one dict per match while the
+            # priors are built per possession owner. A checklist that only
+            # checked bare keys would report correctly-wired per-team metrics as
+            # unfed -- which it did, on the first run after the wiring landed.
             present = [k for k in keys if k in payload]
+            if not present:
+                present = [f"{sd}_{k}" for k in keys for sd in ("home", "away")
+                           if f"{sd}_{k}" in payload]
             label = f"{container}.{keys[0]}"
             if present:
                 print(f"  ok    {label:46s} fed by {present[0]!r}")

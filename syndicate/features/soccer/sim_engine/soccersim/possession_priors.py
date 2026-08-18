@@ -28,8 +28,26 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def _first_float(payload: Mapping[str, Any], keys: list[str]) -> float | None:
+def _first_float(payload: Mapping[str, Any], keys: list[str], *, side: str | None = None) -> float | None:
+    """First numeric hit, preferring this SIDE's copy of the key.
+
+    `feature_generation_payload` is ONE dict for the whole match, but
+    `build_possession_priors` runs per possession owner. Without `side`, a
+    single `xg_for_per_match` is read for both teams -- so whichever side is
+    on the ball gets scored with the same team's xG. A wrong number is worse
+    than the neutral default it replaces, which is why the payload sat unfed
+    rather than being wired naively.
+
+    The key lists already carried `home_xg_for` / `away_xg_for` as fallbacks,
+    which is the shape this restores: try `{side}_{key}` first, then the bare
+    key, so a match-level metric (tempo, market) still resolves for both sides
+    while a per-team metric resolves to the right team.
+    """
     for key in keys:
+        if side:
+            numeric = _safe_float(payload.get(f"{side}_{key}"))
+            if numeric is not None:
+                return numeric
         numeric = _safe_float(payload.get(key))
         if numeric is not None:
             return numeric
@@ -106,13 +124,13 @@ class PossessionPriorProfile:
         }
 
 
-def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Mapping[str, Any], form_metrics: Mapping[str, Any]) -> float:
-    xg_for = _first_float(attacking_metrics, ["xg_for_per_match", "xg_for", "xg", "home_xg_for", "away_xg_for"])
-    shots = _first_float(attacking_metrics, ["shots_per_match", "shots", "home_shots", "away_shots"])
-    big_chances = _first_float(attacking_metrics, ["big_chances_per_match", "big_chances"])
-    goals = _first_float(attacking_metrics, ["goals_per_match", "goals_for_per_match", "goals_for"])
-    set_piece_share = _first_float(set_piece_metrics, ["set_piece_xg_share", "set_piece_goal_share"])
-    form_points = _first_float(form_metrics, ["points_per_match", "recent_points_per_match", "form_points"])
+def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Mapping[str, Any], form_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    xg_for = _first_float(attacking_metrics, ["xg_for_per_match", "xg_for", "xg", "home_xg_for", "away_xg_for"], side=side)
+    shots = _first_float(attacking_metrics, ["shots_per_match", "shots", "home_shots", "away_shots"], side=side)
+    big_chances = _first_float(attacking_metrics, ["big_chances_per_match", "big_chances"], side=side)
+    goals = _first_float(attacking_metrics, ["goals_per_match", "goals_for_per_match", "goals_for"], side=side)
+    set_piece_share = _first_float(set_piece_metrics, ["set_piece_xg_share", "set_piece_goal_share"], side=side)
+    form_points = _first_float(form_metrics, ["points_per_match", "recent_points_per_match", "form_points"], side=side)
 
     score = 0.0
     score += ((xg_for or 1.35) - 1.35) * 0.22
@@ -124,11 +142,11 @@ def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Ma
     return _clamp(0.5 + score, 0.05, 0.95)
 
 
-def _defense_strength(defensive_metrics: Mapping[str, Any]) -> float:
-    xg_against = _first_float(defensive_metrics, ["xg_against_per_match", "xg_against", "home_xg_against", "away_xg_against"])
-    shots_allowed = _first_float(defensive_metrics, ["shots_allowed_per_match", "shots_allowed", "shots_against"])
-    goals_against = _first_float(defensive_metrics, ["goals_against_per_match", "goals_against"])
-    clean_sheet_rate = _first_float(defensive_metrics, ["clean_sheet_rate", "clean_sheets_per_match"])
+def _defense_strength(defensive_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    xg_against = _first_float(defensive_metrics, ["xg_against_per_match", "xg_against", "home_xg_against", "away_xg_against"], side=side)
+    shots_allowed = _first_float(defensive_metrics, ["shots_allowed_per_match", "shots_allowed", "shots_against"], side=side)
+    goals_against = _first_float(defensive_metrics, ["goals_against_per_match", "goals_against"], side=side)
+    clean_sheet_rate = _first_float(defensive_metrics, ["clean_sheet_rate", "clean_sheets_per_match"], side=side)
 
     score = 0.0
     score += (1.35 - (xg_against or 1.35)) * 0.22
@@ -146,8 +164,8 @@ def _pace_values(tempo_metrics: Mapping[str, Any]) -> tuple[float, float]:
     return pace_index, pace_seconds
 
 
-def _possession_share(possession_metrics: Mapping[str, Any]) -> float:
-    share = _first_float(possession_metrics, ["possession_share", "possession_pct", "possession"])
+def _possession_share(possession_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    share = _first_float(possession_metrics, ["possession_share", "possession_pct", "possession"], side=side)
     if share is None:
         return 0.5
     if share > 1.0:
@@ -155,27 +173,27 @@ def _possession_share(possession_metrics: Mapping[str, Any]) -> float:
     return _clamp(share, 0.20, 0.80)
 
 
-def _pressing_index(defensive_metrics: Mapping[str, Any], possession_metrics: Mapping[str, Any]) -> float:
-    ppda = _first_float(defensive_metrics, ["ppda", "passes_per_defensive_action"])
+def _pressing_index(defensive_metrics: Mapping[str, Any], possession_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    ppda = _first_float(defensive_metrics, ["ppda", "passes_per_defensive_action"], side=side)
     if ppda is None:
-        ppda = _first_float(possession_metrics, ["ppda"])
+        ppda = _first_float(possession_metrics, ["ppda"], side=side)
     if ppda is None:
         return 0.5
     # Lower PPDA means more aggressive pressing; league-average is ~11.
     return _clamp(0.5 + (11.0 - ppda) * 0.06, 0.05, 0.95)
 
 
-def _set_piece_index(set_piece_metrics: Mapping[str, Any]) -> float:
-    share = _first_float(set_piece_metrics, ["set_piece_xg_share", "set_piece_goal_share"])
-    corners = _first_float(set_piece_metrics, ["corners_per_match", "corners"])
+def _set_piece_index(set_piece_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    share = _first_float(set_piece_metrics, ["set_piece_xg_share", "set_piece_goal_share"], side=side)
+    corners = _first_float(set_piece_metrics, ["corners_per_match", "corners"], side=side)
     score = 0.0
     score += ((share or 0.30) - 0.30) * 0.8
     score += ((corners or 5.0) - 5.0) * 0.03
     return _clamp(0.5 + score, 0.05, 0.95)
 
 
-def _availability_index(availability_metrics: Mapping[str, Any]) -> float:
-    value = _first_float(availability_metrics, ["availability_index", "squad_availability", "starters_available_share"])
+def _availability_index(availability_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
+    value = _first_float(availability_metrics, ["availability_index", "squad_availability", "starters_available_share"], side=side)
     if value is None:
         return 0.5
     return _clamp(value, 0.0, 1.0)
@@ -227,13 +245,18 @@ def build_possession_priors(
     market_features = _extract_block(sources, ["market_features", "market", "betting"])
     form_metrics = _extract_block(sources, ["form", "recent_form", "form_metrics"])
 
-    attack_index = _attack_strength(attacking_metrics, set_piece_metrics, form_metrics)
-    defense_index = _defense_strength(defensive_metrics)
+    # SIDE SELECTION MIRRORS THE RATING SELECTION ABOVE, which already takes
+    # the owner's attack against the OPPONENT's defence. Attack, possession,
+    # set pieces and availability describe the team on the ball; defence and
+    # pressing describe the team it is playing against.
+    opponent = "away" if owner == "home" else "home"
+    attack_index = _attack_strength(attacking_metrics, set_piece_metrics, form_metrics, side=owner)
+    defense_index = _defense_strength(defensive_metrics, side=opponent)
     pace_index, pace_seconds = _pace_values(tempo_metrics)
-    possession_share = _possession_share(possession_metrics)
-    pressing_index = _pressing_index(defensive_metrics, possession_metrics)
-    set_piece_index = _set_piece_index(set_piece_metrics)
-    availability_index = _availability_index(availability_metrics)
+    possession_share = _possession_share(possession_metrics, side=owner)
+    pressing_index = _pressing_index(defensive_metrics, possession_metrics, side=opponent)
+    set_piece_index = _set_piece_index(set_piece_metrics, side=owner)
+    availability_index = _availability_index(availability_metrics, side=owner)
     market_prior_index = _market_prior_index(market_features)
 
     attack_index = _clamp((attack_index + fallback_attack) / 2.0, 0.05, 0.95)
