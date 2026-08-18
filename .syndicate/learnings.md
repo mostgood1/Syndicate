@@ -4130,3 +4130,82 @@ the entire `#379` diagnosis WITH today's numbers, and reading it earlier would
 have saved two wrong causes. **Read the docstring first for the diagnosis; then
 verify it against the code before acting on it.**
 
+## 2026-08-18 — A DUPLICATED TERM PASSES EVERY CHECK THIS REPO HAS. A PLAUSIBILITY READ CAUGHT IT.
+
+I wired `goals_for` into soccer's rating aggregation. `team_rows_from_match_history`
+already sets `xg_for = home_goals` (goals as the xG stand-in), so the same number
+entered `_attack_strength` twice:
+
+    ((xg_for or 1.35) - 1.35) * 0.22
+    ((goals  or 1.35) - 1.35) * 0.14
+
+Every football-data league weighted goals at **0.36 instead of 0.22**, defence
+identically. I committed it, pushed it, and wrote a checkpoint calling it verified.
+
+**WHAT DID NOT CATCH IT — the full list, because that is the finding.**
+The field was **CONSUMED** (the engine reads it), **POPULATED** (real data, 918
+history rows), and **MOVED PUBLISHED OUTPUT** (a real A/B artifact build showed the
+projection change). So it passed: the input checklist, four reachability tests,
+`off != on` per side, 31 unit tests, and an end-to-end artifact diff. **Every
+instrument this repo has for exactly this class of defect reported healthy**, and
+each one was RIGHT — the field genuinely was consumed, populated and reachable.
+
+**WHAT DID CATCH IT.** `total_mean` read **3.39** for an eredivisie fixture and that
+looked too big for a corners-and-shots change. A number being *implausible for its
+domain* — not failing a threshold, not differing from a baseline, just wrong-looking
+to someone who knows what a Dutch league total is. Correcting it gave 3.32, and
+`win_probability.home` moved 0.49 -> **0.46**: the duplicate had been **flipping the
+direction** of the whole contribution, not merely inflating it.
+
+**THE RULE.** Reachability answers "does this input arrive and matter". It cannot
+answer "is this input's contribution CORRECTLY SIZED", because a term counted twice
+arrives and matters twice. After wiring any input into a weighted sum, **read the
+resulting magnitude against domain knowledge** — an expected-goals total, a win
+probability, a run line — and treat a number that is merely *surprising* as a defect
+until explained. That is the only check that sees this class.
+
+**SECOND-ORDER, and the reason this is not a one-off.** `_attack_strength` is a
+weighted sum whose constants were fitted when every term but the ratings was absent
+and returning neutral defaults. Every field wired into it from now on — the four
+still outstanding (`possession_share`, `set_piece_xg_share`, `availability_index`,
+`pace_seconds_per_event`) — risks the same thing in a subtler form: not literal
+duplication, but a signal the ratings were already absorbing. **Adding a mechanism to
+a calibrated engine requires re-fitting the rates that absorbed it** — CLAUDE.md
+already says this for MLB and it measured a NEGATIVE interaction from two mechanisms
+in 4 of 4 markets. Soccer is now in the same position and has no re-fit.
+
+**Cross-reference:** the same night produced four defects whose error path rendered
+as the system's own "nothing here". This is the inverse and worse: the error path
+rendered as the system WORKING. A green instrument is evidence only about the
+question it asks, and "did it arrive" is not "is it right".
+
+## 2026-08-18 — RULE: a union merge CANNOT carry a deliberate deletion. A collapse pushed through one is undone, and comes back bigger
+
+**I collapsed `state.md` from 59 sections to 26, pushed it through the merge
+cycle, and `origin/main` came out with 87.** The collapse was reverted and my new
+sections were added on top, so the file ended up **larger than before I started**.
+
+**The mechanism is the merge resolver doing exactly its job.** The ledger files
+are append-only, so the cycle resolves them by UNION: take ours, then append any
+block from theirs that ours lacks. A deliberate deletion is indistinguishable
+from "ours is missing a block", so every collapsed section was restored from
+`origin/main` — and the invariant that guards the union reported *loss* when it
+saw the collapse, which is the same confusion from the other side.
+
+**The tell was in the numbers and I nearly missed it**: I checked
+`unpushed: 0` and the file list, and only caught it because the line count on
+main (3,763) was larger than the pre-collapse file (3,526). **A push that
+succeeds is not a push that did what you meant.**
+
+**How to apply.**
+- **A collapse or dedupe must be the LAST commit before the push, and the push
+  must be a fast-forward** — or it must be re-applied on top of the merge result.
+  Re-applying is what worked here: take the collapsed file, diff its sections
+  against the merged one, carry forward only sections that are in neither the
+  collapse nor the archive.
+- **Verify a size-reducing change by SIZE after pushing**, not by exit code.
+  Sections, lines, or bytes — whichever the change was measured in.
+- **Teach the invariant about the archive.** The check tracks six ledger files
+  and knew nothing about `state_archive_2026-08-18_full.md`, so it read 12
+  collapsed lines as lost. They were all in the archive; the override was
+  correct, but the checker should have known.

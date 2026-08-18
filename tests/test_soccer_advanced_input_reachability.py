@@ -31,13 +31,28 @@ PROFILE = get_league_profile("eredivisie")
 
 # Shaped exactly as `compute_team_ratings` emits (loaders.py), so a failure here
 # means the wiring broke, not that the fixture drifted from production.
+# xG IS DELIBERATELY NOT A REACHABILITY SUBJECT HERE ANY MORE.
+# `_attack_strength` / `_defense_strength` no longer read `xg_for_per_match` /
+# `xg_against_per_match`: those terms were dropped because the index is averaged
+# with `fallback_attack = 0.5 + attack_rating`, and the ratings ARE xG
+# (corr +0.984 attack, **-1.000 exactly** on defence). The keys are still
+# populated by `build_soccer_match_features` and are currently UNREAD -- a "dead
+# field" in the model-engine standard's terms, kept because a real xG source
+# whose xG differs from goals would want them. Reachability is therefore
+# asserted on the terms the engine ACTUALLY reads.
 RATINGS = {
     "ajax": {"attack_rating": 0.31, "defense_rating": -0.12,
              "xg_for_per_match": 1.92, "xg_against_per_match": 0.94,
-             "ppda": 9.6, "matches": 34.0},
+             "ppda": 9.6, "matches": 34.0,
+             "shots_per_match": 16.4, "shots_allowed_per_match": 8.1,
+             "clean_sheet_rate": 0.47, "corners_per_match": 7.2,
+             "points_per_match": 2.31},
     "psv": {"attack_rating": 0.28, "defense_rating": -0.09,
             "xg_for_per_match": 1.10, "xg_against_per_match": 1.55,
-            "ppda": 14.8, "matches": 34.0},
+            "ppda": 14.8, "matches": 34.0,
+            "shots_per_match": 9.3, "shots_allowed_per_match": 15.7,
+            "clean_sheet_rate": 0.12, "corners_per_match": 3.4,
+            "points_per_match": 0.94},
 }
 
 
@@ -82,21 +97,30 @@ def test_the_production_constructor_populates_xg_and_ppda():
         league="eredivisie", date="2026-08-19",
         home_team="Ajax", away_team="PSV", ratings=RATINGS,
     )
-    assert match.team_metrics.get("home_xg_for_per_match") == 1.92
-    assert match.team_metrics.get("away_xg_for_per_match") == 1.10
-    assert match.defensive_metrics.get("home_xg_against_per_match") == 0.94
-    assert match.defensive_metrics.get("away_xg_against_per_match") == 1.55
+    # The terms the engine READS today.
+    assert match.team_metrics.get("home_shots_per_match") == 16.4
+    assert match.team_metrics.get("away_shots_per_match") == 9.3
+    assert match.team_metrics.get("home_points_per_match") == 2.31
+    assert match.defensive_metrics.get("home_shots_allowed_per_match") == 8.1
+    assert match.defensive_metrics.get("home_clean_sheet_rate") == 0.47
     assert match.defensive_metrics.get("home_ppda") == 9.6
+    assert match.set_piece_metrics.get("home_corners_per_match") == 7.2
+    # Populated but currently UNREAD -- kept, and pinned so a future re-wiring
+    # of a real xG source finds them where it expects.
+    assert match.team_metrics.get("home_xg_for_per_match") == 1.92
+    assert match.defensive_metrics.get("home_xg_against_per_match") == 0.94
 
 
 @pytest.mark.parametrize("owner", ["home", "away"])
 def test_off_differs_from_on(owner: str):
     """REACHABILITY, and it is the test that must run before any correctness
     test: an empty payload and a fed one must not produce the same priors."""
-    off = _priors({"attacking_metrics": {}, "defensive_metrics": {}}, owner)
+    off = _priors({"attacking_metrics": {}, "defensive_metrics": {},
+                   "possession_metrics": {}, "set_piece_metrics": {}}, owner)
     on = _priors(_payload(), owner)
     assert off.goal_conversion_probability != on.goal_conversion_probability, (
-        f"feeding xG/PPDA changed nothing for owner={owner} -- the input is inert"
+        f"feeding shots/corners/clean-sheets/form/PPDA changed nothing for "
+        f"owner={owner} -- the input is inert"
     )
 
 

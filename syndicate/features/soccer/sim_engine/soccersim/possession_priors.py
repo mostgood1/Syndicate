@@ -125,7 +125,25 @@ class PossessionPriorProfile:
 
 
 def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Mapping[str, Any], form_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
-    xg_for = _first_float(attacking_metrics, ["xg_for_per_match", "xg_for", "xg", "home_xg_for", "away_xg_for"], side=side)
+    # NO xg TERM HERE. `build_possession_priors` averages this index with
+    # `fallback_attack = 0.5 + attack_rating`, and `attack_rating` IS xG --
+    # `(xg_for / league_mean - 1.0) * _RATING_SCALE` in `compute_team_ratings`.
+    # Measured on eredivisie (22 teams, 918 matches): corr(attack_rating,
+    # xg_for) = +0.984, and xG accounted for 0.5546 of the combined
+    # attack_index spread of 0.6728 -- **82% of the index was one signal
+    # arriving through two routes**.
+    #
+    # A model whose measured defect is UNDER-DISPERSION (stdev 0.1575 vs market
+    # 0.1811) does not need the same evidence twice: that raises confidence
+    # without adding information, which moves the spread the right way for the
+    # wrong reason and degrades calibration. CLAUDE.md's "mechanism vs
+    # estimator" rule, measured -- two mechanisms produced a NEGATIVE
+    # interaction in 4 of 4 MLB markets.
+    #
+    # The remaining terms are kept because they are what this block can add
+    # that the rating cannot. `shots` is the weakest of them
+    # (corr(xg_for, shots) = +0.895) and is a candidate for the same treatment
+    # if a re-fit shows it earning nothing.
     shots = _first_float(attacking_metrics, ["shots_per_match", "shots", "home_shots", "away_shots"], side=side)
     big_chances = _first_float(attacking_metrics, ["big_chances_per_match", "big_chances"], side=side)
     goals = _first_float(attacking_metrics, ["goals_per_match", "goals_for_per_match", "goals_for"], side=side)
@@ -133,7 +151,6 @@ def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Ma
     form_points = _first_float(form_metrics, ["points_per_match", "recent_points_per_match", "form_points"], side=side)
 
     score = 0.0
-    score += ((xg_for or 1.35) - 1.35) * 0.22
     score += ((shots or 12.5) - 12.5) * 0.016
     score += ((big_chances or 2.2) - 2.2) * 0.04
     score += ((goals or 1.35) - 1.35) * 0.14
@@ -143,13 +160,28 @@ def _attack_strength(attacking_metrics: Mapping[str, Any], set_piece_metrics: Ma
 
 
 def _defense_strength(defensive_metrics: Mapping[str, Any], *, side: str | None = None) -> float:
-    xg_against = _first_float(defensive_metrics, ["xg_against_per_match", "xg_against", "home_xg_against", "away_xg_against"], side=side)
+    # NO xg_against TERM HERE, for the same reason the attack block has no xg
+    # term -- and the collinearity is even starker on this side.
+    # `build_possession_priors` averages this index with
+    # `fallback_defense = 0.5 + defense_rating`, and `defense_rating` is
+    # `(1.0 - xg_against / league_mean) * _RATING_SCALE`: a linear transform of
+    # `xg_against` and nothing else.
+    #
+    # Measured on eredivisie (22 teams, 918 matches):
+    # **corr(defense_rating, xg_against) = -1.000, exactly**, and xG accounted
+    # for 0.3274 of the 0.4181 combined defense_index spread -- 78% of the index
+    # from one signal arriving twice.
+    #
+    # DROPPED IN THE SAME COMMIT AS THE ATTACK TERM ON PURPOSE. Fixing one side
+    # alone leaves the model counting defensive evidence twice and offensive
+    # evidence once, which systematically favours the defending side -- a NEW
+    # bias, arguably worse than the symmetric double-count it replaces. The two
+    # terms are structurally identical and had to move together.
     shots_allowed = _first_float(defensive_metrics, ["shots_allowed_per_match", "shots_allowed", "shots_against"], side=side)
     goals_against = _first_float(defensive_metrics, ["goals_against_per_match", "goals_against"], side=side)
     clean_sheet_rate = _first_float(defensive_metrics, ["clean_sheet_rate", "clean_sheets_per_match"], side=side)
 
     score = 0.0
-    score += (1.35 - (xg_against or 1.35)) * 0.22
     score += (12.5 - (shots_allowed or 12.5)) * 0.016
     score += (1.35 - (goals_against or 1.35)) * 0.14
     score += ((clean_sheet_rate or 0.30) - 0.30) * 0.30
