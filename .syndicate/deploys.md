@@ -13504,3 +13504,42 @@ are the two that matter.
 **Handed on:** whoever picks up soccer projections next should start at the
 match-to-row join, with `unmatched_match_rows = 1,138 of 1,142` as the opening
 reading. The read is no longer the bottleneck.
+
+## CORRECTION — the ownership gate is NOT inert. It fires on live-odds-worker and not on refresh-worker `[2026-08-18 ~00:4xZ]`
+
+**My earlier verdict — "INERT ON PRODUCTION" — was too broad and I am withdrawing
+it.** A lane's handoff said the gate was "DEPLOYED and HALF-VERIFIED, half one
+confirmed by live-odds-worker's own `SWEEP_OWNERSHIP_EXCLUDED` line". I re-derived
+it rather than taking it on trust, and the lane is right.
+
+**Measured by the coordinator, both services, same window:**
+
+    live-odds-worker  00:34:28Z, 00:35:34Z, 00:36:39Z (repeating)
+      SWEEP_OWNERSHIP_EXCLUDED date=2026-08-17 kept=mlb,wnba,soccer
+        dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+
+    refresh-worker    nothing matched since 20:36Z
+
+**So the corrected verdict is HALF-WORKING, not inert:**
+
+- **live-odds-worker: the gate WORKS.** It keeps `mlb,wnba,soccer` and drops
+  `nfl,ncaaf`, with the reason attached to each dropped sport. That is exactly
+  the designed behaviour and it is running now.
+- **refresh-worker: the gate is NOT REACHED.** No exclusion line at all, while
+  the service continues to launch sweeps for sports it does not own.
+
+**The half that is NOT fixed is the half the request existed for.** The defect
+filed was *"refresh-worker sweeps mlb/wnba/soccer while owning only nfl, wins the
+shared cadence marker, and starves the designated owner"*. live-odds-worker
+dropping nfl/ncaaf is real and good; it is not that.
+
+**What my error was, precisely:** I measured ONE service and generalised to
+"production". The two services run different sweep paths, so a per-service
+reading was required and I took a per-fleet conclusion from it. Same shape as the
+rule this ledger already holds about single-service reasoning over a shared
+marker — which I had just recorded as `#382`'s correction, hours earlier.
+
+**What stands from the earlier measurement:** refresh-worker's path does not
+consult `_live_refresh_loop_effective_sports`. That trace is still the right
+starting point for the remaining half, and the reachability framing was right —
+it was the scope of the word "inert" that was wrong.
