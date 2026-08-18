@@ -510,3 +510,111 @@ instrument is known to be able to read non-zero.**
 
 **Not audited is not "fine".** Those four rows are the next lane's work, not a
 clean bill of health.
+
+
+---
+
+## NFL PRESEASON — audited 2026-08-18, in season, board live
+
+Preseason is the one football surface serving real model output right now, so it
+was audited against the served payload first, per §0b.
+
+### What is HEALTHY
+
+- **Model output reaches the board: 16 of 16 games carry `home_mean`/`away_mean`
+  and a real `home_win` probability.** Unlike NCAAF, this pipeline runs.
+- `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN = 'true'` on
+  refresh-worker (live env, read 2026-08-18).
+- **The week label is NOT an off-by-one.** The board reads "2026 Preseason Week 2
+  (dress rehearsal)" while sourcing `..._wk3.csv`, which looks wrong and is
+  correct: `PRESEASON_WEEK_LABELS` maps ESPN week 1 to the Hall of Fame game, so
+  file week 3 IS display week 2. Checked before it was published as a defect.
+
+### FIXED: the board showed a projected score and no spread or total
+
+**Measured on production, BOTH NFL boards, 16 of 16 games each:**
+
+| field | populated |
+|---|---|
+| `home_mean` | **100%** |
+| `away_mean` | **100%** |
+| `total_mean` | **0%** |
+| `margin_mean` | **0%** |
+
+`_shared_predictions` (`publication_adapter.py`) read the means from
+`predictions`, then `sim.score`, then `score` — and **never from
+`sim.periods.full`**. NFL's cards put all four fields in `periods.full` and only
+TWO in `sim.score`. So exactly the two fields missing from the payload were
+exactly the two the adapter had no path to.
+
+**The data was never absent.** `SmartSimNflPreseasonProjection` carries
+`margin_mean` and `total_mean` as *required* CSV columns. They were dropped in
+transit — a betting board showing a projected score and neither number a market
+line is compared against. Fixed by reading `periods.full`, then deriving
+`total = home + away` / `margin = home − away` as a last resort (definitional,
+and `game_board_contract._normalize_game` already does exactly this for its
+market tiles). Ordered after every real source, so a producer's own value always
+wins — preseason legitimately produces a *shrunk* margin that is not
+home−away, and overwriting it would be a real error.
+
+Cover: `tests/test_published_projection_means.py` (6 tests).
+
+### FIXED: provenance, because the artifact cannot be read from outside
+
+The board carried **no `generated_at`, `profile_name`, `rating_source` or
+`seeds_used`** — all required CSV columns. Combined with the allowlist gap below,
+**a three-week-stale preseason projection and a fresh one were indistinguishable
+to every reader.** Now published as `generated_at` + `projection_provenance`.
+
+### OPEN — `smartsim2` ARTIFACTS ARE NOT ALLOWLISTED. This is the systemic one.
+
+`/api/ops/artifacts/export` refuses all three:
+
+    nfl_source/smartsim2_preseason_projections_2026_wk3.csv   not an allowed hot artifact
+    nfl_source/smartsim2_projections_2026_wk1.csv             not an allowed hot artifact
+    ncaaf_source/data/recommendations_summary/week_1.json      not an allowed hot artifact
+
+**No `smartsim2*` or `*_projections_*.csv` pattern exists in
+`HOT_ARTIFACT_PATTERNS` at all.** Every football board renders from an artifact
+that cannot be audited on Render — which forces exactly the local guessing §3b
+forbids. **Allowlisting these is owed work.**
+
+### OPEN — cover and over/under probabilities are 0% on both NFL boards
+
+`home_cover` / `away_cover` / `total_over` / `total_under` are null on every
+game. **They are computable and are not being computed:** the projection carries
+`margin_stdev` and `total_stdev`, which with `margin_mean`/`total_mean` give a
+normal-approximation cover and total probability directly. Deliberately NOT
+smuggled into the means fix — it is a new mechanism, and §4.4 applies.
+
+### The input inventory — `scripts/football_sim_input_checklist.py`, NFL, 272 real games
+
+    LEVEL 0  production entrypoints passing a payload the engine can READ: 0 of 3
+
+| block | populated | keys consumed | reaches the sim? |
+|---|---|---|---|
+| `offensive_metrics` | **100%** | 11 | **NO — payload unwired** |
+| `advanced_metrics` | **100%** | — | **NO** |
+| `market_features` | **100%** | 4 | **NO** |
+| `defensive_metrics` | 0% | 7 | NO |
+| `pace` | 0% | 4 | NO |
+| `player_usage` | 0% | 12 | NO |
+| `coach_continuity` / `returning_production` / `transfer_impact` | 0% | 12 | EXPECTED_SPARSE (NCAAF-only) |
+
+**Read the two columns together.** Three blocks are fully populated and still
+contribute nothing, because no production entrypoint passes
+`feature_generation_payload` at all. Fixing population without fixing wiring
+changes no output; fixing wiring without a re-fit is §4.4's trap.
+
+**`defensive_metrics` at 0% OVERSTATES the defensive gap** — `_defense_strength`
+also reads `home_defensive_epa`/`away_defensive_epa` out of `advanced_metrics`,
+which is at 100%. Defence is half-fed by that route, not absent. The checklist
+reports blocks, not the engine's fallback chain, and that distinction matters
+before anyone builds a defensive-metrics pipeline.
+
+**PRESEASON SPECIFICALLY: do NOT wire the payload here first.** The preseason
+model deliberately shrinks toward league-neutral (`nfl_preseason_v1`,
+`shrunk_rating`) because preseason outcomes are driven by playing-time decisions,
+not team strength. Adding team-strength mechanisms to a model calibrated on that
+shrinkage is §4.4's negative-interaction case with an obvious causal story.
+Regular season is the right place to test wiring; preseason needs its own re-fit.
