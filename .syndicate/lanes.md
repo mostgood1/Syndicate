@@ -1509,7 +1509,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### odds-cadence-off-the-mlb-peak — OPEN — **1a/1b VERIFIED IN PRODUCTION 2026-08-16 05:51:48Z (`dd53d47c`, live-odds-worker): gate runs, soccer exclusion HOLDS at interval_s=28800 baseline. EFFECT still unmeasured; lane goal DEFERRED to 1c (blocked).** — opened 2026-08-16 — session: sim-engine-track
+### odds-cadence-off-the-mlb-peak — RELEASED 2026-08-18 (orphan sweep; owner `sim-engine-track` archived, all 5 forks) — **1a/1b VERIFIED IN PRODUCTION 2026-08-16 05:51:48Z (`dd53d47c`, live-odds-worker): gate runs, soccer exclusion HOLDS at interval_s=28800 baseline. EFFECT still unmeasured; lane goal DEFERRED to 1c (blocked).** — opened 2026-08-16 — session: sim-engine-track
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Every
 > `sim-engine-track` session and fork is archived.
 > **SINGLE NEXT ACTION:** none available — the lane goal is deferred to 1c and
@@ -2737,7 +2737,7 @@ to betting-accuracy improvements.
   another betting grade** — more simulation cannot help.
 - Nothing promoted, nothing blocked, no production config changed.
 
-### syndicate-coordinator — OPEN — **STANDING LANE, NOT A TASK. Owns every production deploy, ledger upkeep, and cross-session organisation** — opened 2026-08-17 — session: syndicate-coordinator
+### syndicate-coordinator — RELEASED 2026-08-18 (orphan sweep; role RETIRED by user decision, all 3 coordinator sessions archived) — **STANDING LANE, NOT A TASK. Owns every production deploy, ledger upkeep, and cross-session organisation** — opened 2026-08-17 — session: syndicate-coordinator
 - **Established by user decision 2026-08-17.** Contract: `.syndicate/coordinator.md`.
   Session id in `.syndicate/coordinator.id` — **delete that file and the role
   stands down everywhere at once** (hook, digest line, and this lane's authority).
@@ -2966,7 +2966,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Taken by override from `export-force-refresh-escape`** (closed above,
   unattended session, user-authorized). Editing ONLY `:2229` and `:2262`.
 
-### wnba-phase2-migration — OPEN — **taking `run_live_odds_refresh_worker.py` from the RELEASED orphan `soccer-model-coverage`** - opened 2026-08-17 - session: layer1-board-coverage
+### wnba-phase2-migration — RELEASED 2026-08-18 (orphan sweep; owner `layer1-board-coverage` archived, all 6 forks) — **taking `run_live_odds_refresh_worker.py` from the RELEASED orphan `soccer-model-coverage`** - opened 2026-08-17 - session: layer1-board-coverage
 - Goal: re-home the WNBA full refresh onto a worker autorun (Phase 2 of the
   migration off the daily-update GHA cron), so something actually calls
   `refresh_wnba_oddsapi_props.main()` on a cadence.
@@ -2978,7 +2978,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   release, so this entry registers the take. **Its uncommitted fixes #1 and #3
   are NOT mine and remain at risk** - I am not touching soccer code.
 
-### modelled-fair-edge — OPEN — **user decision taken 2026-08-17: allow `book_margin_model` edges, in their own column** - opened 2026-08-17 - session: layer1-board-coverage
+### modelled-fair-edge — RELEASED 2026-08-18 (orphan sweep; owner `layer1-board-coverage` archived, all 6 forks) — **user decision taken 2026-08-17: allow `book_margin_model` edges, in their own column** - opened 2026-08-17 - session: layer1-board-coverage
 - Goal: the 1,416 rows carrying BOTH `model_prob` and
   `modelled_fair.*.fair_probability` serve an edge - in a SEPARATE, labelled
   column that never mixes with `edge_vs_market_pct`.
@@ -3294,7 +3294,7 @@ on the swept side. Appended verbatim, nothing edited, nothing reordered.
 - `scripts/pick_mlb_build_hour.py` already computes Phase 2's band input; only
   the wiring is blocked.
 
-### convergence-phase5-profile-seam — OPEN — opened 2026-08-17 — session: sim-scheduling
+### convergence-phase5-profile-seam — RELEASED 2026-08-18 (orphan sweep; owner `sim-scheduling` archived, all 5 forks) — opened 2026-08-17 — session: sim-scheduling
 - **Goal (single testable outcome):** the three engines that have a calibration
   profile resolve it through `load_versioned_profile` instead of reading their
   in-source constant directly — and behaviour is **byte-for-byte unchanged**
@@ -3988,7 +3988,7 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
   were outside the 3h window. `steam 0` is correct behaviour, not evidence.
   Needs a same-line row moving >=15 pts within 3h of its opening.
   Scheduled re-run 2026-08-17 09:00 CDT.
-### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+### clv-without-settlement — RELEASED 2026-08-18 (orphan sweep; owner `lane-cleanup` = "Orphaned lanes cleanup", archived 08-16) — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
 - Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim -- was the shared artifact-publisher allowlist module; de-linked here 2026-08-18 per `basketball-model-owner`'s `#462`, same precedent `nhl-model-owner` already used on this exact file/lane pair below: session `lane-cleanup` no longer exists in the roster (ORPHANED sweep below), and this lane's own SINGLE NEXT ACTION targets a different file entirely, so the claim was vestigial): n/a
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `lane-cleanup` no longer exists in the roster (`get_session` → not found).
@@ -4502,7 +4502,7 @@ does not hold.** `[measured 08-14]`
   `layer2-board-freshness`, so that lane must be consulted first.**
 - Files: none claimed yet, deliberately.
 
-### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — RELEASED 2026-08-18 (orphan sweep; all 3 "Layer 2 board audit" sessions archived — the block itself invited this: "can be released on request") — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
 > **`live_gameline_join.py` IS NOW CLAIMED — added 2026-08-16 ~00:1xZ by the
 > `ask-answer-substance` session, which holds no claim on this lane.** Board
 > finding 3, which I reported to you earlier, has its root cause in
@@ -4859,7 +4859,7 @@ does not hold.** `[measured 08-14]`
   deploy, which is a reason to keep deploys OFF, not to add one.
 - Blocked by: none.
 
-### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+### wnba-live-tier — RELEASED 2026-08-18 (orphan sweep; owner `layer1-board-coverage` archived, all 6 forks — this also resolves the contested `live_gameline_join.py` in favour of `live-edge-basis`) — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
 - Files (merged 2026-08-18 from a duplicate OPEN block of this lane, so demoting it released no claim): `syndicate/features/shared/board_enrichment.py`
 > **`live_gameline_join.py` RETURNED 2026-08-17 by `live-edge-basis`, which borrowed it under a user override and has now CLOSED.** The `edge_basis` change is shipped and measured on refresh-worker `b20072cd`. Nothing is left in flight on that file; it is yours again exactly as before.
 > **`syndicate/features/shared/live_gameline_join.py` TAKEN FROM THIS LANE
@@ -6019,3 +6019,62 @@ UNCOMPUTED OUTPUT (here, and the `defensive_metrics` 0% that `advanced_metrics`
 half-covers). Both times the remedy I implied — "compute it" — was wrong, and the
 real remedy was upstream. `model_engine_standard.md` §4.1 is exactly this and I
 still walked into it twice in one session.
+### soccer-model-dispersion — SHOTS SHRINK REVERTED 2026-08-18 16:3xZ — a paired test falsified the sqrt(1-r^2) heuristic; the dispersion overshoot stays unaddressed — session: soccer-sport-owner
+
+**`b69c5277` (landed as `87b26496`) reverts `f1bece5a`.** Both shots weights back to
+0.016 in `_attack_strength` and `_defense_strength`.
+
+**WHY: a PAIRED test, not the aggregate comparison that raised the question.**
+Two eredivisie backtests on the IDENTICAL 126 matches (`--dump-matches`, joined by
+fixture, `actual` outcomes verified equal so this is provably the same match set) —
+one at the shrunk weight, one at 0.016:
+
+    per-match Brier delta (unshrunk - shrunk), n=126
+      mean   -0.0098
+      SE      0.0047
+      t      -2.06
+      95% CI -0.0191 .. -0.0005   entirely below zero
+
+**Unshrunk scored lower (better) Brier on the same fixtures.** Real, though modest
+(t=-2.06 against a ~1.98 threshold) — not the overwhelming result a bigger sample
+would give, but not noise either. The AGGREGATE comparison alone (gap +0.0017
+unshrunk vs +0.0115 shrunk) could not distinguish signal from independent-sample
+noise; pairing on identical fixtures is what resolved it.
+
+**THE HEURISTIC'S ASSUMPTION WAS WRONG, NOT JUST ITS NUMBER.** `sqrt(1-r^2)` treats
+the correlated fraction of a predictor as pure redundancy with zero marginal value.
+Shots carries real predictive signal beyond what the rating already encodes —
+shrinking it removed information, not noise.
+
+**CONSEQUENCE FOR THE TWO STAGED-BUT-UNAPPLIED SHRINKS: STAY UNAPPLIED.**
+`form_points` (corr 0.90-0.96) and `clean_sheet_rate` (corr 0.82-0.98) were computed
+under the identical heuristic and never applied. This result is reason to distrust
+the METHOD, not just the one number it produced — do not apply either without its
+own separate evidence, and do not assume a higher correlation means a worse outcome
+from shrinking (shots' 0.895 corr and the falsified shrink don't establish a
+threshold; only a paired test would).
+
+**THE DISPERSION OVERSHOOT IS REAL AND STILL UNADDRESSED.** Platform-wide (all nine
+leagues, cross-league mean stdev 0.1575 -> 0.1907, past market's 0.1811). This was
+the wrong lever for it, not proof no lever exists. The 7/9-leagues Brier improvement
+that motivated this whole probe (mean gap delta -0.0062) came from `94578cbc` alone
+(the xG-term removal) — that result stands, unaffected by this revert.
+
+**MECHANICAL NOTE for reproducibility:** the paired dumps live at
+`/c/tmp/soccer_paired_evidence/{shrunk,unshrunk}_matches.jsonl` — LOCAL TO THIS
+MACHINE, not in the repo (`reports/soccer_backtest/` is untracked scratch output by
+convention, matching the rest of `reports/`'s "regenerated, not hand-edited" status).
+Re-derivable in ~1h per side from `scripts/backtest_soccer_h2h_calibration.py
+--league eredivisie --limit 120 --simulations 300 --dump-matches <path>` against the
+two code states (0.016 vs the reverted value), joined by (home_team, away_team, date).
+
+**PROCESS NOTE, same lesson as the last entry:** local `main` was behind
+`origin/main` when this was recorded. Appended against `origin/main`'s tree via a
+throwaway worktree rather than the local disk copy, for the same reason as before —
+check `git rev-parse main` vs `origin/main` before trusting a local ledger file.
+
+**NEXT, unchanged from before this probe:** the dispersion overshoot needs either a
+different lever (re-fit rather than a correlation heuristic) or acceptance that
+post-`94578cbc`'s state (gap +0.0017, dispersion 0.2373 on eredivisie) is the better
+checkpoint even with its overshoot, since accuracy is the primary objective and this
+probe shows the two are not always aligned.
