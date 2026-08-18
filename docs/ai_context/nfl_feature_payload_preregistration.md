@@ -1,5 +1,36 @@
 # Pre-registration — wiring the feature payload into smartsim2 (NFL regular season)
 
+> ## HALTED 2026-08-18 BEFORE PHASE 3 — THE PAYLOAD IS LEAKED
+>
+> **`build_nflverse_game_metrics` computes its EPA / success-rate / pass-rate
+> fields from THE GAME BEING PREDICTED**, not from prior form.
+> `_match_game_rows` (`nflverse_ingestion.py:151`) filters play-by-play to rows
+> where `home_team == home AND away_team == away` for that season and week —
+> i.e. that one game's plays.
+>
+> **Falsification test, stated before running and then run:** prior-form team
+> strength should correlate with a single game's final margin at roughly
+> r = 0.3–0.5. In-game EPA would exceed 0.8, because EPA accumulated during a
+> game nearly restates who won it.
+>
+> **Measured over 285 games of 2023: r = 0.988.**
+>
+> So the "1.125 pts of margin movement" I measured when wiring the payload was
+> real and worthless — the engine was being handed the answer. **Any backtest
+> built on this would have looked spectacular and meant nothing**, which is the
+> `learnings.md` rule that a leaked backtest number is an UPPER BOUND, not
+> merely an untrustworthy one.
+>
+> **What this does NOT invalidate:** that 0 of 3 production entrypoints pass the
+> payload, and that the fed terms therefore reach the sim not at all. That
+> finding stands. What changes is the REMEDY — wiring this payload as it exists
+> today would ship a leaked model, not a better one.
+>
+> **What the experiment needs before it can run:** an as-of feature builder that
+> computes team form from games STRICTLY BEFORE the one being predicted. That is
+> a real piece of work and it does not exist. Everything below is retained
+> because the sample, power and noise-floor analysis stay valid for it.
+
 > Written 2026-08-18, lane `football-model-owner`, BEFORE any modelling work.
 > Follows the pattern of `mlb_edge_scan_preregistration.md`: the decision rule is
 > fixed in advance so a null result cannot be re-described as a win.
