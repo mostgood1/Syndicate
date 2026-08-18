@@ -1183,10 +1183,15 @@ rule would break it. The gate must be TIME-TO-KICKOFF.
   `rows_with_model_edge: 0`, `matches_in_source: 4`, `unmatched_match_rows:
   8,393`. **These are two different joins and at most one describes the board a
   user sees.** Settle this before raising coverage.
-- **SOCCER GAME ODDS HAVE NOT BEEN CAPTURED FOR ANY LEAGUE SINCE 08-10/08-11.**
-  Eredivisie looked healthy solely because `prop` rows from a different producer
-  masked it. **The vendor is NOT the cause** — all ten soccer keys
-  `listed=True, active=True`. `[measured 08-14 18:4xZ]`
+- ~~**SOCCER GAME ODDS HAVE NOT BEEN CAPTURED FOR ANY LEAGUE SINCE 08-10/08-11.**~~
+  **SUPERSEDED 2026-08-17 21:3xZ — capture is WORKING.** `per_sport_ingest.soccer`
+  on the served `/api/board/layer2-shortlist`: `quote_rows 16,044`,
+  `candidates 8,355`, `dates_with_rows` spanning **08-17..08-23**. Whatever the
+  08-14 outage was, it is over; do not re-diagnose it. The 08-14 note is kept
+  struck-through rather than deleted because its *reasoning* (a healthy-looking
+  league masked by `prop` rows from another producer) is still the right way to
+  read that counter. **The vendor was never the cause** — all ten soccer keys
+  `listed=True, active=True`.
 - **THERE IS EXACTLY ONE PRODUCER and it is not refresh-worker.** `phase=pregame`
   builds 50 steps including 10 odds steps; `phase=live` builds 20 steps and **0
   odds steps** — and refresh-worker's soccer autorun runs `phase="live"`, so it
@@ -3496,3 +3501,226 @@ ledger for inbound was not a step in my turn — it was something I did when I
 happened to think of it. `coordinator.md` §0 and `scripts/coordinator_inbox.py`
 now make it the first step. This block is the backlog that had accumulated in the
 meantime.
+
+### SOCCER â€” VERIFIED 2026-08-17 (session `soccer-layer2-dates`)
+
+- **The soccer live lens was dead for every league with a match in play, and is
+  now FIXED AND DEPLOYED.** `poll_soccer_live_state.py:75` passed 2 args to a
+  3-arg `_load_team_ratings` -> `TypeError`, swallowed by
+  `poll_active_leagues_for_tick`'s **unlogged** handler. Because the call sits
+  behind `if live_events:`, only a league WITH a live match could reach it:
+  silent on a quiet slate, total on a busy one. Production 20:1x-20:3xZ wrote
+  **7 leagues per tick against 10 active**, the 3 missing being **exactly** the 3
+  with matches in play. Fixed by `6bdc50de`; live-odds-worker `7470939b` live
+  21:37:37Z; tick 21:38:37 wrote **10 leagues**. `[measured]`
+- **END-TO-END IS NOT YET PROVEN.** All 10 leagues wrote `(0 live games)` and
+  that is CORRECT â€” ESPN reported today's three matches `post`
+  (`fetch_events(statuses={"in"})` -> 0 for all three). **A league with nothing in
+  play writing `(0 live games)` must never be read as this fix failing.** Needs a
+  slate with a live match.
+- **The chip feed is NOT a "today" feed and its statuses cannot be trusted.**
+  `/api/board/game-chips?sports=soccer` served **89 chips across 08-15..08-28**
+  (14 days). `_SoccerDataProvider.games()` fans out over each active league's
+  WEEK, not the requested date. Statuses are independently wrong in BOTH
+  directions: `EXC @ NEC` served `final 0-0` for a fixture kicking off **five days
+  later**; `SLB @ CAS` served `live` 2h25m after kickoff for a match ESPN called
+  `post`. **Consequence: the board cannot answer "is this match live?" â€” ask ESPN.**
+  `[measured 19:28Z / 21:40Z]`
+- **Soccer's Layer 2 projection coverage is ~0 because of a WINDOW MISMATCH, not
+  a model gap.** Quotes read a **7-day** window (`#379`); projections read **ONE**
+  date. Served: `rows_with_projection 4 / 8,759`, `pct_projected 0.0`,
+  `unmatched_match_rows 8,755`, while `dates_with_rows` spans 08-17..08-23.
+  Loader widened in `6aaa11af`; **INERT until `board_enrichment.py:678` passes the
+  window** â€” that file is held by `wnba-live-tier`. `[measured]`
+- **EXONERATED: the soccer live-lens memory gate.**
+  `SYNDICATE_SOCCER_LIVE_LENS_MEMORY_GATE_ENABLED` is absent on all three services,
+  which means **ENABLED** (`_env_bool(default=True)`) at a 300MB floor â€” but it
+  never fired. Tick 20:29:46Z `ok: true`, absent from `skippedSports`. Do not
+  re-open it. `[measured]`
+- **`SYNDICATE_ENABLE_LIVE_LENS_LOOP` is `true` on BOTH `refresh-worker` AND
+  `live-odds-worker`.** Observed soccer tick logs came from live-odds-worker.
+  **Which service genuinely owns the loop is NOT established** â€” assume either
+  until measured, and deploy loop changes to both.
+- **`ok: true` on a live-lens tick is not evidence of work.**
+  `validate_live_lens_snapshot` accepts `{"date": ..., "games": []}`, so a tick
+  that processed zero matches is indistinguishable from one that processed three.
+  Read tick DURATION alongside it (soccer 1s vs MLB 7s was the tell).
+- **Soccer's memory gate is the only one of three that returns SILENTLY.** MLB and
+  WNBA both print `[LIVE_LENS_TICK_DIAG] ... reason=low_headroom`;
+  `live_lens_loop.py:524-530` does not. Still true after this session.
+
+
+## MLB IN-SIM SUBSTITUTION — BUILT, MEASURED, **OFF** `[2026-08-17, lane convergence-phase7-crps]`
+
+- **The engine now HAS a position-player substitution model.** It never did:
+  `bench` appeared once, building a lookup cache. Behind
+  **`GameConfig.position_substitutions`, default False. NOT DEPLOYED.**
+- **Hazard fitted from 618 `feed_live` games / 10,728 starter-innings.** Inning
+  hazard peaks **0.0509 at the 8th** and is ~0 before the 5th; slot multiplier
+  **0.71 → 1.55**; team spread **2.0x** (Houston 1.33, Boston 0.66).
+- **Opportunity: 34.3% of the gap closed.** Starter AB 3.985 → 3.817 against an
+  actual 3.495, measured on real roster artifacts.
+- **Accuracy vs market (45 games x 120 sims/arm, 2,415 rows):** hits +0.00209,
+  RBI +0.00573, runs +0.00146, **total_bases −0.00154 WORSE**. **The market wins
+  all four.** P2 improved the engine and produced NO edge.
+- **DO NOT DEPLOY until the total-bases regression is understood.** Likely cause:
+  bench selection is **next-available**, not platoon/position aware, and total
+  bases is power-weighted so the substitute's identity matters most there.
+- **`scripts/reproject_mlb_props_with_subs.py` is now the scoreboard** — it
+  scores any MLB engine change against the market end-to-end from archived
+  rosters. Both arms are the sim's own empirical distribution over identical
+  seeds; only the flag differs.
+- **`pinch_hit_aggressiveness` is loaded onto `ManagerProfile` and read by
+  NOTHING.** The tendencies file's absence was a symptom; the missing consumer
+  was the cause.
+- **Sim-count requirement depends on FORECAST REPRESENTATION, not sport.**
+  Empirical/PMF forecasts (MLB outs) need hundreds; parametric mean+sigma
+  summaries (NFL, NCAAF) need tens — NFL's measured knee is **<=100**, so
+  **NFL/NCAAF at 300 are fine** and the earlier "TOO THIN" verdicts were wrong.
+
+## MLB SIM — PITCH-TYPE EFFECTIVENESS IS BUILT AND UNFED `[measured 2026-08-17]`
+
+- **`pitcher.pitch_type_whiff_mult`, `pitch_type_hr_mult` and
+  `batter.vs_pitch_type` are 0% populated** across 450 batters / 449 pitchers,
+  while `pitcher.arsenal` is **100%**. The sim consumes them as
+  `.get(pitch_type, 1.0)` (`simulate.py:1067/1068/1097/1099`, `:2779-2796`), so
+  **a slider and a fastball are interchangeable** and pitch selection is
+  decorative.
+- **Cause:** `fetch_pitcher_pitch_splits` is CACHE-ONLY and the
+  `pitcher_pitch_splits` namespace had **never been written** (the cache held
+  only `bvp`). Its populator is a **manual x64 tool outside the daily pipeline**.
+- **The cache CANNOT reach Render:** its path is inside the **ephemeral repo
+  checkout**, and `vendor/*/data/` is **gitignored** (0 tracked files). This is
+  the `#389` shape.
+- **NOW WIRED (not deployed):** a disk-backed artifact
+  `data/mlb_source/source_artifacts/data/pitch_splits/pitch_splits_<season>.json`
+  resolved via `SYNDICATE_DATA_ROOT`, and an **artifact-first loader**. 5 tests
+  including the empty-cache worker case. **73 pitchers published.**
+- **STILL BLOCKING PRODUCTION:** (a) `HOT_ARTIFACT_PATTERNS` needs one pattern —
+  `artifact_publisher.py` is owned by `clv-without-settlement`, request filed in
+  its lane; (b) **nothing on the worker populates the splits.**
+- **Effect at 12.7% pitcher-slot coverage: FLAT** (2 markets better, 2 worse, all
+  <=0.003). **INCONCLUSIVE** — starters only; 236 bullpen arms were fetching at
+  checkpoint time.
+- **PRODUCTION POPULATION IS UNVERIFIED:** `/api/ops/artifacts/stream` **403s on
+  `roster_objs/`** paths. Confirm on the worker disk before funding further work.
+
+## MLB SIM — MODELLING ABSENT ENTIRELY `[measured 2026-08-17, zero grep matches]`
+
+- **No defensive quality anywhere** (no OAA/DRS/UZR, no team or player fielding).
+  **BABIP has nothing fielding behind it.**
+- **No batted-ball type model** — no GB/FB/LD, no launch angle, no exit velocity.
+  `inplay_hit_rate` is one scalar, so **park factors cannot interact with a
+  hitter's profile** and defence could not be applied even if it existed.
+- **No catcher framing.** The **umpire IS** modelled (called-strike multiplier).
+- **BVP is fetched daily and `simulate.py` never references it** — evaluation
+  tooling only, 1,282 cached files.
+- Full write-up: `.syndicate/research_2026-08-17_mlb_sim_gaps.md`.
+
+## MLB SIM INPUTS — **26 unfed -> 5**, all wiring OFF, nothing deployed `[measured 2026-08-18]`
+
+- **`scripts/sim_input_checklist.py` is the gate.** Cross-references *is this
+  field CONSUMED* against *is it POPULATED*, over `dataclasses.fields()`, exits 1.
+  **Run it with `--simulate-rebuild`** — a plain run audits SERIALISED artifacts
+  and reports the pre-wiring state (26) forever.
+- **5 genuinely unfed remain:** `statcast_quality_mult` (both sides — **no
+  producer anywhere in the repo**), `batter.vs_pitch_type` + `vs_pitch_type_hr`
+  (artifact is pitcher-side only), `pitcher.pitch_type_hr_mult`
+  (`PitcherPitchSplits` has no `hr_mult`).
+- **BVP is FIXED.** It was a stale-empty cache (1,282 files, 30-day TTL) serving
+  `{}` as authoritative while the raw corpus was present. Deleted; recomputes.
+  **13.9% coverage is CORRECT** — a batter only faces some starters — and the
+  five `vs_pitcher_*` fields are documented in `EXPECTED_SPARSE`.
+- **BVP is applied in `daily_update.py:7564`, NOT `build_roster.py`.** Grepping
+  build_roster returns nothing and suggests it is unwired. It is wired, on by
+  default. **Four wrong calls came from this**; see the provenance table in
+  `docs/ai_context/mlb_sim_engine_reference.md`.
+- **Effect of ALL inputs vs market:** mean **+0.0014** Brier; **the market still
+  wins all four markets by 0.007–0.013.** Wiring is plumbing, not an edge.
+- **`total_bases` reversed** — −0.00154 under substitution alone, **+0.00348**
+  with batted-ball data. The power/contact hypothesis held.
+- **Refit:** residuals hr −34.6%, k −24.5%, bb −31.3%, inplay +5.5%. Corrections
+  shrink 3 of 4; **`k_rate` DOES NOT RESPOND** — K comes from the pitch-level
+  model, not the summary rate, so a `k_rate` correction is the wrong lever.
+- **`--use-roster-artifacts` defaults ON**: publishing an input artifact changes
+  nothing without a roster REBUILD.
+- **PRODUCTION IS UNVERIFIED** — `/api/ops/artifacts/stream` 403s on
+  `roster_objs/`. Route is `sim_input_checklist.py --publish` run ON THE WORKER.
+- **Standard is now mandatory:** `docs/ai_context/model_engine_standard.md`,
+  referenced from `CLAUDE.md`, applies to every engine.
+
+### SOCCER — VERIFIED 2026-08-18 01:0xZ (session `soccer-layer2-dates`, second pass)
+
+- **The `#379` projection-window gap is CLOSED IN PRODUCTION.** `board_enrichment.py`
+  now passes the 7-day slate window to `load_soccer_projections`. Shipped as
+  `b4d82364`, live on web `678e2f25` 00:29:52Z. Measured 00:59Z:
+  `pct_projected` **0.0 -> 53.8**, `rows_with_projection` **4 -> 4,738 / 8,808**,
+  `matches_in_source` **3 -> 99**, leagues **4 -> 9**.
+- **BUT SOCCER STILL SERVES ZERO SHORTLIST ROWS, AND THAT IS STILL INTENDED.**
+  Same instant: `active_sports: ["mlb","nfl","wnba"]`, soccer selected rows **0**.
+  **`pct_projected` is GRID coverage, not board presence** — do not read 53.8% as
+  "soccer is on the board". Decision 7 (the model loses to the market) is unchanged
+  by this fix.
+- **The Layer 2 rail date/status defects are FIXED AND VERIFIED.** Web `e5107913`
+  (22:12:38Z), measured 23:47Z: rendered rail **15 cards, all today** (was ~60 across
+  08-15..08-28); **0** chips reporting `live` for a match ESPN calls `post` (was 1).
+  **The CHIP FEED is still 14 days wide BY DESIGN** — verifying this against
+  `/api/board/game-chips` reads as failing when it is passing; read the rendered rail.
+- **`window="slate"` is load-bearing wherever `resolve_window_dates` is called.** It
+  defaults to `window="day"` = one date. Calling it bare leaves a widening inert.
+- **Layer 2 now reports unreadable shards.** `#379`'s per-date `except: continue`
+  swallowed read errors, so a corrupt shard and an empty slate were the same clean
+  zero. `per_sport_ingest` now carries `error` + per-date `read_errors` on BOTH the
+  zero-rows and the success branch. `[ec8c3beb, verified by construction]`
+- **All three live-lens headroom gates now log their skip**, and the soccer poller
+  logs each league's failure with a traceback. `[481de91d, 461774cb — UNPUSHED,
+  UNDEPLOYED; observability only, no behaviour change]`
+
+## MLB SIM — **INPUTS FULLY FED (checklist 26 -> 0)**, still no market edge `[measured 2026-08-18]`
+
+- **`sim_input_checklist.py --simulate-rebuild` PASSES**, exit 0. Every field the
+  engine reads is fed. **A plain run still reports 26** — it audits SERIALISED
+  artifacts, i.e. pre-wiring history. Always use `--simulate-rebuild`.
+- **Arsenal leaderboards are the source of record**, superseding the per-pitcher
+  pitch-splits pipeline: **2 calls vs 309**, 551 pitchers vs 305, and 450 batters
+  vs none. `statcast_{pitcher_arsenal_stats,batter_pitch_arsenal}`; `player_id`
+  IS mlbam_id. Multipliers are normalised per-player (level-neutral), NOT vs the
+  league — league normalisation would double-count `k_rate`/`hr_rate`.
+- **`statcast_quality_mult` contract: a UNION bag, PARTIAL BY DESIGN.** Feed RAW
+  metrics only (`xwoba`, `ev_mean`, `ev_max` supplied); **never** k/bb/hr/inplay,
+  which `simulate.py:163` derives. Seven keys deliberately absent.
+- **FULLY FED vs market:** 4 of 4 better; mean gap **0.01071 -> 0.00732 (32%
+  closed)**; the `runs` regression is fixed. **The market still wins all four by
+  0.0048–0.0105 — NO EDGE.**
+- **Refit, fully fed:** 4 of 4 residuals shrink. `hr` and `inplay` corrections are
+  shippable; **`k_rate` and `bb_rate` are NOT** — a 1.368x `k_rate` correction
+  moved the residual 0.6pp. **K is produced by the pitch-level model, not the
+  per-PA target.**
+- **THE K DEFICIT IS TWO OPPOSING ERRORS AND IS NOT FIXED.** Sim `IN_PLAY` 23.3%
+  vs ~17% and pitches/PA 2.97 vs 3.9 truncate PAs (K 27% LOW); correcting the mix
+  gives K/PA 0.284 vs 0.226 (26% HIGH). **Fixing either alone is a wash.** Values
+  left at originals; diagnosis in `pitch_model.py`. Needs JOINT calibration with
+  the market scoreboard as arbiter.
+- **Whiffs were never the problem** — 12.3% vs a league ~11%.
+- **Nothing is deployed.** Production population remains UNVERIFIED (403 on
+  `roster_objs/`); route is `sim_input_checklist.py --publish` on the worker.
+
+## MLB PITCH MODEL — first-pitch take SHIPPED TO TREE (market-neutral), K still 18% low `[2026-08-18]`
+
+- **`first_pitch_swing_damp = 0.42`, `first_pitch_called_boost = 1.60`** in
+  `pitch_model.py`, applied at 0-0 only. **Set BOTH to 1.0 for an exact no-op**
+  if this is judged wrong.
+- **Fixes the largest structural defect**: 0-0 called strikes 13.7% → **29.6%**
+  against a real 29.6%. K/PA 0.161 → 0.185, pitches/PA 2.96 → 3.25, no overshoot.
+- **MARKET-NEUTRAL** — 2 better / 2 worse, mean −0.00013. **Kept as a
+  precondition for later calibration, not as an improvement.** Judgement call,
+  recorded as such.
+- **The count matrix is MEASURABLE, not fittable.** 895,320 real statcast pitches
+  via `scripts/measure_count_progression.py`. Do not grid-search this.
+- **`count_delta` is a single scalar** and structurally cannot express
+  take-early / attack-middle / protect-late. That is why three separate
+  calibration attempts failed.
+- **STILL WRONG:** `base_in_play` 0.23 vs ~0.17; the 0-2 waste cell; the 3-2
+  protect cell. **K/PA remains 18% low, pitches/PA 17% short.**
+- **The mix-only fix is FORBIDDEN on its own** — it takes K/PA from 27% low to
+  26% high. Two opposing errors; fixing either alone is a wash.
