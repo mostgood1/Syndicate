@@ -15785,3 +15785,29 @@ as `convergence-phase7-crps`'s actual deploy target, and per this file's own
 standing rule the preflight/evidence read is bound to a SHA, not a general
 "safe right now" verdict. Whoever triggers the actual Render deploy must
 name the target commit first.
+
+### deploy PENDING — web — 2026-08-18 ~22:37Z — lane `basketball-model-owner`
+
+`/preflight web` PASS. Candidate `b775255a` (branch
+`deploy/basketball-artifact-allowlist`), parented on web's re-verified live
+SHA `055dfc67` (`GET /api/ops/version` immediately before cutting, per
+state.md's own rule -- the first cut, off `841b6d84`, was already stale by
+the time it was built). Scope: 1 file, 26 insertions, 0 deletions --
+`syndicate/features/shared/artifact_publisher.py`, `#462`'s
+`HOT_ARTIFACT_PATTERNS` additions for basketball smart-sim inputs only.
+Deliberately does NOT reintroduce NHL's own not-yet-live `team_xg`/`team_elo`
+allowlist entries (`055dfc67` predates `ab35f850`) -- that gap is real but a
+different lane's scope.
+
+Expected effect: `GET /api/ops/artifacts/export?path=<team_advanced_stats
+or calibration file>` returns `count:1` instead of `403` -- immediate,
+synchronous, checkable the moment the deploy finishes.
+
+Known blocker before actual deploy trigger: per `convergence-phase7-crps`'s
+entry two sections up, `deploy_preflight.py --service web` can never return
+CLEAR (deleted `ALL_PROCESS_MEMORY` emitter on web's current code) -- will
+need the same user-authorized break-glass substitute (live `/api/ops/memory`
+process read) before triggering, not assumed here.
+
+MEASUREMENT: <pending -- fill in after deploy + verification curl>
+REMINDER: verify within 15 min of deploy finishing.
