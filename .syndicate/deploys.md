@@ -13406,3 +13406,101 @@ pushed and tested (`678e2f25` web / `455df34a` refresh-worker); HELD for a
 refresh-worker window; web must not go alone. With the requester gone, the
 "wait for a window you want" instruction is the last word it left, and it is
 being honoured.
+
+## 2026-08-18 — ALL NEWLY-WIRED INPUTS, MEASURED LOCALLY. **+0.0014 mean, market still wins all four. NO DEPLOY.**
+
+Lane `convergence-phase7-crps`. `scripts/measure_all_inputs_effect.py`.
+45 games x 120 sims per arm, 2,415 scored rows, **98.4% pitcher coverage**.
+Arm "on" applies EVERY applier `build_roster` now runs — the local equivalent of
+a real rebuild.
+
+| market | n | inputs OFF | inputs ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24317 | **0.23077** | +0.00086 |
+| batter_rbis | 663 | 0.22211 | 0.21947 | **0.20959** | +0.00264 |
+| batter_runs_scored | 651 | 0.23974 | 0.24114 | **0.23377** | **−0.00140** |
+| batter_total_bases | 442 | 0.26177 | 0.25828 | **0.24510** | +0.00348 |
+
+**3 of 4 better, mean +0.0014. The market still wins every market by
+0.0074–0.0132.**
+
+### The one real confirmation
+
+`total_bases` **REGRESSED under substitution alone (−0.00154)** and is now the
+**biggest gainer (+0.00348)**. The earlier hypothesis — that TB suffered because
+bench identity and power information were missing — is supported: giving the
+engine contact quality and batted-ball type reversed it.
+
+`runs` going −0.00140 is unexplained.
+
+### WHY THIS IS NOT A DEPLOY
+
+**26 -> 10 unfed fields is PLUMBING. This is the quality number, and it is
++0.0014 against a market gap of ~0.010.** Shipping now would deliver a
+marginally better model that still loses to the price in every market — real
+work, no edge, and a production change to show for it.
+
+**The bigger lever is already identified and is NOT this.** The refit found the
+engine's rates sit **−24% / −37%** off once mechanisms are present, because they
+were fitted with those mechanisms ABSENT and absorb their average effect. These
+inputs are a **precondition** for that refit, not a substitute:
+
+    wire everything  ->  REFIT the rates  ->  measure  ->  then consider deploying
+
+Refitting before the inputs were wired would have baked in the wrong absorption;
+deploying the inputs before the refit ships the double-counting the factorial
+already measured (−0.00331, negative in 4 of 4).
+
+### Standing
+
+- Inputs: wired, off by default, **local-only**. Nothing deployed.
+- Next: **the refit, locally**, with all inputs on.
+- A deploy is justified only once the refit shows a market gap that has actually
+  closed — not before.
+
+## MEASUREMENT — soccer projection window (`678e2f25` web / `455df34a` refresh-worker) — **THE READ IS FIXED. THE JOIN IS NOT.** `[2026-08-18 ~00:5xZ]`
+
+Both live (web 678e2f25, refresh-worker 455df34a). Reading taken by the
+coordinator because the requesting lane archived mid-triage.
+
+- RECONCILED: soccer projection window — measured 2026-08-18, mechanism PASS, outcome FAIL.
+
+**THE WIDENING WORKS — this is the half that shipped.** The projection read now
+spans the slate window instead of one date, on the served payload:
+
+    source_artifacts     30 files across SIX dates
+                         08-17, 08-19, 08-20, 08-21, 08-22, 08-23
+    matches_in_source    3  ->  99
+
+The request's diagnosis was exactly right — *"today was never the problem; the
+other six dates were never read"* — and it is no longer true. `#379`'s widening
+is reachable in production for the first time.
+
+**THE GOAL METRIC DID NOT MOVE.**
+
+    rows_with_projection      4  ->  4
+    rows_considered              1,142
+    unmatched_match_rows         1,138
+    pct_projected                0.4%
+
+99 matches are now loaded and 4 rows carry a projection. **The defect that
+remains is the JOIN, not the read**: matches reach the loader and fail to key
+onto grid rows. That is a different bug from the one this deploy fixed, and it
+was invisible until the read was widened — the old numbers could not distinguish
+"never read" from "read and never matched".
+
+**Do not read this as the projection collapse being fixed.** It is one of two
+causes removed, and the board still shows projections on 4 of 1,142 rows.
+
+**BEFORE/AFTER IS NOT APPLES-TO-APPLES, and the request's own fields say so.**
+`window_dates` and `grid_rows` — quoted in the request as 7 and 8,759 — are
+**ABSENT from this API payload**, so those numbers came from a different
+instrument (a local diagnostic, not `/api/board/book-grid`). The comparable API
+field is `rows_considered`, 1,142 tonight against a quoted 8,759, i.e. a
+different and much smaller slate. The two figures that ARE directly comparable
+are `matches_in_source` (3 -> 99) and `rows_with_projection` (4 -> 4), and they
+are the two that matter.
+
+**Handed on:** whoever picks up soccer projections next should start at the
+match-to-row join, with `unmatched_match_rows = 1,138 of 1,142` as the opening
+reading. The read is no longer the bottleneck.
