@@ -133,9 +133,16 @@ def main() -> int:
     ap.add_argument("--json", type=Path, default=None)
     args = ap.parse_args()
 
-    from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+    from datetime import date as _date
+    from sim_engine.data.arsenal import (apply_arsenal_to_batter,
+                                         apply_arsenal_to_pitcher)
     from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                              apply_batted_ball_to_pitcher)
+    from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+    from sim_engine.data.quality import apply_quality
+    from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
+                                              default_bvp_cache)
+    _bvp = default_bvp_cache()
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.data.statcast_pitch_splits import default_statcast_cache
     from sim_engine.models import GameConfig
@@ -182,11 +189,26 @@ def main() -> int:
 
         for arm in ("off", "on"):
             if arm == "on":
+                # EVERY applier the real build runs. BVP is applied by
+                # daily_update.py:7564, not build_roster, so it needs its own call.
+                for _bat, _pit in ((away, home), (home, away)):
+                    try:
+                        apply_starter_bvp_hr_multipliers(
+                            batting_roster=_bat,
+                            pitcher_id=int(_pit.lineup.pitcher.player.mlbam_id),
+                            season=args.season, start_date=_date(args.season, 3, 1),
+                            end_date=_date(args.season, 7, 30), cache=_bvp)
+                    except Exception:
+                        pass
                 for r_ in (away, home):
                     for b_ in list(r_.lineup.batters) + list(r_.lineup.bench or []):
                         apply_batted_ball_to_batter(b_, season=args.season, weight=0.35)
+                        apply_arsenal_to_batter(b_, season=args.season)
+                        apply_quality(b_, season=args.season, side="batters")
                     for p_ in [r_.lineup.pitcher] + list(r_.lineup.bullpen or []):
                         apply_batted_ball_to_pitcher(p_, season=args.season)
+                        apply_arsenal_to_pitcher(p_, season=args.season)
+                        apply_quality(p_, season=args.season, side="pitchers")
                 # apply the builder's OWN applier -- this is what a rebuilt
                 # roster would carry, not a reimplementation
                 for r in (away, home):
