@@ -1799,3 +1799,276 @@ Accepted session ids are a LIST in `.syndicate/coordinator.id` — a resume
 reassigns the id, so append rather than replace. Deleting that file is the off
 switch. Process records — sweeps, adjudications, corrections — live in
 `deploys.md` and `lanes.md`, not here.
+
+
+## LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE
+
+Sections that arrived from other lanes AFTER the collapse was written, so
+they are neither in the collapsed file nor in the archive. Carried verbatim
+rather than dropped. Several are dated snapshots and belong in `deploys.md`;
+they stay here until their lane moves them.
+
+## 2026-08-17 00:4xZ — LIVE HAZARD (sim-scheduling): refresh-worker's deploy lineage is POISONED until `d9088741` ships
+
+**Do not deploy refresh-worker from `7c2b1a17` + `main`. It will silently
+re-revert 10 lines of `memory_observability.py`.**
+
+`7c2b1a17` (live since 00:24:01Z) was built with its tree computed against
+`origin/main=7eb5fb28` while its `-p` parent re-resolved to `40c3c44b` in a later
+git call. New parent, old tree — a valid fast-forward, so `git push` accepted it
+with no force and no warning.
+
+It reverted, on the deployed service only (`origin/main` is intact; `40c3c44b`
+and `2aa30b7a` remain ancestors of main):
+
+| path | lines | matters? |
+|---|---|---|
+| `syndicate/features/shared/memory_observability.py` | **-10** | **YES, code** |
+| `.syndicate/{deploys,learnings,log/2026-08-16,state}` | -229 | no, inert on a service |
+
+The code is the smaps-vs-cgroup **reconciliation guard** (`cgroup_anon_mb`,
+`reconciles_within_pct`, `reconciles`) — removed from the one service that is
+OOM crash-looping (`#449`), while `#449` was open.
+
+**WHY A PLAIN RE-MERGE WILL NOT FIX IT.** The bad merge recorded the removals as
+INTENTIONAL EDITS on the live side. A fresh `merge-tree` therefore sees "live
+changed, main did not" and preserves the deletion. Re-merging returned
+`deletions=239` a second time. The five paths must be restored from `main`
+EXPLICITLY, which is what `d9088741` does.
+
+**THE FIX IS BUILT AND PUSHED: `d9088741` on branch `deploy/rw-converge-fix`.**
+It descends from live `7c2b1a17`, restores the five paths from main, keeps the
+three LIVE-wins resolutions (0 lines lost), and asserts `deletions vs the main
+parent == 0`. **It is deliberately NOT deployed — it is to ride the next
+refresh-worker ship, not to justify one of its own.** Whoever ships next: base on
+`d9088741`, not on `7c2b1a17`.
+
+**THE ASSERTION THAT CATCHES THIS CLASS, and nothing else does:**
+
+    DEL=$(git diff --numstat "$MAIN" "$SHA" | awk '{d+=$2} END {print d+0}')
+    [ "$DEL" -eq 0 ] || refuse
+
+Ancestry checks, conflict-marker scans and the `render.yaml` guard ALL PASSED on
+the broken commit. Only counting deletions against the main parent sees it.
+And resolve `origin/main` EXACTLY ONCE per build — never re-read a symbolic ref
+in a later call.
+
+## 2026-08-17 00:5xZ — CORRECTION: the "silent revert" was a LAG, not a removal. I overstated it twice.
+
+**What I claimed** (in `state.md`'s POISONED-lineage block, in commits
+`d9088741` / `7623a233`, and to the user): `7c2b1a17` "reverted 10 lines of
+`memory_observability.py` — the smaps-vs-cgroup RECONCILIATION guard — on the one
+service that is OOM crash-looping, while `#449` was open."
+
+**What is actually true, measured:**
+
+    git diff --numstat 7c2b1a17 40c3c44b -- syndicate/features/shared/memory_observability.py
+    -> +10  -49
+
+It is a **refactor**, not a deletion. `7c2b1a17` carried the OLDER implementation
+(`_process_rss_anon_bytes()`, reading `RssAnon` from `/proc/self/status`); main
+had replaced it with cgroup-based accounting (`cgroup_anon_mb`). **`grep -c
+reconciles_within_pct` returns 1 on BOTH trees.** The guard was never absent.
+
+**The tell I nearly walked past:** a `SMAPS_ANON` line emitting
+`reconciles_within_pct` at **00:48:32Z** — five minutes BEFORE my ship landed, so
+emitted by `7c2b1a17` itself. If that SHA had truly lacked the field it could not
+have printed it. I found this only because a follow-up query for the field's
+VALUES came back empty and I chased the discrepancy instead of banking the
+watcher's "1 line" count.
+
+**Corrected severity.** The deployed service was LAGGING main's improved memory
+instrumentation, which is worth fixing and was fixed by `7623a233`. It was not
+"instrumentation removed during an incident". The stale-tree MECHANISM is real
+and the `deletions vs the main parent == 0` assertion still stands — what was
+wrong was my reading of WHAT the 239 lines contained. 229 of them were ledger;
+the 10 code lines were one side of a refactor.
+
+**The lesson, which is not the one I thought I was recording:** a `numstat`
+deletion count tells you SIZE, never MEANING. I read `-10 code lines` and
+supplied "a safety guard was removed" without opening the diff. Read the lines
+before naming the damage — the same rule already written for the `wnba/cards.py`
+`american_price` scare earlier this session, which I got right and then did not
+apply an hour later.
+
+## 2026-08-17 01:3xZ — VERIFIED (sim-scheduling): the real MLB re-sim rules
+
+`_mlb_daily_sim_decision()` (`live_refresh_loop.py`, 230 lines, every tick).
+Blocks first: `disabled` / pipeline deferral / `previous_run_still_active` /
+`odds_refresh_active` / `insufficient_memory_headroom`. Then, first match wins:
+`no_games_scheduled` -> `first_appearance` (own backoff) -> `tip_off_window`
+(default 30 min, **once per game**, deliberately falls through) ->
+`within_check_interval` (**default 600s, floor 60s**) -> merged
+`fingerprint_change` / `join_mismatch` / `board_missing` / `props_now_available`
+-> `evening_next_day_sim` (**default OFF**).
+
+**THE 600s INTERVAL IS A FLOOR, NOT A SCHEDULE.** Past it, any input-hash diff
+relaunches. Measured triggers 23:03:50 / 23:17:31 / 23:32:20 / 23:44:11 /
+23:56:58, all `fingerprint_change`, ~12-14 min apart. Nothing is clock-anchored.
+
+**A `fingerprint_change` launch is SCOPED to changed games and never reaches the
+top-props stage** — the function's own comment records `daily_top_props` holding
+zero rows for 11+ hours because of it. The trigger that fires most often
+regenerates least.
+
+**THE MEMORY GATE NEVER FIRES.** 12 parsed `MLB_SIM_TICK` decisions from 23:00Z:
+`insufficient_memory_headroom` **0**, and no decision carries a `memory` payload
+— on a service OOM-killed every ~12 min (`#449`). The dominant suppressor is
+`intelligence_pipeline_busy`, checked ABOVE the memory gate, so the gate is
+usually unreachable. **Unresolved:** unreachable vs miscalibrated. Do not assume
+that guard is doing work.
+
+**Deployed:** web `763a2f66`, live-odds-worker `c348da53`, refresh-worker
+`4ec66498` (01:23:37Z, another session) — which DESCENDS from my `7623a233` and
+retains Phase 1c and the reconciliation guard. The convergence held.
+
+## 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker
+
+**`#440`'s goal is "live sims for every sport". Every route to it ends at
+refresh-worker/live-odds-worker CAPACITY, which is `#449`.** Not at engine work,
+and not at wiring. Stated because three separate attempts tonight each arrived
+here from a different direction.
+
+**SOCCER'S LIVE SIM ALREADY EXISTS AND PUBLISHES.**
+`soccer/features/live_lens.py` (`build_resume_state`, `apply_red_card_penalty`,
+shipped `df96c3fb`) resumes a match from score/clock/red-cards every 60s and
+writes home/away/draw win probabilities, over 2.5, BTTS, projected goals and
+corners into `data/live/soccer_live_lens.json`. The board never reads it: three
+named gates exclude soccer —
+`attach_live_projections_for_sport` (`sport != "mlb"`),
+`_LIVE_GAMELINE_SPORTS` (`{"mlb","wnba"}`),
+`LIVE_LENS_SOURCES_BY_SPORT` (no soccer key).
+
+**WHY WIRING IT TODAY WOULD NOT HELP.** The join releases an edge only above
+`PRICEABLE_SIGMA=2.0` standard errors of `sqrt(p(1-p)/n)`:
+
+    80 sims (soccer live tick)  -> 10.91 pp at p=.50, ~10.3 pp for its 3-WAY market
+    120 (MLB live)              ->  8.98 pp
+    300                         ->  5.74 pp
+
+**AND 300 DOES NOT FIT.** live-odds-worker measured **1855.2 MB of 2048 (90.6%),
+headroom 257-415 MB across 127 samples — at 80 sims**. Soccer runs FOUR Monte
+Carlo passes per live match, 60s cadence, up to ~18 concurrent fixtures. Same
+service where WNBA's builder once took **+1,062 MB in one step** and crash-looped
+the container. **Do not set `SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS=300`.**
+
+**Part 4 Phase 5 is SHIPPED** (`964c89a4`): `load_versioned_profile` is reached
+from football, soccer and hockey. Calibration is now a file swap and rollback a
+file revert. No-op until an artifact exists.
+
+**`#449` is ONGOING** — kills at 01:07:16, 01:21:07, 01:46:59Z, cadence unbroken
+by two full container replacements. Owned by `Worker memory watchdog logs`.
+
+## WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`)
+
+- **The worker's WNBA `game_cards_<date>.csv` holds ONE fixture on a three-game
+  slate.** Measured 2026-08-17 via `/api/ops/artifacts/export`:
+  `game_cards_2026-08-16.csv` = 1 row (`game_id='1'`, POR@PHX);
+  `cards_props_snapshot_2026-08-16.json` = 1 game. `IND@ATL` and `CHI@SEA` are
+  absent. **`game_id` is a SEQUENTIAL INDEX, not an ESPN event id** — the two
+  missing games carry numeric ESPN ids and come from a different source.
+- **Chip builder, `is_active_today` and provider code are all EXONERATED by
+  measurement.** The defect is the artifact, not any consumer of it.
+- **The 207 unjoined WNBA grid rows are NOT a join failure** — two thirds of the
+  slate has no `game_cards` row to join against. Supersedes the earlier reading.
+- **This is the SAME FILE as the WNBA means-only distribution gap** (outstanding
+  #3): `pred_margin`/`pred_total` are written there as means. One writer owns
+  both defects.
+- **A completed overtime game was published as in progress** until `cc0f7605`
+  (live-odds-worker, 14:43:08Z): `_normalized_game_status` had no precedence
+  between its live and terminal text checks, and `"Final/OT"` trips both.
+  **Deployed, verified by content, behavioural test PENDING a finished OT game.**
+
+## WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17
+
+- **The stable WNBA fixture identity is the ESPN event id, already present in
+  `schedule_2026.csv`** - verified same-instant against ESPN scoreboard; all
+  three 2026-08-16 ids match. Pregame artifacts and the live lens share one key.
+  `syndicate/features/shared/wnba_fixture_identity.py`, 40 tests.
+- **`game_cards` coverage was 82/113 fixtures = 72.6%** over 41 dates. Fixed and
+  proven on the real production artifact (1 row -> 3). **EFFECT IN PRODUCTION
+  UNMEASURED** - deployed to both workers by CONTENT only.
+- **Nothing on a cadence calls `refresh_wnba_oddsapi_props.main()`.**
+  `MAIN_ENTRY` 0 hits over 8h. The GHA cron reads `RUN_FULL_PIPELINE` from
+  `github.event.inputs`, which is empty on the `schedule` trigger, so full
+  regeneration is manual-dispatch only; and `render.yaml:611` Phase-1 migration
+  covered only NFL/NCAAF/NCAAB. **The WNBA full refresh was never re-homed.**
+- **Both workers share ONE unnamespaced cadence marker** (identical
+  `SYNDICATE_REFRESH_STATE_URL`, `KEY_PREFIX` absent on both). refresh-worker
+  stamps it and sweeps four sports; **live-odds-worker swept ZERO across 30h**
+  despite being the designated owner per `#129`. Fix committed (`20025cc4`),
+  **NOT deployed**.
+- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.** Both
+  workers behave as the inverse of their env.
+- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design, see
+  `coordinator.md:139`. **Do not edit or delete it.**
+
+## Phase 2 WNBA autorun + the sweep ownership gate - STATE 2026-08-17 EOD
+
+- **The WNBA full refresh had NO scheduled owner.** `MAIN_ENTRY` 0 hits/8h on
+  both workers. GHA `RUN_FULL_PIPELINE` reads `github.event.inputs`, empty on the
+  `schedule` trigger; Phase 1 re-homed only NFL/NCAAF/NCAAB. **Phase 2 autorun
+  now EXISTS (`e65a5531`) and is TESTED (`c7494c6c`) but is NOT ENABLED** -
+  `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` is unset, so it is INERT.
+- **`phase="pregame"` is the memory-safety property**, pinned by test:
+  live-odds-worker is 2GB, the WNBA refresh leg measures ~1.3-1.5GB RSS, and
+  pregame excludes the sim leg.
+- **The odds sweep ignored the ownership flags.** refresh-worker swept four
+  sports with `ACTIVE_SPORTS=nfl`; live-odds-worker swept ZERO with three
+  claimed. Gate committed `20025cc4`, **NOT DEPLOYED**.
+- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.**
+- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design,
+  `coordinator.md:139`. **Do not edit or delete it.**
+- **`lane-guard` cannot see the coordinator's sweep releases.**
+  `_is_disclaimer()` matches only "not claimed"/"claimed by"/"held by", so a
+  released lane still blocks every session. Cost 2 of 3 blocks this session.
+- **`game_cards` coverage fix is DEPLOYED but its EFFECT is UNMEASURED**, and
+  cannot be measured until Phase 2 is enabled.
+
+## Sweep ownership gate + Phase 2 - STATE 2026-08-17 ~22:00Z
+
+- **THE SWEEP GATE IS DEPLOYED** (`20025cc4`, ~20:35Z, by the coordinator) and
+  **confirmed present by CONTENT on all four deploy branches**, including the
+  later `soccer-lens` pair - another lane's deploy carried it forward rather
+  than reverting it.
+- **Partition CONFIRMED on live-odds-worker** 21:38:32Z:
+  `kept=mlb,wnba,soccer dropped=nfl,ncaaf`. **refresh-worker has not yet emitted
+  its own gate line** - code present, path infrequent, unresolved either way.
+- **`ODDS_SWEEP_OUTCOME` on live-odds-worker is STILL 0** against a hard-zero
+  30h baseline. Pending the shared cadence marker ageing past 2h. Scheduled
+  check `sweep-gate-verification-check` fires 18:40 CDT.
+- **PHASE 2 HAS NEVER SHIPPED** - `wnba_autorun=0` on all four deploy branches.
+  Its env keys on live-odds-worker (`=true`, `=7200`) are therefore **INERT**.
+  **When it does ship it goes HOT IMMEDIATELY** - the flag is already on and
+  `last_epoch=0` means the interval gate does not hold on first run.
+- **live-odds-worker: 293MB RSS / 1237MB headroom** on 2GB (21:38Z). But it
+  reports `psutil_unavailable:ImportError`, so **its memory instrumentation is
+  degraded** - the very signal one would use to abort a Phase 2 rollout.
+- **Pregame cadence: WNBA and MLB are ALREADY identical at 2h.** Only soccer
+  differs (8h). The live path differs by a deliberate memory carve-out, not cadence.
+- **`wnba_forced_through` fired 0 times in 24h on both services** - that
+  carve-out is INERT and is not what gates WNBA.
+
+## Sweep gate, modelled-fair edge, soccer window — STATE 2026-08-18 ~01:00Z
+
+- **SWEEP OWNERSHIP GATE `20025cc4` IS DEPLOYED AND WORKING.** Partition live on
+  live-odds-worker every tick; refresh-worker stopped sweeping mlb/soccer/wnba;
+  **marker ownership transferred at 23:55:40Z**. `ODDS_SWEEP_OUTCOME` on
+  live-odds-worker is still zero — grading lag vs dead launch **UNDETERMINED**.
+- **`edge_vs_modelled_fair_pct` EXISTS AND IS COMMITTED, NOT DEPLOYED.** Measured
+  on the real payload: 228 of 258 both-terms MLB rows priced. Never writes
+  `edge_vs_market_pct`. User decision, taken 2026-08-17.
+- **The soccer projection read was ONE DATE against a SEVEN-DATE quote window.**
+  `#379`'s widening shipped inert — its only caller never passed `window_dates`.
+  Fixed (`b4d82364`), **NOT deployed**. `window="slate"` is required; the
+  resolver defaults to `"day"` = one date.
+- **Soccer's `recommendations_<date>.json` is NOT in `HOT_ARTIFACT_PATTERNS`** —
+  it lives under `soccer_source/<league>/api/recommendations/`, the allowlist
+  covers `source_artifacts/data/processed/`. `/api/ops/artifacts/export` returns
+  `count=0` for it. **`/soccer/<league>/api/cards` is the readable substitute.**
+- **THE LOCAL `lanes.md` IS 123 KB / 27 HEADERS BEHIND THE COMMITTED ONE**, and
+  `lane-guard` reads the local copy. Handed to the coordinator; **do not patch
+  around it.**
+- **`ODDS_SWEEP_LAUNCHED` now exists** — before it, every launch-side print was a
+  `*_FAILED` variant and a successful launch was invisible.
+
