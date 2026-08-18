@@ -3563,3 +3563,40 @@ succeeds is not a push that did what you meant.**
   and knew nothing about `state_archive_2026-08-18_full.md`, so it read 12
   collapsed lines as lost. They were all in the archive; the override was
   correct, but the checker should have known.
+
+## 2026-08-18 — A VARIANCE-REDUCTION TRICK THAT CHANGES THE ANSWER IS NOT A VARIANCE-REDUCTION TRICK
+
+`GameConfig.crn_pa_seeding`, built to make sim A/B tests affordable. **It is
+broken and is marked BROKEN in place rather than deleted.**
+
+Re-seeding the game RNG per plate appearance inflates run scoring by **8-35%**
+across 4 games. It does not matter how much variance it removes: **a CRN scheme
+must be DISTRIBUTION-PRESERVING.** If the two arms are both wrong in the same
+direction, a tighter comparison between them is a more precise measurement of
+the wrong thing.
+
+**The first bug, and why finding it was NOT the end.** I keyed the seed on
+`half.next_batter_index`, reasoning that "a team's Nth plate appearance is the
+same logical event in both arms." **`simulate.py:3178` advances that index MODULO
+the lineup length.** It holds 9 values, so the same stream replayed 4-5 times per
+game — scoring inflated up to **126%**. I had even written "batter_index grows
+monotonically (not modulo)" into the lane note; one line of code said otherwise.
+
+**RULE: before seeding, hashing, or keying anything on an index, read the line
+that ADVANCES it.** A name like `next_batter_index` does not tell you whether it
+wraps, and the difference between monotonic and modulo-9 is the difference
+between a unique key and a 9-fold collision.
+
+**And the second rule, which cost more:** fixing the modulo bug took the
+inflation from 126% to 8-35% — **a big improvement that was still a failure.** I
+verified the fix did what it claimed (104 reseeds, 104 distinct seeds, in a
+104-PA game) and the symptom PERSISTED. **A confirmed fix to a real bug is not
+evidence that the remaining symptom is gone.** Re-measure the SYMPTOM, not the
+mechanism you repaired.
+
+**What is actually suspected:** the joint structure of early Mersenne Twister
+output across many independently-seeded streams. The marginal uniforms are clean
+— draws 1-5 over 40,000 fresh streams sit within 1.2 sd of 0.5 — so the naive
+"biased head" hypothesis was tested and REFUTED. MT is built for one long stream,
+not many short ones. **Anyone revisiting this should use a counter-based
+generator with real substreams (PCG64 `.jumped(n)`, Philox), not reseed MT.**

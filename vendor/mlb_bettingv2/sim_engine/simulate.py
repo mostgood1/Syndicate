@@ -2503,7 +2503,16 @@ def simulate_game(
         fielding_roster = state.fielding_roster()
         half = state.half
 
-        _pa_batter_index = int(half.next_batter_index)
+        # MONOTONIC per-team PA sequence. `half.next_batter_index` is NOT it:
+        # simulate.py:3178 advances it MODULO the lineup length, so it holds only
+        # 9 values and repeats every trip through the order. Seeding on it
+        # replayed the same stream 4-5 times per game and inflated scoring by up
+        # to 126% -- measured, and the reason the CRN flag was broken on arrival.
+        _pa_team_key = int(getattr(batting_roster.team, "team_id", 0) or 0)
+        if not hasattr(state, "_pa_seq_by_team"):
+            state._pa_seq_by_team = {}
+        _pa_batter_index = int(state._pa_seq_by_team.get(_pa_team_key, 0))
+        state._pa_seq_by_team[_pa_team_key] = _pa_batter_index + 1
         batter_prof = _batter_profile(batting_roster, half.next_batter_index, state)
         prev_pitcher_id = state.current_pitcher_by_team.get(fielding_roster.team.team_id)
 

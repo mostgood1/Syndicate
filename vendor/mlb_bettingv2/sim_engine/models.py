@@ -456,6 +456,30 @@ class InningHalfState:
 
 @dataclass
 class GameConfig:
+    # *** BROKEN. DO NOT ENABLE. Kept only so the finding is not re-derived. ***
+    #
+    # Measured 2026-08-18: switching this on inflates run scoring by 8-35% across
+    # 4 games (7.27 -> 9.07, 11.33 -> 12.47, 9.47 -> 10.20, 10.67 -> 14.40).
+    # **A variance-reduction technique MUST be distribution-preserving. This one
+    # is not, so it cannot be used no matter how much variance it removes.**
+    #
+    # A first bug WAS found and fixed and did not account for it: the key used
+    # `half.next_batter_index`, which simulate.py:3178 advances MODULO the lineup
+    # length, so it held 9 values and replayed the same stream 4-5 times per
+    # game -- that version inflated scoring up to 126%. With a monotonic per-team
+    # PA counter the reseed now fires exactly once per PA with 104 distinct seeds
+    # in a 104-PA game, verified, AND SCORING IS STILL INFLATED.
+    #
+    # Residual cause not isolated. The marginal uniforms are clean (draws 1-5
+    # from 40,000 freshly-seeded streams sit within 1.2 sd of 0.5), so it is not
+    # a biased head. Suspicion is the JOINT structure of early Mersenne Twister
+    # output across independently-seeded streams, which is a known weakness --
+    # MT is seeded for one long stream, not for many short ones.
+    #
+    # IF THIS IS EVER REVISITED: do not reseed MT. Use a counter-based generator
+    # with real substreams (numpy PCG64 `.jumped(n)`, or Philox), which is
+    # designed for exactly this and carries no head-of-stream problem.
+    #
     # COMMON RANDOM NUMBERS. Re-seed the game RNG at the start of every plate
     # appearance from (seed, batting team, that team's PA index) rather than
     # letting one stream run the whole game.
