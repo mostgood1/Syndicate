@@ -14288,3 +14288,46 @@ says it does not threaten the service.
 **Watcher note:** it was killed by session teardown mid-window, not by a trip. It
 had reported five clean samples first. A stopped watcher is not a pass — the
 five readings above are the evidence, not its silence afterwards.
+
+## TRIAGE — soccer live-lens observability (`461774cb` + `481de91d`) — **ACCEPTED. Its blocker is already gone; held only so it does not destroy a pending measurement.** `[2026-08-18 ~01:5xZ]`
+
+Request `2026-08-18T011500Z-soccer-live-lens-observability`, both workers.
+
+**THE REQUEST'S CENTRAL PROBLEM IS ALREADY SOLVED.** It says *"sha `461774cb`
+(local `main` tip). **NOT PUSHED**"* and explains at length why the lane would not
+reconcile 239-behind on a shared tree unilaterally — correctly. **All four commits
+in that range reached `origin/main` at 9f255fca**, pushed by the coordinator
+before this request was read. The lane's two commits are safe and shared; nothing
+is owed on the push.
+
+That was the right call by the lane: refusing to rebase a shared tree it did not
+own is exactly the behaviour this role exists to absorb.
+
+**Verified, not assumed:**
+
+| check | result |
+|---|---|
+| both commits on `origin/main` | yes, `461774cb` and `481de91d` |
+| still needed? | **yes** — neither is an ancestor of either live SHA |
+| cherry-pick onto `455df34a` (refresh-worker) | CLEAN, both |
+| cherry-pick onto `396cac89` (live-odds-worker) | CLEAN, both |
+| `render.yaml` in range | not touched, so no `blueprint_sync` |
+| service determination | **BOTH** — `SYNDICATE_ENABLE_LIVE_LENS_LOOP='true'` on both workers, absent on web. Independently confirmed earlier today. |
+
+**HELD, and the reason is NOT the usual one.** Both commits are
+observability-only — 58 lines across two files, changing what a failure looks
+like and no behaviour. The lane rates it LOW and says *"ride along with any
+worker deploy; do not open a window."* Agreed. But:
+
+- **live-odds-worker is IDLE (0 jobs) — normally a free window — and deploying it
+  now would be the wrong move anyway.** A restart resets the WNBA autorun's
+  7200s interval, and `MAIN_ENTRY` has not yet appeared (searched 01:20Z..now,
+  nothing matched). That reading is owed and is the one that says whether the
+  autorun does its job. Deploying now destroys the clock and buys 58 lines of
+  logging.
+- **refresh-worker has 8 jobs in flight**, so it is not a window regardless.
+
+**Ruling: ride along, in this order.** Take `MAIN_ENTRY` on live-odds-worker
+first (due within one interval of the 01:2xZ boot), THEN deploy both workers with
+these two commits. If `MAIN_ENTRY` does not appear by the interval, that is
+itself the finding and the deploy still follows it.
