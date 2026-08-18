@@ -89,6 +89,36 @@ to a live or uncertain lane, and moving another lane's block is editing across
 lanes, which the protocol forbids. It needs either each owner to move their own,
 or an explicit cross-lane mandate.
 
+> **RESOLVED 2026-08-18 — the cross-lane mandate was given, and the structural
+> half is DONE. `check_lane_invariants.py` now reports `INVARIANTS HOLD`.**
+>
+> `scripts/hoist_open_lanes.py` moved all 7 blocks out of the two
+> `## Archived lanes` sections and back under `## OPEN`:
+>
+>     check_lane_invariants   VIOLATED: 7   ->  INVARIANTS HOLD
+>     claims                  65 -> 65, LOST none, GAINED none, contested 0
+>     non-blank lines         3069 -> 3069
+>     bytes                   251,035 -> 251,035      (a pure move)
+>
+> Verified against a pre-run backup using `lane-guard.py`'s OWN `_claims()`,
+> compared **as a set, not a count** — two claims swapping owners leaves the
+> count identical and is a catastrophe. Blocks moved VERBATIM, so no lane's
+> recorded state, claims or history changed; three of the seven had sessions
+> running at the time and none of their content was touched.
+>
+> **THE DURABLE HALF IS STILL OPEN, and this item stays open for it.** Nothing
+> stops the next appended lane landing below the marker again — the fix is at
+> the APPEND SITE, so new lanes are inserted under `## OPEN` rather than at EOF.
+> Until that lands, re-run `hoist_open_lanes.py` when the invariant fails.
+> Whatever writes lane blocks (`/lane open`, and the merge/reconciliation passes
+> that produced the `## MERGED FROM origin/main` sections) is what needs
+> changing.
+>
+> **Also still true and unaddressed:** `lanes.md` is 2.05x over its 120,000-byte
+> cap, and nobody has checked whether a lane was ALREADY silently un-guarded by
+> a past archive pass — that needs a diff of `lanes_closed.md` against the
+> claims present before each pass. The count fixed here was exposure, not damage.
+
 **What is NOT established:** whether any lane has ALREADY been silently
 un-guarded this way. That would need a diff of `lanes_closed.md` against the
 claims that existed before each past archive pass, which nobody has run. The
