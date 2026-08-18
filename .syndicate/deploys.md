@@ -15888,3 +15888,31 @@ MEASUREMENT: <pending -- fill in after deploy + verification curl>
 REMINDER: verify within 15 min of deploy finishing, ~22:5xZ.
 
 **RETRACTION 2026-08-18:** the "deleted emitter" cause recorded above is **WRONG**. The emitter is INTACT at `memory_observability.py:1952`, byte-identical to the old worker's. I read a `head -4` truncated grep as an exhaustive one. **Three causes have now been claimed and refuted for this one symptom (broken sampler / missing psutil / deleted emitter); the real cause is UNKNOWN.** What is established: the emitter exists, refresh-worker emits every ~17s, web has not since 2026-08-14. The open question is WHICH CALLER runs on web and why it stopped. See the RETRACTION section in `state.md`. **Do not act on a cause from these files until the call sites are traced.**
+
+### deploy MEASURED — web — #462 — 2026-08-18 ~23:3xZ — lane `basketball-model-owner`
+
+Closes the `deploy PENDING — web — #462` entry above. `render_deploy.py
+--service web --commit b775255a` -> `dep-da2ekg2jnfac73dfm63g`, triggered
+2026-08-18T23:26:56Z. Break-glass grant used (see
+`.syndicate/deploy/grants/afedb58e-8521-4b40-bd4e-52f23e260f04.json`) --
+`deploy_preflight.py --service web` still UNKNOWN (same open #465
+investigation; substitute evidence was the SAME live process read
+`deploy_preflight.py` itself returns: 4 processes, 0 jobs), user-authorized
+explicitly this session via AskUserQuestion. Target `b775255a` parented
+directly on the live SHA at cut time (`055dfc67`, re-verified via
+`/api/ops/version` immediately before cutting) -- cumulative, drops nothing.
+
+Cutover watched t+0 to t+275s:
+
+    t+0..135s    live=055dfc67       old instance still serving
+    t+155..255s  UNREACHABLE (502 html)   restart window (~2 min, longer than the usual ~60-90s)
+    t+275s       live=b775255a       TARGET LIVE
+
+**verify: MET, by content.** `GET /api/ops/artifacts/export?path=...`
+immediately after cutover:
+
+    wnba team_advanced_stats_2026_asof_20260708.csv    403 -> 200
+    nba  team_advanced_stats_2026.csv                  403 -> 200
+    wnba smart_sim_total_calibration.json (absent file) 403 -> 200 (count:0, correctly -- allowlisted but not yet produced, per model_engine_standard.md Sec3: allowlisting permits, does not require existence)
+
+Claim released: `deploy_claim.py release --service web --holder basketball-model-owner`.
