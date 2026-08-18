@@ -47,16 +47,3 @@ Set the flag to `0` — the autorun goes inert immediately, no deploy needed. Th
 ## note on provenance
 
 I attempted step 2 myself and the permission classifier denied the Render API write. I did not route around it. Recording that so the request is not read as something I could have finished and chose not to.
-
-
----
-
-## EXECUTED by the coordinator 2026-08-17 ~22:0xZ
-
-DEPLOYED to live-odds-worker as `396cac89` (= live `7470939b` + `e65a5531` + `c7494c6c`), deploy `dep-da1oc2vlk1mc73a0ivbg`, at user instruction "fire all 3 now" — **overriding the coordinator's own HOLD**.
-
-**THE THREE HOLD FINDINGS WERE NOT RESOLVED, ONLY OVERRIDDEN.** The flag was already `true`, so there was NO inert observation period and the autorun armed on boot — the exact thing the two-step staging existed to prevent. The interval is 7200 (2h), not the 14400 (4h) the request assumes, so its "allow up to one full interval" verify window is 2h. Headroom measured 1,186 MB against the 1.3-1.5 GB leg the request itself sizes; that arithmetic still predicts an OOM.
-
-**The env was NOT touched.** Flipping another lane's flag to make a deploy fit remains refused. A memory watcher is armed at 88% of 2048MB and rolls back to `7470939b` without asking.
-
-**MEASUREMENT OWED, in the request's own order:** `MAIN_ENTRY` on live-odds-worker within one interval (2h), THEN `GAME_CARDS_CENSUS scheduled=N covered=N`. Do not read the census absence as failure before MAIN_ENTRY appears.

@@ -31,7 +31,30 @@ class _FakeKeyValueClient:
 
 
 class WnbaRefreshRunnerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # ISOLATE THE REAL SEASON SCHEDULE. Since 2026-08-17
+        # `_build_local_game_cards_artifact` consults `schedule_2026.csv` and
+        # backfills any scheduled fixture its market inputs missed -- which is
+        # the point of that change, and which would otherwise inject real
+        # August fixtures into every synthetic slate these tests construct on
+        # real dates.
+        #
+        # These tests are about which BRANCH ran and what it derived from the
+        # odds, not about coverage, so the schedule is an unrelated global
+        # input and pinning it absent restores exactly what they were written
+        # to assert. The backfill has its own tests:
+        # `test_wnba_fixture_identity.py` (40) and the schedule-only case in
+        # `test_wnba_game_cards_census.py`.
+        self._prior_schedule_path = os.environ.get("SYNDICATE_WNBA_SCHEDULE_PATH")
+        os.environ["SYNDICATE_WNBA_SCHEDULE_PATH"] = str(
+            Path(tempfile.gettempdir()) / "wnba_schedule_absent_for_tests.csv"
+        )
+
     def tearDown(self) -> None:
+        if self._prior_schedule_path is None:
+            os.environ.pop("SYNDICATE_WNBA_SCHEDULE_PATH", None)
+        else:
+            os.environ["SYNDICATE_WNBA_SCHEDULE_PATH"] = self._prior_schedule_path
         refresh_state_store.reset_state_store_caches()
         sys.modules.pop("syndicate_wnba_source_app", None)
 

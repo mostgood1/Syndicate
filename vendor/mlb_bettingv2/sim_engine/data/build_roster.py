@@ -30,6 +30,7 @@ from .recency import batter_recent_rates, pitcher_recent_rates
 from ..features import RecencyConfig, apply_recency_to_batter, apply_recency_to_pitcher
 from .disk_cache import DiskCache
 from .statsapi import fetch_person_pitch_arsenal
+from .batted_ball import apply_batted_ball_to_batter
 from .statcast_pitch_splits import fetch_pitcher_pitch_splits
 
 
@@ -518,6 +519,24 @@ def _pprof_from_cached(player: Player, row: Dict[str, Any]) -> PitcherProfile:
     # Keep arsenal a sane default; starter arsenal enrichment happens later.
     prof.arsenal = dict(_DEFAULT_ARSENAL)
     return prof
+
+
+def _batted_ball_weight() -> float:
+    """Pull toward batted-ball contact quality. 0.0 = OFF, and that is the default.
+
+    `#440`. Env-gated rather than a constant so the blend can be turned on per
+    service without a code change, and so an unconfigured service is unchanged.
+    A malformed value reads as OFF -- an unparseable knob must not silently
+    become an active one.
+    """
+    import os  # function-local: this module has no module-level `os` import
+    raw = str(os.environ.get("SYNDICATE_MLB_BATTED_BALL_WEIGHT") or "").strip()
+    if not raw:
+        return 0.0
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _load_manager_tendencies_anykey() -> Dict[str, Dict[str, Any]]:
@@ -2079,6 +2098,29 @@ def build_team_roster(
             try:
                 recent = batter_recent_rates(client, pid, season, games=int(batter_rec_cfg.games))
                 apply_recency_to_batter(prof, recent, batter_rec_cfg)
+            except Exception:
+                pass
+
+            # `#440`: batted-ball quality blend. AFTER recency, so it adjusts the
+            # rate the rest of the pipeline actually settled on rather than a
+            # value recency then overwrites.
+            #
+            # Measured leak-free (n=218, all predictors first-half only): barrel%
+            # predicts future HR at 0.387 vs this profile's own `hr_rate` at
+            # 0.312, and hard-hit% predicts future TB at 0.235 vs 0.126. So this
+            # is a better ESTIMATOR of parameters the sim already has -- not a new
+            # mechanism, and therefore not subject to the calibration-absorption
+            # that made substitution and pitch splits interfere.
+            #
+            # DARK BY DEFAULT: weight comes from the environment and is 0.0 unless
+            # set, so an unconfigured service is byte-for-byte unchanged. It is
+            # wired here because a module with no production caller is inert
+            # however well it is tested -- which is exactly how this one shipped
+            # the first time.
+            try:
+                if _batted_ball_weight() > 0.0:
+                    apply_batted_ball_to_batter(
+                        prof, season=season, weight=_batted_ball_weight())
             except Exception:
                 pass
 

@@ -12529,3 +12529,1632 @@ guard fired. Rule filed in `learnings.md`: zero samples is NO DATA, never clean;
 an impossible reading is a bug report; never `except: pass` around a guard's
 parse. The replacement watcher exits non-zero on zero samples and was used to
 confirm this rollback.
+
+
+## MERGED FROM origin/main - coordinator merge cycle
+
+## MERGED FROM origin/main - coordinator merge cycle
+
+## MERGED FROM origin/main - coordinator merge cycle
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+### ask-sim-margin — web `9f617f34` — MEASURED
+
+- Deployed 2026-08-16 18:30 CDT (23:30:17Z), **web only**, cut from web's own
+  live SHA `9bae928c`. Claim held. Landed on `main` as `cc04240c`; main and live
+  carry identical blobs. **Eighth deploy of this lane.**
+
+- **THIRD AND FINAL CORRECTION to the same clause.** The prop/game split shipped
+  in `9bae928c` was still wrong — it moved the error to a sport that was not on
+  the board. `player_name` is a proxy for "low count"; it fits MLB and **fails on
+  soccer**, because a soccer TOTAL is a low-count **GAME** row, so the old rule
+  routed it straight into the directional claim.
+
+- **Grounded in the system's own model, not an outside assumption.** Soccer's
+  engine models counts as Poisson
+  (`soccer/sim_engine/soccersim/player_props.py`), and a Poisson median sits
+  ~1/3 BELOW its mean, so "mean above the line" stops implying
+  "P(over) > 50%" in a narrow one-sided band:
+
+      market         mean  line  P(over)   mean says  prob says
+      soccer total   2.60   2.5    48.2%     over       UNDER   <-- wrong
+      soccer total   2.55   2.5    46.9%     over       UNDER   <-- wrong
+      soccer total   2.40   2.5    43.0%     under      under
+      soccer total   3.10   2.5    59.9%     over       over
+      MLB total      8.00   7.5    54.7%     over       over
+      MLB total      9.99   8.0    66.6%     over       over    (served)
+      MLB total      5.45   7.5    18.4%     under      under   (served)
+
+  **A 2.5 goal line against a 2.6 mean is the most common shape in soccer and
+  sits exactly in the band** — the rule was most wrong about the sport it had
+  never been tested on.
+
+- Fix is the actual precondition and carries no sport in it: claim a direction
+  only when `abs(projected - line) >= _SIM_DIRECTION_MIN_MARGIN` (**0.5**),
+  enough that the median cannot be on the other side. Below it the sentence says
+  "too close to call the side from the projection alone".
+  **This SUBSUMES the prop/game split and is strictly better**: a prop with a
+  real gap gets its claim back (verified live — `Bryan Woo over 17.5`, projected
+  16.509, gap 0.99, "does NOT support the over"), while a prop without one
+  (0.214 vs 0.5) still stays quiet.
+
+- **Verified on production 23:3xZ:** 3 directional claims, every gap >= 0.5,
+  every direction correct, **0 rule violations**. Pre-deploy replay over the
+  live board: 7 over/under rows, 6 claims, 1 quiet, 0 violations.
+
+- 13 tests including a 7-case parametrised margin table, both soccer shapes,
+  both served MLB rows, and the level-with-the-line case. 85 in this file, 243
+  across all four ask suites.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 9bae928c
+  --allow-rollback`.
+
+- **NOT MEASURED ON SERVED SOCCER ROWS, and the commit says so.** Soccer had 0
+  board rows all session (`active_sports: ['mlb','wnba']`), no retained date
+  carries any, and the local mirror yielded no total lines — the documented
+  lossy-mirror trap. The table is arithmetic on the engine's own Poisson
+  assumption, **not an observation of served rows.** Re-check when soccer
+  returns to the board; that is the single open item on this clause.
+
+---
+
+## 2026-08-16 23:38Z — WNBA live_state dropout — live-odds-worker `16a898ef` — **DEPLOYED AND UNIT-VERIFIED; THE PRODUCTION TRIGGER HAS NOT YET FIRED**
+
+### Root cause, named at the line
+`wnba/cards.py::_public_scoreboard_live_state_payload` was
+`except Exception: return None`, **silently**. Every caller then saw zero public
+games, no live merge ran, and the published lens carried `in_progress: False,
+clock: None, pts: None-None` for games genuinely in progress — at which point
+that module's own source rule (`live_projection` only when `is_live` AND
+`live_margin` AND `elapsed_min`) downgraded every game to `pregame`, and the
+Layer 1 board lost its whole live tier.
+
+**A 6-second timeout to an external host, published as "no games in progress".**
+
+### The dropout, observed end to end
+```
+22:50:31Z  board served 149 live-aware WNBA game rows
+22:57:22Z  same board served 309 game rows and ZERO, while CHI @ SEA and
+           IND @ ATL were still live at 78-74 and 78-77
+22:57:43Z  lens: sources=['pregame'] in_progress=False clock=None pts=None-None
+23:19:10Z  recovered on its own, unchanged code
+```
+
+### The fix, and its limits
+Age-bounded, MARKED carry-forward of the last good scoreboard, following MLB's
+`_carry_forward_live_state_lens` rules because it solved this first:
+- **180s bound**, tighter than MLB's 300s — a basketball clock moves faster than
+  a half-inning. Past it, return None (an honest absence) **and drop the entry**
+  so a later failure cannot resurrect an older board.
+- **Unknown age never takes the permissive branch** (monotonic time, so the age
+  is always knowable).
+- **Marked, never silent:** `carried_forward: True` with age, source and reason;
+  the failure now prints. A carried board that looked fresh would be worse than
+  the nulls it replaces.
+- **Kill switch** `WNBA_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS=0`; a negative
+  value is a typo, not a disable.
+- **A 200 with no events is NOT carried.** Out of season legitimately has none,
+  and carrying over that would INVENT a slate. Only a FAILED fetch is smoothed.
+
+### What is verified, and what is NOT
+**Verified:** 8 tests including the real call path (`urlopen` patched to raise,
+driving `_public_scoreboard_live_state_payload` itself, not just the helper);
+118 green across carry-forward, live-tier, MLB carry-forward and WNBA cards
+suites; deployed SHA carries the code by content.
+
+**NOT verified: the trigger has not fired in production.** A log search for
+`SCOREBOARD_CARRIED_FORWARD` / `SCOREBOARD_FETCH_FAILED` /
+`SCOREBOARD_CARRY_EXPIRED` since 23:38Z returns **0 matches** — the ESPN fetch
+simply has not failed since the deploy. **This fix is unproven against the real
+failure and must not be recorded as proven.** The next dropout is its first
+test; the instrument will say so by name, which it could not do before.
+
+### Collateral confirmation: the live tier itself works on a healthy lens
+23:31:16Z board, IND @ ATL 94-91 (OT) and POR @ PHX 18-22:
+**218 of 321 game rows live_aware with a live_gameline** (up from 149 earlier),
+withheld reasons `live_resim_published_no_distribution_for_this_market` 216 and
+`sim_count_unusable` 2. So `wnba-live-tier`'s wiring is confirmed against a
+second, independent live slate.
+
+### Deploy target reasoning
+**live-odds-worker, not refresh-worker:** `start_live_lens_loop()` is called only
+from `run_live_odds_refresh_worker.py:412`. Cut on live `440f5f29`, which does
+NOT carry the clamp change that lane deferred by user decision — so that
+deferral is preserved.
+
+### Process fix carried from the previous deploy
+The push and the deploy were **gated on the test exit code in the same shell**
+this time (`RC=$?; if [ "$RC" -ne 0 ]; then ... exit 1; fi`), after chaining them
+ungated an hour earlier and having to cancel a deploy mid-build.
+
+## 2026-08-17 00:37–00:40Z — `live-game-line-projection` — **VERIFICATION RUN. Its stated success criterion is MET.**
+
+Not a deploy. This is the read that lane had been waiting on since 15:2xZ, and
+its own "SINGLE NEXT ACTION" verbatim: read `live_gameline_ledger` off
+`/api/board/book-grid?sport=mlb&date=2026-08-16` during a live slate, **across
+two builds, never one.**
+
+### The lane's success criterion, quoted
+> Success = one live slate where `live_gameline_ledger.written > 0` and the
+> counters are reachable from an API.
+
+### Measured — two consecutive builds, MLB, live slate
+
+```
+BUILD 1  2026-08-17T00:37:48.762827Z
+   ledger  written=13  candidates=13  skipped_unchanged=0
+   rows    projected=13  priceable=11   -> NON-priceable written = 2
+
+BUILD 2  2026-08-17T00:39:58.257836Z
+   ledger  written=13  candidates=13  skipped_unchanged=0
+   rows    projected=13  priceable=11   -> NON-priceable written = 2
+```
+
+Withheld breakdown on both: `segment_is_not_full_game` 49,
+`prob_interval_swamps_edge` 2, of 62 considered.
+
+### Both halves of the criterion
+- **`written > 0` on a live slate: YES**, 13 on each of two builds.
+- **Counters reachable from an API: YES** — the `live_gameline_ledger` block is
+  served on `/api/board/book-grid`, no 10 MB artifact stream required. That was
+  the second half of the goal and it is why this read took seconds.
+
+### THE v2 DISCRIMINATOR, which is the part that could have been faked
+The lane warned explicitly that `skipped_unchanged > 0` is **NOT** the signal —
+that was already seen under v1 at 04:22:51Z and is what refuted this lane's own
+earlier "never recorded a row". The real discriminator is **`written` rising on
+rows that are NOT priceable.**
+
+`written 13` against `priceable 11` = **2 non-priceable rows recorded**, on both
+builds. Under v1 those two (`prob_interval_swamps_edge`) would never have been
+written. And `skipped_unchanged` is **0** here, so the result cannot be the
+false signal the lane named.
+
+### What this does NOT establish, carried forward rather than closed over
+1. **The edges are still UNSCORED.** The heading's "THE EDGES ARE UNEVALUATED"
+   is a broader ambition than the Goal this lane actually states. The ledger can
+   now produce a sample; nobody has measured whether those 11 edged rows were
+   RIGHT. That is downstream evaluation work and needs its own lane.
+2. **The ledger's RSS was never measured.** The lane records an `oomKilled` at
+   04:46:44Z, 22 minutes after its deploy added work to refresh-worker, and says
+   plainly: *"I never measured the ledger's RSS and I am not claiming
+   exoneration."* **That debt is NOT discharged by this read.** It stays with
+   `refresh-worker-oom-recurrence` (OPEN). Kill switch if needed, no deploy:
+   `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+Closed on the criterion the lane wrote for itself, with both unmet ambitions
+named above so neither disappears with the lane.
+
+---
+
+### live-edge-basis — refresh-worker `b20072cd` — **MEASURED AND CLOSED**
+
+- Committed 2026-08-17 01:4xZ. **No deploy fired**, by owner instruction: it
+  rides a CONSOLIDATED deploy rather than a ninth one tonight.
+- Two independent reasons it could not go alone anyway, both checked at the time:
+  `refresh-worker-oom-recurrence` has a documented deploy hold on that service,
+  and the refresh-worker deploy claim was **HELD by `sim-scheduling`** mid-ship.
+- Change: `_apply_verdict` sets `projection["edge_basis"] = "live" | "pregame"`,
+  so a consumer can tell WHICH probability `edge_vs_market_pct` was computed
+  against. **Additive — no existing value moves.**
+- Why it matters: the edge is computed against `live_model_prob_over` while
+  `model_prob_over` beside it stays PREGAME. Measured on the served shortlist,
+  13 rows with both an edge and the pair: the **7** that could not be reconciled
+  were all `live_aware`, all **6** that reconciled were not. Stated `−39.93`
+  reproduces exactly from the live pair; the pregame pairing gives `+27.46`.
+- **This is the fix `layer2_board` asked for in a comment** beside
+  `_MODEL_EDGE_MAX_POINTS = 15.0`: "The real fix is an explicit `basis` on the
+  projection… Until projections carry it, this bound is the guard." **The bound
+  is NOT relaxed here** and a test fails if it is.
+- Tests: 6 new; **114 green** across the touched file's suites in a clean
+  worktree. `test_layer2_board.py` was 9-fail/18-pass on clean `origin/main`
+  and identical with this change — pre-existing, not caused by it.
+  **THOSE 9 ARE NOW FIXED (`432e6e73`, 27 passed): all fixture staleness,
+  no source change.** Recorded here because a stale "the suite is broken"
+  reads as a live warning to whoever picks this row up.
+- **VERIFICATION OWED ON THE NEXT refresh-worker DEPLOY:** `edge_basis` present
+  on `full/*` live rows of `/api/board/layer2-shortlist`, `"live"` where
+  `live_aware` is true. **Until then this row stays an open obligation and
+  `edge_basis` has never been seen on a served row.**
+- Rollback: revert `28b03fef`. Nothing reads the key yet, so reverting is inert. (Now deployed — a rollback
+  means redeploying refresh-worker at `8e3d2f95`, which would also drop the wnba
+  and game_shape entries that shipped in the same batch.)
+- **MEASURED 2026-08-17 17:44:30Z — OBLIGATION CLOSED.** Deployed to
+  refresh-worker as part of the consolidated batch in
+  `.syndicate/deploy_manifest_refresh_worker.md` (`dep-da1jkhm417fc73akijag`,
+  live 16:50:48Z, target `b20072cd`, cut from the service's own live SHA
+  `8e3d2f95`). Shipped alongside `wnba/cards.py` (`ea9a2be8`, `a3cecedd`) and
+  `game_shape.py` (`28cc8814`).
+- **`edge_basis` OBSERVED ON SERVED ROWS.** On the 17:44:30Z shortlist build,
+  9 `live_aware` rows:
+
+      edge_basis   edge_vs_market_pct   edge_unavailable_reason      market
+      None         None                 live re-sim produced no…     strikeouts
+      None         None                 prob_interval_swamps_edge    totals
+      None         None                 prob_interval_swamps_edge    totals
+      None         None                 live re-sim produced no…     batter_rbis
+      pregame      21.99                None                         h2h
+      live         20.54                None                         spreads
+      live         10.69                None                         totals
+      live         10.69                None                         totals
+      pregame      21.99                None                         h2h
+
+  **Perfect separation, 9 of 9: `edge_basis` is set IFF the edge is priceable.**
+  All 5 rows carrying it have a real `edge_vs_market_pct`; all 4 without it have
+  `None` plus a stated `edge_unavailable_reason`. Both values appear and both are
+  right — `spreads`/`totals` read `live` where a live projection exists, `h2h`
+  reads `pregame` where it does not.
+- **THE WATCHER REPORTED FAIL AND THE WATCHER WAS WRONG.** It asserted "every
+  `live_aware` row carries `edge_basis`" and exited 1 on the four withheld rows.
+  The code sets the key only on the `priceable` branch — deliberately, and
+  `tests/test_live_gameline_edge_basis.py::test_a_withheld_edge_carries_no_basis`
+  pins exactly that ("no edge, no basis; describing the vintage of a `None` is
+  noise"). **I wrote a production check that contradicted my own test.** Caught by
+  reading `edge_unavailable_reason` on the four rows instead of trusting the
+  pass/fail branch. Had the exit code been taken at face value it would have
+  reported a just-shipped deploy as broken — the mirror image of the
+  absence-proves-nothing trap the watcher existed to avoid. **Do not reuse that
+  assertion as written; the correct one is "every PRICEABLE `live_aware` row
+  carries `edge_basis`".**
+- Two earlier reads were correctly discarded rather than reported: 16:48:20Z
+  (artifact predates the 16:50:48Z deploy) and 16:58:13Z (post-deploy but 0 live
+  rows, so the live-join path never ran). A zero from either would have been
+  uninformative.
+- Deploy cost, as predicted and accepted: a board build 2.3 min in was killed and
+  re-ran. The MLB sim had already finished — it was the blocker two hours
+  earlier, which is why this waited.
+- Measured before firing, because refresh-worker carries an open OOM lane: the
+  new `mlb_leverage_table.py` (5,416 lines) is **function-locally imported** and
+  costs **1.14 MiB resident / 8 MiB RSS / 30.9 MiB transient import peak** —
+  negligible against the ~2 GB transient `refresh-worker-oom-recurrence` is
+  chasing.
+
+
+## 2026-08-17 â€” PHASE 7 ON PRODUCTION â€” **THE MIRROR RESULT IS PARTLY WITHDRAWN**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/score_projections.py --source both`.
+Code on `origin/main` `91be99e6` + the `--source` addition. **Still no deploy.**
+
+### REPRODUCIBILITY (bias = actual âˆ’ mean; negative = THE SIM RUNS HIGH)
+
+| market | bias local | bias prod | same sign | disp local | disp prod |
+|---|---|---|---|---|---|
+| **pitcher_outs** | âˆ’5.139 | âˆ’2.031 | **YES** | 1.537 | 1.105 |
+| **pitcher_hits_allowed** | âˆ’1.901 | âˆ’1.592 | **YES** | 0.874 | 0.794 |
+| **pitcher_earned_runs** | âˆ’0.486 | âˆ’0.694 | **YES** | 0.721 | 0.661 |
+| pitcher_strikeouts | âˆ’0.593 | âˆ’0.005 | yes, but collapses to ZERO | 1.022 | 1.016 |
+| pitcher_pitches | âˆ’6.828 | **+4.313** | **NO** | 1.231 | 1.575 |
+| pitcher_walks_allowed | âˆ’0.148 | +0.137 | **NO** (both ~0, so noise) | 0.783 | 0.772 |
+| game_total_runs | +0.797 | **âˆ’1.230** | **NO** | 0.752 | 0.726 |
+
+Production n = 4,695 observations / 29 dates / 370 games.
+
+### WHAT SURVIVES BOTH WINDOWS â€” this is the real finding
+
+1. **The sim over-projects how deep a starter goes, in both windows.** `outs`
+   is negative in both (âˆ’5.14, âˆ’2.03) and is the largest bias in both. **The
+   `#428` OPPORTUNITY thesis is corroborated** â€” `outs` IS the pitcher-side
+   opportunity variable, and the hitter side showed the same sign via
+   `pa_mean`/`ab_mean`. What is NOT corroborated is a blanket "all markets high".
+2. **`outs` is overconfident in both** (1.54, 1.10 against a calibrated 0.798),
+   so it needs an additive shift AND a Ïƒ scale. `strikeouts` dispersion is
+   1.02 in BOTH windows â€” the most stable number in the table.
+3. **Runs allowed is over-projected in both** (`hits_allowed`, `earned_runs`),
+   consistent with over-projecting workload.
+4. **On production, 5 of 7 markets lose to the constant baseline** â€” only
+   `strikeouts` and `walks_allowed` beat it. Worse than the mirror window.
+5. **The empirical-vs-Normal gap stays under 1% in BOTH windows** (â‰¤0.085). A
+   Gaussian calibration term in Phase 8 is defensible, now on two samples.
+
+## 2026-08-17 ~18:00Z - WNBA game_cards: schedule denominator + stable fixture id
+
+| service | deploy | commit | base | status | measurement |
+|---|---|---|---|---|---|
+| refresh-worker | `dep-da1kftnqj5pc73d8vvj0` | `8c0bd8e6` | live `b20072cd` | live 17:52Z | **EMPTY - not measured** |
+| live-odds-worker | `dep-da1kjb0jo6nc738s2p4g` | `abc99875` | live `cc0f7605` | live 18:00Z | **EMPTY - not measured** |
+
+**VERIFIED BY CONTENT on both** (not by ancestry): `"fixture_id"` in the header,
+`_finalize_and_write` x4 (one def + three write paths), `wnba_fixture_identity.py`
+PRESENT.
+
+**NEITHER LIVE SHA WAS AN ANCESTOR OF `main`.** refresh-worker's `b20072cd` had
+10+ commits absent from main (another lane's OOM instruments, and `898edfed`, the
+WNBA overtime fix); live-odds-worker's `cc0f7605` had 8. **Deploying `main` would
+have reverted them.** Both branches were cut from the LIVE SHA and my commit
+cherry-picked on, then checked: the other lane's `publish to the readable
+channel` block survives in both, and neither branch carries a conflict marker or
+a `.syndicate/` change.
+
+**THE EFFECT IS NOT MEASURED, AND THIS ROW STAYS OPEN UNTIL IT IS.**
+- **9 polls over ~8 minutes after the deploy: ZERO `GAME_CARDS_CENSUS` on either
+  service.**
+- **That is a REAL absence, not a blind instrument.** Control run in the same
+  window: both services returned live log lines (18:06:25Z, 18:06:28Z). And the
+  emitter was confirmed present in the deployed SHA before watching. Both halves
+  of the `absent-signal` rule were checked before reporting the null.
+- **It was ALSO zero for the ~2 days BEFORE the deploy**, with the emitter
+  present in `b20072cd` and `cc0f7605`. So this builder runs rarely - it is not
+  that the deploy broke it.
+- **live-odds-worker is BLOCKED on a stuck run:** `LIVE ODDS REFRESH
+  SKIP/ERROR DETAIL: A refresh run is already active (pid=890). Cancel it before
+  starting a new one.` **A new refresh cannot start there until that pid clears.**
+  Unresolved, and it is not mine - surfaced, not touched.
+- `WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS=21600` (6h) on refresh-worker.
+
+**WHAT WOULD ACTUALLY CLOSE THIS ROW - and today CANNOT.** 2026-08-17 has ONE
+WNBA fixture (DAL@GSV), and a 1-row file is CORRECT for a 1-game slate (pinned by
+test). **A single-game slate proves nothing.** The measurement needs the
+2026-08-18 slate: **4 fixtures** (LAS@CON, IND@TOR, NYL@CHI, ATL@LVA).
+1. Read `GAME_CARDS_CENSUS` after a WNBA tick; expect `scheduled=4 covered=4`
+   with `backfilled=` accounting for whatever odds missed.
+2. Or read `game_cards_2026-08-18.csv` and assert 4 rows and a `fixture_id`
+   column in the header.
+**Do not record this as fixed on the header alone** - `fixture_id` present with
+`covered<scheduled` would mean the id shipped and the coverage fix did not.
+
+Rollback, either service: redeploy the base SHA above via
+`POST /v1/services/<id>/deploys {"commitId": "<base>"}`.
+
+### CORRECTION 18:30Z / 13:30 CDT - "live-odds-worker is BLOCKED on a stuck run" was WRONG. Nothing was stuck; nothing to clear.
+
+I reported the `pid=890` lock as a live blocker and offered to clear it. **Asked
+to clear it, I checked first and it was already gone.** Measured:
+
+- **`pid=890` appears TWICE, both at 18:06:28Z, and NEVER AGAIN** - 23 minutes
+  clean at the time of writing. It was a transient collision while the container
+  was still coming up from MY OWN 18:00Z deploy, not a wedged lock.
+- **The loop is healthy right now**: `live_refresh_loop` emitted FIXTURE_CADENCE
+  and PREGAME_CADENCE lines at 18:28:49Z, and `run_refresh_odds_job` shows in
+  ALL_PROCESS_MEMORY at 18:28:31Z. A refresh IS running.
+- **The guard self-heals anyway** (`ops_refresh.py:645`): `state==running` with a
+  dead pid is rewritten to `failed` on the next read. A genuinely stale lock
+  could not have persisted. **I could have derived that from the code before
+  reporting it as a blocker, and did not.**
+
+**CLEARING IT WOULD HAVE BEEN A DESTRUCTIVE ACTION ON A HEALTHY LOCK** - breaking
+the mutex that stops two concurrent refresh runs, to fix a condition that had
+already resolved 20+ minutes earlier.
+
+**THE REAL REASON THE CENSUS HAS NOT FIRED - it is a cadence, not a fault:**
+```
+[live_refresh_loop] PREGAME_CADENCE_DETAIL wnba:marker_age_s=1618/interval_s=7200
+[live_refresh_loop] PREGAME_CADENCE_SKIPPED sports=wnba
+```
+WNBA pregame runs on a **7200s (2h)** interval; the marker was set 18:01:51Z, so
+the next WNBA pregame refresh is **~20:01:51Z = 15:01 CDT**. The builder was
+never going to run in the 8 minutes I watched. **My watch window was shorter
+than the cadence I was waiting on, which I should have read before watching.**
+
+**STATUS UNCHANGED AND STILL OPEN:** deployed + verified by content on both
+workers, effect NOT measured. Next natural chance ~20:01Z, but **2026-08-17 is a
+ONE-fixture slate and cannot prove coverage** - a 1-row file is correct there.
+The proof needs 2026-08-18 (4 fixtures: LAS@CON, IND@TOR, NYL@CHI, ATL@LVA),
+expecting `scheduled=4 covered=4`.
+
+### MEASUREMENT SCHEDULED - the open WNBA row above has an owner and a date
+
+**Task `wnba-game-cards-coverage-check`, fires ONCE 2026-08-18 13:00 CDT**
+(`~/.claude/scheduled-tasks/wnba-game-cards-coverage-check/SKILL.md`). Chosen so
+several 2h WNBA pregame cycles have run and it is still ~5h before first tip
+(23:00Z).
+
+**Expected reading: `scheduled=4 covered=4`** on the 08-18 slate (LAS@CON,
+IND@TOR, NYL@CHI, ATL@LVA / `401857152-155`). It fills in the measurement column
+on the 2026-08-17 row and states CONFIRMED / FAILED / STILL UNMEASURED.
+
+**The task carries the traps forward so the next reader does not re-learn them:**
+- **`fixture_id` in the header proves only that the code RAN.** Header present
+  WITH `covered<scheduled` means the id shipped and the coverage fix did not.
+  It is told to report a RATIO, never a bare row count.
+- **It must not believe a null.** Before reporting "did not run" it has to
+  re-confirm the emitter is in the deployed SHA AND run a control query proving
+  logs flow in the same window - both halves, as done 2026-08-17.
+- **Cadence is not fault.** WNBA pregame is a 7200s interval that logs
+  `PREGAME_CADENCE_SKIPPED sports=wnba`; if it simply has not run, report the
+  marker age rather than calling it a failure.
+- **It must NOT open a lane.** Unattended sessions cannot be messaged and cannot
+  close their own lane - that is exactly what blocked this work earlier today
+  (`export-force-refresh-escape`). Findings go to `deploys.md` only.
+- **It must NOT deploy.** Deploys are coordinator-owned as of the 2026-08-17
+  protocol change.
+
+### ROOT CAUSE 2026-08-17 ~13:45 CDT - the game_cards builder runs rarely because NOTHING ON A CADENCE CALLS ITS ENTRYPOINT. The odds sweep is a different path.
+
+**THE CHAIN, each link measured:**
+```
+pregame cadence (7200s) -> ODDS SWEEP  -> writes an odds snapshot   [WORKS]
+     ODDS_SWEEP_OUTCOME sport=wnba wrote=True since_launch_s=6532   17:49:33Z
+
+refresh_wnba_oddsapi_props.main()  ->  _run_refresh_via_cli
+     ->  _build_local_game_cards_artifact  ->  GAME_CARDS_CENSUS    [NEVER RUNS]
+     MAIN_ENTRY hits in 8h, BOTH services: 0
+     GAME_CARDS_CENSUS hits in ~2 days, BOTH services: 0
+```
+**`MAIN_ENTRY` is printed by that script's `main()`, and it is the ONLY route to
+the builder.** Zero `MAIN_ENTRY` over 8h means `main()` was not invoked at all.
+The 2h cadence launches an ODDS SWEEP, which captures odds by a different,
+lighter path and never reaches the builder. **So the census was never going to
+appear on the cadence I was watching, and my fix - correct as it is - sits
+behind an entrypoint nothing calls.**
+
+**`#378` IS NOW WRONG AND SHOULD BE CORRECTED.** Its claim, quoted in
+`live_refresh_loop.py:4630`, is *"WNBA never launches -- it produces no
+ODDS_SWEEP_OUTCOME line at all"*. **Measured today: WNBA DOES launch and DOES
+write** (`wrote=True`, refresh-worker, 17:49:33Z). The permanent-stall theory in
+that comment (marker stamped before launch, launch dies every time, marker
+advances forever) **does not fit the current readings** - the sweep completes.
+It may have been true when written; it is not true now. **The stall is one level
+up: the sweep succeeds, the FULL REFRESH is never started.**
+
+**EXONERATED along the way, so nobody re-checks them:**
+- `WNBA_ISOLATE_AFTER_SNAPSHOT` - ABSENT on both services, so the early
+  `return state` above the first build call never fires.
+- A stale/wedged refresh lock - see the correction above; transient, self-healed.
+- The logs API - control queries returned live lines from both services in the
+  same windows. Every null here was checked for instrument blindness first.
+
+**SPLIT BY SERVICE, and this matters for where a fix goes:**
+- **refresh-worker** produces ODDS_SWEEP_OUTCOME for wnba, mlb, soccer - despite
+  `SYNDICATE_ACTIVE_SPORTS=nfl`.
+- **live-odds-worker** produces **ZERO ODDS_SWEEP_OUTCOME for any sport** -
+  despite `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`. **The two services' env
+  says the opposite of what their logs say.** Not chased today; flagged.
+
+**WHAT THIS MEANS FOR THE OPEN DEPLOY ROW.** The scheduled 08-18 check will most
+likely report STILL UNMEASURED rather than a coverage number, because the
+builder will not have run. **That is the correct outcome to record** - the task
+is already told that a skipped cadence is not a failure. The coverage fix cannot
+be measured until something invokes the WNBA full refresh.
+
+**NEXT, and NOT started:** find what is supposed to call
+`refresh_wnba_oddsapi_props.main()` on a schedule (a daily-update wrapper, a
+Render cron, or `run_refresh_odds_job.py`) and establish whether it is
+misconfigured, disabled, or was never wired for WNBA. **Do not "fix" this by
+adding a new caller until that is known** - a second invoker of a job that
+already has an owner is how you get two concurrent refreshes.
+
+### INTENDED OWNER TRACED 2026-08-17 ~14:05 CDT - **THERE ISN'T ONE. WNBA's full refresh fell into the gap between a demoted GHA cron and a partial worker migration.**
+
+**THE ORIGINAL OWNER: `.github/workflows/daily-update.yml`**, cron `0 6 * * *`.
+Its full-regeneration step runs `daily_update_in_season.ps1`, which is the path
+that reaches `refresh_wnba_oddsapi_props.main()` -> the game_cards builder.
+
+**IT CANNOT FIRE ON THE CRON. Line 47:**
+```yaml
+RUN_FULL_PIPELINE: ${{ github.event.inputs.run_full_pipeline || 'false' }}
+```
+`github.event.inputs` is populated **only on `workflow_dispatch`**. On the
+`schedule` trigger it is empty, so `RUN_FULL_PIPELINE` is **ALWAYS `'false'`**
+on the daily run. The step is gated `if: env.RUN_FULL_PIPELINE == 'true'` and
+its own name says it: *"full regeneration -- **manual fallback only**"*. The
+scheduled path takes the `!= 'true'` branch instead: *"Pull current artifacts
+from Render (**backup-only** default path)"* - it DOWNLOADS artifacts rather
+than generating them.
+
+**AND THE WORKER MIGRATION NEVER COVERED WNBA.** `render.yaml:611`:
+*"Phase 1 of migrating off the daily-update GHA cron: **NFL/NCAAF/NCAAB**"*.
+Three sports moved. refresh-worker's autorun is `WEEKLY_SPORTS_*` with
+`SYNDICATE_ACTIVE_SPORTS=nfl` - the weekly-cadence sports. **WNBA is a DAILY
+sport and was never migrated.**
+
+**SO THE FULL CHAIN OF OWNERSHIP IS:**
+```
+GHA daily cron      -> demoted to backup-only; full pipeline is manual-dispatch only
+worker autorun      -> NFL/NCAAF/NCAAB only (Phase 1)
+live refresh loop   -> ODDS SWEEP only; never calls the refresh entrypoint
+                    => WNBA full refresh: NO SCHEDULED OWNER
+```
+That is why `MAIN_ENTRY` is 0 over 8h and `GAME_CARDS_CENSUS` is 0 over ~2 days.
+**Nothing is broken - the job was never re-homed.**
+
+**THIS IS A CLASS PROBLEM, NOT A WNBA ONE.** Phase 1 moved 3 of 8 sports. The
+same gap should be assumed for **MLB, NBA, NHL, soccer** until each is checked:
+demoted cron above, partial migration below. **Do not fix WNBA alone without
+checking the other four** - and check them by reading `MAIN_ENTRY` per sport,
+which is a cheap and direct test.
+
+**DO NOT "FIX" THIS BY ADDING A CALLER YET.** Three real options, and the choice
+is a design decision with an owner, not a patch:
+1. **Phase 2 the migration** - re-home WNBA onto the worker beside NFL. Matches
+   the stated direction. Cost: worker memory, and `#241` is on record that
+   periodic worker work is never free.
+2. **Re-arm the GHA cron** for WNBA only, by setting `RUN_FULL_PIPELINE` from a
+   schedule-safe expression rather than `github.event.inputs`. Smallest diff,
+   but pushes work back onto the path being migrated AWAY from.
+3. **Accept it and change the contract** - if game_cards is genuinely meant to
+   be sweep-derived now, then the builder is dead code and the coverage fix
+   belongs in the sweep path instead.
+**My coverage fix is correct under 1 and 2 and IRRELEVANT under 3**, so this
+decision gates whether the open deploy row can ever be closed.
+
+### CROSS-SPORT CHECK 2026-08-17 ~14:20 CDT - **MY OWN PROBE WAS WRONG, AND THE "CLASS PROBLEM" WAS OVERSTATED. Two live findings survive.**
+
+**CORRECTION 1 - the test I recommended does not exist.** I told the user
+*"`MAIN_ENTRY` per sport is a cheap and direct test"*. **`MAIN_ENTRY` is emitted
+by exactly ONE script** - `refresh_wnba_oddsapi_props.py:6040`, the only
+occurrence in `scripts/*.py`. The other sport scripts have no equivalent entry
+banner. **The cross-sport probe I proposed could never have run.** Checked
+before relying on it, not after.
+
+**CORRECTION 2 - "assume the same gap for MLB, NBA, NHL and soccer" was too
+broad. NBA and NHL are OUT OF SEASON in August** (both start October), so they
+have no slate to refresh and their absence is CORRECT, not a defect. **The class
+question reduces to MLB and soccer**, not four sports. I asserted a five-sport
+blast radius from a calendar I did not check.
+
+**WHAT THE SWEEP LAYER ACTUALLY DOES - `ODDS_SWEEP_OUTCOME`, 30h, refresh-worker:**
+```
+mlb      lines=35   wrote=True:16
+nfl      lines=14   wrote=True:14
+soccer   lines=29   wrote=True:19
+wnba     lines=22   wrote=True: 9
+```
+**All four in-season sports sweep AND write.** The sweep layer is healthy across
+the board - WNBA is not special there.
+**CAVEAT: the API caps at 100 lines and returned exactly 100, so these are
+FLOORS and the split across sports is truncation-biased.** Do not quote the
+ratios as rates.
+
+**FINDING THAT SURVIVES - live-odds-worker does NO sweeping at all.**
+**ZERO `ODDS_SWEEP_OUTCOME` for ANY sport over 30h**, while its
+`SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer` says it should own three. Meanwhile
+refresh-worker sweeps all four **while its own `ACTIVE_SPORTS=nfl`**. **Both
+services' env says the opposite of their behaviour.** Unexplained, and it means
+a per-service env reading is NOT evidence of what a service actually does -
+which is how I nearly deployed to one worker only.
+
+**STILL OPEN AND NOT ANSWERED:** whether MLB and soccer have a scheduled owner
+for their FULL refresh (sims, artifacts, cards) as distinct from the odds sweep.
+**The sweep census above does NOT answer that** - it measures a different layer.
+Answering it needs a per-sport full-refresh marker that does not currently
+exist. **The WNBA gap is confirmed; the MLB/soccer equivalents are UNTESTED, and
+should not be reported either way.**
+
+### ROOT CAUSE 2026-08-17 ~14:35 CDT - **live-odds-worker never sweeps because BOTH WORKERS SHARE ONE CADENCE MARKER, UNNAMESPACED. refresh-worker stamps it; live-odds-worker reads it and skips. Every time.**
+
+**THE MECHANISM, each link measured:**
+1. The pregame cadence marker is `_meta_dir()/last_pregame_refresh_launch.json`,
+   read via `read_json_file` and written via `write_json_file`
+   (`live_refresh_loop.py:3642-3670`) - **the refresh_state_store helpers, i.e.
+   SHARED state, not per-disk.**
+2. Both services are on the **SAME store, with NO namespace:**
+```
+                                    refresh-worker    live-odds-worker
+SYNDICATE_REFRESH_STATE_BACKEND     keyvalue          keyvalue
+SYNDICATE_REFRESH_STATE_URL         redis://red-d88bvljbc2fs73ep...  <-- IDENTICAL
+SYNDICATE_REFRESH_STATE_KEY_PREFIX  <ABSENT>          <ABSENT>
+SYNDICATE_ACTIVE_SPORTS             nfl               mlb,wnba,soccer
+```
+3. **Markers are stamped BEFORE the launch** (`#25`, so a dead launch costs one
+   window rather than a duplicate sweep).
+4. So: refresh-worker ticks, stamps the shared key, sweeps. live-odds-worker
+   ticks, reads **that same key**, sees `age < interval`, skips. **Permanently.**
+
+**THIS IS THE READING THAT PROVES IT** - live-odds-worker skipping on a marker
+it did not write, 18:28:49Z:
+```
+[live_refresh_loop] PREGAME_CADENCE_DETAIL wnba:marker_age_s=1618/interval_s=7200
+[live_refresh_loop] PREGAME_CADENCE_SKIPPED sports=wnba
+```
+Its loop is HEALTHY and running - it filters, then correctly skips a sport
+another service already claimed. **Nothing is crashed. The mutex is working
+exactly as written; it was just never scoped per service.**
+
+**`SYNDICATE_REFRESH_STATE_KEY_PREFIX` being ABSENT on both is the defect.** The
+marker is keyed per-SPORT and per-DATE but not per-SERVICE, so two services
+sharing a store means one starves the other. **`#382`'s "permanent stall" is
+real, but the cause is not a dying launch - it is a marker written by the OTHER
+worker.** The comment at `live_refresh_loop.py:4640` reasons "if the launch dies
+EVERY time, the marker advances forever" - **the marker does advance forever,
+but because a DIFFERENT SERVICE advances it.** Same symptom, wrong culprit.
+
+**CONSEQUENCE: the env is decorative.** `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`
+on live-odds-worker buys nothing, because it loses the race for all three.
+Whatever refresh-worker reaches first, it owns. **Never infer a service's
+workload from its ACTIVE_SPORTS again** - measured today, both services'
+behaviour is the inverse of their env.
+
+**NOT FIXED, AND DELIBERATELY NOT.** The fix is a config change (a per-service
+`SYNDICATE_REFRESH_STATE_KEY_PREFIX`, or making the marker key service-scoped in
+code). A `render.yaml` edit fires `blueprint_sync` and **applies to production
+regardless of `autoDeploy=no`** - and deploys are coordinator-owned as of today.
+**Also unresolved before anyone changes it: is the shared marker INTENTIONAL?**
+It is a perfectly good cross-service mutex preventing two workers from
+double-sweeping the same sport. Namespacing it would let BOTH sweep - which may
+be the bug, not the fix. **That is a design question with an owner, and doubling
+the sweep rate against a 5M OddsAPI cap is not something to discover by trying.**
+
+### ANSWERED 2026-08-17 ~14:50 CDT - **YES. live-odds-worker IS supposed to sweep. The config is CORRECT and the behaviour is a REGRESSION against it. This also RETRACTS my "maybe the shared marker is a good mutex" caution.**
+
+**THE INTENT IS EXPLICIT**, `render.yaml` on live-odds-worker's
+`SYNDICATE_MLB_REFRESH_TICK_OWNER: "true"`:
+> `#129`: reverted back to "true" -- refresh-worker's competing
+> `MLB_ENABLE_REFRESH_WORKER_AUTORUN` path (set "false" there now) is fully
+> disabled, **so this worker is the sole MLB odds-refresh owner again, not just
+> nominally excluded from a race with another owner.**
+
+The architecture split (2026-07-20): **MLB SIM moved to refresh-worker; ODDS
+REFRESH stayed here.** live-odds-worker is the odds owner by design.
+
+**THE CONFIG IS SET CORRECTLY. I checked for a misconfiguration and there is none:**
+```
+                                    refresh-worker   live-odds-worker
+SYNDICATE_MLB_REFRESH_TICK_OWNER    false            true
+MLB_ENABLE_REFRESH_WORKER_AUTORUN   false            <ABSENT>
+WEEKLY_SPORTS_REFRESH_TICK_OWNER    true             false
+```
+Exactly the ownership split `#129` describes. **Nobody fat-fingered a flag.**
+
+**THE DEFECT, now sharp: refresh-worker sweeps `mlb`, `wnba`, `soccer` AND `nfl`
+- and it explicitly does NOT own three of them.** Its `ACTIVE_SPORTS=nfl` and its
+`MLB_REFRESH_TICK_OWNER=false`. **So the odds-sweep path is gated by NEITHER the
+ownership flags NOR `SYNDICATE_ACTIVE_SPORTS`.** It sweeps regardless, wins the
+shared unnamespaced cadence marker, and starves the designated owner.
+
+**RETRACTION - my previous caution was wrong.** I wrote that namespacing the
+marker "would let BOTH sweep" and warned about doubling the OddsAPI burn against
+the 5M cap. **That reasoning assumed the marker was the cross-service mutex. It
+is not** - the OWNERSHIP FLAGS are, and they are already set correctly. With the
+sweep path properly gated, only one service would sweep each sport regardless of
+the marker. **The burn risk I raised was against a design that does not exist.**
+The real risk runs the other way: the intended owner is doing nothing while a
+service that was deliberately taken OFF these sports does all of it.
+
+**WHY THIS MATTERS BEYOND TIDINESS.** `#129`'s own words are that the previous
+fix left this worker *"nominally excluded from a race"* - i.e. someone fought
+exactly this race, believed they had won it, and wrote it down. **It is back, by
+a different mechanism** (the marker, not the autorun flag), which is why the
+flag-level fix did not hold.
+
+**THE FIX IS IN THE SWEEP'S GATE, NOT IN THE MARKER.** Make the odds sweep honour
+the same ownership flags the tick already does, so refresh-worker declines
+`mlb`/`wnba`/`soccer`. **Do NOT namespace the marker as the fix** - that treats
+the symptom and leaves an ungated sweep running on the wrong service.
+**Not started; it is a code change plus a production deploy, and deploys are
+coordinator-owned.**
+
+**AND IT UNBLOCKS THE WNBA QUESTION.** If the sweep is re-gated to its owner,
+live-odds-worker resumes WNBA odds work - which is where a WNBA full-refresh
+owner most naturally belongs, making option 1 (finish the migration onto the
+odds owner) the coherent choice rather than option 2.
+
+
+
+## MERGED FROM origin/main - 2026-08-17 (second pass)
+
+One block the first block-union pass missed. Appended verbatim.
+
+### COORDINATION 2026-08-17 ~14:15 CDT - request handed to the coordinator, and `.syndicate/coordinator.id` IS STALE
+
+**`.syndicate/coordinator.id` holds `9ed7fd89-6696-4d42-9681-39c1a5b78a46`,
+which matches NO SESSION in the roster** - checked with archived included.
+Routed by TITLE instead, to `Deploy and Document Coordinator`
+(`local_1d6f136e-...`, running, active 19:12Z). **`coordinator.md` says the
+off-switch is DELETING that file, so a stale id is ambiguous between
+"coordinator is gone" and "coordinator moved" - it reads as an ACTIVE
+coordinator that cannot be reached.** Same failure shape as the unattended lane
+that blocked this work earlier today: a marker outliving the thing it points at.
+
+**HANDED OVER** (deploy request `2026-08-17T2000Z-wnba-fixture-identity.md`,
+commit `20025cc4`, 245 tests): both services must ship together; branches must be
+cut from each LIVE SHA because neither is an ancestor of `main` and main's copy
+of `refresh_wnba_oddsapi_props.py` lacks a readable-channel block that is live on
+both workers; and the verify needs BOTH halves, because "refresh-worker stopped
+sweeping" is also what a broken gate looks like.
+
+**DISCLOSED, unprompted, so the ledger is not reconstructed later:**
+1. **I deployed twice today** (17:52Z, 18:00Z) **before the coordinator rule
+   reached my digest.** Both rows sit in `deploys.md` with EMPTY measurement.
+2. **I closed another session's lane by override** (`export-force-refresh-escape`,
+   user-authorized) - **its effect measurement is still OWED, not discharged.**
+3. **Three ledger entries are falsified by today's measurements** - `#378`
+   (WNBA does launch and write), `#382` (the marker advances because ANOTHER
+   SERVICE advances it, not because a launch dies), `#129` (regressed by a new
+   mechanism). These are the coordinator's to correct; I did not edit them.
+
+**PROPOSED FOR `learnings.md`, from a near-miss of my own:** *a service's
+`SYNDICATE_ACTIVE_SPORTS` is NOT evidence of what that service does.* Measured
+today, both workers' behaviour is the exact inverse of their env. I nearly
+deployed to one worker on that assumption and would have shipped an inert fix.
+
+
+## MERGED FROM origin/main — 2026-08-17, by the coordinator
+
+Block-level union. These blocks existed on `origin/main` and nowhere
+on the swept side. Appended verbatim, nothing edited, nothing reordered.
+
+### ANSWERED 2026-08-17 ~14:50 CDT - **YES. live-odds-worker IS supposed to sweep. The config is CORRECT and the behaviour is a REGRESSION against it. This also RETRACTS my "maybe the shared marker is a good mutex" caution.**
+
+**THE INTENT IS EXPLICIT**, `render.yaml` on live-odds-worker's
+`SYNDICATE_MLB_REFRESH_TICK_OWNER: "true"`:
+> `#129`: reverted back to "true" -- refresh-worker's competing
+> `MLB_ENABLE_REFRESH_WORKER_AUTORUN` path (set "false" there now) is fully
+> disabled, **so this worker is the sole MLB odds-refresh owner again, not just
+> nominally excluded from a race with another owner.**
+
+The architecture split (2026-07-20): **MLB SIM moved to refresh-worker; ODDS
+REFRESH stayed here.** live-odds-worker is the odds owner by design.
+
+**THE CONFIG IS SET CORRECTLY. I checked for a misconfiguration and there is none:**
+```
+                                    refresh-worker   live-odds-worker
+SYNDICATE_MLB_REFRESH_TICK_OWNER    false            true
+MLB_ENABLE_REFRESH_WORKER_AUTORUN   false            <ABSENT>
+WEEKLY_SPORTS_REFRESH_TICK_OWNER    true             false
+```
+Exactly the ownership split `#129` describes. **Nobody fat-fingered a flag.**
+
+**THE DEFECT, now sharp: refresh-worker sweeps `mlb`, `wnba`, `soccer` AND `nfl`
+- and it explicitly does NOT own three of them.** Its `ACTIVE_SPORTS=nfl` and its
+`MLB_REFRESH_TICK_OWNER=false`. **So the odds-sweep path is gated by NEITHER the
+ownership flags NOR `SYNDICATE_ACTIVE_SPORTS`.** It sweeps regardless, wins the
+shared unnamespaced cadence marker, and starves the designated owner.
+
+**RETRACTION - my previous caution was wrong.** I wrote that namespacing the
+marker "would let BOTH sweep" and warned about doubling the OddsAPI burn against
+the 5M cap. **That reasoning assumed the marker was the cross-service mutex. It
+is not** - the OWNERSHIP FLAGS are, and they are already set correctly. With the
+sweep path properly gated, only one service would sweep each sport regardless of
+the marker. **The burn risk I raised was against a design that does not exist.**
+The real risk runs the other way: the intended owner is doing nothing while a
+service that was deliberately taken OFF these sports does all of it.
+
+**WHY THIS MATTERS BEYOND TIDINESS.** `#129`'s own words are that the previous
+fix left this worker *"nominally excluded from a race"* - i.e. someone fought
+exactly this race, believed they had won it, and wrote it down. **It is back, by
+a different mechanism** (the marker, not the autorun flag), which is why the
+flag-level fix did not hold.
+
+**THE FIX IS IN THE SWEEP'S GATE, NOT IN THE MARKER.** Make the odds sweep honour
+the same ownership flags the tick already does, so refresh-worker declines
+`mlb`/`wnba`/`soccer`. **Do NOT namespace the marker as the fix** - that treats
+the symptom and leaves an ungated sweep running on the wrong service.
+**Not started; it is a code change plus a production deploy, and deploys are
+coordinator-owned.**
+
+**AND IT UNBLOCKS THE WNBA QUESTION.** If the sweep is re-gated to its owner,
+live-odds-worker resumes WNBA odds work - which is where a WNBA full-refresh
+owner most naturally belongs, making option 1 (finish the migration onto the
+odds owner) the coherent choice rather than option 2.
+
+### COORDINATION 2026-08-17 ~14:15 CDT - request handed to the coordinator, and `.syndicate/coordinator.id` IS STALE
+
+**`.syndicate/coordinator.id` holds `9ed7fd89-6696-4d42-9681-39c1a5b78a46`,
+which matches NO SESSION in the roster** - checked with archived included.
+Routed by TITLE instead, to `Deploy and Document Coordinator`
+(`local_1d6f136e-...`, running, active 19:12Z). **`coordinator.md` says the
+off-switch is DELETING that file, so a stale id is ambiguous between
+"coordinator is gone" and "coordinator moved" - it reads as an ACTIVE
+coordinator that cannot be reached.** Same failure shape as the unattended lane
+that blocked this work earlier today: a marker outliving the thing it points at.
+
+**HANDED OVER** (deploy request `2026-08-17T2000Z-wnba-fixture-identity.md`,
+commit `20025cc4`, 245 tests): both services must ship together; branches must be
+cut from each LIVE SHA because neither is an ancestor of `main` and main's copy
+of `refresh_wnba_oddsapi_props.py` lacks a readable-channel block that is live on
+both workers; and the verify needs BOTH halves, because "refresh-worker stopped
+sweeping" is also what a broken gate looks like.
+
+**DISCLOSED, unprompted, so the ledger is not reconstructed later:**
+1. **I deployed twice today** (17:52Z, 18:00Z) **before the coordinator rule
+   reached my digest.** Both rows sit in `deploys.md` with EMPTY measurement.
+2. **I closed another session's lane by override** (`export-force-refresh-escape`,
+   user-authorized) - **its effect measurement is still OWED, not discharged.**
+3. **Three ledger entries are falsified by today's measurements** - `#378`
+   (WNBA does launch and write), `#382` (the marker advances because ANOTHER
+   SERVICE advances it, not because a launch dies), `#129` (regressed by a new
+   mechanism). These are the coordinator's to correct; I did not edit them.
+
+**PROPOSED FOR `learnings.md`, from a near-miss of my own:** *a service's
+`SYNDICATE_ACTIVE_SPORTS` is NOT evidence of what that service does.* Measured
+today, both workers' behaviour is the exact inverse of their env. I nearly
+deployed to one worker on that assumption and would have shipped an inert fix.
+
+
+
+## MERGED FROM origin/main - backstop pass
+
+Blocks the block-union pass missed. Appended verbatim.
+
+### RETRACTION 2026-08-17 ~14:25 CDT - **`coordinator.id` IS NOT STALE. I was wrong, `coordinator.md` documents this exact mistake, and editing the file would have BROKEN THE DEPLOY HOOK. NOTHING WAS CHANGED.**
+
+I reported the register as stale because `9ed7fd89-...` matched no roster entry.
+**`coordinator.md:139-168` already answers this**, under the heading *"The
+register holds ONE of this session's TWO ids - do not read it as stale"*:
+```
+hook payload / scratchpad path / coordinator.id   9ed7fd89-6696-4d42-9681-39c1a5b78a46
+list_sessions roster id                           local_1d6f136e-be80-4799-adff-b9f7071871f7
+roster title                                      "Deploy and Document Coordinator"
+```
+> *"This is not a bug to fix by editing the file. The hook must match the payload
+> id or it stops working; the roster cannot see that id at all... Never conclude
+> the role is unheld from a roster lookup alone, and never delete
+> `coordinator.id` to 'clean up' - that is the off switch, not a tidy."*
+
+**Asked to fix it, I read the contract first and did not touch it.** No edit, no
+delete. Had I "fixed" it, the hook would have stopped matching and **the deploy
+gate would have silently opened for every session** - the failure mode the file
+exists to prevent, caused by tidying it.
+
+**THE EVIDENCE WAS IN MY OWN HANDS ALL SESSION.** This session ALSO has two ids:
+`7c041356-...` in the hook payload I fed `lane-guard`, and `bd97b64e-...` in my
+scratchpad path. **I used both, in the same session, and still read a two-id
+system as a broken one-id system.**
+
+**THE PATTERN, third instance today, and it is worth naming:** I diagnosed a
+DEFECT from a null lookup three times - the `pid=890` "stuck lock" (transient,
+already self-healed), `#378`'s "WNBA never launches" (it launches), and now
+this. **Each time the null was a property of the INSTRUMENT, not the subject.**
+The rule I already hold - *absence in a window is not absence* - generalises:
+**an identifier that does not resolve is not thereby dead.** Ask what would make
+the lookup fail for a HEALTHY subject before calling it broken.
+
+**Nothing else changes.** The deploy request, the two deploy disclosures, and the
+`#378`/`#382`/`#129` corrections all stand; the retraction is scoped to this one
+claim and was sent to the coordinator as its own message.
+
+
+## MERGED FROM origin/main - coordinator merge cycle
+
+
+
+## MERGED FROM origin/main - reconciliation pass
+
+Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
+
+## MERGED FROM origin/main - reconciliation pass
+
+Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
+
+## MERGED FROM origin/main - reconciliation pass
+
+Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
+
+
+
+## MERGED FROM origin/main - reconciliation pass
+
+Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
+
+### Claim override
+`wnba/cards.py` was claimed by `clamp-fix-to-workers`. Its code work has shipped
+(`57a437d5`) and its only open work is verification that does not read this
+function; its session is UNATTENDED (a scheduled-task run) and `send_message`
+was attempted and **refused by the transport**. The file was released in
+`lanes.md` with the reasoning, not silently taken.
+
+### AND A FACT ABOUT THE TWO SOURCES THAT INVERTS THE USUAL WARNING
+
+The standing rule is "production has far more history than the checkout". **For
+the MLB game logs it is the opposite, and the windows barely overlap:**
+
+| source | dates | span |
+|---|---|---|
+| production | 29 | 2026-07-19 .. 2026-08-16 |
+| local mirror | 46 | 2026-05-28 .. 2026-07-12 |
+
+The logs are a **rolling window production trims**, and the mirror is holding
+history production has already dropped. Neither is a superset. That makes them
+**two nearly independent samples**, which is why the scorer now reports a
+reproducibility table instead of one number â€” and it is a better instrument for
+the accident.
+
+### WHAT MUST NOT BE READ INTO THIS
+
+- **The `outs` bias HALVED between windows** (âˆ’5.14 â†’ âˆ’2.03). That could be a
+  real improvement, a seasonal effect, or sampling. **Not attributed.** Nobody
+  should claim a fix caused it without finding the fix.
+- **`pitches` is unstable** â€” sign flipped and dispersion worsened (1.23 â†’
+  1.58). Do not calibrate it on either window alone.
+- The baseline is **in-sample** in both runs (`#440` D4 not done).
+- Two windows is not a time series. Three of seven signs flipping on ~4.7k
+  observations says the per-market numbers are noisier than their n suggests,
+  because observations within a start are not independent.
+
+## 2026-08-17 — TWO RESEARCH ITEMS CLOSED WITH LOCAL DATA (no network, while the statcast fetch ran)
+
+Lane `convergence-phase7-crps`. Read-only.
+
+### 1. **CORRECTION: recency weighting EXISTS and IS ACTIVE.** My research doc was wrong.
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §2e listed *"no explicit recency
+weighting"* as an absent modelling item, labelled BELIEVED-NOT-VERIFIED. **It is
+wrong.**
+
+    sim_engine/data/recency.py -> batter_recent_rates(games=14)
+                                  pitcher_recent_rates(games=6)
+    build_roster.py:1609        batter_recency_weight: float = 0.15
+    build_roster.py:1611        pitcher_recency_weight: float = 0.15
+    applied at :2080-2081 (batters) and :1952-1953 (pitchers)
+
+**No caller overrides the weight**, so recency is live at 15% toward the last 14
+games for batters / 6 for pitchers. **Remove §2e from the gap list.** The
+believed-not-verified label is what made this cheap to catch.
+
+### 2. **Batter fatigue: the naive feature would have the WRONG SIGN.**
+
+Measured on 12,046 player-games / 524 players, local game log only.
+
+**UNPAIRED — more rest looks WORSE:**
+
+    rest 0 (b2b)  AVG .250  TB/AB .421  K% 22.3%
+    rest 1 day    AVG .250  TB/AB .427  K% 22.9%
+    rest 2-3 days AVG .236  TB/AB .396  K% 24.3%
+    rest 4+ days  AVG .232  TB/AB .388  K% 25.2%
+
+    streak 1-2  AVG .246      streak 6-9  AVG .257
+    streak 3-5  AVG .249      streak 10+  AVG .253  (K% 20.2%)
+
+**Both cuts point away from fatigue**, and both are SELECTION: irregular players
+are bench/platoon hitters and injury returnees; everyday players are the good
+ones. **A fatigue feature fitted on this data would learn "rested batters are
+worse" and be actively harmful.**
+
+**WITHIN-PLAYER (paired, controls for player quality) — the sign FLIPS:**
+
+    floor 10 AB  n=384  AVG +0.0078 [-0.0039,+0.0194] n.s.  TB/AB +0.0239 n.s.
+    floor 15 AB  n=327  AVG +0.0025 [-0.0088,+0.0138] n.s.  TB/AB +0.0230 n.s.
+    floor 25 AB  n=182  AVG +0.0164 [+0.0031,+0.0298] SIG   TB/AB +0.0462 SIG
+
+**Direction is consistent and positive at every floor** (rested better), and
+**TB/AB moves ~3x more than AVG** — power before contact, which is the
+physiologically plausible shape.
+
+**BUT SIGNIFICANCE IS NOT ROBUST AND I AM NOT CLAIMING IT.** It appears only at
+the most restrictive floor, with the FEWEST players — the opposite of how power
+normally behaves — so it is more likely a further selection (regulars with enough
+rested AB) or multiple-comparisons noise across three specifications.
+
+**Verdict: do NOT build a batter-fatigue term on this evidence.** The usable
+output is the warning: **any fatigue feature must be fitted WITHIN player.** The
+unpaired version has the wrong sign, and it is the version anyone would write
+first.
+
+## 2026-08-17 — THE MISSING DATA IS ONE CALL AWAY, AND IT DISCRIMINATES. Spread probe on the three absent dimensions.
+
+Lane `convergence-phase7-crps`. Read-only, ~12 network calls.
+
+### The cost finding that reframes the whole research doc
+
+pybaseball is **already vendored** (`.venv_x64`, 2.2.7) and exposes all three
+absent dimensions as **SEASON LEADERBOARDS — one call each, not per-player**:
+
+    statcast_catcher_framing(year)            1 call, all catchers
+    statcast_batter_exitvelo_barrels(year)    1 call, all batters
+    statcast_outs_above_average(year, pos)    1 call
+
+**~12 calls total, against the 314 the pitch splits required.** The dimensions I
+ranked as expensive are the CHEAP ones. That inverts the priority order in
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4.
+
+### BATTED BALL — large spread, and the GB/FB split EXISTS `[measured, n=246]`
+
+    brl_percent      mean  8.37   sd 4.30   p10  3.10  p90 13.85   range 21.7
+    ev95percent      mean 40.10   sd 8.19   p10 29.10  p90 49.70   range 51.2
+    avg_hit_speed    mean 89.13   sd 2.34   p10 86.20  p90 92.20
+    avg_distance     mean 168.5   sd 17.7   p10 145.5  p90 191.0
+
+**Barrel rate runs 3.1% to 13.9% between p10 and p90 — a 4.5x spread.** The sim
+has a single scalar `inplay_hit_rate` and no barrel concept at all.
+
+**AND THE FRAME CARRIES `gb` AND `fbld` COLUMNS.** I listed "no GB/FB/LD split"
+as an absent dimension needing new data; the split ships in the same one-call
+leaderboard. **That is a correction to the research doc.**
+
+### DEFENCE / OAA — material spread `[measured, n=257]`
+
+    outs_above_average          mean +0.60  sd 5.98  p10 -6.0  p90 +7.4  range 39
+    outs_above_average_rhh      sd 3.85     |  ..._lhh  sd 3.31
+    directional: infront / lateral_3b / lateral_1b / behind
+    also: fielding_runs_prevented
+
+**13.4 outs separate a p10 from a p90 fielder over a season**, with handedness
+and directional splits available. The sim has **no fielding term whatsoever**, so
+BABIP is currently modelled with nothing behind it.
+
+### FRAMING — obtainable but the vendored fetch is BROKEN
+
+    statcast_catcher_framing(2026) -> ParserError: Expected 1 fields in line 38, saw 4
+
+**A parser failure against the 2026 savant format, not missing data.** Fixable,
+but it is not free the way the other two are — cost it before promising it.
+
+### Revised priority, on measurement rather than intuition
+
+1. **Batted ball** — one call, 4.5x spread, and it ships the GB/FB split that
+   unlocks park interaction. Cheapest and largest.
+2. **Defence/OAA** — one call, 13.4-out p10-p90 spread, directly under BABIP.
+3. **Framing** — same value case as before, but now carries a parser fix.
+4. Pitch-type splits — already wired, 314 calls spent, **effect still unproven**.
+
+**Nothing here is built. This measures whether the dimensions DISCRIMINATE, which
+is the prior question to modelling them — and all three do.**
+
+## 2026-08-17 — PITCH-TYPE SPLITS AT 98.4% COVERAGE: **the effect is negligible. I am retiring my own research prediction.**
+
+Lane `convergence-phase7-crps`. 45 games x 120 sims per arm, 2,415 scored rows,
+**793/806 pitcher-slots (98.4%)** carrying real splits. Artifact rebuilt with
+**305 pitchers**.
+
+| market | n | splits OFF | splits ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24472 | 0.23077 | **−0.00069 worse** |
+| batter_rbis | 663 | 0.22211 | 0.21940 | 0.20959 | +0.00270 better |
+| batter_runs_scored | 651 | 0.23974 | 0.23844 | 0.23377 | +0.00130 better |
+| batter_total_bases | 442 | 0.26177 | 0.26104 | 0.24510 | +0.00073 better |
+
+3 of 4 better, 1 worse, **every effect <= 0.0027**, market still wins all four by
+0.010–0.016.
+
+### THE DECISIVE COMPARISON — coverage went up 7.7x and the answer did not move
+
+    coverage 12.7%   hits -0.00058  rbi +0.00312  runs -0.00084  tb +0.00084
+    coverage 98.4%   hits -0.00069  rbi +0.00270  runs +0.00130  tb +0.00073
+
+**The earlier result was not thin — it was correct.** Going from 102 to 793
+pitcher-slots changed nothing material. That rules out the coverage explanation I
+had been holding open, and makes this a real negative result rather than an
+inconclusive one.
+
+### RETIRING THE PREDICTION
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4 ranked pitch-type matchup as
+**"where a market beat is most likely"**, on the reasoning that everything was
+built and only needed wiring. **Wiring it produced ~+0.001 mean Brier and no
+market beat. That prediction is WRONG and is retired.**
+
+**I spent the expensive fetch (314 calls, ~2h) on the dimension whose payoff was
+least established, while the spread probe later showed batted-ball and defence
+are ONE CALL EACH with far larger between-player spread.** The ordering error was
+mine: I ranked by "how complete is the machinery" instead of by "how much does
+the dimension discriminate", and machinery-completeness turned out to predict
+nothing.
+
+### WHAT WAS ACTUALLY TESTED — half the feature, and this bounds the claim
+
+The artifact populates the **PITCHER side** (`pitch_type_whiff_mult`,
+`pitch_type_hr_mult`, `inplay_mult`). **`batter.vs_pitch_type` is STILL 0%
+populated** — there is no batter-by-pitch-type source in this work at all.
+
+So what is measured is **a pitcher's average effectiveness per pitch type**, NOT
+the matchup interaction (this batter against this pitch). **The interaction is
+untested.** That does not rescue the prediction — the pitcher half is the larger
+and more available half — but a future claim about "pitch-type matchup" must not
+cite this result as having tested it.
+
+### Standing value of the work
+
+The wiring is **not wasted**: the artifact, the disk-backed path, the
+artifact-first loader and 5 tests are the mechanism any future pitch-level
+feature needs, and the 305-pitcher artifact is real data. **But it should not be
+deployed on these numbers** — a ~0.001 Brier move does not justify a scheduled
+populator and a new mirrored artifact family.
+
+## 2026-08-17 — BATTED-BALL DATA PASSES THE PREDICTIVE GATE (leak-free), and two thirds of its apparent edge WAS the leak
+
+Lane `convergence-phase7-crps`. Read-only. 90,970 raw statcast pitches over the
+first-half window, 15,858 batted balls, **218 qualifying players**.
+
+**All predictors computed from the FIRST HALF ONLY** — same information window
+for every arm, no season aggregate.
+
+| predictor | vs future HR/PA | vs future TB/AB |
+|---|---|---|
+| `hr_rate` (what the sim uses today) | 0.312 | 0.126 |
+| **barrel%** | **0.387** | 0.178 |
+| **hard-hit% (EV>=95)** | 0.363 | **0.235** |
+
+### The leak was two thirds of it
+
+    LEAKED (season aggregate)   hr_rate 0.301   barrel 0.507   gap 0.206
+    CLEAN  (first half only)    hr_rate 0.312   barrel 0.387   gap 0.075
+
+I pre-committed to calling a leaked barrel win **inconclusive**, and that was
+right: the honest edge is **0.075, not 0.206**. Reporting the leaderboard number
+would have overstated the case by ~3x. This is the same shape as the
+re-projection smoke run overstating by 3x earlier today — **season-aggregate
+inputs scored against in-season outcomes are leaked by construction.**
+
+### What survives, and it is real
+
+- **Barrel% out-predicts `hr_rate` on future HR** (0.387 vs 0.312).
+- **Hard-hit% out-predicts `hr_rate` on future TB/AB by ~1.9x** (0.235 vs 0.126)
+  — the largest clean margin in the table.
+- **The split is mechanically sensible**: barrels predict HOME RUNS, hard contact
+  predicts EXTRA BASES. Different inputs for different markets, which is what a
+  batted-ball model is for.
+
+**Significance is NOT formally tested.** These are dependent correlations on
+n=218; the HR gap (0.075) is marginal, the TB gap (0.109) is the more likely
+real one. A Steiger test is owed before anyone quotes a magnitude.
+
+### THE GATE THIS PASSES, AND THE ONE IT DOES NOT
+
+**Passes:** batted-ball data carries incremental predictive signal over the
+outcome rates already in the engine. That is the prior question, and pitch-type
+splits were never subjected to it.
+
+**Does NOT pass, and must not be assumed:** that wiring it moves Brier against
+the market. **Pitch-type splits had real data, real spread, real signal — and
+delivered +0.001 at the scoreboard.** Predictive superiority over an internal
+input is a different claim from beating a price.
+
+**So batted-ball data is now the best-evidenced next wiring target** — it cleared
+a gate nothing else has — but the expectation should be set by the pitch-splits
+precedent, not by the correlation table.
+
+## 2026-08-17 — THE FEATURES INTERFERE. 2x2 factorial: interaction is NEGATIVE in 4 of 4 markets.
+
+Lane `convergence-phase7-crps`. Asked directly: *"are we sure wiring all of these
+together won't make a combined difference?"* **They make one. It is negative.**
+45 games x 120 sims x 4 arms, 2,415 scored rows.
+
+| market | 00 none | 10 subs | 01 splits | 11 BOTH | market | interaction |
+|---|---|---|---|---|---|---|
+| batter_hits | 0.24404 | 0.24195 | 0.24472 | 0.24343 | 0.23077 | −0.00080 |
+| batter_rbis | 0.22211 | **0.21638** | 0.21940 | 0.22165 | 0.20959 | **−0.00798** |
+| batter_runs_scored | 0.23974 | 0.23828 | 0.23844 | **0.24118** | 0.23377 | −0.00420 |
+| batter_total_bases | 0.26177 | 0.26331 | 0.26104 | 0.26283 | 0.24510 | −0.00025 |
+
+    mean interaction -0.00331, NEGATIVE in 4 of 4
+
+**On RBIs the combination erases both gains**: subs alone −0.00573, splits alone
+−0.00271, together only −0.00046. **On runs, BOTH-ON IS WORSE THAN NEITHER.**
+
+I pre-committed to the reading standard before running it — *"±0.002 is noise; a
+consistently-signed interaction across all four markets is what would convince"*
+— and a consistent negative across 4 of 4 clears that bar.
+
+### THE LIKELY MECHANISM, and it is the most important thing here
+
+**The engine's batter/pitcher rate parameters were FITTED IN THE ABSENCE of these
+mechanisms.** `k_rate`, `hr_rate`, `inplay_hit_rate` are calibrated to observed
+outcomes produced by a sim that never substituted anyone and never varied
+effectiveness by pitch type. Those fitted rates therefore already ABSORB the
+average effect of substitution and pitch-mix.
+
+Adding a mechanism back **double-counts** it. Adding two double-counts twice, and
+the errors compound rather than cancel — which is exactly the negative
+interaction, and it also explains why each feature alone measured so small.
+
+### WHAT THIS CHANGES — it is a precondition, not a detail
+
+**You cannot add mechanisms to a calibrated engine without RE-FITTING the rates.**
+That reorders everything:
+
+1. **Do NOT wire batted-ball data next.** It would be a third mechanism added to
+   the same un-refitted rates, and this result predicts it makes things worse in
+   combination — however well it passed the predictive gate.
+2. **The precondition is a re-fit**: with substitution and pitch splits ON,
+   re-derive the batter/pitcher rates so they no longer absorb those effects.
+3. **Only then** add batted-ball, and re-run this factorial rather than a
+   single-feature test.
+
+**This retroactively reframes the small individual effects.** +0.001 from pitch
+splits and 34.3% of the opportunity gap from substitution were never the ceiling
+of those features — they are what survives after the calibrated rates fight them.
+
+### Caveats
+
+- One window (45 games, June 2026), one engine, two features. The MECHANISM is an
+  inference; the negative interaction is measured.
+- The interaction is a difference-of-differences and therefore noisier than any
+  single arm. **Sign consistency across 4 of 4 is what makes it usable**, not any
+  individual magnitude.
+- This says nothing about batted-ball x park x defence, which remain unwired and
+  untested.
+
+## 2026-08-17 — THE REFIT DOES NOT WORK AS DESIGNED, and the reason matters more than the refit
+
+Lane `convergence-phase7-crps`. `scripts/refit_mlb_rates.py`, 20 games x 60 sims,
+all three sources ON (substitution + pitch splits + batted-ball blend).
+
+### All sources are now IN
+
+- **substitution** — `GameConfig.position_substitutions` (`#440` P2)
+- **pitch splits** — 305-pitcher artifact + artifact-first loader
+- **batted-ball** — NEW: `batted_ball_2026.json` (450 players, all with
+  `gb_share`), blended into `hr_rate` / `inplay_hit_rate` via
+  `sim_engine/data/batted_ball.py`, **9 tests**. Barrels drive HR, hard-hit
+  drives in-play — the pairing the predictive test measured.
+  **Deliberately an ESTIMATOR, not a mechanism**, so it should not suffer the
+  absorption problem.
+- **NOT added: defence/OAA.** A genuine new mechanism, needs fielder->team->BABIP
+  plumbing that does not exist, and it has never passed a predictive gate.
+  Adding it untested is the error this lane already made once.
+
+### PASS 1 — the sim is badly off BEFORE any correction
+
+    rate               simulated    actual   residual
+    hr_rate              0.02221   0.03547    -37.4%
+    inplay_hit_rate      0.25761   0.24848     +3.7%
+    k_rate               0.17215   0.22590    -23.8%
+    bb_rate              0.06343   0.08784    -27.8%
+
+**The sim under-produces all three true outcomes by 24-37%.** That is a
+calibration gap far larger than any feature effect measured today (~0.001-0.006
+Brier), and it was invisible until the mechanisms were switched on together.
+
+### PASS 2 — 2 of 4 corrections did nothing. THE GUARD FIRED.
+
+    hr_rate          -37.4%  ->   +2.6%   WORKED
+    bb_rate          -27.8%  ->  +19.2%   partial
+    inplay_hit_rate   +3.7%  ->   +3.9%   NO CHANGE
+    k_rate           -23.8%  ->  +24.0%   NO CHANGE
+
+**A 1.3123x multiplier on `k_rate` moved simulated SO/PA by −0.0006.** The knob
+is not connected to the outcome in any meaningful way.
+
+### WHY — and this reframes the whole improvement programme
+
+**This is a PITCH-LEVEL simulator.** Strikeouts, walks and balls in play emerge
+from pitch-by-pitch whiff / called-strike / swing dynamics driven by the PITCHER
+side and the pitch model. The batter's `k_rate` / `bb_rate` /
+`inplay_hit_rate` scalars are **inputs to that process, not controls on its
+output.** Only `hr_rate` responded cleanly, which suggests HR is drawn far more
+directly.
+
+**Consequences, in order of importance:**
+
+1. **The refit-by-scaling-batter-rates approach is INVALID for 3 of 4 rates.**
+   A real re-fit must target the PITCH MODEL, not these scalars. That is a much
+   larger job than this script.
+2. **It explains the small feature effects.** Every mechanism added today acts on
+   a process whose output is governed elsewhere. Tuning inputs that do not
+   control the output is why +0.001 kept appearing.
+3. **The -24% to -37% calibration gap is the biggest measured defect in the
+   engine** and dwarfs every feature question this lane has been asking. It
+   should be diagnosed before ANY further feature work.
+
+### Status
+
+**Nothing is shipped and nothing should be.** The corrections are not written to
+any artifact; `refit_rates.json` is a measurement, not a config. The batted-ball
+blend is dark (caller must pass a weight) and the other two mechanisms remain
+flag-off.
+
+**The refit as specified is closed as unworkable.** The next question is not
+"which feature next" but **"why does a pitch-level sim under-produce K, BB and HR
+by a quarter to a third?"**
+
+## 2026-08-17 — **I BUILT A FOURTH INERT FEATURE.** The batted-ball blend had ZERO production callers until asked "shouldn't this all be feeding the sim?"
+
+Lane `convergence-phase7-crps`. Caught by the user, not by me.
+
+### The failure
+
+`sim_engine/data/batted_ball.py` was fully implemented, had **9 passing tests**,
+published a 450-player artifact — and `grep apply_batted_ball_to_batter` returned
+**only my own measurement script and its own tests.** `build_roster.py` contained
+no reference to `batted_ball` at all.
+
+**Every one of those 9 tests would have passed forever while the feature did
+nothing in production.**
+
+This is the FOURTH inert feature today (props seal predicate, misplaced
+tendencies artifact, `position_substitutions` via `setattr`, this) and the second
+I created myself. **I had already written the rule — "write the reachability
+assertion FIRST" — into `learnings.md` earlier today, and then broke it on the
+very next feature.** A rule in the ledger is not a control.
+
+### Fixed
+
+- `build_roster.py` now **imports and calls** `apply_batted_ball_to_batter`,
+  placed AFTER the recency hook so it adjusts the rate the pipeline actually
+  settles on rather than one recency then overwrites.
+- Gated by **`SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0** — an unconfigured
+  service is byte-for-byte unchanged, and a **malformed value reads as OFF**
+  (an unparseable knob must not silently become an active one).
+- **4 new tests encode the check as a control rather than a discipline**: the
+  call site must exist in `build_roster.py` source, the gate defaults off, junk
+  reads as off, and a set weight is honoured and clamped.
+- The call-site test also caught a real bug immediately: `_batted_ball_weight`
+  used `os.environ` in a module with no module-level `os` import.
+
+**13 blend tests pass; 23 pass across the substitution / pitch-splits / leash
+suites with no regression.**
+
+### What is now genuinely wired vs still dark
+
+| source | reaches the sim? | gate |
+|---|---|---|
+| pitch splits | **YES** — `build_roster:2141/2154` -> artifact-first loader | needs the artifact on disk |
+| batted-ball | **YES, now** — `build_roster` batter loop | `SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0 |
+| substitution | **YES** — `simulate.py` half-inning hook | `GameConfig.position_substitutions`, default False |
+| defence/OAA | **NO** — deliberately not built | — |
+
+**All three are OFF by default and nothing is deployed.** The distinction that
+matters is that they are now REACHABLE when enabled, which the batted-ball blend
+was not.
+
+## 2026-08-17 — FULL INPUT AUDIT: **18 sim input fields are 0% populated, and my research doc was WRONG about batted-ball**
+
+Lane `convergence-phase7-crps`. Asked "are you sure we have ALL inputs in full".
+**No.** Audited EVERY field on `BatterProfile` / `PitcherProfile` against 40 real
+roster artifacts (n=720 batters, 717 pitchers) instead of spot-checking.
+
+### ZERO-POPULATION FIELDS
+
+**PitcherProfile (13):** `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult`, `statcast_splits_source/_n_pitches/_start_date/_end_date`,
+**`statcast_quality_mult`**, **`bb_gb_rate`**, **`bb_fb_rate`**, **`bb_ld_rate`**,
+**`bb_pu_rate`**, **`bb_inplay_n`**
+
+**BatterProfile (5):** `bb_gb_rate`, `bb_fb_rate`, `bb_ld_rate`, `bb_pu_rate`,
+`bb_inplay_n` (+ `vs_pitch_type`, `vs_pitch_type_hr` already recorded)
+
+**Thin, not zero:** `leverage_skill` 38.4%, `availability_mult` 50.1%,
+`sb_attempt_rate` 72.4%.
+
+### THE CORRECTION — I MIS-CLASSIFIED BATTED-BALL AS ABSENT
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` says *"No batted-ball type model
+— no GB/FB/LD"*. **That is WRONG.** The model EXISTS and the sim CONSUMES it:
+
+    simulate.py:1120  batter_bb_gb_rate=float(getattr(batter, "bb_gb_rate", 0.44))
+    simulate.py:1121  batter_bb_fb_rate=...0.25   :1122 ld 0.20   :1123 pu 0.11
+    simulate.py:1134  pitcher_bb_gb_rate=... (same four, pitcher side)
+
+**Every batter and every pitcher currently runs on the LEAGUE-AVERAGE DEFAULTS**
+(0.44 / 0.25 / 0.20 / 0.11). A ground-ball specialist and a fly-ball slugger have
+**identical** batted-ball distributions in the sim today.
+
+I searched for `ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate`
+and concluded "absent". The fields are named **`bb_gb_rate`** — my pattern missed
+the prefix, and I reported an ABSENT MODEL where there is an UNFED one. Same
+error class as everything else today: I checked for presence of a name, not
+population of a field.
+
+### THIS INVALIDATES MY OWN BATTED-BALL DESIGN
+
+I built `sim_engine/data/batted_ball.py` as a **multiplier hack** on `hr_rate` /
+`inplay_hit_rate`, because I believed no native model existed. **The engine has
+native GB/FB/LD fields it already reads.** Feeding those directly is strictly
+better than scaling a summary rate:
+
+- it drives the actual batted-ball mechanism rather than a proxy;
+- it lets park factors interact with a hitter's profile (the thing the research
+  doc correctly identified as blocked);
+- it needs no clamp, no invented weight, no unit-free multiplier.
+
+**And the data is already in the artifact I built** — `build_mlb_batted_ball_artifact.py`
+captures `gb`, `fbld` and `gb_share` for all 450 players.
+
+### Status
+
+- The multiplier blend is WIRED and OFF (`SYNDICATE_MLB_BATTED_BALL_WEIGHT=0.0`).
+  **Do not enable it.** Populate the native `bb_*` fields instead.
+- Research doc requires correction on this point.
+- `statcast_quality_mult` (consumed at `simulate.py:164` and `:1396`) is a
+  further 0% field nobody has looked at.
+
+## 2026-08-17 — SIM INPUT CHECKLIST: a runnable gate. **26 fields the engine reads and nothing feeds.**
+
+Lane `convergence-phase7-crps`. `scripts/sim_input_checklist.py`. Exits **1** on
+failure, so it can gate. Read-only.
+
+Asked for "almost a checklist of sorts for proper sim engine execution" — this is
+that, and it turns a day of ad-hoc discoveries into a repeatable control.
+
+### How it works, and why it finds what greps do not
+
+It cross-references TWO things per field, over `dataclasses.fields()` rather than
+name patterns:
+
+    is it CONSUMED by the engine?   (search all of sim_engine/ for the name)
+    is it POPULATED in real rosters? (measure against 40 artifacts)
+
+**CONSUMED + UNPOPULATED is the alarm** — a feature that cannot work, invisible
+to every other check in this repo because a `.get(key, 1.0)` default is
+indistinguishable from a working feature at every level except the data.
+
+### RESULT: 26 FAILING FIELDS (720 batters, 717 pitchers)
+
+**batter (13):** `bb_gb_rate` `bb_fb_rate` `bb_ld_rate` `bb_pu_rate`
+`bb_inplay_n` `statcast_quality_mult` `vs_pitch_type` `vs_pitch_type_hr`
+**`vs_pitcher_k_mult` `vs_pitcher_hr_mult` `vs_pitcher_bb_mult`
+`vs_pitcher_inplay_mult` `vs_pitcher_history`**
+
+**pitcher (13):** `bb_*` (5), `pitch_type_whiff_mult` `pitch_type_inplay_mult`
+`pitch_type_hr_mult` `statcast_quality_mult` `statcast_splits_*` (4)
+
+### A THIRD CORRECTION TO MY OWN RESEARCH
+
+I wrote that BVP (batter-vs-pitcher) *"is fetched daily and `simulate.py`
+contains no reference to bvp at all."* **Wrong again.** The engine reads it under
+different names — `simulate.py:1009, 1014, 1036, 1046` use
+`vs_pitcher_hr_mult` / `vs_pitcher_k_mult`. So BVP has:
+
+- a **model home** (5 fields on `BatterProfile`),
+- an **active consumer** (the sim),
+- **1,282 cached data files**,
+- and **0% population**.
+
+That is the strongest instance of the pattern found all day, and I had
+classified it as "not referenced" because I searched for the string `bvp`.
+
+**Three published claims of mine have now been corrected by measurement**
+(batted-ball "absent", BVP "not referenced", and the field count 18 -> 26). Every
+one came from searching for a NAME instead of enumerating FIELDS. The checklist
+exists so the next person does not have to be right about vocabulary.
+
+### Suggested use
+
+- Run before/after any roster-builder or profile change.
+- Add to `/preflight` or `migration_gate.py` — it is fast and exits non-zero.
+- `EXPECTED_SPARSE` documents the legitimately-thin fields, so a low number there
+  is not mistaken for a defect.
+
+## 2026-08-18 — THE CHECKLIST CAN NOW REACH PRODUCTION. Allowlist opened for 3 input artifacts; roster objects deliberately NOT.
+
+Lane `convergence-phase7-crps`. `artifact_publisher.py` + `sim_input_checklist.py`.
+No deploy.
+
+### Why the production run could not happen, and what actually blocked it
+
+`/api/ops/artifacts/stream` gates on `is_hot_artifact_relative_path()`
+(`ops.py:1447`) — i.e. `HOT_ARTIFACT_PATTERNS`. **Roster objects are not on it,
+which is the 403**, not a token or a path-guess problem. Verified in code rather
+than inferred from failed requests.
+
+The SAME allowlist blocks the new input artifacts from reaching production. Both
+of the user's asks converged on one file.
+
+### `artifact_publisher.py` was FREE — the earlier block has cleared
+
+The lane guard blocked this file earlier today (`clv-without-settlement`). That
+lane is **no longer in `origin/main`'s `lanes.md` and no OPEN lane claims the
+file**. Taken without an override; re-verified before editing rather than
+assuming the earlier block still stood.
+
+### ALLOWLISTED (verified by calling the predicate)
+
+    True   pitch_splits/pitch_splits_*.json
+    True   batted_ball/batted_ball_*.json
+    True   sim_input_report/sim_input_report_*.json
+    False  daily_pitcher_props/snapshots/*/roster_objs/*      <- deliberate
+
+### ROSTER OBJECTS ARE DELIBERATELY EXCLUDED, and this is a judgement call
+
+Adding `roster_objs/*` would have let me stream production rosters and audit them
+directly. **I did not, and the reason is that this allowlist drives PUBLISHING as
+well as reading.** Roster objects are hundreds of large files per date; the
+egress history in this ledger (`#322`, the 207MB pivot, the live-odds-worker
+egress work) makes that an expensive unilateral change for what is, on my side,
+diagnostic convenience.
+
+**The `book_grid` pattern is the right one instead: the worker computes, and web
+reads a bounded result.** `sim_input_checklist.py --publish` now writes a small
+report artifact (per-field population + failures), which IS allowlisted. One
+small file answers the production question without moving the rosters.
+
+### Status
+
+- Checklist runs locally, gates at exit 1, publishes with `--publish`.
+- **The production numbers are still NOT MEASURED.** The checklist must RUN ON
+  THE WORKER for that, which needs a deploy — filed, not fired.
+- 18 tests pass across the blend and pitch-splits suites; the local report is
+  written and allowlist-valid.
+
+## 2026-08-18 — THE IN-FLIGHT WORKER PATH, TRACED. **The wiring is live end-to-end — but `--use-roster-artifacts=on` would have made it inert.**
+
+Lane `convergence-phase7-crps`. Read from source, no deploy. Traced on the
+instruction to check what the worker sim script actually creates and writes.
+
+### The chain, end to end
+
+    live_refresh_loop._run_mlb_sim_tick
+      -> scripts/run_mlb_daily_sim_job.py           (detached subprocess)
+        -> vendor/mlb_bettingv2/tools/daily_update.py   (:236, NOT multi_profile)
+          -> build_roster (statcast_cache passed)
+            -> _apply_cached_statcast_pitch_splits
+              -> fetch_pitcher_pitch_splits  -> **artifact-first read (mine)**
+
+### GOOD NEWS: the cache is ON by default, and bullpen is included
+
+    --statcast-starter-splits   choices ["off","starter"]   default "starter"
+
+`daily_update.py:5859` creates `statcast_cache` whenever that is **not** "off",
+so **production does pass a cache** and `_apply_cached_statcast_pitch_splits`
+IS reached. **The pitch-splits artifact will be read in production** once it is
+on the worker's disk — the wiring is live, not theoretical.
+
+Despite the flag being named "starter", `build_roster` applies splits to the
+starter AND to `bullpen_all` (`:2141`, `:2154`) once the cache exists. **The 236
+bullpen fetches were not wasted.**
+
+### THE TRAP, and it would have wasted the whole exercise
+
+    --use-roster-artifacts    default "on"   reuse roster_objs when present
+    --write-roster-artifacts  default "on"   write them
+
+`run_mlb_daily_sim_job.py` **overrides neither** — it takes both defaults.
+
+**So the worker REUSES roster artifacts built earlier.** Those were serialised
+BEFORE the pitch-splits artifact existed, with every `pitch_type_*` field empty.
+Publishing the artifact to the worker disk would change **nothing** on any date
+whose `roster_objs/` already exist — the build that would read it never runs.
+
+**Publishing the artifact is necessary and NOT sufficient. The roster artifacts
+must be REBUILT.** Either run a date with `--use-roster-artifacts=off`, or clear
+`roster_objs/` for the target date first.
+
+Nothing in the artifact work so far accounts for this, and it is exactly the
+shape of thing that produces a confident "we shipped it" followed by a flat
+measurement.
+
+### What the job writes in flight
+
+    snapshot_dir/roster_objs/roster_obj_*.json   <- the profiles the sim uses
+    snapshot_dir/schedule_raw.json
+    snapshot_dir/team_rosters_raw.json
+    snapshot_dir/injuries_raw.json
+    snapshot_dir/roster_events.json
+    data/daily/daily_summary_<date>.json         <- the projections
+
+**`roster_objs/` is the file the checklist audits** — so a production checklist
+run reads exactly what the sim consumed, provided the rebuild actually happened.
+
+## 2026-08-18 — LOCAL-FIRST CAUGHT TWO DESIGN ERRORS. FAIL list **26 -> 20 -> 15**, and a deploy would have been premature.
+
+Lane `convergence-phase7-crps`. Asked "don't we want to run this locally with all
+the right data first?" — **yes, and it was the right call.** I was about to file a
+deploy request, skipping the rebuild step of the procedure I had just written.
+
+### The artifact -> profile link works `[measured locally]`
+
+    pitch splits   applied to 19/19 pitchers, 0 skipped
+                   whiff_mult 0 -> 7 entries, n_pitches=962
+    batted-ball    applied to 18/18 lineup batters
+                   hr_rate 0.04608 -> 0.03834, inplay 0.2501 -> 0.2272
+
+### But a SIMULATED REBUILD showed the fix was far smaller than assumed
+
+    BEFORE (as archived)          26 consumed-but-unfed
+    AFTER  (rebuild simulated)    20      <- only SIX fields fixed
+
+**Two of my own design errors, both invisible until this ran:**
+
+1. **`pitch_type_hr_mult` can never be fed by this artifact.** The
+   `PitcherPitchSplits` dataclass carries `whiff_mult` and `inplay_mult` only —
+   there is **no HR multiplier in the source**. I had assumed the pitch-splits
+   work covered all three pitch-type multipliers. It covers two.
+2. **The batted-ball blend never touched the NATIVE fields.** It scaled
+   `hr_rate` / `inplay_hit_rate` — a proxy — while `bb_gb_rate` and friends
+   stayed at league defaults, so **every hitter kept an identical batted-ball
+   profile**. This is the exact design error recorded earlier ("my multiplier
+   blend was the wrong design") which I then did not correct.
+
+### Fixed, and re-measured
+
+Native `bb_*` population added from the artifact's `gb_share`: the player's real
+ground-ball share is used directly (the large player-specific signal), and the
+air-ball remainder is split on the league proportions the engine already defaults
+to. **Stated plainly: GB/air is measured per player; the split WITHIN air balls
+is not.**
+
+    AFTER native bb_* fix          15 consumed-but-unfed
+
+### THE REMAINING 15, enumerated
+
+| fields | cause | fixable |
+|---|---|---|
+| 5x **pitcher** `bb_*` | only the batter side was written; pitchers have their own GB/FB profile | yes, needs a pitcher leaderboard call |
+| 5x `vs_pitcher_*` (BVP) | 1,282 files cached daily, never mapped into the fields | yes, data already exists |
+| 2x batter `vs_pitch_type*` | no source built | yes |
+| 2x `statcast_quality_mult` | no source anywhere | unknown |
+| 1x `pitch_type_hr_mult` | source dataclass lacks `hr_mult` | **no, not from this source** |
+
+### The lesson, which is procedural
+
+**I wrote the "publish -> rebuild -> checklist -> measure" procedure and then
+tried to skip to the deploy.** Running it locally cost one command and found two
+errors that would have produced a deployed change fixing 6 of 26 fields while
+being described as fixing the pitch-type and batted-ball gaps.
+
+**No deploy request filed.** The right sequence is: close what is cheaply
+closable (pitcher `bb_*`, BVP mapping), then rebuild, then request.

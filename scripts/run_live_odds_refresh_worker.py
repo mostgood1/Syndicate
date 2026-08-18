@@ -167,6 +167,118 @@ def _report_previous_soccer_pregame_run(last_status: dict) -> None:
         print(f"[live_odds_worker] SOCCER_PREGAME_RUN_SUMMARY_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
+# PHASE 2 of the migration off the daily-update GHA cron. Phase 1 moved
+# NFL/NCAAF/NCAAB to refresh-worker's weekly autorun (`render.yaml`); WNBA was
+# never re-homed, so NOTHING called `refresh_wnba_oddsapi_props.main()` on any
+# cadence. Measured 2026-08-17: `MAIN_ENTRY` 0 hits over 8h on BOTH workers, and
+# `GAME_CARDS_CENSUS` 0 over ~2 days with the emitter confirmed present in both
+# deployed SHAs. The GHA cron cannot cover it either -- it reads
+# `RUN_FULL_PIPELINE` from `github.event.inputs`, which is empty on the
+# `schedule` trigger, so full regeneration is manual-dispatch only.
+#
+# `phase="pregame"` IS LOAD-BEARING, NOT COPIED FROM SOCCER. This worker is 2GB
+# and already carries WNBA SmartSim + live-lens load; `render.yaml` records sim
+# workers cut to 1 and the WNBA sim count cut 500 -> 250 -> 100 fighting for that
+# memory, against a WNBA refresh leg measured at ~1.3-1.5GB RSS. Pregame covers
+# schedule/odds/props/picks and EXCLUDES the sim leg. A full-phase autorun here
+# would OOM the service.
+def _wnba_pregame_refresh_enabled() -> bool:
+    # DEFAULT OFF. New periodic worker work is never free (`#241` caused a
+    # production restart loop), and enabling it is a `render.yaml` change, which
+    # is a deploy and therefore coordinator-owned.
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _wnba_pregame_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 14400)  # 4h, matching soccer's cadence for the same work.
+    except ValueError:
+        value = 14400
+    return max(1, value)
+
+
+def _wnba_pregame_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "wnba_pregame_autorun_status.json"
+
+
+def _wnba_active_for_date(date_str: str) -> bool:
+    active = {item.strip().lower() for item in _active_sports_for_date(date_str).split(",") if item.strip()}
+    return "wnba" in active
+
+
+def _report_previous_wnba_pregame_run(last_status: dict) -> None:
+    """Print the PREVIOUS run's outcome to THIS worker's stdout.
+
+    Same reason as `_report_previous_soccer_pregame_run` (`#433`): soccer odds
+    stopped for FOUR DAYS with no visible error because `launch_refresh_run`
+    spawns the child detached with stdout/stderr to DEVNULL, so the launch is
+    otherwise the last thing anyone hears about the run. A silent WNBA autorun
+    would reproduce exactly the invisibility this whole lane exists to fix.
+    """
+    if not last_status:
+        return
+    err = last_status.get("error")
+    if err:
+        print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_PREV date={last_status.get('date')} FAILED {err}", flush=True)
+        return
+    print(
+        f"[live_odds_worker] WNBA_PREGAME_AUTORUN_PREV date={last_status.get('date')} "
+        f"launched=ok runStamp={last_status.get('runStamp')} artifactsDir={last_status.get('artifactsDir')}",
+        flush=True,
+    )
+
+
+def _launch_autorun_wnba_pregame_refresh() -> None:
+    if not _wnba_pregame_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    if not _wnba_active_for_date(selected_date):
+        return
+    status_path = _wnba_pregame_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    # BEFORE the cadence gate, for the same reason soccer does it: the gate
+    # returns on most ticks, so reporting after it would surface the previous
+    # run's outcome up to 4 hours late -- most of the way back to silence.
+    _report_previous_wnba_pregame_run(last_status)
+    if last_status and not last_status.get("reported"):
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_wnba_pregame_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="wnba",
+            phase="pregame",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
+            launch_mode="web_process",
+        )
+    except Exception as exc:
+        write_json_file(status_path, {"epoch": time.time(), "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "wnba",
+            "date": selected_date,
+            "artifactsDir": (result or {}).get("artifactsDir"),
+            "runStamp": (result or {}).get("runStamp"),
+            "reported": False,
+        },
+    )
+    print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_LAUNCHED date={selected_date} phase=pregame", flush=True)
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -385,6 +497,14 @@ def _run_tick() -> dict[str, object] | None:
         _launch_autorun_soccer_pregame_refresh()
     except Exception as exc:
         print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
+    # Phase 2 (WNBA). Same shape and the same independence as soccer above: its
+    # own interval gate makes this a no-op on every call except when due, and its
+    # own try/except means a WNBA failure can never take down the soccer autorun
+    # or the tick that follows.
+    try:
+        _launch_autorun_wnba_pregame_refresh()
+    except Exception as exc:
+        print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
