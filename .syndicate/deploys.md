@@ -12529,3 +12529,848 @@ guard fired. Rule filed in `learnings.md`: zero samples is NO DATA, never clean;
 an impossible reading is a bug report; never `except: pass` around a guard's
 parse. The replacement watcher exits non-zero on zero samples and was used to
 confirm this rollback.
+
+## 2026-08-17 — TWO RESEARCH ITEMS CLOSED WITH LOCAL DATA (no network, while the statcast fetch ran)
+
+Lane `convergence-phase7-crps`. Read-only.
+
+### 1. **CORRECTION: recency weighting EXISTS and IS ACTIVE.** My research doc was wrong.
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §2e listed *"no explicit recency
+weighting"* as an absent modelling item, labelled BELIEVED-NOT-VERIFIED. **It is
+wrong.**
+
+    sim_engine/data/recency.py -> batter_recent_rates(games=14)
+                                  pitcher_recent_rates(games=6)
+    build_roster.py:1609        batter_recency_weight: float = 0.15
+    build_roster.py:1611        pitcher_recency_weight: float = 0.15
+    applied at :2080-2081 (batters) and :1952-1953 (pitchers)
+
+**No caller overrides the weight**, so recency is live at 15% toward the last 14
+games for batters / 6 for pitchers. **Remove §2e from the gap list.** The
+believed-not-verified label is what made this cheap to catch.
+
+### 2. **Batter fatigue: the naive feature would have the WRONG SIGN.**
+
+Measured on 12,046 player-games / 524 players, local game log only.
+
+**UNPAIRED — more rest looks WORSE:**
+
+    rest 0 (b2b)  AVG .250  TB/AB .421  K% 22.3%
+    rest 1 day    AVG .250  TB/AB .427  K% 22.9%
+    rest 2-3 days AVG .236  TB/AB .396  K% 24.3%
+    rest 4+ days  AVG .232  TB/AB .388  K% 25.2%
+
+    streak 1-2  AVG .246      streak 6-9  AVG .257
+    streak 3-5  AVG .249      streak 10+  AVG .253  (K% 20.2%)
+
+**Both cuts point away from fatigue**, and both are SELECTION: irregular players
+are bench/platoon hitters and injury returnees; everyday players are the good
+ones. **A fatigue feature fitted on this data would learn "rested batters are
+worse" and be actively harmful.**
+
+**WITHIN-PLAYER (paired, controls for player quality) — the sign FLIPS:**
+
+    floor 10 AB  n=384  AVG +0.0078 [-0.0039,+0.0194] n.s.  TB/AB +0.0239 n.s.
+    floor 15 AB  n=327  AVG +0.0025 [-0.0088,+0.0138] n.s.  TB/AB +0.0230 n.s.
+    floor 25 AB  n=182  AVG +0.0164 [+0.0031,+0.0298] SIG   TB/AB +0.0462 SIG
+
+**Direction is consistent and positive at every floor** (rested better), and
+**TB/AB moves ~3x more than AVG** — power before contact, which is the
+physiologically plausible shape.
+
+**BUT SIGNIFICANCE IS NOT ROBUST AND I AM NOT CLAIMING IT.** It appears only at
+the most restrictive floor, with the FEWEST players — the opposite of how power
+normally behaves — so it is more likely a further selection (regulars with enough
+rested AB) or multiple-comparisons noise across three specifications.
+
+**Verdict: do NOT build a batter-fatigue term on this evidence.** The usable
+output is the warning: **any fatigue feature must be fitted WITHIN player.** The
+unpaired version has the wrong sign, and it is the version anyone would write
+first.
+
+## 2026-08-17 — THE MISSING DATA IS ONE CALL AWAY, AND IT DISCRIMINATES. Spread probe on the three absent dimensions.
+
+Lane `convergence-phase7-crps`. Read-only, ~12 network calls.
+
+### The cost finding that reframes the whole research doc
+
+pybaseball is **already vendored** (`.venv_x64`, 2.2.7) and exposes all three
+absent dimensions as **SEASON LEADERBOARDS — one call each, not per-player**:
+
+    statcast_catcher_framing(year)            1 call, all catchers
+    statcast_batter_exitvelo_barrels(year)    1 call, all batters
+    statcast_outs_above_average(year, pos)    1 call
+
+**~12 calls total, against the 314 the pitch splits required.** The dimensions I
+ranked as expensive are the CHEAP ones. That inverts the priority order in
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4.
+
+### BATTED BALL — large spread, and the GB/FB split EXISTS `[measured, n=246]`
+
+    brl_percent      mean  8.37   sd 4.30   p10  3.10  p90 13.85   range 21.7
+    ev95percent      mean 40.10   sd 8.19   p10 29.10  p90 49.70   range 51.2
+    avg_hit_speed    mean 89.13   sd 2.34   p10 86.20  p90 92.20
+    avg_distance     mean 168.5   sd 17.7   p10 145.5  p90 191.0
+
+**Barrel rate runs 3.1% to 13.9% between p10 and p90 — a 4.5x spread.** The sim
+has a single scalar `inplay_hit_rate` and no barrel concept at all.
+
+**AND THE FRAME CARRIES `gb` AND `fbld` COLUMNS.** I listed "no GB/FB/LD split"
+as an absent dimension needing new data; the split ships in the same one-call
+leaderboard. **That is a correction to the research doc.**
+
+### DEFENCE / OAA — material spread `[measured, n=257]`
+
+    outs_above_average          mean +0.60  sd 5.98  p10 -6.0  p90 +7.4  range 39
+    outs_above_average_rhh      sd 3.85     |  ..._lhh  sd 3.31
+    directional: infront / lateral_3b / lateral_1b / behind
+    also: fielding_runs_prevented
+
+**13.4 outs separate a p10 from a p90 fielder over a season**, with handedness
+and directional splits available. The sim has **no fielding term whatsoever**, so
+BABIP is currently modelled with nothing behind it.
+
+### FRAMING — obtainable but the vendored fetch is BROKEN
+
+    statcast_catcher_framing(2026) -> ParserError: Expected 1 fields in line 38, saw 4
+
+**A parser failure against the 2026 savant format, not missing data.** Fixable,
+but it is not free the way the other two are — cost it before promising it.
+
+### Revised priority, on measurement rather than intuition
+
+1. **Batted ball** — one call, 4.5x spread, and it ships the GB/FB split that
+   unlocks park interaction. Cheapest and largest.
+2. **Defence/OAA** — one call, 13.4-out p10-p90 spread, directly under BABIP.
+3. **Framing** — same value case as before, but now carries a parser fix.
+4. Pitch-type splits — already wired, 314 calls spent, **effect still unproven**.
+
+**Nothing here is built. This measures whether the dimensions DISCRIMINATE, which
+is the prior question to modelling them — and all three do.**
+
+## 2026-08-17 — PITCH-TYPE SPLITS AT 98.4% COVERAGE: **the effect is negligible. I am retiring my own research prediction.**
+
+Lane `convergence-phase7-crps`. 45 games x 120 sims per arm, 2,415 scored rows,
+**793/806 pitcher-slots (98.4%)** carrying real splits. Artifact rebuilt with
+**305 pitchers**.
+
+| market | n | splits OFF | splits ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24472 | 0.23077 | **−0.00069 worse** |
+| batter_rbis | 663 | 0.22211 | 0.21940 | 0.20959 | +0.00270 better |
+| batter_runs_scored | 651 | 0.23974 | 0.23844 | 0.23377 | +0.00130 better |
+| batter_total_bases | 442 | 0.26177 | 0.26104 | 0.24510 | +0.00073 better |
+
+3 of 4 better, 1 worse, **every effect <= 0.0027**, market still wins all four by
+0.010–0.016.
+
+### THE DECISIVE COMPARISON — coverage went up 7.7x and the answer did not move
+
+    coverage 12.7%   hits -0.00058  rbi +0.00312  runs -0.00084  tb +0.00084
+    coverage 98.4%   hits -0.00069  rbi +0.00270  runs +0.00130  tb +0.00073
+
+**The earlier result was not thin — it was correct.** Going from 102 to 793
+pitcher-slots changed nothing material. That rules out the coverage explanation I
+had been holding open, and makes this a real negative result rather than an
+inconclusive one.
+
+### RETIRING THE PREDICTION
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4 ranked pitch-type matchup as
+**"where a market beat is most likely"**, on the reasoning that everything was
+built and only needed wiring. **Wiring it produced ~+0.001 mean Brier and no
+market beat. That prediction is WRONG and is retired.**
+
+**I spent the expensive fetch (314 calls, ~2h) on the dimension whose payoff was
+least established, while the spread probe later showed batted-ball and defence
+are ONE CALL EACH with far larger between-player spread.** The ordering error was
+mine: I ranked by "how complete is the machinery" instead of by "how much does
+the dimension discriminate", and machinery-completeness turned out to predict
+nothing.
+
+### WHAT WAS ACTUALLY TESTED — half the feature, and this bounds the claim
+
+The artifact populates the **PITCHER side** (`pitch_type_whiff_mult`,
+`pitch_type_hr_mult`, `inplay_mult`). **`batter.vs_pitch_type` is STILL 0%
+populated** — there is no batter-by-pitch-type source in this work at all.
+
+So what is measured is **a pitcher's average effectiveness per pitch type**, NOT
+the matchup interaction (this batter against this pitch). **The interaction is
+untested.** That does not rescue the prediction — the pitcher half is the larger
+and more available half — but a future claim about "pitch-type matchup" must not
+cite this result as having tested it.
+
+### Standing value of the work
+
+The wiring is **not wasted**: the artifact, the disk-backed path, the
+artifact-first loader and 5 tests are the mechanism any future pitch-level
+feature needs, and the 305-pitcher artifact is real data. **But it should not be
+deployed on these numbers** — a ~0.001 Brier move does not justify a scheduled
+populator and a new mirrored artifact family.
+
+## 2026-08-17 — BATTED-BALL DATA PASSES THE PREDICTIVE GATE (leak-free), and two thirds of its apparent edge WAS the leak
+
+Lane `convergence-phase7-crps`. Read-only. 90,970 raw statcast pitches over the
+first-half window, 15,858 batted balls, **218 qualifying players**.
+
+**All predictors computed from the FIRST HALF ONLY** — same information window
+for every arm, no season aggregate.
+
+| predictor | vs future HR/PA | vs future TB/AB |
+|---|---|---|
+| `hr_rate` (what the sim uses today) | 0.312 | 0.126 |
+| **barrel%** | **0.387** | 0.178 |
+| **hard-hit% (EV>=95)** | 0.363 | **0.235** |
+
+### The leak was two thirds of it
+
+    LEAKED (season aggregate)   hr_rate 0.301   barrel 0.507   gap 0.206
+    CLEAN  (first half only)    hr_rate 0.312   barrel 0.387   gap 0.075
+
+I pre-committed to calling a leaked barrel win **inconclusive**, and that was
+right: the honest edge is **0.075, not 0.206**. Reporting the leaderboard number
+would have overstated the case by ~3x. This is the same shape as the
+re-projection smoke run overstating by 3x earlier today — **season-aggregate
+inputs scored against in-season outcomes are leaked by construction.**
+
+### What survives, and it is real
+
+- **Barrel% out-predicts `hr_rate` on future HR** (0.387 vs 0.312).
+- **Hard-hit% out-predicts `hr_rate` on future TB/AB by ~1.9x** (0.235 vs 0.126)
+  — the largest clean margin in the table.
+- **The split is mechanically sensible**: barrels predict HOME RUNS, hard contact
+  predicts EXTRA BASES. Different inputs for different markets, which is what a
+  batted-ball model is for.
+
+**Significance is NOT formally tested.** These are dependent correlations on
+n=218; the HR gap (0.075) is marginal, the TB gap (0.109) is the more likely
+real one. A Steiger test is owed before anyone quotes a magnitude.
+
+### THE GATE THIS PASSES, AND THE ONE IT DOES NOT
+
+**Passes:** batted-ball data carries incremental predictive signal over the
+outcome rates already in the engine. That is the prior question, and pitch-type
+splits were never subjected to it.
+
+**Does NOT pass, and must not be assumed:** that wiring it moves Brier against
+the market. **Pitch-type splits had real data, real spread, real signal — and
+delivered +0.001 at the scoreboard.** Predictive superiority over an internal
+input is a different claim from beating a price.
+
+**So batted-ball data is now the best-evidenced next wiring target** — it cleared
+a gate nothing else has — but the expectation should be set by the pitch-splits
+precedent, not by the correlation table.
+
+## 2026-08-17 — THE FEATURES INTERFERE. 2x2 factorial: interaction is NEGATIVE in 4 of 4 markets.
+
+Lane `convergence-phase7-crps`. Asked directly: *"are we sure wiring all of these
+together won't make a combined difference?"* **They make one. It is negative.**
+45 games x 120 sims x 4 arms, 2,415 scored rows.
+
+| market | 00 none | 10 subs | 01 splits | 11 BOTH | market | interaction |
+|---|---|---|---|---|---|---|
+| batter_hits | 0.24404 | 0.24195 | 0.24472 | 0.24343 | 0.23077 | −0.00080 |
+| batter_rbis | 0.22211 | **0.21638** | 0.21940 | 0.22165 | 0.20959 | **−0.00798** |
+| batter_runs_scored | 0.23974 | 0.23828 | 0.23844 | **0.24118** | 0.23377 | −0.00420 |
+| batter_total_bases | 0.26177 | 0.26331 | 0.26104 | 0.26283 | 0.24510 | −0.00025 |
+
+    mean interaction -0.00331, NEGATIVE in 4 of 4
+
+**On RBIs the combination erases both gains**: subs alone −0.00573, splits alone
+−0.00271, together only −0.00046. **On runs, BOTH-ON IS WORSE THAN NEITHER.**
+
+I pre-committed to the reading standard before running it — *"±0.002 is noise; a
+consistently-signed interaction across all four markets is what would convince"*
+— and a consistent negative across 4 of 4 clears that bar.
+
+### THE LIKELY MECHANISM, and it is the most important thing here
+
+**The engine's batter/pitcher rate parameters were FITTED IN THE ABSENCE of these
+mechanisms.** `k_rate`, `hr_rate`, `inplay_hit_rate` are calibrated to observed
+outcomes produced by a sim that never substituted anyone and never varied
+effectiveness by pitch type. Those fitted rates therefore already ABSORB the
+average effect of substitution and pitch-mix.
+
+Adding a mechanism back **double-counts** it. Adding two double-counts twice, and
+the errors compound rather than cancel — which is exactly the negative
+interaction, and it also explains why each feature alone measured so small.
+
+### WHAT THIS CHANGES — it is a precondition, not a detail
+
+**You cannot add mechanisms to a calibrated engine without RE-FITTING the rates.**
+That reorders everything:
+
+1. **Do NOT wire batted-ball data next.** It would be a third mechanism added to
+   the same un-refitted rates, and this result predicts it makes things worse in
+   combination — however well it passed the predictive gate.
+2. **The precondition is a re-fit**: with substitution and pitch splits ON,
+   re-derive the batter/pitcher rates so they no longer absorb those effects.
+3. **Only then** add batted-ball, and re-run this factorial rather than a
+   single-feature test.
+
+**This retroactively reframes the small individual effects.** +0.001 from pitch
+splits and 34.3% of the opportunity gap from substitution were never the ceiling
+of those features — they are what survives after the calibrated rates fight them.
+
+### Caveats
+
+- One window (45 games, June 2026), one engine, two features. The MECHANISM is an
+  inference; the negative interaction is measured.
+- The interaction is a difference-of-differences and therefore noisier than any
+  single arm. **Sign consistency across 4 of 4 is what makes it usable**, not any
+  individual magnitude.
+- This says nothing about batted-ball x park x defence, which remain unwired and
+  untested.
+
+## 2026-08-17 — THE REFIT DOES NOT WORK AS DESIGNED, and the reason matters more than the refit
+
+Lane `convergence-phase7-crps`. `scripts/refit_mlb_rates.py`, 20 games x 60 sims,
+all three sources ON (substitution + pitch splits + batted-ball blend).
+
+### All sources are now IN
+
+- **substitution** — `GameConfig.position_substitutions` (`#440` P2)
+- **pitch splits** — 305-pitcher artifact + artifact-first loader
+- **batted-ball** — NEW: `batted_ball_2026.json` (450 players, all with
+  `gb_share`), blended into `hr_rate` / `inplay_hit_rate` via
+  `sim_engine/data/batted_ball.py`, **9 tests**. Barrels drive HR, hard-hit
+  drives in-play — the pairing the predictive test measured.
+  **Deliberately an ESTIMATOR, not a mechanism**, so it should not suffer the
+  absorption problem.
+- **NOT added: defence/OAA.** A genuine new mechanism, needs fielder->team->BABIP
+  plumbing that does not exist, and it has never passed a predictive gate.
+  Adding it untested is the error this lane already made once.
+
+### PASS 1 — the sim is badly off BEFORE any correction
+
+    rate               simulated    actual   residual
+    hr_rate              0.02221   0.03547    -37.4%
+    inplay_hit_rate      0.25761   0.24848     +3.7%
+    k_rate               0.17215   0.22590    -23.8%
+    bb_rate              0.06343   0.08784    -27.8%
+
+**The sim under-produces all three true outcomes by 24-37%.** That is a
+calibration gap far larger than any feature effect measured today (~0.001-0.006
+Brier), and it was invisible until the mechanisms were switched on together.
+
+### PASS 2 — 2 of 4 corrections did nothing. THE GUARD FIRED.
+
+    hr_rate          -37.4%  ->   +2.6%   WORKED
+    bb_rate          -27.8%  ->  +19.2%   partial
+    inplay_hit_rate   +3.7%  ->   +3.9%   NO CHANGE
+    k_rate           -23.8%  ->  +24.0%   NO CHANGE
+
+**A 1.3123x multiplier on `k_rate` moved simulated SO/PA by −0.0006.** The knob
+is not connected to the outcome in any meaningful way.
+
+### WHY — and this reframes the whole improvement programme
+
+**This is a PITCH-LEVEL simulator.** Strikeouts, walks and balls in play emerge
+from pitch-by-pitch whiff / called-strike / swing dynamics driven by the PITCHER
+side and the pitch model. The batter's `k_rate` / `bb_rate` /
+`inplay_hit_rate` scalars are **inputs to that process, not controls on its
+output.** Only `hr_rate` responded cleanly, which suggests HR is drawn far more
+directly.
+
+**Consequences, in order of importance:**
+
+1. **The refit-by-scaling-batter-rates approach is INVALID for 3 of 4 rates.**
+   A real re-fit must target the PITCH MODEL, not these scalars. That is a much
+   larger job than this script.
+2. **It explains the small feature effects.** Every mechanism added today acts on
+   a process whose output is governed elsewhere. Tuning inputs that do not
+   control the output is why +0.001 kept appearing.
+3. **The -24% to -37% calibration gap is the biggest measured defect in the
+   engine** and dwarfs every feature question this lane has been asking. It
+   should be diagnosed before ANY further feature work.
+
+### Status
+
+**Nothing is shipped and nothing should be.** The corrections are not written to
+any artifact; `refit_rates.json` is a measurement, not a config. The batted-ball
+blend is dark (caller must pass a weight) and the other two mechanisms remain
+flag-off.
+
+**The refit as specified is closed as unworkable.** The next question is not
+"which feature next" but **"why does a pitch-level sim under-produce K, BB and HR
+by a quarter to a third?"**
+
+## 2026-08-17 — **I BUILT A FOURTH INERT FEATURE.** The batted-ball blend had ZERO production callers until asked "shouldn't this all be feeding the sim?"
+
+Lane `convergence-phase7-crps`. Caught by the user, not by me.
+
+### The failure
+
+`sim_engine/data/batted_ball.py` was fully implemented, had **9 passing tests**,
+published a 450-player artifact — and `grep apply_batted_ball_to_batter` returned
+**only my own measurement script and its own tests.** `build_roster.py` contained
+no reference to `batted_ball` at all.
+
+**Every one of those 9 tests would have passed forever while the feature did
+nothing in production.**
+
+This is the FOURTH inert feature today (props seal predicate, misplaced
+tendencies artifact, `position_substitutions` via `setattr`, this) and the second
+I created myself. **I had already written the rule — "write the reachability
+assertion FIRST" — into `learnings.md` earlier today, and then broke it on the
+very next feature.** A rule in the ledger is not a control.
+
+### Fixed
+
+- `build_roster.py` now **imports and calls** `apply_batted_ball_to_batter`,
+  placed AFTER the recency hook so it adjusts the rate the pipeline actually
+  settles on rather than one recency then overwrites.
+- Gated by **`SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0** — an unconfigured
+  service is byte-for-byte unchanged, and a **malformed value reads as OFF**
+  (an unparseable knob must not silently become an active one).
+- **4 new tests encode the check as a control rather than a discipline**: the
+  call site must exist in `build_roster.py` source, the gate defaults off, junk
+  reads as off, and a set weight is honoured and clamped.
+- The call-site test also caught a real bug immediately: `_batted_ball_weight`
+  used `os.environ` in a module with no module-level `os` import.
+
+**13 blend tests pass; 23 pass across the substitution / pitch-splits / leash
+suites with no regression.**
+
+### What is now genuinely wired vs still dark
+
+| source | reaches the sim? | gate |
+|---|---|---|
+| pitch splits | **YES** — `build_roster:2141/2154` -> artifact-first loader | needs the artifact on disk |
+| batted-ball | **YES, now** — `build_roster` batter loop | `SYNDICATE_MLB_BATTED_BALL_WEIGHT`, default 0.0 |
+| substitution | **YES** — `simulate.py` half-inning hook | `GameConfig.position_substitutions`, default False |
+| defence/OAA | **NO** — deliberately not built | — |
+
+**All three are OFF by default and nothing is deployed.** The distinction that
+matters is that they are now REACHABLE when enabled, which the batted-ball blend
+was not.
+
+## 2026-08-17 — FULL INPUT AUDIT: **18 sim input fields are 0% populated, and my research doc was WRONG about batted-ball**
+
+Lane `convergence-phase7-crps`. Asked "are you sure we have ALL inputs in full".
+**No.** Audited EVERY field on `BatterProfile` / `PitcherProfile` against 40 real
+roster artifacts (n=720 batters, 717 pitchers) instead of spot-checking.
+
+### ZERO-POPULATION FIELDS
+
+**PitcherProfile (13):** `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult`, `statcast_splits_source/_n_pitches/_start_date/_end_date`,
+**`statcast_quality_mult`**, **`bb_gb_rate`**, **`bb_fb_rate`**, **`bb_ld_rate`**,
+**`bb_pu_rate`**, **`bb_inplay_n`**
+
+**BatterProfile (5):** `bb_gb_rate`, `bb_fb_rate`, `bb_ld_rate`, `bb_pu_rate`,
+`bb_inplay_n` (+ `vs_pitch_type`, `vs_pitch_type_hr` already recorded)
+
+**Thin, not zero:** `leverage_skill` 38.4%, `availability_mult` 50.1%,
+`sb_attempt_rate` 72.4%.
+
+### THE CORRECTION — I MIS-CLASSIFIED BATTED-BALL AS ABSENT
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` says *"No batted-ball type model
+— no GB/FB/LD"*. **That is WRONG.** The model EXISTS and the sim CONSUMES it:
+
+    simulate.py:1120  batter_bb_gb_rate=float(getattr(batter, "bb_gb_rate", 0.44))
+    simulate.py:1121  batter_bb_fb_rate=...0.25   :1122 ld 0.20   :1123 pu 0.11
+    simulate.py:1134  pitcher_bb_gb_rate=... (same four, pitcher side)
+
+**Every batter and every pitcher currently runs on the LEAGUE-AVERAGE DEFAULTS**
+(0.44 / 0.25 / 0.20 / 0.11). A ground-ball specialist and a fly-ball slugger have
+**identical** batted-ball distributions in the sim today.
+
+I searched for `ground_ball|fly_ball|line_drive|launch_angle|exit_velo|gb_rate`
+and concluded "absent". The fields are named **`bb_gb_rate`** — my pattern missed
+the prefix, and I reported an ABSENT MODEL where there is an UNFED one. Same
+error class as everything else today: I checked for presence of a name, not
+population of a field.
+
+### THIS INVALIDATES MY OWN BATTED-BALL DESIGN
+
+I built `sim_engine/data/batted_ball.py` as a **multiplier hack** on `hr_rate` /
+`inplay_hit_rate`, because I believed no native model existed. **The engine has
+native GB/FB/LD fields it already reads.** Feeding those directly is strictly
+better than scaling a summary rate:
+
+- it drives the actual batted-ball mechanism rather than a proxy;
+- it lets park factors interact with a hitter's profile (the thing the research
+  doc correctly identified as blocked);
+- it needs no clamp, no invented weight, no unit-free multiplier.
+
+**And the data is already in the artifact I built** — `build_mlb_batted_ball_artifact.py`
+captures `gb`, `fbld` and `gb_share` for all 450 players.
+
+### Status
+
+- The multiplier blend is WIRED and OFF (`SYNDICATE_MLB_BATTED_BALL_WEIGHT=0.0`).
+  **Do not enable it.** Populate the native `bb_*` fields instead.
+- Research doc requires correction on this point.
+- `statcast_quality_mult` (consumed at `simulate.py:164` and `:1396`) is a
+  further 0% field nobody has looked at.
+
+## 2026-08-17 — SIM INPUT CHECKLIST: a runnable gate. **26 fields the engine reads and nothing feeds.**
+
+Lane `convergence-phase7-crps`. `scripts/sim_input_checklist.py`. Exits **1** on
+failure, so it can gate. Read-only.
+
+Asked for "almost a checklist of sorts for proper sim engine execution" — this is
+that, and it turns a day of ad-hoc discoveries into a repeatable control.
+
+### How it works, and why it finds what greps do not
+
+It cross-references TWO things per field, over `dataclasses.fields()` rather than
+name patterns:
+
+    is it CONSUMED by the engine?   (search all of sim_engine/ for the name)
+    is it POPULATED in real rosters? (measure against 40 artifacts)
+
+**CONSUMED + UNPOPULATED is the alarm** — a feature that cannot work, invisible
+to every other check in this repo because a `.get(key, 1.0)` default is
+indistinguishable from a working feature at every level except the data.
+
+### RESULT: 26 FAILING FIELDS (720 batters, 717 pitchers)
+
+**batter (13):** `bb_gb_rate` `bb_fb_rate` `bb_ld_rate` `bb_pu_rate`
+`bb_inplay_n` `statcast_quality_mult` `vs_pitch_type` `vs_pitch_type_hr`
+**`vs_pitcher_k_mult` `vs_pitcher_hr_mult` `vs_pitcher_bb_mult`
+`vs_pitcher_inplay_mult` `vs_pitcher_history`**
+
+**pitcher (13):** `bb_*` (5), `pitch_type_whiff_mult` `pitch_type_inplay_mult`
+`pitch_type_hr_mult` `statcast_quality_mult` `statcast_splits_*` (4)
+
+### A THIRD CORRECTION TO MY OWN RESEARCH
+
+I wrote that BVP (batter-vs-pitcher) *"is fetched daily and `simulate.py`
+contains no reference to bvp at all."* **Wrong again.** The engine reads it under
+different names — `simulate.py:1009, 1014, 1036, 1046` use
+`vs_pitcher_hr_mult` / `vs_pitcher_k_mult`. So BVP has:
+
+- a **model home** (5 fields on `BatterProfile`),
+- an **active consumer** (the sim),
+- **1,282 cached data files**,
+- and **0% population**.
+
+That is the strongest instance of the pattern found all day, and I had
+classified it as "not referenced" because I searched for the string `bvp`.
+
+**Three published claims of mine have now been corrected by measurement**
+(batted-ball "absent", BVP "not referenced", and the field count 18 -> 26). Every
+one came from searching for a NAME instead of enumerating FIELDS. The checklist
+exists so the next person does not have to be right about vocabulary.
+
+### Suggested use
+
+- Run before/after any roster-builder or profile change.
+- Add to `/preflight` or `migration_gate.py` — it is fast and exits non-zero.
+- `EXPECTED_SPARSE` documents the legitimately-thin fields, so a low number there
+  is not mistaken for a defect.
+
+## 2026-08-18 — THE CHECKLIST CAN NOW REACH PRODUCTION. Allowlist opened for 3 input artifacts; roster objects deliberately NOT.
+
+Lane `convergence-phase7-crps`. `artifact_publisher.py` + `sim_input_checklist.py`.
+No deploy.
+
+### Why the production run could not happen, and what actually blocked it
+
+`/api/ops/artifacts/stream` gates on `is_hot_artifact_relative_path()`
+(`ops.py:1447`) — i.e. `HOT_ARTIFACT_PATTERNS`. **Roster objects are not on it,
+which is the 403**, not a token or a path-guess problem. Verified in code rather
+than inferred from failed requests.
+
+The SAME allowlist blocks the new input artifacts from reaching production. Both
+of the user's asks converged on one file.
+
+### `artifact_publisher.py` was FREE — the earlier block has cleared
+
+The lane guard blocked this file earlier today (`clv-without-settlement`). That
+lane is **no longer in `origin/main`'s `lanes.md` and no OPEN lane claims the
+file**. Taken without an override; re-verified before editing rather than
+assuming the earlier block still stood.
+
+### ALLOWLISTED (verified by calling the predicate)
+
+    True   pitch_splits/pitch_splits_*.json
+    True   batted_ball/batted_ball_*.json
+    True   sim_input_report/sim_input_report_*.json
+    False  daily_pitcher_props/snapshots/*/roster_objs/*      <- deliberate
+
+### ROSTER OBJECTS ARE DELIBERATELY EXCLUDED, and this is a judgement call
+
+Adding `roster_objs/*` would have let me stream production rosters and audit them
+directly. **I did not, and the reason is that this allowlist drives PUBLISHING as
+well as reading.** Roster objects are hundreds of large files per date; the
+egress history in this ledger (`#322`, the 207MB pivot, the live-odds-worker
+egress work) makes that an expensive unilateral change for what is, on my side,
+diagnostic convenience.
+
+**The `book_grid` pattern is the right one instead: the worker computes, and web
+reads a bounded result.** `sim_input_checklist.py --publish` now writes a small
+report artifact (per-field population + failures), which IS allowlisted. One
+small file answers the production question without moving the rosters.
+
+### Status
+
+- Checklist runs locally, gates at exit 1, publishes with `--publish`.
+- **The production numbers are still NOT MEASURED.** The checklist must RUN ON
+  THE WORKER for that, which needs a deploy — filed, not fired.
+- 18 tests pass across the blend and pitch-splits suites; the local report is
+  written and allowlist-valid.
+
+## 2026-08-18 — THE IN-FLIGHT WORKER PATH, TRACED. **The wiring is live end-to-end — but `--use-roster-artifacts=on` would have made it inert.**
+
+Lane `convergence-phase7-crps`. Read from source, no deploy. Traced on the
+instruction to check what the worker sim script actually creates and writes.
+
+### The chain, end to end
+
+    live_refresh_loop._run_mlb_sim_tick
+      -> scripts/run_mlb_daily_sim_job.py           (detached subprocess)
+        -> vendor/mlb_bettingv2/tools/daily_update.py   (:236, NOT multi_profile)
+          -> build_roster (statcast_cache passed)
+            -> _apply_cached_statcast_pitch_splits
+              -> fetch_pitcher_pitch_splits  -> **artifact-first read (mine)**
+
+### GOOD NEWS: the cache is ON by default, and bullpen is included
+
+    --statcast-starter-splits   choices ["off","starter"]   default "starter"
+
+`daily_update.py:5859` creates `statcast_cache` whenever that is **not** "off",
+so **production does pass a cache** and `_apply_cached_statcast_pitch_splits`
+IS reached. **The pitch-splits artifact will be read in production** once it is
+on the worker's disk — the wiring is live, not theoretical.
+
+Despite the flag being named "starter", `build_roster` applies splits to the
+starter AND to `bullpen_all` (`:2141`, `:2154`) once the cache exists. **The 236
+bullpen fetches were not wasted.**
+
+### THE TRAP, and it would have wasted the whole exercise
+
+    --use-roster-artifacts    default "on"   reuse roster_objs when present
+    --write-roster-artifacts  default "on"   write them
+
+`run_mlb_daily_sim_job.py` **overrides neither** — it takes both defaults.
+
+**So the worker REUSES roster artifacts built earlier.** Those were serialised
+BEFORE the pitch-splits artifact existed, with every `pitch_type_*` field empty.
+Publishing the artifact to the worker disk would change **nothing** on any date
+whose `roster_objs/` already exist — the build that would read it never runs.
+
+**Publishing the artifact is necessary and NOT sufficient. The roster artifacts
+must be REBUILT.** Either run a date with `--use-roster-artifacts=off`, or clear
+`roster_objs/` for the target date first.
+
+Nothing in the artifact work so far accounts for this, and it is exactly the
+shape of thing that produces a confident "we shipped it" followed by a flat
+measurement.
+
+### What the job writes in flight
+
+    snapshot_dir/roster_objs/roster_obj_*.json   <- the profiles the sim uses
+    snapshot_dir/schedule_raw.json
+    snapshot_dir/team_rosters_raw.json
+    snapshot_dir/injuries_raw.json
+    snapshot_dir/roster_events.json
+    data/daily/daily_summary_<date>.json         <- the projections
+
+**`roster_objs/` is the file the checklist audits** — so a production checklist
+run reads exactly what the sim consumed, provided the rebuild actually happened.
+
+## 2026-08-17 22:12:38Z — web e5107913 — soccer Layer 2 rail dates + stale-live guard (`cd46b403`) — MEASURED, ALL THREE CRITERIA PASS
+
+Carries `cd46b403` **BY CONTENT, NOT ANCESTRY** — third time today this distinction
+decided the answer. `git merge-base --is-ancestor cd46b403 e5107913` -> **NO**;
+marker lines derived from the commit's own diff, present in the deployed tree:
+**78 / 78**. An ancestry check alone would have reported this deploy as not
+carrying the fix.
+
+Measured 23:47:46Z, Central date 2026-08-17.
+
+**CRITERION 1 — stale-live chips: PASS.**
+`/api/board/game-chips?sports=soccer`: 90 chips, `state=live` **0**, live-and-
+>150min-past-kickoff **0**. **Before: 1** (`SLB @ CAS` served `live` 2h25m after
+kickoff for a match ESPN reported `post`).
+
+**CRITERION 2 — the rail shows only today: PASS.** Checked on the RENDERED rail,
+not the feed. `#board-game-cards` innerText:
+
+    before:  ~60+ cards, `SOCCER · SAT AUG 15` plus Aug 19/20/21/22 blocks
+    after:   15 cards, every one today
+
+Soccer contributes **3** cards — ELC 1-1 Deportivo, WXM 1-1 CAR, SLB 7-0 CAS —
+today's three fixtures, all correctly `FINAL`. Both halves of the original
+complaint (dates AND status) are closed.
+
+**NOTE FOR RE-VERIFICATION: the CHIP FEED IS STILL 14 DAYS WIDE AND THAT IS BY
+DESIGN.** The feed served 90 chips across 08-15..08-28, only 3 dated today. The fix
+is to the RAIL's filtering, not the feed. **Measuring criterion 2 against
+`/api/board/game-chips` will read as FAILING when it is passing** — it must be read
+off the rendered rail.
+
+**CRITERION 3 — no regression: PASS.** mlb 11 chips (9 `live` with real innings —
+TOP 6, BOT 2 etc.), wnba 1 pregame. nfl 0, **unchanged from before this deploy**
+(measured 0 earlier the same day), so not a regression.
+
+**STILL NOT FIXED BY THIS DEPLOY, and not claimed to be:** soccer's Layer 2
+projection coverage remains `pct_projected 0.0`. That is `6aaa11af`, which is
+deployed but **INERT** until `board_enrichment.py:678` passes the 7-day window.
+
+## 2026-08-18 — LOCAL-FIRST CAUGHT TWO DESIGN ERRORS. FAIL list **26 -> 20 -> 15**, and a deploy would have been premature.
+
+Lane `convergence-phase7-crps`. Asked "don't we want to run this locally with all
+the right data first?" — **yes, and it was the right call.** I was about to file a
+deploy request, skipping the rebuild step of the procedure I had just written.
+
+### The artifact -> profile link works `[measured locally]`
+
+    pitch splits   applied to 19/19 pitchers, 0 skipped
+                   whiff_mult 0 -> 7 entries, n_pitches=962
+    batted-ball    applied to 18/18 lineup batters
+                   hr_rate 0.04608 -> 0.03834, inplay 0.2501 -> 0.2272
+
+### But a SIMULATED REBUILD showed the fix was far smaller than assumed
+
+    BEFORE (as archived)          26 consumed-but-unfed
+    AFTER  (rebuild simulated)    20      <- only SIX fields fixed
+
+**Two of my own design errors, both invisible until this ran:**
+
+1. **`pitch_type_hr_mult` can never be fed by this artifact.** The
+   `PitcherPitchSplits` dataclass carries `whiff_mult` and `inplay_mult` only —
+   there is **no HR multiplier in the source**. I had assumed the pitch-splits
+   work covered all three pitch-type multipliers. It covers two.
+2. **The batted-ball blend never touched the NATIVE fields.** It scaled
+   `hr_rate` / `inplay_hit_rate` — a proxy — while `bb_gb_rate` and friends
+   stayed at league defaults, so **every hitter kept an identical batted-ball
+   profile**. This is the exact design error recorded earlier ("my multiplier
+   blend was the wrong design") which I then did not correct.
+
+### Fixed, and re-measured
+
+Native `bb_*` population added from the artifact's `gb_share`: the player's real
+ground-ball share is used directly (the large player-specific signal), and the
+air-ball remainder is split on the league proportions the engine already defaults
+to. **Stated plainly: GB/air is measured per player; the split WITHIN air balls
+is not.**
+
+    AFTER native bb_* fix          15 consumed-but-unfed
+
+### THE REMAINING 15, enumerated
+
+| fields | cause | fixable |
+|---|---|---|
+| 5x **pitcher** `bb_*` | only the batter side was written; pitchers have their own GB/FB profile | yes, needs a pitcher leaderboard call |
+| 5x `vs_pitcher_*` (BVP) | 1,282 files cached daily, never mapped into the fields | yes, data already exists |
+| 2x batter `vs_pitch_type*` | no source built | yes |
+| 2x `statcast_quality_mult` | no source anywhere | unknown |
+| 1x `pitch_type_hr_mult` | source dataclass lacks `hr_mult` | **no, not from this source** |
+
+### The lesson, which is procedural
+
+**I wrote the "publish -> rebuild -> checklist -> measure" procedure and then
+tried to skip to the deploy.** Running it locally cost one command and found two
+errors that would have produced a deployed change fixing 6 of 26 fields while
+being described as fixing the pitch-type and batted-ball gaps.
+
+**No deploy request filed.** The right sequence is: close what is cheaply
+closable (pitcher `bb_*`, BVP mapping), then rebuild, then request.
+
+## 2026-08-18 — FAIL LIST **26 -> 10**. One cheap closure landed; the other was NOT cheap and the claim was wrong.
+
+Lane `convergence-phase7-crps`. No deploy.
+
+### CORRECTION: BVP is not a cheap closure. **All 1,282 cached files are EMPTY.**
+
+I wrote that BVP "is already collected daily, 1,282 cached files, needing only a
+mapping into `vs_pitcher_*`". **Measured across the whole cache:**
+
+    BVP cache files       1282
+    EMPTY by_batter       1282     <- every single one
+    populated                0
+    batter entries           0
+
+They are empty envelopes — the same shape as the `pitcher_pitch_splits` namespace
+that had never been written. **BVP requires a real fetch job, not a mapping.**
+That is the fourth claim of mine corrected by measurement today, and again it
+came from trusting a file COUNT instead of reading the contents.
+
+### DONE: pitcher batted-ball rates
+
+`statcast_pitcher_exitvelo_barrels` — the same one-call leaderboard, pitcher side.
+**509 pitchers** published into the artifact (schema v2 now carries `pitchers`
+alongside `players`). `apply_batted_ball_to_pitcher` added and wired into
+`build_roster` for the starter and every bullpen arm.
+
+**No `weight` parameter on the pitcher path, deliberately.** The batter path
+BLENDS because `hr_rate`/`inplay_hit_rate` are fitted rates carrying real
+information. The `bb_*` fields are not fitted to anything — they sit at a
+hardcoded league constant — so an observed rate REPLACES a placeholder rather
+than competing with an estimate. There is nothing to blend against.
+
+### RESULT
+
+    26  as archived
+    20  after pitch splits + batter blend
+    15  after native batter bb_* population
+    10  after pitcher bb_* population        <- now
+
+    pitcher bb_gb_rate  674/717 (94%)
+    batter  bb_gb_rate  949/1047 (91%)
+
+### THE REMAINING 10, with honest causes
+
+| fields | cause | cost |
+|---|---|---|
+| 5x `vs_pitcher_*` (BVP) | **cache is empty** — needs a real fetch, not a mapping | real job |
+| 2x batter `vs_pitch_type*` | no source built | moderate |
+| 2x `statcast_quality_mult` | **no source exists anywhere in the repo** | unknown |
+| 1x `pitch_type_hr_mult` | `PitcherPitchSplits` has no `hr_mult` | not from this source |
+
+**None of the remaining 10 is cheap.** The cheap work is done.
+
+### Ready to rebuild for real
+
+Every applier `build_roster` runs is now exercised, and the simulated rebuild is
+the number a real rebuild should reproduce. **A deploy request is now
+justifiable** with a verify step of "checklist reports <= 10 consumed-but-unfed
+on the worker", where before it would have claimed far more than it delivered.
+
+## TRIAGE — soccer projection window (`b4d82364`) — **HELD, AND THE REQUEST IS MISSING A DEPENDENCY THAT WOULD HAVE BROKEN PRODUCTION** `[2026-08-18 ~00:2xZ]`
+
+Request: `2026-08-18T0010Z-soccer-projection-window.md`, web AND refresh-worker.
+Well-formed — two callers on two services, file:line for each, measured numbers
+(4 of 8,759 grid rows carried a projection), and an explicit "wait for a window
+you want". All of that held up.
+
+**THE CATCH: the named sha alone raises `TypeError` in production.**
+
+`b4d82364` is the CALLER side — it passes `window_dates=` into
+`load_soccer_projections`. The parameter itself was added by **`6aaa11af`, the
+loader side, which is on `main` and on NEITHER live SHA.** Cherry-picking the
+request as filed and running its own tests on the deploy base:
+
+    11 failed, 2 passed
+    TypeError: load_soccer_projections() got an unexpected keyword argument 'window_dates'
+
+That is the soccer projection path, on the served board. Deploying the request as
+written would have replaced "projections silently missing" with "projections
+raise".
+
+The requesting lane already knew `6aaa11af` existed — its own checkpoint calls it
+"LOADER SIDE ONLY, inert until its caller is wired" — and I had recorded that
+same note myself. **Neither of us connected it to this request.** The dependency
+was invisible in the request and visible only by running the tests on the base.
+
+**CORRECTED TARGETS, built and pushed, 13/13 tests passing on each:**
+
+    web              678e2f25  = e5107913 + 6aaa11af + b4d82364
+    refresh-worker   455df34a  = 33659561 + 6aaa11af + b4d82364
+
+**HELD, not deployed.** refresh-worker had 10 jobs in flight including a live
+`run_mlb_daily_sim_job`, and the requester wrote "nothing degrades further by
+waiting for a window you want". **Web must not go alone** — the request is
+explicit that deploying web alone is the more misleading half, since the API
+would then show projections the stored artifact does not have.
+
+**Rule this reinforces, for the third time today:** a deploy request names the
+commit its author was thinking about, not the set the deploy needs. Cherry-pick
+onto the ACTUAL live SHA and run the tests there. `main` passing proves nothing
+about a service whose lineage diverged.
