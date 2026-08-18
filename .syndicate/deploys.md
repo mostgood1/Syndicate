@@ -15742,3 +15742,46 @@ Claim released (`deploy_claim.py release --token 24db7f58...` ->
 `released refresh-worker (was basketball-model-owner)`). `#461`'s code fix
 remains committed and pushed, not yet live; still waiting for a genuinely
 idle refresh-worker window.
+
+### preflight UNKNOWN, break-glass evidence substituted — web — 2026-08-18 ~21:5xZ — lane `convergence-phase7-crps` (session `model-sim-track`)
+
+`deploy_claim.py status`: `web` HELD by `convergence-phase7-crps`, target=
+unset (no SHA registered on the claim). `deploy_preflight.py --service web
+--holder convergence-phase7-crps` (no `--target-commit` passed, so checked
+against the currently live commit, `841b6d84`, not a specific new target):
+
+    UNKNOWN: sample is 357434s old (limit 180s)
+
+This is the KNOWN, already-documented gap above this file's own earlier
+entries and in `state.md`: `deploy_preflight --service web` can never return
+CLEAR because web does not emit `ALL_PROCESS_MEMORY` at all. **User
+authorized the break-glass substitute** (live `/api/ops/memory` process read
+in place of the stale sample), same pattern as the prior precedent.
+
+Live read, pulled directly from `/api/ops/memory` on production at the time
+of this entry:
+
+    container_memory_mb        1649.934 / 2048 max   (80.6%)
+    container_memory_headroom  398.066 MB
+    accounted_rss_mb           1064.699
+    unexplained_memory_mb      585.234
+    process_count               4
+
+    pid 80   gunicorn worker    rss 518.7 MB
+    pid 79   gunicorn worker    rss 405.9 MB
+    pid 62   gunicorn master    rss 136.9 MB
+    pid  1   bash (graceful-shell-command)   rss   3.2 MB
+
+All four are ordinary web infra (2 workers + master + shell wrapper) --
+**no sim/backfill/daily_update child process present**, which is the
+specific hazard this check exists to catch. `process_enum_debug` shows
+`psutil_unavailable` (procfs fallback), 1 enumeration error, but
+`procfs_iterated_count` (4) matches `procfs_pid_count` (4) -- nothing looks
+dropped from the read.
+
+**NOT YET DEPLOYED.** This entry closes the evidence gate only. The claim's
+`target=` is still unregistered -- no specific commit SHA has been confirmed
+as `convergence-phase7-crps`'s actual deploy target, and per this file's own
+standing rule the preflight/evidence read is bound to a SHA, not a general
+"safe right now" verdict. Whoever triggers the actual Render deploy must
+name the target commit first.
