@@ -13264,6 +13264,42 @@ the tracking CSV is where.
 `game_lines` so far. Could be sweep timing (props are a separate job) or a
 per-family gap — unresolved, and worth one read tomorrow once the day is done.
 
+##### RE-MEASURED 2026-08-18 (session `sim-vs-market-freeze-finding`, live production only, no code touched) — the "READER WAS NEVER BUILT" gap from 08-09 still reproduces, on the CURRENT live artifacts
+
+**The freeze WRITE side has clearly improved since this entry was opened** —
+game counts pulled live via `/api/ops/artifacts/export` for
+`oddsapi_game_lines_<date>_pregame.json`: **08-16 = 1, 08-17 = 11, 08-18 = 15**
+(slate in progress). That tracks `908f96d1` (this entry's mode-guard fix) plus
+a later `bafb4fb2` ("Make the pregame props seal monotone", tagged `#440 Phase
+7`, 2026-08-17) fixing a reseed-from-empty bug the code's own docstring says
+was caught mid-collapse on 08-16 (a 14-game freeze becoming 8 in 20 minutes).
+
+**But `/mlb/api/market-accuracy` still reports Moneyline pinned at exactly 1
+resolved bet/day**, unchanged, on both 08-16 and 08-17 despite the 08-17
+freeze holding 11 games. Read directly: `season_betting_day_2026_08_17.json`
+(`source_kind: "season_manifest_static"`, built from
+`locked_cards_retuned/daily_summary_2026_08_17_locked_policy.json`) has a
+`games` object with **exactly 2 keys** against that same date's 11-game
+freeze, and `selected_counts.ml = 1`.
+
+**This looks like the same class of defect this section already named on
+2026-08-09** ("the freeze produces an artifact nothing consumes") — but
+`locked_cards_retuned` is not one of the two reader call sites listed above
+(`sources.py:198`, `odds_refresh_tracking.py:2696`), so it is UNCONFIRMED
+whether it is the *same* never-built reader or a third, separate consumer
+with the identical symptom. **Also unreconciled:** the `grading-blocker-
+settled-zero` lane (`.syndicate/lanes.md`, 2026-08-16 checkpoint) says it
+tested and FALSIFIED a freeze/reader path-mismatch hypothesis — but that test
+checked `build_season_betting_cards_manifest._odds_paths` and
+`_freeze_oddsapi_pregame_markets`'s write destinations, not
+`locked_cards_retuned`'s build step specifically, so the two notes may not
+actually be in conflict.
+
+**Not diagnosed further tonight, by instruction — this is a recorded
+measurement, not a fix.** Next step, if picked up: find where
+`locked_cards_retuned/daily_summary_*_locked_policy.json` is built and
+whether it is supposed to consume `oddsapi_game_lines_*_pregame.json` at all.
+
 #### #266 — both prop families graded zero (`9f8489f3`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
 **Hitters:** `_extract_report_hitter_predictions` resolved team and lineup
