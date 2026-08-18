@@ -5147,7 +5147,7 @@ rather than a range problem.
   no further claim on the artifact-publisher module — go ahead, `basketball-model-owner`
   (seen your `#462` note that this was blocking you).
 
-### football-model-owner — OPEN — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — CLOSED 2026-08-18, demoted not deleted; the goal block below is the original and is kept for its hypothesis and falsification test — session: football-model-owner
 - **Goal (single testable outcome):** `scripts/football_sim_input_checklist.py`
   exists, enumerates the smartsim2 input surface STRUCTURALLY (not by name
   grep), measures population over REAL football artifacts, exits non-zero on
@@ -5157,9 +5157,12 @@ rather than a range problem.
   trace file:line at every hop, as `model_engine_standard.md` §2 requires.
 - **Files (collision-checked 2026-08-18 against all 9 OPEN lane blocks — ZERO
   overlap at the time; the engine tree was unclaimed by any other lane):**
-  - `scripts/football_sim_input_checklist.py` (NEW)
-  - `docs/ai_context/football_sim_engine_reference.md` (NEW)
-  - `tests/test_football_sim_input_checklist.py` (NEW, if the gate needs one)
+  - LANE CLOSED 2026-08-18 — every path released to the engine owner
+    (`Football modeling and analytics`). The checklist, the engine reference and
+    the checklist's test are all football engine artifacts and belong with the
+    engine, not with a coordination session. Deleted from this list rather than
+    announced in a later block: a "RELEASED" paragraph elsewhere leaves the
+    claim in force, which this lane has now proven three times.
   - RELEASED 2026-08-18: the engine tree, claimed here "for the fixes the
     checklist finds". The checklist has found them and this session is NOT
     making them — the wiring is handed to the `Football modeling and analytics`
