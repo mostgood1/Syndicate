@@ -446,60 +446,56 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — opened 2026-08-18 — session: soccer-sport-owner
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — checkpointed 2026-08-19 ~17:2xZ — INPUT-QUALITY WORK DONE, ORIGINAL GOAL STILL UNMET, 9-LEAGUE RE-RUN NOT YET DONE
 
-- Goal: soccer's model stops losing to the closing line on at least one league.
-  **Testable outcome:** `scripts/backtest_soccer_h2h_calibration.py` re-run over the
-  SAME 1,112 matches / 9 leagues reports model multiclass Brier **<= market** on at
-  least one league that is not `belgian_pro_league`, and mean model `stdev(P home)`
-  rises from **0.1575** toward market's **0.1811**. Baseline to beat is committed:
+- Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
+  the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
+  least one non-`belgian_pro_league` league, stdev(P home) rising from
+  **0.1575** toward market's **0.1811**. Baseline:
   `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
-- Files:
-  - `scripts/backtest_soccer_h2h_calibration.py`
-  - `scripts/build_soccer_artifacts.py`
-  - `scripts/validate_soccer_vs_market.py`
-  - `syndicate/features/soccer/` (sim engine, adapters, ratings)
-  - `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
-    `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`
-  - `reports/soccer_backtest/`
-- **NOT IN THIS LANE, and the reason matters:**
-  `syndicate/features/shared/soccer_projections.py` and
-  `syndicate/features/shared/book_margin_model.py` are being edited RIGHT NOW by
-  session `7c041356` under informal lane `modelled-fair-edge` (uncommitted work,
-  `.current-lane` marker, no lane header). They are the BOARD-side adapter; this lane
-  is the SIM side. Do not take them.
-- Hypothesis: the model is UNDER-DISPERSED, not merely inaccurate. Measured
-  2026-08-15: mean model `stdev(P home)` **0.1575** vs market **0.1811**, narrower in
-  **8 of 9** leagues; eredivisie's reliability curve is too timid at both ends
-  (predicted 0.144 -> actual 0.000; predicted 0.823 -> actual 1.000). Two independent
-  routes agree on the shape (production artifact stdev 0.1364 / 166 rows).
-- Falsification test: sharpen the distribution and re-run. **If the Brier gap does not
-  close while stdev rises to market's, under-dispersion is NOT the binding constraint**
-  and the cause is the ratings/inputs, not the spread. That is a real outcome and must
-  be recorded, not retried with a bigger knob.
-  Second, cheaper falsifier first: `adapters._DEFAULT_SIMULATIONS` is **300**, which is
-  **+/-2.9pp of pure Monte Carlo noise** against a gap of **+0.0139**. **Raise the sim
-  count and re-run BEFORE changing any model term** — if the gap moves on sim count
-  alone, the 2026-08-15 number was partly noise and every conclusion drawn from it
-  needs re-reading.
-- Verification: the re-run's own JSON in `reports/soccer_backtest/`, compared
-  league-by-league against the 08-15 baseline on the same match set. **A gap that
-  improves on a DIFFERENT match set proves nothing** — the 1,112 are the control.
+  **This full re-run has not happened since the input work below began** —
+  next session's first move.
+- Status of this session's input-quality work (full narrative in
+  `.syndicate/log/2026-08-19.md`, dated entries — do not duplicate here):
+  xG double-count fixed+validated+kept; shots-weight shrink reverted (was
+  falsified, recorded); dispersion-overshoot mechanism fully decomposed via
+  isolated 2x2 probe, treated as a closed stopping point per explicit
+  instruction; `clean_sheet_rate` fitted (pooled, significant) but its paired
+  backtest trended unfavorably — **discarded**; `possession_share`/
+  `set_piece_goal_share` sourced, wired, pooled-regression-tested (not
+  significant, favorable trend) — **kept**; `starters_available_share`
+  sourced (walk-forward core-XI overlap from ESPN boxscores), pooled-fit
+  significant (t=+2.06), fully wired end to end
+  (commit `d1136447`, BACKTEST-HONEST ONLY — not live-wired, see log), paired
+  test now complete: mean delta -0.0049 vs the possession baseline, t=-1.31,
+  **not significant, favorable direction** — **kept**, same disposition as
+  possession/set-piece and the opposite of `clean_sheet_rate`.
+- Files: `scripts/backtest_soccer_h2h_calibration.py`,
+  `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
+  `scripts/soccer_sim_input_checklist.py`, `syndicate/features/soccer/` (sim
+  engine, adapters, ratings, `ingestion/espn_match_stats.py`),
+  `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
+  `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`,
+  `tests/test_soccer_advanced_input_reachability.py`, `reports/soccer_backtest/`.
+- **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
+  `syndicate/features/shared/book_margin_model.py` — board-side adapter,
+  owned by lane `modelled-fair-edge`. Re-check before assuming still true.
+- Next action: re-run the full 9-league backtest against the 1,112-match
+  control set with all of this session's input changes applied, and compare
+  Brier/stdev against the 08-15 baseline per the original testable outcome
+  above. Everything landed so far is input-quality work; none of it has yet
+  been checked against the lane's own success criterion.
 - Blocked by: none.
 
-**INHERITED, DO NOT RE-DERIVE:**
-- **A leak-free backtest ALREADY EXISTS** — `backtest_soccer_h2h_calibration.py`,
-  committed `5a94b134`. The retired-for-leakage artifacts are
-  `data/soccer_source/*/validation/*_backtest_*.csv`, a DIFFERENT thing. I generalised
-  those into "soccer accuracy is unmeasured" earlier today and was wrong.
-- **MLS CANNOT be backtested from its current source** — `fetch_asa_mls_team_history`
-  returns undated season aggregates; no `as_of` can repair it. Non-MLS leagues only.
-- **Do not publish `model_edge_pct` on the strength of a partial win.** Standing
-  decision: a model that loses to the closing line emits edges that are noise, and its
-  errors are systematically on favourites, so those edges point at underdogs.
-  Publishing is a SEPARATE decision from closing the gap.
-- Fixes #1 (seeds), #3 (accent join), #4 (as-of) were built and tested and are safe to
-  ship; **#2 removes a stale BLOCK and does not make the number publishable.**
+**INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
+archived 2026-08-19 — read there for the falsification-test design and the
+Monte-Carlo-noise-floor cheap-falsifier note, both still valid):
+- A leak-free backtest ALREADY EXISTS (`backtest_soccer_h2h_calibration.py`,
+  `5a94b134`) — the retired-for-leakage `*_backtest_*.csv` artifacts are a
+  DIFFERENT, unrelated thing.
+- MLS cannot be backtested from its current source (undated season aggregates).
+- Do not publish `model_edge_pct` on a partial win — publishing is a separate
+  decision from closing the Brier gap.
 
 #### convergence-phase7-crps — BUILT 2026-08-18, **VALIDATION IN FLIGHT** — per-PA common random numbers
 
