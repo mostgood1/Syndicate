@@ -2587,7 +2587,44 @@ Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`.
 **Filed as `todo.md` `#468`** — a NEW, separate defect from the
 cache-freshness bug `#461` already fixed. NOT FIXED as of this entry.
 
-## [mlb-sim-log-unreachable] FINDING — THE MLB SIM JOB'S DIAGNOSTICS ARE UNREACHABLE FROM ANYWHERE `[2026-08-19]`
+## [mlb-sim-log-unreachable] RETRACTED — THE SIM LOG *IS* REACHABLE REMOTELY `[2026-08-19]`
+
+**THIS ENTIRE FINDING IS WRONG AND IS RETRACTED.** The body is kept below only so
+the mistake is legible; **do not act on it.**
+
+**The mechanism already exists and is purpose-built.**
+`live_refresh_loop.py:2516-2536` copies the child's log into the shared
+Redis-backed state store the moment the process exits, with a comment saying
+exactly why: *"so `/api/ops/live-refresh/state?sim_date=&sim_run=` can surface it
+remotely."*
+
+**Verified by using it:**
+
+    GET /api/ops/live-refresh/state?sim_date=2026-08-19&sim_run=20260819_134839
+      state.sim_run_status      -> the full command line
+      state.sim_run_resolution  -> date, run_stamp, source
+      state.sim_run_log_tail    -> 8000 chars, ending:
+        MLB_DAILY_SIM_END date=2026-08-19 return_code=0 ok=True published_artifacts=93
+
+**The sim SUCCEEDED.** Everything the retracted finding said was invisible is one
+authenticated GET away.
+
+**HOW I GOT IT WRONG — the fourth instance of one habit in this sequence.** I
+checked ONE channel (Render's log API), found nothing, and reported *the system*
+as having nothing. I never asked whether a purpose-built path existed — and the
+answer was in a comment beside the code I had already read to establish the
+redirect. **"My instrument sees nothing" is not "there is nothing."** The
+companion rule [[verify-the-channel-not-just-the-query]] covers the query-vs-
+channel half; this adds: **also ask whether a DIFFERENT channel was built for
+exactly this.**
+
+**I was one step from building a duplicate of an existing mechanism.**
+
+---
+
+### (retracted body follows, for the record only)
+
+## [mlb-sim-log-unreachable-retracted] FINDING — THE MLB SIM JOB'S DIAGNOSTICS ARE UNREACHABLE FROM ANYWHERE `[2026-08-19, WRONG]`
 
 **Every line `run_mlb_daily_sim_job.py` prints goes to a FILE on the worker's
 disk and nowhere else.** `live_refresh_loop.py:2784-2790`:
