@@ -111,6 +111,32 @@ curve's own strong early bucket (driven by the OZ-heavy portion of its blended p
 its short-segment integral higher than NZ's more modest early spike, even though NZ briefly
 exceeds it bucket-by-bucket in the mid-range. This is the correct comparison to state as a claim
 and to test against -- not the marginal buckets in isolation.
+
+STRENGTH-STATE (PP/PK) CURVES (`segment_average_multipliers_pp_role`/`_pk_role`), added in a fifth
+pass. Every curve above is gated `faceoff_ev_only=True` in `engine.py` -- none of them has ever
+applied during a power play or penalty kill. `winner_role="PP"`/`"PK"` (`faceoff_segment_effect.py`)
+isolate PP/PK-STRENGTH draws by the WINNER's own skater-count role (did the team already on the
+power play also win the draw, or did the shorthanded team win it) -- a population the EV-only
+extraction excludes entirely. Both show a real, LARGE, and DIRECTIONALLY SENSIBLE effect: PP-role
+winner share 0.9329 at 10s (the already-advantaged team also winning the draw compounds its
+existing edge); PK-role winner share only 0.4313 at 10s and falling to 0.2749 by 30s (the
+shorthanded team's draw win provides at most a brief reprieve before the opponent's structural
+man-advantage reasserts itself). Isolating the DRAW-SPECIFIC increment from the baseline PP/PK
+manpower asymmetry: the PP TEAM's own share of shots swings from ~0.93 (when the PP team wins the
+draw) to ~0.57 (when the PK team wins it, `1 - 0.4313`) at 10s -- a large, genuinely incremental
+effect from who won the specific draw, not merely a restatement of the known PP/PK baseline
+`pp_shots_mult`/`pk_shots_mult` already encode.
+
+NEITHER STRENGTH-STATE CURVE RECONVERGES WITHIN THE MEASURED WINDOW, UNLIKE THE GENERAL/OZ/NZ
+CURVES -- HELD FLAT AT THE LAST BUCKET, SAME CONVENTION AS DZ. A power play typically runs up to
+~120 seconds; within the 0-90s window this data covers, the underlying MAN-ADVANTAGE situation is
+often still active regardless of who won the draw, so the effect never fully washes out the way a
+single-event EV/OZ/NZ effect does. PP-role ratio: 23.0x -> 11.2x -> 6.7x -> 6.5x -> 4.6x -> 4.5x ->
+4.1x -> 3.4x (still well above parity at 60-90s). PK-role ratio: 1.31x (brief clear-driven bump) ->
+0.46x -> 0.36x -> 0.21x -> 0.26x -> 0.24x -> 0.24x -> 0.28x (settles into a sustained, large
+suppression, never approaching parity). Both held flat beyond 90s at their own (60,90] values,
+rather than assumed to converge -- extrapolating toward parity would understate a real, sustained
+structural effect the data gives no reason to believe fades that quickly.
 """
 from __future__ import annotations
 
@@ -233,6 +259,64 @@ _NZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
 # fallback convention as the general/OZ curves, not DZ's held-tail.
 _NZ_CONVERGED_MULT = 1.0
 
+# Real, measured marginal buckets for PP-STRENGTH draws the WINNER took while their OWN team
+# already had the skater advantage (`winner_role="PP"`, 8,033 real draws). Does NOT reconverge
+# within the measured window -- a real power play often runs close to or beyond 90s, so the
+# man-advantage baseline stays active regardless of who won the specific draw.
+#
+#   bucket        winner/100s  other/100s   winner_mult  other_mult
+#   (0, 5]           1.6732      0.0727       1.9167       0.0833
+#   (5, 10]          2.5769      0.2301       1.8361       0.1639
+#   (10, 15]         1.9164      0.2870       1.7395       0.2605
+#   (15, 20]         1.9316      0.2955       1.7346       0.2654
+#   (20, 30]         1.6156      0.3521       1.6421       0.3579
+#   (30, 45]         1.5432      0.3393       1.6395       0.3605
+#   (45, 60]         1.5729      0.3873       1.6048       0.3952
+#   (60, 90]         1.4555      0.4235       1.5492       0.4508
+#
+# `reports/phase7/nhl_faceoff_pp_decay_curve.json` carries the raw counts behind every value here.
+_PP_ROLE_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.9167, 0.0833),
+    (5.0, 10.0, 1.8361, 0.1639),
+    (10.0, 15.0, 1.7395, 0.2605),
+    (15.0, 20.0, 1.7346, 0.2654),
+    (20.0, 30.0, 1.6421, 0.3579),
+    (30.0, 45.0, 1.6395, 0.3605),
+    (45.0, 60.0, 1.6048, 0.3952),
+    (60.0, 90.0, 1.5492, 0.4508),
+]
+_PP_ROLE_CONVERGED_MULT_WINNER = 1.5492  # held flat at the LAST measured bucket -- a PP often
+_PP_ROLE_CONVERGED_MULT_OTHER = 0.4508   # runs close to or beyond 90s, no reason to assume parity
+
+# Real, measured marginal buckets for PP-STRENGTH draws the WINNER took while THEIR OWN team was
+# shorthanded (`winner_role="PK"`, 6,701 real draws). A brief clear-driven bump in the first 5s,
+# then a sustained, large suppression -- the opponent's man-advantage reasserts itself. Also does
+# NOT reconverge within the measured window.
+#
+#   bucket        winner/100s  other/100s   winner_mult  other_mult
+#   (0, 5]           0.5002      0.3827       1.1331       0.8669
+#   (5, 10]          0.3920      0.8472       0.6327       1.3673
+#   (10, 15]         0.3261      0.9050       0.5298       1.4702
+#   (15, 20]         0.2547      1.2282       0.3435       1.6565
+#   (20, 30]         0.3725      1.4461       0.4097       1.5903
+#   (30, 45]         0.3771      1.5639       0.3886       1.6114
+#   (45, 60]         0.3726      1.5288       0.3919       1.6081
+#   (60, 90]         0.4134      1.4954       0.4332       1.5668
+#
+# `reports/phase7/nhl_faceoff_pk_decay_curve.json` carries the raw counts behind every value here.
+_PK_ROLE_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.1331, 0.8669),
+    (5.0, 10.0, 0.6327, 1.3673),
+    (10.0, 15.0, 0.5298, 1.4702),
+    (15.0, 20.0, 0.3435, 1.6565),
+    (20.0, 30.0, 0.4097, 1.5903),
+    (30.0, 45.0, 0.3886, 1.6114),
+    (45.0, 60.0, 0.3919, 1.6081),
+    (60.0, 90.0, 0.4332, 1.5668),
+]
+_PK_ROLE_CONVERGED_MULT_WINNER = 0.4332  # held flat at the LAST measured bucket -- same reasoning
+_PK_ROLE_CONVERGED_MULT_OTHER = 1.5668   # as PP-role above
+
 
 @dataclass(frozen=True)
 class SegmentFaceoffMultipliers:
@@ -326,4 +410,25 @@ def segment_average_multipliers_nz(seg_len_seconds: float) -> SegmentFaceoffMult
     return _integrate_curve(
         seg_len_seconds, _NZ_DECAY_CURVE,
         converged_winner=_NZ_CONVERGED_MULT, converged_other=_NZ_CONVERGED_MULT,
+    )
+
+
+def segment_average_multipliers_pp_role(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PP-STRENGTH decay curve for draws the WINNER took while already on the power play -- see
+    the module docstring's strength-state section. Does not reconverge within the measured window;
+    held flat at the last measured bucket beyond 90s."""
+    return _integrate_curve(
+        seg_len_seconds, _PP_ROLE_DECAY_CURVE,
+        converged_winner=_PP_ROLE_CONVERGED_MULT_WINNER, converged_other=_PP_ROLE_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_pk_role(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PP-STRENGTH decay curve for draws the WINNER took while shorthanded -- see the module
+    docstring's strength-state section. Direction REVERSES after the first bucket (a brief
+    clear-driven bump, then sustained suppression as the opponent's man-advantage reasserts).
+    Does not reconverge within the measured window; held flat at the last measured bucket."""
+    return _integrate_curve(
+        seg_len_seconds, _PK_ROLE_DECAY_CURVE,
+        converged_winner=_PK_ROLE_CONVERGED_MULT_WINNER, converged_other=_PK_ROLE_CONVERGED_MULT_OTHER,
     )

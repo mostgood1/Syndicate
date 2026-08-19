@@ -8,6 +8,7 @@ import pytest
 
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_segment_effect import (
     compute_post_faceoff_shots,
+    compute_post_faceoff_shots_by_strength_role,
     summarize_post_faceoff_shots,
 )
 
@@ -34,8 +35,8 @@ def _shot(owner_id, seconds, period=1, situation="1551", kind="shot-on-goal"):
             "details": {"eventOwnerTeamId": owner_id}}
 
 
-def _payload(plays):
-    return {"id": 1, "plays": plays}
+def _payload(plays, *, home_id=HOME_ID, away_id=AWAY_ID):
+    return {"id": 1, "plays": plays, "homeTeam": {"id": home_id}, "awayTeam": {"id": away_id}}
 
 
 def test_shot_by_winner_within_window_counts_as_winner_shot():
@@ -199,3 +200,75 @@ def test_winner_zone_filter_truncation_boundary_uses_any_zone_not_just_matching(
     assert rec.n_faceoffs == 1  # only the "D" draw is studied
     assert rec.winner_shots == 0  # the shot at t=12 falls after draw 1's truncated window (ends t=10)
     assert rec.other_shots == 0  # and draw 2 (zone "O") isn't studied at all under this filter
+
+
+# ---------------------------------------------------------------------------
+# Strength-state (PP/PK) faceoff role -- the population `_extract_timed_events`'s default
+# (EV-only) path excludes entirely. situationCode: [awayGoalieInNet][awaySkaters][homeSkaters]
+# [homeGoalieInNet]. "1451" = home has the skater advantage (home PP); "1541" = away does.
+# ---------------------------------------------------------------------------
+
+def test_pp_role_isolates_draws_the_advantaged_team_won():
+    """HOME wins a draw while HOME has the skater advantage ("1451") -- winner_role="PP" must
+    count it; winner_role="PK" must not."""
+    payload = _payload([_faceoff(HOME_ID, 0, situation="1451"), _shot(HOME_ID, 5)])
+    pp = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PP")
+    pk = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PK")
+    assert pp.n_faceoffs == 1
+    assert pp.winner_shots == 1
+    assert pk.n_faceoffs == 0
+
+
+def test_pk_role_isolates_draws_the_shorthanded_team_won():
+    """AWAY wins a draw while HOME has the skater advantage ("1451") -- AWAY is shorthanded, so
+    winner_role="PK" must count it; winner_role="PP" must not."""
+    payload = _payload([_faceoff(AWAY_ID, 0, situation="1451"), _shot(AWAY_ID, 5)])
+    pp = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PP")
+    pk = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PK")
+    assert pk.n_faceoffs == 1
+    assert pk.winner_shots == 1
+    assert pp.n_faceoffs == 0
+
+
+def test_role_flips_with_which_side_has_the_advantage():
+    """Same HOME winner, opposite situationCode ("1541" = AWAY has the advantage) -- HOME is now
+    the shorthanded winner, so this must classify as PK, not PP (the role is relative to who has
+    the skater advantage, not a fixed home/away label)."""
+    payload = _payload([_faceoff(HOME_ID, 0, situation="1541")])
+    pp = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PP")
+    pk = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PK")
+    assert pk.n_faceoffs == 1
+    assert pp.n_faceoffs == 0
+
+
+def test_strength_role_excludes_ev_draws_entirely():
+    payload = _payload([_faceoff(HOME_ID, 0, situation="1551"), _shot(HOME_ID, 5)])
+    pp = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PP")
+    pk = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PK")
+    assert pp.n_faceoffs == 0
+    assert pk.n_faceoffs == 0
+
+
+def test_strength_role_counts_shots_from_any_strength_state_in_the_window():
+    """Unlike the EV-only path, the post-draw shot count here isn't restricted to matching-strength
+    shots -- a shot taken after the man advantage expires (still within the window) counts too,
+    since the shot stream doesn't pause for a strength-state change mid-window."""
+    payload = _payload([
+        _faceoff(HOME_ID, 0, situation="1451"),
+        _shot(HOME_ID, 8, situation="1551"),  # PP has already expired by t=8, still counts
+    ])
+    pp = compute_post_faceoff_shots_by_strength_role(payload, window_seconds=15, winner_role="PP")
+    assert pp.winner_shots == 1
+
+
+def test_strength_role_missing_plays_returns_none():
+    assert compute_post_faceoff_shots_by_strength_role({"id": 1}, winner_role="PP") is None
+
+
+def test_strength_role_backward_compat_ev_only_path_unaffected():
+    """The pre-existing EV-only extraction path must still exclude non-EV faceoffs entirely --
+    confirms `include_non_ev`'s default (`False`) truly reproduces the original behavior for every
+    caller that doesn't opt in."""
+    payload = _payload([_faceoff(HOME_ID, 0, situation="1451"), _shot(HOME_ID, 5, situation="1451")])
+    rec = compute_post_faceoff_shots(payload, window_seconds=15)
+    assert rec.n_faceoffs == 0

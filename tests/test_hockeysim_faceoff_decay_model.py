@@ -12,6 +12,8 @@ from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
     segment_average_multipliers_oz,
+    segment_average_multipliers_pk_role,
+    segment_average_multipliers_pp_role,
 )
 
 
@@ -223,5 +225,78 @@ def test_nz_typical_engine_segment_length_still_shows_a_real_effect():
 @pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
 def test_nz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
     result = segment_average_multipliers_nz(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Strength-state (PP/PK) curves -- the first faceoff mechanism curves to apply during a power
+# play or penalty kill; every other curve is gated EV-only.
+# ---------------------------------------------------------------------------
+
+def test_pp_role_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pp_role(5.0)
+    assert result.winner_mult == pytest.approx(1.9167, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.0833, abs=1e-4)
+
+
+def test_pp_role_stays_strongly_positive_at_every_length_including_very_long():
+    """Unlike every other curve, PP-role never reconverges within the measured window -- a real
+    power play often runs close to or beyond 90s. A very long segment should hold near the (60,90]
+    bucket's own values, NOT decay toward the no-effect baseline."""
+    for seg_len in (5.0, 42.5, 1200.0):
+        result = segment_average_multipliers_pp_role(seg_len)
+        assert result.winner_mult > 1.5, f"failed at seg_len={seg_len}"
+        assert result.other_mult < 0.5, f"failed at seg_len={seg_len}"
+
+
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_pp_role_mean_of_winner_and_other_is_always_one(seg_len):
+    result = segment_average_multipliers_pp_role(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-4)
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_pp_role_non_positive_or_invalid_input_returns_neutral_baseline(bad):
+    result = segment_average_multipliers_pp_role(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+def test_pk_role_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pk_role(5.0)
+    assert result.winner_mult == pytest.approx(1.1331, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.8669, abs=1e-4)
+
+
+def test_pk_role_direction_flips_as_the_window_widens():
+    """A real, distinctive property of this curve alone: a brief clear-driven bump favors the
+    shorthanded winner in the first ~5-10s, then the opponent's man-advantage reasserts and the
+    INTEGRATED average crosses below 1.0 -- unlike DZ, which is reversed from the shortest bucket
+    onward, and unlike PP-role/general/OZ/NZ, which never reverse direction at all."""
+    short = segment_average_multipliers_pk_role(5.0)
+    long = segment_average_multipliers_pk_role(15.0)
+    assert short.winner_mult > 1.0
+    assert long.winner_mult < 1.0
+
+
+def test_pk_role_stays_suppressed_at_typical_and_very_long_segment_lengths():
+    """Like PP-role, PK-role never reconverges to the no-effect baseline within the measured
+    window -- held at the (60,90] bucket's own (suppressed) values."""
+    for seg_len in (42.5, 1200.0):
+        result = segment_average_multipliers_pk_role(seg_len)
+        assert result.winner_mult < 0.6, f"failed at seg_len={seg_len}"
+        assert result.other_mult > 1.4, f"failed at seg_len={seg_len}"
+
+
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_pk_role_mean_of_winner_and_other_is_always_one(seg_len):
+    result = segment_average_multipliers_pk_role(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-4)
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_pk_role_non_positive_or_invalid_input_returns_neutral_baseline(bad):
+    result = segment_average_multipliers_pk_role(bad)
     assert result.winner_mult == 1.0
     assert result.other_mult == 1.0

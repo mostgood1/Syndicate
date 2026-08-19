@@ -16,7 +16,7 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
     build_nhl_sim_config,
     run_hockeysim_game,
 )
-from syndicate.features.nhl.sim_engine.hockeysim.engine import SimConfig
+from syndicate.features.nhl.sim_engine.hockeysim.engine import SimConfig, _strength_state_multipliers
 
 
 def _roster(team: str, base_pid: int) -> list[dict]:
@@ -400,6 +400,82 @@ class HockeySimEngineTest(unittest.TestCase):
                 f"should differ -- if they match, faceoff_dz_discrete_event_model is not gating "
                 f"anything.",
         )
+
+    def test_faceoff_strength_state_model_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2x: `faceoff_strength_state_model=True` (the default) must
+        produce measurably different TOTAL shot output than `False`, holding every other input
+        identical -- proves the flag actually gates a real PP/PK-segment mechanism, the first one
+        to apply outside EV segments (`faceoff_ev_only` gates everything else off during a power
+        play or penalty kill)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        # A high committed_per_game on both sides guarantees plenty of PP/PK segments across the
+        # sample so the effect isn't diluted away by mostly-EV games.
+        st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.3}
+        st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 0.7}
+        cfg_on = build_nhl_sim_config(overrides={"faceoff_strength_state_model": True})
+        cfg_off = build_nhl_sim_config(overrides={"faceoff_strength_state_model": False})
+
+        def _mean_total_shots(profile: SimConfig) -> float:
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return statistics.mean(totals)
+
+        on_mean = _mean_total_shots(cfg_on)
+        off_mean = _mean_total_shots(cfg_off)
+        self.assertNotAlmostEqual(
+            on_mean, off_mean, places=0,
+            msg=f"on_mean={on_mean:.3f} and off_mean={off_mean:.3f} should differ -- if they "
+                f"match, faceoff_strength_state_model is not gating anything.",
+        )
+
+    def test_strength_state_multipliers_expectation_is_exactly_one_for_any_p(self) -> None:
+        """Direct mathematical proof of `_strength_state_multipliers`'s own claim: for ANY win
+        probability `p` and ANY curve shape, `E[m_pp_side] == E[m_pk_side] == 1.0` EXACTLY --
+        computed analytically here (`p*m_when_pp_wins + (1-p)*m_when_pk_wins`), not just checked
+        empirically via a round-robin simulation. Uses the REAL PP-role/PK-role curve values at a
+        representative segment length so this is grounded in the actual measured asymmetry (§2x's
+        own bug: PP-role's magnitude is far larger than PK-role's) that the naive version failed
+        on, not a synthetic case too mild to expose it."""
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+            segment_average_multipliers_pk_role,
+            segment_average_multipliers_pp_role,
+        )
+        pp = segment_average_multipliers_pp_role(42.5)
+        pk = segment_average_multipliers_pk_role(42.5)
+        for p in (0.05, 0.3, 0.5, 0.7, 0.95):
+            m_pp_if_pp_wins, m_pk_if_pp_wins = _strength_state_multipliers(
+                p, True, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+            m_pp_if_pk_wins, m_pk_if_pk_wins = _strength_state_multipliers(
+                p, False, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+            e_pp = p * m_pp_if_pp_wins + (1.0 - p) * m_pp_if_pk_wins
+            e_pk = p * m_pk_if_pp_wins + (1.0 - p) * m_pk_if_pk_wins
+            self.assertAlmostEqual(e_pp, 1.0, places=6, msg=f"E[m_pp_side] failed at p={p}")
+            self.assertAlmostEqual(e_pk, 1.0, places=6, msg=f"E[m_pk_side] failed at p={p}")
+
+    def test_strength_state_multipliers_preserves_the_real_asymmetric_shape(self) -> None:
+        """The normalization must NOT flatten the real measured difference between winning and
+        losing the draw -- the winner's own multiplier should still exceed the loser's, on both
+        sides, even after re-centering to E[]=1.0."""
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+            segment_average_multipliers_pk_role,
+            segment_average_multipliers_pp_role,
+        )
+        pp = segment_average_multipliers_pp_role(42.5)
+        pk = segment_average_multipliers_pk_role(42.5)
+        m_pp_side_wins, m_pk_side_loses = _strength_state_multipliers(
+            0.5, True, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+        m_pp_side_loses, m_pk_side_wins = _strength_state_multipliers(
+            0.5, False, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+        self.assertGreater(m_pp_side_wins, m_pp_side_loses)
+        self.assertGreater(m_pk_side_wins, m_pk_side_loses)
 
     def test_faceoff_dz_discrete_event_model_still_shows_the_measured_direction(self) -> None:
         """Under the NEW default mechanism specifically (not just the legacy fallback the prior

@@ -28,6 +28,8 @@ from .historical_truth.faceoff_decay_model import (
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
     segment_average_multipliers_oz,
+    segment_average_multipliers_pk_role,
+    segment_average_multipliers_pp_role,
 )
 
 
@@ -151,6 +153,15 @@ class SimConfig:
     # incorrect direction, so there is no legacy diff-based fallback to preserve. Default ON.
     # `False` disables the layer entirely (not a fallback to a different mechanism).
     faceoff_nz_discrete_event_model: bool = True
+    # §2x: every faceoff mechanism above is gated `faceoff_ev_only=True` -- none has ever applied
+    # during a power play or penalty kill. A direct segment-level check of PP/PK-STRENGTH draws
+    # (`winner_role="PP"`/`"PK"`, `faceoff_segment_effect.py`) found a real, large, directionally
+    # sensible effect: winner share 0.93 at 10s when the already-advantaged team also wins the draw
+    # (compounding); only 0.43 falling to 0.27 when the shorthanded team wins it (a brief reprieve
+    # before the opponent's man-advantage reasserts). No dedicated per-team PP/PK-specific win-rate
+    # index exists -- this reuses the SAME general (OZ->EV->blend) percentage resolution as an
+    # approximation, a real, stated limitation. Default ON. `False` disables the layer entirely.
+    faceoff_strength_state_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -200,6 +211,34 @@ def _resolve_faceoff_pct(ev_only: bool, oz_index_raw: object, ev_index_raw: obje
         return float(fallback_pct)
     except (TypeError, ValueError):
         return 0.5
+
+
+def _strength_state_multipliers(
+    p_pp_side_wins: float, pp_side_wins_draw: bool,
+    w_pp: float, o_pp: float, w_pk: float, o_pk: float,
+) -> Tuple[float, float]:
+    """Return `(m_pp_side, m_pk_side)` for §2x's strength-state (PP/PK) faceoff mechanism, EXACTLY
+    normalized so `E[m_pp_side] == E[m_pk_side] == 1.0` for THIS SPECIFIC `p_pp_side_wins`, for any
+    curve shape -- not just "each curve's own winner+other averages to 1.0" (that guarantees only
+    `E[m_pp_side] + E[m_pk_side] == 2`, not that each is individually 1.0 -- a real bug caught by
+    the round-robin check every other faceoff layer this session was held to, `hockeysim_faceoff_strength_state_report.md`:
+    since the PP-side's baseline lambda is already larger than the PK-side's, `E[]`-not-1.0 on
+    either side inflates the league-wide aggregate, ~4.5% before this fix, ~0.2% after).
+
+    `w_pp`/`o_pp` are the PP-role curve's own `winner_mult`/`other_mult` at this segment's length
+    (`segment_average_multipliers_pp_role`); `w_pk`/`o_pk` the PK-role curve's own. Derivation: let
+    `p = p_pp_side_wins`. The PP-side's raw (unnormalized) expected multiplier this segment is
+    `E_pp = p*w_pp + (1-p)*o_pk` (gets `w_pp` when the PP-side itself wins, `o_pk` -- the OTHER
+    side's multiplier in the PK-role curve -- when the PK-side wins instead). Dividing each
+    REALIZED outcome by its own side's `E_pp`/`E_pk` makes the expectation exactly 1.0 by
+    construction, for this specific `p`, while leaving each curve's real, measured SHAPE (the
+    ratio between winning and losing the draw) completely untouched -- only the level is
+    re-centered."""
+    e_pp_side = max(1e-6, p_pp_side_wins * w_pp + (1.0 - p_pp_side_wins) * o_pk)
+    e_pk_side = max(1e-6, p_pp_side_wins * o_pp + (1.0 - p_pp_side_wins) * w_pk)
+    if pp_side_wins_draw:
+        return w_pp / e_pp_side, o_pp / e_pk_side
+    return o_pk / e_pp_side, w_pk / e_pk_side
 
 
 class PossessionSimulator:
@@ -1212,6 +1251,44 @@ class PeriodSimulator:
                         m_nz_h, m_nz_a = nz_decay.other_mult, nz_decay.winner_mult
                     lam_h = float(lam_h) * float(m_nz_h)
                     lam_a = float(lam_a) * float(m_nz_a)
+            elif (seg_is_home_pp or seg_is_away_pp) and bool(getattr(self.cfg, "faceoff_strength_state_model", True)):
+                # §2x: the first faceoff mechanism to apply during a PP/PK segment -- fires
+                # precisely when the block above is gated OFF (`ev_only=True` and this IS a PP/PK
+                # segment). Reuses the SAME OZ->EV->blend percentage resolution as the general
+                # mechanism (no dedicated per-team PP/PK-specific win-rate index exists -- a stated
+                # limitation, not hidden) to simulate who wins the segment's assumed draw, then
+                # applies whichever curve matches the WINNER's own role (did the already-advantaged
+                # team also win the draw, or did the shorthanded team win it).
+                #
+                # `_strength_state_multipliers` PER-SEGMENT NORMALIZES the two curves together (see
+                # its own docstring for the exact derivation) -- a naive branch on each curve's own
+                # raw winner_mult/other_mult was a real bug caught by the round-robin check every
+                # other layer this session was held to: it inflated the league-wide total ~4.5%
+                # (`hockeysim_faceoff_strength_state_report.md`), down to ~0.2% after this fix.
+                st_h_pct = _resolve_faceoff_pct(
+                    True, faceoff_oz_idx_home_raw, faceoff_ev_idx_home_raw,
+                    float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5),
+                )
+                st_a_pct = _resolve_faceoff_pct(
+                    True, faceoff_oz_idx_away_raw, faceoff_ev_idx_away_raw,
+                    float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
+                )
+                st_denom = max(1e-6, float(st_h_pct) + float(st_a_pct))
+                p_home_wins_st_draw = max(0.05, min(0.95, float(st_h_pct) / st_denom))
+                p_pp_side_wins = p_home_wins_st_draw if seg_is_home_pp else (1.0 - p_home_wins_st_draw)
+                pp_decay = segment_average_multipliers_pp_role(seg_len)
+                pk_decay = segment_average_multipliers_pk_role(seg_len)
+                pp_side_wins_draw = self.rng.random() < p_pp_side_wins
+                m_pp_side, m_pk_side = _strength_state_multipliers(
+                    p_pp_side_wins, pp_side_wins_draw,
+                    pp_decay.winner_mult, pp_decay.other_mult, pk_decay.winner_mult, pk_decay.other_mult,
+                )
+                if seg_is_home_pp:
+                    m_st_h, m_st_a = m_pp_side, m_pk_side
+                else:
+                    m_st_h, m_st_a = m_pk_side, m_pp_side
+                lam_h = float(lam_h) * float(m_st_h)
+                lam_a = float(lam_a) * float(m_st_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

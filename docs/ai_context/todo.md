@@ -1398,6 +1398,31 @@ top-to-bottom. **Verified the league-wide average did not shift**:
 992-pairing round-robin (2,976 games), 61.786 neutral vs 62.079 real-indexed
 total shots/game -- noise-level.
 
+**Addendum, 2026-08-19: strength-state (PP/PK) faceoff effect built** (reference
+doc §2x, full report `docs/reports/hockeysim_faceoff_strength_state_report.md`)
+-- the first faceoff mechanism to fire outside even strength, closing the
+population every zone-specific check this session ran had, by construction,
+never touched. PP-role winner share 0.9329 at 10s decaying to 0.8790 at 30s
+(8,033 draws); PK-role winner share 0.4313 at 10s decaying to 0.2749 at 30s
+(6,701 draws), with the DIRECTION FLIPPING as the window widens -- unique to
+this curve. **A real bug found by the round-robin check and fixed, not
+shipped**: the first wiring naively branched on each curve's own
+`winner_mult`/`other_mult`; each curve is individually mean-1.0, but that only
+guarantees the SUM of the two sides' expectations is 2, not that EACH side's
+own expectation is 1.0 -- and since the PP-side baseline lambda is already
+larger than the PK-side's, this inflated the league-wide total by **+4.478%**
+in a 992-pairing round-robin, fighting the already truth-calibrated
+`pp_shot_cal_mult`/`pk_shot_cal_mult` baseline. A damping constant was
+considered and rejected (bias scales linearly through the origin -- no
+nonzero damping removes it). Fixed with `_strength_state_multipliers`, an
+exact PER-SEGMENT normalization dividing the realized multiplier by that
+segment's own expected multiplier -- `E[applied_mult] = 1.0` exactly, shape
+untouched. **Verified two ways**: analytically (`E[]=1.0` to 6 decimal places
+at 5 win probabilities, real curve values) and empirically (round-robin delta
+dropped from +4.478% to **+0.203%**). 31 new decay-curve tests (99 total), 7
+new segment-effect tests (24 total), 3 new engine tests, checklist and full
+suite re-confirmed unaffected.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable

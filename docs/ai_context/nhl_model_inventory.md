@@ -624,3 +624,47 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   hockeysim/nhl tests pass, checklist re-confirmed full PASS. **This closes
   the faceoff-zone track's last open signal** — EV, OZ, DZ, and NZ all now
   have their own real, measured, discrete-event mechanism.
+- **Did** build the strength-state (PP/PK) faceoff effect (reference doc §2x,
+  full report `docs/reports/hockeysim_faceoff_strength_state_report.md`) —
+  the first faceoff mechanism to fire OUTSIDE even strength, closing the
+  population every zone-specific (EV/OZ/DZ/NZ) check this session ran had, by
+  construction, never touched (`_extract_timed_events`'s default filter is
+  `away_skaters == home_skaters`). Real, large, directionally sensible
+  effect measured separately by role: PP-role winner share 0.9329 at 10s
+  decaying to 0.8790 at 30s (8,033 draws — the already-advantaged team
+  winning the draw compounds its edge); PK-role winner share 0.4313 at 10s
+  decaying to 0.2749 at 30s (6,701 draws — even winning the draw
+  shorthanded, the opponent's man advantage reasserts, and the curve's
+  DIRECTION FLIPS as the window widens, unlike any other curve this session
+  built). Neither curve reconverges within 90s, unlike the general/OZ/NZ
+  curves — a real power play often runs that long.
+  **A real bug found by the round-robin check every layer this session was
+  held to, and fixed, not shipped**: the first wiring branched naively on
+  each curve's own `winner_mult`/`other_mult`. Each curve is individually
+  mean-1.0, but that only guarantees the SUM of the two sides' expected
+  multipliers is 2, not that EACH side's own expectation is 1.0 — and since
+  the PP-side's baseline lambda is already larger than the PK-side's
+  (`pp_shots_mult > pk_shots_mult`) and PP-role's magnitude dwarfs PK-role's,
+  this inflated the league-wide total by **+4.478%** in a 992-pairing
+  round-robin, silently fighting the already truth-calibrated
+  `pp_shot_cal_mult`/`pk_shot_cal_mult` baseline. A damping constant was
+  considered and rejected — the bias scales linearly with damping strength
+  through the origin, so no nonzero damping both keeps a real effect and
+  removes the bias. Fixed instead with `_strength_state_multipliers`
+  (`engine.py`, extracted as an independently testable pure function):
+  computes each side's own expected multiplier PER SEGMENT at that
+  segment's specific win probability, then divides the realized multiplier
+  by that expectation, making `E[applied_mult] = 1.0` exactly for any win
+  probability while leaving each curve's real, measured, asymmetric shape
+  untouched. **Verified two ways**: analytically (a test confirms `E[]=1.0`
+  to 6 decimal places at 5 win probabilities using the real curve values —
+  a proof, not an approximation) and empirically (round-robin delta dropped
+  from +4.478% to **+0.203%** after the fix). A separate test confirms the
+  fix did not flatten the real effect into a no-op. **Stated limitation**:
+  no dedicated per-team PP/PK-role-specific win-rate index exists — this
+  reuses the general OZ→EV→blend signal as the best available
+  approximation, not a role-specific index built this pass. Verified: 31
+  new decay-curve unit tests (99 total), 7 new segment-effect unit tests
+  (24 total), 3 new engine tests (reachability, the E[]=1.0 proof,
+  shape-preservation), checklist and full suite re-confirmed unaffected (no
+  new consumed field — reuses signals already wired elsewhere).

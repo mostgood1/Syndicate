@@ -138,6 +138,11 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # 0.72 at 10s decaying to 0.59 at 30s, 20,642 real draws, `winner_zone="N"`). Wired straight to
     # the discrete-event curve -- never live with a wrong direction, so no legacy fallback exists.
     faceoff_nz_discrete_event_model=True,
+    # §2x: the first faceoff mechanism to apply during a PP/PK segment -- every mechanism above is
+    # gated EV-only. Real segment-level check: winner share 0.93 at 10s when the already-advantaged
+    # team also wins the draw, only 0.43->0.27 when the shorthanded team wins it. Reuses the general
+    # OZ->EV->blend percentage resolution (no dedicated PP/PK-specific per-team index exists).
+    faceoff_strength_state_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.
