@@ -583,11 +583,26 @@ check.
 > env-var values, so the pre-08-13 value is unrecoverable.** Candidate, not
 > finding.
 >
-> **WHAT TO DECIDE, not investigate:** whether web SHOULD run that loop. It is
-> off by deliberate design (`render.yaml` comments say the intelligence work runs
-> on the REQUEST path there), so the emitter's silence may be correct behaviour
-> and the diagnostic simply mis-sited. Preflight no longer depends on it either
-> way.
+> **DECIDED 2026-08-19 — WEB DOES NOT RUN THE INTELLIGENCE-STATE LOOP. `#465`
+> IS CLOSED.** User decision, recorded in `state.md [user-decisions]`. It
+> confirms the existing configuration and required NO change: verified live env
+> against `render.yaml` with zero drift — `false` on web, `true` on
+> refresh-worker, `false` on live-odds-worker, blueprint identical. **No
+> `render.yaml` push was owed, so no `blueprint_sync` and no production blast
+> radius.**
+>
+> **WHAT THIS SETTLES:** web emitting no `ALL_PROCESS_MEMORY` is **EXPECTED
+> BEHAVIOUR, not a defect**. The emitter lives inside worker loops by design and
+> web was never meant to run them. The symptom that consumed four wrong causes
+> was never a fault in the emitter, the sampler, `psutil`, or the caller graph —
+> it was a diagnostic sited on a service that does not run the code it
+> instruments.
+>
+> **THE ONE THING STILL UNKNOWN IS NOW HARMLESS:** which change on ~08-13/14
+> flipped the service-level flag from a drifted `true` to `false`. Render exposes
+> no env-var history, so it is likely unrecoverable — and since `false` is now
+> the *decided* value, recovering it would change nothing. **Do not reopen this
+> on finding web's log silent; that silence is the design.**
 
 > **RETRACTION 2026-08-18 — read this before the body. The heading of this item
 > used to assert "no web code path emits `ALL_PROCESS_MEMORY`" and called it
