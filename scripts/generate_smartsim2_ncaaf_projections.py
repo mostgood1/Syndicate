@@ -241,6 +241,92 @@ def load_ppa_ratings_with_fallback(season: int) -> tuple[dict[str, dict], str]:
     return index, f"cfbd_ppa_season_{season}"
 
 
+# SP+ -> engine-rating scale. CALIBRATED EMPIRICALLY, not derived.
+#
+# `build_drive_priors` does `clamp(0.5 + rating, 0.05, 0.95)`, so a rating
+# outside about +/-0.45 CLAMPS. SP+ component ratings are points-per-game in the
+# 10-40 band, so passing them raw would clamp every team to 0.95 and destroy
+# exactly the discrimination they are here to provide.
+#
+# The divisor converts a centred SP+ component into that band. It is set so the
+# projected margin SD across a real slate lands near the market's, which is the
+# only defensible target: the model should be LESS dispersed than realised
+# margins (SD ~20.4, that gap is game-day variance) and about as dispersed as
+# the market (SD ~14.5).
+SP_RATING_SCALE = 10.0
+
+
+def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
+    """`{norm(team): (offense_rating, defense_rating)}` from SP+, in POINTS.
+
+    WHY SP+ REPLACES PPA AS THE RATING SOURCE. Backtested 2026-08-19 on ~740
+    games per season, prior-season rating against the NEXT season's realised
+    margins, so no leakage:
+
+        prior->target   rating      r       residual SD
+        2023 -> 2024    SP+         0.442   18.25   <- better
+                        PPA diff    0.348   19.08
+        2024 -> 2025    SP+         0.506   17.63   <- better
+                        PPA diff    0.372   18.97
+
+    SP+ wins on correlation and residual SD in BOTH independent pairs.
+
+    It also fixes a units problem PPA could not. PPA `overall` is a PER-PLAY
+    rate with SD 0.089; across the 51-game 2026 wk1 slate the resulting
+    differential had SD 0.136, which the engine rendered as margin SD **1.74
+    against a market SD of 14.46**. SP+ is already denominated in points per
+    game (SD ~13), which is the quantity a margin model needs.
+
+    `defense.rating` is POINTS ALLOWED -- lower is better -- so it is negated
+    for the engine, whose `defense_rating` means "how good this defense is".
+    """
+    payload = _cfbd_get("/ratings/sp", {"year": season})
+    index: dict[str, tuple[float, float]] = {}
+    if isinstance(payload, list):
+        for row in payload:
+            team = row.get("team")
+            if not team or team == "nationalAverages":
+                continue
+            off = (row.get("offense") or {}).get("rating")
+            dfn = (row.get("defense") or {}).get("rating")
+            if off is None or dfn is None:
+                continue
+            index[norm(team)] = (float(off), float(dfn))
+    return index
+
+
+def sp_offense_defense_rating(team: str, sp_index: dict[str, tuple[float, float]],
+                              means: tuple[float, float]) -> tuple[float, float] | None:
+    """SP+ components -> engine ratings, centred on the league mean.
+
+    CENTRING IS NOT COSMETIC. The engine treats 0.0 as an average team
+    (`0.5 + rating`), and SP+ components are absolute points-per-game around a
+    non-zero league mean. Feeding them uncentred would shift EVERY team the same
+    way, which is the same bias that put the NFL payload's league-mean
+    offense_index at 0.405 against a neutral 0.500.
+
+    Returns None for an unmatched team rather than (0.0, 0.0). A neutral default
+    is indistinguishable from a genuinely average team, and the caller needs to
+    know to fall back rather than silently rate an unknown team as league-average.
+    """
+    row = sp_index.get(norm(team))
+    if row is None:
+        return None
+    off_mean, def_mean = means
+    offense = (row[0] - off_mean) / SP_RATING_SCALE
+    # negate: SP+ defense is points ALLOWED, engine wants defensive STRENGTH
+    defense = -(row[1] - def_mean) / SP_RATING_SCALE
+    return offense, defense
+
+
+def sp_league_means(sp_index: dict[str, tuple[float, float]]) -> tuple[float, float]:
+    if not sp_index:
+        return (0.0, 0.0)
+    offs = [v[0] for v in sp_index.values()]
+    defs = [v[1] for v in sp_index.values()]
+    return (sum(offs) / len(offs), sum(defs) / len(defs))
+
+
 def offense_defense_rating(team: str, ppa_index: dict[str, dict]) -> tuple[float, float]:
     row = ppa_index.get(norm(team))
     if row is None:
@@ -279,9 +365,21 @@ def build_projection(
     ppa_index: dict[str, dict],
     rating_source: str,
     seeds: int = SEEDS_PER_GAME,
+    sp_index: dict[str, tuple[float, float]] | None = None,
+    sp_means: tuple[float, float] = (0.0, 0.0),
 ) -> SmartSimNcaafProjection:
-    home_off, home_def = offense_defense_rating(home_team, ppa_index)
-    away_off, away_def = offense_defense_rating(away_team, ppa_index)
+    # SP+ FIRST, PPA AS FALLBACK. SP+ is points-per-game and backtests better on
+    # margin (r 0.506 vs 0.372, residual SD 17.63 vs 18.97 over 740 games); PPA
+    # is a per-play rate whose differential SD of 0.136 produced margin SD 1.74
+    # against a market 14.46. Per team, so one unrated team does not discard the
+    # whole slate's SP+ ratings.
+    home_sp = sp_offense_defense_rating(home_team, sp_index or {}, sp_means)
+    away_sp = sp_offense_defense_rating(away_team, sp_index or {}, sp_means)
+    if home_sp is not None and away_sp is not None:
+        (home_off, home_def), (away_off, away_def) = home_sp, away_sp
+    else:
+        home_off, home_def = offense_defense_rating(home_team, ppa_index)
+        away_off, away_def = offense_defense_rating(away_team, ppa_index)
 
     home_scores: list[int] = []
     away_scores: list[int] = []
@@ -375,6 +473,13 @@ def main() -> None:
         ppa_index, rating_source = load_ppa_ratings_asof(args.season, args.week)
     log(f"PPA_RATINGS teams={len(ppa_index)} rating_source={rating_source}")
 
+    # SP+ is the primary rating source; PPA above stays as the per-team fallback.
+    sp_index = load_sp_ratings(args.season)
+    sp_means = sp_league_means(sp_index)
+    if sp_index:
+        rating_source = f"cfbd_sp_plus_{args.season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
+    log(f"SP_RATINGS teams={len(sp_index)} off_mean={sp_means[0]:.2f} def_mean={sp_means[1]:.2f}")
+
     projections: list[SmartSimNcaafProjection] = []
     skipped_no_cfbd_match: list[str] = []
     skipped_not_fbs_vs_fbs: list[str] = []
@@ -399,6 +504,8 @@ def main() -> None:
             away_team=away_team,
             game_id=game_id,
             ppa_index=ppa_index,
+            sp_index=sp_index,
+            sp_means=sp_means,
             rating_source=rating_source,
             seeds=args.seeds,
         )
