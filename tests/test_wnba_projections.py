@@ -13,6 +13,8 @@ probability would flow into EV, the blended score, and eventually a stake --
 
 from __future__ import annotations
 
+import json
+
 from syndicate.features.shared.prop_projections import _norm_name
 from syndicate.features.shared.wnba_projections import (
     WnbaPropDistributionIndex,
@@ -355,3 +357,115 @@ def test_loader_returns_an_empty_index_for_a_date_with_no_artifact():
     index = load_wnba_prop_distributions("1901-01-01")
     assert index.players == 0
     assert index.by_player == {}
+
+
+# Shaped exactly like the REAL `cards_sim_detail_<date>.json` (confirmed
+# against production 2026-08-19, not guessed): `games[i]["sim"]["players"]`
+# is a dict of `{"home": [...], "away": [...]}` player rows, each carrying
+# `prop_ladders[stat]["ladder"]`. This is the one piece of #263's loader that
+# every other test in this file bypasses entirely (they build
+# `WnbaPropDistributionIndex` directly) -- this is the parse path itself.
+_REAL_SHAPED_CARDS_SIM_DETAIL = {
+    "date": "2026-08-19",
+    "games": [
+        {
+            "home_tri": "GSV",
+            "away_tri": "MIN",
+            "sim": {
+                "players": {
+                    "home": [
+                        {
+                            "player_name": "Veronica Burton",
+                            "pts_mean": 12.15,
+                            "pts_sd": 5.58,
+                            "prop_ladders": {
+                                "pts": {"ladder": [{"total": 9, "hitProb": 0.75}, {"total": 14, "hitProb": 0.30}]},
+                                "reb": {"ladder": [{"total": 4, "hitProb": 0.60}]},
+                            },
+                        }
+                    ],
+                    "away": [
+                        {
+                            "player_name": "Kayla McBride",
+                            "pts_mean": 14.2,
+                            "prop_ladders": {
+                                "pts": {"ladder": [{"total": 15, "hitProb": 0.45}]},
+                            },
+                        }
+                    ],
+                }
+            },
+        }
+    ],
+}
+
+
+def _patch_cards_sim_detail_path(monkeypatch, tmp_path, payload=_REAL_SHAPED_CARDS_SIM_DETAIL):
+    path = tmp_path / "cards_sim_detail_2026-08-19.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    # `load_wnba_prop_distributions` imports `processed_path` locally (inside
+    # the function body) from `syndicate.features.wnba.sources`, so patching
+    # the SOURCE module's attribute -- not a copy already bound elsewhere --
+    # is what a call made AFTER this patch will actually see.
+    monkeypatch.setattr("syndicate.features.wnba.sources.processed_path", lambda filename: path)
+    return path
+
+
+def test_loader_parses_the_real_artifact_shape(monkeypatch, tmp_path):
+    _patch_cards_sim_detail_path(monkeypatch, tmp_path)
+    index = load_wnba_prop_distributions("2026-08-19")
+
+    assert index.players == 2
+    assert index.source_path == "cards_sim_detail_2026-08-19.json"
+    assert index.ladder_for("Veronica Burton", "player_points") == [
+        {"total": 9, "hitProb": 0.75},
+        {"total": 14, "hitProb": 0.30},
+    ]
+    assert index.ladder_for("Veronica Burton", "player_rebounds") == [{"total": 4, "hitProb": 0.60}]
+    # AWAY side is indexed too, not just home -- a real and easy-to-miss bug
+    # shape (looping "home" only, or overwriting away with home).
+    assert index.ladder_for("Kayla McBride", "player_points") == [{"total": 15, "hitProb": 0.45}]
+
+
+def test_loader_skips_players_with_no_ladders_at_all(monkeypatch, tmp_path):
+    payload = {
+        "date": "2026-08-19",
+        "games": [
+            {
+                "home_tri": "GSV",
+                "away_tri": "MIN",
+                "sim": {"players": {"home": [{"player_name": "No Ladder Player", "pts_mean": 10.0}], "away": []}},
+            }
+        ],
+    }
+    _patch_cards_sim_detail_path(monkeypatch, tmp_path, payload)
+    index = load_wnba_prop_distributions("2026-08-19")
+    # A player row exists but carries no `prop_ladders` at all -- must not be
+    # indexed as an empty entry that then LOOKS matched but answers nothing.
+    assert index.players == 0
+    assert index.ladder_for("No Ladder Player", "player_points") is None
+
+
+def test_loader_handles_a_malformed_artifact_without_crashing(monkeypatch, tmp_path):
+    path = tmp_path / "cards_sim_detail_2026-08-19.json"
+    path.write_text("not json at all {{{", encoding="utf-8")
+    monkeypatch.setattr("syndicate.features.wnba.sources.processed_path", lambda filename: path)
+    index = load_wnba_prop_distributions("2026-08-19")
+    assert index.players == 0
+    assert index.by_player == {}
+
+
+def test_loader_end_to_end_matches_a_board_row(monkeypatch, tmp_path):
+    """The full chain, loader through attach -- not the index built by hand."""
+    _patch_cards_sim_detail_path(monkeypatch, tmp_path)
+    distribution_index = load_wnba_prop_distributions("2026-08-19")
+
+    row = _row("player_points", 8.5, player="Veronica Burton", consensus=_TWO_SIDED_CONSENSUS)
+    attach_wnba_projections(
+        [row],
+        _index(tmp_path, rows=[("Veronica Burton", "GSV", "{'pts': 12.15}")]),
+        distribution_index,
+    )
+    projection = row["projection"]
+    assert projection["model_prob_over"] == 0.75
+    assert projection["basis"] == "empirical_sim_ladder"
