@@ -1,0 +1,54 @@
+{
+  "passing_tds": {
+    "stat": "passing_tds",
+    "shipped_weight": 0.0,
+    "half_a": {
+      "seasons": [
+        2022,
+        2023
+      ],
+      "n": 4459,
+      "w_optimal": 0.3155
+    },
+    "half_b": {
+      "seasons": [
+        2024,
+        2025
+      ],
+      "n": 4539,
+      "w_optimal": 0.0217
+    },
+    "same_sign": true,
+    "ratio": 14.5524,
+    "stable": false,
+    "conservative_weight": 0.0217,
+    "recommendation": "shipped weight 0.0 vs conservative estimate 0.0217 -- weight already at or below the conservative estimate, no change needed",
+    "verdict": "unstable"
+  },
+  "interceptions": {
+    "stat": "interceptions",
+    "shipped_weight": 0.0,
+    "half_a": {
+      "seasons": [
+        2022,
+        2023
+      ],
+      "n": 3890,
+      "w_optimal": 0.1329
+    },
+    "half_b": {
+      "seasons": [
+        2024,
+        2025
+      ],
+      "n": 3795,
+      "w_optimal": 0.0287
+    },
+    "same_sign": true,
+    "ratio": 4.624,
+    "stable": false,
+    "conservative_weight": 0.0287,
+    "recommendation": "shipped weight 0.0 vs conservative estimate 0.0287 -- weight already at or below the conservative estimate, no change needed",
+    "verdict": "unstable"
+  }
+}
