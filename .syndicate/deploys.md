@@ -16078,10 +16078,21 @@ caught in this lane; cutting from live every time is what catches it.
 runs on that date.** Recorded this way deliberately: a successful deploy reading
 as a working feature is most of what went wrong in this lane.
 
-**Why it cannot be verified from here.** Setting the var means editing
-`render.yaml`, which fires `blueprint_sync` and **rewrites the whole env block
-across all three services** — a materially bigger action than this deploy and a
-separate decision, not a follow-through. Until then the gate is inert **by
+**Why it is not verified yet — and I OVERSTATED the cost of the alternative.**
+I wrote that setting the var means editing `render.yaml` and firing
+`blueprint_sync` across all three services. **That is not the only route.**
+Render has a per-service SINGLE-KEY env endpoint:
+
+    PUT /v1/services/srv-d91dpertqb8s73co8ls0/env-vars/SYNDICATE_MLB_ROSTER_REBUILD_DATE
+
+One key, one service, **no `render.yaml` and no `blueprint_sync`.** The real cost
+is one env write plus one worker deploy to re-inject it (env is applied at
+container start, so a write alone does nothing).
+
+**USER DECISION 2026-08-18 ~21:1x CT: WAIT FOR THE DATE ROLLOVER.** Midnight CT
+was ~3 hours out, and **tomorrow's date has no `roster_objs/`, so the rebuild
+happens for free** — no env write, no extra deploy, same evidence. The gate's
+value is doing a rebuild MID-SLATE, which nothing needed tonight. Until then the gate is inert **by
 design**, and its `ROSTER_REBUILD inert:` line would only print to the on-disk
 sim log, which Render's log API cannot serve (see the corrected verify above).
 
