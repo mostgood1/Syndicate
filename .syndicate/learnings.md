@@ -1612,3 +1612,48 @@ checker, until that drift is fixed.
   correct tree from `HEAD`'s real content plus the intended addition,
   verified content on `origin/main` after pushing (both entries present,
   exactly once each) rather than trusting the push succeeding silently.
+
+
+## Reachability of the call is not reachability of the data `[2026-08-19]`
+
+**What we believed:** asked whether NBA had `#468`'s WNBA reachability
+defect (a fixed function made unreachable by broken wiring), traced the
+call graph and found `refresh_nba_oddsapi_props.py` genuinely reaches the
+same shared, monkeypatched, `#468`-fixed function as WNBA does — same
+entry point, `league_code` threading through generically, no env-var
+override. Concluded "structurally identical to WNBA, should work the
+same way" and reported that as the answer.
+
+**What was actually true:** the CALL is reachable; what it needs to
+compute from is not. A real reachability test (the same methodology that
+had verified `#468` for WNBA — real historical data in a scratch copy,
+not code-reading) showed NBA's rebuild returns nothing: the function's
+own two data sources are both structurally absent for NBA (a `boxscores/`
+subdirectory the vendor package expects but Syndicate's NBA pipeline
+never populates, and `player_logs.csv`, also absent). The wiring question
+(`#468`'s exact shape) and the "does this function have anything to work
+with" question are different questions, and tracing the first does not
+answer the second.
+
+**How we found out:** the user asked the identical question twice. The
+first answer rested entirely on a call-graph trace and treated symmetry
+of the CALL PATH as symmetry of the OUTCOME — an assumption never tested.
+Only re-running the actual verification methodology (not a repeat of the
+same trace) surfaced the real difference.
+
+**The rule going forward:** "is this reachable" and "is this reachable
+AND does the destination have valid inputs" are separate claims requiring
+separate evidence. A call-graph trace proves the first; only running the
+function (or a faithful scratch-data reproduction of it) proves the
+second. This is the same shape `model_engine_standard.md` already
+enforces for model inputs (CONSUMED × POPULATED, never one dimension
+alone, never a name grep) — the same discipline applies to any
+"is X wired to Y" reachability question, not just input-field audits.
+When a reachability answer is being extended from one instance (WNBA,
+verified) to a sibling (NBA, untested) by structural analogy alone,
+treat that extension as unverified until it's actually run, even when
+the code paths look identical.
+
+**Cost:** one full round of "here's the answer" that had to be walked
+back and re-verified from scratch, after the user declined to accept the
+first pass at face value.

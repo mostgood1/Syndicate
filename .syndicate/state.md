@@ -2752,10 +2752,26 @@ not a bug): `reports/migration_runs/**` stdout/stderr wrapper files are NOT
 cross-service visible at all — they live on whichever service ran the job,
 web's disk is genuinely separate.
 
-**Unmeasured**: whether NBA has the identical reachability defect (NBA's
-own staleness is plausibly just offseason, not compared apples-to-apples);
-whether the ESPN fetch keeps succeeding on future natural cycles (one
-verified data point exists, the pattern isn't established yet).
+**`#473`, checked 2026-08-19: NBA does NOT have this defect — it has a
+different, deeper one.** Structural reachability is symmetric with WNBA,
+confirmed by trace (`refresh_nba_oddsapi_props.py` reaches the same
+monkeypatched `_load_team_advanced_stats_asof_local`, no NBA-specific
+divergence, no env-var override). But a real reachability test (same
+methodology that verified `#468` for WNBA — real historical NBA data in a
+scratch copy, not just code-reading) found NBA's rebuild returns nothing:
+both fallback data sources are structurally absent — `compute_team_
+advanced_stats_from_boxscores` expects a `processed/boxscores/`
+subdirectory + `raw/games_nba_api.csv` that don't exist anywhere in NBA's
+actual data layout (Syndicate maintains flat `boxscores_2026-*.csv` files
+instead, the WNBA convention, which this vendor function never reads);
+the fallback needs `player_logs.csv`, also absent. NOT FIXED — genuinely
+separate, scoped work, zero current production impact since NBA is
+offseason (Oct–June window) with no dedicated autorun even attempting
+this path. Full writeup: `.syndicate/deploys.md` `#473` entry.
+
+**Unmeasured**: whether the ESPN fetch keeps succeeding on future natural
+cycles (one verified data point exists, the pattern isn't established
+yet).
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
 `.syndicate/log/2026-08-19.md`.
 
