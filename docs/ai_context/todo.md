@@ -1,6 +1,32 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — FOUND 2026-08-19, lane `basketball-model-owner`, NOT FIXED, presence-not-reachability
+### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — REACHABILITY FIX SHIPPED 2026-08-19 (`fd1930b2`), lane `basketball-model-owner`. Boxscore-capture half STILL OPEN — see bottom.
+
+**Reachability fix, verified end-to-end with real data, not assumed:**
+`_load_team_advanced_stats_asof_local` (`basketball_props_smart_sim.py`,
+the module production's real pipeline actually imports in-process) now
+calls a new `_ensure_team_advanced_stats_asof_local` before reading — a
+port of `#461`'s fixed cache-freshness logic onto the reachable path,
+reusing the SAME builder functions (`compute_team_advanced_stats_from_
+boxscores`/`_from_player_logs`) rather than re-deriving the aggregation.
+Both call sites updated to pass `league_code`. Tested two real scenarios
+against a scratch copy of the real WNBA boxscore data (never touched
+`data/wnba_source/`):
+1. Genuinely uncached as-of date -> builds a fresh 14-column file
+   (`games`/`source` populated, 100%, all 15 WNBA teams) where none
+   existed.
+2. An EXISTING stale-schema file (12 columns, no `games`/`source` --
+   production's actual current state) -> gets REBUILT with the fresh
+   schema.
+
+21 targeted tests pass, no regressions.
+
+**Found and corrected a test-setup trap while verifying, worth recording**:
+the local mirror's NESTED `source_artifacts/` tree has NO per-slate
+boxscore files at all -- only the FLAT `data/wnba_source/data/processed/`
+tree does (same split this item's own original investigation already found
+for `team_advanced_stats` itself). The first verification attempt
+silently found nothing until this was caught.
 
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
 `.syndicate/state.md` `[basketball-smart-sim-engine]`. Found by a
@@ -42,14 +68,35 @@ own data stops at 2026-06-30. No caller of
 `syndicate/`, `scripts/`, or `pipeline/` — the same unreachability shape,
 a different function.
 
-**Not fixed this pass.** Two real fixes needed, not one: (1) wire
-`basketball_props_smart_sim.py` to call an equivalent of
-`_ensure_team_advanced_stats_asof` itself (or invoke the vendor CLI), so the
-already-fixed cache-freshness logic actually runs; (2) find and fix why
-boxscore capture stopped updating, a prerequisite for (1) to produce
-anything current even once reachable. **Unmeasured**: whether NBA has the
-identical reachability defect (NBA's own staleness is plausibly just
-offseason, not compared apples-to-apples this pass).
+**(1) wiring — FIXED** (`fd1930b2`, this same day). **(2) boxscore capture —
+STILL OPEN, and re-confirmed directly against production, not just
+inferred**: `GET /api/ops/artifacts/export?pattern=wnba_source/data/
+processed/boxscores_2026-*.csv&names_only=1` on live production returns
+exactly 23 files, newest `boxscores_2026-05-24.csv` — confirms capture has
+been stalled since 05-24, independent of and unaffected by the wiring fix.
+**Consequence, stated precisely so this isn't overclaimed**: once the
+wiring fix deploys to refresh-worker, `team_advanced_stats` WILL rebuild
+successfully and WILL get `games`/`source` populated — but the rebuilt data
+will only be current through whatever boxscore data production actually
+has, i.e. ~2026-05-24, not the actual date of any given sim. The
+reachability half of this defect is fixed; the freshness half is a
+separate, still-open capture-pipeline problem with its own fix needed
+(no caller of `update-boxscores-history`/`backfill-boxscores` found
+anywhere in `syndicate/`, `scripts/`, or `pipeline/`).
+
+**Also discovered while verifying**: this checkout's LOCAL git-tracked
+mirror has per-slate boxscore files through 2026-07-15 — AHEAD of what
+production actually has (05-24). The usual mirror-desync direction in this
+repo is "local behind production"; this is the opposite, and matters
+because it means this fix's local verification used data production does
+not currently have — the verification proves the CODE works, not that
+production will produce July data once deployed.
+
+**Unmeasured**: whether NBA has the identical reachability defect (NBA's
+own staleness is plausibly just offseason, not compared apples-to-apples
+this pass); whether the wiring fix, once live, actually fires on a real
+production smart-sim call (not yet deployed to refresh-worker as of this
+entry).
 
 ### `#467` — **basketball position-matchup multiplier was CONSUMED, POPULATED with real data (47 WNBA / 64 NBA rows), and structurally never applied -- nested behind an unrelated dead gate** — FOUND, FIXED, AND LIVE 2026-08-18 (refresh-worker, `db573857`), lane `basketball-model-owner`, VERIFIED BY REACHABILITY TEST — runtime effect on a real served prediction NOT yet independently observed (see `#468`, same reachability question applies to whether WNBA smart-sim runs at all right now)
 
