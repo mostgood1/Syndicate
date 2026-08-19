@@ -1377,3 +1377,79 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 
 
+
+### soccer-model-dispersion — POSSESSION%/SET-PIECE WIRED AND KEPT 2026-08-19 ~11:0xZ — real data, real infra, NOT shown to help accuracy; different judgment than the clean_sheet_rate discard — session: soccer-sport-owner — commit `ad174dc0`
+
+**Sourced two of the four genuinely-missing input fields
+(`possession_share`, `set_piece_goal_share`) BEFORE assuming they needed new
+external acquisition** -- same "check for a misrouted producer first"
+discipline that found xG and shots/form earlier tonight. This time the raw
+material was real but genuinely not yet extracted, not merely misrouted:
+
+- **`possession_share`**: ESPN's match-summary `boxscore` section (already
+  being fetched by `fetch_match_summary` for lineups/commentary) carries a
+  team-level possession stat, unread by any existing parser.
+- **`set_piece_goal_share`**: `espn_shot_events.py::extract_shot_events`
+  already tags every shot `from_corner: bool` via commentary-text matching
+  ("following a corner") -- built for shot-location calibration, never
+  aggregated into `set_piece_metrics`. **Corner-derived only** -- the
+  classifier does not currently tag free-kick or penalty origin, so this is a
+  genuine but partial proxy for "set piece," not exhaustive. Flagged in the
+  code so nobody assumes it covers all set-piece goals.
+- **`availability_index`** and **`pace_seconds_per_event`**: investigated,
+  NOT sourced. Availability has partial raw material (`_attach_confirmed_
+  starters`, season usage rates, a starter-share prediction system with its
+  own backtest) but needs new integration connecting two subsystems and is
+  inherently near-kickoff-conditional, not an always-available walk-forward
+  aggregate like the others -- bigger scope, not attempted tonight.
+  `rosters_2026.csv` has no injury/availability flags. Pace was not
+  investigated for a from-existing-columns derivation this session.
+
+**VALIDATED with the same paired-test discipline as every change tonight.**
+Real eredivisie backtest (126 matches, 300 sims, `--dump-matches`), against
+the reused pre-existing-wiring dump (`new_matches.jsonl` -- valid because the
+clean_sheet_rate re-fit that separated them was fully discarded, so the two
+code states are otherwise identical):
+
+    stage                        model_brier  market_brier  gap      stdev
+    before (no possession/SP)      0.5081        0.5064     0.0017   0.2373
+    after  (with possession/SP)    0.5157        0.5064     0.0093   0.2474
+
+    paired Brier delta (after-before), n=126
+    mean +0.0075  SE 0.0059  t=+1.27  95% CI -0.0041..+0.0191
+    NOT SIGNIFICANT.
+
+Dispersion moved FURTHER from market (0.2373->0.2474 vs market 0.2257), not
+closer -- consistent with, and further evidence for, the standing finding that
+`_attack_strength`/`_defense_strength`'s ADDITIVE structure needs an actual
+re-fit for the now much larger set of live terms, not that any one field
+(shots, clean_sheet_rate, or now possession/set-piece) is individually wrong.
+
+**KEPT, not reverted -- and this is a DIFFERENT call than the clean_sheet_rate
+discard, deliberately, for reasons worth being explicit about:**
+1. `_possession_share`/`_set_piece_index` are CORE, load-bearing functions
+   that have existed in the engine since it was written -- unfed for the
+   engine's entire life, not a hypothesis freshly introduced tonight. This
+   closes exactly the gap `scripts/soccer_sim_input_checklist.py` exists to
+   find, not a new experiment.
+2. The infrastructure (ingestion parsing, the fuzzy cross-provider join, the
+   artifact) has value independent of whether today's HAND-PICKED constant
+   weights (0.24 for possession, 0.8/0.03 for set-piece -- never fitted from
+   data, unlike clean_sheet_rate's regression-derived replacement) make good
+   use of it yet. There is no "known-good default" being abandoned here.
+3. t=+1.27 is WEAKER evidence of harm than the clean_sheet_rate re-fit's
+   t=+1.71, which was itself not significant.
+4. Additive and optional -- degrades cleanly, currently affects eredivisie
+   only (the only league `espn_stats` sourcing has been built/run for).
+
+**NEXT, if this thread continues:** fold `possession_share`/
+`set_piece_goal_share` into the pooled nine-league regression (the one that
+found `clean_sheet_rate` significant) rather than treating this paired test
+as the last word -- it wasn't built to test these two fields and n=126/one
+league is the same underpowered situation every other single-league paired
+test tonight has been in.
+
+**Checklist state, for reference:** engine read sites unchanged (this adds
+DATA, not new consumer code); alarms should drop by 2 once the checklist is
+re-run against the landed commit (not re-run this session -- flag for whoever
+picks this up next).
