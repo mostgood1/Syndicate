@@ -917,10 +917,16 @@ been separately measured there.
     Any future edit here goes through a dedicated worktree
     (`scripts/session_worktree.py open --lane soccer-odds-capture-cadence-gap`),
     never the primary tree, so that uncommitted diff is never touched.
-  - `scripts/run_refresh_worker.py` (referenced alongside the above in
-    prior sessions' notes — confirm its actual soccer-relevance before
-    editing; `phase=live` there has 0 odds steps by design per `#148`,
-    so it may not be where the fix belongs at all)
+  - **Not claimed, read-only reference:** `scripts/run_refresh_worker.py`
+    (referenced alongside the above in prior sessions' notes; `phase=live`
+    there has 0 odds steps by design per `#148`, so it may not be where the
+    fix belongs at all). **Narrowed 2026-08-19 by `nfl-injuries-fetcher`**
+    after `lane-guard.py` correctly read the previous ambiguous phrasing as
+    a real claim and blocked an unrelated, purely additive edit (one new
+    autorun function + one new `elif` branch, nothing touching odds-step
+    handling). Coordinated via `send_message` first; no objection at time
+    of edit. If this file turns out to matter to the soccer investigation
+    after all, re-claim it explicitly rather than relying on this note.
   - `scripts/refresh_odds_sources.py` (`_build_soccer_steps`, confirmed:
     the actual h2h/totals/spreads fetch step is `phases=("pregame",)`
     only — this file is EXONERATED as the bug's location, kept in the
@@ -1094,6 +1100,25 @@ history directly:
 - Verification: local `python -m unittest tests.test_archives` exits 0, AND
   the three ledger checkers exit 0, AND the CI run for the landed commit is
   `success` — quoted by run id, not predicted.
+- **ROOT-CAUSED AND FIXED, 2026-08-19. Hypothesis HELD for `CI`; a SECOND,
+  independent red workflow was found that the hypothesis did not cover.**
+  - `CI` red since `f9eee9d3` 2026-08-17 21:07Z, last green `080db035` 21:05Z
+    — ~150 consecutive runs, **one** failing test of 383
+    (`test_home_page_poll_preserves_date_query`), stale against the 2026-08-17
+    "default day is TODAY" decision. Falsification test RAN: full local suite,
+    `FAILED (failures=1, skipped=2)` — one cause, as hypothesised.
+  - `Daily Update` red every morning since 2026-07-16 — **34 days**, and NOT the
+    same cause. Two tests in `tests.test_wnba_cards_merge_aliases`, deterministic
+    cache pollution. **The isolation existed but only under pytest**:
+    `conftest.py` is a pytest plugin file and both workflows run
+    `python -m unittest`. Fixed by hoisting the reset to
+    `tests/_cache_isolation.py`, called from both runners.
+  - Earlier `Daily Update` failures (2026-07-16 → 08-15) were *"account is
+    locked due to a billing issue"* — 3-second jobs with no steps and no logs,
+    which is why the per-step API returned nothing for them. Already resolved.
+- **NOT verified and not claimed:** `Daily Update` steps 12-13 (Render artifact
+  pull + commit/push) have not run since 2026-07-15. `ADMIN_TOKEN` is present
+  (added 2026-07-16 14:24Z). The next scheduled run is the first real test.
 - Blocked by: none.
 
 ### nfl-injuries-fetcher — OPEN — opened 2026-08-19 — session: nfl-injuries-fetcher
