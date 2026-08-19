@@ -1,4 +1,4 @@
-﻿# Syndicate — Work Lanes
+# Syndicate — Work Lanes
 
 > Lanes are exclusive by file path. Two lanes may not claim the same file.
 > Max concurrent OPEN lanes: 3 (see `state.md`).
@@ -1383,6 +1383,51 @@ history directly:
   script's own tests already use.
 - Blocked by: none, pending the `run_refresh_worker.py` coordination note
   above.
+
+### daily-update-backup-truncation — OPEN — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Goal: the `Daily Update` backup step stops reporting SUCCESS while silently
+  dropping 99.9% of what it was asked to back up. Testable: a run that
+  truncates says so, in the job output, with the ratio.
+- Files: `.github/workflows/daily-update.yml`
+- NOT claimed: `syndicate/blueprints/ops.py` (the endpoint is CORRECT — it
+  reports `truncated` faithfully; the caller ignores it). Read-only there.
+- **MEASURED 2026-08-19 23:4xZ against production web, single fetch each:**
+  - `/api/ops/artifacts/export` (exactly what step 12 calls, no params):
+    `ok=True`, **`count=8`**, **`truncated=True`**, `bytes=20,947,993`.
+  - `/api/ops/artifacts/export?names_only=1` (full inventory):
+    **`count=7909`**, `bytes=8,457,851,138`.
+  - So the "cold-start safety net" captures **8 of 7,909 files (0.10%)** and
+    **20.9MB of 8.46GB (0.25%)** — always the same first-8 MLB files, because
+    the scan walks `HOT_ARTIFACT_PATTERNS` in order and stops at the 24MB
+    budget (`_artifact_export_budget_bytes`, `ops.py:1493`).
+  - Step 12 checks **only `$response.ok`**. It never reads `truncated`, prints
+    "Wrote 8 artifact file(s)", and the workflow goes green.
+- Hypothesis for WHY the caller is shaped wrong: the endpoint is built for
+  INCREMENTAL pulls — its own comment says "the watermark keeps those small"
+  and it takes `?since=<epoch>`. The workflow passes no `since`, so it asks
+  for the entire 8.46GB set every single run and necessarily truncates.
+- Falsification test: pass a recent `?since=` and see whether the response
+  comes back `truncated=False` with a plausible daily delta. If it still
+  truncates, the budget — not the missing watermark — is the binding constraint.
+- **FALSIFICATION TEST RAN. MY HYPOTHESIS WAS WRONG — recorded rather than
+  quietly dropped.** `?since=` helps a lot and is still nowhere near enough:
+  last-24h = 438 files / 796,432,566 bytes (**33x** the 24MB budget); last-6h =
+  284 / 387,460,652; last-1h = 253 / 378,455,457 (**15x**). A daily run with a
+  perfect watermark would still truncate at ~3% of its own delta. **The budget
+  is a binding constraint too**, so "add a watermark" is not the fix.
+- What makes it decidable: the top 10 files are **68.1%** of the one-hour delta
+  and are all append-only growers (`book_quotes/*.jsonl`, `odds_history/*.json`,
+  `book_grid/*.json`), while **209 of 253 changed files are <1MB and total
+  30,613,218 bytes**. Excluding the giants puts the whole small-file tail within
+  reach of a modest budget raise.
+- **SHIPPED:** truncation is now reported (`Write-Warning` + `GITHUB_STEP_SUMMARY`
+  with both numbers). Deliberately NOT a `throw` — `#480` had just established
+  what a permanently-red gate costs. Both branches executed, not eyeballed.
+- Verification: a truncated pull is visible in the job log with both numbers.
+  Whether the backup should then be made COMPLETE is a design decision with
+  repo-size consequences (8.46GB cannot go into git) and is the user's call,
+  not this lane's — see `#481`.
+- Blocked by: user decision on backup scope (asked 2026-08-19).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
