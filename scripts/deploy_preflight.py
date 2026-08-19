@@ -147,6 +147,72 @@ def _get(url: str, key: str):
     raise RuntimeError("unreachable")
 
 
+# Services whose process list is read from their OWN /api/ops/memory endpoint
+# instead of from an ALL_PROCESS_MEMORY log line. See `web_processes` below.
+API_SAMPLED_SERVICES = {"web", "syndicate"}
+WEB_BASE_URL = os.environ.get("SYNDICATE_DIAG_BASE_URL", "https://syndicate-an21.onrender.com")
+
+
+def _admin_token() -> str | None:
+    value = str(os.environ.get("ADMIN_TOKEN") or "").strip()
+    if value:
+        return value
+    env_path = REPO_ROOT / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.startswith("ADMIN_TOKEN"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
+
+
+def web_processes() -> tuple[list[dict], str] | None:
+    """Web's live process list, read from the service itself. `#465`.
+
+    WHY WEB CANNOT USE THE LOG PATH. `deploy_preflight` was built around
+    `ALL_PROCESS_MEMORY`, a stderr line the WORKERS emit every few seconds.
+    **Web has not emitted one since 2026-08-14**, so its sample is permanently
+    stale and the verdict is permanently UNKNOWN -- which the guard treats as
+    HOLD, so every web deploy needed a break-glass grant. A guard that must be
+    broken on every use has stopped being a guard.
+
+    THE CAUSE OF THE SILENCE IS STILL UNKNOWN, and this does not pretend to fix
+    it. FOUR causes have been claimed for it and all four were wrong (broken
+    sampler / missing psutil / deleted emitter / no caller on web -- see
+    `state.md [web-preflight-dead-sample]`). **This fix deliberately does not
+    depend on the answer**: whatever stopped the log line, the endpoint reads
+    the same processes from the same container, live, on request.
+
+    IT IS ALSO WHAT EVERY BREAK-GLASS ALREADY DID BY HAND. The 2026-08-18 and
+    2026-08-19 web grants both substituted exactly this reading -- process list
+    from `/api/ops/memory`, each entry identified by cmdline -- and recorded it
+    in `deploys.md` as the evidence the deploy was safe. This promotes that
+    manual step to the normal path.
+
+    The records carry `pid`, `ppid` and `cmdline`, which is precisely what
+    `classify()` consumes, so no translation is involved and no field is
+    invented. Returns (processes, iso8601_now) or None if unreachable.
+    """
+    token = _admin_token()
+    if not token:
+        return None
+    request = urllib.request.Request(
+        f"{WEB_BASE_URL}/api/ops/memory",
+        headers={"X-Admin-Token": token, "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    processes = ((payload or {}).get("memory") or {}).get("processes")
+    if not isinstance(processes, list) or not processes:
+        # An empty list is NOT evidence of an idle service -- it is a failed
+        # read. Returning it would turn "I cannot see" into "nothing running",
+        # which is the exact inversion this whole script exists to prevent.
+        return None
+    return processes, datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def newest_log(service_id: str, key: str, text: str, limit: int = 20) -> tuple[str, str] | None:
     """Newest matching log line, sorted BY US.
 
@@ -344,6 +410,12 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             "written_at": time.time(),
             "written_at_iso": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "jobs_in_flight": len(report.get("jobs_in_flight") or []),
+            # HOW the evidence was obtained, and how old it was. A CLEAR from a
+            # live endpoint read and a CLEAR from a log line are different
+            # claims, and without these the receipt cannot be audited after the
+            # fact -- which is the only time anyone reads it. `#465`.
+            "sample_source": report.get("sample_source"),
+            "sample_age_seconds": report.get("sample_age_seconds"),
         }
         (RECEIPT_DIR / f"{args.service}.json").write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -397,14 +469,38 @@ def main() -> int:
         report["target_on_main"] = on_main
         off_main = on_main is not True
 
-    sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
-    parsed = parse_processes(sample[1]) if sample else None
+    # SERVICE-AWARE SAMPLING (`#465`). Web is read from its own
+    # /api/ops/memory; the workers keep the log path, which demonstrably works
+    # for them (refresh-worker emits every ~17s). The fallback direction matters:
+    # if the endpoint read fails we drop to the log path and, if that is also
+    # empty, the existing staleness gate returns UNKNOWN. There is no branch
+    # here that turns "cannot see" into "nothing running".
+    sample = parsed = None
+    sample_source = "log:ALL_PROCESS_MEMORY"
+    if args.service in API_SAMPLED_SERVICES:
+        api = web_processes()
+        if api:
+            processes, _sampled_at = api
+            # Stamp with the run's OWN `now`, not a clock read taken inside the
+            # fetch. Using the latter produced `age -2s` on the first live run:
+            # harmless to the staleness gate, but a receipt that reports a
+            # NEGATIVE age is a receipt nobody should trust the rest of.
+            sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": processes}
+            sample_source = "api:/api/ops/memory"
+    if parsed is None:
+        sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
+        parsed = parse_processes(sample[1]) if sample else None
+        sample_source = "log:ALL_PROCESS_MEMORY"
     if sample and parsed:
         age = (now - datetime.fromisoformat(sample[0].replace("Z", "+00:00"))).total_seconds()
     else:
         age = None
     report["sample_at"] = sample[0] if sample else None
     report["sample_age_seconds"] = round(age, 1) if age is not None else None
+    # Which path produced the verdict. Without this the receipt cannot be
+    # audited: a CLEAR from a live endpoint read and a CLEAR from a log line are
+    # different claims about how the evidence was obtained.
+    report["sample_source"] = sample_source
 
     infra: list[dict] = []
     jobs: list[dict] = []

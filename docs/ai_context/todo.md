@@ -384,7 +384,50 @@ claims that existed before each past archive pass, which nobody has run. The
 count above is exposure, not damage — do not report it as a breach without that
 check.
 
-### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web, so every web deploy requires a break-glass — and a guard broken on every use is not a guard. THE SYMPTOM IS REAL AND MEASURED; THE CAUSE IS UNKNOWN.** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **ROOT CAUSE RETRACTED 2026-08-18 — it was the FOURTH wrong cause for this symptom**
+### `#465` — **SYMPTOM FIXED 2026-08-19: web preflight returns CLEAR again, without knowing why the log line stopped. THE CAUSE REMAINS UNKNOWN and is now a separate, lower-priority question.** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **ROOT CAUSE RETRACTED — it was the FOURTH wrong cause for this symptom**
+
+> **FIXED 2026-08-19 — `deploy_preflight.py` is now SERVICE-AWARE.** Web's
+> process list is read live from its own `/api/ops/memory`; the workers keep the
+> `ALL_PROCESS_MEMORY` log path, which demonstrably works for them. First live
+> run after the change:
+>
+>     web             CLEAR   sample_source api:/api/ops/memory  age 0.0s  jobs 0
+>     refresh-worker  HOLD    sample_source log:ALL_PROCESS_MEMORY age 26s  jobs 7
+>
+> **The fix deliberately does NOT depend on the cause**, which is the point:
+> four causes were claimed for the silence and all four were wrong, so anything
+> resting on the fifth guess would have been the fifth mistake. Whatever stopped
+> the log line, the endpoint reads the same processes from the same container,
+> live, on request.
+>
+> **It also promotes what every break-glass already did BY HAND.** Both web
+> grants tonight substituted exactly this reading — process list from
+> `/api/ops/memory`, each entry identified by cmdline — and recorded it in
+> `deploys.md` as the evidence the deploy was safe. That manual step is now the
+> normal path.
+>
+> **FALSIFIED IN THE DIRECTION THAT MATTERS**, because a preflight that only
+> ever says CLEAR is worse than one that never does:
+>
+>     a sim job present on web (classify, synthetic)  -> HOLD
+>     refresh-worker with 7 real jobs, log path       -> HOLD
+>     endpoint unreachable (bad token)                -> falls back to the log
+>                                                        path -> UNKNOWN, NOT CLEAR
+>
+> An empty process list from the endpoint is treated as a FAILED READ, never as
+> an idle service — turning "I cannot see" into "nothing is running" is the exact
+> inversion this script exists to prevent.
+>
+> **The receipt now records `sample_source` and `sample_age_seconds`.** A CLEAR
+> from a live endpoint read and a CLEAR from a log line are different claims
+> about how the evidence was obtained, and the receipt is only ever read after
+> the fact.
+>
+> **WHAT IS STILL OPEN:** why web stopped emitting `ALL_PROCESS_MEMORY` on
+> 2026-08-14. It no longer blocks anything, so it drops in priority — but it is
+> a service that silently stopped emitting a diagnostic, which is worth knowing
+> before something else depends on it. Lead unchanged: loop ownership moves
+> between services via env flags with no diff. **Do not add a fifth guess.**
 
 > **RETRACTION 2026-08-18 — read this before the body. The heading of this item
 > used to assert "no web code path emits `ALL_PROCESS_MEMORY`" and called it
