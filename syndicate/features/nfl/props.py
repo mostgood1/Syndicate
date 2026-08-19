@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.nfl.player_stats import STAT_KEYS
+from syndicate.features.nfl.player_stats import anytime_td_rate
 from syndicate.features.nfl.player_stats import player_rate
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.nfl.sources import default_nfl_source_root
@@ -101,7 +102,14 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
     duplicated here rather than cross-imported, matching this session's
     established per-module convention), or the player's own per-game hit
     rate directly for anytime_td (a one-sided market with no line -- the
-    rate itself IS the probability of scoring, no distribution needed)."""
+    rate itself IS the probability of scoring, no distribution needed).
+    For anytime_td, `mean` is expected to already be the SHRUNK rate
+    (`player_stats.anytime_td_rate`, not the raw `player_rate`) -- see
+    `#471`: the raw MLE rate reads 0% for a player with 2-4 scoreless
+    games, when the real hit rate for that exact bucket is ~13-14%. This
+    function stays a thin pass-through/clamp either way; the shrinkage
+    itself lives in player_stats.py where the population-level prior is
+    computed."""
     if n < 2 or mean is None:
         return None
     if stat == "anytime_td":
@@ -174,7 +182,15 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         player_id = resolve_player_id(season, player_name)
         if player_id is None:
             continue
-        mean, stdev, n = player_rate(season, week, player_id, stat)
+        if stat == "anytime_td":
+            # `#471` shrinkage -- see player_stats.anytime_td_rate's
+            # docstring. stdev is meaningless for this market
+            # (_nfl_prop_model_probability's anytime_td branch never reads
+            # it), so it is not computed here.
+            mean, n = anytime_td_rate(season, week, player_id)
+            stdev = None
+        else:
+            mean, stdev, n = player_rate(season, week, player_id, stat)
         model_prob = _nfl_prop_model_probability(stat=stat, mean=mean, stdev=stdev, n=n, line=line)
         if model_prob is None:
             continue

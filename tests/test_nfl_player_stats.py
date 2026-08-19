@@ -41,6 +41,7 @@ class NflPlayerStatsTests(unittest.TestCase):
         self.addCleanup(self._root_patch.stop)
         player_stats.load_player_plays.cache_clear()
         player_stats.player_name_index.cache_clear()
+        player_stats._anytime_td_league_week_totals.cache_clear()
 
     def _write_pbp(self, season: int, rows: list[dict]) -> None:
         fieldnames = list(_play().keys())
@@ -132,6 +133,72 @@ class NflPlayerStatsTests(unittest.TestCase):
         ])
         self.assertEqual(player_stats.final_stat_value(2025, "2025_01_KC_DEN", "QB1", "passing_yards"), 200.0)
         self.assertIsNone(player_stats.final_stat_value(2025, "no_such_game", "QB1", "passing_yards"))
+
+    # ---- `#471` anytime_td shrinkage ------------------------------------
+
+    def test_shrink_count_mean_matches_hand_computation(self) -> None:
+        # (2*0.0 + 6*0.3) / (2+6) = 1.8/8 = 0.225
+        self.assertAlmostEqual(player_stats.shrink_count_mean(0.0, 2, 0.3, 6.0), 0.225)
+
+    def test_shrink_count_mean_vanishes_at_large_n(self) -> None:
+        # A player with a genuinely large sample is barely pulled toward
+        # the prior, whatever the prior says.
+        small_n = player_stats.shrink_count_mean(0.0, 2, 0.5, 6.0)
+        large_n = player_stats.shrink_count_mean(0.0, 200, 0.5, 6.0)
+        self.assertGreater(small_n, large_n)
+        self.assertLess(large_n, 0.02)
+
+    def _write_three_player_league(self) -> None:
+        """RB2 scores every week (a real, established rate); RB1 and WR1
+        never do across weeks 1-2 -- the exact shape #471 measured: a raw
+        rolling mean of 0.0 sitting next to a league that clearly does
+        produce anytime_td events."""
+        rows = []
+        for week in ("1", "2"):
+            game = f"2025_0{week}_KC_DEN"
+            rows.append(_play(game_id=game, week=week, rusher_player_id="RB1", rusher_player_name="R.One", rushing_yards="3", rush_attempt="1"))
+            rows.append(_play(game_id=game, week=week, rusher_player_id="RB2", rusher_player_name="R.Two", rushing_yards="4", rush_attempt="1", rush_touchdown="1", touchdown="1"))
+            rows.append(_play(game_id=game, week=week, receiver_player_id="WR1", receiver_player_name="W.One", receiving_yards="10", complete_pass="1"))
+        self._write_pbp(2025, rows)
+
+    def test_anytime_td_league_prior_excludes_current_and_later_weeks(self) -> None:
+        self._write_three_player_league()
+        # As of week 3: 2 events (RB2 x2) over 6 player-game observations
+        # (3 players x 2 weeks) = 1/3.
+        prior_mean, prior_n = player_stats._anytime_td_league_prior(2025, 3)
+        self.assertAlmostEqual(prior_mean, 2 / 6)
+        self.assertEqual(prior_n, 6)
+        # As of week 1: no prior games exist yet at all.
+        prior_mean_wk1, prior_n_wk1 = player_stats._anytime_td_league_prior(2025, 1)
+        self.assertEqual((prior_mean_wk1, prior_n_wk1), (0.0, 0))
+
+    def test_anytime_td_rate_shrinks_a_zero_history_toward_the_league(self) -> None:
+        self._write_three_player_league()
+        raw_mean, _stdev, raw_n = player_stats.player_rate(2025, 3, "RB1", "anytime_td")
+        self.assertEqual(raw_mean, 0.0)  # the exact defect #471 measured
+        shrunk_mean, shrunk_n = player_stats.anytime_td_rate(2025, 3, "RB1", prior_weight=6.0)
+        self.assertEqual(shrunk_n, raw_n)  # sample size is not fabricated
+        self.assertAlmostEqual(shrunk_mean, player_stats.shrink_count_mean(0.0, 2, 2 / 6, 6.0))
+        self.assertGreater(shrunk_mean, 0.0)  # the whole point of the fix
+
+    def test_anytime_td_rate_requires_two_games_same_as_player_rate(self) -> None:
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", rusher_player_id="RB1", rusher_player_name="R.One", rushing_yards="3", rush_attempt="1"),
+        ])
+        mean, n = player_stats.anytime_td_rate(2025, 2, "RB1")
+        self.assertIsNone(mean)
+        self.assertEqual(n, 1)
+
+    def test_anytime_td_rate_prior_n_zero_guard_falls_back_to_raw(self) -> None:
+        # `anytime_td_rate`'s `prior_n == 0` branch is unreachable through
+        # the real player_rate/_anytime_td_league_prior pairing (see that
+        # function's docstring for why) -- exercised directly here instead
+        # of via a contrived fixture that can't actually trigger it, so the
+        # fallback path itself stays covered.
+        with patch.object(player_stats, "player_rate", return_value=(0.0, 0.0, 2)):
+            with patch.object(player_stats, "_anytime_td_league_prior", return_value=(0.0, 0)):
+                mean, n = player_stats.anytime_td_rate(2025, 3, "RB1")
+        self.assertEqual((mean, n), (0.0, 2))
 
 
 if __name__ == "__main__":
