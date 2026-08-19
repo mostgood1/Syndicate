@@ -994,6 +994,52 @@ live — see "still needs verification" below).**
   no error, the bug is elsewhere (the odds fetch itself, not the
   scheduler) and this whole mechanism trace is a dead end to record, not
   retry.
+
+**FALSIFICATION RESOLVED 2026-08-19 21:5xZ — CONFIRMED FROM LOGS, not
+inference.** Did not wait on the `HOT_ARTIFACT_PATTERNS` addition (asked
+`basketball-model-owner`, no reply yet) — found a path that did not need
+it: `render_logs.py` reads live-odds-worker's OWN stdout (the print
+statements `_report_previous_soccer_pregame_run`/
+`_launch_autorun_soccer_pregame_refresh` themselves emit, NOT the
+redirected child's `DEVNULL` stdout `#433` already worked around this
+for). `py -3 scripts/render_logs.py --service live-odds-worker --text
+SOCCER_PREGAME --start 2026-08-19T00:00:00Z` returned the full day's
+history directly:
+
+```
+03:20Z LAUNCHED date=2026-08-18 -> 03:21Z NO_ARTIFACT (child wrote nothing)
+07:26Z LAUNCHED date=2026-08-19 -> 07:42Z SUMMARY steps=0 ok=0 failed=0
+11:32Z LAUNCHED date=2026-08-19 -> 11:48Z SUMMARY steps=0 ok=0 failed=0
+15:38Z LAUNCHED date=2026-08-19 -> 15:53Z SUMMARY steps=0 ok=0 failed=0
+19:39Z-19:47Z  AUTORUN_FAILED ValueError: A refresh run is already active
+               (pid=64). Cancel it before starting a new run.  [x8, ~1/min]
+19:48Z LAUNCHED pid=492 -> 19:49Z NO_ARTIFACT (child wrote nothing)
+```
+
+**TWO CONFIRMED, DISTINCT FAILURE MODES, not one:**
+
+1. **`steps=0` on every one of TODAY's clean cycles (07:26/11:32/15:38) —
+   the DOMINANT cause of the multi-day staleness.** The run launches,
+   completes without error, but the reporting artifact's
+   `results[].generation.steps[]` is empty. Traced the parser itself
+   (`_report_previous_soccer_pregame_run`, `run_live_odds_refresh_worker.py:150`)
+   — **NOT YET DISTINGUISHED: is this a genuinely empty run (something
+   upstream of `_build_soccer_steps` produces zero league_slugs for real),
+   or a schema mismatch between what the reporting code expects
+   (`payload["results"][i]["generation"]["steps"]`) and what a
+   `phase="pregame"` child actually writes?** Checked `_build_soccer_steps`
+   directly and RULED OUT the obvious season-window explanation:
+   `_MLS_OFF_SEASON_MONTHS = (1,)`, `_EUROPEAN_OFF_SEASON_MONTHS = (6, 7)`
+   — August is in-season for every league, so `active_leagues_for_date`
+   should not be empty. The `steps=0` cause is still open; next step is
+   reading one actual `odds_refresh.json` result artifact (needs the
+   `HOT_ARTIFACT_PATTERNS` addition, or `basketball-model-owner` reading it
+   directly off their own disk access) rather than guessing further.
+2. **Mutex contention IS real and directly confirmed** (not just
+   hypothesized) — the exact `#472`-shaped error, firing repeatedly late
+   in the sampled window. Independent of failure mode 1 — even a
+   contention-free pregame run this same day still produced `steps=0`
+   three times before contention ever appeared.
 - Verification: re-pull the book_quotes shard for a live same-day slate
   after any fix and confirm ALL distinct matches (not a sample) show
   `captured_at` inside the target window. Report the per-match count,
