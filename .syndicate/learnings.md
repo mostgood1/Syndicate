@@ -1657,3 +1657,40 @@ the code paths look identical.
 **Cost:** one full round of "here's the answer" that had to be walked
 back and re-verified from scratch, after the user declined to accept the
 first pass at face value.
+---
+
+## 2026-08-19 — I declared a deploy FAILED 60 seconds after it went live, and it had not
+
+**What happened.** Deployed `ebf301ae` (NCAAF wk1 SP+ projections) to web. Read
+the served board ~1 minute after Render reported `live`, saw the OLD values, and
+reported **"STILL PPA - FAILED"**. Then spent several tool calls diagnosing
+`SYNDICATE_NCAAF_SOURCE_ROOT` and concluding **"Path A cannot work"**.
+
+**It had worked.** `_bootstrap_render_data` starts a background thread that
+**sleeps 20 seconds** and then copies committed repo data onto the mounted disk
+web actually reads. 90 seconds after my failure call the board read SD 12.93 /
+max 50.60 — the correct SP+ signature.
+
+**The rule already existed.** `watcher_over_spot_check`: poll until async
+effects land; one early read produced two wrong conclusions in a single earlier
+session. I had it, and still sampled once.
+
+**What makes this one worth its own entry** is the shape of the error, not the
+impatience. The premature read did not merely delay the answer — it sent me
+building an elaborate and *internally consistent* wrong theory. The env-var
+finding was REAL (web does read the mounted disk, not the checkout) and it
+explained the observation perfectly. A true fact can support a false conclusion,
+and a satisfying explanation for a bad reading is more dangerous than no
+explanation at all, because it stops you re-reading.
+
+**The rule going forward.** After a deploy, before drawing ANY conclusion from a
+served payload, establish how the change is supposed to reach the surface and
+how long that takes. If the path includes an async step — a bootstrap sync, a
+cache TTL, a background worker, a CDN — the first read is not evidence and must
+be a POLL, not a sample. And if a failing read leads you into a diagnosis,
+re-read the payload before acting on the diagnosis: the cheapest possible test
+of "is this still true?" costs one call and would have saved five here.
+
+**Cost:** ~5 wasted tool calls, a wrong "FAILED" reported to the user, and a
+recommendation ("Path A cannot work, only Path B") that was the opposite of the
+truth. No production impact — the deploy was correct throughout.
