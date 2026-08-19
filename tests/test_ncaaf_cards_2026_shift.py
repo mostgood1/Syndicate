@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from syndicate.features.ncaaf.cards import _build_smartsim2_standalone_ncaaf_card_contract
 from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
+from syndicate.features.ncaaf.cards import _week_is_within_pregame_window
 from syndicate.features.ncaaf.cards import _smartsim2_standalone_rows
 from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
@@ -62,12 +63,59 @@ def _schedule_game(**overrides) -> dict:
 
 class ResolveActiveSeasonAndWeeksTests(unittest.TestCase):
     def test_prefers_later_season_when_only_smartsim2_has_it(self) -> None:
+        # Pregame window forced open: this test is about SEASON PREFERENCE, and
+        # the window filter (added 2026-08-19) would otherwise trim the week
+        # list to the target week and mask what is being asserted here.
+        # The filter has its own coverage in PregameWindowTests below.
         with patch("syndicate.features.ncaaf.cards._engine_seasons_and_weeks", return_value={2025: [1, 2]}), patch(
             "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={2026: [1, 2, 3]}
-        ):
+        ), patch("syndicate.features.ncaaf.cards._week_is_within_pregame_window", return_value=True):
             season, weeks = _resolve_ncaaf_active_season_and_weeks()
         self.assertEqual(season, 2026)
         self.assertEqual(weeks, [1, 2, 3])
+
+
+class PregameWindowTests(unittest.TestCase):
+    """A sim is a PREGAME artifact; weeks past the window must not be served.
+
+    Load-bearing rather than cosmetic: `bootstrap_data_root` copies committed
+    artifacts onto web's mounted disk and NEVER prunes, so deleting a stale
+    future-week artifact from git does not remove it from the disk web reads.
+    Without this guard the board keeps serving months-old projections for games
+    nobody has simmed for real.
+    """
+
+    def test_weeks_after_the_target_are_not_servable(self) -> None:
+        with patch("syndicate.features.ncaaf.cards.ncaaf_target_week", return_value=3):
+            self.assertTrue(_week_is_within_pregame_window(2026, 1))
+            self.assertTrue(_week_is_within_pregame_window(2026, 3))
+            self.assertFalse(_week_is_within_pregame_window(2026, 4))
+            self.assertFalse(_week_is_within_pregame_window(2026, 15))
+
+    def test_unknown_target_week_fails_OPEN(self) -> None:
+        """A schedule that will not load must not blank the whole board."""
+        with patch("syndicate.features.ncaaf.cards.ncaaf_target_week", return_value=None):
+            self.assertTrue(_week_is_within_pregame_window(2026, 15))
+
+    def test_navigation_drops_out_of_window_weeks(self) -> None:
+        with patch("syndicate.features.ncaaf.cards._engine_seasons_and_weeks", return_value={}), patch(
+            "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={2026: [1, 2, 3, 15]}
+        ), patch("syndicate.features.ncaaf.cards.ncaaf_target_week", return_value=1):
+            season, weeks = _resolve_ncaaf_active_season_and_weeks()
+        self.assertEqual(weeks, [1], "navigation offered a week the board will not populate")
+
+    def test_never_navigates_to_nothing(self) -> None:
+        """If every known week is out of window, keep one rather than none."""
+        with patch("syndicate.features.ncaaf.cards._engine_seasons_and_weeks", return_value={}), patch(
+            "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={2026: [8, 9]}
+        ), patch("syndicate.features.ncaaf.cards.ncaaf_target_week", return_value=1):
+            season, weeks = _resolve_ncaaf_active_season_and_weeks()
+        self.assertEqual(weeks, [8])
+
+    def test_out_of_window_index_is_empty_even_with_an_artifact_on_disk(self) -> None:
+        from syndicate.features.ncaaf.cards import _smartsim2_projection_index
+        with patch("syndicate.features.ncaaf.cards.ncaaf_target_week", return_value=1):
+            self.assertEqual(_smartsim2_projection_index(2026, 12), {})
 
     def test_uses_engine_season_when_it_is_later(self) -> None:
         with patch("syndicate.features.ncaaf.cards._engine_seasons_and_weeks", return_value={2026: [1]}), patch(
