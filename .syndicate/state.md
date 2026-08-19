@@ -491,6 +491,11 @@ unsaved anywhere.
   `[verified 2026-08-18: file-like claims 52 -> 80]`. It previously matched only
   `- Files:`, so 5 lanes using `- **Files (...):**` declared paths NO HOOK COULD
   SEE. A disclaimer now governs only what FOLLOWS it, not the whole line.
+  `_DISCLAIMER_MARKERS` gained `"not touch"` (covers "does not touch"/"not
+  touch"/"not touched" — subsumes the prior "not touched" entry) and
+  `"read-only reference"` `[verified 2026-08-19, commits 0a7fdbeb + f52fc91b,
+  both on origin/main]`; each closed a real false-positive that had blocked an
+  unrelated lane from a file its own ledger text explicitly disclaimed.
   Claim matching is exact-or-suffix (`rel == f or rel.endswith("/"+f) or
   f.endswith("/"+rel)`), never a directory prefix — so a non-path token claimed
   out of prose is INERT.
