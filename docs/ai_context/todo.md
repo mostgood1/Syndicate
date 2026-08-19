@@ -1245,11 +1245,50 @@ same side (OZ strong + EV weak vs. the reverse) and confirms OZ wins the
 fallback chain, not just that one key happens to be checked first. 348
 hockeysim/nhl tests pass (13 new), checklist re-confirmed full PASS.
 
-**Deliberately did NOT wire**: defensive- or neutral-zone-specific rates --
-the parser tracks all three zones, but `_faceoff_multipliers` only models
-offensive shot-share, so a DZ-specific rate has no symmetric consumption
-point to feed yet. `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`
-remain uncalibrated, same open item as above.
+**Deliberately did NOT wire, at that point**: defensive- or neutral-zone-
+specific rates -- closed the same day, addendum below.
+
+**Second addendum, same day: zone-specific (defensive-zone) faceoff
+differentiation built** (reference doc §2o), closing the last piece of the
+original gap analysis. **NOT the OZ index's mirror image** -- a team's OZ
+and DZ win rates come from different, non-overlapping draws (elite at one,
+weak at the other, is a real possible profile). A team that wins its own DZ
+draws well both suppresses the OPPONENT's sustained shot generation from
+that zone-time AND can spring its own transition/rush chance -- a DUAL
+effect, so this is wired as an ADDITIONAL multiplicative layer composed
+with the OZ/EV chain (§2n/§2m), not a fourth fallback tier of it (one
+measurement getting more precise is a different shape of change than a
+second, independent game mechanism). `compute_team_faceoff_dz_index` reuses
+the SAME `GameFaceoffZoneRecord`s the OZ pass already parses -- no new
+fetch, just reads `zone_wins["D"]` instead of `["O"]`.
+
+**Measured**: 1,312 games, 38,120 DZ-attributed faceoffs, mean index
+1.00063 across 32 teams; real spread OTT (1.100x) to STL (0.914x), ~20%
+top-to-bottom. **Confirmed genuinely independent of the OZ index, not its
+inverse**: measured Pearson correlation across all 32 teams = 0.69 --
+positive (good faceoff teams tend to do reasonably well at both ends, as
+expected) but far from 1.0, proving DZ carries real information the OZ
+index doesn't already capture.
+
+**Deliberately gated on BOTH sides being present**, unlike the OZ/EV
+fallback chain (which falls back independently per side): since this is an
+additive layer with nothing to fall back to (no prior mechanism ever
+consumed DZ data), a one-sided value would apply an asymmetric adjustment
+with no counterpart on the other side -- confirmed by a dedicated test that
+a one-sided value is a near no-op.
+
+**Verified the league-wide average did not shift**: 992-pairing
+round-robin (2,976 games, real OZ/EV indices active throughout), 61.940
+neutral vs 61.934 real-indexed total shots/game -- ~0.01%, essentially
+zero. 356 hockeysim/nhl tests pass (8 new), checklist re-confirmed full
+PASS.
+
+**What remains genuinely open**: neutral-zone-specific rates were computed
+but not wired (no plausible consumption point exists for them distinct
+from the blended EV index); `faceoff_alpha`/`faceoff_diff_clip`/
+`faceoff_mult_clip_*` remain the vendor's uncalibrated defaults, same open
+item as §2m/§2n. This closes all three faceoff-zone signals the original
+gap analysis opened.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

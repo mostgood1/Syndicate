@@ -763,6 +763,17 @@ class PeriodSimulator:
         # data with a neutral value at any tier.
         faceoff_oz_idx_home_raw = st_home.get("faceoff_oz_index")
         faceoff_oz_idx_away_raw = st_away.get("faceoff_oz_index")
+        # DEFENSIVE-ZONE-specific faceoff win-rate index (`docs/ai_context/hockeysim_engine_reference.md`
+        # §2o) -- NOT the OZ index's mirror image (measured correlation ~0.69, not -1.0: a team can
+        # be strong at one and weak at the other, computed from different, non-overlapping draws).
+        # Winning a team's OWN defensive-zone draw both suppresses the OPPONENT's sustained shot
+        # generation from that zone-time AND can spring the winning team's own transition/rush
+        # chance -- a dual effect, so this is an ADDITIONAL multiplicative layer applied alongside
+        # the OZ/EV/blend chain above, not a fourth tier of it. Absent (`None`) simply means no
+        # extra adjustment is applied -- unlike the OZ/EV chain, there is nothing here to silently
+        # regress, since nothing previously consumed this signal at all.
+        faceoff_dz_idx_home_raw = st_home.get("faceoff_dz_index")
+        faceoff_dz_idx_away_raw = st_away.get("faceoff_dz_index")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1062,6 +1073,23 @@ class PeriodSimulator:
                 m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
                 lam_h = float(lam_h) * float(m_fo_h)
                 lam_a = float(lam_a) * float(m_fo_a)
+                # DEFENSIVE-ZONE index (§2o) -- an ADDITIONAL layer composed with the adjustment
+                # above, not a replacement: reuses `_faceoff_multipliers`' own diff/clip/alpha math
+                # (the same "how sensitive is shot-share to a faceoff differential" knobs, applied
+                # consistently regardless of which zone the differential comes from), fed
+                # DZ-specific percentages. `m_dz_h` (>1 when HOME wins its own DZ more) applies to
+                # `lam_h` (the winning team's own transition-offense bump); `m_dz_a` applies to
+                # `lam_a` (suppression of the team that DZ win was taken against) -- the function's
+                # existing semantics, just a second, independent zone-context input. Skipped
+                # entirely (both raw values `None`) rather than defaulted to neutral, since there is
+                # nothing here to silently regress -- unlike the OZ/EV chain above, no prior
+                # mechanism ever consumed this signal.
+                if ev_only and faceoff_dz_idx_home_raw is not None and faceoff_dz_idx_away_raw is not None:
+                    dz_h_pct = 0.5 * _f(faceoff_dz_idx_home_raw, 1.0)
+                    dz_a_pct = 0.5 * _f(faceoff_dz_idx_away_raw, 1.0)
+                    m_dz_h, m_dz_a = _faceoff_multipliers(self.cfg, dz_h_pct, dz_a_pct)
+                    lam_h = float(lam_h) * float(m_dz_h)
+                    lam_a = float(lam_a) * float(m_dz_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

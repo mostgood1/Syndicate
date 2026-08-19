@@ -8,10 +8,14 @@ from __future__ import annotations
 import pytest
 
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_ev_index import (
+    DEFAULT_FACEOFF_DZ_INDEX,
     DEFAULT_FACEOFF_EV_INDEX,
     DEFAULT_FACEOFF_OZ_INDEX,
+    MIN_GAMES_FOR_FACEOFF_DZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_INDEX,
     MIN_GAMES_FOR_FACEOFF_OZ_INDEX,
+    GameFaceoffZoneRecord,
+    compute_team_faceoff_dz_index,
     compute_team_faceoff_ev_index,
     compute_team_faceoff_oz_index,
     parse_playbyplay_faceoffs_by_zone,
@@ -231,3 +235,81 @@ def test_oz_index_is_self_consistent_zero_sum():
 
 def test_oz_index_missing_data_is_empty_not_a_crash():
     assert compute_team_faceoff_oz_index([]) == {}
+
+
+# ---------------------------------------------------------------------------
+# Zone-specific (defensive-zone) win index -- NOT the OZ index's mirror image; a team's
+# OZ and DZ win rates come from different, non-overlapping sets of draws.
+# ---------------------------------------------------------------------------
+
+def test_dz_index_neutral_below_games_floor():
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(
+        plays=[_faceoff_event(owner_id=13, zone="D")])) for _ in range(3)]
+    assert 3 < MIN_GAMES_FOR_FACEOFF_DZ_INDEX
+    idx = compute_team_faceoff_dz_index(recs)
+    assert idx["FLA"].index == DEFAULT_FACEOFF_DZ_INDEX
+
+
+def test_dz_index_reflects_a_real_above_average_dz_winner():
+    """Mirrors the OZ index's own fixture shape: two INDEPENDENT sets of DZ draws (FLA's own DZ,
+    and separately CHI's own DZ), each needing both wins and losses to exercise the zone-flip
+    attribution and produce a genuine (not tautological) zero-sum league rate."""
+    n = MIN_GAMES_FOR_FACEOFF_DZ_INDEX + 5
+    plays = (
+        [_faceoff_event(owner_id=13, zone="D") for _ in range(7)]  # FLA wins FLA's own DZ, 7x
+        + [_faceoff_event(owner_id=16, zone="O") for _ in range(1)]  # CHI wins in FLA's DZ (FLA loses it)
+        + [_faceoff_event(owner_id=16, zone="D") for _ in range(1)]  # CHI wins CHI's own DZ, only 1x (weak)
+        + [_faceoff_event(owner_id=13, zone="O") for _ in range(7)]  # FLA wins in CHI's DZ (CHI loses it, 7x)
+    )
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_dz_index(recs)
+    # FLA: own-DZ rate 7/8=0.875 vs league 0.5 -> index 1.75. CHI: own-DZ rate 1/8=0.125 -> index 0.25.
+    assert idx["FLA"].index > 1.0
+    assert idx["CHI"].index < 1.0
+
+
+def test_dz_index_is_self_consistent_zero_sum():
+    n = MIN_GAMES_FOR_FACEOFF_DZ_INDEX + 5
+    plays = (
+        [_faceoff_event(owner_id=13, zone="D") for _ in range(5)]
+        + [_faceoff_event(owner_id=16, zone="O") for _ in range(5)]
+        + [_faceoff_event(owner_id=16, zone="D") for _ in range(5)]
+        + [_faceoff_event(owner_id=13, zone="O") for _ in range(5)]
+    )
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_dz_index(recs)
+    assert idx["FLA"].index == pytest.approx(1.0, abs=1e-6)
+    assert idx["CHI"].index == pytest.approx(1.0, abs=1e-6)
+
+
+def test_dz_index_is_independent_of_oz_index_not_its_mirror():
+    """A team elite at winning its OWN offensive-zone draws but weak at its OWN defensive-zone
+    draws must show index>1.0 for OZ and index<1.0 for DZ -- proving the two are computed from
+    genuinely separate fields (`zone_wins["O"]` vs `zone_wins["D"]`), not `dz_index = 1/oz_index`
+    or similar. Constructs `GameFaceoffZoneRecord`s directly rather than through the event parser
+    -- the zone-flip mechanic makes hand-tuning a realistic BOTH-teams-at-BOTH-ends event fixture
+    to hit two independent target rates simultaneously fragile busywork; the parser's own
+    correctness is already covered by the dedicated `test_zone_parse_*` tests above, so this test
+    only needs to isolate what `compute_team_faceoff_oz_index`/`compute_team_faceoff_dz_index`
+    themselves do with a given record."""
+    n = max(MIN_GAMES_FOR_FACEOFF_OZ_INDEX, MIN_GAMES_FOR_FACEOFF_DZ_INDEX) + 5
+    # FLA: wins 9 of 10 of its own OZ draws (elite), but only 1 of 10 of its own DZ draws (weak).
+    # CHI: the opposite -- weak OZ, elite DZ. Independently tunable, no shared-event contamination.
+    recs = [
+        GameFaceoffZoneRecord(
+            game_id=str(i), home_abbr="FLA", away_abbr="CHI",
+            home_zone_wins={"O": 9, "N": 5, "D": 1}, home_zone_total={"O": 10, "N": 10, "D": 10},
+            away_zone_wins={"O": 1, "N": 5, "D": 9}, away_zone_total={"O": 10, "N": 10, "D": 10},
+        )
+        for i in range(n)
+    ]
+    oz_idx = compute_team_faceoff_oz_index(recs)
+    dz_idx = compute_team_faceoff_dz_index(recs)
+    assert oz_idx["FLA"].index > 1.0
+    assert dz_idx["FLA"].index < 1.0
+    assert oz_idx["CHI"].index < 1.0
+    assert dz_idx["CHI"].index > 1.0
+
+
+def test_dz_index_missing_data_is_empty_not_a_crash():
+    assert compute_team_faceoff_dz_index([]) == {}

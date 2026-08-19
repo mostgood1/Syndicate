@@ -289,6 +289,73 @@ class HockeySimEngineTest(unittest.TestCase):
             f"faceoff_ev_index is winning the fallback chain instead of faceoff_oz_index.",
         )
 
+    def test_special_teams_faceoff_dz_index_actually_changes_shot_volume(self) -> None:
+        """Reachability test for the newest per-team mechanism (`docs/ai_context/
+        hockeysim_engine_reference.md` §2o): `faceoff_dz_index` on `st_home`/`st_away` must
+        measurably change simulated SHOT volume -- an ADDITIONAL layer composed with the OZ/EV
+        chain above, not a fourth tier of it, so BOTH sides need `faceoff_dz_index` present to
+        activate (asserted separately below)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.0}
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong_dz_team = dict(base, faceoff_dz_index=1.8)
+        weak_dz_team = dict(base, faceoff_dz_index=0.3)
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=neutral_away, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong_dz_team)
+        weak_mean = _mean_home_shots(weak_dz_team)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"faceoff_dz_index=1.8 must produce more HOME shots on average than "
+            f"faceoff_dz_index=0.3 when nothing else differs -- got strong={strong_mean:.3f} "
+            f"weak={weak_mean:.3f}. If this fails, faceoff_dz_index is present on "
+            f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
+        )
+
+    def test_faceoff_dz_index_requires_both_sides_to_activate(self) -> None:
+        """The DZ layer is deliberately gated on BOTH `st_home`/`st_away` carrying
+        `faceoff_dz_index` (`engine.py`'s `... and faceoff_dz_idx_away_raw is not None`) --
+        confirms a one-sided value alone does NOT change output, matching the documented
+        "additional layer, not a fallback tier" design (unlike OZ/EV, which fall back
+        independently per side)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        one_sided = dict(base, faceoff_dz_index=1.8)  # away has no faceoff_dz_index at all
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=base, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        one_sided_mean = _mean_home_shots(one_sided)
+        neutral_mean = _mean_home_shots(base)
+        self.assertAlmostEqual(
+            one_sided_mean, neutral_mean, delta=0.5,
+            msg=f"a one-sided faceoff_dz_index (AWAY missing it entirely) should be a near no-op "
+            f"-- got one_sided={one_sided_mean:.3f} neutral={neutral_mean:.3f}. If these diverge "
+            f"substantially, the DZ layer is activating on a one-sided value, not requiring both.",
+        )
+
     def test_player_shot_weight_actually_differentiates_shot_share(self) -> None:
         """Reachability test for `HockeyPlayerFeatures.shot_weight` (`docs/ai_context/
         hockeysim_engine_reference.md` §2k, the last genuinely-absent input this document tracked).

@@ -47,6 +47,24 @@ ice and two teams; one team's offensive zone is the other's defensive zone). Los
 are attributed via that flip (`_ZONE_FLIP`), not left unattributed -- every EV
 faceoff a team participates in, won or lost, contributes to their own zone-relative
 win/total counts.
+
+DEFENSIVE-ZONE WIN INDEX (`compute_team_faceoff_dz_index`), added in a third pass.
+NOT the mirror image of the OZ index (a team's OZ and DZ win rates are computed
+from DIFFERENT, non-overlapping sets of draws -- a team can be elite at OZ draws and
+mediocre at DZ draws, or vice versa -- so this carries genuinely independent
+information, not `1 - oz_index`). A team that wins its own DZ draws well typically
+clears the puck and starts a breakout, which does TWO things at once: suppresses the
+OPPONENT's sustained shot generation from that zone-time (the immediate defensive
+value) AND can spring the winning team's own transition/rush chance (real hockey,
+not a stretch -- a DZ win is often the first pass of a rush the other way). Because
+of that dual effect, this index is applied as an ADDITIONAL multiplicative layer in
+`engine.py`, composed with (not replacing) the OZ/EV-driven multiplier above: the
+SAME `_faceoff_multipliers` function, fed DZ-specific percentages, with `m_fo_h`
+applied to `lam_h` (winning team's own transition-offense bump) and `m_fo_a` applied
+to `lam_a` (suppression of the opponent it was won against) -- exactly the existing
+function's own semantics, just a second, independent zone-context input rather than
+a fourth tier of the OZ/EV/blend fallback chain (which represents one measurement
+getting more precise, not a second, additive game mechanism).
 """
 from __future__ import annotations
 
@@ -310,5 +328,62 @@ def compute_team_faceoff_oz_index(records: Sequence[GameFaceoffZoneRecord]) -> D
         out[team] = TeamFaceoffOzIndex(
             team=team, index=index, games=games,
             oz_wins=row["oz_wins"], oz_total=row["oz_total"],
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Zone-specific (defensive-zone) win index -- see the module docstring's third
+# section for why this is a SEPARATE signal from the OZ index, not its mirror image.
+# ---------------------------------------------------------------------------
+
+MIN_GAMES_FOR_FACEOFF_DZ_INDEX = 10
+DEFAULT_FACEOFF_DZ_INDEX = 1.0
+
+
+@dataclass(frozen=True)
+class TeamFaceoffDzIndex:
+    """Per-team DEFENSIVE-ZONE-specific faceoff win-rate tendency (their own zone, not a
+    rink-absolute frame), normalized against the league-wide DZ win rate -- 1.0 = league average.
+    Applied in `engine.py` as an ADDITIONAL multiplicative layer alongside the OZ/EV chain, not a
+    fourth tier of it -- see the module docstring for why."""
+
+    team: str
+    index: float
+    games: int
+    dz_wins: int
+    dz_total: int
+
+
+def compute_team_faceoff_dz_index(records: Sequence[GameFaceoffZoneRecord]) -> Dict[str, TeamFaceoffDzIndex]:
+    acc: Dict[str, Dict[str, int]] = {}
+
+    def _touch(team: str) -> Dict[str, int]:
+        return acc.setdefault(team, {"games": 0, "dz_wins": 0, "dz_total": 0})
+
+    for r in records:
+        h = _touch(r.home_abbr)
+        a = _touch(r.away_abbr)
+        h["games"] += 1
+        a["games"] += 1
+        h["dz_wins"] += r.home_zone_wins["D"]
+        h["dz_total"] += r.home_zone_total["D"]
+        a["dz_wins"] += r.away_zone_wins["D"]
+        a["dz_total"] += r.away_zone_total["D"]
+
+    league_wins = sum(v["dz_wins"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_DZ_INDEX)
+    league_total = sum(v["dz_total"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_DZ_INDEX)
+    league_rate = _safe_div(league_wins, league_total)
+
+    out: Dict[str, TeamFaceoffDzIndex] = {}
+    for team, row in acc.items():
+        games = row["games"]
+        index = DEFAULT_FACEOFF_DZ_INDEX
+        if games >= MIN_GAMES_FOR_FACEOFF_DZ_INDEX and league_rate > 0:
+            team_rate = _safe_div(row["dz_wins"], row["dz_total"])
+            index = round(team_rate / league_rate, 4)
+        out[team] = TeamFaceoffDzIndex(
+            team=team, index=index, games=games,
+            dz_wins=row["dz_wins"], dz_total=row["dz_total"],
         )
     return out

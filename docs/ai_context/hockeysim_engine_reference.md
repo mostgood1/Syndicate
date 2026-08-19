@@ -675,11 +675,64 @@ proves `faceoff_oz_index=1.8` produces more HOME shots than `0.3`, 80 seeded run
 values on the same side (OZ strong + EV weak vs. OZ weak + EV strong) and confirms the OZ signal
 wins — not just that one key happens to be checked first.
 
-**What this does NOT cover**: defensive-zone- and neutral-zone-specific rates were computed (the
-parser tracks all three) but not wired — only OZ feeds the engine, since `_faceoff_multipliers`
-only models offensive shot-share, not a symmetric defense-side effect a DZ-specific rate could
-drive. `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain uncalibrated, same caveat
-as §2m.
+**What this section originally flagged as future work — now built, §2o.** Neutral-zone-specific
+rates were computed (the parser tracks all three zones) but not wired — no plausible consumption
+point exists for a neutral-zone-specific signal distinct from the blended EV index.
+`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain uncalibrated, same caveat as §2m.
+
+---
+
+## 2o. Zone-specific (defensive-zone) faceoff-index differentiation
+
+Full module: same `historical_truth/faceoff_ev_index.py`, extended again. NOT the OZ index's
+mirror image — a team's OZ and DZ win rates come from different, non-overlapping sets of draws (a
+team can be elite at one and weak at the other). A team that wins its own DZ draws well typically
+clears the puck and starts a breakout, which does two things at once: suppresses the OPPONENT's
+sustained shot generation from that zone-time, AND can spring the winning team's own
+transition/rush chance. Because of that dual effect, this is wired as an ADDITIONAL multiplicative
+layer composed with the OZ/EV chain (§2n/§2m), not a fourth tier of it — one measurement getting
+more precise (the OZ/EV chain) is a different shape of change than a second, independent game
+mechanism (DZ's dual offense/defense effect).
+
+**The new signal**: `compute_team_faceoff_dz_index` — same zero-sum-self-verifying ratio technique,
+reading `zone_wins["D"]`/`zone_total["D"]` instead of `["O"]` from the same
+`GameFaceoffZoneRecord`s §2n's parser already produces (no new parsing). **Measured on real data**:
+1,312 games, 38,120 DZ-attributed EV faceoffs, mean index 1.00063 across 32 teams. Real spread: OTT
+(1.100x)/NYR (1.085x)/BOS (1.075x) highest, STL (0.914x)/MIN (0.915x)/TBL (0.926x) lowest, ~20%
+top-to-bottom. **Confirmed genuinely independent of the OZ index, not its inverse**: measured
+Pearson correlation between the two indices across all 32 teams = 0.69 — positive (good
+faceoff-taking teams tend to do reasonably well at both ends, as expected) but far from 1.0,
+proving DZ carries real information the OZ index doesn't already capture.
+
+**Wiring**: `engine.py` reads `st_home.get("faceoff_dz_index")`/`st_away.get(...)` (raw, both sides
+required — see below) and, when both are present, reuses `_faceoff_multipliers` itself (same
+diff/clip/alpha sensitivity knobs the OZ/EV chain already uses) fed DZ-specific percentages,
+applying the resulting multiplier pair as an ADDITIONAL factor on `lam_h`/`lam_a` — composed with
+(multiplied on top of), not replacing, whatever the OZ/EV chain already produced.
+
+**Deliberately gated on BOTH sides being present, unlike the OZ/EV fallback chain**: since this is
+an additive layer with nothing to fall back to (no prior mechanism ever consumed DZ data), a
+one-sided value would apply an asymmetric adjustment with no counterpart on the other side — the
+gate requires `faceoff_dz_idx_home_raw is not None and faceoff_dz_idx_away_raw is not None` before
+activating at all, confirmed by a dedicated test.
+
+**Verified the league-wide average did not shift**: 992-pairing round-robin (2,976 games each, real
+OZ/EV indices active throughout), neutral DZ index → 61.940 avg total shots/game; real DZ index →
+61.934 — a ~0.01% difference, essentially zero, well within noise.
+
+**Reachability + gating tested**: `test_special_teams_faceoff_dz_index_actually_changes_shot_volume`
+proves `faceoff_dz_index=1.8` produces more HOME shots than `0.3` (with AWAY held at a neutral,
+present DZ index so the gate activates), 80 seeded runs.
+`test_faceoff_dz_index_requires_both_sides_to_activate` confirms a ONE-sided value (home has it,
+away doesn't) is a near no-op, matching the documented "additional layer, not a fallback tier"
+design.
+
+**What this completes**: all three faceoff-zone signals this session's original §2m gap analysis
+opened (EV-blended, offensive-zone, defensive-zone) are now built and wired. Neutral-zone-specific
+rates were computed (the parser tracks all three) but not wired — no plausible consumption point
+exists for a neutral-zone-specific signal distinct from what the blended EV index already captures.
+`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the vendor's uncalibrated
+defaults, same open item as §2m/§2n.
 
 ---
 
@@ -742,6 +795,7 @@ concept.
 | `historical_truth/player_game_rates.py` + `scripts/build_nhl_player_rates_artifact.py` — real per-player `shot_weight`/`goal_weight`/`block_weight`, 828 players rated from 47,231 skater-game records (§2k) | built, run, tested (15 parser + 6 loader + 3 mechanism-level reachability tests), external sanity check (MacKinnon/Matthews/Hughes/McDavid top the shot-volume list) | ALREADY reachable pre-fix (engine.py's own position/TOI heuristic); this replaces that heuristic with real per-player data, proven at the mechanism level, not just population |
 | `historical_truth/faceoff_ev_index.py` + `faceoff_ev_index` wired into `engine.py` (§2m) — closes the all-situations-vs-EV-only mismatch, a NEW per-team mechanism sourced from `situationCode` strength-state data | built, run (1,312 playbyplay games, mean index 1.00011 across 32 teams), verified the league-wide average did not shift (61.786 neutral vs 62.079 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability). Found and fixed a real regression during wiring — a naive version made the already-reachable `TeamRates.faceoff_win_pct` stop mattering whenever no index was supplied; fixed with a raw (non-defaulted) per-side fallback | reachable by default; a REAL behavior change for EV shot-share, with `TeamRates.faceoff_win_pct`'s existing reachability preserved as the fallback path |
 | `compute_team_faceoff_oz_index` + `faceoff_oz_index` wired into `engine.py` via `_resolve_faceoff_pct` (§2n) — a zone-specific refinement of §2m, preferred over the flat EV index when present | built, run (1,312 playbyplay games, 38,120 OZ-attributed faceoffs, mean index 0.99973 across 32 teams — a DIFFERENT ranking than the EV index, confirming a distinct signal), verified the league-wide average did not shift (62.138 neutral vs 61.937 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability + 1 priority-over-EV-index) | reachable by default; three-tier fallback (OZ → EV → all-situations blend) preserves every prior tier's reachability |
+| `compute_team_faceoff_dz_index` + `faceoff_dz_index` wired into `engine.py` as an ADDITIONAL multiplicative layer (§2o) — NOT the OZ index's mirror image (measured correlation 0.69), composed with (not replacing) the OZ/EV chain | built, run (same 1,312 games, 38,120 DZ-attributed faceoffs, mean index 1.00063 across 32 teams), verified the league-wide average did not shift (61.940 neutral vs 61.934 real-indexed, 992-pairing round-robin — ~0.01%, essentially zero), tested (7 unit + 1 loader + 1 reachability + 1 both-sides-required gating) | reachable by default, gated on BOTH sides carrying the index (no fallback tier since nothing previously consumed this signal); completes all 3 faceoff-zone signals §2m's gap analysis opened |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **All of it is additive and reachable-by-default** — no new flag was

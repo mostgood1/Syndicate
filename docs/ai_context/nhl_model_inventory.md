@@ -317,9 +317,34 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   shots/game — noise-level. Reachability AND priority tested: a dedicated
   test sets OZ and EV to CONTRADICTORY values on the same side and confirms
   OZ wins, not just that one key happens to be checked first. Deliberately
-  did NOT wire defensive- or neutral-zone rates (the parser tracks all
-  three, but `_faceoff_multipliers` only models offensive shot-share, so a
-  DZ-specific rate has no symmetric consumption point yet).
+  did NOT wire neutral-zone rates (the parser tracks all three, but no
+  plausible consumption point exists for it distinct from the blended EV
+  index) — defensive-zone rates, built next.
+- **Did** build zone-specific (defensive-zone) faceoff differentiation
+  (reference doc §2o) — closing the last piece of §2m's original gap
+  analysis. NOT the OZ index's mirror image: a team's OZ and DZ win rates
+  come from different, non-overlapping draws (a team can be elite at one
+  and weak at the other). A team that wins its own DZ draws well both
+  suppresses the OPPONENT's sustained shot generation from that zone-time
+  AND can spring its own transition/rush chance — a dual effect, so this
+  is wired as an ADDITIONAL multiplicative layer composed with the OZ/EV
+  chain, not a fourth fallback tier of it. `compute_team_faceoff_dz_index`
+  reuses the same `GameFaceoffZoneRecord`s the OZ pass already parses (no
+  new fetch), reading `zone_wins["D"]` instead of `["O"]`. Measured: 1,312
+  games, 38,120 DZ-attributed faceoffs, mean index 1.00063 across 32 teams;
+  real spread OTT (1.100x) to STL (0.914x), ~20% top-to-bottom. **Confirmed
+  genuinely independent of the OZ index, not its inverse**: measured
+  Pearson correlation across all 32 teams = 0.69 — positive but far from
+  1.0, proving DZ carries real information OZ doesn't already capture.
+  **Deliberately gated on BOTH sides being present** (unlike the OZ/EV
+  fallback chain, which falls back independently per side) since this is
+  an additive layer with nothing to fall back to — a one-sided value would
+  apply an asymmetric adjustment with no counterpart on the other side.
+  **Verified the league-wide average did not shift**: 992-pairing
+  round-robin, 61.940 neutral vs 61.934 real-indexed total shots/game —
+  ~0.01%, essentially zero. Reachability AND gating tested: one test
+  proves the index changes output; a second confirms a one-sided value
+  (only HOME has it) is a near no-op.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
