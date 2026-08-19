@@ -110,11 +110,34 @@ STRUCTURAL_FIELDS = {
 # Payload blocks the engine reads that are LEGITIMATELY sport-specific, with the
 # reason. NCAAF-only inputs are not a defect on an NFL run. Anything consumed and
 # not listed here must clear the population floor on both sports.
-EXPECTED_SPARSE: dict[str, str] = {
-    "returning_production": "NCAAF-only: returning production is a college roster-churn concept; the NFL has no equivalent and `build_ncaaf_returning_production_snapshot.py` is the only producer",
-    "coach_continuity": "NCAAF-only: `build_ncaaf_coach_continuity_snapshot.py` is the only producer",
-    "transfer_impact": "NCAAF-only: the transfer portal has no NFL analogue; `build_ncaaf_transfer_portal_snapshot.py` is the only producer",
+# EXPECTED_SPARSE IS PER SPORT, AND THE FIRST VERSION WAS NOT -- which made this
+# checklist excuse exactly the inputs that matter most.
+#
+# `returning_production`, `coach_continuity` and `transfer_impact` are absent
+# from the NFL because the NFL has no equivalent concept. Marking them
+# "expected sparse" globally was right for an NFL run and WRONG for NCAAF: in
+# college football, roster churn IS the dominant year-over-year signal, and
+# returning production is among the best-known predictors in the sport. A
+# checklist that waves them through on NCAAF reports a clean bill of health on
+# the sport with the largest real gap.
+#
+# So the reason is now keyed by sport, and anything not listed for THAT sport
+# must clear the population floor.
+EXPECTED_SPARSE_BY_SPORT: dict[str, dict[str, str]] = {
+    "nfl": {
+        "returning_production": "NFL has no returning-production concept; it is a college roster-churn measure and `build_ncaaf_returning_production_snapshot.py` is the only producer",
+        "coach_continuity": "NFL: no producer exists; `build_ncaaf_coach_continuity_snapshot.py` is NCAAF-only",
+        "transfer_impact": "the transfer portal has no NFL analogue",
+    },
+    # DELIBERATELY EMPTY. Every block the engine reads is in scope for NCAAF,
+    # including the three above -- they are built (2 files each) and unwired,
+    # not legitimately absent.
+    "ncaaf": {},
 }
+
+
+def expected_sparse(sport: str) -> dict[str, str]:
+    return EXPECTED_SPARSE_BY_SPORT.get(str(sport).lower(), {})
 
 # A consumed block must be populated on at least this share of real games before
 # it counts as fed. Deliberately low -- this gate is for ZERO, not for quality.
@@ -420,7 +443,7 @@ def main() -> int:
     for local in sorted(consumed_blocks):
         wanted = keys.get(local, [])
         total_keys += len(wanted)
-        sparse = " [EXPECTED_SPARSE]" if local in EXPECTED_SPARSE else ""
+        sparse = " [EXPECTED_SPARSE: nfl only]" if local in EXPECTED_SPARSE_BY_SPORT["nfl"] else ""
         print(f"  {local}{sparse}")
         print(f"      accepts blocks named: {', '.join(consumed_blocks[local])}")
         print(f"      reads keys ({len(wanted)}): {', '.join(wanted) if wanted else '(none read directly)'}")
@@ -472,7 +495,7 @@ def main() -> int:
             for local, info in result["blocks"].items():
                 present = ", ".join(f"{k}={v}%" for k, v in info["per_key_pct"].items()) or "(none)"
                 print(f"      {local:<24} {info['populated_pct']:>10.1f}%   {present}")
-                if local in EXPECTED_SPARSE:
+                if local in expected_sparse(sport):
                     continue
                 if info["populated_pct"] < POPULATION_FLOOR * 100:
                     alarms.append(
@@ -482,8 +505,9 @@ def main() -> int:
 
     # ---- VERDICT -------------------------------------------------------
     print("\n" + "=" * 78)
-    for local, reason in EXPECTED_SPARSE.items():
-        print(f"EXPECTED_SPARSE  {local}: {reason}")
+    for sport_name in (sports if not args.skip_population else [args.sport]):
+        for local, reason in expected_sparse(sport_name).items():
+            print(f"EXPECTED_SPARSE [{sport_name}]  {local}: {reason}")
     if notes:
         print()
         for note in notes:
@@ -503,7 +527,7 @@ def main() -> int:
             "entrypoints": rows,
             "consumed_blocks": {b: {"aliases": blocks[b], "keys": keys.get(b, [])} for b in sorted(blocks)},
             "population": population,
-            "expected_sparse": EXPECTED_SPARSE,
+            "expected_sparse_by_sport": EXPECTED_SPARSE_BY_SPORT,
             "population_floor": POPULATION_FLOOR,
             "alarms": alarms,
             "notes": notes,
