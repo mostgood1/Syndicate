@@ -16455,3 +16455,51 @@ before this change (confirmed identical failure signature).
 - Claim: live-odds-worker released (`deploy_claim.py release --service
   live-odds-worker --token c474b50117ce60ee`). refresh-worker: never
   acquired, held by another session throughout.
+
+### #469 pt3 — refresh-worker deployed, both services now carry the fix — 2026-08-19 ~16:52Z — lane `basketball-model-owner`
+
+Completes the `#469` pt3 rollout begun on live-odds-worker (`0c7962a7`).
+`refresh-worker`'s live commit (`6631748c`) was on `deploy/ncaaf-sp-ratings-
+20260819` / `deploy/worker-checklist-script`, NOT an ancestor of
+`origin/main` -- deploying `0c7962a7` directly would have reverted 306
+files of real, deliberately shipped work (a checklist-script hook wiring
+and NCAAF SP ratings, ~96k lines by diff stat). Same shape as `#468`'s
+`fd1930b2 -> f13ea05e` precedent: cherry-picked `0c7962a7` onto the live
+SHA instead (clean auto-merge, no conflicts, verified syntax + fix
+presence), pushed as `deploy/469-pt3-refresh-worker`, deployed as
+`23e70a80` with `deploy_preflight.py --allow-off-main` (required
+separately from `render_deploy.py`, which has no such flag -- ancestry
+was already satisfied since `23e70a80` extends the live SHA directly, so
+`render_deploy.py` needed no override).
+
+**Getting a CLEAR window took ~47 minutes** (claim held 16:06:23 ->
+expired naturally ~16:51, deploy triggered in the last ~90s of that
+window on a 3rd re-armed monitor). refresh-worker ran a `run_mlb_daily_
+sim_job.py` / `daily_update.py --workflow ui-daily` chain continuously
+from at least 14:00Z through the deploy window (632 log matches for the
+job name over 2h42m) -- the exact "in-flight MLB sim" case this repo's
+own rules exist to protect, so a genuinely job-count-zero window was
+waited for rather than settling for a "low impact" mix once that specific
+chain was identified as the recurring blocker, not a cheap-to-interrupt
+one. `deploy-guard.py`'s SHA-bound preflight receipt meant re-running
+preflight immediately before the deploy call was required each retry
+(same pattern as `#469` pt1's live-odds-worker deploy).
+
+- **verify: CODE CONFIRMED LIVE on BOTH services** -- live-odds-worker
+  `0c7962a7` (2026-08-19T15:55:33Z), refresh-worker `23e70a80`
+  (2026-08-19T16:52:58Z, which itself contains `0c7962a7`'s full diff via
+  cherry-pick). `#469`'s full fix (silent-success detection + UA change +
+  the pt3 masking-bug fix) now reaches BOTH services that run
+  `refresh_wnba_oddsapi_props.py`.
+- **Effect on actual boxscore data still NOT observed** -- unchanged from
+  the pt3 entry above; this entry only confirms full deployment coverage,
+  not a runtime result. Next reader: watch for `BOXSCORE_BOOTSTRAP_
+  STALLED` actually appearing now (would confirm the fix reaches the
+  bootstrap and point back at the ESPN IP/UA theory as the remaining open
+  question) versus `boxscores_history.csv`'s max game date genuinely
+  advancing past 2026-06-30 (would mean it's fully fixed) versus continued
+  total silence on both (would mean something else is still gating
+  reachability, undiagnosed).
+- Claim: refresh-worker's claim expired naturally during the wait: no
+  release call needed, confirmed via `deploy_preflight.py` reporting
+  `deploy claim   none` post-deploy.
