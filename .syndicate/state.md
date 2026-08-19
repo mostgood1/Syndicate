@@ -2896,7 +2896,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, BOTH CALIBRATION DEFECTS FIXED — `#471` FULLY CLOSED `[verified 2026-08-19]`
+## [nfl-player-props-model] NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE — WEB DEPLOY OF THE FIX SET IN FLIGHT, NOT YET CONFIRMED `[verified 2026-08-19]`
 
 `syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
 rate) + `props._nfl_prop_model_probability` (Normal-CDF cover probability) —
@@ -2943,16 +2943,53 @@ never-imported dependency).
 **`#471` is now FULLY CLOSED** — both calibration defects it found are
 fixed and measured out-of-sample.
 
-**Production artifact-allowlist gap, confirmed live**:
+**Production artifact-allowlist gap — FIXED, DEPLOYED, VERIFIED LIVE
+`[2026-08-19]`**. `basketball-model-owner` added `nfl_source/oddsapi_
+player_props_*.csv` to `HOT_ARTIFACT_PATTERNS` (deliberately scoped to
+`nfl_source/` specifically rather than a broader `*_source/` glob, to
+avoid matching an unrelated shallow-depth file in another sport's tree).
+Deployed to web (scoped commit, parented on web's live SHA — a straight
+`main` deploy would have carried unrelated concurrent work).
 `/api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv`
-returns `count: 0`. Both `HOT_ARTIFACT_PATTERNS` entries for this filename
-require a `data/processed/` segment; NFL's real file
-(`nfl_source/oddsapi_player_props_<season>_wk<week>.csv`) has none, so
-production's true real-odds coverage is currently unverifiable from web and
-the backup/mirror-refresh pathway can never pull it back either.
-`artifact_publisher.py` is held by `basketball-model-owner` — flagged in
-`#471`, not fixed here (same file-handoff convention `football-model-owner`
-already used).
+now returns `count: 14` on production (was 0). **Content checked, not
+just presence**: production's real coverage EXACTLY MATCHES the local
+git mirror — 13 header-only stubs (5 bytes each) plus the single real
+populated week, `2025_wk22.csv` (10,208 bytes, matching the local copy).
+**Resolves the earlier "believed but unverified" uncertainty**: the
+mirror was NOT lossy for this artifact; production genuinely has no
+richer real-odds coverage. No `#471` Section 3 re-run is owed — there is
+nothing new to re-run against.
+
+**All 6 tuned `#471` constants individually stability-checked against
+genuinely independent data `[2026-08-19]`**, one lane per constant,
+fit-half (2022-2023) vs an INDEPENDENTLY computed estimate on the
+2024-2025 half (never used to select, only to compare — closed form for
+the 5 blend weights, grid search for `anytime_td`'s shrinkage k since the
+`(n+k)` denominator makes Brier rational not quadratic there):
+
+| constant | half A | half B | ratio | verdict |
+|---|---|---|---|---|
+| `rushing_yards` w | 0.5731 | 0.5717 | 1.00x | STABLE |
+| `anytime_td` shrinkage k | 12.0 | 12.0 | 1.00x (exact) | STABLE |
+| `receptions` w | 0.1367 | 0.0771 | 1.77x | STABLE |
+| `receiving_yards` w | 0.2158 | 0.1242 | 1.74x | STABLE |
+| `passing_attempts` w | 1.1409 | 0.8842 | opp. sides of 1.0 | UNSTABLE — left capped |
+| `passing_tds` w | 0.3155 | 0.0217 | 14.55x | UNSTABLE — left at w=0 |
+| `interceptions` w | 0.1329 | 0.0287 | 4.62x | UNSTABLE — left at w=0 |
+
+No code change resulted from any of the 6 checks — every constant was
+either confirmed well-supported or was already at its correct
+conservative/safe value. Reports: `reports/nfl_*_stability_check.json`
+(one per constant/group).
+
+**WEB DEPLOY OF THE FULL FIX SET IS IN FLIGHT, NOT YET CONFIRMED LIVE**
+`[fired 2026-08-19T21:59:15Z]`. Scoped commit `f149f5e2`
+(`syndicate/features/nfl/{props.py,player_stats.py}` only, parented on
+web's live SHA `450e0d6e`), deploy `dep-da32ecou01pc73fojijg`. Last read:
+`build_in_progress`. **Do not cite this fix as live in production until a
+later state.md edit confirms `status=live` by content** — the code has
+been on `origin/main` since earlier today, but `origin/main` is not
+production.
 
 **NFL has no distribution/PMF at all** for player props — confirmed
 independently by `convergence-phase7-crps`'s 165-file/160-date check. This
