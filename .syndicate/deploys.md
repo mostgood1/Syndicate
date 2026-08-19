@@ -15933,3 +15933,24 @@ immediately after cutover:
     wnba smart_sim_total_calibration.json (absent file) 403 -> 200 (count:0, correctly -- allowlisted but not yet produced, per model_engine_standard.md Sec3: allowlisting permits, does not require existence)
 
 Claim released: `deploy_claim.py release --service web --holder basketball-model-owner`.
+
+### deploy PENDING — refresh-worker — #461 + #467 — 2026-08-18 ~01:1xZ — lane `basketball-model-owner`
+
+`/preflight refresh-worker` PASS (with note: two bundled fixes, deliberately,
+to avoid killing in-flight jobs twice -- not a diagnostic multi-guess).
+Candidate `db573857` (branch `deploy/basketball-461-467-cache-and-posmatch`),
+parented on refresh-worker's actual live SHA `00e9a49f` (re-verified via
+`deploy_preflight.py` immediately before cutting this branch). Scope: 4
+files, 705/10 -- `syndicate/features/shared/basketball_props_smart_sim.py`
+(27/8, #467), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (23-24/1 each,
+#461), `docs/ai_context/basketball_sim_engine_reference.md` (fresh add, 641
+lines -- doc-only, didn't exist on this branch's lineage).
+
+Expected effect: WNBA `team_advanced_stats.games` populates on the next
+uncached-date smart-sim call (#461); position-matchup multiplier becomes
+reachable immediately on the next WNBA/NBA smart-sim call, bounded
+adjustment not a large swing (#467). Not yet deployed -- claim held by
+`repo-coordination` and 8+ job processes still in flight as of this write.
+
+MEASUREMENT: <pending>
+REMINDER: verify within 15 min of deploy finishing.
