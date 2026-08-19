@@ -1,0 +1,1031 @@
+{
+  "sport": "nfl",
+  "scope": "player props (rate model)",
+  "generated_at": "2026-08-19T16:00:03.120237+00:00",
+  "seasons": [
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "coverage": {
+    "player_ids": 2406,
+    "player_game_weeks": 21493,
+    "player_stat_weeks_no_rate": 40518
+  },
+  "section_1_point_accuracy": {
+    "passing_yards": {
+      "n": 2278,
+      "excluded_zero_engagement": 14713,
+      "correlation": 0.7078,
+      "mae_model": 58.2223,
+      "mae_constant_baseline": 90.9403,
+      "mae_debiased": 58.5305,
+      "mean_bias": -3.1344,
+      "baseline_value": 182.2621,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 32.718",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 1142,
+        "n_score": 1136,
+        "mae_model": 60.463,
+        "mae_constant_baseline": 88.3175,
+        "mae_debiased": 60.4565,
+        "debiased_beats_baseline": true,
+        "correlation": 0.6689
+      }
+    },
+    "passing_attempts": {
+      "n": 2653,
+      "excluded_zero_engagement": 14338,
+      "correlation": 0.8232,
+      "mae_model": 6.4467,
+      "mae_constant_baseline": 15.037,
+      "mae_debiased": 6.4944,
+      "mean_bias": -0.2203,
+      "baseline_value": 23.6943,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 8.5903",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 1348,
+        "n_score": 1305,
+        "mae_model": 6.9659,
+        "mae_constant_baseline": 14.6762,
+        "mae_debiased": 6.9758,
+        "debiased_beats_baseline": true,
+        "correlation": 0.786
+      }
+    },
+    "passing_tds": {
+      "n": 2000,
+      "excluded_zero_engagement": 14991,
+      "correlation": 0.3422,
+      "mae_model": 0.872,
+      "mae_constant_baseline": 0.9578,
+      "mae_debiased": 0.8744,
+      "mean_bias": -0.015,
+      "baseline_value": 1.2675,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.0858",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 1003,
+        "n_score": 997,
+        "mae_model": 0.9283,
+        "mae_constant_baseline": 0.9803,
+        "mae_debiased": 0.9276,
+        "debiased_beats_baseline": true,
+        "correlation": 0.3093
+      }
+    },
+    "rushing_yards": {
+      "n": 9375,
+      "excluded_zero_engagement": 7616,
+      "correlation": 0.7041,
+      "mae_model": 14.2278,
+      "mae_constant_baseline": 24.0539,
+      "mae_debiased": 14.2999,
+      "mean_bias": -0.2295,
+      "baseline_value": 22.717,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 9.8261",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 4702,
+        "n_score": 4673,
+        "mae_model": 14.2257,
+        "mae_constant_baseline": 24.0311,
+        "mae_debiased": 14.3097,
+        "debiased_beats_baseline": true,
+        "correlation": 0.711
+      }
+    },
+    "rushing_attempts": {
+      "n": 10073,
+      "excluded_zero_engagement": 6918,
+      "correlation": 0.8194,
+      "mae_model": 2.2143,
+      "mae_constant_baseline": 4.8605,
+      "mae_debiased": 2.235,
+      "mean_bias": -0.0788,
+      "baseline_value": 4.8443,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 2.6462",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 5104,
+        "n_score": 4969,
+        "mae_model": 2.221,
+        "mae_constant_baseline": 4.8328,
+        "mae_debiased": 2.2386,
+        "debiased_beats_baseline": true,
+        "correlation": 0.8228
+      }
+    },
+    "receptions": {
+      "n": 14879,
+      "excluded_zero_engagement": 2112,
+      "correlation": 0.5963,
+      "mae_model": 1.4073,
+      "mae_constant_baseline": 1.8243,
+      "mae_debiased": 1.4074,
+      "mean_bias": -0.0004,
+      "baseline_value": 2.5933,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.417",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 7499,
+        "n_score": 7380,
+        "mae_model": 1.3965,
+        "mae_constant_baseline": 1.8139,
+        "mae_debiased": 1.3951,
+        "debiased_beats_baseline": true,
+        "correlation": 0.5938
+      }
+    },
+    "receiving_yards": {
+      "n": 14751,
+      "excluded_zero_engagement": 2240,
+      "correlation": 0.5721,
+      "mae_model": 18.714,
+      "mae_constant_baseline": 24.1005,
+      "mae_debiased": 18.7554,
+      "mean_bias": -0.258,
+      "baseline_value": 28.7311,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 5.3865",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 7425,
+        "n_score": 7326,
+        "mae_model": 18.5227,
+        "mae_constant_baseline": 23.8728,
+        "mae_debiased": 18.4917,
+        "debiased_beats_baseline": true,
+        "correlation": 0.5655
+      }
+    },
+    "interceptions": {
+      "n": 1845,
+      "excluded_zero_engagement": 15146,
+      "correlation": 0.0449,
+      "mae_model": 0.7092,
+      "mae_constant_baseline": 0.697,
+      "mae_debiased": 0.7005,
+      "mean_bias": 0.05,
+      "baseline_value": 0.6385,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": false,
+      "verdict": "NO measured skill",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 933,
+        "n_score": 912,
+        "mae_model": 0.6965,
+        "mae_constant_baseline": 0.6887,
+        "mae_debiased": 0.6872,
+        "debiased_beats_baseline": true,
+        "correlation": 0.0723
+      }
+    },
+    "anytime_td": {
+      "n": 16991,
+      "excluded_zero_engagement": 0,
+      "correlation": 0.235,
+      "mae_model": 0.3579,
+      "mae_constant_baseline": 0.4098,
+      "mae_debiased": 0.3625,
+      "mean_bias": -0.0078,
+      "baseline_value": 0.263,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.0519",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": true,
+        "reason": null,
+        "fit_range": "(2022, 3)..(2023, 18)",
+        "score_range": "(2024, 3)..(2025, 18)",
+        "n_fit": 8527,
+        "n_score": 8464,
+        "mae_model": 0.3647,
+        "mae_constant_baseline": 0.4112,
+        "mae_debiased": 0.3656,
+        "debiased_beats_baseline": true,
+        "correlation": 0.2456
+      }
+    }
+  },
+  "section_2_ladder_calibration": {
+    "markets": {
+      "passing_yards": {
+        "n": 11455,
+        "brier_score": 0.2073,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1145,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.221,
+            "gap": -0.0623
+          },
+          {
+            "bucket": 2,
+            "n": 1145,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2402,
+            "gap": -0.0815
+          },
+          {
+            "bucket": 3,
+            "n": 1145,
+            "avg_predicted": 0.3084,
+            "actual_hit_rate": 0.3109,
+            "gap": -0.0025
+          },
+          {
+            "bucket": 4,
+            "n": 1145,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.345,
+            "gap": -0.0364
+          },
+          {
+            "bucket": 5,
+            "n": 1145,
+            "avg_predicted": 0.4997,
+            "actual_hit_rate": 0.441,
+            "gap": 0.0586
+          },
+          {
+            "bucket": 6,
+            "n": 1145,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4821,
+            "gap": 0.0179
+          },
+          {
+            "bucket": 7,
+            "n": 1145,
+            "avg_predicted": 0.691,
+            "actual_hit_rate": 0.6943,
+            "gap": -0.0034
+          },
+          {
+            "bucket": 8,
+            "n": 1145,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6664,
+            "gap": 0.0251
+          },
+          {
+            "bucket": 9,
+            "n": 1145,
+            "avg_predicted": 0.8408,
+            "actual_hit_rate": 0.7991,
+            "gap": 0.0417
+          },
+          {
+            "bucket": 10,
+            "n": 1150,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7878,
+            "gap": 0.0535
+          }
+        ]
+      },
+      "passing_attempts": {
+        "n": 13195,
+        "brier_score": 0.1919,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1319,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.166,
+            "gap": -0.0074
+          },
+          {
+            "bucket": 2,
+            "n": 1319,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2039,
+            "gap": -0.0453
+          },
+          {
+            "bucket": 3,
+            "n": 1319,
+            "avg_predicted": 0.3084,
+            "actual_hit_rate": 0.2691,
+            "gap": 0.0393
+          },
+          {
+            "bucket": 4,
+            "n": 1319,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2911,
+            "gap": 0.0174
+          },
+          {
+            "bucket": 5,
+            "n": 1319,
+            "avg_predicted": 0.4997,
+            "actual_hit_rate": 0.3685,
+            "gap": 0.1312
+          },
+          {
+            "bucket": 6,
+            "n": 1319,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4177,
+            "gap": 0.0823
+          },
+          {
+            "bucket": 7,
+            "n": 1319,
+            "avg_predicted": 0.691,
+            "actual_hit_rate": 0.721,
+            "gap": -0.03
+          },
+          {
+            "bucket": 8,
+            "n": 1319,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6785,
+            "gap": 0.0129
+          },
+          {
+            "bucket": 9,
+            "n": 1319,
+            "avg_predicted": 0.8409,
+            "actual_hit_rate": 0.8309,
+            "gap": 0.01
+          },
+          {
+            "bucket": 10,
+            "n": 1324,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.8172,
+            "gap": 0.0241
+          }
+        ]
+      },
+      "passing_tds": {
+        "n": 9705,
+        "brier_score": 0.2106,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 970,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1876,
+            "gap": -0.029
+          },
+          {
+            "bucket": 2,
+            "n": 970,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2289,
+            "gap": -0.0702
+          },
+          {
+            "bucket": 3,
+            "n": 970,
+            "avg_predicted": 0.3084,
+            "actual_hit_rate": 0.2948,
+            "gap": 0.0135
+          },
+          {
+            "bucket": 4,
+            "n": 970,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3351,
+            "gap": -0.0265
+          },
+          {
+            "bucket": 5,
+            "n": 970,
+            "avg_predicted": 0.4996,
+            "actual_hit_rate": 0.4021,
+            "gap": 0.0975
+          },
+          {
+            "bucket": 6,
+            "n": 970,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4402,
+            "gap": 0.0598
+          },
+          {
+            "bucket": 7,
+            "n": 970,
+            "avg_predicted": 0.6909,
+            "actual_hit_rate": 0.6546,
+            "gap": 0.0362
+          },
+          {
+            "bucket": 8,
+            "n": 970,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6093,
+            "gap": 0.0822
+          },
+          {
+            "bucket": 9,
+            "n": 970,
+            "avg_predicted": 0.8407,
+            "actual_hit_rate": 0.7629,
+            "gap": 0.0778
+          },
+          {
+            "bucket": 10,
+            "n": 975,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7733,
+            "gap": 0.068
+          }
+        ]
+      },
+      "rushing_yards": {
+        "n": 49470,
+        "brier_score": 0.1956,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 4947,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1846,
+            "gap": -0.0259
+          },
+          {
+            "bucket": 2,
+            "n": 4947,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1829,
+            "gap": -0.0243
+          },
+          {
+            "bucket": 3,
+            "n": 4947,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2652,
+            "gap": 0.0433
+          },
+          {
+            "bucket": 4,
+            "n": 4947,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2541,
+            "gap": 0.0544
+          },
+          {
+            "bucket": 5,
+            "n": 4947,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.373,
+            "gap": 0.127
+          },
+          {
+            "bucket": 6,
+            "n": 4947,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.3725,
+            "gap": 0.1275
+          },
+          {
+            "bucket": 7,
+            "n": 4947,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6266,
+            "gap": 0.0648
+          },
+          {
+            "bucket": 8,
+            "n": 4947,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6012,
+            "gap": 0.0903
+          },
+          {
+            "bucket": 9,
+            "n": 4947,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.8274,
+            "gap": 0.014
+          },
+          {
+            "bucket": 10,
+            "n": 4947,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.8369,
+            "gap": 0.0045
+          }
+        ]
+      },
+      "rushing_attempts": {
+        "n": 49745,
+        "brier_score": 0.2044,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 4974,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1986,
+            "gap": -0.04
+          },
+          {
+            "bucket": 2,
+            "n": 4974,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.196,
+            "gap": -0.0374
+          },
+          {
+            "bucket": 3,
+            "n": 4974,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2841,
+            "gap": 0.0244
+          },
+          {
+            "bucket": 4,
+            "n": 4974,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2797,
+            "gap": 0.0289
+          },
+          {
+            "bucket": 5,
+            "n": 4974,
+            "avg_predicted": 0.4999,
+            "actual_hit_rate": 0.3657,
+            "gap": 0.1342
+          },
+          {
+            "bucket": 6,
+            "n": 4974,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.3723,
+            "gap": 0.1277
+          },
+          {
+            "bucket": 7,
+            "n": 4974,
+            "avg_predicted": 0.6913,
+            "actual_hit_rate": 0.5977,
+            "gap": 0.0936
+          },
+          {
+            "bucket": 8,
+            "n": 4974,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.5808,
+            "gap": 0.1106
+          },
+          {
+            "bucket": 9,
+            "n": 4974,
+            "avg_predicted": 0.8412,
+            "actual_hit_rate": 0.8086,
+            "gap": 0.0326
+          },
+          {
+            "bucket": 10,
+            "n": 4979,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.8062,
+            "gap": 0.0352
+          }
+        ]
+      },
+      "receptions": {
+        "n": 72065,
+        "brier_score": 0.2135,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 7206,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.208,
+            "gap": -0.0494
+          },
+          {
+            "bucket": 2,
+            "n": 7206,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2093,
+            "gap": -0.0506
+          },
+          {
+            "bucket": 3,
+            "n": 7206,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3103,
+            "gap": -0.0018
+          },
+          {
+            "bucket": 4,
+            "n": 7206,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3304,
+            "gap": -0.0219
+          },
+          {
+            "bucket": 5,
+            "n": 7206,
+            "avg_predicted": 0.4999,
+            "actual_hit_rate": 0.4216,
+            "gap": 0.0784
+          },
+          {
+            "bucket": 6,
+            "n": 7206,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4351,
+            "gap": 0.0649
+          },
+          {
+            "bucket": 7,
+            "n": 7206,
+            "avg_predicted": 0.6914,
+            "actual_hit_rate": 0.623,
+            "gap": 0.0684
+          },
+          {
+            "bucket": 8,
+            "n": 7206,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.5946,
+            "gap": 0.0968
+          },
+          {
+            "bucket": 9,
+            "n": 7206,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7609,
+            "gap": 0.0804
+          },
+          {
+            "bucket": 10,
+            "n": 7211,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7654,
+            "gap": 0.076
+          }
+        ]
+      },
+      "receiving_yards": {
+        "n": 74105,
+        "brier_score": 0.2126,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 7410,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.217,
+            "gap": -0.0583
+          },
+          {
+            "bucket": 2,
+            "n": 7410,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2267,
+            "gap": -0.0681
+          },
+          {
+            "bucket": 3,
+            "n": 7410,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2953,
+            "gap": 0.0132
+          },
+          {
+            "bucket": 4,
+            "n": 7410,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3184,
+            "gap": -0.0098
+          },
+          {
+            "bucket": 5,
+            "n": 7410,
+            "avg_predicted": 0.4999,
+            "actual_hit_rate": 0.4162,
+            "gap": 0.0838
+          },
+          {
+            "bucket": 6,
+            "n": 7410,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4317,
+            "gap": 0.0683
+          },
+          {
+            "bucket": 7,
+            "n": 7410,
+            "avg_predicted": 0.6914,
+            "actual_hit_rate": 0.5885,
+            "gap": 0.1029
+          },
+          {
+            "bucket": 8,
+            "n": 7410,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.5795,
+            "gap": 0.112
+          },
+          {
+            "bucket": 9,
+            "n": 7410,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7877,
+            "gap": 0.0535
+          },
+          {
+            "bucket": 10,
+            "n": 7415,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7899,
+            "gap": 0.0515
+          }
+        ]
+      },
+      "interceptions": {
+        "n": 9105,
+        "brier_score": 0.215,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 910,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.211,
+            "gap": -0.0523
+          },
+          {
+            "bucket": 2,
+            "n": 910,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1659,
+            "gap": -0.0073
+          },
+          {
+            "bucket": 3,
+            "n": 910,
+            "avg_predicted": 0.3084,
+            "actual_hit_rate": 0.2637,
+            "gap": 0.0446
+          },
+          {
+            "bucket": 4,
+            "n": 910,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2989,
+            "gap": 0.0096
+          },
+          {
+            "bucket": 5,
+            "n": 910,
+            "avg_predicted": 0.4996,
+            "actual_hit_rate": 0.3835,
+            "gap": 0.1161
+          },
+          {
+            "bucket": 6,
+            "n": 910,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.378,
+            "gap": 0.122
+          },
+          {
+            "bucket": 7,
+            "n": 910,
+            "avg_predicted": 0.6908,
+            "actual_hit_rate": 0.4956,
+            "gap": 0.1952
+          },
+          {
+            "bucket": 8,
+            "n": 910,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.4747,
+            "gap": 0.2167
+          },
+          {
+            "bucket": 9,
+            "n": 910,
+            "avg_predicted": 0.8407,
+            "actual_hit_rate": 0.7604,
+            "gap": 0.0802
+          },
+          {
+            "bucket": 10,
+            "n": 915,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7956,
+            "gap": 0.0457
+          }
+        ]
+      },
+      "anytime_td": {
+        "n": 16991,
+        "brier_score": 0.1939,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1699,
+            "avg_predicted": 0.0,
+            "actual_hit_rate": 0.1442,
+            "gap": -0.1442
+          },
+          {
+            "bucket": 2,
+            "n": 1699,
+            "avg_predicted": 0.0,
+            "actual_hit_rate": 0.1342,
+            "gap": -0.1342
+          },
+          {
+            "bucket": 3,
+            "n": 1699,
+            "avg_predicted": 0.0,
+            "actual_hit_rate": 0.136,
+            "gap": -0.136
+          },
+          {
+            "bucket": 4,
+            "n": 1699,
+            "avg_predicted": 0.0679,
+            "actual_hit_rate": 0.1566,
+            "gap": -0.0887
+          },
+          {
+            "bucket": 5,
+            "n": 1699,
+            "avg_predicted": 0.1561,
+            "actual_hit_rate": 0.1772,
+            "gap": -0.0211
+          },
+          {
+            "bucket": 6,
+            "n": 1699,
+            "avg_predicted": 0.2252,
+            "actual_hit_rate": 0.1913,
+            "gap": 0.0339
+          },
+          {
+            "bucket": 7,
+            "n": 1699,
+            "avg_predicted": 0.3053,
+            "actual_hit_rate": 0.2472,
+            "gap": 0.058
+          },
+          {
+            "bucket": 8,
+            "n": 1699,
+            "avg_predicted": 0.3964,
+            "actual_hit_rate": 0.2884,
+            "gap": 0.108
+          },
+          {
+            "bucket": 9,
+            "n": 1699,
+            "avg_predicted": 0.5278,
+            "actual_hit_rate": 0.3055,
+            "gap": 0.2223
+          },
+          {
+            "bucket": 10,
+            "n": 1700,
+            "avg_predicted": 0.8263,
+            "actual_hit_rate": 0.4282,
+            "gap": 0.398
+          }
+        ]
+      }
+    },
+    "pooled_all_markets_informational_only": {
+      "n": 305836,
+      "brier_score": 0.2066,
+      "buckets": [
+        {
+          "bucket": 1,
+          "n": 30583,
+          "avg_predicted": 0.1266,
+          "actual_hit_rate": 0.1886,
+          "gap": -0.0619
+        },
+        {
+          "bucket": 2,
+          "n": 30583,
+          "avg_predicted": 0.1587,
+          "actual_hit_rate": 0.2059,
+          "gap": -0.0472
+        },
+        {
+          "bucket": 3,
+          "n": 30583,
+          "avg_predicted": 0.2785,
+          "actual_hit_rate": 0.2714,
+          "gap": 0.0072
+        },
+        {
+          "bucket": 4,
+          "n": 30583,
+          "avg_predicted": 0.3085,
+          "actual_hit_rate": 0.2979,
+          "gap": 0.0106
+        },
+        {
+          "bucket": 5,
+          "n": 30583,
+          "avg_predicted": 0.463,
+          "actual_hit_rate": 0.3662,
+          "gap": 0.0967
+        },
+        {
+          "bucket": 6,
+          "n": 30583,
+          "avg_predicted": 0.5,
+          "actual_hit_rate": 0.421,
+          "gap": 0.079
+        },
+        {
+          "bucket": 7,
+          "n": 30583,
+          "avg_predicted": 0.6606,
+          "actual_hit_rate": 0.5775,
+          "gap": 0.083
+        },
+        {
+          "bucket": 8,
+          "n": 30583,
+          "avg_predicted": 0.6915,
+          "actual_hit_rate": 0.5911,
+          "gap": 0.1003
+        },
+        {
+          "bucket": 9,
+          "n": 30583,
+          "avg_predicted": 0.8294,
+          "actual_hit_rate": 0.7809,
+          "gap": 0.0485
+        },
+        {
+          "bucket": 10,
+          "n": 30589,
+          "avg_predicted": 0.8446,
+          "actual_hit_rate": 0.7763,
+          "gap": 0.0683
+        }
+      ]
+    }
+  },
+  "section_3_real_market_hit_rate": {
+    "no_resolvable_player": 8,
+    "no_resolvable_rate": 57,
+    "pushes_excluded": 0,
+    "markets": {}
+  }
+}
