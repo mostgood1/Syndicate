@@ -15,6 +15,7 @@ than erroring or fabricating.
 from __future__ import annotations
 
 import csv
+import math
 import statistics
 from functools import lru_cache
 from pathlib import Path
@@ -95,28 +96,98 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+# `#471` defect 1: `_nfl_prop_model_probability`'s plain Normal-CDF cover
+# probability is overconfident near its own mean (predicts ~50% cover
+# where NFL's real, right-skewed box-score distributions actually cover
+# ~37-44%) -- a Normal is symmetric by construction and real yardage/count
+# stats have a hard floor at 0 plus occasional big games, so mean >
+# median. `scripts/compare_nfl_cover_probability_models.py` measured that
+# a PURE log-normal correction (method-of-moments, same mean/stdev inputs)
+# OVERCORRECTS on 4 of 8 markets -- the mid-decile gap often flips sign
+# and grows rather than shrinks. `scripts/calibrate_nfl_cover_probability_
+# blend.py` found the right answer is a PER-MARKET BLEND weight `w` in
+# [0, 1] between the current Normal probability and the log-normal one,
+# with a closed-form Brier-minimizing solution (Brier is convex in a
+# linear blend of two fixed probabilities), TUNED out-of-sample (selected
+# on 2022-2023, only ever reported on 2024-2025 -- never re-selected
+# there): passing_attempts got the largest correction (w=1.0, clipped from
+# an unclipped optimum of 1.14 -- the data wanted MORE than pure
+# log-normal, capped at the model actually validated), receptions/
+# receiving_yards the smallest real ones (w=0.137/0.216). `passing_tds`
+# and `interceptions` showed NO real out-of-sample benefit (improvement
+# -0.0009 and -0.0002, both roughly noise-sized next to the ~+0.002 to
+# +0.006 improvements elsewhere) and are deliberately left at w=0 (today's
+# Normal-only behavior) rather than shipping a fitted correction that
+# didn't generalize. Full sweep: reports/nfl_cover_probability_blend_
+# calibration.json.
+_COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
+    "passing_yards": 0.689,
+    "passing_attempts": 1.0,
+    "passing_tds": 0.0,
+    "rushing_yards": 0.573,
+    "rushing_attempts": 0.550,
+    "receptions": 0.137,
+    "receiving_yards": 0.216,
+    "interceptions": 0.0,
+}
+
+
+def _lognormal_params_from_moments(mean: float, stdev: float) -> tuple[float, float] | None:
+    """Method-of-moments fit: the (mu, sigma) of the log-normal
+    distribution with the SAME mean and variance `player_rate` already
+    computes -- no new upstream data needed. None when undefined: mean<=0
+    (can only happen if a player's ENTIRE prior sample for this stat is
+    0 -- e.g. a pure rusher's passing_yards -- no log-normal has that
+    mean) or the moment equations degenerate."""
+    if mean is None or mean <= 0 or stdev is None or stdev <= 0:
+        return None
+    variance = stdev * stdev
+    sigma_sq = math.log(1.0 + variance / (mean * mean))
+    if sigma_sq <= 0:
+        return None
+    mu = math.log(mean) - sigma_sq / 2.0
+    return mu, math.sqrt(sigma_sq)
+
+
+def _lognormal_cover_probability(mean: float, stdev: float, line: float) -> float | None:
+    if line <= 0:
+        return None  # no real NFL prop line is <= 0; caller falls back to the Normal-only probability
+    params = _lognormal_params_from_moments(mean, stdev)
+    if params is None:
+        return None
+    mu, sigma = params
+    z = (math.log(line) - mu) / sigma
+    return 1.0 - statistics.NormalDist(0.0, 1.0).cdf(z)
+
+
 def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float | None, n: int, line: float | None) -> float | None:
-    """Real season-to-date rate, converted to a probability -- a
-    Normal-CDF cover probability for count/yardage stats with a real
-    quoted line (same pattern as _nfl_cover_probability in cards.py,
-    duplicated here rather than cross-imported, matching this session's
-    established per-module convention), or the player's own per-game hit
-    rate directly for anytime_td (a one-sided market with no line -- the
-    rate itself IS the probability of scoring, no distribution needed).
-    For anytime_td, `mean` is expected to already be the SHRUNK rate
-    (`player_stats.anytime_td_rate`, not the raw `player_rate`) -- see
-    `#471`: the raw MLE rate reads 0% for a player with 2-4 scoreless
+    """Real season-to-date rate, converted to a probability -- a blended
+    Normal/log-normal cover probability for count/yardage stats with a
+    real quoted line (see `_COVER_PROBABILITY_BLEND_WEIGHT`'s comment for
+    why it's a blend, not either model alone), or the player's own
+    per-game hit rate directly for anytime_td (a one-sided market with no
+    line -- the rate itself IS the probability of scoring, no distribution
+    needed). For anytime_td, `mean` is expected to already be the SHRUNK
+    rate (`player_stats.anytime_td_rate`, not the raw `player_rate`) --
+    see `#471`: the raw MLE rate reads 0% for a player with 2-4 scoreless
     games, when the real hit rate for that exact bucket is ~13-14%. This
-    function stays a thin pass-through/clamp either way; the shrinkage
-    itself lives in player_stats.py where the population-level prior is
-    computed."""
+    function stays a thin pass-through/clamp for anytime_td either way;
+    the shrinkage itself lives in player_stats.py where the
+    population-level prior is computed."""
     if n < 2 or mean is None:
         return None
     if stat == "anytime_td":
         return max(0.0, min(1.0, mean))
     if line is None or stdev is None or stdev <= 0:
         return None
-    return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+    normal_prob = 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+    weight = _COVER_PROBABILITY_BLEND_WEIGHT.get(stat, 0.0)
+    if weight <= 0.0:
+        return normal_prob
+    lognormal_prob = _lognormal_cover_probability(mean, stdev, line)
+    if lognormal_prob is None:
+        return normal_prob  # log-normal undefined for this row (e.g. mean<=0) -- fall back rather than guess
+    return (1.0 - weight) * normal_prob + weight * lognormal_prob
 
 
 def _nfl_prop_join_market_key(stat: str, player_name: str) -> str:

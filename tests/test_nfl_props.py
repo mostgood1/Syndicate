@@ -156,6 +156,64 @@ class NflPropsTests(unittest.TestCase):
         prob = props._nfl_prop_model_probability(stat="passing_yards", mean=250.0, stdev=20.0, n=1, line=230.0)
         self.assertIsNone(prob)
 
+    # ---- `#471` defect 1: Normal/log-normal blend ------------------------
+
+    def test_lognormal_params_match_hand_computation(self) -> None:
+        # variance=25, mean=10 -> sigma^2 = ln(1 + 25/100) = ln(1.25)
+        import math
+        mu, sigma = props._lognormal_params_from_moments(10.0, 5.0)
+        expected_sigma_sq = math.log(1.25)
+        self.assertAlmostEqual(sigma * sigma, expected_sigma_sq)
+        self.assertAlmostEqual(mu, math.log(10.0) - expected_sigma_sq / 2.0)
+
+    def test_lognormal_params_none_for_nonpositive_mean(self) -> None:
+        self.assertIsNone(props._lognormal_params_from_moments(0.0, 5.0))
+        self.assertIsNone(props._lognormal_params_from_moments(-1.0, 5.0))
+
+    def test_lognormal_cover_probability_none_for_nonpositive_line(self) -> None:
+        self.assertIsNone(props._lognormal_cover_probability(10.0, 5.0, 0.0))
+        self.assertIsNone(props._lognormal_cover_probability(10.0, 5.0, -1.0))
+
+    def test_model_probability_weight_zero_market_is_pure_normal(self) -> None:
+        # interceptions and passing_tds are shipped at weight 0.0 -- the
+        # OOS tune found no real benefit there. Must match the plain
+        # Normal-CDF probability exactly, not just approximately (a
+        # weight of 0.0 should short-circuit before any log-normal call).
+        import statistics as stdlib_statistics
+        mean, stdev, line = 1.2, 0.8, 1.5
+        normal_only = 1.0 - stdlib_statistics.NormalDist(mean, stdev).cdf(line)
+        self.assertEqual(props._COVER_PROBABILITY_BLEND_WEIGHT["interceptions"], 0.0)
+        blended = props._nfl_prop_model_probability(stat="interceptions", mean=mean, stdev=stdev, n=5, line=line)
+        self.assertEqual(blended, normal_only)
+
+    def test_model_probability_weighted_market_differs_from_pure_normal(self) -> None:
+        # rushing_yards ships at weight 0.573 (a real, non-trivial
+        # correction) -- the blended probability must actually differ from
+        # the pure-Normal one for a realistic right-skewed input, or the
+        # wiring did nothing.
+        self.assertGreater(props._COVER_PROBABILITY_BLEND_WEIGHT["rushing_yards"], 0.0)
+        mean, stdev, line = 60.0, 30.0, 60.0  # line AT the mean -- exactly where the defect was measured
+        import statistics as stdlib_statistics
+        normal_only = 1.0 - stdlib_statistics.NormalDist(mean, stdev).cdf(line)
+        blended = props._nfl_prop_model_probability(stat="rushing_yards", mean=mean, stdev=stdev, n=10, line=line)
+        self.assertNotEqual(blended, normal_only)
+        # A right-skewed distribution has P(X > mean) < 0.5 (mean sits
+        # above the median) -- the blend should move the probability DOWN
+        # from the Normal's exact 0.5 at line==mean, not up.
+        self.assertAlmostEqual(normal_only, 0.5)
+        self.assertLess(blended, 0.5)
+
+    def test_model_probability_falls_back_to_normal_when_lognormal_undefined(self) -> None:
+        # A market with a nonzero blend weight but a degenerate mean<=0
+        # input (e.g. a mostly-non-rushing player's rushing_yards rate)
+        # must still return the Normal-only probability, not None and not
+        # crash -- mean<=0 is exactly the case _lognormal_params_from_
+        # moments returns None for.
+        blended = props._nfl_prop_model_probability(stat="rushing_yards", mean=0.0, stdev=3.0, n=5, line=5.0)
+        import statistics as stdlib_statistics
+        normal_only = 1.0 - stdlib_statistics.NormalDist(0.0, 3.0).cdf(5.0)
+        self.assertEqual(blended, normal_only)
+
     def test_join_market_key_disambiguates_by_player(self) -> None:
         # Same bug class as MLB's hitter-RBI props (_mlb_prop_join_market_key):
         # every player sharing a market label must not collide in the join.
