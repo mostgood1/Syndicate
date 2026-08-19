@@ -16230,3 +16230,38 @@ Claim released: `deploy_claim.py release --service refresh-worker --holder baske
   had never received those either).
 - Claim released: `deploy_claim.py release --service live-odds-worker
   --token 0eaa645d79dc4ae4`.
+
+### #468 + #469 — EFFECT CONFIRMED on a real production cycle — 2026-08-19 ~15:13Z — lane `basketball-model-owner`
+
+Both deploys (`#468` wiring fix, `f13ea05e`/`e1d1bcf4`; `#469` boxscore
+silent-success fix, `e1d1bcf4`) were LIVE with runtime effect explicitly
+UNOBSERVED as of ~04:00Z the same day, because WNBA smart-sim generation is
+gated on `snapshot_rows > 0` (`scripts/refresh_wnba_oddsapi_props.py:4420`)
+-- it only runs once a game actually has posted sportsbook lines to
+snapshot, not on a fixed timer. At 04:00Z every remaining game that day had
+already been played and the next one (TOR@WSH, 2026-08-19T23:30Z) had no
+odds posted yet, so every autorun tick in between skipped predictions.
+
+**Measured now, `/api/ops/artifacts/export?names_only=1`:**
+- `wnba_source/data/processed/smart_sim_2026-08-19_WSH_TOR.json` --
+  age 14.53h at check time (ran ~00:40Z, well before the predicted
+  23:30Z game time -- OddsAPI evidently posted WNBA lines earlier than
+  the schedule mirror's listed tipoff, or the mirror's own kickoff time
+  was off; either way, a real sim cycle for this game did fire).
+- `wnba_source/data/processed/team_advanced_stats_2026_asof_20260818.csv`,
+  `..._20260819.csv`, `..._20260820.csv` -- all mtime `1787116318`/
+  `1787116158` (~15.0h old at check time), vs. the pre-#468 baseline
+  mtime `1784828578.03` that had been frozen since before this session's
+  deploys. THREE fresh as-of dates now exist where one stale file did
+  before.
+
+**Verdict: `#468`'s wiring fix is confirmed working end-to-end in
+production**, not just in the isolated scratch-copy tests from before
+deploy. The as-of rebuild fired on a real smart-sim call for a real game.
+
+**`#469` (boxscore bootstrap) not separately confirmed by this reading** --
+mtime evidence here is `team_advanced_stats`/`smart_sim` only. Whoever
+checks `#469` specifically should still pull `boxscores_history.csv`'s own
+max game date (not just its mtime) and check live-odds-worker's log stream
+for `BOXSCORE_BOOTSTRAP_STALLED`, per the standing instruction in the
+`#469` entry above -- this entry does not discharge that check.
