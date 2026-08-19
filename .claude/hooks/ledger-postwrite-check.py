@@ -6,7 +6,7 @@ all three files the ledger's invariants are defined over: `lanes.md`, `state.md`
 and `learnings.md`. The predicates live in `ledger_invariants.py` so the
 commit-boundary guard enforces exactly the same set.
 
-THE GAP IT FILLS. `lanes-append-guard.py` (PreToolUse) sees only
+THE GAP IT FILLS. `ledger-append-guard.py` (PreToolUse) sees only
 `Edit|Write|MultiEdit`, so a Bash write is invisible to it. `ledger-commit-guard.py`
 catches the same damage but only when someone COMMITS, which can be an hour
 later. `check_lane_invariants.py` / `state_key_check.py` run at session start,

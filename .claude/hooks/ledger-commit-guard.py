@@ -6,7 +6,7 @@ Covers `lanes.md`, `state.md` and `learnings.md`. The predicates live in
 two guards disagreeing about what "broken" means is worse than one guard.
 
 WHY THIS EXISTS, and why the PreToolUse file-tool guard was not enough.
-`lanes-append-guard.py` blocks the two ways `lanes.md` goes wrong, but it matches
+`ledger-append-guard.py` blocks the two ways `lanes.md` goes wrong, but it matches
 `Edit|Write|MultiEdit` and is therefore BLIND TO BASH. That is not an edge case
 here: this repo's own ledger tooling -- `trim_lane_blocks.py`,
 `hoist_open_lanes.py`, `compact_learnings.py`, `archive_released_lanes.py` --

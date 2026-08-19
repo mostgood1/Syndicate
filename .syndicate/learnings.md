@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 422 rules `[generated]`
+## Index — 423 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1426,3 +1426,38 @@ the guard was worth.
 **Related:** the same session asserted that a mid-flight hook could not protect
 running sessions, which one tool call disproved. Both were mechanisms invented to
 explain an observation, stated with more confidence than the evidence carried.
+
+## 2026-08-19 — RULE: exonerated as the CAUSE is not free of DEFECTS. Re-ask the narrower question.
+
+- The rule going forward: **when a suspect is cleared of causing the symptom you
+  were chasing, ask separately whether it is nonetheless broken.** An exoneration
+  answers one question — "did this cause X" — and it is routinely read as
+  answering a bigger one, "is this fine". Those come apart, and the second
+  question is cheap to ask once you are already looking at the thing.
+
+**MEASURED.** `psutil`'s absence was claimed as the cause of web's dead
+`deploy_preflight` sample, disproved, and recorded as "real, but incidental" —
+correctly, since production is Linux and the procfs backend enumerates 4 of 4
+processes without it. That exoneration then read as "psutil is not a problem",
+and it nearly hid a genuine one: **Windows has no `/proc`, so on the dev machine
+psutil is the ONLY working backend, and it was installed ad hoc and declared in
+no requirements file.** With it, 433 processes enumerate; without it, 2 — and the
+function DEGRADES rather than raising, so a fresh Windows clone would have shown
+2 and reported success.
+
+**THE SHAPE.** The disproof was about PRODUCTION and the defect was about LOCAL.
+An exoneration is scoped to the environment, question and time it was measured
+in; carrying it further than that is the same error as carrying a stale liveness
+read or a handed-down baseline.
+
+**WHAT THE FIX HAD TO PRESERVE.** Declaring the dependency where it is actually
+needed (`requirements-dev.txt`) and NOT in production, with the reasoning written
+beside the line, because the tempting version of this fix — adding psutil to
+`requirements.txt` — is exactly the move the ledger warns "would fix nothing and
+look exactly like a fix". **A correct fix and a fix-shaped mistake can differ by
+one file.**
+
+**Related:** [[feedback_retraction_is_not_innocence]] — withdrawing a bad
+attribution gives "not proven guilty", never "proven innocent". This is its
+mirror: proving something did not cause X says nothing about whether X's suspect
+works.
