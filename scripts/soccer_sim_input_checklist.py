@@ -27,6 +27,7 @@ CONSUMED + UNPOPULATED is the alarm, and it exits non-zero.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from dataclasses import fields
 from pathlib import Path
@@ -92,7 +93,8 @@ def main() -> int:
     # direction is not, and a stale fixture can do both.
     import csv
 
-    hist = sorted((REPO / "data/soccer_source/eredivisie/history").glob("matches_*.csv"))
+    hist_dir = REPO / "data/soccer_source/eredivisie/history"
+    hist = sorted(hist_dir.glob("matches_*.csv"))
     if not hist:
         print("  cannot run: no eredivisie match history on disk")
         return 2
@@ -100,8 +102,14 @@ def main() -> int:
     for path in hist:
         with path.open(encoding="utf-8", newline="") as fh:
             rows.extend(dict(r) for r in csv.DictReader(fh))
+    # Same optional ESPN backfill the two production loaders now read
+    # (`build_soccer_artifacts.py`, `backtest_soccer_h2h_calibration.py`) --
+    # kept in sync here on purpose, or this gate silently stops representing
+    # what production actually feeds.
+    espn_path = hist_dir / "espn_match_stats.json"
+    espn_stats = json.loads(espn_path.read_text(encoding="utf-8")) if espn_path.exists() else []
     ratings = compute_team_ratings(
-        team_rows_from_match_history(rows), as_of="2026-08-19", allow_undated=False
+        team_rows_from_match_history(rows, espn_stats=espn_stats), as_of="2026-08-19", allow_undated=False
     )
     if len(ratings) < 2:
         print(f"  cannot run: only {len(ratings)} rated teams from {len(rows)} history rows")

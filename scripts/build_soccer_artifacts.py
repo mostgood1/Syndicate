@@ -73,7 +73,19 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
         if not frames:
             raise SystemExit(f"no match history under {history_dir}; run fetch_soccer_history_local.py --kind matches first")
         match_rows = pd.concat(frames, ignore_index=True).to_dict("records")
-        rows = team_rows_from_match_history(match_rows)
+        # Possession%/set-piece-goal-share, if `espn_match_stats.py`'s offline
+        # backfill has been run for this league. Absent file -> empty list ->
+        # `team_rows_from_match_history` behaves exactly as before -- this is
+        # the PRODUCTION path, so a league with no backfill yet must not raise
+        # or degrade, only miss out on the two extra fields.
+        espn_path = history_dir / "espn_match_stats.json"
+        espn_stats = []
+        if espn_path.exists():
+            try:
+                espn_stats = json.loads(espn_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                espn_stats = []
+        rows = team_rows_from_match_history(match_rows, espn_stats=espn_stats)
         return compute_team_ratings(rows, as_of=as_of, window=90)
     history_dir = source_root / league / "team_history"
     frames = [pd.read_csv(path) for path in sorted(history_dir.glob("teams_*.csv"))]

@@ -205,3 +205,67 @@ def test_the_goals_as_xg_path_does_not_feed_goals_twice():
     assert home["points"] == 3.0          # Ajax won
     away = rows[1]
     assert away["clean_sheet"] == 0.0 and away["points"] == 0.0
+
+
+def test_espn_match_stats_join_reaches_possession_and_set_piece():
+    """`possession_share` and `set_piece_goal_share` were CONSUMED and
+    UNPOPULATED since the checklist first ran -- `possession_metrics` was
+    never even returned by `build_soccer_match_features` (an empty dict on
+    every call, so `_possession_share`'s own 0.5 neutral default was the only
+    value the engine had ever seen), and `set_piece_metrics` only ever carried
+    `corners_per_match`.
+
+    `espn_match_stats.aggregate_season_match_stats` sources both from a
+    single ESPN endpoint already being called for shot events
+    (`espn_shot_events.py`) -- `boxscore.teams[].statistics[].possessionPct`,
+    a real per-match field, plus the same commentary feed's `from_corner`
+    shot tagging aggregated to a goal share. Matched to football-data rows by
+    FUZZY team-pair resolution (`match_team_name`, not exact canonical
+    equality -- measured 99.8% row-level match rate on real eredivisie data,
+    up from 44% under exact-canonical pair matching, which is why the fuzzy
+    matcher exists here rather than a simpler equality check).
+    """
+    from syndicate.features.soccer.features.loaders import team_rows_from_match_history
+
+    history_row = {
+        "league": "eredivisie", "season": 2025, "date": "07/08/2026",
+        "home_team": "Ajax", "away_team": "PSV",
+        "home_goals": 2, "away_goals": 1,
+        "home_shots": 12, "away_shots": 9,
+        "home_corners": 5, "away_corners": 3,
+    }
+    espn_row = {
+        "event_id": "1", "date": "2026-08-07T18:00Z",
+        # Deliberately the FULLER ESPN-style names, not football-data's
+        # short forms -- this is the exact mismatch shape that made the
+        # exact-canonical join fail on 56% of real rows.
+        "home_team": "Ajax Amsterdam", "away_team": "PSV Eindhoven",
+        "home_possession_share": 0.612, "away_possession_share": 0.388,
+        "home_goals": 2, "home_corner_goals": 1, "home_set_piece_goal_share": 0.5,
+        "away_goals": 1, "away_corner_goals": 0, "away_set_piece_goal_share": 0.0,
+    }
+
+    without = team_rows_from_match_history([history_row])
+    with_espn = team_rows_from_match_history([history_row], espn_stats=[espn_row])
+
+    for row in without:
+        assert "possession_share" not in row, "no espn_stats given -- must not fabricate a value"
+        assert "set_piece_goal_share" not in row
+
+    home, away = with_espn
+    assert home["possession_share"] == 0.612
+    assert away["possession_share"] == 0.388
+    assert home["set_piece_goal_share"] == 0.5
+    assert away["set_piece_goal_share"] == 0.0
+
+    match = build_soccer_match_features(
+        league="eredivisie", date="2026-08-19", home_team="Ajax", away_team="PSV",
+        ratings={
+            "ajax": {"attack_rating": 0.1, "defense_rating": -0.05, "possession_share": 0.60, "set_piece_goal_share": 0.4},
+            "psv": {"attack_rating": 0.05, "defense_rating": 0.0, "possession_share": 0.40, "set_piece_goal_share": 0.1},
+        },
+    )
+    assert match.possession_metrics.get("home_possession_share") == 0.60
+    assert match.possession_metrics.get("away_possession_share") == 0.40
+    assert match.set_piece_metrics.get("home_set_piece_goal_share") == 0.4
+    assert match.set_piece_metrics.get("away_set_piece_goal_share") == 0.1

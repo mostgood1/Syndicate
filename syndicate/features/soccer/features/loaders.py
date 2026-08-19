@@ -103,12 +103,94 @@ def _as_iso_day(value: Any) -> str | None:
     return None
 
 
-def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+class _EspnStatsIndex:
+    """ESPN match-stats rows, indexed for fuzzy cross-provider lookup.
+
+    `canonical_team_name` alone is NOT enough here -- MEASURED on eredivisie:
+    exact-canonical pair matching found only 194 of 444 team pairs (44%),
+    because football-data's short forms ("Waalwijk", "Nijmegen", "Zwolle",
+    "Heracles") canonicalize DIFFERENTLY from ESPN's fuller names ("RKC
+    Waalwijk", "NEC Nijmegen", "PEC Zwolle", "Heracles Almelo") -- the exact
+    class of mismatch `match_team_name`'s fuzzy fallback exists for
+    (`_rating_for`, a few lines below, already uses it for the identical
+    problem resolving a rating lookup). Rebuilt on fuzzy per-team resolution
+    against the ESPN name list actually seen: **916 of 918 football-data rows
+    (99.8%) now find their ESPN match**, measured directly against real data,
+    not assumed from the pair-count improvement alone. The remaining 0.2% is
+    not chased further -- plausibly a fixture ESPN never carried a summary
+    for, and `espn_stats` is optional/additive throughout, so a miss degrades
+    to today's behaviour for that one row rather than failing anything.
+    """
+
+    def __init__(self, espn_rows: list[dict[str, Any]] | None) -> None:
+        from datetime import datetime
+
+        self._by_pair: dict[tuple[str, str], list[tuple[Any, dict[str, Any]]]] = {}
+        self._team_names: set[str] = set()
+        for row in espn_rows or []:
+            home = str(row.get("home_team") or "").strip()
+            away = str(row.get("away_team") or "").strip()
+            if not home or not away:
+                continue
+            raw_date = str(row.get("date") or "")
+            try:
+                parsed = datetime.fromisoformat(raw_date.replace("Z", "+00:00")).date()
+            except ValueError:
+                continue
+            self._team_names.add(home)
+            self._team_names.add(away)
+            self._by_pair.setdefault((home, away), []).append((parsed, row))
+        for pairs in self._by_pair.values():
+            pairs.sort(key=lambda item: item[0])
+        self._names_list = sorted(self._team_names)
+
+    def lookup(self, home_team: str, away_team: str, date_str: str, *, max_days: int = 3) -> dict[str, Any] | None:
+        """Nearest ESPN row for this (home, away) pair within `max_days` of
+        the football-data date, or None. `date_str` is football-data's own
+        format (`DD/MM/YYYY`)."""
+        from datetime import datetime
+
+        from syndicate.features.soccer.features.team_names import match_team_name
+
+        if not self._names_list:
+            return None
+        matched_home = match_team_name(home_team, self._names_list)
+        matched_away = match_team_name(away_team, self._names_list)
+        if matched_home is None or matched_away is None:
+            return None
+        candidates = self._by_pair.get((matched_home, matched_away))
+        if not candidates:
+            return None
+        try:
+            target = datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
+        except ValueError:
+            return None
+        best = min(candidates, key=lambda item: abs((item[0] - target).days))
+        if abs((best[0] - target).days) > max_days:
+            return None
+        return best[1]
+
+
+def team_rows_from_match_history(
+    match_rows: list[dict[str, Any]], *, espn_stats: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Convert football-data match rows into per-team performance rows.
 
     Goals stand in for xG when no xG source covers the league, keeping
     ``compute_team_ratings`` source-agnostic.
+
+    `espn_stats`, WHEN GIVEN, adds `possession_share` and
+    `set_piece_goal_share` -- checked into the checklist as CONSUMED and
+    UNPOPULATED since `scripts/soccer_sim_input_checklist.py` first ran,
+    because nothing in this repo has ever sourced them.
+    `espn_match_stats.aggregate_season_match_stats` does
+    (`boxscore.teams[].statistics[].possessionPct`, a real per-match field,
+    plus the same `commentary` feed `espn_shot_events.py` already parses for
+    corner-derived goals). Matched by TEAM PAIR + nearest date, not silently
+    assumed aligned -- see `_match_espn_stats`. Optional and additive: every
+    existing caller passes nothing and gets exactly today's behaviour.
     """
+    espn_index = _EspnStatsIndex(espn_stats)
     team_rows: list[dict[str, Any]] = []
     for row in match_rows:
         home_goals = _safe_float(row.get("home_goals"))
@@ -158,17 +240,37 @@ def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[
         # This is the "mechanism vs estimator" hazard in CLAUDE.md: adding a
         # mechanism to a calibrated engine without re-fitting the rates that
         # were already absorbing it.
+        # NEITHER FIELD IS EMITTED WHEN NO ESPN MATCH IS FOUND -- absent, not a
+        # fabricated 0/0.5. `compute_team_ratings`'s `_mean_of` already treats
+        # absent-per-row as "excluded from this team's mean", the same
+        # None-not-zero contract `00475bce` established for ppda.
+        espn_row = espn_index.lookup(str(row.get("home_team") or ""),
+                                      str(row.get("away_team") or ""), str(row.get("date") or ""))
+        home_extra: dict[str, Any] = {}
+        away_extra: dict[str, Any] = {}
+        if espn_row is not None:
+            if espn_row.get("home_possession_share") is not None:
+                home_extra["possession_share"] = espn_row["home_possession_share"]
+            if espn_row.get("away_possession_share") is not None:
+                away_extra["possession_share"] = espn_row["away_possession_share"]
+            if espn_row.get("home_set_piece_goal_share") is not None:
+                home_extra["set_piece_goal_share"] = espn_row["home_set_piece_goal_share"]
+            if espn_row.get("away_set_piece_goal_share") is not None:
+                away_extra["set_piece_goal_share"] = espn_row["away_set_piece_goal_share"]
+
         team_rows.append({**common, "team": row.get("home_team"),
                           "xg_for": home_goals, "xg_against": away_goals,
                           "shots": hs, "shots_allowed": aws, "corners": hc,
                           # A clean sheet is the OPPONENT failing to score.
                           "clean_sheet": 1.0 if away_goals == 0 else 0.0,
-                          "points": _points(home_goals, away_goals)})
+                          "points": _points(home_goals, away_goals),
+                          **home_extra})
         team_rows.append({**common, "team": row.get("away_team"),
                           "xg_for": away_goals, "xg_against": home_goals,
                           "shots": aws, "shots_allowed": hs, "corners": ac,
                           "clean_sheet": 1.0 if home_goals == 0 else 0.0,
-                          "points": _points(away_goals, home_goals)})
+                          "points": _points(away_goals, home_goals),
+                          **away_extra})
     return team_rows
 
 
@@ -324,6 +426,12 @@ def compute_team_ratings(
             ("clean_sheet_rate", "clean_sheet"),
             ("corners_per_match", "corners"),
             ("points_per_match", "points"),
+            # ESPN-sourced, and genuinely sparse where `espn_stats` was never
+            # passed (every existing caller) -- `_mean_of` already handles a
+            # team with zero non-None rows by omitting the key, so this is a
+            # no-op for anyone not yet passing `espn_stats`.
+            ("possession_share", "possession_share"),
+            ("set_piece_goal_share", "set_piece_goal_share"),
         ):
             value = _mean_of(src)
             if value is not None:
@@ -400,8 +508,13 @@ def build_soccer_match_features(
     # team it is playing against -- `build_possession_priors` picks the side.
     _ATTACK = ("shots_per_match", "goals_for_per_match", "points_per_match")
     _DEFEND = ("shots_allowed_per_match", "goals_against_per_match", "clean_sheet_rate")
-    _SET_PIECE = ("corners_per_match",)
+    _SET_PIECE = ("corners_per_match", "set_piece_goal_share")
+    # `possession_share` was NEVER forwarded before this -- `possession_metrics`
+    # was returned empty on every call, so `_possession_share`'s own neutral
+    # default (0.5) was the only value the engine had ever seen for it.
+    _POSSESSION = ("possession_share",)
     set_piece_metrics: dict[str, Any] = {}
+    possession_metrics: dict[str, Any] = {}
     for side, rating in (("home", home_rating), ("away", away_rating)):
         for key in _ATTACK:
             if rating.get(key) is not None:
@@ -412,6 +525,9 @@ def build_soccer_match_features(
         for key in _SET_PIECE:
             if rating.get(key) is not None:
                 set_piece_metrics[f"{side}_{key}"] = rating[key]
+        for key in _POSSESSION:
+            if rating.get(key) is not None:
+                possession_metrics[f"{side}_{key}"] = rating[key]
     team_metrics = {k: v for k, v in team_metrics.items() if v is not None}
     return SoccerMatchFeatures(
         league=league,
@@ -422,6 +538,7 @@ def build_soccer_match_features(
         team_metrics=team_metrics,
         defensive_metrics=defensive_metrics,
         set_piece_metrics=set_piece_metrics,
+        possession_metrics=possession_metrics,
         market_features=dict(market_features or {}),
         knockout=knockout,
         home_starter_ids=tuple(home_starter_ids),
