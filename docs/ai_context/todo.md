@@ -90,6 +90,64 @@ mirror and never the source of truth. The options, with their costs:
 Until one is chosen the workflow is *honest but still incomplete* — it will now
 say so on every run rather than reporting a success it did not earn.
 
+#### RESOLVED 2026-08-19 — option 1 chosen `[user decision]`, BUILT and RUN against production
+
+**Scope decided: back up the small-file tail, skip the append-only giants.**
+
+Step 12 no longer issues a bulk body export at all. It now:
+
+1. calls `?since=<26h>&names_only=1` — **the one call that cannot truncate**,
+   because that path never reads a file so there is no budget to exceed (the
+   handler says so itself). This is what makes the whole design safe;
+2. drops every candidate over a per-file cap (default 1 MiB) — which is exactly
+   the append-only growers, and reports how many and how many bytes;
+3. fetches each surviving file individually with `?path=`, one small body per
+   request. **Bounded memory on the 2GB web service and on the runner, with no
+   budget raise anywhere.**
+
+**A CORRECTION to the figures this item was decided on.** The options above
+quoted "~30MB/day" for the small-file tail. That was the **1-hour** sample
+extrapolated carelessly. The real **26-hour** figure is **370 files /
+51,538,751 bytes**, so the git cost is nearer **19GB/year** than the 11GB
+implied. The decision still holds — it is the only option that both fits the
+budget and protects the long tail — but the cost was understated when it was
+made, and that belongs on the record rather than in a footnote.
+
+**MEASURED — the step script extracted from the YAML and executed against
+production web in an isolated scratch git repo** (so the real tree was never
+touched; verified afterwards that no `data/` path in the repo changed):
+
+    ==> Wrote 174 of 216 changed artifact(s) (80.6%); 42 skipped over cap, 0 failed
+    EXIT=0   elapsed=75.4s   (BACKUP_SINCE_HOURS=1)
+
+- **80.6% of the changed set, against 0.10% before.** The missing 19.4% is the
+  42 deliberately-skipped giants (347,026,834 bytes).
+- 173 of the 174 staged paths match step 13's `^data/[^/]+_source/` gate, so the
+  commit step passes.
+- Coverage is now **MLB 87, soccer 84, WNBA 2** — previously 8 files, MLB only.
+- Zero files over the cap reached disk. `GITHUB_STEP_SUMMARY` rendered correctly.
+
+**Reported as a RATE with its denominator, deliberately.** "Wrote 8 artifact
+file(s)" was literally true every day while 0.10% was captured; a bare count is
+what let that read as success.
+
+**Two `workflow_dispatch` inputs added** so this is tunable without editing the
+file: `backup_since_hours` (default 26 — not 24, since a window equal to the
+cadence loses whatever is written between two runs' start times) and
+`backup_max_file_bytes` (default 1048576). A recovery run after a gap can widen
+the window; a **stateless window cannot self-heal** a gap like
+2026-07-15..2026-08-19 on its own, which is why the knob exists.
+
+**One failure mode is still red on purpose:** candidates existed, were within
+cap, and every fetch failed. That is a broken backup rather than a quiet day.
+"Nothing changed in the window" stays a warning and exits 0.
+
+**STILL NOT PROVEN, and this is the honest limit of the above:** the step has
+been run by hand against production, not by the workflow. `Daily Update`'s own
+steps 12-13 have not executed since 2026-07-15. **The next scheduled 06:00Z run
+is the first end-to-end exercise; do not record the path as working until one
+shows both steps green.**
+
 ### `#480` — **CI HAD BEEN RED ON EVERY PUSH TO `main` FOR 26 HOURS, AND THE DAILY UPDATE WORKFLOW FOR 34 DAYS. BOTH ROOT-CAUSED AND FIXED; ONE CAUSE EACH, NEITHER A PRODUCT DEFECT** — FOUND+FIXED 2026-08-19, lane `ci-green`
 
 **The complaint that started it:** "anytime we deploy to git there are CI errors."

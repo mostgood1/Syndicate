@@ -1384,7 +1384,7 @@ history directly:
 - Blocked by: none, pending the `run_refresh_worker.py` coordination note
   above.
 
-### daily-update-backup-truncation — OPEN — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+### daily-update-backup-truncation — CLOSED 2026-08-19 — **Backup rebuilt to the user's chosen scope and RUN against production: 174 of 216 changed artifacts (80.6%), 0 failed, exit 0 — against 8 of 7,909 (0.10%) before. NOT yet exercised BY THE WORKFLOW; next 06:00Z run is the first.** — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Goal: the `Daily Update` backup step stops reporting SUCCESS while silently
   dropping 99.9% of what it was asked to back up. Testable: a run that
   truncates says so, in the job output, with the ratio.
@@ -1427,7 +1427,25 @@ history directly:
   Whether the backup should then be made COMPLETE is a design decision with
   repo-size consequences (8.46GB cannot go into git) and is the user's call,
   not this lane's — see `#481`.
-- Blocked by: user decision on backup scope (asked 2026-08-19).
+- **UNBLOCKED + SHIPPED. Scope decision: back up the small-file tail, skip the
+  append-only giants** `[2026-08-19, user]`. Step 12 no longer does a bulk body
+  export: `?names_only=1` for the inventory (the one call that CANNOT truncate),
+  a per-file cap (default 1MiB) that drops exactly the growers, then `?path=`
+  per surviving file. Bounded memory both ends, no budget raise.
+- **VERIFICATION RAN — script extracted from the YAML and executed against
+  production in an ISOLATED scratch git repo** (real tree never touched;
+  confirmed afterwards that no repo `data/` path changed):
+  `Wrote 174 of 216 changed artifact(s) (80.6%); 42 skipped over cap, 0 failed`,
+  `EXIT=0`, 75.4s. 173/174 staged paths satisfy step 13's gate. Coverage MLB 87
+  / soccer 84 / WNBA 2, versus 8 MLB-only files before. No over-cap file
+  reached disk.
+- **Correction on the record:** the option was decided on "~30MB/day", which was
+  a 1h sample extrapolated carelessly. The true 26h figure is 370 files /
+  51,538,751 bytes — ~19GB/year of git growth, not ~11GB. Decision unchanged;
+  the understatement is logged rather than quietly fixed.
+- **NOT proven and not claimed:** the WORKFLOW has still not run these steps
+  since 2026-07-15. The next 06:00Z run is the first end-to-end test.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
