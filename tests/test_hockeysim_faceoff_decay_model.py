@@ -10,6 +10,7 @@ import pytest
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
     segment_average_multipliers,
     segment_average_multipliers_dz,
+    segment_average_multipliers_nz,
     segment_average_multipliers_oz,
 )
 
@@ -173,5 +174,54 @@ def test_oz_typical_engine_segment_length_shows_a_real_and_larger_effect():
 @pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
 def test_oz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
     result = segment_average_multipliers_oz(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+def test_nz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_nz(5.0)
+    assert result.winner_mult == pytest.approx(1.4964, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.5036, abs=1e-4)
+
+
+def test_nz_effect_is_weaker_than_the_general_curve_at_every_matched_length():
+    """The general (blended) curve's short-segment integral is dominated by the OZ-heavy portion
+    of its population (OZ's raw winner rate is far larger per-draw than NZ's, even though NZ is
+    the largest of the three zone populations by draw COUNT) -- checked directly via the
+    TIME-WEIGHTED INTEGRAL both curves actually use, not assumed from the marginal buckets alone
+    (which show a MIXED bucket-by-bucket picture, NZ briefly exceeding the general curve in the
+    mid-range before the comparison is integrated)."""
+    for seg_len in (5.0, 10.0, 20.0, 42.5, 90.0, 1200.0):
+        nz = segment_average_multipliers_nz(seg_len)
+        general = segment_average_multipliers(seg_len)
+        assert nz.winner_mult <= general.winner_mult, f"failed at seg_len={seg_len}"
+
+
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_nz_mean_of_winner_and_other_is_always_one(seg_len):
+    result = segment_average_multipliers_nz(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-4)
+
+
+def test_nz_very_long_segment_converges_to_baseline():
+    """Like the general and OZ curves (unlike DZ), the NZ curve fully reconverges within the
+    measured range -- a very long segment should land at essentially the no-effect baseline."""
+    result = segment_average_multipliers_nz(1200.0)
+    assert result.winner_mult == pytest.approx(1.0, abs=0.05)
+    assert result.other_mult == pytest.approx(1.0, abs=0.05)
+
+
+def test_nz_typical_engine_segment_length_still_shows_a_real_effect():
+    """At the engine's real ~40-45s segment length, the NZ winner should still show a measurable
+    positive edge -- weaker than the general curve's own (see the dedicated comparison test above),
+    but a REAL effect, not a no-op."""
+    nz = segment_average_multipliers_nz(42.5)
+    assert nz.winner_mult > 1.0
+    assert nz.other_mult < 1.0
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_nz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
+    result = segment_average_multipliers_nz(bad)
     assert result.winner_mult == 1.0
     assert result.other_mult == 1.0

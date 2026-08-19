@@ -598,3 +598,29 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   equal weight to every caveat above, not less because n went up: this is
   evidence the harness holds up against a real production pull, not
   evidence of an edge on a still-far-from-powered sample.
+- **Did** build the NZ discrete-event faceoff curve (reference doc §2w, full
+  report `docs/reports/hockeysim_faceoff_nz_discrete_event_report.md`) —
+  reversing an earlier decision (§2p) not to wire `faceoff_nz_index` at all,
+  on the strength of real evidence rather than a change of mind. §2p's
+  season-aggregate check found no correlation between NZ win rate and real
+  shot generation; §2s later proved a season-aggregate null doesn't rule
+  out a real segment-level effect (DZ's own season correlation was equally
+  null, yet its segment effect was real, just backwards), so NZ's
+  segment-level effect got the same direct check: winner share 0.7203 at
+  10s decaying to 0.5945 at 30s (20,642 real draws), a real effect in the
+  EXPECTED direction, unlike DZ. **A real correction caught before
+  shipping**: an early docstring draft claimed the NZ curve was "stronger
+  than the general curve's blend" from the marginal buckets alone;
+  computing the actual time-weighted INTEGRAL both curves use (the real
+  comparison) at 7 segment lengths showed the opposite — NZ sits BELOW the
+  general curve at every length, because the general curve's early strength
+  is disproportionately driven by the OZ-heavy portion of its pooled
+  population. Wired end to end for the first time (CSV producer, loader,
+  `engine.py`, as a third additional layer alongside DZ, same bilateral
+  gate) with no legacy fallback, since this signal was never live before.
+  Verified: 17 new unit tests (85 total in the decay-model file), 3 new
+  reachability tests, 1 loader test, league-wide aggregate barely moved
+  (61.795 off vs 61.774 on, −0.034%, 992-pairing round-robin), 456
+  hockeysim/nhl tests pass, checklist re-confirmed full PASS. **This closes
+  the faceoff-zone track's last open signal** — EV, OZ, DZ, and NZ all now
+  have their own real, measured, discrete-event mechanism.

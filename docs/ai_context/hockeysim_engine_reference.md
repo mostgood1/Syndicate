@@ -989,10 +989,46 @@ does, proving the bilateral gate actually gates); 433+ hockeysim/nhl tests pass;
 aggregate barely moved (992-pairing round-robin, general 62.127 vs OZ-specific 62.284 avg total
 shots/game, +0.253%); checklist re-confirmed full PASS.
 
-**What this does NOT do**: no NZ-specific curve was built (§2p's decision not to wire
-`faceoff_nz_index` at all stands); the general curve remains the fallback for segments where only
-EV-tier data is available (no genuinely EV-specific, OZ-excluded curve was built); no re-derivation
-of the general curve's own composition.
+**What this section flagged as future work — §2p's non-wiring decision — revisited next, §2w, and
+reversed with real evidence.**
+
+---
+
+## 2w. NZ discrete-event curve — reversing §2p's decision, with evidence
+
+Full report: `docs/reports/hockeysim_faceoff_nz_discrete_event_report.md`. §2p checked NZ against
+real SEASON-AGGREGATE shot generation, found no correlation, and declined to wire it. §2s later
+proved a season-aggregate null does not rule out a real segment-level effect (DZ's own season
+correlation was equally null; its segment effect was real, just backwards) — so NZ's segment-level
+effect got the same direct check DZ did.
+
+**Result: a real, monotonically decaying effect, in the EXPECTED direction** (unlike DZ) —
+`compute_post_faceoff_shots(..., winner_zone="N")`, 20,642 real draws: winner share 0.7203 at 10s
+decaying to 0.5945 at 30s (2.576x → 1.466x). The marginal decay curve (`--winner-zone N`) decays
+smoothly to exact parity by (45,60]s, fully reconverging like the general and OZ curves.
+
+**A real correction caught before shipping**: an early docstring draft claimed NZ was "stronger
+than the general curve's blend," reasoning from marginal buckets where NZ's mid-range briefly
+exceeds the general curve. Computing the actual TIME-WEIGHTED INTEGRAL both curves use (the
+comparison that matters) at 7 segment lengths showed the OPPOSITE — NZ sits below the general
+curve at every length, because the general curve's early-bucket strength is disproportionately
+driven by the OZ-heavy portion of its pooled population. Caught by checking the metric actually
+used, not a proxy for it, before publishing the claim.
+
+**Wired end to end for the first time**: `faceoff_nz_index` (built in §2p, never wired) now has a
+CSV column, a loader entry, and an `engine.py` consumer — a THIRD additional multiplicative layer
+composed alongside DZ, bilateral-gated the same way. Wired straight to the discrete-event curve
+with **no legacy fallback** (unlike DZ, this signal was never live with a wrong direction to
+preserve for rollback) — `faceoff_nz_discrete_event_model=False` disables the layer outright.
+
+**Verified**: 17 new unit tests (85 total in the decay-model file), 3 new reachability tests
+(changes output; bilateral gate; flag fully disables), 1 new loader test, checklist and full suite
+re-confirmed, league-wide aggregate barely moved (see the report for the measured round-robin
+delta). Real per-team spread: TOR (1.125x) to SEA (0.927x), mean 0.99997 across 32 teams.
+
+**This closes the faceoff-zone track's last open signal.** EV, OZ, DZ, and NZ all now have their
+own real, measured, discrete-event mechanism. What remains deliberately unbuilt: strength-state
+(PP/PK) faceoff effects, and the vendor's original block-rate EV:PK:PP-def ratio.
 
 ---
 
@@ -1063,6 +1099,7 @@ concept.
 | `engine.py`'s `faceoff_dz_direction_fixed` (§2t) — the narrow fix §2s recommended: swaps which side's shots `m_dz_h`/`m_dz_a` apply to, matching the measured direction | built, tested (existing reachability test caught the direction change immediately, updated; 1 new flag-reachability test), verified the league-wide average barely moved (62.230 legacy vs 62.106 fixed, −0.199%, 992-pairing round-robin) | **reachable, DEFAULT ON**; now the middle tier of §2u's 3-tier fallback, superseded as the default path but still exercised when `faceoff_dz_discrete_event_model=False` |
 | `historical_truth/faceoff_decay_model.py::segment_average_multipliers_dz` + `engine.py`'s `faceoff_dz_discrete_event_model` (§2u) — the proper DZ redesign, same treatment §2r gave the general case | built, tested (34 unit incl. 17 new + 2 new reachability), verified the league-wide average barely moved (62.082 legacy-direction-fixed vs 62.196 discrete-event, +0.185%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the third genuinely new flag this session's work introduced; 416 tests pass with it as the default |
 | `historical_truth/faceoff_decay_model.py::segment_average_multipliers_oz` + `engine.py`'s `faceoff_oz_specific_curve` (§2v) — closes the precision mismatch between the already-preferred OZ percentage and the still-general decay curve consuming it | built, tested (51 unit incl. 17 new + 2 new reachability, incl. a bilateral-gate test), verified the league-wide average barely moved (62.127 general-curve vs 62.284 OZ-specific, +0.253%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the fourth genuinely new flag this session's work introduced; 433+ tests pass with it as the default |
+| `faceoff_nz_index` wired end to end for the first time (CSV producer, loader, `engine.py`) + `historical_truth/faceoff_decay_model.py::segment_average_multipliers_nz` (§2w) — reverses §2p's non-wiring decision on the strength of a real segment-level check | built, tested (17 new unit tests, 85 total in the decay-model file; 3 new reachability tests incl. bilateral-gate and flag-disables-layer; 1 new loader test), verified the league-wide average barely moved (61.795 off vs 61.774 on, −0.034%, 992-pairing round-robin) | **reachable, DEFAULT ON**, no legacy fallback (never live with any wiring before this pass); 456 tests pass with it as the default; closes the faceoff-zone track's last open signal |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **Almost all of it is additive and reachable-by-default with no flag to flip** — the four

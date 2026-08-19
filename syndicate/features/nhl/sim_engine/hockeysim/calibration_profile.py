@@ -133,6 +133,11 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # whenever both sides' resolved percentage actually came from real OZ index data. Only takes
     # effect when `faceoff_discrete_event_model=True`. Round-robin verified.
     faceoff_oz_specific_curve=True,
+    # §2w: NZ, built in §2p but deliberately left unwired pending a segment-level check that (unlike
+    # the null season-aggregate correlation) found a real, expected-direction effect (winner share
+    # 0.72 at 10s decaying to 0.59 at 30s, 20,642 real draws, `winner_zone="N"`). Wired straight to
+    # the discrete-event curve -- never live with a wrong direction, so no legacy fallback exists.
+    faceoff_nz_discrete_event_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

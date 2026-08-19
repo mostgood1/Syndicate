@@ -79,6 +79,38 @@ the same design property that already handles the DZ curve's own extremes.
 OZ USES THE GENERAL CURVE AS ITS OWN FALLBACK, NOT THE DZ CURVE'S TAIL-HOLD BEHAVIOR. Because this
 curve DOES fully reconverge (unlike DZ), buckets beyond 90s are held at 1.0/1.0 exactly like the
 general curve -- there is no unconverged tail to preserve here.
+
+NZ-SPECIFIC CURVE (`segment_average_multipliers_nz`), added in a fourth pass -- after `#463`'s own
+season-aggregate check (`hockeysim_faceoff_nz_calibration_report.md`) found no correlation and
+declined to wire `faceoff_nz_index` at all. The DZ pass had already proven a season-aggregate null
+does not rule out a real segment-level effect (DZ's own season correlation was equally null, yet
+its segment effect was real, just backwards) -- so NZ's segment-level effect was checked directly,
+the same population `hockeysim_faceoff_dz_segment_validation_report.md`'s OZ control already used
+as a comparison point, via `winner_zone="N"` (20,642 real draws). Unlike the season-aggregate
+check, this DOES show a real effect, in the EXPECTED direction: winner share 0.7203 at 10s decaying
+smoothly to 0.5945 at 30s (ratio 2.576x -> 1.466x) -- weaker than OZ's spike, stronger than the
+general curve's blend, and (unlike DZ) in the SAME direction the general/OZ effect already
+established. This reverses the earlier decision: `faceoff_nz_index` is now wired (CSV producer,
+loader, `engine.py`), matching the OZ index's own wiring history (built, deliberately unwired
+pending validation, then wired once validation supported it).
+
+THE NZ CURVE RECONVERGES CLEANLY, LIKE THE GENERAL AND OZ CURVES, NOT DZ'S UNRESOLVED TAIL. Raw
+ratio 2.97x in the first 5 seconds decaying smoothly and almost monotonically -- 2.48x, 2.01x,
+1.25x, 1.14x, 0.95x, 1.00x (exact parity), 1.04x -- to full convergence by (45,60]s. Held flat at
+1.0/1.0 beyond 90s like the general/OZ curves, not DZ's held-tail convention, since the data
+supports full reconvergence here.
+
+NZ'S INTEGRATED EFFECT IS CONSISTENTLY WEAKER THAN THE GENERAL CURVE'S OWN -- CHECKED DIRECTLY,
+NOT ASSUMED FROM THE MARGINAL BUCKETS. The raw marginal buckets alone are a MIXED comparison (NZ's
+own first bucket, 1.4964, sits BELOW the general curve's 1.7548, but several middle buckets sit
+slightly above it) -- an earlier draft of this docstring generalized from that mixed picture to a
+wrong claim ("stronger than the general blend"), caught by computing the actual TIME-WEIGHTED
+INTEGRATED comparison the engine uses (`segment_average_multipliers` vs `_nz`) at seven segment
+lengths (5s to 1200s): NZ sits BELOW the general curve at every one of them, because the general
+curve's own strong early bucket (driven by the OZ-heavy portion of its blended population) makes
+its short-segment integral higher than NZ's more modest early spike, even though NZ briefly
+exceeds it bucket-by-bucket in the mid-range. This is the correct comparison to state as a claim
+and to test against -- not the marginal buckets in isolation.
 """
 from __future__ import annotations
 
@@ -172,6 +204,35 @@ _OZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
 # no unconverged tail to preserve, so this holds flat at 1.0/1.0 exactly like the general curve.
 _OZ_CONVERGED_MULT = 1.0
 
+# Real, measured marginal buckets for draws the WINNER took in the NEUTRAL zone only
+# (`winner_zone="N"`, 20,642 real draws). Weaker than OZ's spike, stronger than the general curve's
+# blend, same (expected) direction throughout -- unlike DZ. Fully reconverges by (45,60]s.
+#
+#   bucket        winner/100s  other/100s   winner_mult  other_mult
+#   (0, 5]           0.1848      0.0622       1.4964       0.5036
+#   (5, 10]          0.5603      0.2257       1.4257       0.5743
+#   (10, 15]         0.9386      0.4666       1.3359       0.6641
+#   (15, 20]         0.9044      0.7231       1.1114       0.8886
+#   (20, 30]         0.8158      0.7166       1.0648       0.9352
+#   (30, 45]         0.6976      0.7383       0.9717       1.0283
+#   (45, 60]         0.6737      0.6737       1.0000       1.0000
+#   (60, 90]         0.6894      0.6614       1.0207       0.9793
+#
+# `reports/phase7/nhl_faceoff_nz_decay_curve.json` carries the raw counts behind every value here.
+_NZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.4964, 0.5036),
+    (5.0, 10.0, 1.4257, 0.5743),
+    (10.0, 15.0, 1.3359, 0.6641),
+    (15.0, 20.0, 1.1114, 0.8886),
+    (20.0, 30.0, 1.0648, 0.9352),
+    (30.0, 45.0, 0.9717, 1.0283),
+    (45.0, 60.0, 1.0000, 1.0000),
+    (60.0, 90.0, 1.0207, 0.9793),
+]
+# The NZ curve DOES fully reconverge (exact parity at (45,60], within 2.1% at (60,90]) -- same
+# fallback convention as the general/OZ curves, not DZ's held-tail.
+_NZ_CONVERGED_MULT = 1.0
+
 
 @dataclass(frozen=True)
 class SegmentFaceoffMultipliers:
@@ -255,4 +316,14 @@ def segment_average_multipliers_oz(seg_len_seconds: float) -> SegmentFaceoffMult
     return _integrate_curve(
         seg_len_seconds, _OZ_DECAY_CURVE,
         converged_winner=_OZ_CONVERGED_MULT, converged_other=_OZ_CONVERGED_MULT,
+    )
+
+
+def segment_average_multipliers_nz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """The NZ-specific decay curve -- see the module docstring's NZ section. Same (expected)
+    direction as the general/OZ curves throughout, unlike DZ's reversal -- weaker than OZ's spike,
+    stronger than the general curve's blend."""
+    return _integrate_curve(
+        seg_len_seconds, _NZ_DECAY_CURVE,
+        converged_winner=_NZ_CONVERGED_MULT, converged_other=_NZ_CONVERGED_MULT,
     )

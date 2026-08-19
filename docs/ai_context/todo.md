@@ -1855,6 +1855,68 @@ session set out to build, validate, redesign, re-examine against its own
 justification, correct, redesign for real, AND close the last remaining
 precision mismatch.**
 
+**Tenth addendum, same day: NZ discrete-event curve -- reversing the
+third addendum's own decision, with real evidence.** Full report:
+`docs/reports/hockeysim_faceoff_nz_discrete_event_report.md`. The third
+addendum checked `faceoff_nz_index` against real SEASON-AGGREGATE shot
+generation, found no correlation, and deliberately declined to wire it.
+The sixth addendum later proved a season-aggregate null does not rule out
+a real SEGMENT-LEVEL effect (DZ's own season correlation was equally
+null, yet its segment effect was real, just backwards) -- so NZ's
+segment-level effect got the same direct check DZ got, rather than
+resting on the season-aggregate result alone.
+
+**Result: a real, monotonically decaying effect, in the EXPECTED
+direction** (unlike DZ's reversal) -- `winner_zone="N"`, 20,642 real EV
+faceoffs: winner share 0.7203 at 10s decaying to 0.5945 at 30s (2.576x ->
+1.466x). The marginal decay curve decays smoothly to exact parity by
+(45,60]s, fully reconverging like the general and OZ curves (not DZ's
+unresolved tail).
+
+**A real correction caught before shipping, not after**: an early draft
+of this module's docstring claimed the NZ curve was "stronger than the
+general curve's blend," reasoning loosely from the marginal buckets
+(where NZ's mid-range 10-30s buckets do sit slightly above the general
+curve's own). Computing the actual comparison the engine uses -- the
+TIME-WEIGHTED INTEGRAL both curves produce, at 7 segment lengths from 5s
+to 1200s -- showed the OPPOSITE: NZ sits BELOW the general curve at
+EVERY length tested, because the general curve's strong early bucket is
+disproportionately driven by the OZ-heavy portion of its pooled
+population (OZ's raw per-draw shot rate is far larger than NZ's, even
+though NZ is the largest of the three zone populations by draw count).
+Caught by checking the metric actually used, not a proxy for it, before
+publishing the claim.
+
+**Wired end to end for the first time**: `faceoff_nz_index` (built third
+addendum, never wired) now has a CSV column
+(`scripts/build_nhl_special_teams_artifact.py`, reusing the SAME
+`playbyplay` cache the OZ/DZ indices already parse -- no new fetch), a
+loader entry, and an `engine.py` consumer -- a THIRD additional
+multiplicative layer composed alongside DZ (not a tier of the OZ/EV/blend
+fallback chain, which never included NZ), bilateral-gated the same way
+DZ already is. Wired straight to the discrete-event curve with **no
+legacy fallback** -- unlike DZ, this signal was never live with a wrong
+direction to preserve for rollback, so `faceoff_nz_discrete_event_model=False`
+disables the layer outright rather than switching mechanisms.
+
+**Verified**: 17 new unit tests (85 total in the decay-model file: exact
+bucket reproduction, the corrected weaker-than-general comparison at 6
+lengths, mean-1.0 invariant across 9 lengths, full reconvergence,
+invalid-input handling); 3 new reachability tests (changes output;
+one-sided value is a near no-op, confirming the bilateral gate actually
+gates; the flag fully disables the layer); 1 new loader test. League-wide
+aggregate barely moved: 992-pairing round-robin, NZ layer off 61.795 vs
+on 61.774 avg total shots/game -- a -0.034% delta, essentially zero.
+**456 hockeysim/nhl tests pass** (up from 435), checklist re-confirmed
+full PASS after wiring. Real per-team spread regenerated: TOR (1.125x) to
+SEA (0.927x), mean 0.99997 across 32 teams -- the same spread measured
+when the index was first built, unchanged since only the wiring changed.
+
+**This closes the faceoff-zone track's last open signal.** EV, OZ, DZ,
+and NZ all now have their own real, measured, discrete-event mechanism.
+What remains deliberately unbuilt: strength-state (PP/PK) faceoff
+effects, and the vendor's original block-rate EV:PK:PP-def ratio.
+
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 
 **Deployed to web** (`b775255a`, break-glass authorized, see

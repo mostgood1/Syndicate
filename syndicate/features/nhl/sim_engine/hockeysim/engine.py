@@ -26,6 +26,7 @@ from .models import RateModels, TeamRates, PlayerRates
 from .historical_truth.faceoff_decay_model import (
     segment_average_multipliers,
     segment_average_multipliers_dz,
+    segment_average_multipliers_nz,
     segment_average_multipliers_oz,
 )
 
@@ -142,6 +143,14 @@ class SimConfig:
     # when `faceoff_discrete_event_model=True` (the umbrella discrete-event gate). Default ON.
     # `False` uses the general curve even when real OZ-specific data is available, for rollback/A-B.
     faceoff_oz_specific_curve: bool = True
+    # §2w: `faceoff_nz_index` was built in §2p but deliberately left UNWIRED -- the season-aggregate
+    # correlation check found nothing. A direct segment-level check (the same kind that reversed
+    # DZ's own null result) found a REAL effect, in the SAME direction as OZ/EV (unlike DZ): winner
+    # share 0.72 at 10s decaying to 0.59 at 30s, 20,642 real draws (`winner_zone="N"`). Wired
+    # straight to the discrete-event curve from day one -- unlike DZ, this was never live with an
+    # incorrect direction, so there is no legacy diff-based fallback to preserve. Default ON.
+    # `False` disables the layer entirely (not a fallback to a different mechanism).
+    faceoff_nz_discrete_event_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -813,6 +822,13 @@ class PeriodSimulator:
         # regress, since nothing previously consumed this signal at all.
         faceoff_dz_idx_home_raw = st_home.get("faceoff_dz_index")
         faceoff_dz_idx_away_raw = st_away.get("faceoff_dz_index")
+        # NEUTRAL-ZONE-specific faceoff win-rate index (§2w) -- built earlier this session (§2p)
+        # but deliberately left unwired pending a real segment-level check, which (unlike the
+        # null season-aggregate correlation that originally declined to wire it) found a real
+        # effect in the SAME direction as the OZ/EV chain (unlike DZ's reversal), so this is wired
+        # the SAME way DZ is: an ADDITIONAL multiplicative layer, both sides required to activate.
+        faceoff_nz_idx_home_raw = st_home.get("faceoff_nz_index")
+        faceoff_nz_idx_away_raw = st_away.get("faceoff_nz_index")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1177,6 +1193,25 @@ class PeriodSimulator:
                             m_dz_h, m_dz_a = raw_h, raw_a
                     lam_h = float(lam_h) * float(m_dz_h)
                     lam_a = float(lam_a) * float(m_dz_a)
+                # NEUTRAL-ZONE index (§2w) -- ANOTHER additional layer, composed alongside DZ
+                # (not the OZ/EV/blend fallback chain, which never included NZ as a tier). Wired
+                # directly to the discrete-event curve from day one -- unlike DZ, this signal was
+                # never live with an incorrect (or any) direction, so there is no legacy diff-based
+                # fallback to preserve for rollback; `faceoff_nz_discrete_event_model=False` simply
+                # disables the layer entirely rather than falling back to a different mechanism.
+                if (ev_only and bool(getattr(self.cfg, "faceoff_nz_discrete_event_model", True))
+                        and faceoff_nz_idx_home_raw is not None and faceoff_nz_idx_away_raw is not None):
+                    nz_h_pct = 0.5 * _f(faceoff_nz_idx_home_raw, 1.0)
+                    nz_a_pct = 0.5 * _f(faceoff_nz_idx_away_raw, 1.0)
+                    nz_denom = max(1e-6, float(nz_h_pct) + float(nz_a_pct))
+                    p_home_wins_nz_draw = max(0.05, min(0.95, float(nz_h_pct) / nz_denom))
+                    nz_decay = segment_average_multipliers_nz(seg_len)
+                    if self.rng.random() < p_home_wins_nz_draw:
+                        m_nz_h, m_nz_a = nz_decay.winner_mult, nz_decay.other_mult
+                    else:
+                        m_nz_h, m_nz_a = nz_decay.other_mult, nz_decay.winner_mult
+                    lam_h = float(lam_h) * float(m_nz_h)
+                    lam_a = float(lam_a) * float(m_nz_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

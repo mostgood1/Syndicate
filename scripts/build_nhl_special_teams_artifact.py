@@ -31,6 +31,12 @@ signal, NOT the OZ index's mirror image (measured correlation ~0.69, not -1.0). 
 `engine.py` as an ADDITIONAL multiplicative layer alongside the OZ/EV chain, not a fourth tier of
 it -- see `historical_truth/faceoff_ev_index.py`'s own docstring.
 
+§2w: ALSO writes `faceoff_nz_index` from the SAME `playbyplay` cache -- built earlier this session
+(§2p) but deliberately left UNWIRED pending a real segment-level validation, which (unlike the
+season-aggregate check that originally declined to wire it) found a real, expected-direction effect
+(`hockeysim_faceoff_nz_calibration_report.md` -> segment-level re-check reversed that decision).
+Applied the same way as `faceoff_dz_index`, an ADDITIONAL multiplicative layer.
+
 Usage:
   py -3 scripts/build_nhl_special_teams_artifact.py
   py -3 scripts/build_nhl_special_teams_artifact.py --season 2025-2026 --fetch
@@ -63,9 +69,11 @@ from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.boxscore_shot_
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_ev_index import (  # noqa: E402
     DEFAULT_FACEOFF_DZ_INDEX,
     DEFAULT_FACEOFF_EV_INDEX,
+    DEFAULT_FACEOFF_NZ_INDEX,
     DEFAULT_FACEOFF_OZ_INDEX,
     compute_team_faceoff_dz_index,
     compute_team_faceoff_ev_index,
+    compute_team_faceoff_nz_index,
     compute_team_faceoff_oz_index,
     parse_playbyplay_faceoffs_by_zone,
     parse_playbyplay_faceoffs_ev,
@@ -133,15 +141,15 @@ def _load_regular_season_playbyplay(root: Path) -> List[Dict]:
 
 
 def _write_csv(path: Path, rates: dict, shot_idx: dict, block_idx: dict, faceoff_idx: dict,
-                faceoff_oz_idx: dict, faceoff_dz_idx: dict) -> int:
+                faceoff_oz_idx: dict, faceoff_dz_idx: dict, faceoff_nz_idx: dict) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = sorted(rates.items())
     with path.open("w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["abbr", "pp_pct", "pk_pct", "committed_per_game", "pp_shot_index",
                     "pk_shot_index_allowed", "block_rate_index", "faceoff_ev_index",
-                    "faceoff_oz_index", "faceoff_dz_index", "games", "pp_opportunities",
-                    "pp_goals", "pk_opportunities", "pp_goals_against"])
+                    "faceoff_oz_index", "faceoff_dz_index", "faceoff_nz_index", "games",
+                    "pp_opportunities", "pp_goals", "pk_opportunities", "pp_goals_against"])
         for abbr, r in rows:
             sidx = shot_idx.get(abbr)
             pp_shot_index = sidx.pp_shot_index if sidx is not None else DEFAULT_SHOT_INDEX
@@ -154,10 +162,12 @@ def _write_csv(path: Path, rates: dict, shot_idx: dict, block_idx: dict, faceoff
             faceoff_oz_index = fozidx.index if fozidx is not None else DEFAULT_FACEOFF_OZ_INDEX
             fdzidx = faceoff_dz_idx.get(abbr)
             faceoff_dz_index = fdzidx.index if fdzidx is not None else DEFAULT_FACEOFF_DZ_INDEX
+            fnzidx = faceoff_nz_idx.get(abbr)
+            faceoff_nz_index = fnzidx.index if fnzidx is not None else DEFAULT_FACEOFF_NZ_INDEX
             w.writerow([abbr, r.pp_pct, r.pk_pct, r.committed_per_game, pp_shot_index,
                         pk_shot_index, block_rate_index, faceoff_ev_index, faceoff_oz_index,
-                        faceoff_dz_index, r.games, r.pp_opportunities, r.pp_goals,
-                        r.pk_opportunities, r.pp_goals_against])
+                        faceoff_dz_index, faceoff_nz_index, r.games, r.pp_opportunities,
+                        r.pp_goals, r.pk_opportunities, r.pp_goals_against])
     return len(rows)
 
 
@@ -202,6 +212,7 @@ def main() -> int:
     faceoff_idx: dict = {}
     faceoff_oz_idx: dict = {}
     faceoff_dz_idx: dict = {}
+    faceoff_nz_idx: dict = {}
     if playbyplay:
         fo_recs = [r for d in playbyplay if (r := parse_playbyplay_faceoffs_ev(d)) is not None]
         if fo_recs:
@@ -213,14 +224,16 @@ def main() -> int:
             print(f"  faceoff-OZ index: {len(fo_zone_recs)} playbyplay games, {len(faceoff_oz_idx)} teams")
             faceoff_dz_idx = compute_team_faceoff_dz_index(fo_zone_recs)
             print(f"  faceoff-DZ index: {len(fo_zone_recs)} playbyplay games, {len(faceoff_dz_idx)} teams")
+            faceoff_nz_idx = compute_team_faceoff_nz_index(fo_zone_recs)
+            print(f"  faceoff-NZ index: {len(fo_zone_recs)} playbyplay games, {len(faceoff_nz_idx)} teams")
 
     out_dir = root / "data" / "processed"
     written = []
     if season:
         p = out_dir / f"team_special_teams_{season}.csv"
-        written.append((p, _write_csv(p, rates, shot_idx, block_idx, faceoff_idx, faceoff_oz_idx, faceoff_dz_idx)))
+        written.append((p, _write_csv(p, rates, shot_idx, block_idx, faceoff_idx, faceoff_oz_idx, faceoff_dz_idx, faceoff_nz_idx)))
     p_latest = out_dir / "team_special_teams_latest.csv"
-    written.append((p_latest, _write_csv(p_latest, rates, shot_idx, block_idx, faceoff_idx, faceoff_oz_idx, faceoff_dz_idx)))
+    written.append((p_latest, _write_csv(p_latest, rates, shot_idx, block_idx, faceoff_idx, faceoff_oz_idx, faceoff_dz_idx, faceoff_nz_idx)))
 
     league_pp = sum(r.pp_goals for r in rates.values()) / max(1, sum(r.pp_opportunities for r in rates.values()))
     print(f"games: {len(regular)} regular-season ({dates[0] if dates else '?'}..{dates[-1] if dates else '?'})")
