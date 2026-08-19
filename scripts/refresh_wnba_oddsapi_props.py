@@ -2247,6 +2247,22 @@ _GAME_CARDS_HEADER_ORDER = [
     # row did not resolve against the schedule -- a REPORTABLE upstream problem,
     # never something to paper over with an invented id.
     "fixture_id",
+    # Added 2026-08-19 (wnba-edge-263): the sim's own REAL Monte Carlo
+    # probabilities, threaded through the same way pred_margin/pred_total
+    # were on 2026-08-02 -- p_home_win is a per-game empirical estimate, not
+    # a derived approximation, so `wnba/cards.py`'s single sanctioned
+    # margin->probability transform (`_margin_win_prob`, a fixed scale=3.4
+    # applied uniformly to every game) becomes the FALLBACK for rows without
+    # a completed sim, not the primary source for rows that have one.
+    # market_home_spread/market_total are the sim's OWN pricing input (its
+    # copy of the book line at sim time), kept separate from the existing
+    # book-quoted home_spread/total columns above -- useful for detecting a
+    # stale sim run against a since-moved line, not a replacement for them.
+    "p_home_win",
+    "p_home_cover",
+    "p_total_over",
+    "market_home_spread",
+    "market_total",
 ]
 
 
@@ -2516,10 +2532,18 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         projection = sim_projections.get((str(home_tri or "").strip().upper(), str(away_tri or "").strip().upper())) or {}
         pred_margin = _float_or_none(projection.get("pred_margin"))
         pred_total = _float_or_none(projection.get("pred_total"))
-        return {
+        fields: dict[str, object] = {
             "pred_margin": round(pred_margin, 3) if pred_margin is not None else None,
             "pred_total": round(pred_total, 3) if pred_total is not None else None,
         }
+        # wnba-edge-263: same source dict _smart_sim_projection_index just
+        # built -- these keys are simply absent (not zero) on rows without a
+        # completed sim, so DictReader + .get() downstream degrades exactly
+        # like pred_margin/pred_total already do.
+        for key in ("p_home_win", "p_home_cover", "p_total_over", "market_home_spread", "market_total"):
+            value = _float_or_none(projection.get(key))
+            fields[key] = round(value, 4) if value is not None else None
+        return fields
 
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
@@ -2844,10 +2868,32 @@ def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[
             away_total += float(_float_or_none(quarter.get("away_pts_mu")) or 0.0)
         if home_total <= 0 and away_total <= 0:
             continue
-        index[(home, away)] = {
+        entry: dict[str, float] = {
             "pred_margin": home_total - away_total,
             "pred_total": home_total + away_total,
         }
+        # wnba-edge-263, 2026-08-19: the sim's own `score` block already
+        # carries real, per-game Monte Carlo probabilities -- not a fixed-
+        # scale transform of the mean margin (wnba/cards.py's
+        # `_margin_win_prob` applies scale=3.4 uniformly to every game,
+        # regardless of that game's own computed variance). Threading these
+        # through means the ONE sanctioned margin-transform site becomes a
+        # FALLBACK for games without a completed sim, not the primary source
+        # for games that have one. `market` carries the sim's OWN pricing
+        # input, useful for detecting when the sim ran against a since-moved
+        # book line -- kept separate from game_cards' existing book-quoted
+        # `home_spread`/`total` columns, not a replacement for them.
+        score_block = payload.get("score") if isinstance(payload.get("score"), dict) else {}
+        for key in ("p_home_win", "p_home_cover", "p_total_over"):
+            value = _float_or_none(score_block.get(key))
+            if value is not None:
+                entry[key] = value
+        market_block = payload.get("market") if isinstance(payload.get("market"), dict) else {}
+        for key in ("market_home_spread", "market_total"):
+            value = _float_or_none(market_block.get(key))
+            if value is not None:
+                entry[key] = value
+        index[(home, away)] = entry
     return index
 
 
