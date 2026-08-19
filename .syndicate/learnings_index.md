@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 411 rules `[generated]`
+## Index — 414 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -82,7 +82,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 343**
+**Rules and corrections — 346**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -235,6 +235,9 @@
 - [2026-08-18 — RULE: a check that answers a SLIGHTLY DIFFERENT question returns a confide…](#2026-08-18-rule-a-check-that-answers-a-slightly-different-question-returns-a-confident-wrong-answer-six-in-one-session)
 - [2026-08-19 — RULE: no active owner, no claims. And a liveness read EXPIRES.](#2026-08-19-rule-no-active-owner-no-claims-and-a-liveness-read-expires)
 - [2026-08-19 — CORRECTION: the PATHSPEC commit does NOT cover a NEW file. Staging is stil…](#2026-08-19-correction-the-pathspec-commit-does-not-cover-a-new-file-staging-is-still-the-race-and-it-bit)
+- [2026-08-19 — RULE: before building a feature pipeline for an unwired input, check wheth…](#2026-08-19-rule-before-building-a-feature-pipeline-for-an-unwired-input-check-whether-the-engine-has-a-better-wired-input-already-doing-that-job)
+- [2026-08-19 — RULE: a population checklist CANNOT detect leakage, and a large clean firs…](#2026-08-19-rule-a-population-checklist-cannot-detect-leakage-and-a-large-clean-first-wiring-effect-is-a-leakage-suspect)
+- [2026-08-19 — RULE: a small-n result is not a preview of the large-n result. It is the a…](#2026-08-19-rule-a-small-n-result-is-not-a-preview-of-the-large-n-result-it-is-the-artifact)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
