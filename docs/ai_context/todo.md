@@ -1459,7 +1459,55 @@ vendor's uncalibrated defaults, and this report adds evidence that the
 SIGNAL feeding them may itself be too aggregated to matter -- a different,
 arguably more fundamental question than whether the sensitivity constants
 alone are mistuned. This closes the faceoff-zone track's open items this
-session set out to check.
+session set out to check, EXCEPT the segment-level validation itself,
+which was the ONE thing flagged as still genuinely open -- checked the
+same day, fourth addendum below.
+
+**Fourth addendum, same day: segment-level faceoff validation -- and it
+FLIPS the season-aggregate picture.** Full report:
+`docs/reports/hockeysim_faceoff_segment_validation_report.md`. The prior
+addendum's null season-aggregate correlation could not distinguish "no
+real effect" from "a real, local effect that washes out over a season."
+`historical_truth/faceoff_segment_effect.py` checks the LOCAL claim
+directly: counts real shot-on-goal/goal events by the WINNING team vs the
+OTHER team in a window immediately after every real EV faceoff (1,312
+games, 58,762 draws), truncated at the next EV faceoff so no shot is ever
+double-counted across two overlapping windows.
+
+**Result, robust across 4 independently-run window sizes, with the exact
+decay a real effect should show**: winner share 0.7935 at a 10s window
+(3.84x shot-rate ratio) down to 0.6361 at 30s (1.75x) -- a large, real
+effect that decays smoothly toward parity as the window widens. A
+methodology artifact or noise would not decay this cleanly across four
+independent runs.
+
+**This is the single most important finding of the whole faceoff-zone
+track**: faceoffs DO have a real, substantial, immediate effect on shot
+generation. The season-aggregate null result was measuring the wrong
+TIMESCALE, not disproving the premise behind building EV/OZ/DZ/NZ in the
+first place.
+
+**The important caveat, stated with equal weight as the finding itself**:
+this does NOT validate the engine's CURRENT mechanism as-is.
+`_faceoff_multipliers` applies ONE uniform multiplier across an entire
+engine SEGMENT, sourced from a team's SEASON-LONG (or per-team zone-index)
+win rate -- not a discrete, short-lived boost tied to a specific draw the
+way this measurement is. **Directly recalibrating `faceoff_alpha` to match
+a ~2-4x per-draw ratio would be a category error** -- `alpha` scales a
+segment-long multiplier, not a per-draw spike; they are not the same kind
+of quantity. A faithful model would need faceoffs as discrete, time-limited
+events with a real decay profile -- a genuine engine redesign, not a
+calibration pass, and explicitly out of scope this pass.
+
+**What remains genuinely open**: a properly-scoped recalibration of the
+segment-wide mechanism using this report's decay curve as a directional
+sanity check (not attempted -- the basis mismatch means no single clean
+conversion exists); an engine redesign representing faceoffs as discrete
+events with the measured decay profile (a substantially larger project);
+whether this local effect explains any of the real per-team OZ/DZ/NZ
+spread (not tested, a natural follow-up). 373 hockeysim/nhl tests pass (13
+new), checklist unaffected (nothing new added as a consumed field). This
+closes the faceoff-zone track this session set out to build and validate.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

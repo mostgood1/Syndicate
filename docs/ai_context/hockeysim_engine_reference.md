@@ -763,12 +763,55 @@ loader, NOT wired into `engine.py`. Publishing an unconsumed field would recreat
 doing nothing. The checklist has nothing new to flag either way, since NZ was never added as a
 `HockeyTeamFeatures`/CSV field.
 
-**What remains genuinely open**: a segment-level (not season-aggregate) validation of the EV/OZ/DZ
-mechanism — the only kind of check that could actually confirm or refute the local effect
-`_faceoff_multipliers` claims to model; `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`
-remain the vendor's uncalibrated defaults, and this report adds evidence that the SIGNAL feeding
-them may itself be too aggregated to matter — a different, arguably more fundamental question than
-whether the sensitivity constants alone are mistuned.
+**What this section flagged as future work — checked next, §2q, and it flips the picture.**
+
+---
+
+## 2q. Segment-level faceoff validation — a real, large, local effect
+
+Full report: `docs/reports/hockeysim_faceoff_segment_validation_report.md`. §2p's season-aggregate
+null result could not distinguish "faceoffs have no real effect" from "a real, local effect exists
+and washes out over a season." This checks the local claim directly: `historical_truth/faceoff_segment_effect.py`
+counts real `shot-on-goal`/`goal` events by the WINNING team vs the OTHER team in a window
+immediately after every real EV faceoff (1,312 games, 58,762 draws) — truncated at the next EV
+faceoff, the fixed window, or the period's end, so no shot is ever double-counted across two
+overlapping windows.
+
+**Result, robust across four independently-run window sizes, with the exact decay a real effect
+should show**:
+
+| window | winner share | shots/100s winner : other | ratio |
+|---|---|---|---|
+| 10s | 0.7935 | 0.9740 : 0.2535 | 3.84x |
+| 15s | 0.7337 | 0.9245 : 0.3356 | 2.76x |
+| 20s | 0.6882 | 0.8865 : 0.4016 | 2.21x |
+| 30s | 0.6361 | 0.8493 : 0.4858 | 1.75x |
+
+The winner out-shoots the loser by a large margin at every window, decaying smoothly toward parity
+as the window widens — exactly what a genuine, concentrated, local effect produces (closer to the
+draw, more of the window is the direct consequence of it; wider windows dilute toward broken-play
+noise). A methodology artifact would not decay this cleanly across four independent runs.
+
+**This is the single most important finding of the whole faceoff-zone track**: faceoffs DO have a
+real, substantial, immediate effect on shot generation. §2p's null season-aggregate result was
+measuring the wrong timescale, not disproving the premise behind building EV/OZ/DZ/NZ in the first
+place.
+
+**The important caveat, stated as plainly as the finding itself**: this does NOT validate the
+ENGINE's CURRENT mechanism as-is. `_faceoff_multipliers` applies ONE uniform multiplier across an
+entire engine SEGMENT, sourced from a team's SEASON-LONG (or per-team zone-index) win rate — not a
+discrete, short-lived boost tied to a specific draw the way this measurement is. The real effect is
+a sharp spike concentrated in ~10-15 seconds, not a persistent segment-wide shift. **Directly
+recalibrating `faceoff_alpha` to match a ~2-4x per-draw ratio would be a category error** — `alpha`
+scales a segment-long multiplier, not a per-draw spike; they are not the same kind of quantity. A
+faithful model would need to represent faceoffs as discrete, time-limited events with a real decay
+profile — a genuine engine redesign, not a calibration pass, and substantially out of scope here.
+
+**What remains genuinely open**: a properly-scoped recalibration of the segment-wide mechanism
+using this report's decay curve as a directional sanity check (not attempted — the basis mismatch
+means no single clean conversion exists); an engine redesign representing faceoffs as discrete
+events with the measured decay profile (a substantially larger project); whether this local effect
+explains any of the real per-team OZ/DZ/NZ spread (§2n/§2o/§2p) — not tested, a natural follow-up.
 
 ---
 

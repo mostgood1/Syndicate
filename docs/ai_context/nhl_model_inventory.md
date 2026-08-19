@@ -364,6 +364,30 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   publishing an unconsumed field would recreate the exact "populated but
   confirmed dead" anti-pattern already found and fixed once this session
   (`blocks_per_60`/`penalties_per_60`).
+- **Did** build a segment-level faceoff validation (reference doc §2q, full
+  report `docs/reports/hockeysim_faceoff_segment_validation_report.md`) —
+  the check §2p's own season-aggregate null result explicitly left open,
+  and it FLIPS the picture. `historical_truth/faceoff_segment_effect.py`
+  counts real shots by the WINNING team vs the OTHER team in a window
+  immediately after every real EV faceoff (1,312 games, 58,762 draws),
+  truncated at the next draw so no shot double-counts. **Result, robust
+  across 4 independent window sizes with the exact decay a real effect
+  should show**: winner share 0.7935 (10s window, 3.84x shot-rate ratio)
+  down to 0.6361 (30s window, 1.75x) — a large, real, LOCAL effect that
+  decays smoothly toward parity as the window widens. **This is the single
+  most important finding of the whole faceoff-zone track**: faceoffs DO
+  matter for shot generation; §2p's null result was measuring the wrong
+  TIMESCALE, not disproving the premise. **Stated with equal weight as the
+  finding itself**: this does NOT validate the engine's CURRENT mechanism
+  as-is — `_faceoff_multipliers` applies one uniform SEGMENT-WIDE
+  multiplier from season-long win rate, not a discrete per-draw spike the
+  way this measurement is, so directly recalibrating `faceoff_alpha` to
+  match a ~2-4x per-draw ratio would be a category error (different kinds
+  of quantities). A faithful model would need faceoffs as discrete,
+  time-limited events with a real decay profile — a genuine engine
+  redesign, not a calibration pass, explicitly out of scope this pass. 373
+  hockeysim/nhl tests pass (13 new), checklist unaffected (nothing new
+  added as a consumed field).
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
