@@ -241,10 +241,8 @@
 - [2026-08-19 — RULE: a repair pass must be constrained to EXTEND, never SUBSTITUTE. And a…](#2026-08-19-rule-a-repair-pass-must-be-constrained-to-extend-never-substitute-and-a-mid-flight-hook-protects-only-new-sessions)
 - [2026-08-19 — RETRACTION: "a mid-flight hook protects only new sessions" is WRONG. Hooks…](#2026-08-19-retraction-a-mid-flight-hook-protects-only-new-sessions-is-wrong-hooks-fire-per-call-the-real-hole-is-bash)
 - [2026-08-19 — VERIFY THE CHANNEL, NOT JUST THE QUERY](#2026-08-19-verify-the-channel-not-just-the-query)
-- [2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS"…](#2026-08-19-live-by-commit-sha-and-reachable-from-the-call-path-that-actually-runs-are-two-different-claims-i-reported-the-first-as-if-it-were-the-second-for-461-in-front-of-the-user-before-checking)
 - [2026-08-19 — RULE: a guard that fails open silently is indistinguishable from a guard t…](#2026-08-19-rule-a-guard-that-fails-open-silently-is-indistinguishable-from-a-guard-that-works-grep-for-the-symbol-you-deleted)
 - [2026-08-19 — RULE: a threshold raise buys HEADROOM ÷ GROWTH RATE. Compute it, or you ar…](#2026-08-19-rule-a-threshold-raise-buys-headroom-growth-rate-compute-it-or-you-are-choosing-a-fix-you-have-not-measured)
-- [2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file…](#2026-08-19-lane-guardpys-pathish_re-flags-a-bare-filename-in-prose-as-a-real-file-claim-blocking-an-unrelated-lane-twice-in-one-session)
 - [2026-08-19 — RULE: "this cannot be automated" is a claim like any other. Name the predi…](#2026-08-19-rule-this-cannot-be-automated-is-a-claim-like-any-other-name-the-predicate-you-tried)
 - [2026-08-19 — RULE: exonerated as the CAUSE is not free of DEFECTS. Re-ask the narrower…](#2026-08-19-rule-exonerated-as-the-cause-is-not-free-of-defects-re-ask-the-narrower-question)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
@@ -439,5 +437,7 @@
 - [RULE: AN ERROR PATH MUST NOT LAND ON THE SYSTEM'S EXISTING EMPTY STATE](learnings_evidence.md#rule-an-error-path-must-not-land-on-the-systems-existing-empty-state) `[evidence]`
 - [RULE: A GREEN/HEALTHY READING IS EVIDENCE ONLY ONCE YOU KNOW WHAT MAKES IT RED](learnings_evidence.md#rule-a-greenhealthy-reading-is-evidence-only-once-you-know-what-makes-it-red) `[evidence]`
 - [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](learnings_evidence.md#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it) `[evidence]`
+- [2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS"…](learnings_evidence.md#2026-08-19-live-by-commit-sha-and-reachable-from-the-call-path-that-actually-runs-are-two-different-claims-i-reported-the-first-as-if-it-were-the-second-for-461-in-front-of-the-user-before-checking) `[evidence]`
+- [2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file…](learnings_evidence.md#2026-08-19-lane-guardpys-pathish_re-flags-a-bare-filename-in-prose-as-a-real-file-claim-blocking-an-unrelated-lane-twice-in-one-session) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->

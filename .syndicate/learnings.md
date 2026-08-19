@@ -1000,464 +1000,60 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-19 — RULE: no active owner, no claims. And a liveness read EXPIRES.
 
-- The rule going forward: **a lane whose owning session is archived, absent from
-  the roster, or silent for hours MUST NOT hold file claims.** Releasing claims
-  is NOT closing the lane — its findings stand and it can be reopened. Audit the
-  full claim set against the roster **including archived**, because
-  `include_archived: false` hides exactly the evidence the question needs.
-
-**THE HALF THAT WAS ALREADY A RULE, and the half that was not.**
-[[A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK]] (08-18)
-established *how to judge liveness*: `isRunning` is a CLAIM, not a reading —
-judge by `lastActivityAt`. Confirmed twice over tonight: between two roster
-reads minutes apart, `isRunning` flipped `true -> false` on a session active 4
-minutes earlier and `false -> true` on another, while a third read `RUNNING`
-continuously through 20 hours of silence. **But nothing said what to DO about
-it.** That rule named `refresh-worker-oom-recurrence` explicitly, `lanes.md`
-already carried "flagged running (stale 40h)", and its 7 claims — including the
-two files the live `#465` investigation needed — sat guarded for another day
-because no rule consumed the observation. **A rule that diagnoses without
-prescribing waits for a human who may not come.**
-
-**A LIVENESS READ EXPIRES. RE-TAKE IT; DO NOT TRUST YOUR OWN EARLIER SWEEP.**
-Measured tonight, and it is the part most likely to be skipped:
-`grading-blocker-settled-zero` was DELIBERATELY SPARED in the first sweep
-because a running session ("Betting settlement data") looked like its true owner
-by SUBJECT, even though the lane header named a different, archived one. That
-session was archived at 00:45Z. **The reason for sparing it evaporated within
-hours, and only a fresh census caught it.** Sweep results are perishable in the
-same way [[feedback_rebaseline_before_judging]] describes for baselines.
-
-**METHOD, in order:**
-1. claim set from `lane-guard.py`'s OWN `_claims()` — not the looser copy in
-   `check_lane_invariants.py`, which disagreed by 32 claims over one file;
-2. roster WITH archived; map each claim-holding lane to its session;
-3. release where the owner is archived/absent; flag, don't guess, where it is
-   merely idle — and say what the flag is blocking;
-4. verify the claim set before/after **as a SET, never a count** — two claims
-   swapping owners leaves the count identical and is a catastrophe.
-
-**THIS CANNOT BE MECHANISED WITH CURRENT TOOLING, which is why it needs a
-standing pass.** Liveness comes from the session roster (an MCP call), not from
-the filesystem, so no hook or checker can read it. `check_lane_invariants.py`
-can see a contested file and a stray section; it is structurally blind to
-"this lane's owner died". Until something bridges that, this is a periodic
-coordinator job — 65 -> 47 claims and 12 -> 5 lanes in one pass tonight, after
-which every remaining holder had acted within 35 minutes.
+- The rule going forward: **a lane whose owning session is archived, absent from the roster, or silent for hours MUST NOT hold file claims.** Releasing claims is NOT closing the lane — its findings stand and it can be reopened. Audit the full claim set against the roster **including archived**, because `include_archived: false` hides exactly the evidence the question needs.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — CORRECTION: the PATHSPEC commit does NOT cover a NEW file. Staging is still the race, and it bit.
 
-- The rule going forward: **`git commit -- <paths>` only works on paths git
-  already knows. A brand-new file MUST be `git add`ed first, and that add-to-commit
-  window is exactly the race the pathspec form was adopted to remove.** For a new
-  file on a shared tree, either commit it from your own worktree, or accept that
-  it may be carried into another session's commit and verify by CONTENT afterwards.
-
-**THIS CORRECTS FOUR ENTRIES THAT ALL STATE THE MITIGATION WITHOUT THE EXCEPTION:**
-`2026-08-14 — git add <paths> SCOPES THE INDEX; ONLY A PATHSPEC ON commit SCOPES
-THE COMMIT`; `the inspection must be its own tool call ... prefer the pathspec
-form, which makes the index state irrelevant`; `2026-08-17 — a PATHSPEC commit is
-the default; the isolated index is the FALLBACK`; and `2026-08-18 — a session
-worktree protects your INDEX, not your EDIT`. None is wrong about TRACKED files.
-All four read as complete, and the gap is invisible until you hit it.
-
-**MEASURED 2026-08-19.** `git commit .claude/hooks/lanes-append-guard.py
-.claude/settings.json` failed outright:
-
-    error: pathspec '.claude/hooks/lanes-append-guard.py' did not match any
-    file(s) known to git
-
-So the file was `git add`ed, and in the window before the commit another session
-committed — the new hook landed inside `c52fb653 "record the worker deploy as
-PENDING"`, an unrelated commit. My own commit then contained ONLY
-`settings.json`, which registers a hook that my commit does not contain. **A
-half-landed guard is worse than an unlanded one**: the registration would have
-pointed at a missing file if the other commit had not also been pushed.
-
-**WHY THE MITIGATION STILL STANDS FOR EVERYTHING ELSE.** Every ledger write this
-session — `lanes.md`, `learnings.md`, `state.md`, `todo.md` — is a TRACKED file,
-and the pathspec form protected all of them, including one 5,375-line deletion
-that would have been catastrophic to have absorbed. The exception is narrow and
-it is exactly: **files git has never seen.**
-
-**Related:** [[a session worktree protects your INDEX, not your EDIT]] — a
-worktree DOES cover this case, because its index is not shared. That is the
-fallback for new files, and it is the one situation where the worktree beats the
-pathspec commit rather than the reverse.
+- The rule going forward: **`git commit -- <paths>` only works on paths git already knows. A brand-new file MUST be `git add`ed first, and that add-to-commit window is exactly the race the pathspec form was adopted to remove.** For a new file on a shared tree, either commit it from your own worktree, or accept that it may be carried into another session's commit and verify by CONTENT afterwards.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: before building a feature pipeline for an unwired input, check whether the engine has a BETTER-WIRED input already doing that job
 
-**Evidence.** `smartsim2` reads 33 alias-terms from `feature_generation_payload`
-and no production entrypoint passes it. I measured that wiring it changed the
-output, then spent a session building a leak-free as-of feature pipeline for it.
-
-**Measured at the end, and it should have been the FIRST measurement:**
-
-    |d margin| via feature_generation_payload : 0.553 pts   (4.1% of the 13.5-pt SD)
-    |d margin| via home/away_offense_rating   : 2.322 pts   (17.2%)   -> 4.2x
-
-`build_drive_priors` builds ONE GAME-LEVEL profile and never reads
-`away_offense_rating` at all; per-team differentiation lives in
-`play_simulator.py:258-259`, on the ratings path. **All three generate scripts
-already pass ratings, and NFL's are already computed as-of**
-(`_mean_epa(..., before_week=week)`, same prior-season fallback and explicit
-neutral-no-data branch I re-implemented from scratch).
-
-**So "unwired" was true and not the important fact.** An input can be unwired
-because it is the weak lever. The engine had a strong, correctly-fed one.
-
-- **The rule:** when you find an unwired input, before building for it, measure
-  its LEVERAGE against every other input that reaches the same output. Ask "is
-  anything else already doing this job, better?" — a leverage ratio is cheap
-  (6 games) and I ran it last instead of first.
-- **The user asked me to wire the ratings path and I nearly did** — it was
-  already wired, and I would have rewritten working, leak-free code.
-
----
+- **Evidence.** `smartsim2` reads 33 alias-terms from `feature_generation_payload` and no production entrypoint passes it. I measured that wiring it changed the output, then spent a session building a leak-free as-of feature pipeline for it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: a population checklist CANNOT detect leakage, and a large clean first-wiring effect is a leakage SUSPECT
 
-**Evidence.** `build_nflverse_game_metrics` computes EPA from the game being
-predicted. **r = 0.988** against the final margin over 285 games.
-
-**Everything passed.** Field names are exactly what legitimate prior-form
-features would be called. Population was **100%**. The input checklist marked
-them FED. The reachability test passed (`off != on`). Unit tests passed. **A
-leaked field is 100% populated BY CONSTRUCTION and looks maximally healthy.**
-
-The tell I misread: wiring it moved margin 1.125 pts — large and clean. **I read
-that as evidence the features mattered; it was evidence they contained the
-answer.**
-
-- **The rule:** for every model input, write down the WINDOW it covers —
-  as-of-before-kickoff, season-to-date-excluding-this-game, or in-game. It is
-  not in the name, the type, the population rate, or the consuming code.
-- Run the correlation-with-outcome test before wiring. Two minutes. Honest prior
-  form lands r = 0.3-0.5; anything above ~0.65 contains the outcome.
-- **Related, and worse:** my FIRST FIX for the NCAAF version of this leaked
-  harder than the original. `/ppa/games?week=1` without `seasonType=regular`
-  returns the College Football Playoff, importing JANUARY games into a week-8
-  rating. **The tell was an impossible count** — 10 prior games through week 7
-  for a team that plays weekly — **not a failing test.** A postseason row is
-  otherwise indistinguishable from a regular one.
-- **And the obvious fix was a silent no-op:** `/ppa/teams` ACCEPTS `week=N` and
-  IGNORES it (identical rows and values), so a week parameter yields the same
-  leaked number, a clean diff, and a false all-clear.
-
----
+- **Evidence.** `build_nflverse_game_metrics` computes EPA from the game being predicted. **r = 0.988** against the final margin over 285 games.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: a small-n result is not a preview of the large-n result. It is the artifact.
 
-**Evidence, one metric, one session:**
-
-    n=15   dCRPS +0.2058  (2.79 SE)   <- I concluded "systematic degradation"
-    n=40   +0.1116
-    n=102  +0.0326  (0.76 SE)
-    n=130  +0.0424  (1.13 SE)         <- converging NULL
-
-At n=15 I had a mechanistic story ready for the degradation. **The story was
-explaining noise.** Separately, a 6-game / 100-seed check gave "all six moved the
-same direction, therefore systematic bias" — where per-game MC noise (1.35 pts)
-**EXCEEDED the 2.013-pt effect being interpreted.** 20 games showed mixed
-directions. Both retracted.
-
-- **The rule:** compute the SE before reading the point estimate, every time. If
-  |effect| < noise, there is no finding — and say so instead of explaining it.
-- **The pressure is real and predictable:** both errors came from reaching for a
-  fast foreground check because a result had been asked for twice. Latency
-  pressure is exactly when this rule stops being applied.
-- Corollary: **write results to a FILE from the producing process.** Three runs
-  were lost to harness, not model — a `timeout` I set too short, a `grep`
-  buffering a pipe, and prints that only ran at exit.
+- **Evidence, one metric, one session:**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: a repair pass must be constrained to EXTEND, never SUBSTITUTE. And a mid-flight hook protects only new sessions.
 
-- The rule going forward: **when automating a fix across N items, the safety
-  condition is a property of the REPLACEMENT RELATIVE TO THE ORIGINAL — "the new
-  text must START WITH the old" — not a property of the source you pulled it
-  from.** "The evidence file has a rule line" is not "this is the SAME line,
-  longer", and the gap between those two clobbered 18 lines that existed nowhere
-  else.
-
-**MEASURED.** Repairing 70 truncated rule stubs: the first pass replaced each
-stub with whatever `_rule_line` returned from that entry's evidence body. For 51
-of 58 that was a DIFFERENT bullet — an `- **Overturned belief:**` overwritten by
-a `- **The rule going forward:**` — and 18 were hand-written summaries from an
-earlier compaction, reproducible from nothing. Caught by a conservation check,
-not by review. Redone with `full.startswith(stub)` as a hard precondition: 59
-extended, 0 lost. **The constraint is one line of code and it is the entire
-difference between a repair and a rewrite.**
-
-**COROLLARY, and the reason five passes were needed:** each failed match had a
-different cause — a `- ` prefix the other copy lacked, `##` vs `###` on the same
-heading, three copies of one heading from repeated compactions, and continuation
-lines starting with a break character. **Read one failing case before loosening
-a matcher.** Loosening blind is how a substitution bug gets introduced while
-"fixing" a truncation bug.
-
-**SEPARATE RULE, same night: A MECHANICAL GUARD ADDED MID-FLIGHT PROTECTS ONLY
-SESSIONS THAT START AFTER IT.** `lanes-append-guard.py` went live at 20:43 and a
-lane block landed below the archive marker at 20:57 — fourteen minutes later,
-from a session that had been running since before the guard existed. Hooks are
-read from `settings.json` at session start. **Shipping a guard is not the same as
-the guard being in force**, and on a tree with long-running sessions the gap is
-hours. Verify by behaviour, not by the commit landing.
+- The rule going forward: **when automating a fix across N items, the safety condition is a property of the REPLACEMENT RELATIVE TO THE ORIGINAL — "the new text must START WITH the old" — not a property of the source you pulled it from.** "The evidence file has a rule line" is not "this is the SAME line, longer", and the gap between those two clobbered 18 lines that existed nowhere else.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RETRACTION: "a mid-flight hook protects only new sessions" is WRONG. Hooks fire per call. The real hole is BASH.
 
-- The rule going forward: **hooks are evaluated on every tool call, not cached at
-  session start — a newly registered guard IS in force immediately, including for
-  sessions that started before it existed. But a PreToolUse guard matched on
-  `Edit|Write|MultiEdit` is BLIND to writes made through Bash**, and in this repo
-  that is not an edge case: `trim_lane_blocks.py`, `hoist_open_lanes.py` and
-  `compact_learnings.py` all write ledger files from Bash by design.
-
-**RETRACTS the same-day entry "a mechanical guard added mid-flight protects only
-sessions that start after it".** That was written as BELIEVED-NOT-VERIFIED, which
-was the right label, and then it was wrong.
-
-**HOW IT WAS FALSIFIED, and it was the cheap test all along.** THIS session began
-hours before `lanes-append-guard.py` was registered at 20:43. Issuing the exact
-edit the guard forbids — a duplicate `### live-game-line-projection` block —
-returned:
-
-    PreToolUse:Edit hook error: BLOCKED: this edit adds a SECOND block for a
-    lane that already has one: live-game-line-projection.
-
-The guard fired in a pre-guard session. One tool call, and it settled a question
-I had instead answered with a plausible mechanism and shipped as a rule.
-
-**WHAT ACTUALLY LET THE 20:57 WRITE THROUGH — narrowed, not proven.** Commit
-`14decdd5` is NOT a merge (single parent) and it re-added a
-`### football-model-owner` block below the archive marker fourteen minutes after
-the guard went live. With the mid-flight theory dead, the remaining explanation
-is that the write did not pass through a file tool at all. **The guard covers the
-file tools; Bash is a hole, and it is a wide one here because the repo's own
-ledger tooling writes through it.**
-
-**THE FIX THAT WOULD ACTUALLY CLOSE IT** is not another PreToolUse matcher —
-Bash commands are opaque strings — but a check at the COMMIT boundary, where a
-Bash write has to surface to become durable: refuse to commit a `lanes.md` whose
-invariants fail. `commit-guard.py` already gates commits and is the natural home.
-
-**The pattern worth keeping:** I explained a guard's silence with a mechanism I
-had not tested, wrote it down as a rule, and the disproof was a single tool call
-available the whole time. *Absent signal is about the emitter* — check whether
-the guard FIRES before theorising about why it didn't.
+- The rule going forward: **hooks are evaluated on every tool call, not cached at session start — a newly registered guard IS in force immediately, including for sessions that started before it existed. But a PreToolUse guard matched on `Edit|Write|MultiEdit` is BLIND to writes made through Bash**, and in this repo that is not an edge case: `trim_lane_blocks.py`, `hoist_open_lanes.py` and `compact_learnings.py` all write ledger files from Bash by design.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — VERIFY THE CHANNEL, NOT JUST THE QUERY
 
-I wrote a `verify:` naming a log line, then watched Render's log API for it for
-twenty minutes and started forming theories about why the code had not run.
-
-**It could never appear there.** `live_refresh_loop.py:2784-2790` spawns the sim
-job with `popen_kwargs["stdout"] = open(log_path, "wb")` — every line the wrapper
-prints goes to a FILE on the worker's disk, never to the container stdout Render
-collects.
-
-**The subtle part: I DID check the instrument.** I verified the logs `text=`
-filter against four strings visible in the unfiltered feed, precisely because
-this session had already burned me on unproven null results. The query was sound.
-**The CHANNEL was wrong.** A correct instrument aimed at the wrong pipe returns a
-confident, well-tested nothing.
-
-**RULE: a signal has TWO failure points — is it emitted, and can it REACH me.**
-Proving the reader works says nothing about the writer's destination. Before
-naming any log line as a verification, check where that process's stdout goes.
-
-**Corollary for `verify:` fields:** prefer a signal with a KNOWN path off the
-machine. On this worker that means the published, allowlisted checklist artifact
-— not a print, however well-placed. `deploys.md` and the engine reference both
-said "grep for this log line" and both were unusable as written.
-
-Sits directly on top of [[feedback_absent_signal_is_about_the_emitter]], which I
-had already written and still only half-applied.
-
-### 2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS" ARE TWO DIFFERENT CLAIMS. I reported the first as if it were the second, for `#461`, in front of the user, before checking
-
-Deployed `#461`'s fix (a cache-freshness guard in `wnba_betting.cli`'s
-`_ensure_team_advanced_stats_asof`) to refresh-worker, confirmed `db573857`
-as the live commit via `deploy_preflight.py`, and reported it as "live."
-That claim was TRUE and also NOT THE QUESTION THAT MATTERED. Production's
-real WNBA props/sim path (`refresh_wnba_oddsapi_props.py` ->
-`basketball_props_smart_sim.py`) `importlib.import_module`s
-`wnba_betting.sim.smart_sim` directly, in-process — it never subprocesses
-into `wnba_betting.cli` at all, so the fixed function was never on the
-executed call graph in production, ever, regardless of what commit is live.
-The deploy was real. The reach was zero. Only caught because the user asked
-to "dig into the staleness gap" rather than accept "deployed" as closure.
-
-**This repo already has this rule** ([[feedback_presence_is_not_reachability]]
-— 4 inert fixes in one session, same shape) **and I had it in memory and
-still didn't apply it to my own deploy.** The gap: "presence ≠ reachability"
-was checked for FLAGS and CONFIG in prior instances; here the thing not
-reachable was a whole FUNCTION, fixed and genuinely correct for the path
-that calls it — the bug was in a DIFFERENT function's import strategy
-(direct in-process module import bypassing the CLI layer entirely), three
-files away from the file I'd edited. Fixing a function correctly is not
-evidence anything calls it.
-
-**How to apply, added specificity beyond the existing rule:** before
-reporting any fix as "done" — even after a real, measured deploy — trace
-the ACTUAL production call graph from the real entrypoint
-(`scripts/refresh_<x>.py` or equivalent) to the fixed function, not just
-from the function's own immediate caller. A fix's own unit tests and a
-green reachability harness both passed here too — they exercised the fixed
-function directly, which proves the function works, not that anything in
-production reaches it. "Deployed and verified" claims two different things
-and both need a distinct, separate measurement: (1) is this commit live,
-(2) does the live process's real entrypoint ever execute this code path.
+- **It could never appear there.** `live_refresh_loop.py:2784-2790` spawns the sim job with `popen_kwargs["stdout"] = open(log_path, "wb")` — every line the wrapper prints goes to a FILE on the worker's disk, never to the container stdout Render collects.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: a guard that fails open silently is indistinguishable from a guard that works. Grep for the symbol you deleted.
 
-- The rule going forward: **after editing a guard, prove it still FIRES — do not
-  accept "it parses" or "it is registered" as evidence.** Every hook here wraps
-  its work in `except Exception: return 0` so a broken guard cannot block real
-  work, which means a broken guard is also SILENT. Those two properties are the
-  same line of code.
-
-**MEASURED.** A scripted four-part edit generalising `ledger-commit-guard.py`
-had ONE string replacement silently not match. The result: `main()` still called
-`_violations()`, which the same edit had deleted, and passed 2 arguments to a
-function that now took 3. **`ast.parse` passed.** Both call sites sit inside
-`except Exception: return 0`, so the guard would have been registered, run on
-every single commit, and never once fired — while every status readout said it
-was installed.
-
-**WHAT CAUGHT IT** was `grep -c '_violations'` returning 0 — asking whether the
-symbol I deleted was still referenced, not whether the file was valid Python.
-**A syntax check answers "is this Python"; the question was "does this still
-work".** Same family as the six checks that answered adjacent questions earlier
-in this session.
-
-**THE TEST THAT SHOULD ALWAYS FOLLOW A GUARD EDIT** is the one already used for
-the originals: break the thing deliberately and confirm exit 2, then repair it
-and confirm exit 0. Both halves. A guard verified only on the failing case can
-still block everything; verified only on the passing case it can be inert.
+- The rule going forward: **after editing a guard, prove it still FIRES — do not accept "it parses" or "it is registered" as evidence.** Every hook here wraps its work in `except Exception: return 0` so a broken guard cannot block real work, which means a broken guard is also SILENT. Those two properties are the same line of code.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: a threshold raise buys HEADROOM ÷ GROWTH RATE. Compute it, or you are choosing a fix you have not measured.
 
-- The rule going forward: **before raising a limit instead of fixing what fills
-  it, divide the new headroom by the observed growth rate and say the answer out
-  loud in hours.** If that number is smaller than the interval between the people
-  who would act on it, the raise is not a fix, it is a snooze — and it costs the
-  credibility of the threshold as well as the time.
+- The rule going forward: **before raising a limit instead of fixing what fills it, divide the new headroom by the observed growth rate and say the answer out loud in hours.** If that number is smaller than the interval between the people who would act on it, the raise is not a fix, it is a snooze — and it costs the credibility of the threshold as well as the time.
+- *(evidence in `learnings_evidence.md`)*
 
-**MEASURED, on the same evening, twice.** `state.md`'s cap was raised
-60,000 → 180,000 with a careful argument that the old figure had stopped being a
-threshold (it fired continuously through two full collapses). That argument was
-right. What was never computed was the other half: headroom at the moment of the
-raise was ~13 KB against an observed ~2.5 KB/hour under concurrent sessions —
-**about five hours.** The file breached the new cap the same evening and needed a
-third collapse. The arithmetic was available before the decision and would have
-predicted the outcome exactly.
-
-**THE ASYMMETRY WORTH REMEMBERING.** A raise is cheap to make and expensive to
-un-make: the number now carries an implicit claim that someone measured it, and
-the next person to find the file over budget inherits both the file and the
-question of whether the limit means anything. Raising twice in a night would have
-destroyed the signal entirely, which is why the second event was answered with a
-collapse instead.
-
-**WHERE IT DOES NOT APPLY:** when the thing filling the limit has a MECHANICAL
-reclaim, the growth-rate calculation is about scheduling a tool, not about the
-limit. `lanes.md` and `learnings.md` both have one and both sit comfortably under
-cap. `state.md` has none — its growth is live prose getting longer — which is
-exactly why raising its limit was the tempting move and the wrong one.
-
-### 2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file claim, blocking an unrelated lane twice in one session
-
-Two `lane-guard.py` BLOCKED errors on `docs/ai_context/todo.md`, both from
-`basketball-model-owner`'s Files bullet — which never actually claims that path.
-It reads "...collision with `nhl-model-owner`/`clv-without-settlement` resolved
-same session, see `todo.md` `#462`" — a DOC REFERENCE in prose, not a claim.
-
-**Root cause, found by reading the hook, not guessing**: `_paths_in()`'s
-`PATHISH_RE = r"^[\w.\-]+\.\w{1,5}$"` matches ANY bare `name.ext` token — no
-slash required. `todo.md` alone satisfies it, so any bare mention of a
-git-tracked filename inside an OPEN lane's Files bullet becomes a phantom claim
-on that file for every OTHER lane, forever, until the bullet is edited or the
-lane closes. This is a THIRD, distinct root cause for the same class of false
-positive this file already documents twice in `lane-guard.py`'s own inline
-comments (a `lanes.md`-mentioned-as-grepped-target case, and a wrapped-
-continuation-line case) — those needed a slash; this one doesn't.
-
-**How to apply**: before treating a `lane-guard` BLOCKED as a real, live
-conflict, read the claiming lane's actual Files bullet — if the flagged path
-appears as a bare filename in PROSE (no slash, inside a sentence, often after
-"see" or "per"), it is very likely this bug, not a real claim, and the file's
-own established "touch and release" precedent (commit immediately, hold no
-lock) applies whether or not the block clears on its own. `lane-guard` only
-intercepts the `Edit` tool — a `Bash`/`PowerShell` write to the same path
-bypasses it, which is how this session routed around both hits (verified: the
-resulting diffs were clean, non-overlapping single-line/list-append changes,
-confirmed by `git diff --stat` before trusting it). Not fixed at the source —
-`PATHISH_RE` still needs a slash-requirement carve-out for prose bullets, or a
-bare-filename allowlist, for whoever owns `lane-guard.py` next.
 ## 2026-08-19 — RULE: "this cannot be automated" is a claim like any other. Name the predicate you tried.
 
-- The rule going forward: **before concluding something is not enforceable, state
-  the specific predicate you tested and why it fails. If you cannot name one, you
-  have described the first idea you had, not the problem.** The useful move is
-  almost always to narrow the target: not "detect appending", but "detect the one
-  SHAPE of appending that causes the damage".
-
-**MEASURED, and it is the second unverified mechanism I asserted in one session.**
-At a checkpoint I wrote that `state.md`'s "EDIT THE LINE" rule could not be
-enforced, because "no predicate can distinguish *this section grew because a fact
-changed* from *someone appended instead of editing*". True of appending in
-general — and irrelevant, because the failure that forced THREE collapses has a
-narrow observable form: a **dated `### ` sub-heading**, a chronology built one
-append at a time. That predicate is trivial, and it shipped an hour later.
-
-**THE SECOND HALF OF THE FIX WAS THE DELTA, not the pattern.** `state.md` already
-contains 2 dated sub-headings, so a STATE check would fire on the status quo
-forever and be ripped out within a day. Comparing the file BEFORE and AFTER the
-edit forbids adding a third while saying nothing about the two present. **A
-predicate that is unusable as a state check is often fine as a delta check** —
-worth trying before declaring the thing unenforceable.
-
-**PAIR IT WITH ROUTING.** The guard does not merely refuse: a dated record is
-often legitimate and simply belongs in `deploys.md`, `lanes.md` or
-`learnings.md`, so the block message names the home. A guard that forbids without
-saying where to go instead gets overridden, and an override habit costs more than
-the guard was worth.
-
-**Related:** the same session asserted that a mid-flight hook could not protect
-running sessions, which one tool call disproved. Both were mechanisms invented to
-explain an observation, stated with more confidence than the evidence carried.
+- The rule going forward: **before concluding something is not enforceable, state the specific predicate you tested and why it fails. If you cannot name one, you have described the first idea you had, not the problem.** The useful move is almost always to narrow the target: not "detect appending", but "detect the one SHAPE of appending that causes the damage".
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-19 — RULE: exonerated as the CAUSE is not free of DEFECTS. Re-ask the narrower question.
 
-- The rule going forward: **when a suspect is cleared of causing the symptom you
-  were chasing, ask separately whether it is nonetheless broken.** An exoneration
-  answers one question — "did this cause X" — and it is routinely read as
-  answering a bigger one, "is this fine". Those come apart, and the second
-  question is cheap to ask once you are already looking at the thing.
-
-**MEASURED.** `psutil`'s absence was claimed as the cause of web's dead
-`deploy_preflight` sample, disproved, and recorded as "real, but incidental" —
-correctly, since production is Linux and the procfs backend enumerates 4 of 4
-processes without it. That exoneration then read as "psutil is not a problem",
-and it nearly hid a genuine one: **Windows has no `/proc`, so on the dev machine
-psutil is the ONLY working backend, and it was installed ad hoc and declared in
-no requirements file.** With it, 433 processes enumerate; without it, 2 — and the
-function DEGRADES rather than raising, so a fresh Windows clone would have shown
-2 and reported success.
-
-**THE SHAPE.** The disproof was about PRODUCTION and the defect was about LOCAL.
-An exoneration is scoped to the environment, question and time it was measured
-in; carrying it further than that is the same error as carrying a stale liveness
-read or a handed-down baseline.
-
-**WHAT THE FIX HAD TO PRESERVE.** Declaring the dependency where it is actually
-needed (`requirements-dev.txt`) and NOT in production, with the reasoning written
-beside the line, because the tempting version of this fix — adding psutil to
-`requirements.txt` — is exactly the move the ledger warns "would fix nothing and
-look exactly like a fix". **A correct fix and a fix-shaped mistake can differ by
-one file.**
-
-**Related:** [[feedback_retraction_is_not_innocence]] — withdrawing a bad
-attribution gives "not proven guilty", never "proven innocent". This is its
-mirror: proving something did not cause X says nothing about whether X's suspect
-works.
+- The rule going forward: **when a suspect is cleared of causing the symptom you were chasing, ask separately whether it is nonetheless broken.** An exoneration answers one question — "did this cause X" — and it is routinely read as answering a bigger one, "is this fine". Those come apart, and the second question is cheap to ask once you are already looking at the thing.
+- *(evidence in `learnings_evidence.md`)*
