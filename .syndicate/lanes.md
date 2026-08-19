@@ -712,7 +712,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   never tracks players. Props would be a build, not a wiring fix.
 - Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
 
-### soccer-two-sided-edges-cut — OPEN — opened 2026-08-19 — session: soccer-two-sided-edges-cut
+### soccer-two-sided-edges-cut — CLOSED-VERIFIED 2026-08-19 — **DIAGNOSED, NOT A BUG: real cause is a soccer odds-capture cadence gap, not a Layer 2 defect. Scope reassigned, no follow-on lane opened yet.** — opened 2026-08-19 — session: soccer-two-sided-edges-cut
 - Goal: identify and fix why soccer's genuinely two-sided, consensus-priced
   game markets (h2h/totals/spreads) with real positive EV never reach the
   Layer 2 shortlist. **Testable outcome:** on a live build, at least one
