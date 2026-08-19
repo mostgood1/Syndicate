@@ -20,7 +20,28 @@ Write this session to disk. Assume the context window dies immediately after.
    session. Overwrite the stale line; do not stack contradictory lines.
    If a fact was assumed rather than checked, it does not go in state.md.
 
-4. Update the lane entry in `.syndicate/lanes.md` with current status.
+4. **EDIT your lane's EXISTING block in `.syndicate/lanes.md` in place. Do NOT
+   append a second `### <slug>` block.** Rewrite the header's status field and
+   any lines that changed. One lane, one block.
+
+   **`lanes.md` carries STATUS. The narrative already went in step 2** — the
+   daily log is where "what changed, what was verified, what is believed" lives,
+   and duplicating it here is what makes this file grow. If a superseded block
+   holds something worth keeping, move it VERBATIM to
+   `.syndicate/lanes_history.md`; do not leave it in `lanes.md`.
+
+   **WHY, measured 2026-08-18.** `lanes.md` is read at every session start and
+   weighed against a 120,000-byte cap, and the session-start digest truncates
+   its OPEN LANES section to 600 bytes — so an oversized file arrives *lossy*,
+   which is the opposite of what checkpointing is for. Appending had taken it to
+   **2.12x the cap**, with one lane holding **16 blocks / 44,905 B** and its
+   current status in only one of them. After a trim it was back **over cap
+   within eight hours**, purely from appended blocks.
+
+   If the digest reports `LEDGER OVER BUDGET`, run
+   `py -3 scripts/trim_lane_blocks.py` (dry run by default; it keeps every
+   claim-bearing and every OPEN block, and verifies the claim set is unchanged
+   before writing). That tool is the cleanup — this step is the prevention.
 
 5. If a belief was overturned this session, append to `.syndicate/learnings.md`.
 
