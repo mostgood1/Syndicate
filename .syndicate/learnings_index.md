@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 420 rules `[generated]`
+## Index — 422 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -82,7 +82,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 352**
+**Rules and corrections — 354**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -244,6 +244,8 @@
 - [2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS"…](#2026-08-19-live-by-commit-sha-and-reachable-from-the-call-path-that-actually-runs-are-two-different-claims-i-reported-the-first-as-if-it-were-the-second-for-461-in-front-of-the-user-before-checking)
 - [2026-08-19 — RULE: a guard that fails open silently is indistinguishable from a guard t…](#2026-08-19-rule-a-guard-that-fails-open-silently-is-indistinguishable-from-a-guard-that-works-grep-for-the-symbol-you-deleted)
 - [2026-08-19 — RULE: a threshold raise buys HEADROOM ÷ GROWTH RATE. Compute it, or you ar…](#2026-08-19-rule-a-threshold-raise-buys-headroom-growth-rate-compute-it-or-you-are-choosing-a-fix-you-have-not-measured)
+- [2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file…](#2026-08-19-lane-guardpys-pathish_re-flags-a-bare-filename-in-prose-as-a-real-file-claim-blocking-an-unrelated-lane-twice-in-one-session)
+- [2026-08-19 — RULE: "this cannot be automated" is a claim like any other. Name the predi…](#2026-08-19-rule-this-cannot-be-automated-is-a-claim-like-any-other-name-the-predicate-you-tried)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
