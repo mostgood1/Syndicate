@@ -890,10 +890,39 @@ once the shape of the fix is clear, not in the same pass as the measurement.
 backward-compatibility, and that the truncation boundary still considers every EV faceoff
 regardless of ITS OWN zone). 17 total tests pass in the segment-effect test file.
 
-**What remains genuinely open**: whether/how to change the DZ mechanism's wiring direction (the
-natural next step, not attempted here — and "the winner gets fewer shots" doesn't automatically
-imply "model it as suppressing the winner," since a segment-level effect this specific may itself
-need discrete-event treatment rather than a simple sign flip on a still-flat constant).
+**What this section flagged as open — the wiring direction itself — fixed next, §2t.**
+
+---
+
+## 2t. DZ mechanism wiring-direction fix
+
+Full report: `docs/reports/hockeysim_faceoff_dz_direction_fix_report.md`. §2s's own recommendation
+was narrow and specific: fix the wiring direction, not redesign the mechanism's shape (that
+redesign remains a distinct, larger, not-yet-attempted follow-up). This is that fix.
+
+**The change**: `m_dz_h`/`m_dz_a` are computed exactly as before (`_faceoff_multipliers` fed
+DZ-specific percentages) — only WHICH team's lambda each is applied to changed. Before: `lam_h *=
+m_dz_h` (elevated own-DZ-index team's OWN shots boosted). After (default): `lam_h *= m_dz_a`,
+`lam_a *= m_dz_h` — the DZ-strong team's own shots pulled DOWN, the opponent's pulled UP, matching
+§2s's measured direction. Gated by `faceoff_dz_direction_fixed` (default `True`), `False` restores
+the exact original mapping for rollback/A-B — the same pattern `faceoff_discrete_event_model`
+(§2r) already established.
+
+**The existing reachability test caught the change immediately, before any new test was written**:
+`test_special_teams_faceoff_dz_index_actually_changes_shot_volume` failed on the first post-fix run
+with `strong=31.450 < weak=32.688` — the exact reversal intended, confirming the fix took effect.
+Updated to assert the corrected direction; a new reachability test confirms the flag itself gates
+the swap.
+
+**Verified**: league-wide aggregate barely moved (992-pairing round-robin, legacy 62.230 vs fixed
+62.106 avg total shots/game, −0.199%, as expected for a symmetric swap not a magnitude change); 397
+hockeysim/nhl tests pass (up from 396); checklist re-confirmed full PASS.
+
+**What this does NOT do, stated plainly**: this is a targeted sign fix, not the discrete-event
+redesign §2r gave the general case — `faceoff_alpha`/`faceoff_diff_clip` are unchanged, so the
+SIZE of the DZ adjustment is the same conservative default as before; only its direction changed.
+A genuinely faithful DZ-specific model (its own decay curve, fit to the §2s segment data already
+gathered) remains open.
 
 ---
 
@@ -959,15 +988,17 @@ concept.
 | `compute_team_faceoff_dz_index` + `faceoff_dz_index` wired into `engine.py` as an ADDITIONAL multiplicative layer (§2o) — NOT the OZ index's mirror image (measured correlation 0.69), composed with (not replacing) the OZ/EV chain | built, run (same 1,312 games, 38,120 DZ-attributed faceoffs, mean index 1.00063 across 32 teams), verified the league-wide average did not shift (61.940 neutral vs 61.934 real-indexed, 992-pairing round-robin — ~0.01%, essentially zero), tested (7 unit + 1 loader + 1 reachability + 1 both-sides-required gating) | reachable by default, gated on BOTH sides carrying the index (no fallback tier since nothing previously consumed this signal); completes all 3 faceoff-zone signals §2m's gap analysis opened |
 | `compute_team_faceoff_nz_index` + `scripts/calibrate_nhl_faceoff_nz_index.py` (§2p) — checks whether ANY faceoff-zone index correlates with real season-aggregate `shots_per_60`, not just whether it's normalized correctly | built, run — every correlation (NZ/OZ/DZ/EV) under 0.02 in magnitude, indistinguishable from zero across all 32 teams | **deliberately NOT wired** — real measurement found no basis to; function is tested (5 unit tests) but not added to the CSV producer, loader, or `engine.py`, avoiding the exact "populated but dead" anti-pattern §2l already fixed once |
 | `historical_truth/faceoff_segment_effect.py` + `scripts/validate_nhl_faceoff_segment_effect.py`/`build_nhl_faceoff_decay_curve.py` (§2q) — checks the mechanism's claimed LOCAL, segment-level effect directly, not just season aggregates | built, run — real, large, sharp, short-lived effect confirmed (3.84x-7.15x near a draw, decaying to 1.00x by 60-90s, 58,762 real EV faceoffs) | measurement-only; flips the §2p null result's interpretation but changes no engine behavior by itself |
-| `historical_truth/faceoff_decay_model.py` + `engine.py`'s `faceoff_discrete_event_model` (§2r) — the redesign §2q's own finding required: a discrete per-draw event with a real decay curve, not a per-segment constant | built, tested (17 unit + 2 reachability), verified the league-wide average barely moved (61.938 legacy vs 61.864 discrete-event, −0.12%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the one genuinely new flag this session's additive work introduced (`False` restores the exact pre-redesign mechanism); 392 tests pass with it as the default, including exact-seed determinism tests |
+| `historical_truth/faceoff_decay_model.py` + `engine.py`'s `faceoff_discrete_event_model` (§2r) — the redesign §2q's own finding required: a discrete per-draw event with a real decay curve, not a per-segment constant | built, tested (17 unit + 2 reachability), verified the league-wide average barely moved (61.938 legacy vs 61.864 discrete-event, −0.12%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the first of two genuinely new flags this session's additive work introduced (`False` restores the exact pre-redesign mechanism); 392 tests pass with it as the default, including exact-seed determinism tests |
 | `faceoff_segment_effect.py`'s new `winner_zone` filter + `scripts/validate_nhl_faceoff_dz_segment_effect.py` (§2s) — tests the DZ mechanism's dual claim directly, the one faceoff-zone mechanism §2r left unmeasured | built, run (19,458 real DZ draws, 4 window sizes) — **winner share BELOW 0.5 at every window (0.42-0.47)**, the OPPOSITE direction from the mechanism's own justification; OZ-specific comparison confirms the technique (0.93 winner share, even stronger than the blended population) | measurement-only, changes no engine behavior by itself — flags the shipped `faceoff_dz_index` WIRING DIRECTION (not the index itself) as now in question, a distinct next step deliberately not attempted this pass |
+| `engine.py`'s `faceoff_dz_direction_fixed` (§2t) — the narrow fix §2s recommended: swaps which side's shots `m_dz_h`/`m_dz_a` apply to, matching the measured direction | built, tested (existing reachability test caught the direction change immediately, updated; 1 new flag-reachability test), verified the league-wide average barely moved (62.230 legacy vs 62.106 fixed, −0.199%, 992-pairing round-robin) | **reachable, DEFAULT ON** — a second genuinely new flag this session's work introduced (`False` restores the exact original, now-known-incorrect mapping); 397 tests pass with it as the default |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
-**Almost all of it is additive and reachable-by-default with no flag to flip** — the one exception
-is §2r's `faceoff_discrete_event_model`, added DEFAULT ON specifically because it's backed by a
-real measurement and a round-robin verification showing the league-wide aggregate barely moves; it
-exists as a flag (rather than an unconditional replacement) purely for rollback/A-B comparison, not
-because anyone needs to flip it on. The other thing deliberately left OFF
+**Almost all of it is additive and reachable-by-default with no flag to flip** — the two exceptions
+are §2r's `faceoff_discrete_event_model` and §2t's `faceoff_dz_direction_fixed`, both added DEFAULT
+ON specifically because each is backed by a real measurement and a round-robin verification showing
+the league-wide aggregate barely moves; both exist as flags (rather than an unconditional
+replacement) purely for rollback/A-B comparison, not because anyone needs to flip them on. The
+other thing deliberately left OFF
 is `elo_blend_weight`, and §6 explains why with a measurement, not caution
 alone. `special_teams`'s PP%/PK%/committed-per-game feed the engine's EXISTING
 goal-rate adjustment unconditionally (no new gate to flip), so populating it

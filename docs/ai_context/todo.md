@@ -1019,7 +1019,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, the discrete-event engine redesign the validation demanded, AND a DZ-specific re-examination that found the shipped mechanism's WIRING DIRECTION may be backwards) fully built through to a shipped mechanism change plus an honestly-flagged open correction** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, the discrete-event engine redesign the validation demanded, AND a DZ-specific re-examination that found the shipped mechanism's WIRING DIRECTION was backwards, THEN FIXED) fully built through measurement, redesign, and correction** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -1707,9 +1707,51 @@ wiring direction (the natural next step, not attempted here -- and "the
 winner gets fewer shots" does not automatically imply "model it as
 suppressing the winner," since an effect this specific may itself need
 discrete-event treatment rather than a simple sign flip on a still-flat
-constant). **This closes the faceoff-zone track this session set out to
-build, validate, redesign, AND (for DZ specifically) re-examine against
-its own justification.**
+constant).
+
+**Seventh addendum, same day: fixed the DZ wiring direction the sixth
+addendum recommended.** Full report:
+`docs/reports/hockeysim_faceoff_dz_direction_fix_report.md`. A narrow,
+targeted swap, not a mechanism redesign -- matching exactly what was
+asked, not more.
+
+`m_dz_h`/`m_dz_a` are computed exactly as before (`_faceoff_multipliers`
+fed DZ-specific percentages); only WHICH team's shot lambda each is
+applied to changed. Before: `lam_h *= m_dz_h` (elevated own-DZ-index team's
+OWN shots boosted). After (default): `lam_h *= m_dz_a`, `lam_a *= m_dz_h`
+-- the DZ-strong team's own shots pulled DOWN, the opponent's pulled UP,
+matching the sixth addendum's measured direction. Gated by
+`faceoff_dz_direction_fixed` (default `True`), `False` restores the exact
+original mapping for rollback/A-B -- the same pattern
+`faceoff_discrete_event_model` (fourth/fifth addenda) already established.
+
+**The existing reachability test caught the change immediately, before any
+new test was written**: `test_special_teams_faceoff_dz_index_actually_changes_shot_volume`
+failed on the FIRST post-fix run with `strong=31.450 < weak=32.688` -- the
+exact reversal intended, confirming the fix took effect before a single
+new assertion was written. Updated to assert the corrected direction
+(`assertLess` instead of `assertGreater`); a new reachability test
+confirms the flag itself gates the swap (fixed-direction mean < legacy-
+direction mean for the identical strong-DZ team).
+
+**Verified**: league-wide aggregate barely moved (992-pairing round-robin,
+legacy-direction 62.230 vs fixed-direction 62.106 avg total shots/game, a
+-0.199% delta -- expected for a symmetric swap of which side receives a
+multiplier, not a magnitude change, confirming nothing else regressed);
+**397 hockeysim/nhl tests pass** (up from 396); checklist re-confirmed
+full PASS (no new consumed field, this changes HOW an already-consumed
+signal is applied).
+
+**What this does NOT do, stated as plainly as every other caveat this
+session**: `faceoff_alpha`/`faceoff_diff_clip` are unchanged -- only the
+DIRECTION of the DZ adjustment changed, not its SIZE. A genuinely faithful
+DZ-specific discrete-event model (its own decay curve, fit to the sixth
+addendum's segment data) remains a distinct, larger, not-yet-attempted
+follow-up -- this fix corrects a clear directional error with the smallest
+change that does so. **This closes the faceoff-zone track this session set
+out to build, validate, redesign, re-examine against its own
+justification, AND (where that re-examination found a real defect)
+correct.**
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

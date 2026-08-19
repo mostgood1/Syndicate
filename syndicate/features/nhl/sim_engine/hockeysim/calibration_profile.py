@@ -111,6 +111,16 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # segment and applies the real measured decay curve's time-weighted average instead. Round-robin
     # verified: -0.12% league-wide shot delta vs the legacy mechanism, well within noise.
     faceoff_discrete_event_model=True,
+    # §2s: DZ wiring-direction fix, on by default. `hockeysim_faceoff_dz_segment_validation_report.md`
+    # measured the ORIGINAL DZ wiring backwards -- a team that wins its own DZ draw is OUT-SHOT, not
+    # out-shooting, in the following seconds, at every one of 4 window sizes tested (winner share
+    # 0.42-0.47, 19,458 real DZ draws), while an OZ-specific control showed the expected STRONG
+    # positive direction (0.78-0.93), confirming the technique and isolating DZ as a real reversal,
+    # not a method artifact. Swaps which side's shots `m_dz_h`/`m_dz_a` apply to, matching the
+    # measured direction: an elevated `faceoff_dz_index` now pulls the team's OWN shots down and the
+    # OPPONENT's up, instead of the reverse. `False` restores the original (now-known-incorrect)
+    # mapping for rollback/A-B comparison.
+    faceoff_dz_direction_fixed=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

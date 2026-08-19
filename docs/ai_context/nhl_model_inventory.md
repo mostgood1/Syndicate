@@ -443,6 +443,27 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   r=0.69), only against how it's composed into the engine. **Deliberately
   NOT fixed this pass**, matching the same measure-first discipline §2q→§2r
   followed. 4 new unit tests, 17 total in the segment-effect file.
+- **Did** fix the DZ mechanism's wiring direction §2s recommended
+  (reference doc §2t, full report
+  `docs/reports/hockeysim_faceoff_dz_direction_fix_report.md`) — a narrow,
+  targeted swap, not a mechanism redesign. `m_dz_h`/`m_dz_a` are computed
+  exactly as before; only which team's shot lambda each is applied to
+  changed: `lam_h *= m_dz_a`/`lam_a *= m_dz_h` (default), pulling the
+  DZ-strong team's OWN shots down and the opponent's up, matching §2s's
+  measured direction — the previous mapping (`lam_h *= m_dz_h`) is
+  preserved behind `faceoff_dz_direction_fixed=False` for rollback/A-B, the
+  same pattern §2r's `faceoff_discrete_event_model` already established.
+  **The existing reachability test caught the change immediately**: failed
+  on the first post-fix run with `strong=31.450 < weak=32.688` — the exact
+  reversal intended — updated to assert the corrected direction, plus a new
+  test confirming the flag itself gates the swap. **Verified**: league-wide
+  aggregate barely moved (992-pairing round-robin, 62.230 legacy vs 62.106
+  fixed, −0.199%, expected for a symmetric swap not a magnitude change);
+  397 tests pass (up from 396); checklist re-confirmed full PASS. **Stated
+  plainly what this does NOT do**: `faceoff_alpha`/`faceoff_diff_clip` are
+  unchanged — only the direction of the DZ adjustment changed, not its
+  size; a genuinely faithful DZ-specific discrete-event model (§2s's own
+  segment data could fit one) remains a distinct, larger follow-up.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
