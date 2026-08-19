@@ -593,7 +593,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 ### basketball-model-owner — OPEN — **THE FULL CHAIN IS CLOSED WITH REAL PRODUCTION CONFIRMATION: `#461`/`#462`/`#464`/`#467`/`#468`/`#469`/`#472` all live, all measured, not just code-correct-in-isolation. `boxscores_history.csv`'s max game date advanced 2026-06-30 → 2026-08-18 in a real production run (real ESPN data, 101 verified rows). Also resolved 2 queued cross-session asks and 2 ops-tooling visibility gaps found while chasing this. No further action identified as ready in this lane.** — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine up to `docs/ai_context/model_engine_standard.md`. Original scope SHIPPED. This session's chain: `#461`→`#468`→`#469`→`#472`, each one uncovering the next real blocker rather than a false trail, ending in a real, measured production confirmation rather than a plausible-sounding stopping point — see `.syndicate/log/2026-08-19.md` and `.syndicate/deploys.md`'s "CONFIRMED WORKING end-to-end" entry for the full narrative, this block is status only. NCAAB still has no sim engine — documented design gap, deliberately not backfilled.
-- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`/`#468`'s fixes), `syndicate/features/shared/artifact_publisher.py` (`#462` WNBA/NBA + `#471` NFL `HOT_ARTIFACT_PATTERNS` additions, plus the WNBA/NBA refresh-script log-file allowlist found this session), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix, UA change, and the `_player_logs_ready` masking-bug fix pt3), `scripts/run_live_odds_refresh_worker.py` (`#472`: shared WNBA/soccer mutex-contention epoch bug). Read-only over the rest of `basketball_props_*.py`, `syndicate/features/{nba,wnba,ncaab}/**`. Not touched: board_enrichment.py or wnba_fixture_identity.py.
+- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`/`#468`'s fixes), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix, UA change, and the `_player_logs_ready` masking-bug fix pt3), `scripts/run_live_odds_refresh_worker.py` (`#472`: shared WNBA/soccer mutex-contention epoch bug). Read-only over the rest of `basketball_props_*.py`, `syndicate/features/{nba,wnba,ncaab}/**`. Not touched: board_enrichment.py or wnba_fixture_identity.py.
+  **`syndicate/features/shared/artifact_publisher.py` claim RELEASED 2026-08-19
+  by `soccer-odds-capture-cadence-gap`**, not this session — `#462`/`#471`'s
+  own additions are SHIPPED and this lane's own header already says "no
+  further action identified as ready" here. Released rather than left
+  claimed-but-idle so a genuinely narrow, unrelated addition (one soccer
+  `HOT_ARTIFACT_PATTERNS` line) does not have to wait on a closed-in-
+  substance lane's formal close. Done under explicit user authorization,
+  logged in `soccer-odds-capture-cadence-gap`'s own block. If this session
+  resumes and needs the file again, re-claim it there — nothing here
+  prevents that.
 - Verification, by commit, ALL LIVE: refresh-worker `f13ea05e`→`23e70a80`→`152c3292`(wnba-edge-263's own deploy, still carries `#469` pt3), live-odds-worker `e1d1bcf4`→`0c7962a7`→`97e85b66`(`#472`), web `b775255a`→`8833cfd6`→`450e0d6e`(log allowlist). **`#468` effect CONFIRMED** (real sim call rebuilt 3 fresh `team_advanced_stats` files). **`#472` effect CONFIRMED**: WNBA autorun launched 23min post-deploy vs. the 5h+ drought measured pre-fix. **`#469` effect CONFIRMED, the headline result**: a manually-triggered real refresh (fired rather than wait ~4h for the next natural cycle) produced a genuinely new `boxscores_2026-08-18.csv` (101 real ESPN rows) and advanced `boxscores_history.csv`'s own max date from 2026-06-30 to 2026-08-18 — the datacenter-IP-soft-block hypothesis was correct and the browser-UA fix resolves it.
 - Two ops-tooling gaps found and fixed while chasing this, both real and reusable by future sessions: (1) `launch_refresh_run`'s autorun-launched children have `stdout=DEVNULL` by design, so `print()` markers (including `#469`'s own `BOXSCORE_BOOTSTRAP_STALLED`) never reach Render's log collector for those specific runs — the script's own `_append_log` file was the only surviving signal and was never allowlisted either (fixed). (2) `reports/migration_runs/**` stdout/stderr wrapper files are NOT cross-service visible at all — confirmed directly against this specific path family that they live on whichever service ran the job, not on web's disk; only the `HOT_ARTIFACT_PATTERNS` sweep crosses that boundary.
 - `wnba-edge-263`: modeling decision made (WNBA h2h should read the sim's real `p_home_win` directly, not `_margin_win_prob`'s fixed-scale transform) and producer-half edits landed (`6933d263`) — their consumer half should be unblocked.
@@ -878,6 +888,13 @@ been separately measured there.
   <today>.jsonl` for a slate with same-day kickoffs; every distinct
   match's h2h/totals/spreads `captured_at` is <24h old, not just some.
 - Files:
+  - `syndicate/features/shared/artifact_publisher.py` — **claimed 2026-08-19,
+    narrow: ONE new `HOT_ARTIFACT_PATTERNS` line
+    (`reports/refresh_status/latest/soccer_pregame_autorun_status.json`)
+    only. Was `basketball-model-owner`'s; released by them (their own
+    header: "no further action identified as ready", `#462`/`#471` both
+    shipped) rather than left claimed-but-idle. Done under explicit user
+    authorization — see that lane's own block for the release note.**
   - `scripts/run_live_odds_refresh_worker.py` (defines
     `_launch_autorun_soccer_pregame_refresh`, the SOLE producer, 4h
     cadence) — **CAUTION: this file has real uncommitted changes sitting
