@@ -2855,3 +2855,72 @@ already used).
 independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
+
+## [mlb-ladders-native-builder] MLB LADDERS: STALE BECAUSE ONLY THE VENDOR APP BUILDS THEM `[2026-08-19]`
+
+**SYMPTOM (user-reported, confirmed on the SERVED payload):** pitcher-props
+ladder candidates on the MLB compact cards do not update. Every row carries a
+full sim side and an EMPTY market side.
+
+    GET /mlb/api/pitcher-ladders?date=2026-08-19  ->  found=True, 12 rows
+      "Mean 4.66  Over '-'  Mode 4  Sim count 994"
+      "Market line: -"   "Over probability: -"
+
+**MEASURED CAUSE — a timing gap, not a missing producer:**
+
+    ladder artifact  daily_ladders_2026_08_19.json   generatedAt 2026-08-18T18:20:25-05:00
+    odds artifact    oddsapi_pitcher_props_2026_08_19.json  retrieved_at 2026-08-19T18:16:45
+                                                      mode=live, 24 pitchers, real lines
+
+**The ladder was built ~19h BEFORE the odds arrived and nothing rebuilds it.**
+Sims are NOT the problem: 24 `daily_sim` runs on 08-19, latest 18:10:39Z, every
+15-20 min. **The ladder is the only stale link.**
+
+**WHY NOTHING REBUILDS IT.** The only writer is `write_daily_ladders_artifact`
+in **`vendor/.../flask_frontend.py:4058`**, called ON REQUEST when
+`_artifact_is_stale()` and only while the SOURCE APP serves. Syndicate has the
+READER and PRESENTER only — `cards.py:1273`, `ladders_common.py:142`,
+`pitcher_ladders.py` (whose own docstring says "backed by the existing ladders
+artifact"). **Syndicate inherited the consumer and not the producer.**
+
+### TWO WRONG DIAGNOSES I PUBLISHED FIRST — both from ONE artifact-export query
+
+1. *"the artifact is frozen at 2026-06-02"* — **WRONG.** `export?pattern=*ladders*`
+   returns only `daily_ladders_2026_06_02.json`, but the live artifacts sit at
+   `/opt/render/project/data/...` and the SERVED payload shows today's file.
+2. *"Syndicate inherited the reader not the writer, so it stopped in June"* —
+   half right, wrong conclusion: it IS produced, just never refreshed.
+
+**The served payload contradicted both in one call, and I had not looked at it.**
+`feedback_user_watches_the_board` says go straight to the served payload. I did
+not, and scoped an entire worker-side builder for a frozen artifact that was not
+frozen.
+
+### NATIVE BUILD IS ASSEMBLY, NOT INVENTION — every input verified present
+
+    SIM     daily_sim_artifact_path(date, game_pk)         sources.py:308
+            -> sim.pitcher_props[<mlbam_id>].so_dist  (full outcome histogram)
+                                             .so_mean
+            (also outs/pitches/hits/earned_runs/walks/batters_faced _dist+_mean)
+    MARKET  daily_snapshot_oddsapi_pitcher_props_path(date) sources.py:286
+            -> pitcher_props[<lowercase name>].strikeouts.line / over_odds
+            **already imported by cards.py:46**
+    SCHEMA  pinned by ladders_common.py:70-84 — rows need pitcherName, team,
+            matchup, marketLine, mean, mode, overLineProb, simCount
+    SHAPE   groups.pitcher.strikeouts.rows[]  (`_extract_prop_group`, :35)
+    WRITE   daily_ladders_path(date)                        sources.py:163
+
+`mode` = argmax of `so_dist`; `overLineProb` = mass above the line. **Arithmetic
+on data that already exists — no new model.**
+
+### THE JOIN RISK, named before writing it
+
+**Sim keys on `mlbam_id` (`680570`); odds key on lowercase NAME
+(`"michael king"`).** That name->id join is where rows will silently vanish. The
+builder MUST count and publish unmatched pitchers — 24 odds pitchers yielding 11
+rows has to be visible in the artifact, not inferred from a thin card.
+
+**NEXT:** native `ladders_build.py` (pitcher/strikeouts first — it is what the
+compact card reads via `_extract_prop_group(summary,"pitcher","strikeouts")`),
+then a freshness trigger in the sim job so every ~15-min sim re-derives ladders
+against current lines AND current game state. **Retires the vendor import.**

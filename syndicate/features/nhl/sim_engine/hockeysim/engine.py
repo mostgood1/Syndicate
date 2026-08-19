@@ -113,6 +113,15 @@ class SimConfig:
     # segment's actual length. Default ON (backed by real measurement, strictly more faithful);
     # `False` restores the exact pre-redesign diff-based mechanism for rollback/A-B comparison.
     faceoff_discrete_event_model: bool = True
+    # §2s: `hockeysim_faceoff_dz_segment_validation_report.md` measured the DZ mechanism's own
+    # justification BACKWARDS -- a team that wins its own DZ draw is OUT-SHOT (not out-shooting) in
+    # the following seconds, at every one of 4 window sizes tested (winner share 0.42-0.47 vs the
+    # OZ-specific control's 0.78-0.93, confirming the technique and isolating DZ as a real, not
+    # artifactual, reversal). Default ON: applies `m_dz_h`/`m_dz_a` SWAPPED relative to the original
+    # wiring -- a team with an elevated `faceoff_dz_index` (wins more of its own DZ draws than
+    # average) sees its OWN shots pulled down and the OPPONENT's pulled up, matching the measured
+    # direction. `False` restores the exact original (now-known-incorrect) wiring for rollback/A-B.
+    faceoff_dz_direction_fixed: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -1102,19 +1111,27 @@ class PeriodSimulator:
                 # above, not a replacement: reuses `_faceoff_multipliers`' own diff/clip/alpha math
                 # (the same "how sensitive is shot-share to a faceoff differential" knobs, applied
                 # consistently regardless of which zone the differential comes from), fed
-                # DZ-specific percentages. `m_dz_h` (>1 when HOME wins its own DZ more) applies to
-                # `lam_h` (the winning team's own transition-offense bump); `m_dz_a` applies to
-                # `lam_a` (suppression of the team that DZ win was taken against) -- the function's
-                # existing semantics, just a second, independent zone-context input. Skipped
-                # entirely (both raw values `None`) rather than defaulted to neutral, since there is
-                # nothing here to silently regress -- unlike the OZ/EV chain above, no prior
-                # mechanism ever consumed this signal.
+                # DZ-specific percentages. Skipped entirely (both raw values `None`) rather than
+                # defaulted to neutral, since there is nothing here to silently regress -- unlike
+                # the OZ/EV chain above, no prior mechanism ever consumed this signal.
                 if ev_only and faceoff_dz_idx_home_raw is not None and faceoff_dz_idx_away_raw is not None:
                     dz_h_pct = 0.5 * _f(faceoff_dz_idx_home_raw, 1.0)
                     dz_a_pct = 0.5 * _f(faceoff_dz_idx_away_raw, 1.0)
                     m_dz_h, m_dz_a = _faceoff_multipliers(self.cfg, dz_h_pct, dz_a_pct)
-                    lam_h = float(lam_h) * float(m_dz_h)
-                    lam_a = float(lam_a) * float(m_dz_a)
+                    # §2s: real segment-level data showed the ORIGINAL wiring below (m_dz_h ->
+                    # lam_h, "the winning team's own transition-offense bump") backwards -- a team
+                    # that wins its own DZ draw is OUT-SHOT, not out-shooting, in the following
+                    # seconds. Default FIXED: m_dz_h (>1 when HOME wins its own DZ more) applies to
+                    # `lam_a` (the OPPONENT gets the boost) and m_dz_a applies to `lam_h` (the
+                    # DZ-winning side's own shots are pulled down) -- matching the measured
+                    # direction. `faceoff_dz_direction_fixed=False` restores the exact original
+                    # (now-known-incorrect) mapping for rollback/A-B comparison.
+                    if bool(getattr(self.cfg, "faceoff_dz_direction_fixed", True)):
+                        lam_h = float(lam_h) * float(m_dz_a)
+                        lam_a = float(lam_a) * float(m_dz_h)
+                    else:
+                        lam_h = float(lam_h) * float(m_dz_h)
+                        lam_a = float(lam_a) * float(m_dz_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

@@ -676,6 +676,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   unaffected — no in-season history means the prior-season fallback.
 - **2026 data built and slate-complete** (94-team coverage verified); five of
   seven builders were unrunnable and are fixed at the choke point.
+- **DEPLOY PENDING, BUILT AND READY:** `f2eb719d`, branch
+  `deploy/ncaaf-sp-ratings-20260819b`, 2 files on live SHA `23e70a80`, blobs
+  identical to `origin/main`. **Blocked on the refresh-worker claim** held by
+  `nfl-player-props-backtest`; `--force` was attempted (user-directed) and denied
+  by the permission classifier — not worked around. Full recipe, two-stage
+  verify, staleness precondition and the known-defect disclosure are in
+  `.syndicate/deploy/requests/20260819T163000Z-ncaaf-sp-ratings.md`.
+  **REFRESH-WORKER IS CONTENDED** — three sessions inside an hour, and my first
+  graft was invalidated once already by a deploy landing mid-wait. Re-check the
+  live SHA before firing.
 - **OWED:** (1) **NOTHING IS DEPLOYED** — production still serves 0 of 51; the
   worker autorun has not fired since the key landed and no football code is live.
   (2) NCAAF opener verification, PASS = ~51 of 51 non-null
@@ -739,6 +749,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     (`wnba_game_projections.py`) against the NEW column names as a contract,
     with synthetic fixtures carrying them, so it activates the moment the
     producer half lands — by either owner.
+  - **THIS DISCLAIMER SENTENCE ITSELF THEN BECAME A NEW LANE-GUARD BUG,
+    2026-08-19.** "not taken" was not a recognized `_DISCLAIMER_MARKERS`
+    string, so this exact bullet re-read as `wnba-edge-263` CLAIMING
+    `scripts/refresh_wnba_oddsapi_props.py` — and blocked
+    `basketball-model-owner`, the file's real owner, from editing their own
+    file when they went to apply the 3 producer-half edits. They diagnosed it
+    correctly but could not self-fix (`.claude/hooks/` edits gated for their
+    permission mode). **FIXED AND PUSHED**: `a1cbcde1`, `_DISCLAIMER_MARKERS`
+    +"not taken", regression test reproduces this exact incident verbatim,
+    22/22 lane-guard tests green. They should be unblocked after `git pull`.
+    Messaged them directly rather than waiting for the next digest.
 - Hypothesis: the sim already computes a real per-market probability/edge for
   WNBA props. `props_edges.py::compute_props_edges` prices each `play` using
   `sd_pts`/`sd_reb`/... (preferring the simulated sd, falling back to a
@@ -1148,6 +1169,63 @@ reconstructed Normal CDF.**
   denominator for BOTH halves — `prop_coverage.rows_with_distribution` and
   the game-line `at_market_line` count — not just a combined total, so a
   partial win on one half is legible rather than averaged away.
+
+**PRODUCER HALF LANDED 2026-08-19 (`6933d263`, `basketball-model-owner`) —
+INTEGRATED AND ONE REAL BUG CAUGHT BEFORE DEPLOY.** Rebased my worktree
+branch onto it cleanly (zero conflicts on my claimed files, confirmed by
+`git log --oneline HEAD..origin/main -- <my files>` returning empty before
+the rebase). Two follow-ups, both now committed (`896e36fe`):
+
+- **COLUMN-NAME MISMATCH, would have shipped silently dead.** My consumer
+  code (written before the producer landed) read
+  `row.get("sim_market_home_spread"/"sim_market_total")`; the landed producer
+  writes `market_home_spread`/`market_total` — no `sim_` prefix. Every
+  existing test built `WnbaGameProjectionIndex` by hand, bypassing the
+  loader's real `row.get(...)` calls, so nothing would have caught this
+  before a live deploy. Fixed at the loader only (internal dict key stays
+  `sim_market_*`, just the CSV column read changes); closed the coverage
+  gap with two new loader tests using the real column names, one of which
+  pins this exact bug.
+- **h2h now reads `p_home_win` directly** — `basketball-model-owner`'s
+  explicit modeling call, made on production data (`smart_sim_2026-08-19
+  _WSH_TOR.json`: `p_home_win=0.82`, confirmed live). `_margin_win_prob`
+  becomes the fallback for games without a completed sim. The
+  `edge_vs_market_pct` withholding for h2h is DELIBERATELY UNCHANGED — their
+  decision answered "which probability source", not "is it safe to price an
+  edge off it"; those stay separate.
+
+**Both bugs found by adding tests that exercise the LOADER, not just the
+join** — the same shape gap that `load_wnba_prop_distributions` had earlier
+in this lane (props loader test added a few commits back). Worth generalizing:
+any join in this codebase whose tests build the index by hand rather than
+through its own loader has an unmeasured seam exactly like this one.
+
+**Status: both sub-fixes complete, integrated, tested (209 tests across the
+two files + refresh_runner regression, only the 3 pre-existing-unrelated
+failures `basketball-model-owner`'s own commit already names). Not yet
+merged to `origin/main` — still in the worktree branch
+`session/wnba-edge-263`, ready to land.** Verification step above (live
+`rows_with_model_edge`) needs an actual deploy, which is a separate,
+explicit decision — not taken here.
+
+### nfl-odds-allowlist-deploy — OPEN — opened 2026-08-19 — session: nfl-odds-allowlist-deploy
+- Goal: get `basketball-model-owner`'s already-merged `nfl_source/oddsapi_
+  player_props_*.csv` `HOT_ARTIFACT_PATTERNS` fix (`#471` follow-up) actually
+  OBSERVABLE from web. **Testable outcome:** `/api/ops/artifacts/export?
+  pattern=nfl_source/oddsapi_player_props_*.csv` returns `count > 0` on
+  production (currently `count: 0` despite the code being correct and on
+  `origin/main` — confirmed the LIVE web commit `b775255a` predates the fix
+  by content, not ancestry).
+- Files: none (deploy-execution only, no code/ledger edits beyond this
+  block and the post-deploy measurement in `deploys.md`).
+- Hypothesis: n/a (not diagnostic — the fix is already verified correct in
+  code; this lane only exists to run the deploy through the claim +
+  preflight locks and record the measurement).
+- Falsification test: n/a.
+- Verification: post-deploy, the export endpoint above returns `count > 0`
+  with real file names, AND the live commit is confirmed BY CONTENT (not
+  ancestry) to carry the new pattern.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
