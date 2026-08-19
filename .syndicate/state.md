@@ -2015,7 +2015,20 @@ market-relative scoreboard.
   either predates them or did not include this file. Treat it as unverified for
   `test_intelligence.py` specifically; the line above is the direct measurement.
 - Full suite: **526 passed, 0 failed** after the soccer `as_of` fix `[08-15]`.
-- `tests.test_archives` (what CI runs) — 383 pass.
+- `tests.test_archives` (what CI runs) — **383 pass, 2 skipped, ~6 min**
+  `[re-measured 2026-08-19, lane ci-green]`.
+- **CI RUNS `unittest`, NOT `pytest`, AND `conftest.py` DOES NOT EXIST TO IT**
+  `[verified 2026-08-19]`. `ci.yml` runs `python -m unittest tests.test_archives`
+  and `daily-update.yml` runs 13 modules the same way, while the documented
+  local loop is `python -m pytest tests/`. `tests/conftest.py` is a pytest
+  plugin file, so **every autouse fixture in it is absent in CI**. Measured on
+  one commit, one machine, one minute: `tests/test_wnba_cards_merge_aliases` was
+  `20 passed` under pytest and `FAILED (failures=2)` under unittest. **A green
+  local pytest run is not evidence about CI.** Shared setup a CI-run module
+  needs belongs in `tests/_cache_isolation.py` (plain functions + a `TestCase`
+  mixin, which `conftest.py` now delegates to), not in `conftest.py` alone.
+- `daily-update.yml`'s 13-module contract list — **55 pass**
+  `[measured 2026-08-19]`, the same count CI reports.
 
 ---
 
@@ -2038,6 +2051,16 @@ market-relative scoreboard.
   0, pegged CPU. Cause unconfirmed.
 - **MLB sim model-side as-of-ness is UNKNOWN.** The backtest is PIT-safe by
   replay, which says nothing about the model's own inputs.
+- **`Daily Update`'s artifact-backup steps (12-13) have not executed since
+  2026-07-15** `[verified 2026-08-19, #481]`. Three blockers stood in front of
+  them and all three are now cleared: `ADMIN_TOKEN` (absent 07-16, added the
+  same day), an account **billing lock** that killed every run 07-16..08-15
+  before any step (3-second jobs, empty `steps[]`, no retrievable log — which is
+  why the per-step API reported no failing step for that whole month), and the
+  test step `#480` fixed. The step itself was also rebuilt (`#481`) and hand-run
+  green against production. **Nothing has yet been proven END TO END by the
+  workflow. The next scheduled 06:00Z run is the first; do not record the backup
+  path as working until one shows both steps green.**
 - **NBA / NHL / NCAAB feature point-in-time status UNKNOWN** — no harness reaches
   them.
 - **NHL and soccer market anchoring** make those engines' market-relative
