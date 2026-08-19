@@ -132,6 +132,96 @@ def load_ppa_ratings(season: int) -> dict[str, dict]:
     return index
 
 
+# Minimum prior games before a team's as-of PPA is trusted. Below this the
+# team falls back to the prior season rather than being rated on two games --
+# and it is reported as fallback, never silently averaged.
+_MIN_ASOF_GAMES = 3
+
+
+def load_ppa_games_week(season: int, week: int) -> list[dict]:
+    """Per-GAME PPA for one REGULAR-SEASON week.
+
+    `seasonType=regular` IS LOAD-BEARING AND ITS ABSENCE IS A WORSE LEAK THAN
+    THE ONE THIS FILE EXISTS TO FIX. Without it, `/ppa/games?week=1` returns
+    regular week 1 AND the postseason's "week 1" -- the College Football Playoff.
+    Measured 2026-08-19: Ohio State came back with FIVE rows for 2024 week 1,
+    one against Akron (the real week-1 game) and four against Texas, Notre Dame,
+    Oregon and Tennessee, all played the following JANUARY. Aggregating
+    "weeks < 8" was therefore importing games from months AFTER the target week,
+    which is strictly worse than the season-aggregate leak it replaced.
+
+    The tell was an impossible count, not a failing test: 10 prior games through
+    week 7 for a team that plays once a week, and 231 rows in week 1 against
+    ~100-127 in every other week. A postseason row is otherwise indistinguishable
+    from a regular one -- same shape, same fields, plausible values.
+    """
+    payload = _cfbd_get("/ppa/games", {
+        "year": season, "week": week,
+        "seasonType": "regular", "excludeGarbageTime": "true",
+    })
+    return [row for row in (payload if isinstance(payload, list) else [])
+            if str(row.get("seasonType") or "regular") == "regular"]
+
+
+def load_ppa_ratings_asof(season: int, week: int) -> tuple[dict[str, dict], str]:
+    """Team PPA aggregated over weeks STRICTLY BEFORE `week`.
+
+    WHY THIS REPLACES `/ppa/teams`. That endpoint returns season-aggregate PPA --
+    its own docstring below says so -- which for a completed season includes the
+    game being predicted. Measured 2026-08-19 over 558 games of 2024:
+
+        r(full-season PPA differential, margin) = 0.663   <- leaked
+        r(as-of      PPA differential, margin) = 0.487   <- this function
+
+    a 0.176 gap, inflating apparent skill by 36%. The as-of value sits in the
+    0.3-0.5 band expected of honest prior form, which is the same frame that
+    caught the NFL in-game leak at r = 0.988.
+
+    AND THE OBVIOUS FIX IS A SILENT NO-OP, which is why this takes the longer
+    route. `/ppa/teams` ACCEPTS `week=N` AND IGNORES IT -- measured, identical
+    134 rows and identical 0.42 for Ohio State with and without `week=5`. Adding
+    a week parameter there yields the same leaked number, a clean diff and a
+    false all-clear. `/ppa/games` is the only week-scoped source.
+
+    Returns the SAME SHAPE as `/ppa/teams` ({"offense": {"overall": x}, ...})
+    so `offense_defense_rating` is unchanged.
+
+    Cost: week-1 CFBD calls instead of 1. CFBD is not the OddsAPI budget and a
+    full season is ~15 calls.
+    """
+    offs: dict[str, list[float]] = {}
+    defs: dict[str, list[float]] = {}
+    for wk in range(1, max(1, int(week))):
+        for row in load_ppa_games_week(season, wk):
+            team = row.get("team")
+            o = (row.get("offense") or {}).get("overall")
+            d = (row.get("defense") or {}).get("overall")
+            if team is None or o is None or d is None:
+                continue
+            offs.setdefault(norm(team), []).append(float(o))
+            defs.setdefault(norm(team), []).append(float(d))
+
+    index: dict[str, dict] = {}
+    for key, values in offs.items():
+        if len(values) < _MIN_ASOF_GAMES:
+            continue
+        index[key] = {
+            "offense": {"overall": sum(values) / len(values)},
+            "defense": {"overall": sum(defs[key]) / len(defs[key])},
+            "_asof_games": len(values),
+        }
+    if index:
+        return index, f"cfbd_ppa_asof_{season}_through_wk{int(week) - 1}"
+
+    # No usable in-season history (week 1, or a season that has not started).
+    # The prior season's FULL aggregate is a legitimate preseason proxy and is
+    # not a leak: it contains no information about the season being predicted.
+    prior = load_ppa_ratings(season - 1)
+    if prior:
+        return prior, f"cfbd_ppa_season_{season - 1}_fallback_for_{season}"
+    return {}, f"cfbd_ppa_asof_{season}_unavailable"
+
+
 def load_ppa_ratings_with_fallback(season: int) -> tuple[dict[str, dict], str]:
     """PPA ratings are season-aggregate stats computed from games actually
     played that season -- for the first week(s) of a brand-new season, CFBD
@@ -247,6 +337,9 @@ def main() -> None:
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--seeds", type=int, default=SEEDS_PER_GAME)
+    parser.add_argument("--leaked-season-ppa", action="store_true",
+                        help="use season-aggregate PPA (LEAKED for a completed season). "
+                             "Reproduces pre-2026-08-19 behaviour for comparison only.")
     parser.add_argument("--progress-log", type=Path, default=None)
     args = parser.parse_args()
 
@@ -270,7 +363,16 @@ def main() -> None:
         used_cfbd_schedule_fallback = True
         log(f"ENGINE_SCHEDULE_EMPTY falling back to CFBD games directly rows={len(schedule_rows)}")
 
-    ppa_index, rating_source = load_ppa_ratings_with_fallback(args.season)
+    # AS-OF, not season-aggregate. `load_ppa_ratings_with_fallback` is retained
+    # below for reference and for the `--leaked-season-ppa` escape hatch, but the
+    # default is now leak-free. See `load_ppa_ratings_asof`.
+    if args.leaked_season_ppa:
+        ppa_index, rating_source = load_ppa_ratings_with_fallback(args.season)
+        print("WARNING: --leaked-season-ppa in use. Ratings contain the games "
+              "being predicted; any accuracy number from this run is an UPPER "
+              "BOUND, not a measurement.", flush=True)
+    else:
+        ppa_index, rating_source = load_ppa_ratings_asof(args.season, args.week)
     log(f"PPA_RATINGS teams={len(ppa_index)} rating_source={rating_source}")
 
     projections: list[SmartSimNcaafProjection] = []
