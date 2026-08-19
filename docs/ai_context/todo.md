@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#471` — **NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill; two concrete calibration defects found. Defect 1 (anytime_td shrinkage) FIXED+TUNED+MEASURED, see addendum below. Defect 2 (mean-overconfidence) not started.** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
+### `#471` — **CLOSED, both calibration defects fixed. NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill. Defect 1 (anytime_td shrinkage) and defect 2 (mean-overconfidence) both FIXED+TUNED+MEASURED out-of-sample — see the two addenda below.** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
 
 `scripts/backtest_nfl_props.py` (new, 13 tests) — mirrors `backtest_mlb_props.py`'s per-market
 denominator discipline and in-sample/out-of-sample split (this repo's `convergence-phase7-crps`/
@@ -124,6 +124,82 @@ pbp-resolution tests — confirmed identical with this change stashed out, not a
 **Next**: defect (1), yardage/count markets overconfident near their own mean (predicts ~50% cover,
 actual ~37-44%) — needs a skewed/empirical-quantile approach, not shrinkage (this is a shape
 problem, not a small-sample problem). Not started.
+
+#### `#471` ADDENDUM 2 2026-08-19 — **Defect "count/yardage markets overconfident near their own mean" FIXED, TUNED, MEASURED out-of-sample — lane `nfl-player-props-skew-fix`**
+
+The last open piece of `#471`. Real NFL box-score count/yardage stats (yards, receptions,
+attempts) are right-skewed — a hard floor at 0, occasional big games — so mean > median, and the
+true `P(actual > mean)` sits below 50%. `Normal(mean, stdev)` is symmetric by construction and
+cannot represent that, which is exactly the shape of the measured defect (well-calibrated at both
+tails, overconfident in the middle).
+
+**FIRST ATTEMPT WAS A NULL RESULT, kept and reported rather than discarded** — the falsification
+test this lane was opened with fired for real: `scripts/compare_nfl_cover_probability_models.py`
+measured a PURE log-normal correction (method-of-moments fit off the SAME mean/stdev
+`player_rate` already computes, no new data, no tunable parameter) as a MIXED result — Brier
+improved on 4 of 8 markets (`passing_yards/attempts`, `rushing_yards/attempts` — the
+higher-coefficient-of-variation ones) and WORSENED it on the other 4 (`passing_tds`, `receptions`,
+`receiving_yards`, `interceptions`) by OVERCORRECTING — the mid-decile gap often flipped sign and
+grew rather than shrank (e.g. `interceptions` bucket 6: `+0.113 → -0.143`, further from zero).
+Shipping pure log-normal universally would have traded one calibration defect for another on half
+the markets.
+
+**THE REAL FIX: a per-market Normal/log-normal BLEND, closed-form tuned, not guessed.**
+`scripts/calibrate_nfl_cover_probability_blend.py` blends `p = (1-w)*p_normal + w*p_lognormal`
+per market. Because Brier score is convex in a linear blend of two FIXED probabilities, the
+Brier-minimizing weight has a **closed form** (no grid search): `w* = -sum(e_i*d_i) / sum(d_i^2)`
+where `d_i = p_lognormal_i - p_normal_i`, `e_i = p_normal_i - outcome_i`. `w` is **SELECTED on
+2022-2023** and only ever **REPORTED on 2024-2025** (never re-selected there) — the same fit/score
+discipline as `#471`'s original anytime_td shrinkage constant.
+
+**MEASURED, out-of-sample, per market (n_score ~4,500-35,000 rows each):**
+
+| market | w (clipped) | Brier w=0 (baseline) | Brier w* | verdict |
+|---|---|---|---|---|
+| passing_attempts | **1.000** (unclipped optimum 1.14, capped at pure log-normal) | 0.2062 | 0.1998 | real improvement |
+| rushing_yards | 0.573 | 0.2157 | 0.2111 | real improvement |
+| rushing_attempts | 0.550 | 0.2192 | 0.2171 | real improvement |
+| passing_yards | 0.689 | 0.2176 | 0.2174 | small real improvement |
+| receiving_yards | 0.216 | 0.222742 | 0.222677 | marginal |
+| receptions | 0.137 | 0.218231 | 0.218215 | marginal |
+| passing_tds | 0.315 (unclipped) | 0.223145 | 0.224007 | **NO real benefit — SHIPPED AT w=0** |
+| interceptions | 0.133 (unclipped) | 0.240758 | 0.240922 | **NO real benefit — SHIPPED AT w=0** |
+
+`passing_tds` and `interceptions` are deliberately left at today's Normal-only behavior (weight
+0.0 in `_COVER_PROBABILITY_BLEND_WEIGHT`) rather than shipping a fitted correction that showed no
+real out-of-sample benefit — reported honestly, not forced through to claim a clean sweep.
+
+**Full-scale re-run confirms the same shape** (`scripts/backtest_nfl_props.py`, 16,991+ rows per
+market, not just the held-out slice): `passing_attempts` Brier `0.1919 → 0.1836`, its worst
+mid-decile gap `+0.082 → -0.010`; `rushing_yards` Brier `0.1956 → 0.1917`. **Section 1
+(point-accuracy MAE) confirmed BYTE-IDENTICAL before/after, programmatically diffed, not
+eyeballed** — this fix only touches the probability TRANSFORM, not the underlying mean estimate,
+so no `#471` beats-baseline verdict regressed.
+
+**Implementation**: `syndicate/features/nfl/props.py` — `_lognormal_params_from_moments`,
+`_lognormal_cover_probability` (both stdlib-only, `statistics.NormalDist` on the log-transformed
+line — deliberately NOT using `scipy`, which is a declared dependency in `requirements.txt` but
+has never been imported anywhere in `syndicate/` or `scripts/`; a Gamma-distribution alternative
+stays on the table if ever needed, but this fix didn't require introducing it), `_COVER_
+PROBABILITY_BLEND_WEIGHT` (the 8 tuned constants), `_nfl_prop_model_probability`'s non-`anytime_td`
+branch now blends instead of pure Normal, falling back to pure Normal whenever log-normal is
+undefined (`mean<=0` — a player with zero prior engagement in that specific stat) rather than
+crashing or returning `None` where the old code wouldn't have.
+
+**Tests**: 8 new (`tests/test_nfl_props.py`). 620 NFL tests pass total (3 unrelated pre-existing
+failures — `generate_smartsim2_nfl_projections.py` pbp-resolution tests — confirmed identical with
+this change stashed out, not a regression).
+
+**Verified on `origin/main` by content**: `5def74df` — `props.py` carries
+`_COVER_PROBABILITY_BLEND_WEIGHT` with `"passing_attempts": 1.0`. `reports/nfl_props_backtest_
+2022_2025.json` regenerated to reflect both fixes; `reports/nfl_cover_probability_model_
+comparison.json` (the null pure-log-normal result) and `reports/nfl_cover_probability_blend_
+calibration.json` (the shipped tuning sweep) are both committed as the record.
+
+**`#471` is now FULLY CLOSED** — both calibration defects it found are fixed, tuned, and measured
+out-of-sample. The remaining open item from the original entry (the `HOT_ARTIFACT_PATTERNS`
+allowlist gap blocking real-odds coverage verification, handed to `basketball-model-owner`) is
+unrelated to either calibration defect and still stands on its own.
 
 ### `#470` — **NHL never had a market-comparison backtest -- the instrument that answers "does this show an edge," distinct from every calibration `#463` closed** — BUILT, MEASURED, HONESTLY CAVEATED 2026-08-19, lane `nhl-model-owner`
 

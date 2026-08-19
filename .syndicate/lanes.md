@@ -1307,7 +1307,7 @@ reconstructed Normal CDF.**
   `0a7fdbeb` confirmed on `origin/main` post-push.
 - Blocked by: none.
 
-### nfl-player-props-skew-fix — OPEN — opened 2026-08-19 — session: nfl-player-props-skew-fix
+### nfl-player-props-skew-fix — CLOSED-VERIFIED 2026-08-19 — Normal/log-normal PER-MARKET BLEND, closed-form OOS-tuned, `5def74df` on `origin/main`, verified by content. Pure log-normal was a NULL result (overcorrected 4 of 8 markets) — recorded, not shipped. 6 of 8 markets improved; 2 (passing_tds, interceptions) correctly shipped unchanged (no real OOS benefit). — session: nfl-player-props-skew-fix
 - Goal: fix `#471` defect 1 (renumbered from the calibration-fix lane's
   "defect 1" — the yardage/count-market one, not `anytime_td` which is
   already fixed): every count/yardage market's Normal-CDF cover
@@ -1365,6 +1365,27 @@ reconstructed Normal CDF.**
   checked, not assumed); Section 2's per-market bucket gaps stated
   before/after, same honesty standard as the anytime_td fix (report the
   trade-off if one exists, do not hide it).
+- **DONE, verification MET, falsification test FIRED ONCE (kept, not
+  hidden) then a second approach passed.** `scripts/compare_nfl_
+  cover_probability_models.py` measured pure log-normal as a NULL
+  result — Brier improved on 4/8 markets, WORSENED on 4/8 by
+  overcorrecting. `scripts/calibrate_nfl_cover_probability_blend.py`
+  found the real fix: a per-market Normal/log-normal blend weight `w`,
+  closed-form Brier-minimizing (no grid search — Brier is convex in a
+  linear blend), selected on 2022-2023, reported on 2024-2025:
+  `passing_attempts w=1.0` (Brier 0.2062→0.1998), `rushing_yards w=0.573`
+  (0.2157→0.2111), `rushing_attempts w=0.550`, `passing_yards w=0.689`,
+  `receiving_yards`/`receptions` small real weights. `passing_tds` and
+  `interceptions` showed NO real OOS benefit and SHIP UNCHANGED (w=0) —
+  a fitted correction that doesn't generalize was not forced through.
+  Full-scale re-run (16,991+ rows/market) confirms the same shape:
+  passing_attempts Brier 0.1919→0.1836, its worst bucket gap
+  +0.082→-0.010. Section 1 point-accuracy MAE confirmed BYTE-IDENTICAL
+  before/after (programmatic diff, not eyeballed) — no regression to any
+  beats-baseline verdict. 8 new tests, 620 NFL tests pass (3 unrelated
+  pre-existing failures, confirmed identical with this change stashed
+  out). Full writeup: `docs/ai_context/todo.md` `#471` addendum 2,
+  `.syndicate/deploys.md` 2026-08-19.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
