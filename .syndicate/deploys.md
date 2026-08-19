@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-08-19 — WEB: NFL PROP CALIBRATION FIXES — MEASURED LIVE (follow-up to the PENDING row above)
+
+**`dep-da32ecou01pc73fojijg` -> `status=live`, `commit=f149f5e2`,
+finished `2026-08-19T22:06:28Z`** (fired `21:59:15Z`, ~7 min build) — read
+via `/v1/services/srv-d88ahvrbc2fs73eodu30/deploys?limit=1`, commit field
+matches the scoped candidate exactly.
+
+**Content verified, not just the commit-SHA match**: `git show
+f149f5e2:syndicate/features/nfl/player_stats.py` contains `ANYTIME_TD_
+SHRINKAGE_K = 12.0`; `git show f149f5e2:syndicate/features/nfl/props.py`
+contains `_COVER_PROBABILITY_BLEND_WEIGHT` and the per-market weights.
+Render deploys build directly from the pushed commit with no
+transformation of this file, so commit identity is content identity here
+— combined with the API's own commit-match, this is the same rigor as
+the earlier artifact-allowlist verification (`count: 14`), not a
+weaker one.
+
+**A live BEHAVIORAL test was attempted and hit a pre-existing, documented
+limitation, not a defect from this deploy**: `/nfl/api/props?season=2025&week=22`
+(the only week anywhere with real quoted player-prop odds) returned
+`rank_cards: []` — expected per `#471`'s own finding that week 22 sits
+outside REG season entirely, so `player_rate` never resolves for it
+regardless of this fix. `2026 wk1` is also a header-only stub (no real
+odds exist for the current week either). **No live route currently has
+real quoted NFL prop odds to exercise the new code path against** — this
+is a data-coverage fact, unrelated to and unmoved by this deploy.
+
+**Verdict: fix is live and content-verified; its effect on a real served
+prop cannot be observed until real quoted NFL player-prop odds exist for
+an in-REG-season week** — worth a follow-up check once the 2026 season
+is further along and `oddsapi_player_props_2026_wk<N>.csv` for some
+N<=18 has real rows.
+
+Claim released: `python scripts/deploy_claim.py release --service web
+--token 40a875282827ffc6`.
+
+---
+
 ## 2026-08-19 — WEB: NFL PROP CALIBRATION FIXES (`#471` full set), SCOPED, PENDING
 
 **Scope:** `syndicate/features/nfl/{props.py,player_stats.py}` only, 214
