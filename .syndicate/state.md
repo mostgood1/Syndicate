@@ -2239,6 +2239,29 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   0.0902 without a fresh, larger paired validation. Full detail: lane
   `soccer-model-dispersion`.
   The earlier 16-fixture probe (stdev 0.1765) remains SUPERSEDED, unchanged.
+- **TWO of the four genuinely-missing input fields are now SOURCED — 2026-08-19
+  ~11:0xZ, `ad174dc0`.** `possession_share` (ESPN's `boxscore` section, already
+  fetched for lineups/commentary, unread until now) and `set_piece_goal_share`
+  (corner-tagged shots already extracted by `espn_shot_events.py`, never
+  aggregated — free-kick/penalty origin NOT classified, a partial not
+  exhaustive proxy). Checked for a misrouted producer BEFORE assuming new
+  external sourcing was needed — same discipline that found xG and
+  shots/form; paid off a third time. **Remaining unsourced:**
+  `availability_index` (partial raw material exists — confirmed-starter
+  detection, season usage rates — but needs new cross-subsystem integration
+  and is near-kickoff-conditional, not an always-available aggregate) and
+  `pace_seconds_per_event` (not investigated for a from-existing-columns
+  derivation).
+  **VALIDATED, KEPT DESPITE NON-SIGNIFICANCE — a different judgment than the
+  clean_sheet_rate discard above, reasoning in the lane, not just the
+  verdict:** paired eredivisie test, t=+1.27 (weaker evidence of harm than
+  clean_sheet_rate's own non-significant t=+1.71), dispersion moved further
+  from market (0.2373->0.2474). Kept because these are CORE engine functions
+  unfed since inception (closing exactly the checklist's gap, not a fresh
+  hypothesis) with no known-good default being abandoned — unlike
+  clean_sheet_rate's regression-derived replacement. Do not re-run this exact
+  single-league test as the final word — folding both fields into the pooled
+  nine-league regression is the natural next step and was not done.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
