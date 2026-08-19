@@ -1195,3 +1195,37 @@ mechanism is elegant, because elegance reads as evidence.
 TRIGGER is recorded as unproven and possibly unrecoverable — Render exposes no
 env-var history. **"Mechanism known, trigger unknown" is a real result; "cause
 found" would have been a fabrication.**
+
+## 2026-08-19 — RULE: a flag's NAME is a hypothesis about its meaning, not its meaning. Read the setter before gating on it.
+
+- The rule going forward: **before rejecting or filtering data on a flag found
+  in a payload, find where the flag is SET and read what condition actually
+  produces it — do not infer meaning from the flag's name, even when the name
+  reads as self-explanatory.** A name chosen for one context (display copy,
+  a UI hint) can sound like it means something load-bearing (live adjustment,
+  circularity) in a different context (a backtest scoring real predictions).
+
+**MEASURED, caught before shipping, not after.** Building NHL's market-comparison
+backtest against real production data, `/nhl/api/cards`'s `lookahead_applied`
+flag read as an obvious candidate for "this probability was adjusted using
+information not available pregame" — exactly the circularity risk the backtest
+existed to avoid. The first draft rejected every row carrying it: 23 of 24 rows
+in the first test run.
+
+**Reading the actual setter (`nba/cards.py`, the same flag) found a different,
+unrelated mechanism**: `lookahead_applied = bool(resolved_date != requested_date)`
+— it means "the requested date had no games, so the route served the next date
+that does," not "this game's probability was live-adjusted." Confirmed against
+every one of 20 cached NHL responses: `resolved_date` was always LATER than
+`requested_date` when the flag was true, consistent with a forward-looking
+fallback, never same-day.
+
+**THE FIX WAS THE SAME SHAPE AS THE ORIGINAL STALE-FILE BUG THIS SAME BACKTEST
+ALREADY FOUND**: don't drop the row, key it on the value the flag reveals is
+actually correct (the resolved date, not the one requested) — the existing dedup
+then does the rest. Two bugs, one session, same root cause: trusting a label
+over what actually produced it.
+
+**WHAT SURVIVES**: `grade_nhl_predictions_vs_market.py`'s docstring now states
+the verified meaning explicitly, with the confirming evidence, so the next
+reader doesn't have to re-derive it from the name a second time.

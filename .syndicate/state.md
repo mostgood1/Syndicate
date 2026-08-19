@@ -1179,7 +1179,8 @@ unsaved anywhere.
 
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
-  (§1–§2k), `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`.
+  (§1–§2l, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
+  `#463`/`#470`.
 - **Special teams, per-team AND league-calibrated**: PP/PK goal conversion
   (`pk_goal_cal_mult=0.4645`, `pp_goal_cal_mult=1.0` deliberately neutral —
   measured statistically indistinguishable from baseline), PP/PK shot volume
@@ -1191,13 +1192,16 @@ unsaved anywhere.
   distance/angle/shot-type/strength/rebound/empty-net, 112,888 Fenwick
   shots): holdout AUC=0.7450, Brier=0.0667, league xGF/60 within 1.8% of the
   truth-calibrated goals/60 baseline.
-- **Team rates: `shots_per_60`/`faceoff_win_pct` REACHABLE, `blocks_per_60`/
-  `penalties_per_60` a CONFIRMED DEAD GATE** — populated into `TeamRates`
-  but `engine.py` never reads either field (proven via fixed-seed,
-  byte-identical-output test). NOT force-fixed with a new mechanism (blocks
-  already modeled via the calibrated per-shot `block_rate_*`; no PIM market
-  exists for penalties) — an explicit open decision (build a mechanism, or
-  delete the two dead fields), not silently marked fixed.
+- **`TeamRates.blocks_per_60`/`penalties_per_60` REMOVED, not fixed** —
+  confirmed dead (populated, `engine.py` never read either field, proven via
+  a byte-identical-output test) and no legitimate mechanism existed to wire
+  them into without double-counting: blocks are already fully governed by
+  the calibrated per-shot `block_rate_*` mechanism above, and penalty rate
+  already drives PP/PK segment generation via `special_teams`'s
+  `committed_per_game` (`engine.py:718-719`, confirmed by reading the code).
+  Deleted from `HockeyTeamFeatures`/`TeamRates` and every call site, traced
+  end to end across 15 files (§2l). `shots_per_60`/`faceoff_win_pct` remain
+  reachable and unaffected.
 - **Player usage weights built** (`shot_weight`/`goal_weight`/`block_weight`,
   828 players from 47,231 skater-game boxscore records) — these were ALREADY
   reachable pre-fix via `engine.py`'s position/TOI heuristic; real per-player
@@ -1208,11 +1212,31 @@ unsaved anywhere.
 - **Play-by-play ingestion is new substrate** (`NhlWebIngestClient.play_by_play()`,
   1,312 games cached) — was previously unused for NHL entirely (`#454`,
   closed as a data-availability gap this session).
+- **`#470`: NHL's first market-comparison backtest** (`scripts/grade_nhl_predictions_vs_market.py`,
+  Brier score, `devig()`, mirrors MLB's `convergence-phase7-crps` methodology).
+  Confirmed non-circular by reading `adapters.py`/the `/nhl/api/cards` route
+  directly — `build_game_prediction` never touches `market_anchoring.py`.
+  **Pulls real PRODUCTION data** (`--source production`/`both`, public
+  `/nhl/api/cards/dates` + `/nhl/api/cards`, no admin token) as well as the
+  thin local mirror. Two real bugs found and fixed while building this, both
+  by checking cached responses rather than assuming: (1) several
+  `predictions_<date>.csv` files are byte-identical stale duplicates of an
+  earlier date — deduped on `(date, home_abbr, away_abbr)`; (2)
+  `lookahead_applied` does NOT mean live/circular adjustment despite the
+  name — it means "requested date had no games, served the next date that
+  does," fixed by keying rows on the RESOLVED date. **Measured, n=14-15
+  moneyline/total across 12 dates (2026-03-01..2026-06-11)**: moneyline
+  market wins (0.2905 vs 0.2769), total model beats market this run (0.2102
+  vs 0.2378) — stated plainly as NOT a powered verdict either way, n is
+  still far below what MLB's own much larger sample needed to find its own
+  noise floor. Puck-line odds are not exposed by the production route at
+  all; `--source both` covers it from local files (n=3).
 - **Genuinely still open**: player-level usage-weight producer's small-sample
-  floor (< 5 games falls back to heuristic, by design); `blocks_per_60`/
-  `penalties_per_60` dead gate above; the vendor's original block-rate
-  EV:PK:PP-def ratio (0.45:0.55:0.35) was never itself validated, only
-  scaled; xG model's rebound/tip-in coefficient sign is an open question.
+  floor (< 5 games falls back to heuristic, by design); the vendor's
+  original block-rate EV:PK:PP-def ratio (0.45:0.55:0.35) was never itself
+  validated, only scaled; xG model's rebound/tip-in coefficient sign is an
+  open question; `#470`'s market-backtest sample (n=14-15) is nowhere near
+  powered — re-run as the season resumes and dates accumulate.
 
 
 ## [model-skill] MODEL SKILL (`#428`) — measured vs not

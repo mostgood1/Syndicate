@@ -535,30 +535,47 @@ across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will no
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
-### nhl-model-owner — OPEN — CHECKLIST FULL PASS (`nhl_sim_input_checklist.py` exits 0, 16 alarms → 0 this session) — session: nhl-model-owner
+### nhl-model-owner — OPEN — CHECKLIST FULL PASS + dead-gate REMOVED + first market-comparison backtest built (`#470`, real production data) — session: nhl-model-owner
 - Goal: NHL sim engine reaches the same deep-dive rigor MLB/soccer already have —
   **testable outcome MET**: `python scripts/nhl_sim_input_checklist.py` exits 0.
-  Full detail: `docs/ai_context/hockeysim_engine_reference.md` §1–§2k,
-  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`,
-  `.syndicate/log/2026-08-18.md` (checkpoint entry, this session's full narrative
-  by file/verified/believed/dead-ends), `.syndicate/state.md` `[nhl-sim-engine]`.
-  3 prior PROGRESS/CLAIM-OVERRIDE/SHIPPED sub-blocks moved verbatim to
-  `lanes_history.md` at this checkpoint — superseded, not deleted.
+  Extended goal, also MET this session: does the resulting model show any
+  edge over a real market — `scripts/grade_nhl_predictions_vs_market.py`
+  (`#470`) answers that, pulling real production data, not just the local
+  mirror. Full detail: `docs/ai_context/hockeysim_engine_reference.md`
+  §1–§2l, §8/§8b, `docs/ai_context/nhl_model_inventory.md`, `todo.md`
+  `#463`/`#470`, `.syndicate/log/2026-08-19.md` (this checkpoint's full
+  narrative by file/verified/believed/dead-ends), `.syndicate/state.md`
+  `[nhl-sim-engine]`.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
-  `scripts/nhl_*.py` (new producer/calibration scripts), `docs/ai_context/hockeysim_engine_reference.md`,
+  `scripts/nhl_*.py`/`scripts/grade_nhl_predictions_vs_market.py`/`scripts/calibrate_nhl_*.py`
+  (producer/calibration/backtest scripts), `docs/ai_context/hockeysim_engine_reference.md`,
   `docs/ai_context/nhl_model_inventory.md`. Shared artifact-publisher allowlist
-  module: touch-and-released repeatedly (5 additions total this session, each
-  committed and released same-turn, no held claim) — not currently claimed.
-- **Only remaining gap**: `HockeyTeamFeatures.blocks_per_60`/`penalties_per_60`
-  are a CONFIRMED DEAD GATE (populated into `TeamRates`, `engine.py` never
-  reads either — proven, not assumed, via a byte-identical-output test).
-  Deliberately NOT force-fixed (would either double-count against the already-
-  calibrated per-shot block mechanism, or has no market/mechanism to drive at
-  all for penalties) — an open decision (build a mechanism, or delete the
-  fields) for whoever picks this up next, not a wiring fix.
+  module: touch-and-released repeatedly, each addition committed and released
+  same-turn — not currently claimed.
+- **Dead gate CLOSED, not left open**: `HockeyTeamFeatures.blocks_per_60`/
+  `penalties_per_60` were confirmed dead (proven, not assumed) AND confirmed
+  to have no legitimate consumption mechanism that wouldn't double-count
+  already-live real data (blocks: the calibrated per-shot `block_rate_*`
+  mechanism; penalties: `special_teams.committed_per_game` already drives
+  PP/PK segment generation). Removed from `HockeyTeamFeatures`/`TeamRates`
+  and every call site across 15 files, not just documented.
+- **New this session, on top of the full-PASS checklist**: a real
+  market-comparison backtest (`#470`) — the instrument that answers "does
+  this show an edge," distinct from every calibration the checklist proves.
+  Pulls real PRODUCTION data (`--source production`, public
+  `/nhl/api/cards/dates` route, no admin token) in addition to the thin
+  local mirror. Found and fixed two real bugs by checking real responses,
+  not assuming: stale-duplicate prediction files, and `lookahead_applied`'s
+  actual meaning (date-fallback, not live adjustment). Measured n=14-15
+  moneyline/total (up from n=3-4 local-only) — explicitly NOT a powered
+  verdict, stated with equal weight to every other caveat this session.
 - Verification: `python scripts/nhl_sim_input_checklist.py` — full PASS.
-  323 hockeysim/nhl tests pass. Nothing deployed (offline artifact-producer +
-  engine-wiring work only; next NHL refresh-worker/web deploy picks it up).
+  323 hockeysim/nhl tests pass throughout (unchanged since the last
+  addition — this class of script is validated by running it against real
+  data, matching MLB's own precedent). Nothing deployed (offline
+  artifact-producer + engine-wiring work only; next NHL refresh-worker/web
+  deploy picks it up). All commits pushed to `origin/main`, confirmed via
+  `git merge-base --is-ancestor` after every push this session.
 - Blocked by: none
 
 ### basketball-model-owner — OPEN — **#468's WIRING FIX SHIPPED 2026-08-19 (`fd1930b2`), verified end-to-end with real data (uncached-date build + stale-schema rebuild, both correct). NOT YET DEPLOYED to refresh-worker. Boxscore-capture half of #468 STILL OPEN — production confirmed stuck at 2026-05-24 (23 files, re-checked directly), a separate defect the wiring fix cannot reach. #467 LIVE on refresh-worker. #462 LIVE+VERIFIED on web. #464 CLOSED.** inventory pass SHIPPED (#460-#468 filed) — opened 2026-08-18 — session: basketball-model-owner
