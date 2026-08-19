@@ -93,10 +93,36 @@ def contested_files(claim_set) -> dict[str, list[str]]:
 
 
 def open_lanes_under_archived(text: str) -> list[str]:
-    marker = "## Archived lanes"
-    if marker not in text:
+    """OPEN lanes filed below the `## Archived lanes` HEADING.
+
+    THE MARKER MUST BE MATCHED AS A HEADING, NOT AS A SUBSTRING. This used
+    `text.index("## Archived lanes")`, a plain substring search, so any PROSE
+    that merely mentioned the heading moved the slice to wherever that sentence
+    sat -- and this file's whole job is to be trusted about where lanes live.
+
+    Measured 2026-08-18, and self-inflicted, which is the useful part: a session
+    wrote an orphan-sweep record into the TOP of `lanes.md` containing the
+    sentence "THE 7 REMAINING `OPEN`-UNDER-`## Archived lanes` ARE NOT MINE TO
+    FIX." That put the literal marker at lines 56 and 58, ABOVE `## OPEN`, so
+    the slice began above every open lane and the check reported **11 strays
+    where there were 7**. The four extras -- `ask-sport-coverage`,
+    `live-game-line-projection` (twice) and `refresh-worker-oom-recurrence` --
+    are filed correctly under `## OPEN` and were never strays at all.
+
+    The failure direction is what makes it worth a docstring: a report of MORE
+    violations than exist reads as vigilance, so nobody doubts it. The 7 -> 11
+    jump was written up as "four other sessions opened lanes while the count was
+    being watched" -- a plausible story for a number that had a mechanical
+    cause. An instrument that cannot be wrong in the reassuring direction still
+    has to be checked in the alarming one.
+
+    `(?m)^## Archived lanes` costs nothing and cannot be moved by prose, because
+    a heading is the one thing prose cannot accidentally be.
+    """
+    m0 = re.search(r"(?m)^## Archived lanes", text)
+    if not m0:
         return []
-    arch = text[text.index(marker):]
+    arch = text[m0.start():]
     return [m.group(1) for m in re.finditer(r"(?m)^### (\S+) —\s*([^—]*)", arch)
             if OPEN_RE.search(m.group(2))]
 

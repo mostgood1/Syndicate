@@ -191,7 +191,20 @@ done
 # crashing checker leaves the line off entirely rather than blocking a session.
 INCOHERENT=""
 if command -v python >/dev/null 2>&1; then
+  # check_lane_invariants.py was MISSING from this list until 2026-08-18, and
+  # its absence is why `#466` ran unnoticed. lane_identity_check answers "does
+  # one slug have two OPEN blocks"; it says nothing about WHERE a block sits or
+  # whether two lanes claim one file. Both of those failed for days with a green
+  # session-start banner over them: 7 OPEN lanes filed inside `## Archived
+  # lanes` (whose claims a future archive pass drops silently, since lane-guard
+  # reads lanes.md and nothing else) and 1 contested file.
+  #
+  # The lesson is the cheap half of the pair. `/lane` was also fixed to insert
+  # under `## OPEN` instead of appending at EOF -- but that is PROSE in a slash
+  # command, and prose is what failed here in the first place. A checker in this
+  # loop is what makes the regression surface next session instead of next week.
   for c in "lane_identity_check.py:lanes.md" \
+           "check_lane_invariants.py:lanes.md" \
            "state_key_check.py:state.md" \
            "todo_id_reconcile.py --no-history:todo.md"; do
     script=${c%%:*}; label=${c##*:}

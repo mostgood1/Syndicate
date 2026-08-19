@@ -15884,10 +15884,27 @@ Expected effect: `GET /api/ops/artifacts/export?path=<team_advanced_stats
 or calibration file>` returns `count:1` instead of `403` -- immediate,
 synchronous, checkable the moment the deploy finishes.
 
-MEASUREMENT: <pending -- fill in after deploy + verification curl>
-REMINDER: verify within 15 min of deploy finishing, ~22:5xZ.
+Known blocker before actual deploy trigger: per `convergence-phase7-crps`'s
+entry two sections up, `deploy_preflight.py --service web` can never return
+CLEAR (per that entry's ORIGINAL claim, a deleted `ALL_PROCESS_MEMORY`
+emitter on web's current code) -- will need the same user-authorized
+break-glass substitute (live `/api/ops/memory` process read) before
+triggering, not assumed here.
 
-**RETRACTION 2026-08-18:** the "deleted emitter" cause recorded above is **WRONG**. The emitter is INTACT at `memory_observability.py:1952`, byte-identical to the old worker's. I read a `head -4` truncated grep as an exhaustive one. **Three causes have now been claimed and refuted for this one symptom (broken sampler / missing psutil / deleted emitter); the real cause is UNKNOWN.** What is established: the emitter exists, refresh-worker emits every ~17s, web has not since 2026-08-14. The open question is WHICH CALLER runs on web and why it stopped. See the RETRACTION section in `state.md`. **Do not act on a cause from these files until the call sites are traced.**
+**RETRACTION 2026-08-18, on the "deleted emitter" claim above:** it is
+**WRONG**. The emitter is INTACT at `memory_observability.py:1952`,
+byte-identical to the old worker's -- a `head -4` truncated grep was read as
+exhaustive. **Three causes have now been claimed and refuted for this one
+symptom (broken sampler / missing psutil / deleted emitter); the real cause
+is UNKNOWN.** What is established: the emitter exists, refresh-worker emits
+every ~17s, web has not since 2026-08-14. The open question is WHICH CALLER
+runs on web and why it stopped. See the RETRACTION section in `state.md`.
+**Do not act on a cause from these files until the call sites are traced.**
+The break-glass substitute above is still the right move regardless of
+which cause is eventually confirmed -- it does not depend on the cause.
+
+MEASUREMENT: <pending -- fill in after deploy + verification curl>
+REMINDER: verify within 15 min of deploy finishing.
 
 ### deploy MEASURED — web — #462 — 2026-08-18 ~23:3xZ — lane `basketball-model-owner`
 

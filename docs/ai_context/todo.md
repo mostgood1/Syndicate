@@ -1,5 +1,197 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#466` — **7 OPEN lanes sit INSIDE the two `## Archived lanes` sections of `lanes.md` and would be silently un-guarded by the next archive pass** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **RE-MEASURED AND PARTLY RETRACTED SAME DAY — the count was 7, not 11, and the stated mechanism was WRONG**
+
+> **CORRECTION 2026-08-18, before anyone acts on the original text below.**
+> Two claims in the first version of this item are disproved. Both are left
+> visible rather than edited away, because the wrong version is the one that
+> reads as more alarming and would have sent the next reader at the wrong file.
+>
+> **RETRACTED 1 — "7 → 11, growing, because four other sessions opened lanes."**
+> The count never grew. `check_lane_invariants.py` matched the marker with
+> `text.index("## Archived lanes")`, a plain SUBSTRING search, and **this lane
+> wrote that literal string into PROSE at the top of `lanes.md`** (an
+> orphan-sweep record: "THE 7 REMAINING `OPEN`-UNDER-`## Archived lanes` ARE NOT
+> MINE TO FIX", lines 56 and 58). The slice therefore began above `## OPEN`, and
+> three correctly-filed lanes — `ask-sport-coverage`,
+> `live-game-line-projection` (counted twice) and
+> `refresh-worker-oom-recurrence` — were reported as strays. **Self-inflicted,
+> by the same session that then explained the jump with a story about other
+> sessions.** Fixed by matching `(?m)^## Archived lanes`, a heading, which prose
+> cannot accidentally be; falsified against a planted canary lane, which the
+> fixed check still catches. Live count after the fix: **7**.
+>
+> **RETRACTED 2 — "the `## MERGED FROM origin/main` sections are the problem."**
+> They are not. Measured by mapping every OPEN lane to its enclosing section:
+> the merged band (then lines 1469–2081) contains **ZERO** OPEN lanes. Moving
+> those ~613 lines above the marker — the fix the original text prescribes —
+> changes the violation count by **0**. It is pure churn on a contended file.
+>
+> **WHAT IS ACTUALLY TRUE, and is the real item:** 7 OPEN lanes sit *inside the
+> two `## Archived lanes` sections themselves* — 4 in the first, 3 in the
+> second. The hazard below is real and unchanged; only the location and the
+> remedy were wrong.
+>
+>     FIRST  Archived section : grading-blocker-settled-zero, live-edge-basis,
+>                               convergence-phase7-crps, soccer-model-dispersion
+>     SECOND Archived section : nhl-model-owner, basketball-model-owner,
+>                               repo-coordination
+>
+> **The lesson worth keeping:** the instrument failed in the REASSURING
+> direction. A check reporting MORE violations than exist reads as vigilance, so
+> nobody doubts it — and a plausible narrative ("other sessions opened lanes")
+> was available for a number that had a purely mechanical cause. Verify an
+> alarming reading as hard as a comforting one.
+
+**The invariant that fails**, `scripts/check_lane_invariants.py` (post-fix):
+
+    [FAIL] no OPEN lane under '## Archived lanes'
+    VIOLATED: 7 OPEN lane(s) under Archived
+
+**Why it matters, in the checker's own words:** archiving moves a lane's body to
+`lanes_closed.md`, which **`lane-guard` never reads** — it opens `lanes.md` and
+nothing else. So a future archive pass over these lanes drops their file
+protection **silently**, and the guard reports nothing because from its side the
+claim simply ceased to exist. This is the same class of failure as a
+claim-bearing opening block being archived, which `lanes_history.md`'s header
+already warns about.
+
+> ---
+> **EVERYTHING FROM HERE TO THE END OF THIS ITEM IS THE SUPERSEDED ORIGINAL.**
+> Kept verbatim for the record. Do NOT action it: the two paragraphs below
+> prescribe moving the `## MERGED FROM origin/main` sections, which is measured
+> to change nothing, and cite the retracted 7 → 11 growth. Read the correction
+> above instead.
+> ---
+
+**IT IS A SECTION-ORDERING DEFECT, NOT A SIZE ONE, AND THIS IS THE WHOLE POINT.**
+`lanes.md` has `## Archived lanes` at line ~1457 with **`## MERGED FROM
+origin/main` sections appended after it** by successive merge/reconciliation
+cycles. The checker slices from the first `## Archived lanes` marker to EOF, so
+everything appended below — including every genuinely new lane — reads as
+"under Archived". Measured 2026-08-18 in a single session: **7 → 11**, purely
+because four other sessions opened lanes while the count was being watched.
+Every append lands on the wrong side of the marker.
+
+**Trimming does not touch it.** `scripts/archive_released_lanes.py` moved 17
+blocks and 204,345 bytes out the same evening (`lanes.md` 3.76x → 2.05x over
+cap) and the stray count went **up**, not down, because the two are unrelated
+quantities. Do not expect a size fix to close this item.
+
+**The fix is to make `## Archived lanes` the last section and keep it there:**
+move the trailing `## MERGED FROM origin/main` sections and every genuinely-open
+lane block above the marker, then have whatever appends lanes insert them under
+`## OPEN` rather than at EOF. The append site is the durable half — without it
+the count regrows within hours, which is exactly what was observed.
+
+**NOT DONE IN THE FINDING SESSION, DELIBERATELY.** Every one of the 11 belongs
+to a live or uncertain lane, and moving another lane's block is editing across
+lanes, which the protocol forbids. It needs either each owner to move their own,
+or an explicit cross-lane mandate.
+
+> **RESOLVED 2026-08-18 — the cross-lane mandate was given, and the structural
+> half is DONE. `check_lane_invariants.py` now reports `INVARIANTS HOLD`.**
+>
+> `scripts/hoist_open_lanes.py` moved all 7 blocks out of the two
+> `## Archived lanes` sections and back under `## OPEN`:
+>
+>     check_lane_invariants   VIOLATED: 7   ->  INVARIANTS HOLD
+>     claims                  65 -> 65, LOST none, GAINED none, contested 0
+>     non-blank lines         3069 -> 3069
+>     bytes                   251,035 -> 251,035      (a pure move)
+>
+> Verified against a pre-run backup using `lane-guard.py`'s OWN `_claims()`,
+> compared **as a set, not a count** — two claims swapping owners leaves the
+> count identical and is a catastrophe. Blocks moved VERBATIM, so no lane's
+> recorded state, claims or history changed; three of the seven had sessions
+> running at the time and none of their content was touched.
+>
+> **THE DURABLE HALF IS STILL OPEN, and this item stays open for it.** Nothing
+> stops the next appended lane landing below the marker again — the fix is at
+> the APPEND SITE, so new lanes are inserted under `## OPEN` rather than at EOF.
+> Until that lands, re-run `hoist_open_lanes.py` when the invariant fails.
+> Whatever writes lane blocks (`/lane open`, and the merge/reconciliation passes
+> that produced the `## MERGED FROM origin/main` sections) is what needs
+> changing.
+>
+> **THE BYTE CAP IS NOW MET — `lanes.md` reads `ok` in the digest's own bloat
+> check for the first time.** `scripts/trim_lane_blocks.py` moved **45
+> superseded blocks / 141,812 bytes** to `lanes_history.md`:
+>
+>     lanes.md   253,880 -> 112,068 B      2.12x -> 0.93x of the 120,000 cap
+>     claims     65 -> 65, LOST none, GAINED none, contested 0
+>     lines      conserved across lanes.md + lanes_history.md
+>     invariants INVARIANTS HOLD
+>
+> A block was kept if it is **claim-bearing** (`lane-guard` reads `lanes.md` and
+> nothing else) **or its header reads OPEN** (an open lane that vanishes from
+> the file also vanishes from the session-start digest, and a lane nobody can
+> see is one two sessions will collide on). 12 lanes left `lanes.md` entirely —
+> every one verified to hold **zero claims** and to be non-OPEN first.
+>
+> **THE HEADROOM IS THIN AND THIS WILL RECUR.** It measured 115,193 B within
+> minutes of the trim — **96% of cap, ~4.8 KB of slack** — because several live
+> sessions append continuously. This is a periodic operation, not a repair: run
+> `trim_lane_blocks.py` when the digest reports `LEDGER OVER BUDGET`.
+>
+> **The other two weighed files are still over and are NOT addressed here:**
+> `state.md` 160,909 / 60,000 (2.68x) and `learnings.md` 252,020 / 120,000
+> (2.10x). Both are prose-collapse jobs rather than block moves — `state.md` has
+> been collapsed twice already — so neither is mechanical the way this was.
+>
+> **THE "ALREADY UN-GUARDED?" QUESTION IS NOW ANSWERED: NO.**
+> `scripts/audit_lane_unguarding.py` walked **all 344 commits** touching
+> `lanes.md` (2026-08-13 → 08-18), recomputing the claim set at each with
+> `lane-guard.py`'s own `_claims()` and classifying every claim that
+> disappeared:
+>
+>     ARCHIVED (moved out of lanes.md while still OPEN)   0   <-- the feared case
+>     VANISHED (block gone, not OPEN in either archive)   1
+>     RELEASED (lane closed/released, block still there)  3
+>     REWORDED (lane narrowed its own Files line)         0
+>
+> **No archive pass ever cost a lane its protection.** Every claim that stopped
+> being enforced belonged to a lane that had been released or closed.
+>
+> **The single VANISHED event is real but is NOT an archive pass, and it is
+> already repaired.** Commit `63fc2c84` (2026-08-17 19:33) — whose message reads
+> *"my lane headers are parseable"* — ran a hyphen→em-dash header rewrite that
+> wrote **corrupt bytes**: the headers became
+> `### \x01 <bad> \x02 <bad> **stable fixture identity SHIPPED...`, with literal
+> control characters where the slug and status belong. `LANE_RE` cannot parse
+> that, so slug and status were destroyed on **12 headers across 4 lanes**
+> (`wnba-fixture-identity`, `wnba-phase2-migration`, `modelled-fair-edge`,
+> `soccer-projection-collapse`) and `wnba-fixture-identity`'s 3 claims went dark
+> —`scripts/refresh_wnba_oddsapi_props.py`,
+> `syndicate/features/shared/wnba_fixture_identity.py`,
+> `tests/test_wnba_fixture_identity.py`.
+>
+> **No harm resulted, and the reason matters.** That lane had already recorded
+> "CLOSED / FILES RELEASED 2026-08-17 ~15:1x CDT" — about four hours BEFORE the
+> corruption. The guard was still enforcing the claims at 18:00 because the
+> release was written in PROSE and the OPEN block still carried the `Files:`
+> line, which is the only thing `lane-guard` reads. The corruption then dropped
+> claims that were already stale by intent. It did the right thing for the wrong
+> reason, which is not a defence of the mechanism.
+>
+> **Current state is clean, measured across the whole ledger:** 0 control
+> characters and 0 invalid UTF-8 in `lanes.md`, `lanes_closed.md`,
+> `lanes_history.md`, `state.md`, `learnings.md` and `deploys.md`, live and on
+> `origin/main`. The affected headers now carry proper slugs.
+>
+> **What this changes about the risk model.** The danger `#466` was filed for —
+> an archive pass silently dropping a live claim — has never once occurred in
+> this repo's history. The mechanism that DID cost a lane its guard was a
+> careless bulk rewrite of header lines, which no invariant check would have
+> caught either, because the file stayed well-formed markdown. Worth a
+> `git diff` check on any future bulk edit of `lanes.md` headers.
+
+**What is NOT established:** whether any lane has ALREADY been silently
+un-guarded this way. That would need a diff of `lanes_closed.md` against the
+claims that existed before each past archive pass, which nobody has run. The
+count above is exposure, not damage — do not report it as a breach without that
+check.
+
 ### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web: no web code path emits `ALL_PROCESS_MEMORY`, so every web deploy requires a break-glass — and a guard broken on every use is not a guard** — FOUND AND MEASURED 2026-08-18, lane `repo-coordination`, ROOT CAUSE CONFIRMED BY CALLER TRACE (a first hypothesis was WRONG — see below)
 
 **Symptom, measured on the live receipt** `.syndicate/deploy/preflight/web.json`,
@@ -328,7 +520,17 @@ checklist, 9 mirrored dates, 10 team-sides, 297 players):**
   legitimate, if cruder, proxy), so this degrades rather than breaks — but is
   genuinely absent, not merely unfed.
 
-### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND AND MEASURED 2026-08-18, lane `basketball-model-owner`, FIXED AND PUSHED (`fcfb1e62`)
+### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
+
+**Deployed to web** (`b775255a`, break-glass authorized, see
+`.syndicate/deploys.md` "deploy MEASURED — web — #462"). Verified by content
+immediately after cutover: `GET /api/ops/artifacts/export?path=...` on all
+three sampled paths (WNBA/NBA `team_advanced_stats`, WNBA
+`smart_sim_total_calibration.json`) returned `200` where it previously 403'd.
+Not yet deployed to refresh-worker/live-odds-worker (not needed for this
+fix — `HOT_ARTIFACT_PATTERNS` gates the `/api/ops/artifacts/*` read/publish
+surface on whichever service serves the request; web is what
+`/api/ops/artifacts/export` runs on).
 
 **Fix shipped**: added `team_advanced_stats_*.csv` (both directory-nesting
 variants) and the four calibration JSON filenames
