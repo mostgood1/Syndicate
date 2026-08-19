@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 423 rules `[generated]`
+## Index — 425 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1062,3 +1062,35 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 - The rule going forward: **`git diff --cached` (or plain `git diff`) coming back EMPTY on a file you know you just edited means the edit already landed in someone else's commit — check before concluding there is nothing to do.** Two hook-script docstrings (`.claude/hooks/ledger-commit-guard.py`, `ledger-postwrite-check.py`, not `.syndicate/*.md`) were fixed here, left uncommitted pending the user's go-ahead, then swept into a parallel `github-actions[bot]` checkpoint commit (`f5953d4c`) before this session staged them. `git log -1 -- <path>` then `git blame -L <line>,<line> <path>` named the commit and confirmed the exact content in two calls. Cost was zero — the fix is correct and already on `origin/main` — but the intended atomic, reviewable two-file commit never existed as such; it rode inside an unrelated bundle. Broadens the 2026-08-18 "shared-file carry is not absorption" rule above: the mechanism is not ledger-specific, it is anything sitting uncommitted in the one shared working tree.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-08-19 — RULE: read the convention off the DIRECTORY before restructuring it. The precedent is usually already on disk.
+
+- The rule going forward: **before splitting, renaming or re-keying a set of
+  files, look at how the EXISTING members are keyed and confirm your rule
+  reproduces them.** If your scheme would have filed yesterday's files
+  differently than they are actually filed, your scheme is wrong -- the existing
+  layout is the specification.
+
+**MEASURED, and reverted within the hour.** Asked to split an 87 KB daily log, I
+moved 7 entries stamped `2026-08-19 ...Z` into a new `log/2026-08-19.md`. The
+repo keys these files to the **LOCAL** date, so UTC stamps rolling past midnight
+stay in the local day's file. **The proof was two directory entries away and I
+read it afterwards:** `2026-08-16.md` contains 5 headings stamped 08-17,
+`2026-08-17.md` contains 4 stamped 08-18. A single `grep` over a sibling file,
+before the change, would have settled it.
+
+**THE COST WAS DISCOVERABILITY, which is what a log is FOR.** A session looking
+for "what happened tonight" opens the local-date file; my checkpoints would have
+been missing from it while sitting in a file for a day that had not started
+locally. Nothing was lost and the error was cheap only because it was caught fast.
+
+**THE REVERT HAD ITS OWN TRAP.** Another session appended to the log between the
+split and the revert, so restoring the pre-split backup would have destroyed
+their work. Entries were APPENDED BACK instead, accepting approximate ordering
+within the day. **On a shared file, "undo" is not "restore the backup".**
+
+**What survived the mistake, because it was measured rather than assumed:** a
+single chronological cut is unsafe here (an 08-18 entry sits after the first
+08-19 one, so the file is not strictly time-ordered), and splitting on `###`
+shreds entries (40 of 46 blocks are undated sub-sections of a parent). Both
+findings stand; only the day-key was wrong.

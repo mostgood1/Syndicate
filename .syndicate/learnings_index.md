@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 423 rules `[generated]`
+## Index — 425 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -82,7 +82,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 355**
+**Rules and corrections — 357**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -245,6 +245,8 @@
 - [2026-08-19 — RULE: a threshold raise buys HEADROOM ÷ GROWTH RATE. Compute it, or you ar…](#2026-08-19-rule-a-threshold-raise-buys-headroom-growth-rate-compute-it-or-you-are-choosing-a-fix-you-have-not-measured)
 - [2026-08-19 — RULE: "this cannot be automated" is a claim like any other. Name the predi…](#2026-08-19-rule-this-cannot-be-automated-is-a-claim-like-any-other-name-the-predicate-you-tried)
 - [2026-08-19 — RULE: exonerated as the CAUSE is not free of DEFECTS. Re-ask the narrower…](#2026-08-19-rule-exonerated-as-the-cause-is-not-free-of-defects-re-ask-the-narrower-question)
+- [2026-08-19 — CORRECTION: shared-file carry reaches plain files too, and it reads as not…](#2026-08-19-correction-shared-file-carry-reaches-plain-files-too-and-it-reads-as-nothing-to-commit-not-as-loss)
+- [2026-08-19 — RULE: read the convention off the DIRECTORY before restructuring it. The p…](#2026-08-19-rule-read-the-convention-off-the-directory-before-restructuring-it-the-precedent-is-usually-already-on-disk)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
