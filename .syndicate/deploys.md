@@ -16110,3 +16110,37 @@ tomorrow without touching `render.yaml`.
 **ROLLBACK:** re-deploy the previous worker SHA `3d945f04` via the sanctioned
 entrypoint (written prose-style — the literal invocation trips `deploy-guard.py`,
 which pattern-matches this file's TEXT).
+
+| refresh-worker | `f9174d5b` | fired 2026-08-19T02:26:34Z | **the checklist now runs itself — verification becomes self-serving** |
+
+**Deploy `dep-da2h8mijnfac73dk8cpg`.** Claim `5e229cc2`, preflight **CLEAR**
+immediately prior (waited out `HOLD 7 -> 2 -> CLEAR`). **Third clean gate pass in
+a row, no break-glass.**
+
+**Cut from `6966753e`, the LIVE SHA** — which also CONFIRMS the previous deploy
+landed (02:08:57Z). My local `45233140` does not contain it; deploying that
+directly would have reverted the rebuild gate. **Fourth catch of the
+stale-parent trap tonight.** 2 files, +117/-1.
+
+**WHAT IT CHANGES:** every successful sim now runs
+`sim_input_checklist.py --games 8 --publish --warn-only` before the publish
+sweep, so the population report is written AND pushed to web in the same job.
+**Nothing ran the checklist on the worker before** — not the sim job, the refresh
+loop, or a cron — and the worker serves no HTTP, so it could not be run remotely.
+The engine set was **unverifiable in principle**, not merely unverified.
+
+**verify — self-serving from here, no manual step:**
+1. after the next successful sim: `GET /api/ops/artifacts/export?pattern=*sim_input_report*`
+   returns **`count: 1`** where it is **0** today (checked 02:19Z);
+2. after the CT rollover rebuild (~05:00Z): `conditional_arsenal` in that report
+   **> 0%**, source `statcast_conditional_mix`.
+
+**Note the pattern is a GLOB.** `pattern=sim_input_report_2026-08-19.json`
+returns 0 for a file that IS present — a bare filename never matches. Every
+`count: 0` reported earlier on 2026-08-18 came from that mistake.
+
+**Bounded:** worker was at 87.9% of its memory cap, so 8 games, a 180s child
+timeout, non-fatal on every path, skipped when the sim failed, and it PRINTS why
+it skipped.
+
+**ROLLBACK:** re-deploy `6966753e` via the sanctioned entrypoint.
