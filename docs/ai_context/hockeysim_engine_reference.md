@@ -188,6 +188,57 @@ edit to the profile constant fails a test, not silently drifts.
 
 ---
 
+## 2e. `pp_shot_cal_mult`/`pk_shot_cal_mult` calibrated against real truth (boxscore bulk fetch)
+
+Full report: `docs/reports/hockeysim_special_teams_shot_cal_report.md`. This closes the gap §5
+flagged as the last remaining special-teams item: the `landing` feed has no shot-by-strength-state
+breakdown, so `pp_shot_cal_mult`/`pk_shot_cal_mult` had no truth target until this pass.
+
+**New this session**: `scripts/fetch_nhl_boxscore_cache.py` bulk-fetched the separate `boxscore`
+endpoint for all 1,312 regular-season games (1,297 new fetches, 0 failures — only 11 were cached
+before). `historical_truth/boxscore_shot_strength.py` parses per-goalie strength-state shot splits
+into `pp_shot_share`/`sh_shot_share` truth targets, mirroring `pp_goal_share`/`sh_goal_share`'s
+role for the goal multipliers. Cross-validated: the derived shots/game (55.27) nearly matches the
+independently-sourced `landing` feed's SOG count (55.66); PP shots convert at a materially higher
+rate than average (14.88% of shots, 19.44% of goals) — matches known real hockey.
+
+| multiplier | truth target | before (mult=1.0) | after | verdict |
+|---|---|---|---|---|
+| `pp_shot_cal_mult` | `pp_shot_share` 0.1488 | 0.1514 (round 1) | **0.9108** | real, modest (~9%) correction |
+| `pk_shot_cal_mult` | `sh_shot_share` 0.0272 | 0.0755-0.0780 | **0.3369** | real, substantial correction — shots-while-shorthanded were over-simulated ~2.8x |
+
+**A methodology bug this calibration found and fixed, worth carrying forward**: a first,
+sequential fit (pp fully fit while pk held at the stale 1.0, then pk fit) left a ~5% verification
+gap even at 260,000 simulated shots — far larger than sampling noise. Root cause: `pp_shot_share`
+and `sh_shot_share` share a denominator (`total_shots`), and the uncalibrated ~3x SH-shot
+inflation biased the pp fit. **Fixed with a JOINT alternating fit** (3 rounds, each multiplier
+re-fit against the other's current best estimate) plus a full round-robin pairing (992 ordered
+team pairs) instead of random sampling, to remove a second, smaller variance source. Final
+verification (318,093 simulated shots): `pp_shot_share` 0.1476 vs 0.1488 target, `sh_shot_share`
+0.0272 vs 0.0272 — exact.
+
+**Left as a documented, not-yet-confirmed gap**: the earlier goal-multiplier calibration (§2d)
+predates this discovery and used the original sequential method. Its own verification was
+reasonably tight, so there's no direct evidence it has the same bias — but it was never re-run
+jointly to confirm. Cheap to redo; flagged rather than silently assumed fine.
+
+**Circumstantial but notable**: `pk_shot_cal_mult`'s correction (~2.8x over-simulated) and
+`pk_goal_cal_mult`'s (~2.2x over-simulated, §2d) point the same direction at similar magnitude,
+both governing the same rare shorthanded-team-does-something event class, fit independently
+against independent truth sources. Suggests one shared bias in the PK segment-allocation logic
+upstream of both multipliers, not two unrelated miscalibrations — not chased further this session.
+
+**What this does NOT cover, deliberately**: per-team differentiation of the shot multipliers.
+Unlike goals (which have the real per-team `pp_pct`/`pk_pct` signal to layer a correction on top
+of), there is currently NO per-team shot-volume signal at all — building one needs a new
+`HockeyTeamFeatures` field and a new consumption formula in `engine.py`, a real modelling project,
+not a calibration pass. The data now exists to support it
+(`historical_truth.boxscore_shot_strength.TeamShotStrengthRates`) if a future pass wants to build
+it. Block rates (`block_rate_*`) remain uncalibrated — no truth target for blocked-shot rate by
+strength state in either parser yet.
+
+---
+
 ## 3. Input provenance — where each input is produced and applied
 
 | input | produced by | applied in | population `[this checkout]` |
@@ -198,7 +249,7 @@ edit to the profile constant fails a test, not silently drifts.
 | `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct` | **no producer exists** — `build_team_features` never sets them | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% — genuinely absent, §5 |
 | `shot_weight`, `goal_weight`, `block_weight` (player) | **no producer exists** — `build_player_features` never sets them | player-level allocation weighting inside `engine.py` | 0% — genuinely absent, §5 |
 | `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
-| `special_teams_cal` (7 keys — separate parameter, see §2b/§2c/§2d) | **NEW**: `SimConfig`'s 7 new fields, resolved via `build_nhl_sim_config` and mapped by `player_props._special_teams_cal` | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | reachable (§2c); `pk_goal_cal_mult` truth-calibrated to `0.4645` (§2d), the other 6 still at neutral defaults |
+| `special_teams_cal` (7 keys — separate parameter, see §2b/§2c/§2d/§2e) | **NEW**: `SimConfig`'s 7 new fields, resolved via `build_nhl_sim_config` and mapped by `player_props._special_teams_cal` | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | reachable (§2c); `pk_goal_cal_mult=0.4645` (§2d), `pp_shot_cal_mult=0.9108`, `pk_shot_cal_mult=0.3369` (§2e) truth-calibrated — `pp_goal_cal_mult` and the 3 `block_rate_*` keys still at neutral defaults |
 | `period_goal_lambdas` | `apply_projection`, from the (now-corrected) projection | `game_market_sim.py` — the **main board's** ML/spread/total | 100%, and this is what makes the main board unaffected by everything else in this table |
 
 **The main-board / props-engine split is the load-bearing fact in this
@@ -231,6 +282,9 @@ concept.
 | `SimConfig`'s 7 new fields + `player_props._special_teams_cal` — wires `special_teams_cal` (§2c) | built, tested (2 new reachability/mapping-fidelity tests) | reachable by default now; values unchanged, so no behavior change until a future calibration pass |
 | `sh_goals_home`/`sh_goals_away` on `HistoricalGameRecord` + `TruthMetrics.sh_goal_share` — new truth metric, parsed from `strength == "sh"` goals | built, tested (isolated fixture; existing `_landing()` fixture untouched) | feeds the calibration below; no new fetch, same 1,312-game cache |
 | `scripts/calibrate_nhl_special_teams_goal_mult.py` + calibrated `pk_goal_cal_mult=0.4645` (§2d) | built, run, applied to `NHL_CALIBRATION_PROFILE_DEFAULT`, locked in a test | reachable by default; a REAL behavior change (shorthanded-goal rate roughly halved to match truth) |
+| `scripts/fetch_nhl_boxscore_cache.py` — bulk-fetched the `boxscore` endpoint (1,297 games, 0 failures) | built, run | new substrate; only 11/1,312 games were cached before |
+| `historical_truth/boxscore_shot_strength.py` — parses PP/PK/EV shot splits, new `pp_shot_share`/`sh_shot_share` truth targets | built, tested (9 tests), cross-validated against the independent `landing` feed's SOG count | feeds the calibration below |
+| `scripts/calibrate_nhl_special_teams_shot_mult.py` + calibrated `pp_shot_cal_mult=0.9108`/`pk_shot_cal_mult=0.3369` (§2e) | built, run (joint alternating fit + full round-robin pairing, after finding and fixing a sequential-fit interaction bug), applied, locked in tests | reachable by default; a REAL behavior change (shot volume during PP/PK segments now matches truth) |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**9 alarms**, down from 16 once `special_teams_cal` became reachable) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
 
 **All of it is additive and reachable-by-default** — no new flag was
@@ -299,24 +353,21 @@ class `elo_rating`, `goals_per_60`, and `special_teams` were:
 - **Player weights** (`shot_weight`/`goal_weight`/`block_weight`): usage-share
   weighting for the props allocator; needs per-player game logs the current
   loaders don't read.
-- **`special_teams_cal`'s 4 multiplier keys, CALIBRATED values specifically**
-  (the wiring itself is done, §2c — this is about what value to put there,
-  not how to deliver it): a real per-team `pp_shot_multiplier`/`pk_shot_multiplier`
-  would double-count against `special_teams`'s `pp_pct`/`pk_pct` if derived from
-  the same signal (the standard's §4.4 mechanism-vs-estimator trap) — a
-  LEAGUE-WIDE truth-calibration pass (does the simulated PP-goal SHARE match
-  `TruthMetrics.pp_goal_share` on average, the same style of check Phase 3b
-  ran for the projection layer) is the right next step, not a per-team
-  producer for these specifically.
-- **PP/PK SHOT rates, the data those multipliers would need if made
-  per-team anyway**: the `api-web.nhle.com` **boxscore** endpoint (distinct
-  from the **landing** endpoint the truth loader reads) carries per-goalie
-  `evenStrengthShotsAgainst`/`powerPlayShotsAgainst`/`shorthandedShotsAgainst`
-  splits — verified against one cached sample game this session
-  (`ingestion/nhl_web.py`'s existing `boxscore()` client already fetches and
-  caches this; only 11 games are cached locally today vs. 1,312 for
-  `landing`). A bulk fetch (~1,300 games, rate-limited, same pattern as the
-  truth loader) is the remaining step, not a new endpoint to discover.
+- **`special_teams_cal`'s league-wide calibration — DONE for 3 of 4 multiplier
+  keys, §2d/§2e.** `pk_goal_cal_mult` (0.4645), `pp_shot_cal_mult` (0.9108), and
+  `pk_shot_cal_mult` (0.3369) are now truth-calibrated; `pp_goal_cal_mult`
+  measured statistically indistinguishable from neutral and was correctly left
+  at `1.0`. **Genuinely still open**: real PER-TEAM PP/PK shot-volume
+  differentiation (as opposed to the league-wide multiplier just calibrated) —
+  unlike goals, which have the real per-team `pp_pct`/`pk_pct` signal to layer
+  a correction on top of, there is no per-team shot-volume signal at all yet.
+  Building one needs a NEW `HockeyTeamFeatures` field and a NEW consumption
+  formula in `engine.py` (no existing per-team analog to extend), a real
+  modelling project, not a calibration pass. The data now exists to support it
+  (`historical_truth.boxscore_shot_strength.TeamShotStrengthRates`, from the
+  same boxscore bulk fetch, §2e) if a future pass wants to build it. Block
+  rates (`block_rate_*`) remain uncalibrated — no truth target for
+  blocked-shot rate by strength state in either parser yet.
 
 ---
 

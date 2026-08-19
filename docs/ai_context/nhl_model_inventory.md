@@ -121,11 +121,37 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   `0.4645`, locked in a test. Deliberately did NOT attempt per-team
   differentiation of either multiplier — that would double-count against the
   already-per-team `pp_pct`/`pk_pct` signal (reference doc §2d/§5).
+- **Did** bulk-fetch the `boxscore` endpoint (`scripts/fetch_nhl_boxscore_cache.py`,
+  1,297 new fetches, 0 failures — only 11/1,312 games were cached before) and
+  build `historical_truth/boxscore_shot_strength.py` to parse per-team PP/PK
+  SHOT volume (distinct from the goal-share truth above; the `landing` feed
+  has no shot-by-strength-state breakdown). Cross-validated against the
+  independent `landing` feed's SOG count (55.27 vs 55.66 — close agreement,
+  two different endpoints/parsers).
+- **Did** calibrate `pp_shot_cal_mult`/`pk_shot_cal_mult` against that new
+  truth (reference doc §2e, full report
+  `docs/reports/hockeysim_special_teams_shot_cal_report.md`). Found and fixed
+  a real methodology bug along the way: a naive sequential fit (pp then pk)
+  left a ~5% verification gap even at 260,000 simulated shots, because the two
+  targets share a denominator and the uncalibrated pk correction shifts it
+  substantially. Fixed with a JOINT alternating fit (3 rounds) plus a full
+  round-robin team-pairing (removes a second variance source). Result:
+  `pp_shot_cal_mult=0.9108` (real, modest correction), `pk_shot_cal_mult=0.3369`
+  (real, substantial — shots-while-shorthanded were over-simulated ~2.8x,
+  matching the same direction/magnitude as `pk_goal_cal_mult`'s correction,
+  circumstantial evidence of one shared root cause rather than two). Final
+  verification: 318,093 simulated shots, both targets matched almost exactly.
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct` or player usage weights — needs the truth-loader's parser
-  extended further (beyond the penalties extension already done this session)
-  or the boxscore endpoint's per-goalie strength-state shot splits bulk-fetched
-  (verified the data exists; only 11 of 1,312 games are cached locally today).
+  extended further (beyond the penalties extension already done this session).
+  Genuine per-team PP/PK SHOT-volume differentiation (as opposed to the
+  league-wide multiplier just calibrated) is also still open — the boxscore
+  data now exists to support it, but it needs a new `HockeyTeamFeatures` field
+  and a new engine formula, not a calibration pass.
+- Did not re-run the goal-multiplier calibration (§2d, earlier this session)
+  with the joint-fit method the shot-multiplier bug discovery motivated —
+  flagged as an open methodology-consistency gap, not a known error (its own
+  verification was already reasonably tight).
 - Did not build a real xG (expected goals) model — the reader and allowlist
   exist; the shot-quality model producing the data does not, and building one
   is a distinct, substantial modelling project, not an input-population fix.

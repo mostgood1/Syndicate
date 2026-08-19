@@ -135,7 +135,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals at 2x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), `special_teams_cal`'s wiring, and `pk_goal_cal_mult`'s calibration all FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -250,6 +250,46 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   by a fresh joint run reproducing both targets simultaneously (pp 0.1971 vs
   0.1944, sh 0.0246 vs 0.0250), and locked in a test so a future profile edit
   fails a test rather than silently drifting.
+- **`pp_shot_cal_mult`/`pk_shot_cal_mult` calibrated against real truth** —
+  the last remaining special-teams gap. Full report:
+  `docs/reports/hockeysim_special_teams_shot_cal_report.md`. First bulk-fetched
+  the SEPARATE `boxscore` endpoint (`scripts/fetch_nhl_boxscore_cache.py`,
+  1,297 new fetches, 0 failures — only 11/1,312 games were cached before; the
+  `landing` feed the rest of `historical_truth/` reads has no
+  shot-by-strength-state breakdown). Built `historical_truth/boxscore_shot_strength.py`
+  to parse per-team PP/PK shot volume into `pp_shot_share`/`sh_shot_share`
+  truth targets, cross-validated against the independent `landing` feed's SOG
+  count (55.27 vs 55.66, close agreement).
+  **Found and fixed a real methodology bug along the way**: a naive sequential
+  fit (fit `pp_shot_cal_mult` fully, THEN `pk_shot_cal_mult`) left a ~5%
+  verification gap even at 260,000 simulated shots — far larger than sampling
+  noise. Root cause: the two targets share a denominator (`total_shots`), and
+  the uncalibrated `pk_shot_cal_mult=1.0` inflates SH shots ~3x, biasing the
+  pp fit against a wrong total. Fixed with a JOINT alternating fit (3 rounds,
+  each multiplier re-fit against the other's current best estimate) plus a
+  full round-robin team-pairing (992 ordered pairs, removes a second variance
+  source from random sampling).
+  **Result**: `pp_shot_cal_mult=0.9108` (real, modest ~9% correction);
+  `pk_shot_cal_mult=0.3369` (real, substantial — shots-while-shorthanded were
+  over-simulated ~2.8x). Final verification: 318,093 simulated shots,
+  `pp_shot_share` 0.1476 vs 0.1488 target, `sh_shot_share` 0.0272 vs 0.0272
+  exact. Both locked in tests.
+  **Notable, circumstantial**: `pk_shot_cal_mult`'s correction (~2.8x
+  over-simulated) and `pk_goal_cal_mult`'s (~2.2x over-simulated, above) point
+  the same direction at similar magnitude, independently fit against
+  independent truth sources — suggests one shared bias in the PK
+  segment-allocation logic, not two unrelated miscalibrations. Not chased
+  further this session.
+  **Left open**: the earlier `pk_goal_cal_mult` calibration predates this
+  bug discovery and used the sequential method — its own verification was
+  already reasonably tight, so there's no direct evidence it has the same
+  bias, but it was never re-run jointly to confirm. Flagged, not fixed.
+  Also still open: genuine PER-TEAM PP/PK shot-volume differentiation (as
+  opposed to the league-wide multiplier just calibrated) — unlike goals,
+  there is no per-team shot-volume signal yet; building one needs a new
+  `HockeyTeamFeatures` field and a new `engine.py` formula, a real modelling
+  project, not a calibration pass. The boxscore data now supports it if a
+  future pass wants to build it.
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**

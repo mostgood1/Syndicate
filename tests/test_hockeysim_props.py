@@ -117,21 +117,24 @@ class HockeySimPropsTest(unittest.TestCase):
         })
 
     def test_special_teams_cal_production_default_carries_the_calibration(self) -> None:
-        """`build_nhl_sim_config()` (what production actually resolves) reflects
-        `scripts/calibrate_nhl_special_teams_goal_mult.py`'s result (§2d): `pk_goal_cal_mult`
-        measurably corrected against real `sh_goal_share` truth, `pp_goal_cal_mult` left at
-        neutral (measured statistically indistinguishable from 1.0). Locks the calibrated value in
-        place so a future edit to the profile constant fails a test, not silently drifts."""
+        """`build_nhl_sim_config()` (what production actually resolves) reflects both calibration
+        passes (§2d/§2e): `pk_goal_cal_mult`/`pp_shot_cal_mult`/`pk_shot_cal_mult` measurably
+        corrected against real truth, `pp_goal_cal_mult` left at neutral (measured statistically
+        indistinguishable from 1.0). Locks the calibrated values in place so a future edit to the
+        profile constant fails a test, not silently drifts."""
         from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
         from syndicate.features.nhl.sim_engine.hockeysim.player_props import _special_teams_cal
 
         cal = _special_teams_cal(build_nhl_sim_config())
         self.assertEqual(cal["pp_goal_multiplier"], 1.0)
         self.assertEqual(cal["pk_goal_multiplier"], 0.4645)
-        # Shot multipliers and block rates are NOT part of this calibration pass (no truth target
-        # for PP/PK shot volume or block rate specifically yet) -- still neutral.
-        self.assertEqual(cal["pp_shot_multiplier"], 1.0)
-        self.assertEqual(cal["pk_shot_multiplier"], 1.0)
+        self.assertEqual(cal["pp_shot_multiplier"], 0.9108)
+        self.assertEqual(cal["pk_shot_multiplier"], 0.3369)
+        # Block rates are NOT part of either calibration pass (no truth target for blocked-shot
+        # rate by strength state yet) -- still neutral.
+        self.assertEqual(cal["blocks_ev_rate"], 0.45)
+        self.assertEqual(cal["blocks_pk_rate"], 0.55)
+        self.assertEqual(cal["blocks_pp_def_rate"], 0.35)
 
     def test_special_teams_cal_reflects_a_custom_profile(self) -> None:
         """A non-default `SimConfig` must actually change what `build_prop_projections` sends to

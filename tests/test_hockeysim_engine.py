@@ -159,6 +159,43 @@ class HockeySimEngineTest(unittest.TestCase):
             f"catch.",
         )
 
+    def test_special_teams_cal_pp_shot_mult_actually_changes_shot_volume(self) -> None:
+        """Reachability test for `pp_shot_cal_mult`/`pk_shot_cal_mult` specifically -- distinct
+        from the goal-multiplier test above, since shot VOLUME (this test) and goal CONVERSION
+        (the sibling test) are separate mechanisms in `engine.py` (`pp_mult_shots` vs
+        `p_goal_home`), calibrated separately (`scripts/calibrate_nhl_special_teams_shot_mult.py`,
+        `hockeysim_engine_reference.md` §2e) against a real per-team `pp_pct`/`pk_pct` -- the
+        SHOT-count events, not goal events.
+        """
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        low_cal = {"pp_shot_multiplier": 0.4, "pk_shot_multiplier": 1.0,
+                   "pp_goal_multiplier": 1.0, "pk_goal_multiplier": 1.0,
+                   "blocks_ev_rate": 0.45, "blocks_pk_rate": 0.55, "blocks_pp_def_rate": 0.35}
+        high_cal = dict(low_cal, pp_shot_multiplier=2.0)
+
+        def _mean_home_shots(cal: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st, st_away=st, special_teams_cal=cal, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        low_mean = _mean_home_shots(low_cal)
+        high_mean = _mean_home_shots(high_cal)
+        self.assertGreater(
+            high_mean, low_mean,
+            f"pp_shot_multiplier=2.0 must produce more HOME shots on average than "
+            f"pp_shot_multiplier=0.4 when nothing else differs -- got high={high_mean:.3f} "
+            f"low={low_mean:.3f}. If this fails, pp_shot_cal_mult is present but not reachable.",
+        )
+
     def test_profile_seam_is_non_mutating(self) -> None:
         before = NHL_CALIBRATION_PROFILE.pp_shots_mult
         cfg = build_nhl_sim_config(seed=5, overrides={"pp_shots_mult": 9.9, "bogus": 1})

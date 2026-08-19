@@ -38,11 +38,26 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     pp_goals_mult=1.0,
     pk_goals_mult=1.0,
     # Newly reachable this session (`docs/ai_context/hockeysim_engine_reference.md` §2c) via
-    # `scripts/calibrate_nhl_special_teams_goal_mult.py` against the 1,312-game truth snapshot
-    # (§2d). Shot multipliers and block rates unchanged (no truth target exists yet for PP/PK shot
-    # volume or block rate specifically -- see §5).
-    pp_shot_cal_mult=1.0,
-    pk_shot_cal_mult=1.0,
+    # `scripts/calibrate_nhl_special_teams_goal_mult.py`/`calibrate_nhl_special_teams_shot_mult.py`
+    # against the 1,312-game truth snapshot (§2d/§2e). Block rates unchanged (no truth target
+    # exists yet for blocked-shot rate by strength state -- see §5).
+    #
+    # pp_shot_cal_mult: measured 0.9108 against real pp_shot_share (0.1488) -- a real, modest
+    # (~9%) correction. `scripts/calibrate_nhl_special_teams_shot_mult.py`, full round-robin (992
+    # ordered team pairs, eliminates composition bias), 3 JOINT alternating rounds with
+    # pk_shot_cal_mult (fitting pp against a stale pk=1.0 placeholder left a ~5% verification gap
+    # even at 260k simulated shots -- pk's correction shrinks the shared total-shots denominator
+    # substantially, since uncalibrated SH shots ran ~3x the real rate, which biases pp_shot_share
+    # if pk hasn't been corrected first). Final joint verification: 318,093 simulated shots,
+    # pp_shot_share 0.1476 vs target 0.1488.
+    pp_shot_cal_mult=0.9108,
+    # pk_shot_cal_mult: measured 0.3369 against real sh_shot_share (0.0272) -- a real, substantial,
+    # and highly stable correction across all 3 joint rounds (0.3366/0.3341/0.3369). Uncalibrated
+    # (1.0), the engine simulated shots-while-shorthanded at ~2.8x the real rate (0.0755-0.0780 vs
+    # 0.0272 truth) -- the same over-simulation direction and similar relative magnitude as the
+    # shorthanded-GOAL rate (`pk_goal_cal_mult`, below), consistent with one root cause rather than
+    # two independent ones. Final joint verification: sh_shot_share 0.0272, an exact match.
+    pk_shot_cal_mult=0.3369,
     # pp_goal_cal_mult: measured 1.0021 against real pp_goal_share (0.1944) -- statistically
     # indistinguishable from neutral (iteration range 1.0013-1.0029 on a 2,000-game/iter sample).
     # The PP-goal mechanism (pp_pct + the existing pp_shots_mult=1.4) was ALREADY well-calibrated;
@@ -52,6 +67,13 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # converged correction. Uncalibrated (1.0), the engine simulated shorthanded goals at MORE THAN
     # DOUBLE the real rate (0.0538 vs 0.0250 truth). Verified: final joint run at both fitted
     # values reproduces both targets simultaneously (pp 0.1971 vs 0.1944, sh 0.0246 vs 0.0250).
+    #
+    # NOTE: unlike this file's shot-multiplier pair above, the goal-multiplier calibration was
+    # NOT re-run with a joint alternating fit -- it predates the discovery (this session) that a
+    # sequential pp-then-pk fit can leave a shared-denominator bias. The goal case's own
+    # verification match was already tight (pp 0.1971 vs 0.1944, within noise), so this is flagged
+    # as a documented gap in methodology consistency, not a known error -- re-running it jointly
+    # is cheap and worth doing before trusting `pp_goal_cal_mult` to more decimal places than 1.0.
     pk_goal_cal_mult=0.4645,
     block_rate_ev=0.45,
     block_rate_pk=0.55,
