@@ -43,6 +43,7 @@ import glob
 import json
 import re
 import sys
+import os
 from collections import Counter
 from dataclasses import fields
 from pathlib import Path
@@ -54,7 +55,25 @@ for _p in (str(REPO), str(VENDOR)):
         sys.path.insert(0, _p)
 
 ENGINE = VENDOR / "sim_engine"
-SNAPSHOTS = REPO / "data/mlb_source/source_artifacts/data/daily_pitcher_props/snapshots"
+
+
+def _data_root() -> Path:
+    """The root the WORKER actually writes to.
+
+    **This was hardcoded to `REPO / "data"` and it made the checklist useless in
+    the one place it matters.** Locally that IS the data root, so the script ran
+    perfectly on a dev box; in production `SYNDICATE_DATA_ROOT` points at the
+    mounted disk and `REPO/data` is the EPHEMERAL CHECKOUT, which holds no
+    `roster_objs/`. So on the worker the glob matched nothing, the script exited
+    1 with REFUSED, and no report was ever written -- while the `--publish` path
+    twenty lines below resolved the SAME root correctly. **The file read from one
+    root and wrote to another.**
+    """
+    root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    return Path(root).expanduser().resolve() if root else (REPO / "data")
+
+
+SNAPSHOTS = _data_root() / "mlb_source/source_artifacts/data/daily_pitcher_props/snapshots"
 
 # Fields that are legitimately sparse. Documented so a low number here is not
 # mistaken for a defect -- anything NOT listed, and consumed, must be populated.
@@ -136,7 +155,16 @@ def main() -> int:
 
     paths = sorted(glob.glob(str(SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
     if not paths:
+        # Distinguish "wrong root" from "right root, no rosters yet". A bare
+        # REFUSED sent me chasing the sim job for hours when the path was wrong.
+        _root = _data_root()
         print(f"REFUSED: no roster artifacts under {SNAPSHOTS}")
+        print(f"  data root      : {_root}  (exists={_root.exists()})")
+        print(f"  SYNDICATE_DATA_ROOT env: {os.environ.get('SYNDICATE_DATA_ROOT') or '(unset -- falling back to REPO/data)'}")
+        print(f"  snapshots dir  : exists={SNAPSHOTS.exists()}")
+        if SNAPSHOTS.exists():
+            _dates = sorted(d.name for d in SNAPSHOTS.iterdir() if d.is_dir())[-3:]
+            print(f"  dates present  : {_dates or '(none)'} -- rosters may not be built yet")
         return 1
 
     src = engine_source()
@@ -269,10 +297,12 @@ def main() -> int:
         print(f"\nwrote {args.json}")
 
     if args.publish:
-        import os
+        # `os` is imported at MODULE scope (see `_data_root`). A local `import os`
+        # here made `os` a local name for the WHOLE function, so the diagnostic
+        # REFUSED block above raised UnboundLocalError instead of printing --
+        # turning a helpful message into a crash on exactly the failing path.
         from datetime import datetime, timezone
-        root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
-        base = Path(root).expanduser().resolve() if root else (REPO / "data")
+        base = _data_root()   # same root the SNAPSHOTS glob reads from
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         out = (base / "mlb_source/source_artifacts/data/sim_input_report"
                / f"sim_input_report_{stamp}.json")
@@ -280,7 +310,9 @@ def main() -> int:
         out.write_text(json.dumps({
             "schema_version": 1,
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "host": "worker" if root else "local",
+            # "worker" iff the mounted-disk root is configured; `_data_root()`
+                # falls back to REPO/data on a dev box and that is "local".
+                "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
             "rosters": len(paths), "counts": n,
             "failures": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in failures],
             "warnings": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in warnings],
