@@ -2284,18 +2284,33 @@ that hour is how this subject came to have three sections.
   averages its metrics index with `0.5 + attack_rating`, so such a feature enters
   twice. `94578cbc` removed the two explicit xG terms; **check this before wiring any
   further goal-derived metric into `possession_priors`.**
-- **`corr(xg_for, shots_per_match)` is +0.83..+0.93 in all nine leagues.** Shots is
-  the weakest surviving term in `_attack_strength` (weight 0.016) and is 83-93% the
-  same signal as the rating. Not removed — pending evidence it earns nothing.
+- **`corr(xg_for, shots_per_match)` is +0.83..+0.93 in all nine leagues.**
+  **UPDATE 2026-08-18 ~19:3xZ, SUPERSEDES "not removed" below: shots' weight WAS
+  tested (shrunk to `sqrt(1-r^2)`, ~0.0071/0.0097) and the shrink was FALSIFIED by a
+  paired test on 126 identical eredivisie fixtures** (t=-2.06, 95% CI
+  -0.0191..-0.0005, unshrunk scored better Brier) **and REVERTED — current weight is
+  0.016, unchanged from before any of this.** The correlation is real but shots
+  carries predictive value beyond it; `sqrt(1-r^2)` wrongly assumed the correlated
+  fraction was pure redundancy. The two OTHER terms computed under the same
+  heuristic (`form_points`, `clean_sheet_rate`) were never applied — that heuristic
+  is now distrusted as a method, not just for this one number. Full detail: lane
+  `soccer-model-dispersion`.
 - **CAVEAT ON ALL OF THE ABOVE:** measured as the pipeline computes ratings TODAY,
   where `xg_for` IS goals on the football-data path
   (`team_rows_from_match_history`). A real xG source whose values diverge from goals
   would weaken these correlations and could earn the dropped terms back. That is why
   the now-unread `xg_for_per_match` / `xg_against_per_match` keys stay populated.
-- **The dispersion question is NOT yet answered.** A 16-fixture probe returned
-  stdev(P home) 0.1765 against baseline model 0.1575 / market 0.1811, but its 95%
-  band (0.1133..0.2397) contains both — the effect is smaller than the instrument's
-  noise. **Do not cite 0.1765 as evidence the under-dispersion is fixed.**
+- **The dispersion question is STILL NOT ANSWERED, and the leading hypothesis has
+  CHANGED.** `possession_priors.py`'s own formulas are exonerated by exact
+  arithmetic (every per-possession term measurably NARROWED after the xG-term
+  removal, not widened). A properly-powered real-fixture trace (126 real matches,
+  not a synthetic probe) suggests the actual driver is `00475bce`'s FEATURE WIRING
+  itself (shots/form/clean-sheet/corners newly populated), not the xG-removal
+  everyone had been chasing — removing xG while holding the wiring constant moved
+  dispersion TOWARD the true baseline, not away. **UNCONFIRMED — a hypothesis the
+  numbers point at, not an isolated result.** The earlier 16-fixture probe (stdev
+  0.1765 against 0.1575/0.1811) is SUPERSEDED and should not be cited; it used a
+  different, smaller, since-shown-underpowered method.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
