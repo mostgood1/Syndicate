@@ -1890,9 +1890,18 @@ client-side JS). Trace the served `book` field to its writer before acting.
   refresh-worker `f2eb719d` (SP+ ratings + as-of PPA leak fix) live 18:51:08Z,
   stage 1 verified by content; **STAGE 2 STILL OWED** — ~51/51 non-null
   `predictions.home_mean`, 86400s autorun, ≤24h. Season opens **2026-08-29**.
-- **The model loses to the OPENING line too, so there is no softer target.**
-  `[measured 2026-08-19, full 2025 season, 2,530 rows / 888 games / 3 books]`
-  vs close n=2235 **+3.419** (t=+16.33); vs open n=2175 **+3.358** (t=+16.08).
+- **The model loses to the close AND the open, CLEAN and OUT-OF-SAMPLE.**
+  `[measured 2026-08-19: 2023 SP+ -> 2024 games, all 15 weeks, 100 seeds,
+  PRODUCTION generator via --ratings-season, graded from the pick ledger,
+  graded_leak_status {'clean': 2236}, no leak warning]`
+  vs close **n=2233 model MAE 15.775 vs market 12.212, +3.563, t=+17.20**;
+  vs open n=2148 **+3.329** (t=+16.23). Loses to Bovada (+3.578), DraftKings
+  (+3.560) and ESPN Bet (+3.549) INDEPENDENTLY. **Replicates the leaked 2025
+  season** (+3.419) and is slightly WORSE clean — the direction leakage
+  predicts, so the two measurements corroborate rather than merely agree.
+  **2 of 14 per-week buckets read TIED — that is multiplicity, NOT an edge**:
+  the best bucket is still positive, and TIED loses after vig anyway.
+  `[superseded: full 2025 season, LEAKED rows, vs close +3.419 / vs open +3.358]`
   The open is **0.06 MAE softer than the close** — this is an ACCURACY problem,
   not a timing one, and "beat the open first" is dead as a shortcut. Loses to
   Bovada/DraftKings/ESPN Bet individually, so not an artefact of one sharp book.

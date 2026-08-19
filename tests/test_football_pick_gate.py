@@ -1,8 +1,10 @@
 """The football pick-serving gate: suppression must be REACHABLE and REVERSIBLE.
 
 Measured 2026-08-19, and the reason this gate exists: the NCAAF margin model
-loses to the closing line by +2.176 MAE (SE 0.518, t=+4.20) over 220 games, so
-a served NCAAF pick sells an edge the model has not demonstrated.
+loses to the closing line by +3.563 MAE (SE 0.207, t=+17.20) over 2,233 graded
+rows -- CLEAN and OUT-OF-SAMPLE (2023 SP+ on 2024 games, production generator,
+graded_leak_status {'clean': 2236}). It loses to the OPENING line by nearly as
+much, so a served NCAAF pick sells an edge the model has not demonstrated.
 
 The tests that matter here are not "does the gate return False". They are:
 
@@ -58,11 +60,18 @@ class DefaultDenyTests(unittest.TestCase):
             self.assertFalse(is_servable("ncaaf", market), market)
 
     def test_verdict_carries_the_measurement(self) -> None:
-        """A suppression without its numbers is an opinion."""
+        """A suppression without its numbers is an opinion.
+
+        Pins the CLEAN out-of-sample measurement (2023 SP+ -> 2024 games, all
+        15 weeks, production generator, graded_leak_status {'clean': 2236}).
+        It deliberately fails if the numbers are edited, so an improved
+        measurement is a conscious update rather than a silent drift.
+        """
         verdict = market_verdict("ncaaf", "spread")
-        self.assertEqual(verdict.sample_size, 220)
+        self.assertEqual(verdict.sample_size, 2233)
         self.assertGreater(verdict.model_metric, verdict.market_metric)
-        self.assertIn("11.586", verdict.summary())
+        self.assertIn("12.212", verdict.summary())
+        self.assertIn("OUT-OF-SAMPLE", verdict.detail)
 
 
 class MarketSpellingTests(unittest.TestCase):
@@ -115,7 +124,7 @@ class FilterAndNoticeTests(unittest.TestCase):
         notice = notice_for("ncaaf", suppressed)
         self.assertIn("closing line", notice["headline"])
         self.assertTrue(notice["lift_condition"])
-        self.assertIn("11.586", notice["reasons"][0]["reason"])
+        self.assertIn("12.212", notice["reasons"][0]["reason"])
 
     def test_board_notice_clears_when_any_market_opens(self) -> None:
         """The board must come back on its own, with no second edit."""
