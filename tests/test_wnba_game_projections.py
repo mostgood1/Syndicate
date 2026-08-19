@@ -25,15 +25,39 @@ from syndicate.features.shared.wnba_game_projections import (
 HOME, AWAY = "Las Vegas Aces", "Washington Mystics"
 
 
-def _index(margin: float | None = 7.5, total: float | None = 163.5) -> WnbaGameProjectionIndex:
+def _index(
+    margin: float | None = 7.5,
+    total: float | None = 163.5,
+    *,
+    p_home_cover: float | None = None,
+    p_total_over: float | None = None,
+    sim_market_home_spread: float | None = None,
+    sim_market_total: float | None = None,
+) -> WnbaGameProjectionIndex:
     index = WnbaGameProjectionIndex()
-    index.by_teams[(HOME.lower(), AWAY.lower())] = {"pred_margin": margin, "pred_total": total}
+    index.by_teams[(HOME.lower(), AWAY.lower())] = {
+        "pred_margin": margin,
+        "pred_total": total,
+        "p_home_cover": p_home_cover,
+        "p_total_over": p_total_over,
+        "sim_market_home_spread": sim_market_home_spread,
+        "sim_market_total": sim_market_total,
+    }
     index.games = 1
     return index
 
 
-def _row(market: str, *, segment: str = "full", line=None, kind: str = "game") -> dict:
-    return {
+def _row(
+    market: str,
+    *,
+    segment: str = "full",
+    line=None,
+    kind: str = "game",
+    consensus: dict | None = None,
+    sides: list | None = None,
+    game_state: str | None = None,
+) -> dict:
+    row: dict = {
         "kind": kind,
         "market": market,
         "segment": segment,
@@ -41,6 +65,29 @@ def _row(market: str, *, segment: str = "full", line=None, kind: str = "game") -
         "home_team": HOME,
         "away_team": AWAY,
     }
+    if consensus is not None:
+        row["consensus"] = consensus
+    if sides is not None:
+        row["sides"] = sides
+    if game_state is not None:
+        # `live_edge_policy.game_state_of` reads `row["game"]["state"]`, NOT a
+        # top-level `game_state` key -- a different shape from
+        # `opportunity_gate.game_state_of`'s. Matched here deliberately so
+        # this fixture exercises the SAME function the code under test calls.
+        row["game"] = {"state": game_state}
+    return row
+
+
+# `#263` -- two-sided consensus book pricing, so `_no_vig_over_probability`
+# (imported straight from `prop_projections.py`, not reimplemented) has
+# something real to de-vig. American odds, both sides quoted at -110 -- a
+# standard ~4.55% hold, not a degenerate case. Spreads quote home/away;
+# totals quote over/under -- `_no_vig_over_probability` handles both
+# vocabularies, per its own docstring.
+_SPREADS_CONSENSUS = {"home": -110, "away": -110}
+_SPREADS_SIDES = ["home", "away"]
+_TOTALS_CONSENSUS = {"over": -110, "under": -110}
+_TOTALS_SIDES = ["over", "under"]
 
 
 def test_moneyline_probability_follows_the_home_positive_margin():
@@ -149,3 +196,122 @@ def test_moneyline_reason_does_not_claim_a_missing_term():
     # And it must not reuse the mean branches' DIFFERENT key, which the board
     # does not read for the Edge column.
     assert "probability_unavailable_reason" not in row["projection"]
+
+
+# `#263` -- the sim's own real, model-free Monte Carlo probability
+# (`p_home_cover`/`p_total_over`), threaded through when a row's line matches
+# the sim's own market line.
+
+
+def test_spreads_at_market_line_gets_a_real_probability_and_edge():
+    row = _row("spreads", line=2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.3
+    # -110/-110 de-vigs to an exact 0.5 fair -- (0.30 - 0.50) * 100.
+    assert projection["edge_vs_market_pct"] == -20.0
+    assert projection.get("probability_unavailable_reason") is None, (
+        "a stale reason must not sit beside a real probability"
+    )
+    # The mean-based fields are UNCHANGED by this -- same convention as before.
+    assert projection["projected"] == 9.32
+    assert projection["edge_vs_line"] == 7.32
+
+
+def test_totals_at_market_line_gets_a_real_probability_and_edge():
+    row = _row("totals", line=164.5, consensus=_TOTALS_CONSENSUS, sides=_TOTALS_SIDES)
+    index = _index(total=163.08, p_total_over=0.49, sim_market_total=164.5)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.49
+    assert projection["edge_vs_market_pct"] == -1.0
+    assert projection.get("probability_unavailable_reason") is None
+
+
+def test_alt_line_stays_null_with_an_honest_alternate_line_reason():
+    # `#263`'s whole point: the sim priced ONE line (2.0), this row asks about
+    # a DIFFERENT one (1.5, a spreads_alt row) -- the 3-point quantile summary
+    # cannot answer that, so this must stay a blank, never a fabricated number.
+    row = _row("spreads", line=1.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] is None
+    assert projection["edge_vs_market_pct"] is None
+    reason = projection["probability_unavailable_reason"]
+    assert "alternate line" in reason
+    assert "2" in reason, "the reason should name the line the sim DID price"
+    # The old, now-false-for-main-lines reason must not appear here either --
+    # this IS still an honest "no distribution" statement, just a more precise
+    # one; the assertion below is really about it not silently reverting.
+    assert "not a distribution" not in reason
+    # Mean-based fields still populate for an alt line -- only the
+    # probability/edge terms are gated.
+    assert projection["projected"] == 9.32
+    assert projection["edge_vs_line"] == 7.82
+
+
+def test_sim_line_absent_keeps_the_original_mean_only_reason():
+    # An OLDER `game_cards` row, written before `#263` -- no sim_market_* at
+    # all. Must degrade to decision 3's exact original behaviour, not the new
+    # alternate-line wording (there is no "own line" to contrast against).
+    row = _row("totals", line=161.5, consensus=_TOTALS_CONSENSUS, sides=_TOTALS_SIDES)
+    index = _index(total=163.5)  # no p_total_over / sim_market_total supplied
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] is None
+    assert projection["probability_unavailable_reason"] == "sim ships a total mean, not a distribution"
+
+
+def test_market_line_priced_but_one_sided_book_reports_why():
+    # At the sim's own line, but the BOOK only quotes one side -- a different
+    # rejection than the mean-only one, and it must say so via the SAME
+    # `_edge_unavailable_reason` every other sport's game market uses, not a
+    # bespoke sixth phrasing.
+    row = _row("spreads", line=2.0, consensus={"home": -110}, sides=["home"])
+    index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.3, "the sim probability still attaches -- only the EDGE is refused"
+    assert projection["edge_vs_market_pct"] is None
+    assert "one-sided market" in projection["edge_unavailable_reason"]
+
+
+def test_live_market_suppresses_the_edge_even_at_market_line():
+    # `live_edge_unavailable_reason` (imported, not reimplemented) must fire
+    # here exactly as it does for every other sport's game market: a pregame
+    # sim priced against a re-priced live market is not an edge.
+    row = _row(
+        "totals",
+        line=164.5,
+        consensus=_TOTALS_CONSENSUS,
+        sides=_TOTALS_SIDES,
+        game_state="live",
+    )
+    index = _index(total=163.08, p_total_over=0.49, sim_market_total=164.5)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.49, "the sim probability itself is not suppressed, only the edge"
+    assert projection["edge_vs_market_pct"] is None
+    assert "pregame projection" in projection["edge_unavailable_reason"]
+
+
+def test_h2h_is_untouched_by_the_spreads_totals_subfix():
+    # Regression guard while h2h's OWN question (sim p_home_win vs
+    # _margin_win_prob) sits open with basketball-model-owner: an index entry
+    # now carrying the new #263 fields must not change h2h's behaviour at all.
+    row = _row("h2h")
+    index = _index(margin=7.5, p_home_cover=0.9, sim_market_home_spread=2.0)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["basis"] == "margin_win_prob"
+    assert projection.get("edge_vs_market_pct") is None
+    assert "producer does not compute" in projection["edge_unavailable_reason"]
