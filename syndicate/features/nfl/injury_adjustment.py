@@ -48,6 +48,7 @@ from typing import Any
 
 from syndicate.features.nfl.player_stats import load_player_plays
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_injuries_path
 
 MIN_EXCLUSION_SAMPLE = 20
 ADJUSTED_STATUSES = frozenset({"out", "doubtful"})
@@ -246,7 +247,12 @@ def _looks_like_real_gsis_id(player_id: str) -> bool:
 
 
 def _injured_players_for_team(season: int, week: int, team: str) -> list[dict[str, Any]]:
-    path = default_nfl_source_root() / "tracking" / "nflverse" / "injuries" / f"injuries_{season}.csv"
+    # `nfl_injuries_path`, not `default_nfl_source_root() / "tracking" / ...`
+    # directly -- the latter resolves a root by probing for an UNRELATED file
+    # (`upcoming_recs_*.csv`) and can silently pick the ephemeral repo
+    # checkout over the mounted disk. Exactly `#441`'s pbp bug, fixed here
+    # by reusing the same resolver `nfl_pbp_path` already uses.
+    path = nfl_injuries_path(season)
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:
             rows = list(csv.DictReader(handle))

@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from syndicate.features.nfl import injury_adjustment as inj
 from syndicate.features.nfl import player_stats
+from syndicate.features.nfl import sources
 
 
 _PBP_FIELDNAMES = [
@@ -39,10 +40,20 @@ class InjuryAdjustmentTestCase(unittest.TestCase):
         self.addCleanup(player_stats.load_player_plays.cache_clear)
         patcher_a = patch.object(player_stats, "default_nfl_source_root", return_value=self.root)
         patcher_b = patch.object(inj, "default_nfl_source_root", return_value=self.root)
+        # `_injured_players_for_team` now resolves the injuries file through
+        # `nfl_injuries_path` (`sources._resolve_nfl_tracking_path` ->
+        # `sources._source_roots()`), not through `inj.default_nfl_source_root`
+        # directly -- the whole point of the fix this lane made. Patching only
+        # `inj.default_nfl_source_root` (patcher_b, still needed by
+        # `_depth_chart_path`, deliberately out of scope this lane) silently
+        # stopped covering the injuries read path; this closes that gap.
+        patcher_c = patch.object(sources, "_source_roots", return_value=[self.root])
         patcher_a.start()
         patcher_b.start()
+        patcher_c.start()
         self.addCleanup(patcher_a.stop)
         self.addCleanup(patcher_b.stop)
+        self.addCleanup(patcher_c.stop)
 
     def _write_pbp(self, season: int, rows: list[dict]) -> None:
         directory = self.root / "tracking" / "nflverse" / "pbp"

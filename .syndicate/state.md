@@ -2331,6 +2331,35 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   `clean_sheet_rate` earlier this session (significant in the pooled fit,
   then failed its paired accuracy test, discarded) — the identical caution
   applied here and the outcome differed only in direction, not in rigor.
+  **UPDATE 2026-08-19 ~19:0xZ — `pace_seconds_per_event` sourcing ATTEMPTED
+  AND FAILED ITS OWN CHEAP FALSIFIER. DO NOT RE-ATTEMPT THE SAME PROXY
+  WITHOUT NEW INFORMATION.** ESPN's boxscore carries per-team
+  `totalPasses`/`totalShots`/`totalTackles`/`totalCrosses`/`totalLongBalls`/
+  `wonCorners`/`foulsCommitted` on the same call already made for
+  possession/set-piece/availability — summed across both teams and divided
+  into a fixed 5400s, this gives a real, per-match-varying number
+  (prototyped on 252 real eredivisie matches: mean 4.88s, range 3.63-10.71s,
+  stdev 0.50). **Two problems, either one disqualifying on its own:**
+  (1) the raw scale is ~2.8x too fast for `_pace_values`'s assumed neutral
+  center (13.5s) — wiring it as-is would clamp `pace_index` to +1.0 for
+  nearly every match, which is a degenerate constant, not real variation,
+  and `_pace_values`'s own constants (13.5 center, /5.0 scale) were never
+  calibrated against real data either, since this field has NEVER been
+  populated before now; (2) even before worrying about rescaling, the raw
+  proxy shows NO relationship with the most basic plausible outcome —
+  pearson(pace, total match goals) = 0.0757, t=1.201 (not significant, need
+  ~1.98 at n=252), and pace terciles are flat on mean total goals (fast
+  2.905, mid 2.964, slow 2.952 — no monotonic trend at all). Stopped here
+  deliberately, before the expensive 9-league fetch + pooled regression +
+  paired backtest the other three fields went through — this is the
+  identical "cheaper falsifier first" principle this lane already used for
+  the Monte-Carlo sim-count check, applied to a sourcing question instead of
+  a weight question. **The extraction code was NOT committed** (would be
+  unused, unwired infrastructure) — the proxy design, the null result, and
+  the exact numbers above are the only thing worth keeping; if someone
+  revisits this, a DIFFERENT hypothesis for what pace should predict (not
+  total goals) or a fundamentally different "event" unit is needed, not a
+  rerun of the same test.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
