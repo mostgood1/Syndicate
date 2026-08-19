@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 414 rules `[generated]`
+## Index — 415 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1169,3 +1169,36 @@ directions. Both retracted.
 - Corollary: **write results to a FILE from the producing process.** Three runs
   were lost to harness, not model — a `timeout` I set too short, a `grep`
   buffering a pipe, and prints that only ran at exit.
+
+## 2026-08-19 — RULE: a repair pass must be constrained to EXTEND, never SUBSTITUTE. And a mid-flight hook protects only new sessions.
+
+- The rule going forward: **when automating a fix across N items, the safety
+  condition is a property of the REPLACEMENT RELATIVE TO THE ORIGINAL — "the new
+  text must START WITH the old" — not a property of the source you pulled it
+  from.** "The evidence file has a rule line" is not "this is the SAME line,
+  longer", and the gap between those two clobbered 18 lines that existed nowhere
+  else.
+
+**MEASURED.** Repairing 70 truncated rule stubs: the first pass replaced each
+stub with whatever `_rule_line` returned from that entry's evidence body. For 51
+of 58 that was a DIFFERENT bullet — an `- **Overturned belief:**` overwritten by
+a `- **The rule going forward:**` — and 18 were hand-written summaries from an
+earlier compaction, reproducible from nothing. Caught by a conservation check,
+not by review. Redone with `full.startswith(stub)` as a hard precondition: 59
+extended, 0 lost. **The constraint is one line of code and it is the entire
+difference between a repair and a rewrite.**
+
+**COROLLARY, and the reason five passes were needed:** each failed match had a
+different cause — a `- ` prefix the other copy lacked, `##` vs `###` on the same
+heading, three copies of one heading from repeated compactions, and continuation
+lines starting with a break character. **Read one failing case before loosening
+a matcher.** Loosening blind is how a substitution bug gets introduced while
+"fixing" a truncation bug.
+
+**SEPARATE RULE, same night: A MECHANICAL GUARD ADDED MID-FLIGHT PROTECTS ONLY
+SESSIONS THAT START AFTER IT.** `lanes-append-guard.py` went live at 20:43 and a
+lane block landed below the archive marker at 20:57 — fourteen minutes later,
+from a session that had been running since before the guard existed. Hooks are
+read from `settings.json` at session start. **Shipping a guard is not the same as
+the guard being in force**, and on a tree with long-running sessions the gap is
+hours. Verify by behaviour, not by the commit landing.

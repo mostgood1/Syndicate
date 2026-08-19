@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 414 rules `[generated]`
+## Index — 415 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -82,7 +82,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 346**
+**Rules and corrections — 347**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -238,6 +238,7 @@
 - [2026-08-19 — RULE: before building a feature pipeline for an unwired input, check wheth…](#2026-08-19-rule-before-building-a-feature-pipeline-for-an-unwired-input-check-whether-the-engine-has-a-better-wired-input-already-doing-that-job)
 - [2026-08-19 — RULE: a population checklist CANNOT detect leakage, and a large clean firs…](#2026-08-19-rule-a-population-checklist-cannot-detect-leakage-and-a-large-clean-first-wiring-effect-is-a-leakage-suspect)
 - [2026-08-19 — RULE: a small-n result is not a preview of the large-n result. It is the a…](#2026-08-19-rule-a-small-n-result-is-not-a-preview-of-the-large-n-result-it-is-the-artifact)
+- [2026-08-19 — RULE: a repair pass must be constrained to EXTEND, never SUBSTITUTE. And a…](#2026-08-19-rule-a-repair-pass-must-be-constrained-to-extend-never-substitute-and-a-mid-flight-hook-protects-only-new-sessions)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

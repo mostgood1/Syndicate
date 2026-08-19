@@ -704,6 +704,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     and no checker.
 - **Blocked by:** none.
 
+
+### football-model-owner — OPEN — **NFL/NCAAF board defects SHIPPED+MEASURED; two model LEAKS found and fixed; payload experiment at Phase 3 (running, converging NULL)** — opened 2026-08-18 — session: football-model-owner
+- Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
+  treatment MLB and soccer have. **Testable:** a gating checklist exists and runs;
+  every model input is leak-free and reachable; board defects measured on the
+  SERVED payload.
+- Files: `syndicate/features/football/**`, `syndicate/features/ncaaf/cards.py`,
+  `syndicate/features/nfl/preseason_cards.py`,
+  `syndicate/features/shared/{publication_adapter,game_board_contract}.py`,
+  `scripts/{football_sim_input_checklist,backfill_nfl_historical_odds,generate_smartsim2_ncaaf_projections}.py`,
+  `docs/ai_context/{model_engine_standard,football_sim_engine_reference,nfl_feature_payload_preregistration}.md`,
+  `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form}.py`
+- **NOT claimed:** `syndicate/features/shared/artifact_publisher.py` — held by
+  `basketball-model-owner`; allowlist patterns handed to them via `send_message`.
+  `scripts/deploy_preflight.py` — `repo-coordination`'s charter; defect handed over.
+- Status: **14 commits, all on `origin/main`, 0 unpushed.** 3 web deploys live and
+  measured (`5fdabc46`, `4c3b0aa5`, `841b6d84`). `CFBD_API_KEY` set by the user.
+- **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
+- **IN FLIGHT:** Phase 3 CRPS run, n=130/269. **Do not quote a verdict until
+  `scratchpad/phase3_summary.txt` exists** — trajectory converging NULL, not final.
+- **OWED:** (1) NCAAF opener verification — key live but autorun had not fired
+  since; PASS = ~51 of 51 non-null `predictions.home_mean`, watcher armed.
+  (2) allowlist `smartsim2_*projections_*.csv` + `recommendations_summary` —
+  with `basketball-model-owner`. (3) web cannot pass preflight — with
+  `repo-coordination`.
+- Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
@@ -932,29 +959,3 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 
 
-
-### football-model-owner — OPEN — **NFL/NCAAF board defects SHIPPED+MEASURED; two model LEAKS found and fixed; payload experiment at Phase 3 (running, converging NULL)** — opened 2026-08-18 — session: football-model-owner
-- Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
-  treatment MLB and soccer have. **Testable:** a gating checklist exists and runs;
-  every model input is leak-free and reachable; board defects measured on the
-  SERVED payload.
-- Files: `syndicate/features/football/**`, `syndicate/features/ncaaf/cards.py`,
-  `syndicate/features/nfl/preseason_cards.py`,
-  `syndicate/features/shared/{publication_adapter,game_board_contract}.py`,
-  `scripts/{football_sim_input_checklist,backfill_nfl_historical_odds,generate_smartsim2_ncaaf_projections}.py`,
-  `docs/ai_context/{model_engine_standard,football_sim_engine_reference,nfl_feature_payload_preregistration}.md`,
-  `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form}.py`
-- **NOT claimed:** `syndicate/features/shared/artifact_publisher.py` — held by
-  `basketball-model-owner`; allowlist patterns handed to them via `send_message`.
-  `scripts/deploy_preflight.py` — `repo-coordination`'s charter; defect handed over.
-- Status: **14 commits, all on `origin/main`, 0 unpushed.** 3 web deploys live and
-  measured (`5fdabc46`, `4c3b0aa5`, `841b6d84`). `CFBD_API_KEY` set by the user.
-- **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
-- **IN FLIGHT:** Phase 3 CRPS run, n=130/269. **Do not quote a verdict until
-  `scratchpad/phase3_summary.txt` exists** — trajectory converging NULL, not final.
-- **OWED:** (1) NCAAF opener verification — key live but autorun had not fired
-  since; PASS = ~51 of 51 non-null `predictions.home_mean`, watcher armed.
-  (2) allowlist `smartsim2_*projections_*.csv` + `recommendations_summary` —
-  with `basketball-model-owner`. (3) web cannot pass preflight — with
-  `repo-coordination`.
-- Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
