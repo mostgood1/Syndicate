@@ -595,6 +595,7 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
         try:
             from syndicate.features.shared.wnba_projections import (
                 attach_wnba_projections,
+                load_wnba_prop_distributions,
                 load_wnba_projections,
             )
             from syndicate.features.wnba.sources import processed_root
@@ -650,7 +651,20 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                     "source_artifact": str(source_path),
                 }
             else:
-                prop_coverage = attach_wnba_projections(grid, index)
+                # `#263`. Best-effort and independent of the means-only join
+                # above: a missing/unreadable `cards_sim_detail_<date>.json`
+                # must not suppress the mean-based projection that already
+                # works, only narrow it back to exactly today's behaviour --
+                # same "additive, never a new failure mode" contract the game
+                # lines join above already follows.
+                try:
+                    distribution_index = load_wnba_prop_distributions(selected_date)
+                except Exception:
+                    _LOGGER.exception(
+                        "BOOK_GRID_PROP_DISTRIBUTION_FAILURE sport=wnba date=%s", selected_date
+                    )
+                    distribution_index = None
+                prop_coverage = attach_wnba_projections(grid, index, distribution_index)
             return {
                 **prop_coverage,
                 "rows_with_projection": int(prop_coverage.get("rows_with_projection") or 0)
