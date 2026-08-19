@@ -2499,3 +2499,49 @@ vacuous preflight, refresh-worker's gate WORKS and this is it working.
 `sim_input_checklist.py --publish` shows `conditional_arsenal` > 0% with source
 `statcast_conditional_mix`. **Needs a ROSTER REBUILD** — `--use-roster-artifacts`
 defaults on and reuses profiles serialised before these fields existed.
+
+### MERGE ASSESSMENT — getting refresh-worker onto main is a REAL TWO-WAY MERGE `[2026-08-18]`
+
+**Measured, so the next session starts from numbers rather than rediscovering
+this.** The correct end-state (one worker deploy from main carries everything and
+STOPS the divergence) is confirmed correct — and it is **not a quick action.**
+
+    merge base     aa60d7569
+    main side      420 commits
+    worker side     63 commits   (live worker 00e9a49f)
+    merge-tree     CONFLICTS -- 7 conflict / changed-in-both markers
+
+**BOTH SIDES HAVE MOVED ON THE SAME FILES.** Changed on main AND on the worker
+since the base:
+
+    pipeline/intelligence_state.py
+    syndicate/features/shared/board_enrichment.py
+    syndicate/features/shared/game_shape.py
+    syndicate/features/shared/intelligence_evaluation.py
+    syndicate/features/shared/live_gameline_join.py    <- ledger already records
+                                                          this as a CONTESTED file
+    syndicate/features/shared/live_gameline_ledger.py
+    syndicate/features/shared/book_grid_artifact.py
+    scripts/poll_soccer_live_state.py
+    scripts/refresh_wnba_oddsapi_props.py
+    scripts/mlb_leverage_index.py
+
+**This needs SEMANTIC resolution, not a merge driver** — deciding whose soccer
+poller, whose gameline join, whose board enrichment is right, in files owned by
+OTHER lanes. **A wrong resolution does not fail loudly**; it ships a half-merged
+board or intelligence path to the service that runs the daily pipeline.
+
+**NOT ATTEMPTED, deliberately.** Doing it would have meant guessing at other
+sessions' intent in files I had not read. Recorded instead.
+
+**Sequence when someone takes it:**
+1. an owner for the merge; read the lane ledger for `live_gameline_*`,
+   `board_enrichment`, `intelligence_state` before resolving anything;
+2. land on main, tests green;
+3. ONE worker deploy from main then carries **all** of it — the 63 soccer/WNBA
+   commits, `edge_basis` (`lanes.md:613`), and the `#440` engine set.
+
+**Until then the worker stays off main and every worker deploy is an off-main
+graft that must be re-cut against the live SHA.** That is the cost of deferring,
+and it compounds: each graft pushes the worker further from main and makes this
+merge larger.
