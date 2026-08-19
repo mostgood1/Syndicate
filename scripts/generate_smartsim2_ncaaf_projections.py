@@ -539,6 +539,39 @@ def main() -> None:
     print(f"elapsed_seconds={elapsed:.1f}")
     print(f"artifact_path={path}")
 
+    # PUBLISH TO WEB. Without this the whole run is inert for the board.
+    #
+    # Measured 2026-08-19: refresh-worker regenerated this artifact on its own
+    # disk and the served board did not move for HOURS, because the worker and
+    # web do not share a disk and nothing pushed the file across. Web reads
+    # SYNDICATE_NCAAF_SOURCE_ROOT (its MOUNTED DISK); the only other way in is
+    # committing the CSV to git and riding a web deploy, which is a deploy per
+    # model change and leaves the worker's own autorun pointless.
+    #
+    # The relative path lands where web already reads: the worker publishes
+    # `ncaaf_source/data/smartsim2_projections_<season>_wk<week>.csv` relative
+    # to SYNDICATE_DATA_ROOT, and web writes it under its own data root --
+    # `/opt/render/project/data/ncaaf_source/data/...`, which is exactly
+    # SYNDICATE_NCAAF_SOURCE_ROOT. So no read-path change is needed on web.
+    #
+    # Best-effort by design: publish_hot_artifact never raises and returns
+    # False when unconfigured (every local run), when the path is not
+    # allowlisted, or on a network error. A generator must not fail because a
+    # transfer did -- the artifact on disk is still correct and still the
+    # output of this script.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(Path(path))
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
+        published = False
+        print(f"artifact_publish_error={type(exc).__name__}: {exc}", flush=True)
+    # Printed either way. `published=False` on the worker means the board is
+    # still serving whatever it had -- the condition that was invisible for the
+    # entire life of this gap, and the first thing to check when a model change
+    # does not show up.
+    print(f"artifact_published={published}", flush=True)
+
 
 if __name__ == "__main__":
     main()
