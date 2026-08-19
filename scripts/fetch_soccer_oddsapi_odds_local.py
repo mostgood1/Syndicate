@@ -74,9 +74,17 @@ def _preferred_books() -> list[str]:
 def _segment_market_map() -> dict[str, tuple[str, str]]:
     """`#343`: full-game + half markets, from the ONE shared vocabulary.
 
-    Soccer plays halves, so `h1`/`h2` -- not quarters. The same dict is used to
-    REQUEST the keys and to TAG the returned quotes, which is what stops a
-    fetcher asking for `totals_h1` and then writing it under `full`.
+    Soccer plays halves, so `h1`/`h2` -- not quarters. Kept for TAGGING only
+    (see `_append_soccer_book_quotes`) -- NOT for requesting, see `_game_markets`
+    below. `market_segments.py`'s own docstring says why: "Each segment market
+    is a distinct OddsAPI market key on a per-event request." This fetcher only
+    ever calls the BULK `/sports/{sport}/odds` endpoint (see `fetch_game_odds`)
+    -- unlike MLB's fetcher, which has a separate per-event path
+    (`_event_wants_full_game_markets` in `fetch_mlb_oddsapi_local.py`) gated
+    specifically for segment markets. Soccer never grew that second path, so
+    tagging-only is the honest use of this map today: every quote this script
+    actually receives is a full-game market, and `normalize_segment` already
+    defaults an untagged key to `full` correctly.
     """
     from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
 
@@ -84,14 +92,33 @@ def _segment_market_map() -> dict[str, tuple[str, str]]:
 
 
 def _game_markets() -> list[str]:
+    """The markets to REQUEST from the bulk `/sports/{sport}/odds` endpoint.
+
+    Must stay `DEFAULT_GAME_MARKETS` only (h2h/totals/spreads) unless the env
+    override is set. `#343` (`77c0ee49`, 2026-08-10 21:17:39 -0500) merged
+    `_segment_market_map()`'s h1/h2 + alternate-line keys into this list --
+    those are valid OddsAPI market keys, but not on THIS endpoint, and the
+    request sends every market as one comma-joined `markets=` param, so one
+    unsupported key 422s the entire call, every league, every time:
+
+        HTTP 422 {"error_code": "INVALID_MARKET", "message": "Markets not
+        supported by this endpoint: alternate_spreads, ..., h2h_h1, h2h_h2,
+        spreads_h1, spreads_h2, totals_h1, totals_h2"}
+
+    Confirmed live against the production API 2026-08-19 for `mls` and
+    `la_liga` -- both 422 with the full 18-key list, both 200 with real events
+    (31 / 14) on `DEFAULT_GAME_MARKETS` alone. The regression date lines up
+    exactly with the last good capture found anywhere in the book_quotes
+    shard (2026-08-10/08-11): every soccer game-odds request has 422'd, for
+    every league, since this landed. This is the SAME failure class the
+    removed `btts`/`draw_no_bet`/`double_chance` markets already hit once
+    (see the comment on `DEFAULT_GAME_MARKETS` below) -- `#343` reintroduced
+    it with a bigger set nobody checked against this specific endpoint.
+    """
     raw = os.environ.get("ODDS_API_SOCCER_GAME_MARKETS")
     if raw:
         return [market.strip() for market in raw.split(",") if market.strip()]
-    # Segment keys appended rather than replacing the default: an env override
-    # still wins outright, so an operator capping cost keeps that control.
-    markets = list(DEFAULT_GAME_MARKETS)
-    markets.extend(key for key in _segment_market_map() if key not in markets)
-    return markets
+    return list(DEFAULT_GAME_MARKETS)
 
 
 def _write_text_atomic(path: Path, text: str) -> None:
