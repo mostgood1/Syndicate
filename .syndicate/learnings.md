@@ -3935,3 +3935,31 @@ not a codebase.**
 **What held:** everything I re-derived. The 403->200 cutover watched through,
 the merge-base ancestry, the artifacts read back BY CONTENT. **The failures were
 uniformly in what I did NOT re-derive.**
+
+## 2026-08-18 — A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK
+
+`refresh-worker-oom-recurrence` held a documented deploy hold on refresh-worker.
+Its owner had not moved in **43 hours** while the roster reported
+`isRunning: true`.
+
+**It survived BOTH checks, for opposite reasons:**
+- the **orphan sweep** releases lanes whose session is ARCHIVED — this one is not
+  archived, so it was skipped;
+- a **liveness read** shows `isRunning: true` — so it looks owned.
+
+**Neither check asks the question that matters: WHEN DID IT LAST DO ANYTHING.**
+`lanes.md:51` had already recorded "flagged running (stale 40h)" and nothing
+acted on it, because no rule consumes that field.
+
+**RULE: treat `isRunning` as a CLAIM, not a reading. Judge ownership by
+`lastActivityAt`.** A hold whose owner has been silent for tens of hours is
+orphaned regardless of its flag, and blocks real work until someone adjudicates
+it. This is the same shape as
+[[feedback_session_roster_hides_archived]] — "ended" and "never existed" look
+identical — with a third state now added: **"claims to be running and is not."**
+
+**Cost here:** I nearly deployed straight through a documented hold because the
+mechanical locks were free (claim available, preflight reachable) and I read
+*free locks as permission*. The policy hold lives in `lanes.md` and nothing
+mechanical enforces it. **Read the lane ledger for the SERVICE before deploying,
+not just the locks.**

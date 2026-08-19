@@ -2453,3 +2453,49 @@ WORKERS can produce, so web's preflight has never been satisfiable.**
 
 **To confirm:** find any web-side call path to `log_all_process_memory`, or
 confirm none exists. If none, the fix is (2) and no emitter is missing.
+
+## refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
+
+**The hold is VOID — its owner is dead, and the roster lies about it.**
+
+    "Oom band full report"  3a27ad02
+      isRunning:      true          <- the flag
+      lastActivityAt: 2026-08-17T05:15:58Z   <- 43 HOURS earlier
+
+`lanes.md:51` already flagged it "flagged running (stale 40h)". **The orphan
+sweep skipped it precisely BECAUSE it claims to be running** — the sweep releases
+lanes whose session is ARCHIVED, and this one is neither archived nor alive.
+**A stale-but-"running" session is invisible to both checks.** `lanes.md:235`
+still shows the lane OPEN and `:611` still cites its deploy hold; both are stale.
+`[user decision 2026-08-18: the lane is dead, treat the hold as void]`
+
+**READY, PUSHED, NOT DEPLOYED:** `deploy/worker-sim-engine-20260818` = `a1235755`
+- parent **`00e9a49f`** — the LIVE worker, not main.
+- **14 files, +1,478 / -22.** Whole `sim_engine` tree + `artifact_publisher.py`
+  + `run_mlb_daily_sim_job.py`.
+- **Import-checked in isolation**: `simulate`, `build_roster`, `conditional_mix`,
+  `pitch_codes`, `pull_season_artifacts` all import; `ST -> PitchType.SL`.
+- **Verified no overlap**: the worker's **63 commits main lacks** (soccer polls,
+  ownership gates, WNBA) touch `syndicate/features` + tests, **NOT** `sim_engine`
+  / `artifact_publisher` / the sim job. The graft overwrites nothing unique to
+  the worker — and **deploying main instead would REVERT all 63.**
+
+**WHY IT DID NOT SHIP — a live blocker, not a policy one:** `HOLD: 9 jobs in
+flight`, including `run_mlb_daily_sim_job.py` mid-run with `daily_update.py` and
+multiprocessing children. **A deploy kills a running MLB sim.** Unlike web's
+vacuous preflight, refresh-worker's gate WORKS and this is it working.
+
+**BEFORE DEPLOYING `a1235755`, READ THIS:**
+1. **It does NOT carry the `edge_basis` fix** another lane left on main marked
+   "whoever next deploys refresh-worker carries it" (`lanes.md:613`). Shipping
+   mine as-is silently skips theirs and pushes the worker FURTHER from main.
+2. **Its parent is the CURRENT live SHA.** If the worker moves first, RE-CUT —
+   the same staleness that invalidated my first web branch tonight.
+3. **Better end-state: get the worker onto main.** That carries `edge_basis`, my
+   engine set, and the other 420 commits at once, and stops the divergence
+   instead of deepening it. Bigger change, needs its own preflight.
+
+**verify once deployed:** a sim run logs `season_artifacts_pulled=N`, then
+`sim_input_checklist.py --publish` shows `conditional_arsenal` > 0% with source
+`statcast_conditional_mix`. **Needs a ROSTER REBUILD** — `--use-roster-artifacts`
+defaults on and reuses profiles serialised before these fields existed.
