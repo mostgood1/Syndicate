@@ -2773,6 +2773,6 @@ shape, a different function.
 
 **Unmeasured**: whether NBA has the identical reachability defect (NBA's
 own staleness is plausibly just offseason, not compared apples-to-apples).
-Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
-`todo.md` `#461` (needs a follow-up entry — this is a NEW, separate defect
-from the cache-freshness bug `#461` already fixed).
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`.
+**Filed as `todo.md` `#468`** — a NEW, separate defect from the
+cache-freshness bug `#461` already fixed. NOT FIXED as of this entry.
