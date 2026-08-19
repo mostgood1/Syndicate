@@ -1244,3 +1244,38 @@ invariants fail. `commit-guard.py` already gates commits and is the natural home
 had not tested, wrote it down as a rule, and the disproof was a single tool call
 available the whole time. *Absent signal is about the emitter* — check whether
 the guard FIRES before theorising about why it didn't.
+
+### 2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS" ARE TWO DIFFERENT CLAIMS. I reported the first as if it were the second, for `#461`, in front of the user, before checking
+
+Deployed `#461`'s fix (a cache-freshness guard in `wnba_betting.cli`'s
+`_ensure_team_advanced_stats_asof`) to refresh-worker, confirmed `db573857`
+as the live commit via `deploy_preflight.py`, and reported it as "live."
+That claim was TRUE and also NOT THE QUESTION THAT MATTERED. Production's
+real WNBA props/sim path (`refresh_wnba_oddsapi_props.py` ->
+`basketball_props_smart_sim.py`) `importlib.import_module`s
+`wnba_betting.sim.smart_sim` directly, in-process — it never subprocesses
+into `wnba_betting.cli` at all, so the fixed function was never on the
+executed call graph in production, ever, regardless of what commit is live.
+The deploy was real. The reach was zero. Only caught because the user asked
+to "dig into the staleness gap" rather than accept "deployed" as closure.
+
+**This repo already has this rule** ([[feedback_presence_is_not_reachability]]
+— 4 inert fixes in one session, same shape) **and I had it in memory and
+still didn't apply it to my own deploy.** The gap: "presence ≠ reachability"
+was checked for FLAGS and CONFIG in prior instances; here the thing not
+reachable was a whole FUNCTION, fixed and genuinely correct for the path
+that calls it — the bug was in a DIFFERENT function's import strategy
+(direct in-process module import bypassing the CLI layer entirely), three
+files away from the file I'd edited. Fixing a function correctly is not
+evidence anything calls it.
+
+**How to apply, added specificity beyond the existing rule:** before
+reporting any fix as "done" — even after a real, measured deploy — trace
+the ACTUAL production call graph from the real entrypoint
+(`scripts/refresh_<x>.py` or equivalent) to the fixed function, not just
+from the function's own immediate caller. A fix's own unit tests and a
+green reachability harness both passed here too — they exercised the fixed
+function directly, which proves the function works, not that anything in
+production reaches it. "Deployed and verified" claims two different things
+and both need a distinct, separate measurement: (1) is this commit live,
+(2) does the live process's real entrypoint ever execute this code path.
