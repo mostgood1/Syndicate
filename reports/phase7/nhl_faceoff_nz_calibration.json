@@ -1,0 +1,10 @@
+{
+  "teams_qualified": 32,
+  "league_mean_shots_per_60": 27.8323,
+  "correlations": {
+    "nz": -0.0025,
+    "oz": 0.0088,
+    "dz": -0.0101,
+    "ev": -0.0109
+  }
+}

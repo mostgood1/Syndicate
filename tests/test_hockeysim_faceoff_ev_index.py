@@ -10,13 +10,16 @@ import pytest
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_ev_index import (
     DEFAULT_FACEOFF_DZ_INDEX,
     DEFAULT_FACEOFF_EV_INDEX,
+    DEFAULT_FACEOFF_NZ_INDEX,
     DEFAULT_FACEOFF_OZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_DZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_INDEX,
+    MIN_GAMES_FOR_FACEOFF_NZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_OZ_INDEX,
     GameFaceoffZoneRecord,
     compute_team_faceoff_dz_index,
     compute_team_faceoff_ev_index,
+    compute_team_faceoff_nz_index,
     compute_team_faceoff_oz_index,
     parse_playbyplay_faceoffs_by_zone,
     parse_playbyplay_faceoffs_ev,
@@ -313,3 +316,49 @@ def test_dz_index_is_independent_of_oz_index_not_its_mirror():
 
 def test_dz_index_missing_data_is_empty_not_a_crash():
     assert compute_team_faceoff_dz_index([]) == {}
+
+
+# ---------------------------------------------------------------------------
+# Zone-specific (neutral-zone) win index -- built and tested like OZ/DZ, but
+# deliberately NOT wired into engine.py (see scripts/calibrate_nhl_faceoff_nz_index.py
+# and docs/reports/hockeysim_faceoff_nz_calibration_report.md for why: no measured
+# real-data correlation with shot generation). The function itself is still real,
+# tested measurement infrastructure -- these tests cover it on that basis.
+# ---------------------------------------------------------------------------
+
+def test_nz_index_neutral_below_games_floor():
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(
+        plays=[_faceoff_event(owner_id=13, zone="N")])) for _ in range(3)]
+    assert 3 < MIN_GAMES_FOR_FACEOFF_NZ_INDEX
+    idx = compute_team_faceoff_nz_index(recs)
+    assert idx["FLA"].index == DEFAULT_FACEOFF_NZ_INDEX
+
+
+def test_nz_index_reflects_a_real_above_average_nz_winner():
+    n = MIN_GAMES_FOR_FACEOFF_NZ_INDEX + 5
+    # FLA wins 8 of 9 of its own NZ draws (elite); CHI wins only 1 of 9 (weak). Neutral-zone
+    # draws don't flip like O/D (zone stays "N" for both sides), so this is symmetric by
+    # construction -- CHI's NZ total is touched by the SAME events as FLA's, just from the
+    # other side of the same draws.
+    plays = (
+        [_faceoff_event(owner_id=13, zone="N") for _ in range(8)]
+        + [_faceoff_event(owner_id=16, zone="N") for _ in range(1)]
+    )
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_nz_index(recs)
+    assert idx["FLA"].index > 1.0
+    assert idx["CHI"].index < 1.0
+
+
+def test_nz_index_is_self_consistent_zero_sum():
+    n = MIN_GAMES_FOR_FACEOFF_NZ_INDEX + 5
+    plays = [_faceoff_event(owner_id=13, zone="N") for _ in range(5)] + \
+            [_faceoff_event(owner_id=16, zone="N") for _ in range(5)]
+    recs = [parse_playbyplay_faceoffs_by_zone(_zone_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_nz_index(recs)
+    assert idx["FLA"].index == pytest.approx(1.0, abs=1e-6)
+    assert idx["CHI"].index == pytest.approx(1.0, abs=1e-6)
+
+
+def test_nz_index_missing_data_is_empty_not_a_crash():
+    assert compute_team_faceoff_nz_index([]) == {}

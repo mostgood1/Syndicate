@@ -1361,12 +1361,58 @@ neutral vs 61.934 real-indexed total shots/game -- ~0.01%, essentially
 zero. 356 hockeysim/nhl tests pass (8 new), checklist re-confirmed full
 PASS.
 
-**What remains genuinely open**: neutral-zone-specific rates were computed
-but not wired (no plausible consumption point exists for them distinct
-from the blended EV index); `faceoff_alpha`/`faceoff_diff_clip`/
-`faceoff_mult_clip_*` remain the vendor's uncalibrated defaults, same open
-item as §2m/§2n. This closes all three faceoff-zone signals the original
-gap analysis opened.
+**What remains genuinely open, at that point**: neutral-zone-specific rates
+were computed but not wired -- checked with a real measurement the same
+day, addendum below.
+
+**Third addendum, same day: neutral-zone faceoff calibration checked with a
+REAL MEASUREMENT, not an assertion.** Full report:
+`docs/reports/hockeysim_faceoff_nz_calibration_report.md`. The prior
+addendum's own "no plausible consumption point exists" line was a judgment
+call, not something measured -- `scripts/calibrate_nhl_faceoff_nz_index.py`
+checks directly: does a team's SEASON-AGGREGATE faceoff win rate, at ANY
+zone, correlate with their SEASON-AGGREGATE real `shots_per_60`
+(`team_game_rates.py`'s own real data)?
+
+**Result: every correlation is under 0.02 in magnitude** -- `faceoff_nz_index`
+-0.0025, `faceoff_oz_index` +0.0088, `faceoff_dz_index` -0.0101,
+`faceoff_ev_index` -0.0109, all 32 teams qualified. Indistinguishable from
+zero for all four, including the three ALREADY-SHIPPED indices this session
+built and wired without ever checking them this way.
+
+**Does NOT prove the engine's segment-level mechanism is wrong** --
+`_faceoff_multipliers` models a LOCAL, moment-to-moment effect (does winning
+THIS draw shift shot generation in the next few seconds of THIS segment)
+that could exist and still wash out completely in a season-long aggregate.
+**What it DOES mean**: no real evidence justifies wiring a NEW mechanism
+(NZ) on top of three that were never themselves validated against real
+aggregate shot data -- EV/OZ/DZ were previously checked only against their
+own internal normalization (mean ~1.0) and the engine's own simulated
+output, never against reality. That gap is real and retroactively applies
+to all three already-shipped indices, not just the one this pass declines
+to add.
+
+**Decision**: `compute_team_faceoff_nz_index` built and unit-tested (5
+tests) as real, reusable measurement infrastructure -- but deliberately
+NOT added to the CSV producer, NOT added to the loader, NOT wired into
+`engine.py`. Publishing an unconsumed field would recreate the exact
+"populated but confirmed dead" anti-pattern this session already found and
+fixed once (`blocks_per_60`/`penalties_per_60`, earlier in this entry) --
+a field that looks fixed to population-only checks while doing nothing.
+The checklist has nothing new to flag either way, since NZ was never added
+as a `HockeyTeamFeatures`/CSV field in the first place.
+
+**What remains genuinely open**: a segment-level (not season-aggregate)
+validation of the EV/OZ/DZ mechanism -- the only kind of check that could
+actually confirm or refute the local effect `_faceoff_multipliers` claims
+to model, needing real shot-event timestamps matched against real
+faceoff-event timestamps, a substantially larger data-engineering project;
+`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the
+vendor's uncalibrated defaults, and this report adds evidence that the
+SIGNAL feeding them may itself be too aggregated to matter -- a different,
+arguably more fundamental question than whether the sensitivity constants
+alone are mistuned. This closes the faceoff-zone track's open items this
+session set out to check.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

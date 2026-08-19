@@ -345,6 +345,25 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   ~0.01%, essentially zero. Reachability AND gating tested: one test
   proves the index changes output; a second confirms a one-sided value
   (only HOME has it) is a near no-op.
+- **Did** check neutral-zone faceoff calibration with a REAL measurement,
+  not an assertion (reference doc §2p, full report
+  `docs/reports/hockeysim_faceoff_nz_calibration_report.md`) — the prior
+  entry's own "no plausible consumption point" line was a judgment call,
+  not a measurement. `scripts/calibrate_nhl_faceoff_nz_index.py` checks
+  directly whether a team's SEASON-AGGREGATE faceoff win rate, at ANY
+  zone, correlates with their SEASON-AGGREGATE real `shots_per_60`.
+  **Result: every correlation (NZ/OZ/DZ/EV) is under 0.02 in magnitude**
+  — indistinguishable from zero, all 32 teams qualified. Does NOT prove
+  the engine's segment-level mechanism is wrong (a real local effect could
+  wash out in a season aggregate) — but DOES mean there's no basis to wire
+  a new mechanism (NZ) on top of three (EV/OZ/DZ) that were never
+  themselves checked against real aggregate shot data, only against their
+  own internal normalization. `compute_team_faceoff_nz_index` is built and
+  tested (5 unit tests) as real measurement infrastructure, but
+  deliberately NOT added to the CSV producer, loader, or `engine.py` —
+  publishing an unconsumed field would recreate the exact "populated but
+  confirmed dead" anti-pattern already found and fixed once this session
+  (`blocks_per_60`/`penalties_per_60`).
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader

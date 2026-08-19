@@ -727,12 +727,48 @@ present DZ index so the gate activates), 80 seeded runs.
 away doesn't) is a near no-op, matching the documented "additional layer, not a fallback tier"
 design.
 
-**What this completes**: all three faceoff-zone signals this session's original §2m gap analysis
-opened (EV-blended, offensive-zone, defensive-zone) are now built and wired. Neutral-zone-specific
-rates were computed (the parser tracks all three) but not wired — no plausible consumption point
-exists for a neutral-zone-specific signal distinct from what the blended EV index already captures.
-`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the vendor's uncalibrated
-defaults, same open item as §2m/§2n.
+**What this section originally flagged as future work — checked next, §2p, with a real
+measurement, not an assertion.**
+
+---
+
+## 2p. Neutral-zone faceoff calibration — a real check, a null result
+
+Full report: `docs/reports/hockeysim_faceoff_nz_calibration_report.md`. §2o's own "not wired, no
+plausible consumption point" line was an ASSERTION, not a measurement. This section replaces it
+with one: `scripts/calibrate_nhl_faceoff_nz_index.py` asks directly whether a team's
+SEASON-AGGREGATE faceoff win rate, at ANY zone, correlates with their SEASON-AGGREGATE real
+`shots_per_60` — the only comparison the currently-available data supports (matching real shots to
+the ~15 seconds after each specific real draw would need full event-sequence time-delta analysis,
+out of scope here).
+
+**Result: every correlation is under 0.02 in magnitude** — `faceoff_nz_index` −0.0025,
+`faceoff_oz_index` +0.0088, `faceoff_dz_index` −0.0101, `faceoff_ev_index` −0.0109, all 32 teams
+qualified. Indistinguishable from zero for all four.
+
+**This does NOT prove the engine's segment-level mechanism is wrong.** `_faceoff_multipliers`
+models a LOCAL, moment-to-moment effect that could exist and still wash out completely in a
+season-long aggregate. What it DOES mean: there is no real evidence to justify wiring a NEW
+mechanism (NZ) on top of three (EV/OZ/DZ) that have never themselves been validated against real
+aggregate shot data — each was previously verified only against its own internal normalization
+(mean ≈1.0) and the engine's own simulated output, never against reality. **That gap is real and
+retroactively applies to all three already-shipped indices, not just the one this pass declines to
+add.**
+
+**Decision**: `compute_team_faceoff_nz_index` is built and unit-tested — real, reusable
+measurement infrastructure — but deliberately NOT added to the CSV producer, NOT added to the
+loader, NOT wired into `engine.py`. Publishing an unconsumed field would recreate exactly the
+"populated but confirmed dead" anti-pattern §2l already found and fixed once this session
+(`blocks_per_60`/`penalties_per_60`) — a field that looks fixed to population-only checks while
+doing nothing. The checklist has nothing new to flag either way, since NZ was never added as a
+`HockeyTeamFeatures`/CSV field.
+
+**What remains genuinely open**: a segment-level (not season-aggregate) validation of the EV/OZ/DZ
+mechanism — the only kind of check that could actually confirm or refute the local effect
+`_faceoff_multipliers` claims to model; `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`
+remain the vendor's uncalibrated defaults, and this report adds evidence that the SIGNAL feeding
+them may itself be too aggregated to matter — a different, arguably more fundamental question than
+whether the sensitivity constants alone are mistuned.
 
 ---
 
@@ -796,6 +832,7 @@ concept.
 | `historical_truth/faceoff_ev_index.py` + `faceoff_ev_index` wired into `engine.py` (§2m) — closes the all-situations-vs-EV-only mismatch, a NEW per-team mechanism sourced from `situationCode` strength-state data | built, run (1,312 playbyplay games, mean index 1.00011 across 32 teams), verified the league-wide average did not shift (61.786 neutral vs 62.079 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability). Found and fixed a real regression during wiring — a naive version made the already-reachable `TeamRates.faceoff_win_pct` stop mattering whenever no index was supplied; fixed with a raw (non-defaulted) per-side fallback | reachable by default; a REAL behavior change for EV shot-share, with `TeamRates.faceoff_win_pct`'s existing reachability preserved as the fallback path |
 | `compute_team_faceoff_oz_index` + `faceoff_oz_index` wired into `engine.py` via `_resolve_faceoff_pct` (§2n) — a zone-specific refinement of §2m, preferred over the flat EV index when present | built, run (1,312 playbyplay games, 38,120 OZ-attributed faceoffs, mean index 0.99973 across 32 teams — a DIFFERENT ranking than the EV index, confirming a distinct signal), verified the league-wide average did not shift (62.138 neutral vs 61.937 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability + 1 priority-over-EV-index) | reachable by default; three-tier fallback (OZ → EV → all-situations blend) preserves every prior tier's reachability |
 | `compute_team_faceoff_dz_index` + `faceoff_dz_index` wired into `engine.py` as an ADDITIONAL multiplicative layer (§2o) — NOT the OZ index's mirror image (measured correlation 0.69), composed with (not replacing) the OZ/EV chain | built, run (same 1,312 games, 38,120 DZ-attributed faceoffs, mean index 1.00063 across 32 teams), verified the league-wide average did not shift (61.940 neutral vs 61.934 real-indexed, 992-pairing round-robin — ~0.01%, essentially zero), tested (7 unit + 1 loader + 1 reachability + 1 both-sides-required gating) | reachable by default, gated on BOTH sides carrying the index (no fallback tier since nothing previously consumed this signal); completes all 3 faceoff-zone signals §2m's gap analysis opened |
+| `compute_team_faceoff_nz_index` + `scripts/calibrate_nhl_faceoff_nz_index.py` (§2p) — checks whether ANY faceoff-zone index correlates with real season-aggregate `shots_per_60`, not just whether it's normalized correctly | built, run — every correlation (NZ/OZ/DZ/EV) under 0.02 in magnitude, indistinguishable from zero across all 32 teams | **deliberately NOT wired** — real measurement found no basis to; function is tested (5 unit tests) but not added to the CSV producer, loader, or `engine.py`, avoiding the exact "populated but dead" anti-pattern §2l already fixed once |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **All of it is additive and reachable-by-default** — no new flag was

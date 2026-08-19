@@ -65,6 +65,20 @@ to `lam_a` (suppression of the opponent it was won against) -- exactly the exist
 function's own semantics, just a second, independent zone-context input rather than
 a fourth tier of the OZ/EV/blend fallback chain (which represents one measurement
 getting more precise, not a second, additive game mechanism).
+
+NEUTRAL-ZONE WIN INDEX (`compute_team_faceoff_nz_index`), added in a fourth pass -- BUILT BUT
+DELIBERATELY NOT WIRED, on the basis of a real measurement, not a judgment call. Unlike OZ (a
+refinement of the EV/blend consumption point) or DZ (a clear dual offense/defense causal story),
+NZ has no comparably direct link to shot generation, so `scripts/calibrate_nhl_faceoff_nz_index.py`
+checked directly: does ANY faceoff-zone index (NZ, and for context OZ/DZ/EV too) correlate with
+REAL season-aggregate `shots_per_60`? Result: every |correlation| across all four indices is under
+0.02 (`docs/reports/hockeysim_faceoff_nz_calibration_report.md`) -- no real evidence that
+season-aggregate faceoff performance, at any zone, predicts season-aggregate shot volume. This does
+NOT prove the engine's segment-level mechanism is wrong (a real, small, local effect could still
+exist and wash out in a season-long aggregate), but it means there is no basis to wire a NEW
+mechanism (NZ) on top of an unvalidated one, and it surfaces a real gap in the ALREADY-SHIPPED
+EV/OZ/DZ mechanisms too: none of them have ever been checked against real aggregate shot data, only
+against their own internal normalization and the engine's own simulated output.
 """
 from __future__ import annotations
 
@@ -385,5 +399,64 @@ def compute_team_faceoff_dz_index(records: Sequence[GameFaceoffZoneRecord]) -> D
         out[team] = TeamFaceoffDzIndex(
             team=team, index=index, games=games,
             dz_wins=row["dz_wins"], dz_total=row["dz_total"],
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Zone-specific (neutral-zone) win index -- built to MEASURE first, wire second
+# (or not at all). See `docs/reports/hockeysim_faceoff_nz_calibration_report.md`
+# for the real-data check this module's own docstring update (below) summarizes.
+# ---------------------------------------------------------------------------
+
+MIN_GAMES_FOR_FACEOFF_NZ_INDEX = 10
+DEFAULT_FACEOFF_NZ_INDEX = 1.0
+
+
+@dataclass(frozen=True)
+class TeamFaceoffNzIndex:
+    """Per-team NEUTRAL-ZONE-specific faceoff win-rate tendency, normalized against the
+    league-wide NZ win rate -- 1.0 = league average. Unlike OZ (a refinement of the same
+    consumption point) or DZ (an additional layer with a clear dual offense/defense story), NZ has
+    no comparably direct causal link to shot generation -- see the module docstring for the
+    real-data calibration check that determined whether/how this gets wired."""
+
+    team: str
+    index: float
+    games: int
+    nz_wins: int
+    nz_total: int
+
+
+def compute_team_faceoff_nz_index(records: Sequence[GameFaceoffZoneRecord]) -> Dict[str, TeamFaceoffNzIndex]:
+    acc: Dict[str, Dict[str, int]] = {}
+
+    def _touch(team: str) -> Dict[str, int]:
+        return acc.setdefault(team, {"games": 0, "nz_wins": 0, "nz_total": 0})
+
+    for r in records:
+        h = _touch(r.home_abbr)
+        a = _touch(r.away_abbr)
+        h["games"] += 1
+        a["games"] += 1
+        h["nz_wins"] += r.home_zone_wins["N"]
+        h["nz_total"] += r.home_zone_total["N"]
+        a["nz_wins"] += r.away_zone_wins["N"]
+        a["nz_total"] += r.away_zone_total["N"]
+
+    league_wins = sum(v["nz_wins"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_NZ_INDEX)
+    league_total = sum(v["nz_total"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_NZ_INDEX)
+    league_rate = _safe_div(league_wins, league_total)
+
+    out: Dict[str, TeamFaceoffNzIndex] = {}
+    for team, row in acc.items():
+        games = row["games"]
+        index = DEFAULT_FACEOFF_NZ_INDEX
+        if games >= MIN_GAMES_FOR_FACEOFF_NZ_INDEX and league_rate > 0:
+            team_rate = _safe_div(row["nz_wins"], row["nz_total"])
+            index = round(team_rate / league_rate, 4)
+        out[team] = TeamFaceoffNzIndex(
+            team=team, index=index, games=games,
+            nz_wins=row["nz_wins"], nz_total=row["nz_total"],
         )
     return out
