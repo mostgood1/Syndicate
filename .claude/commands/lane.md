@@ -1,7 +1,7 @@
 ---
 description: Open, close, or list Syndicate work lanes
 argument-hint: open <slug> "<goal>" | close <slug> | list | block <slug> "<reason>"
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git status:*), Bash(git diff:*)
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(echo:*)
 ---
 
 Manage work lanes in `.syndicate/lanes.md`.
@@ -44,9 +44,30 @@ Request: `$ARGUMENTS`
 - Blocked by: <lane slug or none>
 ```
 
-6. Write the lane slug to `.syndicate/.current-lane` (overwrite). The
-   `lane-guard` PreToolUse hook reads this marker to tell your own lane from
-   another session's; without it the guard blocks your own edits.
+6. Write the lane slug to **your own per-session marker**,
+   `.syndicate/.current-lane.<your session id>` — resolve the id with
+   `Bash: echo $CLAUDE_CODE_SESSION_ID`, then `Write` the slug to
+   `.syndicate/.current-lane.<that value>`. Both `lane-guard.py` and
+   `deploy-guard.py` read this file FIRST and only fall back to the bare
+   `.syndicate/.current-lane` when it's absent — their own docstrings say
+   so, because the bare file is a single shared slot and whichever session
+   wrote it last silently answers "your lane" for every OTHER session that
+   has no marker of its own.
+
+   **Do NOT also write the bare `.syndicate/.current-lane` file.** That
+   used to be this step's whole instruction, and it is the confirmed cause
+   of a real cross-session misattribution: measured 2026-08-19, a
+   `refresh-worker` deploy claim was acquired under a lane-slug holder name
+   that belonged to a DIFFERENT session — the acquiring session had no
+   per-session marker, fell back to the bare file, read whichever lane a
+   third session had most recently opened via this exact step, and (most
+   likely) copied that misattributed name straight out of the guard's own
+   printed remedy text into `deploy_claim.py --holder`. Twice, with two
+   different lane names, both traced back to this step writing the shared
+   file. Writing only the per-session marker removes the leak: a session
+   with no marker of its own now correctly reads as "no lane" (safe,
+   forces a real `/lane open`) instead of silently inheriting someone
+   else's identity.
 
 7. Report the lane and the first concrete step. Nothing else.
 
@@ -56,7 +77,12 @@ Request: `$ARGUMENTS`
 2. Flip status to CLOSED with the date and a one-line outcome.
 3. If the lane produced a wrong belief or a broken deploy, invoke
    `/postmortem <slug>` before closing.
-4. If `.syndicate/.current-lane` holds this slug, empty it.
+4. Empty your per-session marker if it holds this slug:
+   `Bash: echo $CLAUDE_CODE_SESSION_ID` to get the id, then `Write` an
+   empty string to `.syndicate/.current-lane.<that value>`. Also check the
+   bare `.syndicate/.current-lane` — if it happens to hold this slug
+   (e.g. left over from before this step changed), empty that too, but do
+   not write a NEW value into it.
 
 ## list
 Show OPEN lanes only, one line each: slug, goal, files, blocker.
