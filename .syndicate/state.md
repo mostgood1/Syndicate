@@ -2663,6 +2663,13 @@ differentiation is in `play_simulator.py:258-259`, on the ratings path.
 (`_mean_epa(..., before_week=week)`). The unwired payload was real and is the
 wrong lever.
 
+**AND THE PAYLOAD IS A MEASURED NULL** `[Phase 3, n=269, 2023, 300 seeds]`:
+`dCRPS +0.0226 (0.97 SE)`, `dMAE +0.0256 (0.88 SE)` — nominally worse, under 1 SE
+both ways. **It does not ship, and Phase 4 is moot.** An intervention worth 4.1%
+of the outcome's spread cannot produce a detectable accuracy change even if
+directionally perfect. **Anyone revisiting this should test the RATINGS path, not
+the payload** — `asof_team_form.py` is built and certified for exactly that.
+
 **Engine baselines do not match real NFL distributions** — `success_rate` assumed
 0.500 vs a league mean of 0.422, `explosive_play_rate` 0.100 vs 0.066. Raw values
 put league-mean `offense_index` at 0.405 vs a neutral 0.500 and suppressed every

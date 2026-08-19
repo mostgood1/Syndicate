@@ -716,7 +716,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **NFL/NCAAF board defects SHIPPED+MEASURED; two model LEAKS found and fixed; payload experiment at Phase 3 (running, converging NULL)** — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — OPEN — **Phase 3 COMPLETE: VERDICT NULL (dCRPS +0.0226, 0.97 SE, n=269). Board defects SHIPPED+MEASURED; two model LEAKS fixed. Payload does not ship; Phase 4 moot.** — opened 2026-08-18 — session: football-model-owner
 - Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
   treatment MLB and soccer have. **Testable:** a gating checklist exists and runs;
   every model input is leak-free and reachable; board defects measured on the
@@ -733,8 +733,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Status: **14 commits, all on `origin/main`, 0 unpushed.** 3 web deploys live and
   measured (`5fdabc46`, `4c3b0aa5`, `841b6d84`). `CFBD_API_KEY` set by the user.
 - **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
-- **IN FLIGHT:** Phase 3 CRPS run, n=130/269. **Do not quote a verdict until
-  `scratchpad/phase3_summary.txt` exists** — trajectory converging NULL, not final.
+- **Phase 3 DONE, n=269:** `dCRPS +0.0226 (0.97 SE)`, `dMAE +0.0256 (0.88 SE)`.
+  **NULL per the pre-registered rule — does not ship.** Mechanism: the payload is
+  worth 4.1% of the 13.5-pt margin SD; the ratings path is worth 17.2% and
+  production already uses it, already as-of. **Phase 4 is moot** — nothing to
+  re-fit for a mechanism that does not move the output.
 - **OWED:** (1) NCAAF opener verification — key live but autorun had not fired
   since; PASS = ~51 of 51 non-null `predictions.home_mean`, watcher armed.
   (2) allowlist `smartsim2_*projections_*.csv` + `recommendations_summary` —
@@ -970,82 +973,3 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 
 
-
-### soccer-model-dispersion — DISPERSION OVERSHOOT DECOMPOSED, CLEANLY 2026-08-18 21:1xZ — CORRECTS the prior entry's framing: the xG double-count's own effect is LARGER than the wiring's, not smaller. `94578cbc` was helpful, not harmful. — session: soccer-sport-owner
-
-**This RETRACTS the "wiring is the more likely driver" framing from the immediately
-prior entry (archived, `lanes_history.md`).** That framing was built on a CONFOUNDED
-comparison (flagged as such at the time). This entry runs the actual isolated 2x2 and
-the direction is reversed on the dominant term.
-
-**FOUR configurations, `backtest_league()` called directly, 126 real eredivisie
-fixtures, real per-match-day `as_of`/`window=45` recomputation, 300 sims, ~78-80
-min/config (2 run in parallel on separate worktrees).** Artifacts at
-`/c/tmp/soccer_isolate_wiring_evidence/` (local scratch) plus the two already-had
-configs from the prior (confounded) trace.
-
-    config                            xG        wiring   model_brier   stdev
-    true baseline (08-15)            n/a        none       0.5211     0.1886
-    A: current formula, no wiring   absent     absent       0.5211     0.1886   <- EXACT match
-    B: old formula, no wiring      present     absent       0.5238     0.2745
-    new: current formula, wiring    absent    present       0.5081     0.2373
-    old: old formula, wiring       present    present       0.5189     0.2945
-
-**Config A matches the true 08-15 baseline to FOUR DECIMAL PLACES on both
-model_brier and stdev.** Not approximate -- exact. `00475bce^`'s loaders.py sits
-between `1834dd50` (xG forwarding added) and `00475bce` (shots/form/clean-sheet/
-corners added), so with the CURRENT formula (which no longer reads xG) run against
-it, `attacking_metrics`/`defensive_metrics` offer nothing at all -- attack_index/
-defense_index collapse to pure `fallback_attack`/`fallback_defense` (the raw rating,
-nothing else). That this reproduces the true historical numbers exactly is strong
-evidence the ORIGINAL pre-wiring state was, mechanically, the same "rating-only"
-configuration -- not a coincidence.
-
-**DECOMPOSED MARGINAL EFFECTS, holding each factor constant in turn:**
-
-    xG-term's own effect,  wiring ABSENT:  B - A     = +0.0859
-    xG-term's own effect,  wiring PRESENT: old - new  = +0.0572
-    wiring's own effect,   xG ABSENT:      new - A    = +0.0487
-    wiring's own effect,   xG PRESENT:     old - B    = +0.0200
-
-**THE xG DOUBLE-COUNT'S OWN EFFECT (0.057-0.086) IS LARGER THAN THE WIRING'S OWN
-EFFECT (0.020-0.049) IN BOTH HELD-CONSTANT COMPARISONS.** This is the reversal.
-The prior entry's confounded trace only ever compared xG-on vs xG-off WITH the
-wiring already present (old vs new = +0.0572) and, seeing both states sit above the
-true baseline, guessed the wiring was the larger factor. It never isolated the
-wiring-absent case (B vs A = +0.0859), which is actually the BIGGER of the two xG
-deltas.
-
-**CONSEQUENCE, and it is the opposite of last entry's implication:** `94578cbc`
-(removing the xG double-count, ALREADY COMMITTED) is CORRECT and HELPFUL --
-it moves dispersion TOWARD the true baseline, not away from it, and its effect
-is the larger of the two levers. **The REMAINING overshoot in the current
-committed state (`new`, 0.2373 vs true 0.1886) is a real, now CLEANLY ISOLATED
-+0.0487, and Config A's exact baseline match makes it attributable entirely to
-`00475bce`'s wiring -- not a hypothesis anymore, a measured decomposition.**
-
-**PAIRED BRIER TEST ON THE KEY COMPARISON (A vs B, isolating xG's own effect):
-t=+0.19, 95% CI -0.0261..+0.0316 -- NOT SIGNIFICANT.** Same pattern as every
-paired test tonight except the shots-shrink one: DISPERSION moves cleanly and
-large; ACCURACY (Brier) stays statistically murky at n=126. **This decomposition
-answers "where does the dispersion overshoot come from", not "does any of this
-make the model more or less accurate" -- that remains open.**
-
-**STANDING, UNCHANGED:**
-- The shots-shrink revert (`b69c5277`) is unaffected -- separate, unconfounded,
-  properly-powered result (t=-2.06, significant).
-- Neither `94578cbc` nor `00475bce` has been shown to move ACCURACY in either
-  direction at conventional significance. Dispersion and accuracy are different
-  axes and this investigation has now cleanly separated them.
-- The wiring's own +0.0487 is real but UNADDRESSED -- nobody has re-fit
-  `_attack_strength`/`_defense_strength`'s weights for the shots/form/clean-sheet/
-  corners terms now present. That re-fit is the concrete next step if this is
-  picked up again, not a further isolation probe -- the isolation question is
-  answered.
-
-**PROCESS NOTE, same lesson as before, applied correctly this time:** another
-ledger compaction landed between fetch and this write (`lanes.md` down to 972
-live lines, prior 2 entries archived to `lanes_history.md`). Verified via
-PowerShell that nothing was lost (both prior entries found in the archive) BEFORE
-writing anything, then appended fresh to the current tip rather than attempting
-a merge. No near-incident this time -- the check-first habit held.
