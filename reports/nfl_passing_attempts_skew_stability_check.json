@@ -1,0 +1,21 @@
+{
+  "stat": "passing_attempts",
+  "half_a": {
+    "seasons": [
+      2022,
+      2023
+    ],
+    "n": 5994,
+    "w_optimal_unclipped": 1.1409
+  },
+  "half_b": {
+    "seasons": [
+      2024,
+      2025
+    ],
+    "n": 5894,
+    "w_optimal_unclipped": 0.8842
+  },
+  "verdict": "not stable -- cap stays at 1.0",
+  "note": "the two independent halves average to ~1.013, close to the currently shipped w=1.0 -- reassuring the existing clip is already near-optimal, not leaving improvement on the table"
+}
