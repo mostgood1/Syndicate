@@ -869,3 +869,77 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 
 
+
+### soccer-model-dispersion — RE-FIT ATTEMPTED, DISCARDED 2026-08-18 22:5xZ — clean_sheet_rate re-fit via pooled regression improved dispersion but trended (not significantly) WORSE on accuracy; edit reverted, not committed — session: soccer-sport-owner
+
+**Attempted a principled re-fit of `_attack_strength`/`_defense_strength`'s
+shots/form/clean-sheet weights, replacing the falsified `sqrt(1-r^2)` shrink
+heuristic (`b69c5277`) with actual OLS regression against real, walk-forward,
+held-out goals.** Method, then result, then why it was discarded.
+
+**METHOD.** Reused `backtest_league()`'s own per-match-day loop (same `as_of`/
+`window=45` walk-forward, same `min_prior_matches` gate) but skipped the Monte
+Carlo simulation entirely -- just collected each team's rating/metrics AS OF
+that match day, paired with the goals actually scored, no simulation cost.
+First attempt: single-league (eredivisie), 252 team-match rows -- too few, most
+coefficients not significant. **Pooled across all nine leagues: 14,246 rows.**
+League fixed effects via demeaning (the "within" estimator) -- each league's own
+mean subtracted from every column first, so a league simply being higher- or
+lower-scoring cannot masquerade as a shots/form/clean-sheet effect. Rescaled the
+fitted goals-coefficients into the formula's existing index-point units via the
+ONE anchor this formula ever had: the original xG term's validated 0.22
+points-per-goal rate (never shown wrong -- what was wrong was applying it via
+TWO routes at once, not the rate itself).
+
+**RESULT: only `clean_sheet_rate` was significant.** `shots_per_match` and
+`points_per_match` (attack) and `shots_allowed_per_match` (defense) were NOT
+significant in the pooled fit and were left untouched. `clean_sheet_rate`:
+0.30 -> 0.0902 (a large cut, well below the current value).
+
+**VALIDATION, same paired-test discipline as every other change tonight.**
+Applied the single change, ran a real eredivisie backtest (126 matches, 300
+sims, `--dump-matches`), paired against the already-had current-state dump by
+fixture:
+
+    stage                       model_brier  market_brier  gap      stdev
+    before (clean_sheet=0.30)     0.5081        0.5064     0.0017   0.2373
+    after  (clean_sheet=0.0902)   0.5151        0.5064     0.0087   0.2307
+
+**Dispersion moved exactly as predicted** -- 0.2373 -> 0.2307, closer to
+market's 0.2257, roughly halving the remaining gap on that metric alone.
+**But the Brier gap WIDENED, not narrowed** -- 0.0017 -> 0.0087. Paired test:
+
+    mean +0.0069   SE 0.0040   t=+1.71   95% CI -0.0010..+0.0149
+    NOT significant at conventional thresholds -- but the closest any
+    "no effect" result got to crossing it tonight, and the CI barely
+    includes zero on the favourable side.
+
+**DISCARDED, NOT COMMITTED.** `git checkout --` in the session worktree,
+confirmed clean, weight back to 0.30. Reasoning: tonight's shots-revert was
+justified because the ALTERNATIVE (the shrink) was shown SIGNIFICANTLY harmful
+-- reverting to the known-safe default was the low-risk move. This is the
+opposite situation: adopting a NEW, untested value away from a known default,
+with the test trending (not proving) harm. "An offline regression predicted
+this should help" is not sufficient grounds to override a paired test leaning
+the wrong way -- that is the EXACT lesson the shots-shrink already taught once.
+
+**WHAT THIS DOES NOT SETTLE:** whether `clean_sheet_rate`'s weight is genuinely
+wrong. The regression's own within-league R^2 was modest and the validation
+sample (n=126, one league) is the same size that's been insufficient to
+significantly confirm ANY accuracy improvement all night except the shots
+result. A larger validation (pooled across leagues, or a bigger single-league
+n) might resolve the ambiguity in either direction -- **not attempted, and
+should not be assumed either way.**
+
+**Evidence preserved:** `/c/tmp/soccer_refit_evidence/` (regression fit script
++ per-league walk-forward data + isolation-wiring artifacts) -- local scratch,
+not in the repo, matching the standing `reports/soccer_backtest/` convention.
+
+**STANDING, unchanged:** `b69c5277` (shots revert) is the only weight change
+from tonight's investigation that is actually committed and validated. The
+dispersion-overshoot decomposition (prior entry, archived to
+`lanes_history.md`, not lost -- verified before this write) stands: the xG
+double-count's own effect is larger than the wiring's, `94578cbc` is helpful
+not harmful, and the wiring's real +0.0487 stdev effect remains
+UNADDRESSED -- this re-fit attempt was aimed at closing that gap and did not
+succeed cleanly.
