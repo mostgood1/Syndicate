@@ -2858,6 +2858,27 @@ simulated ladder like MLB's pitcher props.
 
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
+### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
+
+    branch  deploy/worker-ladders-ridealong
+    commit  5c2851a4   parent f2eb719d (live at 18:51:08Z)
+    scope   3 files, +681, ZERO deletions -- purely additive
+
+**If you are about to deploy refresh-worker, cut from THIS instead of from the
+live SHA and both changes land together.** It is live-plus-three-files, so it
+cannot revert you; verified against the football lane's NCAAF deploy, both of
+their files byte-identical.
+
+**It goes stale whenever the worker moves** — the claim passed through three
+lanes in eight minutes on 2026-08-19 and this branch expired twice. **Re-cutting
+is one command** (`read-tree <new live>`, `update-index` the three paths,
+`commit-tree`); ask the `convergence-phase7-crps` lane or just do it.
+
+**The same deploy also injects `SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-08-19`**,
+which is SET on the service but inert until a restart and **EXPIRES AT 05:00Z**.
+So one worker deploy before then closes out the ladders fix AND the roster
+rebuild that has been pending all day.
+
 **BUILT.** `f86b24a3` + `6a213156`.
 **Nothing imports `flask_frontend` any more.**
 
