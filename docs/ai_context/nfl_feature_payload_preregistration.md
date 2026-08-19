@@ -310,3 +310,54 @@ distribution). Shipping the mechanism without it ships a systematic under-total.
   (`offense_index` 0.050–0.825, 30 distinct values, ranking football-accurate).
 - **Phase 3 must not be judged before Phase 4.** A −2.6-point total bias would
   dominate any CRPS result and read as a model finding.
+
+
+---
+
+## RE-CENTRING COMPLETE — 2026-08-19. Both systematic biases eliminated.
+
+Same 20 games / weeks 6-7 / 300 seeds throughout, so the three columns are
+directly comparable.
+
+| metric | units-buggy | units-fixed | **re-centred** |
+|---|---|---|---|
+| mean \|Δ margin\| | 0.463 | 0.544 | 0.394 |
+| **signed Δ margin** | +0.309 | +0.300 (SE 0.119) | **+0.065 (SE 0.105)** |
+| mean \|Δ total\| | 8.024 | 3.563 | **2.189** |
+| **signed Δ total** | — | −2.644 (SE 0.695) | **−0.283 (SE 0.597)** |
+| asymmetry | 17.3× | 6.5× | 5.6× |
+
+**Both signed effects are now within 1 SE of zero** — margin at 0.62 SE, total at
+0.47 SE. The systematic −2.6-point total suppression is gone, and so is the
++0.3-point home-favouring margin shift I had attributed to the home-only
+`drive_priors` structure.
+
+**That is the correct shape for a properly centred feature payload:** it moves
+INDIVIDUAL games (|Δ margin| 0.394, |Δ total| 2.189) without shifting the
+league-wide mean. Dispersion without bias.
+
+### The remaining 5.6× asymmetry is a DESIGN PROPERTY, not a defect
+
+`build_drive_priors` produces one game-level profile that drives
+`scoring_environment`; per-team differentiation happens in
+`play_simulator.py:258-259`, which this payload does not touch. So the payload
+should be expected to move totals more than margins. **The asymmetry stopped
+being alarming the moment the bias came out of it** — 17.3× of systematic
+suppression was a bug; 5.6× of unbiased dispersion is the architecture.
+
+### What is now TRUE of the payload
+
+- **leak-free** — as-of window enforced at the read, certified r = 0.235 (was 0.988)
+- **reachable** — 20 of 20 games change
+- **discriminating** — `offense_index` 0.115–0.922, 31 distinct values, zero clamped
+- **unbiased** — both signed effects within 1 SE of zero
+- **football-accurate** — MIA/BUF/SF/BAL top, NYJ/NYG/LV/CAR bottom for 2023
+
+### What is still NOT known, and must not be assumed
+
+**None of the above is ACCURACY.** Reachability says the payload moves the
+engine; unbiasedness says it does not tilt the league. **Neither says the
+projections got better.** That is Phase 3, it needs realised outcomes and a
+proper scoring rule, and the decision rule in §3 above stands unchanged:
+paired ΔCRPS on held-out games, improvement > 2× the noise floor, or it is a
+NULL and does not ship.
