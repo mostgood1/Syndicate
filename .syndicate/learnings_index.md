@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 408 rules `[generated]`
+## Index — 409 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -82,7 +82,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 340**
+**Rules and corrections — 341**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -233,6 +233,7 @@
 - [2026-08-18 — A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK](#2026-08-18-a-stale-but-running-session-is-invisible-to-every-orphan-check)
 - [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it)
 - [2026-08-18 — RULE: a session worktree protects your INDEX, not your EDIT. Shared-file c…](#2026-08-18-rule-a-session-worktree-protects-your-index-not-your-edit-shared-file-carry-is-not-absorption)
+- [2026-08-18 — RULE: a check that answers a SLIGHTLY DIFFERENT question returns a confide…](#2026-08-18-rule-a-check-that-answers-a-slightly-different-question-returns-a-confident-wrong-answer-six-in-one-session)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

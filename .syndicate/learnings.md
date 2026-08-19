@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 408 rules `[generated]`
+## Index — 409 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1706,3 +1706,48 @@ work -- outright overwrite -- had no rule at all and duly happened.
 managing it. Chat does not survive the session; a committed rule does. The
 deliverable when concurrency bites is a WRITTEN RULE plus a verified content
 check, committed within the same turn it is written.
+
+## 2026-08-18 — RULE: a check that answers a SLIGHTLY DIFFERENT question returns a confident wrong answer. Six in one session.
+
+- The rule going forward: **before believing a surprising reading, state what
+  the command actually compared.** Every one of these was a real command,
+  exiting 0, returning a plausible number — and answering a question adjacent to
+  the one asked. None failed loudly. The tell is always the same: a result that
+  would be *convenient* or *alarming* if true, produced by a check nobody
+  restated in words first.
+
+**THE SIX, kept because the shapes recur and are not obvious in isolation:**
+
+    bool(g._claims(body))          `_claims` is a GENERATOR; the object is ALWAYS
+                                   truthy, so every block read as claim-bearing
+                                   and "movable bytes" measured ZERO. A wrong
+                                   answer that says THERE IS NOTHING TO DO HERE
+                                   ends an investigation.
+    git diff main..HEAD            two-dot compares TIPS, not this branch's
+                                   commits. main had advanced, so it showed
+                                   another session's NHL files as if mine, in a
+                                   push-safety check.
+    git cat-file -e rev:path       reported two files ABSENT from origin/main
+                                   that `ls-tree` showed present. Trust the
+                                   listing over the existence probe.
+    Git Bash `rev:path`            mangled into `rev\path`; `git show` then
+                                   errors or answers about the wrong object.
+                                   Drive git from subprocess with LIST args.
+    text.index("## Heading")       substring, not heading. My own PROSE
+                                   mentioning the marker moved the slice above
+                                   `## OPEN` and inflated a violation count 7->11
+                                   -- which I then explained with a plausible
+                                   story about other sessions.
+    grep on a wrapped phrase       line-scoped grep returned 0 for text that was
+                                   present but wrapped a newline.
+
+**THE DIRECTION THAT ACTUALLY BITES.** Four of the six erred toward MORE alarm or
+MORE work, and those are the dangerous ones: an over-report reads as vigilance,
+so nobody doubts it. The 7->11 count had a mechanical cause and a ready
+narrative, and the narrative was written into `todo.md` before the mechanism was
+checked. **Verify an alarming reading as hard as a comforting one.**
+
+**WHY THIS IS NOT "be more careful".** Each was caught by the same move: a
+SECOND check of a different shape over the same question — a set comparison
+against a backup, a line-conservation count, a planted canary, reading the raw
+`repr()`. Redundancy of METHOD, not of attention.

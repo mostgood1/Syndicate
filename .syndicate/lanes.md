@@ -1167,6 +1167,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     and no checker.
 - **Blocked by:** none.
 
+### ledger-coherence-sweep — CLOSED 2026-08-19 — **all three weighed ledger files under cap, `INVARIANTS HOLD`, `state_key_check` coherent, claims 65 -> 47 across 12 -> 5 lanes. Everything landed; 0 commits unlanded.** — opened 2026-08-18 — session: ledger-coherence-sweep
+- Goal: make the ledger's own invariants true and keep them true. Met.
+- Files: **NONE CLAIMED — and that was a protocol gap, not a choice.** This lane
+  was never registered via `/lane open`; a worktree was created under the slug
+  and work proceeded. No collision resulted (every path touched was new, or
+  `.syndicate/**` / `.claude/**` which `lane-guard.py:244` exempts, or
+  `check_lane_invariants.py` which nothing claimed) — but that is luck, not
+  design, and the guard could not have protected this work.
+- Verification: `check_lane_invariants.py` INVARIANTS HOLD; `state_key_check.py`
+  exit 0; claim sets compared AS A SET against backups at every move, never as a
+  count. Full working in `log/2026-08-18.md`.
+- Shipped: 5 new tools (`archive_released_lanes`, `hoist_open_lanes`,
+  `trim_lane_blocks`, `compact_learnings`, `audit_lane_unguarding`), the
+  substring→heading fix in `check_lane_invariants`, both append-site fixes
+  (`/lane`, `/checkpoint`), and `check_lane_invariants` wired into session-start.
+- **STILL OWED:** `#465`'s cause is UNKNOWN after four wrong answers, one of them
+  this lane's. `#466` stays open on its durable half — the append-site fixes are
+  PROSE and untested by time; `lanes.md` has ~3.5KB headroom and the fix is
+  unproven until it is still under cap tomorrow.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
