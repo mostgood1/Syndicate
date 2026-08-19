@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-08-19 — WEB: NFL PROP CALIBRATION FIXES (`#471` full set), SCOPED, PENDING
+
+**Scope:** `syndicate/features/nfl/{props.py,player_stats.py}` only, 214
+insertions / 9 deletions, diffed against web's live SHA `450e0d6e` and
+confirmed by `diff-tree` -- one cohesive change (anytime_td Gamma-Poisson
+shrinkage k=12.0 + per-market Normal/log-normal cover-probability blend).
+A straight `main` deploy was rejected: 421 files / 130,147 insertions of
+unrelated concurrent work. Scoped commit `f149f5e2`, parented on
+`450e0d6e`, pushed as `deploy/nfl-props-calibration-20260819`.
+
+**Expected effect:** immediate on next page load (live-computed per
+request, not artifact-cached) -- `/nfl/props` and the NFL market board
+stop showing 0% `anytime_td` for small-sample-zero players, and
+yardage/attempt markets blend in the log-normal correction instead of a
+symmetric Normal.
+
+**Blast radius:** `web` only (2GB, display-only). `refresh-worker`/
+`live-odds-worker` untouched, no restart. Stop-then-start, brief
+downtime, no in-flight job at risk (web holds no long-running job the way
+refresh-worker's sim does).
+
+**Rollback:** `py -3 scripts/render_deploy.py --service web --commit 450e0d6e --allow-rollback`
+
+**Ledger check:** no `learnings.md` rule violated; no OPEN lane claims
+either file (checked against `origin/main`'s current `lanes.md`).
+
+**Measured:** _(pending — this session reads the deployed blob by content
+and smoke-checks `/nfl/props` immediately after the deploy lands)_
+
+---
+
 ## 2026-08-19 — STALE refresh-worker CLAIM FORCE-BROKEN, NO DEPLOY — holder `stale-claim-cleanup`
 
 **NO DEPLOY.** Pure claim hygiene, not a deploy claim used for its actual
