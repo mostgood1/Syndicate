@@ -2586,3 +2586,57 @@ own staleness is plausibly just offseason, not compared apples-to-apples).
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`.
 **Filed as `todo.md` `#468`** — a NEW, separate defect from the
 cache-freshness bug `#461` already fixed. NOT FIXED as of this entry.
+
+## [mlb-sim-log-unreachable] FINDING — THE MLB SIM JOB'S DIAGNOSTICS ARE UNREACHABLE FROM ANYWHERE `[2026-08-19]`
+
+**Every line `run_mlb_daily_sim_job.py` prints goes to a FILE on the worker's
+disk and nowhere else.** `live_refresh_loop.py:2784-2790`:
+
+    log_path = _mlb_sim_log_dir() / f"{date_str}_{run_stamp}.log"
+    popen_kwargs["stdout"] = open(log_path, "wb")
+    popen_kwargs["stderr"] = subprocess.STDOUT
+
+The worker runs **no HTTP server**, and no ops endpoint tails that directory. So
+**any failure inside the sim job is undiagnosable remotely** — not merely
+inconvenient, invisible. Render's log API cannot serve it; `text=` searches for
+those markers return nothing no matter what happened.
+
+**THIS IS BLOCKING A LIVE DIAGNOSIS RIGHT NOW.** The `#440` checklist hook is
+deployed and verified present in the live SHA (`f13ea05e`, 7 occurrences), sims
+run normally, and **no `sim_input_report` has ever been published** (`count: 0`).
+Three candidate causes, and **I cannot distinguish them**:
+
+  1. the checklist subprocess fails on the worker (no rosters for that date,
+     import error, the 180s timeout);
+  2. it writes the report but `publish_changed_hot_artifacts` does not sweep it;
+  3. `ok` is false in practice for a reason not visible from outside.
+
+**Every one of those paths prints to the unreachable log.** The hook was even
+written to print on its skip path precisely so a silent skip would be
+distinguishable — and that print is unreachable too.
+
+### The control that stopped a FALSE finding being filed here
+
+I had concluded "13 sims started today, 0 finished — the sims are broken."
+**Wrong.** Control against prior dates:
+
+    2026-08-19   13 daily_sim   0 finished   exits={None: 13}
+    2026-08-17   29 daily_sim   0 finished   exits={None: 29}
+    2026-08-16   32 daily_sim   0 finished   exits={None: 32}
+
+**`finished_at`/`exit_code` are NEVER populated for `kind=daily_sim`** — the row
+is written at launch and the job detaches. "0 finished" is this ledger's normal
+output, not an incident. **Sims are running.** Had the control not been run, a
+production incident that does not exist would have been filed for another lane.
+
+### What would fix it
+
+An ops endpoint that tails `_mlb_sim_log_dir()` for a given date/run-stamp —
+bounded, most-recent-N-lines, same auth as the other `/api/ops/artifacts/*`
+routes. Alternatively, tee the wrapper's own status lines to the container stdout
+the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
+`season_artifacts_pulled`, `ROSTER_REBUILD`, `MLB_DAILY_SIM_END`.
+
+**Until then, every `verify:` naming a sim-job print is unusable**, and the
+`#440` chain cannot be closed. Both `deploys.md` and
+`mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
