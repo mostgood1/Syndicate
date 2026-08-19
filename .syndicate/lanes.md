@@ -1208,7 +1208,7 @@ merged to `origin/main` — still in the worktree branch
 `rows_with_model_edge`) needs an actual deploy, which is a separate,
 explicit decision — not taken here.
 
-### nfl-odds-allowlist-deploy — OPEN — opened 2026-08-19 — session: nfl-odds-allowlist-deploy
+### nfl-odds-allowlist-deploy — CLOSED-VERIFIED 2026-08-19 — deployed `b233c55d` (scoped, parented on web's live SHA, NOT main), live 19:03:22Z. `/api/ops/artifacts/export` `count: 0 -> 14`, real file names confirmed. Production coverage == local mirror exactly (13 stubs + 2025 wk22 real, 10,208 bytes) — no new real weeks, #471's "believed but unverified" item now resolved. — session: nfl-odds-allowlist-deploy
 - Goal: get `basketball-model-owner`'s already-merged `nfl_source/oddsapi_
   player_props_*.csv` `HOT_ARTIFACT_PATTERNS` fix (`#471` follow-up) actually
   OBSERVABLE from web. **Testable outcome:** `/api/ops/artifacts/export?
@@ -1225,6 +1225,25 @@ explicit decision — not taken here.
 - Verification: post-deploy, the export endpoint above returns `count > 0`
   with real file names, AND the live commit is confirmed BY CONTENT (not
   ancestry) to carry the new pattern.
+- **MET.** `render_deploy.py`'s own rollback guard refused the naive
+  `main`-based target: web's live SHA `b775255a` is on a scoped-deploy
+  lineage (`converge origin/main into web's deploy lineage`, plus several
+  prior `scoped deploy(...): ... parented on the live SHA` commits — an
+  established pattern for this service, not invented here), and deploying
+  straight from `main` would have reverted 241 files / 46,620 lines. Fixed
+  by cherry-picking the one-file commit (`894b4135`, `origin/main`) onto
+  `b775255a` via `git merge-tree --write-tree --merge-base=894b4135~1
+  b775255a 894b4135` (object-database only, no working-tree checkout),
+  confirmed by `diff-tree` to touch exactly one file, pushed as
+  `deploy/nfl-odds-allowlist-20260819` (`b233c55d`), preflight required
+  `--allow-off-main` (correct — this commit is deliberately not on `main`),
+  user explicitly approved both the deploy and the override. Live
+  19:03:22Z. `/api/ops/artifacts/export?pattern=nfl_source/oddsapi_
+  player_props_*.csv` went `count: 0` → `count: 14`: 13 header-only stubs
+  (5 bytes) + `2025_wk22.csv` (10,208 bytes, real, matches the local
+  mirror almost exactly). **No real coverage exists beyond what `#471`
+  already measured locally** — the mirror was accurate here, not lossy.
+  Claim released (`web`, token `eb378c...`).
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

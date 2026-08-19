@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-08-19 — WEB: NFL ODDS ARTIFACT-ALLOWLIST FIX DEPLOYED, SCOPED OFF-MAIN — lane `nfl-odds-allowlist-deploy`
+
+**Deployed**: 2026-08-19 19:03:22Z. `web` `b775255a` → `b233c55d`
+(`dep-da2vo1nlk1mc73f3naag`, `status=live`).
+
+**Change**: the `nfl_source/oddsapi_player_props_*.csv` `HOT_ARTIFACT_
+PATTERNS` addition `basketball-model-owner` merged to `origin/main`
+(`894b4135`, handed off from `nfl-player-props-backtest` via
+`send_message`) — one file, 12 lines, purely additive.
+
+**Why NOT a plain `main`-based deploy**: `render_deploy.py`'s own rollback
+guard refused it — web's live SHA `b775255a` sits on a scoped-deploy
+lineage (`converge origin/main into web's deploy lineage`, `763a2f66`,
+plus several prior `scoped deploy(...): parented on the live SHA` commits
+— an established pattern for this service, not invented here) that is
+NOT an ancestor of `main`. Deploying `main` directly would have reverted
+**241 files / 46,620 lines** live on web today.
+
+**Fix**: cherry-picked `894b4135`'s diff onto `b775255a` via `git
+merge-tree --write-tree --merge-base=894b4135~1 b775255a 894b4135`
+(object-database only, zero working-tree checkout), confirmed by
+`diff-tree` to change exactly one file relative to the live tree. Pushed
+as `deploy/nfl-odds-allowlist-20260819` (`b233c55d`). Preflight correctly
+flagged `OFF_MAIN` (exit 4) — required and used `--allow-off-main`, with
+the user's explicit approval for both the deploy itself and the override
+(two separate confirmations, asked and given for each).
+
+**Measured, by content, not ancestry**: `/api/ops/artifacts/export?
+pattern=nfl_source/oddsapi_player_props_*.csv&names_only=1`:
+
+    before:  {"count": 0}
+    after:   {"count": 14, "bytes": 10273, "artifacts": {
+                nfl_source/oddsapi_player_props_2025_wk10..21.csv: 5 bytes each (header-only stubs),
+                nfl_source/oddsapi_player_props_2025_wk22.csv: 10,208 bytes (REAL, 65 rows),
+                nfl_source/oddsapi_player_props_2026_wk1.csv: 5 bytes (header-only stub)
+              }}
+
+**verify:** `count` field on the export endpoint, read live post-deploy —
+`0 → 14`, not "watch the board."
+
+**A real finding, not just a plumbing fix**: production's real NFL
+prop-odds coverage is **identical** to the local git mirror — one
+populated week (2025 wk22), same byte count, no additional real weeks
+anywhere on the Render disk. This resolves `#471`'s "believed but
+unverified" item (`nfl-player-props-backtest`'s checkpoint note: "that the
+local mirror is genuinely as sparse as production... currently
+unverifiable"). **Nothing new to re-run `backtest_nfl_props.py` Section 3
+against** — the earlier measurement stands confirmed, not superseded.
+
+Claim released: `python scripts/deploy_claim.py release --service web
+--token eb378c6b8d0cddf5`.
+
+---
+
 ## 2026-08-19 — WNBA `#263` LAYER 2 MODEL_EDGE_PCT FIX — PENDING — lane `wnba-edge-263`
 
 **Goal:** `/api/board/layer2-shortlist?sport=wnba` reports
