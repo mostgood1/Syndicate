@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#480` — **CI HAD BEEN RED ON EVERY PUSH TO `main` FOR 26 HOURS, AND THE DAILY UPDATE WORKFLOW FOR 34 DAYS. BOTH ROOT-CAUSED AND FIXED; ONE CAUSE EACH, NEITHER A PRODUCT DEFECT** — FOUND+FIXED 2026-08-19, lane `ci-green`
+
+**The complaint that started it:** "anytime we deploy to git there are CI errors."
+It was literally true and worth taking at face value — **every** run of the `CI`
+workflow since `f9eee9d3` (2026-08-17 21:07Z) failed. Last green: `080db035`,
+2026-08-17 21:05Z. That is ~150 consecutive red runs across every session's
+pushes, which is precisely how a gate stops being read — the same argument
+`ci.yml`'s own comment makes about `continue-on-error`.
+
+**Neither failure was a bug in shipped code. Both were tests that had gone stale
+against a deliberate change, and in both cases the product was correct.**
+
+#### Cause 1 — `CI` / `Run archive regression suite` (1 failing test of 383)
+
+`tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query`
+asserted the literal `date: urlParams.get("date") || "",` from
+`syndicate/templates/intelligence.html`. The 2026-08-17 **"THE DEFAULT DAY IS
+TODAY, NOT All" user decision** replaced that right-hand side with
+`_initialDayFilterDate()`, and replaced the input sync below it with
+`state.explicitDateOverride ? state.date : ""`. The template is right; the
+assertions were pinned to the retired spelling. Updated to track the new
+right-hand sides, with the *intent* the test protects (the seed reads ONLY from
+the URL, never from the live `#board-date` input — `#111`/`#113`) left intact
+and re-stated in the comment.
+
+#### Cause 2 — `Daily Update` / `Run daily update contract regressions` (2 failing tests of 55)
+
+`tests.test_wnba_cards_merge_aliases` — `1 != 4` games, and a `startTime` of
+`2026-07-02T23:00:00Z` where the fixture had no start time at all. **Not a
+flake and not a race: deterministic test pollution.**
+`build_source_cards_payload`'s cache is keyed on `(selected_date, ...)` + a
+wall-clock TTL bucket, so
+`test_source_cards_payload_hydrates_betting_from_live_lines_artifact` (first
+alphabetically, and it uses `commence_time: 2026-07-02T23:00:00Z`) leaves its
+payload in the cache for the two `("2026-07-02", True)` tests that follow.
+
+**The load-bearing part, and the reason this hid for so long: the isolation
+existed, but only under pytest.** `tests/conftest.py` has had an autouse
+fixture clearing exactly these caches for months — and `conftest.py` is a
+**pytest plugin file that `unittest` never imports**. `ci.yml` runs
+`python -m unittest tests.test_archives`; `daily-update.yml` runs thirteen
+modules the same way. So the module passed under `python -m pytest` and failed
+under `python -m unittest`, and the day-to-day loop in `CLAUDE.md` is pytest.
+A green local run was not evidence about CI.
+
+Fixed by moving the reset into `tests/_cache_isolation.py` and calling it from
+**both** runners — `conftest.py`'s two autouse fixtures now delegate to it, and
+`WnbaCardsMergeAliasTests` mixes in `WallClockCacheIsolationMixin`. One
+definition, so the two cannot drift apart again.
+
+#### What is fixed vs. what is merely unblocked — stated separately on purpose
+
+- **Measured green locally:** `tests.test_archives` 383 tests; the full
+  thirteen-module daily-update list, 55 tests (same count CI reports); all three
+  ledger checkers (`lane_identity_check`, `todo_id_reconcile --no-history`,
+  `state_key_check`) exit 0; and `test_wnba_cards_merge_aliases` green under
+  **both** `unittest` and `pytest`.
+- **NOT verified, and not claimable from here:** `Daily Update`'s later steps.
+  Steps 12-13 (`Pull current artifacts from Render`, `Commit and push pipeline
+  outputs`) have not executed since **2026-07-15**. Two earlier blockers sat in
+  front of them and both are already gone: `ADMIN_TOKEN` was missing on
+  2026-07-16 06:49Z and was added the same day at 14:24Z (confirmed via the
+  secrets API — names only), and every run 2026-07-16 → 2026-08-15 was killed
+  before any step with *"The job was not started because your account is locked
+  due to a billing issue"* (3-second jobs, no logs, which is why the failing-step
+  API returned nothing for them). Billing recovered on 2026-08-16 — and the very
+  first run that could actually execute steps hit cause 2 above. **So the next
+  scheduled run is the first real test of the artifact-backup path in five
+  weeks. Do not record it as working until a run shows those two steps green.**
+
+**Operational note worth keeping:** `gh run view --log-failed` silently drops
+the last chunk of a step's output — the `Ran N tests / FAILED (failures=N)`
+summary was absent from every CI log fetched here, so the fetched log could not
+say whether there was one failing test or twenty. The count came from running
+the suite locally. Do not infer "only one thing is broken" from a truncated
+Actions log.
+
 ### `#471` — **CLOSED, both calibration defects fixed. NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill. Defect 1 (anytime_td shrinkage) and defect 2 (mean-overconfidence) both FIXED+TUNED+MEASURED out-of-sample — see the two addenda below.** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
 
 `scripts/backtest_nfl_props.py` (new, 13 tests) — mirrors `backtest_mlb_props.py`'s per-market

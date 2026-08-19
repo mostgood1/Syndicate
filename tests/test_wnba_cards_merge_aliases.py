@@ -5,6 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from tests._cache_isolation import WallClockCacheIsolationMixin
+
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import _games_from_live_state_fallback
 from syndicate.features.wnba.cards import _supplement_games_with_live_state
@@ -14,7 +16,12 @@ from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import build_source_cards_payload
 
 
-class WnbaCardsMergeAliasTests(unittest.TestCase):
+# WallClockCacheIsolationMixin, not just the pytest conftest fixture: CI runs
+# this module through `python -m unittest` (daily-update.yml), which never
+# loads conftest.py. Without it, the hydrates-betting test's cached
+# ('2026-07-02', True) payload leaks into the two tests after it and both
+# fail deterministically. See tests/_cache_isolation.py.
+class WnbaCardsMergeAliasTests(WallClockCacheIsolationMixin, unittest.TestCase):
     def test_live_aliases_do_not_create_duplicate_cards(self) -> None:
         processed_games = [
             {

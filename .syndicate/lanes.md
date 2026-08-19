@@ -1085,7 +1085,8 @@ history directly:
 - Goal: `CI` on `main` is GREEN again and stays green. Testable: a push to
   `main` produces a run whose `Run archive regression suite` AND
   `Ledger coherence` steps both pass.
-- Files: `tests/test_archives.py`
+- Files: `tests/test_archives.py`, `tests/test_wnba_cards_merge_aliases.py`,
+  `tests/conftest.py`, `tests/_cache_isolation.py`
 - NOT claimed, deliberately: the CI workflow definition itself belongs to
   `repo-coordination` and is not touched here; `intelligence.html` is read
   as a reference only, no edit.

@@ -3517,8 +3517,22 @@ class HomeBoardTests(unittest.TestCase):
         # date. Only an explicit ?date= URL param should seed state.date
         # now; the input is synced FROM state.date just after, not the
         # reverse.
-        self.assertIn('date: urlParams.get("date") || "",', body)
-        self.assertIn('if (dateInput) dateInput.value = state.date;', body)
+        #
+        # The `|| ""` half of that seed was replaced on 2026-08-17 by the
+        # "THE DEFAULT DAY IS TODAY, NOT All" user decision: the empty
+        # string did not mean "no date chosen", it turned OFF every date
+        # filter on the board (both filters are guarded on state.date being
+        # truthy), so the one view every user loads was the one view with no
+        # date filter at all. What this test protects is unchanged -- the
+        # seed still reads ONLY from the URL, never from the live input --
+        # so the assertion tracks the new right-hand side rather than
+        # pinning the retired one. Asserting the old literal is what held CI
+        # red from 2026-08-17 21:07Z; the template was correct throughout.
+        self.assertIn('date: urlParams.get("date") || _initialDayFilterDate(),', body)
+        # ...and the input is still synced FROM state.date, now blanked
+        # unless the date is a deliberate override, so a DEFAULTED today
+        # does not render as a typed-in date the user never entered.
+        self.assertIn('if (dateInput) dateInput.value = state.explicitDateOverride ? state.date : "";', body)
         # 4b238313 (#114) added the explicitDateOverride gate: state.date is
         # also used for client-side date-tab filtering, and forwarding it to
         # every background poll regardless would leak that filter into the

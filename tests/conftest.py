@@ -53,33 +53,16 @@ def _clear_wall_clock_ttl_caches() -> None:
     # would otherwise leak a stale result from one test into the next. Clear
     # before every test so each one starts cold regardless of real elapsed
     # wall-clock time.
-    from syndicate.features.wnba.cards import build_cards_page_context
-    from syndicate.features.wnba.cards import build_live_player_lens_payload
-    from syndicate.features.wnba.cards import build_live_state_payload
-    from syndicate.features.wnba.cards import build_source_cards_payload
+    # The reset itself lives in tests/_cache_isolation.py because CI does NOT
+    # run pytest -- ci.yml and daily-update.yml both use `python -m unittest`,
+    # which never loads this file. Two WNBA tests were failing the Daily Update
+    # workflow every morning for exactly that reason. One definition, called
+    # from both runners.
+    from tests._cache_isolation import clear_wnba_wall_clock_caches
 
-    caches = [
-        build_live_state_payload,
-        build_source_cards_payload,
-        build_cards_page_context,
-        build_live_player_lens_payload,
-    ]
-    # build_soccer_market_board's cache has the same hazard for the same
-    # reason: it is keyed on (league, selected_date) + a 60s wall-clock
-    # bucket + artifact signatures, and those signatures are all 0 in tests
-    # because the real CSVs don't exist in a checkout. Two tests building
-    # the same league/date with different patched rows would otherwise
-    # collide -- which the existing BuildSoccerMarketBoardTests do, both on
-    # ("mls", "2026-07-22").
-    from syndicate.features.soccer.market_board import clear_soccer_market_board_cache
-
-    for cache_owner in caches:
-        cache_owner.cache_clear()
-    clear_soccer_market_board_cache()
+    clear_wnba_wall_clock_caches()
     yield
-    for cache_owner in caches:
-        cache_owner.cache_clear()
-    clear_soccer_market_board_cache()
+    clear_wnba_wall_clock_caches()
 
 
 @pytest.fixture(autouse=True)
@@ -95,25 +78,11 @@ def _clear_nba_cards_caches() -> None:
     # calling cache_clear() themselves, which only protects that one file's
     # own run order, not the full suite. Clearing here follows the exact
     # same pattern this file already uses for WNBA/soccer above.
-    from syndicate.features.nba.cards import _NBA_CARDS_CONTEXT_CACHE
-    from syndicate.features.nba.cards import _live_projection_calibration_index
-    from syndicate.features.nba.cards import _local_live_snapshot_payload_cached
-    from syndicate.features.nba.cards import _local_live_state_payload_cached
-    from syndicate.features.nba.cards import _nba_team_branding_index
+    from tests._cache_isolation import clear_nba_cards_caches
 
-    caches = [
-        _nba_team_branding_index,
-        _local_live_state_payload_cached,
-        _local_live_snapshot_payload_cached,
-        _live_projection_calibration_index,
-    ]
-    for cache_owner in caches:
-        cache_owner.cache_clear()
-    _NBA_CARDS_CONTEXT_CACHE.clear()
+    clear_nba_cards_caches()
     yield
-    for cache_owner in caches:
-        cache_owner.cache_clear()
-    _NBA_CARDS_CONTEXT_CACHE.clear()
+    clear_nba_cards_caches()
 
 
 @pytest.fixture(autouse=True)
