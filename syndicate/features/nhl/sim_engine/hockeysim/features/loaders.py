@@ -138,6 +138,51 @@ def load_team_xg_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dic
     return out
 
 
+def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, float]]:
+    """Load ``{ABBR: {"shots_per_60":.., "blocks_per_60":.., "faceoff_win_pct":..}}`` for a date.
+
+    Written by ``scripts/build_nhl_team_rates_artifact.py`` from real boxscore (SOG + blocks) and
+    play-by-play (faceoffs) data -- closes 3 of the 4 team-level ``HockeyTeamFeatures`` fields
+    ``docs/ai_context/hockeysim_engine_reference.md`` §5 flagged as genuinely absent (`penalties_per_60`
+    is handled separately, from `special_teams_map`'s already-computed `committed_per_game` -- see
+    `build_team_features`). Same candidate-order convention as `load_team_xg_map`/`load_team_elo_map`.
+    Returns an empty map when unavailable, so `HockeyTeamFeatures` falls back to its own hardcoded
+    league-average defaults (`shots_per_60=30.0`/`blocks_per_60=12.0`/`faceoff_win_pct=0.5`) exactly
+    as it did before this producer existed -- a missing file degrades, it does not break.
+    """
+    proc = _processed_dir(root)
+    season = _season_code_for_date(date)
+    candidates = [proc / f"team_rates_{season}.csv", proc / "team_rates_latest.csv"]
+    rows: List[Dict[str, str]] = []
+    for path in candidates:
+        rows = _read_csv_rows(path)
+        if rows:
+            break
+    if not rows:
+        return {}
+
+    out: Dict[str, Dict[str, float]] = {}
+    for row in rows:
+        lower = {k.lower(): v for k, v in row.items()}
+        ab = lower.get("abbr") or lower.get("team")
+        key = _abbr(ab) or (str(ab).upper() if ab else None)
+        if not key:
+            continue
+        shots = _to_float(lower.get("shots_per_60"))
+        blocks = _to_float(lower.get("blocks_per_60"))
+        fo = _to_float(lower.get("faceoff_win_pct"))
+        entry: Dict[str, float] = {}
+        if shots is not None:
+            entry["shots_per_60"] = shots
+        if blocks is not None:
+            entry["blocks_per_60"] = blocks
+        if fo is not None:
+            entry["faceoff_win_pct"] = fo
+        if entry:
+            out[key] = entry
+    return out
+
+
 def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, float]:
     """Load ``{ABBR: elo}`` for a date.
 
@@ -285,8 +330,14 @@ def build_team_features(
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
     elo_map: Optional[Dict[str, float]] = None,
     special_teams_map: Optional[Dict[str, Dict[str, float]]] = None,
+    rates_map: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> HockeyTeamFeatures:
-    """Assemble one side's team-strength features, filling xGF/xGA/Elo/special-teams when present."""
+    """Assemble one side's team-strength features, filling xGF/xGA/Elo/special-teams/rates when
+    present. `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct` are NOT Optional
+    on `HockeyTeamFeatures` (unlike xGF/Elo) -- they carry hardcoded league-average defaults, so a
+    value is only passed through when one is genuinely available; omitting the keyword lets the
+    dataclass's own default apply, exactly the fallback behavior this function had before these
+    inputs existed."""
     ab = abbrev or _abbr(name)
     xgf = xga = None
     if xg_map and ab and ab in xg_map:
@@ -294,9 +345,26 @@ def build_team_features(
         xga = xg_map[ab].get("xga60")
     elo = elo_map.get(ab) if (elo_map and ab) else None
     special_teams = dict(special_teams_map[ab]) if (special_teams_map and ab and ab in special_teams_map) else {}
+
+    extra: Dict[str, float] = {}
+    if rates_map and ab and ab in rates_map:
+        r = rates_map[ab]
+        if "shots_per_60" in r:
+            extra["shots_per_60"] = r["shots_per_60"]
+        if "blocks_per_60" in r:
+            extra["blocks_per_60"] = r["blocks_per_60"]
+        if "faceoff_win_pct" in r:
+            extra["faceoff_win_pct"] = r["faceoff_win_pct"]
+    # `penalties_per_60` deliberately reuses `special_teams`'s ALREADY-COMPUTED
+    # `committed_per_game` -- the exact same quantity (penalties committed per team per game) --
+    # rather than a second producer (`scripts/build_nhl_team_rates_artifact.py`'s module docstring
+    # explains why this one field is handled here, not in that script).
+    if "committed_per_game" in special_teams:
+        extra["penalties_per_60"] = special_teams["committed_per_game"]
+
     return HockeyTeamFeatures(
         name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga, elo_rating=elo,
-        special_teams=special_teams,
+        special_teams=special_teams, **extra,
     )
 
 
@@ -352,6 +420,7 @@ def build_game_features(
     xg_map: Optional[Dict[str, Dict[str, float]]] = None,
     elo_map: Optional[Dict[str, float]] = None,
     special_teams_map: Optional[Dict[str, Dict[str, float]]] = None,
+    rates_map: Optional[Dict[str, Dict[str, float]]] = None,
     lineups: Optional[Dict[str, List[Dict[str, str]]]] = None,
     goalies: Optional[Dict[str, Dict[str, str]]] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
@@ -374,13 +443,15 @@ def build_game_features(
         elo_map = load_team_elo_map(date, root=root)
     if special_teams_map is None:
         special_teams_map = load_team_special_teams_map(date, root=root)
+    if rates_map is None:
+        rates_map = load_team_rates_map(date, root=root)
     if lineups is None:
         lineups = load_lineups(date, root=root)
     if goalies is None:
         goalies = load_starting_goalies(date, root=root)
 
-    home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map)
-    away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map)
+    home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map, rates_map=rates_map)
+    away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map, rates_map=rates_map)
 
     if project:
         home, away, _proj = apply_projection(home, away, profile=profile)
@@ -445,6 +516,7 @@ def build_slate_features(
     xg_map = load_team_xg_map(date, root=root)
     elo_map = load_team_elo_map(date, root=root)
     special_teams_map = load_team_special_teams_map(date, root=root)
+    rates_map = load_team_rates_map(date, root=root)
     lineups = load_lineups(date, root=root)
     goalies = load_starting_goalies(date, root=root)
     out: List[HockeyGameFeatures] = []
@@ -453,7 +525,7 @@ def build_slate_features(
             build_game_features(
                 pk, date, home_name, away_name,
                 root=root, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map,
-                lineups=lineups, goalies=goalies,
+                rates_map=rates_map, lineups=lineups, goalies=goalies,
                 profile=profile, project=project,
                 anchor_to_market=anchor_to_market, anchor_weight=anchor_weight,
             )

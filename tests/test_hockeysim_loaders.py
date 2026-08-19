@@ -50,6 +50,12 @@ def synth_root(tmp_path: Path) -> Path:
         "CHI,0.14,0.79,3.3\n",
         encoding="utf-8",
     )
+    (proc / "team_rates_2025-2026.csv").write_text(
+        "abbr,shots_per_60,blocks_per_60,faceoff_win_pct,games,faceoffs\n"
+        "BOS,32.1,14.2,0.54,82,4700\n"
+        "CHI,26.3,12.1,0.47,82,4650\n",
+        encoding="utf-8",
+    )
     (proc / f"lineups_{date}.csv").write_text(
         "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
         "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n"
@@ -233,6 +239,62 @@ def test_load_team_special_teams_map_reads_block_rate_index_when_present(tmp_pat
     m = loaders.load_team_special_teams_map(date, root=tmp_path)
     assert m["BOS"]["block_rate_index"] == 1.10
     assert m["CHI"]["block_rate_index"] == 0.87
+
+
+# ---------------------------------------------------------------------------
+# Team rates (shots_per_60/blocks_per_60/faceoff_win_pct) -- `docs/ai_context/
+# hockeysim_engine_reference.md` §2j. `penalties_per_60` is tested separately below, sourced from
+# `special_teams_map`'s `committed_per_game`, not this reader.
+# ---------------------------------------------------------------------------
+
+
+def test_load_team_rates_map(synth_root):
+    m = loaders.load_team_rates_map("2026-03-15", root=synth_root)
+    assert m["BOS"] == {"shots_per_60": 32.1, "blocks_per_60": 14.2, "faceoff_win_pct": 0.54}
+    assert m["CHI"]["shots_per_60"] == 26.3
+
+
+def test_load_team_rates_map_missing_is_empty(tmp_path):
+    assert loaders.load_team_rates_map("2026-03-15", root=tmp_path) == {}
+
+
+def test_build_team_features_uses_rates_map(synth_root):
+    m = loaders.load_team_rates_map("2026-03-15", root=synth_root)
+    bos = loaders.build_team_features("Boston Bruins", rates_map=m)
+    assert bos.shots_per_60 == 32.1 and bos.blocks_per_60 == 14.2 and bos.faceoff_win_pct == 0.54
+
+
+def test_build_team_features_without_rates_map_is_dataclass_default(synth_root):
+    bos = loaders.build_team_features("Boston Bruins", rates_map={})
+    assert bos.shots_per_60 == 30.0 and bos.blocks_per_60 == 12.0 and bos.faceoff_win_pct == 0.5
+
+
+def test_build_team_features_penalties_per_60_reuses_special_teams_committed_per_game(synth_root):
+    """`penalties_per_60` deliberately has NO dedicated producer -- it reuses the SAME
+    `committed_per_game` value `special_teams_map` already carries (the exact same quantity,
+    computed once). Confirms it lands on the TOP-LEVEL field, not just the nested
+    `special_teams["committed_per_game"]` dict."""
+    stm = loaders.load_team_special_teams_map("2026-03-15", root=synth_root)
+    bos = loaders.build_team_features("Boston Bruins", special_teams_map=stm)
+    assert bos.penalties_per_60 == 2.9  # from the synth_root fixture's team_special_teams CSV
+    assert bos.special_teams["committed_per_game"] == 2.9
+
+
+def test_build_team_features_without_special_teams_penalties_per_60_is_dataclass_default(synth_root):
+    bos = loaders.build_team_features("Boston Bruins", special_teams_map={})
+    assert bos.penalties_per_60 == 3.0
+
+
+def test_build_game_features_populates_team_rates_end_to_end(synth_root):
+    """The full loader path (what `build_slate_features` drives in production) actually reaches
+    `shots_per_60`/`blocks_per_60`/`faceoff_win_pct`/`penalties_per_60` -- mirrors the elo/xG
+    end-to-end tests above, now that `scripts/build_nhl_team_rates_artifact.py` is a real producer."""
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    assert game.home.shots_per_60 == 32.1 and game.home.blocks_per_60 == 14.2
+    assert game.home.faceoff_win_pct == 0.54 and game.home.penalties_per_60 == 2.9
+    assert game.away.shots_per_60 == 26.3 and game.away.penalties_per_60 == 3.3
 
 
 def test_build_player_features_flags_starting_goalie(synth_root):

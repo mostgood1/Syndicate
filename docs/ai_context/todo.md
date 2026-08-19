@@ -469,7 +469,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, and a real xG (expected goals) model FIXED (only `pp_goal_cal_mult` intentionally left neutral); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, and `shots_per_60`/`faceoff_win_pct` FIXED; `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads either -- same shape as basketball's `#467`); player usage weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -739,35 +739,55 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   `scripts/nhl_sim_input_checklist.py`'s alarm count drops from 9 to **7**,
   the lowest measured this session.
 
+- **Team rates (`shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`)
+  built -- but 2 of 4 are a CONFIRMED DEAD GATE, stated plainly, not silently
+  marked fixed.** Full report: `docs/reports/hockeysim_team_rates_report.md`.
+  `historical_truth/team_game_rates.py` + `scripts/build_nhl_team_rates_artifact.py`
+  parse `shots_per_60`/`blocks_per_60` from the boxscore cache (SOG straight
+  from the league's own recorded field; blocks reuse the §2g parser) and
+  `faceoff_win_pct` from the play-by-play cache's `faceoff` events
+  (`eventOwnerTeamId` is the WINNING team -- verified against `rosterSpots`,
+  0/70 mismatches in a spot-check). Run against all 1,312 games: fully
+  joined. League avg blocks/60 = 14.19 -- an EXACT match to the
+  independently-computed block-rate truth above, cross-validating two
+  separately-built modules. `penalties_per_60` reuses `special_teams`'s
+  already-computed `committed_per_game` (same quantity, no new producer) --
+  `build_team_features` just wasn't reading it into this separate top-level
+  field before.
+  **Reachability tested, and the result is NOT uniform**: `TeamRatesReachabilityTest`
+  proves `shots_per_60`/`faceoff_win_pct` change engine output (a directional
+  SOG difference on an extreme swing), while the SAME extreme swing on
+  `blocks_per_60`/`penalties_per_60` (fixed seed) produces a BYTE-IDENTICAL
+  projection set -- `player_props.py`'s `_team_rates()` reads all 4 into
+  `TeamRates`, but `engine.py` only ever reads `.shots_per_60`/`.goals_per_60`/
+  `.faceoff_win_pct`. `.blocks_per_60`/`.penalties_per_60` are never read
+  anywhere in `engine.py` -- the SAME class of bug as basketball's `#467`
+  (CONSUMED, POPULATED, and never used), present from the start rather than
+  introduced by a later refactor. Deliberately NOT force-fixed with a new
+  consumption mechanism: real block generation is already fully modeled by
+  the truth-calibrated `block_rate_ev`/`pk`/`pp_def` + `block_rate_index`
+  (§2g/§2h) -- a strictly more granular per-shot-event mechanism; bolting
+  `blocks_per_60` on top risks the exact double-counting `model_engine_standard.md`
+  §4.4 warns against. `penalties_per_60` has no PIM/penalty market or
+  mechanism to drive at all. Both flagged as an explicit open follow-up
+  decision (build a real mechanism, or remove the dead fields) -- not
+  silently mischaracterized as fixed. `scripts/nhl_sim_input_checklist.py`'s
+  alarm count drops from 7 to **3**.
+
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**
-- `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct`
-  (team) and `shot_weight`, `goal_weight`, `block_weight` (player) — **all
-  0.0% populated.** `build_team_features`/`build_player_features` never set
-  them; they are the direct, verbatim input to `player_props.py`'s `TeamRates`
-  construction, which `engine.py` (the boxscore/props sim — SOG, saves,
-  blocks, points markets) consumes. **The main board (moneyline/spread/total
-  in `predictions_{date}.csv`) is UNAFFECTED** — `game_market_sim.py` only
+- `shot_weight`, `goal_weight`, `block_weight` (player) — **all 0.0%
+  populated.** `build_player_features` never sets them; direct, verbatim
+  input to `player_props.py`'s `TeamRates`/allocation construction, which
+  `engine.py` (the boxscore/props sim — SOG, saves, blocks, points markets)
+  consumes. **The main board (moneyline/spread/total in
+  `predictions_{date}.csv`) is UNAFFECTED** — `game_market_sim.py` only
   consumes `period_goal_lambdas`, which the (now-corrected) projection layer
   already computes per-matchup. This gap is isolated to player props. Needs
-  real per-team/per-player game logs (shot volume, block volume, penalty
-  minutes, faceoff wins, usage share) that the current truth loader does not
-  capture (`HistoricalGameRecord` has goals/SOG/period splits/penalties now,
-  not shots-by-strength-state or faceoffs) — a real data-pipeline build, not a
-  wiring fix. Matches this file's own framing for MLB's remaining 5 (`#440`):
-  "needs a definition first," not fixable by populating an existing field. The
-  `api-web.nhle.com` **boxscore** endpoint (distinct from the **landing**
-  endpoint the truth loader reads) DOES carry per-goalie strength-state shot
-  splits (`evenStrengthShotsAgainst`/`powerPlayShotsAgainst`/
-  `shorthandedShotsAgainst`) — verified against a cached sample this session;
-  only 11 of 1,312 games are cached locally, so a bulk fetch (rate-limited,
-  same pattern the truth loader already uses) is the remaining step for PP/PK
-  SHOT rates specifically. This is now doubly relevant: `special_teams_cal`'s
-  `pp_shot_multiplier`/`pk_shot_multiplier` are wired and waiting for exactly
-  this data to calibrate them (see FIXED above) — a real per-team value for
-  these two, once the fetch happens, needs to avoid double-counting against
-  `pp_pct`/`pk_pct`'s already-real goal-rate signal (mechanism vs estimator,
-  `model_engine_standard.md` §4.4).
+  real per-player usage-share game logs the current truth loader does not
+  capture — a real data-pipeline build, not a wiring fix. Matches this
+  file's own framing for MLB's remaining 5 (`#440`): "needs a definition
+  first," not fixable by populating an existing field.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

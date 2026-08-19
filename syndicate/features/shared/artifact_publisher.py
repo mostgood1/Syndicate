@@ -351,6 +351,12 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `committed_per_game`) got a real producer (`scripts/build_nhl_special_teams_artifact.py`).
     "nhl_source/source_artifacts/data/processed/team_special_teams_*.csv",
     "nhl_source/data/processed/team_special_teams_*.csv",
+    # Same category, added once `HockeyTeamFeatures.shots_per_60`/`blocks_per_60`/
+    # `faceoff_win_pct` got a real producer (`scripts/build_nhl_team_rates_artifact.py`) --
+    # closing 3 of the 4 remaining genuinely-absent team-level inputs (`penalties_per_60` reuses
+    # `team_special_teams_*.csv`'s already-allowlisted `committed_per_game`, no new file).
+    "nhl_source/source_artifacts/data/processed/team_rates_*.csv",
+    "nhl_source/data/processed/team_rates_*.csv",
     # #163's MLB player game-log index (last-N starts/games, history vs
     # opponent -- syndicate/features/mlb/player_game_log.py, read by
     # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same

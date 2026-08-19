@@ -154,5 +154,75 @@ class HockeySimPropsTest(unittest.TestCase):
         self.assertEqual(cal["pk_goal_multiplier"], 0.4645)
 
 
+# ---------------------------------------------------------------------------
+# Team rates (`shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`) --
+# `docs/ai_context/hockeysim_engine_reference.md` §2j. `shots_per_60`/`faceoff_win_pct` are
+# CONSUMED all the way through `engine.py`'s shot-volume lambda; `blocks_per_60`/`penalties_per_60`
+# are CONSUMED only as far as `TeamRates` construction (`player_props._team_rates`) and then never
+# read by `engine.py` at all -- a genuine dead gate, the same shape as basketball's `#467`. These
+# tests prove BOTH the reachable and the unreachable cases with real assertions, not code-reading.
+# ---------------------------------------------------------------------------
+
+
+def _game_with(home_overrides: dict, away_overrides: dict) -> HockeyGameFeatures:
+    home_kwargs = {"shots_per_60": 30.0, "goals_per_60": 3.0, **home_overrides}
+    away_kwargs = {"shots_per_60": 30.0, "goals_per_60": 3.0, **away_overrides}
+    home = HockeyTeamFeatures(name="HOME", **home_kwargs)
+    away = HockeyTeamFeatures(name="AWAY", **away_kwargs)
+    return HockeyGameFeatures(
+        game_pk="2026020099", date="2026-03-15", home=home, away=away,
+        home_players=_players("HOME", 1000), away_players=_players("AWAY", 2000),
+    )
+
+
+class TeamRatesReachabilityTest(unittest.TestCase):
+    def _mean_team_sog(self, game: HockeyGameFeatures, team: str, n_sims: int) -> float:
+        projs = build_prop_projections(game, n_sims=n_sims, base_seed=777)
+        totals = [p.proj for p in projs if p.market == "SOG" and p.team == team]
+        return sum(totals) / len(totals) if totals else 0.0
+
+    def test_shots_per_60_actually_changes_sog_projection(self) -> None:
+        heavy = _game_with({"shots_per_60": 40.0}, {"shots_per_60": 20.0})
+        heavy_sog = self._mean_team_sog(heavy, "HOME", n_sims=60)
+        light = _game_with({"shots_per_60": 20.0}, {"shots_per_60": 40.0})
+        light_sog = self._mean_team_sog(light, "HOME", n_sims=60)
+        self.assertGreater(heavy_sog, light_sog,
+                            "HOME shots_per_60=40 should out-shoot HOME shots_per_60=20")
+
+    def test_faceoff_win_pct_actually_changes_sog_projection(self) -> None:
+        strong = _game_with({"faceoff_win_pct": 0.65}, {"faceoff_win_pct": 0.35})
+        strong_sog = self._mean_team_sog(strong, "HOME", n_sims=60)
+        weak = _game_with({"faceoff_win_pct": 0.35}, {"faceoff_win_pct": 0.65})
+        weak_sog = self._mean_team_sog(weak, "HOME", n_sims=60)
+        self.assertGreater(strong_sog, weak_sog,
+                            "HOME winning more faceoffs should raise its own shot volume")
+
+    def test_blocks_per_60_is_a_dead_gate_not_reachable(self) -> None:
+        """`blocks_per_60` reaches `TeamRates` (`player_props._team_rates`) but `engine.py` never
+        reads `rates.home.blocks_per_60`/`rates.away.blocks_per_60` -- confirmed by grep AND, here,
+        by a deterministic same-seed run: an extreme swing (3.0 -> 60.0) produces a BYTE-IDENTICAL
+        projection set. Real block generation is governed entirely by `special_teams_cal`'s
+        `block_rate_ev`/`pk`/`pp_def` (§2g/§2h), a genuinely different mechanism -- this is NOT a
+        missing wiring step, it is confirmed dead code on `TeamRates.blocks_per_60`."""
+        low = _game_with({"blocks_per_60": 3.0}, {"blocks_per_60": 3.0})
+        high = _game_with({"blocks_per_60": 60.0}, {"blocks_per_60": 60.0})
+        low_projs = build_prop_projections(low, n_sims=40, base_seed=555)
+        high_projs = build_prop_projections(high, n_sims=40, base_seed=555)
+        low_by_key = {(p.player_id, p.market): p.proj for p in low_projs}
+        high_by_key = {(p.player_id, p.market): p.proj for p in high_projs}
+        self.assertEqual(low_by_key, high_by_key)
+
+    def test_penalties_per_60_is_a_dead_gate_not_reachable(self) -> None:
+        """Same finding as `blocks_per_60` above, for `penalties_per_60` -- no PIM/penalty market
+        or mechanism reads it anywhere in `engine.py`."""
+        low = _game_with({"penalties_per_60": 1.0}, {"penalties_per_60": 1.0})
+        high = _game_with({"penalties_per_60": 12.0}, {"penalties_per_60": 12.0})
+        low_projs = build_prop_projections(low, n_sims=40, base_seed=555)
+        high_projs = build_prop_projections(high, n_sims=40, base_seed=555)
+        low_by_key = {(p.player_id, p.market): p.proj for p in low_projs}
+        high_by_key = {(p.player_id, p.market): p.proj for p in high_projs}
+        self.assertEqual(low_by_key, high_by_key)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -86,8 +86,8 @@ from its own vendor repos; NHL had none of that class of tool at all until
 
 | id | one-line | status |
 |---|---|---|
-| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (`pp_pct`/`pk_pct`/`committed_per_game`) FIXED; `special_teams_cal` (7 keys) WIRED (reachable, not yet calibrated); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player weights genuinely absent, 9 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
-| `#454` | Play-by-play is an unused offline modelling substrate — NHL is one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | OPEN, unowned. Directly relevant to §3's finding: extending the truth-loader's parser (already done once this session, for penalties; team-rate data would need it extended further, reference doc §5) and building real pbp ingestion are related but not identical asks — pbp would give shot-by-shot/event-level detail this session's fixes don't touch at all. |
+| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (goal conversion + per-team shot + per-team block rate) + `special_teams_cal` (ALL 6 non-neutral keys calibrated) + a real xG model + `shots_per_60`/`faceoff_win_pct` FIXED (reachable); `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads them); player weights genuinely absent — 3 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
+| `#454` | Play-by-play was an unused offline modelling substrate — NHL was one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | **CLOSED as a data-availability gap this session** (still open as a cross-sport tracking item for soccer/NCAAB). `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py` bulk-fetched all 1,312 regular-season games (reference doc §2i) — the substrate now exists and is consumed by both the xG model (§2i) and team rates' faceoff data (§2j). |
 | `#440` | Sim-engine track pin (cross-sport); this session's work is NHL's contribution to it | PLANNED, referenced throughout |
 
 **`.syndicate/audit_2026-08-14_models.md`** (line 170/192) already flagged NHL's
@@ -192,11 +192,33 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   doesn't disturb the league-wide level. Locked in a test. Every one of
   `special_teams_cal`'s 7 keys except `pp_goal_multiplier` (measured
   statistically indistinguishable from neutral, §2d) is now truth-calibrated.
-- Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
-  `faceoff_win_pct` (the GLOBAL team rates the props engine's `TeamRates`
-  reads) or player usage weights — needs the truth-loader's parser extended
-  further (beyond the penalties extension already done this session). This is
-  distinct from the PP/PK-specific shot/block differentiation just built above.
+- **Did** build the GLOBAL team rates the props engine's `TeamRates` reads —
+  `shots_per_60`/`blocks_per_60`/`faceoff_win_pct` (reference doc §2j, full
+  report `docs/reports/hockeysim_team_rates_report.md`) — distinct from the
+  PP/PK-SPECIFIC shot/block differentiation built above (that's a per-strength-
+  state SIGNAL; this is the flat ALL-situations rate `TeamRates` itself reads).
+  `historical_truth/team_game_rates.py` parses SOG + blocks from the boxscore
+  cache and faceoff wins from the play-by-play cache (`eventOwnerTeamId` on a
+  `faceoff` event is the WINNING team — verified against `rosterSpots`, 0/70
+  mismatches). Run against all 1,312 games: fully joined. League avg blocks/60
+  = 14.19, an EXACT match to §2g/§2h's independently-computed truth — a real
+  cross-check between two separately-built modules. `penalties_per_60` reuses
+  `special_teams`'s already-computed `committed_per_game` — no new producer,
+  just a second read of an already-real value. **A real finding, not glossed
+  over**: reachability testing (holding to the SAME bar every other input this
+  session got) proved `shots_per_60`/`faceoff_win_pct` change engine output,
+  while `blocks_per_60`/`penalties_per_60` are a CONFIRMED DEAD GATE —
+  populated all the way into `TeamRates` but never read by `engine.py`
+  (proven with a fixed-seed, byte-identical-output test, not assumed from
+  code reading) — the same class of bug as basketball's `#467`. Deliberately
+  NOT force-fixed with a new consumption mechanism: blocks are already fully
+  modeled by the truth-calibrated `block_rate_*` + `block_rate_index`
+  mechanism (§2g/§2h), and bolting `blocks_per_60` on top risks double-
+  counting; `penalties_per_60` has no market or mechanism to drive at all.
+  Flagged as an explicit open follow-up decision (build a mechanism, or
+  remove the dead fields), not silently marked "fixed." Player usage weights
+  (`shot_weight`/`goal_weight`/`block_weight`) still need the truth-loader's
+  parser extended further — the 3 remaining checklist alarms.
 - Did not re-run the goal-multiplier calibration (§2d, earlier this session)
   with the joint-fit method the shot-multiplier bug discovery motivated —
   flagged as an open methodology-consistency gap, not a known error (its own
