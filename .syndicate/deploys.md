@@ -17501,3 +17501,49 @@ not retroactive) -- expected to resolve on the next normal
 continues `soccer-odds-capture-cadence-gap` should re-curl this same URL;
 a 200 with real `epoch`/`error` JSON is what finally answers the
 `steps=0` open question.
+
+---
+
+## 2026-08-19 17:53 local — web `6b23d6fa` — pregame window + weeks 2-15 deleted
+
+    lane:      football-model-owner
+    sha:       6b23d6fa (scoped graft, 14 paths, parent 17986fb5,
+               branch deploy/ncaaf-pregame-window-20260819)
+    deploy:    dep-da3343n40ujc73b8qgfg  trigger=api
+    rollback:  deploy 17986fb5
+
+**verify: PASSED, by MULTI-PROBE (10 probes per week, not one sample).**
+
+| week requested | games | model | probes agreeing |
+|---|---|---|---|
+| 1 | 51 | SP+ | 10/10 |
+| 5 | 51 | SP+ | 10/10 |
+| 12 | 51 | SP+ | 10/10 |
+
+Every week now resolves to week 1 — the only week inside the pregame window —
+and serves the SP+ artifact. Picks still suppressed: **6/6 probes `0 cards,
+"Picks suppressed"`**.
+
+**MULTI-PROBE IS THE POINT, not thoroughness theatre.** After the previous
+deploy (`ebf301ae`) a single sample read SP+ and I called it PASS; probing 12
+times showed **9 PPA / 3 SP+** — gunicorn workers had cached the projection
+index at different moments relative to the bootstrap sync, so the board was
+genuinely inconsistent and one sample could report either answer. A single read
+of a multi-worker service is not a measurement.
+
+### Why the deletion needed the guard to do anything
+
+`bootstrap_data_root` copies committed artifacts onto web's mounted disk and
+**never prunes**, and web reads that disk via `SYNDICATE_NCAAF_SOURCE_ROOT`. So
+deleting the 13 artifacts from git does not remove them from the disk being
+served, and there is no ops endpoint that can. `_week_is_within_pregame_window`
+is what stops them being served; the deletion is what stops them coming back.
+
+### A defect this introduced and caught before shipping
+
+The new function was inserted directly beneath an existing
+`@lru_cache(maxsize=16)` and **captured it** — caching the window decision and
+silently stripping the cache from `_smartsim2_projection_index`, turning a hot
+read into a per-request disk read on the 2GB web service. Found only because a
+unit-test patch would not take effect. Decorator restored; window check
+uncached; 392 ncaaf/football tests pass.
