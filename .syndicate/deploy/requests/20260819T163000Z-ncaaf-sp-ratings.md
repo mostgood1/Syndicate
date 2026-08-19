@@ -14,7 +14,27 @@
 
 ---
 
-## Status: PENDING BY USER DECISION, 2026-08-19 ~17:4xZ
+## Status: CLAIM HELD, DEPLOY BLOCKED ON AN IN-FLIGHT MLB SIM, 18:28Z
+
+**Claim ACQUIRED 18:27:54Z by `football-model-owner`** (token bdbe4548e1d89616,
+ttl 2700s). `nfl-player-props-backtest`'s claim had EXPIRED at 47.8 min without
+them ever deploying, so this was the normal expired-claim path, NOT a force.
+
+**Before taking it I checked the Render deploys API for an IN-FLIGHT deploy.**
+A live-SHA read cannot see one: a deploy that is still BUILDING leaves the old
+SHA reading live, so "live == my parent" looks safe while a newer SHA is seconds
+from landing. That is precisely the 2026-08-15 revert. Result: no in-flight
+deploy, live settled at `23e70a80` — still exactly `f2eb719d`'s parent, so the
+graft composes and did NOT need rebuilding.
+
+**PREFLIGHT RETURNED HOLD — 7 jobs in flight**, an MLB daily sim
+(`run_mlb_daily_sim_job.py` -> `daily_update.py --workflow ui-daily` plus
+multiprocessing children). A deploy kills it. Watcher `b00tn2zed` polls until
+jobs reach 0. `nfl-player-props-backtest` has been messaged: told I hold the
+claim, have not deployed, will release if they still need it, and that any graft
+of theirs parented on `23e70a80` goes stale the moment mine lands.
+
+### Previously: PENDING BY USER DECISION, 2026-08-19 ~17:4xZ
 
 **Built, pushed, verified. Not deployed. Left pending deliberately.**
 
