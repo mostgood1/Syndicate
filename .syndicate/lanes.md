@@ -154,7 +154,7 @@ the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
 needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 — original re-take header follows —
-### convergence-phase7-crps — OPEN — **ENGINE SET + CHECKLIST HOOK + REBUILD GATE LIVE ON refresh-worker; five MLB sim artifacts LIVE ON WEB. `conditional_arsenal` STILL 0% — rosters predate the deploy, rebuild gate SET but inert until a restart and EXPIRES 05:00Z. NATIVE LADDERS BUILDER built + tested, NOT deployed — ridealong `5c2851a4` on branch `deploy/worker-ladders-ridealong`, parent verified live 19:06Z.** — opened 2026-08-17 — session: model-sim-track
+### convergence-phase7-crps — OPEN — **MLB LADDERS: native builder LIVE on refresh-worker (`3b76cef5`, 21:19Z) but the artifact has NOT rebuilt — still 2026-08-18T18:20, 12 rows, 0 market lines, CAUSE UNKNOWN because every trigger print is truncated out of the 8000-char log window. Status-artifact deploy `4d9f3cf1` pushed + claimed, waiting on a CLEAR window. Roster-rebuild gate SET, unspent, EXPIRES 05:00Z.** — opened 2026-08-17 — session: model-sim-track
 - **Goal (single testable outcome):** a proper scoring rule runs over
   CONTINUOUS projections joined to realized outcomes, with **no dependency on
   settlement, grading, or a placed bet**, and emits a non-zero per-sport sample
