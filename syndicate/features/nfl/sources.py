@@ -75,7 +75,14 @@ def nfl_pbp_path(season: int) -> Path:
     message still names a concrete location -- the guard prints this path, and a
     `None` here would degrade a precise diagnostic into "not found".
     """
-    relative = Path("tracking") / "nflverse" / "pbp" / f"pbp_{season}.csv"
+    return _resolve_nfl_tracking_path(Path("tracking") / "nflverse" / "pbp" / f"pbp_{season}.csv")
+
+
+def _resolve_nfl_tracking_path(relative: Path) -> Path:
+    """Shared resolver behind `nfl_pbp_path` and `nfl_injuries_path` --
+    same candidate-list search, same "return the last candidate as a named
+    fallback rather than None" contract, kept in one place so the two
+    callers cannot drift into different logic for the identical bug."""
     for root in _source_roots():
         candidate = root / relative
         try:
@@ -84,6 +91,22 @@ def nfl_pbp_path(season: int) -> Path:
         except OSError:
             continue
     return default_nfl_source_root() / relative
+
+
+def nfl_injuries_path(season: int) -> Path:
+    """Where the real nflverse injury reports for *season* actually ARE.
+
+    THE SAME BUG `#441` FOUND AND FIXED FOR PBP, NEVER FIXED HERE.
+    `syndicate.features.nfl.injury_adjustment._injured_players_for_team`
+    used to build this path directly off `default_nfl_source_root()`,
+    which resolves a root by probing for an UNRELATED file
+    (`upcoming_recs_*.csv`) and can silently pick the ephemeral repo
+    checkout over the mounted disk -- exactly `nfl_pbp_path`'s docstring
+    above, just never applied to injuries. `scripts/fetch_nfl_injuries.py`
+    is the write-side twin, using `nfl_artifact_output_root()` the same
+    way `fetch_nfl_pbp.py` does.
+    """
+    return _resolve_nfl_tracking_path(Path("tracking") / "nflverse" / "injuries" / f"injuries_{season}.csv")
 
 
 def nfl_pbp_diagnostic(season: int) -> str:
