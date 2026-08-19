@@ -68,7 +68,32 @@ def _sources_from_payload(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]
     return sources
 
 
-# TEAM-STRENGTH INDEX BOUNDS. Deliberately wider than [0.05, 0.95].
+# TEAM-STRENGTH INDEX BOUNDS. REVERTED to [0.05, 0.95] on 2026-08-19 after
+# measuring that widening them was unnecessary AND harmful.
+#
+# I widened these to [-0.75, 1.75] believing the clamp was capping NCAAF margin
+# dispersion. It was not. Measured on the real 51-game slate, SP+ at scale 10:
+#
+#     bounds                  margin SD    total SD
+#     [0.05, 0.95] (original)    15.97        7.51
+#     [-0.75, 1.75] (widened)    15.27        9.55
+#
+# Margins are BETTER with the original bounds, and the widening inflated totals
+# by 27%. The margin dispersion comes from `play_simulator.py:354/382`
+# (`offense_rating * 3.0 - defense_rating * 2.2`, per possession, NO clamp on the
+# rating) -- not from these indices at all. Fixing the rating SOURCE (PPA -> SP+,
+# a per-play rate -> points per game) was the whole of the margin fix; this
+# clamp was never the constraint.
+#
+# The constants are kept as named symbols rather than inlined so the bounds are
+# greppable and the next person does not have to rediscover that they were
+# tried and rejected.
+#
+# STILL OPEN: totals remain over-dispersed at ~2.17x market even at these
+# bounds. The cause is NOT here -- see `play_simulator.py:354`, where the
+# offense weight (3.0) exceeds the defense weight (2.2), so a strong offense
+# adds more than a strong defense subtracts and games between good teams inflate.
+# That asymmetry is shared with NFL and needs its own calibration.
 #
 # `offense_index` / `defense_index` are a TEAM-STRENGTH scale centred on 0.5,
 # not probabilities. Bounding them at [0.05, 0.95] capped how far apart two
@@ -96,8 +121,8 @@ def _sources_from_payload(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]
 # `turnover_probability` and the rest keep their own bounds because those ARE
 # probabilities and must stay in range. This widens the input to those formulas,
 # not their output.
-_INDEX_FLOOR = -0.75
-_INDEX_CEILING = 1.75
+_INDEX_FLOOR = 0.05
+_INDEX_CEILING = 0.95
 
 
 @dataclass(frozen=True)

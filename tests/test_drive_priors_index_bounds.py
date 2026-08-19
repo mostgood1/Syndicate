@@ -1,18 +1,36 @@
-"""Widening the team-strength index must move NCAAF and leave NFL untouched.
+"""The team-strength index bounds, and the record of why widening them FAILED.
 
 `offense_index` / `defense_index` are a TEAM-STRENGTH scale centred on 0.5, not
-probabilities, and they were bounded at [0.05, 0.95]. For NCAAF that cap was the
-binding constraint on the entire model: measured 2026-08-19, the 2026 wk1 slate
-projected margin SD **1.74 against a market SD of 14.46**, and no rating scale
-could fix it — tightening the scale to chase dispersion simply clamped more
-teams (36 of 138 at the best setting), flattening the tails that produce
-blowouts.
+probabilities, bounded at [0.05, 0.95].
 
-NFL is unaffected BY ARITHMETIC, not by luck: nflverse EPA/play ratings span
-roughly -0.20..0.10, so `0.5 + rating` lands in 0.30..0.60 and never approaches
-either bound. These tests pin that, so a future narrowing of the bounds cannot
-silently re-cap NCAAF, and a future NFL rating change that starts clamping is
-caught rather than absorbed.
+**I BELIEVED THAT CAP WAS THE BINDING CONSTRAINT ON NCAAF MARGINS. IT WAS NOT.**
+The 2026 wk1 slate did project margin SD 1.74 against a market 14.46, and the
+bound does saturate — 36 of 138 teams pinned at the best SP+ scale — so the story
+was coherent. It was still wrong. Measured on the real slate, SP+ at scale 10:
+
+    bounds                  margin SD    total SD    (market: 14.46 / 3.46)
+    [0.05, 0.95] (kept)        15.97        7.51
+    [-0.75, 1.75] (rejected)   15.27        9.55
+
+Widening made margins slightly WORSE and inflated totals by 27%. The margin fix
+was entirely the rating SOURCE — PPA, a per-play rate with differential SD 0.136,
+replaced by SP+, points-per-game — and margin dispersion is produced in
+`play_simulator.py:354/382` from the RAW ratings, which carry no clamp. These
+indices never gated it.
+
+So the saturation these tests assert is DELIBERATE and costs nothing measurable.
+A future reader who spots it and "fixes" it will make both metrics worse; that is
+why the rejected numbers are recorded here rather than deleted with the change.
+
+NFL is untouched either way, by arithmetic rather than luck: nflverse EPA/play
+spans roughly -0.20..0.10, so `0.5 + rating` lands in 0.30..0.60 and never
+approaches either bound.
+
+STILL OPEN, and NOT fixable here: totals remain ~2.17x market dispersion even at
+these bounds. The cause is `play_simulator.py:354`, where the offense weight
+(3.0) exceeds the defense weight (2.2), so a strong offense adds more than a
+strong defense subtracts and games between good teams inflate. That asymmetry is
+shared with NFL and needs its own calibration.
 """
 from __future__ import annotations
 
@@ -30,25 +48,60 @@ def _profile(home_off: float, home_def: float):
 
 
 class IndexBoundsTest(unittest.TestCase):
-    def test_bounds_are_wider_than_a_probability(self) -> None:
-        """The index is team strength, not a probability. If someone narrows
-        these back to [0.05, 0.95], NCAAF silently re-caps."""
-        self.assertLess(dp._INDEX_FLOOR, 0.05)
-        self.assertGreater(dp._INDEX_CEILING, 0.95)
+    def test_bounds_are_the_original_probability_range(self) -> None:
+        """WIDENING THESE WAS TRIED AND REJECTED. Measured 2026-08-19 on the
+        real 51-game slate with SP+ at scale 10:
 
-    def test_a_dominant_team_is_no_longer_pinned(self) -> None:
-        """The defect, stated as a test. Under the old [0.05, 0.95] bounds a
-        team at +0.60 and one at +1.20 produced the SAME index, so the engine
-        could not tell them apart."""
+            bounds                  margin SD    total SD
+            [0.05, 0.95] (this)        15.97        7.51
+            [-0.75, 1.75]              15.27        9.55
+
+        Margins are BETTER at the original bounds and the widening inflated
+        totals by 27%. Do not widen these to chase margin dispersion -- margin
+        comes from `play_simulator.py:354/382`, which has no clamp on the
+        rating, so these indices were never the constraint.
+        """
+        self.assertEqual(dp._INDEX_FLOOR, 0.05)
+        self.assertEqual(dp._INDEX_CEILING, 0.95)
+
+    def test_index_saturates_and_that_is_ACCEPTED(self) -> None:
+        """Two very strong teams DO collapse to the same index here, and that is
+        a deliberate trade, not an oversight.
+
+        It costs nothing measurable: margin dispersion is produced downstream in
+        play_simulator from the raw ratings, which are never clamped. Widening
+        these to separate such teams changed margin SD by -0.7 and total SD by
+        +2.0 -- strictly worse on both.
+        """
         strong = _profile(0.60, 0.0).offense_index
         stronger = _profile(1.20, 0.0).offense_index
-        self.assertGreater(stronger, strong,
-                           "two clearly different teams collapsed to one index -- the cap is back")
+        self.assertEqual(strong, stronger,
+                         "saturation is expected at these bounds; if this changes, "
+                         "re-measure totals before assuming it is an improvement")
 
-    def test_a_dreadful_team_is_no_longer_pinned(self) -> None:
-        weak = _profile(-0.60, 0.0).offense_index
-        weaker = _profile(-1.20, 0.0).offense_index
-        self.assertLess(weaker, weak)
+    def test_margin_still_differentiates_despite_index_saturation(self) -> None:
+        """The load-bearing claim: saturation upstream does NOT flatten margins,
+        because the ratings reach play_simulator unclamped."""
+        from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
+        from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import (
+            NCAAF_CALIBRATION_PROFILE,
+        )
+        import statistics
+
+        def margin(ho, ao, seeds=60):
+            vals = []
+            for s in range(1, seeds + 1):
+                o = simulate_game(SmartSim2SimulationInput(
+                    home_team="H", away_team="A", seed=s,
+                    home_offense_rating=ho, away_offense_rating=ao),
+                    profile=NCAAF_CALIBRATION_PROFILE)
+                vals.append(o.final_score["home"] - o.final_score["away"])
+            return statistics.fmean(vals)
+
+        # Both saturate the index, yet must still produce different margins.
+        self.assertGreater(margin(1.60, -1.60), margin(0.60, -0.60) + 3.0,
+                           "margins collapsed with the index saturated -- the "
+                           "differentiation is NOT coming from play_simulator after all")
 
     def test_nfl_rating_range_never_touches_either_bound(self) -> None:
         """NFL safety, by arithmetic. As-of nflverse EPA spans about
