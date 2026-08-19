@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 425 rules `[generated]`
+## Index — 426 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1094,3 +1094,38 @@ single chronological cut is unsafe here (an 08-18 entry sits after the first
 08-19 one, so the file is not strictly time-ordered), and splitting on `###`
 shreds entries (40 of 46 blocks are undated sub-sections of a parent). Both
 findings stand; only the day-key was wrong.
+
+## 2026-08-19 — RULE: a mass-deletion diff is not self-explaining. Compare DISTINCT lines before accepting "it was just dedupe".
+
+- The rule going forward: **when a diff you did not intend shows large deletions,
+  do not reason from the line COUNTS or from a plausible story about
+  reformatting. Take the set difference of DISTINCT lines, both directions, and
+  then grep the tree for a sample of what is missing.** Counts cannot separate
+  "500 duplicate copies removed" from "500 unique records deleted", and those are
+  the same number.
+
+**MEASURED.** A stray `git add -A` on the shared tree swept another session's
+in-progress rewrite of two day-logs into my commit: 1,087 insertions, 1,173
+deletions. **My first read was "deduplication of union-merge blocks"** -- the
+removed samples were generic repeated headings (`### VERIFIED`, `### Lane`),
+which is exactly what dedupe looks like, and the file did contain "MERGED FROM
+origin/main -- block-level union" sections. Comfortable, plausible, wrong.
+Distinct-line comparison showed **498 and 440 lines gone ENTIRELY**, including
+whole session records; a grep confirmed they existed nowhere on disk.
+
+**THE DISCRIMINATOR IS CHEAP AND THE STORY IS FREE.** `set(before) - set(after)`
+takes one line to write. The dedupe story took no evidence at all and would have
+closed the investigation.
+
+**RESTORING NEEDED A UNION, NOT A REVERT.** The swept version also contained
+1,087 lines of genuine new work, so neither version was a superset: reverting
+would have destroyed their additions, keeping would have destroyed the history.
+**When both sides of an accidental overwrite contain unique content, the only
+non-destructive repair is a block-level union**, verified in BOTH directions --
+0 distinct lines missing from either side.
+
+**Related:** the rule against `git add -A` on a shared tree was already recorded
+and I had followed it all session, using pathspec commits specifically to avoid
+this. I reached for `-A` because the change spanned three files instead of one.
+**A rule you keep for the easy case and drop for the slightly harder one is not
+a rule you have.**
