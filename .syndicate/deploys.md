@@ -17331,3 +17331,34 @@ then doesn't have to rediscover it from scratch.
 in `run_live_odds_refresh_worker.py` (only WNBA and soccer do) -- a
 structural difference from WNBA independent of this specific defect,
 noted for whoever eventually works on NBA in-season reachability.
+
+---
+
+## 2026-08-19 — soccer_pregame_autorun_status.json allowlisted on live-odds-worker
+
+**Deployed**: `live-odds-worker <- 2431df26` (`dep-da32hv0u01pc73foqbbg`).
+Fired 22:06:52Z after two consecutive CLEAR preflight reads. **CONFIRMED
+LIVE by content**: `deploy_preflight.py --service live-odds-worker` reports
+live commit `2431df26`, finished `2026-08-19T22:10:35Z`.
+
+**Change**: added `reports/refresh_status/latest/soccer_pregame_autorun_status.json`
+to `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/artifact_publisher.py`).
+Purely additive — one new glob pattern, nothing else touched.
+
+**Why**: `soccer-odds-capture-cadence-gap`'s open question (is `steps=0` on
+soccer's pregame odds-capture cycles a genuinely empty run, or a schema
+mismatch in the reporting code's own artifact parse) needs this file's
+`epoch`/`error` history to answer directly rather than by inference.
+
+**Still needed, NOT done as of this entry**: the SAME commit (or later)
+also needs deploying to `web`, since `/api/ops/artifacts/stream` is served
+there and needs the updated allowlist to actually serve the file — `web`'s
+deploy claim was held by `nfl-props-calibration-deploy` throughout this
+session and never freed up. **verify:** once web carries `2431df26`+,
+`curl .../api/ops/artifacts/stream?path=reports/refresh_status/latest/soccer_pregame_autorun_status.json`
+returns 200 with real content (currently would 403, allowlist not yet
+live on the serving side).
+
+Claim released (force, token mismatch across separate shell invocations
+within the same session — verified the claim was genuinely still mine
+before forcing, not a stale session's).
