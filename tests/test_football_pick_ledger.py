@@ -26,6 +26,8 @@ from syndicate.features.football.pick_ledger import (
     evaluate,
     is_leaked_rating_source,
     leak_warning,
+    leak_status,
+    rating_seasons,
     load_ledger,
     ledger_path,
     normalise_provider,
@@ -217,3 +219,49 @@ class PathTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LeakStatusTests(unittest.TestCase):
+    """The GENERAL rule: rating season vs the season it predicts."""
+
+    def test_prior_season_ratings_are_clean(self) -> None:
+        self.assertEqual(
+            leak_status("cfbd_sp_plus_2023[scale=10]+cfbd_ppa_season_2023_fallback_for_2024", 2024),
+            "clean",
+        )
+
+    def test_fallback_for_suffix_does_not_read_as_same_season(self) -> None:
+        """'..._fallback_for_2024' names the TARGET, not a rating.
+
+        Without excluding it, every prior-season backtest would misclassify as
+        same_season and its clean number would be treated as ambiguous.
+        """
+        self.assertIn(2024, rating_seasons("cfbd_sp_plus_2023+cfbd_ppa_season_2023_fallback_for_2024"))
+        self.assertEqual(leak_status("cfbd_sp_plus_2023+cfbd_ppa_season_2023_fallback_for_2024", 2024), "clean")
+
+    def test_future_ratings_are_leaked(self) -> None:
+        self.assertEqual(leak_status("cfbd_sp_plus_2025[scale=10]", 2024), "leaked")
+
+    def test_season_aggregate_ppa_is_leaked_regardless(self) -> None:
+        self.assertEqual(leak_status("cfbd_ppa_season_2025", 2025), "leaked")
+
+    def test_same_season_is_reported_not_guessed(self) -> None:
+        """Preseason SP+ (clean) and final SP+ (leaked) are indistinguishable
+        from the string, so this must not silently pick one."""
+        self.assertEqual(leak_status("cfbd_sp_plus_2026[scale=10]", 2026), "same_season")
+
+    def test_unparseable_source_is_unknown_not_clean(self) -> None:
+        """Unknown must not default to the permissive answer."""
+        self.assertEqual(leak_status("", 2025), "unknown")
+        self.assertEqual(leak_status("mystery_rating", 2025), "unknown")
+
+    def test_coverage_reports_leak_status_of_graded_rows(self) -> None:
+        rows = [
+            _row(game_id="g1", season=2024, model_margin=1.0, realised_margin=2.0,
+                 rating_source="cfbd_sp_plus_2023"),
+            _row(game_id="g2", season=2025, model_margin=1.0, realised_margin=2.0,
+                 rating_source="cfbd_ppa_season_2025"),
+        ]
+        status = coverage(rows)["graded_leak_status"]
+        self.assertEqual(status.get("clean"), 1)
+        self.assertEqual(status.get("leaked"), 1)

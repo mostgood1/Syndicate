@@ -438,6 +438,14 @@ def main() -> None:
     parser.add_argument("--leaked-season-ppa", action="store_true",
                         help="use season-aggregate PPA (LEAKED for a completed season). "
                              "Reproduces pre-2026-08-19 behaviour for comparison only.")
+    parser.add_argument("--ratings-season", type=int, default=None,
+                        help="Season whose SP+ ratings to use. Defaults to --season. "
+                             "SET IT TO THE PRIOR SEASON TO BACKTEST A COMPLETED ONE: "
+                             "/ratings/sp?year=<completed season> returns FINAL ratings, "
+                             "which contain the outcome of the games being predicted. "
+                             "The rating_source records whichever season is actually "
+                             "used, so a leaked run is identifiable downstream rather "
+                             "than merely disclaimed here.")
     parser.add_argument("--progress-log", type=Path, default=None)
     args = parser.parse_args()
 
@@ -474,10 +482,14 @@ def main() -> None:
     log(f"PPA_RATINGS teams={len(ppa_index)} rating_source={rating_source}")
 
     # SP+ is the primary rating source; PPA above stays as the per-team fallback.
-    sp_index = load_sp_ratings(args.season)
+    ratings_season = args.ratings_season if args.ratings_season is not None else args.season
+    sp_index = load_sp_ratings(ratings_season)
     sp_means = sp_league_means(sp_index)
     if sp_index:
-        rating_source = f"cfbd_sp_plus_{args.season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
+        rating_source = f"cfbd_sp_plus_{ratings_season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
+    if ratings_season != args.season:
+        log(f"RATINGS_SEASON_OVERRIDE ratings={ratings_season} games={args.season} "
+            f"(prior-season ratings -> leak-free backtest)" )
     log(f"SP_RATINGS teams={len(sp_index)} off_mean={sp_means[0]:.2f} def_mean={sp_means[1]:.2f}")
 
     projections: list[SmartSimNcaafProjection] = []

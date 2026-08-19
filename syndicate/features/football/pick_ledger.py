@@ -261,10 +261,16 @@ def coverage(rows: Iterable[PickLedgerRow]) -> dict[str, Any]:
     gradable_open = sum(
         1 for r in rows if r.model_margin is not None and r.spread_open is not None and r.realised_margin is not None
     )
+    graded = [r for r in rows if r.model_margin is not None and r.realised_margin is not None]
+    status: dict[str, int] = {}
+    for r in graded:
+        st = leak_status(r.rating_source, r.season)
+        status[st] = status.get(st, 0) + 1
     return {
         "rows": n,
         "games": len({r.game_id for r in rows}),
         "providers": sorted({r.provider for r in rows if r.provider}),
+        "graded_leak_status": status,
         "with_model": have("model_margin"),
         "with_spread_close": have("spread_close"),
         "with_spread_open": have("spread_open"),
@@ -380,6 +386,61 @@ _LEAKED_RATING_SOURCE = re.compile(r"^cfbd_ppa_season_\d{4}$")
 
 def is_leaked_rating_source(source: Any) -> bool:
     return bool(_LEAKED_RATING_SOURCE.match(str(source or "").strip()))
+
+
+#: Any 4-digit year inside a rating-source string, e.g.
+#: "cfbd_sp_plus_2023[scale=10]+cfbd_ppa_season_2023_fallback_for_2024".
+_YEAR_IN_SOURCE = re.compile(r"(19|20)\d{2}")
+
+
+def rating_seasons(source: Any) -> list[int]:
+    """Every season named in a rating source, ascending.
+
+    A composite source names more than one (a primary rating plus a fallback,
+    and sometimes the TARGET season in a '..._fallback_for_2024' suffix), so the
+    check below uses the LATEST — the most recent information the run could
+    possibly have seen.
+    """
+    text = str(source or "")
+    return sorted({int(m.group(0)) for m in _YEAR_IN_SOURCE.finditer(text)})
+
+
+def leak_status(source: Any, game_season: Any) -> str:
+    """Classify one graded row's rating against the season it predicts.
+
+    This is the GENERAL rule; `is_leaked_rating_source` is the special case for
+    a source known to be season-aggregate regardless of year.
+
+      "clean"        every rating season is STRICTLY BEFORE the game's season,
+                     so the rating cannot contain the game.
+      "same_season"  the rating names the game's own season. AMBIGUOUS and it
+                     genuinely matters which: PRESEASON SP+ for an unplayed
+                     season is clean and is what production uses, while FINAL
+                     SP+ for a completed one is leaked. The two are
+                     indistinguishable from the string alone, so this reports
+                     rather than guesses.
+      "leaked"       a rating season AFTER the game's season (future
+                     information), or a known season-aggregate source.
+      "unknown"      no season could be parsed.
+    """
+    if is_leaked_rating_source(source):
+        return "leaked"
+    try:
+        target = int(game_season)
+    except (TypeError, ValueError):
+        return "unknown"
+    seasons = rating_seasons(source)
+    # A '..._fallback_for_<target>' suffix names the TARGET, not a rating; it
+    # would otherwise make every prior-season run look same-season.
+    seasons = [s for s in seasons if s != target] or seasons
+    if not seasons:
+        return "unknown"
+    latest = max(seasons)
+    if latest > target:
+        return "leaked"
+    if latest == target:
+        return "same_season"
+    return "clean"
 
 
 def leak_warning(rows: Iterable[PickLedgerRow]) -> dict[str, Any] | None:
