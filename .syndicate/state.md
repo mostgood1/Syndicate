@@ -2376,144 +2376,112 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 - **Residual:** `055dfc67` is off main, so a future off-main web deploy drops
   these six lines. They are on main in `c2030c72`.
 
-## [web-preflight-dead-sample] CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+## [web-preflight-dead-sample] WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08-18, collapsed from 2 stacked sections]`
 
-> **SUPERSEDED — this section's conclusion is WRONG and its own author retracted
-> it in the section below, which carries the SAME subject key deliberately.**
-> The emitter was not deleted; it is intact at `memory_observability.py:1952`.
-> Retained verbatim because the retraction explains how the mistake was made
-> (a `head -4` truncated grep read as exhaustive) and that reasoning is worth
-> more than a tidy file. **Do not act on anything in this section.**
-> Collapsing the two into one is owed work for whoever owns this subject —
-> `state_key_check.py` now reports it, which is the intended behaviour.
+**COLLAPSED 2026-08-18 by lane `ledger-coherence-sweep`, under an explicit
+instruction.** This subject had a CORRECTION section and a RETRACTION section
+that contradicted each other, which is the stacking this file has been collapsed
+for twice. Newest truth wins; the superseded claims are recorded below as VOID
+rather than deleted, because two of them are *actionable and wrong* and someone
+remembering them would do damage. Full prior text is in git history.
 
-**Supersedes what I wrote three times today** — in the break-glass grant, in the
-web-deploy state entry above, and in the session checkpoint. All three name
-`psutil` as the cause. **They are wrong.**
+**THE SYMPTOM, which nothing below disputes:** `deploy_preflight.py` returns
+`UNKNOWN` for web — "sample is 356656s old (limit 180s)", 4.1 days and only
+ageing. The guard requires a CLEAR within 15 min, so **web's preflight is
+permanently unsatisfiable and every web deploy needs a break-glass grant.** A
+guard that must be broken on every use has stopped being a guard. Tracked as
+`todo.md` `#465`.
 
-**MEASURED:**
+### WHAT IS ESTABLISHED — and it is only this
 
-    00e9a49f  (live refresh-worker, 420 commits old)
-        memory_observability.py -> 3 hits, INCLUDING print(f"ALL_PROCESS_MEMORY...
-    origin/main (what web runs after `055dfc67`)
-        memory_observability.py -> EMITTER GONE
-        survivors are CONSUMERS ONLY: deploy_preflight, check_worker_memory_gate,
-        diagnose_sim_pipeline
+- **The emitter EXISTS and prints when called.** `memory_observability.py:1944
+  def log_all_process_memory` → `:1952 print(f"ALL_PROCESS_MEMORY ...")`.
+- **`origin/main`'s copy is BYTE-IDENTICAL to the 420-commit-old live worker
+  `00e9a49f`** — 124,684 bytes both sides, 1 emitter definition, 1 emitter print
+  each. Measured 2026-08-18.
+- **refresh-worker emits every ~17s. Web has not emitted since 2026-08-14.**
+- **Web HAS a reachable call path** (see the falsified trace below), so "web
+  never had a caller" is not consistent with the evidence.
 
-**The emitter was DELETED somewhere in those 420 commits.** `psutil_available:
-false` on web is real but INCIDENTAL — procfs enumeration works there (4/4
-processes, and `/api/ops/memory` returned full process data to me). The signal is
-missing because **nothing prints the line any more.**
-
-**INSTALLING `psutil` WOULD HAVE CHANGED NOTHING** while looking exactly like a
-fix: a shipped dependency, a plausible story, and a gate still returning UNKNOWN.
-
-**THE TRAP THIS LEAVES.** refresh-worker's CLEAR preflight is an ARTEFACT OF
-STALENESS — it emits only because it runs old code. **The moment the worker is
-brought onto main (which is the correct thing to do), its preflight goes UNKNOWN
-too and NO service can gate a deploy.** Whoever modernises the worker walks into
-this.
-
-**THE ACTUAL FIX:** restore the emitter. It exists verbatim at
-`00e9a49f:syndicate/features/shared/memory_observability.py`. Contract: a log
-line `deploy_preflight.py:parse_processes` can parse into `{pid, ppid, rss, cmd}`.
-Re-adding the periodic call must respect the standing rule that **worker periodic
-work is never free** (`#241` caused a production restart loop; ~1.4GB headroom).
-
-## [web-preflight-dead-sample] RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
-
-> **THIS IS THE CURRENT TRUTH FOR THIS SUBJECT.** It shares its key with the
-> superseded CORRECTION section above, so `state_key_check.py` reports the
-> subject as stacked — deliberately, per this file's own rule that a second
-> section on one subject is a defect to be seen rather than hidden behind a
-> different slug. Collapse is owed by this subject's owner.
->
-> **A FOURTH CAUSE HAS SINCE BEEN CLAIMED AND RETRACTED TOO** `[added 2026-08-18
-> by lane `ledger-coherence-sweep`]`: `todo.md` `#465` asserted "no web code
-> path emits `ALL_PROCESS_MEMORY`", confirmed by caller trace. Also wrong — web
-> has a live path, `syndicate/app.py:37` →
-> `start_intelligence_state_background_loop` →
-> `intelligence_state.py:_diag_log_all_process_memory` (12 sites) →
-> `memory_observability.py:1919 log_and_persist_process_memory` → `:1944` →
-> `:1952`. It read as true because `app.py` contains zero occurrences of the
-> callee — it *starts a loop* that calls it. **The tally in this section is now
-> 4 wrong causes, not 3**, and its "do not add a fifth guess" stands.
-
-**Supersedes the CORRECTION section immediately above.** That section says the
-`ALL_PROCESS_MEMORY` emitter was deleted from `memory_observability.py`.
-**It was not. It is intact on main**, byte-identical to the 420-commit-old worker:
-
-    memory_observability.py:1944  def log_all_process_memory(...)
-    memory_observability.py:1952  print(f"ALL_PROCESS_MEMORY {json.dumps(...)}",
-                                        file=sys.stderr, flush=True)
-
-**HOW I GOT IT WRONG:** `git grep -l 'ALL_PROCESS_MEMORY' origin/main -- '*.py'`
-piped through `head -4` returned four `scripts/` paths. **I read a TRUNCATED list
-as an EXHAUSTIVE one** and concluded the file was absent from it.
-
-**FOUR ROOT CAUSES CLAIMED FOR ONE SYMPTOM, THREE OF THEM WRONG:**
+### FOUR CAUSES CLAIMED FOR ONE SYMPTOM. ALL FOUR ARE WRONG.
 
     1. "the sampler is broken"        NO
-    2. "psutil is not installed"      NO -- real, but incidental; procfs works
-    3. "the emitter was deleted"      NO -- it is at :1952, intact
-    4. actual cause                   **UNKNOWN. Do not add a fifth guess.**
+    2. "psutil is not installed"      NO -- real, but incidental. procfs
+                                      enumerates 4/4 processes and
+                                      /api/ops/memory returns full process data.
+    3. "the emitter was deleted"      NO -- intact at :1952, byte-identical to
+                                      the live worker's copy.
+    4. "web has no caller"            NO -- app.py:37 starts one.
 
-**WHAT IS ACTUALLY ESTABLISHED**, and it is only this:
-- the emitter exists and prints when called;
-- `log_all_process_memory()` is called from live-lens loops,
-  `scripts/refresh_odds_sources.py`, and elsewhere;
-- **refresh-worker emits every ~17s. Web has not emitted since 2026-08-14.**
+    ACTUAL CAUSE                      **UNKNOWN. DO NOT ADD A FIFTH GUESS.**
 
-**THE QUESTION IS WHICH CALLER RUNS ON WEB AND WHY IT STOPPED** — not whether the
-code exists. First place to look: **loop ownership moves between services via env
-flags with NO DIFF** (`_mlb_refresh_tick_owner_here` and friends), which is
-already a recorded trap. A web-side caller may simply have been handed to a
-worker.
+**Acting on cause 2 would have shipped a `psutil` dependency that fixed nothing
+and looked exactly like a fix.** That is the pattern to watch here: every one of
+these four was plausible, and three were argued from real evidence.
 
-**DO NOT ACT ON A CAUSE FROM THIS FILE UNTIL SOMEONE TRACES THE CALL SITES.**
-Acting on cause 2 would have shipped a `psutil` dependency that fixed nothing and
-looked exactly like a fix.
+### THE TRACE THAT CLAIMED "NO CALLER ON WEB" IS FALSIFIED
 
-### TRACE — web has NO CALLER for the emitter. **PROVISIONAL, not confirmed.** `[2026-08-18]`
+It enumerated **two** caller families — `live_lens_loop` (started only by
+`run_live_odds_refresh_worker.py:30`) and `refresh_odds_sources.py` (a worker
+script) — and concluded both were worker-only, therefore web has no caller.
+**It missed a third family, while quoting it.** Its own evidence block reads
+`syndicate/app.py:36-37 starts live_refresh_loop + intelligence_state`, and:
 
-Answers the open question left by the RETRACTION above. **Marked provisional
-deliberately: this is the FOURTH cause proposed for this symptom today and three
-were wrong. The TRACE below is evidence; the CONCLUSION is not yet verified.**
+    syndicate/app.py:37        start_intelligence_state_background_loop
+     -> pipeline/intelligence_state.py  _diag_log_all_process_memory  (12 sites)
+       -> memory_observability.py:1919  log_and_persist_process_memory
+         -> :1944 log_all_process_memory  ->  :1952 the print
 
-**EVIDENCE (file:line, all re-read, none inferred):**
+**Web starts a loop that reaches the emitter.** The claim read as true because
+`syndicate/app.py`, `wsgi.py` and `syndicate/blueprints/` contain ZERO
+occurrences of the callee — literally true, and materially misleading, because
+`app.py` does not call it, it *starts something that does*. Grepping for the
+callee and never asking what starts the caller is a reachability error.
 
-    log_and_persist_process_memory(...)  -> live_lens_loop.py :507 :578 :616
-                                            :767 :777 :840 :895
-    log_all_process_memory(...)          -> refresh_odds_sources.py :465 :2670 :2673
+**So the question is NOT "does a caller exist" but "why does the caller that
+exists not emit".** Candidates, none tested: the loop is gated off on web by
+env; it returns before reaching those 12 sites; or it is not actually running.
 
-    start_live_lens_loop  imported by  scripts/run_live_odds_refresh_worker.py:30
-                                       -- and by NOTHING ELSE
-    syndicate/app.py:36-37  starts  live_refresh_loop + intelligence_state
-                                    -- NOT the live-lens loop
-    render.yaml:1043  SYNDICATE_LIVE_LENS_INTERVAL_SECONDS  -- worker block
+**HOW CAUSE 3 WAS REACHED, kept because the mechanism recurs:**
+`git grep -l 'ALL_PROCESS_MEMORY' origin/main -- '*.py'` piped through `head -4`
+returned four `scripts/` paths, and **a TRUNCATED list was read as an EXHAUSTIVE
+one** — `memory_observability.py` was simply below the cut. Same family as cause
+4's error: both concluded absence from a search that was never asked to be
+complete.
 
-**BOTH caller families are WORKER-ONLY.** `live_lens_loop` is started only by
-`run_live_odds_refresh_worker.py`; `refresh_odds_sources.py` is a worker script.
+### THE SUPERSEDED CORRECTION'S TWO ACTIONABLE CLAIMS ARE VOID
 
-**PROVISIONAL CONCLUSION: web does not emit because NOTHING ON WEB CALLS IT.**
-Not broken, not disabled, not deleted — the emitter lives inside worker loops.
-That also explains the asymmetry without needing a fault: worker loops run
-continuously (17s samples), web serves requests. **The 2026-08-14 sample was
-probably the last time web ran something that happened to call it, NOT the moment
-a healthy thing broke.**
+Recorded explicitly because both are alarming, specific, and would waste real
+work:
 
-**IF THAT HOLDS, `deploy_preflight.py` gates EVERY service on a signal only
-WORKERS can produce, so web's preflight has never been satisfiable.**
+- **VOID — "refresh-worker's CLEAR preflight is an ARTEFACT OF STALENESS. The
+  moment the worker is brought onto main its preflight goes UNKNOWN too and NO
+  service can gate a deploy."** This derived from the emitter being absent on
+  main. It is present, and the file is byte-identical across those 420 commits,
+  so modernising the worker changes nothing about its emitter. **Do not let this
+  warning deter a worker update.**
+- **VOID — "THE ACTUAL FIX: restore the emitter."** There is nothing to restore.
 
-**Two candidate fixes — do NOT pick one until the conclusion is confirmed:**
-1. give web its own periodic emitter — subject to **worker periodic work is never
-   free** (`#241` caused a prod restart loop);
-2. **make preflight service-aware** — cheaper, and better matched to the real
-   risk: a web deploy has no long job to land on. That is precisely why tonight's
-   break-glass was safe, measured: 4 processes, all infra, zero jobs.
+### THE LEAD, AND THE FIX THAT SURVIVES REGARDLESS OF CAUSE
 
-**To confirm:** find any web-side call path to `log_all_process_memory`, or
-confirm none exists. If none, the fix is (2) and no emitter is missing.
+**Look at loop ownership first: it moves between services via env flags with NO
+DIFF** (`_mlb_refresh_tick_owner_here` and friends) — already a recorded trap in
+this file. A loop web still starts can be gated off inside it, which would look
+exactly like this.
+
+**The fix does not depend on the cause and should be taken now: make preflight
+SERVICE-AWARE — have `deploy_preflight.py` read `/api/ops/memory` for web**
+instead of scraping logs for `ALL_PROCESS_MEMORY`. That endpoint already returns
+a fresh, complete enumeration on live web (measured: 4 processes, all infra,
+zero jobs), and it is **already what every web break-glass does by hand**. It is
+also better matched to the real risk — a web deploy has no long job to land on.
+
+**Rejected alternative: give web its own periodic emitter.** That is request-path
+periodic work, which the worker-split rule exists to prevent and which `#241`
+already turned into a production restart loop (~1.4GB headroom).
+
+**DO NOT ACT ON A CAUSE FROM THIS SECTION.** Act on the fix, which is
+cause-independent.
 
 ## [refresh-worker-deploy-hold] refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
 
