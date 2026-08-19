@@ -2703,3 +2703,45 @@ logs `text=` filter was verified to work first — four strings visible in the
 unfiltered feed each returned rows — so a null result from it is now evidence of
 absence rather than of a broken query. **Earlier tonight I reported nulls from a
 query I had never proven could return non-null.**
+
+## [basketball-smart-sim-engine] NBA/WNBA smart-sim: allowlist, dead-gate fix, and an open staleness question — 2026-08-18 (lane `basketball-model-owner`)
+
+**Code facts, verified by reading + reachability test, true regardless of
+current deploy state — do not restate as a live-SHA claim, ASK THE SERVICE
+per `[live-sha-authority]` above for what's actually running:**
+
+- `syndicate/features/shared/artifact_publisher.py`'s `HOT_ARTIFACT_PATTERNS`
+  includes `team_advanced_stats_*.csv` and the four optional per-game
+  calibration JSONs (`smart_sim_total_calibration.json`,
+  `intervals_band_calibration.json`, `intervals_time_profile.json`,
+  `player_stat_calibration.json`), both directory-nesting variants. Was
+  previously unallowlisted (only the final `smart_sim_*.json` OUTPUT was).
+- `_apply_player_priors_local` (`basketball_props_smart_sim.py:~3277-3306`)
+  used to nest FOUR split mechanisms — opponent-specific, career-vs-opponent,
+  venue, and opponent-position-matchup — behind one `player_logs is not
+  None` gate. Three genuinely need `player_logs.csv`, absent from BOTH
+  leagues' production data roots (platform-wide, not WNBA-specific) and
+  correctly still dead. The FOURTH (position-matchup) is sourced from a
+  DIFFERENT, successfully-populated table (`pos_lookup`, 47 WNBA / 64 NBA
+  real rows measured) and was wrongly coupled to the same gate — fixed,
+  reachability-measured 0->111 calls off/on.
+- `vendor/{wnba,nba}_betting_repo/src/*/cli.py`'s `_ensure_team_advanced_stats_asof`
+  had a cache-freshness bug: a non-zero-size check alone treated a
+  stale-schema file as fresh forever, blocking rebuild. Fixed.
+- Team-advanced-stats and player-priors are CONFIRMED to genuinely drive the
+  WNBA smart-sim's output (not just populate a field) — real ablation, 3
+  seeds, neutralizing team-advanced-stats moved simulated win probability
+  ~45-50 points every time.
+
+**Open question, NOT resolved as of this entry — do not assume the fix above
+solves it:** production's WNBA `team_advanced_stats` has not been rebuilt for
+ANY date since ~2026-07-15 (measured via `/api/ops/artifacts/export`,
+newest as-of file `asof_20260715`, over a month stale as of 2026-08-18).
+The cache-freshness fix above only unblocks a rebuild that is actually
+attempted for an already-cached date — it does not explain why no rebuild
+has been attempted at all in over a month. Candidates not yet distinguished:
+a real WNBA schedule gap (innocent), a silently-swallowed exception in
+`_ensure_team_advanced_stats_asof`'s bare `except Exception: return None`
+(zero logging on failure), or the scheduling/trigger for the WNBA daily job
+not running. Full write-up when resolved: `docs/ai_context/basketball_sim_engine_reference.md`,
+`todo.md` `#461`.

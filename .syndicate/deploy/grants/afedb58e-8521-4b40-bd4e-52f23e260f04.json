@@ -1,0 +1,9 @@
+{
+  "service": "web",
+  "session_id": "afedb58e-8521-4b40-bd4e-52f23e260f04",
+  "lane": "basketball-model-owner",
+  "target_commit": "b775255a",
+  "granted_epoch": 1787095598,
+  "expires_epoch": 1787097398,
+  "note": "BREAK-GLASS, user-authorized 2026-08-18 via explicit AskUserQuestion confirmation ('Yes, authorize break-glass and deploy'). Same known gap as AUTHORIZATION-2026-08-18-web-breakglass.md / todo.md #465: web never calls log_all_process_memory (worker-only emitter), so deploy_preflight.py --service web is UNKNOWN-forever, not slow. SUBSTITUTE MEASUREMENT, from deploy_preflight.py's own live process read (not taken on trust): 4 processes -- gunicorn master, 2 workers, bash graceful-shell-command entrypoint. ZERO job/sim/daily_update processes. Target b775255a (branch deploy/basketball-artifact-allowlist) is parented DIRECTLY on web's live SHA 055dfc67 (re-verified via GET /api/ops/version immediately before cutting) -- cumulative by construction, drops nothing live. Diff vs 055dfc67: 1 file, +26 insertions, 0 deletions -- syndicate/features/shared/artifact_publisher.py, #462's HOT_ARTIFACT_PATTERNS additions only."
+}
