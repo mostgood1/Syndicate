@@ -1577,3 +1577,38 @@ question against `lane-guard.py`'s own `_claims()` directly (see this
 session's own throwaway one-liner, or write a test in
 `tests/test_lane_guard_files_forms.py`), not against the invariant
 checker, until that drift is fixed.
+
+### 2026-08-19 — NEAR-MISS: an object-database merge updates the REF, not the working tree, and a later working-tree write can silently revert real content
+
+- **What happened.** Used the sanctioned zero-working-tree-writes merge
+  recipe (`git merge-tree --write-tree` + `commit-tree` + `update-ref`) to
+  push a checkpoint past a dirty shared tree — correctly, and it worked.
+  Minutes later, wrote a NEW deploy measurement to `.syndicate/deploys.md`
+  via a plain `cat >> .syndicate/deploys.md` against the WORKING TREE file
+  — which the merge had never touched, so it still held an OLDER version
+  of the file, missing a real ~80-line entry (`#473`, another session's
+  NBA investigation) that had arrived via the merge into the REF only.
+  `git add` + `git commit` then staged "the stale working file plus my
+  append" against a parent commit that DID have `#473` — producing a diff
+  that deleted their entire entry and replaced it with mine.
+- **How we found out.** Read the commit's own diff before pushing (a
+  `git diff --cached --stat` showing 77 deletions on what should have been
+  a pure append was the tell) rather than trusting the commit message.
+  Caught before the commit reached `origin` — verified with `git log
+  --oneline origin/main..HEAD` first.
+- **The rule going forward: after ANY object-database merge that moves
+  `HEAD` via `update-ref` without touching the working tree, treat every
+  file in that merge as STALE in the working tree until proven otherwise.**
+  Before writing to a file with a plain shell append/edit, diff the
+  working-tree copy against `HEAD`'s own copy of that exact path
+  (`git diff HEAD -- <path>`) — a non-empty diff on a file you have not
+  touched since the merge means the working tree is behind the ref you
+  just created, and a naive append will re-base off the wrong content.
+  Safer still: build any further edit to that file the SAME way the merge
+  was built (read `HEAD`'s blob, edit that content, write a new blob/tree/
+  commit) rather than mixing the two methods on the same file in one
+  session.
+- **Cost:** fully recoverable, not yet pushed when caught — rebuilt the
+  correct tree from `HEAD`'s real content plus the intended addition,
+  verified content on `origin/main` after pushing (both entries present,
+  exactly once each) rather than trusting the push succeeding silently.
