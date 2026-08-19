@@ -208,3 +208,24 @@ def test_worktree_relative_syndicate_path_is_exempt():
         env={**os.environ, "CLAUDE_PROJECT_DIR": str(REPO_ROOT)},
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_a_disclaimer_about_the_guards_own_prior_enforcement_is_not_a_counter_claim(guard):
+    """2026-08-19, the real incident. `wnba-edge-263` correctly got blocked
+    from `scripts/refresh_wnba_oddsapi_props.py` (owned by
+    `basketball-model-owner`) and recorded that in its own Files block as
+    "BLOCKED, not taken" -- a disclaimer about a file it does NOT hold. Before
+    "not taken" was a recognized marker, that sentence re-read as
+    `wnba-edge-263`'s own claim on the path, and blocked the file's ACTUAL
+    owner (`basketball-model-owner`) from editing their own file. Reproduces
+    the exact wording from `.syndicate/lanes.md` at the time.
+    """
+    text = """\
+### wnba-edge-263 — OPEN — opened 2026-08-19 — session: wnba-edge-263
+- Files:
+  - **BLOCKED, not taken: `scripts/refresh_wnba_oddsapi_props.py`.**
+    `lane-guard` caught this live -- `basketball-model-owner`'s Files block
+    explicitly holds WRITE on this exact file. **Not editing it.**
+"""
+    got = {p for _, p in claims(guard, text)}
+    assert "scripts/refresh_wnba_oddsapi_props.py" not in got

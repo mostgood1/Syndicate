@@ -95,6 +95,21 @@ PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 # a genuine claim. That blocked `nhl-model-owner` from editing `todo.md`, a
 # file every lane in this repo edits constantly as a shared append-only
 # ledger.
+#
+# "not taken" was ALSO MISSING -- the third instance of the same class in one
+# day. Measured 2026-08-19: `wnba-edge-263` wrote "**BLOCKED, not taken:**
+# `scripts/refresh_wnba_oddsapi_props.py`. `lane-guard` caught this live --
+# `basketball-model-owner`'s Files block ... explicitly holds WRITE on this
+# exact file ... **Not editing it.**" -- a disclaimer stating the OPPOSITE of a
+# claim, written specifically BECAUSE this hook had just enforced the real
+# owner's claim correctly. Neither `_is_disclaimer` nor `_claimable_prefix`
+# recognized "not taken", so the path re-read as `wnba-edge-263`'s OWN claim --
+# and blocked `basketball-model-owner`, the file's actual, stated, correctly-
+# enforced owner, from editing their own file. A correct block followed by a
+# stale record of that block turning into a phantom counter-claim is a new
+# failure shape, not a repeat of the first two: those were disclaimers about a
+# file the writer never touched; this one is a disclaimer ABOUT THIS HOOK'S
+# OWN PRIOR ENFORCEMENT, and it still needs the same fix.
 _DISCLAIMER_MARKERS = (
     "not claimed",
     "collision check",
@@ -102,6 +117,7 @@ _DISCLAIMER_MARKERS = (
     "read-only reference",
     "not touched",
     "not touch",
+    "not taken",
     "held by",
     "claimed by",
     "ownership checked",
