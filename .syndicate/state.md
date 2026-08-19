@@ -2770,7 +2770,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, TWO CALIBRATION DEFECTS OPEN `[verified 2026-08-19]`
+## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, ONE OF TWO CALIBRATION DEFECTS FIXED `[verified 2026-08-19]`
 
 `syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
 rate) + `props._nfl_prop_model_probability` (Normal-CDF cover probability) —
@@ -2782,11 +2782,23 @@ constant baseline both in-sample and out-of-sample** (fit 2022-2023, scored
 2024-2025); `interceptions` genuinely shows no skill (corr 0.045). Full
 table: `docs/ai_context/todo.md` `#471`, `.syndicate/deploys.md` 2026-08-19.
 
-**Two open, diagnosed-not-fixed calibration defects**: (1) every count/yardage
-market is overconfident near its own mean (predicts ~50% cover, actual
-~37-44%) — real box-score stats are right-skewed, `Normal(mean, stdev)`
-can't represent that; (2) `anytime_td` at a rolling rate of exactly 0.0
-predicts 0%, real hit rate ~13-14% (small-sample MLE, needs shrinkage).
+**Defect 2 FIXED, TUNED, MEASURED out-of-sample `[2026-08-19, lane
+nfl-player-props-calibration-fix, 30caf008]`**: `anytime_td` at a rolling
+rate of exactly 0.0 used to predict 0% (real hit rate ~13-14%, a
+small-sample MLE problem). `player_stats.anytime_td_rate` now applies a
+Gamma-Poisson shrinkage toward a no-lookahead league-wide prior, `k=12`
+selected on 2022-2023 and only ever reported on 2024-2025 (never
+re-selected there). OOS Brier 0.1973 → 0.1680 (8,464 held-out rows); the
+raw_mean==0.0 bucket moved 0.0% → 18.0% predicted against a real 14.1% —
+closes most of the gap, a ~4pp residual stays, stated not hidden. Real
+trade-off: `anytime_td`'s point MAE got WORSE (0.358→0.386), correct for
+a probability market (Brier is the graded metric) but a real cost.
+
+**Defect 1 still OPEN, diagnosed-not-fixed**: every count/yardage market
+is overconfident near its own mean (predicts ~50% cover, actual ~37-44%)
+— real box-score stats are right-skewed, `Normal(mean, stdev)` can't
+represent that. Needs a different fix than shrinkage (a shape problem,
+not a small-n problem).
 
 **Production artifact-allowlist gap, confirmed live**:
 `/api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv`
