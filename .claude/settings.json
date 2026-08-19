@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lanes-postwrite-check.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-postwrite-check.py"
           }
         ]
       }
