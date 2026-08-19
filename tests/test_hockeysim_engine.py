@@ -221,6 +221,74 @@ class HockeySimEngineTest(unittest.TestCase):
             f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
         )
 
+    def test_special_teams_faceoff_oz_index_actually_changes_shot_volume(self) -> None:
+        """Reachability test for the newest per-team mechanism (`docs/ai_context/
+        hockeysim_engine_reference.md` §2n): `faceoff_oz_index` on `st_home`/`st_away` must
+        measurably change simulated SHOT volume at even strength -- a refinement of
+        `faceoff_ev_index` above (offensive-zone-specific rather than all-EV-zone-blended)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong_oz_team = dict(base, faceoff_oz_index=1.8)
+        weak_oz_team = dict(base, faceoff_oz_index=0.3)
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=base, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong_oz_team)
+        weak_mean = _mean_home_shots(weak_oz_team)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"faceoff_oz_index=1.8 must produce more HOME shots on average than "
+            f"faceoff_oz_index=0.3 when nothing else differs -- got strong={strong_mean:.3f} "
+            f"weak={weak_mean:.3f}. If this fails, faceoff_oz_index is present on "
+            f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
+        )
+
+    def test_faceoff_oz_index_takes_priority_over_faceoff_ev_index(self) -> None:
+        """`_resolve_faceoff_pct`'s fallback chain (§2n) must prefer `faceoff_oz_index` over
+        `faceoff_ev_index` when BOTH are present on the same side, not just fall back to whichever
+        key is checked first. Set them to CONTRADICTORY values -- a strong OZ index but a weak EV
+        index -- and confirm the OZ signal wins."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        # OZ says strong, EV says weak -- if OZ truly takes priority, HOME should out-shoot a team
+        # whose OZ says weak while ITS EV says strong (the opposite contradiction).
+        oz_strong_ev_weak = dict(base, faceoff_oz_index=1.8, faceoff_ev_index=0.3)
+        oz_weak_ev_strong = dict(base, faceoff_oz_index=0.3, faceoff_ev_index=1.8)
+
+        def _mean_home_shots(st_home: dict, st_away: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        home_oz_strong = _mean_home_shots(oz_strong_ev_weak, base)
+        home_oz_weak = _mean_home_shots(oz_weak_ev_strong, base)
+        self.assertGreater(
+            home_oz_strong, home_oz_weak,
+            f"HOME with faceoff_oz_index=1.8 (even though its faceoff_ev_index=0.3) must "
+            f"out-shoot HOME with faceoff_oz_index=0.3 (even though ITS faceoff_ev_index=1.8) -- "
+            f"got oz_strong={home_oz_strong:.3f} oz_weak={home_oz_weak:.3f}. If this fails, "
+            f"faceoff_ev_index is winning the fallback chain instead of faceoff_oz_index.",
+        )
+
     def test_player_shot_weight_actually_differentiates_shot_share(self) -> None:
         """Reachability test for `HockeyPlayerFeatures.shot_weight` (`docs/ai_context/
         hockeysim_engine_reference.md` §2k, the last genuinely-absent input this document tracked).

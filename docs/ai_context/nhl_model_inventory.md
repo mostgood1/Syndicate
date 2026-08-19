@@ -293,6 +293,33 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   immediately by the pre-existing `test_faceoff_win_pct_actually_changes_sog_projection`
   regressing, fixed with a raw (non-defaulted) per-side fallback so the
   index only overrides the blend when one is actually present.
+- **Did** build zone-specific (offensive-zone) faceoff differentiation
+  (reference doc §2n) — a refinement of the flat EV index above, not a
+  separate mechanism: not every faceoff win is equally valuable. A win in a
+  team's OWN offensive zone sets up an immediate shot chance; a win in
+  their own defensive zone mostly just prevents one against them.
+  Confirmed empirically that `zoneCode` is relative to the WINNER, not a
+  fixed rink frame — two faceoffs at the identical `(xCoord, yCoord)`
+  showed `zoneCode="O"` when home won and `"D"` when away won the same
+  physical draw — so the loser's own zone is the mirror image (`O`↔`D`
+  swap, `N` unchanged), letting every EV faceoff a team took (won OR lost)
+  contribute to their own zone-relative counts, not just their wins.
+  `compute_team_faceoff_oz_index` — same zero-sum-self-verifying ratio
+  technique. Measured: 1,312 games, 38,120 OZ-attributed faceoffs, mean
+  index 0.99973 across 32 teams; real spread NYR (1.101x) to FLA (0.907x),
+  ~21% top-to-bottom — and notably a DIFFERENT ranking than the flat EV
+  index (FLA mid-pack there, bottom-5 here), confirming this captures a
+  distinct signal, not a rescaled duplicate. Wired via a three-tier
+  fallback (`_resolve_faceoff_pct`): OZ index → EV index → all-situations
+  blend, each tier used only when present, preserving every prior tier's
+  reachability. **Verified the league-wide average did not shift**:
+  992-pairing round-robin, 62.138 neutral vs 61.937 real-indexed total
+  shots/game — noise-level. Reachability AND priority tested: a dedicated
+  test sets OZ and EV to CONTRADICTORY values on the same side and confirms
+  OZ wins, not just that one key happens to be checked first. Deliberately
+  did NOT wire defensive- or neutral-zone rates (the parser tracks all
+  three, but `_faceoff_multipliers` only models offensive shot-share, so a
+  DZ-specific rate has no symmetric consumption point yet).
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader

@@ -128,6 +128,32 @@ def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tu
         return 1.0, 1.0
 
 
+def _resolve_faceoff_pct(ev_only: bool, oz_index_raw: object, ev_index_raw: object,
+                          fallback_pct: float) -> float:
+    """One side's effective faceoff win percentage for `_faceoff_multipliers`, preferring the
+    OZ-specific index (§2n) over the EV-blended index (§2m) over the all-situations
+    `TeamRates.faceoff_win_pct` blend, in that order -- each tier used ONLY when both (a) the
+    segment is actually even-strength (`ev_only`) and (b) that tier's raw value is not `None`
+    (a missing index falls through to the next tier rather than being treated as neutral, which
+    would silently override real data at a coarser tier with a manufactured 1.0 -- the exact bug
+    `test_faceoff_win_pct_actually_changes_sog_projection` caught during development, §2m)."""
+    if ev_only:
+        if oz_index_raw is not None:
+            try:
+                return 0.5 * float(oz_index_raw)
+            except (TypeError, ValueError):
+                pass
+        if ev_index_raw is not None:
+            try:
+                return 0.5 * float(ev_index_raw)
+            except (TypeError, ValueError):
+                pass
+    try:
+        return float(fallback_pct)
+    except (TypeError, ValueError):
+        return 0.5
+
+
 class PossessionSimulator:
     """Placeholder for future possession-level simulation.
 
@@ -726,6 +752,17 @@ class PeriodSimulator:
         # `test_faceoff_win_pct_actually_changes_sog_projection` regressing before this was fixed.
         faceoff_ev_idx_home_raw = st_home.get("faceoff_ev_index")
         faceoff_ev_idx_away_raw = st_away.get("faceoff_ev_index")
+        # OFFENSIVE-ZONE-specific faceoff win-rate index (`docs/ai_context/hockeysim_engine_reference.md`
+        # §2n) -- a refinement of the blended EV index above, not a separate mechanism: not every
+        # faceoff win is equally valuable. A win in a team's OWN offensive zone sets up an
+        # immediate shot chance; a win in their own defensive zone mostly just prevents one against
+        # them. `_faceoff_multipliers` specifically boosts the WINNING team's own shot generation,
+        # so the OZ-specific rate is the more theoretically correct input -- preferred over the
+        # flat EV index when present, same raw/non-defaulted discipline as above so the fallback
+        # chain (OZ index -> EV index -> TeamRates.faceoff_win_pct) never silently overrides real
+        # data with a neutral value at any tier.
+        faceoff_oz_idx_home_raw = st_home.get("faceoff_oz_index")
+        faceoff_oz_idx_away_raw = st_away.get("faceoff_oz_index")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1004,24 +1041,24 @@ class PeriodSimulator:
             # Applies a small symmetric shift between teams, clamped to avoid destabilizing calibration.
             ev_only = bool(getattr(self.cfg, "faceoff_ev_only", True))
             if ((not ev_only) or ((not seg_is_home_pp) and (not seg_is_away_pp))):
-                # PREFER the EV-specific index (§2m) over the all-situations `faceoff_win_pct`
-                # blend when this segment IS actually even-strength AND a real index was supplied
-                # -- 0.5 is the natural fair-average baseline a 1.0-centered index scales around.
-                # Falls back to `TeamRates.faceoff_win_pct` per side, independently, whenever that
-                # side has no index (preserves the field's existing reachability -- NOT the same
-                # as defaulting the index to 1.0, which would silently override real data with a
-                # neutral value instead of falling back to it). When `ev_only` is False (a
-                # non-default config applying this adjustment to ALL segments, including PP/PK),
-                # the EV-specific index would be the wrong basis for a PP/PK segment, so both sides
-                # always use the all-situations blend in that case.
-                if ev_only and faceoff_ev_idx_home_raw is not None:
-                    fo_h_pct = 0.5 * _f(faceoff_ev_idx_home_raw, 1.0)
-                else:
-                    fo_h_pct = float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5)
-                if ev_only and faceoff_ev_idx_away_raw is not None:
-                    fo_a_pct = 0.5 * _f(faceoff_ev_idx_away_raw, 1.0)
-                else:
-                    fo_a_pct = float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5)
+                # PREFER the OZ-specific index (§2n) over the EV-blended index (§2m) over the
+                # all-situations `faceoff_win_pct` blend, in that order, when this segment IS
+                # actually even-strength -- 0.5 is the natural fair-average baseline a 1.0-centered
+                # index scales around. Falls back per side, independently, at each tier whenever
+                # that side lacks the more-precise signal (preserves reachability all the way down
+                # -- NOT the same as defaulting a missing index to 1.0, which would silently
+                # override real data with a neutral value instead of falling back to it). When
+                # `ev_only` is False (a non-default config applying this adjustment to ALL
+                # segments, including PP/PK), neither index is the right basis for a PP/PK segment,
+                # so both sides always use the all-situations blend in that case.
+                fo_h_pct = _resolve_faceoff_pct(
+                    ev_only, faceoff_oz_idx_home_raw, faceoff_ev_idx_home_raw,
+                    float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5),
+                )
+                fo_a_pct = _resolve_faceoff_pct(
+                    ev_only, faceoff_oz_idx_away_raw, faceoff_ev_idx_away_raw,
+                    float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
+                )
                 m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
                 lam_h = float(lam_h) * float(m_fo_h)
                 lam_a = float(lam_a) * float(m_fo_a)

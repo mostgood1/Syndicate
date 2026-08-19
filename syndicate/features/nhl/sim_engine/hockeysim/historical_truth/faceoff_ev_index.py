@@ -27,10 +27,30 @@ the same "not a power play for either side" condition `engine.py`'s own
 `seg_is_home_pp`/`seg_is_away_pp` flags represent -- this module's ground truth and
 the engine's own segment classification are conceptually the same split, just
 computed from real historical data here instead of simulated on the fly there.
+
+OFFENSIVE-ZONE WIN INDEX (`compute_team_faceoff_oz_index`), added in a second pass.
+Not every faceoff win is equally valuable: winning a draw in your OWN offensive zone
+sets up an immediate shot chance, winning it in your own defensive zone mostly just
+PREVENTS one against you, and a neutral-zone win is somewhere in between. The flat
+EV index above blends all three together. `_faceoff_multipliers` specifically boosts
+the WINNING team's OWN shot generation, so the offensive-zone-specific win rate is
+the more theoretically correct input for that mechanism -- this is a refinement of
+what feeds the SAME consumption point, not a second, separately-wired signal.
+
+`zoneCode` IS RELATIVE TO THE WINNER, CONFIRMED EMPIRICALLY, NOT ASSUMED. Two
+faceoff events at the IDENTICAL `(xCoord, yCoord)` in a real cached game showed
+`zoneCode="O"` when the home team won and `zoneCode="D"` when the away team won at
+that same physical dot -- proof the label describes the WINNING team's own zone, not
+a fixed rink-absolute frame. This means the LOSING team's own zone at that same draw
+is the mirror image: `O` and `D` swap, `N` stays `N` (there are only two ends of the
+ice and two teams; one team's offensive zone is the other's defensive zone). Losses
+are attributed via that flip (`_ZONE_FLIP`), not left unattributed -- every EV
+faceoff a team participates in, won or lost, contributes to their own zone-relative
+win/total counts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence
 
 
@@ -154,5 +174,141 @@ def compute_team_faceoff_ev_index(records: Sequence[GameFaceoffEvRecord]) -> Dic
         out[team] = TeamFaceoffEvIndex(
             team=team, index=index, games=games,
             ev_wins=row["ev_wins"], ev_total=row["ev_total"],
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Zone-specific (offensive-zone) win index -- see the module docstring's second
+# section for why this exists and why `zoneCode` can be trusted as winner-relative.
+# ---------------------------------------------------------------------------
+
+_ZONES = ("O", "N", "D")
+_ZONE_FLIP = {"O": "D", "D": "O", "N": "N"}
+
+
+def _empty_zone_counts() -> Dict[str, int]:
+    return {z: 0 for z in _ZONES}
+
+
+@dataclass(frozen=True)
+class GameFaceoffZoneRecord:
+    """One finished game's EVEN-STRENGTH faceoff counts, split by zone, from EACH
+    team's OWN perspective (`home_zone_*`/`away_zone_*` are not mirror images of a
+    single shared frame -- they are independently team-relative, per the module
+    docstring's zone-flip note)."""
+
+    game_id: str
+    home_abbr: str
+    away_abbr: str
+    home_zone_wins: Dict[str, int] = field(default_factory=_empty_zone_counts)
+    home_zone_total: Dict[str, int] = field(default_factory=_empty_zone_counts)
+    away_zone_wins: Dict[str, int] = field(default_factory=_empty_zone_counts)
+    away_zone_total: Dict[str, int] = field(default_factory=_empty_zone_counts)
+
+
+def parse_playbyplay_faceoffs_by_zone(payload: Dict) -> Optional[GameFaceoffZoneRecord]:
+    """Parse one `playbyplay` payload into a :class:`GameFaceoffZoneRecord`, EVEN-
+    STRENGTH faceoffs only, split by each team's OWN zone. Returns `None` under the
+    same conditions as :func:`parse_playbyplay_faceoffs_ev` -- never raises. A
+    faceoff with a `zoneCode` outside `{"O","D","N"}` (missing/malformed) is
+    skipped entirely (both win and total counts), matching this module's existing
+    "skip rather than guess" discipline for an unresolved `eventOwnerTeamId`."""
+    if not isinstance(payload, dict):
+        return None
+    home_team = payload.get("homeTeam") or {}
+    away_team = payload.get("awayTeam") or {}
+    home_id = home_team.get("id")
+    away_id = away_team.get("id")
+    home_abbr = str(home_team.get("abbrev") or "").upper()
+    away_abbr = str(away_team.get("abbrev") or "").upper()
+    if home_id is None or away_id is None or not home_abbr or not away_abbr:
+        return None
+    plays = payload.get("plays")
+    if not isinstance(plays, list):
+        return None
+
+    home_wins, home_total = _empty_zone_counts(), _empty_zone_counts()
+    away_wins, away_total = _empty_zone_counts(), _empty_zone_counts()
+
+    for play in plays:
+        if not isinstance(play, dict) or play.get("typeDescKey") != "faceoff":
+            continue
+        skaters = _skaters_from_situation_code(play.get("situationCode"))
+        if skaters is None or skaters[0] != skaters[1]:
+            continue  # not even strength (or malformed code) -- skip, don't guess
+        details = play.get("details") or {}
+        owner = details.get("eventOwnerTeamId")
+        zone = details.get("zoneCode")
+        if zone not in _ZONES:
+            continue  # missing/malformed zone -- skip rather than guess
+        if owner == home_id:
+            home_wins[zone] += 1
+            home_total[zone] += 1
+            away_total[_ZONE_FLIP[zone]] += 1  # away lost it; zone flips to their own frame
+        elif owner == away_id:
+            away_wins[zone] += 1
+            away_total[zone] += 1
+            home_total[_ZONE_FLIP[zone]] += 1
+        # else: owner unresolved -- skip rather than misattribute (neither side's counts move)
+
+    return GameFaceoffZoneRecord(
+        game_id=str(payload.get("id") or ""),
+        home_abbr=home_abbr, away_abbr=away_abbr,
+        home_zone_wins=home_wins, home_zone_total=home_total,
+        away_zone_wins=away_wins, away_zone_total=away_total,
+    )
+
+
+MIN_GAMES_FOR_FACEOFF_OZ_INDEX = 10
+DEFAULT_FACEOFF_OZ_INDEX = 1.0
+
+
+@dataclass(frozen=True)
+class TeamFaceoffOzIndex:
+    """Per-team OFFENSIVE-ZONE-specific faceoff win-rate tendency (their own zone,
+    not a rink-absolute frame), normalized against the league-wide OZ win rate --
+    1.0 = league average. The more theoretically correct input for
+    `_faceoff_multipliers` than the blended EV index above, since that mechanism
+    specifically boosts the WINNING team's own shot generation and an OZ win is
+    what most directly causes one."""
+
+    team: str
+    index: float
+    games: int
+    oz_wins: int
+    oz_total: int
+
+
+def compute_team_faceoff_oz_index(records: Sequence[GameFaceoffZoneRecord]) -> Dict[str, TeamFaceoffOzIndex]:
+    acc: Dict[str, Dict[str, int]] = {}
+
+    def _touch(team: str) -> Dict[str, int]:
+        return acc.setdefault(team, {"games": 0, "oz_wins": 0, "oz_total": 0})
+
+    for r in records:
+        h = _touch(r.home_abbr)
+        a = _touch(r.away_abbr)
+        h["games"] += 1
+        a["games"] += 1
+        h["oz_wins"] += r.home_zone_wins["O"]
+        h["oz_total"] += r.home_zone_total["O"]
+        a["oz_wins"] += r.away_zone_wins["O"]
+        a["oz_total"] += r.away_zone_total["O"]
+
+    league_wins = sum(v["oz_wins"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_OZ_INDEX)
+    league_total = sum(v["oz_total"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_OZ_INDEX)
+    league_rate = _safe_div(league_wins, league_total)
+
+    out: Dict[str, TeamFaceoffOzIndex] = {}
+    for team, row in acc.items():
+        games = row["games"]
+        index = DEFAULT_FACEOFF_OZ_INDEX
+        if games >= MIN_GAMES_FOR_FACEOFF_OZ_INDEX and league_rate > 0:
+            team_rate = _safe_div(row["oz_wins"], row["oz_total"])
+            index = round(team_rate / league_rate, 4)
+        out[team] = TeamFaceoffOzIndex(
+            team=team, index=index, games=games,
+            oz_wins=row["oz_wins"], oz_total=row["oz_total"],
         )
     return out

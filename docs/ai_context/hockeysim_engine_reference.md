@@ -623,11 +623,63 @@ absent — the index now only overrides the blend when a real one is actually su
 everything else held identical.
 
 **What this does NOT cover**: zone-specific faceoff differentiation (offensive/defensive/neutral —
-`zoneCode` is present on every `playbyplay` faceoff event but unused here; a zone-weighted index is
-a plausible future refinement, not attempted this pass); the `faceoff_alpha`/`faceoff_diff_clip`/
-`faceoff_mult_clip_*` constants controlling how much a win-rate difference moves shot share remain
-the vendor's original, never-calibrated defaults — this pass fixes WHAT data feeds the mechanism,
-not whether the mechanism's own sensitivity constants match real truth.
+`zoneCode` is present on every `playbyplay` faceoff event but was unused by this pass; closed next,
+§2n). The `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` constants controlling how much a
+win-rate difference moves shot share remain the vendor's original, never-calibrated defaults — this
+pass fixes WHAT data feeds the mechanism, not whether the mechanism's own sensitivity constants
+match real truth.
+
+---
+
+## 2n. Zone-specific (offensive-zone) faceoff-index differentiation
+
+Full module: same `historical_truth/faceoff_ev_index.py`, extended. A refinement of §2m, not a
+separate mechanism: not every faceoff win is equally valuable for shot generation. A win in a
+team's OWN offensive zone sets up an immediate shot chance; a win in their own defensive zone
+mostly just prevents one against them. The flat EV index blends all three zones together;
+`_faceoff_multipliers` specifically boosts the WINNING team's OWN shot generation, so the
+offensive-zone-specific win rate is the theoretically correct input for that mechanism.
+
+**`zoneCode` is relative to the WINNER, confirmed empirically, not assumed**: two faceoff events at
+the IDENTICAL `(xCoord, yCoord)` in a real cached game showed `zoneCode="O"` when the home team won
+and `zoneCode="D"` when the away team won at that same physical dot — proof the label describes the
+winning team's own zone, not a fixed rink-absolute frame. The losing team's own zone at that same
+draw is therefore the mirror image (`O`↔`D` swap, `N` unchanged — there are only two ends of the ice
+and two teams), so every EV faceoff a team participates in — won OR lost — contributes to their own
+zone-relative counts, not just their wins.
+
+**The new signal**: `compute_team_faceoff_oz_index` — a per-team OFFENSIVE-ZONE-specific win-rate
+index (ratio to league-average OZ win rate, mean ≈1.0), computed the same zero-sum-self-verifying
+way as §2m. **Measured on real data**: 1,312 games, 38,120 OZ-attributed EV faceoffs (summed across
+both team perspectives), mean index 0.99973 across 32 teams. Real spread: NYR (1.101x)/OTT
+(1.096x)/TOR (1.090x) highest, FLA (0.907x)/ANA (0.910x)/MIN (0.916x) lowest — ~21% top-to-bottom,
+and notably a DIFFERENT ranking than the flat EV index (FLA is mid-pack on the blended index but
+bottom-5 on OZ-specific — confirming this captures something the blend doesn't).
+
+**Wiring**: `_resolve_faceoff_pct` (new helper, next to `_faceoff_multipliers`) implements a
+three-tier fallback per side, independently: `faceoff_oz_index` (most precise) → `faceoff_ev_index`
+(§2m) → `TeamRates.faceoff_win_pct` (all-situations, §2j/§2l) — each tier used only when its raw
+value is not `None` and the segment is actually even-strength, so a missing index at any tier falls
+through to the next rather than being treated as neutral (the same discipline §2m's regression fix
+established, generalized to a longer chain).
+
+**Verified the league-wide average did not shift**: 992-pairing round-robin (2,976 games each,
+real EV index active throughout), neutral OZ index → 62.138 avg total shots/game; real OZ index →
+61.937 — a ~0.32% difference, noise-level, confirming the OZ layer redistributes shots between
+teams without moving the league aggregate, same property verified for every per-team index this
+session.
+
+**Reachability + priority tested**: `test_special_teams_faceoff_oz_index_actually_changes_shot_volume`
+proves `faceoff_oz_index=1.8` produces more HOME shots than `0.3`, 80 seeded runs.
+`test_faceoff_oz_index_takes_priority_over_faceoff_ev_index` sets the two indices to CONTRADICTORY
+values on the same side (OZ strong + EV weak vs. OZ weak + EV strong) and confirms the OZ signal
+wins — not just that one key happens to be checked first.
+
+**What this does NOT cover**: defensive-zone- and neutral-zone-specific rates were computed (the
+parser tracks all three) but not wired — only OZ feeds the engine, since `_faceoff_multipliers`
+only models offensive shot-share, not a symmetric defense-side effect a DZ-specific rate could
+drive. `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain uncalibrated, same caveat
+as §2m.
 
 ---
 
@@ -689,6 +741,7 @@ concept.
 | `blocks_per_60`/`penalties_per_60` — REMOVED (§2l) after §2j proved them a confirmed dead gate | deleted from `HockeyTeamFeatures`/`TeamRates` and every reference site (loaders, `player_props`, the producer script, 3 calibration scripts), traced through the whole chain, not just the dataclass fields | `nhl_sim_input_checklist.py`'s `--- HockeyTeamFeatures ---` section is now EMPTY — nothing left unreachable to report |
 | `historical_truth/player_game_rates.py` + `scripts/build_nhl_player_rates_artifact.py` — real per-player `shot_weight`/`goal_weight`/`block_weight`, 828 players rated from 47,231 skater-game records (§2k) | built, run, tested (15 parser + 6 loader + 3 mechanism-level reachability tests), external sanity check (MacKinnon/Matthews/Hughes/McDavid top the shot-volume list) | ALREADY reachable pre-fix (engine.py's own position/TOI heuristic); this replaces that heuristic with real per-player data, proven at the mechanism level, not just population |
 | `historical_truth/faceoff_ev_index.py` + `faceoff_ev_index` wired into `engine.py` (§2m) — closes the all-situations-vs-EV-only mismatch, a NEW per-team mechanism sourced from `situationCode` strength-state data | built, run (1,312 playbyplay games, mean index 1.00011 across 32 teams), verified the league-wide average did not shift (61.786 neutral vs 62.079 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability). Found and fixed a real regression during wiring — a naive version made the already-reachable `TeamRates.faceoff_win_pct` stop mattering whenever no index was supplied; fixed with a raw (non-defaulted) per-side fallback | reachable by default; a REAL behavior change for EV shot-share, with `TeamRates.faceoff_win_pct`'s existing reachability preserved as the fallback path |
+| `compute_team_faceoff_oz_index` + `faceoff_oz_index` wired into `engine.py` via `_resolve_faceoff_pct` (§2n) — a zone-specific refinement of §2m, preferred over the flat EV index when present | built, run (1,312 playbyplay games, 38,120 OZ-attributed faceoffs, mean index 0.99973 across 32 teams — a DIFFERENT ranking than the EV index, confirming a distinct signal), verified the league-wide average did not shift (62.138 neutral vs 61.937 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability + 1 priority-over-EV-index) | reachable by default; three-tier fallback (OZ → EV → all-situations blend) preserves every prior tier's reachability |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **All of it is additive and reachable-by-default** — no new flag was

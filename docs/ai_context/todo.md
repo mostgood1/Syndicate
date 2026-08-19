@@ -1211,10 +1211,45 @@ when a real one is actually supplied. 335 hockeysim/nhl tests pass (12 new:
 10 parser/index + 1 loader + 1 reachability), checklist re-confirmed full
 PASS after the fix.
 
-**What remains open**: zone-specific faceoff differentiation (`zoneCode` is
-present on every event, unused here); `faceoff_alpha`/`faceoff_diff_clip`/
-`faceoff_mult_clip_*` remain the vendor's never-calibrated defaults -- this
-pass fixed WHAT feeds the mechanism, not its own sensitivity constants.
+**What remains open**: `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`
+remain the vendor's never-calibrated defaults -- this pass fixed WHAT feeds
+the mechanism, not its own sensitivity constants.
+
+**Addendum, same day: zone-specific (offensive-zone) faceoff differentiation
+built** (reference doc §2n) -- a refinement of the EV index above, not a
+separate mechanism. Not every faceoff win is equally valuable: a win in a
+team's OWN offensive zone sets up an immediate shot chance, a win in their
+own defensive zone mostly just prevents one against them. **Confirmed
+empirically, not assumed, that `zoneCode` is relative to the WINNER**: two
+faceoff events at the IDENTICAL `(xCoord, yCoord)` in a real cached game
+showed `zoneCode="O"` when home won and `"D"` when away won the SAME
+physical draw -- the loser's own zone is therefore the mirror image
+(`O`<->`D` swap, `N` unchanged), so every EV faceoff a team took, won OR
+lost, contributes to their own zone-relative counts via that flip, not just
+their wins. `compute_team_faceoff_oz_index` -- same zero-sum-self-verifying
+ratio technique as the EV index. **Measured**: 1,312 games, 38,120
+OZ-attributed faceoffs, mean index 0.99973 across 32 teams; real spread NYR
+(1.101x) to FLA (0.907x), ~21% top-to-bottom -- and notably a DIFFERENT
+ranking than the flat EV index (FLA mid-pack there, bottom-5 here),
+confirming a genuinely distinct signal, not a rescaled duplicate.
+
+Wired via `_resolve_faceoff_pct`, a three-tier per-side fallback: OZ index
+-> EV index -> all-situations blend, each tier used only when its raw value
+is present, preserving every prior tier's reachability (same discipline the
+EV-index regression fix established, generalized to a longer chain).
+**Verified the league-wide average did not shift**: 992-pairing round-robin,
+62.138 neutral vs 61.937 real-indexed total shots/game -- noise-level.
+**Reachability AND priority tested**: one test proves `faceoff_oz_index`
+changes shot volume; a second sets OZ and EV to CONTRADICTORY values on the
+same side (OZ strong + EV weak vs. the reverse) and confirms OZ wins the
+fallback chain, not just that one key happens to be checked first. 348
+hockeysim/nhl tests pass (13 new), checklist re-confirmed full PASS.
+
+**Deliberately did NOT wire**: defensive- or neutral-zone-specific rates --
+the parser tracks all three zones, but `_faceoff_multipliers` only models
+offensive shot-share, so a DZ-specific rate has no symmetric consumption
+point to feed yet. `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`
+remain uncalibrated, same open item as above.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 
