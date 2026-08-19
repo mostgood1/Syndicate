@@ -137,3 +137,83 @@ dominant year-over-year signal — but they arrive through the weak lever.
   either against a team NAME silently yields zero matches — it produced a false
   "94 teams missing rosters" during this very audit. Resolve through
   `/teams/fbs?year=<season>`.
+
+---
+
+## 7. Returning production: MEASURED, and it is NOT redundant with SP+
+
+Measured 2026-08-19, after SP+ replaced PPA as the rating source. §5 said these
+three inputs "arrive through the weak lever" and left it there. That was a
+statement about the PLUMBING, and it skipped the prior question: **is the
+information already inside the rating?** If preseason SP+ already blended
+returning production, wiring it again would DOUBLE-COUNT — the mechanism-vs-
+estimator trap (`model_engine_standard.md` §4.4) that made 4 of 4 markets worse.
+
+**It does not. Two independent tests, both leak-free.**
+
+### Test 1 — is it already in preseason SP+? NO.
+
+Regress preseason SP+ 2026 on final SP+ 2025 (n=136) and probe the residual:
+
+| probe | r vs 1-prior-season residual | r vs 2-prior |
+|---|---|---|
+| returning production (`percentPPA`) | **+0.035** | +0.015 |
+| recruiting points 2026 | **+0.482** | +0.260 |
+
+Incremental R² from returning production: **+0.000** on a base R² of 0.769.
+
+**The recruiting row is the POSITIVE CONTROL and it is the reason the null is
+usable.** A residual that detects nothing is indistinguishable from a residual
+that *cannot* detect. Recruiting — publicly documented as an SP+ preseason
+ingredient — reads +0.482 through the identical residual, so the instrument
+works and the +0.035 is a real absence, not a broken probe.
+
+### Test 2 — does it predict anything? YES.
+
+Availability is not usefulness. Correlate returning production for season S
+(published in the offseason, strictly prior information) against how much a team
+ACTUALLY moved — final SP+(S) residualised on final SP+(S−1):
+
+| season | n | r(RP, movement) |
+|---|---|---|
+| 2019 | 130 | +0.332 |
+| 2021 | 128 | +0.115 |
+| 2022 | 130 | +0.195 |
+| 2023 | 131 | +0.326 |
+| 2024 | 133 | +0.175 |
+| 2025 | 134 | +0.103 |
+| **pooled** | **786** | **+0.207**, ~5.8σ |
+
+4.3% of the variance in year-over-year SP+ movement, **and the sign is positive
+in all six seasons independently** — 2020 excluded as COVID-distorted. That
+per-season consistency is what makes this different from the small-n reads that
+misfired twice this session; no single season carries it.
+
+Movement SD is ~8.4 SP+ points, so ≈ **1.7 points of team rating per SD of
+returning production** — at `SP_RATING_SCALE`, ≈0.17 in engine units.
+
+### What is NOT yet established
+
+The outcome above is **SP+ movement, which is a PROXY for game results.**
+`SP_RATING_SCALE=10` was itself chosen by matching a proxy (market dispersion)
+and never tested for accuracy — the same error, one layer up. So:
+
+**Do not wire this on the strength of §7 alone.** It clears the redundancy bar
+and the signal bar; the remaining gate is a paired ΔCRPS or margin-MAE test
+against REALISED results, and it still arrives through the 4.1% payload lever
+rather than the 17.2% ratings lever. The higher-value form is likely an
+adjustment to the SP+ rating itself, not a `feature_generation_payload` key.
+
+### A stale artifact this surfaced
+
+`ncaaf_returning_production_snapshot.csv` held **season 2025 only** (134 rows).
+CFBD serves `year=2026` fine — **136 rows**. `--season` is a REQUIRED argument,
+so this was an invocation error when the snapshot was built on 2026-08-19, not a
+builder defect: it was run with `--season 2025` and the file is named without a
+season, so nothing about it looks wrong on disk. Rebuilt for 2026.
+
+**The general trap:** a season-less filename over a season-scoped fetch makes a
+wrong-season artifact indistinguishable from a right one at every level except
+opening it. Same shape as the stale-artifact false success recorded in
+`.syndicate/log/2026-08-19.md` — check the season/`generated_at` INSIDE the
+file, never its existence.
