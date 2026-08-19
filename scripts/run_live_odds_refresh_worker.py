@@ -64,6 +64,33 @@ from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_backgr
 # live-odds-worker, where it belongs). refresh-worker's own autorun now
 # requests phase="live" only, keeping just the sim (soccer_{league}_artifacts,
 # phases=("pregame","live")) and live_state polling.
+def _is_refresh_run_contention_error(exc: Exception) -> bool:
+    """True when `exc` is `launch_refresh_run`'s "already active" mutex
+    ValueError specifically -- i.e. NOTHING was actually attempted here,
+    some OTHER job (often a protected in-flight sim) legitimately holds the
+    shared "one refresh run active" slot right now.
+
+    `#472`: both `_launch_autorun_soccer_pregame_refresh` and
+    `_launch_autorun_wnba_pregame_refresh` used to write a fresh, full-
+    interval-resetting epoch on EVERY exception here, contention included --
+    conflating "we tried and it's genuinely too soon to try again" (a real
+    completed attempt) with "we didn't get a turn" (contention says nothing
+    about whether it's too soon). One lost race therefore cost the FULL
+    cadence interval (4h default) instead of a short retry. Confirmed live
+    2026-08-19: WNBA's autorun succeeded cleanly at ~4h intervals all day
+    (01:24/05:24/09:29/13:35Z), then went 5+ hours dark the first time it
+    collided with a chain of back-to-back MLB resims (`fingerprint_change`-
+    triggered; the sim's own pid was observed switching mid-investigation,
+    3311 -> 111, confirming it was genuinely still running, not a stuck
+    zombie state). Distinguishing this class is what lets the caller skip
+    the epoch-reset for contention only, so the very next tick (the
+    worker's own short poll cadence, not this function's interval) retries
+    again -- succeeding the moment the slot frees up rather than being
+    locked out for up to a full cadence window over one race.
+    """
+    return isinstance(exc, ValueError) and "already active" in str(exc)
+
+
 def _soccer_pregame_refresh_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN") or "").strip().lower()
     return raw_value in {"1", "true", "yes", "on"}
@@ -262,7 +289,13 @@ def _launch_autorun_wnba_pregame_refresh() -> None:
             launch_mode="web_process",
         )
     except Exception as exc:
-        write_json_file(status_path, {"epoch": time.time(), "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        if _is_refresh_run_contention_error(exc):
+            # Same fix as soccer's identical except-block, #472: preserve the
+            # ORIGINAL epoch on contention instead of stamping a new one, so
+            # one lost mutex race doesn't cost a full cadence window.
+            write_json_file(status_path, {**last_status, "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
         print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
         return
     write_json_file(
@@ -314,7 +347,15 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
             launch_mode="web_process",
         )
     except Exception as exc:
-        write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        if _is_refresh_run_contention_error(exc):
+            # Preserve the ORIGINAL epoch (from the last real success) rather
+            # than stamping a new one -- see _is_refresh_run_contention_error.
+            # Once that original interval elapses, every subsequent tick
+            # retries again immediately instead of waiting out a second full
+            # window earned by pure bad luck.
+            write_json_file(status_path, {**last_status, "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
         print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
         return
     # `artifactsDir` and `runStamp` are what make the NEXT tick able to report
