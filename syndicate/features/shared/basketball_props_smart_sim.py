@@ -27,6 +27,7 @@ _TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str], object] = {}
 _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str], object] = {}
 _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], set[str]]] = {}
 _REAL_SMART_SIM_MODULE_CACHE_LOCAL: dict[str, Any] = {}
+_ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL: dict[tuple[str, str], tuple[Any, Any]] = {}
 
 
 def _json_default_local(value: Any) -> Any:
@@ -3469,8 +3470,128 @@ def _norm_pct01_local(value: Any) -> float:
         return float("nan")
 
 
-def _load_team_advanced_stats_asof_local(*, processed_root: Path, season: int, as_of_date_str: str):
+# `#468`: `#461` fixed the cache-freshness guard around this exact rebuild
+# logic in `<package>/cli.py`'s `_ensure_team_advanced_stats_asof` -- but
+# that function is unreachable from here. Production's real pipeline
+# (`refresh_wnba_oddsapi_props.py` -> this module) imports
+# `<package>.sim.smart_sim` directly, in-process, and never subprocesses
+# into `<package>.cli`, so the fixed function was never on the executed
+# call graph. This is the SAME cache-freshness check, ported onto the path
+# that actually runs, calling the SAME builder functions `#461` already
+# relies on (`compute_team_advanced_stats_from_boxscores`/`_from_player_logs`)
+# rather than re-deriving the aggregation math a second time.
+_TEAM_ADV_STATS_REQUIRED_COLUMNS_LOCAL = ("games", "source")
+
+
+def _team_adv_stats_cache_is_fresh_local(path: Path) -> bool:
+    """Port of `_team_adv_stats_cache_is_fresh` (`<package>/cli.py:1893`).
+    True only if `path`'s header has the current schema. Header-only read,
+    cheap enough to check on every access, not just on first build."""
     import pandas as pd
+
+    try:
+        header = pd.read_csv(path, nrows=0)
+    except Exception:
+        return False
+    return all(c in header.columns for c in _TEAM_ADV_STATS_REQUIRED_COLUMNS_LOCAL)
+
+
+def _import_advanced_stats_builders_local(*, package_name: str, processed_root: Path) -> tuple[Any, Any]:
+    """Import the vendored `<package>.advanced_stats_boxscores` /
+    `_player_logs` builder modules and pin their `paths` to `processed_root`
+    -- same pattern `_build_local_smart_sim_module` already uses for
+    `smart_sim.py` (explicit pin, not trusting
+    `WNBA_BETTING_DATA_ROOT`/`NBA_BETTING_DATA_ROOT` to already match).
+    Cached per (package, processed_root) so the sys.path mutation and
+    import cost is paid once per process, not once per game."""
+    cache_key = (package_name, str(processed_root))
+    cached = _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL.get(cache_key)
+    if cached is not None:
+        return cached
+    boxscores_mod: Any = None
+    player_logs_mod: Any = None
+    try:
+        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
+        src_root = vendor_root / "src"
+        src_root_s = str(src_root)
+        if src_root.is_dir() and src_root_s not in sys.path:
+            sys.path.insert(0, src_root_s)
+        source_root = processed_root.parent.parent if processed_root.parent.name.lower() == "data" else processed_root.parent
+        pinned_paths = SimpleNamespace(data_processed=processed_root, data_raw=source_root / "data" / "raw", root=source_root)
+        boxscores_mod = importlib.import_module(f"{package_name}.advanced_stats_boxscores")
+        boxscores_mod.paths = pinned_paths
+        player_logs_mod = importlib.import_module(f"{package_name}.advanced_stats_player_logs")
+        player_logs_mod.paths = pinned_paths
+    except Exception:
+        boxscores_mod = None
+        player_logs_mod = None
+    result = (boxscores_mod, player_logs_mod)
+    _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL[cache_key] = result
+    return result
+
+
+def _ensure_team_advanced_stats_asof_local(*, processed_root: Path, league_code: str, season: int, as_of_date_str: str) -> Path | None:
+    """Port of `#461`'s fixed `_ensure_team_advanced_stats_asof`
+    (`<package>/cli.py:1903`), on the code path production's real pipeline
+    actually executes. Returns the as-of file's path if it's present and
+    fresh, or was just (re)built; None if nothing could be built. Callers
+    should call this before reading the as-of file, not instead of reading
+    it -- this only ensures the file, it doesn't return the data."""
+    as_of_s = str(as_of_date_str).strip()
+    safe = as_of_s.replace(":", "-")
+    out_path = processed_root / f"team_advanced_stats_{int(season)}_asof_{safe}.csv"
+    try:
+        if out_path.is_file() and out_path.stat().st_size > 0 and _team_adv_stats_cache_is_fresh_local(out_path):
+            return out_path
+    except OSError:
+        pass
+    package_name = "wnba_betting" if str(league_code or "").strip().lower() != "nba" else "nba_betting"
+    boxscores_mod, player_logs_mod = _import_advanced_stats_builders_local(package_name=package_name, processed_root=processed_root)
+    if boxscores_mod is None and player_logs_mod is None:
+        return None
+    local_min_games = 1 if str(league_code or "").strip().lower() != "nba" else 10
+    stats = None
+    if boxscores_mod is not None:
+        try:
+            stats = boxscores_mod.compute_team_advanced_stats_from_boxscores(int(season), min_games=local_min_games, as_of=as_of_s)
+        except Exception:
+            stats = None
+    if (stats is None or stats.empty) and player_logs_mod is not None:
+        try:
+            stats = player_logs_mod.compute_team_advanced_stats_from_player_logs(int(season), min_games=local_min_games, as_of=as_of_s)
+        except Exception:
+            stats = None
+    if stats is None or stats.empty:
+        return None
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        stats.to_csv(out_path, index=False)
+        return out_path
+    except Exception:
+        return None
+
+
+def _load_team_advanced_stats_asof_local(*, processed_root: Path, season: int, as_of_date_str: str, league_code: str = ""):
+    import pandas as pd
+
+    # `#468`: ensure the as-of file is fresh (or build it) BEFORE reading --
+    # this is the reachability fix. `league_code` defaults to "" for
+    # backward compatibility with any caller that hasn't been updated to
+    # pass it -- an empty code SKIPS the ensure step entirely (old
+    # read-only behavior, unchanged) rather than guessing a league, since
+    # guessing wrong would point the builder at the wrong boxscores
+    # directory. Every call site in this file has been updated to pass it;
+    # this default only protects an external caller this pass didn't find.
+    # If the ensure step can't build anything (e.g. no boxscores cached),
+    # the read below falls through to whatever's already on disk, exactly
+    # as before this fix.
+    if league_code:
+        _ensure_team_advanced_stats_asof_local(
+            processed_root=processed_root,
+            league_code=league_code,
+            season=int(season),
+            as_of_date_str=str(as_of_date_str),
+        )
 
     cache_key = (str(processed_root), int(season), str(as_of_date_str).strip())
     cached = _TEAM_ADVANCED_STATS_CACHE_LOCAL.get(cache_key)
@@ -3604,7 +3725,7 @@ def _team_adj_from_advanced_stats_local(*, processed_root: Path, date_str: str, 
         # adjustments came back None and every sim ran both teams at
         # identical league-baseline efficiencies.
         compact_date_str = str(date_str).strip().replace("-", "")
-        df = _load_team_advanced_stats_asof_local(processed_root=processed_root, season=int(season), as_of_date_str=compact_date_str)
+        df = _load_team_advanced_stats_asof_local(processed_root=processed_root, season=int(season), as_of_date_str=compact_date_str, league_code=str(getattr(league, "code", "") or ""))
         if df is None or df.empty:
             diag["reason"] = "missing_team_advanced_stats"
             return None, None, 1.0, diag
@@ -4572,6 +4693,7 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                 processed_root=processed_root,
                 season=int(season_y),
                 as_of_date_str=compact_date_str,
+                league_code=str(league_code or ""),
             )
             if sdf is None or sdf.empty:
                 return {}
