@@ -2694,26 +2694,47 @@ the genuine `player_logs.parquet`/`.csv` artifacts; the boxscore fallback
 path is gated purely on content-date staleness plus a dedicated 30-minute
 attempt-backoff marker (mirrors this file's own `_predict_date_*` pattern).
 
-**A THIRD bug (`#472`) then explained why even THAT fix's effect stayed
-unobserved for 5+ hours**: `_launch_autorun_wnba_pregame_refresh` (and its
-identical twin, `_launch_autorun_soccer_pregame_refresh`) wrote a fresh,
-full-interval-resetting epoch on EVERY launch failure, including plain
-mutex contention from `launch_refresh_run`'s "already active" check — so
-one lost race against another job (confirmed: a legitimately in-flight MLB
-resim chain) cost the FULL 4h cadence instead of a short retry. Measured
-live: WNBA succeeded cleanly at ~4h intervals all day (01:24/05:24/09:29/
-13:35Z) then went 5+ hours dark the moment it first collided. Fixed
-(`97e85b66`, on `origin/main`, **NOT YET DEPLOYED** — live-odds-worker's
-claim was held by another session for the rest of this session).
+**A THIRD bug (`#472`) explained why even THAT fix's effect stayed
+unobserved for 5+ hours, and IS NOW DEPLOYED AND CONFIRMED WORKING**:
+`_launch_autorun_wnba_pregame_refresh` (and its identical twin,
+`_launch_autorun_soccer_pregame_refresh`) wrote a fresh, full-interval-
+resetting epoch on EVERY launch failure, including plain mutex contention
+from `launch_refresh_run`'s "already active" check — so one lost race
+against another job (confirmed: a legitimately in-flight MLB resim chain)
+cost the FULL 4h cadence instead of a short retry. Fixed (`97e85b66`), live
+on live-odds-worker `2026-08-19T19:37:20Z`. Confirmed working: WNBA's
+pregame autorun launched successfully `20:00:46Z`, ~23 minutes post-deploy
+— versus the 5+ hour drought measured pre-fix.
 
-**Runtime effect of `#469`'s ESPN fix is STILL UNOBSERVED as of this
-entry** — not because it doesn't work, but because the `#472` starvation
-bug has prevented the WNBA refresh from getting a long enough uncontended
-run to test it. `boxscores_history.csv`'s own max game date was still
-frozen at 2026-06-30 at end of session.
+**`#469`'s ESPN fix is CONFIRMED WORKING END-TO-END, updated 2026-08-19**
+— the datacenter-IP soft-block hypothesis was correct and the browser-UA
+fix resolves it. A manually-triggered real refresh (fired via
+`/api/ops/odds-refresh/run` rather than wait ~4h for the next natural
+`#472`-gated cycle) produced `boxscores_2026-08-18.csv` — a genuinely new
+per-slate file, 101 real ESPN rows, verified content (real player names,
+real stats, `source=espn`). `boxscores_history.csv`'s own max game date
+advanced **2026-06-30 → 2026-08-18** in that same run, measured by direct
+CSV content pull. Full chain (`#461`/`#462`/`#464`/`#467`/`#468`/`#469`/
+`#472`) is closed with real production confirmation, not just code-
+correct-in-isolation. Measurement: `.syndicate/deploys.md` "CONFIRMED
+WORKING end-to-end" entry.
+
+Two ops-tooling visibility gaps found and fixed while chasing this:
+`launch_refresh_run`'s autorun-launched children run with `stdout=DEVNULL`
+by design, so `print()` diagnostics (including `#469`'s own
+`BOXSCORE_BOOTSTRAP_STALLED` marker) never reach Render's log collector for
+those specific runs — the script's own `_append_log` file
+(`<source_root>/logs/syndicate_refresh_oddsapi_props_<date>.log`) was the
+only surviving signal and was never in `HOT_ARTIFACT_PATTERNS` either
+(fixed, `b35dcfa0`/`450e0d6e`). Separately confirmed (a structural fact,
+not a bug): `reports/migration_runs/**` stdout/stderr wrapper files are NOT
+cross-service visible at all — they live on whichever service ran the job,
+web's disk is genuinely separate.
 
 **Unmeasured**: whether NBA has the identical reachability defect (NBA's
-own staleness is plausibly just offseason, not compared apples-to-apples).
+own staleness is plausibly just offseason, not compared apples-to-apples);
+whether the ESPN fetch keeps succeeding on future natural cycles (one
+verified data point exists, the pattern isn't established yet).
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
 `.syndicate/log/2026-08-19.md`.
 

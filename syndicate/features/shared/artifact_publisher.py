@@ -240,6 +240,19 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # RECEIVES, which is what decides whether #205/#206's single-book and
     # missing-closing-line findings are a capture defect or a publish defect.
     "reports/mlb_odds_diag/odds_history_provenance_*.json",
+    # `soccer-odds-capture-cadence-gap`. `_launch_autorun_soccer_pregame_refresh`
+    # (run_live_odds_refresh_worker.py) writes this status file on
+    # live-odds-worker's OWN disk after every 4h attempt -- epoch, runStamp,
+    # artifactsDir, and any contention/launch error. It is the one artifact
+    # that would show WHY a cycle failed directly rather than by inference:
+    # confirmed live 2026-08-19 via `render_logs.py` (the worker's own stdout,
+    # not this file) that 3 of that day's cycles reported `steps=0` with no
+    # error -- this file's `epoch`/`error` history is the next thing needed to
+    # tell "genuinely zero steps attempted" from "the reporting code's own
+    # parse of the result artifact doesn't match what a pregame child writes".
+    # Tiny by construction (one small JSON, overwritten each cycle, same shape
+    # as `hot_artifact_pull_watermark.json` two entries below).
+    "reports/refresh_status/latest/soccer_pregame_autorun_status.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which
