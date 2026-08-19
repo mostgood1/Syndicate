@@ -1075,6 +1075,96 @@ history directly:
   not just "capture resumed."
 - Blocked by: none.
 
+### ci-green — OPEN — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Goal: `CI` on `main` is GREEN again and stays green. Testable: a push to
+  `main` produces a run whose `Run archive regression suite` AND
+  `Ledger coherence` steps both pass.
+- Files: `tests/test_archives.py`
+- NOT claimed, deliberately: the CI workflow definition itself belongs to
+  `repo-coordination` and is not touched here; `intelligence.html` is read
+  as a reference only, no edit.
+- Hypothesis: CI is red for ONE cause, not many — `test_home_page_poll_
+  preserves_date_query` asserts a template literal that the 2026-08-17
+  "default day is TODAY, not All" user decision deliberately changed
+  (`date: urlParams.get("date") || ""` -> `|| _initialDayFilterDate()`).
+  The test is stale; the template is correct.
+- Falsification test: run the full archive suite locally and count the
+  failures. More than one distinct failing test, or a failure that is NOT
+  about the date seed, falsifies "one cause".
+- Verification: local `python -m unittest tests.test_archives` exits 0, AND
+  the three ledger checkers exit 0, AND the CI run for the landed commit is
+  `success` — quoted by run id, not predicted.
+- Blocked by: none.
+
+### nfl-injuries-fetcher — OPEN — opened 2026-08-19 — session: nfl-injuries-fetcher
+- Goal: `syndicate/features/nfl/injury_adjustment.py` (the one place real
+  player-level data reaches the NFL sim today) depends on `injuries_
+  {season}.csv`, which has NO producer anywhere in this repo -- only a
+  stale, git-untracked, wrong-season (2025, not 2026) copy exists on one
+  dev machine, and it's not allowlisted so production presence can't even
+  be checked from web. **Testable outcome:** a real fetcher pulls
+  nflverse's own injuries release (confirmed live:
+  `https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{season}.csv`,
+  plain CSV, real schema confirmed by content), wired into refresh-worker
+  autorun the same way `#441`'s pbp fetch already is, AND the consumer
+  actually reads what it writes -- confirmed by tracing the read path, not
+  assumed from the write landing.
+- Files:
+  - `scripts/fetch_nfl_injuries.py` (NEW) — mirrors `fetch_nfl_pbp.py`'s
+    structure: atomic install, schema+row-count validation before replace,
+    graceful 404-is-normal handling for a season with no reports yet.
+  - `syndicate/features/nfl/sources.py` — add `nfl_injuries_path()`,
+    mirroring the existing `nfl_pbp_path()` multi-candidate resolver
+    EXACTLY, for the same reason it exists: `default_nfl_source_root()`
+    picks a root by probing for an unrelated file (`upcoming_recs_*.csv`)
+    and can silently resolve to the ephemeral repo checkout instead of the
+    mounted disk -- `#441`'s own documented root cause, never fixed for
+    injuries.
+  - `syndicate/features/nfl/injury_adjustment.py` — `_injured_players_for_team`
+    switches from the raw `default_nfl_source_root() / "tracking" / ...`
+    join to the new `nfl_injuries_path()`. This is the fix that makes the
+    fetcher not-inert; confirmed the bug is real by reading the code, not
+    assumed from the pbp precedent alone.
+  - `scripts/run_refresh_worker.py` — ONE new autorun function
+    (`_launch_autorun_nfl_injuries_fetch`, mirroring `_launch_autorun_nfl_pbp_fetch`
+    structurally) plus ONE new `elif` branch in the dispatch chain,
+    placed immediately after the pbp fetch branch per `#341`'s documented
+    starvation lesson (a late entry in this `elif` chain can go mute for
+    weeks while enabled and correctly configured -- already measured twice
+    in this file's own history). Narrow, additive touch to a large shared
+    file; no other lane currently claims it (checked `lanes.md` before
+    opening -- one stale/superseded reference and one explicit
+    read-only-reference, neither an active claim).
+  - `tests/test_fetch_nfl_injuries.py` (NEW), updates to
+    `tests/test_nfl_injury_adjustment.py` and `tests/test_nfl_sources.py`.
+  - Read-only reference: `scripts/fetch_nfl_pbp.py` (the template),
+    `docs/ai_context/todo.md` `#441` (the precedent this mirrors).
+  - **NOT claimed, deliberately**: `syndicate/features/shared/artifact_publisher.py`
+    (`HOT_ARTIFACT_PATTERNS` addition for the new injuries/roster/depth-chart
+    artifacts is owed but held by `basketball-model-owner` -- same
+    hand-off convention already used twice this session for this exact
+    file) — will message/flag rather than take.
+- Hypothesis: n/a (a build, not a diagnosis) — but the READ-PATH bug is a
+  genuine hypothesis, stated before fixing: `injury_adjustment.py`'s
+  `default_nfl_source_root()` usage silently resolves to the wrong root on
+  refresh-worker whenever the mounted disk's `nfl_source/` lacks
+  `upcoming_recs_*.csv` at the moment of the probe, exactly `#441`'s
+  documented mechanism for pbp.
+- Falsification test: if `nfl_pbp_path()`'s existing pattern turns out to
+  already correctly resolve injuries too (e.g. because the two paths are
+  always identical in practice on this deployment), the read-path fix is
+  unnecessary — verified by writing a test that asserts the OLD code path
+  fails exactly the scenario `#441` measured (mounted disk has the file,
+  checkout does not, no `upcoming_recs_*.csv` present) before applying the
+  fix, so the fix is proven necessary, not just applied by precedent.
+- Verification: new tests pass; full NFL test suite still passes (no
+  regression); the fetcher's own `--json` output shows a real download
+  against the live nflverse injuries release for a real season; `py -3
+  scripts/football_sim_input_checklist.py` (read-only reference, not
+  touched) re-run informationally to see if this changes anything it
+  reports.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
