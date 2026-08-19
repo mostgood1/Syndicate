@@ -41,6 +41,21 @@ def test_regex_matches_the_hook_source(name):
     )
 
 
+def test_disclaimer_markers_match_the_hook_source():
+    """The copied `_DISCLAIMER_MARKERS` tuple must not drift from lane-guard.py's
+    either -- same failure mode as the regexes above, just a list instead of a
+    pattern. This is the sync check the FILES_RE drift (2026-08-19) showed was
+    missing: a test that pins REGEXES alone still let the marker list rot."""
+    src = HOOK.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"^_DISCLAIMER_MARKERS\s*=\s*\((.*?)\n\)", src, re.MULTILINE | re.DOTALL)
+    assert m, "_DISCLAIMER_MARKERS not found in lane-guard.py -- the hook changed shape"
+    hook_markers = eval("(" + m.group(1) + ")")  # noqa: S307 - our own repo file, literal only
+    assert mod._DISCLAIMER_MARKERS == hook_markers, (
+        "_DISCLAIMER_MARKERS has DRIFTED from lane-guard.py; this check is now "
+        "measuring something the guard does not"
+    )
+
+
 # --------------------------------------------------------------------------
 # 2. The invariants themselves.
 # --------------------------------------------------------------------------

@@ -29,8 +29,21 @@ PARSING IS COPIED FROM `lane-guard.py`, NOT IMPORTED. That module is a hook: it
 runs `main()` at import and, with stdin at EOF, calls `sys.exit()` -- which kills
 the importing script with **exit code 0 and no output**. Two attempts to reuse it
 died exactly that way and looked like "the parser returned nothing". If the four
-regexes below ever drift from the hook's, this check silently measures something
-else; `tests/test_check_lane_invariants.py` pins them against the hook's source.
+regexes or the disclaimer-marker tuple below ever drift from the hook's, this
+check silently measures something else; `tests/test_check_lane_invariants.py`
+pins all five against the hook's source.
+
+CONFIRMED DRIFT, 2026-08-19: `FILES_RE` here was missing the hook's bold-form
+(`\\*{0,2}`) and optional-colon (`:?`) support, and `claims()` never learned the
+hook's disclaimer-marker stripping at all (see `_claimable_prefix` below) -- so
+a lane that wrote "RELEASED, no longer claimed: `X`" under its `- Files:` block
+still read here as a live claim on `X`, and a second lane's genuine claim on the
+same file then reported as a false two-holder contest. `lane-guard.py` itself
+had already learned to strip that disclaimer; this file just hadn't copied the
+fix. Both are fixed now; `test_disclaimer_markers_match_the_hook_source` guards
+the marker tuple the same way `test_regex_matches_the_hook_source` guards the
+regexes, so this is the second drift caught, not the first, and should be the
+last for these two.
 
     py -3 scripts/check_lane_invariants.py [path]
     exit 0 = invariants hold, 1 = violated, 2 = could not read
@@ -52,10 +65,44 @@ import sys
 HEADER_RE = re.compile(r"^###\s")
 LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
 OPEN_RE = re.compile(r"\bOPEN\b")
-FILES_RE = re.compile(r"^\s*-\s*Files\b[^:]*:(.*)$")
+FILES_RE = re.compile(r"^\s*-\s*\*{0,2}Files\b[^:]*:?(.*)$")
+
+# Also copied verbatim from lane-guard.py's `_DISCLAIMER_MARKERS`. A bullet
+# under `- Files:` that talks ABOUT a path ("released", "held by", "not
+# taken", ...) instead of claiming it. See the hook's own docstring for the
+# full incident history behind each entry -- this file only needs to
+# reproduce the list, not re-derive it, and `test_disclaimer_markers_match_
+# the_hook_source` keeps the two from drifting apart the way `FILES_RE` did.
+_DISCLAIMER_MARKERS = (
+    "not claimed",
+    "collision check",
+    "read-only dependency",
+    "read-only reference",
+    "not touched",
+    "not touch",
+    "not taken",
+    "released",
+    "held by",
+    "claimed by",
+    "ownership checked",
+    "zero mentions",
+    "no lane",
+)
 
 PATH_RE = re.compile(r"[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+")
 PROSE_HINT_RE = re.compile(r"\bnames?\b|\bDIFFERENT file\b|\bcandidate\b|\bclaimed by\b")
+
+
+def _claimable_prefix(line: str) -> str:
+    """Everything in `line` before the first disclaimer marker -- copied from
+    lane-guard.py's function of the same name. A marker GOVERNS WHAT FOLLOWS
+    IT, so this is a prefix cut, not a whole-line veto: a claim that precedes
+    a disclaimer ("`a.py`, `b.py` (new). Collision check: CLEAR.") keeps its
+    real paths and only drops what the disclaimer talks about."""
+    low = line.lower()
+    positions = [low.find(m) for m in _DISCLAIMER_MARKERS]
+    positions = [p for p in positions if p != -1]
+    return line[:min(positions)] if positions else line
 
 
 def claims(text: str) -> set[tuple[str, str]]:
@@ -72,7 +119,7 @@ def claims(text: str) -> set[tuple[str, str]]:
         if m:
             in_files = True
             if open_lane:
-                out.update((slug, f) for f in PATH_RE.findall(m.group(1)))
+                out.update((slug, f) for f in PATH_RE.findall(_claimable_prefix(m.group(1))))
             continue
         if in_files and open_lane:
             stripped = line.strip()
@@ -81,7 +128,7 @@ def claims(text: str) -> set[tuple[str, str]]:
             if stripped.startswith("- ") and not stripped.startswith("- `"):
                 in_files = False
                 continue
-            out.update((slug, f) for f in PATH_RE.findall(line))
+            out.update((slug, f) for f in PATH_RE.findall(_claimable_prefix(line)))
     return out
 
 
