@@ -17214,3 +17214,82 @@ while chasing this:**
 `#468`/`#469`/`#472` are ALL closed with real production confirmation, not
 just code-correct-in-isolation. No further action identified as ready in
 this lane as of this entry.
+
+
+### #473 — NBA does NOT have #468's defect, it has a deeper one — 2026-08-19 ~22:xxZ — lane `basketball-model-owner`
+
+Investigation, not a fix. User asked to check whether NBA has the same
+reachability defect `#468` found and fixed for WNBA. First pass (static
+code tracing) concluded "structurally identical, should work the same
+way" -- WRONG, and the user asked the same question again, prompting an
+actual reachability test rather than resting on code-reading.
+
+**Structural reachability IS symmetric, confirmed by trace**: `refresh_nba_
+oddsapi_props.py` -> `export_props_predictions_local` (`basketball_props_
+predictions.py`) -> `export_props_predictions_with_smart_sim_local`
+(`basketball_props_smart_sim.py:445`) -> the same monkeypatch mechanism
+that wires `_team_adj_from_advanced_stats` -> `_load_team_advanced_stats_
+asof_local`, the exact function `#468` fixed. `league_code` is a generic
+parameter the whole way; no NBA-specific branch diverges. No env-var
+override disables NBA's smart-sim path in `render.yaml` (`REFRESH_PREDICT_
+PROPS_USE_SMART_SIM` absent, code default `True`, same as WNBA's
+equivalent).
+
+**But a real reachability test (scratch copy of real historical NBA
+`boxscores_history.csv` + one real per-slate `boxscores_2026-01-01.csv`,
+mirroring the exact test that verified `#468` for WNBA) found NBA's
+rebuild returns NOTHING, both for a fresh as-of date and for a planted
+stale-schema file.** Traced why: `_ensure_team_advanced_stats_asof_local`
+tries two data sources for NBA (`min_games=10` for NBA vs `min_games=1`
+for WNBA -- a real, deliberate difference, not itself the bug):
+
+1. `nba_betting.advanced_stats_boxscores.compute_team_advanced_stats_
+   from_boxscores` expects `<processed_root>/boxscores/` -- A SUBDIRECTORY,
+   not Syndicate's actual flat `boxscores_2026-*.csv` file convention --
+   plus a separate `<raw_root>/games_nba_api.csv`. **Neither exists
+   anywhere in NBA's data layout** (confirmed: `data/nba_source/data/
+   processed/boxscores/` does not exist, `data/nba_source/data/raw/`
+   has one unrelated odds file, no `games_nba_api.csv`).
+2. Fallback, `compute_team_advanced_stats_from_player_logs`, needs
+   `player_logs.csv` -- confirmed absent for NBA earlier this session
+   (platform-wide finding, `#462`'s original investigation: priors are
+   computed in-memory from `boxscores_history.csv`, `player_logs.csv` was
+   never a real artifact for either league).
+
+**Both fallback paths are structurally empty for NBA, regardless of
+season or freshness.** This is NOT `#468`'s shape (a fixed function made
+unreachable by broken wiring) -- the wiring IS reachable, proven by trace
+and unchanged from WNBA's. This is a data-layout mismatch: the vendor
+package's own boxscore-reading convention (`processed/boxscores/`
+subdirectory) was apparently never actually populated by Syndicate's NBA
+pipeline, which uses the WNBA-style flat-file convention instead for
+whatever boxscore data it DOES maintain (`boxscores_2026-*.csv`,
+`boxscores_history.csv` -- present, just not in the shape this specific
+vendor function reads).
+
+**Also confirmed, a separate and deliberate (not a bug) constraint**:
+NBA's `boxscores_history.csv`/`boxscores_2*.csv` are NOT in
+`HOT_ARTIFACT_PATTERNS` at all (WNBA's are) -- rides the git+bootstrap
+mirror lane instead, per an existing code comment (~20MB, size/egress
+tradeoff). This meant production couldn't be checked live for this
+specific investigation; the local git-tracked mirror (real, but
+potentially stale, historical data) was used instead -- sufficient to
+prove the CODE PATH's behavior, not to prove PRODUCTION's current state.
+
+**NOT FIXED.** Genuinely out of scope for a same-session fix: fixing this
+means either (a) writing a NEW builder that reads Syndicate's actual flat
+boxscore-file convention for NBA (mirroring WNBA's own working path,
+which reads different files than what the vendor CLI's boxscore builder
+expects), or (b) populating the vendor's expected `processed/boxscores/`
+subdirectory + `games_nba_api.csv` layout for NBA specifically -- both are
+real, scoped pieces of work, not a quick wiring fix like `#468` was.
+Since NBA is genuinely offseason (Oct-June window, today is Aug 19) with
+no dedicated autorun even attempting this path right now, there is no
+current production impact -- but the gap will be real again once NBA's
+season resumes in October, and this entry exists so whoever picks it up
+then doesn't have to rediscover it from scratch.
+
+**Also, while chasing this**: NBA has no dedicated pregame autorun at all
+in `run_live_odds_refresh_worker.py` (only WNBA and soccer do) -- a
+structural difference from WNBA independent of this specific defect,
+noted for whoever eventually works on NBA in-season reachability.
