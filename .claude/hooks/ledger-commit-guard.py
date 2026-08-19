@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse hook - refuses to COMMIT a `lanes.md` whose invariants fail.
+"""PreToolUse hook - refuses to COMMIT a LEDGER FILE whose invariants fail.
+
+Covers `lanes.md`, `state.md` and `learnings.md`. The predicates live in
+`ledger_invariants.py` so the write-time hook enforces exactly the same set --
+two guards disagreeing about what "broken" means is worse than one guard.
 
 WHY THIS EXISTS, and why the PreToolUse file-tool guard was not enough.
 `lanes-append-guard.py` blocks the two ways `lanes.md` goes wrong, but it matches
@@ -43,6 +47,12 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from ledger_invariants import TRACKED, violations
+except Exception:
+    sys.exit(0)
+
 LANES = ".syndicate/lanes.md"
 ALLOW_ENV = "SYNDICATE_ALLOW_LEDGER_COMMIT"
 HEADER_RE = re.compile(r"(?m)^###\s+(\S+)\s")
@@ -60,7 +70,7 @@ def _git(root, *args):
         return None
 
 
-def _content_to_be_committed(root, command):
+def _content_to_be_committed(root, command, rel):
     """The lanes.md text this commit would record, or None if it records none.
 
     Three cases, and they genuinely differ:
@@ -68,46 +78,23 @@ def _content_to_be_committed(root, command):
       - `-a` / `--all` with lanes.md modified -> the WORKING TREE file
       - otherwise, if lanes.md is staged      -> the STAGED blob (`:path`)
     """
-    names_path = "lanes.md" in command
+    names_path = os.path.basename(rel) in command
     all_flag = bool(re.search(r"\s-(?:[a-zA-Z]*a[a-zA-Z]*)\b|\s--all\b", command))
 
     if names_path or all_flag:
-        modified = _git(root, "status", "--porcelain", "--", LANES)
+        modified = _git(root, "status", "--porcelain", "--", rel)
         if names_path or (modified or "").strip():
             try:
-                with open(os.path.join(root, LANES), encoding="utf-8", errors="replace") as fh:
+                with open(os.path.join(root, rel), encoding="utf-8", errors="replace") as fh:
                     return fh.read()
             except OSError:
                 return None
 
-    staged = _git(root, "diff", "--cached", "--name-only", "--", LANES)
+    staged = _git(root, "diff", "--cached", "--name-only", "--", rel)
     if staged and staged.strip():
-        return _git(root, "show", f":{LANES}")
+        return _git(root, "show", f":{rel}")
     return None
 
-
-def _violations(text):
-    out = []
-    counts = {}
-    for m in HEADER_RE.finditer(text):
-        counts[m.group(1)] = counts.get(m.group(1), 0) + 1
-    dupes = sorted(s for s, n in counts.items() if n > 1)
-    if dupes:
-        out.append(("a lane with MORE THAN ONE block: " + ", ".join(dupes[:6]),
-                    "One lane, one block. Edit the existing block in place and put the\n"
-                    "narrative in .syndicate/log/<today>.md. If the old block is worth\n"
-                    "keeping, move it VERBATIM to lanes_history.md, or run\n"
-                    "  py -3 scripts/trim_lane_blocks.py"))
-    arch = ARCHIVE_RE.search(text)
-    if arch:
-        below = HEADER_RE.findall(text[arch.start():])
-        if below:
-            out.append(("a lane block BELOW the `## Archived lanes` heading: " + ", ".join(sorted(set(below))[:6]),
-                        "lane-guard reads lanes.md and NOTHING else, so the next archive pass\n"
-                        "moves that block out and its file claims stop being enforced SILENTLY.\n"
-                        "Move it under `## OPEN`, or run\n"
-                        "  py -3 scripts/hoist_open_lanes.py --apply"))
-    return out
 
 
 def main():
@@ -124,27 +111,32 @@ def main():
         return 0
 
     root = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-    try:
-        text = _content_to_be_committed(root, command)
-    except Exception:
-        return 0
-    if not text:
-        return 0
-    try:
-        bad = _violations(text)
-    except Exception:
-        return 0
-    if not bad:
+    report = []
+    for rel in TRACKED:
+        try:
+            text = _content_to_be_committed(root, command, rel)
+        except Exception:
+            continue
+        if not text:
+            continue
+        bad = violations(rel, text)
+        if bad:
+            report.append((rel, bad))
+    if not report:
         return 0
 
-    sys.stderr.write("BLOCKED: this commit would record a lanes.md that fails its invariants.\n\n")
-    for what, how in bad:
-        sys.stderr.write(f"  * {what}\n{how}\n\n")
+    sys.stderr.write("BLOCKED: this commit would record a ledger file that fails its invariants.\n\n")
+    for rel, bad in report:
+        sys.stderr.write(f"{rel}\n")
+        for what, how in bad:
+            sys.stderr.write(f"  * {what}\n{how}\n")
+        sys.stderr.write("\n")
     sys.stderr.write(
-        "Checked the content this commit would actually record (staged blob for a\n"
+        "Checked the content each commit would actually record (staged blob for a\n"
         "plain commit, working file for a pathspec or -a commit) -- not merely the\n"
         "file on disk.\n"
-        f"Verify with: py -3 scripts/check_lane_invariants.py\n"
+        "Verify with: py -3 scripts/check_lane_invariants.py\n"
+        "             py -3 scripts/state_key_check.py\n"
         f"Override:    {ALLOW_ENV}=1 git commit ...\n")
     return 2
 
