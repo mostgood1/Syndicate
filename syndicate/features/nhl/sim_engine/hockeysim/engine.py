@@ -206,6 +206,20 @@ class SimConfig:
     # than risked in a rush; roster composition plausibly matters there too, a natural next step.
     # Both sides required to have real data (same bilateral-gate discipline as DZ/NZ). Default ON.
     faceoff_lineup_model: bool = True
+    # §2zz's own stated next step, closed here: the lineup-aware layer above was deliberately
+    # gated `ev_only` only in its first pass -- roster composition (who's actually taking draws
+    # tonight) plausibly matters just as much during a power play or penalty kill, and there is no
+    # reason the underlying signal (`faceoff_lineup_pct`) would suddenly stop being real once a
+    # segment becomes PP/PK. Applies `_faceoff_multipliers` to the SAME raw lineup percentages,
+    # composed AFTER the strength-state mechanism resolves `m_st_h`/`m_st_a` (role + optional
+    # joint-zone layers) -- an independent multiplicative refinement on top, not a replacement or a
+    # tier in `_resolve_strength_state_faceoff_pct`'s own chain. INDEPENDENT of `faceoff_lineup_model`
+    # (the EV-only layer's own switch) -- each can be A/B'd or rolled back separately, matching
+    # every other pair of independent layers in this file (e.g. `faceoff_oz_specific_curve` needs
+    # no OTHER flag beyond its own umbrella). Only reachable when `faceoff_strength_state_model`
+    # is already True (the block this fires inside is itself gated on it). Same bilateral-gate
+    # discipline (both sides required). Default ON.
+    faceoff_lineup_model_strength_state: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -997,7 +1011,10 @@ class PeriodSimulator:
         # percentage, not an index. Wired as an ADDITIONAL multiplicative layer
         # (`faceoff_lineup_model`) alongside DZ/NZ below, not a tier in the OZ/EV/role/blend
         # resolution chain -- see that flag's own docstring for the reachability bug this design
-        # avoids.
+        # avoids. Read ONCE here, applied in BOTH the EV-only block below AND the strength-state
+        # block (`faceoff_lineup_model_strength_state`, §2zz's own stated next step) -- the same
+        # raw values, since a team's dressed roster doesn't change between an EV shift and a PP/PK
+        # one within the same game.
         faceoff_lineup_pct_home_raw = st_home.get("faceoff_lineup_pct")
         faceoff_lineup_pct_away_raw = st_away.get("faceoff_lineup_pct")
         # Combined PP intensity from penalty rates.
@@ -1455,6 +1472,20 @@ class PeriodSimulator:
                     m_st_h, m_st_a = m_pk_side, m_pp_side
                 lam_h = float(lam_h) * float(m_st_h)
                 lam_a = float(lam_a) * float(m_st_a)
+                # LINEUP-AWARE faceoff percentage, extended to strength-state segments (§2zz's own
+                # stated next step, closed here) -- the SAME `faceoff_lineup_pct` raw values the
+                # EV-only block above already reads, applied as an INDEPENDENT additional layer on
+                # top of whatever the role/zone mechanism just produced, not a tier of
+                # `_resolve_strength_state_faceoff_pct`'s own chain (see `faceoff_lineup_model`'s
+                # docstring for why an additional layer, not a `faceoff_win_pct`-style override, is
+                # the reachable design).
+                if (bool(getattr(self.cfg, "faceoff_lineup_model_strength_state", True))
+                        and faceoff_lineup_pct_home_raw is not None and faceoff_lineup_pct_away_raw is not None):
+                    lineup_h_pct = _f(faceoff_lineup_pct_home_raw, 0.5)
+                    lineup_a_pct = _f(faceoff_lineup_pct_away_raw, 0.5)
+                    m_lineup_st_h, m_lineup_st_a = _faceoff_multipliers(self.cfg, lineup_h_pct, lineup_a_pct)
+                    lam_h = float(lam_h) * float(m_lineup_st_h)
+                    lam_a = float(lam_a) * float(m_lineup_st_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

@@ -1190,6 +1190,18 @@ end-to-end reachability, not a synthetic-fixture-only pass. **634 hockeysim/nhl 
 mirror) — noise-level; a separate no-data control confirmed an EXACT 0.000% delta, proving the
 bilateral gate correctly no-ops. Full report: `docs/reports/hockeysim_player_faceoff_rate_report.md`.
 
+**Addendum, same day: extended to strength-state (PP/PK) segments**, closing §2zz's own stated
+next step. `faceoff_lineup_model_strength_state` (default ON) applies the SAME
+`faceoff_lineup_pct` raw values as an INDEPENDENT additional layer composed AFTER the
+strength-state mechanism resolves its own multipliers — not a tier in
+`_resolve_strength_state_faceoff_pct`'s chain. Kept deliberately INDEPENDENT of
+`faceoff_lineup_model` (the EV-only switch), not umbrella-gated under it, so each layer can be
+A/B'd or rolled back separately — a dedicated test confirms the two flags stay independent (each
+still fires with the other disabled). 3 new engine tests (reachability via per-seed vectors, same
+low-sensitivity trap the symmetric diff-based mechanism hit for the EV-only layer; direction;
+independence). Checklist re-confirmed full PASS (no new consumed field). Round-robin: see the
+report's own measured delta on real per-team lineup data.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

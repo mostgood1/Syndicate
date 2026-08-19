@@ -782,6 +782,111 @@ class HockeySimEngineTest(unittest.TestCase):
                 "enforced.",
         )
 
+    def test_faceoff_lineup_model_strength_state_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2zz's own stated next step: `faceoff_lineup_model_strength_state`
+        must produce a DIFFERENT per-seed event stream than its absence, isolated from the EV-only
+        layer (`faceoff_lineup_model=False` here) and from the other strength-state mechanisms
+        (which stay at their defaults so any difference is attributable to THIS flag alone). High
+        `committed_per_game` on both sides guarantees plenty of PP/PK segments so the effect isn't
+        diluted by a mostly-EV sample."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_lineup_pct": 0.62}
+        st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_lineup_pct": 0.38}
+        cfg_on = build_nhl_sim_config(overrides={
+            "faceoff_lineup_model": False, "faceoff_lineup_model_strength_state": True})
+        cfg_off = build_nhl_sim_config(overrides={
+            "faceoff_lineup_model": False, "faceoff_lineup_model_strength_state": False})
+
+        def _home_shot_totals(profile: SimConfig) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return totals
+
+        on_totals = _home_shot_totals(cfg_on)
+        off_totals = _home_shot_totals(cfg_off)
+        self.assertNotEqual(
+            on_totals, off_totals,
+            msg="per-seed HOME-shot vectors are IDENTICAL -- "
+                "faceoff_lineup_model_strength_state is not gating anything.",
+        )
+
+    def test_faceoff_lineup_model_strength_state_direction(self) -> None:
+        """A team with a HIGH `faceoff_lineup_pct` must produce MORE of its own shots on average
+        than a LOW one, isolated to the strength-state extension (EV-only layer off), confirming
+        the sign wasn't inverted while wiring the new block."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 4.5, "faceoff_lineup_pct": 0.5}
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 4.5}
+        strong_lineup = dict(base, faceoff_lineup_pct=0.62)
+        weak_lineup = dict(base, faceoff_lineup_pct=0.38)
+        cfg = build_nhl_sim_config(overrides={
+            "faceoff_lineup_model": False, "faceoff_lineup_model_strength_state": True})
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=neutral_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong_lineup)
+        weak_mean = _mean_home_shots(weak_lineup)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"faceoff_lineup_pct=0.62 must produce MORE HOME shots on average than 0.38 (strength-"
+            f"state extension only) -- got strong={strong_mean:.3f} weak={weak_mean:.3f}.",
+        )
+
+    def test_faceoff_lineup_model_strength_state_independent_of_ev_only_layer(self) -> None:
+        """The two layers are INDEPENDENT switches, not a shared umbrella -- confirms the
+        strength-state extension still fires with the EV-only layer OFF (already exercised above,
+        `faceoff_lineup_model=False` throughout) and, symmetrically, that the EV-only layer still
+        fires with the strength-state extension OFF -- a real regression this test would catch if
+        someone later re-coupled the two flags."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        # Low committed_per_game -> mostly EV segments, isolating the EV-only layer's own effect.
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 1.0, "faceoff_oz_index": 1.0,
+                   "faceoff_lineup_pct": 0.62}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 1.0, "faceoff_oz_index": 1.0,
+                   "faceoff_lineup_pct": 0.38}
+        cfg_ev_only_layer_alone = build_nhl_sim_config(overrides={
+            "faceoff_lineup_model": True, "faceoff_lineup_model_strength_state": False})
+        cfg_neither = build_nhl_sim_config(overrides={
+            "faceoff_lineup_model": False, "faceoff_lineup_model_strength_state": False})
+
+        def _home_shot_totals(profile: SimConfig) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return totals
+
+        self.assertNotEqual(
+            _home_shot_totals(cfg_ev_only_layer_alone), _home_shot_totals(cfg_neither),
+            msg="the EV-only layer stopped firing with the strength-state extension disabled -- "
+                "the two flags are no longer independent.",
+        )
+
     def test_faceoff_oz_specific_curve_flag_actually_changes_output(self) -> None:
         """Reachability test for §2v: `faceoff_oz_specific_curve=True` (the default, dramatically
         stronger OZ-specific decay curve) must produce measurably different output than `False`

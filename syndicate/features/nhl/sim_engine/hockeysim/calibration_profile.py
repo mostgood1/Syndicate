@@ -156,6 +156,10 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # (matching DZ/NZ), NOT a `faceoff_win_pct` override -- a first draft override was caught as
     # UNREACHABLE (behind the already-100%-populated OZ/EV/role tiers) before shipping.
     faceoff_lineup_model=True,
+    # §2zz's own stated next step: extends the lineup-aware layer to strength-state (PP/PK)
+    # segments too -- the same raw `faceoff_lineup_pct`, composed after the role/zone mechanism,
+    # since roster composition doesn't stop mattering just because a segment becomes a power play.
+    faceoff_lineup_model_strength_state=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

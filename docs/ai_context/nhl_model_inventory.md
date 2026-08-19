@@ -727,3 +727,14 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   end-to-end reachability), 634 hockeysim/nhl tests pass overall (up from 605). Round-robin:
   **-0.112%** (real per-team lineup data), noise-level; a no-data control confirmed an EXACT 0.000%
   delta, proving the bilateral gate correctly no-ops.
+- **Did** extend the lineup-aware faceoff layer to strength-state (PP/PK) segments, closing the
+  above item's own stated next step, same day (reference doc §2zz addendum, report addendum in
+  `docs/reports/hockeysim_player_faceoff_rate_report.md`). `faceoff_lineup_model_strength_state`
+  (default ON) applies the SAME `faceoff_lineup_pct` raw values as an INDEPENDENT additional layer
+  composed after the strength-state mechanism's own multipliers -- not a tier in
+  `_resolve_strength_state_faceoff_pct`'s chain. Kept deliberately INDEPENDENT of
+  `faceoff_lineup_model` (the EV-only switch), not umbrella-gated under it, so each layer can be
+  A/B'd or rolled back separately -- a dedicated test confirms the two flags stay independent.
+  Verified: 3 new engine tests (reachability via per-seed vectors, direction, independence),
+  checklist full PASS (no new consumed field). Round-robin: **-0.138%** (992 pairings, real
+  per-team lineup data), noise-level.

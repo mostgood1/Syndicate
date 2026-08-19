@@ -78,8 +78,6 @@ segments, a real, stated, deliberately narrow limitation rather than something r
 
 ## What this does NOT do
 
-- No strength-state (PP/PK) extension yet -- roster composition plausibly matters there too, a
-  real, stated next step, not attempted this pass.
 - No per-team differentiation of WHICH specific line a center plays on within a game (a team's
   4th-line faceoff specialist and its 1st-line center both contribute via the SAME TOI-weighted
   formula) -- a coarser signal than a full line-matching model would give, but a real, measured
@@ -87,3 +85,26 @@ segments, a real, stated, deliberately narrow limitation rather than something r
 - The `faceoff_win_pct`-override design was tried and explicitly reverted, not merely abandoned
   silently -- kept in this report as the clearest illustration this session has produced of
   "presence is not reachability" biting a brand-new signal, not just an inherited one.
+
+## Addendum, same day: extended to strength-state (PP/PK) segments
+
+The one item left open above was closed the same day. `faceoff_lineup_model_strength_state`
+(default ON) applies the SAME `faceoff_lineup_pct` raw values -- already read once per segment,
+no new plumbing -- as an INDEPENDENT additional layer composed AFTER the strength-state mechanism
+(role + optional joint-zone refinement) resolves its own multipliers, not a tier in
+`_resolve_strength_state_faceoff_pct`'s own chain. There is no reason the underlying signal (who's
+actually taking draws tonight) would stop being real just because a segment becomes a power play
+or penalty kill.
+
+**Deliberately kept INDEPENDENT of `faceoff_lineup_model`** (the EV-only layer's own switch), not
+umbrella-gated under it -- each can be A/B'd or rolled back separately, matching every other pair
+of independent layers in this engine. A dedicated test confirms the two flags stay independent:
+the EV-only layer still fires with the strength-state extension OFF, and vice versa.
+
+**Verified**: 3 new engine tests (reachability via per-seed vectors -- the same low-sensitivity
+trap `_faceoff_multipliers`'s symmetric diff-based mechanism hit for the EV-only layer applies
+here too, so a mean-based comparison was not used; direction; independence-from-the-other-flag).
+`nhl_sim_input_checklist.py` re-confirmed full PASS (no new consumed field -- reuses the same
+`faceoff_lineup_pct` key already wired). **Round-robin**: **-0.138%** (992-pairing round-robin,
+real per-team lineup data from the local mirror, extension ON vs OFF) -- noise-level, in line with
+every other faceoff layer's near-zero aggregate shift this session measured.
