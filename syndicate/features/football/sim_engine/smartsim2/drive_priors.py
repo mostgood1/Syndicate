@@ -68,6 +68,38 @@ def _sources_from_payload(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]
     return sources
 
 
+# TEAM-STRENGTH INDEX BOUNDS. Deliberately wider than [0.05, 0.95].
+#
+# `offense_index` / `defense_index` are a TEAM-STRENGTH scale centred on 0.5,
+# not probabilities. Bounding them at [0.05, 0.95] capped how far apart two
+# teams could be, and for NCAAF that cap was the binding constraint on the whole
+# model: measured 2026-08-19, the 2026 wk1 slate projected margin SD **1.74
+# against a market SD of 14.46**, and no choice of rating scale could fix it.
+#
+#     SP+ scale   margin SD   teams clamped (of 138)
+#        34          5.93            3
+#        24          8.18           22
+#        18         10.19           36
+#        12          ~              62
+#
+# Tightening the scale to chase dispersion just clamped MORE teams, flattening
+# exactly the tails that produce blowouts. The ceiling was ~10.2 SD with 36
+# teams pinned -- the model literally could not tell the best team from the
+# worst.
+#
+# SAFE FOR NFL, VERIFIED NOT ASSUMED. NFL ratings are nflverse EPA/play; as-of
+# 2023 wk10 they span -0.201..0.099, so `0.5 + rating` spans 0.299..0.599 and
+# these bounds NEVER BIND for NFL. Widening them changes NCAAF and leaves NFL
+# byte-identical, which `test_drive_priors_index_bounds.py` asserts.
+#
+# THE PROBABILITY CLAMPS BELOW ARE UNTOUCHED. `drive_success_probability`,
+# `turnover_probability` and the rest keep their own bounds because those ARE
+# probabilities and must stay in range. This widens the input to those formulas,
+# not their output.
+_INDEX_FLOOR = -0.75
+_INDEX_CEILING = 1.75
+
+
 @dataclass(frozen=True)
 class DrivePriorProfile:
     offense_index: float
@@ -230,8 +262,8 @@ def _market_prior_index(market_features: Mapping[str, Any]) -> float:
 def build_drive_priors(source: SmartSim2SimulationInput | Mapping[str, Any], *, possession_state: PossessionState | None = None) -> DrivePriorProfile:
     if isinstance(source, SmartSim2SimulationInput):
         payload = _copy_mapping(source.feature_generation_payload)
-        fallback_offense = _clamp(0.5 + float(source.home_offense_rating or 0.0), 0.05, 0.95)
-        fallback_defense = _clamp(0.5 + float(source.home_defense_rating or 0.0), 0.05, 0.95)
+        fallback_offense = _clamp(0.5 + float(source.home_offense_rating or 0.0), _INDEX_FLOOR, _INDEX_CEILING)
+        fallback_defense = _clamp(0.5 + float(source.home_defense_rating or 0.0), _INDEX_FLOOR, _INDEX_CEILING)
     else:
         payload = _copy_mapping(source)
         fallback_offense = 0.5
@@ -257,8 +289,8 @@ def build_drive_priors(source: SmartSim2SimulationInput | Mapping[str, Any], *, 
     transfer_volatility = _transfer_volatility(transfer_impact)
     market_prior_index = _market_prior_index(market_features)
 
-    offense_index = _clamp((offense_index + fallback_offense) / 2.0, 0.05, 0.95)
-    defense_index = _clamp((defense_index + fallback_defense) / 2.0, 0.05, 0.95)
+    offense_index = _clamp((offense_index + fallback_offense) / 2.0, _INDEX_FLOOR, _INDEX_CEILING)
+    defense_index = _clamp((defense_index + fallback_defense) / 2.0, _INDEX_FLOOR, _INDEX_CEILING)
 
     aggressiveness = _clamp(0.5 + pace_index * 0.15 + (coach_index - 0.5) * 0.12 + (0.5 - transfer_volatility) * 0.08, 0.05, 0.95)
     scoring_environment = _clamp(0.35 + market_prior_index * 0.35 + offense_index * 0.18 - defense_index * 0.08, 0.05, 0.95)
