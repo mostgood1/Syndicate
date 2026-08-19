@@ -1,0 +1,69 @@
+{
+  "prediction_dates": [
+    "2026-03-01",
+    "2026-05-18",
+    "2026-05-21",
+    "2026-05-22",
+    "2026-05-24",
+    "2026-05-25",
+    "2026-05-26",
+    "2026-05-27",
+    "2026-05-29",
+    "2026-06-02",
+    "2026-06-03T00:00:00Z",
+    "2026-06-04",
+    "2026-06-06",
+    "2026-06-09",
+    "2026-06-11"
+  ],
+  "outcome_date_count": 178,
+  "intersection_dates": [
+    "2026-03-01",
+    "2026-05-22",
+    "2026-05-24",
+    "2026-05-25",
+    "2026-05-26",
+    "2026-05-27",
+    "2026-05-29",
+    "2026-06-02",
+    "2026-06-04",
+    "2026-06-06",
+    "2026-06-09",
+    "2026-06-11"
+  ],
+  "counters": {
+    "no_settled_outcome": 3,
+    "home_ml:scored": 15,
+    "total_over:scored": 15,
+    "home_puck_line_-1.5:scored": 3,
+    "home_puck_line_-1.5:no_market": 1,
+    "duplicate_stale_file_row": 13,
+    "home_ml:no_market": 2,
+    "total_over:no_market": 2,
+    "home_puck_line_-1.5:no_model": 13
+  },
+  "results": {
+    "home_ml": {
+      "n": 15,
+      "base_rate": 0.6,
+      "brier_model": 0.2905,
+      "brier_market": 0.2769,
+      "verdict": "market wins"
+    },
+    "total_over": {
+      "n": 15,
+      "base_rate": 0.4,
+      "brier_model": 0.2102,
+      "brier_market": 0.2378,
+      "verdict": "MODEL BEATS MARKET"
+    },
+    "home_puck_line_-1.5": {
+      "n": 3,
+      "base_rate": 0.3333,
+      "brier_model": 0.2146,
+      "brier_market": 0.2133,
+      "verdict": "market wins"
+    }
+  },
+  "total_scored": 33
+}

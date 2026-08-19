@@ -345,3 +345,22 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   session: that sample is nowhere near powered enough to support a real
   verdict, and the run's value is proving the harness correct end-to-end on
   real data, not settling whether hockeysim has an edge.
+- **Did** widen that backtest against real PRODUCTION data (reference doc
+  §8b) rather than stopping at the thin local mirror — per CLAUDE.md's own
+  standing rule to check production before concluding data is missing. Added
+  `--source production`/`both`, pulling every date `/nhl/api/cards/dates`
+  lists from `https://syndicate-an21.onrender.com` (a public route, no admin
+  token), confirmed non-circular for this route specifically by reading its
+  own payload fields (`source_path` points at the real `predictions_<date>.csv`
+  on Render's disk). **Found a second real bug the same way as the first**:
+  `lookahead_applied` does not mean live/circular adjustment as its name
+  suggests — verified against every cached response, it means "requested
+  date had no games, served the next date that does." An early draft
+  rejected those rows outright, silently discarding real games mislabeled
+  under the wrong date; fixed by keying on the RESOLVED date instead, which
+  let the existing dedup collapse 13 redundant off-day requests. Sample grew
+  from n=3–4 to n=14–15 (moneyline/total) across 12 dates instead of 4.
+  Total flipped to "model beats market" on this larger sample — stated with
+  equal weight to every caveat above, not less because n went up: this is
+  evidence the harness holds up against a real production pull, not
+  evidence of an edge on a still-far-from-powered sample.

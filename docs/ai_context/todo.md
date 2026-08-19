@@ -46,10 +46,43 @@ every row that fails to score is counted under a named reason (`no_settled_outco
 but load-bearing at scale.
 
 **What remains open**: the stale-file duplication itself (a real production-pipeline defect, not
-this script's problem to fix); local coverage is too thin for a real verdict (needs either a
-fuller regular-season mirror pulled from production, or continuous re-runs as dates accumulate);
-puck-line odds coverage is thinner than moneyline/total (1 of 4 matched games had none) -- worth
+this script's problem to fix); puck-line odds coverage is thinner than moneyline/total -- worth
 checking whether that's a genuine market-availability gap or a capture gap at scale.
+
+**Addendum, same day: pulled from PRODUCTION instead of the local mirror, per CLAUDE.md's own
+standing rule** ("don't diagnose missing data from the local checkout -- check production first").
+Added `--source production`/`both`: pulls every date `/nhl/api/cards/dates` currently lists from
+`https://syndicate-an21.onrender.com` (a public route, no admin token needed), reshapes each game
+into the same row shape the scoring logic already reads, caches each raw response under
+`data/nhl_source/data/ingestion_cache/nhl_cards_<date>.json` (matching the boxscore-cache
+convention). **Confirmed non-circular for this specific route**, not assumed from the general
+finding above: the payload's own `source_path` points at the real `predictions_<date>.csv` on
+Render's disk, `lookahead_applied=False`/`using_sample_data=False` on the checked sample. Moneyline
++ total odds parse from a `"Moneyline and total board"` panel's clean label->value `summary_stats`;
+puck-line American odds are not exposed by this route at all (confirmed against several dates with
+non-null puck-line EV, proving the data exists, this display layer just never surfaces the price)
+-- `--source both` recovers puck-line coverage from local files, deduped against production.
+
+**A second real bug, found the exact same way as the first -- by checking, not assuming.**
+`lookahead_applied` does NOT mean live/circular adjustment, despite the name. Read `nba/cards.py`'s
+identical flag, then confirmed against every cached NHL response: it means "the requested date had
+no games (an off day), the route served the NEXT date that does" -- `payload["date"] !=
+payload["requested_date"]`, always later. An early draft of this script rejected those rows
+outright (23 of 24 in the first production run), which would have silently discarded real, valid
+games mislabeled under the wrong date -- the same *shape* of bug as the stale-duplicate-file
+finding above, not a different one. Fixed the same way: key every row on the RESOLVED
+`payload["date"]`, never the requested one -- the existing dedup then naturally collapses the many
+off-day requests that resolve to the same underlying slate (13 collapsed in the `both` run).
+
+**Updated measured result**: sample grew from n=3-4 to **n=14-15** (moneyline/total, `--source
+both`), n=3 puck line (unchanged, local-only), across 12 dates with a matched settled outcome
+(`2026-03-01`..`2026-06-11`) instead of 4 -- roughly 3-4x. Moneyline: market still wins (0.2905 vs
+0.2769). Total: **model beats market this run** (0.2102 vs 0.2378). **Stated with equal weight to
+every caveat above, not less because n went up**: n=14-15 remains far below a powered sample, and a
+"beats market" headline on a small sample is exactly the kind of result noise would most readily
+produce. This addendum is evidence the harness holds up against a real production pull, NOT
+evidence of an edge -- the local-coverage constraint the first pass flagged is now addressed
+directly, and no further script changes are needed as the season resumes and dates accumulate.
 
 ### `#469` — **`#468`'s "no caller of boxscore-capture exists anywhere" was wrong — a real, ENABLED, ESPN-based caller runs every ~2h and silently reports success while adding zero rows** — DIAGNOSED AND FIXED 2026-08-19 (`1fa94eb8`), lane `basketball-model-owner`. Deploy to live-odds-worker pending a clear preflight window (job-in-flight HOLD as of first attempt).
 

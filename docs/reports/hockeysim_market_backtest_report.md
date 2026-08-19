@@ -95,3 +95,63 @@ already found for a different sport's engine.
 - **Puck line coverage is thinner than moneyline/total** (1 of 4 matched games had no puck-line
   odds) — worth checking whether that's a genuine market-availability gap or a capture gap, if this
   becomes a market worth tracking at scale.
+
+---
+
+## Addendum — pulled from production, the binding constraint above addressed
+
+Per CLAUDE.md's own standing rule ("Render is the source of truth — `data/**` in git is a lossy
+mirror... don't diagnose 'missing data' from the local checkout — check production first"), added
+`--source production`/`both` to `scripts/grade_nhl_predictions_vs_market.py`: pulls every date
+`/nhl/api/cards/dates` currently lists from `https://syndicate-an21.onrender.com` (a PUBLIC route,
+no admin token needed), reshapes each game into the same row shape the scoring logic already reads,
+and caches each raw response to `data/nhl_source/data/ingestion_cache/nhl_cards_<date>.json` (same
+convention as the boxscore cache) so a re-run doesn't re-hit production.
+
+**Confirmed non-circular for this route specifically**, not assumed from the earlier general
+finding: `lookahead_applied=False`, `using_sample_data=False`, `hasArtifactData=True`, and
+`source_path` on the payload literally points at `predictions_<date>.csv` on Render's disk — the
+API is directly serving the same real, un-transformed artifact, packaged as JSON.
+
+**Moneyline + total odds only** — American prices come from the `"Moneyline and total board"`
+panel's `summary_stats` (a clean label→value lookup). Puck-line American odds are **not exposed by
+this route at all**, confirmed against several dates where the puck-line EV was non-null (proving
+the underlying data exists, this display layer just never surfaces the price) — `--source both`
+recovers puck-line coverage from local files, deduped against production on the same
+`(date, home_abbr, away_abbr)` key.
+
+**A second real bug, found the same way as the first — by checking, not assuming**: the first
+production pull showed 23 of 24 rows failing a naive `lookahead_applied` filter. Investigating
+`lookahead_applied`'s actual meaning (reading `nba/cards.py`'s identical flag, then confirming
+against every cached NHL response) showed it means something different than the name suggests:
+**the REQUESTED date had no games (an off day) and the route served the NEXT date that does** —
+`payload["date"] != payload["requested_date"]`, always later, never a live/in-game adjustment.
+Rejecting those rows outright — an earlier draft of this script did exactly that — would have
+silently discarded real, valid games mislabeled under the wrong date, the same *shape* of bug as
+the stale-duplicate-file finding above. Fixed the same way: key every row on `payload["date"]` (the
+RESOLVED date), never the date requested — the existing dedup then naturally collapses the many
+off-day requests that resolve to the same underlying slate (13 collapsed in the `both` run below).
+
+### Updated measured result
+
+| market | n (`--source production`) | n (`--source both`) | model Brier | market Brier | verdict |
+|---|---|---|---|---|---|
+| home moneyline | 14 | 15 | 0.2905 | 0.2769 | market wins |
+| total over/under | 14 | 15 | 0.2102 | 0.2378 | **MODEL BEATS MARKET** |
+| home puck line (-1.5) | 0 (no odds via this route) | 3 | 0.2146 | 0.2133 | market wins |
+
+Coverage widened from 4 dates (one playoff series' tail) to 12 dates with a matched settled outcome
+(`2026-03-01` through `2026-06-11`) — roughly 3-4x the sample, and no longer confined to one
+matchup's single-game nights.
+
+**Stated exactly as plainly as the first result, not more confidently just because n went up**:
+n=14-15 is still far below any sample that can support a real "beats/loses" verdict — the total-over
+result flipping to "model beats market" on this larger-but-still-small sample is at least as
+consistent with noise as with a real signal; the earlier CAVEAT about MLB's much larger sample
+still finding its own noise floor exceeded the effects under study applies with MORE force here,
+not less, precisely because a "beats market" headline is the exact kind of result that noise would
+most readily manufacture. **This is not evidence of an edge. It is evidence the sample got bigger
+and the harness held up under a real production pull.** Re-running as new NHL dates accumulate
+(the season resumes in October) is the only way this graduates from "the harness works" to
+"here is a measured result," and even then only after the pre-registration discipline
+`docs/ai_context/mlb_edge_scan_preregistration.md` describes — not a single ad hoc pull.

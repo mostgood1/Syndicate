@@ -767,9 +767,38 @@ Fixed with an explicit dedup on `(date, home_abbr, away_abbr)`, counted under
 `duplicate_stale_file_row`, not silently dropped. **This staleness pattern is itself a real,
 separate production-pipeline finding, not just a backtest artifact** — worth its own follow-up.
 
-**Measured**: n=3–4 per market (moneyline, total, puck line) after dedup — the market wins all
-three (0.2061 vs 0.2630 moneyline; 0.2115 vs 0.2294 total; 0.2133 vs 0.2146 puck line). **Stated as
-plainly as everywhere else in this document**: n=3–4, all from one playoff series, cannot support a
-real verdict either way — this proves the harness is correct end-to-end on real data, not that the
-engine has or lacks an edge. Local `predictions_<date>.csv` coverage is the binding constraint, not
-the harness; pointing `--root` at a fuller mirror needs no script changes.
+**Measured (local only)**: n=3–4 per market (moneyline, total, puck line) after dedup — the market
+wins all three (0.2061 vs 0.2630 moneyline; 0.2115 vs 0.2294 total; 0.2133 vs 0.2146 puck line).
+**Stated as plainly as everywhere else in this document**: n=3–4, all from one playoff series,
+cannot support a real verdict either way — this proves the harness is correct end-to-end on real
+data, not that the engine has or lacks an edge.
+
+**§8b — pulled from production instead, per CLAUDE.md's own standing rule** ("don't diagnose
+missing data from the local checkout — check production first"). Added `--source production`/`both`:
+pulls every date `/nhl/api/cards/dates` currently lists from `https://syndicate-an21.onrender.com`
+(a public route, no admin token), confirmed non-circular for this specific route by reading its own
+payload fields (`lookahead_applied=False`, `using_sample_data=False`, `source_path` pointing at the
+real `predictions_<date>.csv` on Render's disk). Moneyline + total odds parse cleanly from a
+`"Moneyline and total board"` panel; puck-line American odds are not exposed by this route at all
+(confirmed against several non-null-EV dates), so `--source both` recovers puck-line coverage from
+local files, deduped against production.
+
+**A second real bug, found the same way as the first**: `lookahead_applied` does NOT mean
+live/circular adjustment (the initial assumption) — reading `nba/cards.py`'s identical flag and
+confirming against every cached response showed it means "the requested date had no games, served
+the next date that does" (`payload["date"] != payload["requested_date"]`, always later). An earlier
+draft of this script rejected those rows outright, silently discarding real games mislabeled under
+the wrong date — the same *shape* of bug as the stale-duplicate-file finding above. Fixed by keying
+every row on the RESOLVED `payload["date"]`, letting the existing dedup collapse the redundant
+off-day requests (13 collapsed in the combined run).
+
+**Updated measured result**: n=14–15 per market (moneyline, total), n=3 puck line (local-only, as
+before) across 12 dates with a matched outcome (`2026-03-01`..`2026-06-11`) — roughly 3-4x the
+sample. Moneyline: market still wins (0.2905 vs 0.2769). Total: **model beats market this run**
+(0.2102 vs 0.2378). **Stated with EQUAL weight to every other caveat in this document, not less
+because the sample got bigger**: n=14-15 remains far below a powered sample, and a "beats market"
+headline on a small sample is exactly the kind of result noise would most readily produce — this is
+evidence the harness holds up against a real production pull, not evidence of an edge. Local
+`predictions_<date>.csv` coverage was the binding constraint the first pass flagged; this addendum
+addresses it directly, and the harness needs no further changes to keep widening as the season
+resumes and new dates accumulate.
