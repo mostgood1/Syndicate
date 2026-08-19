@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 416 rules `[generated]`
+## Index — 419 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1307,3 +1307,30 @@ function directly, which proves the function works, not that anything in
 production reaches it. "Deployed and verified" claims two different things
 and both need a distinct, separate measurement: (1) is this commit live,
 (2) does the live process's real entrypoint ever execute this code path.
+
+## 2026-08-19 — RULE: a guard that fails open silently is indistinguishable from a guard that works. Grep for the symbol you deleted.
+
+- The rule going forward: **after editing a guard, prove it still FIRES — do not
+  accept "it parses" or "it is registered" as evidence.** Every hook here wraps
+  its work in `except Exception: return 0` so a broken guard cannot block real
+  work, which means a broken guard is also SILENT. Those two properties are the
+  same line of code.
+
+**MEASURED.** A scripted four-part edit generalising `ledger-commit-guard.py`
+had ONE string replacement silently not match. The result: `main()` still called
+`_violations()`, which the same edit had deleted, and passed 2 arguments to a
+function that now took 3. **`ast.parse` passed.** Both call sites sit inside
+`except Exception: return 0`, so the guard would have been registered, run on
+every single commit, and never once fired — while every status readout said it
+was installed.
+
+**WHAT CAUGHT IT** was `grep -c '_violations'` returning 0 — asking whether the
+symbol I deleted was still referenced, not whether the file was valid Python.
+**A syntax check answers "is this Python"; the question was "does this still
+work".** Same family as the six checks that answered adjacent questions earlier
+in this session.
+
+**THE TEST THAT SHOULD ALWAYS FOLLOW A GUARD EDIT** is the one already used for
+the originals: break the thing deliberately and confirm exit 2, then repair it
+and confirm exit 0. Both halves. A guard verified only on the failing case can
+still block everything; verified only on the passing case it can be inert.
