@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 427 rules `[generated]`
+## Index — 428 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1164,3 +1164,34 @@ permissive verdict is worse than one that never does, so the tests that count ar
 the ones that must FAIL: a job present → HOLD, the untouched path still → HOLD,
 and an unreachable source → UNKNOWN rather than CLEAR. An empty result must read
 as a FAILED READ, never as an idle service.
+
+## 2026-08-19 — RULE: a cause must explain the TIMING, not just the mechanism. Date the change before believing it.
+
+- The rule going forward: **when you propose a change as the cause of a dated
+  symptom, find out WHEN that change happened before asserting it.** A mechanism
+  that cannot produce the observed timing is not the cause, however completely it
+  explains the current state — and "explains the state" is the part that feels
+  like proof.
+
+**MEASURED, on the fifth attempt at one symptom.** Web stopped emitting
+`ALL_PROCESS_MEMORY` on 2026-08-14. Having finally found the real gate — an env
+flag that stops the only emitting loop from starting on web — my immediate next
+move was to blame the five `render.yaml` pushes of 08-13, each of which fires
+`blueprint_sync` and rewrites a service's WHOLE env block. Mechanically perfect:
+a sync would overwrite exactly that kind of manual value.
+
+**`git log -S` killed it in one command.** `render.yaml` has carried `"false"`
+for web since **2026-07-25**, and the gate itself has existed since **07-04** —
+both WEEKS before the last emission. A sync cannot flip a value that was already
+false. Four causes for this symptom had already been wrong; that would have been
+the fifth, and it would have been written up as a finding.
+
+**THE DISCRIMINATOR IS CHEAP AND ALMOST NEVER RUN.** One `git log -S <token>`
+over the file, before asserting. The temptation is strongest exactly when the
+mechanism is elegant, because elegance reads as evidence.
+
+**WHAT SURVIVES IS BETTER THAN WHAT I NEARLY CLAIMED.** The mechanism is verified
+(code path + live config + web rebooting repeatedly without emitting), and the
+TRIGGER is recorded as unproven and possibly unrecoverable — Render exposes no
+env-var history. **"Mechanism known, trigger unknown" is a real result; "cause
+found" would have been a fabrication.**
