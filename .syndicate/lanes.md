@@ -1095,6 +1095,20 @@ reconstructed Normal CDF.**
   clean. Smoke-tested `board_enrichment.attach_projections(sport="wnba")`
   directly against a nonexistent date — degrades to the exact pre-`#263`
   `reason` string, no crash.
+- **REAL-DATA VALIDATION, while waiting on `basketball-model-owner` 2026-08-19.**
+  Ran the SHIPPED `_hit_prob_over` (not a copy) directly against today's real
+  `cards_sim_detail_2026-08-19.json` — every `(player, stat)` combo with a
+  ladder across both of today's games, **344 combos**. For each, compared
+  `P(over mean-5)` against `P(over mean+5)`: **zero monotonicity violations,
+  zero out-of-[0,1] values, zero crashes.** Also spot-checked Veronica
+  Burton's real `pts` ladder (the exact row that motivated this whole
+  sub-fix) at 5 lines: `P(over 13.5)=0.34` (below 0.5, correct — line sits
+  above her 12.15 mean), `P(over 0.5)=1.0`, `P(over 40.5)=0.0` — sane at both
+  tails. This is real-artifact validation the unit tests (synthetic fixtures)
+  cannot provide on their own; it does not replace the post-deploy
+  verification step (still needs a live build to prove the READ path works
+  cross-service), but it rules out a whole class of "the math is wrong on
+  real data's actual shape" failure before that deploy happens.
 - **NOT PUSHED**, same reasoning as the game-line sub-fix: additive and
   inert on its own (a build with no `cards_sim_detail` reachable degrades to
   today's behaviour, verified by test), but landing it alongside the
@@ -1291,6 +1305,66 @@ reconstructed Normal CDF.**
   test-covered). Full narrative: `.syndicate/log/2026-08-19.md`.
 - Verification: `pytest tests/test_lane_guard_files_forms.py` 10/10 pass;
   `0a7fdbeb` confirmed on `origin/main` post-push.
+- Blocked by: none.
+
+### nfl-player-props-skew-fix — OPEN — opened 2026-08-19 — session: nfl-player-props-skew-fix
+- Goal: fix `#471` defect 1 (renumbered from the calibration-fix lane's
+  "defect 1" — the yardage/count-market one, not `anytime_td` which is
+  already fixed): every count/yardage market's Normal-CDF cover
+  probability is overconfident near its own mean (predicts ~50% cover,
+  actual ~37-44%). **Testable outcome:** a re-run of
+  `scripts/backtest_nfl_props.py`'s Section 2 ladder calibration shows the
+  mid-deciles (currently the worst gap, +0.06 to +0.13 across all 7
+  affected markets) materially closer to calibrated, with no regression
+  to Section 1's beats-baseline verdicts on any of the 7 markets.
+- Files:
+  - `syndicate/features/nfl/props.py` — `_nfl_prop_model_probability`'s
+    non-`anytime_td` branch (currently a plain `NormalDist(mean,
+    stdev).cdf(line)`).
+  - `scripts/backtest_nfl_props.py` — read/run to validate; may need a
+    small edit if the fix needs new substrate the current collector
+    doesn't already provide.
+  - New comparison/validation script under `scripts/` (name TBD),
+    mirroring `scripts/calibrate_nfl_anytime_td_shrinkage.py`'s
+    fit-vs-report discipline if the fix has any tunable parameter, or a
+    plain before/after comparison if it does not (log-normal moment
+    matching has none — deterministic given mean/stdev).
+  - `tests/test_nfl_props.py` — new tests for the new probability path.
+  - Read-only reference: `docs/ai_context/todo.md` `#471` (source of the
+    defect), `reports/nfl_props_backtest_2022_2025.json` (baseline),
+    `syndicate/features/nfl/player_stats.py` (NOT expected to need edits
+    — this defect is about the probability TRANSFORM, not the rate
+    estimate itself, unlike the anytime_td fix).
+- Hypothesis: real NFL box-score count/yardage stats are right-skewed
+  (mean > median), which `Normal(mean, stdev)` cannot represent (it is
+  symmetric by construction) — that mismatch alone should account for the
+  observed pattern (well-calibrated at both tails, overconfident in the
+  middle, since a Normal puts too much mass exactly at/near its own mean
+  relative to a right-skewed distribution's true, lower-than-50%
+  P(X>mean)). A log-normal fit via method-of-moments (same mean/stdev
+  inputs already computed, no new upstream data needed, no scipy
+  dependency required — closed-form via `statistics.NormalDist(0,1).cdf`
+  on the log-transformed line) should close most of the gap. `scipy` is
+  already a declared dependency (`requirements.txt`) but is not currently
+  imported anywhere in `syndicate/` or `scripts/` — a Gamma-distribution
+  alternative stays on the table if log-normal underperforms, but adding
+  scipy as this repo's FIRST live runtime scipy import is a larger,
+  riskier move than a stdlib-only fix and should not be reached for
+  first.
+- Falsification test: if a side-by-side comparison (Normal vs log-normal
+  cover probability, same rows, same Brier/calibration methodology
+  `backtest_nfl_props.py` Section 2 already uses) does not close the
+  mid-decile gap, or closes it at the cost of the tail calibration that
+  is currently fine, the hypothesis is wrong and this reports a null
+  result rather than shipping a change that trades one defect for
+  another.
+- Verification: `scripts/backtest_nfl_props.py --seasons 2022,2023,2024,2025`
+  re-run post-fix; Section 1 shows no market flipping from "beats
+  baseline" to "no measured skill" (point-accuracy MAE is a DIFFERENT
+  metric than cover probability and should be unaffected, but must be
+  checked, not assumed); Section 2's per-market bucket gaps stated
+  before/after, same honesty standard as the anytime_td fix (report the
+  trade-off if one exists, do not hide it).
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
