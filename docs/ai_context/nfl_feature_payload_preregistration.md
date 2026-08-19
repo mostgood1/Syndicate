@@ -361,3 +361,65 @@ projections got better.** That is Phase 3, it needs realised outcomes and a
 proper scoring rule, and the decision rule in §3 above stands unchanged:
 paired ΔCRPS on held-out games, improvement > 2× the noise floor, or it is a
 NULL and does not ship.
+
+
+---
+
+# VERDICT: NULL — 2026-08-19. The payload does not ship.
+
+    PHASE 3 RESULT  season=2023  n=269  seeds=300  calibration UNCHANGED
+    paired dCRPS  : +0.0226   SE 0.0233   (0.97 SE)
+    paired dMAE   : +0.0256   SE 0.0290   (0.88 SE)
+    mean CRPS off : 7.9004      mean CRPS on : 7.9229
+
+Both under 1 SE, and nominally WORSE rather than better. Against the rule fixed
+in §3 before any modelling: *"improves but < noise floor -> NULL. Do NOT ship.
+Do NOT re-describe as promising."* It does not even improve. **NULL.**
+
+## The null has a MECHANISM, not a shrug
+
+| path | \|Δ margin\| | share of the 13.5-pt margin SD |
+|---|---|---|
+| `feature_generation_payload` | 0.553 pts | **4.1%** |
+| `home/away_offense_rating` | 2.322 pts | **17.2%** |
+
+**4.2× leverage difference, and production already uses the stronger path**, already
+as-of (`_mean_epa(..., before_week=week)`). `build_drive_priors` builds ONE
+game-level profile driving `scoring_environment` and never reads
+`away_offense_rating`; per-team differentiation is in `play_simulator.py:258-259`.
+**An intervention worth 4% of the outcome's spread cannot produce a detectable
+accuracy change even if directionally perfect** — which is exactly what n=269 shows.
+
+## PHASE 4 IS MOOT
+
+There is nothing to re-fit for a mechanism that does not move the output. The
+re-centring already done (league-mean `offense_index` 0.405 → 0.500) was required
+to make the null *interpretable* — without it the measurement would have been of a
+units bug — but no further calibration work is justified by this result.
+
+## What the experiment DID buy, none of it from the payload
+
+- **The football feature builder was leaked** — r = **0.988** vs margin. Any model
+  fed it would have backtested spectacularly and been worthless.
+- **NCAAF ratings were leaked** — 30% inflation; fixed, opener unaffected.
+- **A leak-free as-of builder exists and self-certifies** (r = 0.235, in-module).
+- **The engine's baselines do not match real NFL distributions** (`success_rate`
+  0.500 assumed vs 0.422 actual), documented with the correction.
+
+## The trajectory, kept because it is the methodological finding
+
+    n=15  +0.2058 (2.79 SE)  <- called "systematic degradation", story attached
+    n=40  +0.1116
+    n=102 +0.0326
+    n=217 +0.0455
+    n=269 +0.0226 (0.97 SE)  <- the truth
+
+The small-n reading was not a preview of the answer; it WAS the artifact. Recorded
+as a standing rule in `learnings.md`.
+
+## If anyone revisits this
+
+Do not re-run the payload. **Test the RATINGS path instead** — it is where the
+leverage is, it is already wired, and the open question there is not whether it
+reaches the engine but whether a better as-of estimator beats the current
+rolling-EPA one. `asof_team_form.py` is built and certified for exactly that.
