@@ -698,7 +698,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   never tracks players. Props would be a build, not a wiring fix.
 - Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
 
-### wnba-edge-263 — OPEN — opened 2026-08-19 — session: wnba-edge-263
+### wnba-edge-263 — OPEN — **ALL CODE MERGED, DEPLOY BUILT+CLAIMED, BLOCKED ON JOB-IN-FLIGHT** — opened 2026-08-19 — session: wnba-edge-263
 - Goal: WNBA Layer 2 rows carry a real `model_edge_pct` (or an honestly-labeled
   approximation) instead of `None` on every row. **Testable outcome:**
   `/api/board/layer2-shortlist?sport=wnba` on a live slate reports
@@ -1200,13 +1200,19 @@ in this lane (props loader test added a few commits back). Worth generalizing:
 any join in this codebase whose tests build the index by hand rather than
 through its own loader has an unmeasured seam exactly like this one.
 
-**Status: both sub-fixes complete, integrated, tested (209 tests across the
-two files + refresh_runner regression, only the 3 pre-existing-unrelated
-failures `basketball-model-owner`'s own commit already names). Not yet
-merged to `origin/main` — still in the worktree branch
-`session/wnba-edge-263`, ready to land.** Verification step above (live
-`rows_with_model_edge`) needs an actual deploy, which is a separate,
-explicit decision — not taken here.
+**STATUS AT CHECKPOINT 2026-08-19, superseding the paragraph above.** All code
+merged to `origin/main` (both sub-fixes + `basketball-model-owner`'s producer
+half). Two scoped deploy branches built/pushed and claim-held —
+`deploy/wnba-263-refresh-worker` (`152c3292`), `deploy/wnba-263-live-odds-worker`
+(`218a5ded`) — **but NOT YET DEPLOYED**: `deploy-guard.py` blocks on a genuine
+job-in-flight HOLD on both services (real MLB sim on refresh-worker, no idle
+window on live-odds-worker), and `SYNDICATE_DEPLOY_GUARD=off` has no working
+override from inside a tool call (see `state.md` `[deploy-discipline]`).
+Session ended with the user deciding whether to set that env var themselves or
+keep waiting for a natural clear window. **Next session: check
+`py -3 scripts/deploy_claim.py status` first — claims may have expired (45-min
+TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
+`.syndicate/log/2026-08-19.md`, "Lane: wnba-edge-263" section.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

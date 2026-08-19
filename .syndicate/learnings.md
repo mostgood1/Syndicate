@@ -1352,3 +1352,28 @@ and commit. I stopped chaining, adopted pathspec, and then produced two NEW
 incidents of a different class with it. Fixing the named instance without
 understanding the category is how the same failure returns wearing different
 clothes.
+
+### 2026-08-19 — OVERTURNED: `SYNDICATE_DEPLOY_GUARD=off` works as an inline Bash prefix
+- What we believed: `CLAUDE.md` documents `SYNDICATE_DEPLOY_GUARD=off` as the
+  off switch for `deploy-guard.py`, presented with no caveat — the natural
+  reading is `SYNDICATE_DEPLOY_GUARD=off python scripts/render_deploy.py ...`
+  in one Bash call.
+- What was actually true: silently inert. `deploy-guard.py` (a PreToolUse
+  hook) reads its OWN process environment, and that hook evaluates the
+  command string BEFORE any shell would parse and export a prefix inside it.
+  Ran it twice, identical block message both times.
+- How we found out: tried it to get past a genuine job-in-flight HOLD (a real
+  MLB sim on refresh-worker), on explicit user instruction to force the
+  deploy. Confirmed by reading `deploy-guard.py`'s source directly rather than
+  retrying with variations.
+- The rule going forward: **this is the SAME class of gap already documented
+  for `commit-guard.py`** (2026-08-17: "all THREE documented overrides were
+  unreachable... a PreToolUse hook runs BEFORE the shell") — a sibling
+  instance in a different hook, not a new mechanism. Any `SYNDICATE_*_GUARD`
+  off-switch mentioned in prose must be assumed unreachable from inside a
+  tool call until proven otherwise; it can only be set at the harness/settings
+  level, outside any session's own reach. Do not spend a second attempt
+  varying the prefix syntax — go straight to reading the hook's source for
+  where it actually reads the value from, or hand the decision to the user.
+- Cost: two blocked deploy attempts, ~5 minutes, no production impact (the
+  guard did its job correctly both times).

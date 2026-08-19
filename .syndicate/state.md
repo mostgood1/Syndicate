@@ -207,6 +207,13 @@ Product decisions, not engineering ones. Do not re-take them.
 - **Deployed SHAs move constantly** — five times in one evening, twice inside 25
   minutes. Re-read per service inside the step that uses one; never carry one
   across turns. A stale read nearly shipped a rollback. `[measured 08-14]`
+- **`SYNDICATE_DEPLOY_GUARD=off` has NO working override reachable from an
+  inline Bash command prefix.** `SYNDICATE_DEPLOY_GUARD=off python scripts/
+  render_deploy.py ...` is silently inert — `deploy-guard.py` (PreToolUse hook)
+  reads its OWN process environment, and that hook evaluates the command
+  BEFORE a shell would ever export a prefix inside it. Confirmed: identical
+  block message with and without the prefix. The real switch is set at the
+  harness/settings level, outside any tool call's reach. `[measured 08-19]`
 - **A fired deploy is not a landed deploy.** Check `status=live` AND the commit,
   never the 201. One deploy sat `build_in_progress` for 33+ minutes while being
   reported as shipped. `[measured 08-13]`
@@ -492,10 +499,17 @@ unsaved anywhere.
   `- Files:`, so 5 lanes using `- **Files (...):**` declared paths NO HOOK COULD
   SEE. A disclaimer now governs only what FOLLOWS it, not the whole line.
   `_DISCLAIMER_MARKERS` gained `"not touch"` (covers "does not touch"/"not
-  touch"/"not touched" — subsumes the prior "not touched" entry) and
-  `"read-only reference"` `[verified 2026-08-19, commits 0a7fdbeb + f52fc91b,
-  both on origin/main]`; each closed a real false-positive that had blocked an
-  unrelated lane from a file its own ledger text explicitly disclaimed.
+  touch"/"not touched" — subsumes the prior "not touched" entry),
+  `"read-only reference"`, and `"not taken"` `[verified 2026-08-19, commits
+  0a7fdbeb + f52fc91b + a1cbcde1, all on origin/main]`; each closed a real
+  false-positive that had blocked a lane from a file its own ledger text
+  explicitly disclaimed. `"not taken"` is a NEW failure shape, not a repeat:
+  a lane correctly got blocked from a file it did not own, recorded that
+  block as its own disclaimer ("BLOCKED, not taken: ..."), and THAT SENTENCE
+  then re-read as a phantom counter-claim, blocking the file's actual,
+  correctly-enforced owner from editing their own file — a disclaimer about
+  the guard's own prior correct enforcement, not about a file the writer
+  never touched.
   Claim matching is exact-or-suffix (`rel == f or rel.endswith("/"+f) or
   f.endswith("/"+rel)`), never a directory prefix — so a non-path token claimed
   out of prose is INERT.
