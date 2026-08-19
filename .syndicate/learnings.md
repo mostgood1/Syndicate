@@ -137,12 +137,12 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 
 ## 2026-08-14 — OVERTURNED: a number that corrects a known bias is the easiest one to believe
 
-**Measured:** two independent defects, either alone sufficient to invalidate it. 1. The LINE was never compared. Odds-history keys carry no line; the point's `line` block does. A board row at `home -5.0` was being differenced against a `home -1.5` close. 2. **25 of 25 closes were captured BEFORE their openings.** Openings at 00:46:53Z against "closes" from 22:12–23:16 the previous evening.
+- **Believed:** the joiner's first same-book CLV, `avg_clv_pct = -5.215` over 25
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-14 — a control with no baseline is a guess wearing a control's clothes
 
-**How to apply:** a control needs a PRE-CHANGE READING, not an intuition about what "should" be true. An unbaselined control fails in both directions: it raises false alarms, and it would have waved a real regression through just as easily. Related: [[feedback_a_rate_not_count]].
+- **2023-2025**), unrelated to the MLB window (2026-08-01..08-14), and they
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-14 — read the system's clock, not the wall clock
@@ -157,12 +157,12 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 
 ## 2026-08-15 — A CADENCE IS A DISTRIBUTION ACROSS REGIMES, NOT A CONSTANT
 
-**Why the original was not a sloppy measurement.** It sampled a real regime correctly. The error was in the *quantifier*, not the number: a rate measured in one regime was promoted to a property of the system. The window was daytime, and the system's behaviour is defined by whether a slate is live — a variable the window held constant without anyone choosing to.
+- **The belief.** "MLB quote capture runs on a metronomic ~121.6-minute beat." It
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — ANCESTRY OF `origin/main` IS NOT DEPLOYMENT; READ THE DEPLOYED TREE
 
-**Rule.** To answer "is this fix running", read the changed SYMBOL out of the deployed SHA — `git show <deployed-sha>:<path>` — not the commit's presence in any branch. Branch membership answers "is it merged". Those are different questions on every service with `autoDeploy` off, and they are different questions on every repo where commits get rebased. This is the same family as `test the fix's predicate, not its deploy state` — the predicate here is the function signature, which is cheap and unambiguous.
+- **The near-miss.** Asked whether the per-sport pregame cooldown had shipped, the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — RULE: a "baseline" is a FILE you diffed, not a number you quoted
@@ -213,7 +213,7 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 - *(evidence in `learnings_evidence.md`)*
 
 ### 2026-08-13 — Presence is not reachability: verify the PATH, not the symbol
-**Overturned belief:** that confirming a fix is present in the deployed code means the observed behaviour goes through it.
+- **Overturned belief:** that confirming a fix is present in the deployed code
 - *(evidence in `learnings_evidence.md`)*
 
 ### 2026-08-13 — A safety gate answers ITS question, not the one you were asked
@@ -437,15 +437,15 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 - *(evidence in `learnings_evidence.md`)*
 
 ### 2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silently reports a peak over a sliver
-**How to apply:** page backward, and make the tool print the window it ACTUALLY covered next to the window it was asked for. A peak over an unstated span is not a measurement. The sample count did not reveal the truncation — 99 samples looks like coverage; 99 samples inside 1.2s of a 51s window is the tell, and only printing both makes it visible.
+- I wrote a pager that walked a time window by advancing `startTime` past the last
 - *(evidence in `learnings_evidence.md`)*
 
 ### 2026-08-14 — a before/after is void if the change moved work INSIDE the measured span
-**How to apply:** before deploying, ask what else reads the window you are changing the contents of. A threshold calibrated against a span is invalidated by a change to that span's definition, and nothing in the diff mentions the threshold. State the before/after spans explicitly and confirm they contain the same work; if they cannot, say the comparison is void rather than reporting a delta.
+- The `#387` streaming cutover was measured as "peak anon during
 - *(evidence in `learnings_evidence.md`)*
 
 ### 2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice
-**How to apply:** the cheapest possible check on an incident diagnosis is to find the same event shape that did NOT fail and compare. It costs one log query. Do it BEFORE the deploy, not after — I had the whole evening's logs available and queried them only when the post-deploy number looked wrong.
+- A handoff carried, as its single next action, a fix whose justification was one
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — FORBIDDEN: never treat equality of a LABEL as identity of a BET
@@ -465,12 +465,12 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 
 ## 2026-08-15 — FORBIDDEN: never read a joiner zero as a fact about the world until the reader is shown to SEE the data
 
-**What happened.** The rule was written in advance, in good faith, and was wrong. `same_book_n=0` came back for all 8 sports. The truth: `/api/ops/clv/report` runs on **web**, `load_openings` is a `path.exists()` on a local file, and web held **0 bytes** of the ledger while refresh-worker had **490 openings recorded for that same date**. The endpoint returned `ok: true` throughout. Shipping one allowlist line moved `same_book_n` **0 → 144** with **no change to odds history at all**. Breadth constrains `resolved` (`no_market_in_history: 172`), never `same_book_n`.
+- **What happened.** The rule was written in advance, in good faith, and was
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — FORBIDDEN: shipping a verification you have not falsified. THREE failed checks in one night, zero failed fixes
 
-**The rule.** Before arming any check, ask the falsification question about the CHECK, not the fix: *what reading would this produce if the fix worked perfectly?* If that equals the failure reading, the check is broken. Then:
+- **The rule.** Before arming any check, ask the falsification question about the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — FORBIDDEN: `git <cmd> <rev>:<dotpath>` in Git Bash on Windows. It silently reads the WRONG thing, and only for dot-prefixed trees
@@ -540,7 +540,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — FORBIDDEN: never read a deploy claim's `target` as a statement about what is running
 
-**A claim is a lock plus a stated intention. It is not a deployment, not a queue, and not a promise.** The holder can deploy something else, deploy nothing, or let the claim expire — all of which happened here.
+- **Measured 2026-08-15/16 on live-odds-worker.** Its claim advertised
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-15 — RULE: merge in the object database when the shared tree is dirty
@@ -570,17 +570,17 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — RULE: fix a bad commit MESSAGE by rebuilding the commit from its own tree, not by `--amend` and not by living with it
 
-- **How we found out:** used PowerShell here-string syntax (`@'...'@`) inside the Bash tool, where `@'x'@` is concatenation, not a here-string — it pasted a stray `@` at both ends of the message (`ceccb672`). Rebuilt as above to `01c53f56`; blob hashes byte-identical, `git show --stat` exactly the 2 intended files, CAS passed.
+- **What we believed:** the shared-tree recipe offered two options for a wrong
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — a per-row field read off ONE row and generalised to all of them
 
-**Rule:** when a field appears on every row, a value read off ONE row is a fact about that row only. Before writing "every X is Y", scan the column. This is the `read-the-field-you-already-have` failure in its most expensive form: no new data was needed, no tool call would have helped, and the wrong version reached `origin/main` and a scheduled task that would have sent every future run hunting for a result already in hand.
+- **Overturned:** my own same-day claim that "every exercised `win_prob` run is on
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — OVERTURNED: a pinned SHA identifies deployed CODE
 
-**Why the wrong version survived review.** A rebase changes every SHA while changing no code, so the *stricter-looking* test (equality) is the one that fires falsely, and it fires in the direction that looks responsible — declaring your own measurement invalid. A guard that errs toward "invalid" does not feel like a bug. It quietly throws away good evidence.
+- **The belief.** Two scheduled measurement tasks pinned their comparison with
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — CORRECTED IN-SESSION: at-cap is not a kill
@@ -590,7 +590,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — NEAR-MISS: verifying against a ref NAME is not verifying
 
-**Why it nearly passed review.** The two checks disagreed and the RIGHT-LOOKING one was the misleading one:
+- **What almost shipped.** A three-file ledger commit that also silently reverted
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — NARROWING AN INSTRUMENT TO A MEASURED DISTRIBUTION BUILDS IN A BLIND SPOT
@@ -600,7 +600,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — FORBIDDEN: never test what is deployed with `git merge-base --is-ancestor`. It answers a question about HISTORY; deployment is a question about CONTENT.
 
-**The rule:** `git show <live-sha>:<path> | grep -c <marker>` against the same command run on `main`. Do it on every service the question touches — on 08-16 web, refresh-worker and live-odds-worker gave three different answers.
+- `edbbee9d` (spread-sign fix) is **NOT an ancestor** of live `97491161` — and
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — FORBIDDEN: never use a fresh `git worktree` as a test baseline for anything that reads `data/`.
@@ -615,7 +615,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — a mirrored row set makes a wrong join look like a UNIFORM defect, which is the most convincing kind.
 
-**The rule:** uniformity is not evidence of a real defect; a wrong join is uniform too. Before believing a 100%-consistent finding, ask what the join key would do if two rows could both match it. Prefer a key that cannot collide (here: the prices, which the row already carried).
+- **What happened.** To verify an edge-attribution fix before deploying, I fetched
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 - FORBIDDEN: never let a branch sit behind a deploy gate without re-cutting it. Waiting is itself a source of staleness.
@@ -635,7 +635,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 - `check_deploy_safety.py` can report a blocker that does not exist, and a BLIND read of it is not a CLEAR one.
 
-**The rule:** gate on an explicit positive (`CLEAR:` present) AND the absence of `[UNKNOWN]` - never on the absence of a negative. Cross-check any "build in flight" claim against the artifact's `written_at`, which is the output rather than the marker.
+- **What happened:** an isolated-index commit of 3 ledger files produced a commit of
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — FORBIDDEN: letting a FITTED MODEL judge, when a model-free measurement of the same thing is available
@@ -680,7 +680,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 — FORBIDDEN: curating a deploy branch BY FILE without checking the call boundary you just cut
 
-**What made it dangerous was the error handling, not the error.** The per-sport `except Exception` at `layer2_shortlist.py:320` catches the `TypeError` and records it as `{"error": ...}` in `per_sport_stats`. So the worker did not crash, did not restart, and emitted no traceback — it just produced ZERO layer2 rows for EVERY sport. A caught exception is not a safe failure when the catch is what hides it. Exposure ~17 min (20:33:23Z -> 20:50:14Z), closed by another session's `a9e5d3d6`, not by me.
+- **A file-level diff cannot see this.** I verified content by blob, ancestry
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — FORBIDDEN: computing a RATE or a COUNT from `scripts/render_logs.py`
@@ -695,7 +695,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 - a blob hash written into a ledger is a SNAPSHOT, not a lease.
 
-**The rule:** in a repo where files move several times an evening, a ledger may record a hash as EVIDENCE of what was true, but must never present one as an INSTRUCTION to be followed later without re-reading. Name the branch and the files; let the reader resolve the hashes at cut time.
+- **re-read the blobs before cutting rather than trusting the numbers printed in
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 2: five beliefs overturned
@@ -725,7 +725,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-16 - FORBIDDEN: a verifier that cannot FAIL cannot PASS. State the denominator every assertion needs, or it will report an empty population as success.
 
-**The rule, structurally:** every assertion in a verifier declares the minimum denominator it needs. Below that the verdict is INCONCLUSIVE and names what it is waiting for. Pick the threshold from the population the DEFECT was observed in (here 19 moved-line rows of 23 tracked -> require 3), so a pass cannot rest on one lucky row.
+- **There were ZERO moved-line rows.** `PASS if not leaked and not bad_steam` is
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-16 — FORBIDDEN: reading `$?` after a pipeline. TWICE IN ONE HOUR, two different tools, both times the wrong answer was the REASSURING one
@@ -750,12 +750,12 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-17 — FORBIDDEN: deploying `main`'s TREE to a service that runs a curated deploy branch
 
-**The tell is per-file, and it is cheap:** for each conflicted path compute `live-only` and `main-only` line counts. **`main-only == 0` means production is AHEAD there** and taking main is a revert. Measured tonight on `refresh_nba_oddsapi_props.py`, `refresh_wnba_oddsapi_props.py` and `test_win_prob_null_counter.py` — three files, on two separate services, where the obvious move was the wrong one.
+- **The tell is per-file, and it is cheap:** for each conflicted path compute
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — FORBIDDEN: gating a deploy on "no jobs running" for a continuously-busy worker
 
-**Worse, the gate measures the wrong moment.** Render BUILDS first and stops the service after (`build_started 21:13:49 -> build_ended 21:18:29 -> live 21:21:05`). What dies is whatever runs at the STOP, ~5 minutes after the trigger — not what preflight saw when you fired.
+- **Worse, the gate measures the wrong moment.** Render BUILDS first and stops the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — FORBIDDEN: resolving the SAME symbolic ref in two git calls. A stale tree on a current parent is a fast-forward, and git cannot tell it from a deliberate revert.
@@ -775,12 +775,12 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-17 — RULE: the em-dash in a lane header is SYNTAX, not punctuation. A hyphen header is an UNGUARDED lane
 
-**Evidence.** `wnba-fixture-identity` was opened by a live session with ASCII hyphens: `### wnba-fixture-identity - OPEN - **...`. `lane-guard.py` parses `^###\s+(\S+)\s+—\s*([^—]*)` and requires U+2014, so the header did not parse at all. Consequences, all silent: the lane's three claimed files were unguarded (one of them contended with a lane closed minutes earlier), and the session-start digest did not list the lane as OPEN, so an arriving session saw no claim on those paths. Found 2026-08-17 12:3x CDT by the `ledger-sweep` lane while verifying something else; the hook had been printing `(1 lane header(s) have no parseable status and are NOT guarded)` and nobody had read it as naming a specific live lane.
+- **Evidence.** `wnba-fixture-identity` was opened by a live session with ASCII
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — FORBIDDEN: diagnosing from FILTERED log projections. Six wrong attributions, one question, and the answer was in the lines I was truncating.
 
-**Each filter encoded the hypothesis I was trying to test.** A `text=` query returns only what I already believed mattered; stripping the memory lines removed the only rows carrying `seconds_since_stage` and `climb_mb_per_s`; truncation hid the discriminating field. The phantom "third ledger pass" was a filtered window that began mid-scan and invented a caller that never existed.
+- **Each filter encoded the hypothesis I was trying to test.** A `text=` query
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: committing through an ISOLATED index ARMS the shared index with a revert of that commit. Disarm after, not just before
@@ -800,7 +800,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-17 — RULE: score a DISTRIBUTIONAL forecast with a distributional baseline. A point test on a distribution is the wrong instrument, even when it agrees.
 
-**What happened.** Phase 7's whole purpose was to build a proper scoring rule for projections (CRPS, bias/dispersion). I built it, used it to find a real defect — the MLB F5 starter leash, dispersion 1.002 vs a 0.7979 target — and then decided whether the model had SKILL by comparing its **mean absolute error to a constant point prediction**. That verdict went into `state.md`.
+- **What happened.** Phase 7's whole purpose was to build a proper scoring rule for
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: a LEAKED backtest number is an UPPER BOUND, not merely an untrustworthy one
@@ -810,27 +810,27 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-17 — RULE: a PATHSPEC commit is the default; the isolated index is the FALLBACK. The latter arms a revert every time
 
-**Relayed by `commit-guard-blind-to-own-recipe`, owed to and written by the coordinator.** That lane measured the two forms against a repo whose index held a revert of `A.txt` and a deletion of `C.txt`:
+- **Relayed by `commit-guard-blind-to-own-recipe`, owed to and written by the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: never close a queue item in BULK. Close each against its own evidence
 
-**I did this to a live deploy request within hours of documenting the same failure shape.** After deploying three requests I moved *everything* in `.syndicate/deploy/requests/` to `done/` and stamped it all "EXECUTED by the coordinator". A fourth request (`soccer-layer2-dates`) had been filed at 20:20Z, after that batch was scoped. It was never deployed — its commits were not even pushed — and it spent that time marked delivered.
+- **I did this to a live deploy request within hours of documenting the same
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: an aggregate dispersion check cannot see an UNINFORMATIVE CENTRE
 
-**What happened.** Phase 7's bias/dispersion decomposition reported MLB pitcher outs at **dispersion 0.791 against a 0.798 target** — as close to perfect as that metric gets. I read it as "the shape is right, only the location is off" and went looking for a calibration fix.
+- **What happened.** Phase 7's bias/dispersion decomposition reported MLB pitcher
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: a signature change needs a CALLER CENSUS, not a spot-check of the caller you just edited
 
-**Evidence.** `_load_team_ratings` gained a required third parameter (`as_of`, audit §7 #6). The author updated the caller inside the same module and wrote a test for it:
+- **Evidence.** `_load_team_ratings` gained a required third parameter (`as_of`,
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: a falsified prediction LOCALISES a bug; treat it as a measurement, not a miss
 
-**Three predictions were falsified today and each was worth more than the confirmation would have been.**
+- **Three predictions were falsified today and each was worth more than the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — A SIGNATURE CHANGE NEEDS A CALLER CENSUS, AND THE CALLER YOU CANNOT REACH IS THE ONE THAT BREAKS
@@ -845,32 +845,32 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-17 — RULE: the FIRST test for any flagged feature is "does enabling it change anything"
 
-**I built three inert things today.** Not three bugs — three pieces of work that existed, looked complete, passed their obvious tests, and did nothing:
+- **I built three inert things today.** Not three bugs — three pieces of work that
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: a watcher that reports a PEAK of ZERO has not measured a peak. Zero samples is NO DATA, never "clean"
 
-**I wrote a memory watcher whose entire purpose was to catch an OOM I had predicted, and it reported `Window clean. Peak live-odds-worker memory 0.0% of 2048MB` while the service was at 85.3% and climbing.** Had I trusted it, the rollback would not have happened. It was caught only because the user asked me to check the number by hand.
+- **I wrote a memory watcher whose entire purpose was to catch an OOM I had
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: a feature can be unfed at the DATA layer, and it looks nothing like a bug
 
-**Standing rules here cover code that is present-but-unreachable.** This is the same failure one level down: code that IS reached, with inputs that are empty.
+- **Standing rules here cover code that is present-but-unreachable.** This is the
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: rank modelling gaps by how much the dimension DISCRIMINATES, not by how complete its machinery is
 
-**What I did.** Researching what the MLB sim was missing, I found pitch-type effectiveness fully built — model fields, four consumption sites, a loader, a cache, a fetch tool — and **0% populated**. I ranked it "where a market beat is most likely" *because everything existed and only needed wiring*, and spent **314 network calls and ~2 hours** filling it.
+- **What I did.** Researching what the MLB sim was missing, I found pitch-type
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: you cannot add a MECHANISM to a CALIBRATED engine without re-fitting its rates
 
-**Measured, 2x2 factorial, 4 of 4 markets:** adding position-player substitution and pitch-type splits to the MLB sim produced a **NEGATIVE interaction, mean −0.00331**. On RBIs each feature alone helped (−0.00573, −0.00271) and together they gained almost nothing (−0.00046). **On runs, both-on was WORSE than neither.**
+- **Measured, 2x2 factorial, 4 of 4 markets:** adding position-player substitution
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — RULE: "the model is absent" needs a FIELD AUDIT, not a name search
 
-**I published a research document stating the MLB sim has "no batted-ball type model — no GB/FB/LD". It was wrong.** The model exists and `simulate.py:1120-1136` consumes it for both batter and pitcher:
+- **I published a research document stating the MLB sim has "no batted-ball type
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-17 — FOUR DEFECTS IN ONE SESSION SHARED ONE SHAPE: THE ERROR PATH RENDERED AS THE SYSTEM'S OWN "NOTHING HERE"
@@ -880,7 +880,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — RULE: a cache with a TTL can serve EMPTINESS as authoritative
 
-**Measured:** 1,282 BVP cache files, every one `by_batter: {}`. I concluded twice from the file COUNT — first "the data is already collected, it just needs mapping", then "it needs a real fetch job". **Both wrong, in opposite directions.** Computing fresh returned 117-170 batter entries for 5 of 5 pitchers.
+- **Measured:** 1,282 BVP cache files, every one `by_batter: {}`. I concluded twice
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: when a claim is corrected TWICE, stop asserting and run it
@@ -890,12 +890,12 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — I ALMOST REQUESTED A DEPLOY FOR SOMETHING ALREADY LIVE, AND ONLY THE BASELINE CAUGHT IT
 
-**What caught it was mechanical, not clever:** the deploy-request template has a `verify:` field that demands a BEFORE value, so filing it forced one fresh read. The discipline that saved this was writing down the before-number at the moment of filing rather than carrying it forward.
+- **What caught it was mechanical, not clever:** the deploy-request template has a
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: a bias can be the NET of two opposing errors, and fixing one is a wash
 
-**Measured:** the MLB engine under-produced strikeouts by **27%** (K/PA 0.179 vs 0.226). The obvious cause was the pitch-outcome mix — `base_in_play` 0.23 against a league ~0.17, `base_foul` 0.12 against ~0.18 — and correcting it lands the mix almost exactly on the league.
+- **Measured:** the MLB engine under-produced strikeouts by **27%** (K/PA 0.179 vs
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — A STRUCTURAL DEFECT AND A MARKET EDGE ARE DIFFERENT QUESTIONS
@@ -910,7 +910,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — RULE: a session RESUME reassigns the session id, which silently stands the coordinator role down. The register must be re-verified, not assumed
 
-**My own deploy guard blocked me.** `coordinator.id` held `9ed7fd89-...` — correct when written at 13:36 — and the hook was being handed `6f0980eb-...`. Nothing edited the register; **the session id changed underneath it** when the session was resumed. The role had been silently unheld for an unknown stretch, and the first symptom was the coordinator being unable to deploy.
+- **My own deploy guard blocked me.** `coordinator.id` held
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — THE MARKET HARNESS HAS A NOISE FLOOR 2.4x THE EFFECTS IT WAS USED TO JUDGE
@@ -920,7 +920,7 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — RULE: a `sed` backreference that does not match writes a RAW CONTROL BYTE, and it ate three lane slugs
 
-**Three OPEN lanes lost their names entirely.** Their headers read `###  \x01  —  \x02  — **body` — the literal bytes `\x01` and `\x02` where the slug and status should be. A session correcting the ASCII-hyphen headers ran a substitution with `\1`/`\2` backreferences whose capture groups did not match, and `sed` wrote the escape sequences as raw control characters instead of the captured text.
+- **Three OPEN lanes lost their names entirely.** Their headers read
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — A DUPLICATED TERM PASSES EVERY CHECK THIS REPO HAS. A PLAUSIBILITY READ CAUGHT IT.
@@ -930,32 +930,32 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — RULE: a union merge CANNOT carry a deliberate deletion. A collapse pushed through one is undone, and comes back bigger
 
-**I collapsed `state.md` from 59 sections to 26, pushed it through the merge cycle, and `origin/main` came out with 87.** The collapse was reverted and my new sections were added on top, so the file ended up **larger than before I started**.
+- **I collapsed `state.md` from 59 sections to 26, pushed it through the merge
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — A VARIANCE-REDUCTION TRICK THAT CHANGES THE ANSWER IS NOT A VARIANCE-REDUCTION TRICK
 
-**The first bug, and why finding it was NOT the end.** I keyed the seed on `half.next_batter_index`, reasoning that "a team's Nth plate appearance is the same logical event in both arms." **`simulate.py:3178` advances that index MODULO the lineup length.** It holds 9 values, so the same stream replayed 4-5 times per game — scoring inflated up to **126%**. I had even written "batter_index grows monotonically (not modulo)" into the lane note; one line of code said otherwise.
+- **The first bug, and why finding it was NOT the end.** I keyed the seed on
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: a wiring gate must ask whether the payload is READ, not whether a payload is PASSED
 
-**Lane `football-model-owner`. Caught by measurement, one step before it would have been published as a clean result.**
+- **Lane `football-model-owner`. Caught by measurement, one step before it would
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: a zero from a LOCAL checkout is a statement about the mirror, never about production. I filed one as a defect
 
-**Lane `football-model-owner`. Caught by the repo's own rule, one step after I had already written the wrong claim into `todo.md` and a reference doc.**
+- **Lane `football-model-owner`. Caught by the repo's own rule, one step after I
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: a guard that gates on IDENTITY fails to a total block when the identity holder disappears. Gate on STATE
 
-**The failure.** `deploy-guard.py` allowed a deploy when `session_id in .syndicate/coordinator.id`. The coordinator was a session. The session was archived. From that moment the allow-branch was **unreachable**, and the guard blocked every deploy from every session — while presenting itself as a routing rule ("file a request, carry on"). Two requests sat in `deploy/requests/`, `deploy/grants/` was empty, and an 11-day clock ran on the NCAAF opener. Nobody had disabled anything; the predicate simply stopped having a true value.
+- **The failure.** `deploy-guard.py` allowed a deploy when
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — CHECK WHETHER A FIELD EXISTS BEFORE DECLARING IT
 
-**No error, no warning, no test failure.** The symptom was that an override dict of 1.0s produced different results from an empty dict.
+- **No error, no warning, no test failure.** The symptom was that an override dict
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — OVERTURNED: "the ledger files were fine, just big" — session `football-model-owner`
@@ -970,17 +970,17 @@ had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
 
 ## 2026-08-18 — FORBIDDEN: never apply a transform to a shared file by patching the transform's own source with `str.replace` — session `football-model-owner`
 
-**What happened.** To re-run a collapse against the WORKING copy instead of `HEAD`, I rewrote the script's input line with `str.replace` and `exec`'d it. The replacement DID NOT MATCH — whitespace differed — so the "worktree rebuild" silently re-ran the HEAD version, and writing the result destroyed another session's 31 uncommitted lines, including a deployed-and-measured NCAAF result.
+- **What happened.** To re-run a collapse against the WORKING copy instead of
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — RULE: before wiring ANY feature into a model, check whether the feature is computed FROM THE THING BEING PREDICTED. Ask what WINDOW it covers, not what it is named.
 
-**Evidence.** `smartsim2` reads 33 alias-terms out of `feature_generation_payload` and no production entrypoint passes it. Wiring it moved **21 of 21** drive-prior fields and **1.125 pts** of margin — a large, clean, entirely spurious effect.
+- ### The rule going forward
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — A TRUNCATED READING IS NOT A COMPLETE ONE
 
-**RULE: before reporting a null or an absence, prove the query can return a non-null.** A control that must succeed. `pattern=*conditional_mix*` returns count:1 where `pattern=conditional_mix_2026.json` returns count:0 for the SAME file — and I ran the bad form five times and quoted it to two other sessions.
+- **RULE: before reporting a null or an absence, prove the query can return a
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-18 — A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK
@@ -1084,3 +1084,88 @@ it is exactly: **files git has never seen.**
 worktree DOES cover this case, because its index is not shared. That is the
 fallback for new files, and it is the one situation where the worktree beats the
 pathspec commit rather than the reverse.
+
+## 2026-08-19 — RULE: before building a feature pipeline for an unwired input, check whether the engine has a BETTER-WIRED input already doing that job
+
+**Evidence.** `smartsim2` reads 33 alias-terms from `feature_generation_payload`
+and no production entrypoint passes it. I measured that wiring it changed the
+output, then spent a session building a leak-free as-of feature pipeline for it.
+
+**Measured at the end, and it should have been the FIRST measurement:**
+
+    |d margin| via feature_generation_payload : 0.553 pts   (4.1% of the 13.5-pt SD)
+    |d margin| via home/away_offense_rating   : 2.322 pts   (17.2%)   -> 4.2x
+
+`build_drive_priors` builds ONE GAME-LEVEL profile and never reads
+`away_offense_rating` at all; per-team differentiation lives in
+`play_simulator.py:258-259`, on the ratings path. **All three generate scripts
+already pass ratings, and NFL's are already computed as-of**
+(`_mean_epa(..., before_week=week)`, same prior-season fallback and explicit
+neutral-no-data branch I re-implemented from scratch).
+
+**So "unwired" was true and not the important fact.** An input can be unwired
+because it is the weak lever. The engine had a strong, correctly-fed one.
+
+- **The rule:** when you find an unwired input, before building for it, measure
+  its LEVERAGE against every other input that reaches the same output. Ask "is
+  anything else already doing this job, better?" — a leverage ratio is cheap
+  (6 games) and I ran it last instead of first.
+- **The user asked me to wire the ratings path and I nearly did** — it was
+  already wired, and I would have rewritten working, leak-free code.
+
+---
+
+## 2026-08-19 — RULE: a population checklist CANNOT detect leakage, and a large clean first-wiring effect is a leakage SUSPECT
+
+**Evidence.** `build_nflverse_game_metrics` computes EPA from the game being
+predicted. **r = 0.988** against the final margin over 285 games.
+
+**Everything passed.** Field names are exactly what legitimate prior-form
+features would be called. Population was **100%**. The input checklist marked
+them FED. The reachability test passed (`off != on`). Unit tests passed. **A
+leaked field is 100% populated BY CONSTRUCTION and looks maximally healthy.**
+
+The tell I misread: wiring it moved margin 1.125 pts — large and clean. **I read
+that as evidence the features mattered; it was evidence they contained the
+answer.**
+
+- **The rule:** for every model input, write down the WINDOW it covers —
+  as-of-before-kickoff, season-to-date-excluding-this-game, or in-game. It is
+  not in the name, the type, the population rate, or the consuming code.
+- Run the correlation-with-outcome test before wiring. Two minutes. Honest prior
+  form lands r = 0.3-0.5; anything above ~0.65 contains the outcome.
+- **Related, and worse:** my FIRST FIX for the NCAAF version of this leaked
+  harder than the original. `/ppa/games?week=1` without `seasonType=regular`
+  returns the College Football Playoff, importing JANUARY games into a week-8
+  rating. **The tell was an impossible count** — 10 prior games through week 7
+  for a team that plays weekly — **not a failing test.** A postseason row is
+  otherwise indistinguishable from a regular one.
+- **And the obvious fix was a silent no-op:** `/ppa/teams` ACCEPTS `week=N` and
+  IGNORES it (identical rows and values), so a week parameter yields the same
+  leaked number, a clean diff, and a false all-clear.
+
+---
+
+## 2026-08-19 — RULE: a small-n result is not a preview of the large-n result. It is the artifact.
+
+**Evidence, one metric, one session:**
+
+    n=15   dCRPS +0.2058  (2.79 SE)   <- I concluded "systematic degradation"
+    n=40   +0.1116
+    n=102  +0.0326  (0.76 SE)
+    n=130  +0.0424  (1.13 SE)         <- converging NULL
+
+At n=15 I had a mechanistic story ready for the degradation. **The story was
+explaining noise.** Separately, a 6-game / 100-seed check gave "all six moved the
+same direction, therefore systematic bias" — where per-game MC noise (1.35 pts)
+**EXCEEDED the 2.013-pt effect being interpreted.** 20 games showed mixed
+directions. Both retracted.
+
+- **The rule:** compute the SE before reading the point estimate, every time. If
+  |effect| < noise, there is no finding — and say so instead of explaining it.
+- **The pressure is real and predictable:** both errors came from reaching for a
+  fast foreground check because a result had been asked for twice. Latency
+  pressure is exactly when this rule stops being applied.
+- Corollary: **write results to a FILE from the producing process.** Three runs
+  were lost to harness, not model — a `timeout` I set too short, a `grep`
+  buffering a pipe, and prints that only ran at exit.
