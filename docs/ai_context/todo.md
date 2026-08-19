@@ -1,6 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#467` — **basketball position-matchup multiplier was CONSUMED, POPULATED with real data (47 WNBA / 64 NBA rows), and structurally never applied -- nested behind an unrelated dead gate** — FOUND, FIXED, DEPLOYED-TO-COMMIT-NOT-YET-LIVE 2026-08-18, lane `basketball-model-owner`, VERIFIED BY REACHABILITY TEST
+### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — FOUND 2026-08-19, lane `basketball-model-owner`, NOT FIXED, presence-not-reachability
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
+`.syndicate/state.md` `[basketball-smart-sim-engine]`. Found by a
+background investigation into why production's WNBA `team_advanced_stats`
+hasn't rebuilt for any date since ~2026-07-15, launched after `#461`'s fix
+went live and the staleness didn't budge.
+
+**The schedule-gap explanation was ruled out with data**: `schedule_2026.csv`
+shows games running daily 2026-07-15 through 2026-08-19, only routine
+single-day breaks. Not a bye week.
+
+**The real cause**: production's actual props/sim path is
+`scripts/refresh_wnba_oddsapi_props.py` -> `syndicate/features/shared/
+basketball_props_smart_sim.py`, which `importlib.import_module`s
+`wnba_betting.sim.smart_sim` DIRECTLY, in-process. It never subprocesses
+into `wnba_betting.cli`, where `_ensure_team_advanced_stats_asof` (the
+function `#461` fixed) lives. The CLI code path that would reach it
+(`predict-props`) is built by `_predict_props_cli_args()`
+(`refresh_wnba_oddsapi_props.py:4144`) — **never called anywhere in the
+file**, dead code. `smart_sim.py`'s own reader
+(`_load_team_advanced_stats_asof`, `:546-570`) does an exact-date filename
+match and, on a miss, falls straight to the stale season file (12 columns,
+no `games`/`source` — the pre-`#461` schema) without ever attempting a
+rebuild.
+
+**Consequence, stated plainly**: `db573857` being the live commit on
+refresh-worker changes nothing observable in production today. The fix is
+correct for the code path it patches; that path is unreachable from the
+pipeline that actually runs. `#461` is CODE-FIXED, DEPLOYED, and
+STILL-INERT simultaneously — these are three different facts and none of
+them implies the others.
+
+**Secondary, independent finding from the same investigation**: even
+reachability alone wouldn't be sufficient. The underlying boxscore capture
+is also stalled — dated per-slate files (`boxscores_2026-*.csv`) stop at
+2026-05-24; the aggregate `boxscores_history.csv` has a fresh mtime but its
+own data stops at 2026-06-30. No caller of
+`update-boxscores-history`/`backfill-boxscores` exists anywhere in
+`syndicate/`, `scripts/`, or `pipeline/` — the same unreachability shape,
+a different function.
+
+**Not fixed this pass.** Two real fixes needed, not one: (1) wire
+`basketball_props_smart_sim.py` to call an equivalent of
+`_ensure_team_advanced_stats_asof` itself (or invoke the vendor CLI), so the
+already-fixed cache-freshness logic actually runs; (2) find and fix why
+boxscore capture stopped updating, a prerequisite for (1) to produce
+anything current even once reachable. **Unmeasured**: whether NBA has the
+identical reachability defect (NBA's own staleness is plausibly just
+offseason, not compared apples-to-apples this pass).
+
+### `#467` — **basketball position-matchup multiplier was CONSUMED, POPULATED with real data (47 WNBA / 64 NBA rows), and structurally never applied -- nested behind an unrelated dead gate** — FOUND, FIXED, AND LIVE 2026-08-18 (refresh-worker, `db573857`), lane `basketball-model-owner`, VERIFIED BY REACHABILITY TEST — runtime effect on a real served prediction NOT yet independently observed (see `#468`, same reachability question applies to whether WNBA smart-sim runs at all right now)
 
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec8.
 Gate: `scripts/basketball_sim_input_checklist.py` (unaffected by this fix --
