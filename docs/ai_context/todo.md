@@ -1,5 +1,95 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#481` — **THE DAILY ARTIFACT BACKUP CAPTURES 0.10% OF WHAT IT IS ASKED TO BACK UP, AND REPORTS SUCCESS. Truncation is now VISIBLE (shipped); making the backup COMPLETE needs a scope decision** — FOUND+MEASURED 2026-08-19, lane `daily-update-backup-truncation`
+
+Found while answering "what about the daily update workflow" after `#480` fixed
+the test step that had been masking everything behind it. **This is not the same
+defect and it is much larger.** `Daily Update`'s whole remaining purpose on the
+default path is to keep a git-committed cold-start safety net of the hot
+artifacts (Render workers own live generation now). It does not do that.
+
+**MEASURED against production web, 2026-08-19 23:4xZ, single fetch each:**
+
+| call | result |
+|---|---|
+| `/api/ops/artifacts/export` (exactly what step 12 sends) | `ok=True`, `count=8`, **`truncated=True`**, `bytes=20,947,993` |
+| `/api/ops/artifacts/export?names_only=1` (full inventory) | `count=7909`, `bytes=8,457,851,138` |
+
+**8 of 7,909 files (0.10%). 20.9MB of 8.46GB (0.25%).** The same first-8 MLB
+files every run, because the scan walks `HOT_ARTIFACT_PATTERNS` in order and
+stops at the 24MB ceiling. Step 12 read **only `$response.ok`** and never
+`truncated`, printed "Wrote 8 artifact file(s)", and the job went green.
+
+**The endpoint is not at fault and should not be changed.** It applies the
+ceiling (`_artifact_export_budget_bytes`, `syndicate/blueprints/ops.py:1493`)
+because an unbounded export OOM'd the 2GB web instance on 2026-07-25, and it
+reports `truncated` faithfully. It is built for INCREMENTAL pulls: it accepts
+`?since=<epoch>` and its own comment says *"the watermark keeps those small"*.
+The caller passes no watermark.
+
+#### SHIPPED — truncation is no longer silent
+
+`.github/workflows/daily-update.yml` now reads `truncated` and emits a
+`Write-Warning` plus a `GITHUB_STEP_SUMMARY` block carrying both numbers.
+**Deliberately not a `throw`**: failing there would trade a silent wrong answer
+for a red workflow that blocks the rest of the job, and `#480` had just
+established what a permanently-red gate costs. Both branches were executed
+directly, not eyeballed.
+
+#### MY OWN HYPOTHESIS WAS FALSIFIED — a watermark alone does NOT fix this
+
+The lane predicted `?since=` would bring a run under budget. Measured, it does
+not, and the gap is not close:
+
+| window | files | bytes | vs 24MB budget |
+|---|---|---|---|
+| all | 7,909 | 8,457,851,138 | 352x |
+| last 24h | 438 | 796,432,566 | **33x** |
+| last 6h | 284 | 387,460,652 | 16x |
+| last 1h | 253 | 378,455,457 | **15x** |
+
+A daily run with a perfect watermark would still truncate at ~3% of its own
+delta. **The budget is a binding constraint too, not just the missing
+watermark.**
+
+#### What the churn actually is — this is what makes it decidable
+
+Top 10 files are **68.1%** of the one-hour delta, and every one is an
+append-only file that grows all day:
+
+    84,795,776  mlb_source/tracking/book_quotes/2026-08-19.jsonl
+    53,451,340  mlb_source/tracking/odds_history/2026-08-19.json
+    53,451,340  mlb_source/artifacts/mlb/odds_history/2026-08-19.json   (same bytes -- likely a duplicate of the line above, worth its own look)
+    11,970,598  soccer_source/tracking/book_quotes/2026-08-19.jsonl
+    11,254,190  mlb_source/data/book_grid/book_grid_2026-08-19.json
+    ...
+
+Meanwhile **209 of the 253 changed files are under 1MB and total 30,613,218
+bytes** — i.e. the entire long tail of genuinely small artifacts is ~30MB,
+just over the current ceiling.
+
+#### OPEN — needs a scope decision before any further code
+
+Not taken unilaterally because it is a real tradeoff about repository growth,
+and `CLAUDE.md` is explicit that `data/**` in git is a deliberately lossy
+mirror and never the source of truth. The options, with their costs:
+
+1. **Watermark + exclude the append-only giants + modest budget raise.** Backs
+   up the ~30MB/day small-file tail, which is where cold-start actually needs
+   help. Cost: roughly 11GB/year of git growth before compression, and the
+   biggest files stay unprotected.
+2. **Watermark + paginate** (loop `since`/`pattern` until `truncated=False`).
+   Complete, but pulls ~800MB/day through the 2GB web service and into git.
+   Almost certainly too expensive on both ends.
+3. **Narrow what the safety net is FOR** — an explicit small allowlist of the
+   artifacts a cold start genuinely needs, rather than "all hot artifacts".
+   Smallest and most honest, but someone has to name that list.
+4. **Retire the git safety net** and rely on Render disk + the publish path,
+   accepting that a cold start is a rebuild.
+
+Until one is chosen the workflow is *honest but still incomplete* — it will now
+say so on every run rather than reporting a success it did not earn.
+
 ### `#480` — **CI HAD BEEN RED ON EVERY PUSH TO `main` FOR 26 HOURS, AND THE DAILY UPDATE WORKFLOW FOR 34 DAYS. BOTH ROOT-CAUSED AND FIXED; ONE CAUSE EACH, NEITHER A PRODUCT DEFECT** — FOUND+FIXED 2026-08-19, lane `ci-green`
 
 **The complaint that started it:** "anytime we deploy to git there are CI errors."

@@ -225,6 +225,41 @@ jobs:
             throw "Artifact export request failed: $($response.error)"
           }
 
+          # $response.ok is NOT a statement about completeness, and reading it
+          # as one made this step a no-op that reported success.
+          #
+          # MEASURED 2026-08-19 against production web, single fetch each:
+          # this exact call returned ok=True, count=8, truncated=True,
+          # bytes=20,947,993 -- while ?names_only=1 reported the full
+          # hot-artifact set as count=7909, bytes=8,457,851,138. The "cold-start
+          # safety net" was capturing 8 of 7,909 files (0.10%) and 0.25% of the
+          # bytes, the same first-8 MLB files every run, and going green.
+          #
+          # The endpoint is not at fault: it applies a 24MB ceiling
+          # (_artifact_export_budget_bytes, ops.py) because an unbounded export
+          # OOM'd the 2GB web instance on 2026-07-25, and it reports `truncated`
+          # faithfully. It is built for INCREMENTAL pulls -- it takes
+          # ?since=<epoch> and its own comment says "the watermark keeps those
+          # small". This caller passes no watermark, so it asks for all 8.46GB
+          # every run and necessarily truncates.
+          #
+          # Reported, deliberately NOT thrown: failing here would only trade a
+          # silent wrong answer for a red workflow that blocks the rest of the
+          # job, and the real fix (a watermark, and a decision about how much of
+          # an 8.46GB set belongs in git at all) is a design change, not a retry.
+          # See `#481`.
+          $exportCount = [int]$response.count
+          $exportBytes = [int64]$response.bytes
+          if ($response.truncated) {
+            Write-Warning ("ARTIFACT EXPORT TRUNCATED: got {0} file(s) / {1:N0} bytes, and the server stopped at its budget -- the REST OF THE HOT-ARTIFACT SET IS NOT IN THIS BACKUP. This run is not a complete cold-start safety net. See #481." -f $exportCount, $exportBytes)
+            if ($env:GITHUB_STEP_SUMMARY) {
+              "### :warning: Artifact backup was TRUNCATED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              ("Pulled **{0}** file(s), **{1:N0}** bytes before the server hit its export budget. The remainder of the hot-artifact set is **not** backed up by this run. See ``#481``." -f $exportCount, $exportBytes) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            }
+          } else {
+            Write-Host ("==> Artifact export COMPLETE (not truncated): {0} file(s), {1:N0} bytes" -f $exportCount, $exportBytes)
+          }
+
           # git-add each written file directly here rather than relying on the
           # commit step's directory-root heuristic below to rediscover them --
           # that heuristic predates the shallow-layout and current_week.json
