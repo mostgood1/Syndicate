@@ -17362,3 +17362,67 @@ live on the serving side).
 Claim released (force, token mismatch across separate shell invocations
 within the same session — verified the claim was genuinely still mine
 before forcing, not a stale session's).
+
+---
+
+## 2026-08-19 ~17:23 local — web `ebf301ae` — NCAAF wk1 SP+ projections reach the board
+
+    lane:      football-model-owner
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       ebf301ae  (scoped graft, ONE file, parent f149f5e2,
+                          branch deploy/ncaaf-wk1-spplus-20260819)
+    deploy:    dep-da32mbmk1f9s73du3keg  trigger=api
+    rollback:  deploy f149f5e2 (this graft's parent)
+
+**verify: PASSED on the SERVED board.**
+
+| reading | before | after | market |
+|---|---|---|---|
+| `\|margin\|` SD | 1.58 | **12.93** | 14.46 |
+| `\|margin\|` max | 7.80 | **50.60** | 49.50 |
+| picks | 0 cards, suppressed | **0 cards, suppressed** | — |
+
+The old max of **exactly 7.80** was the tell throughout: it matched the
+pre-deploy measurement to the decimal, which is what proved the artifact was
+unchanged rather than merely similar.
+
+### WHY `f2eb719d` ALONE COULD NEVER HAVE DONE THIS
+
+`f2eb719d` put SP+ live on refresh-worker at 18:51:08Z and the board did not
+move for **two independent reasons**, neither of which was the autorun timer I
+originally blamed:
+
+1. **`smartsim2_projections_*.csv` is git-TRACKED and matches NONE of the 127
+   `HOT_ARTIFACT_PATTERNS`.** The worker/web disks are not shared, so the
+   worker's season-projection autorun regenerates a file **nothing reads**.
+2. **Web resolves the artifact through `SYNDICATE_NCAAF_SOURCE_ROOT =
+   /opt/render/project/data/ncaaf_source` — the MOUNTED DISK, not the
+   checkout.** The bridge is `_bootstrap_render_data` -> `bootstrap_data_root`,
+   which copies committed repo data onto that disk after a deploy
+   (`shutil.copy2`, changed files only).
+
+So the delivery path for this artifact is **commit -> web deploy -> bootstrap
+sync -> mounted disk**, and the worker plays no part in it. Task `#10` tracks
+the correct fix (allowlist + publish + web read-path).
+
+### I CALLED THIS DEPLOY FAILED, AND IT HAD NOT
+
+First read of the board was ~1 minute after `live` and showed the OLD numbers,
+so I reported **"STILL PPA - FAILED"** and started diagnosing env vars.
+**Bootstrap sleeps 20s then syncs in a background thread** — 90 seconds later
+the board was correct. The env-var finding was real and is recorded above, but
+the conclusion I drew from it ("Path A cannot work") was **false**.
+
+`watcher_over_spot_check` exists precisely for this and I had the rule. A
+post-deploy read must poll until the async sync lands, not sample once.
+
+### Known defects still shipping
+
+- **Totals over-dispersed and getting worse**: total SD **7.50** against a
+  market 3.46 = **2.17x** (was 1.67x on the old artifact). Suppressed by the
+  pick gate, so not served as advice — but visible on the board.
+- **Weeks 2-15 remain PPA in git.** Switching weeks shows margins jumping
+  between ~1.6 and ~13 SD. Deliberate: pre-generating a season in August is the
+  wrong cadence (sim in the pregame window, re-sim on injury/lineup news), and
+  it is measurably harmful — the model-vs-market gap runs +1.815 at weeks 1-3
+  and +4.111 by weeks 7-9, driven by that staleness.
