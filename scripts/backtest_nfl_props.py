@@ -188,6 +188,16 @@ def collect_raw(seasons: list[int]) -> tuple[list[dict[str, Any]], dict[str, int
                     if mean is None:
                         counts["player_stat_weeks_no_rate"] += 1
                         continue
+                    if stat == "anytime_td":
+                        # `#471` fix: match production's
+                        # anytime_td_rate -- shrink the raw rate toward
+                        # the pre-week league prior before this row is
+                        # used anywhere downstream. _anytime_td_league_prior
+                        # is cheap (lru_cached per season, sums ~18 weeks),
+                        # so calling it per row here is fine.
+                        prior_mean, prior_n = player_stats._anytime_td_league_prior(season, week)
+                        if prior_n:
+                            mean = player_stats.shrink_count_mean(mean, n, prior_mean, player_stats.ANYTIME_TD_SHRINKAGE_K)
                     rows.append({
                         "season": season, "player_id": pid, "week": week,
                         "game_id": entry["game_id"], "stat": stat,

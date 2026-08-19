@@ -30,6 +30,24 @@ class NflPropsTests(unittest.TestCase):
         props._nfl_raw_player_props.cache_clear()
         player_stats.load_player_plays.cache_clear()
         player_stats.player_name_index.cache_clear()
+        player_stats._anytime_td_league_week_totals.cache_clear()
+
+    def _write_pbp(self, season: int, rows: list[dict]) -> None:
+        pbp_dir = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
+        os.makedirs(pbp_dir, exist_ok=True)
+        fieldnames = [
+            "game_id", "week", "season_type",
+            "passer_player_id", "passer_player_name", "passing_yards", "pass_attempt", "pass_touchdown",
+            "rusher_player_id", "rusher_player_name", "rushing_yards", "rush_attempt", "rush_touchdown",
+            "receiver_player_id", "receiver_player_name", "receiving_yards", "complete_pass", "touchdown", "interception",
+        ]
+        with open(os.path.join(pbp_dir, f"pbp_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                full = {key: "" for key in fieldnames}
+                full.update(row)
+                writer.writerow(full)
 
     def _write_props(self, season: int, week: int, rows: list[dict]) -> None:
         fieldnames = ["player", "team", "market", "line", "over_price", "under_price", "book", "event", "game_time", "home_team", "away_team", "is_ladder"]
@@ -71,6 +89,30 @@ class NflPropsTests(unittest.TestCase):
         self.assertEqual(len(odds_rows), 1)
         self.assertEqual(odds_rows[0]["side"], "over")
         self.assertNotIn("line", odds_rows[0])
+
+    def test_anytime_td_sim_row_uses_the_shrunk_rate_not_the_raw_zero(self) -> None:
+        # `#471`: a player with a raw rolling mean of exactly 0.0 (2 games,
+        # no TDs) used to project a literal 0% chance to score, in a
+        # league that clearly does produce scores elsewhere. This is the
+        # end-to-end wiring test -- nfl_props_rows_for_week must reach
+        # anytime_td_rate, not player_rate, for this specific market.
+        pbp_rows = []
+        for week in ("1", "2"):
+            game = f"2025_0{week}_KC_DEN"
+            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "rusher_player_id": "RB1", "rusher_player_name": "R.One", "rushing_yards": "3", "rush_attempt": "1"})
+            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "rusher_player_id": "RB2", "rusher_player_name": "R.Two", "rushing_yards": "4", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
+        self._write_pbp(2025, pbp_rows)
+        self._write_props(2025, 3, [
+            {"player": "R. One", "market": "Anytime TD", "line": "", "over_price": "250", "home_team": "New England Patriots", "away_team": "Seattle Seahawks"},
+        ])
+        with patch.object(player_stats, "resolve_player_id", return_value="RB1"):
+            _odds_rows, sim_rows = props.nfl_props_rows_for_week(2025, 3)
+        self.assertEqual(len(sim_rows), 1)
+        # Raw rate would be exactly 0.0 (2 scoreless games) -- the shrunk
+        # rate must be strictly positive, pulled toward the league's own
+        # observed rate (RB2 scored every week).
+        self.assertGreater(sim_rows[0]["sim_projection"], 0.0)
+        self.assertEqual(sim_rows[0]["projected_value"], sim_rows[0]["sim_projection"])
 
     def test_receiving_yards_and_interceptions_are_mapped(self) -> None:
         # Regression: both markets are fetched by
