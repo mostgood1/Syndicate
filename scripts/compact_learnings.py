@@ -58,17 +58,43 @@ def _rule_line(body):
     rule line still beats a stub with the wrong one -- the heading carries the
     rule regardless, so this is belt-and-braces, not the only copy.
     """
-    for l in body:
+    def whole_bullet(i):
+        """The bullet at line i PLUS its wrapped continuation lines.
+
+        RETURNING ONE PHYSICAL LINE TRUNCATES THE RULE MID-SENTENCE. These
+        bullets wrap -- the rules in this file are written as prose and almost
+        none fit on one line. Measured 2026-08-19, after this tool's first two
+        runs: **77 of 176 stubs (43%) ended mid-sentence**, including
+        "expect an" and "...re-read the". The evidence file still had the full
+        text, so nothing was LOST -- but `learnings.md` is the file every
+        session reads, and a rule that stops mid-clause there is not a rule.
+        This tool's whole promise is "the rule stays, the evidence moves"; a
+        one-line grab broke exactly that promise.
+
+        A continuation is any following line that is indented or non-empty and
+        does not itself start a new bullet or heading.
+        """
+        out = [body[i].rstrip()]
+        for nxt in body[i + 1:]:
+            s = nxt.strip()
+            if not s or s.startswith(("- ", "#", ">", "|", "```")):
+                break
+            if not (nxt[:1].isspace() or s):
+                break
+            out.append(s)
+        return " ".join(x.strip() for x in out)
+
+    for i, l in enumerate(body):
         if "rule going forward" in l.lower():
-            return l.strip()
-    for l in body:
+            return whole_bullet(i)
+    for i, l in enumerate(body):
         s = l.strip()
         if s.startswith(("- **", "**")) and len(s) > 12:
-            return s
-    for l in body:
+            return whole_bullet(i)
+    for i, l in enumerate(body):
         s = l.strip()
         if s.startswith("- ") and len(s) > 12:
-            return s
+            return whole_bullet(i)
     return None
 
 
