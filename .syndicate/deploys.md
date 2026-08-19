@@ -16907,3 +16907,35 @@ The model still loses to the close. Suppression buys time; it is not a fix.
 Gap by week: **+1.815 (wk1-3), +3.234 (4-6), +4.111 (7-9), +3.748 (10+)** — the
 opener is where the model is CLOSEST to competitive. Strategy and exit criterion:
 `docs/ai_context/ncaaf_beat_the_close_strategy.md`.
+
+
+### #472 — mutex-contention epoch fix deployed to live-odds-worker — 2026-08-19 ~19:37Z — lane `basketball-model-owner`
+
+Root cause and fix already fully written up in the `#472` commit message
+(`97e85b66`) and `.syndicate/log/2026-08-19.md`. This entry is the deploy
+measurement only.
+
+- **verify: CODE CONFIRMED LIVE.** `deploy_preflight.py`: live commit
+  `97e85b66`, finished `2026-08-19T19:37:20Z`. Claim acquired 19:16:51Z
+  (naturally expired from `wnba-edge-263`, not forced), preflight CLEAR at
+  attempt 9 (~6.5min wait, `3 job(s) in flight` -> clear), deployed, released
+  cleanly (`deploy_claim.py release --service live-odds-worker --token
+  76a7a35dd58cd4b5`).
+- **Effect NOT yet observed** -- same honest framing as every entry in this
+  thread. The fix changes RETRY BEHAVIOR, not an immediate state change, so
+  there is nothing to read right after deploy. What proves it worked: the
+  NEXT time the WNBA (or soccer) pregame autorun hits mutex contention,
+  `WNBA_PREGAME_AUTORUN_PREV ... FAILED ... already active` should stop
+  being followed by silence for up to 4h and instead retry within roughly
+  the worker's own tick cadence (observed ~65-70s) once the contending job
+  clears. Concretely: watch for `WNBA_PREGAME_AUTORUN_LAUNCHED` appearing
+  sooner than a full 4h after the NEXT contention failure, not sooner than
+  4h after the LAST success (that's the old, broken behavior looking
+  identical from a distance -- the two must be told apart by which failure
+  the gap is measured from).
+- Also carries `#469`'s full fix chain (pt1/pt2/pt3, all already deployed
+  earlier this session) since it's the same file lineage -- no separate
+  measurement needed there, this deploy is purely additive on top.
+- Rollback: `render_deploy.py --service live-odds-worker --commit
+  0c7962a7` (the prior live commit, no `--allow-rollback` needed since
+  `97e85b66` is a direct descendant of it).
