@@ -1202,6 +1202,32 @@ low-sensitivity trap the symmetric diff-based mechanism hit for the EV-only laye
 independence). Checklist re-confirmed full PASS (no new consumed field). Round-robin: see the
 report's own measured delta on real per-team lineup data.
 
+**§2zzz, the last open faceoff-track item, closed by a real measurement — not a redesign**: an
+exhaustive re-check of every faceoff addendum in this document, `nhl_model_inventory.md`, and every
+`#463` addendum in `todo.md` found exactly one item stated as open and never closed:
+`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`, `_faceoff_multipliers`'s own sensitivity
+constants, still the vendor's original never-validated defaults. **Now consequential, not just
+historical debt**: these constants are the ONLY mechanism behind the two newest layers this session
+built (§2zz's `faceoff_lineup_model`/`faceoff_lineup_model_strength_state`) — a persistent
+per-game roster-quality signal has no discrete "event" to build a decay curve from, so there is no
+discrete-event alternative the way EV/OZ/DZ/NZ have.
+
+`scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, what
+`compute_lineup_faceoff_pct` would compute from that game's CONFIRMED dressed roster (real players,
+real per-game TOI, from the `boxscore` cache) and regresses the game's real shot SHARE against the
+lineup-pct differential — game-level, not season-aggregate (the earlier NZ check, §2p, only tested
+season aggregates and found a clean null; this is a genuinely different question). Result: R²=0.0028,
+slope=0.1086±0.0566 (p≈0.055) — a real, weak, borderline signal, neither a clean null nor a
+confident one. **The decisive fact**: the vendor's `alpha=0.35` sits comfortably inside the
+measured 95% CI `[~0, 0.44]`. **Decision: left unchanged.** Real data does not contradict the
+current default, and does not precisely pin down a better number either — overwriting a genuine,
+if imprecise, measurement with a differently-uncertain point estimate would not be an improvement,
+the same discipline the NZ item (§2p) and the block-rate ratio (§2h) already established.
+`faceoff_diff_clip=0.12` separately confirmed sensible against the real `|lineup_pct_diff|`
+distribution (p95=0.085, max=0.158). `calibration_profile.py` now carries an explicit comment
+documenting this check so a future session doesn't re-discover and re-run it from scratch. Full
+report: `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

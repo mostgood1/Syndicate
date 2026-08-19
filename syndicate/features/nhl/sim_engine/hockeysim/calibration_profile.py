@@ -97,6 +97,24 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     usage_model="deterministic",
     usage_noisy_sigma=0.18,
     faceoff_enabled=True,
+    # CHECKED against real data (§2zzz, `scripts/calibrate_nhl_faceoff_alpha.py`,
+    # `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`), NOT left uncalibrated by
+    # default alone -- the vendor's original constants below were the ONE faceoff item every
+    # session addendum stated as open and never closed. Now consequential, not just legacy: these
+    # constants are the ONLY mechanism behind the two newest layers this session built
+    # (`faceoff_lineup_model`/`faceoff_lineup_model_strength_state`, §2zz), which have no
+    # discrete-event alternative (a persistent per-game roster-quality signal has no discrete
+    # "event" to build a decay curve from). A game-level fit across all 1,312 real games
+    # (reconstructing each game's CONFIRMED dressed roster + real per-game TOI from the boxscore,
+    # regressed against that game's real shot share) found `alpha`'s 95% confidence interval is
+    # `[~0, 0.44]` (slope=0.1086, se=0.0566, R^2=0.0028, p~=0.055 -- borderline, weak, not a clean
+    # null the way the NZ season-aggregate check found (|r|<0.02) but not a confident signal
+    # either). **DECISION: left UNCHANGED**, not recalibrated -- the vendor's 0.35 sits WELL
+    # WITHIN that confidence interval, so real data neither contradicts it nor precisely pins down
+    # a better number; overwriting a genuine (if imprecise) measurement with a differently-uncertain
+    # guess would not be an improvement. `faceoff_diff_clip=0.12` separately confirmed sensible
+    # against the real observed |lineup_pct_diff| distribution (p95=0.085, max=0.158) -- it clips
+    # only the most extreme ~5% of real cases, not an arbitrary bound.
     faceoff_alpha=0.35,
     faceoff_diff_clip=0.12,
     faceoff_mult_clip_low=0.90,

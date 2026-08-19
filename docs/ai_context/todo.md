@@ -1662,6 +1662,39 @@ vectors -- same low-sensitivity trap the symmetric diff-based mechanism hit for 
 direction; independence), checklist full PASS (no new consumed field). Round-robin: **-0.138%**
 (992 pairings, real per-team lineup data), noise-level.
 
+**Addendum, same day: closed the last open faceoff-track item with a real measurement, not a
+redesign** (reference doc §2zzz, full report
+`docs/reports/hockeysim_faceoff_alpha_calibration_report.md`). An exhaustive re-check of every
+faceoff addendum in this item, the reference doc, and the model inventory found exactly one item
+stated as open and never closed: `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`,
+`_faceoff_multipliers`'s own sensitivity constants, still the vendor's original never-validated
+defaults. **Now consequential**: these constants are the ONLY mechanism behind the two newest
+lineup-aware layers, which have no discrete-event alternative (a persistent per-game roster-quality
+signal has no discrete "event" to build a decay curve from).
+`scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, each game's
+CONFIRMED dressed roster (real per-game TOI, from the boxscore cache) and regresses real shot
+share against the lineup-pct differential -- game-level, a genuinely different question from the
+earlier season-aggregate NZ check (§2p), which only tested season aggregates and found a clean
+null. Result: R²=0.0028, slope=0.1086+/-0.0566 (p~=0.055) -- real, weak, borderline, neither a
+clean null nor a confident signal. **The decisive fact**: the vendor's `alpha=0.35` sits
+comfortably inside the measured 95% CI `[~0, 0.44]`. **Decision: left unchanged.** Real data
+neither contradicts the current default nor precisely pins down a better number -- overwriting a
+genuine, if imprecise, measurement with a differently-uncertain point estimate would not be an
+improvement, the same discipline the NZ item and the block-rate EV:PK:PP-def ratio already
+established. `faceoff_diff_clip=0.12` separately confirmed sensible against the real observed
+`|lineup_pct_diff|` distribution (p95=0.085, max=0.158). `calibration_profile.py` now carries an
+explicit comment documenting this check so a future session doesn't re-discover and re-run it from
+scratch. Verified: `_ols_slope_and_r2`'s own arithmetic checked against two synthetic cases (a
+perfect line, a flat line); full 1,312-game run, 0 games skipped; checklist re-confirmed full
+PASS; calibration_profile.py's values confirmed byte-identical before/after (a documentation-only
+change, no behavior change).
+
+**This closes the faceoff-track's own open-items list to zero.** EV, OZ, DZ, NZ, strength-state
+role, per-team role index, joint role-zone, player-level lineup-aware (both EV-only and
+strength-state), and now the legacy diff-based mechanism's own sensitivity constants -- every item
+this session's own addenda ever flagged as open has a closing addendum, whether that closure built
+something or, as here, measured and confirmed the existing default was already fine.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable

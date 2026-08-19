@@ -738,3 +738,22 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   Verified: 3 new engine tests (reachability via per-seed vectors, direction, independence),
   checklist full PASS (no new consumed field). Round-robin: **-0.138%** (992 pairings, real
   per-team lineup data), noise-level.
+- **Did** close the last open faceoff-track item with a real measurement, not a redesign
+  (reference doc §2zzz, full report
+  `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`). An exhaustive re-check of every
+  faceoff addendum in this file, the reference doc, and every `#463` addendum in `todo.md` found
+  exactly one item stated as open and never closed: `faceoff_alpha`/`faceoff_diff_clip`/
+  `faceoff_mult_clip_*`, `_faceoff_multipliers`'s own sensitivity constants, still the vendor's
+  original never-validated defaults. **Now consequential**: these constants are the ONLY
+  mechanism behind the two newest lineup-aware layers, which have no discrete-event alternative.
+  `scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, each game's
+  CONFIRMED dressed roster (real TOI, from the boxscore) and regresses real shot share against
+  the lineup-pct differential -- game-level, a genuinely different question from the earlier
+  season-aggregate NZ check. Result: R²=0.0028, slope=0.1086±0.0566 (p≈0.055) -- real, weak,
+  borderline, neither a clean null nor confident. **The decisive fact**: the vendor's 0.35 sits
+  comfortably inside the measured 95% CI `[~0, 0.44]`. **Decision: left unchanged** -- real data
+  neither contradicts the current default nor precisely pins down a better number; overwriting a
+  genuine measurement with a differently-uncertain point estimate would not be an improvement,
+  same discipline as the NZ item and the block-rate ratio. `faceoff_diff_clip=0.12` separately
+  confirmed sensible against the real observed distribution. `calibration_profile.py` now carries
+  an explicit comment documenting the check so it isn't re-discovered and re-run from scratch.
