@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-08-19 — STALE refresh-worker CLAIM FORCE-BROKEN, NO DEPLOY — holder `stale-claim-cleanup`
+
+**NO DEPLOY.** Pure claim hygiene, not a deploy claim used for its actual
+purpose.
+
+Found while checking status for an unrelated reason: `refresh-worker` was
+held by `nfl-receptions-blend-stability` (a lane closed earlier this
+session, which never itself acquired any deploy claim — a coincidental
+holder-name collision with some other process, same class as an earlier
+`nfl-player-props-backtest` collision this session). `acquired_at_iso
+2026-08-19T21:12:41Z`, `pid 32652`.
+
+**Verified the holder is gone before force-breaking**, per the standing
+rule ("if a claim is held by a session that is gone, break it and say
+so"): `Get-Process -Id 32652` on this machine — **NOT FOUND**. Every
+other concurrent session this evening runs as a local process on this
+same machine, so a missing PID here is the expected signature of an
+exited process, not just "can't see it."
+
+**User explicitly directed the force** ("force it") after being told the
+claim would otherwise self-expire at `21:57:41Z` on its own and asked
+which they preferred.
+
+`python scripts/deploy_claim.py acquire --service refresh-worker --holder
+stale-claim-cleanup --force` → acquired, replacing the 33.3-min-old
+claim. Immediately released back to free (`deploy_claim.py release`) —
+no deploy was queued or needed, this was purely clearing the stale entry
+so it stops showing as held. Confirmed via `deploy_claim.py status`: all
+four services free.
+
+---
+
 ## 2026-08-19 — RECEPTIONS BLEND WEIGHT: STABILITY CHECKED, CONFIRMED STABLE — `#471` FULL CONSTANT AUDIT COMPLETE — lane `nfl-receptions-blend-stability`
 
 **NO DEPLOY. Local analysis only** (new report, `922e2ab7` on
