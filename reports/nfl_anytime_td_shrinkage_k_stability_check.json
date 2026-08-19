@@ -1,0 +1,33 @@
+{
+  "shipped_k": 12.0,
+  "half_a": {
+    "seasons": [
+      2022,
+      2023
+    ],
+    "n": 8527,
+    "best_k": 12.0,
+    "best_brier": 0.160576,
+    "k_within_1pct_of_best": [
+      8.0,
+      30.0
+    ]
+  },
+  "half_b": {
+    "seasons": [
+      2024,
+      2025
+    ],
+    "n": 8464,
+    "best_k": 12.0,
+    "best_brier": 0.167974,
+    "k_within_1pct_of_best": [
+      8.0,
+      20.0
+    ]
+  },
+  "ratio": 1.0,
+  "stable": true,
+  "recommendation": "no change -- shipped k is well-supported",
+  "verdict": "stable"
+}
