@@ -3278,8 +3278,8 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
             player_logs = split_by_player.get(player_key)
             player_career_opp_logs = career_opp_by_player.get(player_key)
             mult = 1.0
+            opp_key = str(opp_series.loc[idx] or "").strip().upper()
             if player_logs is not None and not player_logs.empty:
-                opp_key = str(opp_series.loc[idx] or "").strip().upper()
                 if opp_key:
                     opp_rows = player_logs[player_logs["_opp"] == opp_key]
                     if not opp_rows.empty:
@@ -3297,13 +3297,24 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
                     venue_rate = pd.to_numeric(venue_rows.get(f"_{stat}_pm"), errors="coerce").dropna()
                     if not venue_rate.empty:
                         mult *= bounded_split_multiplier(anchor, float(venue_rate.mean()), int(len(venue_rows)), min_games=5, max_games=12, lo=max(0.90, lo), hi=min(1.12, hi))
-                pos_key = str(pos_series.loc[idx] or "").strip().upper()
-                pos_row = pos_lookup.get((opp_key, pos_key)) if opp_key and pos_key else None
-                if pos_row is not None:
-                    pos_rate = safe_float(pos_row.get(stat), float("nan"))
-                    pos_n = int(max(0.0, safe_float(pos_row.get("n"), 0.0)))
-                    if np.isfinite(pos_rate) and pos_rate >= 0.0 and pos_n > 0:
-                        mult *= bounded_split_multiplier(anchor, float(pos_rate), int(pos_n), min_games=12, max_games=80, lo=max(lo, 0.90 if stat in {"threes", "stl", "blk"} else 0.92), hi=min(hi, 1.10 if stat in {"threes", "stl", "blk"} else 1.08))
+            # `#467`: position-matchup is sourced from `pos_lookup`
+            # (`_opponent_position_rate_context_local`, boxscore-derived) --
+            # NOT from `player_logs`/`split_ctx` like the three blocks above.
+            # It was nested inside `if player_logs is not None and not
+            # player_logs.empty:` regardless, so on every checkout where
+            # `player_logs.csv` is absent (measured 2026-08-18: BOTH leagues,
+            # not WNBA-specific) this real, correctly-populated data (47/64
+            # rows measured for WNBA/NBA) never fired -- CONSUMED but never
+            # influential, model_engine_standard.md's canonical trap. Un-nested
+            # so it runs whenever `pos_lookup` itself has the row, independent
+            # of the player_logs gate above.
+            pos_key = str(pos_series.loc[idx] or "").strip().upper()
+            pos_row = pos_lookup.get((opp_key, pos_key)) if opp_key and pos_key else None
+            if pos_row is not None:
+                pos_rate = safe_float(pos_row.get(stat), float("nan"))
+                pos_n = int(max(0.0, safe_float(pos_row.get("n"), 0.0)))
+                if np.isfinite(pos_rate) and pos_rate >= 0.0 and pos_n > 0:
+                    mult *= bounded_split_multiplier(anchor, float(pos_rate), int(pos_n), min_games=12, max_games=80, lo=max(lo, 0.90 if stat in {"threes", "stl", "blk"} else 0.92), hi=min(hi, 1.10 if stat in {"threes", "stl", "blk"} else 1.08))
             updated.loc[idx] = float(anchor * np.clip(mult, lo, hi))
         out[prior_col] = updated.astype(float)
 

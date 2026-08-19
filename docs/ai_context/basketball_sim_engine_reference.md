@@ -492,14 +492,150 @@ recorded as an open item (Sec6) rather than fixed, per the lane's scope.
 | Gating checklist script, exits 1 | **DONE** — `scripts/basketball_sim_input_checklist.py` |
 | Pipeline trace, file:line, incl. what it writes | **DONE** — Sec1 |
 | Every input disk-backed via `SYNDICATE_DATA_ROOT` | **PARTIALLY AUDITED** — `refresh_{wnba,nba}_oddsapi_props.py` overrides `WNBA_BETTING_DATA_ROOT`/`NBA_BETTING_DATA_ROOT` to a `--source-root`-derived path per invocation (not the vendor-repo-relative default), which is the right shape; the CLI arg's own upstream resolution back to `SYNDICATE_DATA_ROOT` was not traced end-to-end in this pass |
-| Every input allowlisted in `HOT_ARTIFACT_PATTERNS` | **NOT SATISFIED, confirmed** — grepped `syndicate/features/shared/artifact_publisher.py` for `team_advanced_stats`, `player_logs`, `player_priors`, and all four calibration filenames: **zero matches for all of them.** Only the final `smart_sim_*.json` OUTPUT is allowlisted (`:95,173`); every INPUT this checklist audits is unauditable through `/api/ops/artifacts/*`. New todo item filed. |
+| Every input allowlisted in `HOT_ARTIFACT_PATTERNS` | **SATISFIED 2026-08-18, shipped and verified live** (`#462`) — `team_advanced_stats_*.csv` and the four calibration JSONs added; confirmed by content against production (`403` → `200` on all three sampled paths post-deploy). `player_logs`/`player_priors` confirmed NOT separate artifacts (see Sec8) — no pattern needed for either. |
 | Reuse/caching flags documented + rebuild procedure | **NOT AUDITED** — no MLB-style `--use-roster-artifacts` analogue found; `PlayerPriors`/team-advanced-stats are recomputed per call in the local ports (`_compute_player_priors_cached_local` has a cache but keyed per (date, days_back), not a persistent artifact-reuse flag) |
-| Reachability test per flagged feature (`off != on`) | **DONE for Level0** (Sec2); not done for the `events` sibling fallback or for the four Level3 calibration flags |
-| Mechanisms vs estimators, with the re-fit obligation | **NOT APPLICABLE THIS PASS** — no mechanism was added or proposed; nothing to re-fit |
+| Reachability test per flagged feature (`off != on`) | **DONE for Level0** (Sec2, plus the `events` sibling fallback closed 2026-08-18 — Sec8 §0). **DONE for the position-matchup mechanism** (`#467`, Sec8 §2 — measured `0 → 111` calls, real off/on proof). Not done for the four Level3 calibration flags, or for the opponent-split/career-opponent-split/venue-split mechanisms (genuinely unreachable pending a real `player_logs.csv` pipeline, not a flag to test). |
+| Mechanisms vs estimators, with the re-fit obligation | **`#467` is a wiring fix, not a new mechanism** — the position-matchup multiplier already existed and was calibrated as part of the four-mechanism block; un-nesting it from a dead gate does not change its own math, so no re-fit is owed. Flagged for a monitoring pass regardless (Sec8 §4). |
 | A market-relative scoreboard | **NOT DONE** — out of this lane's scope; see `vendor/{wnba,nba}_betting_repo/tools/audit_slate_prob_backtest.py` for the closest existing instrument (Brier/calibration against a ledger, not gated) |
-| Known-sparse fields documented with reasons | **DONE** — Sec3 (below-threshold players), Sec5 (optional calibration layers) |
+| Known-sparse fields documented with reasons | **DONE** — Sec3 (below-threshold players), Sec5 (optional calibration layers), Sec8 (the three genuinely-dead split mechanisms) |
 
-**Not audited is not "fine."** The `HOT_ARTIFACT_PATTERNS` gap in particular
-means every number in Secs 3-5 could ONLY be read from this local, stale,
-per-family-desynced checkout — there is no way to ask Render the same question
-today even when it is reachable.
+**Not audited is not "fine."** Reuse/caching flags and the market-relative
+scoreboard remain open for a future pass.
+
+---
+
+## 8. Advanced-data end-to-end: does it actually INFLUENCE the sim, not just populate a field? (`#467`)
+
+Everything above (Secs 2-5) proves a field is CONSUMED and POPULATED. It does
+**not** prove the value changes the simulated output — a populated field can
+still be silently discarded, overwritten by a neutral default further
+downstream, or mathematically inert. This section closes that gap with real
+ablations against the real, vendored engine (not a reimplementation),
+invoked the same way Sec2's checklist already validated as real.
+
+**Method**: a real WNBA matchup (CON @ MIN, 2026-07-08, real rosters pulled
+from `boxscores_history.csv`) run twice through `_smart_sim_worker_run_local`
+— once with real inputs, once with the target field neutralized in-process
+(monkeypatched at the module level, never touching vendor/bridge source on
+disk) — comparing the real engine's own score/win-probability output.
+Repeated across 3 independent seeds (12345, 777, 2026) at 150 sims each.
+
+### §0. Closed from Sec2/Sec6's open items
+
+`_import_real_events_module_local` called directly for both packages:
+**`wnba_betting: REAL`, `nba_betting: REAL`.** The possession-engine sibling
+fallback (structurally identical to the `#440` bridge fallback, never
+separately checked before) is not firing either.
+
+### §1. Team-advanced-stats and player-priors: confirmed real, large, robust
+
+| Seed | Baseline margin (home−away) | Neutral team-adv margin | Flat-priors margin |
+|---|---|---|---|
+| 12345 | −16.05 (p_home_win 0.113) | **+3.29** (p_home_win 0.567) | −19.03 |
+| 777 | −14.62 (p_home_win 0.133) | **+3.51** (p_home_win 0.593) | −16.91 |
+| 2026 | −16.07 (p_home_win 0.120) | **+3.57** (p_home_win 0.620) | −19.11 |
+
+Neutralizing `pace`/`off_rtg`/`def_rtg`/`tov_pct`/`orb_pct`/`ft_rate` **flips
+the simulated win probability by ~45-50 points, every seed** — the single
+largest, most robust effect found in this audit. Fully traced to
+`_team_adj_from_advanced_stats_local` (`basketball_props_smart_sim.py:3578`)
+computing `eff_mult`/`tov_mult`/`foul_mult`/`oreb_mult`/`pace_mult` from real
+`off_rtg`/`def_rtg` etc., feeding the real vendored `events.py`'s
+per-possession shot/turnover/foul/rebound probabilities
+(`events.py:442-457,688,782,1528,1646`). Player priors: real, consistent,
+smaller (~2-3 pts every seed) — confirmed signal, secondary to team-advanced
+for this matchup. **Both are genuinely used end-to-end, not just populated.**
+
+### §2. The bug this section exists to find: real data, computed correctly, never used — FIXED
+
+Measured directly against both leagues' local mirrors:
+
+    WNBA  split_ctx (opponent-specific split)   : 0 rows
+    WNBA  career_opp_ctx (career-vs-opp split)  : 0 rows
+    WNBA  pos_ctx (opponent-position matchup)   : 47 rows -- REAL DATA
+    NBA   split_ctx                             : 0 rows
+    NBA   pos_ctx                                : 64 rows -- REAL DATA
+
+**Platform-wide, not WNBA-specific**: `_player_split_rate_context_local`/
+`_player_career_opponent_rate_context_local` require `player_logs.csv`
+(vendor `smart_sim.py:953-961`), absent from BOTH leagues' production data
+roots. `vendor/nba_betting_repo/data/processed/player_logs.csv` exists
+inside the vendor package itself (26,652 rows) but is the package's own
+default-path fallback, not what `NBA_BETTING_DATA_ROOT`/
+`SYNDICATE_DATA_ROOT` override production to read — not proof production
+has it.
+
+**The actual bug**: `_apply_player_priors_local`
+(`basketball_props_smart_sim.py:3277-3306`, pre-fix) nested FOUR mechanisms
+inside one `if player_logs is not None and not player_logs.empty:` gate —
+opponent-specific split, career-opponent split, venue split, **and**
+opponent-position defensive matchup. The first three genuinely need
+`player_logs` and are correctly dead until that pipeline exists. The
+fourth — position-matchup — is sourced entirely from `pos_lookup`
+(`_opponent_position_rate_context_local`, boxscore-derived, NOT
+`player_logs`-derived) and has real, correctly-populated data (47/64 rows
+above) that was structurally prevented from ever being consulted. This is
+`model_engine_standard.md`'s canonical "CONSUMED but never influential"
+trap, caught by tracing past the CONSUMED×POPULATED checklist into whether
+the value reaches the sampling step.
+
+**Fixed, 2026-08-18**: hoisted `opp_key`'s computation above the
+`player_logs` gate (both the gated blocks and the position block need it)
+and un-nested the position-matchup block so it runs whenever `pos_lookup`
+itself has the row, independent of `player_logs`'s state. Diff: 19
+insertions, 8 deletions, one file — no other mechanism's logic touched.
+
+**Reachability, measured, not assumed** — the model_engine_standard's own
+required "off != on" test, run by monkeypatching
+`_bounded_split_multiplier` to count calls by `min_games` (position-matchup
+is the only caller using `min_games=12`), on the real engine, real WNBA
+matchup, real positions pulled from `boxscores_history.csv`'s
+`START_POSITION`:
+
+    BEFORE fix: position-matchup calls = 0   (other 3 split calls = 0, correctly -- player_logs genuinely absent)
+    AFTER  fix: position-matchup calls = 111 (other 3 split calls = 0, unchanged -- correctly still gated)
+
+Identical harness, identical inputs, only the code under test differs.
+**Targeted tests pass**: `tests/test_basketball_props_smart_sim_advanced_stats.py`,
+`tests/test_basketball_props_smart_sim.py`, and the broader
+`-k "basketball_props_smart_sim or basketball_props_advanced or smart_sim"`
+selection — 29 tests total, all green, no regressions. The checklist
+(`scripts/basketball_sim_input_checklist.py`) still exits 1 on the same
+single pre-existing `#461`-mirror alarm, unrelated to this fix.
+
+### §3. Other findings, platform-wide (not WNBA-specific)
+
+- **No home-court-advantage constant anywhere.** Grepped `smart_sim.py`,
+  `events.py`, `quarters.py` for `home_adv`/`home_edge`/`home_boost` — zero
+  matches. Implicit only via a real market line when present, or an
+  optional `team_split_home_by_tri` calibration block (`quarters.py:342-345`)
+  that lives in one of the four calibration JSONs already confirmed ABSENT
+  (Sec5). Absent a market line, both leagues simulate with zero baked-in
+  home-court effect. Not fixed this pass — a real constant, calibrated from
+  `boxscores_history.csv`'s own home/away score differential (data already
+  exists), is the natural next step (see `todo.md` `#467`).
+- **ELO reaches the sim only indirectly, unmeasured.**
+  `vendor/wnba_betting_repo/src/wnba_betting/elo.py` is a real system, but
+  `grep -i elo` in `smart_sim.py` returns zero matches. It likely reaches
+  the sim via `predictions_<date>.csv`'s `totals`/`spread_margin` →
+  `_smart_sim_run_date_local`'s `home_mu`/`away_mu` → `_rating_from_mu` →
+  `TeamContextLocal.off_rating`, a **different** mechanism (quarter
+  generation) than team-advanced-stats' `eff_mult` path in §1. Traced
+  through code, not ablated — flagged as a good next measurement.
+
+### §4. The `learnings.md` WNBA-possessions entry — reconciled, not contradicted
+
+`.syndicate/learnings.md`'s 2026-08-16 entry ("WNBA possessions are
+underivable — no FGA/TOV/OREB/FTA anywhere") is **narrower than, and now
+stale relative to**, `syndicate/features/shared/game_shape.py:427-472`'s own
+same-day amendment, which already scopes the finding correctly: it is about
+the LIVE in-game `live_state` payload specifically (which genuinely lacks
+those columns), not a platform-wide claim. This audit adds a third site the
+amendment didn't name: `advanced_stats_boxscores.py:90-92` computes the same
+Dean-Oliver formula from `boxscores_history.csv`'s real, 100%-populated
+`FGA`/`TOV`/`OREB`/`FTA` columns to produce the season-aggregate
+`pace`/`off_rtg`/`def_rtg` that §1 just proved drives the pregame sim.
+Possessions ARE derived and used in production — just not from the live
+payload the original finding was about. Recommend updating the terse
+`learnings.md` line to point at `game_shape.py`'s fuller explanation rather
+than fixing anything in code.
