@@ -16714,3 +16714,65 @@ SE 0.518, t=+4.20. Every scale 6..24 loses. This deploy makes margins
 CALIBRATED, not COMPETITIVE. NCAAF picks are consequently suppressed at the
 serving layer (`syndicate/features/football/pick_gate.py`); projections still
 publish and display.
+
+---
+
+## 2026-08-19 19:18:07Z — web `8833cfd6` — NCAAF pick suppression
+
+    lane:      football-model-owner
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       8833cfd6  (scoped graft, parent b233c55d, branch
+               deploy/ncaaf-pick-suppression-20260819b)
+    deploy:    dep-da2vv8rbc2fs73fnl740  trigger=api  fired 19:09:5xZ, live 19:18:07Z
+    claim:     acquired 19:07:5xZ, released after verify
+    rollback:  deploy b233c55d (this graft's parent). Picks return immediately.
+
+**verify: PASSED on the SERVED payload, both halves required.**
+
+    GET /ncaaf/api/picks?week=1
+      cards served        0
+      empty_state eyebrow "Picks suppressed"
+      empty_state title   "NCAAF picks are suppressed: the model does not beat
+                           the closing line in any market this board serves."
+
+**Zero cards ALONE would NOT have been a pass** — an offseason-empty board also
+serves zero, and reading that as success is the same gate-open/gate-closed
+confusion `test_off_is_not_on` exists to prevent. The empty_state title is what
+proves the GATE produced the zero. Before the deploy the same endpoint served
+**12 cards**, so this is a measured before/after, not an assumed one.
+
+**Blast radius verified, not assumed:**
+
+| check | reading | verdict |
+|---|---|---|
+| NCAAF projections still serve | `/ncaaf/api/cards?week=1` -> **51 games**, `dropped: 0` | PASS — only the BET is withheld |
+| NFL picks unaffected | `/nfl/api/picks` -> **12 cards**, no suppression empty_state | PASS — gate wired only into NCAAF |
+| other lane's work preserved | `diff b233c55d 8833cfd6` = exactly my 2 files | PASS |
+
+### THE NEAR-MISS, and it happened twice today
+
+`nfl-odds-allowlist-deploy` deployed at **19:03:22Z**, moving web
+`b775255a` -> `b233c55d`, **while I was waiting on their claim.** My graft
+(`b002c03b`) was parented on the OLD SHA. Deploying it would have silently
+reverted their allowlist fix.
+
+**The claim serialised us correctly and that was NOT enough.** Serialisation
+orders deploys; it cannot make them compose. Only re-reading the live SHA at
+deploy time catches this — and it is the SECOND occurrence today (the
+refresh-worker graft needed the identical rebuild after basketball-model-owner
+deployed mid-wait).
+
+**A process error worth recording:** my first in-flight check queried the WRONG
+SERVICE. I looped over every `web_service` and kept overwriting the id, ending
+on `NCAAF-Predictions` instead of `syndicate` — reading an unrelated deploy
+history that happened to look reassuring. Caught only because the SHAs did not
+resemble anything in this repo. The Syndicate web service is
+**`srv-d88ahvrbc2fs73eodu30`**. That re-check is what surfaced the moved SHA;
+had I trusted the first reading I would have reverted another lane.
+
+### What this deploy does NOT fix
+
+The model still loses to the close. Suppression buys time; it is not a fix.
+Gap by week: **+1.815 (wk1-3), +3.234 (4-6), +4.111 (7-9), +3.748 (10+)** — the
+opener is where the model is CLOSEST to competitive. Strategy and exit criterion:
+`docs/ai_context/ncaaf_beat_the_close_strategy.md`.
