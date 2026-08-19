@@ -15954,3 +15954,43 @@ adjustment not a large swing (#467). Not yet deployed -- claim held by
 
 MEASUREMENT: <pending>
 REMINDER: verify within 15 min of deploy finishing.
+
+### deploy LIVE, effect NOT YET OBSERVED — refresh-worker — #461 + #467 — 2026-08-19 01:36:46Z — lane `basketball-model-owner`
+
+Closes the `deploy PENDING` entry above. Preflight went CLEAR at 01:29:32Z
+(0 job processes, caught by a background Monitor polling every 60s), claim
+acquired, final preflight re-confirmed CLEAR (2 infra-only processes) at
+01:29:54Z, `render_deploy.py --service refresh-worker --commit db573857
+--allow-rollback` -> `dep-da2ge7bl550s73e8sdd0`, triggered 01:30:05Z.
+**live commit confirmed `db573857` at 01:36:46Z** (~6.7 min build+rollout,
+polled every 20s via `deploy_preflight.py`'s own live-commit field --
+refresh-worker has no HTTP surface to query directly).
+
+**verify: CODE CONFIRMED LIVE. RUNTIME EFFECT NOT YET OBSERVED, stated
+honestly rather than assumed.** Both fixes only fire on the NEXT real
+smart-sim invocation for WNBA/NBA -- refresh-worker's own internal
+scheduler, not something triggerable externally. Checked immediately via
+`/api/ops/artifacts/export?pattern=wnba_source/*/team_advanced_stats_*.csv`
+(web's disk, which refresh-worker pushes to via `HOT_ARTIFACT_PATTERNS`):
+every existing as-of file's mtime is **2026-07-20 or earlier — none newer
+than the deploy, as expected** (nothing has run yet in the ~1 min since
+cutover).
+
+**Separate, concerning finding surfaced by this check, NOT yet diagnosed as
+this fix's problem or a different one**: the newest WNBA `team_advanced_stats`
+as-of file on production is dated **`asof_20260715`** (mtime 2026-07-20) --
+**over a month stale** relative to today (2026-08-19). The season-level
+`team_advanced_stats_2026.csv` is still **0 bytes** on production (the
+"partial/failed write" case `#461`'s own root-cause writeup already names).
+`#461`'s fix targets the CACHE-FRESHNESS GUARD specifically (a request for
+an ALREADY-CACHED-but-stale date wouldn't rebuild) -- it does not explain why
+NO NEWER as-of date has been requested/built AT ALL in over a month. That is
+either a separate scheduling/trigger gap, or evidence the WNBA smart-sim
+pipeline itself hasn't run recently for reasons unrelated to this fix.
+**Needs its own investigation before claiming this deploy "fixes" the stale
+data** -- it only fixes the mechanism that would have blocked a rebuild IF
+one were attempted for an already-cached date.
+
+Claim released: `deploy_claim.py release --service refresh-worker --holder basketball-model-owner`.
+Next step: watch for the next natural WNBA/NBA smart-sim cycle and confirm
+by content (fresh as-of file, `games`/`source` columns populated) once one runs.
