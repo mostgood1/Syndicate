@@ -95,6 +95,26 @@ That story ended; do not re-open it from the archive.**
   No `render.yaml` change was made and none is owed; the file still says
   `plan: pro` at line 272 and that is CORRECT.
 
+- **2026-08-18 — RAISE THIS FILE'S SIZE CAP, DO NOT COLLAPSE IT AGAIN.**
+  `session-start.sh`'s bloat threshold for `state.md` goes **60,000 → 180,000**
+  (40 keyed subjects × ~4,500 B, so it tracks the subject count rather than
+  today's byte count). Asked directly, with the numbers: the file had been
+  collapsed **twice in ten days** — 2026-08-15 and 2026-08-18, both archived
+  verbatim — and was back to **2.77×** the same evening. Options put were
+  archive-and-rewrite all 40 sections, raise the cap, or have each subject's
+  owner collapse their own. **Chosen: raise the cap.**
+  The measurement that decided it: only **923 B of 163,412** is self-declared
+  archival; the remaining 40 sections are live current-truth carrying just
+  8–19% dated measurement lines. There is nothing mechanical to reclaim, so a
+  non-owner "collapse" means deciding which of someone else's measured numbers
+  stop mattering. `lanes.md` (2.12× → 0.93×) and `learnings.md` (2.07× → 0.91×)
+  were both brought under cap the same evening by MOVING blocks, which is
+  verifiable; this file has no equivalent operation.
+  Consequence to hold onto: **size was always a proxy here.** The failure it
+  stood in for — stacked contradictory sections — is caught directly by
+  `state_key_check.py`, which still runs. Exceeding 180,000 is a signal to
+  collapse BY OWNER, not to raise again.
+
 Product decisions, not engineering ones. Do not re-take them.
 
 1. **The LLM is NOT meant to be on.** `ANTHROPIC_API_KEY` stays absent. The
@@ -2264,18 +2284,33 @@ that hour is how this subject came to have three sections.
   averages its metrics index with `0.5 + attack_rating`, so such a feature enters
   twice. `94578cbc` removed the two explicit xG terms; **check this before wiring any
   further goal-derived metric into `possession_priors`.**
-- **`corr(xg_for, shots_per_match)` is +0.83..+0.93 in all nine leagues.** Shots is
-  the weakest surviving term in `_attack_strength` (weight 0.016) and is 83-93% the
-  same signal as the rating. Not removed — pending evidence it earns nothing.
+- **`corr(xg_for, shots_per_match)` is +0.83..+0.93 in all nine leagues.**
+  **UPDATE 2026-08-18 ~19:3xZ, SUPERSEDES "not removed" below: shots' weight WAS
+  tested (shrunk to `sqrt(1-r^2)`, ~0.0071/0.0097) and the shrink was FALSIFIED by a
+  paired test on 126 identical eredivisie fixtures** (t=-2.06, 95% CI
+  -0.0191..-0.0005, unshrunk scored better Brier) **and REVERTED — current weight is
+  0.016, unchanged from before any of this.** The correlation is real but shots
+  carries predictive value beyond it; `sqrt(1-r^2)` wrongly assumed the correlated
+  fraction was pure redundancy. The two OTHER terms computed under the same
+  heuristic (`form_points`, `clean_sheet_rate`) were never applied — that heuristic
+  is now distrusted as a method, not just for this one number. Full detail: lane
+  `soccer-model-dispersion`.
 - **CAVEAT ON ALL OF THE ABOVE:** measured as the pipeline computes ratings TODAY,
   where `xg_for` IS goals on the football-data path
   (`team_rows_from_match_history`). A real xG source whose values diverge from goals
   would weaken these correlations and could earn the dropped terms back. That is why
   the now-unread `xg_for_per_match` / `xg_against_per_match` keys stay populated.
-- **The dispersion question is NOT yet answered.** A 16-fixture probe returned
-  stdev(P home) 0.1765 against baseline model 0.1575 / market 0.1811, but its 95%
-  band (0.1133..0.2397) contains both — the effect is smaller than the instrument's
-  noise. **Do not cite 0.1765 as evidence the under-dispersion is fixed.**
+- **The dispersion question is STILL NOT ANSWERED, and the leading hypothesis has
+  CHANGED.** `possession_priors.py`'s own formulas are exonerated by exact
+  arithmetic (every per-possession term measurably NARROWED after the xG-term
+  removal, not widened). A properly-powered real-fixture trace (126 real matches,
+  not a synthetic probe) suggests the actual driver is `00475bce`'s FEATURE WIRING
+  itself (shots/form/clean-sheet/corners newly populated), not the xG-removal
+  everyone had been chasing — removing xG while holding the wiring constant moved
+  dispersion TOWARD the true baseline, not away. **UNCONFIRMED — a hypothesis the
+  numbers point at, not an isolated result.** The earlier 16-fixture probe (stdev
+  0.1765 against 0.1575/0.1811) is SUPERSEDED and should not be cited; it used a
+  different, smaller, since-shown-underpowered method.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
@@ -2317,7 +2352,7 @@ for that pattern. **It does NOT carry the five MLB sim patterns**, which are
 still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 /api/ops/artifacts/publish` still 403s.
 
-## WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]`
+## [mlb-sim-artifacts-live] WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]`
 
 - **`POST /api/ops/artifacts/publish` 403 -> 200.** All five published and read
   back BY CONTENT: `arsenal` 0.57MB, `quality` 0.08MB, `batted_ball` 0.23MB,
@@ -2341,7 +2376,16 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 - **Residual:** `055dfc67` is off main, so a future off-main web deploy drops
   these six lines. They are on main in `c2030c72`.
 
-## CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+## [web-preflight-dead-sample] CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+
+> **SUPERSEDED — this section's conclusion is WRONG and its own author retracted
+> it in the section below, which carries the SAME subject key deliberately.**
+> The emitter was not deleted; it is intact at `memory_observability.py:1952`.
+> Retained verbatim because the retraction explains how the mistake was made
+> (a `head -4` truncated grep read as exhaustive) and that reasoning is worth
+> more than a tidy file. **Do not act on anything in this section.**
+> Collapsing the two into one is owed work for whoever owns this subject —
+> `state_key_check.py` now reports it, which is the intended behaviour.
 
 **Supersedes what I wrote three times today** — in the break-glass grant, in the
 web-deploy state entry above, and in the session checkpoint. All three name
@@ -2376,7 +2420,24 @@ line `deploy_preflight.py:parse_processes` can parse into `{pid, ppid, rss, cmd}
 Re-adding the periodic call must respect the standing rule that **worker periodic
 work is never free** (`#241` caused a production restart loop; ~1.4GB headroom).
 
-## RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
+## [web-preflight-dead-sample] RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
+
+> **THIS IS THE CURRENT TRUTH FOR THIS SUBJECT.** It shares its key with the
+> superseded CORRECTION section above, so `state_key_check.py` reports the
+> subject as stacked — deliberately, per this file's own rule that a second
+> section on one subject is a defect to be seen rather than hidden behind a
+> different slug. Collapse is owed by this subject's owner.
+>
+> **A FOURTH CAUSE HAS SINCE BEEN CLAIMED AND RETRACTED TOO** `[added 2026-08-18
+> by lane `ledger-coherence-sweep`]`: `todo.md` `#465` asserted "no web code
+> path emits `ALL_PROCESS_MEMORY`", confirmed by caller trace. Also wrong — web
+> has a live path, `syndicate/app.py:37` →
+> `start_intelligence_state_background_loop` →
+> `intelligence_state.py:_diag_log_all_process_memory` (12 sites) →
+> `memory_observability.py:1919 log_and_persist_process_memory` → `:1944` →
+> `:1952`. It read as true because `app.py` contains zero occurrences of the
+> callee — it *starts a loop* that calls it. **The tally in this section is now
+> 4 wrong causes, not 3**, and its "do not add a fifth guess" stands.
 
 **Supersedes the CORRECTION section immediately above.** That section says the
 `ALL_PROCESS_MEMORY` emitter was deleted from `memory_observability.py`.
@@ -2454,7 +2515,7 @@ WORKERS can produce, so web's preflight has never been satisfiable.**
 **To confirm:** find any web-side call path to `log_all_process_memory`, or
 confirm none exists. If none, the fix is (2) and no emitter is missing.
 
-## refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
+## [refresh-worker-deploy-hold] refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
 
 **The hold is VOID — its owner is dead, and the roster lies about it.**
 
@@ -2545,3 +2606,48 @@ sessions' intent in files I had not read. Recorded instead.
 graft that must be re-cut against the live SHA.** That is the cost of deferring,
 and it compounds: each graft pushes the worker further from main and makes this
 merge larger.
+
+## [locked-cards-retuned-no-autorun] `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]`
+
+- The only builder, `build_season_betting_cards_manifest.py`, is invoked two
+  ways and **neither runs on Render**: the routine season-wide path only
+  exists inside `daily_update.py` (GHA-only, `scripts/daily_update.ps1`,
+  Render never calls it); the single-date backfill inside
+  `run_refresh_worker.py` is manually env-var-gated
+  (`MLB_BETTING_DAY_BACKFILL_DATE`).
+- **The GHA cron itself defaults to backup-only**, not the full pipeline —
+  `run_full_pipeline` defaults `false`; its own text calls the full-pipeline
+  path a "manual fallback for backfills/recovery."
+- Consequence, measured: the pregame odds freeze (`#265`/`#440` Phase 7) is
+  fixed and improving (1→11→15 games captured, 08-16→08-18), but
+  `season_betting_day_2026_08_17.json` still has exactly 2 games / `ml=1`,
+  because nothing ever rebuilds it against the improved freeze. Full trace:
+  `docs/ai_context/todo.md` under `#265`.
+- **NOT FIXED.** Next step if picked up: decide whether to add a routine,
+  feature-flagged autorun (generalizing the existing single-date backfill) or
+  fix the GHA default — either is a real, scoped change, neither attempted.
+
+## [lane-guard-disclaimer-and-worktree-exemption-bugs] TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]`
+
+- **Bug 1:** the `.syndicate`/`.claude` exemption (`rel.startswith(".syndicate")`)
+  is computed relative to `CLAUDE_PROJECT_DIR` (the primary tree). Editing the
+  same logical file via a `session_worktree.py` worktree produces a
+  `../../../tmp/...`-style relative path that never starts with `.syndicate`,
+  so the exemption silently fails to apply and the file gets claim-checked
+  like ordinary code.
+- **Bug 2:** in `_claims()`, the initial `- Files:` line's content goes
+  straight to `_paths_in()` without `_claimable_prefix()` first — unlike
+  continuation lines, which do get it. A same-line disclaimer clause after the
+  path list (e.g. "Collision check: ... grepped `lanes.md`, clean.") is read
+  as claims, not prose. **Live instance:** `basketball-model-owner` appears to
+  claim `lanes.md` itself, purely from a collision-check aside on its own
+  Files line.
+- Together these blocked a routine worktree edit to `.syndicate/lanes.md`
+  this session (worked around by landing via a different session's sweep,
+  not by fixing the guard). **NOT FIXED** — a design was drafted
+  (`.claimable_prefix()` applied to the initial Files line too; exemption
+  check based on path substring rather than root-relative prefix) but never
+  written to a file. Regression tests belong in
+  `tests/test_lane_guard_files_forms.py`, which already has fixture coverage
+  that happens not to trigger bug 2 (`PLAIN_WRAPPED`'s first line has no
+  colon, so it sidesteps the bug by coincidence, not by testing against it).

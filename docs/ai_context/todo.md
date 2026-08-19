@@ -1,5 +1,99 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#467` — **basketball position-matchup multiplier was CONSUMED, POPULATED with real data (47 WNBA / 64 NBA rows), and structurally never applied -- nested behind an unrelated dead gate** — FOUND, FIXED, DEPLOYED-TO-COMMIT-NOT-YET-LIVE 2026-08-18, lane `basketball-model-owner`, VERIFIED BY REACHABILITY TEST
+
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md` Sec8.
+Gate: `scripts/basketball_sim_input_checklist.py` (unaffected by this fix --
+it audits CONSUMED×POPULATED, not influence; this item is the deeper
+question the checklist doesn't ask).
+
+Arose from a user-requested deep dive: "make sure WNBA modeling is using
+[advanced data] end to end." The checklist proves a field is read and has a
+real value; it does NOT prove the value reaches the sampling step. Traced
+past it with real ablations against the real vendored engine (not a
+reimplementation), invoked the same way `#460`'s checklist already validated
+as real.
+
+**Team-advanced-stats and player-priors: confirmed real, large, robust.**
+3 independent seeds (12345/777/2026), 150 sims each, real WNBA matchup
+(CON @ MIN, 2026-07-08): neutralizing `pace`/`off_rtg`/`def_rtg`/`tov_pct`/
+`orb_pct`/`ft_rate` flips simulated win probability by **~45-50 points,
+every seed** -- the largest, most robust effect found in this audit. Player
+priors: real, smaller (~2-3 pts/seed), secondary. Both are genuinely used
+end-to-end.
+
+**The bug**: `_apply_player_priors_local`
+(`basketball_props_smart_sim.py:3277-3306`, pre-fix) nested FOUR
+mechanisms -- opponent-specific split, career-opponent split, venue split,
+**and opponent-position defensive matchup** -- behind one
+`if player_logs is not None and not player_logs.empty:` gate. The first
+three genuinely need `player_logs.csv`, which is absent from BOTH leagues'
+production data roots (**platform-wide, not a WNBA-specific gap** --
+`split_ctx`/`career_opp_ctx` measured at 0 rows for both WNBA and NBA) and
+are correctly dead pending a real per-game player-log pipeline. The fourth
+-- position-matchup -- is sourced entirely from `pos_lookup`
+(`_opponent_position_rate_context_local`, boxscore-derived, unrelated to
+`player_logs`) and had real, correctly-computed data (**47 WNBA rows, 64 NBA
+rows, measured**) that could never fire because of the shared gate.
+`model_engine_standard.md`'s canonical "CONSUMED but never influential"
+trap, found by tracing past the CONSUMED×POPULATED checklist into whether
+the value reaches the sampling step.
+
+**Fixed**: hoisted `opp_key`'s computation above the `player_logs` gate
+(needed by both the still-gated blocks and the position block) and
+un-nested the position-matchup block so it runs whenever `pos_lookup` has
+the row, independent of `player_logs`'s state. 19 insertions / 8 deletions,
+one file, no other mechanism's math touched.
+
+**Reachability measured, not assumed** (`model_engine_standard.md`'s
+required off != on test): monkeypatched `_bounded_split_multiplier` to
+count calls by `min_games` (position-matchup is the only caller using
+`min_games=12`), real engine, real WNBA matchup, real positions pulled from
+`boxscores_history.csv`'s `START_POSITION`. **BEFORE: 0 calls. AFTER: 111
+calls.** Other 3 split mechanisms unchanged at 0 (correctly still gated).
+Targeted tests pass (`test_basketball_props_smart_sim_advanced_stats.py`,
+`test_basketball_props_smart_sim.py`, 29 tests total via the broader
+`smart_sim` selection) -- no regressions. Checklist still exits 1 on the
+same single pre-existing `#461`-mirror alarm, unrelated.
+
+**Committed and pushed** (`06de4fd6` / rebased to `9b5e1755` on `main`).
+**Not yet deployed** to refresh-worker (where the smart-sim engine actually
+runs) -- refresh-worker's deploy window has been HELD twice this session on
+in-flight jobs (`#461`'s own deploy is queued for the same window). This fix
+rides along whenever that deploy lands.
+
+**Other findings from the same audit pass, filed here rather than as
+separate items since they share one investigation**:
+- **No home-court-advantage constant anywhere** in `smart_sim.py`/
+  `events.py`/`quarters.py` (grepped `home_adv`/`home_edge`/`home_boost`,
+  zero matches). Implicit only via a real market line or an optional
+  calibration block already confirmed ABSENT (`#460`'s Level 3). Platform-wide,
+  both leagues simulate with zero baked-in home-court effect absent a market
+  line. NOT fixed this pass -- a real constant calibrated from
+  `boxscores_history.csv`'s own home/away differential (data already exists)
+  is the natural next step.
+- **ELO reaches the sim only indirectly, unmeasured this pass.**
+  `vendor/wnba_betting_repo/src/wnba_betting/elo.py` is real but
+  `smart_sim.py` has zero direct references. Likely path:
+  `predictions_<date>.csv`'s `totals`/`spread_margin` -> `home_mu`/`away_mu`
+  -> `_rating_from_mu` -> `TeamContextLocal.off_rating` -- a DIFFERENT
+  mechanism than team-advanced-stats' `eff_mult` path above. Traced through
+  code, not ablated.
+- **Events-sibling fallback reachability, closed**: `_import_real_events_module_local`
+  called directly for both packages -- `wnba_betting: REAL`, `nba_betting:
+  REAL`. Closes the open item from `#460`'s Sec2/Sec6.
+- **`.syndicate/learnings.md`'s 2026-08-16 "WNBA possessions are
+  underivable" entry reconciled, not contradicted.** It is narrower than,
+  and now stale relative to, `syndicate/features/shared/game_shape.py:427-472`'s
+  own same-day amendment, which already scopes the finding to the LIVE
+  in-game payload specifically. This audit adds a third confirming site:
+  `advanced_stats_boxscores.py:90-92` computes the same Dean-Oliver formula
+  from `boxscores_history.csv`'s real, 100%-populated FGA/TOV/OREB/FTA
+  columns to produce the season-aggregate pace/ratings that this item's own
+  ablation just proved drives the pregame sim. Recommend updating the terse
+  `learnings.md` line to point at `game_shape.py`'s fuller explanation --
+  not a code fix.
+
 ### `#466` — **7 OPEN lanes sit INSIDE the two `## Archived lanes` sections of `lanes.md` and would be silently un-guarded by the next archive pass** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **RE-MEASURED AND PARTLY RETRACTED SAME DAY — the count was 7, not 11, and the stated mechanism was WRONG**
 
 > **CORRECTION 2026-08-18, before anyone acts on the original text below.**
