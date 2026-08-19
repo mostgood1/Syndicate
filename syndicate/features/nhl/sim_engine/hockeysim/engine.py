@@ -213,6 +213,31 @@ def _resolve_faceoff_pct(ev_only: bool, oz_index_raw: object, ev_index_raw: obje
         return 0.5
 
 
+def _resolve_strength_state_faceoff_pct(
+    is_pp_side: bool, pp_role_index_raw: object, pk_role_index_raw: object,
+    oz_index_raw: object, ev_index_raw: object, fallback_pct: float,
+) -> float:
+    """One side's effective faceoff win percentage during a PP/PK segment, for §2x's
+    strength-state mechanism -- §2y's own resolution chain, ONE TIER ahead of `_resolve_faceoff_pct`.
+
+    §2x originally resolved this via the SAME OZ->EV->blend chain the even-strength mechanism
+    uses -- a stated limitation, not hidden: that chain has no idea this side is actually on the
+    PP or the PK right now, only its GENERAL faceoff tendency. §2y closes it with a genuinely
+    role-specific index (`faceoff_pp_role_index`/`faceoff_pk_role_index`, `historical_truth/
+    faceoff_ev_index.py`) -- whichever one matches THIS side's actual role in THIS segment
+    (`is_pp_side`) is preferred first; a missing role index for this side falls straight through
+    to `_resolve_faceoff_pct`'s unchanged OZ->EV->blend chain, exactly the raw/non-defaulted
+    discipline every tier in this file already follows (a missing tier falls through, it is never
+    silently treated as neutral)."""
+    role_index_raw = pp_role_index_raw if is_pp_side else pk_role_index_raw
+    if role_index_raw is not None:
+        try:
+            return 0.5 * float(role_index_raw)
+        except (TypeError, ValueError):
+            pass
+    return _resolve_faceoff_pct(True, oz_index_raw, ev_index_raw, fallback_pct)
+
+
 def _strength_state_multipliers(
     p_pp_side_wins: float, pp_side_wins_draw: bool,
     w_pp: float, o_pp: float, w_pk: float, o_pk: float,
@@ -868,6 +893,17 @@ class PeriodSimulator:
         # the SAME way DZ is: an ADDITIONAL multiplicative layer, both sides required to activate.
         faceoff_nz_idx_home_raw = st_home.get("faceoff_nz_index")
         faceoff_nz_idx_away_raw = st_away.get("faceoff_nz_index")
+        # STRENGTH-STATE-ROLE-specific faceoff win-rate indices (§2y) -- close the strength-state
+        # mechanism's (§2x) own stated limitation: it originally resolved each side's win
+        # percentage via the SAME OZ/EV/blend chain above, not a signal specific to non-EV draws.
+        # `_resolve_strength_state_faceoff_pct` prefers whichever of these matches EACH SIDE'S
+        # actual role in a given PP/PK segment (the PP-side team's PP-role index, the PK-side
+        # team's PK-role index) one tier ahead of that chain -- a missing role index for either
+        # side falls straight through to the unchanged OZ/EV/blend chain.
+        faceoff_pp_role_idx_home_raw = st_home.get("faceoff_pp_role_index")
+        faceoff_pp_role_idx_away_raw = st_away.get("faceoff_pp_role_index")
+        faceoff_pk_role_idx_home_raw = st_home.get("faceoff_pk_role_index")
+        faceoff_pk_role_idx_away_raw = st_away.get("faceoff_pk_role_index")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1254,23 +1290,25 @@ class PeriodSimulator:
             elif (seg_is_home_pp or seg_is_away_pp) and bool(getattr(self.cfg, "faceoff_strength_state_model", True)):
                 # §2x: the first faceoff mechanism to apply during a PP/PK segment -- fires
                 # precisely when the block above is gated OFF (`ev_only=True` and this IS a PP/PK
-                # segment). Reuses the SAME OZ->EV->blend percentage resolution as the general
-                # mechanism (no dedicated per-team PP/PK-specific win-rate index exists -- a stated
-                # limitation, not hidden) to simulate who wins the segment's assumed draw, then
-                # applies whichever curve matches the WINNER's own role (did the already-advantaged
-                # team also win the draw, or did the shorthanded team win it).
+                # segment). §2y: each side's win percentage now prefers a genuinely ROLE-SPECIFIC
+                # index over the general OZ->EV->blend chain (`_resolve_strength_state_faceoff_pct`
+                # -- closes §2x's own stated limitation), then simulates who wins the segment's
+                # assumed draw, then applies whichever curve matches the WINNER's own role (did the
+                # already-advantaged team also win the draw, or did the shorthanded team win it).
                 #
                 # `_strength_state_multipliers` PER-SEGMENT NORMALIZES the two curves together (see
                 # its own docstring for the exact derivation) -- a naive branch on each curve's own
                 # raw winner_mult/other_mult was a real bug caught by the round-robin check every
                 # other layer this session was held to: it inflated the league-wide total ~4.5%
                 # (`hockeysim_faceoff_strength_state_report.md`), down to ~0.2% after this fix.
-                st_h_pct = _resolve_faceoff_pct(
-                    True, faceoff_oz_idx_home_raw, faceoff_ev_idx_home_raw,
+                st_h_pct = _resolve_strength_state_faceoff_pct(
+                    seg_is_home_pp, faceoff_pp_role_idx_home_raw, faceoff_pk_role_idx_home_raw,
+                    faceoff_oz_idx_home_raw, faceoff_ev_idx_home_raw,
                     float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5),
                 )
-                st_a_pct = _resolve_faceoff_pct(
-                    True, faceoff_oz_idx_away_raw, faceoff_ev_idx_away_raw,
+                st_a_pct = _resolve_strength_state_faceoff_pct(
+                    seg_is_away_pp, faceoff_pp_role_idx_away_raw, faceoff_pk_role_idx_away_raw,
+                    faceoff_oz_idx_away_raw, faceoff_ev_idx_away_raw,
                     float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
                 )
                 st_denom = max(1e-6, float(st_h_pct) + float(st_a_pct))

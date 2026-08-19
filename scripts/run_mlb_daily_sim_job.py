@@ -478,14 +478,39 @@ def main() -> int:
             if _st.get("stale"):
                 _res = _lb.write_ladders_artifact(str(args.date), _pks)
                 print(f"MLB_LADDERS_REFRESH reason={_st.get('reason')} games={len(_pks)} {_res}", flush=True)
+                _lb.write_status_artifact(str(args.date), {
+                    "outcome": "rebuilt", "reason": _st.get("reason"),
+                    "games": len(_pks), "result": _res, "staleness": _st,
+                })
             else:
                 print(f"MLB_LADDERS_REFRESH skipped fresh games={len(_pks)}", flush=True)
+                _lb.write_status_artifact(str(args.date), {
+                    "outcome": "skipped_fresh", "games": len(_pks), "staleness": _st,
+                })
         except Exception as _exc:
             # Never fatal: a ladder refresh must not take down the sim job.
             print(f"MLB_LADDERS_REFRESH_FAILED {type(_exc).__name__}: {_exc}", flush=True)
+            try:
+                from syndicate.features.mlb import ladders_build as _lb2
+                _lb2.write_status_artifact(str(args.date), {
+                    "outcome": "failed", "error": f"{type(_exc).__name__}: {_exc}",
+                })
+            except Exception:
+                pass
     else:
         print(f"MLB_LADDERS_REFRESH skipped sim_ok={ok} "
               f"gate={os.environ.get('SYNDICATE_MLB_LADDERS_REFRESH') or 'on'}", flush=True)
+        # EVERY path writes a status, including this one. A missing status file
+        # would be the one outcome indistinguishable from "the code never ran",
+        # which is precisely the ambiguity this artifact exists to remove.
+        try:
+            from syndicate.features.mlb import ladders_build as _lb3
+            _lb3.write_status_artifact(str(args.date), {
+                "outcome": "skipped_gate", "sim_ok": bool(ok),
+                "gate": os.environ.get("SYNDICATE_MLB_LADDERS_REFRESH") or "on",
+            })
+        except Exception:
+            pass
 
     published_count = 0
     try:

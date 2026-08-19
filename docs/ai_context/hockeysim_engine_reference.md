@@ -1093,6 +1093,38 @@ total), 3 new engine tests (reachability, the E[]=1.0 proof, shape-preservation)
 full suite re-confirmed unaffected (no new consumed field; this reuses signals already wired
 elsewhere).
 
+**§2y, closing §2x's own stated limitation**: `faceoff_pp_role_index`/`faceoff_pk_role_index`
+(`historical_truth/faceoff_ev_index.py`) — a genuinely role-specific per-team win-rate index,
+built with the SAME zero-sum winner/loser-attribution technique as the zone indices
+(`GameFaceoffRoleRecord`/`_ROLE_FLIP` mirror `GameFaceoffZoneRecord`/`_ZONE_FLIP`), splitting on
+the WINNER's own strength-state role instead of zone. Real, self-verifying (mean index ~1.0002 on
+both), disjoint populations (PP-role and PK-role rank teams differently — PHI is bottom-5 PP-role,
+top-5 PK-role), ~30-45% top-to-bottom spread. `_resolve_strength_state_faceoff_pct` (`engine.py`)
+sits ONE TIER ahead of `_resolve_faceoff_pct`'s existing OZ→EV→blend chain, used only inside the
+strength-state block: prefers whichever role index matches each side's ACTUAL role this segment,
+falling through to the unchanged chain when that side's role index is absent — no new `SimConfig`
+flag, since this refines an existing consumption point rather than adding a new gated mechanism.
+
+**A real trap this piece's own first reachability-test draft fell into, caught before shipping**:
+a mean-total-shots comparison with home/away-symmetric role-index magnitudes (home PP=away PK,
+home PK=away PP) produced an EXACTLY identical output whether the role index was present or
+absent (62.500 == 62.500 to 3 decimals) — not a wiring bug, but a fixture design flaw: matched
+magnitudes put the win probability back at exactly 0.5 in both configurations by construction.
+Fixed the fixture with genuinely asymmetric magnitudes, which DID move the mean (62.500→62.858)
+but by less than a 120-seed `assertNotAlmostEqual(places=0)` could reliably distinguish from
+noise — itself a direct, expected consequence of §2x's own exact-normalization design
+(`E[applied_mult]=1.0` for ANY win probability, so shifting the probability moves the per-game
+DISTRIBUTION, not a reliably-detectable mean shift at low sample sizes). The final reachability
+test instead compares exact per-seed total-shot VECTORS across 60 seeds, a noise-free proof.
+
+**Verified**: 15 new parser/index unit tests, 1 new loader test, 6 new engine tests (4 on
+`_resolve_strength_state_faceoff_pct`'s tier fallback, 1 vector-based reachability test, plus the
+checklist confirming both new keys 100% populated and consumed, AST-derived not hardcoded). 519
+hockeysim/nhl tests pass overall (up from 497). **Round-robin**: -0.131% (992 pairings, real
+production role-index data vs the two keys stripped) — noise-level, consistent with the
+mean-invariance property above, not evidence the mechanism has no real effect. Full report:
+`docs/reports/hockeysim_faceoff_strength_state_role_index_report.md`.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

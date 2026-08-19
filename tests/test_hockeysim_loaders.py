@@ -322,6 +322,28 @@ def test_load_team_special_teams_map_reads_faceoff_nz_index_when_present(tmp_pat
     assert m["CHI"]["faceoff_nz_index"] == 0.96
 
 
+def test_load_team_special_teams_map_reads_faceoff_role_indices_when_present(tmp_path):
+    """`faceoff_pp_role_index`/`faceoff_pk_role_index` (§2y) -- closes the strength-state
+    mechanism's own stated limitation (§2x). Again a separate fixture so backward compat with
+    CSVs written before this pair existed stays covered by the earlier fixtures."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "team_special_teams_2025-2026.csv").write_text(
+        "abbr,pp_pct,pk_pct,committed_per_game,pp_shot_index,pk_shot_index_allowed,"
+        "block_rate_index,faceoff_ev_index,faceoff_oz_index,faceoff_dz_index,faceoff_nz_index,"
+        "faceoff_pp_role_index,faceoff_pk_role_index\n"
+        "BOS,0.23,0.83,2.9,1.24,0.91,1.10,1.06,1.12,0.94,1.03,1.09,0.88\n"
+        "CHI,0.14,0.79,3.3,0.88,1.15,0.87,0.93,0.89,1.08,0.96,0.91,1.14\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_team_special_teams_map(date, root=tmp_path)
+    assert m["BOS"]["faceoff_pp_role_index"] == 1.09
+    assert m["BOS"]["faceoff_pk_role_index"] == 0.88
+    assert m["CHI"]["faceoff_pp_role_index"] == 0.91
+    assert m["CHI"]["faceoff_pk_role_index"] == 1.14
+
+
 # ---------------------------------------------------------------------------
 # Team rates (shots_per_60/faceoff_win_pct) -- `docs/ai_context/hockeysim_engine_reference.md`
 # §2j. `blocks_per_60`/`penalties_per_60` were REMOVED entirely (§2l) after being proven a

@@ -265,15 +265,17 @@ def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, fl
 def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, float]]:
     """Load ``{ABBR: {"pp_pct":..., "pk_pct":..., "committed_per_game":..., "pp_shot_index":...,
     "pk_shot_index_allowed":..., "block_rate_index":..., "faceoff_ev_index":...,
-    "faceoff_oz_index":..., "faceoff_dz_index":..., "faceoff_nz_index":...}}`` for a date.
+    "faceoff_oz_index":..., "faceoff_dz_index":..., "faceoff_nz_index":..., "faceoff_pp_role_index":...,
+    "faceoff_pk_role_index":...}}`` for a date.
 
     Written by ``scripts/build_nhl_special_teams_artifact.py`` from real settled results
     (`historical_truth.special_teams_builder` for the first three keys;
     `historical_truth.boxscore_shot_strength` for the shot-index pair, §2f;
     `historical_truth.boxscore_block_rate` for `block_rate_index`, §2g;
     `historical_truth.faceoff_ev_index` for `faceoff_ev_index`/`faceoff_oz_index`/`faceoff_dz_index`/
-    `faceoff_nz_index`, §2m/§2n/§2o/§2w -- all absent when the producer ran without the matching
-    cache, degrading to the engine's own neutral default rather than missing entirely). Same
+    `faceoff_nz_index`, §2m/§2n/§2o/§2w, and `faceoff_pp_role_index`/`faceoff_pk_role_index`, §2y --
+    all absent when the producer ran without the matching cache, degrading to the engine's own
+    neutral default rather than missing entirely). Same
     candidate-order convention as
     :func:`load_team_xg_map`/:func:`load_team_elo_map`. Returns an empty map when unavailable, so
     ``HockeyTeamFeatures.special_teams`` stays ``{}`` and the engine falls back to its own
@@ -308,6 +310,8 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
         faceoff_oz_idx = _to_float(lower.get("faceoff_oz_index"))
         faceoff_dz_idx = _to_float(lower.get("faceoff_dz_index"))
         faceoff_nz_idx = _to_float(lower.get("faceoff_nz_index"))
+        faceoff_pp_role_idx = _to_float(lower.get("faceoff_pp_role_index"))
+        faceoff_pk_role_idx = _to_float(lower.get("faceoff_pk_role_index"))
         entry: Dict[str, float] = {}
         if pp is not None:
             entry["pp_pct"] = pp
@@ -329,6 +333,10 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
             entry["faceoff_dz_index"] = faceoff_dz_idx
         if faceoff_nz_idx is not None:
             entry["faceoff_nz_index"] = faceoff_nz_idx
+        if faceoff_pp_role_idx is not None:
+            entry["faceoff_pp_role_index"] = faceoff_pp_role_idx
+        if faceoff_pk_role_idx is not None:
+            entry["faceoff_pk_role_index"] = faceoff_pk_role_idx
         if entry:
             out[key] = entry
     return out

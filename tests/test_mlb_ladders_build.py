@@ -224,3 +224,31 @@ def test_fresh_when_the_artifact_is_newest(wired, tmp_path):
         _touch(f, 600_000)
     _touch(dest, 2_000_000)
     assert lb.is_stale("2026-05-28", [7]) == {"stale": False, "reason": "fresh"}
+
+
+def test_status_artifact_is_written_and_allowlisted(wired, tmp_path):
+    """The status file is the ONLY channel that survives — the sim job's stdout
+    goes to a disk file whose endpoint serves the last 8000 chars, and the
+    publish sweep's ~109 PUBLISH_OK lines consume that window entirely."""
+    wired({7: _sim_payload()}, {"pitcher_props": {}})
+    written = lb.write_status_artifact("2026-05-28", {"outcome": "skipped_fresh", "games": 3})
+    assert written, "status write returned nothing"
+    doc = json.loads(Path(written).read_text(encoding="utf-8"))
+    assert doc["outcome"] == "skipped_fresh"
+    assert doc["date"] == "2026-05-28"
+    assert doc["writtenAt"], "no timestamp -- a status with no time cannot be aged"
+
+
+def test_status_filename_matches_the_EXISTING_allowlist(tmp_path):
+    """Must publish with NO new HOT_ARTIFACT_PATTERNS entry: adding one needs a
+    WEB deploy, because the publish endpoint gates on web's copy of the
+    allowlist -- that is what 403'd five artifacts on 2026-08-18."""
+    from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+    rel = "mlb_source/source_artifacts/data/daily/ladders/daily_ladders_status_2026_08_19.json"
+    assert is_hot_artifact_relative_path(rel)
+
+
+def test_status_never_raises_on_an_unwritable_path(monkeypatch):
+    """A status write must never fail the sim job it is reporting on."""
+    monkeypatch.setattr(lb, "daily_ladders_path", lambda d: Path("/nonexistent\x00/x.json"))
+    assert lb.write_status_artifact("2026-05-28", {"outcome": "rebuilt"}) is None

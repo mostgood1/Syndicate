@@ -12,15 +12,22 @@ from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_ev_ind
     DEFAULT_FACEOFF_EV_INDEX,
     DEFAULT_FACEOFF_NZ_INDEX,
     DEFAULT_FACEOFF_OZ_INDEX,
+    DEFAULT_FACEOFF_PK_ROLE_INDEX,
+    DEFAULT_FACEOFF_PP_ROLE_INDEX,
     MIN_GAMES_FOR_FACEOFF_DZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_INDEX,
     MIN_GAMES_FOR_FACEOFF_NZ_INDEX,
     MIN_GAMES_FOR_FACEOFF_OZ_INDEX,
+    MIN_GAMES_FOR_FACEOFF_ROLE_INDEX,
+    GameFaceoffRoleRecord,
     GameFaceoffZoneRecord,
     compute_team_faceoff_dz_index,
     compute_team_faceoff_ev_index,
     compute_team_faceoff_nz_index,
     compute_team_faceoff_oz_index,
+    compute_team_faceoff_pk_role_index,
+    compute_team_faceoff_pp_role_index,
+    parse_playbyplay_faceoffs_by_role,
     parse_playbyplay_faceoffs_by_zone,
     parse_playbyplay_faceoffs_ev,
 )
@@ -316,6 +323,176 @@ def test_dz_index_is_independent_of_oz_index_not_its_mirror():
 
 def test_dz_index_missing_data_is_empty_not_a_crash():
     assert compute_team_faceoff_dz_index([]) == {}
+
+
+# ---------------------------------------------------------------------------
+# Strength-state-role-specific (PP-role / PK-role) win index -- entirely NON-EV (unequal
+# skaters), disjoint from every zone index above, which is EV-only.
+# ---------------------------------------------------------------------------
+
+def _role_playbyplay(*, home_id=13, away_id=16, home_abbr="FLA", away_abbr="CHI", plays=None):
+    return {
+        "id": 1,
+        "homeTeam": {"id": home_id, "abbrev": home_abbr},
+        "awayTeam": {"id": away_id, "abbrev": away_abbr},
+        "plays": plays or [],
+    }
+
+
+def test_role_parse_home_pp_winner_is_pp_role():
+    # "1451" = away 4 skaters, home 5 -> home has the advantage (home PP).
+    payload = _role_playbyplay(plays=[_faceoff_event(owner_id=13, situation="1451")])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert rec.home_role_wins["PP"] == 1
+    assert rec.home_role_total["PP"] == 1
+
+
+def test_role_parse_shorthanded_winner_is_pk_role():
+    # "1451" = home has the advantage (home PP); the AWAY (shorthanded) side wins it -> away's
+    # OWN role at that draw is PK, even though the opponent had the man advantage.
+    payload = _role_playbyplay(plays=[_faceoff_event(owner_id=16, situation="1451")])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert rec.away_role_wins["PK"] == 1
+    assert rec.away_role_total["PK"] == 1
+
+
+def test_role_parse_flips_the_losers_role():
+    # Home wins its own PP draw -> the AWAY side's own role at that same draw was PK (it lost a
+    # draw it was shorthanded for), attributed via the flip even though away didn't win it.
+    payload = _role_playbyplay(plays=[_faceoff_event(owner_id=13, situation="1451")])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert rec.away_role_total["PK"] == 1
+    assert rec.away_role_wins["PK"] == 0
+
+
+def test_role_parse_away_pp_situation_code():
+    # "1541" = away 5 skaters, home 4 -> away has the advantage (away PP).
+    payload = _role_playbyplay(plays=[_faceoff_event(owner_id=16, situation="1541")])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert rec.away_role_wins["PP"] == 1
+    assert rec.home_role_total["PK"] == 1  # home lost it, shorthanded
+
+
+def test_role_parse_excludes_ev_faceoffs_entirely():
+    payload = _role_playbyplay(plays=[
+        _faceoff_event(owner_id=13, situation="1551"),  # EV -- excluded, this index is non-EV only
+        _faceoff_event(owner_id=13, situation="1451"),  # PP -- included
+    ])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert sum(rec.home_role_total.values()) == 1
+
+
+def test_role_parse_unresolved_owner_is_skipped_not_misattributed():
+    payload = _role_playbyplay(plays=[_faceoff_event(owner_id=999999, situation="1451")])
+    rec = parse_playbyplay_faceoffs_by_role(payload)
+    assert sum(rec.home_role_total.values()) == 0
+    assert sum(rec.away_role_total.values()) == 0
+
+
+def test_role_parse_not_a_dict_or_missing_ids_returns_none():
+    assert parse_playbyplay_faceoffs_by_role(None) is None
+    payload = _role_playbyplay()
+    del payload["homeTeam"]["id"]
+    assert parse_playbyplay_faceoffs_by_role(payload) is None
+
+
+def test_role_parse_missing_plays_returns_none():
+    payload = _role_playbyplay()
+    del payload["plays"]
+    assert parse_playbyplay_faceoffs_by_role(payload) is None
+
+
+def test_pp_role_index_neutral_below_games_floor():
+    recs = [parse_playbyplay_faceoffs_by_role(_role_playbyplay(
+        plays=[_faceoff_event(owner_id=13, situation="1451")])) for _ in range(3)]
+    assert 3 < MIN_GAMES_FOR_FACEOFF_ROLE_INDEX
+    idx = compute_team_faceoff_pp_role_index(recs)
+    assert idx["FLA"].index == DEFAULT_FACEOFF_PP_ROLE_INDEX
+
+
+def test_pp_role_index_reflects_a_real_above_average_team():
+    """Mirrors the OZ index's own fixture shape: two INDEPENDENT sets of PP-role draws (FLA's own
+    PP, and separately CHI's own PP), each needing both wins and losses to exercise the role-flip
+    attribution and produce a genuine (not tautological) zero-sum league rate."""
+    n = MIN_GAMES_FOR_FACEOFF_ROLE_INDEX + 5
+    plays = (
+        [_faceoff_event(owner_id=13, situation="1451") for _ in range(7)]  # FLA wins FLA's own PP, 7x
+        + [_faceoff_event(owner_id=16, situation="1451") for _ in range(1)]  # CHI wins in FLA's PP (FLA loses it)
+        + [_faceoff_event(owner_id=16, situation="1541") for _ in range(1)]  # CHI wins CHI's own PP, only 1x (weak)
+        + [_faceoff_event(owner_id=13, situation="1541") for _ in range(7)]  # FLA wins in CHI's PP (CHI loses it, 7x)
+    )
+    recs = [parse_playbyplay_faceoffs_by_role(_role_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_pp_role_index(recs)
+    # FLA: own-PP rate 7/8=0.875 vs league 0.5 -> index 1.75. CHI: own-PP rate 1/8=0.125 -> index 0.25.
+    assert idx["FLA"].index > 1.0
+    assert idx["CHI"].index < 1.0
+
+
+def test_pp_role_index_is_self_consistent_zero_sum():
+    n = MIN_GAMES_FOR_FACEOFF_ROLE_INDEX + 5
+    plays = (
+        [_faceoff_event(owner_id=13, situation="1451") for _ in range(5)]
+        + [_faceoff_event(owner_id=16, situation="1451") for _ in range(5)]
+        + [_faceoff_event(owner_id=16, situation="1541") for _ in range(5)]
+        + [_faceoff_event(owner_id=13, situation="1541") for _ in range(5)]
+    )
+    recs = [parse_playbyplay_faceoffs_by_role(_role_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_pp_role_index(recs)
+    assert idx["FLA"].index == pytest.approx(1.0, abs=1e-6)
+    assert idx["CHI"].index == pytest.approx(1.0, abs=1e-6)
+
+
+def test_pp_role_index_missing_data_is_empty_not_a_crash():
+    assert compute_team_faceoff_pp_role_index([]) == {}
+
+
+def test_pk_role_index_neutral_below_games_floor():
+    recs = [parse_playbyplay_faceoffs_by_role(_role_playbyplay(
+        plays=[_faceoff_event(owner_id=16, situation="1451")])) for _ in range(3)]  # away shorthanded, wins
+    assert 3 < MIN_GAMES_FOR_FACEOFF_ROLE_INDEX
+    idx = compute_team_faceoff_pk_role_index(recs)
+    assert idx["CHI"].index == DEFAULT_FACEOFF_PK_ROLE_INDEX
+
+
+def test_pk_role_index_reflects_a_real_above_average_team():
+    n = MIN_GAMES_FOR_FACEOFF_ROLE_INDEX + 5
+    plays = (
+        [_faceoff_event(owner_id=13, situation="1541") for _ in range(7)]  # FLA (shorthanded) wins own PK, 7x
+        + [_faceoff_event(owner_id=16, situation="1541") for _ in range(1)]  # CHI (advantaged) wins -> FLA loses its own PK draw
+        + [_faceoff_event(owner_id=16, situation="1451") for _ in range(1)]  # CHI (shorthanded) wins own PK, only 1x (weak)
+        + [_faceoff_event(owner_id=13, situation="1451") for _ in range(7)]  # FLA (advantaged) wins -> CHI loses its own PK draw, 7x
+    )
+    recs = [parse_playbyplay_faceoffs_by_role(_role_playbyplay(plays=plays)) for _ in range(n)]
+    idx = compute_team_faceoff_pk_role_index(recs)
+    # FLA: own-PK rate 7/8=0.875 -> index 1.75. CHI: own-PK rate 1/8=0.125 -> index 0.25.
+    assert idx["FLA"].index > 1.0
+    assert idx["CHI"].index < 1.0
+
+
+def test_pk_role_index_is_independent_of_pp_role_index_not_its_mirror():
+    """A team elite at winning its own PP-role draws but weak at its own PK-role draws must show
+    index>1.0 for PP-role and index<1.0 for PK-role -- proving the two are computed from
+    genuinely separate fields, not `pk_index = 1/pp_index`. Constructs `GameFaceoffRoleRecord`s
+    directly, same rationale as the OZ/DZ independence test above."""
+    n = MIN_GAMES_FOR_FACEOFF_ROLE_INDEX + 5
+    recs = [
+        GameFaceoffRoleRecord(
+            game_id=str(i), home_abbr="FLA", away_abbr="CHI",
+            home_role_wins={"PP": 9, "PK": 1}, home_role_total={"PP": 10, "PK": 10},
+            away_role_wins={"PP": 1, "PK": 9}, away_role_total={"PP": 10, "PK": 10},
+        )
+        for i in range(n)
+    ]
+    pp_idx = compute_team_faceoff_pp_role_index(recs)
+    pk_idx = compute_team_faceoff_pk_role_index(recs)
+    assert pp_idx["FLA"].index > 1.0
+    assert pk_idx["FLA"].index < 1.0
+    assert pp_idx["CHI"].index < 1.0
+    assert pk_idx["CHI"].index > 1.0
+
+
+def test_pk_role_index_missing_data_is_empty_not_a_crash():
+    assert compute_team_faceoff_pk_role_index([]) == {}
 
 
 # ---------------------------------------------------------------------------

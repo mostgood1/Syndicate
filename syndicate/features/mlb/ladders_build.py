@@ -420,4 +420,47 @@ def write_ladders_artifact(date_str: str, game_pks: list[int]) -> dict[str, Any]
     }
 
 
-__all__ = ["build_ladders_artifact", "write_ladders_artifact", "build_pitcher_strikeout_rows"]
+def status_artifact_path(date_str: str) -> Path:
+    """Sibling of the ladders artifact, and NOT an accident of naming.
+
+    `daily_ladders_status_<date>.json` matches the ALREADY-ALLOWLISTED glob
+    `*/daily/ladders/daily_ladders_*.json`, so it publishes to production with
+    no change to `HOT_ARTIFACT_PATTERNS` — and therefore **no web deploy**.
+    Adding a new pattern would need one: the publish endpoint gates on the WEB
+    service's copy of the allowlist, which is what returned 403 on five
+    artifacts on 2026-08-18.
+
+    The reader builds an exact filename (`sources.daily_ladders_path`), so this
+    file can never be mistaken for the ladders artifact itself.
+    """
+    return Path(daily_ladders_path(date_str)).with_name(
+        f"daily_ladders_status_{date_str.replace('-', '_')}.json")
+
+
+def write_status_artifact(date_str: str, payload: dict[str, Any]) -> str | None:
+    """Record what the refresh DID, on every path including the skips.
+
+    **This exists because the log cannot be read.** The sim job's stdout goes to
+    a file on the worker's disk, and the endpoint that surfaces it serves only
+    `log_text[-8000:]` (`ops.py:1757`) — a window the publish sweep's ~109
+    `PUBLISH_OK` lines consume entirely. Measured twice on 2026-08-19: both the
+    checklist hook's line and this module's own refresh line were absent from
+    the tail, and a pre-existing marker printed from the same place was absent
+    too, proving truncation rather than absence.
+
+    So the outcome is written where it can be READ instead of printed where it
+    cannot. Never raises: a status write must not fail a sim job.
+    """
+    try:
+        out = status_artifact_path(date_str)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        body = dict(payload)
+        body["date"] = date_str
+        body["writtenAt"] = datetime.now(timezone.utc).isoformat()
+        out.write_text(json.dumps(body, indent=1), encoding="utf-8")
+        return str(out)
+    except Exception:
+        return None
+
+
+__all__ = ["write_status_artifact", "status_artifact_path", "build_ladders_artifact", "write_ladders_artifact", "build_pitcher_strikeout_rows"]

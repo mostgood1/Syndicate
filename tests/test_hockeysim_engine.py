@@ -16,7 +16,11 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
     build_nhl_sim_config,
     run_hockeysim_game,
 )
-from syndicate.features.nhl.sim_engine.hockeysim.engine import SimConfig, _strength_state_multipliers
+from syndicate.features.nhl.sim_engine.hockeysim.engine import (
+    SimConfig,
+    _resolve_strength_state_faceoff_pct,
+    _strength_state_multipliers,
+)
 
 
 def _roster(team: str, base_pid: int) -> list[dict]:
@@ -476,6 +480,84 @@ class HockeySimEngineTest(unittest.TestCase):
             0.5, False, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
         self.assertGreater(m_pp_side_wins, m_pp_side_loses)
         self.assertGreater(m_pk_side_wins, m_pk_side_loses)
+
+    def test_faceoff_strength_state_role_index_actually_changes_output(self) -> None:
+        """Reachability for §2y: a genuinely ROLE-SPECIFIC `faceoff_pp_role_index`/
+        `faceoff_pk_role_index` pair must produce a DIFFERENT event stream, per seed, than their
+        absence (which falls through to the OZ->EV->blend chain §2x shipped with) -- holding
+        every other input, including `faceoff_oz_index` itself, identical.
+
+        NOT a mean-total-shots comparison, deliberately: `_strength_state_multipliers`'s own
+        design guarantees `E[m_pp_side] == E[m_pk_side] == 1.0` EXACTLY for ANY win probability
+        (that is the whole point of the §2x bug fix) -- so shifting the win probability via a
+        role index moves the per-game DISTRIBUTION (which side gets the temporary boost, and how
+        deterministically), not the long-run MEAN, which is real but too small for a
+        low-sample mean-comparison test to reliably detect (a first draft using
+        `assertNotAlmostEqual` on a 120-seed mean caught its own asymmetric-index bug at
+        62.500 vs 62.858 -- a real but sub-0.5 shift, an unreliable signal for THIS specific
+        mechanism). Comparing the exact per-seed total-shot vectors is a stronger, noise-free
+        proof: if the role index is actually being read, at least some seeds must land on a
+        different `pp_side_wins_draw` coin flip and therefore a different realized shot count."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        base_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        st_home_no_role = dict(base_home)
+        st_away_no_role = dict(base_away)
+        st_home_with_role = dict(base_home, faceoff_pp_role_index=1.6, faceoff_pk_role_index=0.5)
+        st_away_with_role = dict(base_away, faceoff_pp_role_index=1.3, faceoff_pk_role_index=0.4)
+        cfg = build_nhl_sim_config(overrides={"faceoff_strength_state_model": True})
+
+        def _totals(st_home: dict, st_away: dict) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        no_role_totals = _totals(st_home_no_role, st_away_no_role)
+        with_role_totals = _totals(st_home_with_role, st_away_with_role)
+        self.assertNotEqual(
+            no_role_totals, with_role_totals,
+            msg="per-seed total-shot vectors are IDENTICAL -- faceoff_pp_role_index/"
+                "faceoff_pk_role_index are not being read.",
+        )
+
+    def test_resolve_strength_state_faceoff_pct_prefers_role_index_over_oz(self) -> None:
+        """`_resolve_strength_state_faceoff_pct` tier order: role index (this side's actual role)
+        beats OZ, which beats EV, which beats the all-situations fallback -- all four present at
+        once, only the role index's value should surface."""
+        pct = _resolve_strength_state_faceoff_pct(
+            True, 1.4, 0.6,  # is_pp_side=True -> uses the PP-role index (1.4), not the PK-role one
+            0.8, 0.9, 0.5,   # oz=0.8, ev=0.9, fallback=0.5 -- all should be ignored
+        )
+        self.assertAlmostEqual(pct, 0.7)  # 0.5 * 1.4
+
+    def test_resolve_strength_state_faceoff_pct_uses_pk_role_index_when_pk_side(self) -> None:
+        pct = _resolve_strength_state_faceoff_pct(
+            False, 1.4, 0.6,  # is_pp_side=False -> uses the PK-role index (0.6)
+            0.8, 0.9, 0.5,
+        )
+        self.assertAlmostEqual(pct, 0.3)  # 0.5 * 0.6
+
+    def test_resolve_strength_state_faceoff_pct_falls_through_to_oz_when_role_missing(self) -> None:
+        pct = _resolve_strength_state_faceoff_pct(
+            True, None, None,
+            0.8, 0.9, 0.5,
+        )
+        self.assertAlmostEqual(pct, 0.4)  # 0.5 * 0.8 (OZ), not EV or fallback
+
+    def test_resolve_strength_state_faceoff_pct_falls_through_to_fallback_when_everything_missing(self) -> None:
+        pct = _resolve_strength_state_faceoff_pct(
+            True, None, None,
+            None, None, 0.55,
+        )
+        self.assertAlmostEqual(pct, 0.55)
 
     def test_faceoff_dz_discrete_event_model_still_shows_the_measured_direction(self) -> None:
         """Under the NEW default mechanism specifically (not just the legacy fallback the prior

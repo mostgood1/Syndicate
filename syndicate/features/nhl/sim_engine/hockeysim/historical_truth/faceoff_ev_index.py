@@ -66,6 +66,24 @@ function's own semantics, just a second, independent zone-context input rather t
 a fourth tier of the OZ/EV/blend fallback chain (which represents one measurement
 getting more precise, not a second, additive game mechanism).
 
+STRENGTH-STATE-ROLE WIN INDEX (`compute_team_faceoff_pp_role_index`/`compute_team_faceoff_pk_role_index`),
+added in a fifth pass, closing the stated limitation `engine.py`'s strength-state (PP/PK) faceoff
+mechanism (§2x) shipped with: that mechanism resolves each side's win percentage via the SAME
+OZ->EV->blend chain the even-strength mechanism uses, not a signal specific to PP/PK draws at all --
+a team's faceoff performance while ALREADY on the power play (specialist personnel are often
+deployed) could genuinely differ from its general/EV rate, and the general chain cannot capture that.
+This closes it with the SAME zero-sum, self-verifying, winner/loser-attribution technique as the
+zone-specific indices (`GameFaceoffRoleRecord`/`_ROLE_FLIP` mirror `GameFaceoffZoneRecord`/
+`_ZONE_FLIP` exactly), just splitting on the WINNER's own strength-state role (PP = had the skater
+advantage at the draw, PK = was shorthanded) instead of zone. Two independent indices, not one: a
+team's PP-role win rate and PK-role win rate are computed from disjoint sets of non-EV draws (a team
+can be elite at winning draws while already on the power play and mediocre at winning them while
+shorthanded, or vice versa), same "not each other's mirror image" discipline as OZ vs DZ.
+`engine.py`'s strength-state block prefers the role-specific index that matches EACH SIDE'S actual
+role in that segment (the PP-side team's PP-role index, the PK-side team's PK-role index) over the
+general OZ->EV->blend chain, one additional tier ahead of it, not a replacement -- a missing role
+index for either side falls through to the SAME chain the mechanism shipped with, unchanged.
+
 NEUTRAL-ZONE WIN INDEX (`compute_team_faceoff_nz_index`), added in a fourth pass -- BUILT BUT
 DELIBERATELY NOT WIRED, on the basis of a real measurement, not a judgment call. Unlike OZ (a
 refinement of the EV/blend consumption point) or DZ (a clear dual offense/defense causal story),
@@ -399,6 +417,189 @@ def compute_team_faceoff_dz_index(records: Sequence[GameFaceoffZoneRecord]) -> D
         out[team] = TeamFaceoffDzIndex(
             team=team, index=index, games=games,
             dz_wins=row["dz_wins"], dz_total=row["dz_total"],
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Strength-state-role-specific (PP-role / PK-role) win index -- see the module docstring's
+# fifth section for why this is a SEPARATE per-team signal from the general OZ/EV/blend chain
+# the strength-state mechanism (§2x) originally shipped with.
+# ---------------------------------------------------------------------------
+
+_ROLES = ("PP", "PK")
+_ROLE_FLIP = {"PP": "PK", "PK": "PP"}
+
+
+def _empty_role_counts() -> Dict[str, int]:
+    return {r: 0 for r in _ROLES}
+
+
+@dataclass(frozen=True)
+class GameFaceoffRoleRecord:
+    """One finished game's STRENGTH-STATE (non-EV) faceoff counts, split by each team's OWN
+    role at the moment of the draw (`"PP"` = had the skater advantage, `"PK"` = was shorthanded),
+    from EACH team's OWN perspective -- `home_role_*`/`away_role_*` are not mirror images of a
+    single shared frame, same convention as `GameFaceoffZoneRecord`'s zone-flip."""
+
+    game_id: str
+    home_abbr: str
+    away_abbr: str
+    home_role_wins: Dict[str, int] = field(default_factory=_empty_role_counts)
+    home_role_total: Dict[str, int] = field(default_factory=_empty_role_counts)
+    away_role_wins: Dict[str, int] = field(default_factory=_empty_role_counts)
+    away_role_total: Dict[str, int] = field(default_factory=_empty_role_counts)
+
+
+def parse_playbyplay_faceoffs_by_role(payload: Dict) -> Optional[GameFaceoffRoleRecord]:
+    """Parse one `playbyplay` payload into a :class:`GameFaceoffRoleRecord`, NON-EV (PP/PK)
+    faceoffs only, split by each team's OWN role. Returns `None` under the same conditions as
+    :func:`parse_playbyplay_faceoffs_ev` -- never raises. A draw whose `situationCode` is EV (or
+    malformed) is skipped entirely -- this index is non-EV only, the mirror-image population of
+    `parse_playbyplay_faceoffs_ev`."""
+    if not isinstance(payload, dict):
+        return None
+    home_team = payload.get("homeTeam") or {}
+    away_team = payload.get("awayTeam") or {}
+    home_id = home_team.get("id")
+    away_id = away_team.get("id")
+    home_abbr = str(home_team.get("abbrev") or "").upper()
+    away_abbr = str(away_team.get("abbrev") or "").upper()
+    if home_id is None or away_id is None or not home_abbr or not away_abbr:
+        return None
+    plays = payload.get("plays")
+    if not isinstance(plays, list):
+        return None
+
+    home_wins, home_total = _empty_role_counts(), _empty_role_counts()
+    away_wins, away_total = _empty_role_counts(), _empty_role_counts()
+
+    for play in plays:
+        if not isinstance(play, dict) or play.get("typeDescKey") != "faceoff":
+            continue
+        skaters = _skaters_from_situation_code(play.get("situationCode"))
+        if skaters is None or skaters[0] == skaters[1]:
+            continue  # EV or malformed code -- skip, this index is non-EV only
+        away_sk, home_sk = skaters
+        home_has_advantage = home_sk > away_sk
+        details = play.get("details") or {}
+        owner = details.get("eventOwnerTeamId")
+        if owner == home_id:
+            winner_role = "PP" if home_has_advantage else "PK"
+            home_wins[winner_role] += 1
+            home_total[winner_role] += 1
+            away_total[_ROLE_FLIP[winner_role]] += 1  # away lost it; role flips to their own frame
+        elif owner == away_id:
+            winner_role = "PP" if not home_has_advantage else "PK"
+            away_wins[winner_role] += 1
+            away_total[winner_role] += 1
+            home_total[_ROLE_FLIP[winner_role]] += 1
+        # else: owner unresolved -- skip rather than misattribute (neither side's counts move)
+
+    return GameFaceoffRoleRecord(
+        game_id=str(payload.get("id") or ""),
+        home_abbr=home_abbr, away_abbr=away_abbr,
+        home_role_wins=home_wins, home_role_total=home_total,
+        away_role_wins=away_wins, away_role_total=away_total,
+    )
+
+
+MIN_GAMES_FOR_FACEOFF_ROLE_INDEX = 10
+DEFAULT_FACEOFF_PP_ROLE_INDEX = 1.0
+DEFAULT_FACEOFF_PK_ROLE_INDEX = 1.0
+
+
+@dataclass(frozen=True)
+class TeamFaceoffPpRoleIndex:
+    """Per-team win-rate tendency SPECIFICALLY on draws where this team already had the skater
+    advantage (PP-role), normalized against the league-wide PP-role win rate -- 1.0 = league
+    average. Disjoint population from :class:`TeamFaceoffPkRoleIndex` -- not each other's mirror
+    image, same discipline as OZ vs DZ."""
+
+    team: str
+    index: float
+    games: int
+    pp_role_wins: int
+    pp_role_total: int
+
+
+def compute_team_faceoff_pp_role_index(records: Sequence[GameFaceoffRoleRecord]) -> Dict[str, TeamFaceoffPpRoleIndex]:
+    acc: Dict[str, Dict[str, int]] = {}
+
+    def _touch(team: str) -> Dict[str, int]:
+        return acc.setdefault(team, {"games": 0, "pp_role_wins": 0, "pp_role_total": 0})
+
+    for r in records:
+        h = _touch(r.home_abbr)
+        a = _touch(r.away_abbr)
+        h["games"] += 1
+        a["games"] += 1
+        h["pp_role_wins"] += r.home_role_wins["PP"]
+        h["pp_role_total"] += r.home_role_total["PP"]
+        a["pp_role_wins"] += r.away_role_wins["PP"]
+        a["pp_role_total"] += r.away_role_total["PP"]
+
+    league_wins = sum(v["pp_role_wins"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX)
+    league_total = sum(v["pp_role_total"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX)
+    league_rate = _safe_div(league_wins, league_total)
+
+    out: Dict[str, TeamFaceoffPpRoleIndex] = {}
+    for team, row in acc.items():
+        games = row["games"]
+        index = DEFAULT_FACEOFF_PP_ROLE_INDEX
+        if games >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX and league_rate > 0:
+            team_rate = _safe_div(row["pp_role_wins"], row["pp_role_total"])
+            index = round(team_rate / league_rate, 4)
+        out[team] = TeamFaceoffPpRoleIndex(
+            team=team, index=index, games=games,
+            pp_role_wins=row["pp_role_wins"], pp_role_total=row["pp_role_total"],
+        )
+    return out
+
+
+@dataclass(frozen=True)
+class TeamFaceoffPkRoleIndex:
+    """Per-team win-rate tendency SPECIFICALLY on draws where this team was already shorthanded
+    (PK-role), normalized against the league-wide PK-role win rate -- 1.0 = league average.
+    Disjoint population from :class:`TeamFaceoffPpRoleIndex`."""
+
+    team: str
+    index: float
+    games: int
+    pk_role_wins: int
+    pk_role_total: int
+
+
+def compute_team_faceoff_pk_role_index(records: Sequence[GameFaceoffRoleRecord]) -> Dict[str, TeamFaceoffPkRoleIndex]:
+    acc: Dict[str, Dict[str, int]] = {}
+
+    def _touch(team: str) -> Dict[str, int]:
+        return acc.setdefault(team, {"games": 0, "pk_role_wins": 0, "pk_role_total": 0})
+
+    for r in records:
+        h = _touch(r.home_abbr)
+        a = _touch(r.away_abbr)
+        h["games"] += 1
+        a["games"] += 1
+        h["pk_role_wins"] += r.home_role_wins["PK"]
+        h["pk_role_total"] += r.home_role_total["PK"]
+        a["pk_role_wins"] += r.away_role_wins["PK"]
+        a["pk_role_total"] += r.away_role_total["PK"]
+
+    league_wins = sum(v["pk_role_wins"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX)
+    league_total = sum(v["pk_role_total"] for v in acc.values() if v["games"] >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX)
+    league_rate = _safe_div(league_wins, league_total)
+
+    out: Dict[str, TeamFaceoffPkRoleIndex] = {}
+    for team, row in acc.items():
+        games = row["games"]
+        index = DEFAULT_FACEOFF_PK_ROLE_INDEX
+        if games >= MIN_GAMES_FOR_FACEOFF_ROLE_INDEX and league_rate > 0:
+            team_rate = _safe_div(row["pk_role_wins"], row["pk_role_total"])
+            index = round(team_rate / league_rate, 4)
+        out[team] = TeamFaceoffPkRoleIndex(
+            team=team, index=index, games=games,
+            pk_role_wins=row["pk_role_wins"], pk_role_total=row["pk_role_total"],
         )
     return out
 

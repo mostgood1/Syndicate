@@ -1423,6 +1423,28 @@ dropped from +4.478% to **+0.203%**). 31 new decay-curve tests (99 total), 7
 new segment-effect tests (24 total), 3 new engine tests, checklist and full
 suite re-confirmed unaffected.
 
+**Addendum, same day: closed strength-state's own stated limitation with a real per-team
+PP/PK-role win-rate index built** (reference doc §2y, full report
+`docs/reports/hockeysim_faceoff_strength_state_role_index_report.md`). `faceoff_pp_role_index`/
+`faceoff_pk_role_index` use the SAME zero-sum winner/loser-attribution technique as the zone
+indices, split on the WINNER's own strength-state role instead of zone -- real, self-verifying
+(mean index ~1.0002 on both), disjoint populations (~30-45% top-to-bottom spread; a team can rank
+very differently on PP-role vs PK-role). `_resolve_strength_state_faceoff_pct` sits one tier
+ahead of the existing OZ->EV->blend chain, preferring each side's own role-matching index when
+present, no new `SimConfig` flag needed (refines an existing consumption point). **A real trap
+caught in this piece's own first reachability-test draft**: home/away-symmetric role-index
+magnitudes produced an EXACTLY identical mean output whether the index was present or absent
+(62.500 == 62.500 to 3 decimals) -- a fixture flaw, not a wiring bug: matched magnitudes put the
+win probability back at exactly 0.5 in both configurations by construction. Rebuilt asymmetric,
+which DID move the mean but by less than a coarse 120-seed comparison could reliably distinguish
+from noise -- an expected consequence of the strength-state mechanism's own exact-normalization
+design (`E[applied_mult]=1.0` for ANY win probability), not a bug. Final reachability test
+compares exact per-seed total-shot vectors instead, a noise-free proof. Verified: 15 new
+parser/index unit tests, 1 new loader test, 6 new engine tests, 519 hockeysim/nhl tests pass
+overall (up from 497), checklist full PASS with both new keys AST-derived. **Round-robin**:
+-0.131% (992 pairings, real production data), noise-level, consistent with the mean-invariance
+property above, not evidence the mechanism has no real effect.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable
