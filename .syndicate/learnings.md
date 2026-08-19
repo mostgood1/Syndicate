@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 419 rules `[generated]`
+## Index — 420 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1334,3 +1334,33 @@ in this session.
 the originals: break the thing deliberately and confirm exit 2, then repair it
 and confirm exit 0. Both halves. A guard verified only on the failing case can
 still block everything; verified only on the passing case it can be inert.
+
+## 2026-08-19 — RULE: a threshold raise buys HEADROOM ÷ GROWTH RATE. Compute it, or you are choosing a fix you have not measured.
+
+- The rule going forward: **before raising a limit instead of fixing what fills
+  it, divide the new headroom by the observed growth rate and say the answer out
+  loud in hours.** If that number is smaller than the interval between the people
+  who would act on it, the raise is not a fix, it is a snooze — and it costs the
+  credibility of the threshold as well as the time.
+
+**MEASURED, on the same evening, twice.** `state.md`'s cap was raised
+60,000 → 180,000 with a careful argument that the old figure had stopped being a
+threshold (it fired continuously through two full collapses). That argument was
+right. What was never computed was the other half: headroom at the moment of the
+raise was ~13 KB against an observed ~2.5 KB/hour under concurrent sessions —
+**about five hours.** The file breached the new cap the same evening and needed a
+third collapse. The arithmetic was available before the decision and would have
+predicted the outcome exactly.
+
+**THE ASYMMETRY WORTH REMEMBERING.** A raise is cheap to make and expensive to
+un-make: the number now carries an implicit claim that someone measured it, and
+the next person to find the file over budget inherits both the file and the
+question of whether the limit means anything. Raising twice in a night would have
+destroyed the signal entirely, which is why the second event was answered with a
+collapse instead.
+
+**WHERE IT DOES NOT APPLY:** when the thing filling the limit has a MECHANICAL
+reclaim, the growth-rate calculation is about scheduling a tool, not about the
+limit. `lanes.md` and `learnings.md` both have one and both sit comfortably under
+cap. `state.md` has none — its growth is live prose getting longer — which is
+exactly why raising its limit was the tempting move and the wrong one.
