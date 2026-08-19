@@ -113,6 +113,23 @@ def test_disclaimer_bullet_is_still_skipped(guard):
     assert "syndicate/features/shared/theirs.py" not in got
 
 
+def test_read_only_reference_disclaimer_is_skipped(guard):
+    """Measured live 2026-08-19: `nfl-player-props-calibration-fix` wrote
+    "Read-only reference: `docs/ai_context/todo.md`" -- an explicit disclaimer,
+    phrased differently from the already-recognized "Read-only dependency:" --
+    and it was read as a genuine claim, blocking `nhl-model-owner` from
+    editing `todo.md`, a file every lane edits as a shared append-only
+    ledger."""
+    text = """\
+### demo-lane — OPEN — opened 2026-08-19 — session: demo
+- Files: `syndicate/features/shared/mine.py`
+- Read-only reference: `docs/ai_context/todo.md`
+"""
+    got = {p for _, p in claims(guard, text)}
+    assert "syndicate/features/shared/mine.py" in got
+    assert "docs/ai_context/todo.md" not in got
+
+
 def test_the_real_ledger_parses_and_claims_something(guard):
     """A parser change that silently returned nothing would pass every unit test
     above while unguarding the entire repo."""

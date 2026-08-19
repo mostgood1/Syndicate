@@ -86,10 +86,20 @@ PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 # whose named would-be claimants were both already closed. "not touch" is a
 # substring of the existing "not touched", so it subsumes that entry (covers
 # both tenses) without changing where either function looks for it.
+#
+# "read-only reference" was ALSO MISSING. Measured 2026-08-19:
+# `nfl-player-props-calibration-fix` wrote "Read-only reference:
+# `docs/ai_context/todo.md`" -- an explicit disclaimer, phrased differently
+# from the already-recognized "Read-only dependency:" -- and neither
+# `_is_disclaimer` nor `_claimable_prefix` recognized it, so the path read as
+# a genuine claim. That blocked `nhl-model-owner` from editing `todo.md`, a
+# file every lane in this repo edits constantly as a shared append-only
+# ledger.
 _DISCLAIMER_MARKERS = (
     "not claimed",
     "collision check",
     "read-only dependency",
+    "read-only reference",
     "not touched",
     "not touch",
     "held by",
