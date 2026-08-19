@@ -1337,6 +1337,48 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   `reports/nfl_yardage_blend_stability_check.json`.
 - Blocked by: none.
 
+### nfl-tds-interceptions-blend-stability — OPEN — opened 2026-08-19 — session: nfl-tds-interceptions-blend-stability
+- Goal: `passing_tds` and `interceptions` are the two markets
+  `nfl-player-props-skew-fix` shipped at `w=0` (Normal-only, no log-normal
+  blend at all) because their ONE-WAY test (weight fit on 2022-2023,
+  applied to 2024-2025) showed a small NEGATIVE improvement
+  (-0.000862/-0.000164 Brier). That test used the fit-half's exact
+  optimal weight (0.3155/0.1327) — the same shape of test that, for
+  `passing_attempts`, turned out to rest on an unstable estimate. This
+  checks whether `passing_tds`/`interceptions` are genuinely uncorrectable
+  (both halves' independent optima disagree/are near zero, confirming
+  `w=0` was right) or whether a MORE CONSERVATIVE weight (chosen the same
+  way the stable yardage markets validated) would have generalized where
+  the fit-half's specific number didn't.
+- Files:
+  - `syndicate/features/nfl/props.py` — `_COVER_PROBABILITY_BLEND_WEIGHT`'s
+    `passing_tds`/`interceptions` entries, ONLY if this finds a real,
+    stable, POSITIVE reason to move them off `0`.
+  - Read-only: `scripts/check_nfl_blend_weight_stability.py` (reused
+    as-is, no new script needed — already takes `--stats`),
+    `scripts/calibrate_nfl_cover_probability_blend.py`,
+    `scripts/backtest_nfl_props.py`,
+    `reports/nfl_cover_probability_blend_calibration.json`.
+- Hypothesis: BOTH markets stay unstable or near-zero on the independent
+  half too — `interceptions` in particular already showed NO measured
+  point-accuracy skill at all in `#471`'s original backtest (corr 0.045),
+  so there is little reason to expect a rare, hard-to-predict event like
+  turnovers to suddenly reveal a stable distributional-shape correction
+  that a real-skill market like `rushing_yards` needed. Held loosely.
+- Falsification test: if either market's independent half (2024-2025)
+  produces an optimal weight that (a) shares the fit half's sign
+  (positive) AND (b) sits within the same 2.0x ratio threshold the
+  yardage markets were judged against, that is real, stable, POSITIVE
+  evidence a correction should ship after all — contradicting the
+  original `w=0` decision, and the shipped weight should move to the
+  conservative (minimum-magnitude) estimate, verified by an actual Brier
+  comparison before shipping, not shipped on the stability finding alone.
+- Verification: both halves' independently-computed optimal weights
+  stated side by side, explicit stable/unstable verdict per market, and —
+  only if stable and positive — a Brier check at the proposed weight
+  before any code change.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
