@@ -16019,12 +16019,33 @@ artifacts at all.
 01:36:29Z) while `3d945f04` was created 01:39:06Z. **Fired is not landed**, and
 the verification below has NOT been taken by me.
 
-**verify, in two halves:**
-1. `season_artifacts_pulled=N` (N>=1) in a sim tick log. **Arrives WITHOUT a
-   rebuild** — `pull_season_artifacts` runs before the build subprocess. This
-   alone proves the deploy took effect.
-2. `conditional_arsenal` > 0%, source `statcast_conditional_mix`, via
-   `sim_input_checklist.py --publish`. **NEEDS A ROSTER REBUILD.**
+**verify — CORRECTED 2026-08-19. The original half of this was UNUSABLE.**
+
+I wrote "`season_artifacts_pulled=N` in a sim tick log" and then watched Render's
+log API for it for twenty minutes. **It can never appear there.**
+`live_refresh_loop.py:2784-2790` spawns the sim job with
+`popen_kwargs["stdout"] = open(log_path, "wb")` — every line the wrapper prints
+goes to a FILE on the worker's disk, not to the container stdout Render collects.
+**The absence proved nothing; I was watching a channel the line cannot reach.**
+
+(`learnings.md` already says "absent signal != absent path". I verified the log
+QUERY was sound — `text=` filter checked against four strings from the unfiltered
+feed — and never checked the CHANNEL. A correct instrument aimed at the wrong pipe.)
+
+**The only signal with a path OFF the worker is the published checklist report:**
+
+    sim_input_checklist.py --publish   ->   sim_input_report_*.json
+    PASS = `conditional_arsenal` > 0% AND source = `statcast_conditional_mix`
+
+That artifact is allowlisted, so it reaches web and can be read remotely. **It
+NEEDS A ROSTER REBUILD** (`SYNDICATE_MLB_ROSTER_REBUILD_DATE`, shipped in
+`6966753e`), because `--use-roster-artifacts` defaults to reuse.
+
+**Full chain, no shortcut through the logs:** deploy the gate -> set the date var
+-> rebuild -> publish the report -> read the population.
+
+`season_artifacts_pulled` is still worth reading, but ONLY from the on-disk sim
+log via an ops endpoint that tails it — no such endpoint exists today.
 
 **THE REBUILD TRIGGER DOES NOT EXIST — measured, not assumed.**
 `run_mlb_daily_sim_job.py:235` builds a hardcoded command of eleven flags and

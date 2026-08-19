@@ -80,7 +80,19 @@ already exist — the build that would read it never runs.
 
    Cheapest alternative, no env change: `roster_objs/` are per-date, so the
    **first sim on a NEW DATE rebuilds for free.**
-3. run `sim_input_checklist.py --publish` and confirm the field left the FAIL list;
+3. run `sim_input_checklist.py --publish` and confirm the field left the FAIL list.
+
+   **THIS IS THE ONLY VERIFICATION WITH A PATH OFF THE WORKER, and that is not a
+   style preference.** The sim job is spawned with its stdout redirected to a
+   FILE — `live_refresh_loop.py:2784-2790` sets
+   `popen_kwargs["stdout"] = open(log_path, "wb")` — so **nothing the job prints
+   reaches Render's log collector.** On 2026-08-19 I spent twenty minutes
+   watching the logs API for a line the wrapper prints on every run; it can never
+   appear there. Verifying an input by grepping Render logs for a sim-job print
+   is checking a channel the line cannot reach, and it will always look like
+   failure. The checklist REPORT is allowlisted and published, so it is readable
+   remotely; the on-disk sim log is not, absent an ops endpoint that tails it.
+   No such endpoint exists today;
 4. only then measure effect.
 
 Skipping (2) produces a confident "shipped" followed by a flat measurement.
