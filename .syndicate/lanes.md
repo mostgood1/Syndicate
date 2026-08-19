@@ -1393,7 +1393,7 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   `reports/nfl_tds_interceptions_blend_stability_check.json`.
 - Blocked by: none.
 
-### nfl-anytime-td-shrinkage-stability — OPEN — opened 2026-08-19 — session: nfl-anytime-td-shrinkage-stability
+### nfl-anytime-td-shrinkage-stability — CLOSED-VERIFIED 2026-08-19 — CONFIRMED stable, PERFECT match: both halves independently select k=12.0 exactly (ratio 1.00x). No code change. `5f39c9a3` on `origin/main`. — session: nfl-anytime-td-shrinkage-stability
 - Goal: `#471`'s `anytime_td` fix shipped `ANYTIME_TD_SHRINKAGE_K = 12.0`,
   selected by grid search (candidates 0-30) on 2022-2023, reported (never
   re-selected) on 2024-2025 -- a genuine one-way OOS test, but the SAME
@@ -1434,6 +1434,17 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   side, plus each half's OWN sweep curve (to judge how sharp/flat the
   minimum is, not just the single argmin), and an explicit stable/
   unstable verdict.
+- **RAN. Hypothesis CONFIRMED, more strongly than expected — a PERFECT
+  match.** `scripts/check_anytime_td_shrinkage_k_stability.py`: half A
+  (2022-2023, n=8527) best k=**12.0** (Brier 0.160576); half B
+  (2024-2025, n=8464) best k=**12.0** (Brier 0.167974) — **ratio 1.00x,
+  the exact same integer selected independently on two fully separate
+  multi-season samples.** Curve is also reasonably flat near the minimum
+  in both halves (k=8-30 within 1% of best for half A, k=8-20 for half
+  B), so the constant is neither a fragile single-point read nor an
+  accident of the split. **No code change made.**
+  `ANYTIME_TD_SHRINKAGE_K` stays at `12.0`. Report:
+  `reports/nfl_anytime_td_shrinkage_k_stability_check.json`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

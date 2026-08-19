@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-08-19 — ANYTIME_TD SHRINKAGE k=12.0: STABILITY CHECKED, PERFECT MATCH — lane `nfl-anytime-td-shrinkage-stability`
+
+**NO DEPLOY. Local analysis only** (new script + report, `5f39c9a3` on
+`origin/main`). No production code changed.
+
+`#471`'s `anytime_td` fix shipped `ANYTIME_TD_SHRINKAGE_K = 12.0`,
+selected by grid search on 2022-2023, reported (not re-selected) on
+2024-2025. Checked whether that argmin replicates by running the SAME
+grid search INDEPENDENTLY on 2024-2025 — no closed form exists for this
+one (the `(n+k)` denominator makes Brier a rational, not quadratic,
+function of `k`, unlike the blend weights), so this reuses the existing
+grid-search machinery rather than inventing a new method.
+
+    half A (2022-2023, n=8527): best k = 12.0  (Brier 0.160576)
+    half B (2024-2025, n=8464): best k = 12.0  (Brier 0.167974)
+    ratio: 1.00x
+
+**Both halves select the EXACT SAME integer.** The cleanest possible
+outcome — stronger even than `rushing_yards`' 1.00x blend-weight match,
+since this is a full grid search landing on identical points, not just a
+close ratio between two continuous optima. The curve is also reasonably
+flat near the minimum in both halves (k=8-30 and k=8-20 within 1% of
+best), so the constant is neither fragile nor an artifact of one split.
+
+**No code change made.** `ANYTIME_TD_SHRINKAGE_K` stays at `12.0`.
+
+**This completes the full stability audit of every tuned NFL prop
+calibration constant from `#471`**: 5 blend weights + 1 shrinkage
+constant, all individually checked against genuinely independent data.
+Confirmed stable: `rushing_yards`, `receiving_yards`, `anytime_td` k.
+Correctly left unstable/at their safe value: `passing_attempts` (capped
+at boundary), `passing_tds`, `interceptions` (both `w=0`).
+
+Verify: `scripts/check_anytime_td_shrinkage_k_stability.py`,
+`reports/nfl_anytime_td_shrinkage_k_stability_check.json`.
+
+---
+
 ## 2026-08-19 — PASSING_TDS + INTERCEPTIONS BLEND WEIGHTS: STABILITY CHECKED, w=0 CONFIRMED CORRECT — lane `nfl-tds-interceptions-blend-stability`
 
 **NO DEPLOY. Local analysis only** (new report, `284d4436` on
