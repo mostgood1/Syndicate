@@ -229,3 +229,29 @@ def test_a_disclaimer_about_the_guards_own_prior_enforcement_is_not_a_counter_cl
 """
     got = {p for _, p in claims(guard, text)}
     assert "scripts/refresh_wnba_oddsapi_props.py" not in got
+
+
+def test_a_claim_release_note_written_marker_first_is_not_a_counter_claim(guard):
+    """2026-08-19, the real incident, found while fixing the "not taken" one
+    above. `soccer-odds-capture-cadence-gap` released `basketball-model-
+    owner`'s completed-but-unclosed claim on `artifact_publisher.py` (that
+    lane's own header already said "no further action identified as ready")
+    and recorded the release inside `basketball-model-owner`'s OWN Files
+    block. **First attempt put the path BEFORE the marker** ("`path` claim
+    RELEASED...") and still failed even after "released" was added to
+    `_DISCLAIMER_MARKERS` -- `_claimable_prefix` cuts a line AT the marker
+    and keeps everything BEFORE it, so a marker that comes AFTER the path
+    protects nothing. Every existing marker in this file works because it
+    PRECEDES the path ("NOT claimed: `path`", "BLOCKED, not taken: `path`").
+    This is the correct, marker-first phrasing.
+    """
+    text = """\
+### basketball-model-owner — OPEN — opened 2026-08-18 — session: basketball-model-owner
+- Files: scripts/basketball_sim_input_checklist.py (new).
+  **RELEASED, no longer claimed: `syndicate/features/shared/artifact_publisher.py`**
+  -- released 2026-08-19 by `soccer-odds-capture-cadence-gap`, not this
+  session. `#462`/`#471`'s own additions are SHIPPED and this lane's own
+  header already says "no further action identified as ready" here.
+"""
+    got = {p for _, p in claims(guard, text)}
+    assert "syndicate/features/shared/artifact_publisher.py" not in got

@@ -110,6 +110,20 @@ PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 # failure shape, not a repeat of the first two: those were disclaimers about a
 # file the writer never touched; this one is a disclaimer ABOUT THIS HOOK'S
 # OWN PRIOR ENFORCEMENT, and it still needs the same fix.
+#
+# "released"/"claim released" was ALSO MISSING -- the fourth instance,
+# measured 2026-08-19 while FIXING the third. `soccer-odds-capture-cadence-
+# gap` released `basketball-model-owner`'s completed-but-unclosed claim on
+# `artifact_publisher.py` (their own header already said "no further action
+# identified as ready") and wrote "**`syndicate/features/shared/
+# artifact_publisher.py` claim RELEASED 2026-08-19 by `soccer-odds-capture-
+# cadence-gap`**..." into THEIR Files block as the release note. "released"
+# was not a recognized marker, so that sentence's own path mention re-read as
+# a claim under the still-OPEN `basketball-model-owner` header -- and blocked
+# the very session that had just released it, in its own worktree, on the
+# very next edit. Same shape as "not taken": a disclaimer about this hook's
+# own prior state (here, a claim transfer) needs the same fix as a
+# disclaimer about a file never touched.
 _DISCLAIMER_MARKERS = (
     "not claimed",
     "collision check",
@@ -118,6 +132,7 @@ _DISCLAIMER_MARKERS = (
     "not touched",
     "not touch",
     "not taken",
+    "released",
     "held by",
     "claimed by",
     "ownership checked",
