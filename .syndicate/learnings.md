@@ -1229,3 +1229,32 @@ over what actually produced it.
 **WHAT SURVIVES**: `grade_nhl_predictions_vs_market.py`'s docstring now states
 the verified meaning explicitly, with the confirming evidence, so the next
 reader doesn't have to re-derive it from the name a second time.
+
+## 2026-08-19 — VERIFY WHAT THE THING YOU CHANGED *DEPENDS ON*
+
+I added a hook that shells out to `scripts/sim_input_checklist.py`, deployed it,
+and confirmed **twice, by content** that the hook was in the live SHA. **The
+script it calls was never on that worker.** My earlier graft shipped the
+`sim_engine` tree, `artifact_publisher.py` and the sim job — and not the
+checklist. Every invocation was `FileNotFoundError`, swallowed by the hook's own
+`except` and printed into a truncated log tail.
+
+**RULE: verifying the code you wrote is present is HALF a check. Verify its
+inputs, its callees and its data exist in the same environment.** "Is my change
+live?" and "can my change do anything?" are different questions, and I answered
+the first one twice while never asking the second.
+
+**Corollary, and it cost an hour: DO NOT DIAGNOSE DEFECT 2 BEFORE CONFIRMING
+DEFECT 1.** I found a genuine root-resolution bug in that script (it read from
+`REPO/data` while writing to `SYNDICATE_DATA_ROOT`) and fixed it carefully —
+while it sat downstream of a file that did not exist. The fix was correct and
+irrelevant. **When a component appears broken, first establish that it RAN.**
+
+**The same session's fifth instance of one habit** — see
+[[verify-the-channel-not-just-the-query]] and
+[[a-truncated-reading-is-not-a-complete-one]]. Each time: I checked the thing in
+front of me, found it sound, and stopped one dependency short.
+
+**What finally worked:** extracting the deploy TREE and executing the script
+inside it — imports resolved, ran to a clean diagnosis. Not the working copy, not
+the diff: **the artifact that will actually run.**
