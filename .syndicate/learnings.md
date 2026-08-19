@@ -1732,3 +1732,41 @@ delegating to the same functions. One definition, both harnesses. Adding a new
 autouse fixture to `conftest.py` alone is fine ONLY for modules that no
 workflow invokes through `unittest`; check `ci.yml` and `daily-update.yml`
 before assuming that.
+
+## "We don't capture that" is a claim about NAMES until you check the CACHES `[2026-08-19]`
+
+**What we believed:** two of the four smart-sim calibration artifacts
+(`intervals_band_calibration`, `intervals_time_profile`) could not be built
+because they need per-3-minute-segment actual scoring, and "Syndicate
+captures final box lines and quarter totals, not intra-quarter segment
+scoring". Reported as `actuals_unavailable` and deferred as separate work
+requiring a new play-by-play capture pipeline.
+
+**What was actually true:** the actuals were already on disk. ESPN's summary
+endpoint returns a `plays` array (~380 plays/game) carrying `period.number`,
+`clock.displayValue`, and the RUNNING `homeScore`/`awayScore` — and
+`_espn_summary_local` already fetches and CACHES that payload for every game
+the boxscore bootstrap touches. 113 of 114 locally-cached summaries were
+usable immediately. Differencing the running score across plays yields exact
+per-segment scoring; verified on a real game where the 16 derived segments
+summed to 179 against a final score of 179.
+
+**How we found out:** the user declined the deferral and said "find
+actuals". The search that followed was not clever — it was grepping for
+play-by-play in the repo (which surfaced an entire existing
+`game-shape-capture` lane), then listing the ESPN cache directory, then
+opening one cached file and reading its top-level keys. Every one of those
+steps was available before the wrong conclusion was published.
+
+**The rule going forward:** an artifact that does not exist under its own
+name is not the same as data that does not exist. Before concluding a
+derived input cannot be built, enumerate what the pipeline already FETCHES
+and CACHES — raw upstream payloads (`_espn_cache/**`, vendor caches, raw/
+snapshots) routinely carry far more than the narrow field the consumer
+extracted from them. Grep for the concept, list the cache directories, and
+open one file. "We don't capture that" is a statement about the
+transformation layer; the raw payload usually captured it anyway.
+
+**Cost:** one wrong deferral published in a commit message and a lane block,
+retracted the same session. The fix, once the data was found, was a single
+builder script and no new capture infrastructure at all.
