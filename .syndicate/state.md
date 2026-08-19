@@ -95,6 +95,26 @@ That story ended; do not re-open it from the archive.**
   No `render.yaml` change was made and none is owed; the file still says
   `plan: pro` at line 272 and that is CORRECT.
 
+- **2026-08-18 — RAISE THIS FILE'S SIZE CAP, DO NOT COLLAPSE IT AGAIN.**
+  `session-start.sh`'s bloat threshold for `state.md` goes **60,000 → 180,000**
+  (40 keyed subjects × ~4,500 B, so it tracks the subject count rather than
+  today's byte count). Asked directly, with the numbers: the file had been
+  collapsed **twice in ten days** — 2026-08-15 and 2026-08-18, both archived
+  verbatim — and was back to **2.77×** the same evening. Options put were
+  archive-and-rewrite all 40 sections, raise the cap, or have each subject's
+  owner collapse their own. **Chosen: raise the cap.**
+  The measurement that decided it: only **923 B of 163,412** is self-declared
+  archival; the remaining 40 sections are live current-truth carrying just
+  8–19% dated measurement lines. There is nothing mechanical to reclaim, so a
+  non-owner "collapse" means deciding which of someone else's measured numbers
+  stop mattering. `lanes.md` (2.12× → 0.93×) and `learnings.md` (2.07× → 0.91×)
+  were both brought under cap the same evening by MOVING blocks, which is
+  verifiable; this file has no equivalent operation.
+  Consequence to hold onto: **size was always a proxy here.** The failure it
+  stood in for — stacked contradictory sections — is caught directly by
+  `state_key_check.py`, which still runs. Exceeding 180,000 is a signal to
+  collapse BY OWNER, not to raise again.
+
 Product decisions, not engineering ones. Do not re-take them.
 
 1. **The LLM is NOT meant to be on.** `ANTHROPIC_API_KEY` stays absent. The
