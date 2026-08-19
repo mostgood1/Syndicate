@@ -12,6 +12,7 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
     HockeyGameFeatures,
     HockeyPlayerFeatures,
     HockeyTeamFeatures,
+    TeamRates,
     build_prop_projections,
 )
 
@@ -155,12 +156,13 @@ class HockeySimPropsTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Team rates (`shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`) --
-# `docs/ai_context/hockeysim_engine_reference.md` §2j. `shots_per_60`/`faceoff_win_pct` are
-# CONSUMED all the way through `engine.py`'s shot-volume lambda; `blocks_per_60`/`penalties_per_60`
-# are CONSUMED only as far as `TeamRates` construction (`player_props._team_rates`) and then never
-# read by `engine.py` at all -- a genuine dead gate, the same shape as basketball's `#467`. These
-# tests prove BOTH the reachable and the unreachable cases with real assertions, not code-reading.
+# Team rates (`shots_per_60`/`faceoff_win_pct`) -- `docs/ai_context/hockeysim_engine_reference.md`
+# §2j. Both are CONSUMED all the way through `engine.py`'s shot-volume lambda, proven below.
+# `blocks_per_60`/`penalties_per_60` were CONSUMED only as far as `TeamRates` construction
+# (`player_props._team_rates`) and never read by `engine.py` at all -- a genuine dead gate, the
+# same shape as basketball's `#467`, proven the same way (a byte-identical-output test) before
+# being REMOVED from both dataclasses entirely (§2l). The regression tests below guard against
+# either field quietly coming back without a real consumer.
 # ---------------------------------------------------------------------------
 
 
@@ -197,31 +199,21 @@ class TeamRatesReachabilityTest(unittest.TestCase):
         self.assertGreater(strong_sog, weak_sog,
                             "HOME winning more faceoffs should raise its own shot volume")
 
-    def test_blocks_per_60_is_a_dead_gate_not_reachable(self) -> None:
-        """`blocks_per_60` reaches `TeamRates` (`player_props._team_rates`) but `engine.py` never
-        reads `rates.home.blocks_per_60`/`rates.away.blocks_per_60` -- confirmed by grep AND, here,
-        by a deterministic same-seed run: an extreme swing (3.0 -> 60.0) produces a BYTE-IDENTICAL
-        projection set. Real block generation is governed entirely by `special_teams_cal`'s
-        `block_rate_ev`/`pk`/`pp_def` (§2g/§2h), a genuinely different mechanism -- this is NOT a
-        missing wiring step, it is confirmed dead code on `TeamRates.blocks_per_60`."""
-        low = _game_with({"blocks_per_60": 3.0}, {"blocks_per_60": 3.0})
-        high = _game_with({"blocks_per_60": 60.0}, {"blocks_per_60": 60.0})
-        low_projs = build_prop_projections(low, n_sims=40, base_seed=555)
-        high_projs = build_prop_projections(high, n_sims=40, base_seed=555)
-        low_by_key = {(p.player_id, p.market): p.proj for p in low_projs}
-        high_by_key = {(p.player_id, p.market): p.proj for p in high_projs}
-        self.assertEqual(low_by_key, high_by_key)
+    def test_blocks_per_60_field_stays_removed(self) -> None:
+        """`blocks_per_60` was a confirmed dead gate (populated into `TeamRates`, never read by
+        `engine.py` -- proven via a byte-identical-output test before removal) and was deleted from
+        both `HockeyTeamFeatures` and `TeamRates` (§2l) rather than force-wired into a mechanism
+        that would double-count against the already-calibrated `block_rate_*` signal. This regression
+        test fails loudly if the field quietly comes back without a real consumer alongside it."""
+        self.assertNotIn("blocks_per_60", HockeyTeamFeatures.__dataclass_fields__)
+        self.assertNotIn("blocks_per_60", TeamRates.__dataclass_fields__)
 
-    def test_penalties_per_60_is_a_dead_gate_not_reachable(self) -> None:
-        """Same finding as `blocks_per_60` above, for `penalties_per_60` -- no PIM/penalty market
-        or mechanism reads it anywhere in `engine.py`."""
-        low = _game_with({"penalties_per_60": 1.0}, {"penalties_per_60": 1.0})
-        high = _game_with({"penalties_per_60": 12.0}, {"penalties_per_60": 12.0})
-        low_projs = build_prop_projections(low, n_sims=40, base_seed=555)
-        high_projs = build_prop_projections(high, n_sims=40, base_seed=555)
-        low_by_key = {(p.player_id, p.market): p.proj for p in low_projs}
-        high_by_key = {(p.player_id, p.market): p.proj for p in high_projs}
-        self.assertEqual(low_by_key, high_by_key)
+    def test_penalties_per_60_field_stays_removed(self) -> None:
+        """Same finding and same fix as `blocks_per_60` above, for `penalties_per_60` -- no PIM
+        market or mechanism ever read it, and the real penalty-rate signal already drives PP/PK
+        segment generation via `special_teams`'s `committed_per_game`."""
+        self.assertNotIn("penalties_per_60", HockeyTeamFeatures.__dataclass_fields__)
+        self.assertNotIn("penalties_per_60", TeamRates.__dataclass_fields__)
 
 
 if __name__ == "__main__":

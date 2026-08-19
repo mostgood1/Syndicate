@@ -1,5 +1,13 @@
 # hockeysim team rates: `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`
 
+**RESOLVED, follow-up.** This report's own "open decision" (build a real consumption mechanism
+for `blocks_per_60`/`penalties_per_60`, or delete them) is now closed: **both fields were REMOVED
+entirely**, traced through every reference site, after confirming neither could gain a legitimate
+consumer without duplicating already-live real data (`special_teams`'s `committed_per_game` already
+drives PP/PK segment time; block volume is already fully governed by the per-shot `block_rate_*`
+mechanism). Full detail: `docs/ai_context/hockeysim_engine_reference.md` §2l. The rest of this
+report is preserved as-written — an accurate record of the original finding and its evidence.
+
 Closes 4 of `docs/ai_context/hockeysim_engine_reference.md` §5's remaining genuinely-absent
 `HockeyTeamFeatures` fields — but with an important finding stated up front rather than buried:
 **2 of the 4 are populated but confirmed UNREACHABLE — a dead gate, not a wiring fix.**

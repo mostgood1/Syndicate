@@ -36,10 +36,8 @@ def _roster(team: str, base_pid: int) -> list[dict]:
 
 def _rates() -> RateModels:
     return RateModels(
-        home=TeamRates(shots_per_60=31.0, goals_per_60=3.1, blocks_per_60=13.0,
-                       penalties_per_60=3.0, faceoff_win_pct=0.51),
-        away=TeamRates(shots_per_60=29.5, goals_per_60=2.8, blocks_per_60=12.0,
-                       penalties_per_60=3.0, faceoff_win_pct=0.49),
+        home=TeamRates(shots_per_60=31.0, goals_per_60=3.1, faceoff_win_pct=0.51),
+        away=TeamRates(shots_per_60=29.5, goals_per_60=2.8, faceoff_win_pct=0.49),
         player_rates={},
     )
 

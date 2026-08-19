@@ -222,8 +222,10 @@ def apply_projection(
     §CONSUMED+UNPOPULATED). That default is what ``player_props.py``'s ``TeamRates`` -- the boxscore
     /props engine's actual rate input -- reads verbatim, so every team's shot/goal environment for
     SOG, saves, and points props was identical and stale. This does not fix ``shots_per_60`` /
-    ``blocks_per_60`` / ``penalties_per_60`` / ``faceoff_win_pct`` -- those have no equivalent
-    projected value to back-fill from and remain a genuinely absent input, not merely an unfed one.
+    ``faceoff_win_pct`` -- those have no equivalent projected value to back-fill from; both now have
+    real producers instead (`hockeysim_engine_reference.md` §2j). ``blocks_per_60``/``penalties_per_60``
+    were REMOVED from ``HockeyTeamFeatures``/``TeamRates`` entirely (§2l) -- confirmed dead code, not
+    an absent input needing a producer.
     """
     proj = project_game(home, away, profile=profile)
     new_home = replace(home, period_goal_lambdas=proj.period_home_lambdas, goals_per_60=proj.proj_home_goals)

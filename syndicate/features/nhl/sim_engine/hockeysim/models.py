@@ -13,10 +13,12 @@ from typing import Dict, Optional
 class TeamRates:
     shots_per_60: float = 30.0
     goals_per_60: float = 2.9
-    blocks_per_60: float = 12.0
-    penalties_per_60: float = 3.0
     # Pregame team-level faceoff win percentage (0..1). Used as a mild possession/shot-share signal.
     faceoff_win_pct: float = 0.5
+    # `blocks_per_60` / `penalties_per_60` REMOVED (`docs/ai_context/hockeysim_engine_reference.md`
+    # §2l) -- confirmed dead: nothing in `engine.py` ever read either field. Block volume is fully
+    # governed by the truth-calibrated per-shot `block_rate_*` mechanism; penalty rate already
+    # drives PP/PK segment generation via `special_teams`'s `committed_per_game`.
 
 
 @dataclass
@@ -36,6 +38,6 @@ class RateModels:
     @staticmethod
     def baseline(base_mu: float = 3.0) -> "RateModels":
         # Simple baseline: adjust goals per 60 around base_mu; shots approx 30/60
-        home = TeamRates(shots_per_60=31.0, goals_per_60=base_mu, blocks_per_60=12.0, penalties_per_60=3.0)
-        away = TeamRates(shots_per_60=30.0, goals_per_60=base_mu, blocks_per_60=12.0, penalties_per_60=3.0)
+        home = TeamRates(shots_per_60=31.0, goals_per_60=base_mu)
+        away = TeamRates(shots_per_60=30.0, goals_per_60=base_mu)
         return RateModels(home=home, away=away, player_rates={})

@@ -126,10 +126,8 @@ def _simulate_blocks_per_game(
     rng = random.Random(seed)
     teams = sorted(team_st)
     rates = RateModels(
-        home=TeamRates(shots_per_60=30.0, goals_per_60=3.1269, blocks_per_60=12.0,
-                       penalties_per_60=3.0, faceoff_win_pct=0.5),
-        away=TeamRates(shots_per_60=30.0, goals_per_60=3.1269, blocks_per_60=12.0,
-                       penalties_per_60=3.0, faceoff_win_pct=0.5),
+        home=TeamRates(shots_per_60=30.0, goals_per_60=3.1269, faceoff_win_pct=0.5),
+        away=TeamRates(shots_per_60=30.0, goals_per_60=3.1269, faceoff_win_pct=0.5),
         player_rates={},
     )
     cfg = build_nhl_sim_config(overrides={

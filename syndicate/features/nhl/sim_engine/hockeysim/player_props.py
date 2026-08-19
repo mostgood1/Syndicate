@@ -67,11 +67,12 @@ _DEFAULT_PROP_SIMS = 1000
 
 
 def _team_rates(team) -> TeamRates:
+    # `blocks_per_60`/`penalties_per_60` REMOVED from both `HockeyTeamFeatures` and `TeamRates`
+    # (`docs/ai_context/hockeysim_engine_reference.md` §2l) -- confirmed dead code, not merely
+    # unfed; see contracts.py's field-removal comment for why.
     return TeamRates(
         shots_per_60=float(team.shots_per_60),
         goals_per_60=float(team.goals_per_60),
-        blocks_per_60=float(team.blocks_per_60),
-        penalties_per_60=float(team.penalties_per_60),
         faceoff_win_pct=float(team.faceoff_win_pct),
     )
 

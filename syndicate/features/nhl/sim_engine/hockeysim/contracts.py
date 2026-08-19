@@ -22,9 +22,17 @@ class HockeyTeamFeatures:
     # Per-60 rates consumed by the boxscore engine (models.TeamRates).
     shots_per_60: float = 30.0
     goals_per_60: float = 2.9
-    blocks_per_60: float = 12.0
-    penalties_per_60: float = 3.0
     faceoff_win_pct: float = 0.5
+    # `blocks_per_60` / `penalties_per_60` were REMOVED here (`docs/ai_context/
+    # hockeysim_engine_reference.md` §2j/§2l) -- confirmed dead code, not merely
+    # unfed: `engine.py` never read `TeamRates.blocks_per_60`/`.penalties_per_60`
+    # anywhere (proven by a byte-identical-output test before deletion, not
+    # assumed). Block volume is already fully governed by the truth-calibrated
+    # per-shot `block_rate_ev`/`pk`/`pp_def` + `block_rate_index` mechanism;
+    # penalty rate already drives PP/PK segment generation via `special_teams`'s
+    # `committed_per_game` (`engine.py:718-719`). A second, flat per-game-rate
+    # input for either would have been a pure duplicate of already-live real
+    # data, not a fix -- so the fields were deleted rather than wired.
     # Expected-goals rates (5v5+all-situations blend) consumed by the projection layer
     # (``projection.project_game``). Optional: when absent the projection falls back to
     # ``goals_per_60`` for offense and the league baseline for defense.

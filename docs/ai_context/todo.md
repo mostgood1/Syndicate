@@ -567,7 +567,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS; `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads either -- same shape as basketball's `#467`) is the ONLY remaining gap** — FOUND, MEASURED, MOSTLY FIXED 2026-08-18/19, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -899,10 +899,33 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   All three pass. `scripts/nhl_sim_input_checklist.py`'s alarm count drops
   from 3 to **0** -- a full PASS, the first time this session.
 
-**The ONLY remaining gap after this pass is `blocks_per_60`/`penalties_per_60`'s
-confirmed dead gate, above** -- an explicit open follow-up decision (build a
-real consumption mechanism, or remove the dead fields), not a "needs a
-definition first" absence like MLB's remaining 5 (`#440`).
+**That follow-up decision is now CLOSED.** `blocks_per_60`/`penalties_per_60`
+REMOVED entirely, not force-wired. Checked before deciding which way to go,
+not assumed: `engine.py`'s actual segment-generation code (`engine.py:715-719`)
+confirms `special_teams`'s `committed_per_game` already drives PP/PK segment
+time -- the exact quantity a `penalties_per_60` mechanism would need -- so
+wiring it anywhere would have been a second signal for the same real-world
+quantity, double-counted against the first (this file's own `model_engine_standard.md`
+§4.4 warning, applied here rather than just cited). Block volume has the
+same shape: no team-level rate input exists anywhere in the truth-calibrated
+per-shot `block_rate_ev`/`pk`/`pp_def` code path for `blocks_per_60` to
+legitimately join. Traced through the WHOLE chain, not just the two
+dataclass fields: `contracts.py`/`models.py` (the fields themselves),
+`player_props._team_rates()`, `loaders.build_team_features()`,
+`historical_truth/team_game_rates.py` (dropped `blocks_per_60` computation
+entirely -- `parse_boxscore_sog_and_blocks` renamed `parse_boxscore_sog`),
+the producer script's CSV schema (backward-compatible: an old CSV with a
+leftover `blocks_per_60` column still loads, just ignored, verified with a
+dedicated test), and 3 calibration scripts' inert `TeamRates(...)` fixture
+construction. The two "dead gate, byte-identical output" reachability tests
+are replaced with regression tests asserting the fields are gone from
+`__dataclass_fields__` -- the ORIGINAL reachability proof is what justified
+the deletion, not discarded, just superseded by a cheaper guard now that
+there's no field left to test reachability of.
+**Verified**: `nhl_sim_input_checklist.py`'s `--- HockeyTeamFeatures ---`
+section is now EMPTY -- nothing left unreachable to report. 323
+hockeysim/nhl tests pass (net count unchanged). Full detail:
+`docs/ai_context/hockeysim_engine_reference.md` §2l.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

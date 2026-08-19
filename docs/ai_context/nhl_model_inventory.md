@@ -86,7 +86,7 @@ from its own vendor repos; NHL had none of that class of tool at all until
 
 | id | one-line | status |
 |---|---|---|
-| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (goal conversion + per-team shot + per-team block rate) + `special_teams_cal` (ALL 6 non-neutral keys calibrated) + a real xG model + `shots_per_60`/`faceoff_win_pct` + player usage weights ALL FIXED (reachable); `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads them) — the ONLY remaining gap; checklist reports a full PASS otherwise | FOUND, MEASURED, MOSTLY FIXED this session |
+| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (goal conversion + per-team shot + per-team block rate) + `special_teams_cal` (ALL 6 non-neutral keys calibrated) + a real xG model + `shots_per_60`/`faceoff_win_pct` + player usage weights ALL FIXED (reachable); `blocks_per_60`/`penalties_per_60` populated then proven a CONFIRMED DEAD GATE and REMOVED entirely (neither field could gain a legitimate consumer without duplicating already-live real data) — checklist reports a full PASS | FOUND, MEASURED, FULLY CLOSED this session |
 | `#454` | Play-by-play was an unused offline modelling substrate — NHL was one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | **CLOSED as a data-availability gap this session** (still open as a cross-sport tracking item for soccer/NCAAB). `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py` bulk-fetched all 1,312 regular-season games (reference doc §2i) — the substrate now exists and is consumed by both the xG model (§2i) and team rates' faceoff data (§2j). |
 | `#440` | Sim-engine track pin (cross-sport); this session's work is NHL's contribution to it | PLANNED, referenced throughout |
 
@@ -217,6 +217,28 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   counting; `penalties_per_60` has no market or mechanism to drive at all.
   Flagged as an explicit open follow-up decision (build a mechanism, or
   remove the dead fields), not silently marked "fixed."
+- **Did** resolve that follow-up decision — REMOVED `blocks_per_60`/
+  `penalties_per_60` entirely (reference doc §2l), rather than force-wiring a
+  new mechanism. Checked, not assumed, before deciding which way to go:
+  reading `engine.py`'s actual segment-generation code confirmed
+  `special_teams`'s `committed_per_game` already drives PP/PK segment time —
+  the exact quantity a `penalties_per_60` mechanism would need — so wiring it
+  anywhere would have been a second signal for the same real-world quantity,
+  double-counted against the first; block volume has the same shape, with no
+  team-level rate input anywhere in the per-shot `block_rate_*` code path for
+  `blocks_per_60` to legitimately join. Traced through the WHOLE chain, not
+  just the two dataclass fields: `contracts.py`/`models.py` (the fields
+  themselves), `player_props._team_rates()`, `loaders.build_team_features()`,
+  `historical_truth/team_game_rates.py` (dropped `blocks_per_60` computation
+  entirely — `parse_boxscore_sog_and_blocks` renamed `parse_boxscore_sog`),
+  the producer script's CSV schema (backward-compatible: an old CSV with a
+  leftover `blocks_per_60` column still loads, just ignored), and 3
+  calibration scripts' inert `TeamRates(...)` fixture construction. The two
+  "dead gate" reachability tests are replaced with regression tests
+  asserting the fields are gone from `__dataclass_fields__`, guarding against
+  either quietly coming back without a real consumer. **Checklist's
+  `--- HockeyTeamFeatures ---` section is now EMPTY** — nothing left
+  unreachable to report. 323 tests still pass (net count unchanged).
 - **Did** build real player usage weights (`shot_weight`/`goal_weight`/
   `block_weight`, reference doc §2k, full report
   `docs/reports/hockeysim_player_weights_report.md`) — the checklist's LAST

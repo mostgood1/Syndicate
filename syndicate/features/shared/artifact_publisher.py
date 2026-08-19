@@ -351,10 +351,13 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `committed_per_game`) got a real producer (`scripts/build_nhl_special_teams_artifact.py`).
     "nhl_source/source_artifacts/data/processed/team_special_teams_*.csv",
     "nhl_source/data/processed/team_special_teams_*.csv",
-    # Same category, added once `HockeyTeamFeatures.shots_per_60`/`blocks_per_60`/
-    # `faceoff_win_pct` got a real producer (`scripts/build_nhl_team_rates_artifact.py`) --
-    # closing 3 of the 4 remaining genuinely-absent team-level inputs (`penalties_per_60` reuses
-    # `team_special_teams_*.csv`'s already-allowlisted `committed_per_game`, no new file).
+    # Same category, added once `HockeyTeamFeatures.shots_per_60`/`faceoff_win_pct` got a real
+    # producer (`scripts/build_nhl_team_rates_artifact.py`). `blocks_per_60`/`penalties_per_60`
+    # were ALSO produced here at first, then REMOVED from `HockeyTeamFeatures`/`TeamRates` entirely
+    # once proven a confirmed dead gate (`hockeysim_engine_reference.md` §2l) -- the CSV this
+    # pattern allowlists may still carry a `blocks_per_60` column from an older producer run; it is
+    # simply unread now, not a reason to un-allowlist the file (`shots_per_60`/`faceoff_win_pct`
+    # still need it).
     "nhl_source/source_artifacts/data/processed/team_rates_*.csv",
     "nhl_source/data/processed/team_rates_*.csv",
     # Same category, added once `HockeyPlayerFeatures.shot_weight`/`goal_weight`/`block_weight`

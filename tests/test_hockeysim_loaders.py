@@ -51,9 +51,9 @@ def synth_root(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (proc / "team_rates_2025-2026.csv").write_text(
-        "abbr,shots_per_60,blocks_per_60,faceoff_win_pct,games,faceoffs\n"
-        "BOS,32.1,14.2,0.54,82,4700\n"
-        "CHI,26.3,12.1,0.47,82,4650\n",
+        "abbr,shots_per_60,faceoff_win_pct,games,faceoffs\n"
+        "BOS,32.1,0.54,82,4700\n"
+        "CHI,26.3,0.47,82,4650\n",
         encoding="utf-8",
     )
     (proc / "player_rates_2025-2026.csv").write_text(
@@ -248,15 +248,15 @@ def test_load_team_special_teams_map_reads_block_rate_index_when_present(tmp_pat
 
 
 # ---------------------------------------------------------------------------
-# Team rates (shots_per_60/blocks_per_60/faceoff_win_pct) -- `docs/ai_context/
-# hockeysim_engine_reference.md` §2j. `penalties_per_60` is tested separately below, sourced from
-# `special_teams_map`'s `committed_per_game`, not this reader.
+# Team rates (shots_per_60/faceoff_win_pct) -- `docs/ai_context/hockeysim_engine_reference.md`
+# §2j. `blocks_per_60`/`penalties_per_60` were REMOVED entirely (§2l) after being proven a
+# confirmed dead gate -- `HockeyTeamFeatures`/`TeamRates` no longer carry either field at all.
 # ---------------------------------------------------------------------------
 
 
 def test_load_team_rates_map(synth_root):
     m = loaders.load_team_rates_map("2026-03-15", root=synth_root)
-    assert m["BOS"] == {"shots_per_60": 32.1, "blocks_per_60": 14.2, "faceoff_win_pct": 0.54}
+    assert m["BOS"] == {"shots_per_60": 32.1, "faceoff_win_pct": 0.54}
     assert m["CHI"]["shots_per_60"] == 26.3
 
 
@@ -264,43 +264,43 @@ def test_load_team_rates_map_missing_is_empty(tmp_path):
     assert loaders.load_team_rates_map("2026-03-15", root=tmp_path) == {}
 
 
+def test_load_team_rates_map_ignores_a_leftover_blocks_per_60_column(tmp_path):
+    """A CSV from an OLDER producer run (before §2l's removal) may still carry a `blocks_per_60`
+    column -- the reader must simply ignore it, not error, and must not resurrect the field on
+    `HockeyTeamFeatures`/`TeamRates` (which no longer have it at all)."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "team_rates_2025-2026.csv").write_text(
+        "abbr,shots_per_60,blocks_per_60,faceoff_win_pct,games,faceoffs\n"
+        "BOS,32.1,14.2,0.54,82,4700\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_team_rates_map(date, root=tmp_path)
+    assert m["BOS"] == {"shots_per_60": 32.1, "faceoff_win_pct": 0.54}
+    assert "blocks_per_60" not in m["BOS"]
+
+
 def test_build_team_features_uses_rates_map(synth_root):
     m = loaders.load_team_rates_map("2026-03-15", root=synth_root)
     bos = loaders.build_team_features("Boston Bruins", rates_map=m)
-    assert bos.shots_per_60 == 32.1 and bos.blocks_per_60 == 14.2 and bos.faceoff_win_pct == 0.54
+    assert bos.shots_per_60 == 32.1 and bos.faceoff_win_pct == 0.54
 
 
 def test_build_team_features_without_rates_map_is_dataclass_default(synth_root):
     bos = loaders.build_team_features("Boston Bruins", rates_map={})
-    assert bos.shots_per_60 == 30.0 and bos.blocks_per_60 == 12.0 and bos.faceoff_win_pct == 0.5
-
-
-def test_build_team_features_penalties_per_60_reuses_special_teams_committed_per_game(synth_root):
-    """`penalties_per_60` deliberately has NO dedicated producer -- it reuses the SAME
-    `committed_per_game` value `special_teams_map` already carries (the exact same quantity,
-    computed once). Confirms it lands on the TOP-LEVEL field, not just the nested
-    `special_teams["committed_per_game"]` dict."""
-    stm = loaders.load_team_special_teams_map("2026-03-15", root=synth_root)
-    bos = loaders.build_team_features("Boston Bruins", special_teams_map=stm)
-    assert bos.penalties_per_60 == 2.9  # from the synth_root fixture's team_special_teams CSV
-    assert bos.special_teams["committed_per_game"] == 2.9
-
-
-def test_build_team_features_without_special_teams_penalties_per_60_is_dataclass_default(synth_root):
-    bos = loaders.build_team_features("Boston Bruins", special_teams_map={})
-    assert bos.penalties_per_60 == 3.0
+    assert bos.shots_per_60 == 30.0 and bos.faceoff_win_pct == 0.5
 
 
 def test_build_game_features_populates_team_rates_end_to_end(synth_root):
     """The full loader path (what `build_slate_features` drives in production) actually reaches
-    `shots_per_60`/`blocks_per_60`/`faceoff_win_pct`/`penalties_per_60` -- mirrors the elo/xG
-    end-to-end tests above, now that `scripts/build_nhl_team_rates_artifact.py` is a real producer."""
+    `shots_per_60`/`faceoff_win_pct` -- mirrors the elo/xG end-to-end tests above, now that
+    `scripts/build_nhl_team_rates_artifact.py` is a real producer."""
     game = loaders.build_game_features(
         "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
     )
-    assert game.home.shots_per_60 == 32.1 and game.home.blocks_per_60 == 14.2
-    assert game.home.faceoff_win_pct == 0.54 and game.home.penalties_per_60 == 2.9
-    assert game.away.shots_per_60 == 26.3 and game.away.penalties_per_60 == 3.3
+    assert game.home.shots_per_60 == 32.1 and game.home.faceoff_win_pct == 0.54
+    assert game.away.shots_per_60 == 26.3
 
 
 # ---------------------------------------------------------------------------
