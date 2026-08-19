@@ -1,1 +1,19 @@
 playwright>=1.45,<2.0
+
+# Process enumeration for LOCAL diagnostics on Windows.
+#
+# `memory_observability.get_all_process_memory_snapshot()` has two backends:
+# psutil, and a procfs reader over /proc. Production is Linux and the procfs
+# path works there -- measured 2026-08-19 on live web, 4 of 4 processes
+# enumerated with cmdlines while psutil was absent. Windows has no /proc, so
+# LOCALLY psutil is the only backend that works at all: with it, 433 processes
+# enumerated; with it removed, 2. That gap was silent and undeclared -- psutil
+# was installed ad hoc on the dev machine and listed in no requirements file.
+#
+# DELIBERATELY NOT IN requirements.txt. Adding it to the production install
+# would change nothing that is broken: `deploy_preflight.py` returning UNKNOWN
+# for web is NOT caused by psutil's absence. That was claimed and DISPROVED --
+# see state.md `[web-preflight-dead-sample]`, where it is cause 2 of four, all
+# four wrong. Shipping psutil to production would "fix nothing and look exactly
+# like a fix", which is the trap that section exists to prevent.
+psutil>=5.9,<8.0   # 7.2.2 is what the 433-process reading above was measured on
