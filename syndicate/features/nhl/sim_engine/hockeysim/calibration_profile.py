@@ -39,8 +39,7 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     pk_goals_mult=1.0,
     # Newly reachable this session (`docs/ai_context/hockeysim_engine_reference.md` §2c) via
     # `scripts/calibrate_nhl_special_teams_goal_mult.py`/`calibrate_nhl_special_teams_shot_mult.py`
-    # against the 1,312-game truth snapshot (§2d/§2e). Block rates unchanged (no truth target
-    # exists yet for blocked-shot rate by strength state -- see §5).
+    # against the 1,312-game truth snapshot (§2d/§2e). Block rates calibrated too, see §2h below.
     #
     # pp_shot_cal_mult: measured 0.9108 against real pp_shot_share (0.1488) -- a real, modest
     # (~9%) correction. `scripts/calibrate_nhl_special_teams_shot_mult.py`, full round-robin (992
@@ -75,9 +74,23 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # as a documented gap in methodology consistency, not a known error -- re-running it jointly
     # is cheap and worth doing before trusting `pp_goal_cal_mult` to more decimal places than 1.0.
     pk_goal_cal_mult=0.4645,
-    block_rate_ev=0.45,
-    block_rate_pk=0.55,
-    block_rate_pp_def=0.35,
+    # block_rate_ev/pk/pp_def: the vendor's shipped defaults (0.45/0.55/0.35) were never checked
+    # against a real block rate before `scripts/calibrate_nhl_block_rate.py` (§2h). Unlike the
+    # goal/shot multipliers above, the truth source (`historical_truth.boxscore_block_rate`) has
+    # only ONE league-wide target -- blocks have no strength-state breakdown in the `boxscore`
+    # payload at all -- so this is a SINGLE shared scale factor (`block_scale=1.0631`) applied
+    # uniformly to all three, preserving their existing structural ratio (higher on the PK, lower
+    # on the PP) rather than fitting 3 independent, underdetermined constants against 1 number.
+    # Fit against real blocks_per_game(team)=14.1905 (1,312 games) with `block_rate_index` (§2g)
+    # held NEUTRAL to isolate the absolute-level fit from the per-team layer; converged in 5
+    # iterations (13.2613 -> 14.2800 -> 14.1821 -> 14.1958 -> 14.1975). Verified TWICE with a fresh
+    # seed on the full round-robin (992 pairings x 20 sims = 19,840 games each): 14.2606 with the
+    # index still neutral, 14.2583 with the REAL per-team `block_rate_index` active -- confirming
+    # (again, post-calibration) that the per-team layer does not disturb the league-wide level.
+    # Both ~0.5% above target, well within simulation noise.
+    block_rate_ev=0.4784,
+    block_rate_pk=0.5847,
+    block_rate_pp_def=0.3721,
     score_effects="dynamic",
     goal_model="from_shots",
     assist_model="onice",

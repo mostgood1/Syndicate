@@ -170,11 +170,28 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   Wired into `engine.py`, scaling the blocking team's own probability right
   before the block roll, clamped `[0.02, 0.95]`. **Verified the league-wide
   average did not shift**: 200 round-robin pairings, 24.635 avg blocks/game
-  neutral vs 24.475 real-indexed — noise-level. Reachability-tested. Explicitly
-  did NOT calibrate the ABSOLUTE block rate (simulated ~12.2-12.3/team/game
-  sits below the real 14.19) — the base constants (`block_rate_ev` etc.)
-  remain the vendor's original guess; only relative per-team scale was built,
-  matching this task's scope.
+  neutral vs 24.475 real-indexed — noise-level. Reachability-tested. This pass
+  deliberately did NOT calibrate the ABSOLUTE block rate — done next, below.
+- **Did** calibrate the ABSOLUTE block rate (reference doc §2h, full report
+  `docs/reports/hockeysim_absolute_block_rate_cal_report.md`) — the base
+  constants the per-team pass above deliberately left at the vendor's
+  never-measured 0.45/0.55/0.35. Only ONE league-wide truth target exists
+  (blocked shots carry no strength-state split at all), so `scripts/calibrate_nhl_block_rate.py`
+  fits a SINGLE shared scale factor applied uniformly to all three constants,
+  preserving their existing structural ratio — the only degree of freedom the
+  data supports (fitting 3 independently against 1 number would be
+  underdetermined). Fit with `block_rate_index` held neutral (isolates the
+  absolute level from the per-team layer), converged in 5 proportional-correction
+  iterations against target `blocks_per_game(team)=14.1905`: 13.2613 → 14.2800
+  → 14.1821 → 14.1958 → 14.1975. Result: `block_scale=1.0631` (a modest ~6.3%
+  correction) → `block_rate_ev=0.4784`, `block_rate_pk=0.5847`,
+  `block_rate_pp_def=0.3721`. **Verified twice** on the full 992-pairing
+  round-robin (19,840 games each): 14.2606 with the index still neutral,
+  14.2583 with the REAL per-team index active — both ~0.5% above target,
+  confirming (again, now against the calibrated base) that the per-team layer
+  doesn't disturb the league-wide level. Locked in a test. Every one of
+  `special_teams_cal`'s 7 keys except `pp_goal_multiplier` (measured
+  statistically indistinguishable from neutral, §2d) is now truth-calibrated.
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct` (the GLOBAL team rates the props engine's `TeamRates`
   reads) or player usage weights — needs the truth-loader's parser extended
@@ -184,9 +201,11 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   with the joint-fit method the shot-multiplier bug discovery motivated —
   flagged as an open methodology-consistency gap, not a known error (its own
   verification was already reasonably tight).
-- Did not calibrate the ABSOLUTE block rate to real truth (§2g leaves the base
-  constants at the vendor's uncalibrated 0.45/0.55/0.35), build strength-state-specific
-  per-team blocking (no data source distinguishes it), or investigate the
+- Did not build strength-state-specific per-team blocking (no data source
+  distinguishes it — even the league-wide absolute calibration, §2h, could
+  only fit ONE shared scale, not per-strength-state constants), validate the
+  vendor's original EV:PK:PP-def ratio itself (0.45:0.55:0.35, preserved
+  through §2h's scale, never independently checked), or investigate the
   faceoff multiplier's interaction with the new per-team shot/block indices
   (§2f/§2g) — the faceoff effect is EV-only by default and untouched by this
   pass.

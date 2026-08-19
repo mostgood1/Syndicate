@@ -469,7 +469,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + NEW per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights and the ABSOLUTE block rate genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, and ALL 6 non-neutral goal/shot/block-rate multiplier calibrations FIXED (only `pp_goal_cal_mult` intentionally left neutral); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -682,6 +682,32 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   confirmed populated on every team-side. Fixed by driving the loop off
   `special_teams_consumed_keys()` itself so the two can't drift again; alarm
   count returns to 9 (down from a false 12).
+- **ABSOLUTE block-rate calibration — built, closing the gap the previous
+  bullet explicitly left open.** Full report:
+  `docs/reports/hockeysim_absolute_block_rate_cal_report.md`. Only ONE
+  league-wide truth target exists for blocks (no strength-state split in the
+  source at all), so `scripts/calibrate_nhl_block_rate.py` fits a SINGLE
+  shared scale factor applied uniformly to `block_rate_ev`/`block_rate_pk`/
+  `block_rate_pp_def`, preserving their existing structural ratio — fitting 3
+  constants independently against 1 target would be underdetermined. Fit with
+  `block_rate_index` (the per-team layer, above) held NEUTRAL to isolate the
+  absolute level, converged in 5 proportional-correction iterations against
+  target `blocks_per_game(team)=14.1905` (1,312 games): 13.2613 → 14.2800 →
+  14.1821 → 14.1958 → 14.1975. Result: `block_scale=1.0631` (a real, modest
+  ~6.3% correction) → `block_rate_ev=0.4784`, `block_rate_pk=0.5847`,
+  `block_rate_pp_def=0.3721`. **Verified twice** on the full 992-pairing
+  round-robin (19,840 games each, fresh seed): 14.2606 with the per-team
+  index still neutral, 14.2583 with the REAL per-team index active — both
+  ~0.5% above target, confirming (again, now against the calibrated base)
+  that the per-team layer doesn't disturb the league-wide level. Locked in a
+  test (`test_special_teams_cal_production_default_carries_the_calibration`).
+  **Every `special_teams_cal` key except `pp_goal_multiplier` is now
+  truth-calibrated** (that one measured statistically indistinguishable from
+  neutral, §2d — left at 1.0 deliberately, not an oversight). **Left open**:
+  the vendor's original EV:PK:PP-def RATIO itself (0.45:0.55:0.35) was never
+  independently validated — this pass preserves it through a shared scale, it
+  doesn't re-derive it; no strength-state-split truth source exists to fit it
+  against.
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**
