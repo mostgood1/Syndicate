@@ -231,7 +231,6 @@
 - [2026-08-18 — RULE: before wiring ANY feature into a model, check whether the feature is…](#2026-08-18-rule-before-wiring-any-feature-into-a-model-check-whether-the-feature-is-computed-from-the-thing-being-predicted-ask-what-window-it-covers-not-what-it-is-named)
 - [2026-08-18 — A TRUNCATED READING IS NOT A COMPLETE ONE](#2026-08-18-a-truncated-reading-is-not-a-complete-one)
 - [2026-08-18 — A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK](#2026-08-18-a-stale-but-running-session-is-invisible-to-every-orphan-check)
-- [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it)
 - [2026-08-18 — RULE: a session worktree protects your INDEX, not your EDIT. Shared-file c…](#2026-08-18-rule-a-session-worktree-protects-your-index-not-your-edit-shared-file-carry-is-not-absorption)
 - [2026-08-18 — RULE: a check that answers a SLIGHTLY DIFFERENT question returns a confide…](#2026-08-18-rule-a-check-that-answers-a-slightly-different-question-returns-a-confident-wrong-answer-six-in-one-session)
 - [2026-08-19 — RULE: no active owner, no claims. And a liveness read EXPIRES.](#2026-08-19-rule-no-active-owner-no-claims-and-a-liveness-read-expires)
@@ -426,5 +425,6 @@
 - [2026-08-17 — "IT MATCHES NO SESSION IN THE ROSTER" IS NOT "IT POINTS AT NOBODY". One se…](learnings_evidence.md#2026-08-17-it-matches-no-session-in-the-roster-is-not-it-points-at-nobody-one-session-has-two-ids-and-the-register-holds-the-one-you-cannot-look-up) `[evidence]`
 - [RULE: AN ERROR PATH MUST NOT LAND ON THE SYSTEM'S EXISTING EMPTY STATE](learnings_evidence.md#rule-an-error-path-must-not-land-on-the-systems-existing-empty-state) `[evidence]`
 - [RULE: A GREEN/HEALTHY READING IS EVIDENCE ONLY ONCE YOU KNOW WHAT MAKES IT RED](learnings_evidence.md#rule-a-greenhealthy-reading-is-evidence-only-once-you-know-what-makes-it-red) `[evidence]`
+- [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](learnings_evidence.md#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->
