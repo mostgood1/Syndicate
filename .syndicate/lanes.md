@@ -1037,6 +1037,46 @@ the two intended files touched (318 insertions / 13 deletions,
   size stated next to every number (rule: "a rate, not a count").
 - Blocked by: none.
 
+### nfl-player-props-calibration-fix — OPEN — opened 2026-08-19 — session: nfl-player-props-calibration-fix
+- Goal: fix the two calibration defects `#471` found and measured but did not
+  fix. **Testable outcome, defect 1 (this pass):** `anytime_td`'s predicted
+  probability at a rolling rate of exactly 0.0 stops reading as 0% when the
+  real hit rate for that bucket is ~13-14% (measured, `reports/nfl_props_
+  backtest_2022_2025.json`) — a shrinkage estimator blends the raw small-n
+  rate toward a data-derived league baseline, tuned and verified out-of-sample
+  via `scripts/backtest_nfl_props.py`'s own existing harness (re-run, not
+  rebuilt). **Defect 2 (yardage/count markets overconfident near their own
+  mean — predicts ~50% cover, actual ~37-44%) is explicitly SECOND, not
+  started this pass** — user instruction was "start with the anytime_td
+  shrinkage".
+- Files:
+  - `syndicate/features/nfl/player_stats.py` — new shrinkage function,
+    additive (does not change `player_rate`'s existing signature/behavior for
+    any other market).
+  - `syndicate/features/nfl/props.py` — `_nfl_prop_model_probability`'s
+    `anytime_td` branch switches to the shrunk rate.
+  - `tests/test_nfl_player_stats.py`, `tests/test_nfl_props.py` — updated/new
+    tests for the shrinkage behavior.
+  - `scripts/backtest_nfl_props.py` — read/run only this pass (used to tune
+    and verify the shrinkage constant out-of-sample); not expected to need
+    edits, but not ruled out if the tuning needs a CLI hook.
+  - Read-only reference: `docs/ai_context/todo.md` `#471` (the source of the
+    defect), `reports/nfl_props_backtest_2022_2025.json` (baseline numbers).
+- Hypothesis: a Gamma-Poisson (count) shrinkage toward the population's own
+  empirical anytime_td-per-game mean, weighted by a small pseudo-count `k`,
+  closes most of the 0%-predicted/13-14%-actual gap for n=2-4 samples without
+  measurably hurting players who already have a real history (large n is
+  barely pulled).
+- Falsification test: if the shrunk estimator's out-of-sample Brier score on
+  `anytime_td` (scored 2024-2025, tuned on 2022-2023) is not better than the
+  unshrunk baseline's, the hypothesis is wrong and this reports a null result
+  rather than shipping a change that doesn't help.
+- Verification: re-run `scripts/backtest_nfl_props.py --seasons 2022,2023,2024,2025`
+  after the change; Section 1's `anytime_td` OOS row and Section 2's
+  `anytime_td` calibration buckets (low end specifically) both improve,
+  with the numbers stated, not just "looks better".
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
