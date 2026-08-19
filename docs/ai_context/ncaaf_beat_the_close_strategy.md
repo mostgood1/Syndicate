@@ -63,18 +63,36 @@ stale: it refetches `/ratings/sp?year=<current season>`, which CFBD updates
 in-season.
 
 So the measurement is a **fair proxy for week 1** — where preseason ratings
-genuinely are the input — and **pessimistic afterwards**. This is being resolved
-by a per-week split of the same gap (`scratchpad/gap_by_week.py`):
+genuinely are the input — and **pessimistic afterwards**.
 
-- **gap flat across weeks** → staleness is not the driver; the model is simply
-  worse, and in-season updating will not save it. Attack §1 #1/#3.
-- **gap grows with week** → staleness IS the driver; production is better than
-  this number implies, the week-1 suppression still stands on its own evidence,
-  and in-season updating is the highest-value lever.
+### RESOLVED 2026-08-19: the gap GROWS with week. Staleness is a real driver.
 
-**The week-1 suppression holds either way**, which is what matters with the
-opener on 2026-08-29. Anyone lifting the gate for later weeks must read this
-split first.
+Same harness, 600 games, 30 seeds, bucketed by week:
+
+| weeks | n | model MAE | market MAE | gap |
+|---|---|---|---|---|
+| 1–3 | 140 | 13.911 | 12.096 | **+1.815** (SE 0.642) |
+| 4–6 | 148 | 13.771 | 10.537 | +3.234 (SE 0.691) |
+| 7–9 | 164 | 16.599 | 12.488 | +4.111 (SE 0.846) |
+| 10–20 | 148 | 15.545 | 11.797 | +3.748 (SE 0.837) |
+| **all** | **600** | 15.014 | 11.745 | **+3.269** (SE 0.385) |
+
+Three things follow, and they reshape the plan:
+
+1. **The week-1 suppression stands on its own evidence.** +1.815 at SE 0.642 is
+   t=2.83 — the model loses to the close at the opener too, just by less.
+2. **The opener is where the model is CLOSEST to competitive.** The gap roughly
+   doubles by midseason. If there is anywhere the model can compete, early
+   season is the most likely place — which sharpens §3 Stage 4 considerably.
+3. **In-season rating updates are now a QUANTIFIED lever**, worth on the order
+   of 1.4–2.3 MAE points of the mid/late-season gap, rather than the guess §1
+   listed. That promotes it above situational factors.
+
+**Caveat on the caveat:** this says production is better than the harness after
+week 1 *if* CFBD's current-season SP+ actually refreshes in-season. The
+generator refetches `/ratings/sp?year=<season>` each run, so the plumbing is
+there — but that the upstream VALUES move week to week has not been verified
+here. Worth confirming before banking lever #3.
 
 ---
 

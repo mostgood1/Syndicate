@@ -121,6 +121,13 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # OPPONENT's up, instead of the reverse. `False` restores the original (now-known-incorrect)
     # mapping for rollback/A-B comparison.
     faceoff_dz_direction_fixed=True,
+    # §2u: the proper DZ discrete-event redesign, on by default -- replaces the sign-flip fix
+    # above with the SAME treatment §2r gave the general EV/OZ case: a discrete draw per segment,
+    # then the REAL measured DZ-specific decay curve (19,458 real draws, `winner_zone="D"`) applied
+    # time-weighted, instead of a still-flat per-segment constant. The curve's own sign already
+    # encodes the correct (measured) direction, so `faceoff_dz_direction_fixed` above only matters
+    # when this is `False` (the legacy diff-based fallback). Round-robin verified.
+    faceoff_dz_discrete_event_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.
