@@ -9,6 +9,7 @@ import pytest
 
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
     segment_average_multipliers,
+    segment_average_multipliers_dz,
 )
 
 
@@ -60,5 +61,61 @@ def test_typical_engine_segment_length_shows_a_real_but_diluted_effect():
 @pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
 def test_non_positive_or_invalid_input_returns_neutral_baseline(bad):
     result = segment_average_multipliers(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# DZ-specific curve (`segment_average_multipliers_dz`) -- direction REVERSED relative to the
+# general curve, per `hockeysim_faceoff_dz_segment_validation_report.md`'s real measurement.
+# ---------------------------------------------------------------------------
+
+def test_dz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_dz(5.0)
+    assert result.winner_mult == pytest.approx(0.3890, abs=1e-4)
+    assert result.other_mult == pytest.approx(1.6110, abs=1e-4)
+
+
+def test_dz_direction_is_reversed_from_the_general_curve():
+    """The defining property of the DZ curve: at short segment lengths, the WINNER's multiplier is
+    BELOW 1.0 and the OTHER team's is ABOVE 1.0 -- the opposite of the general curve, matching the
+    real measured direction (a team that wins its own DZ draw is out-shot, not out-shooting)."""
+    dz = segment_average_multipliers_dz(10.0)
+    general = segment_average_multipliers(10.0)
+    assert dz.winner_mult < 1.0 < dz.other_mult
+    assert general.winner_mult > 1.0 > general.other_mult
+
+
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_dz_mean_of_winner_and_other_is_always_one(seg_len):
+    """Same design invariant as the general curve and every per-team index this session built:
+    the winner's and other team's multipliers average to 1.0 for ANY segment length."""
+    result = segment_average_multipliers_dz(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-6)
+
+
+def test_dz_very_long_segment_holds_at_the_last_measured_bucket_not_assumed_parity():
+    """Unlike the general curve (which converges to 1.0/1.0 beyond 90s), the DZ curve never
+    reached parity within the measured range -- a very long segment should hold at the (60,90]
+    bucket's own values, not silently assume the effect fully decayed."""
+    result = segment_average_multipliers_dz(1200.0)
+    assert result.winner_mult == pytest.approx(0.9726, abs=0.01)
+    assert result.other_mult == pytest.approx(1.0274, abs=0.01)
+    # And explicitly NOT the general curve's converged baseline:
+    assert result.winner_mult != pytest.approx(1.0, abs=1e-3)
+
+
+def test_dz_typical_engine_segment_length_shows_a_real_but_diluted_reversed_effect():
+    """At the engine's real ~40-45s segment length, the DZ winner should still show a measurable
+    suppression, but far smaller than the raw 5s-window ratio, since most of the segment falls
+    past the sharpest early suppression."""
+    result = segment_average_multipliers_dz(42.5)
+    assert 0.9 < result.winner_mult < 1.0
+    assert 1.0 < result.other_mult < 1.1
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_dz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
+    result = segment_average_multipliers_dz(bad)
     assert result.winner_mult == 1.0
     assert result.other_mult == 1.0

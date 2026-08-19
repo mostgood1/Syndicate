@@ -11,6 +11,9 @@ from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
 from syndicate.features.ncaaf.sources import load_json
 from syndicate.features.ncaaf.sources import summary_path
+from syndicate.features.football.pick_gate import board_notice
+from syndicate.features.football.pick_gate import filter_pick_rows
+from syndicate.features.football.pick_gate import notice_for
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.rank_board import build_rank_page_context
@@ -47,8 +50,34 @@ def _selected_date_token(week: int, *, season: int | None = None) -> str:
     return f"{resolved_season}-01-{week:02d}"
 
 
-def _collapse_results(summary: dict[str, Any], *, limit: int = 12) -> list[dict[str, Any]]:
-    results = summary.get("results") if isinstance(summary.get("results"), list) else []
+def _collapse_results(
+    summary: dict[str, Any],
+    *,
+    limit: int = 12,
+    gate_counts: dict[str, int] | None = None,
+) -> list[dict[str, Any]]:
+    """Collapse recommendation rows to the best card per (matchup, market, side).
+
+    Rows are gated FIRST, before dedup and ranking. Gating after ranking would
+    still withhold the card but would leave a suppressed row occupying a slot in
+    the top-`limit`, so a served market could lose cards to a market that is not
+    allowed to be served at all.
+
+    `gate_counts` follows the `counts=` out-param idiom cards.py already uses for
+    board truncation: a cap that bites must announce it.
+    """
+    raw_results = summary.get("results") if isinstance(summary.get("results"), list) else []
+    results, suppressed = filter_pick_rows("ncaaf", raw_results)
+    if gate_counts is not None:
+        gate_counts.clear()
+        gate_counts.update(suppressed)
+    if suppressed:
+        # Web's stdout IS collected by Render; logger.info is not.
+        print(
+            "NCAAF_PICKS_SUPPRESSED "
+            + " ".join(f"{market}={count}" for market, count in sorted(suppressed.items())),
+            flush=True,
+        )
     best_rows: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in results:
         if not isinstance(row, dict):
@@ -342,8 +371,107 @@ def _standalone_smartsim2_picks_context(*, season: int, resolved_week: int, week
     }
 
 
+#: Markets the NCAAF picks board can offer. Every candidate it builds is one of
+#: these or a confidence ranking derived from them, so if none is servable the
+#: board has nothing legitimate to show.
+_PICKS_BOARD_MARKETS = ("spread", "moneyline", "total")
+
+
+def _suppressed_picks_context(
+    *,
+    season: int,
+    selected_week: int,
+    active_weeks: list[int],
+    gate: dict[str, Any],
+) -> dict[str, Any]:
+    """The picks board with nothing to serve, saying so and saying why.
+
+    Deliberately NOT an error or an empty board. A blank surface with no reason
+    reads as a data outage, and the repair somebody reaches for is deleting the
+    gate. The board keeps its navigation so projections stay reachable -- the
+    model's opinion is still published on /ncaaf/cards, it is only the BET that
+    is withheld.
+    """
+    weeks = active_weeks or [1]
+    resolved_week = _clamp_week(selected_week or (weeks[-1] if weeks else 1))
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    return {
+        **build_rank_page_context(
+            selected_date=_selected_date_token(resolved_week, season=season),
+            route_path="/ncaaf/picks",
+            intro_title="NCAAF Picks",
+            intro_body=(
+                "NCAAF picks are currently suppressed. Projections remain "
+                "available on the cards board; what is withheld is the "
+                "recommendation to bet them."
+            ),
+            aria_label="NCAAF picks board",
+            source_path="syndicate/features/football/pick_gate.py",
+            source_title="NCAAF pick serving gate",
+            source_date_display=f"Week {resolved_week}",
+            rank_cards=[],
+            using_sample_data=False,
+            header_stats=[
+                {"label": "Cards", "value": "0"},
+                {"label": "Suppressed markets", "value": str(len(gate["markets"]))},
+                {"label": "Weeks", "value": str(len(weeks) or "-")},
+            ],
+            module_links=build_module_links(resolved_week, "Picks"),
+            control_label="Week",
+            control_type="number",
+            control_name="week",
+            control_value=str(resolved_week),
+            prev_href=f"/ncaaf/picks?week={prev_week}",
+            next_href=f"/ncaaf/picks?week={next_week}",
+            empty_state={
+                "eyebrow": "Picks suppressed",
+                "title": gate["headline"],
+                "body": (
+                    "A pick asserts the model prices a market better than the "
+                    "book does. For NCAAF that assertion has been measured "
+                    "against realised results and it is false, so the picks are "
+                    "withheld rather than served."
+                ),
+                "list_items": [reason["reason"] for reason in gate["reasons"]]
+                + [gate["lift_condition"]],
+            },
+            warning_panel={
+                "eyebrow": "Model vs market",
+                "title": "Measured: the NCAAF margin model loses to the close",
+                "body": (
+                    "Prior-season 2024 SP+ scoring realised 2025 margins, 220 "
+                    "games, closing spread on the same games as the benchmark: "
+                    "model MAE 13.763 against a market 11.586. Paired dMAE "
+                    "+2.176, SE 0.518, t=+4.20. Every rating scale from 6 to 24 "
+                    "loses, so this is a property of the model rather than of a "
+                    "tuning constant."
+                ),
+                "list_items": [reason["detail"] for reason in gate["reasons"]],
+            },
+        ),
+        "week": resolved_week,
+        "available_weeks": weeks,
+        "season": season,
+        "picks_gate": gate,
+    }
+
+
 def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
+    # GATE FIRST, before any candidate path runs. This function has three
+    # sources (runtime engine rows, standalone SmartSim2 projections, and the
+    # summary-artifact fallback) and BOTH routes -- /ncaaf/picks and
+    # /ncaaf/api/picks -- enter here. Gating the fallback alone would have been
+    # inert, the same way the board cap lived in build_cards_page_context while
+    # the route served build_smartsim_cards_page_context.
     season, active_weeks = _resolve_ncaaf_active_season_and_weeks()
+    gate = board_notice("ncaaf", _PICKS_BOARD_MARKETS)
+    if gate is not None:
+        return _suppressed_picks_context(
+            season=season,
+            selected_week=selected_week,
+            active_weeks=active_weeks,
+            gate=gate,
+        )
     if not active_weeks:
         return build_picks_page_context(selected_week)
     default_active_week = _ncaaf_default_active_week(season, active_weeks)
@@ -427,14 +555,33 @@ def build_picks_page_context(selected_week: int) -> dict[str, Any]:
     resolved_week = _clamp_week(selected_week or default_week())
     path = summary_path(resolved_week)
     summary = load_json(path) or {}
-    cards = _collapse_results(summary)
+    gate_counts: dict[str, int] = {}
+    cards = _collapse_results(summary, gate_counts=gate_counts)
+    gate_notice = notice_for("ncaaf", gate_counts)
     using_sample_data = False
 
     weeks = available_weeks()
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     total_results = len(summary.get("results") or []) if isinstance(summary.get("results"), list) else 0
     empty_state = None
-    if not cards:
+    if not cards and gate_notice:
+        # Rows EXIST and were withheld. Saying "none available" here would be
+        # false, would read as an outage, and is how a suppression gets
+        # "fixed" by deleting it. State the reason and the numbers.
+        empty_state = {
+            "eyebrow": "Picks suppressed",
+            "title": gate_notice["headline"],
+            "body": (
+                f"{total_results} stored NCAAF recommendation row"
+                f"{'' if total_results == 1 else 's'} for Week {resolved_week} "
+                "were withheld rather than served. A pick asserts the model "
+                "prices a market better than the book does; for these markets "
+                "that assertion has been measured and it is false."
+            ),
+            "list_items": [reason["reason"] for reason in gate_notice["reasons"]]
+            + [gate_notice["lift_condition"]],
+        }
+    elif not cards:
         empty_state = {
             "eyebrow": "Historical mode",
             "title": "No recommendations available.",

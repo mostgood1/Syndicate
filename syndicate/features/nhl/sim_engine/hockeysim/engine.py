@@ -23,7 +23,7 @@ import numpy as np
 
 from .state import GameState, TeamState, PlayerState, Event
 from .models import RateModels, TeamRates, PlayerRates
-from .historical_truth.faceoff_decay_model import segment_average_multipliers
+from .historical_truth.faceoff_decay_model import segment_average_multipliers, segment_average_multipliers_dz
 
 
 @dataclass
@@ -122,6 +122,15 @@ class SimConfig:
     # average) sees its OWN shots pulled down and the OPPONENT's pulled up, matching the measured
     # direction. `False` restores the exact original (now-known-incorrect) wiring for rollback/A-B.
     faceoff_dz_direction_fixed: bool = True
+    # §2u: the proper redesign the sign-flip fix above deliberately deferred.
+    # `historical_truth/faceoff_decay_model.py::segment_average_multipliers_dz` is the SAME
+    # discrete-event treatment §2r gave the general case, fit to the DZ-specific segment population
+    # (19,458 real draws, `winner_zone="D"`) -- replaces the still-flat per-segment DZ constant with
+    # a real, time-weighted decay curve whose direction is baked in from measurement (no separate
+    # sign flag needed on this path). Default ON. `False` falls back to the diff-based mechanism
+    # above, itself still governed by `faceoff_dz_direction_fixed` -- a 3-tier fallback (discrete
+    # DZ curve -> direction-fixed diff -> original diff) preserving every prior rollback point.
+    faceoff_dz_discrete_event_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -1108,30 +1117,44 @@ class PeriodSimulator:
                 lam_h = float(lam_h) * float(m_fo_h)
                 lam_a = float(lam_a) * float(m_fo_a)
                 # DEFENSIVE-ZONE index (§2o) -- an ADDITIONAL layer composed with the adjustment
-                # above, not a replacement: reuses `_faceoff_multipliers`' own diff/clip/alpha math
-                # (the same "how sensitive is shot-share to a faceoff differential" knobs, applied
-                # consistently regardless of which zone the differential comes from), fed
-                # DZ-specific percentages. Skipped entirely (both raw values `None`) rather than
-                # defaulted to neutral, since there is nothing here to silently regress -- unlike
-                # the OZ/EV chain above, no prior mechanism ever consumed this signal.
+                # above, not a replacement: fed DZ-specific percentages. Skipped entirely (both raw
+                # values `None`) rather than defaulted to neutral, since there is nothing here to
+                # silently regress -- unlike the OZ/EV chain above, no prior mechanism ever
+                # consumed this signal.
                 if ev_only and faceoff_dz_idx_home_raw is not None and faceoff_dz_idx_away_raw is not None:
                     dz_h_pct = 0.5 * _f(faceoff_dz_idx_home_raw, 1.0)
                     dz_a_pct = 0.5 * _f(faceoff_dz_idx_away_raw, 1.0)
-                    m_dz_h, m_dz_a = _faceoff_multipliers(self.cfg, dz_h_pct, dz_a_pct)
-                    # §2s: real segment-level data showed the ORIGINAL wiring below (m_dz_h ->
-                    # lam_h, "the winning team's own transition-offense bump") backwards -- a team
-                    # that wins its own DZ draw is OUT-SHOT, not out-shooting, in the following
-                    # seconds. Default FIXED: m_dz_h (>1 when HOME wins its own DZ more) applies to
-                    # `lam_a` (the OPPONENT gets the boost) and m_dz_a applies to `lam_h` (the
-                    # DZ-winning side's own shots are pulled down) -- matching the measured
-                    # direction. `faceoff_dz_direction_fixed=False` restores the exact original
-                    # (now-known-incorrect) mapping for rollback/A-B comparison.
-                    if bool(getattr(self.cfg, "faceoff_dz_direction_fixed", True)):
-                        lam_h = float(lam_h) * float(m_dz_a)
-                        lam_a = float(lam_a) * float(m_dz_h)
+                    # §2u: the proper redesign -- the SAME discrete-event treatment §2r gave the
+                    # general EV/OZ case, fit to the DZ-specific segment population. Simulates who
+                    # wins the segment's (assumed single) DZ draw from the SAME resolved
+                    # percentages, then applies the REAL measured DZ decay curve -- whose direction
+                    # is baked in from measurement (winner_mult < 1, other_mult > 1 in most
+                    # buckets), so no separate direction flag is needed on this path. Default ON.
+                    if bool(getattr(self.cfg, "faceoff_dz_discrete_event_model", True)):
+                        dz_denom = max(1e-6, float(dz_h_pct) + float(dz_a_pct))
+                        p_home_wins_dz_draw = max(0.05, min(0.95, float(dz_h_pct) / dz_denom))
+                        dz_decay = segment_average_multipliers_dz(seg_len)
+                        if self.rng.random() < p_home_wins_dz_draw:
+                            m_dz_h, m_dz_a = dz_decay.winner_mult, dz_decay.other_mult
+                        else:
+                            m_dz_h, m_dz_a = dz_decay.other_mult, dz_decay.winner_mult
                     else:
-                        lam_h = float(lam_h) * float(m_dz_h)
-                        lam_a = float(lam_a) * float(m_dz_a)
+                        # Legacy diff-based fallback -- itself still governed by
+                        # `faceoff_dz_direction_fixed` (§2t's sign fix): `True` (default) applies
+                        # m_dz_h/m_dz_a SWAPPED relative to the ORIGINAL (now-known-incorrect,
+                        # `False`) wiring, matching the measured direction without the curve's own
+                        # shape. `_raw_h`/`_raw_a` are what `_faceoff_multipliers` itself computed
+                        # (>1 for the side with the higher DZ index); swapping which lambda each
+                        # hits is the entire fix, so the swap must actually happen only when the
+                        # flag says to -- unlike the discrete-event branch above, which has no
+                        # separate direction flag because the curve's own sign already encodes it.
+                        raw_h, raw_a = _faceoff_multipliers(self.cfg, dz_h_pct, dz_a_pct)
+                        if bool(getattr(self.cfg, "faceoff_dz_direction_fixed", True)):
+                            m_dz_h, m_dz_a = raw_a, raw_h
+                        else:
+                            m_dz_h, m_dz_a = raw_h, raw_a
+                    lam_h = float(lam_h) * float(m_dz_h)
+                    lam_a = float(lam_a) * float(m_dz_a)
             # Apply overdispersion via lognormal multiplicative noise
             if float(self.cfg.dispersion_shots or 0.0) > 0.0:
                 try:

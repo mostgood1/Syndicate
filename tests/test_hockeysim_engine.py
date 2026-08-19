@@ -330,17 +330,23 @@ class HockeySimEngineTest(unittest.TestCase):
         )
 
     def test_faceoff_dz_direction_fixed_flag_actually_changes_output(self) -> None:
-        """Reachability test for the §2s flag itself: `faceoff_dz_direction_fixed=True` (the
-        default, corrected direction) must produce measurably different output than `False` (the
-        exact original, now-known-incorrect mapping), holding every other input identical --
-        proves the flag actually gates something, not just that it exists on `SimConfig`."""
+        """Reachability test for the §2s flag itself, WITHIN THE LEGACY DIFF-BASED FALLBACK
+        (`faceoff_dz_discrete_event_model=False` on both sides -- §2u's discrete-event curve is now
+        the default and has the correct direction baked into the curve itself, so
+        `faceoff_dz_direction_fixed` only matters on the pre-§2u fallback path this test targets):
+        `faceoff_dz_direction_fixed=True` (the corrected direction) must produce measurably
+        different output than `False` (the exact original, now-known-incorrect mapping), holding
+        every other input identical -- proves the flag actually gates something on that path, not
+        just that it exists on `SimConfig`."""
         rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
         lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
         lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
         neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.0}
         strong_dz_team = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.8}
-        cfg_fixed = build_nhl_sim_config(overrides={"faceoff_dz_direction_fixed": True})
-        cfg_legacy = build_nhl_sim_config(overrides={"faceoff_dz_direction_fixed": False})
+        cfg_fixed = build_nhl_sim_config(overrides={
+            "faceoff_dz_discrete_event_model": False, "faceoff_dz_direction_fixed": True})
+        cfg_legacy = build_nhl_sim_config(overrides={
+            "faceoff_dz_discrete_event_model": False, "faceoff_dz_direction_fixed": False})
 
         def _mean_home_shots(profile: SimConfig) -> float:
             totals = []
@@ -360,6 +366,73 @@ class HockeySimEngineTest(unittest.TestCase):
             f"fixed-direction mean={fixed_mean:.3f} should be LESS than legacy-direction "
             f"mean={legacy_mean:.3f} for the SAME strong-DZ team -- if not, the flag is not "
             f"gating the direction swap.",
+        )
+
+    def test_faceoff_dz_discrete_event_model_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2u: `faceoff_dz_discrete_event_model=True` (the default, real
+        decay curve) must produce measurably different output than `False` (the legacy diff-based
+        fallback, direction-fixed), holding every other input identical -- proves the flag actually
+        gates something, not just that it exists on `SimConfig`."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.0}
+        strong_dz_team = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.8}
+        cfg_discrete = build_nhl_sim_config(overrides={"faceoff_dz_discrete_event_model": True})
+        cfg_legacy = build_nhl_sim_config(overrides={"faceoff_dz_discrete_event_model": False})
+
+        def _mean_home_shots(profile: SimConfig) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=strong_dz_team, st_away=neutral_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        discrete_mean = _mean_home_shots(cfg_discrete)
+        legacy_mean = _mean_home_shots(cfg_legacy)
+        self.assertNotAlmostEqual(
+            discrete_mean, legacy_mean, places=1,
+            msg=f"discrete-event mean={discrete_mean:.3f} and legacy-diff mean={legacy_mean:.3f} "
+                f"should differ -- if they match, faceoff_dz_discrete_event_model is not gating "
+                f"anything.",
+        )
+
+    def test_faceoff_dz_discrete_event_model_still_shows_the_measured_direction(self) -> None:
+        """Under the NEW default mechanism specifically (not just the legacy fallback the prior
+        tests exercise): a team with a HIGH `faceoff_dz_index` must produce FEWER own shots than a
+        LOW one, matching §2s's measured direction, using the real decay curve rather than the
+        diff-based sign flip."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_dz_index": 1.0}
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong_dz_team = dict(base, faceoff_dz_index=1.8)
+        weak_dz_team = dict(base, faceoff_dz_index=0.3)
+        cfg = build_nhl_sim_config(overrides={"faceoff_dz_discrete_event_model": True})
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=neutral_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong_dz_team)
+        weak_mean = _mean_home_shots(weak_dz_team)
+        self.assertLess(
+            strong_mean, weak_mean,
+            f"Under the discrete-event DZ mechanism, faceoff_dz_index=1.8 must produce FEWER "
+            f"HOME shots on average than faceoff_dz_index=0.3 -- got strong={strong_mean:.3f} "
+            f"weak={weak_mean:.3f}.",
         )
 
     def test_faceoff_discrete_event_model_flag_actually_changes_output(self) -> None:

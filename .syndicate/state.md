@@ -2856,7 +2856,76 @@ independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
-## [mlb-ladders-native-builder] MLB LADDERS: STALE BECAUSE ONLY THE VENDOR APP BUILDS THEM `[2026-08-19]`
+## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
+
+### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
+
+    branch  deploy/worker-ladders-ridealong
+    commit  5c2851a4   parent f2eb719d (live at 18:51:08Z)
+    scope   3 files, +681, ZERO deletions -- purely additive
+
+**If you are about to deploy refresh-worker, cut from THIS instead of from the
+live SHA and both changes land together.** It is live-plus-three-files, so it
+cannot revert you; verified against the football lane's NCAAF deploy, both of
+their files byte-identical.
+
+**It goes stale whenever the worker moves** — the claim passed through three
+lanes in eight minutes on 2026-08-19 and this branch expired twice. **Re-cutting
+is one command** (`read-tree <new live>`, `update-index` the three paths,
+`commit-tree`); ask the `convergence-phase7-crps` lane or just do it.
+
+**The same deploy also injects `SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-08-19`**,
+which is SET on the service but inert until a restart and **EXPIRES AT 05:00Z**.
+So one worker deploy before then closes out the ladders fix AND the roster
+rebuild that has been pending all day.
+
+**BUILT.** `f86b24a3` + `6a213156`.
+**Nothing imports `flask_frontend` any more.**
+
+    syndicate/features/mlb/ladders_build.py     native builder, 17 prop groups
+    tests/test_mlb_ladders_build.py             14 tests, mutation-checked
+    scripts/run_mlb_daily_sim_job.py            trigger, before the publish sweep
+
+**VERIFIED ON REAL DATA** (2026-05-28, the date the local mirror holds):
+
+    PITCHER  strikeouts/outs/hits_allowed/earned_runs/walks_allowed
+                 12 rows, 6 with lines, matched 6/6
+             pitches, batters_faced                marketAvailable=false
+    HITTER   hits/hits_runs_rbis/home_runs/total_bases/runs/rbi
+                 156 rows, 58-71 with lines, matched 74/74
+             hitter_strikeouts/doubles/triples/stolen_bases  marketAvailable=false
+    both native readers render cards from the output
+
+**Every market-backed prop matched 100%, zero unmatched odds on either side.**
+
+**THE ODDS FEED IS NARROWER THAN THE SIM** — 5 of 7 pitcher props, 6 of 10
+hitter. Those carry `marketAvailable: false` and are EXCLUDED from the join
+accounting. Without that, four hitter props would report `matched 0/74` forever
+and look exactly like the bug this module fixes.
+
+**THE JOIN IS PUBLISHED:** `matchedPlayers` / `oddsPlayers` / `unmatchedOdds` /
+`unmatchedSimNames` on every group. Sim keys on `mlbam_id`, odds on lowercase
+name; names fold through an accent-stripping normaliser (the feed writes ASCII
+where the roster writes diacritics).
+
+**THE WRITER REFUSES TO OVERWRITE A GOOD ARTIFACT WITH AN EMPTY ONE** — an empty
+rebuild renders identically to a correct one, so overwriting on zero rows would
+destroy working output and look like a successful refresh.
+
+**TRIGGER:** `is_stale()` fires on `artifact_missing` / `odds_newer` /
+`sim_newer`, checked against BOTH odds files. Not a rebuild every tick. The
+`sim_newer` clause is what re-derives ladders on GAME STATE, since sims re-run
+every 15-20 min. Env kill-switch `SYNDICATE_MLB_LADDERS_REFRESH`, default on,
+never fatal, skipped when the sim failed.
+
+**NOT DEPLOYED.** Needs a refresh-worker deploy. `daily_ladders_*` is already
+allowlisted (2 patterns), so the existing sweep publishes it.
+
+**Bugs caught by RUNNING the real reader, not by reading:** `away`/`home` are
+OBJECTS and were being stringified whole into `team`/`matchup`; and the push
+boundary (`>` vs `>=`) — mutation-tested, a whole-number line must push.
+
+### WHY — the original diagnosis, kept because it is the evidence
 
 **SYMPTOM (user-reported, confirmed on the SERVED payload):** pitcher-props
 ladder candidates on the MLB compact cards do not update. Every row carries a

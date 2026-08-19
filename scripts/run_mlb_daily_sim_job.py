@@ -455,6 +455,38 @@ def main() -> int:
         print(f"MLB_INPUT_CHECKLIST skipped sim_ok={ok} "
               f"gate={os.environ.get('SYNDICATE_MLB_INPUT_CHECKLIST') or 'on'}", flush=True)
 
+    # LADDERS REFRESH. `#440`.
+    #
+    # The ladder artifact had ONE writer: the vendor Flask frontend, on-request,
+    # only while the source app served. Syndicate inherited the reader and not
+    # the producer. Measured 2026-08-19: the ladder was generated at 18:20 the
+    # previous evening, the odds it needs landed at 18:16 the next day, and every
+    # served row carried a full sim side against an EMPTY market side.
+    #
+    # Placed here, before the publish sweep, for the same reason as the checklist
+    # and the game-log bootstrap: the sweep only pushes files whose mtime is
+    # newer than `started_epoch` WHEN IT RUNS.
+    #
+    # `is_stale()` is the gate, so this is NOT a rebuild every tick -- it fires
+    # when the odds or a sim are newer than the artifact. The sim clause is what
+    # re-derives ladders on GAME STATE, since sims re-run every 15-20 minutes.
+    if ok and str(os.environ.get("SYNDICATE_MLB_LADDERS_REFRESH") or "on").strip().lower() not in ("0", "off", "false"):
+        try:
+            from syndicate.features.mlb import ladders_build as _lb
+            _pks = _lb.discover_game_pks(str(args.date))
+            _st = _lb.is_stale(str(args.date), _pks)
+            if _st.get("stale"):
+                _res = _lb.write_ladders_artifact(str(args.date), _pks)
+                print(f"MLB_LADDERS_REFRESH reason={_st.get('reason')} games={len(_pks)} {_res}", flush=True)
+            else:
+                print(f"MLB_LADDERS_REFRESH skipped fresh games={len(_pks)}", flush=True)
+        except Exception as _exc:
+            # Never fatal: a ladder refresh must not take down the sim job.
+            print(f"MLB_LADDERS_REFRESH_FAILED {type(_exc).__name__}: {_exc}", flush=True)
+    else:
+        print(f"MLB_LADDERS_REFRESH skipped sim_ok={ok} "
+              f"gate={os.environ.get('SYNDICATE_MLB_LADDERS_REFRESH') or 'on'}", flush=True)
+
     published_count = 0
     try:
         published_count = publish_changed_hot_artifacts(started_epoch)

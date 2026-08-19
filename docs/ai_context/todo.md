@@ -1019,7 +1019,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, the discrete-event engine redesign the validation demanded, AND a DZ-specific re-examination that found the shipped mechanism's WIRING DIRECTION was backwards, THEN FIXED) fully built through measurement, redesign, and correction** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, the discrete-event engine redesign the validation demanded, a DZ-specific re-examination that found the shipped mechanism's WIRING DIRECTION was backwards, THEN FIXED, AND FINALLY given its own proper discrete-event redesign matching the general case) fully built through measurement, redesign, correction, and a second redesign** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -1748,10 +1748,63 @@ DIRECTION of the DZ adjustment changed, not its SIZE. A genuinely faithful
 DZ-specific discrete-event model (its own decay curve, fit to the sixth
 addendum's segment data) remains a distinct, larger, not-yet-attempted
 follow-up -- this fix corrects a clear directional error with the smallest
-change that does so. **This closes the faceoff-zone track this session set
+change that does so.
+
+**Eighth addendum, same day: the proper DZ discrete-event model -- not
+just the sign fix the seventh addendum shipped.** Full report:
+`docs/reports/hockeysim_faceoff_dz_discrete_event_report.md`. The seventh
+addendum fixed the DIRECTION of the DZ adjustment but left the SHAPE
+unchanged -- still one flat constant across an entire segment, the exact
+category error the fourth/fifth addenda already fixed for the general
+case. This addendum gives DZ that same treatment.
+
+`scripts/build_nhl_faceoff_decay_curve.py --winner-zone D` extends the
+fourth addendum's marginal-bucket technique to the 19,458 real EV faceoffs
+the winner took in their own defensive zone: 0.24x at (0,5]s, briefly
+crossing back above 1.0x at (10,15]s (1.157x -- reported AS MEASURED, not
+smoothed, given roughly a third the sample per bucket vs the general
+curve, so more noise is expected), settling into a sustained ~0.95x
+through 60-90s. **Unlike the general curve, this one never fully
+reconverges to parity within the measured range** -- tail buckets beyond
+90s hold at the last measured bucket's own values, not an assumed 1.0/1.0.
+
+`historical_truth/faceoff_decay_model.py::segment_average_multipliers_dz`
+shares a refactored `_integrate_curve` helper with the general curve's own
+function -- same integration logic, different curve data (the general
+curve's own numbers are UNCHANGED, confirmed via a byte-for-byte re-run
+matching the previously-committed values exactly). `engine.py`'s DZ layer
+now has a 3-tier fallback, preserving every prior rollback point:
+`faceoff_dz_discrete_event_model=True` (default, the new curve, whose own
+sign already encodes the correct direction, no separate direction flag
+needed) -> `False` + `faceoff_dz_direction_fixed=True` (seventh addendum's
+sign fix) -> `False` + `faceoff_dz_direction_fixed=False` (the original,
+now-known-incorrect wiring).
+
+**Verified**: 34 unit tests on the decay-model module (17 pre-existing
+unchanged after the refactor + 17 new for the DZ curve); 2 new
+reachability tests (the flag changes output; a high `faceoff_dz_index`
+still shows fewer own shots than a low one UNDER THE NEW MECHANISM
+specifically, proving the redesign preserved the measured direction, not
+just changed the shape); **the existing `faceoff_dz_direction_fixed` test
+needed updating -- not because it broke silently, but because its premise
+changed**: with discrete-event now the default, that flag no longer
+affects output unless the legacy fallback is ALSO selected, so the test
+now explicitly targets `faceoff_dz_discrete_event_model=False` to exercise
+the path it actually tests; **416 hockeysim/nhl tests pass** (up from
+397); checklist re-confirmed full PASS (no new consumed field). League-
+wide aggregate barely moved (992-pairing round-robin, legacy
+direction-fixed 62.082 vs discrete-event 62.196 avg total shots/game,
++0.185%).
+
+**What this does NOT do**: no segment-level validation was re-run for
+OZ/EV specifically re-applying this refactored code (their own curve
+numbers are simply unchanged, confirmed); the DZ curve's noisy (10,15]s
+excursion is used as measured, not investigated further; PP/PK-strength
+DZ draws remain entirely unstudied, same `faceoff_ev_only` gate as
+everything upstream. **This closes the faceoff-zone track this session set
 out to build, validate, redesign, re-examine against its own
-justification, AND (where that re-examination found a real defect)
-correct.**
+justification, correct, AND (where a proper fix was warranted) redesign
+for real.**
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

@@ -64,12 +64,21 @@ def _load_regular_season_playbyplay(root: Path) -> List[Dict]:
     return out
 
 
-def _bucket_counts_for_game(payload: Dict) -> Tuple[List[int], List[int], List[float], int]:
+def _bucket_counts_for_game(
+    payload: Dict, *, winner_zone: Optional[str] = None,
+) -> Tuple[List[int], List[int], List[float], int]:
     """Per-bucket (winner_shots, other_shots, actual_seconds_covered) for one game, plus the
-    game's own EV faceoff count. A bucket's actual coverage is truncated at the next EV faceoff
-    (same discipline as `compute_post_faceoff_shots`), so a faceoff late in a shift contributes
-    less than the full bucket width to the denominator -- avoiding a rate that's biased toward
-    zero just because most of that bucket's nominal width was never actually "available".
+    game's own (possibly zone-filtered) EV faceoff count. A bucket's actual coverage is truncated
+    at the next EV faceoff REGARDLESS of its own zone (same discipline as
+    `compute_post_faceoff_shots`'s `winner_zone` filter -- truncation is about not double-counting
+    a shot, not about which draws are studied), so a faceoff late in a shift contributes less than
+    the full bucket width to the denominator -- avoiding a rate that's biased toward zero just
+    because most of that bucket's nominal width was never actually "available".
+
+    `winner_zone`, when given (`"O"`/`"N"`/`"D"`), restricts which draws are STUDIED (contribute to
+    `winner`/`other`/`covered`) to those the winner took in their own matching zone -- e.g. `"D"`
+    builds the DZ-specific decay curve `historical_truth/faceoff_decay_model.py`'s DZ discrete-event
+    mechanism needs, the same population §2s's `winner_zone` filter already validated.
     """
     events = _extract_timed_events(payload)
     n_buckets = len(_BUCKETS)
@@ -77,9 +86,12 @@ def _bucket_counts_for_game(payload: Dict) -> Tuple[List[int], List[int], List[f
     other = [0] * n_buckets
     covered = [0.0] * n_buckets
     n_faceoffs = 0
+    zone_filter = str(winner_zone).strip().upper() if winner_zone else None
 
     for i, ev in enumerate(events):
         if not ev.is_faceoff or ev.team_id is None:
+            continue
+        if zone_filter is not None and ev.zone != zone_filter:
             continue
         n_faceoffs += 1
         next_faceoff_time: Optional[float] = None
@@ -116,6 +128,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, default=None)
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--winner-zone", default=None, choices=(None, "O", "N", "D"),
+                     help="restrict to draws the winner took in their own matching zone")
     args = ap.parse_args()
 
     root = args.root or _nhl_source_root()
@@ -123,7 +137,7 @@ def main() -> int:
     if not playbyplay:
         print(f"REFUSED: no playbyplay cache under {root} -- run scripts/fetch_nhl_playbyplay_cache.py first", file=sys.stderr)
         return 1
-    print(f"loaded {len(playbyplay)} regular-season playbyplay payloads")
+    print(f"loaded {len(playbyplay)} regular-season playbyplay payloads (winner_zone={args.winner_zone!r})")
 
     n_buckets = len(_BUCKETS)
     total_winner = [0] * n_buckets
@@ -132,7 +146,7 @@ def main() -> int:
     total_faceoffs = 0
 
     for payload in playbyplay:
-        w, o, c, n = _bucket_counts_for_game(payload)
+        w, o, c, n = _bucket_counts_for_game(payload, winner_zone=args.winner_zone)
         for b in range(n_buckets):
             total_winner[b] += w[b]
             total_other[b] += o[b]

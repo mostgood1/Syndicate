@@ -464,6 +464,31 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   unchanged — only the direction of the DZ adjustment changed, not its
   size; a genuinely faithful DZ-specific discrete-event model (§2s's own
   segment data could fit one) remains a distinct, larger follow-up.
+- **Did** build that DZ discrete-event model (reference doc §2u, full
+  report `docs/reports/hockeysim_faceoff_dz_discrete_event_report.md`) —
+  the SAME treatment §2r gave the general EV/OZ case, applied to DZ, not
+  just another sign fix. `scripts/build_nhl_faceoff_decay_curve.py --winner-zone D`
+  extends §2r's marginal-bucket technique to the 19,458 real DZ draws:
+  0.24x at (0,5]s, briefly crossing back above 1.0x at (10,15]s (1.157x —
+  reported as measured, not smoothed, given roughly a third the sample per
+  bucket vs the general curve), settling at ~0.95x through 60-90s —
+  **never fully reconverging to parity within the measured range**, unlike
+  the general curve; tail buckets beyond 90s hold at the last measured
+  bucket's own values rather than assumed parity.
+  `segment_average_multipliers_dz` shares a refactored `_integrate_curve`
+  helper with the general curve's own function (confirmed byte-identical
+  output for the general curve after the refactor). `engine.py`'s DZ layer
+  now has a 3-tier fallback: discrete-event (default, curve's own sign
+  encodes the direction) → direction-fixed diff (§2t) → original diff, every
+  prior rollback point preserved. **Verified**: 34 unit tests (17 new), 2
+  new reachability tests (flag changes output; the measured direction still
+  holds under the new default specifically), the existing
+  `faceoff_dz_direction_fixed` test needed updating — not because it broke
+  silently, but because its premise changed (that flag now only matters on
+  the legacy fallback path) — 416 tests pass (up from 397); checklist
+  re-confirmed full PASS; league-wide aggregate barely moved (992-pairing
+  round-robin, 62.082 legacy-direction-fixed vs 62.196 discrete-event,
+  +0.185%). This closes the faceoff-zone track's own stated next step.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
