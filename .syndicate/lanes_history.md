@@ -9004,3 +9004,136 @@ test tonight has been in.
 DATA, not new consumer code); alarms should drop by 2 once the checklist is
 re-run against the landed commit (not re-run this session -- flag for whoever
 picks this up next).
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-19
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### nfl-odds-allowlist-deploy — CLOSED-VERIFIED 2026-08-19 — deployed `b233c55d` (scoped, parented on web's live SHA, NOT main), live 19:03:22Z. `/api/ops/artifacts/export` `count: 0 -> 14`, real file names confirmed. Production coverage == local mirror exactly (13 stubs + 2025 wk22 real, 10,208 bytes) — no new real weeks, #471's "believed but unverified" item now resolved. — session: nfl-odds-allowlist-deploy
+- Goal: get `basketball-model-owner`'s already-merged `nfl_source/oddsapi_
+  player_props_*.csv` `HOT_ARTIFACT_PATTERNS` fix (`#471` follow-up) actually
+  OBSERVABLE from web. **Testable outcome:** `/api/ops/artifacts/export?
+  pattern=nfl_source/oddsapi_player_props_*.csv` returns `count > 0` on
+  production (currently `count: 0` despite the code being correct and on
+  `origin/main` — confirmed the LIVE web commit `b775255a` predates the fix
+  by content, not ancestry).
+- Files: none (deploy-execution only, no code/ledger edits beyond this
+  block and the post-deploy measurement in `deploys.md`).
+- Hypothesis: n/a (not diagnostic — the fix is already verified correct in
+  code; this lane only exists to run the deploy through the claim +
+  preflight locks and record the measurement).
+- Falsification test: n/a.
+- Verification: post-deploy, the export endpoint above returns `count > 0`
+  with real file names, AND the live commit is confirmed BY CONTENT (not
+  ancestry) to carry the new pattern.
+- **MET.** `render_deploy.py`'s own rollback guard refused the naive
+  `main`-based target: web's live SHA `b775255a` is on a scoped-deploy
+  lineage (`converge origin/main into web's deploy lineage`, plus several
+  prior `scoped deploy(...): ... parented on the live SHA` commits — an
+  established pattern for this service, not invented here), and deploying
+  straight from `main` would have reverted 241 files / 46,620 lines. Fixed
+  by cherry-picking the one-file commit (`894b4135`, `origin/main`) onto
+  `b775255a` via `git merge-tree --write-tree --merge-base=894b4135~1
+  b775255a 894b4135` (object-database only, no working-tree checkout),
+  confirmed by `diff-tree` to touch exactly one file, pushed as
+  `deploy/nfl-odds-allowlist-20260819` (`b233c55d`), preflight required
+  `--allow-off-main` (correct — this commit is deliberately not on `main`),
+  user explicitly approved both the deploy and the override. Live
+  19:03:22Z. `/api/ops/artifacts/export?pattern=nfl_source/oddsapi_
+  player_props_*.csv` went `count: 0` → `count: 14`: 13 header-only stubs
+  (5 bytes) + `2025_wk22.csv` (10,208 bytes, real, matches the local
+  mirror almost exactly). **No real coverage exists beyond what `#471`
+  already measured locally** — the mirror was accurate here, not lossy.
+  Claim released (`web`, token `eb378c...`).
+- Blocked by: none.
+
+### soccer-model-dispersion — POSSESSION/SET-PIECE FOLDED INTO THE POOLED REGRESSION 2026-08-19 ~13:5xZ — NEITHER SIGNIFICANT; a real sample-composition artifact isolated and flagged, not over-interpreted — session: soccer-sport-owner
+
+**Backfilled `espn_match_stats.json` for the eight leagues `ad174dc0` left
+uncovered, then re-ran the pooled, league-fixed-effects regression with
+`possession_share`/`set_piece_goal_share` added.** Findings, then two real
+bugs hit and fixed along the way (worth recording so nobody re-hits them).
+
+**BACKFILL, ~35min total.** `espn_match_stats.py::aggregate_season_match_stats`
+is league-agnostic in code; only the ARTIFACT was eredivisie-only. First
+attempt used one wide `date_windows` span (2023-2026) and 400'd -- ESPN's
+scoreboard endpoint rejects overly long ranges. **Worse than the 400 itself:
+narrower windows that DID succeed (5mo, 10mo) both returned exactly 100
+events flat** -- confirmed by testing a genuinely narrow window (2mo -> 68,
+well under 100) that this is a real ~100-events/request PAGE CAP, not
+coincidence. A wide-but-valid window would have silently truncated, not just
+errored. Rebuilt on MONTHLY windows (37, Aug 2023-Aug 2026); all 8 leagues
+succeeded with organic, non-round row counts (917-1683) and no more caps.
+
+**Coverage measured per league, not assumed** (eredivisie's own 99.8% join
+rate from `ad174dc0` was NOT re-verified per-league here):
+
+    eredivisie 100%  epl 100%  serie_a 100%  primeira_liga 94%  championship 96%
+    bundesliga 91%  la_liga 89%  ligue_1 88%  belgian_pro_league 77%
+
+**REGRESSION RESULT, n=13,162 (espn-covered subset, league fixed effects):**
+
+    possession_share       coef=+0.190  t=+1.61  NOT significant
+    set_piece_goal_share   coef=-0.305  t=-1.80  NOT significant
+
+**Neither clears significance.** Unlike `clean_sheet_rate`, which passed the
+regression stage and only failed at PAIRED BACKTEST, these fail at the
+REGRESSION stage itself -- no weight-change candidate to even propose, so no
+paired backtest was run for this. The wiring's DEFAULT hardcoded weights
+(0.24/0.8) already have their own paired-backtest result (earlier entry:
+t=+1.27, not significant, KEPT) -- this finding does not change that.
+
+**A REAL DISCREPANCY, ISOLATED BEFORE REPORTING, NOT SILENTLY ACCEPTED:**
+on this espn-covered subsample, `shots_per_match`/`points_per_match` ARE
+significant (t=9.39, t=4.77) -- contradicting the earlier entry's finding on
+the full pooled sample ("NOT significant... left untouched"). Ran a
+same-sample A/B (attack-only vs attack+possession+set-piece, IDENTICAL
+n=13,162 rows both times) to isolate the cause: **shots/form are ALREADY
+significant on this subsample WITHOUT the two new terms** (t=9.84, t=4.61) --
+adding possession/set-piece barely moves them. **The discrepancy is a SAMPLE-
+COMPOSITION effect (espn-covered subset vs full pool), NOT caused by the new
+terms.** Flagged, not acted on: the shots weight is ALREADY settled by a real
+paired BACKTEST (`b69c5277`, the falsified-shrink revert), which is the
+actual arbiter established all night -- an offline regression finding
+different significance on a different subsample does not reopen that.
+
+**TWO BUGS HIT AND FIXED while building this, both from the SAME root cause:**
+session worktrees exclude `data/` by default except what a landed commit
+specifically carries -- this worktree had ONLY eredivisie's subtree.
+(1) The backfill script's `open(out, "w")` crashed on the FIRST league
+(`primeira_liga`) with `FileNotFoundError` because the target directory
+didn't exist -- Python's `open` doesn't create parents. Killed the entire
+run before leagues 2-8 ever started. Fixed with `mkdir -p` first, verified,
+reran clean.
+(2) The pooled collector then hit `ZeroDivisionError` on `primeira_liga`
+specifically -- `_load_history` returned 0 rows because the league's
+`matches_*.csv` files ALSO aren't in this worktree (only their NEWLY-WRITTEN
+`espn_match_stats.json` was, since I'd just created that). Fixed by copying
+the 8 new artifacts into the PRIMARY tree (which has the full `data/` corpus)
+and running the collector from there instead -- read-only against `data/`,
+confirmed via `git status --porcelain` that no staging occurred; the
+`git add`-writes-a-shared-index warning is about staging, not reads.
+
+**NOT COMMITTED, deliberately, and this is a SCOPE decision, not an
+oversight.** The 8 new `espn_match_stats.json` files exist on disk (both
+trees) but committing them would silently expand PRODUCTION
+`possession_metrics`/`set_piece_metrics` coverage to 8 more leagues -- a
+different, bigger action than "fold into the regression," and these 8
+leagues' join coverage (77-100%) was measured with less rigor than
+eredivisie's own 99.8% (no per-league fuzzy-match audit). If someone wants
+production coverage expanded, that is its own decision with its own paired
+validation, not a side effect of this regression exercise.
+
+**Reproducibility:** backfill script + all 9 leagues' collected rows +
+both regression scripts under `C:\tmp\` (local scratch) --
+`fit_data_v2_{league}.json`, `fit_weights_pooled_v2.py`,
+`fit_compare_samples.py`, `backfill_espn_stats2.py`.
+
+**STANDING, unchanged:** the wiring's committed weights (0.24/0.8, default)
+stay as-is. `b69c5277` (shots revert) and the clean_sheet_rate discard are
+both unaffected by this. Availability/pace remain the two genuinely unsourced
+fields.
