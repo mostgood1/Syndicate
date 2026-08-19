@@ -1244,3 +1244,31 @@ invariants fail. `commit-guard.py` already gates commits and is the natural home
 had not tested, wrote it down as a rule, and the disproof was a single tool call
 available the whole time. *Absent signal is about the emitter* — check whether
 the guard FIRES before theorising about why it didn't.
+
+## 2026-08-19 — VERIFY THE CHANNEL, NOT JUST THE QUERY
+
+I wrote a `verify:` naming a log line, then watched Render's log API for it for
+twenty minutes and started forming theories about why the code had not run.
+
+**It could never appear there.** `live_refresh_loop.py:2784-2790` spawns the sim
+job with `popen_kwargs["stdout"] = open(log_path, "wb")` — every line the wrapper
+prints goes to a FILE on the worker's disk, never to the container stdout Render
+collects.
+
+**The subtle part: I DID check the instrument.** I verified the logs `text=`
+filter against four strings visible in the unfiltered feed, precisely because
+this session had already burned me on unproven null results. The query was sound.
+**The CHANNEL was wrong.** A correct instrument aimed at the wrong pipe returns a
+confident, well-tested nothing.
+
+**RULE: a signal has TWO failure points — is it emitted, and can it REACH me.**
+Proving the reader works says nothing about the writer's destination. Before
+naming any log line as a verification, check where that process's stdout goes.
+
+**Corollary for `verify:` fields:** prefer a signal with a KNOWN path off the
+machine. On this worker that means the published, allowlisted checklist artifact
+— not a print, however well-placed. `deploys.md` and the engine reference both
+said "grep for this log line" and both were unusable as written.
+
+Sits directly on top of [[feedback_absent_signal_is_about_the_emitter]], which I
+had already written and still only half-applied.
