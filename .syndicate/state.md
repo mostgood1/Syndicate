@@ -2337,7 +2337,7 @@ for that pattern. **It does NOT carry the five MLB sim patterns**, which are
 still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 /api/ops/artifacts/publish` still 403s.
 
-## WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]`
+## [mlb-sim-artifacts-live] WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]`
 
 - **`POST /api/ops/artifacts/publish` 403 -> 200.** All five published and read
   back BY CONTENT: `arsenal` 0.57MB, `quality` 0.08MB, `batted_ball` 0.23MB,
@@ -2361,7 +2361,16 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 - **Residual:** `055dfc67` is off main, so a future off-main web deploy drops
   these six lines. They are on main in `c2030c72`.
 
-## CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+## [web-preflight-dead-sample] CORRECTION — THE DEAD PREFLIGHT IS A DELETED EMITTER, NOT MISSING `psutil` `[2026-08-18]`
+
+> **SUPERSEDED — this section's conclusion is WRONG and its own author retracted
+> it in the section below, which carries the SAME subject key deliberately.**
+> The emitter was not deleted; it is intact at `memory_observability.py:1952`.
+> Retained verbatim because the retraction explains how the mistake was made
+> (a `head -4` truncated grep read as exhaustive) and that reasoning is worth
+> more than a tidy file. **Do not act on anything in this section.**
+> Collapsing the two into one is owed work for whoever owns this subject —
+> `state_key_check.py` now reports it, which is the intended behaviour.
 
 **Supersedes what I wrote three times today** — in the break-glass grant, in the
 web-deploy state entry above, and in the session checkpoint. All three name
@@ -2396,7 +2405,24 @@ line `deploy_preflight.py:parse_processes` can parse into `{pid, ppid, rss, cmd}
 Re-adding the periodic call must respect the standing rule that **worker periodic
 work is never free** (`#241` caused a production restart loop; ~1.4GB headroom).
 
-## RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
+## [web-preflight-dead-sample] RETRACTION — "THE EMITTER WAS DELETED" IS ALSO WRONG. CAUSE IS **UNKNOWN**. `[2026-08-18]`
+
+> **THIS IS THE CURRENT TRUTH FOR THIS SUBJECT.** It shares its key with the
+> superseded CORRECTION section above, so `state_key_check.py` reports the
+> subject as stacked — deliberately, per this file's own rule that a second
+> section on one subject is a defect to be seen rather than hidden behind a
+> different slug. Collapse is owed by this subject's owner.
+>
+> **A FOURTH CAUSE HAS SINCE BEEN CLAIMED AND RETRACTED TOO** `[added 2026-08-18
+> by lane `ledger-coherence-sweep`]`: `todo.md` `#465` asserted "no web code
+> path emits `ALL_PROCESS_MEMORY`", confirmed by caller trace. Also wrong — web
+> has a live path, `syndicate/app.py:37` →
+> `start_intelligence_state_background_loop` →
+> `intelligence_state.py:_diag_log_all_process_memory` (12 sites) →
+> `memory_observability.py:1919 log_and_persist_process_memory` → `:1944` →
+> `:1952`. It read as true because `app.py` contains zero occurrences of the
+> callee — it *starts a loop* that calls it. **The tally in this section is now
+> 4 wrong causes, not 3**, and its "do not add a fifth guess" stands.
 
 **Supersedes the CORRECTION section immediately above.** That section says the
 `ALL_PROCESS_MEMORY` emitter was deleted from `memory_observability.py`.
@@ -2474,7 +2500,7 @@ WORKERS can produce, so web's preflight has never been satisfiable.**
 **To confirm:** find any web-side call path to `log_all_process_memory`, or
 confirm none exists. If none, the fix is (2) and no emitter is missing.
 
-## refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
+## [refresh-worker-deploy-hold] refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]`
 
 **The hold is VOID — its owner is dead, and the roster lies about it.**
 
