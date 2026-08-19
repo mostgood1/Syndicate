@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-08-19 — RECEIVING_YARDS + RUSHING_YARDS BLEND WEIGHTS: STABILITY CHECKED, BOTH CONFIRMED STABLE — lane `nfl-yardage-blend-stability`
+
+**NO DEPLOY. Local analysis only** (new script + report, `83679a7a` on
+`origin/main`). No production code changed.
+
+Generalized `nfl-passing-attempts-skew-extrapolation`'s stability check
+(same closed-form optimal blend weight, computed independently on two
+genuinely separate seasons) to markets that were never clipped, to check
+whether their shipped weights are as fit-half-noisy as `passing_attempts`
+turned out to be. Pre-registered stability criterion before running: same
+sign AND ratio (larger/smaller) <= 2.0x.
+
+    rushing_yards   (shipped w=0.573)
+      half A (2022-2023, n=20278): w=0.5731
+      half B (2024-2025, n=20325): w=0.5717
+      ratio 1.00x -- essentially identical across two fully independent
+      multi-season samples. About as clean a replication as this check
+      can produce.
+
+    receiving_yards (shipped w=0.216)
+      half A (n=34825): w=0.2158
+      half B (n=34436): w=0.1242
+      ratio 1.74x, same sign -- within the pre-registered threshold.
+
+**Both STABLE. No code change made** —
+`_COVER_PROBABILITY_BLEND_WEIGHT["rushing_yards"/"receiving_yards"]` stay
+as shipped. Unlike `passing_attempts` (half A=1.14, half B=0.88 —
+opposite sides of the log-normal boundary, genuinely unstable), these two
+markets' weights are real, well-estimated properties of the data, not
+noise from one particular split.
+
+Verify: `scripts/check_nfl_blend_weight_stability.py`,
+`reports/nfl_yardage_blend_stability_check.json`.
+
+---
+
 ## 2026-08-19 — PASSING_ATTEMPTS BLEND WEIGHT: STABILITY CHECKED, FALSIFICATION FIRED, NO FIX SHIPPED — lane `nfl-passing-attempts-skew-extrapolation`
 
 **NO DEPLOY. Local analysis only** (new script + report, `c0939290` on
@@ -106,11 +142,31 @@ service's live SHA was 340 files / 107k lines — contaminated by ~15 other
 concurrent lanes' unrelated work landing on the shared trunk. Split into the
 TRUE scope: **6 files, 1058 insertions / 29 deletions**
 (`wnba_projections.py`, `wnba_game_projections.py`, `board_enrichment.py`,
-`refresh_wnba_oddsapi_props.py`, both test files), built as two scoped
-cherry-pick branches — `deploy/wnba-263-refresh-worker` (`579f70d7`, onto live
-`23e70a80`) and `deploy/wnba-263-live-odds-worker` (`218a5ded`, onto live
-`0c7962a7`) — each a verified descendant of its own target's actual live SHA,
-56/56 tests passing on both.
+`refresh_wnba_oddsapi_props.py`, both test files), built as scoped cherry-pick
+branches — a clean descendant of the target's own live SHA each time, tests
+passing on every rebuild.
+
+**UPDATE 2026-08-19 20:04Z — live-odds-worker needs NO deploy of its own.**
+Its live SHA moved twice during this session (`0c7962a7` → `97e85b66`, a
+normal main-line push carrying `basketball-model-owner`'s unrelated `#472`
+fix) and that new SHA already contains all 5 WNBA commits as real ancestors —
+confirmed BY CONTENT, not just ancestry (`git show 97e85b66:...
+wnba_game_projections.py | grep -c p_home_win` → 6 matches;
+`load_wnba_prop_distributions`/`_hit_prob_over` present in
+`wnba_projections.py`). Claim released, branch abandoned unused.
+
+**refresh-worker's branch was rebuilt twice** as its own live SHA moved
+(`23e70a80` → `f2eb719d`, another lane's unrelated NCAAF deploy, verified as
+forward ancestry not divergence both times before rebuilding). Final branch:
+`deploy/wnba-263-refresh-worker` → `152c3292`, onto live `f2eb719d`.
+
+**OFF-MAIN, DELIBERATELY — justification per the escape hatch.** `152c3292`
+is not on `origin/main` by construction: it is `f2eb719d` (refresh-worker's
+own live SHA, itself off-main — a scoped NCAAF deploy branch) plus exactly
+the 5 WNBA commits, cherry-picked to exclude the ~15 other concurrent lanes'
+unrelated work that IS on `origin/main`. Composing on top of the service's
+own live SHA, not main, is the documented reason this escape hatch exists.
+`--allow-off-main` used on both `deploy_preflight.py` and `render_deploy.py`.
 
 **Expected effect:** `game_cards_<date>.csv`/`props_recommendations_<date>.csv`
 regenerate with 5 new columns on the next WNBA refresh cycle post-deploy (that
@@ -120,17 +176,60 @@ board loop ticks every 60s). No precise WNBA refresh-cadence number available
 to pin a window tighter than "next cycle" — will report the actual observed
 timing, not assert one in advance.
 
-**Blast radius:** both `refresh-worker` (4GB) and `live-odds-worker` (2GB)
-restart, stop-then-start, no overlapping instances. live-odds-worker's fire
-kills whatever's in flight at that instant (precedented/accepted for this
-service — no idle window during active hours). refresh-worker checked for a
-clean window at fire time.
+**Blast radius:** `refresh-worker` (4GB) restarts, stop-then-start, no
+overlapping instances. Fired only after two consecutive CLEAR preflight
+reads (20:03:55Z, 20:04:10Z), per the documented method for this exact
+"deploy kills an in-flight MLB sim" scenario — genuinely busy most of this
+session (MLB daily sim + NFL smartsim jobs), windows lasted seconds to low
+minutes each time.
 
-**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 23e70a80 --allow-rollback`
-/ `py -3 scripts/render_deploy.py --service live-odds-worker --commit 0c7962a7 --allow-rollback`.
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit f2eb719d --allow-rollback`
+(supersedes the earlier `23e70a80` target — that SHA is no longer refresh-
+worker's live commit as of this session, `f2eb719d` is).
 
-**Measured:** _(pending — reminder: read `per_sport_ingest.wnba` post-deploy,
-this session)_
+**MEASURED 2026-08-19 20:24:47Z, by content, same session.** Fired
+`152c3292` at 20:07:28Z after two consecutive CLEAR preflight reads
+(20:03:55Z, 20:04:10Z; a third pair with `--target-commit`/`--allow-off-main`
+at 20:06:58Z/20:07:11Z, since the guard additionally wants a preflight
+vouching for the EXACT target SHA). Build finished 20:14:22Z (confirmed live
+by content via `deploy_preflight.py`, not just the 201). First fresh
+post-deploy WNBA board build landed 20:24:47Z (`written_at`, ~10 min after
+container restart — the WNBA producer's own turn in the refresh rotation,
+not immediate).
+
+- `rows_with_model_edge`: **0 → 71**, on the SAME date/board endpoint, content
+  re-pulled independently after the notification (not trusting the watcher
+  alone).
+- `distribution_source_artifact: "cards_sim_detail_2026-08-19.json"` —
+  confirms the real empirical sim ladder is the live source, not a
+  reconstructed approximation.
+- `probability_fields`: `"empirical sim ladder where the player/stat/line
+  matched; means only elsewhere (unmatched player, unsupported market, or no
+  line)"` — the exact honest label from the shipped code, live in the served
+  payload.
+- Props: `rows_with_distribution: 124` (of 232 considered, 171 with any
+  projection at all).
+- Game lines: `games_in_index: 2`, `rows_with_projection: 21` (of 71
+  considered).
+- Spot-checked individual rows, not just the aggregate: `Lauren Betts |
+  player_points | model_edge_pct=-1.93 | basis=empirical_sim_ladder` — one
+  concrete non-null edge on a real player row. Most of today's top-12
+  SELECTED rows carry `basis=empirical_sim_ladder` (a real probability
+  attached) with `model_edge_pct` still `None` on that SPECIFIC row (its own
+  two-sided fair could not de-vig) — an honest, separate reason, not a
+  fix failure; the 71-row edge count lives across the fuller 1167-candidate
+  pool, not concentrated at today's very top of the ranking. Stated
+  precisely so this isn't read as "every visible row now shows an edge."
+- h2h's `p_home_win` half not independently spot-checked this session (no
+  h2h row happened to be in today's top-12 sample) — the code path is
+  tested (4 dedicated tests) and the column-read is content-verified
+  present on the live commit, but a live h2h row carrying `basis=
+  sim_win_probability` has not been directly observed yet. Flagged as the
+  one remaining unverified edge of this lane's original goal.
+
+**Lane goal MET**: the testable outcome stated at lane-open
+(`rows_with_model_edge > 0`, up from the measured 0 of 1,072) is confirmed
+live, by content, same session.
 
 ---
 

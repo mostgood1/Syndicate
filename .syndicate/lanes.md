@@ -705,7 +705,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   never tracks players. Props would be a build, not a wiring fix.
 - Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
 
-### wnba-edge-263 — OPEN — **ALL CODE MERGED, DEPLOY BUILT+CLAIMED, BLOCKED ON JOB-IN-FLIGHT** — opened 2026-08-19 — session: wnba-edge-263
+### wnba-edge-263 — CLOSED 2026-08-19 20:24:47Z — **DEPLOYED AND VERIFIED LIVE: `rows_with_model_edge` 0 → 71** — opened 2026-08-19 — session: wnba-edge-263
 - Goal: WNBA Layer 2 rows carry a real `model_edge_pct` (or an honestly-labeled
   approximation) instead of `None` on every row. **Testable outcome:**
   `/api/board/layer2-shortlist?sport=wnba` on a live slate reports
@@ -1207,19 +1207,21 @@ in this lane (props loader test added a few commits back). Worth generalizing:
 any join in this codebase whose tests build the index by hand rather than
 through its own loader has an unmeasured seam exactly like this one.
 
-**STATUS AT CHECKPOINT 2026-08-19, superseding the paragraph above.** All code
-merged to `origin/main` (both sub-fixes + `basketball-model-owner`'s producer
-half). Two scoped deploy branches built/pushed and claim-held —
-`deploy/wnba-263-refresh-worker` (`152c3292`), `deploy/wnba-263-live-odds-worker`
-(`218a5ded`) — **but NOT YET DEPLOYED**: `deploy-guard.py` blocks on a genuine
-job-in-flight HOLD on both services (real MLB sim on refresh-worker, no idle
-window on live-odds-worker), and `SYNDICATE_DEPLOY_GUARD=off` has no working
-override from inside a tool call (see `state.md` `[deploy-discipline]`).
-Session ended with the user deciding whether to set that env var themselves or
-keep waiting for a natural clear window. **Next session: check
-`py -3 scripts/deploy_claim.py status` first — claims may have expired (45-min
-TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
-`.syndicate/log/2026-08-19.md`, "Lane: wnba-edge-263" section.
+**CLOSED-VERIFIED 2026-08-19 20:24:47Z, superseding both paragraphs above.**
+`live-odds-worker` needed NO deploy in the end — its live SHA moved on its
+own (`0c7962a7` → `97e85b66`, an unrelated normal main-line push) and the new
+SHA already contained all 5 WNBA commits, content-verified. `refresh-worker`
+fired at 20:07:28Z (`152c3292`, off-main by design — justification in
+`deploys.md`), live at 20:14:22Z. First fresh post-deploy WNBA board build
+landed 20:24:47Z: **`rows_with_model_edge` 0 → 71**, content-verified twice
+independently (not just the watcher's report). Full measurement, including
+the one honestly-flagged gap (h2h's `p_home_win` path is code-verified but
+had no live row to observe today — zero `h2h` markets on today's board at
+all): `.syndicate/deploys.md`, "WNBA `#263` LAYER 2 MODEL_EDGE_PCT FIX"
+entry. Both deploy claims released. Lane goal MET as stated at open. Full
+narrative including the deploy-window hunt, two lane-guard bugs found and
+fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
+2026-08-19.md`, "Lane: wnba-edge-263" section.
 
 ### nfl-passing-attempts-skew-extrapolation — CLOSED-VERIFIED 2026-08-19 — falsification test FIRED: half B (2024-2025) independently wants w=0.88, NOT >1.0 (half A wanted 1.14). NOT a stable signal -- no code change, w=1.0 stays as shipped. `c0939290` on `origin/main`. — session: nfl-passing-attempts-skew-extrapolation
 - Goal: `nfl-player-props-skew-fix`'s blend fix capped `passing_attempts`'
@@ -1277,7 +1279,7 @@ TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
   Report committed: `reports/nfl_passing_attempts_skew_stability_check.json`.
 - Blocked by: none.
 
-### nfl-yardage-blend-stability — OPEN — opened 2026-08-19 — session: nfl-yardage-blend-stability
+### nfl-yardage-blend-stability — CLOSED-VERIFIED 2026-08-19 — BOTH markets confirmed STABLE: rushing_yards half A/B = 0.5731/0.5717 (1.00x ratio), receiving_yards = 0.2158/0.1242 (1.74x, within threshold). No code change -- shipped weights well-supported. `83679a7a` on `origin/main`. — session: nfl-yardage-blend-stability
 - Goal: `nfl-passing-attempts-skew-extrapolation` checked whether a CLIPPED
   weight (passing_attempts, capped at 1.0) was hiding a real, stable
   correction beyond the boundary -- and found the fit-half number (1.14)
@@ -1321,6 +1323,18 @@ TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
   verdict per market and, if unstable, a decision on whether the shipped
   weight should move toward the more conservative (closer to 0) estimate
   or be left as-is with the instability disclosed.
+- **RAN. Both markets STABLE — hypothesis's relative ranking correct, but
+  both landed inside the pre-registered threshold, unlike passing_attempts.**
+  `scripts/check_nfl_blend_weight_stability.py`:
+  `rushing_yards`: half A (2022-2023, n=20278) w=0.5731, half B
+  (2024-2025, n=20325) w=0.5717 — **ratio 1.00x**, essentially identical
+  across two fully independent multi-season samples. `receiving_yards`:
+  half A (n=34825) w=0.2158, half B (n=34436) w=0.1242 — ratio 1.74x,
+  same sign, within the pre-registered <=2.0x threshold. **No code
+  change** — `_COVER_PROBABILITY_BLEND_WEIGHT` stays as-is for both;
+  unlike `passing_attempts`, both shipped weights are genuinely
+  well-supported, not fit-half noise. Report committed:
+  `reports/nfl_yardage_blend_stability_check.json`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
