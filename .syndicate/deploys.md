@@ -17547,3 +17547,67 @@ silently stripping the cache from `_smartsim2_projection_index`, turning a hot
 read into a per-request disk read on the 2GB web service. Found only because a
 unit-test patch would not take effect. Decorator restored; window check
 uncached; 392 ncaaf/football tests pass.
+
+
+## 2026-08-19 23:20:39Z — CI GREEN AGAIN after ~26 hours red — lane `ci-green`, `#480`
+
+**NOT a Render deploy.** No service was touched, no claim taken, no preflight
+run — `render.yaml` untouched, so no `blueprint_sync`. Recorded here because it
+is a MEASUREMENT of a fix, which is what this file is for.
+
+**verify:** GitHub Actions run **32312838316**, head `1a45cedb`, conclusion
+`success`, **both** gated steps green:
+
+    success  Run archive regression suite
+    success  Ledger coherence (enforced -- lanes.md, todo.md, state.md)
+
+The second line matters on its own: `Ledger coherence` runs AFTER the suite, so
+for the whole 26-hour red window it was **skipped, not passing**. This is the
+first run since 2026-08-17 21:05Z in which the ledger gate actually executed.
+
+**Attribution, checked rather than assumed.** The discriminator is the presence
+of `tests/_cache_isolation.py` in the pushed tree, tested per-commit:
+
+| head | fix present | CI |
+|---|---|---|
+| `c6cf5a2e` 22:59Z | ABSENT | failure |
+| `17cc1177` 23:04Z | ABSENT | failure |
+| `43715313` 23:05Z | ABSENT | failure |
+| `8b970475` 23:06Z | ABSENT | failure |
+| `6f83a006` 23:16Z | ABSENT | failure |
+| `e8b56d0e` 23:20Z | PRESENT | **success** |
+| `1a45cedb` 23:20Z | PRESENT | **success** |
+
+Five red immediately before, two green immediately after, one bit between them.
+`e8b56d0e` is another session's push that already carried `5557d4ce` as an
+ancestor (confirmed) — the shared primary tree again — so the first green run is
+not even mine, which is the cleanest possible form of this evidence.
+
+**What was measured locally before pushing, on the MERGED tree:**
+`tests.test_archives` 383 tests `OK (skipped=2)`; the 13-module daily-update
+list 55 tests `OK`, the same count CI reports; `test_wnba_cards_merge_aliases`
+green under `unittest` AND `pytest`; `lane_identity_check` /
+`todo_id_reconcile --no-history` / `state_key_check` all exit 0.
+
+**NOT MEASURED, and specifically not claimed:** the `Daily Update` workflow. Its
+failing step is fixed by the same commit, but steps 12-13 (`Pull current
+artifacts from Render`, `Commit and push pipeline outputs`) have not executed
+since **2026-07-15** and this changes nothing about them. Two blockers stood in
+front of them and both are already gone: `ADMIN_TOKEN` absent 2026-07-16 06:49Z,
+added the same day 14:24Z (secrets API, names only); every run 07-16 -> 08-15
+killed before any step by *"your account is locked due to a billing issue"*
+(3-second jobs, empty `steps[]`, no retrievable log — which is why the per-step
+API reported no failing step for that entire month). **The next scheduled 06:00Z
+run is the first real exercise of the artifact-backup path in five weeks. Do not
+record it as working until a run shows those two steps green.**
+
+**Push route worth copying.** The primary shared tree held another session's
+uncommitted NHL work on 14 paths that `origin/main` had also changed, so
+`git merge` refused ("local changes would be overwritten") and any force would
+have destroyed it. Landed with **`git merge-tree --write-tree` + `commit-tree`
++ `push`** instead: writes objects and refs only, never touching the index or
+working tree, so a contended shared tree cannot be damaged by someone else's
+merge. An earlier attempt also had to move an untracked file aside
+(`scripts/build_basketball_home_court_advantage.py`, another lane's `#474`
+work) — backed up first, and verified byte-identical apart from CRLF after the
+merge restored it.

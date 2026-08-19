@@ -1112,7 +1112,7 @@ history directly:
   not just "capture resumed."
 - Blocked by: none.
 
-### ci-green — OPEN — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+### ci-green — CLOSED 2026-08-19 — **CI GREEN, run `32312838316` head `1a45cedb`, BOTH gated steps success. Daily Update's failing step fixed by the same commit but its later steps remain UNEXERCISED since 2026-07-15 — see `#480`.** — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Goal: `CI` on `main` is GREEN again and stays green. Testable: a push to
   `main` produces a run whose `Run archive regression suite` AND
   `Ledger coherence` steps both pass.
@@ -1152,6 +1152,18 @@ history directly:
   pull + commit/push) have not run since 2026-07-15. `ADMIN_TOKEN` is present
   (added 2026-07-16 14:24Z). The next scheduled run is the first real test.
 - Blocked by: none.
+- **VERIFICATION RAN, result quoted not predicted:** run `32312838316`,
+  `Run archive regression suite` success + `Ledger coherence` success. The
+  second had been SKIPPED (not passing) for the whole red window, so this is
+  also the first execution of the ledger gate since 2026-08-17 21:05Z.
+  Attribution checked per-commit: 5 consecutive reds without
+  `tests/_cache_isolation.py`, 2 greens with it. Full table in `deploys.md`.
+- Rule written to `learnings.md`: a green local `pytest` run is not evidence
+  about CI, because CI runs `unittest` and `conftest.py` is a pytest-only
+  plugin file.
+- **Left open for whoever owns it next, NOT done here:** the 06:00Z `Daily
+  Update` run is the first exercise of its Render-artifact-pull + commit/push
+  steps in five weeks. Do not record that path as working without a run.
 
 ### nfl-injuries-fetcher — CLOSED 2026-08-19 — session: nfl-injuries-fetcher — landed `9ef312c5` on `origin/main`, not yet deployed
 - Goal: `syndicate/features/nfl/injury_adjustment.py` (the one place real

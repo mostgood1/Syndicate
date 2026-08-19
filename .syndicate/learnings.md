@@ -1694,3 +1694,41 @@ of "is this still true?" costs one call and would have saved five here.
 **Cost:** ~5 wasted tool calls, a wrong "FAILED" reported to the user, and a
 recommendation ("Path A cannot work, only Path B") that was the opposite of the
 truth. No production impact — the deploy was correct throughout.
+
+
+## 2026-08-19 — FORBIDDEN: never treat a green local `pytest` run as evidence about CI. **CI runs `unittest`, and `conftest.py` does not exist to it.**
+
+`tests/conftest.py` is a **pytest plugin file**. `python -m unittest` never
+imports it. Both workflows in this repo run `unittest`:
+
+    ci.yml            python -m unittest tests.test_archives
+    daily-update.yml  python -m unittest <13 modules>
+
+while `CLAUDE.md`'s documented day-to-day loop is `python -m pytest tests/`.
+So every autouse fixture in `conftest.py` — cache resets, the prediction-ledger
+isolation, the background-loop suppression — is **silently absent in CI**, and
+a test that depends on one passes locally and fails in the gate, forever, with
+no signal that the two runs were not the same run.
+
+**Measured:** `tests/test_wnba_cards_merge_aliases` — `20 passed` under
+`python -m pytest`, `FAILED (failures=2)` under `python -m unittest`, same
+commit, same machine, same minute. Cause: `build_source_cards_payload`'s cache
+is keyed on `(date, ...)` + a wall-clock TTL bucket, `conftest.py` had cleared
+it since months ago, and under `unittest` nothing did — so the
+alphabetically-first test's `("2026-07-02", True)` payload was served to the
+two tests after it. **Deterministic, not a flake, and it had failed the Daily
+Update workflow every single morning it was able to run.**
+
+**The general rule, which is not about pytest:** *run the command the gate
+runs.* A verification is only evidence about the thing that shares its
+harness. This is the same shape as `presence != reachability` and
+`a deployed fix can be inert` — the code was there, the fixture was there, and
+the path that mattered never reached it.
+
+**How to not re-introduce it:** shared setup that a CI-run module depends on
+must live somewhere BOTH runners load — `tests/_cache_isolation.py` is the
+pattern: plain functions plus a `TestCase` mixin, with `conftest.py`'s fixtures
+delegating to the same functions. One definition, both harnesses. Adding a new
+autouse fixture to `conftest.py` alone is fine ONLY for modules that no
+workflow invokes through `unittest`; check `ci.yml` and `daily-update.yml`
+before assuming that.
