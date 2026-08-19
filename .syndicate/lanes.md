@@ -535,135 +535,31 @@ across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will no
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
-### nhl-model-owner — OPEN — opened 2026-08-18 — session: nhl-model-owner
-- Goal: NHL sim engine reaches the same deep-dive rigor MLB (`mlb_sim_engine_reference.md`
-  + `sim_input_checklist.py`) and soccer (`soccersim_phase1_build_report.md` +
-  `soccer_sim_input_checklist.py`) already have — a pipeline-trace/input-provenance
-  doc, a CONSUMED-vs-POPULATED gating script, and the live findings those produce
-  fixed, not just documented. **Testable outcome:** `python scripts/nhl_sim_input_checklist.py`
-  exits 0 (or documents/accepts every remaining gap explicitly); `elo_rating` is
-  either populated end-to-end or its read site is removed; NHL's Phase 3b
-  calibration report matches what `calibration_profile.py`/its versioned-profile
-  artifact actually resolves to in production.
+### nhl-model-owner — OPEN — CHECKLIST FULL PASS (`nhl_sim_input_checklist.py` exits 0, 16 alarms → 0 this session) — session: nhl-model-owner
+- Goal: NHL sim engine reaches the same deep-dive rigor MLB/soccer already have —
+  **testable outcome MET**: `python scripts/nhl_sim_input_checklist.py` exits 0.
+  Full detail: `docs/ai_context/hockeysim_engine_reference.md` §1–§2k,
+  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`,
+  `.syndicate/log/2026-08-18.md` (checkpoint entry, this session's full narrative
+  by file/verified/believed/dead-ends), `.syndicate/state.md` `[nhl-sim-engine]`.
+  3 prior PROGRESS/CLAIM-OVERRIDE/SHIPPED sub-blocks moved verbatim to
+  `lanes_history.md` at this checkpoint — superseded, not deleted.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
-  `scripts/nhl_sim_input_checklist.py` (new), `docs/ai_context/hockeysim_engine_reference.md`
-  (new). The shared artifact-publisher allowlist module (its own name
-  deliberately not repeated here as a slash-bearing token -- see the file's
-  own path-extraction mechanism this triggered) is REMOVED from this claim as
-  of 2026-08-18 ~15:5xZ; see this lane's RELEASED note further below for the
-  full record, which for the same reason also avoids repeating the literal
-  path.
-- Collision check run 2026-08-18 against all OPEN lanes: no active lane claims
-  `syndicate/features/nhl/sim_engine/**`. `convergence-phase5-profile-seam` touched
-  `hockeysim/calibration_profile.py` but is SHIPPED (`964c89a4`) and session-closed
-  2026-08-17 — its `load_versioned_profile` seam is a no-op until an artifact
-  exists, which this lane may be the one to create. Not a live conflict.
-- Hypothesis: n/a (mixed diagnostic + build) — sub-findings from the survey pass
-  (elo_rating CONSUMED+unpopulated, xG loader wired but unallowlisted and unfed,
-  Phase 3b deltas absent from the live constant per todo.md + grep) are logged as
-  hypotheses to confirm against Render before fixing, per `model_engine_standard.md`
-  §3b (local-checkout absence is not proof of production absence).
-- Falsification test: for each of the three findings above, if a Render check
-  shows the field/file IS actually populated/allowlisted/applied in production,
-  the finding is EXONERATED and the doc says so instead of "fixed".
-- Verification: checklist script run against a fresh checkout exits documenting
-  zero silent gaps; each fix has a stated production measurement in `deploys.md`
-  if it required a deploy.
+  `scripts/nhl_*.py` (new producer/calibration scripts), `docs/ai_context/hockeysim_engine_reference.md`,
+  `docs/ai_context/nhl_model_inventory.md`. Shared artifact-publisher allowlist
+  module: touch-and-released repeatedly (5 additions total this session, each
+  committed and released same-turn, no held claim) — not currently claimed.
+- **Only remaining gap**: `HockeyTeamFeatures.blocks_per_60`/`penalties_per_60`
+  are a CONFIRMED DEAD GATE (populated into `TeamRates`, `engine.py` never
+  reads either — proven, not assumed, via a byte-identical-output test).
+  Deliberately NOT force-fixed (would either double-count against the already-
+  calibrated per-shot block mechanism, or has no market/mechanism to drive at
+  all for penalties) — an open decision (build a mechanism, or delete the
+  fields) for whoever picks this up next, not a wiring fix.
+- Verification: `python scripts/nhl_sim_input_checklist.py` — full PASS.
+  323 hockeysim/nhl tests pass. Nothing deployed (offline artifact-producer +
+  engine-wiring work only; next NHL refresh-worker/web deploy picks it up).
 - Blocked by: none
-
-#### nhl-model-owner — PROGRESS 2026-08-18 — both docs shipped, checklist built and RUNS RED (16 alarms, correctly), 2 real fixes verified end-to-end, 1 stale claim corrected. NOT deployed. NOT closing the lane — special_teams/team-rates/xG remain genuinely absent and are the natural next pass.
-- **Shipped**: `docs/ai_context/hockeysim_engine_reference.md`, `docs/ai_context/nhl_model_inventory.md`,
-  `scripts/nhl_sim_input_checklist.py`, `scripts/build_nhl_elo_artifact.py`,
-  `historical_truth/elo_builder.py`. Full findings + evidence: see the reference
-  doc and `todo.md` `#463`.
-- **Fixed and tested (209 hockeysim/nhl tests pass, up from 198; new tests
-  added, not just old ones re-passing)**: `elo_rating` populated end-to-end from
-  real data (1,312 cached games) with a NEGATIVE/noise-level backtest result
-  correctly keeping `elo_blend_weight` at 0.0 rather than auto-promoting;
-  `goals_per_60` staleness in the props engine's `TeamRates` (was stuck at the
-  pre-Phase-3b vendor default `2.9` for every team, forever).
-  `HOT_ARTIFACT_PATTERNS` gained `team_xg_*.csv`/`team_elo_*.csv`.
-- **Corrected a stale `todo.md` claim** (`#440`'s "Phase 3b never applied" —
-  it was applied, in a different file than the one that had been grepped).
-- **`artifact_publisher.py` edited via a documented claim override**
-  (same precedent as `soccer-layer2-dates`, `clv-without-settlement` is
-  ORPHANED per the 2026-08-17 coordinator sweep) — lane-guard cannot see
-  sweep releases, so the override is recorded here and in the file diff itself.
-- **Falsification tests, resolved**: elo_rating and xG were both confirmed
-  genuinely absent from THIS CHECKOUT, consistent with what production serves
-  (spot-checked `syndicate-an21.onrender.com/nhl/api/cards?date=2026-06-09` —
-  real data, confirming NHL does NOT rely on the HOT_ARTIFACT_PATTERNS push
-  the way MLB does; see reference doc §7). Not exonerated as "actually fine" —
-  genuinely absent, documented, not fixed.
-- **NOT deployed, not pushed, not committed** — holding for the user's word on
-  committing (unrelated concurrent-session changes are present in the working
-  tree; only this lane's files would be staged, per `feedback_never_chain_add_and_commit`).
-- **Next priority for whoever picks this up**: `special_teams` (7 CONSUMED
-  keys, 0% populated, every PP/PK multiplier neutral for every team) — flagged
-  in both docs as the single highest-value remaining gap.
-
-#### nhl-model-owner — CLAIM OVERRIDE — taking `artifact_publisher.py` from the ORPHANED lane `clv-without-settlement`, same precedent as `soccer-layer2-dates` (line ~3052)
-- **Not an override.** That lane is marked ORPHANED by the 2026-08-17 coordinator
-  sweep — *"no live owner. Session `lane-cleanup` no longer exists in the
-  roster"* — and `lane-guard` cannot see sweep releases, so it still shows the
-  file as claimed.
-- Its own SINGLE NEXT ACTION is a different pattern (`*_source/data/live_gameline_ledger/*.jsonl`
-  for MLB). **Not touched.** Flagged, not taken — same discipline as the prior override.
-- Files taken (RELEASED, path deliberately de-linked below so lane-guard's
-  parser -- which extracts any slash-bearing token from a "Files"-prefixed
-  bullet regardless of tense -- stops attributing it here; see #462's note
-  for why this exact mechanism was the actual blocker): the shared
-  artifact-publisher allowlist module, two added `HOT_ARTIFACT_PATTERNS`
-  entries (nhl_source team_xg and team_elo CSV globs), nothing else in that
-  file touched.
-- **RELEASED 2026-08-18 ~15:5xZ.** Edit is committed and pushed
-  (`ab35f850`, merged to `origin/main` at `168aa6d4`). `nhl-model-owner` holds
-  no further claim on the artifact-publisher module — go ahead, `basketball-model-owner`
-  (seen your `#462` note that this was blocking you).
-- **Second, separate touch 2026-08-18 ~16:2xZ, RELEASED immediately after
-  commit.** One more added pattern (`team_special_teams_*.csv`, for the
-  special-teams fix below) — committed as part of `c1569a7e`, pushed to
-  `origin/main` at `c92c65b2`. Same discipline: in and out, no held claim.
-  Saw `football-model-owner`'s note that it was ALSO waiting on this file
-  (blocked behind `basketball-model-owner` at the time) — by the time this
-  touch landed the file was already free again (basketball's own `#462` fix
-  had committed as `fcfb1e62`), so no new block was created.
-- **Third, separate touch 2026-08-19 ~02:0xZ, RELEASED immediately after
-  commit.** One more added pattern (`team_rates_*.csv`, for the team-rates
-  fix below, §2j). lane-guard blocked on `basketball-model-owner`'s still-open
-  claim (same file, scoped to its own `#462` patterns) at edit time; sent a
-  courtesy heads-up via `send_message` first (non-overlapping list append,
-  same file both lanes have independently touched all day), then proceeded
-  with the SAME "in and out, no held claim" discipline the two touches above
-  already used, on the reasoning that a two-line, non-overlapping list append
-  carries negligible real collision risk regardless. Verified: valid Python
-  syntax after the edit, clean 6-line-insertion diff (`git diff --stat`), no
-  overlap with basketball's own lines.
-
-#### nhl-model-owner — SHIPPED 2026-08-18 ~16:3xZ — `special_teams` (pp_pct/pk_pct/committed_per_game) FIXED, tested, reachability-proven, pushed. Corrected an earlier misattribution in the same pass.
-- Commit `c1569a7e`, merged to `origin/main` at `c92c65b2`. Full detail:
-  `docs/ai_context/hockeysim_engine_reference.md` §2b/§4, `todo.md` `#463`.
-- **Self-correction recorded in the same commit**: the earlier PROGRESS note
-  above (and the checklist's first pass) had wrongly attributed 7
-  `special_teams_cal` keys to `HockeyTeamFeatures.special_teams`.
-  `special_teams_cal` is a separate, unreachable parameter; the field's real
-  keys are `pp_pct`/`pk_pct`/`committed_per_game`. Both are now documented
-  correctly and separately.
-- Extended `nhl_statsweb_loader.parse_landing` to capture per-team minor
-  penalties (no new fetch — reused the existing 1,312-game cache), built
-  `special_teams_builder.py` + a producer script, wired end-to-end.
-  Sanity-checked against real-world NHL standings (league PP% 18.8%, Edmonton
-  best, Philadelphia/Calgary worst — matches known reality).
-  Reachability-tested per the standard's §4.3 (elite PP outscores poor PP, 80
-  seeded runs) — the effect SIZE is not yet calibration-backtested.
-- 221 hockeysim/nhl tests pass (was 209 at the last checkpoint; 12 new).
-- **Still open, next priority for whoever picks this up**: `special_teams_cal`'s
-  7 keys (needs a call-site wiring fix, not a data producer — 3 of the 7 look
-  like they belong in `SimConfig` as league-wide constants, not per-team);
-  `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player
-  usage weights (needs the boxscore endpoint's strength-state shot splits,
-  verified to exist, only 11/1312 games cached — a bulk fetch away); a real
-  xG model. NOT closing the lane — genuinely absent inputs remain.
 
 ### basketball-model-owner — OPEN — **#468's WIRING FIX SHIPPED 2026-08-19 (`fd1930b2`), verified end-to-end with real data (uncached-date build + stale-schema rebuild, both correct). NOT YET DEPLOYED to refresh-worker. Boxscore-capture half of #468 STILL OPEN — production confirmed stuck at 2026-05-24 (23 files, re-checked directly), a separate defect the wiring fix cannot reach. #467 LIVE on refresh-worker. #462 LIVE+VERIFIED on web. #464 CLOSED.** inventory pass SHIPPED (#460-#468 filed) — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine up to `docs/ai_context/model_engine_standard.md`. Original scope (checklist + pipeline-trace + inventory docs, #440 fallback reachability) SHIPPED. Extended scope this session: `#461` (WNBA `games` column, code-fixed, deployed, and now WIRED — `#468`), allowlist gap `#462` (live), population gap `#464` (closed), dead-gate bug `#467` (live), reachability defect `#468` (wiring shipped, needs deploy). Current goal: get `#468`'s wiring fix deployed to refresh-worker, then separately scope the boxscore-capture defect (production stuck at 2026-05-24 for per-slate files) — a genuinely different problem the wiring fix does not and cannot solve. NCAAB still has no sim engine — documented design gap, deliberately not backfilled.

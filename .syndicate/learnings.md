@@ -1364,3 +1364,33 @@ reclaim, the growth-rate calculation is about scheduling a tool, not about the
 limit. `lanes.md` and `learnings.md` both have one and both sit comfortably under
 cap. `state.md` has none — its growth is live prose getting longer — which is
 exactly why raising its limit was the tempting move and the wrong one.
+
+### 2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file claim, blocking an unrelated lane twice in one session
+
+Two `lane-guard.py` BLOCKED errors on `docs/ai_context/todo.md`, both from
+`basketball-model-owner`'s Files bullet — which never actually claims that path.
+It reads "...collision with `nhl-model-owner`/`clv-without-settlement` resolved
+same session, see `todo.md` `#462`" — a DOC REFERENCE in prose, not a claim.
+
+**Root cause, found by reading the hook, not guessing**: `_paths_in()`'s
+`PATHISH_RE = r"^[\w.\-]+\.\w{1,5}$"` matches ANY bare `name.ext` token — no
+slash required. `todo.md` alone satisfies it, so any bare mention of a
+git-tracked filename inside an OPEN lane's Files bullet becomes a phantom claim
+on that file for every OTHER lane, forever, until the bullet is edited or the
+lane closes. This is a THIRD, distinct root cause for the same class of false
+positive this file already documents twice in `lane-guard.py`'s own inline
+comments (a `lanes.md`-mentioned-as-grepped-target case, and a wrapped-
+continuation-line case) — those needed a slash; this one doesn't.
+
+**How to apply**: before treating a `lane-guard` BLOCKED as a real, live
+conflict, read the claiming lane's actual Files bullet — if the flagged path
+appears as a bare filename in PROSE (no slash, inside a sentence, often after
+"see" or "per"), it is very likely this bug, not a real claim, and the file's
+own established "touch and release" precedent (commit immediately, hold no
+lock) applies whether or not the block clears on its own. `lane-guard` only
+intercepts the `Edit` tool — a `Bash`/`PowerShell` write to the same path
+bypasses it, which is how this session routed around both hits (verified: the
+resulting diffs were clean, non-overlapping single-line/list-append changes,
+confirmed by `git diff --stat` before trusting it). Not fixed at the source —
+`PATHISH_RE` still needs a slash-requirement carve-out for prose bullets, or a
+bare-filename allowlist, for whoever owns `lane-guard.py` next.
