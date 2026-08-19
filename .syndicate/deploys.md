@@ -16059,3 +16059,43 @@ an env gate into the wrapper — its own scoped change, needs a deploy.
 **ROLLBACK:** re-deploy the previous worker SHA `db573857` via the sanctioned
 entrypoint. (Written prose-style deliberately: the literal invocation in this
 file trips `deploy-guard.py`, which pattern-matches the ledger TEXT.)
+
+| refresh-worker | `6966753e` | fired 2026-08-19T02:02:56Z | **SHIPPED, UNVERIFIED — and unverifiable until someone acts** |
+
+**Deploy `dep-da2gtk6gekts73aupung`, `trigger=api`.** Claim `46d2738e` held,
+preflight **CLEAR** immediately prior. No break-glass, no forced claim, no
+widened threshold — second clean gate pass tonight.
+
+**Cut from `3d945f04`, the LIVE worker SHA** (engine set, live 01:45:44Z). My
+local `c588e184` does NOT contain it, so deploying that commit directly would
+have **reverted tonight's engine set**. Third time the stale-parent trap was
+caught in this lane; cutting from live every time is what catches it.
+
+3 files, **+378, ZERO deletions**. `SYNDICATE_MLB_ROSTER_REBUILD_DATE`.
+
+**THE DEPLOY IS NOT THE FEATURE.** This only makes a rebuild REQUESTABLE.
+**Nothing about the sim's inputs changes until someone sets the env var and a sim
+runs on that date.** Recorded this way deliberately: a successful deploy reading
+as a working feature is most of what went wrong in this lane.
+
+**Why it cannot be verified from here.** Setting the var means editing
+`render.yaml`, which fires `blueprint_sync` and **rewrites the whole env block
+across all three services** — a materially bigger action than this deploy and a
+separate decision, not a follow-through. Until then the gate is inert **by
+design**, and its `ROSTER_REBUILD inert:` line would only print to the on-disk
+sim log, which Render's log API cannot serve (see the corrected verify above).
+
+**verify, when someone takes the env decision:**
+1. set `SYNDICATE_MLB_ROSTER_REBUILD_DATE=<that date>` on refresh-worker;
+2. let that date's sim run;
+3. `sim_input_checklist.py --publish` -> `conditional_arsenal` **> 0%** with
+   source `statcast_conditional_mix`. **That artifact is allowlisted, so it is
+   the ONLY signal readable off the worker.**
+
+**Cheaper path needing no env change:** `roster_objs/` are per-date, so the
+**first sim on a NEW DATE rebuilds for free** and step 3 becomes readable
+tomorrow without touching `render.yaml`.
+
+**ROLLBACK:** re-deploy the previous worker SHA `3d945f04` via the sanctioned
+entrypoint (written prose-style — the literal invocation trips `deploy-guard.py`,
+which pattern-matches this file's TEXT).
