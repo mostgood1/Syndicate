@@ -892,9 +892,14 @@ been separately measured there.
     prior sessions' notes — confirm its actual soccer-relevance before
     editing; `phase=live` there has 0 odds steps by design per `#148`,
     so it may not be where the fix belongs at all)
-  - `scripts/refresh_odds_sources.py` (soccer step-builder, `_build_wnba_steps`
-    sibling for soccer — read first, likely where the actual HTTP fetch
-    step lives)
+  - `scripts/refresh_odds_sources.py` (`_build_soccer_steps`, confirmed:
+    the actual h2h/totals/spreads fetch step is `phases=("pregame",)`
+    only — this file is EXONERATED as the bug's location, kept in the
+    list as read-only reference only)
+  - `syndicate/features/shared/ops_refresh.py` (`launch_refresh_run`,
+    `_assert_no_active_refresh_run`, `_resolve_launch_mode` — THIS is now
+    the most likely location of the actual fix, per the mechanism traced
+    below, not the files originally guessed at lane-open)
   - Read-only reference: `.syndicate/state.md` `[soccer]` section — the
     prior investigation's full history, DEAD hypotheses, and the now-
     contradicted "SUPERSEDED 2026-08-17" note.
@@ -934,6 +939,61 @@ been separately measured there.
   firing but the FETCH itself fails, the bug is downstream (HTTP/auth/
   odds-source), not the scheduler — say so and retarget rather than
   assuming the scheduler is the fault by default.
+**MECHANISM TRACED 2026-08-19, from code (not yet directly observed firing
+live — see "still needs verification" below).**
+
+1. **Confirmed by reading `_build_soccer_steps` directly**
+   (`scripts/refresh_odds_sources.py:1168`): `soccer_{league}_odds`,
+   `_props`, `_picks` are ALL `phases=("pregame",)` ONLY — never `"live"`.
+   Only `soccer_{league}_artifacts` (the sim) runs in both. **`state.md`'s
+   "phase=live builds 0 odds steps" claim is CORRECT, not stale** — this
+   session's own earlier suspicion that it might be outdated is now
+   resolved in the ORIGINAL note's favor.
+2. Pulled `/api/ops/odds-refresh/status` live: `phase=live` soccer runs
+   ARE firing constantly — every ~5 minutes, alternating between
+   `refresh-worker` and `live-odds-worker`, both "finished" successfully.
+   **This is a red herring by design (1) already explains** — these runs
+   were never going to capture odds regardless of how healthy they look,
+   which is exactly the "healthy-looking activity masks the real gap"
+   shape.
+3. **REFUTED SUB-HYPOTHESIS, recorded so it is not retried:** suspected
+   `_launch_autorun_soccer_pregame_refresh`'s `launch_mode="web_process"`
+   routed its concurrency check through refresh-worker's OWN lane (which
+   is almost always saturated with MLB/NFL sims) via the
+   `external_runner`/queue path. **Checked `_resolve_launch_mode` directly
+   (`ops_refresh.py:161`): `"web_process"` is not a recognized value and
+   silently falls back to `"detached_subprocess"`**, which is NOT
+   `external_runner_mode` — so it runs directly on the CALLING service
+   (live-odds-worker) under live-odds-worker's OWN lane, not refresh-
+   worker's. The refresh-worker-starvation theory is dead.
+4. **CURRENT LEADING HYPOTHESIS, not yet directly confirmed:**
+   self-contention on live-odds-worker's OWN lane. The very frequent
+   `phase=live` cycle (every ~5 min) and the rare `phase=pregame` soccer
+   cycle (every 4h) BOTH launch via `launch_refresh_run(...,
+   launch_mode="web_process", ...)` on the SAME service, both resolving to
+   the SAME `detached_subprocess` lane. `_assert_no_active_refresh_run`
+   (`ops_refresh.py:636`) is a genuine hard per-lane block — confirmed by
+   reading it, not inferred. If the frequent cycle's lane is occupied
+   (or was, moments earlier) essentially every time the 4-hour pregame
+   timer comes due, the pregame odds-capture steps may simply never win
+   the race. The contention-handling code
+   (`_is_refresh_run_contention_error`) preserves the original epoch on
+   failure rather than resetting it, so a starved autorun retries on
+   EVERY subsequent tick rather than backing off — consistent with a
+   sustained, indefinite gap rather than a one-off miss.
+- **Still needs verification before this is called done** (next concrete
+  step for whoever continues): read `soccer_pregame_autorun_status.json`
+  directly off live-odds-worker's disk (path:
+  `reports_root()/refresh_status/latest/soccer_pregame_autorun_status.json`
+  — NOT currently in `HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/
+  stream` 403s on it; either add it to the allowlist or find another
+  read path) to see its actual `epoch`/`error` history — this is the one
+  artifact that would show contention errors directly rather than by
+  inference. If it shows repeated `_is_refresh_run_contention_error`
+  hits, hypothesis (4) is CONFIRMED; if it shows successful launches with
+  no error, the bug is elsewhere (the odds fetch itself, not the
+  scheduler) and this whole mechanism trace is a dead end to record, not
+  retry.
 - Verification: re-pull the book_quotes shard for a live same-day slate
   after any fix and confirm ALL distinct matches (not a sample) show
   `captured_at` inside the target window. Report the per-match count,
