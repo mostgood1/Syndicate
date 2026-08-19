@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 406 rules `[generated]`
+## Index — 408 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1666,3 +1666,43 @@ result — the corrected loop (counting `[JOB]` lines directly) ran cleanly to a
 genuine idle read minutes later. Same family as
 [[feedback_gate_on_the_output_not_the_input]] — gate on what the state
 actually is, not on the one message you expected it to print.
+
+## 2026-08-18 — RULE: a session worktree protects your INDEX, not your EDIT. Shared-file carry is not absorption.
+
+- The rule going forward: **when your deliverable IS a shared ledger file, expect
+  the next session that commits the shared tree to carry your edit, and expect an
+  UNCOMMITTED edit to be destroyed outright.** Commit it with a PATHSPEC commit
+  (`git commit <paths> -m ...`, no staging) the moment it is written. Verify by
+  CONTENT on `origin/main`. Attribution is not worth defending; LOSS is the only
+  thing to check.
+
+**THREE OUTCOMES, ONE LABEL, DIFFERENT MITIGATIONS.** All three were called
+"absorption" in one session. Only the first is:
+
+    TRUE INDEX ABSORPTION -- another session's `git commit` consumes YOUR STAGED
+    entry from the shared index. Twice: `lanes.md` header edits into `661cb3da`;
+    `scripts/archive_released_lanes.py` into `d46be8a0`, a commit a later reset
+    ORPHANED, leaving the file untracked again.
+    -> A session worktree PREVENTS this. Its index is its own.
+
+    SHARED-FILE CARRY -- you write the live `.syndicate/*.md`, another session
+    commits the shared tree, their commit contains your edit. Once: `state.md`
+    keying landed inside `04e44610`. My worktree commit then rebased to a NO-OP,
+    0 commits ahead. -> A worktree CANNOT prevent this and SHOULD NOT TRY. The
+    edit must be in the shared file to be live. Shared state working correctly.
+
+    OUTRIGHT LOSS -- another session REWRITES the file from its own buffer and
+    your uncommitted edit is gone. Once, and it destroyed the first draft of
+    THIS ENTRY: learnings.md went 111,324 -> 110,452 B between the append and
+    the commit, grep for the new rule returned 0.
+    -> Nothing prevents this but COMMITTING IMMEDIATELY. A worktree is no help:
+       the file that matters is the shared one.
+
+**WHY THE MISLABEL MATTERED.** It framed correct behaviour (carry) as a defect,
+pointing at a mitigation that cannot work, while the one outcome that DOES lose
+work -- outright overwrite -- had no rule at all and duly happened.
+
+**THE COORDINATOR VERSION.** Reporting concurrency damage in chat is not
+managing it. Chat does not survive the session; a committed rule does. The
+deliverable when concurrency bites is a WRITTEN RULE plus a verified content
+check, committed within the same turn it is written.
