@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-08-19 — PASSING_ATTEMPTS BLEND WEIGHT: STABILITY CHECKED, FALSIFICATION FIRED, NO FIX SHIPPED — lane `nfl-passing-attempts-skew-extrapolation`
+
+**NO DEPLOY. Local analysis only** (new script + report, `c0939290` on
+`origin/main`). No production code changed.
+
+`nfl-player-props-skew-fix`'s Normal/log-normal blend weight for
+`passing_attempts` was capped at `w=1.0` even though the 2022-2023 fit's
+closed-form optimum was `w=1.14` (data wanted more skew correction than
+pure log-normal expresses). Before extrapolating past that boundary
+(which has no distributional interpretation past w=1 — pure
+curve-fitting), checked whether the same optimum replicates on the
+INDEPENDENT 2024-2025 half, never used to select anything:
+
+    half A (2022-2023, n=5994): optimal w = 1.1409
+    half B (2024-2025, n=5894): optimal w = 0.8842  <-- below 1.0
+
+**The two independent halves disagree in both magnitude and direction**
+relative to the 1.0 boundary — the 1.14 fit-half number was sampling
+noise from that one split, not a stable market property. Falsification
+test fired exactly as designed; hypothesis rejected.
+
+**No code change made.** `_COVER_PROBABILITY_BLEND_WEIGHT["passing_
+attempts"]` stays at `1.0`. Bonus finding, stated for what it's worth:
+the two halves' optimal weights average to ~1.013 — reassuringly close to
+the already-shipped 1.0, evidence the existing clip is near-optimal
+rather than leaving real improvement on the table.
+
+Verify: `scripts/check_passing_attempts_skew_stability.py`,
+`reports/nfl_passing_attempts_skew_stability_check.json`.
+
+---
+
 ## 2026-08-19 — WEB: NFL ODDS ARTIFACT-ALLOWLIST FIX DEPLOYED, SCOPED OFF-MAIN — lane `nfl-odds-allowlist-deploy`
 
 **Deployed**: 2026-08-19 19:03:22Z. `web` `b775255a` → `b233c55d`

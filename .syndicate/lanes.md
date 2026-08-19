@@ -1221,7 +1221,7 @@ keep waiting for a natural clear window. **Next session: check
 TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
 `.syndicate/log/2026-08-19.md`, "Lane: wnba-edge-263" section.
 
-### nfl-passing-attempts-skew-extrapolation — OPEN — opened 2026-08-19 — session: nfl-passing-attempts-skew-extrapolation
+### nfl-passing-attempts-skew-extrapolation — CLOSED-VERIFIED 2026-08-19 — falsification test FIRED: half B (2024-2025) independently wants w=0.88, NOT >1.0 (half A wanted 1.14). NOT a stable signal -- no code change, w=1.0 stays as shipped. `c0939290` on `origin/main`. — session: nfl-passing-attempts-skew-extrapolation
 - Goal: `nfl-player-props-skew-fix`'s blend fix capped `passing_attempts`'
   weight at `w=1.0` (pure log-normal) even though the closed-form optimum
   fit on 2022-2023 was `w=1.14` — i.e. the data wanted MORE skew correction
@@ -1262,6 +1262,19 @@ TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
 - Verification: an out-of-sample Brier comparison at the chosen
   extrapolated weight vs the current `w=1.0`, fit/select discipline
   identical to the original blend fix (never select using the score half).
+- **RAN. Falsification test FIRED — hypothesis WRONG.**
+  `scripts/check_passing_attempts_skew_stability.py`: half A (2022-2023,
+  n=5994) optimal w=1.1409, matching the original fit; half B (2024-2025,
+  n=5894, computed INDEPENDENTLY, never used to select anything) optimal
+  w=**0.8842** — below 1.0, opposite side of the boundary from half A. The
+  two independent halves do not agree in magnitude OR direction relative
+  to 1.0, so the original 1.14 was sampling noise from that one split, not
+  a real property of the market. **No code change made** —
+  `_COVER_PROBABILITY_BLEND_WEIGHT["passing_attempts"]` stays at `1.0`.
+  Bonus finding: the two halves' optimal weights average to ~1.013,
+  reassuringly close to the currently-shipped 1.0 — the existing clip was
+  already close to ideal, not leaving real improvement on the table.
+  Report committed: `reports/nfl_passing_attempts_skew_stability_check.json`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
