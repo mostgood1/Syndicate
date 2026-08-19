@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 415 rules `[generated]`
+## Index — 416 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1202,3 +1202,45 @@ from a session that had been running since before the guard existed. Hooks are
 read from `settings.json` at session start. **Shipping a guard is not the same as
 the guard being in force**, and on a tree with long-running sessions the gap is
 hours. Verify by behaviour, not by the commit landing.
+
+## 2026-08-19 — RETRACTION: "a mid-flight hook protects only new sessions" is WRONG. Hooks fire per call. The real hole is BASH.
+
+- The rule going forward: **hooks are evaluated on every tool call, not cached at
+  session start — a newly registered guard IS in force immediately, including for
+  sessions that started before it existed. But a PreToolUse guard matched on
+  `Edit|Write|MultiEdit` is BLIND to writes made through Bash**, and in this repo
+  that is not an edge case: `trim_lane_blocks.py`, `hoist_open_lanes.py` and
+  `compact_learnings.py` all write ledger files from Bash by design.
+
+**RETRACTS the same-day entry "a mechanical guard added mid-flight protects only
+sessions that start after it".** That was written as BELIEVED-NOT-VERIFIED, which
+was the right label, and then it was wrong.
+
+**HOW IT WAS FALSIFIED, and it was the cheap test all along.** THIS session began
+hours before `lanes-append-guard.py` was registered at 20:43. Issuing the exact
+edit the guard forbids — a duplicate `### live-game-line-projection` block —
+returned:
+
+    PreToolUse:Edit hook error: BLOCKED: this edit adds a SECOND block for a
+    lane that already has one: live-game-line-projection.
+
+The guard fired in a pre-guard session. One tool call, and it settled a question
+I had instead answered with a plausible mechanism and shipped as a rule.
+
+**WHAT ACTUALLY LET THE 20:57 WRITE THROUGH — narrowed, not proven.** Commit
+`14decdd5` is NOT a merge (single parent) and it re-added a
+`### football-model-owner` block below the archive marker fourteen minutes after
+the guard went live. With the mid-flight theory dead, the remaining explanation
+is that the write did not pass through a file tool at all. **The guard covers the
+file tools; Bash is a hole, and it is a wide one here because the repo's own
+ledger tooling writes through it.**
+
+**THE FIX THAT WOULD ACTUALLY CLOSE IT** is not another PreToolUse matcher —
+Bash commands are opaque strings — but a check at the COMMIT boundary, where a
+Bash write has to surface to become durable: refuse to commit a `lanes.md` whose
+invariants fail. `commit-guard.py` already gates commits and is the natural home.
+
+**The pattern worth keeping:** I explained a guard's silence with a mechanism I
+had not tested, wrote it down as a rule, and the disproof was a single tool call
+available the whole time. *Absent signal is about the emitter* — check whether
+the guard FIRES before theorising about why it didn't.
