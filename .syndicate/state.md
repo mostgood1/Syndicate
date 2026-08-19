@@ -2184,17 +2184,36 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   (`team_rows_from_match_history`). A real xG source whose values diverge from goals
   would weaken these correlations and could earn the dropped terms back. That is why
   the now-unread `xg_for_per_match` / `xg_against_per_match` keys stay populated.
-- **The dispersion question is STILL NOT ANSWERED, and the leading hypothesis has
-  CHANGED.** `possession_priors.py`'s own formulas are exonerated by exact
-  arithmetic (every per-possession term measurably NARROWED after the xG-term
-  removal, not widened). A properly-powered real-fixture trace (126 real matches,
-  not a synthetic probe) suggests the actual driver is `00475bce`'s FEATURE WIRING
-  itself (shots/form/clean-sheet/corners newly populated), not the xG-removal
-  everyone had been chasing — removing xG while holding the wiring constant moved
-  dispersion TOWARD the true baseline, not away. **UNCONFIRMED — a hypothesis the
-  numbers point at, not an isolated result.** The earlier 16-fixture probe (stdev
-  0.1765 against 0.1575/0.1811) is SUPERSEDED and should not be cited; it used a
-  different, smaller, since-shown-underpowered method.
+- **The dispersion overshoot is now CLEANLY DECOMPOSED — 2026-08-18 ~21:1xZ,
+  SUPERSEDES "unconfirmed" above.** `possession_priors.py`'s own formulas remain
+  exonerated (every per-possession term measurably narrowed after the xG-term
+  removal). A full 2x2 isolation (4 configs, 126 real eredivisie fixtures each,
+  `backtest_league()` called directly) settled the driver question, and it
+  REVERSES the "wiring is the likely driver" guess above — that guess came from
+  a CONFOUNDED comparison that never isolated the wiring-absent case:
+
+        config                          xG        wiring   model_brier  stdev
+        true baseline (08-15)          n/a        none       0.5211    0.1886
+        current formula, no wiring    absent     absent       0.5211    0.1886  <- EXACT match
+        old formula, no wiring       present     absent       0.5238    0.2745
+        current formula, wiring       absent    present       0.5081    0.2373
+        old formula, wiring          present    present       0.5189    0.2945
+
+  **The xG double-count's own effect (+0.057..+0.086) is LARGER than the
+  wiring's own effect (+0.020..+0.049) in both held-constant comparisons.**
+  `94578cbc` (xG removal, already committed) is HELPFUL, not harmful — it moves
+  dispersion TOWARD the true baseline. **The remaining overshoot in the current
+  committed state is a real, isolated +0.0487, entirely attributable to
+  `00475bce`'s wiring** (Config A's exact baseline match is what makes this
+  attribution solid rather than inferred). A pooled (14,246 rows, 9 leagues,
+  league-fixed-effects) re-fit of the wiring's own weights found
+  `clean_sheet_rate` significant (0.30 -> 0.0902) and IMPROVED dispersion on
+  validation (0.2373->0.2307) but WIDENED the Brier gap (0.0017->0.0087,
+  t=+1.71, not significant but the closest any "no effect" result got to
+  crossing significance tonight) — **DISCARDED, not committed.** Do not re-apply
+  0.0902 without a fresh, larger paired validation. Full detail: lane
+  `soccer-model-dispersion`.
+  The earlier 16-fixture probe (stdev 0.1765) remains SUPERSEDED, unchanged.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
