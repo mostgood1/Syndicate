@@ -1,0 +1,52 @@
+{
+  "receiving_yards": {
+    "stat": "receiving_yards",
+    "shipped_weight": 0.216,
+    "half_a": {
+      "seasons": [
+        2022,
+        2023
+      ],
+      "n": 34825,
+      "w_optimal": 0.2158
+    },
+    "half_b": {
+      "seasons": [
+        2024,
+        2025
+      ],
+      "n": 34436,
+      "w_optimal": 0.1242
+    },
+    "same_sign": true,
+    "ratio": 1.7381,
+    "stable": true,
+    "recommendation": "no change -- shipped weight is well-supported",
+    "verdict": "stable"
+  },
+  "rushing_yards": {
+    "stat": "rushing_yards",
+    "shipped_weight": 0.573,
+    "half_a": {
+      "seasons": [
+        2022,
+        2023
+      ],
+      "n": 20278,
+      "w_optimal": 0.5731
+    },
+    "half_b": {
+      "seasons": [
+        2024,
+        2025
+      ],
+      "n": 20325,
+      "w_optimal": 0.5717
+    },
+    "same_sign": true,
+    "ratio": 1.0024,
+    "stable": true,
+    "recommendation": "no change -- shipped weight is well-supported",
+    "verdict": "stable"
+  }
+}
