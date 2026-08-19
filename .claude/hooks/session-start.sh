@@ -162,8 +162,35 @@ fi
 # 2026-08-15: state.md was 120KB/51 sections stacking contradictions (#387 in
 # six of them) and lanes.md was 79% closed lanes. Both are read at every session
 # start, so their size is a tax on every session, not just on the writer.
+#
+# state.md 60000 -> 180000, 2026-08-18 [USER DECISION]. The old figure was set
+# when state.md carried far fewer subjects, and by its own principle above it had
+# stopped being a threshold: it fired continuously through two full collapses
+# (2026-08-15 and 2026-08-18, both archived verbatim) and was back to 2.77x the
+# same evening. A warning that cannot be satisfied is one people learn to scroll
+# past, which costs more than the warning was ever worth.
+#
+# 180000 IS SUBJECT-COUNT-DRIVEN, NOT REVERSE-ENGINEERED FROM TODAY'S SIZE:
+# 40 keyed subjects x ~4,500 B. `state_key_check.py` enforces one-subject-one-
+# section, so the subject count is what actually drives this file's size, and a
+# cap that tracks it says something. A cap set to whatever the file measures
+# today would be a rubber stamp -- it would pass on the day it is written and
+# never fail again.
+#
+# THE RIGHT RESPONSE TO EXCEEDING THIS IS NOT ANOTHER RAISE. It is collapse by
+# the SUBJECT'S OWNER: measured 2026-08-18, only 923 B of state.md's 163,412 was
+# self-declared archival, and the rest is live current-truth at 8-19% dated
+# measurement lines -- so there is nothing mechanical to reclaim, and a
+# non-owner compressing it is deciding which of someone else's measured numbers
+# stop mattering. lanes.md and learnings.md were both brought under cap the same
+# evening by MOVING blocks, which is verifiable; state.md has no such operation.
+#
+# SIZE WAS ALWAYS A PROXY HERE. The failure it stood in for -- stacked
+# contradictory sections -- is caught directly and better by
+# `state_key_check.py` in the coherence loop below, which is why loosening this
+# number does not loosen the thing that matters.
 BLOAT=""
-for f in state.md:60000 lanes.md:120000 learnings.md:120000; do
+for f in state.md:180000 lanes.md:120000 learnings.md:120000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')

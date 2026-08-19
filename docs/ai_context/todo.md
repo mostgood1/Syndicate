@@ -192,7 +192,55 @@ claims that existed before each past archive pass, which nobody has run. The
 count above is exposure, not damage — do not report it as a breach without that
 check.
 
-### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web: no web code path emits `ALL_PROCESS_MEMORY`, so every web deploy requires a break-glass — and a guard broken on every use is not a guard** — FOUND AND MEASURED 2026-08-18, lane `repo-coordination`, ROOT CAUSE CONFIRMED BY CALLER TRACE (a first hypothesis was WRONG — see below)
+### `#465` — **`deploy_preflight.py` can NEVER return CLEAR for web, so every web deploy requires a break-glass — and a guard broken on every use is not a guard. THE SYMPTOM IS REAL AND MEASURED; THE CAUSE IS UNKNOWN.** — FOUND 2026-08-18, lane `ledger-coherence-sweep`, **ROOT CAUSE RETRACTED 2026-08-18 — it was the FOURTH wrong cause for this symptom**
+
+> **RETRACTION 2026-08-18 — read this before the body. The heading of this item
+> used to assert "no web code path emits `ALL_PROCESS_MEMORY`" and called it
+> ROOT CAUSE CONFIRMED BY CALLER TRACE. That is WRONG. Web has a live caller
+> path, traced end to end:**
+>
+>     syndicate/app.py:37        start_intelligence_state_background_loop
+>      -> pipeline/intelligence_state.py  _diag_log_all_process_memory  (12 sites)
+>        -> memory_observability.py:1919  log_and_persist_process_memory
+>          -> :1944 log_all_process_memory  ->  :1952 prints ALL_PROCESS_MEMORY
+>
+> **HOW THE CLAIM SURVIVED REVIEW: it was literally true and materially
+> misleading.** The body below states that `syndicate/app.py`, `wsgi.py` and
+> `syndicate/blueprints/` contain zero occurrences of `log_all_process_memory`.
+> They do. But `app.py` does not need to *call* the emitter — it **starts a
+> background loop that does**, and `pipeline/intelligence_state.py` was
+> dismissed as "worker-owned" on the strength of a `CLAUDE.md` sentence rather
+> than a reachability check. Grepping for the callee and never asking what
+> starts the caller is a reachability error, and this repo has a rule for it.
+>
+> **THE FACT THAT SHOULD HAVE STOPPED ME, and it was already in `state.md`:
+> web EMITTED until 2026-08-14.** A service with no caller cannot have emitted
+> for months and then stopped. "Never had a caller" was not consistent with the
+> evidence at the time I wrote it.
+>
+> **FOUR CAUSES HAVE NOW BEEN CLAIMED FOR THIS ONE SYMPTOM AND ALL FOUR ARE
+> WRONG** — tally kept from `state.md`'s RETRACTION section, this item being #4:
+>
+>     1. "the sampler is broken"        NO
+>     2. "psutil is not installed"      NO -- real, but incidental; procfs works
+>     3. "the emitter was deleted"      NO -- intact at :1952
+>     4. "web has no caller"            NO -- app.py:37 starts one   <- THIS ITEM
+>
+> **DO NOT ADD A FIFTH GUESS.** What is established is only: the emitter exists
+> and prints when called; web has a reachable call path through the
+> intelligence-state loop; refresh-worker emits every ~17s; **web has not
+> emitted since 2026-08-14.** The open question is therefore *why that loop
+> stopped emitting on web* — not whether the code exists.
+>
+> **The lead worth taking first**, unchanged from `state.md`: loop ownership
+> moves between services via env flags **with no diff**
+> (`_mlb_refresh_tick_owner_here` and friends). A loop that web still starts can
+> be gated off inside, and that would look exactly like this.
+>
+> **The RECOMMENDED FIX in the body survives the retraction**, because it does
+> not depend on the cause: teach `deploy_preflight.py` to read
+> `/api/ops/memory` for web, which returns a fresh complete enumeration today
+> and is already what every break-glass does by hand.
 
 **Symptom, measured on the live receipt** `.syndicate/deploy/preflight/web.json`,
 2026-08-18 22:0xZ, holder `convergence-phase7-crps`:
