@@ -1770,3 +1770,36 @@ transformation layer; the raw payload usually captured it anyway.
 **Cost:** one wrong deferral published in a commit message and a lane block,
 retracted the same session. The fix, once the data was found, was a single
 builder script and no new capture infrastructure at all.
+
+## 2026-08-19 — NEAR-MISS: a multi-step object-database commit re-resolved `origin/main` mid-construction
+
+Landing a ledger update via `read-tree origin/main` → `hash-object` →
+`update-index` → `write-tree` (one Bash call) → `commit-tree -p origin/main`
+→ `push` (a LATER, separate Bash call) produced a commit whose PARENT
+pointer correctly recorded the fresh tip (`f9907d0b`) but whose TREE was
+built from an older cached resolution of `origin/main` (`259103d9`) from
+the earlier call — because another session fetched on this SAME shared
+clone in between. The push succeeded as a real fast-forward (the parent
+pointer was genuinely valid), so nothing rejected it; it silently reverted
+another session's already-landed lane block (`#481` daily-update backup
+truncation) back out, while every other file stayed correct.
+
+**Caught by:** `git diff-tree -r --name-status <believed-parent>
+<new-commit>` run immediately after every push in this pattern, not
+assumed clean because the push itself didn't error. The parent SHA a
+commit records is not proof its tree matches that parent's tree plus only
+your intended diff — verify both independently.
+
+**The rule going forward:** on a shared clone, symbolic refs (`origin/main`)
+can move between separate tool-call boundaries because other sessions fetch
+concurrently. A multi-step object-database construction must pin one
+explicit commit SHA at the start (`BASE=$(git rev-parse origin/main)`) and
+use `$BASE` — never the symbolic ref — at every subsequent step
+(`read-tree`, `commit-tree -p`), even across separate calls. See
+[[project_shared_index_can_hold_a_revert]] and the object-database-merge
+near-miss already in this file for the sibling failure modes on the same
+shared-clone hazard.
+
+**Cost:** caught and corrected with a follow-up commit before any other
+session built on the bad state; content-verified restored via diff-tree
+against the true prior tip.
