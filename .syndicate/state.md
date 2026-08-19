@@ -2280,29 +2280,37 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   0.0902 without a fresh, larger paired validation. Full detail: lane
   `soccer-model-dispersion`.
   The earlier 16-fixture probe (stdev 0.1765) remains SUPERSEDED, unchanged.
-- **TWO of the four genuinely-missing input fields are now SOURCED — 2026-08-19
-  ~11:0xZ, `ad174dc0`.** `possession_share` (ESPN's `boxscore` section, already
-  fetched for lineups/commentary, unread until now) and `set_piece_goal_share`
-  (corner-tagged shots already extracted by `espn_shot_events.py`, never
-  aggregated — free-kick/penalty origin NOT classified, a partial not
-  exhaustive proxy). Checked for a misrouted producer BEFORE assuming new
-  external sourcing was needed — same discipline that found xG and
-  shots/form; paid off a third time. **Remaining unsourced:**
-  `availability_index` (partial raw material exists — confirmed-starter
-  detection, season usage rates — but needs new cross-subsystem integration
-  and is near-kickoff-conditional, not an always-available aggregate) and
-  `pace_seconds_per_event` (not investigated for a from-existing-columns
-  derivation).
-  **VALIDATED, KEPT DESPITE NON-SIGNIFICANCE — a different judgment than the
-  clean_sheet_rate discard above, reasoning in the lane, not just the
-  verdict:** paired eredivisie test, t=+1.27 (weaker evidence of harm than
-  clean_sheet_rate's own non-significant t=+1.71), dispersion moved further
-  from market (0.2373->0.2474). Kept because these are CORE engine functions
-  unfed since inception (closing exactly the checklist's gap, not a fresh
-  hypothesis) with no known-good default being abandoned — unlike
-  clean_sheet_rate's regression-derived replacement. Do not re-run this exact
-  single-league test as the final word — folding both fields into the pooled
-  nine-league regression is the natural next step and was not done.
+- **THREE of the four genuinely-missing input fields are now SOURCED.**
+  `possession_share` and `set_piece_goal_share` (`ad174dc0`, 2026-08-19 ~11:0xZ)
+  as before. **UPDATE 2026-08-19 ~17:0xZ, SUPERSEDES "remaining unsourced"
+  below: `starters_available_share` is now ALSO sourced and wired end-to-end**
+  (`d1136447`) — ESPN's post-match boxscore marks each player `starter: True`,
+  extracted from the SAME call already made for possession/set-piece, and
+  aggregated WALK-FORWARD (a team's core XI as of a match day = the 11 players
+  with the most starts across its prior 10 matches). Architecturally different
+  from every other field: PER-FIXTURE (this match's own lineup), not a rolling
+  team average, so it does NOT flow through `compute_team_ratings` — threaded
+  as a direct param exactly like the pre-existing `home_starter_ids`/
+  `away_starter_ids` pattern, not the `_mean_of` pattern the others use.
+  BACKTEST-HONEST, NOT LIVE-PRODUCTION-READY: uses each match's ACTUAL
+  observed lineup, valid for offline validation, but `build_soccer_
+  artifacts.py` (the live path) is deliberately NOT wired — a future
+  fixture's lineup is not known until near kickoff, which is what the
+  separate, already-existing `attach_confirmed_starters` pregame mechanism is
+  for. Only `pace_seconds_per_event` remains unsourced.
+  **REGRESSION-SIGNIFICANT (pooled, 14,246 rows, 9 leagues, league fixed
+  effects): coef +0.143, t=+2.06.** The SAME pooled fit, extended to also
+  include `possession_share`/`set_piece_goal_share` jointly (answering
+  whether folding them in would flip their earlier kept-despite-non-
+  significant decision — it did not: t=+1.65 and t=-1.82, both still not
+  significant).
+  **THE PAIRED BACKTEST VALIDATION WAS STILL RUNNING AT LAST CHECKPOINT
+  (~17:08Z) — NOT YET COMPLETE. Do not report `starters_available_share` as
+  accuracy-validated or operationally trusted until it lands.**
+  Regression significance was necessary but not sufficient for
+  `clean_sheet_rate` earlier this session (significant in the pooled fit,
+  then failed its paired accuracy test, discarded) — the identical caution
+  applies here.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
