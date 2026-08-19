@@ -39,6 +39,10 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-guard.py",
             "timeout": 25,
             "statusMessage": "Checking the shared git index..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-commit-guard.py"
           }
         ]
       },
