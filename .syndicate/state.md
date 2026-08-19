@@ -2733,15 +2733,46 @@ per `[live-sha-authority]` above for what's actually running:**
   seeds, neutralizing team-advanced-stats moved simulated win probability
   ~45-50 points every time.
 
-**Open question, NOT resolved as of this entry — do not assume the fix above
-solves it:** production's WNBA `team_advanced_stats` has not been rebuilt for
-ANY date since ~2026-07-15 (measured via `/api/ops/artifacts/export`,
-newest as-of file `asof_20260715`, over a month stale as of 2026-08-18).
-The cache-freshness fix above only unblocks a rebuild that is actually
-attempted for an already-cached date — it does not explain why no rebuild
-has been attempted at all in over a month. Candidates not yet distinguished:
-a real WNBA schedule gap (innocent), a silently-swallowed exception in
-`_ensure_team_advanced_stats_asof`'s bare `except Exception: return None`
-(zero logging on failure), or the scheduling/trigger for the WNBA daily job
-not running. Full write-up when resolved: `docs/ai_context/basketball_sim_engine_reference.md`,
-`todo.md` `#461`.
+**Staleness gap RESOLVED 2026-08-19 — and the answer is worse than the
+question: `#461`'s deployed fix has ZERO reach into production right now,
+even though the code fix itself is correct.** A real WNBA schedule gap was
+RULED OUT with data (`schedule_2026.csv`: games run daily 07-15..08-19, only
+routine single-day breaks). The original staleness check had also queried
+the WRONG tree — `WNBA_BETTING_DATA_ROOT` resolves to the FLAT
+`wnba_source/data/processed/` on all three services (`render.yaml:176,551,1000`),
+not the nested `source_artifacts/` copy the check used
+(`artifact_publisher.py:158-161` already documents this exact split for
+WNBA). Querying the right tree: newest as-of file is `asof_20260723` (still
+~27 days stale), and the season file is 3,243 bytes — NOT 0 — but still the
+OLD 12-column schema (no `games`/`source`), live right now.
+
+**Root cause: `_ensure_team_advanced_stats_asof` (the function `#461`
+fixed) is UNREACHABLE from production's real pipeline.** Production's
+actual path is `refresh_wnba_oddsapi_props.py` ->
+`basketball_props_smart_sim.py`, which `importlib.import_module`s
+`wnba_betting.sim.smart_sim` DIRECTLY, in-process — never subprocessing
+into `wnba_betting.cli`, where `_ensure_team_advanced_stats_asof` lives.
+The CLI code path that WOULD call it (`predict-props`) is built by
+`_predict_props_cli_args()` (`refresh_wnba_oddsapi_props.py:4144`), which is
+**never called anywhere in the file** — dead code. `smart_sim.py`'s own
+reader (`_load_team_advanced_stats_asof`, `:546-570`) does an exact-date
+filename match and, on a miss, falls straight to the stale season file —
+it never rebuilds, never calls the fixed function at all. **"Presence is
+not reachability" — same shape this repo has hit before.** `db573857`
+being live changes nothing observable until either the vendor CLI is
+invoked directly against Render, or `basketball_props_smart_sim.py` is
+wired to call an equivalent builder itself.
+
+**Secondary, independent finding**: even reachability alone wouldn't fix
+it — the underlying boxscore capture is ALSO stalled. Dated per-slate files
+(`boxscores_2026-*.csv`) stop at 2026-05-24; the aggregate
+`boxscores_history.csv` has a fresh mtime but its data stops at 2026-06-30.
+No caller of `update-boxscores-history`/`backfill-boxscores` exists
+anywhere in `syndicate/`, `scripts/`, or `pipeline/` — same unreachability
+shape, a different function.
+
+**Unmeasured**: whether NBA has the identical reachability defect (NBA's
+own staleness is plausibly just offseason, not compared apples-to-apples).
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
+`todo.md` `#461` (needs a follow-up entry — this is a NEW, separate defect
+from the cache-freshness bug `#461` already fixed).
