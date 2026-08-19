@@ -1516,3 +1516,64 @@ already-verified invocation paths.
 that was never going to resolve on its own, until the transport gap itself
 was found and fixed (allowlisting `_append_log`'s own file) and a manual
 trigger was used to get a real, direct answer instead.
+
+### 2026-08-19 — a disclaimer marker must PRECEDE the path it disclaims, not follow it
+
+- **What we believed:** adding a phrase to `lane-guard.py`'s
+  `_DISCLAIMER_MARKERS` list is sufficient to make any sentence containing
+  that phrase stop misreading as a claim — the same fix that worked for
+  "not touch" and "not taken" earlier the same day.
+- **What was actually true:** `_claimable_prefix` cuts a line AT the
+  marker's position and keeps only the text BEFORE it as claimable.
+  Writing a release note as "`path` claim RELEASED..." (path first, marker
+  second) still left the path in the claimable prefix, because the marker
+  came too late to protect it. Every marker that already worked
+  ("NOT claimed: `path`", "BLOCKED, not taken: `path`", "held by") happens
+  to precede the path it disclaims — the mechanism has a required word
+  order this session had never had to state explicitly, because nobody had
+  written a marker-after-path sentence before.
+- **How we found out:** wrote a regression test for the new marker BEFORE
+  trusting the fix, exactly as the two same-day precedents had — and it
+  failed. Fixed the actual `lanes.md` prose to be marker-first and re-ran;
+  the test passed.
+- **The rule going forward:** when writing any Files-block disclaimer in
+  `lanes.md`, put the marker phrase FIRST and the path AFTER — "RELEASED,
+  no longer claimed: `path`", never "`path` ... RELEASED". When adding a
+  new marker to `_DISCLAIMER_MARKERS`, the regression test must reproduce
+  the EXACT sentence about to be committed, not a hand-simplified stand-in
+  — the first version of this fix's own test used marker-first phrasing
+  from the start and would have passed even if the real `lanes.md` prose
+  (path-first) stayed broken, which is a different, easier trap than the
+  bug itself.
+- **Cost:** caught before shipping — the failing test was the whole point
+  of writing it first — but it is the fourth instance of this general
+  parser-gap shape in one day, and this specific sub-shape (word order,
+  not just word presence) had not been named until now.
+
+**Same session, a THIRD sub-shape found minutes later while writing a
+DIFFERENT disclaimer.** `_claims()` processes each PHYSICAL LINE of a
+wrapped bullet independently — `_claimable_prefix`/`_paths_in` never see
+a joined logical bullet, only one line at a time. A marker phrase that
+line-wraps ("... NOT\n    claimed here:** `path`") has its recognized
+words split across two lines the parser reads separately: line one
+("... NOT") contains no path so yields nothing; line two ("claimed
+here:** `path`") contains the path but, read in isolation, no longer
+contains "not claimed" — only "claimed", which matches nothing — so the
+path is extracted as a claim regardless of the marker one line up.
+**Verified against `_claims()` directly, not assumed**: this exact wrap
+reproduced the double-claim live in `lanes.md`; moving the marker and the
+path onto the SAME physical line (no line break between them) fixed it,
+confirmed by re-running `_claims()` against the file afterward. **The
+rule, combined with the one above: a marker must be on the SAME physical
+line as the path, AND before it on that line.** Splitting either way
+(wrong order, or right order but wrapped) is invisible to the parser.
+This also means `check_lane_invariants.py` is currently the wrong tool to
+verify a disclaimer fix with — separately discovered this session that
+its own copied `FILES_RE` has drifted from `lane-guard.py`'s (caught by
+`tests/test_check_lane_invariants.py`'s own pinning test, pre-existing,
+not caused here) — so it can report a false double-claim independent of
+whether the real, live-enforced parser agrees. Verify any lane-claim
+question against `lane-guard.py`'s own `_claims()` directly (see this
+session's own throwaway one-liner, or write a test in
+`tests/test_lane_guard_files_forms.py`), not against the invariant
+checker, until that drift is fixed.

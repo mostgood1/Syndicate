@@ -1724,20 +1724,33 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   8,393`. **These are two different joins and at most one describes the board a
   user sees.** Settle this before raising coverage.
 - ~~**SOCCER GAME ODDS HAVE NOT BEEN CAPTURED FOR ANY LEAGUE SINCE 08-10/08-11.**~~
-  **SUPERSEDED 2026-08-17 21:3xZ — capture is WORKING.** `per_sport_ingest.soccer`
-  on the served `/api/board/layer2-shortlist`: `quote_rows 16,044`,
-  `candidates 8,355`, `dates_with_rows` spanning **08-17..08-23**. Whatever the
-  08-14 outage was, it is over; do not re-diagnose it. The 08-14 note is kept
-  struck-through rather than deleted because its *reasoning* (a healthy-looking
-  league masked by `prop` rows from another producer) is still the right way to
-  read that counter. **The vendor was never the cause** — all ten soccer keys
-  `listed=True, active=True`.
+  ~~**SUPERSEDED 2026-08-17 21:3xZ — capture is WORKING.**~~ **RE-OPENED AND
+  CORRECTED 2026-08-19, lane `soccer-odds-capture-cadence-gap`: the 08-17
+  "supersede" was itself wrong — it read AGGREGATE health (`quote_rows`,
+  `dates_with_rows` spanning many dates) as proof of PER-MATCH freshness,
+  which it never checked. Measured 2026-08-19: 8 of 8 same-day-kickoff
+  matches, across MLS AND La Liga, had their freshest h2h/totals/spreads
+  capture 211-236 HOURS old (8.8-9.8 days) — the original 08-14 finding was
+  never actually fixed, it just stopped being visible in the aggregate.
+  **Root cause, confirmed directly from `render_logs.py` reading
+  live-odds-worker's own stdout (not inferred): TWO distinct failure modes.**
+  (1) `steps=0` on every clean pregame cycle sampled — the run launches and
+  completes with no error but the reporting artifact shows zero steps
+  processed. DOMINANT cause; NOT YET FULLY EXPLAINED — could be a genuinely
+  empty run or a schema mismatch in the reporting code's own artifact parse,
+  see the lane for the open question. (2) Real mutex contention
+  (`ValueError: A refresh run is already active`), confirmed but secondary —
+  it started hours after `steps=0` cycles had already failed with no
+  contention involved. **Do not re-cite the 08-17 note as current; this
+  entry supersedes it.**
 - **THERE IS EXACTLY ONE PRODUCER and it is not refresh-worker.** `phase=pregame`
   builds 50 steps including 10 odds steps; `phase=live` builds 20 steps and **0
   odds steps** — and refresh-worker's soccer autorun runs `phase="live"`, so it
   never fetches soccer odds at all, by design since `#148`. Everything depends on
   `_launch_autorun_soccer_pregame_refresh` on live-odds-worker, 4h cadence.
-  **Single point of failure.** `[measured 08-14 18:5xZ]`
+  **Single point of failure.** `[measured 08-14 18:5xZ, RE-CONFIRMED 08-19 by
+  reading _build_soccer_steps directly — the "0 odds steps" claim is code-exact,
+  not stale]`
 - **WHY the step fails is STILL UNKNOWN.** No error has been observed anywhere.
   **Two hypotheses are DEAD — do not re-run them:** step truncation at #27 of 50
   (falsified by a ~6-step scoped run that captured nothing), and

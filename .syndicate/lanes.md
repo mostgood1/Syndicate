@@ -881,7 +881,7 @@ been separately measured there.
   (`w=0`).
 - Blocked by: none.
 
-### soccer-odds-capture-cadence-gap — OPEN — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
+### soccer-odds-capture-cadence-gap — OPEN — **ROOT CAUSE HAS TWO CONFIRMED PARTS (steps=0 dominant + mutex contention secondary, from live-odds-worker's own logs). ALLOWLIST FIX (`2431df26`) DEPLOYING TO live-odds-worker AT CHECKPOINT (build_in_progress); web NOT YET DEPLOYED (claim held elsewhere). Open question (genuine-empty-run vs reporting-schema-mismatch) still needs the newly-allowlisted status file read once both deploys land.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
   refreshes within a bounded window (target: <24h old for a match kicking
   off within the next day) instead of sitting 8-10 days stale.
@@ -896,16 +896,20 @@ been separately measured there.
     header: "no further action identified as ready", `#462`/`#471` both
     shipped) rather than left claimed-but-idle. Done under explicit user
     authorization — see that lane's own block for the release note.**
-  - `scripts/run_live_odds_refresh_worker.py` (defines
-    `_launch_autorun_soccer_pregame_refresh`, the SOLE producer, 4h
-    cadence) — **CAUTION: this file has real uncommitted changes sitting
+  - **Not claimed here, read-only reference:** `scripts/run_live_odds_refresh_worker.py`
+    (defines `_launch_autorun_soccer_pregame_refresh`, the SOLE producer,
+    4h cadence; held by `basketball-model-owner`, `#472`). Traced only,
+    never edited — `#472`'s own fix (preserve epoch on contention) is
+    already live in this file; this lane's `steps=0` question needs a
+    DIFFERENT change (still unscoped to a location). If an edit here does
+    become necessary, re-claim it explicitly rather than relying on this
+    reference. Also note: this file has real uncommitted changes sitting
     in the PRIMARY shared tree right now, not mine, likely from the
     informally-referenced "OOM band" session (flagged stale 40h in the
-    roster, no formal lane header found — nothing to collide with per
-    `lane-guard`, but the uncommitted diff itself is real).** Do not edit
-    in the primary tree; use a dedicated worktree
-    (`scripts/session_worktree.py open --lane soccer-odds-capture-cadence-gap`)
-    for any actual edit so that diff is never touched.
+    roster, no formal lane header found).
+    Any future edit here goes through a dedicated worktree
+    (`scripts/session_worktree.py open --lane soccer-odds-capture-cadence-gap`),
+    never the primary tree, so that uncommitted diff is never touched.
   - `scripts/run_refresh_worker.py` (referenced alongside the above in
     prior sessions' notes — confirm its actual soccer-relevance before
     editing; `phase=live` there has 0 odds steps by design per `#148`,
