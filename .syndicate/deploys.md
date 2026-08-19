@@ -16975,3 +16975,40 @@ measurement only.
 - Rollback: `render_deploy.py --service live-odds-worker --commit
   0c7962a7` (the prior live commit, no `--allow-rollback` needed since
   `97e85b66` is a direct descendant of it).
+
+
+### Log-file allowlist — deployed to web — 2026-08-19 ~20:59Z — lane `basketball-model-owner`
+
+Web's live SHA (`8833cfd6`) was also off-`main` (`deploy/ncaaf-pick-suppression-20260819b`,
+real NCAAF work) -- same shape as every other deploy this session. Cherry-picked
+`b35dcfa0` onto it (`450e0d6e`), pushed as `deploy/log-allowlist-web-20260819`,
+deployed with a plain `render_deploy.py` call (no `--allow-rollback` needed,
+since `450e0d6e` extends the live SHA directly).
+
+- **verify: CODE CONFIRMED LIVE.** `deploy_preflight.py`: live commit `450e0d6e`,
+  finished `2026-08-19T20:59:30Z`. CLEAR immediately both preflight checks (web
+  has no long-running jobs to protect). Claim released cleanly.
+- **Fix partially confirmed working, partially inconclusive.** The 403 is gone
+  -- `?path=wnba_source/logs/syndicate_refresh_oddsapi_props_2026-08-19.log`
+  now returns `count: 0` (genuinely not found) instead of `403 Forbidden`
+  (blocked). But a `names_only=1` sweep of the whole pattern shows the newest
+  file web actually has is **`2026-08-07`** -- a 12-day gap, right through
+  today's confirmed autorun launch at 20:00:46Z. Two live hypotheses, not yet
+  distinguished: (1) the hot-artifact sweep that pushes matching files from a
+  worker's disk to web's simply hasn't run again since this pattern was added
+  (allowlisting is necessary but the SWEEP is a separate, periodic mechanism --
+  a brand-new pattern doesn't retroactively pull anything until the next
+  cycle); (2) the underlying script genuinely hasn't written a fresh log file
+  in 12 days regardless of today's launches, which would mean `#472`'s fixed
+  LAUNCH is not the same as the spawned process actually reaching its own
+  `_append_log` calls -- a new, more concerning possibility that would explain
+  the still-frozen `boxscores_history.csv` far better than "ESPN is still
+  soft-blocked" does.
+- **Next reader**: re-check `?path=...2026-08-19.log` (or whatever today's date
+  is by then) after waiting a few sweep cycles. If it appears and its content
+  shows real `_append_log` activity (STALLED lines or success lines), (1) is
+  confirmed and the allowlist fix is fully working -- read the content for
+  #469's real answer. If it stays absent well past a reasonable sweep interval
+  despite more autorun launches, (2) is confirmed and the actual defect is
+  upstream of anything #469/#472 touch -- the spawned refresh process itself
+  is not completing normal execution, a genuinely new investigation thread.
