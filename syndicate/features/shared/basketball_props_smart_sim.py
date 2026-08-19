@@ -3799,6 +3799,44 @@ def _team_adj_from_advanced_stats_local(*, processed_root: Path, date_str: str, 
             "foul_mult": _ratio(float(away_row.get("ft_rate", float("nan"))), league_ft, 0.80, 1.25),
             "oreb_mult": _ratio(float(away_row.get("orb_pct", float("nan"))), league_orb, 0.75, 1.35),
         }
+        # `#474`, HOME-COURT ADVANTAGE. Everything above this point describes
+        # WHICH TEAMS are playing, never WHERE -- `home_adj`/`away_adj` are
+        # each team's own season-long efficiency/four-factor ratios, so two
+        # evenly-matched teams simulated identically regardless of venue.
+        # This is the only place in the engine that knows both the venue
+        # (home_tri vs away_tri) and the multiplier the sim consumes, so it
+        # is where the venue effect belongs.
+        #
+        # Symmetric by construction (+delta home, -delta away): shifts MARGIN
+        # by the measured amount while leaving the TOTAL untouched, which is
+        # the correct shape for a venue effect. Applied multiplicatively on
+        # top of team quality so a strong home team still gets both effects.
+        hca = _load_home_court_advantage_local(processed_root=processed_root)
+        if isinstance(hca, dict):
+            try:
+                home_mult = float(hca.get("home_eff_mult", 1.0))
+                away_mult = float(hca.get("away_eff_mult", 1.0))
+                # Re-clamp on READ, not just on write: the file is disk-backed
+                # and rebuildable by anyone, so the engine must not trust its
+                # bounds. Same defensive posture as the total-calibration
+                # multiplier's own clip in the vendored sim.
+                home_mult = float(np.clip(home_mult, 0.97, 1.03))
+                away_mult = float(np.clip(away_mult, 0.97, 1.03))
+                if np.isfinite(home_mult) and np.isfinite(away_mult):
+                    home_adj["eff_mult"] = float(home_adj["eff_mult"]) * home_mult
+                    away_adj["eff_mult"] = float(away_adj["eff_mult"]) * away_mult
+                    diag["hca_applied"] = True
+                    diag["hca_home_mult"] = home_mult
+                    diag["hca_away_mult"] = away_mult
+                    diag["hca_mean_home_margin"] = (hca.get("measured") or {}).get("mean_home_margin")
+                    diag["hca_games"] = (hca.get("measured") or {}).get("games")
+            except Exception as exc:
+                diag["hca_applied"] = False
+                diag["hca_reason"] = str(exc)
+        else:
+            diag["hca_applied"] = False
+            diag["hca_reason"] = "home_court_advantage.json absent or not ok"
+
         diag["applied"] = True
         diag["pace_mult"] = pace_mult
         diag["home_adj"] = home_adj
@@ -3829,6 +3867,26 @@ def _load_smartsim_total_calibration_local(*, processed_root: Path) -> dict[str,
         return obj if isinstance(obj, dict) else {}
     except Exception:
         return {}
+
+
+def _load_home_court_advantage_local(*, processed_root: Path) -> dict[str, Any] | None:
+    """`#474`. Optional, same convention as the calibration loaders around it:
+    absent file -> None -> no adjustment, which is exactly today's behaviour,
+    so this can never make things worse than the no-HCA baseline it replaces.
+
+    Built by `scripts/build_basketball_home_court_advantage.py`, which refuses
+    to write below `--min-games` rather than ship a thin-sample constant.
+    """
+    file_path = processed_root / "home_court_advantage.json"
+    if not file_path.exists():
+        return None
+    try:
+        obj = json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(obj, dict) or not obj.get("ok"):
+        return None
+    return obj
 
 
 def _load_intervals_band_calibration_local(*, processed_root: Path) -> dict[str, Any] | None:
