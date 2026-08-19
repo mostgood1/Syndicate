@@ -710,8 +710,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **Read-only reference, do NOT edit without raising with
     `basketball-model-owner`** (holds write access to both):
     `syndicate/features/shared/basketball_props_predictions.py`,
-    `vendor/wnba_betting_repo/src/wnba_betting/props_edges.py`. Also do not
-    touch `syndicate/features/shared/artifact_publisher.py`
+    `vendor/wnba_betting_repo/src/wnba_betting/props_edges.py`.
+  - Not touch `syndicate/features/shared/artifact_publisher.py`
     (`HOT_ARTIFACT_PATTERNS`) — same owner, raise instead of take, per that
     lane's own "hand off, don't take" convention with `football-model-owner`.
   - **Coordination note:** this lane sits inside `basketball-model-owner`'s
