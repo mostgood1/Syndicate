@@ -185,6 +185,26 @@ def test_build_game_features_populates_special_teams_end_to_end(synth_root):
     assert game.away.special_teams["pp_pct"] == 0.14
 
 
+def test_load_team_special_teams_map_reads_shot_index_when_present(tmp_path):
+    """`pp_shot_index`/`pk_shot_index_allowed` (`docs/ai_context/hockeysim_engine_reference.md`
+    §2f) -- a SEPARATE test fixture from `synth_root` above, so the backward-compat case (an
+    artifact written before this session, with no shot-index columns) stays covered by the
+    existing tests rather than silently changing what they assert."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "team_special_teams_2025-2026.csv").write_text(
+        "abbr,pp_pct,pk_pct,committed_per_game,pp_shot_index,pk_shot_index_allowed\n"
+        "BOS,0.23,0.83,2.9,1.24,0.91\n"
+        "CHI,0.14,0.79,3.3,0.88,1.15\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_team_special_teams_map(date, root=tmp_path)
+    assert m["BOS"] == {"pp_pct": 0.23, "pk_pct": 0.83, "committed_per_game": 2.9,
+                         "pp_shot_index": 1.24, "pk_shot_index_allowed": 0.91}
+    assert m["CHI"]["pp_shot_index"] == 0.88
+
+
 def test_build_player_features_flags_starting_goalie(synth_root):
     lineups = loaders.load_lineups("2026-03-15", root=synth_root)
     goalies = loaders.load_starting_goalies("2026-03-15", root=synth_root)

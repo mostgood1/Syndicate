@@ -696,6 +696,15 @@ class PeriodSimulator:
         cal_pk_sh_mult = _f((special_teams_cal or {}).get("pk_shot_multiplier", 1.0), 1.0)
         cal_pp_gl_mult = _f((special_teams_cal or {}).get("pp_goal_multiplier", 1.0), 1.0)
         cal_pk_gl_mult = _f((special_teams_cal or {}).get("pk_goal_multiplier", 1.0), 1.0)
+        # PER-TEAM shot-generation intensity (`docs/ai_context/hockeysim_engine_reference.md` §2f)
+        # -- distinct from `pp_pct`/`pk_pct` above (which differentiate GOAL conversion) and from
+        # `cal_pp_sh_mult`/`cal_pk_sh_mult` above (LEAGUE-WIDE calibration constants, truth-fit
+        # assuming these per-team indices average to ~1.0, `hockeysim_special_teams_shot_cal_report.md`).
+        # Read once here, not per-segment: neither value changes within a game.
+        pp_shot_idx_home = _f(st_home.get("pp_shot_index", 1.0), 1.0)
+        pp_shot_idx_away = _f(st_away.get("pp_shot_index", 1.0), 1.0)
+        pk_shot_idx_home = _f(st_home.get("pk_shot_index_allowed", 1.0), 1.0)
+        pk_shot_idx_away = _f(st_away.get("pk_shot_index_allowed", 1.0), 1.0)
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -943,11 +952,11 @@ class PeriodSimulator:
             pp_mult_shots = float(self.cfg.pp_shots_mult) * cal_pp_sh_mult
             pk_mult_shots = float(self.cfg.pk_shots_mult) * cal_pk_sh_mult
             if seg_is_home_pp:
-                home_factor *= pp_mult_shots
-                away_factor *= pk_mult_shots
+                home_factor *= pp_mult_shots * pp_shot_idx_home
+                away_factor *= pk_mult_shots * pk_shot_idx_away
             elif seg_is_away_pp:
-                away_factor *= pp_mult_shots
-                home_factor *= pk_mult_shots
+                away_factor *= pp_mult_shots * pp_shot_idx_away
+                home_factor *= pk_mult_shots * pk_shot_idx_home
             # Empty-net end-game effects: trailing team increases shot rate; leading team more likely to score into empty net
             # Simple heuristic: apply in final 3 minutes of P3 when down 1, and final 2 minutes when down >=2
             if period_idx == 2:  # third period (0-indexed)

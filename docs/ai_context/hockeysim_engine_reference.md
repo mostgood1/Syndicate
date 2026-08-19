@@ -228,14 +228,48 @@ both governing the same rare shorthanded-team-does-something event class, fit in
 against independent truth sources. Suggests one shared bias in the PK segment-allocation logic
 upstream of both multipliers, not two unrelated miscalibrations — not chased further this session.
 
-**What this does NOT cover, deliberately**: per-team differentiation of the shot multipliers.
-Unlike goals (which have the real per-team `pp_pct`/`pk_pct` signal to layer a correction on top
-of), there is currently NO per-team shot-volume signal at all — building one needs a new
-`HockeyTeamFeatures` field and a new consumption formula in `engine.py`, a real modelling project,
-not a calibration pass. The data now exists to support it
-(`historical_truth.boxscore_shot_strength.TeamShotStrengthRates`) if a future pass wants to build
-it. Block rates (`block_rate_*`) remain uncalibrated — no truth target for blocked-shot rate by
-strength state in either parser yet.
+**What this section originally flagged as future work — now built, §2f.**
+
+---
+
+## 2f. Per-team PP/PK shot-rate differentiation — a NEW mechanism, not a calibration
+
+Full report: `docs/reports/hockeysim_per_team_shot_rate_report.md`. Closes the gap §2e left open:
+until this pass, `HockeyTeamFeatures.special_teams` had NOTHING differentiating shot VOLUME per
+team (`pp_pct`/`pk_pct` differentiate GOAL conversion; `cal_pp_sh_mult`/`cal_pk_sh_mult` are
+LEAGUE-WIDE calibration constants) — every team's PP/PK shot generation was identical.
+
+**The new signal**: `historical_truth.boxscore_shot_strength.compute_team_shot_rate_index` —
+`pp_shot_index` = (team's PP shots / team's PP opportunities) normalized against the same
+league-wide ratio; `pk_shot_index_allowed` the PK-side counterpart. Deliberately normalized by
+OPPORTUNITY count (from `special_teams_builder`'s penalty-derived counts), not raw per-game shot
+count, to avoid conflating "how often on the power play" (already `committed_per_game`'s job)
+with "how many shots once there" — the genuinely new, independent signal. Measured on real data:
+mean ≈ 1.006 across 32 teams (confirms proper normalization), real spread NJD 1.237x to MTL
+0.802x. EDM lands near the top (1.137x) — the same team independently measured as having the
+league's best PP GOAL rate (§2d) — two unrelated data sources agreeing on one team's PP quality.
+
+**Wiring**: `engine.py` reads `st_home.get("pp_shot_index", 1.0)`/`st_away.get("pk_shot_index_allowed", 1.0)`
+(and the symmetric pair) once per game, multiplied directly into the existing `home_factor`/
+`away_factor` shot-volume terms alongside `pp_mult_shots`/`pk_mult_shots`. `scripts/build_nhl_special_teams_artifact.py`
+now writes both as two ADDITIONAL columns on the SAME `team_special_teams_{season}.csv` (not a
+second artifact), degrading to the neutral default when no `boxscore` cache exists.
+
+**Verified the existing global calibration (§2e) did NOT need re-fitting**, not assumed: because
+the new indices are constructed to average ≈1.0 league-wide, re-running the full round-robin
+simulation with REAL per-team indices active reproduces the same league aggregate the global fit
+already matched (`pp_shot_share` 0.1478 vs 0.1488 truth, `sh_shot_share` 0.0279 vs 0.0272 truth,
+158,826 simulated shots) — the per-team layer changes which team gets more/fewer shots in a given
+matchup, not the league-wide average.
+
+**Reachability tested**: `test_special_teams_pp_shot_index_actually_changes_shot_volume` proves
+`pp_shot_index=1.8` produces more HOME shots than `pp_shot_index=0.4` on average, 80 seeded runs,
+everything else held identical.
+
+**What this does NOT cover**: block rates (`block_rate_*`) remain uncalibrated and undifferentiated
+— no truth target for blocked-shot rate by strength state in either parser. Faceoff-driven
+interaction with the new shot index was not evaluated (the faceoff multiplier is EV-only by
+default and untouched by this pass).
 
 ---
 
@@ -248,7 +282,8 @@ strength state in either parser yet.
 | `goals_per_60` | `apply_projection` back-fills from `proj_home_goals`/`proj_away_goals` (**NEW** this session) | `player_props.py`'s `TeamRates` construction, then `engine.py` (shots/goals allocation, saves) | was 0% (stuck at the stale `2.9` default) → 100%, matchup-adjusted, after the fix |
 | `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct` | **no producer exists** — `build_team_features` never sets them | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% — genuinely absent, §5 |
 | `shot_weight`, `goal_weight`, `block_weight` (player) | **no producer exists** — `build_player_features` never sets them | player-level allocation weighting inside `engine.py` | 0% — genuinely absent, §5 |
-| `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
+| `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`, GOAL conversion) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
+| `special_teams` (dict; `pp_shot_index`/`pk_shot_index_allowed`, SHOT volume — §2f) | **NEW**: `historical_truth/boxscore_shot_strength.py`, from boxscore shot splits + opportunity counts | same `st_home`/`st_away` dict, different keys → `engine.py`'s `pp_mult_shots`/`pk_mult_shots` application | 0% → 100% after §2f; a genuinely new per-team signal, not a calibration of an existing one |
 | `special_teams_cal` (7 keys — separate parameter, see §2b/§2c/§2d/§2e) | **NEW**: `SimConfig`'s 7 new fields, resolved via `build_nhl_sim_config` and mapped by `player_props._special_teams_cal` | `engine.py`'s multiplier/block-rate adjustments, 7 `.get()` sites | reachable (§2c); `pk_goal_cal_mult=0.4645` (§2d), `pp_shot_cal_mult=0.9108`, `pk_shot_cal_mult=0.3369` (§2e) truth-calibrated — `pp_goal_cal_mult` and the 3 `block_rate_*` keys still at neutral defaults |
 | `period_goal_lambdas` | `apply_projection`, from the (now-corrected) projection | `game_market_sim.py` — the **main board's** ML/spread/total | 100%, and this is what makes the main board unaffected by everything else in this table |
 
@@ -285,6 +320,7 @@ concept.
 | `scripts/fetch_nhl_boxscore_cache.py` — bulk-fetched the `boxscore` endpoint (1,297 games, 0 failures) | built, run | new substrate; only 11/1,312 games were cached before |
 | `historical_truth/boxscore_shot_strength.py` — parses PP/PK/EV shot splits, new `pp_shot_share`/`sh_shot_share` truth targets | built, tested (9 tests), cross-validated against the independent `landing` feed's SOG count | feeds the calibration below |
 | `scripts/calibrate_nhl_special_teams_shot_mult.py` + calibrated `pp_shot_cal_mult=0.9108`/`pk_shot_cal_mult=0.3369` (§2e) | built, run (joint alternating fit + full round-robin pairing, after finding and fixing a sequential-fit interaction bug), applied, locked in tests | reachable by default; a REAL behavior change (shot volume during PP/PK segments now matches truth) |
+| `historical_truth.boxscore_shot_strength.compute_team_shot_rate_index` + `pp_shot_index`/`pk_shot_index_allowed` wired into `engine.py` (§2f) — a NEW per-team mechanism, not a calibration | built, tested (reachability + loader + unit tests), verified the existing global calibration did not need re-fitting | reachable by default; a REAL behavior change (per-team shot-volume variation, previously nonexistent) |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**9 alarms**, down from 16 once `special_teams_cal` became reachable) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
 
 **All of it is additive and reachable-by-default** — no new flag was

@@ -120,6 +120,41 @@ class HockeySimEngineTest(unittest.TestCase):
             f"fails, st_home is present but not reachable, the exact defect this test exists to catch.",
         )
 
+    def test_special_teams_pp_shot_index_actually_changes_shot_volume(self) -> None:
+        """Reachability test for the NEW per-team mechanism (`docs/ai_context/hockeysim_engine_reference.md`
+        §2f): `pp_shot_index`/`pk_shot_index_allowed` on `st_home`/`st_away` -- distinct from
+        `pp_pct` above (goal CONVERSION) and from `special_teams_cal`'s league-wide multipliers
+        (calibration constants) -- must measurably change simulated SHOT volume, not goal count.
+        """
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        high_index = dict(base, pp_shot_index=1.8)
+        low_index = dict(base, pp_shot_index=0.4)
+        away_neutral = dict(base, pk_shot_index_allowed=1.0)
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=away_neutral, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        high_mean = _mean_home_shots(high_index)
+        low_mean = _mean_home_shots(low_index)
+        self.assertGreater(
+            high_mean, low_mean,
+            f"pp_shot_index=1.8 must produce more HOME shots on average than pp_shot_index=0.4 "
+            f"when nothing else differs -- got high={high_mean:.3f} low={low_mean:.3f}. If this "
+            f"fails, pp_shot_index is present on HockeyTeamFeatures.special_teams but not "
+            f"reachable in engine.py.",
+        )
+
     def test_special_teams_cal_pp_goal_mult_actually_changes_output(self) -> None:
         """Reachability test for the OTHER special-teams parameter: `special_teams_cal`
         (`pp_goal_cal_mult` etc, sourced from `SimConfig` via `player_props._special_teams_cal`).

@@ -141,17 +141,35 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   matching the same direction/magnitude as `pk_goal_cal_mult`'s correction,
   circumstantial evidence of one shared root cause rather than two). Final
   verification: 318,093 simulated shots, both targets matched almost exactly.
+- **Did** build genuine per-team PP/PK SHOT-volume differentiation (reference
+  doc §2f, full report `docs/reports/hockeysim_per_team_shot_rate_report.md`)
+  — a NEW mechanism, not a calibration. `historical_truth.boxscore_shot_strength.compute_team_shot_rate_index`
+  produces `pp_shot_index`/`pk_shot_index_allowed` per team, normalized by
+  PP/PK OPPORTUNITY count (not raw shot count, to avoid conflating "how often
+  on the power play" with "how many shots once there"). Wired into `engine.py`'s
+  `home_factor`/`away_factor` shot-volume terms alongside the existing global
+  multipliers. Measured: mean ≈1.006 across 32 real teams (confirms proper
+  normalization); real spread NJD 1.237x to MTL 0.802x; EDM lands near the
+  top (1.137x), the same team independently measured with the league's best
+  PP goal rate — two unrelated data sources agreeing. **Verified the existing
+  global calibration did not need re-fitting**: with real per-team indices
+  active, the league-wide simulated aggregate still matches truth closely
+  (`pp_shot_share` 0.1478 vs 0.1488, `sh_shot_share` 0.0279 vs 0.0272,
+  158,826 simulated shots) — the per-team layer shifts which team gets more
+  shots in a matchup, not the league average. Reachability-tested.
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
-  `faceoff_win_pct` or player usage weights — needs the truth-loader's parser
-  extended further (beyond the penalties extension already done this session).
-  Genuine per-team PP/PK SHOT-volume differentiation (as opposed to the
-  league-wide multiplier just calibrated) is also still open — the boxscore
-  data now exists to support it, but it needs a new `HockeyTeamFeatures` field
-  and a new engine formula, not a calibration pass.
+  `faceoff_win_pct` (the GLOBAL team rates the props engine's `TeamRates`
+  reads) or player usage weights — needs the truth-loader's parser extended
+  further (beyond the penalties extension already done this session). This is
+  distinct from the PP/PK-specific shot differentiation just built above.
 - Did not re-run the goal-multiplier calibration (§2d, earlier this session)
   with the joint-fit method the shot-multiplier bug discovery motivated —
   flagged as an open methodology-consistency gap, not a known error (its own
   verification was already reasonably tight).
+- Did not build per-team block rates or investigate the faceoff multiplier's
+  interaction with the new per-team shot index (§2f) — no truth target for
+  blocked-shot rate by strength state exists, and the faceoff effect is
+  EV-only by default and untouched by this pass.
 - Did not build a real xG (expected goals) model — the reader and allowlist
   exist; the shot-quality model producing the data does not, and building one
   is a distinct, substantial modelling project, not an input-population fix.

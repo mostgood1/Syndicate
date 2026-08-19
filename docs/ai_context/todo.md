@@ -327,7 +327,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK%), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + NEW per-team PP/PK SHOT-volume differentiation), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -476,12 +476,30 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   bug discovery and used the sequential method — its own verification was
   already reasonably tight, so there's no direct evidence it has the same
   bias, but it was never re-run jointly to confirm. Flagged, not fixed.
-  Also still open: genuine PER-TEAM PP/PK shot-volume differentiation (as
-  opposed to the league-wide multiplier just calibrated) — unlike goals,
-  there is no per-team shot-volume signal yet; building one needs a new
-  `HockeyTeamFeatures` field and a new `engine.py` formula, a real modelling
-  project, not a calibration pass. The boxscore data now supports it if a
-  future pass wants to build it.
+- **Genuine PER-TEAM PP/PK SHOT-volume differentiation — built.** Full
+  report: `docs/reports/hockeysim_per_team_shot_rate_report.md`. Unlike goals
+  (which had `pp_pct`/`pk_pct` per team already), shot VOLUME had no
+  per-team signal at all before this — only the league-wide `cal_pp_sh_mult`/
+  `cal_pk_sh_mult` constants just above. `historical_truth.boxscore_shot_strength.compute_team_shot_rate_index`
+  produces `pp_shot_index`/`pk_shot_index_allowed` per team, normalized by
+  PP/PK OPPORTUNITY count (not raw per-game shot count — deliberately, to
+  avoid conflating "how often on the power play" with "how many shots once
+  there"). Measured: mean ≈1.006 across 32 real teams (confirms proper
+  normalization); real spread NJD 1.237x to MTL 0.802x; EDM lands near the
+  top (1.137x) — the same team independently measured with the league's best
+  PP goal rate, two unrelated data sources agreeing. Wired into `engine.py`'s
+  `home_factor`/`away_factor` shot-volume terms, read once per game.
+  `scripts/build_nhl_special_teams_artifact.py` now writes both as two
+  ADDITIONAL columns on the existing `team_special_teams_{season}.csv` (not
+  a second artifact), degrading to neutral when no `boxscore` cache exists.
+  **Verified the existing global calibration did NOT need re-fitting**, not
+  assumed: re-running the full round-robin simulation with REAL per-team
+  indices active reproduces the same league-wide aggregate the global fit
+  already matched (`pp_shot_share` 0.1478 vs 0.1488 truth, `sh_shot_share`
+  0.0279 vs 0.0272 truth, 158,826 simulated shots) — the per-team layer
+  shifts which team gets more shots in a matchup, not the league average, by
+  construction (indices average to ~1.0). Reachability-tested (elite-shot-rate
+  team outshoots a poor one on average, 80 seeded runs).
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**
