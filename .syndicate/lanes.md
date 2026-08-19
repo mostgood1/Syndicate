@@ -535,17 +535,20 @@ across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will no
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
-### nhl-model-owner — OPEN — CHECKLIST FULL PASS + dead-gate REMOVED + first market-comparison backtest built (`#470`, real production data) — session: nhl-model-owner
+### nhl-model-owner — OPEN — CHECKLIST FULL PASS + dead-gate REMOVED + market-comparison backtest (`#470`) + faceoff-zone track (EV/OZ/DZ, `#463`) all CLOSED — session: nhl-model-owner
 - Goal: NHL sim engine reaches the same deep-dive rigor MLB/soccer already have —
   **testable outcome MET**: `python scripts/nhl_sim_input_checklist.py` exits 0.
-  Extended goal, also MET this session: does the resulting model show any
-  edge over a real market — `scripts/grade_nhl_predictions_vs_market.py`
-  (`#470`) answers that, pulling real production data, not just the local
-  mirror. Full detail: `docs/ai_context/hockeysim_engine_reference.md`
-  §1–§2l, §8/§8b, `docs/ai_context/nhl_model_inventory.md`, `todo.md`
-  `#463`/`#470`, `.syndicate/log/2026-08-19.md` (this checkpoint's full
-  narrative by file/verified/believed/dead-ends), `.syndicate/state.md`
-  `[nhl-sim-engine]`.
+  Extended goal, also MET: does the resulting model show any edge over a
+  real market — `scripts/grade_nhl_predictions_vs_market.py` (`#470`)
+  answers that, pulling real production data, not just the local mirror.
+  Third extension, also MET: does the faceoff-driven shot-share mechanism
+  actually use zone-appropriate data — three per-team faceoff indices
+  (EV-blended, offensive-zone, defensive-zone) built and wired. Full
+  detail: `docs/ai_context/hockeysim_engine_reference.md` §1–§2o, §8/§8b,
+  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`,
+  `.syndicate/log/2026-08-19.md` (full narrative by
+  file/verified/believed/dead-ends across all checkpoints today),
+  `.syndicate/state.md` `[nhl-sim-engine]`.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_*.py`/`scripts/grade_nhl_predictions_vs_market.py`/`scripts/calibrate_nhl_*.py`
   (producer/calibration/backtest scripts), `docs/ai_context/hockeysim_engine_reference.md`,
@@ -555,27 +558,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Dead gate CLOSED, not left open**: `HockeyTeamFeatures.blocks_per_60`/
   `penalties_per_60` were confirmed dead (proven, not assumed) AND confirmed
   to have no legitimate consumption mechanism that wouldn't double-count
-  already-live real data (blocks: the calibrated per-shot `block_rate_*`
-  mechanism; penalties: `special_teams.committed_per_game` already drives
-  PP/PK segment generation). Removed from `HockeyTeamFeatures`/`TeamRates`
+  already-live real data. Removed from `HockeyTeamFeatures`/`TeamRates`
   and every call site across 15 files, not just documented.
-- **New this session, on top of the full-PASS checklist**: a real
-  market-comparison backtest (`#470`) — the instrument that answers "does
-  this show an edge," distinct from every calibration the checklist proves.
-  Pulls real PRODUCTION data (`--source production`, public
-  `/nhl/api/cards/dates` route, no admin token) in addition to the thin
-  local mirror. Found and fixed two real bugs by checking real responses,
-  not assuming: stale-duplicate prediction files, and `lookahead_applied`'s
-  actual meaning (date-fallback, not live adjustment). Measured n=14-15
-  moneyline/total (up from n=3-4 local-only) — explicitly NOT a powered
-  verdict, stated with equal weight to every other caveat this session.
+- **Market-comparison backtest (`#470`) built and extended to real production
+  data** — the instrument that answers "does this show an edge," distinct
+  from every calibration the checklist proves. `--source production` pulls
+  the public `/nhl/api/cards/dates` route (no admin token). Found and fixed
+  two real bugs by checking real responses, not assuming: stale-duplicate
+  prediction files, and `lookahead_applied`'s actual meaning (date-fallback,
+  not live adjustment). Measured n=14-15 moneyline/total — explicitly NOT a
+  powered verdict, stated with equal weight to every other caveat.
+- **Faceoff-zone track (§2m/§2n/§2o) fully closed**: `_faceoff_multipliers`
+  was gated EV-only but fed an all-situations blend — three per-team
+  indices now close that, in order: EV-blended (fallback tier 1),
+  offensive-zone (preferred over EV when present, tier 0 — a refinement,
+  not a separate mechanism), defensive-zone (an ADDITIONAL multiplicative
+  layer composed with the OZ/EV chain, not a fourth tier — winning a DZ
+  draw both suppresses the opponent's shots AND springs the winner's own
+  transition chance, a dual effect a fallback chain can't represent).
+  `zoneCode` confirmed empirically relative to the WINNER (two draws at the
+  identical rink coordinates showed opposite zone labels depending who
+  won), OZ/DZ confirmed genuinely independent (correlation 0.69, not
+  ±1.0). Every index verified not to shift the league-wide shot average
+  (992-pairing round-robin each time, all landed under 0.5% — one under
+  0.02%) and reachability/priority/gating-tested, not just populated.
 - Verification: `python scripts/nhl_sim_input_checklist.py` — full PASS.
-  323 hockeysim/nhl tests pass throughout (unchanged since the last
-  addition — this class of script is validated by running it against real
-  data, matching MLB's own precedent). Nothing deployed (offline
-  artifact-producer + engine-wiring work only; next NHL refresh-worker/web
-  deploy picks it up). All commits pushed to `origin/main`, confirmed via
-  `git merge-base --is-ancestor` after every push this session.
+  356 hockeysim/nhl tests pass (up from 254 at session start). Nothing
+  deployed (offline artifact-producer + engine-wiring work only; next NHL
+  refresh-worker/web deploy picks it up). All commits pushed to
+  `origin/main`, confirmed via `git merge-base --is-ancestor` after every
+  push — latest confirmed tip `fc7c717d` (this lane's work) with
+  `361d0498` (another session's checkpoint, pushed alongside) on top.
 - Blocked by: none
 
 ### basketball-model-owner — OPEN — **#468's WIRING FIX LIVE on BOTH refresh-worker (`f13ea05e`) and live-odds-worker (`e1d1bcf4`), verified end-to-end with real data pre-deploy (uncached-date build + stale-schema rebuild, both correct). #469 (boxscore-capture root cause — earlier "no caller found" hypothesis was WRONG, see below) FOUND+FIXED+DEPLOYED to live-odds-worker (`e1d1bcf4`). #467 LIVE on refresh-worker. #462 LIVE+VERIFIED on web. #464 CLOSED. Runtime effect of #468/#469 on a real served prediction NOT YET OBSERVED — WNBA smart-sim fires per-game, not on a fixed interval, and the next real game (TOR@WSH) is ~19h out from 2026-08-19T04:xxZ.** inventory pass SHIPPED (#460-#469 filed) — opened 2026-08-18 — session: basketball-model-owner
@@ -981,7 +994,7 @@ the two intended files touched (318 insertions / 13 deletions,
   queued) so the two land together rather than shipping dead columns-reading
   code with nothing to read.
 
-### nfl-player-props-backtest — OPEN — opened 2026-08-19 — session: nfl-player-props-backtest
+### nfl-player-props-backtest — CLOSED-VERIFIED 2026-08-19 — measured 152,919 rows/2,406 players/4 seasons; 8 of 9 markets beat baseline in AND out of sample; two calibration defects + one allowlist gap flagged. Full write-up `todo.md` `#471`, measurement `deploys.md`. — opened 2026-08-19 — session: nfl-player-props-backtest
 - Goal: measure whether `syndicate/features/nfl/player_stats.py`'s rolling
   season-to-date rate model (mean/stdev per player per stat, feeding
   `syndicate/features/nfl/props.py`'s Normal-CDF cover probability) predicts
