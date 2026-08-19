@@ -1077,6 +1077,47 @@ the two intended files touched (318 insertions / 13 deletions,
   with the numbers stated, not just "looks better".
 - Blocked by: none.
 
+### lane-guard-disclaimer-marker-fix — CLOSED 2026-08-19 — fix shipped and verified, `f52fc91b` live on `origin/main`. — session: lane-guard-disclaimer-marker-fix
+- Goal: `_DISCLAIMER_MARKERS` in `.claude/hooks/lane-guard.py` recognizes
+  "read-only reference" as a disclaimer phrase, so a `Files` bullet like
+  `Read-only reference: docs/ai_context/todo.md` stops being misread as an
+  exclusive claim. **DONE.**
+- Files: `.claude/hooks/lane-guard.py` — one string added to the existing
+  `_DISCLAIMER_MARKERS` tuple (same list that already holds `"read-only
+  dependency"`), no other logic touched — and `tests/test_lane_guard_files_forms.py`
+  (one new regression test, `test_read_only_reference_disclaimer_is_skipped`).
+- **Collision check, stated explicitly:** this path sits inside
+  `repo-coordination`'s claimed territory (`.claude/hooks/`,
+  lines 616-617 above). `repo-coordination` is recorded UNMAPPED by the
+  2026-08-18 orphan sweep (line 53 of this file) — no live session in the
+  roster resolves to it, so there is no one to message. Left guarded there
+  rather than released, so this lane does NOT take over that charter; it
+  claims only this one file for this one string addition and should be
+  folded back into `repo-coordination` (or closed on its own) once a live
+  owner resurfaces.
+- Trigger: measured live 2026-08-19 — `nfl-player-props-calibration-fix`'s
+  block wrote `Read-only reference: docs/ai_context/todo.md` (an explicit
+  disclaimer, not a claim), and the guard's `_is_disclaimer`/
+  `_claimable_prefix` did not recognize the phrase, so it blocked
+  `nhl-model-owner` from editing `todo.md` — a file every lane in this repo
+  edits as a shared append-only ledger.
+- Hypothesis: n/a (mechanical fix, not diagnostic).
+- Falsification test: n/a.
+- Verification: construct a lanes.md fixture containing a
+  `Read-only reference:` bullet and confirm `_claims()` no longer yields
+  that path as a claim; run the hook's existing test suite if one covers
+  `_DISCLAIMER_MARKERS`. **DONE** — added
+  `test_read_only_reference_disclaimer_is_skipped` to
+  `tests/test_lane_guard_files_forms.py`; full suite 11/11 pass. Also ran
+  the fixed guard directly against the real, live `.syndicate/lanes.md`
+  (not just the fixture): `docs/ai_context/todo.md` no longer appears in
+  `_claims()`'s output.
+- Blocked by: none.
+- **Shipped:** `f52fc91b` on `origin/main` (rebased clean onto
+  `930a0a1e`, which already carried an unrelated same-day commit to the
+  same file — merged, not overwritten; both disclaimer-marker additions
+  survive). Landed via `session_worktree.py` (own worktree, own index).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
