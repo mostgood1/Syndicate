@@ -1214,6 +1214,49 @@ keep waiting for a natural clear window. **Next session: check
 TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
 `.syndicate/log/2026-08-19.md`, "Lane: wnba-edge-263" section.
 
+### nfl-passing-attempts-skew-extrapolation — OPEN — opened 2026-08-19 — session: nfl-passing-attempts-skew-extrapolation
+- Goal: `nfl-player-props-skew-fix`'s blend fix capped `passing_attempts`'
+  weight at `w=1.0` (pure log-normal) even though the closed-form optimum
+  fit on 2022-2023 was `w=1.14` — i.e. the data wanted MORE skew correction
+  than a log-normal distribution can express. **Testable outcome:** compute
+  the SAME closed-form optimal weight independently on the 2024-2025 half
+  (never used to select, only to check stability) and compare to the
+  2022-2023 fit's 1.14. If both halves agree the true correction exceeds
+  1.0, extrapolate the blend past pure log-normal for this one market
+  specifically and verify the extrapolated weight beats `w=1.0` out-of-
+  sample by the SAME discipline as the original fix (fit on one half,
+  reported on the other, never re-selected).
+- Files:
+  - `syndicate/features/nfl/props.py` — `_COVER_PROBABILITY_BLEND_WEIGHT`'s
+    `passing_attempts` entry only, and the blend formula's `[0,1]` clip
+    (extending the clip ceiling for this market only, if justified).
+  - New analysis script under `scripts/` (name TBD) reusing
+    `scripts/calibrate_nfl_cover_probability_blend.py`'s
+    `optimal_blend_weight`/`collect_aligned_prob_pairs`.
+  - `tests/test_nfl_props.py` — updated/new tests if the weight or clip
+    changes.
+  - Read-only reference: `scripts/backtest_nfl_props.py`,
+    `scripts/calibrate_nfl_cover_probability_blend.py`,
+    `scripts/compare_nfl_cover_probability_models.py`,
+    `reports/nfl_cover_probability_blend_calibration.json`.
+- Hypothesis: the 1.14 unclipped optimum is a REAL, stable signal (both
+  independent halves will show an optimum meaningfully above 1.0), because
+  `passing_attempts` had the largest realized improvement of any market
+  when clipped to 1.0 already — a market where the correction is working
+  well is more likely to want more of the same correction than one that
+  doesn't need it. Held loosely; the falsification test below settles it
+  either way.
+- Falsification test: if the 2024-2025 half's independently-computed
+  optimal weight is NOT meaningfully above 1.0 (e.g. close to 1.0, or
+  below, or wildly different from 1.14), the 1.14 fit-half number is noise
+  from that specific split, not a stable property of the market, and
+  extrapolating past `w=1.0` would be shipping an unvalidated correction —
+  report that as a null result and leave the cap at 1.0.
+- Verification: an out-of-sample Brier comparison at the chosen
+  extrapolated weight vs the current `w=1.0`, fit/select discipline
+  identical to the original blend fix (never select using the score half).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
