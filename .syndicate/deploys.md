@@ -16179,3 +16179,54 @@ as-of file appearing later as proof the staleness problem is fully solved
 -- check its content date range, not just its existence.
 
 Claim released: `deploy_claim.py release --service refresh-worker --holder basketball-model-owner`.
+
+### #469 — WNBA/NBA boxscore bootstrap silent-success fix + ESPN UA change
+- Deployed: 2026-08-19 03:52:32Z (live-odds-worker)
+- Change: `_bootstrap_local_boxscores_history_for_props`'s success check was
+  reading `history_rows` (cumulative total, always >0 once any history
+  exists) instead of `rows` (the current pull's own contribution) --
+  masking a fully failed ESPN fetch as success indefinitely. Now
+  distinguishes a real fetch failure from a legitimate zero-games day
+  (`days_checked`/`days_fetch_failed`, added to
+  `bootstrap_boxscores_history_local`'s return) and emits a loud
+  `print(..., flush=True)` `BOXSCORE_BOOTSTRAP_STALLED` marker instead of
+  a silent, indistinguishable-from-healthy log line. Leniency preserved on
+  purpose -- still returns success, does not hard-block props/predictions
+  generation. Also: ESPN's site API got a browser-shaped User-Agent
+  (was `"syndicate/1.0"`) -- the standard mitigation for a public API
+  soft-blocking a bot UA from cloud/datacenter egress IPs.
+- Expected: either boxscore capture resumes (best case: the UA change was
+  the actual cause) or, at minimum, the next stall is VISIBLE in
+  live-odds-worker's log stream (`days_fetch_failed` on the
+  `BOXSCORE_BOOTSTRAP_STALLED` line) instead of silent.
+- Pre-deploy safety check: `render_deploy.py` correctly flagged
+  `live-odds-worker`'s live commit (`cdaeaa58`, on
+  `origin/deploy/lens-observability-low`) as not an ancestor of the target
+  -- investigated the flagged content (`win_prob_null` recording call site
+  count, old guard/hook files) and confirmed it was consolidated-but-present
+  on target, not genuinely lost (git history shows an explicit "merge the
+  two parallel implementations into one instrument" cleanup). Deployed with
+  `--allow-rollback` on that basis, not blindly.
+- Deploy: `render_deploy.py --service live-odds-worker --commit e1d1bcf4
+  --allow-rollback` -> `dep-da2ih00n74is7382sqf0`, triggered 03:52:32Z.
+  **Live commit confirmed `e1d1bcf4` at 03:56:16Z** (~4 min, polled every
+  20s via Render's deploy-status API).
+- **verify: CODE CONFIRMED LIVE. Effect on actual data NOT yet observed** --
+  same honest framing as `#461`/`#467`/`#468`'s deploys. This only fires on
+  the next `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN` tick (confirmed
+  live, 7200s interval on live-odds-worker). **Whoever reads this next**:
+  check live-odds-worker's log stream for `BOXSCORE_BOOTSTRAP_STALLED`
+  (bad -- UA change didn't fix it, `days_fetch_failed` tells you if it's
+  still a fetch problem) versus its absence plus
+  `wnba_source/data/processed/boxscores_history.csv`'s own max game date
+  (via `/api/ops/artifacts/export?path=...`) actually advancing past
+  2026-06-30 (good -- confirms real fix). Do not read "no STALLED line"
+  alone as success -- the line only fires on a genuine zero-new-rows
+  result; confirm the content date advanced too.
+- Rollback: `render_deploy.py --service live-odds-worker --commit cdaeaa58
+  --allow-rollback` (moves live-odds-worker back to its prior deploy-branch
+  state; loses this fix and the wiring/reachability improvements from
+  `#467`/`#468` that this same deploy also carried, since live-odds-worker
+  had never received those either).
+- Claim released: `deploy_claim.py release --service live-odds-worker
+  --token 0eaa645d79dc4ae4`.
