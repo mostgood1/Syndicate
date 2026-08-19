@@ -435,6 +435,76 @@ class HockeySimEngineTest(unittest.TestCase):
             f"weak={weak_mean:.3f}.",
         )
 
+    def test_faceoff_oz_specific_curve_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2v: `faceoff_oz_specific_curve=True` (the default, dramatically
+        stronger OZ-specific decay curve) must produce measurably different output than `False`
+        (the general EV+OZ+DZ-blended curve), when BOTH sides carry real `faceoff_oz_index` data
+        -- proves the flag actually gates something, not just that it exists on `SimConfig`."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 1.6}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 0.5}
+        cfg_oz_curve = build_nhl_sim_config(overrides={"faceoff_oz_specific_curve": True})
+        cfg_general_curve = build_nhl_sim_config(overrides={"faceoff_oz_specific_curve": False})
+
+        def _mean_home_shots(profile: SimConfig) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        oz_mean = _mean_home_shots(cfg_oz_curve)
+        general_mean = _mean_home_shots(cfg_general_curve)
+        self.assertNotAlmostEqual(
+            oz_mean, general_mean, places=1,
+            msg=f"OZ-specific-curve mean={oz_mean:.3f} and general-curve mean={general_mean:.3f} "
+                f"should differ when both sides carry real OZ data -- if they match, "
+                f"faceoff_oz_specific_curve is not gating anything.",
+        )
+
+    def test_faceoff_oz_specific_curve_only_activates_when_both_sides_have_real_oz_data(self) -> None:
+        """The curve CHOICE is gated the same way the DZ layer gates its own activation: BOTH
+        sides need real `faceoff_oz_index` data, not just one. When only HOME carries it (AWAY
+        falls back to the EV/blend tier for its own percentage), `faceoff_oz_specific_curve=True`
+        must be a near no-op relative to `False` -- the general curve is used either way, since the
+        bilateral condition isn't met."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        # Only HOME has faceoff_oz_index; AWAY has neither OZ nor EV index, so it falls all the way
+        # back to the all-situations blend -- the bilateral "both sides real OZ data" condition
+        # is NOT met, regardless of what faceoff_oz_specific_curve is set to.
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 1.6}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        cfg_oz_curve = build_nhl_sim_config(overrides={"faceoff_oz_specific_curve": True})
+        cfg_general_curve = build_nhl_sim_config(overrides={"faceoff_oz_specific_curve": False})
+
+        def _mean_home_shots(profile: SimConfig) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        oz_mean = _mean_home_shots(cfg_oz_curve)
+        general_mean = _mean_home_shots(cfg_general_curve)
+        self.assertAlmostEqual(
+            oz_mean, general_mean, delta=1.0,
+            msg=f"With only ONE side carrying real OZ data, faceoff_oz_specific_curve should be a "
+                f"near no-op (the general curve is used either way) -- got oz={oz_mean:.3f} "
+                f"general={general_mean:.3f}, too far apart for the bilateral gate to be working.",
+        )
+
     def test_faceoff_discrete_event_model_flag_actually_changes_output(self) -> None:
         """Reachability test for the §2r redesign: `faceoff_discrete_event_model=True` (the
         default) must produce measurably different simulated output than `False` (the exact

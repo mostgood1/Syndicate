@@ -1,0 +1,85 @@
+{
+  "total_ev_faceoffs": 18662,
+  "buckets": [
+    {
+      "lo": 0.0,
+      "hi": 5.0,
+      "winner_shots": 3113,
+      "other_shots": 26,
+      "covered_seconds": 92065.0,
+      "winner_per_100s": 3.3813,
+      "other_per_100s": 0.0282,
+      "ratio": 119.7308
+    },
+    {
+      "lo": 5.0,
+      "hi": 10.0,
+      "winner_shots": 1442,
+      "other_shots": 295,
+      "covered_seconds": 83426.0,
+      "winner_per_100s": 1.7285,
+      "other_per_100s": 0.3536,
+      "ratio": 4.8881
+    },
+    {
+      "lo": 10.0,
+      "hi": 15.0,
+      "winner_shots": 885,
+      "other_shots": 460,
+      "covered_seconds": 77270.0,
+      "winner_per_100s": 1.1453,
+      "other_per_100s": 0.5953,
+      "ratio": 1.9239
+    },
+    {
+      "lo": 15.0,
+      "hi": 20.0,
+      "winner_shots": 721,
+      "other_shots": 470,
+      "covered_seconds": 71940.0,
+      "winner_per_100s": 1.0022,
+      "other_per_100s": 0.6533,
+      "ratio": 1.534
+    },
+    {
+      "lo": 20.0,
+      "hi": 30.0,
+      "winner_shots": 1217,
+      "other_shots": 883,
+      "covered_seconds": 129024.0,
+      "winner_per_100s": 0.9432,
+      "other_per_100s": 0.6844,
+      "ratio": 1.3783
+    },
+    {
+      "lo": 30.0,
+      "hi": 45.0,
+      "winner_shots": 1228,
+      "other_shots": 1181,
+      "covered_seconds": 163102.0,
+      "winner_per_100s": 0.7529,
+      "other_per_100s": 0.7241,
+      "ratio": 1.0398
+    },
+    {
+      "lo": 45.0,
+      "hi": 60.0,
+      "winner_shots": 915,
+      "other_shots": 846,
+      "covered_seconds": 135159.0,
+      "winner_per_100s": 0.677,
+      "other_per_100s": 0.6259,
+      "ratio": 1.0816
+    },
+    {
+      "lo": 60.0,
+      "hi": 90.0,
+      "winner_shots": 1322,
+      "other_shots": 1304,
+      "covered_seconds": 202711.0,
+      "winner_per_100s": 0.6522,
+      "other_per_100s": 0.6433,
+      "ratio": 1.0138
+    }
+  ]
+}

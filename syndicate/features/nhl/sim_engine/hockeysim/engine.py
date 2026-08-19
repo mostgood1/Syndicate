@@ -23,7 +23,11 @@ import numpy as np
 
 from .state import GameState, TeamState, PlayerState, Event
 from .models import RateModels, TeamRates, PlayerRates
-from .historical_truth.faceoff_decay_model import segment_average_multipliers, segment_average_multipliers_dz
+from .historical_truth.faceoff_decay_model import (
+    segment_average_multipliers,
+    segment_average_multipliers_dz,
+    segment_average_multipliers_oz,
+)
 
 
 @dataclass
@@ -131,6 +135,13 @@ class SimConfig:
     # above, itself still governed by `faceoff_dz_direction_fixed` -- a 3-tier fallback (discrete
     # DZ curve -> direction-fixed diff -> original diff) preserving every prior rollback point.
     faceoff_dz_discrete_event_model: bool = True
+    # §2v: use the OZ-SPECIFIC decay curve (a dramatically stronger, cleaner version of the
+    # general curve's own effect -- raw ratio 119.7x in the first 5s, fully reconverging by
+    # 60-90s, 18,662 real draws) instead of the general EV+OZ+DZ-blended curve, whenever BOTH
+    # sides' resolved faceoff percentage actually came from real OZ index data. Only takes effect
+    # when `faceoff_discrete_event_model=True` (the umbrella discrete-event gate). Default ON.
+    # `False` uses the general curve even when real OZ-specific data is available, for rollback/A-B.
+    faceoff_oz_specific_curve: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -1107,7 +1118,18 @@ class PeriodSimulator:
                 if bool(getattr(self.cfg, "faceoff_discrete_event_model", True)):
                     denom = max(1e-6, float(fo_h_pct) + float(fo_a_pct))
                     p_home_wins_draw = max(0.05, min(0.95, float(fo_h_pct) / denom))
-                    decay = segment_average_multipliers(seg_len)
+                    # §2v: use the OZ-SPECIFIC curve (a dramatically stronger, cleaner version of
+                    # the general curve's own effect) when BOTH sides' resolved percentage actually
+                    # came from real OZ index data -- the same "both sides required" discipline the
+                    # DZ layer below already uses, since the curve choice is a single segment-level
+                    # decision, not a per-side one. Falls back to the general (EV+OZ+DZ-blended)
+                    # curve whenever either side lacks real OZ data (matching `_resolve_faceoff_pct`'s
+                    # own per-side fallback for the PERCENTAGE, now extended to the CURVE choice too).
+                    use_oz_curve = (
+                        bool(getattr(self.cfg, "faceoff_oz_specific_curve", True))
+                        and faceoff_oz_idx_home_raw is not None and faceoff_oz_idx_away_raw is not None
+                    )
+                    decay = segment_average_multipliers_oz(seg_len) if use_oz_curve else segment_average_multipliers(seg_len)
                     if self.rng.random() < p_home_wins_draw:
                         m_fo_h, m_fo_a = decay.winner_mult, decay.other_mult
                     else:

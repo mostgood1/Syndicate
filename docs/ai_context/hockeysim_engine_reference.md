@@ -955,10 +955,44 @@ tests pass (up from 397); checklist re-confirmed full PASS; league-wide aggregat
 (992-pairing round-robin, legacy direction-fixed 62.082 vs discrete-event 62.196 avg total
 shots/game, +0.185%).
 
-**What this does NOT do**: no segment-level validation was run for OZ/EV re-applying this
-refactored code (their own curve numbers are simply unchanged, confirmed); the DZ curve's noisy
-(10,15]s excursion is used as measured, not investigated further; PP/PK-strength DZ draws remain
-entirely unstudied, same `faceoff_ev_only` gate as everything upstream.
+**What this section flagged as open — OZ's own precision mismatch — closed next, §2v.**
+
+---
+
+## 2v. OZ-specific discrete-event curve
+
+Full report: `docs/reports/hockeysim_faceoff_oz_discrete_event_report.md`. `_resolve_faceoff_pct`
+already prefers the OZ-specific index over the coarser EV-blend index when available (§2n) — but
+until this pass, that more-precise signal still fed the general (EV+OZ+DZ-blended) decay curve,
+discounting the precision the percentage resolution already prioritized.
+
+**The curve**: `scripts/build_nhl_faceoff_decay_curve.py --winner-zone O`, the same 18,662-draw
+population the DZ validation report already used as its confirming OZ control, built at marginal
+resolution: raw ratio 119.7x in the first 5s (winner 3.38 shots/100s vs other 0.028/100s — the
+team that just lost a draw deep in the opponent's zone has essentially no shots yet, real hockey
+sense, not measurement instability), decaying smoothly and monotonically to full reconvergence by
+(60,90]s (within 1.4%) — a dramatically stronger, cleaner version of the general curve's own
+effect, since OZ draws are the purest case of the phenomenon the blended curve dilutes with NZ/DZ.
+Mean-normalization tames the extreme first bucket into a bounded pair (winner_mult≈1.98,
+other_mult≈0.017), the same property already handling DZ's own extremes.
+
+**Wiring**: `segment_average_multipliers_oz` shares the same `_integrate_curve` helper; since it
+fully reconverges, its tail-hold matches the general curve (1.0/1.0), not DZ's own last-bucket
+hold. `engine.py` chooses between the OZ-specific and general curve as ONE segment-level decision
+— gated on BOTH sides carrying real `faceoff_oz_index` data, the same bilateral discipline DZ
+already uses. `faceoff_oz_specific_curve` (default `True`) controls this; `False` uses the general
+curve even when real OZ data exists, for rollback/A-B.
+
+**Verified**: 51 unit tests (34 pre-existing unchanged + 17 new); 2 new reachability tests (the
+flag changes output when both sides carry real OZ data; confirmed a near no-op when only one side
+does, proving the bilateral gate actually gates); 433+ hockeysim/nhl tests pass; league-wide
+aggregate barely moved (992-pairing round-robin, general 62.127 vs OZ-specific 62.284 avg total
+shots/game, +0.253%); checklist re-confirmed full PASS.
+
+**What this does NOT do**: no NZ-specific curve was built (§2p's decision not to wire
+`faceoff_nz_index` at all stands); the general curve remains the fallback for segments where only
+EV-tier data is available (no genuinely EV-specific, OZ-excluded curve was built); no re-derivation
+of the general curve's own composition.
 
 ---
 
@@ -1028,14 +1062,16 @@ concept.
 | `faceoff_segment_effect.py`'s new `winner_zone` filter + `scripts/validate_nhl_faceoff_dz_segment_effect.py` (§2s) — tests the DZ mechanism's dual claim directly, the one faceoff-zone mechanism §2r left unmeasured | built, run (19,458 real DZ draws, 4 window sizes) — **winner share BELOW 0.5 at every window (0.42-0.47)**, the OPPOSITE direction from the mechanism's own justification; OZ-specific comparison confirms the technique (0.93 winner share, even stronger than the blended population) | measurement-only, changes no engine behavior by itself — flags the shipped `faceoff_dz_index` WIRING DIRECTION (not the index itself) as now in question, a distinct next step deliberately not attempted this pass |
 | `engine.py`'s `faceoff_dz_direction_fixed` (§2t) — the narrow fix §2s recommended: swaps which side's shots `m_dz_h`/`m_dz_a` apply to, matching the measured direction | built, tested (existing reachability test caught the direction change immediately, updated; 1 new flag-reachability test), verified the league-wide average barely moved (62.230 legacy vs 62.106 fixed, −0.199%, 992-pairing round-robin) | **reachable, DEFAULT ON**; now the middle tier of §2u's 3-tier fallback, superseded as the default path but still exercised when `faceoff_dz_discrete_event_model=False` |
 | `historical_truth/faceoff_decay_model.py::segment_average_multipliers_dz` + `engine.py`'s `faceoff_dz_discrete_event_model` (§2u) — the proper DZ redesign, same treatment §2r gave the general case | built, tested (34 unit incl. 17 new + 2 new reachability), verified the league-wide average barely moved (62.082 legacy-direction-fixed vs 62.196 discrete-event, +0.185%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the third genuinely new flag this session's work introduced; 416 tests pass with it as the default |
+| `historical_truth/faceoff_decay_model.py::segment_average_multipliers_oz` + `engine.py`'s `faceoff_oz_specific_curve` (§2v) — closes the precision mismatch between the already-preferred OZ percentage and the still-general decay curve consuming it | built, tested (51 unit incl. 17 new + 2 new reachability, incl. a bilateral-gate test), verified the league-wide average barely moved (62.127 general-curve vs 62.284 OZ-specific, +0.253%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the fourth genuinely new flag this session's work introduced; 433+ tests pass with it as the default |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
-**Almost all of it is additive and reachable-by-default with no flag to flip** — the three
-exceptions are §2r's `faceoff_discrete_event_model`, §2t's `faceoff_dz_direction_fixed`, and §2u's
-`faceoff_dz_discrete_event_model`, all added DEFAULT ON specifically because each is backed by a
-real measurement and a round-robin verification showing the league-wide aggregate barely moves;
-all three exist as flags (rather than an unconditional replacement) purely for rollback/A-B
-comparison, not because anyone needs to flip them on. The other thing deliberately left OFF
+**Almost all of it is additive and reachable-by-default with no flag to flip** — the four
+exceptions are §2r's `faceoff_discrete_event_model`, §2t's `faceoff_dz_direction_fixed`, §2u's
+`faceoff_dz_discrete_event_model`, and §2v's `faceoff_oz_specific_curve`, all added DEFAULT ON
+specifically because each is backed by a real measurement and a round-robin verification showing
+the league-wide aggregate barely moves; all four exist as flags (rather than an unconditional
+replacement) purely for rollback/A-B comparison, not because anyone needs to flip them on. The
+other thing deliberately left OFF
 is `elo_blend_weight`, and §6 explains why with a measurement, not caution
 alone. `special_teams`'s PP%/PK%/committed-per-game feed the engine's EXISTING
 goal-rate adjustment unconditionally (no new gate to flip), so populating it

@@ -128,6 +128,11 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # encodes the correct (measured) direction, so `faceoff_dz_direction_fixed` above only matters
     # when this is `False` (the legacy diff-based fallback). Round-robin verified.
     faceoff_dz_discrete_event_model=True,
+    # §2v: use the OZ-SPECIFIC decay curve (raw ratio 119.7x in the first 5s, fully reconverging by
+    # 60-90s, 18,662 real draws, `winner_zone="O"`) instead of the general EV+OZ+DZ-blended curve,
+    # whenever both sides' resolved percentage actually came from real OZ index data. Only takes
+    # effect when `faceoff_discrete_event_model=True`. Round-robin verified.
+    faceoff_oz_specific_curve=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

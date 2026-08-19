@@ -10,6 +10,7 @@ import pytest
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
     segment_average_multipliers,
     segment_average_multipliers_dz,
+    segment_average_multipliers_oz,
 )
 
 
@@ -117,5 +118,60 @@ def test_dz_typical_engine_segment_length_shows_a_real_but_diluted_reversed_effe
 @pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
 def test_dz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
     result = segment_average_multipliers_dz(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# OZ-specific curve (`segment_average_multipliers_oz`) -- a dramatically stronger, cleaner
+# version of the general curve's own effect, fully reconverging by 60-90s (unlike DZ).
+# ---------------------------------------------------------------------------
+
+def test_oz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_oz(5.0)
+    assert result.winner_mult == pytest.approx(1.9834, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.0165, abs=1e-4)
+
+
+def test_oz_effect_is_stronger_than_the_general_curve_at_every_matched_length():
+    """The defining property of the OZ curve: since it isolates the purest case of the general
+    phenomenon (no dilution from NZ/DZ draws), its winner_mult should be >= the general curve's
+    own at short/medium segment lengths."""
+    for seg_len in (5.0, 10.0, 20.0, 45.0):
+        oz = segment_average_multipliers_oz(seg_len)
+        general = segment_average_multipliers(seg_len)
+        assert oz.winner_mult >= general.winner_mult, f"failed at seg_len={seg_len}"
+
+
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_oz_mean_of_winner_and_other_is_always_one(seg_len):
+    # abs=1e-3, not 1e-6 like the general/DZ curves' own version of this test: the OZ curve's
+    # extreme first-bucket ratio (raw 119.7x) means its 4-decimal-place constants carry slightly
+    # more rounding error than the milder general/DZ curves' own constants do.
+    result = segment_average_multipliers_oz(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-3)
+
+
+def test_oz_very_long_segment_converges_to_baseline():
+    """Unlike DZ, the OZ curve DOES fully reconverge within the measured range -- a very long
+    segment should land at essentially the no-effect baseline, same as the general curve."""
+    result = segment_average_multipliers_oz(1200.0)
+    assert result.winner_mult == pytest.approx(1.0, abs=0.05)
+    assert result.other_mult == pytest.approx(1.0, abs=0.05)
+
+
+def test_oz_typical_engine_segment_length_shows_a_real_and_larger_effect():
+    """At the engine's real ~40-45s segment length, the OZ winner should show a measurable edge
+    LARGER than the general curve's own edge at the same length, reflecting the purer signal."""
+    oz = segment_average_multipliers_oz(42.5)
+    general = segment_average_multipliers(42.5)
+    assert oz.winner_mult > general.winner_mult
+    assert oz.winner_mult > 1.0
+    assert oz.other_mult < 1.0
+
+
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_oz_non_positive_or_invalid_input_returns_neutral_baseline(bad):
+    result = segment_average_multipliers_oz(bad)
     assert result.winner_mult == 1.0
     assert result.other_mult == 1.0

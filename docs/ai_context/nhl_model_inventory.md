@@ -489,6 +489,27 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   re-confirmed full PASS; league-wide aggregate barely moved (992-pairing
   round-robin, 62.082 legacy-direction-fixed vs 62.196 discrete-event,
   +0.185%). This closes the faceoff-zone track's own stated next step.
+- **Did** close a real precision mismatch the DZ redesign left in place
+  (reference doc §2v, full report
+  `docs/reports/hockeysim_faceoff_oz_discrete_event_report.md`):
+  `_resolve_faceoff_pct` already prefers the OZ-specific index over the
+  coarser EV-blend index (§2n), but the more precise signal still fed the
+  general (EV+OZ+DZ-blended) decay curve. Built `segment_average_multipliers_oz`
+  from the same 18,662-draw population the DZ report used as its confirming
+  OZ control: raw ratio 119.7x at (0,5]s (the team that just lost a draw
+  deep in the opponent's zone has almost no shots yet — real hockey sense,
+  not measurement instability), decaying smoothly to full reconvergence by
+  (60,90]s — a dramatically stronger, cleaner version of the general
+  curve's own effect, since OZ draws are the purest case of the phenomenon
+  the general curve dilutes with NZ/DZ. `engine.py` now chooses the
+  OZ-specific curve as a single segment-level decision gated on BOTH sides
+  carrying real `faceoff_oz_index` data (same bilateral discipline as DZ),
+  via `faceoff_oz_specific_curve` (default ON). **Verified**: 51 unit tests
+  (17 new), 2 new reachability tests (flag changes output when both sides
+  have real data; confirmed a near no-op when only one does, proving the
+  bilateral gate actually gates), league-wide aggregate barely moved
+  (992-pairing round-robin, 62.127 general vs 62.284 OZ-specific, +0.253%),
+  checklist re-confirmed full PASS.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader

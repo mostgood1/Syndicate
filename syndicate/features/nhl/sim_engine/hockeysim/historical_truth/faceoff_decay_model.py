@@ -58,6 +58,27 @@ values (winner_mult≈0.973, other_mult≈1.027, per `reports/phase7/nhl_faceoff
 rather than the general curve's 1.0/1.0 -- the DZ population never actually reached parity within
 the measured window, so assuming full convergence beyond it would be extrapolation the general
 curve's own 60-90s bucket (a 0.2% gap) did not need.
+
+OZ-SPECIFIC CURVE (`segment_average_multipliers_oz`), added in a third pass. `_resolve_faceoff_pct`
+already PREFERS the OZ-specific index over the coarser EV-blend index when both are available (§2n)
+-- but until this pass, that more-precise WIN-RATE signal was still discounted through the general
+(EV+OZ+DZ-blended) decay curve, understating the true OZ-specific effect. This gives OZ its own
+curve, built from the SAME 18,662-draw population (`winner_zone="O"`) `hockeysim_faceoff_dz_segment_validation_report.md`
+already used as its confirming control.
+
+THE OZ CURVE SHOWS A DRAMATICALLY LARGER, CLEANER SPIKE THAN THE GENERAL CURVE, AND FULLY
+RECONVERGES. Raw ratio 119.7x in the first 5 seconds (winner 3.3813 shots/100s vs other only
+0.0282/100s -- the team that just lost a draw deep in the OPPONENT's attacking zone has essentially
+no shots of its own in the first few seconds, real hockey sense: it does not yet have the puck),
+decaying smoothly and monotonically -- 4.89x, 1.92x, 1.53x, 1.38x, 1.04x, 1.08x, 1.01x -- to full
+convergence by (60,90]s (winner/other within 1.4% of each other), the SAME clean pattern the
+general curve showed, just stronger. Mean-normalization tames the extreme raw first-bucket ratio
+into a bounded, sensible pair (winner_mult≈1.98, other_mult≈0.017) rather than the raw 119.7x --
+the same design property that already handles the DZ curve's own extremes.
+
+OZ USES THE GENERAL CURVE AS ITS OWN FALLBACK, NOT THE DZ CURVE'S TAIL-HOLD BEHAVIOR. Because this
+curve DOES fully reconverge (unlike DZ), buckets beyond 90s are held at 1.0/1.0 exactly like the
+general curve -- there is no unconverged tail to preserve here.
 """
 from __future__ import annotations
 
@@ -121,6 +142,35 @@ _DZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
 ]
 _DZ_CONVERGED_MULT_WINNER = 0.9726  # held flat at the LAST measured bucket, not assumed parity --
 _DZ_CONVERGED_MULT_OTHER = 1.0274   # see the module docstring's DZ section for why
+
+# Real, measured marginal buckets for draws the WINNER took in their own OFFENSIVE zone only
+# (`winner_zone="O"`, 18,662 real draws). A dramatically larger, cleaner spike than the general
+# curve, fully reconverging by (60,90]s -- see the module docstring's OZ section.
+#
+#   bucket        winner/100s  other/100s   winner_mult  other_mult
+#   (0, 5]           3.3813      0.0282       1.9834       0.0165
+#   (5, 10]          1.7285      0.3536       1.6604       0.3397
+#   (10, 15]         1.1453      0.5953       1.3160       0.6840
+#   (15, 20]         1.0022      0.6533       1.2107       0.7893
+#   (20, 30]         0.9432      0.6844       1.1590       0.8410
+#   (30, 45]         0.7529      0.7241       1.0195       0.9805
+#   (45, 60]         0.6770      0.6259       1.0392       0.9608
+#   (60, 90]         0.6522      0.6433       1.0069       0.9931
+#
+# `reports/phase7/nhl_faceoff_oz_decay_curve.json` carries the raw counts behind every value here.
+_OZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.9834, 0.0165),
+    (5.0, 10.0, 1.6604, 0.3397),
+    (10.0, 15.0, 1.3160, 0.6840),
+    (15.0, 20.0, 1.2107, 0.7893),
+    (20.0, 30.0, 1.1590, 0.8410),
+    (30.0, 45.0, 1.0195, 0.9805),
+    (45.0, 60.0, 1.0392, 0.9608),
+    (60.0, 90.0, 1.0069, 0.9931),
+]
+# The OZ curve DOES fully reconverge (winner/other within 1.4% by the last bucket) -- unlike DZ,
+# no unconverged tail to preserve, so this holds flat at 1.0/1.0 exactly like the general curve.
+_OZ_CONVERGED_MULT = 1.0
 
 
 @dataclass(frozen=True)
@@ -195,4 +245,14 @@ def segment_average_multipliers_dz(seg_len_seconds: float) -> SegmentFaceoffMult
     return _integrate_curve(
         seg_len_seconds, _DZ_DECAY_CURVE,
         converged_winner=_DZ_CONVERGED_MULT_WINNER, converged_other=_DZ_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_oz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """The OZ-specific decay curve -- see the module docstring's OZ section. A dramatically
+    stronger, cleaner version of the general curve's own effect (real hockey sense: the team that
+    just lost a draw deep in the opponent's attacking zone does not yet have the puck)."""
+    return _integrate_curve(
+        seg_len_seconds, _OZ_DECAY_CURVE,
+        converged_winner=_OZ_CONVERGED_MULT, converged_other=_OZ_CONVERGED_MULT,
     )
