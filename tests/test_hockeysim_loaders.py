@@ -56,6 +56,12 @@ def synth_root(tmp_path: Path) -> Path:
         "CHI,26.3,12.1,0.47,82,4650\n",
         encoding="utf-8",
     )
+    (proc / "player_rates_2025-2026.csv").write_text(
+        "player_id,full_name,position,shot_weight,goal_weight,block_weight,games\n"
+        "101,Star Center,F,3.8,0.6,0.3,80\n"   # elite top-line producer
+        "102,Top Dman,D,1.2,0.1,1.8,80\n",     # shot-blocking defenseman
+        encoding="utf-8",
+    )
     (proc / f"lineups_{date}.csv").write_text(
         "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
         "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n"
@@ -295,6 +301,59 @@ def test_build_game_features_populates_team_rates_end_to_end(synth_root):
     assert game.home.shots_per_60 == 32.1 and game.home.blocks_per_60 == 14.2
     assert game.home.faceoff_win_pct == 0.54 and game.home.penalties_per_60 == 2.9
     assert game.away.shots_per_60 == 26.3 and game.away.penalties_per_60 == 3.3
+
+
+# ---------------------------------------------------------------------------
+# Player rates (shot_weight/goal_weight/block_weight) -- `docs/ai_context/
+# hockeysim_engine_reference.md` §2k, the last 3 genuinely-absent inputs this document tracked.
+# ---------------------------------------------------------------------------
+
+
+def test_load_player_rates_map(synth_root):
+    m = loaders.load_player_rates_map("2026-03-15", root=synth_root)
+    assert m[101] == {"shot_weight": 3.8, "goal_weight": 0.6, "block_weight": 0.3}
+    assert m[102]["block_weight"] == 1.8
+
+
+def test_load_player_rates_map_missing_is_empty(tmp_path):
+    assert loaders.load_player_rates_map("2026-03-15", root=tmp_path) == {}
+
+
+def test_build_player_features_uses_player_rates_map(synth_root):
+    m = loaders.load_player_rates_map("2026-03-15", root=synth_root)
+    lineups = loaders.load_lineups("2026-03-15", root=synth_root)
+    players = loaders.build_player_features(lineups["BOS"], player_rates_map=m)
+    star = next(p for p in players if p.full_name == "Star Center")
+    assert star.shot_weight == 3.8 and star.goal_weight == 0.6 and star.block_weight == 0.3
+
+
+def test_build_player_features_without_player_rates_map_is_none(synth_root):
+    lineups = loaders.load_lineups("2026-03-15", root=synth_root)
+    players = loaders.build_player_features(lineups["BOS"], player_rates_map={})
+    star = next(p for p in players if p.full_name == "Star Center")
+    assert star.shot_weight is None and star.goal_weight is None and star.block_weight is None
+
+
+def test_build_player_features_player_not_in_map_falls_back_to_none(synth_root):
+    """A real map that just doesn't cover THIS player (e.g. a rookie call-up with < the games
+    floor) must not raise or borrow another player's rates."""
+    m = loaders.load_player_rates_map("2026-03-15", root=synth_root)
+    lineups = loaders.load_lineups("2026-03-15", root=synth_root)
+    players = loaders.build_player_features(lineups["BOS"], player_rates_map=m)
+    goalie = next(p for p in players if p.full_name == "Bruins Starter")  # id 103, not in the map
+    assert goalie.shot_weight is None
+
+
+def test_build_game_features_populates_player_rates_end_to_end(synth_root):
+    """The full loader path (what `build_slate_features` drives in production) actually reaches
+    `shot_weight`/`goal_weight`/`block_weight` -- mirrors the team-rates end-to-end test above."""
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    star = next(p for p in game.home_players if p.full_name == "Star Center")
+    assert star.shot_weight == 3.8 and star.block_weight == 0.3
+    dman = next(p for p in game.home_players if p.full_name == "Top Dman")
+    assert dman.block_weight == 1.8
 
 
 def test_build_player_features_flags_starting_goalie(synth_root):

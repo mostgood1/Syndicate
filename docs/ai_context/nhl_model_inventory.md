@@ -86,7 +86,7 @@ from its own vendor repos; NHL had none of that class of tool at all until
 
 | id | one-line | status |
 |---|---|---|
-| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (goal conversion + per-team shot + per-team block rate) + `special_teams_cal` (ALL 6 non-neutral keys calibrated) + a real xG model + `shots_per_60`/`faceoff_win_pct` FIXED (reachable); `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads them); player weights genuinely absent — 3 alarms remain | FOUND, MEASURED, PARTIALLY FIXED this session |
+| `#463` | This session's findings: `elo_rating` + `goals_per_60` staleness + `special_teams` (goal conversion + per-team shot + per-team block rate) + `special_teams_cal` (ALL 6 non-neutral keys calibrated) + a real xG model + `shots_per_60`/`faceoff_win_pct` + player usage weights ALL FIXED (reachable); `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads them) — the ONLY remaining gap; checklist reports a full PASS otherwise | FOUND, MEASURED, MOSTLY FIXED this session |
 | `#454` | Play-by-play was an unused offline modelling substrate — NHL was one of only 3 sports (with soccer, NCAAB) with **zero** pbp files ingested | **CLOSED as a data-availability gap this session** (still open as a cross-sport tracking item for soccer/NCAAB). `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py` bulk-fetched all 1,312 regular-season games (reference doc §2i) — the substrate now exists and is consumed by both the xG model (§2i) and team rates' faceoff data (§2j). |
 | `#440` | Sim-engine track pin (cross-sport); this session's work is NHL's contribution to it | PLANNED, referenced throughout |
 
@@ -216,9 +216,32 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   mechanism (§2g/§2h), and bolting `blocks_per_60` on top risks double-
   counting; `penalties_per_60` has no market or mechanism to drive at all.
   Flagged as an explicit open follow-up decision (build a mechanism, or
-  remove the dead fields), not silently marked "fixed." Player usage weights
-  (`shot_weight`/`goal_weight`/`block_weight`) still need the truth-loader's
-  parser extended further — the 3 remaining checklist alarms.
+  remove the dead fields), not silently marked "fixed."
+- **Did** build real player usage weights (`shot_weight`/`goal_weight`/
+  `block_weight`, reference doc §2k, full report
+  `docs/reports/hockeysim_player_weights_report.md`) — the checklist's LAST
+  3 alarms, now a full PASS. UNLIKE the team-rates dead gate above, these
+  were ALREADY reachable: `engine.py`'s `_weighted_choice` reads them
+  directly with a documented position/TOI heuristic fallback (forwards get
+  more shot-weight, defensemen more block-weight) that cannot differentiate
+  a top-line sniper from a 4th-liner at the same position/TOI.
+  `historical_truth/player_game_rates.py` parses the SAME boxscore cache's
+  per-skater `sog`/`goals`/`blockedShots` (no new fetch) into per-game
+  averages — 47,231 skater-game records, 828 players rated (>= 5 games
+  floor). Real spread: N. MacKinnon, A. Matthews, J. Hughes, C. McDavid top
+  `shot_weight` — real, well-known elite scorers, matching the external-
+  validation pattern every per-team signal this session built has shown.
+  Wired via `loaders.load_player_rates_map()` (the first per-PLAYER, not
+  per-team, reader in this package) + `build_player_features`'s new
+  `player_rates_map` parameter. **Reachability tested at the MECHANISM
+  level** (population-reachability alone proves nothing new here, since it
+  was already wired): 3 new `test_hockeysim_engine.py` tests hold TOI/
+  position identical between two synthetic players and vary ONLY the field
+  under test — `shot_weight`/`block_weight` (more events credited) and
+  `goal_weight` with `shot_weight` held fixed (more goals per shot, the
+  finishing-rate mechanism). All three pass.
+  `scripts/nhl_sim_input_checklist.py`'s alarm count drops from 3 to **0** —
+  a full PASS, the first time this session.
 - Did not re-run the goal-multiplier calibration (§2d, earlier this session)
   with the joint-fit method the shot-multiplier bug discovery motivated —
   flagged as an open methodology-consistency gap, not a known error (its own

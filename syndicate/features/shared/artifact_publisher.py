@@ -357,6 +357,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `team_special_teams_*.csv`'s already-allowlisted `committed_per_game`, no new file).
     "nhl_source/source_artifacts/data/processed/team_rates_*.csv",
     "nhl_source/data/processed/team_rates_*.csv",
+    # Same category, added once `HockeyPlayerFeatures.shot_weight`/`goal_weight`/`block_weight`
+    # got a real producer (`scripts/build_nhl_player_rates_artifact.py`) -- the last 3
+    # genuinely-absent inputs `hockeysim_engine_reference.md` §5 tracked.
+    "nhl_source/source_artifacts/data/processed/player_rates_*.csv",
+    "nhl_source/data/processed/player_rates_*.csv",
     # #163's MLB player game-log index (last-N starts/games, history vs
     # opponent -- syndicate/features/mlb/player_game_log.py, read by
     # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same

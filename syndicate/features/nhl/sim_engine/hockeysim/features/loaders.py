@@ -183,6 +183,50 @@ def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, 
     return out
 
 
+def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int, Dict[str, float]]:
+    """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..}}`` for a date.
+
+    Written by ``scripts/build_nhl_player_rates_artifact.py`` from real boxscore per-skater stats --
+    closes the last 3 genuinely-absent ``HockeyPlayerFeatures`` fields
+    ``docs/ai_context/hockeysim_engine_reference.md`` §5 tracked. UNLIKE the team-rates producer,
+    keyed by integer player id, not team abbreviation -- season-wide, so the SAME candidate-order
+    convention (season file, then ``_latest``) still applies, just with a per-player row shape.
+    Returns an empty map when unavailable, so `HockeyPlayerFeatures` falls back to `None` on these
+    fields, which `engine.py`'s own position/TOI heuristic already handles gracefully -- a missing
+    file degrades to that existing fallback, it does not break.
+    """
+    proc = _processed_dir(root)
+    season = _season_code_for_date(date)
+    candidates = [proc / f"player_rates_{season}.csv", proc / "player_rates_latest.csv"]
+    rows: List[Dict[str, str]] = []
+    for path in candidates:
+        rows = _read_csv_rows(path)
+        if rows:
+            break
+    if not rows:
+        return {}
+
+    out: Dict[int, Dict[str, float]] = {}
+    for row in rows:
+        lower = {k.lower(): v for k, v in row.items()}
+        pid = _safe_int(lower.get("player_id"))
+        if pid is None:
+            continue
+        sw = _to_float(lower.get("shot_weight"))
+        gw = _to_float(lower.get("goal_weight"))
+        bw = _to_float(lower.get("block_weight"))
+        entry: Dict[str, float] = {}
+        if sw is not None:
+            entry["shot_weight"] = sw
+        if gw is not None:
+            entry["goal_weight"] = gw
+        if bw is not None:
+            entry["block_weight"] = bw
+        if entry:
+            out[pid] = entry
+    return out
+
+
 def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, float]:
     """Load ``{ABBR: elo}`` for a date.
 
@@ -372,8 +416,15 @@ def build_player_features(
     team_rows: List[Dict[str, str]],
     *,
     starting_goalie: Optional[Dict[str, str]] = None,
+    player_rates_map: Optional[Dict[int, Dict[str, float]]] = None,
 ) -> Tuple[HockeyPlayerFeatures, ...]:
-    """Assemble a team's player features from lineup/roster rows (+ optional starting goalie)."""
+    """Assemble a team's player features from lineup/roster rows (+ optional starting goalie).
+
+    `shot_weight`/`goal_weight`/`block_weight` ARE `Optional` on `HockeyPlayerFeatures` (unlike the
+    team-rate fields) -- `None` is the correct "no data" value, and `engine.py` already has a
+    documented position/TOI heuristic fallback for exactly that case, so a value is only passed
+    through when `player_rates_map` genuinely has one for this player.
+    """
     goalie_name = str((starting_goalie or {}).get("goalie") or "").strip().lower()
     players: List[HockeyPlayerFeatures] = []
     for row in team_rows:
@@ -385,12 +436,16 @@ def build_player_features(
         position = _canonical_position(row.get("position"))
         full_name = str(row.get("full_name") or "").strip()
         is_starter = bool(goalie_name) and position == "G" and full_name.lower() == goalie_name
+        rates = player_rates_map.get(pid_int) if (player_rates_map and pid_int) else None
         players.append(
             HockeyPlayerFeatures(
                 player_id=pid_int,
                 full_name=full_name,
                 position=position,
                 proj_toi=_to_float(row.get("proj_toi")) or 0.0,
+                shot_weight=(rates or {}).get("shot_weight"),
+                goal_weight=(rates or {}).get("goal_weight"),
+                block_weight=(rates or {}).get("block_weight"),
                 line_slot=(str(row.get("line_slot")).strip() or None) if row.get("line_slot") else None,
                 pp_unit=_safe_int(row.get("pp_unit")),
                 pk_unit=_safe_int(row.get("pk_unit")),
@@ -421,6 +476,7 @@ def build_game_features(
     elo_map: Optional[Dict[str, float]] = None,
     special_teams_map: Optional[Dict[str, Dict[str, float]]] = None,
     rates_map: Optional[Dict[str, Dict[str, float]]] = None,
+    player_rates_map: Optional[Dict[int, Dict[str, float]]] = None,
     lineups: Optional[Dict[str, List[Dict[str, str]]]] = None,
     goalies: Optional[Dict[str, Dict[str, str]]] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
@@ -445,6 +501,8 @@ def build_game_features(
         special_teams_map = load_team_special_teams_map(date, root=root)
     if rates_map is None:
         rates_map = load_team_rates_map(date, root=root)
+    if player_rates_map is None:
+        player_rates_map = load_player_rates_map(date, root=root)
     if lineups is None:
         lineups = load_lineups(date, root=root)
     if goalies is None:
@@ -459,10 +517,12 @@ def build_game_features(
     home_ab = home.abbrev or _abbr(home_name)
     away_ab = away.abbrev or _abbr(away_name)
     home_players = build_player_features(
-        lineups.get(home_ab, []) if home_ab else [], starting_goalie=(goalies or {}).get(home_ab or "")
+        lineups.get(home_ab, []) if home_ab else [], starting_goalie=(goalies or {}).get(home_ab or ""),
+        player_rates_map=player_rates_map,
     )
     away_players = build_player_features(
-        lineups.get(away_ab, []) if away_ab else [], starting_goalie=(goalies or {}).get(away_ab or "")
+        lineups.get(away_ab, []) if away_ab else [], starting_goalie=(goalies or {}).get(away_ab or ""),
+        player_rates_map=player_rates_map,
     )
 
     game = HockeyGameFeatures(
@@ -506,9 +566,10 @@ def build_slate_features(
 ) -> List[HockeyGameFeatures]:
     """Assemble projection-primed features for every game on a date's scoreboard.
 
-    Shared per-date maps (xG / Elo / special-teams / lineups / goalies) are read once and reused
-    across games. ``anchor_to_market`` opts into Phase-4 market anchoring per game (no-op without
-    odds). Returns ``[]`` when no scoreboard is mirrored for the date.
+    Shared per-date maps (xG / Elo / special-teams / team-rates / player-rates / lineups /
+    goalies) are read once and reused across games. ``anchor_to_market`` opts into Phase-4 market
+    anchoring per game (no-op without odds). Returns ``[]`` when no scoreboard is mirrored for the
+    date.
     """
     games = _load_scoreboard_games(date, root=root)
     if not games:
@@ -517,6 +578,7 @@ def build_slate_features(
     elo_map = load_team_elo_map(date, root=root)
     special_teams_map = load_team_special_teams_map(date, root=root)
     rates_map = load_team_rates_map(date, root=root)
+    player_rates_map = load_player_rates_map(date, root=root)
     lineups = load_lineups(date, root=root)
     goalies = load_starting_goalies(date, root=root)
     out: List[HockeyGameFeatures] = []
@@ -525,7 +587,7 @@ def build_slate_features(
             build_game_features(
                 pk, date, home_name, away_name,
                 root=root, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map,
-                rates_map=rates_map, lineups=lineups, goalies=goalies,
+                rates_map=rates_map, player_rates_map=player_rates_map, lineups=lineups, goalies=goalies,
                 profile=profile, project=project,
                 anchor_to_market=anchor_to_market, anchor_weight=anchor_weight,
             )

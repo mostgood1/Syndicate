@@ -465,6 +465,49 @@ scope every field is measured at). Remaining 3: player-level usage weights (`sho
 
 ---
 
+## 2k. Player usage weights (`shot_weight`/`goal_weight`/`block_weight`) — checklist reaches PASS
+
+Full report: `docs/reports/hockeysim_player_weights_report.md`. Closes the last 3 genuinely-absent
+inputs §5 tracked — `scripts/nhl_sim_input_checklist.py` now reports a full **PASS**.
+
+**Unlike §2j's dead gate, these were ALREADY reachable**: `engine.py`'s `_weighted_choice` reads
+all three directly to decide which on-ice skater gets credited for a shot/goal/block, with a
+documented position/TOI heuristic fallback when absent (forwards get more shot-weight, defensemen
+more block-weight) — reasonable, but unable to differentiate a top-line sniper from a 4th-line
+grinder at the same position/TOI. This pass supplies real, individually differentiated data on top
+of that existing heuristic (which remains the fallback for anyone below the games floor).
+
+**The new signal**: `historical_truth/player_game_rates.py` parses the `boxscore` cache's
+per-skater `sog`/`goals`/`blockedShots` (already bulk-fetched, no new fetch) into a per-game
+average per player — exactly the unit `engine.py`'s own fallback-heuristic comment specifies.
+Floor at 5 games (`MIN_GAMES_FOR_PLAYER_WEIGHT`), below which a player is omitted, not guessed.
+Run against all 1,312 games: 47,231 skater-game records, **828 players rated**. Real spread, top
+`shot_weight`: N. MacKinnon (4.375 shots/game), A. Matthews, C. Gauthier, J. Hughes, C. McDavid —
+real, well-known elite scorers, the same style of external validation every per-team signal this
+session built has passed.
+
+**Wiring**: `loaders.load_player_rates_map()` (new — the first per-PLAYER, not per-team, reader in
+this package, keyed by integer `player_id`) + `build_player_features`'s new `player_rates_map`
+parameter, threaded through `build_game_features`/`build_slate_features`. All three fields stay
+`Optional[float]` (unlike the team-rate fields) — `None` is the CORRECT "no data" signal, since
+`engine.py` already handles it via the heuristic.
+
+**Reachability tested at the MECHANISM level** (these were already wired, so population-reachability
+alone proves nothing new): 3 new tests in `test_hockeysim_engine.py`, each holding TOI/position
+identical between two synthetic players and varying ONLY the field under test — `shot_weight=8.0`
+vs `0.2` (more shots credited), `block_weight=6.0` vs `0.1` (more blocks credited), and
+`goal_weight=3.6` vs `0.2` with `shot_weight` held FIXED (more goals per shot — the finishing-rate
+mechanism, not attribution volume). All three pass.
+
+**Checklist impact**: alarm count drops from 3 to **0**. Full PASS.
+
+**What remains open**: no goaltender-specific weight (untouched — not part of the genuinely-absent
+list); the position/TOI heuristic fallback is unchanged for anyone below the 5-game floor
+(intentional); not cross-validated against real per-player prop-market outcomes (a distinct, larger
+backtest project, matching the scope boundary §6's Elo backtest drew for its own mechanism).
+
+---
+
 ## 3. Input provenance — where each input is produced and applied
 
 | input | produced by | applied in | population `[this checkout]` |
@@ -474,7 +517,7 @@ scope every field is measured at). Remaining 3: player-level usage weights (`sho
 | `goals_per_60` | `apply_projection` back-fills from `proj_home_goals`/`proj_away_goals` (**NEW** this session) | `player_props.py`'s `TeamRates` construction, then `engine.py` (shots/goals allocation, saves) | was 0% (stuck at the stale `2.9` default) → 100%, matchup-adjusted, after the fix |
 | `shots_per_60`, `blocks_per_60`, `faceoff_win_pct` | **NEW**: `historical_truth/team_game_rates.py` + `scripts/build_nhl_team_rates_artifact.py`, from boxscore + play-by-play (§2j) | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% → 100% after §2j; `shots_per_60`/`faceoff_win_pct` REACHABLE (engine.py reads them), `blocks_per_60` populated but a CONFIRMED DEAD GATE — engine.py never reads it |
 | `penalties_per_60` | reuses `special_teams`'s already-computed `committed_per_game` (§2j) — no new producer | same `TeamRates` construction | 0% → 100% after §2j; populated but a CONFIRMED DEAD GATE — engine.py never reads it |
-| `shot_weight`, `goal_weight`, `block_weight` (player) | **no producer exists** — `build_player_features` never sets them | player-level allocation weighting inside `engine.py` | 0% — genuinely absent, §5 |
+| `shot_weight`, `goal_weight`, `block_weight` (player) | **NEW**: `historical_truth/player_game_rates.py` + `scripts/build_nhl_player_rates_artifact.py`, from boxscore per-skater stats, 828 players rated (§2k) | player-level allocation weighting + finishing-rate multiplier inside `engine.py`'s `_weighted_choice` | 0% → 100% (>= 5 games) after §2k; ALREADY reachable pre-fix (position/TOI heuristic), now real per-player data on top |
 | `special_teams` (dict; `pp_pct`/`pk_pct`/`committed_per_game`, GOAL conversion) | **NEW**: `historical_truth/special_teams_builder.py` + `scripts/build_nhl_special_teams_artifact.py`, from real PP goals + parsed penalty data | `player_props.py:90-91` → `st_home`/`st_away` → `engine.py:677-678,973-980` (PP/PK goal-rate adjustment) | 0% → 100% after the fix (§4) — see §2b for the correction to what this row used to say |
 | `special_teams` (dict; `pp_shot_index`/`pk_shot_index_allowed`, SHOT volume — §2f) | **NEW**: `historical_truth/boxscore_shot_strength.py`, from boxscore shot splits + opportunity counts | same `st_home`/`st_away` dict, different keys → `engine.py`'s `pp_mult_shots`/`pk_mult_shots` application | 0% → 100% after §2f; a genuinely new per-team signal, not a calibration of an existing one |
 | `special_teams` (dict; `block_rate_index`, BLOCK tendency — §2g) | **NEW**: `historical_truth/boxscore_block_rate.py`, from boxscore blocked-shot + SOG counts | same `st_home`/`st_away` dict → `engine.py`'s `p_blk_home`/`p_blk_away` scaling before the block roll | 0% → 100% after §2g; a genuinely new per-team signal, not a calibration of an existing one |
@@ -520,7 +563,8 @@ concept.
 | `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py` — bulk-fetched 1,312 real games (1,307 new, 0 failures) | built, run | new substrate; the play-by-play endpoint had never been fetched before this session at all |
 | `historical_truth/shot_xg_model.py` + `scripts/build_nhl_xg_artifact.py` — a real logistic xG model (distance/angle/shot-type/strength/rebound/empty-net), fit on 112,888 Fenwick shots (§2i) | built, run, holdout-validated (AUC=0.7450, Brier=0.0667, calibration table tracked across all 10 deciles), tested (21 new unit + loader tests) | reachable by default; closes §5's original listing for `xgf_per_60`/`xga_per_60` |
 | `historical_truth/team_game_rates.py` + `scripts/build_nhl_team_rates_artifact.py` — `shots_per_60`/`blocks_per_60`/`faceoff_win_pct` from boxscore + play-by-play, `penalties_per_60` reused from `special_teams` (§2j) | built, run (1,312/1,312 games joined), tested (13 parser + 6 loader + 4 reachability tests) | `shots_per_60`/`faceoff_win_pct` reachable (REAL behavior change); `blocks_per_60`/`penalties_per_60` populated but PROVEN a dead gate — `engine.py` never reads either, confirmed by a byte-identical-output test, not left unverified |
-| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**3 alarms**, down from 16 once `special_teams_cal` became reachable, then further once §2i/§2j landed) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
+| `historical_truth/player_game_rates.py` + `scripts/build_nhl_player_rates_artifact.py` — real per-player `shot_weight`/`goal_weight`/`block_weight`, 828 players rated from 47,231 skater-game records (§2k) | built, run, tested (15 parser + 6 loader + 3 mechanism-level reachability tests), external sanity check (MacKinnon/Matthews/Hughes/McDavid top the shot-volume list) | ALREADY reachable pre-fix (engine.py's own position/TOI heuristic); this replaces that heuristic with real per-player data, proven at the mechanism level, not just population |
+| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **All of it is additive and reachable-by-default** — no new flag was
 introduced that needs to be flipped later. The one thing deliberately left OFF
@@ -540,52 +584,26 @@ measurement before leaning on it for props at scale.
 
 ---
 
-## 5. Genuinely absent (not merely unfed) — 3 alarms, `scripts/nhl_sim_input_checklist.py`
+## 5. Genuinely absent (not merely unfed) — 0 alarms, `scripts/nhl_sim_input_checklist.py` reports a full PASS
 
 `[measured against this checkout: 9 mirrored dates 2026-06-02..2026-07-09,
 10 team-sides, 297 players — per §7, UNMEASURED against Render, not 0%,
 until checked there]`
 
-```
---- HockeyPlayerFeatures ---
-  0.0%   block_weight       FAIL  consumed but NEVER populated
-  0.0%   goal_weight        FAIL  consumed but NEVER populated
-  0.0%   shot_weight        FAIL  consumed but NEVER populated
-```
+Every field this document originally tracked as genuinely absent now has a real producer:
+`elo_rating` (§4), `goals_per_60` staleness (§4), `special_teams`'s 3 real keys (§2b/§4),
+`special_teams_cal`'s 7 keys — wired (§2c) and truth-calibrated except `pp_goal_multiplier`
+(deliberately neutral, §2d) — `xgf_per_60`/`xga_per_60` (§2i), the team rates (§2j — though 2 of
+those 4, `blocks_per_60`/`penalties_per_60`, are a **confirmed dead gate**, not truly reachable,
+stated in full at §2j rather than repeated here), and the 3 player usage weights (§2k, closing
+this section out). The checklist's own population check cannot see the dead-gate distinction —
+only §2j's and §2k's dedicated mechanism-level reachability tests can, which is exactly why those
+tests exist separately from the checklist rather than being folded into it.
 
-(`HockeyTeamFeatures.special_teams`'s real 3 keys — `pp_pct`/`pk_pct`/`committed_per_game` —
-are FIXED this session, §4, and no longer appear above; see §2b for how an
-earlier pass of this document mis-attributed 7 OTHER keys to that field.
-`special_teams_cal`'s 7 keys are also no longer here — wired reachable, §2c —
-though only `pp_goal_multiplier` is still at its neutral default (deliberately,
-§2d), the rest truth-calibrated (§2d/§2e/§2h). `xgf_per_60`/`xga_per_60` are
-ALSO no longer here — real producer built, §2i. `shots_per_60`/`blocks_per_60`/
-`penalties_per_60`/`faceoff_win_pct` are ALSO no longer here — real producers
-built, §2j, though 2 of the 4 (`blocks_per_60`/`penalties_per_60`) are a
-**confirmed dead gate**, not truly reachable — populated but never read by
-`engine.py`, proven by a byte-identical-output test, see §2j. The checklist's
-own population check cannot see that distinction; only §2j's dedicated
-reachability tests can. Removing all 6 of those rows is why the count dropped
-from 9 to 3.)
-
-The 3 remaining player-usage-weight fields need **real per-player data the
-current truth loader does not capture** — the same "needs a definition
-first" class MLB's remaining 5 fall into, not the "just populate an existing
-pipe" class `elo_rating`, `goals_per_60`, `special_teams`, `xgf_per_60`/
-`xga_per_60`, and the team rates were:
-- **Player weights** (`shot_weight`/`goal_weight`/`block_weight`): usage-share
-  weighting for the props allocator; needs per-player game logs the current
-  loaders don't read.
-
-**Everything else this section originally flagged as open is now built.**
-`xgf_per_60`/`xga_per_60` (§2i) and the team rates (§2j) now have real
-producers — though §2j's `blocks_per_60`/`penalties_per_60` are a confirmed
-dead gate, not truly reachable, stated there in full rather than repeated
-here. `special_teams_cal`'s league-wide calibration is DONE for every key
-except `pp_goal_cal_mult` (deliberately left neutral, §2d). Per-team PP/PK
-shot-volume differentiation is built (§2f). Per-team AND absolute block-rate
-calibration are both built (§2g/§2h). None of that is re-explained here —
-see the referenced sections.
+**Nothing in this section is repeated here** — see the referenced sections for what was built, how
+it was verified, and what (§2j's dead gate; §2h's unvalidated EV:PK:PP-def ratio; §2i's rebound/
+tip-in sign anomaly; the team-rate/player-weight producers' small-sample floors) is explicitly
+still open within each.
 
 ---
 

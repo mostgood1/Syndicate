@@ -520,7 +520,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, and `shots_per_60`/`faceoff_win_pct` FIXED; `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads either -- same shape as basketball's `#467`); player usage weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS; `blocks_per_60`/`penalties_per_60` populated but a CONFIRMED DEAD GATE (engine.py never reads either -- same shape as basketball's `#467`) is the ONLY remaining gap** — FOUND, MEASURED, MOSTLY FIXED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -824,21 +824,38 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   decision (build a real mechanism, or remove the dead fields) -- not
   silently mischaracterized as fixed. `scripts/nhl_sim_input_checklist.py`'s
   alarm count drops from 7 to **3**.
+- **Player usage weights (`shot_weight`/`goal_weight`/`block_weight`) built --
+  checklist's LAST 3 alarms, now a full PASS.** Full report:
+  `docs/reports/hockeysim_player_weights_report.md`. UNLIKE the team-rates
+  dead gate above, these were ALREADY reachable -- `engine.py`'s
+  `_weighted_choice` reads them directly with a documented position/TOI
+  heuristic fallback (forwards get more shot-weight, defensemen more
+  block-weight) that cannot differentiate a top-line sniper from a
+  4th-liner at the same position/TOI. `historical_truth/player_game_rates.py`
+  parses the SAME boxscore cache's per-skater `sog`/`goals`/`blockedShots`
+  (no new fetch) into per-game averages -- 47,231 skater-game records, 828
+  players rated (>= 5 games floor, below which a player is omitted, not
+  guessed, and falls back to the existing heuristic). Real spread, top
+  `shot_weight`: N. MacKinnon (4.375 shots/game), A. Matthews, C. Gauthier,
+  J. Hughes, C. McDavid -- real, well-known elite scorers, the same
+  external-validation pattern every per-team signal this session built has
+  shown. Wired via `loaders.load_player_rates_map()` (the first per-PLAYER,
+  not per-team, reader in this package, keyed by integer `player_id`) +
+  `build_player_features`'s new `player_rates_map` parameter.
+  **Reachability tested at the MECHANISM level** (population-reachability
+  alone proves nothing new, since it was already wired): 3 new
+  `test_hockeysim_engine.py` tests hold TOI/position identical between two
+  synthetic players and vary ONLY the field under test -- `shot_weight=8.0`
+  vs `0.2` (more shots credited), `block_weight=6.0` vs `0.1` (more blocks
+  credited), `goal_weight=3.6` vs `0.2` with `shot_weight` held FIXED (more
+  goals per shot -- the finishing-rate mechanism, not attribution volume).
+  All three pass. `scripts/nhl_sim_input_checklist.py`'s alarm count drops
+  from 3 to **0** -- a full PASS, the first time this session.
 
-**NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
-checklist, 9 mirrored dates, 10 team-sides, 297 players):**
-- `shot_weight`, `goal_weight`, `block_weight` (player) — **all 0.0%
-  populated.** `build_player_features` never sets them; direct, verbatim
-  input to `player_props.py`'s `TeamRates`/allocation construction, which
-  `engine.py` (the boxscore/props sim — SOG, saves, blocks, points markets)
-  consumes. **The main board (moneyline/spread/total in
-  `predictions_{date}.csv`) is UNAFFECTED** — `game_market_sim.py` only
-  consumes `period_goal_lambdas`, which the (now-corrected) projection layer
-  already computes per-matchup. This gap is isolated to player props. Needs
-  real per-player usage-share game logs the current truth loader does not
-  capture — a real data-pipeline build, not a wiring fix. Matches this
-  file's own framing for MLB's remaining 5 (`#440`): "needs a definition
-  first," not fixable by populating an existing field.
+**The ONLY remaining gap after this pass is `blocks_per_60`/`penalties_per_60`'s
+confirmed dead gate, above** -- an explicit open follow-up decision (build a
+real consumption mechanism, or remove the dead fields), not a "needs a
+definition first" absence like MLB's remaining 5 (`#440`).
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

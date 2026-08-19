@@ -189,6 +189,106 @@ class HockeySimEngineTest(unittest.TestCase):
             f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
         )
 
+    def test_player_shot_weight_actually_differentiates_shot_share(self) -> None:
+        """Reachability test for `HockeyPlayerFeatures.shot_weight` (`docs/ai_context/
+        hockeysim_engine_reference.md` §2k, the last genuinely-absent input this document tracked).
+        UNLIKE the team-rates dead gate (§2j), this one is ALREADY consumed by `_weighted_choice`
+        -- this proves it, at the roster-row level `run_hockeysim_game` actually reads, not just
+        by grepping the source. Two forwards at IDENTICAL `proj_toi` (so the position/TOI fallback
+        heuristic alone would treat them identically) differ ONLY in `shot_weight`."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        rh[0]["proj_toi"] = rh[1]["proj_toi"] = 18.0  # remove TOI as a confound
+        star_id = rh[0]["player_id"]
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+
+        def _mean_star_shots(shot_weight: float) -> float:
+            roster = [dict(r) for r in rh]
+            roster[0]["shot_weight"] = shot_weight
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", roster, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.player_id == star_id))
+            return statistics.mean(totals)
+
+        high_mean = _mean_star_shots(8.0)
+        low_mean = _mean_star_shots(0.2)
+        self.assertGreater(
+            high_mean, low_mean,
+            f"shot_weight=8.0 must produce more shots credited to that player on average than "
+            f"shot_weight=0.2 when TOI/position are held identical -- got high={high_mean:.3f} "
+            f"low={low_mean:.3f}. If this fails, shot_weight is present on HockeyPlayerFeatures "
+            f"but not reachable in engine.py's _weighted_choice.",
+        )
+
+    def test_player_block_weight_actually_differentiates_block_share(self) -> None:
+        """Same proof as `shot_weight` above, for `block_weight` -- a defenseman's own block
+        credit share, distinct from the per-TEAM `block_rate_index` mechanism (§2g), which governs
+        how many total blocks a team records, not WHICH skater gets credited for each one."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        # defensemen are indices 12/13 in `_roster`'s layout (12 forwards, then 6 defense)
+        rh[12]["proj_toi"] = rh[13]["proj_toi"] = 20.0
+        blocker_id = rh[12]["player_id"]
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+
+        def _mean_blocker_blocks(block_weight: float) -> float:
+            roster = [dict(r) for r in rh]
+            roster[12]["block_weight"] = block_weight
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", roster, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "block" and e.player_id == blocker_id))
+            return statistics.mean(totals)
+
+        high_mean = _mean_blocker_blocks(6.0)
+        low_mean = _mean_blocker_blocks(0.1)
+        self.assertGreater(
+            high_mean, low_mean,
+            f"block_weight=6.0 must produce more blocks credited to that defenseman on average "
+            f"than block_weight=0.1 when TOI/position are held identical -- got high={high_mean:.3f} "
+            f"low={low_mean:.3f}.",
+        )
+
+    def test_player_goal_weight_actually_differentiates_finishing_rate(self) -> None:
+        """Same proof as `shot_weight`/`block_weight` above, for `goal_weight` -- this one drives
+        `engine.py`'s per-shot FINISHING multiplier (`goal_weight`/`shot_weight` ratio), not
+        attribution volume, so `shot_weight` is held FIXED across both variants and only the
+        GOALS credited to that shooter (not shots taken) should differ."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        rh[0]["proj_toi"] = 18.0
+        rh[0]["shot_weight"] = 4.0  # held fixed -- only goal_weight varies below
+        sniper_id = rh[0]["player_id"]
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+
+        def _mean_sniper_goals(goal_weight: float) -> float:
+            roster = [dict(r) for r in rh]
+            roster[0]["goal_weight"] = goal_weight
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", roster, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "goal" and e.player_id == sniper_id))
+            return statistics.mean(totals)
+
+        high_mean = _mean_sniper_goals(3.6)   # gw/sw ratio 0.9 -- elite finisher
+        low_mean = _mean_sniper_goals(0.2)    # gw/sw ratio 0.05 -- poor finisher
+        self.assertGreater(
+            high_mean, low_mean,
+            f"goal_weight=3.6 (high gw/sw ratio) must produce more goals for that shooter on "
+            f"average than goal_weight=0.2 (low ratio), with shot_weight held fixed -- got "
+            f"high={high_mean:.3f} low={low_mean:.3f}.",
+        )
+
     def test_special_teams_cal_pp_goal_mult_actually_changes_output(self) -> None:
         """Reachability test for the OTHER special-teams parameter: `special_teams_cal`
         (`pp_goal_cal_mult` etc, sourced from `SimConfig` via `player_props._special_teams_cal`).
