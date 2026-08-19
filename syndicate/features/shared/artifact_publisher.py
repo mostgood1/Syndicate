@@ -118,6 +118,18 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # this session's market board work started reading it directly.
     "*_source/source_artifacts/data/processed/oddsapi_player_props_*.csv",
     "*_source/data/processed/oddsapi_player_props_*.csv",
+    # NFL's equivalent lives one level up, directly under `nfl_source/` (not
+    # `data/processed/`) -- `refresh_nfl_oddsapi.py` writes
+    # `oddsapi_player_props_<season>_wk<week>.csv` there. Neither pattern
+    # above matches it (confirmed live 2026-08-19: production export
+    # returns count: 0), so NFL prop-odds coverage was unverifiable from
+    # web despite the file existing worker-side -- the same gap class as
+    # the two patterns immediately above, flagged by nfl-player-props-
+    # backtest. Scoped to NFL specifically rather than broadening the
+    # general pattern to `*_source/oddsapi_player_props_*.csv`, to avoid
+    # unexpectedly matching an unrelated shallow-depth file in another
+    # sport's tree.
+    "nfl_source/oddsapi_player_props_*.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the
