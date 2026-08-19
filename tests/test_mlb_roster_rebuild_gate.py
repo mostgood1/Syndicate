@@ -24,7 +24,12 @@ import scripts.run_mlb_daily_sim_job as job  # noqa: E402
 
 
 class _FakeProc:
+    """Popen stand-in. Needs the context-manager protocol because
+    `subprocess.run()` wraps Popen in a `with` block, and the checklist hook
+    added in `#440` calls `subprocess.run`."""
     returncode = 0
+    stdout = ""
+    stderr = ""
 
     def poll(self):
         return 0
@@ -32,13 +37,30 @@ class _FakeProc:
     def wait(self, timeout=None):
         return 0
 
+    def communicate(self, *a, **k):
+        return ("", "")
+
+    def kill(self):
+        return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
 
 def _run(monkeypatch, tmp_path, gate: str | None, date: str = "2026-08-19"):
     """Invoke the real main() and capture the argv it builds."""
     captured: dict = {}
 
     def fake_popen(cmd, **kwargs):
-        captured["cmd"] = list(cmd)
+        # FIRST daily_update invocation only. The checklist hook also reaches
+        # Popen (via subprocess.run), and taking the last call silently replaced
+        # the sim command with the checklist's -- which made two passing tests
+        # fail for a reason that had nothing to do with the gate.
+        if "cmd" not in captured and any("daily_update" in str(t) for t in cmd):
+            captured["cmd"] = list(cmd)
         return _FakeProc()
 
     monkeypatch.setattr(job.subprocess, "Popen", fake_popen)
@@ -113,3 +135,58 @@ def test_off_is_not_a_magic_word(monkeypatch, tmp_path):
     """
     cmd = _run(monkeypatch, tmp_path, "off", date="2026-08-19")
     assert not _has_rebuild(cmd)
+
+
+# ---------------------------------------------------------------- checklist hook
+
+def _run_capturing_checklist(monkeypatch, gate: str | None, sim_rc: int = 0):
+    """Drive the REAL main() and capture whether the checklist subprocess ran."""
+    calls: list = []
+
+    class _P:
+        returncode = sim_rc
+
+        def poll(self):
+            return sim_rc
+
+        def wait(self, timeout=None):
+            return sim_rc
+
+    monkeypatch.setattr(job.subprocess, "Popen", lambda cmd, **kw: _P())
+    monkeypatch.setattr(job.subprocess, "run",
+                        lambda cmd, **kw: calls.append(list(cmd)) or _P())
+    monkeypatch.setattr(job, "_hydrate_vendor_oddsapi_mirror", lambda *a, **k: None)
+    monkeypatch.setattr(job, "publish_changed_hot_artifacts", lambda *a, **k: 0)
+    monkeypatch.setattr(job, "bootstrap_mlb_player_game_log", lambda *a, **k: {})
+    monkeypatch.setattr(job, "pull_season_artifacts", lambda *a, **k: 0)
+    if gate is None:
+        monkeypatch.delenv("SYNDICATE_MLB_INPUT_CHECKLIST", raising=False)
+    else:
+        monkeypatch.setenv("SYNDICATE_MLB_INPUT_CHECKLIST", gate)
+    monkeypatch.setattr(sys, "argv", [
+        "run_mlb_daily_sim_job.py", "--date", "2026-08-19", "--season", "2026",
+        "--sims", "1", "--workers", "1",
+    ])
+    try:
+        job.main()
+    except SystemExit:
+        pass
+    except Exception:
+        pass
+    return [c for c in calls if any("sim_input_checklist" in str(t) for t in c)]
+
+
+def test_checklist_runs_by_default(monkeypatch):
+    """Default ON is the point: nothing ran this on the worker before."""
+    got = _run_capturing_checklist(monkeypatch, None)
+    assert got, "checklist did not run with the gate unset"
+    assert "--publish" in got[0], "ran without --publish -- the report never leaves the worker"
+
+
+def test_checklist_gate_off_is_honoured(monkeypatch):
+    assert not _run_capturing_checklist(monkeypatch, "off")
+
+
+def test_checklist_skipped_when_the_sim_failed(monkeypatch):
+    """A failed sim leaves rosters half-written; auditing them reports noise."""
+    assert not _run_capturing_checklist(monkeypatch, None, sim_rc=1)

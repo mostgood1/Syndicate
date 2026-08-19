@@ -416,6 +416,45 @@ def main() -> int:
     except Exception as exc:
         print(f"MLB_PLAYER_GAME_LOG_FAILED {type(exc).__name__}: {exc}", flush=True)
 
+    # INPUT CHECKLIST. `#440`.
+    #
+    # The engine standard makes this the gate for every sim input, and until now
+    # NOTHING RAN IT ON THE WORKER -- not this job, not the refresh loop, not a
+    # cron. The worker serves no HTTP, so it could not be run remotely either.
+    # The report is the ONLY population signal with a path off this machine:
+    # `roster_objs/` are deliberately not allowlisted (hundreds of large files
+    # per date), so a bounded report is published in their place.
+    #
+    # Placed HERE, before `publish_changed_hot_artifacts`, for the same reason
+    # the game-log bootstrap above is: the sweep only pushes files whose mtime
+    # is already newer than `started_epoch` WHEN IT RUNS. Writing the report
+    # afterwards would silently defer its push to the next job.
+    #
+    # NEVER FATAL, and bounded. A worker at 87.9% of its memory cap does not get
+    # unbounded extra work: `--games` is small by default, the child gets a hard
+    # timeout, and every failure path is swallowed with a printed reason. An
+    # audit that can break the sim it audits is worse than no audit.
+    if ok and str(os.environ.get("SYNDICATE_MLB_INPUT_CHECKLIST") or "on").strip().lower() not in ("0", "off", "false"):
+        try:
+            _cl_games = str(os.environ.get("SYNDICATE_MLB_INPUT_CHECKLIST_GAMES") or "8").strip()
+            _cl = subprocess.run(
+                [sys.executable, str(REPO_ROOT / "scripts" / "sim_input_checklist.py"),
+                 "--games", _cl_games, "--publish", "--warn-only"],
+                cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=180,
+            )
+            _tail = (_cl.stdout or _cl.stderr or "").strip().splitlines()
+            print(f"MLB_INPUT_CHECKLIST rc={_cl.returncode} games={_cl_games} "
+                  f"last={_tail[-1][:160] if _tail else '(no output)'}", flush=True)
+        except subprocess.TimeoutExpired:
+            print("MLB_INPUT_CHECKLIST_TIMEOUT after 180s -- report not written", flush=True)
+        except Exception as exc:
+            print(f"MLB_INPUT_CHECKLIST_FAILED {type(exc).__name__}: {exc}", flush=True)
+    else:
+        # Say WHY it did not run. Silence here is indistinguishable from a
+        # checklist that ran and found nothing wrong.
+        print(f"MLB_INPUT_CHECKLIST skipped sim_ok={ok} "
+              f"gate={os.environ.get('SYNDICATE_MLB_INPUT_CHECKLIST') or 'on'}", flush=True)
+
     published_count = 0
     try:
         published_count = publish_changed_hot_artifacts(started_epoch)
