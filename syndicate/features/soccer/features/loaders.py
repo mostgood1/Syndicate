@@ -459,6 +459,8 @@ def build_soccer_match_features(
     knockout: bool = False,
     home_starter_ids: tuple[str, ...] = (),
     away_starter_ids: tuple[str, ...] = (),
+    home_starters_available_share: float | None = None,
+    away_starters_available_share: float | None = None,
 ) -> SoccerMatchFeatures:
     home_rating, home_matched = _rating_for(ratings, home_team)
     away_rating, away_matched = _rating_for(ratings, away_team)
@@ -529,6 +531,16 @@ def build_soccer_match_features(
             if rating.get(key) is not None:
                 possession_metrics[f"{side}_{key}"] = rating[key]
     team_metrics = {k: v for k, v in team_metrics.items() if v is not None}
+    # DIRECT PARAMS, NOT RATINGS-DERIVED -- see the field's own comment in
+    # contracts.py for why. `None` (not fed for this fixture, e.g. the team
+    # has too little history for a core-XI estimate yet) stays ABSENT rather
+    # than becoming a fabricated 0.5 -- the same None-not-neutral-default
+    # contract `00475bce` established for ppda.
+    availability_metrics: dict[str, Any] = {}
+    if home_starters_available_share is not None:
+        availability_metrics["home_starters_available_share"] = home_starters_available_share
+    if away_starters_available_share is not None:
+        availability_metrics["away_starters_available_share"] = away_starters_available_share
     return SoccerMatchFeatures(
         league=league,
         date=date,
@@ -539,6 +551,7 @@ def build_soccer_match_features(
         defensive_metrics=defensive_metrics,
         set_piece_metrics=set_piece_metrics,
         possession_metrics=possession_metrics,
+        availability_metrics=availability_metrics,
         market_features=dict(market_features or {}),
         knockout=knockout,
         home_starter_ids=tuple(home_starter_ids),
@@ -634,9 +647,14 @@ def build_soccer_simulation_input(
     """Assemble a full simulation input from fixtures + ratings (+ players).
 
     Fixtures are ``{"home_team", "away_team"}`` dicts, optionally carrying
-    ``match_id``, ``market_features``, and confirmed/projected lineups as
+    ``match_id``, ``market_features``, confirmed/projected lineups as
     ``home_starter_ids`` / ``away_starter_ids`` (see
-    ``soccersim.player_props.build_usage_profiles`` for the id format).
+    ``soccersim.player_props.build_usage_profiles`` for the id format), and
+    ``home_starters_available_share`` / ``away_starters_available_share`` --
+    this fixture's actual starting-XI overlap with the team's historical core
+    XI, PER-FIXTURE and not ratings-derived (see ``SoccerMatchFeatures.
+    availability_metrics``). Absent for a fixture with no known value rather
+    than a fabricated neutral default.
     """
     matches = tuple(
         build_soccer_match_features(
@@ -650,6 +668,8 @@ def build_soccer_simulation_input(
             knockout=knockout or bool(fixture.get("knockout")),
             home_starter_ids=tuple(fixture.get("home_starter_ids") or ()),
             away_starter_ids=tuple(fixture.get("away_starter_ids") or ()),
+            home_starters_available_share=fixture.get("home_starters_available_share"),
+            away_starters_available_share=fixture.get("away_starters_available_share"),
         )
         for fixture in fixtures
     )

@@ -30,6 +30,16 @@ class SoccerMatchFeatures:
     defensive_metrics: dict[str, Any] = field(default_factory=dict)
     possession_metrics: dict[str, Any] = field(default_factory=dict)
     set_piece_metrics: dict[str, Any] = field(default_factory=dict)
+    # `_availability_index` in `possession_priors.py` has read from this
+    # container since the engine was written; nothing ever populated it --
+    # `_extract_block` always returned `{}`, so its own 0.5 neutral default was
+    # the only value the engine had ever seen. UNLIKE the ratings-derived
+    # containers above, this is inherently PER-FIXTURE (this match's actual
+    # starting XI against the team's historical core, not a rolling team
+    # average), so it is threaded through as direct params, the same pattern
+    # already used for `home_starter_ids`/`away_starter_ids` below -- not
+    # derived from `ratings` the way `team_metrics` etc. are.
+    availability_metrics: dict[str, Any] = field(default_factory=dict)
     market_features: dict[str, Any] = field(default_factory=dict)
     tempo_features: dict[str, Any] = field(default_factory=dict)
     knockout: bool = False

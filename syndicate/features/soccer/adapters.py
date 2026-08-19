@@ -53,6 +53,10 @@ class SoccerSimulationAdapter:
             "defensive_metrics": dict(match.defensive_metrics or {}),
             "possession_metrics": dict(match.possession_metrics or {}),
             "set_piece_metrics": dict(match.set_piece_metrics or {}),
+            # `_extract_block`'s first accepted name for this container is
+            # "availability" -- confirmed against `possession_priors.py`
+            # before using it, not assumed from the other keys' pattern.
+            "availability": dict(match.availability_metrics or {}),
             "tempo": dict(match.tempo_features or {}),
             "market_features": dict(match.market_features or {}),
         }

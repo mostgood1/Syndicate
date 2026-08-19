@@ -57,7 +57,12 @@ CONTAINER_TO_FIELD = {
     "tempo_metrics": "tempo_features",
     "market_features": "market_features",
     "form_metrics": "team_metrics",
-    "availability_metrics": "team_metrics",
+    # WAS "team_metrics" -- a placeholder guess from before `availability_
+    # metrics` existed as its own field. Corrected now that it does; a wrong
+    # mapping here would have this gate reporting the field FED whenever
+    # team_metrics happened to be non-empty, regardless of whether
+    # availability was ever actually populated.
+    "availability_metrics": "availability_metrics",
 }
 
 
@@ -119,9 +124,20 @@ def main() -> int:
     print(f"  fixture: {home} vs {away}")
     print()
 
+    # A REAL availability value, not a synthetic one -- same discipline as the
+    # ratings above. `starters_available_share` is PER-FIXTURE, not part of
+    # `ratings`, so it cannot be looked up for this synthetic (home, away)
+    # pairing the way ratings can; any real observed value from the same
+    # artifact proves the constructor param -> engine path is genuinely wired,
+    # which is what this gate checks.
+    real_availability = next(
+        (r["home_starters_available_share"] for r in espn_stats if r.get("home_starters_available_share") is not None),
+        None,
+    )
     match = build_soccer_match_features(
         league="eredivisie", date="2026-08-19",
         home_team=home, away_team=away, ratings=ratings,
+        home_starters_available_share=real_availability,
     )
 
     print("SOCCER SIM INPUT CHECKLIST")

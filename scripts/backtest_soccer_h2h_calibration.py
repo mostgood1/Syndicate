@@ -60,6 +60,7 @@ import pandas as pd  # noqa: E402
 from syndicate.features.soccer.adapters import build_soccer_simulation_adapter  # noqa: E402
 from syndicate.features.soccer.features.loaders import (  # noqa: E402
     _as_iso_day,
+    _EspnStatsIndex,
     build_soccer_simulation_input,
     compute_team_ratings,
     team_rows_from_match_history,
@@ -171,7 +172,16 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
     if not history:
         return {"league": league, "error": "no committed history"}
 
-    team_rows = team_rows_from_match_history(history, espn_stats=_load_espn_match_stats(league))
+    espn_stats = _load_espn_match_stats(league)
+    team_rows = team_rows_from_match_history(history, espn_stats=espn_stats)
+    # SEPARATE from the `team_rows` join above on purpose. `possession_share`/
+    # `set_piece_goal_share` are ratings-derived (rolling team averages, via
+    # `compute_team_ratings`); `starters_available_share` is PER-FIXTURE (this
+    # match's actual lineup against the team's historical core), so it is
+    # looked up per fixture below, not folded into a team-level average. Same
+    # underlying artifact, same fuzzy-match index, different consumption
+    # shape -- reusing `_EspnStatsIndex` rather than building a second one.
+    espn_index = _EspnStatsIndex(espn_stats)
 
     # Coverage, printed rather than assumed -- the repo rule for anything built
     # on `data/**`.
@@ -231,13 +241,23 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
         if not eligible:
             continue
 
+        def _fixture(row: dict[str, Any]) -> dict[str, Any]:
+            fx: dict[str, Any] = {
+                "home_team": row["home_team"], "away_team": row["away_team"],
+                "match_id": str(row.get("match_id") or ""),
+            }
+            espn_row = espn_index.lookup(str(row["home_team"]), str(row["away_team"]), str(row.get("date") or ""))
+            if espn_row is not None:
+                if espn_row.get("home_starters_available_share") is not None:
+                    fx["home_starters_available_share"] = espn_row["home_starters_available_share"]
+                if espn_row.get("away_starters_available_share") is not None:
+                    fx["away_starters_available_share"] = espn_row["away_starters_available_share"]
+            return fx
+
         simulation_input = build_soccer_simulation_input(
             league=league,
             date=day,
-            fixtures=[
-                {"home_team": row["home_team"], "away_team": row["away_team"], "match_id": str(row.get("match_id") or "")}
-                for row in eligible
-            ],
+            fixtures=[_fixture(row) for row in eligible],
             ratings=ratings,
             simulations=simulations,
         )
