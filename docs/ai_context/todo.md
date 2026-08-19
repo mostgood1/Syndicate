@@ -1178,6 +1178,44 @@ section is now EMPTY -- nothing left unreachable to report. 323
 hockeysim/nhl tests pass (net count unchanged). Full detail:
 `docs/ai_context/hockeysim_engine_reference.md` §2l.
 
+**Addendum, 2026-08-19: per-team even-strength faceoff-index differentiation
+built** (reference doc §2m), closing a real MISMATCH `#463`'s original close
+had left flagged, not a new alarm (`faceoff_win_pct` was already reachable).
+`_faceoff_multipliers` is gated `faceoff_ev_only=True` but was fed
+`TeamRates.faceoff_win_pct`, an ALL-SITUATIONS blend (PP/PK draws mixed into
+a mechanism that claims to exclude them). `historical_truth/faceoff_ev_index.py`
+parses each `playbyplay` faceoff event's `situationCode` (confirmed against a
+real cached game: `"1551"`=5v5 EV, `"1451"`/`"1541"`=one side on the PP) to
+build a genuinely EV-specific per-team win-rate index (ratio to league
+average, same convention as `block_rate_index`/`pp_shot_index`). Faceoffs are
+zero-sum, which makes the index self-verifying -- the league-wide rate it
+normalizes against is mathematically ~0.5 regardless of input, so a mean
+index that lands near 1.0 confirms correct attribution, not just correct
+math. **Measured**: 1,312 games, 58,762 EV faceoffs (44.8/game), mean index
+1.00011 across 32 teams; real spread NYR (1.097x) to MIN (0.927x), ~18%
+top-to-bottom. **Verified the league-wide average did not shift**:
+992-pairing round-robin (2,976 games), 61.786 neutral vs 62.079 real-indexed
+total shots/game -- noise-level.
+
+**A real regression found and fixed while wiring this, not after.** The
+first version made the EV-gated segment ALWAYS consume the index (defaulting
+absent data to neutral 1.0), which silently made the already-reachable
+`TeamRates.faceoff_win_pct` stop mattering whenever no index was supplied --
+a neutral 1.0 overrode whatever real value the field carried. Caught
+immediately by the pre-existing `test_faceoff_win_pct_actually_changes_sog_projection`
+regressing in the full test run, not discovered later or shipped first. Fixed
+by reading `st_home.get("faceoff_ev_index")` RAW (not defaulted) and falling
+back to `rates.home.faceoff_win_pct` per side, independently, whenever that
+side's index is genuinely absent -- the index now only overrides the blend
+when a real one is actually supplied. 335 hockeysim/nhl tests pass (12 new:
+10 parser/index + 1 loader + 1 reachability), checklist re-confirmed full
+PASS after the fix.
+
+**What remains open**: zone-specific faceoff differentiation (`zoneCode` is
+present on every event, unused here); `faceoff_alpha`/`faceoff_diff_clip`/
+`faceoff_mult_clip_*` remain the vendor's never-calibrated defaults -- this
+pass fixed WHAT feeds the mechanism, not its own sensitivity constants.
+
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 
 **Deployed to web** (`b775255a`, break-glass authorized, see

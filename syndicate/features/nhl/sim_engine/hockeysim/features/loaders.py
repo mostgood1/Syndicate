@@ -264,14 +264,15 @@ def load_team_elo_map(date: str, *, root: Optional[Path] = None) -> Dict[str, fl
 
 def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, float]]:
     """Load ``{ABBR: {"pp_pct":..., "pk_pct":..., "committed_per_game":..., "pp_shot_index":...,
-    "pk_shot_index_allowed":..., "block_rate_index":...}}`` for a date.
+    "pk_shot_index_allowed":..., "block_rate_index":..., "faceoff_ev_index":...}}`` for a date.
 
     Written by ``scripts/build_nhl_special_teams_artifact.py`` from real settled results
     (`historical_truth.special_teams_builder` for the first three keys;
     `historical_truth.boxscore_shot_strength` for the shot-index pair, §2f;
-    `historical_truth.boxscore_block_rate` for `block_rate_index`, §2g -- all three absent when
-    the producer ran without a `boxscore` cache, degrading to the engine's own neutral default
-    rather than missing entirely). Same candidate-order convention as
+    `historical_truth.boxscore_block_rate` for `block_rate_index`, §2g;
+    `historical_truth.faceoff_ev_index` for `faceoff_ev_index`, §2m -- all absent when the producer
+    ran without the matching cache, degrading to the engine's own neutral default rather than
+    missing entirely). Same candidate-order convention as
     :func:`load_team_xg_map`/:func:`load_team_elo_map`. Returns an empty map when unavailable, so
     ``HockeyTeamFeatures.special_teams`` stays ``{}`` and the engine falls back to its own
     league-average defaults (`engine.py:667-668`) exactly as it did before this producer existed --
@@ -301,6 +302,7 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
         pp_shot_idx = _to_float(lower.get("pp_shot_index"))
         pk_shot_idx = _to_float(lower.get("pk_shot_index_allowed"))
         block_idx = _to_float(lower.get("block_rate_index"))
+        faceoff_ev_idx = _to_float(lower.get("faceoff_ev_index"))
         entry: Dict[str, float] = {}
         if pp is not None:
             entry["pp_pct"] = pp
@@ -314,6 +316,8 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
             entry["pk_shot_index_allowed"] = pk_shot_idx
         if block_idx is not None:
             entry["block_rate_index"] = block_idx
+        if faceoff_ev_idx is not None:
+            entry["faceoff_ev_index"] = faceoff_ev_idx
         if entry:
             out[key] = entry
     return out

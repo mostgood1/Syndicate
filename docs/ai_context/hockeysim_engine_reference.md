@@ -567,6 +567,70 @@ either: it looks fixed to anything checking population alone (exactly what the c
 
 ---
 
+## 2m. Per-team even-strength faceoff-index differentiation
+
+Full module: `historical_truth/faceoff_ev_index.py`. Closes a real mismatch, not a genuinely absent
+input: `engine.py`'s faceoff-driven shot-share adjustment (`_faceoff_multipliers`) is gated
+`faceoff_ev_only=True` — applied ONLY during even-strength segments — but the input feeding it,
+`TeamRates.faceoff_win_pct` (§2j/§2l's team-rates producer), is an ALL-SITUATIONS blend (every
+faceoff a team took, PP/PK/EV together). A mechanism that claims to be EV-specific was reading a
+number that mixes in exactly the situations it's supposed to exclude.
+
+**The new signal**: `compute_team_faceoff_ev_index` — a per-team win-rate INDEX (ratio to league
+average, mean ≈1.0 by construction, same convention as `block_rate_index`/`pp_shot_index`),
+computed from EVEN-STRENGTH faceoffs only. Strength state comes from each `playbyplay` faceoff
+event's `situationCode` (a 4-digit string: `[awayGoalieInNet][awaySkaters][homeSkaters]
+[homeGoalieInNet]` — confirmed against a real cached game, not assumed: `"1551"`=5v5 EV,
+`"1451"`=home team on the PP, `"1541"`=away team on the PP). EVEN = `away_skaters == home_skaters`,
+covering 5v5/4v4/3v3 alike — the standard hockey definition, and the same "not a power play for
+either side" condition `engine.py`'s own `seg_is_home_pp`/`seg_is_away_pp` flags represent.
+
+**Faceoffs are zero-sum, which makes the index self-verifying**: every draw has exactly one winner,
+so the league-wide EV win rate the index normalizes against is mathematically ≈0.5 regardless of
+input, not a number that could drift from a parsing bug without also producing an index whose mean
+visibly isn't 1.0. **Measured on real data**: 1,312 games, 58,762 total EV faceoffs (44.8/game),
+mean index across all 32 teams = 1.00011 (confirms both correct normalization and the zero-sum
+identity). Real spread: NYR (1.097x)/TOR (1.090x)/OTT (1.066x) win EV draws most relative to league
+average; MIN (0.927x)/BUF (0.932x)/CHI (0.934x) least — roughly an 18% top-to-bottom spread.
+
+**Wiring**: `engine.py` reads `st_home.get("faceoff_ev_index", 1.0)`/`st_away.get(...)` once per
+game, converts to an effective win percentage (`0.5 * index`) at the point of use — 0.5 is the
+natural fair-average baseline the index scales around — and feeds that into
+`_faceoff_multipliers` for EV segments (the default/common case). When `faceoff_ev_only=False` (a
+non-default config applying the adjustment to ALL segments including PP/PK), the mechanism falls
+back to the all-situations blend instead, since the EV-specific index would be the wrong basis for
+a PP/PK segment. `scripts/build_nhl_special_teams_artifact.py` writes `faceoff_ev_index` as a
+fourth additional column on the existing `team_special_teams_{season}.csv`, reading the SAME
+`playbyplay` cache the xG model (§2i) already bulk-fetched — no new fetch needed.
+
+**Verified the league-wide average did not shift**: 992-pairing full round-robin (2,976 games each),
+neutral index → 61.786 avg total shots/game; real per-team index → 62.079 — a ~0.47% difference,
+noise-level, confirming the per-team layer redistributes shots between teams without moving the
+league aggregate. ~62 shots/game total (~31/team) is a plausible real NHL figure.
+
+**A real regression found and fixed while wiring this, not after**: the first version made the
+EV-gated segment ALWAYS use the index (defaulting to neutral 1.0 when absent), which silently made
+`TeamRates.faceoff_win_pct` — an already-reachable field, populated by §2j/§2l's team-rates
+producer — stop mattering whenever no index was supplied, since a neutral 1.0 (→0.5 pct) overrode
+whatever real value the field carried. Caught immediately by the existing
+`test_faceoff_win_pct_actually_changes_sog_projection` regressing, not discovered later. Fixed by
+checking `st_home.get("faceoff_ev_index")` RAW (not defaulted) and falling back to
+`rates.home.faceoff_win_pct` per side, independently, whenever that side's index is genuinely
+absent — the index now only overrides the blend when a real one is actually supplied.
+
+**Reachability tested**: `test_special_teams_faceoff_ev_index_actually_changes_shot_volume` —
+`faceoff_ev_index=1.8` produces measurably more HOME shots than `0.3` on average, 80 seeded runs,
+everything else held identical.
+
+**What this does NOT cover**: zone-specific faceoff differentiation (offensive/defensive/neutral —
+`zoneCode` is present on every `playbyplay` faceoff event but unused here; a zone-weighted index is
+a plausible future refinement, not attempted this pass); the `faceoff_alpha`/`faceoff_diff_clip`/
+`faceoff_mult_clip_*` constants controlling how much a win-rate difference moves shot share remain
+the vendor's original, never-calibrated defaults — this pass fixes WHAT data feeds the mechanism,
+not whether the mechanism's own sensitivity constants match real truth.
+
+---
+
 ## 3. Input provenance — where each input is produced and applied
 
 | input | produced by | applied in | population `[this checkout]` |
@@ -624,6 +688,7 @@ concept.
 | `historical_truth/team_game_rates.py` + `scripts/build_nhl_team_rates_artifact.py` — `shots_per_60`/`faceoff_win_pct` from boxscore + play-by-play (§2j) | built, run (1,312/1,312 games joined), tested | reachable by default; a REAL behavior change |
 | `blocks_per_60`/`penalties_per_60` — REMOVED (§2l) after §2j proved them a confirmed dead gate | deleted from `HockeyTeamFeatures`/`TeamRates` and every reference site (loaders, `player_props`, the producer script, 3 calibration scripts), traced through the whole chain, not just the dataclass fields | `nhl_sim_input_checklist.py`'s `--- HockeyTeamFeatures ---` section is now EMPTY — nothing left unreachable to report |
 | `historical_truth/player_game_rates.py` + `scripts/build_nhl_player_rates_artifact.py` — real per-player `shot_weight`/`goal_weight`/`block_weight`, 828 players rated from 47,231 skater-game records (§2k) | built, run, tested (15 parser + 6 loader + 3 mechanism-level reachability tests), external sanity check (MacKinnon/Matthews/Hughes/McDavid top the shot-volume list) | ALREADY reachable pre-fix (engine.py's own position/TOI heuristic); this replaces that heuristic with real per-player data, proven at the mechanism level, not just population |
+| `historical_truth/faceoff_ev_index.py` + `faceoff_ev_index` wired into `engine.py` (§2m) — closes the all-situations-vs-EV-only mismatch, a NEW per-team mechanism sourced from `situationCode` strength-state data | built, run (1,312 playbyplay games, mean index 1.00011 across 32 teams), verified the league-wide average did not shift (61.786 neutral vs 62.079 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability). Found and fixed a real regression during wiring — a naive version made the already-reachable `TeamRates.faceoff_win_pct` stop mattering whenever no index was supplied; fixed with a raw (non-defaulted) per-side fallback | reachable by default; a REAL behavior change for EV shot-share, with `TeamRates.faceoff_win_pct`'s existing reachability preserved as the fallback path |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **All of it is additive and reachable-by-default** — no new flag was

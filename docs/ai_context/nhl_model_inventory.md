@@ -270,12 +270,29 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   verification was already reasonably tight).
 - Did not build strength-state-specific per-team blocking (no data source
   distinguishes it — even the league-wide absolute calibration, §2h, could
-  only fit ONE shared scale, not per-strength-state constants), validate the
-  vendor's original EV:PK:PP-def ratio itself (0.45:0.55:0.35, preserved
-  through §2h's scale, never independently checked), or investigate the
-  faceoff multiplier's interaction with the new per-team shot/block indices
-  (§2f/§2g) — the faceoff effect is EV-only by default and untouched by this
-  pass.
+  only fit ONE shared scale, not per-strength-state constants), or validate
+  the vendor's original EV:PK:PP-def ratio itself (0.45:0.55:0.35, preserved
+  through §2h's scale, never independently checked).
+- **Did** investigate and fix the faceoff multiplier's mismatch with the
+  per-team shot indices flagged above (reference doc §2m) —
+  `_faceoff_multipliers` is gated `faceoff_ev_only=True` but was fed
+  `TeamRates.faceoff_win_pct`, an ALL-SITUATIONS blend (PP/PK draws mixed
+  into a mechanism that claims to exclude them). `historical_truth/faceoff_ev_index.py`
+  parses `situationCode` per faceoff event (confirmed against a real cached
+  game: `"1551"`=5v5 EV, `"1451"`/`"1541"`=PP for one side) to build a
+  genuinely EV-specific per-team win-rate index. Faceoffs are zero-sum,
+  which makes the index self-verifying: measured mean 1.00011 across 32
+  teams (1,312 games, 58,762 EV faceoffs) — confirms correct normalization
+  without needing an external sanity check. Real spread NYR (1.097x) to MIN
+  (0.927x), ~18% top-to-bottom. **Verified the league-wide average did not
+  shift**: 992-pairing round-robin, 61.786 neutral vs 62.079 real-indexed
+  total shots/game — noise-level. **Found and fixed a real regression while
+  wiring this**: a naive version made the index override
+  `TeamRates.faceoff_win_pct` unconditionally, silently breaking that
+  field's existing reachability whenever no index was supplied — caught
+  immediately by the pre-existing `test_faceoff_win_pct_actually_changes_sog_projection`
+  regressing, fixed with a raw (non-defaulted) per-side fallback so the
+  index only overrides the blend when one is actually present.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader

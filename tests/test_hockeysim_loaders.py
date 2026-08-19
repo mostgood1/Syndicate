@@ -247,6 +247,25 @@ def test_load_team_special_teams_map_reads_block_rate_index_when_present(tmp_pat
     assert m["CHI"]["block_rate_index"] == 0.87
 
 
+def test_load_team_special_teams_map_reads_faceoff_ev_index_when_present(tmp_path):
+    """`faceoff_ev_index` (`docs/ai_context/hockeysim_engine_reference.md` §2m) -- again a
+    separate fixture, so backward compat (an artifact predating this column) stays covered
+    elsewhere without silently changing what those tests assert."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "team_special_teams_2025-2026.csv").write_text(
+        "abbr,pp_pct,pk_pct,committed_per_game,pp_shot_index,pk_shot_index_allowed,"
+        "block_rate_index,faceoff_ev_index\n"
+        "BOS,0.23,0.83,2.9,1.24,0.91,1.10,1.06\n"
+        "CHI,0.14,0.79,3.3,0.88,1.15,0.87,0.93\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_team_special_teams_map(date, root=tmp_path)
+    assert m["BOS"]["faceoff_ev_index"] == 1.06
+    assert m["CHI"]["faceoff_ev_index"] == 0.93
+
+
 # ---------------------------------------------------------------------------
 # Team rates (shots_per_60/faceoff_win_pct) -- `docs/ai_context/hockeysim_engine_reference.md`
 # §2j. `blocks_per_60`/`penalties_per_60` were REMOVED entirely (§2l) after being proven a

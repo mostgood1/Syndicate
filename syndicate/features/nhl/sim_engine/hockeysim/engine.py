@@ -712,6 +712,20 @@ class PeriodSimulator:
         # strength-state split for blocks) applied to whichever team is DOING the blocking.
         block_idx_home = _f(st_home.get("block_rate_index", 1.0), 1.0)
         block_idx_away = _f(st_away.get("block_rate_index", 1.0), 1.0)
+        # PER-TEAM EVEN-STRENGTH faceoff win-rate index (`docs/ai_context/hockeysim_engine_reference.md`
+        # §2m) -- closes a real mismatch: `_faceoff_multipliers` below is gated `faceoff_ev_only`
+        # but was fed `TeamRates.faceoff_win_pct`, an ALL-SITUATIONS blend (PP/PK draws included).
+        # `historical_truth/faceoff_ev_index.py` parses `situationCode` per faceoff event to isolate
+        # EV-only draws. An index (ratio to league average, mean ~1.0, same convention as
+        # `block_rate_index` above), converted to an effective win percentage at the point of use
+        # since `_faceoff_multipliers` itself operates on percentages, not indices.
+        # RAW (not defaulted) here -- `None` means "no index supplied", which must fall back to
+        # `TeamRates.faceoff_win_pct` (the already-reachable all-situations field, §2j/§2l) rather
+        # than silently overriding it with a neutral 1.0. Defaulting inline here would have made
+        # `TeamRates.faceoff_win_pct` unreachable whenever no index is present -- caught by
+        # `test_faceoff_win_pct_actually_changes_sog_projection` regressing before this was fixed.
+        faceoff_ev_idx_home_raw = st_home.get("faceoff_ev_index")
+        faceoff_ev_idx_away_raw = st_away.get("faceoff_ev_index")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -990,11 +1004,25 @@ class PeriodSimulator:
             # Applies a small symmetric shift between teams, clamped to avoid destabilizing calibration.
             ev_only = bool(getattr(self.cfg, "faceoff_ev_only", True))
             if ((not ev_only) or ((not seg_is_home_pp) and (not seg_is_away_pp))):
-                m_fo_h, m_fo_a = _faceoff_multipliers(
-                    self.cfg,
-                    float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5),
-                    float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
-                )
+                # PREFER the EV-specific index (§2m) over the all-situations `faceoff_win_pct`
+                # blend when this segment IS actually even-strength AND a real index was supplied
+                # -- 0.5 is the natural fair-average baseline a 1.0-centered index scales around.
+                # Falls back to `TeamRates.faceoff_win_pct` per side, independently, whenever that
+                # side has no index (preserves the field's existing reachability -- NOT the same
+                # as defaulting the index to 1.0, which would silently override real data with a
+                # neutral value instead of falling back to it). When `ev_only` is False (a
+                # non-default config applying this adjustment to ALL segments, including PP/PK),
+                # the EV-specific index would be the wrong basis for a PP/PK segment, so both sides
+                # always use the all-situations blend in that case.
+                if ev_only and faceoff_ev_idx_home_raw is not None:
+                    fo_h_pct = 0.5 * _f(faceoff_ev_idx_home_raw, 1.0)
+                else:
+                    fo_h_pct = float(getattr(rates.home, "faceoff_win_pct", 0.5) or 0.5)
+                if ev_only and faceoff_ev_idx_away_raw is not None:
+                    fo_a_pct = 0.5 * _f(faceoff_ev_idx_away_raw, 1.0)
+                else:
+                    fo_a_pct = float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5)
+                m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
                 lam_h = float(lam_h) * float(m_fo_h)
                 lam_a = float(lam_a) * float(m_fo_a)
             # Apply overdispersion via lognormal multiplicative noise
