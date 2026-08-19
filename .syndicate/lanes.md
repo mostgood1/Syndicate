@@ -1447,6 +1447,109 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   `reports/nfl_anytime_td_shrinkage_k_stability_check.json`.
 - Blocked by: none.
 
+### soccer-two-sided-edges-cut — OPEN — opened 2026-08-19 — session: soccer-two-sided-edges-cut
+- Goal: identify and fix why soccer's genuinely two-sided, consensus-priced
+  game markets (h2h/totals/spreads) with real positive EV never reach the
+  Layer 2 shortlist. **Testable outcome:** on a live build, at least one
+  soccer `game`-kind row with `fair_method: consensus` and positive
+  `ev_pct` appears in `per_sport.soccer.game` (currently 0).
+- Files:
+  - `pipeline/layer2_shortlist.py` (the read/build path — quotes come from
+    `read_book_quotes_latest`, a DIFFERENT function than the public
+    `/api/board/book-grid` endpoint used to gather today's evidence; the
+    two may not see the same rows)
+  - `syndicate/features/shared/layer2_board.py` (`_fair_by_side`,
+    `build_layer2_rows`, `select_shortlist` — confirmed correct in
+    isolation against real data, but the full pipeline still drops these
+    rows)
+  - `syndicate/features/shared/opportunity_gate.py` (eligibility lanes —
+    a live/pregame or staleness misclassification could silently demote a
+    correct row)
+  - `syndicate/features/shared/odds_book_quotes.py` (`read_book_quotes_latest`)
+  - `syndicate/features/shared/book_grid.py` (`build_book_grid`)
+  - **Collision-checked 2026-08-19 against every OPEN lane's Files block:
+    zero overlap.** `soccer-model-dispersion` explicitly does NOT claim
+    these files (only the sim/adapter side); the informal `modelled-fair-edge`
+    lane claims `soccer_projections.py` + `book_margin_model.py`
+    specifically, neither of which is in this lane's file set. If the trace
+    leads into either of those two, STOP and raise with that lane rather
+    than editing them here.
+- Hypothesis: `pipeline/layer2_shortlist.py`'s own quote read
+  (`read_book_quotes_latest`) does not see the same rows the public
+  book-grid endpoint serves — either a different capture window, a
+  different dedup/latest-key rule, or a live/pregame state misread inside
+  `opportunity_gate.py` demotes these specific rows before they reach
+  scoring. NOT the model-quality hold: these rows get `fair_method:
+  consensus` already (verified by running `_fair_by_side` directly against
+  real quote data pulled from production), so `_row_ev_is_hold_restatement`
+  should not fire on them.
+- **Already ruled out, measured 2026-08-19 (do not re-derive):**
+  - Horizon window — both positive-EV matches kick off later TODAY
+    (2026-08-19T23:30:00Z and 2026-08-19T19:00:00Z), well inside
+    `horizon_days=1`.
+  - `excluded_markets` — only `["goal_scorer"]`, does not touch h2h/totals/
+    spreads.
+  - Value floor — both rows (+1.11%, +0.84%) clear the flat -2.0% floor
+    with room to spare.
+  - `_fair_by_side` itself — confirmed correct in isolation: 17 genuinely
+    two-sided game rows today (8 h2h, 8 totals, 1 spread, all MLS + one
+    La Liga match), every one correctly resolves to `fair_method:
+    "consensus"` when run directly against real production quote data.
+  - The "100% one-sided" reading from `per_sport_ingest.soccer.
+    enrichment.margin_model` is NOT itself the bug — soccer's candidate
+    pool is genuinely dominated by one-sided player props (`sides:
+    ['over']` confirmed at the source for `player_shots_on_target` etc.,
+    same shape as MLB's `batter_home_runs`). `book_margin_model` is the
+    correct handling for those; this lane is only about the 17 rows that
+    ARE two-sided and still get cut.
+- Falsification test: pull the EXACT quote rows `pipeline/layer2_shortlist.py`
+  reads for today's date (via `read_book_quotes_latest("soccer", ...)` or by
+  instrumenting the build) and diff against the public book-grid rows for
+  the same two matches (FC Cincinnati vs NYCFC, Philadelphia Union vs Inter
+  Miami). If the rows are IDENTICAL going in, the cut happens downstream
+  (`opportunity_gate`/`build_layer2_rows`/`select_shortlist`) and the
+  hypothesis about a read-path mismatch is WRONG — say so and move to the
+  next candidate rather than forcing the read-path story to fit.
+- Verification: on a live production build, `per_sport_ingest.soccer`
+  reports at least one `game`-kind opportunity with `fair_method: consensus`
+  and a stated `ev_pct`, and `per_sport.soccer.game > 0`. Report the
+  specific gate/stage that was dropping them, with a measured before/after
+  count — not just "it works now."
+- Blocked by: none.
+
+### nfl-receptions-blend-stability — OPEN — opened 2026-08-19 — session: nfl-receptions-blend-stability
+- Goal: `receptions` is the last un-checked market from `#471`'s blend-
+  weight family. Shipped `w=0.137` off a fit-half optimum of 0.1367 --
+  the SMALLEST measured one-way OOS improvement of any weighted market
+  (+0.000016, an order of magnitude smaller than `receiving_yards`'
+  already-marginal +0.000065). A market whose realized benefit was this
+  close to zero is a natural candidate for an estimate that doesn't
+  replicate. **Testable outcome:** run the existing
+  `scripts/check_nfl_blend_weight_stability.py --stats receptions`
+  (already generalized, no new script needed) and report whether the
+  independent 2024-2025 half agrees.
+- Files:
+  - `syndicate/features/nfl/props.py` — `_COVER_PROBABILITY_BLEND_WEIGHT["receptions"]`,
+    ONLY if the check finds a real, stable reason to change it.
+  - Read-only: `scripts/check_nfl_blend_weight_stability.py`,
+    `scripts/calibrate_nfl_cover_probability_blend.py`,
+    `reports/nfl_cover_probability_blend_calibration.json`,
+    `reports/nfl_yardage_blend_stability_check.json`.
+- Hypothesis: UNSTABLE, more likely than not -- `receiving_yards` (whose
+  own one-way improvement was 4x larger) already came in at a wider
+  1.74x ratio than `rushing_yards`' near-perfect 1.00x; `receptions`'
+  order-of-magnitude-smaller realized benefit suggests its estimate is
+  even less pinned down. Held loosely -- the point of running the check
+  is to find out, not confirm this.
+- Falsification test: if the independent half's optimal weight shares
+  `receptions`' sign and sits within the pre-registered <=2.0x ratio,
+  the hypothesis is wrong and the tiny shipped weight is real signal
+  after all, not noise that happened to survive one clipping-free split.
+- Verification: both halves' independently-computed optimal weights
+  stated side by side, explicit stable/unstable verdict, same criterion
+  as every other market this session.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
