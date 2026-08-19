@@ -1393,6 +1393,49 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   `reports/nfl_tds_interceptions_blend_stability_check.json`.
 - Blocked by: none.
 
+### nfl-anytime-td-shrinkage-stability — OPEN — opened 2026-08-19 — session: nfl-anytime-td-shrinkage-stability
+- Goal: `#471`'s `anytime_td` fix shipped `ANYTIME_TD_SHRINKAGE_K = 12.0`,
+  selected by grid search (candidates 0-30) on 2022-2023, reported (never
+  re-selected) on 2024-2025 -- a genuine one-way OOS test, but the SAME
+  shape of test that turned out to rest on an unstable estimate for
+  `passing_attempts`. This checks whether 12.0 replicates: run the exact
+  same grid-search selection INDEPENDENTLY on 2024-2025 (as if it were the
+  fit half) and compare the two argmins, mirroring the blend-weight family
+  checks already done this session (`nfl-passing-attempts-skew-
+  extrapolation`, `nfl-yardage-blend-stability`,
+  `nfl-tds-interceptions-blend-stability`).
+- Files:
+  - `syndicate/features/nfl/player_stats.py` —
+    `ANYTIME_TD_SHRINKAGE_K`, ONLY if this finds a real, stable reason to
+    move it.
+  - New analysis script under `scripts/` reusing
+    `scripts/calibrate_nfl_anytime_td_shrinkage.py`'s
+    `collect_anytime_td_substrate`/`brier_for_k` (grid search, not a
+    closed form -- the shrinkage formula's `(n+k)` denominator makes
+    Brier a rational, not quadratic, function of `k`, so the blend
+    weight's closed-form trick does not apply here).
+  - Read-only: `scripts/calibrate_nfl_anytime_td_shrinkage.py`,
+    `scripts/backtest_nfl_props.py`,
+    `reports/nfl_anytime_td_shrinkage_calibration.json`.
+- Hypothesis: `k=12` is more likely to be stable than `passing_attempts`'
+  unclipped weight was, because the ORIGINAL fit/score test already
+  showed a large, clearly real out-of-sample improvement (OOS Brier
+  0.1973 -> 0.1680, per `state.md`) rather than a marginal one -- a
+  correction with that much realized OOS lift is less likely to be riding
+  on a fragile point estimate than one whose one-way test barely cleared
+  (or didn't clear) zero. Held loosely.
+- Falsification test: if the independent half's own best-k lands far from
+  12 (order-of-magnitude different, or the fit half's own loss curve is so
+  flat near its minimum that "12" was arbitrary among many near-tied
+  candidates), the constant is less well-pinned-down than the one-way test
+  suggested -- report honestly, and consider shipping a more conservative
+  value only after an actual Brier check, not the stability finding alone.
+- Verification: both halves' independently-selected best-k stated side by
+  side, plus each half's OWN sweep curve (to judge how sharp/flat the
+  minimum is, not just the single argmin), and an explicit stable/
+  unstable verdict.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
