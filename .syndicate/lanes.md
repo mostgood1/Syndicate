@@ -1252,6 +1252,71 @@ history directly:
   artifact, to `basketball-model-owner` (see the NOT-claimed file note
   above) -- not yet messaged as of this close.
 
+### nfl-roster-depth-autorun — OPEN — opened 2026-08-19 — session: nfl-roster-depth-autorun
+- Goal: `nfl-injuries-fetcher`'s own audit surfaced a sibling gap while
+  fixing `#441` for injuries: `roster_snapshot_builder.py` and
+  `depth_chart_snapshot_builder.py` (both real, both already consumed by
+  `ask_the_syndicate_data.py`) write their output via
+  `default_nfl_source_root() / "source_artifacts" / ...` DIRECTLY -- the
+  same probing-based root selector `#389` already proved silently resolves
+  to the ephemeral repo checkout on refresh-worker (not `nfl_artifact_
+  output_root()`, which `fetch_nfl_pbp.py`/`fetch_nfl_injuries.py` both
+  correctly use). Neither builder is wired into refresh-worker autorun at
+  all -- both are CLI-only today, same class of gap injuries had before
+  this lane's parent. `injury_adjustment.py`'s `_depth_chart_path` also
+  still has the READ-side `#441` bug (raw `default_nfl_source_root()`
+  join), deliberately left out of the parent lane's scope. **Testable
+  outcome:** both builders write via `nfl_artifact_output_root()`, the
+  depth-chart READ path goes through a resolver mirroring `nfl_pbp_path`/
+  `nfl_injuries_path`, and both builders are wired into refresh-worker
+  autorun (default-OFF, same convention as pbp/injuries).
+- Files:
+  - `syndicate/features/football/ingestion/roster_snapshot_builder.py` —
+    `roster_snapshot_output_path` switches to `nfl_artifact_output_root()`.
+  - `syndicate/features/football/ingestion/depth_chart_snapshot_builder.py`
+    — `depth_chart_snapshot_output_path` switches to
+    `nfl_artifact_output_root()`.
+  - `syndicate/features/nfl/sources.py` — add a roster-snapshot-path and
+    depth-chart-snapshot-path resolver alongside the existing
+    `_resolve_nfl_tracking_path` (note: snapshot outputs live under
+    `source_artifacts/data/processed/...`, a DIFFERENT relative shape than
+    the `tracking/nflverse/...` layout `_resolve_nfl_tracking_path` already
+    handles -- may need a sibling helper, not a forced reuse).
+  - `syndicate/features/nfl/injury_adjustment.py` — `_depth_chart_path`
+    switches to the new resolver.
+  - `scripts/run_refresh_worker.py` — two new autorun functions + two new
+    `elif` branches, placed directly behind the injuries fetch per `#341`.
+    **NOTE:** `lanes.md`'s own status table lists this file as guarded by
+    `refresh-worker-oom-recurrence` ("flagged running, stale 40h+" as of
+    this lane's own earlier sweep) despite no formal `### ... — OPEN` block
+    existing for that slug anywhere in this file -- same shape as the
+    `soccer-odds-capture-cadence-gap` collision this session already hit
+    and resolved once. Will coordinate via `send_message` to that session
+    (`local_3a27ad02-...`, "Oom band full report") before editing, same
+    convention.
+  - Read-only reference: `syndicate/features/football/ingestion/
+    nflverse_ingestion.py` (a THIRD, separate root-resolution mechanism —
+    `tracking_root()`/`SYNDICATE_DATA_ROOT`-based, used by the network-
+    fetch-on-cache-miss loaders `load_nflverse_roster`/
+    `load_nflverse_depth_chart`/`load_nflverse_injuries` — the last of
+    which is confirmed DEAD, zero callers anywhere. Investigating whether
+    this third mechanism is itself correct is IN SCOPE informationally;
+    changing it is NOT, unless it turns out to share the same defect).
+- Hypothesis: the write-side bug is real by the same mechanism `#389`
+  already measured for pbp/season-projections, applied here without a
+  fresh production measurement (a code-level confirmation, same standard
+  used for the parent lane's read-side fix).
+- Falsification test: a test proving `default_nfl_source_root()` picks a
+  root lacking the just-written snapshot file when a later candidate root
+  has it (mirrors `test_nfl_injuries_path_root.py`'s shape) — if this does
+  NOT reproduce, the hypothesis is wrong and the fix is unnecessary.
+- Verification: new tests pass; full NFL test suite still passes; both
+  builders' `--json`/stdout output verified against a real run (network
+  access permitting) or the existing hermetic fixture pattern each
+  script's own tests already use.
+- Blocked by: none, pending the `run_refresh_worker.py` coordination note
+  above.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
