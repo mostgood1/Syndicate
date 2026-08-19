@@ -2545,6 +2545,162 @@ def _launch_autorun_nfl_pbp_fetch(
     return True
 
 
+# ---------------------------------------------------------------------------
+# NFL injury report ingestion (`nfl-injuries-fetcher` lane).
+#
+# WHY THIS AUTORUN EXISTS. `injury_adjustment.py` is the one place real
+# player-level data reaches the NFL sim engine today -- it excludes an
+# injured player's own real EPA contribution from their team rating, with a
+# real depth-chart backup substitution. It depends entirely on
+# `injuries_{season}.csv`, and there was NO ingestion path for that file
+# anywhere in this repo: the only copy found anywhere was on one dev
+# machine, git-untracked, dated 2026-08-01. Nothing kept it current and
+# nothing would have noticed it going stale. `scripts/fetch_nfl_injuries.py`
+# is the fetch side of the fix; `injury_adjustment.py` and
+# `syndicate/features/nfl/sources.py` (`nfl_injuries_path`) fix the READ
+# side, which had the exact same root-resolution bug `#441` already found
+# and fixed for play-by-play -- this autorun is the piece that keeps the
+# fetch side from going stale the same way the pbp file did before `#441`.
+#
+# DEFAULT OFF, like every sibling autorun -- see the pbp block above for the
+# full reasoning (three existing tests caught a default-on version of that
+# one; the same contract applies here). `NFL_INJURIES_FETCH_ENABLE_REFRESH_
+# WORKER_AUTORUN=true` arms it.
+#
+# INTERVAL DEFAULT IS A CONSIDERED GUESS, NOT A MEASURED ONE. 21600s (4x/day)
+# assumes injury reports change meaningfully across a practice-report cadence
+# (teams file daily-ish reports in-season) without hammering the release on
+# every tick. Unlike pbp there is no "how stale is too stale" incident this
+# was measured against -- revisit if a real staleness complaint shows up.
+#
+# PLACED IMMEDIATELY AFTER THE PBP BRANCH IN THE DISPATCH CHAIN, deliberately
+# -- `#341`: this is a long `elif` chain where only one branch fires per
+# tick, so a branch appended at the end can go mute for weeks even while
+# correctly enabled, if higher-priority branches keep winning during busy
+# periods (measured historically for `reconciliation` and `nfl_pbp_fetch`
+# before it was moved early). Injuries fetch is exactly as time-sensitive as
+# pbp for the same sport, so it gets the same priority tier.
+#
+# NO PERSISTED PID GUARD, deliberately -- same rule as the pbp fetch above
+# (`#443`): a last-ATTEMPT marker recorded BEFORE the launch, so a crash
+# costs one interval, never a storm, and there is no pid whose liveness can
+# be misread. The fetch is idempotent and installs atomically.
+# ---------------------------------------------------------------------------
+
+_NFL_INJURIES_SKIP_LOG_AT: dict[str, float] = {}
+_NFL_INJURIES_SKIP_LOG_INTERVAL_SECONDS = 60.0
+
+
+def _nfl_injuries_fetch_enabled() -> bool:
+    # Absent means OFF -- see the block comment above.
+    raw = str(os.environ.get("NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_injuries_fetch_interval_seconds() -> int:
+    raw = str(os.environ.get("NFL_INJURIES_FETCH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 21600)
+    except Exception:
+        value = 21600
+    return max(3600, value)
+
+
+def _nfl_injuries_fetch_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_injuries_fetch.json"
+
+
+def _nfl_injuries_fetch_script_args(season: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "fetch_nfl_injuries.py"
+    return [sys.executable, str(script_path), "--season", str(season), "--json"]
+
+
+def _launch_autorun_nfl_injuries_fetch(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Fetch the nflverse injury report when the marker is missing or stale.
+
+    Runs immediately after `_launch_autorun_nfl_pbp_fetch` in the dispatch
+    chain -- see the module comment above for why (`#341` starvation).
+    """
+    # EVERY DECLINE SAYS WHY -- same `#443` discipline as the pbp fetch.
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_INJURIES_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NFL_INJURIES_SKIP_LOG_INTERVAL_SECONDS:
+            _NFL_INJURIES_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_INJURIES_FETCH_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_injuries_fetch_enabled():
+        return _skip("disabled", "NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return _skip("not_in_season", f"date={selected_date} active={','.join(sorted(active))}")
+
+    interval = _nfl_injuries_fetch_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_injuries_fetch_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    season = date.today().year
+    # Marker BEFORE the launch: a run that dies costs one interval rather than
+    # relaunching every tick.
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_injuries_fetch_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "season": season,
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        # A marker we cannot write means we cannot rate-limit; refuse rather than
+        # risk a fetch storm against a public host.
+        print(f"[refresh_worker] NFL_INJURIES_FETCH_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    print(
+        f"[refresh_worker] NFL_INJURIES_FETCH_LAUNCHING season={season} "
+        f"last_attempt_age_s={int(age) if last_attempt else 'never'} "
+        f"interval_s={interval}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_nfl_injuries_fetch_script_args(season))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_INJURIES_FETCH_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NFL injuries fetch (season={season}) because the marker was missing or older than {interval}s.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 def _season_projection_process_still_running(sport: str) -> bool:
     # Confirmed live 2026-08-02: this autorun had no "already running" guard
     # at all -- unlike every sibling autorun here (MLB's daily sim, the
@@ -3767,6 +3923,20 @@ def main() -> int:
             # It must also stay AHEAD of `_launch_autorun_season_projections`:
             # this fetches the only input those projections rate teams from
             # (`#441`). Producer before consumer -- pinned by a test.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_injuries_fetch(
+            # THIRD, DIRECTLY BEHIND THE PBP FETCH -- same `#341` starvation
+            # reasoning as that branch's comment above: injuries data is
+            # exactly as time-sensitive for the same sport, so it gets the
+            # same priority tier rather than being appended at the end where
+            # it can go mute for weeks while still enabled and correctly
+            # configured. Also DAILY-ish gated (default 21600s interval, not
+            # literally daily), so it wins at most a handful of ticks per day.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
