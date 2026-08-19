@@ -705,6 +705,13 @@ class PeriodSimulator:
         pp_shot_idx_away = _f(st_away.get("pp_shot_index", 1.0), 1.0)
         pk_shot_idx_home = _f(st_home.get("pk_shot_index_allowed", 1.0), 1.0)
         pk_shot_idx_away = _f(st_away.get("pk_shot_index_allowed", 1.0), 1.0)
+        # PER-TEAM blocked-shot tendency (`docs/ai_context/hockeysim_engine_reference.md` §2g) --
+        # the last special-teams gap: `block_rate_ev`/`block_rate_pk`/`block_rate_pp_def` (below,
+        # near the block-attribution code) had no per-team differentiation and were never checked
+        # against a real block rate at all. ONE combined index (the source data has no
+        # strength-state split for blocks) applied to whichever team is DOING the blocking.
+        block_idx_home = _f(st_home.get("block_rate_index", 1.0), 1.0)
+        block_idx_away = _f(st_away.get("block_rate_index", 1.0), 1.0)
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1231,6 +1238,11 @@ class PeriodSimulator:
                 p_blk_home = p_block_pp_def
             else:
                 p_blk_home = p_block_ev
+            # Scale by the BLOCKING team's own per-team tendency (§2g) -- clamped so a team at the
+            # extreme end of the real measured spread (0.87x-1.10x, `hockeysim_per_team_block_rate_report.md`)
+            # can't push a segment's block probability outside a sane range.
+            p_blk_away = max(0.02, min(0.95, p_blk_away * block_idx_away))
+            p_blk_home = max(0.02, min(0.95, p_blk_home * block_idx_home))
             b_away = sum(1 for _ in range(sh_h) if self.rng.random() < p_blk_away)
             b_home = sum(1 for _ in range(sh_a) if self.rng.random() < p_blk_home)
             # Attribute blocks to the defending skaters actually on the ice.

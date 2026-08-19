@@ -157,19 +157,39 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   (`pp_shot_share` 0.1478 vs 0.1488, `sh_shot_share` 0.0279 vs 0.0272,
   158,826 simulated shots) — the per-team layer shifts which team gets more
   shots in a matchup, not the league average. Reachability-tested.
+- **Did** build genuine per-team blocked-shot-rate differentiation (reference
+  doc §2g, full report `docs/reports/hockeysim_per_team_block_rate_report.md`)
+  — closing the last special-teams gap. `historical_truth.boxscore_block_rate.compute_team_block_rate_index`
+  produces `block_rate_index` per team from the same `boxscore` cache §2e/§2f
+  already bulk-fetched (blocks/shots-faced ratio, normalized against the
+  league-wide ratio — the ONLY basis available, since blocked shots carry no
+  strength-state split in this source at all, unlike PP/PK shots). Measured:
+  1,312 games, league block rate 33.77%, 14.19 blocks/game/team, mean index
+  0.9999 (confirms normalization); real spread PHI (1.102x)/VGK (1.098x)/MTL
+  (1.091x) highest, NSH (0.867x)/CHI (0.869x) lowest, ~27% top-to-bottom.
+  Wired into `engine.py`, scaling the blocking team's own probability right
+  before the block roll, clamped `[0.02, 0.95]`. **Verified the league-wide
+  average did not shift**: 200 round-robin pairings, 24.635 avg blocks/game
+  neutral vs 24.475 real-indexed — noise-level. Reachability-tested. Explicitly
+  did NOT calibrate the ABSOLUTE block rate (simulated ~12.2-12.3/team/game
+  sits below the real 14.19) — the base constants (`block_rate_ev` etc.)
+  remain the vendor's original guess; only relative per-team scale was built,
+  matching this task's scope.
 - Did not build per-team `shots_per_60`/`blocks_per_60`/`penalties_per_60`/
   `faceoff_win_pct` (the GLOBAL team rates the props engine's `TeamRates`
   reads) or player usage weights — needs the truth-loader's parser extended
   further (beyond the penalties extension already done this session). This is
-  distinct from the PP/PK-specific shot differentiation just built above.
+  distinct from the PP/PK-specific shot/block differentiation just built above.
 - Did not re-run the goal-multiplier calibration (§2d, earlier this session)
   with the joint-fit method the shot-multiplier bug discovery motivated —
   flagged as an open methodology-consistency gap, not a known error (its own
   verification was already reasonably tight).
-- Did not build per-team block rates or investigate the faceoff multiplier's
-  interaction with the new per-team shot index (§2f) — no truth target for
-  blocked-shot rate by strength state exists, and the faceoff effect is
-  EV-only by default and untouched by this pass.
+- Did not calibrate the ABSOLUTE block rate to real truth (§2g leaves the base
+  constants at the vendor's uncalibrated 0.45/0.55/0.35), build strength-state-specific
+  per-team blocking (no data source distinguishes it), or investigate the
+  faceoff multiplier's interaction with the new per-team shot/block indices
+  (§2f/§2g) — the faceoff effect is EV-only by default and untouched by this
+  pass.
 - Did not build a real xG (expected goals) model — the reader and allowlist
   exist; the shot-quality model producing the data does not, and building one
   is a distinct, substantial modelling project, not an input-population fix.

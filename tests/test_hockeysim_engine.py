@@ -155,6 +155,40 @@ class HockeySimEngineTest(unittest.TestCase):
             f"reachable in engine.py.",
         )
 
+    def test_special_teams_block_rate_index_actually_changes_block_volume(self) -> None:
+        """Reachability test for the LAST per-team special-teams mechanism
+        (`docs/ai_context/hockeysim_engine_reference.md` §2g): `block_rate_index` on
+        `st_home`/`st_away` must measurably change simulated BLOCK volume for the team doing the
+        blocking -- distinct from `pp_shot_index` (shots taken) and `pp_pct` (goals scored).
+        """
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        heavy_blocker = dict(base, block_rate_index=1.8)
+        light_blocker = dict(base, block_rate_index=0.3)
+
+        def _mean_home_blocks(st_home: dict) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=base, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "block" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        heavy_mean = _mean_home_blocks(heavy_blocker)
+        light_mean = _mean_home_blocks(light_blocker)
+        self.assertGreater(
+            heavy_mean, light_mean,
+            f"block_rate_index=1.8 must produce more HOME blocks on average than "
+            f"block_rate_index=0.3 when nothing else differs -- got heavy={heavy_mean:.3f} "
+            f"light={light_mean:.3f}. If this fails, block_rate_index is present on "
+            f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
+        )
+
     def test_special_teams_cal_pp_goal_mult_actually_changes_output(self) -> None:
         """Reachability test for the OTHER special-teams parameter: `special_teams_cal`
         (`pp_goal_cal_mult` etc, sourced from `SimConfig` via `player_props._special_teams_cal`).

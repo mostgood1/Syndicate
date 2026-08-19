@@ -205,6 +205,24 @@ def test_load_team_special_teams_map_reads_shot_index_when_present(tmp_path):
     assert m["CHI"]["pp_shot_index"] == 0.88
 
 
+def test_load_team_special_teams_map_reads_block_rate_index_when_present(tmp_path):
+    """`block_rate_index` (`docs/ai_context/hockeysim_engine_reference.md` §2g) -- again a
+    separate fixture, so backward compat (an artifact predating this column) stays covered
+    elsewhere without silently changing what those tests assert."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "team_special_teams_2025-2026.csv").write_text(
+        "abbr,pp_pct,pk_pct,committed_per_game,pp_shot_index,pk_shot_index_allowed,block_rate_index\n"
+        "BOS,0.23,0.83,2.9,1.24,0.91,1.10\n"
+        "CHI,0.14,0.79,3.3,0.88,1.15,0.87\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_team_special_teams_map(date, root=tmp_path)
+    assert m["BOS"]["block_rate_index"] == 1.10
+    assert m["CHI"]["block_rate_index"] == 0.87
+
+
 def test_build_player_features_flags_starting_goalie(synth_root):
     lineups = loaders.load_lineups("2026-03-15", root=synth_root)
     goalies = loaders.load_starting_goalies("2026-03-15", root=synth_root)

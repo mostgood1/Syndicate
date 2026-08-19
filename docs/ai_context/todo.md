@@ -375,7 +375,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + NEW per-team PP/PK SHOT-volume differentiation), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + NEW per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, and all 3 non-neutral goal/shot multiplier calibrations FIXED; `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights and the ABSOLUTE block rate genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -548,6 +548,46 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   shifts which team gets more shots in a matchup, not the league average, by
   construction (indices average to ~1.0). Reachability-tested (elite-shot-rate
   team outshoots a poor one on average, 80 seeded runs).
+- **Genuine PER-TEAM blocked-shot-rate differentiation — built, closing the
+  last special-teams gap.** Full report:
+  `docs/reports/hockeysim_per_team_block_rate_report.md`. `block_rate_ev`/
+  `block_rate_pk`/`block_rate_pp_def` had no per-team differentiation AND had
+  **never been checked against a real block rate at all** — the vendor's
+  shipped defaults (0.45/0.55/0.35) were never measured before this bullet.
+  `historical_truth.boxscore_block_rate.compute_team_block_rate_index`
+  produces `block_rate_index` per team from the SAME `boxscore` cache the
+  shot-index work already bulk-fetched (blocks / shots-faced, normalized
+  against the league-wide ratio — shots-faced = opponent SOG + own blocks,
+  the same shot-attempt-vs-SOG basis mismatch `engine.py`'s own `block_rate_ev`
+  comment already flags; a RATIO cancels it out, same technique as the
+  shot-index bullet above). **No strength-state split exists in this data at
+  all** (unlike PP/PK shots) — one combined index scales all three of the
+  engine's existing strength-state constants, whose structural difference
+  (higher on the PK, lower on the PP) stays intact. Measured: 1,312 games,
+  league block rate 33.77%, 14.19 blocks/game/team, mean index 0.9999
+  (confirms normalization); real spread PHI (1.102x)/VGK (1.098x)/MTL
+  (1.091x) highest, NSH (0.867x)/CHI (0.869x) lowest, ~27% top-to-bottom.
+  Wired into `engine.py`, scaling the blocking team's own probability right
+  before the block roll, clamped `[0.02, 0.95]`. `scripts/build_nhl_special_teams_artifact.py`
+  writes `block_rate_index` as a third additional column on the existing CSV,
+  sharing one read pass over the boxscore cache with the shot-index work.
+  **Verified the league-wide average did NOT shift**: 200 real round-robin
+  pairings, 24.635 avg total blocks/game neutral vs 24.475 real-indexed — a
+  ~0.6% difference, noise-level. Reachability-tested (`block_rate_index=1.8`
+  produces more blocks than `0.3` on average, 80 seeded runs). **Left open,
+  stated plainly**: this does NOT calibrate the ABSOLUTE block rate — simulated
+  per-team average (~12.2-12.3/game) sits below the real 14.19/game; the base
+  constants remain the vendor's original guess. Only relative per-team scale
+  was in scope this pass.
+- **Checklist bug found and fixed while verifying the above.**
+  `nhl_sim_input_checklist.py`'s population loop checked a hardcoded
+  `("pp_pct", "pk_pct", "committed_per_game")` tuple that was never updated
+  when `pp_shot_index`/`pk_shot_index_allowed` (§2f) were added to the
+  AST-derived `special_teams_consumed_keys()` — so it reported those two plus
+  the new `block_rate_index` as 0.0% FAIL despite all six being directly
+  confirmed populated on every team-side. Fixed by driving the loop off
+  `special_teams_consumed_keys()` itself so the two can't drift again; alarm
+  count returns to 9 (down from a false 12).
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**

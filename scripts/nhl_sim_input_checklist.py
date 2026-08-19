@@ -226,6 +226,14 @@ def main() -> int:
 
     team_defaults = {f.name: f.default for f in fields(HockeyTeamFeatures)}
     player_defaults = {f.name: f.default for f in fields(HockeyPlayerFeatures)}
+    # AST-derived, NOT a hardcoded tuple (model_engine_standard.md: "never a name grep") -- a
+    # hardcoded ("pp_pct", "pk_pct", "committed_per_game") tuple here previously silently missed
+    # `pp_shot_index`/`pk_shot_index_allowed` (§2f) and `block_rate_index` (§2g) when they were
+    # added to `special_teams_consumed_keys()`'s AST walk but not to this loop -- it reported all
+    # three as 0.0% FAIL ("consumed but NEVER populated") even though `load_team_special_teams_map`
+    # populates all six correctly on every team-side, checked directly. Fixed by driving this loop
+    # off the same function the report table already uses, so the two can never drift again.
+    st_consumed_keys = [k for k, _ in special_teams_consumed_keys()]
 
     for date in dates:
         games = build_slate_features(date)
@@ -239,7 +247,7 @@ def main() -> int:
                         team_hits[f.name] = team_hits.get(f.name, 0) + 1
                 if team.special_teams:
                     st_nonempty += 1
-                for key in ("pp_pct", "pk_pct", "committed_per_game"):
+                for key in st_consumed_keys:
                     if team.special_teams.get(key) is not None:
                         st_key_hits[key] = st_key_hits.get(key, 0) + 1
             for players in (game.home_players, game.away_players):
