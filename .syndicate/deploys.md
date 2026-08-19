@@ -17474,3 +17474,30 @@ post-deploy read must poll until the async sync lands, not sample once.
   wrong cadence (sim in the pregame window, re-sim on injury/lineup news), and
   it is measurably harmful — the model-vs-market gap runs +1.815 at weeks 1-3
   and +4.111 by weeks 7-9, driven by that staleness.
+
+---
+
+## 2026-08-19 — web deployed for the soccer status-file allowlist (scoped, off-main)
+
+**Deployed**: `web <- 17986fb5` (`dep-da32tn3bc2fs7384hsvg`). Fired 22:31:56Z
+with `--allow-off-main` (justification: web runs a scoped cherry-pick
+branch off its own live SHA, `ebf301ae` -- NOT literal `origin/main`,
+confirmed by `render_deploy.py`'s own refusal on the first attempt: "253
+files changed, 371 insertions(+), 51106 deletions(-)" against
+`origin/main` directly, a false rollback signal from branch topology, not
+real content loss). Cherry-picked JUST `2431df26` (the allowlist commit)
+onto `ebf301ae` in a throwaway worktree, pushed as
+`deploy/web-soccer-status-allowlist`, deployed that scoped SHA instead.
+**CONFIRMED LIVE by content**: `deploy_preflight.py --service web` reports
+live commit `17986fb5`, finished `2026-08-19T22:38:26Z`.
+
+**verify:** `curl .../api/ops/artifacts/stream?path=reports/refresh_status/latest/soccer_pregame_autorun_status.json`
+now returns **404** (not found), a real change from the pre-deploy **403**
+(not an allowed hot artifact) -- confirms the allowlist check itself is
+live and passing. The 404 means the file hasn't been SWEPT from
+live-odds-worker's disk to web's yet (allowlisting is forward-looking,
+not retroactive) -- expected to resolve on the next normal
+`sweep_changed_hot_artifacts` cycle, not a further deploy. Whoever
+continues `soccer-odds-capture-cadence-gap` should re-curl this same URL;
+a 200 with real `epoch`/`error` JSON is what finally answers the
+`steps=0` open question.
