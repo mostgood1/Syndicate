@@ -5,6 +5,63 @@
 
 ---
 
+## 2026-08-19 — NFL COVER-PROBABILITY MEAN-OVERCONFIDENCE FIX, `#471` NOW FULLY CLOSED — lane `nfl-player-props-skew-fix`
+
+**NO DEPLOY. Library function change, same class as the anytime_td fix.**
+`5def74df` on `origin/main`, verified by content. Full write-up:
+`docs/ai_context/todo.md` `#471` addendum 2.
+
+Fixes the SECOND (last) calibration defect `#471` measured: every NFL
+count/yardage market's Normal-CDF cover probability was overconfident
+near its own mean (predicts ~50%, real hit rate ~37-44%) — real box-score
+stats are right-skewed (mean > median), a Normal is symmetric and can't
+represent that.
+
+**First attempt was a NULL RESULT, recorded not discarded**: pure
+log-normal (method-of-moments off the same mean/stdev, no new data, no
+tunable parameter) improved Brier on 4 of 8 markets and WORSENED it on
+the other 4 by overcorrecting. `reports/nfl_cover_probability_model_
+comparison.json` is that record.
+
+**Real fix: per-market Normal/log-normal blend, closed-form tuned.**
+`p = (1-w)*p_normal + w*p_lognormal`; Brier is convex in a linear blend of
+two fixed probabilities, so the minimizing `w` has a closed form (no grid
+search). `w` selected on 2022-2023, reported (never re-selected) on
+2024-2025:
+
+| market | w | Brier w=0 | Brier w* |
+|---|---|---|---|
+| passing_attempts | 1.000 | 0.2062 | 0.1998 |
+| rushing_yards | 0.573 | 0.2157 | 0.2111 |
+| rushing_attempts | 0.550 | 0.2192 | 0.2171 |
+| passing_yards | 0.689 | 0.2176 | 0.2174 |
+| receiving_yards | 0.216 | 0.222742 | 0.222677 |
+| receptions | 0.137 | 0.218231 | 0.218215 |
+| passing_tds | 0 (no real OOS benefit, shipped unchanged) | 0.223145 | 0.224007 |
+| interceptions | 0 (no real OOS benefit, shipped unchanged) | 0.240758 | 0.240922 |
+
+**Full-scale re-run** (`scripts/backtest_nfl_props.py`, 16,991+ rows):
+`passing_attempts` Brier `0.1919→0.1836`, worst mid-decile gap
+`+0.082→-0.010`; `rushing_yards` Brier `0.1956→0.1917`. **Section 1
+point-accuracy MAE confirmed byte-identical before/after** (programmatic
+diff) — no regression to any `#471` beats-baseline verdict.
+
+Deliberately did NOT introduce `scipy` (a declared but never-imported
+dependency) — the log-normal transform is closed-form via stdlib
+`statistics.NormalDist` on the log-transformed line.
+
+Verify: `reports/nfl_props_backtest_2022_2025.json` (regenerated, both
+fixes), `reports/nfl_cover_probability_blend_calibration.json` (the
+shipped tuning sweep). 8 new tests, 620 NFL tests pass (3 unrelated
+pre-existing failures, confirmed identical with this change stashed out).
+
+**`#471` is now fully closed** — both calibration defects fixed and
+measured out-of-sample. The `HOT_ARTIFACT_PATTERNS` allowlist gap (real
+NFL prop-odds coverage unverifiable from web) is unrelated to either
+defect and still stands, handed to `basketball-model-owner`.
+
+---
+
 ## 2026-08-19 — NFL ANYTIME_TD SHRINKAGE FIX, TUNED AND MEASURED OUT-OF-SAMPLE — lane `nfl-player-props-calibration-fix`
 
 **NO DEPLOY. Local tooling + a production code path, but the code change
