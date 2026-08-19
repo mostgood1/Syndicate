@@ -1395,3 +1395,88 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 
 
 
+
+### soccer-model-dispersion — REAL-FIXTURE TRACE, STOPPING POINT 2026-08-18 19:2xZ — the xG-term removal is likely NOT the driver of the dispersion overshoot; the feature-wiring itself (`00475bce`) is the more likely cause — session: soccer-sport-owner
+
+**Properly-powered version of the mechanism trace, per the previous attempt's own
+prescription (now archived in `lanes_history.md`): `backtest_league()` called
+directly (not a synthetic pairing probe), same 126 real eredivisie fixtures, same
+per-match-day `as_of`/`window=45` rating recomputation as the trusted h2h backtest,
+300 sims/match, ~62-64 min per side.** Artifacts at
+`/c/tmp/soccer_real_fixture_trace_evidence/` (local scratch, not in the repo).
+
+    config                                    matches  model_brier  market_brier  stdev
+    new (current: wiring present, xG removed)    126      0.5081       0.5064     0.2373
+    old (wiring present, xG term RESTORED)        126      0.5189       0.5064     0.2945
+
+`new`'s numbers are BYTE-IDENTICAL to the CLI-run `post_xgdrop_eredivisie_s300.json`
+-- confirms calling `backtest_league()` directly is equivalent to the subprocess
+invocation, so this driver is sound.
+
+**PAIRED BRIER TEST (same fixtures, joined, `actual` verified equal): t=+0.98, 95%
+CI -0.0106..+0.0321 -- NOT DISTINGUISHABLE FROM NOISE.** Unlike the shots-shrink
+test (t=-2.06, clearly significant), restoring the xG double-count does NOT produce
+a clear accuracy difference in either direction on this match set.
+
+**THE COMPARISON HAS A REAL CONFOUND, AND IT IS WHAT MAKES THIS FINDING WORTH
+HAVING.** "old" here swaps ONLY `possession_priors.py` back to the pre-`94578cbc`
+formula -- it still runs against the CURRENT `loaders.py`, which includes
+`00475bce`'s converter wiring (shots/corners/clean_sheet/form now populated,
+previously always neutral). So "old" is NOT the true historical state; it is
+"double-counted xG PLUS all of today's newly-wired data", a combination that never
+ran in production. **This was not the comparison originally intended, and it is not
+a clean isolation of `94578cbc` alone.**
+
+**WHAT THE CONFOUND ACCIDENTALLY REVEALS, three numbers on the SAME league:**
+
+    true historical baseline (08-15, NO wiring at all)     0.1886
+    new  (current: wiring present, xG removed)             0.2373
+    old  (wiring present, xG term ALSO restored)            0.2945
+
+**0.1886 sits below BOTH post-wiring states.** Removing the xG term while HOLDING
+THE WIRING CONSTANT moves dispersion TOWARD the true baseline (2945 -> 2373), not
+away from it -- the OPPOSITE of the story this whole lane has been chasing since
+the first backtest result. This suggests `94578cbc` is not the cause of the
+overshoot and may be mitigating it; the more likely driver is `00475bce` itself --
+giving the model real shots/form/clean-sheet/corners data it never had is exactly
+the kind of change that widens confidence, and BOTH `new` and `old` carry that
+wiring while the true baseline has none of it.
+
+**THIS IS A HYPOTHESIS THE NUMBERS POINT AT, NOT A SETTLED RESULT.** Confirming it
+needs an ISOLATED `00475bce`-alone probe -- the pre-`00475bce` `loaders.py` (not
+just the pre-`94578cbc` `possession_priors.py`) run against the current formula, or
+vice versa. That is a genuinely different probe from either one run tonight and was
+NOT attempted. **User decision: stop here rather than run a third multi-hour probe.**
+
+**STANDING, UNCHANGED BY THIS ENTRY:**
+- The shots-shrink revert (`b69c5277`) is unaffected -- that was a clean, properly
+  powered, unconfounded paired test (same wiring on both sides, only the shots
+  weight varied) and its result stands regardless of how this question resolves.
+- An earlier synthetic 16-fixture probe (archived, `lanes_history.md`) is STILL not
+  to be trusted in either direction -- underpowered, as already recorded there.
+- The dispersion overshoot itself (0.1886 -> ~0.2373-0.2945 depending on
+  configuration) is real and reproduced a third time here.
+
+**IF THIS IS PICKED UP AGAIN, the concrete next step is named, not vague:** run
+`backtest_league()` under (a) current `possession_priors.py` + pre-`00475bce`
+`loaders.py`, and (b) pre-`94578cbc` `possession_priors.py` + pre-`00475bce`
+`loaders.py`, both against the same 126 fixtures. That isolates `00475bce`'s own
+marginal effect on dispersion, which is the piece still untested. Budget ~2h for
+the pair, same as tonight's two probes.
+
+**PROCESS NOTE, and this one is new tonight: a "clean" state can go stale mid-write.**
+Fetched a genuinely in-sync `origin/main` before starting this append; by the time
+of push, another session had landed a MAJOR compaction (`ccaf5b6d`,
+lanes.md 253,880 -> 115,193 bytes, prior entries moved to `lanes_history.md`, nothing
+deleted). The resulting merge conflict, resolved by blind UNION as in earlier
+entries, would have RE-INFLATED the just-shrunk file with stale pre-compaction
+content -- the same mistake as the earlier `state.md` incident, this time almost
+self-inflicted rather than caught in someone else's work. **Caught by checking
+`origin/main`'s ACTUAL current line count and content (via PowerShell -- Git Bash's
+`rev:path` syntax mangled this check twice and returned false empties) before
+trusting a merge conflict's "ours" side, then aborting the merge and re-appending
+onto a fresh checkout instead of resolving in place.** Prior entries were NOT lost --
+verified present in `lanes_history.md` before concluding anything -- but the
+INSTINCT to union first and check second nearly caused a second incident on the same
+file class in one session. **When a ledger write's target has moved between fetch
+and push, re-derive from the NEW target; do not merge a stale local branch into it.**
