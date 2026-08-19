@@ -2219,10 +2219,37 @@ anything resting on a fifth guess would have been the fifth mistake. Falsified i
 the blocking direction too — a job on web yields HOLD, and an unreachable
 endpoint falls back to the log path and yields UNKNOWN, never CLEAR.
 
-**WHAT REMAINS IS THE CAUSE, and only that:** web has not emitted
-`ALL_PROCESS_MEMORY` since 2026-08-14. It no longer blocks anything, so it is a
-lower-priority question — but a service that silently stopped emitting a
-diagnostic is worth understanding before something else comes to depend on it.
+**THE MECHANISM IS NOW FOUND AND VERIFIED `[2026-08-19]` — and it is NOT a fifth
+guess, because it is read off the code and the live config rather than inferred
+from the symptom.** Web has exactly one path to the emitter, and it is gated off:
+
+    syndicate/app.py  _start_background_loops()
+      render_web_dyno = _is_render_web_dyno()
+      if render_web_dyno and not _env_bool(
+              "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
+          return                     <-- web returns HERE
+      start_intelligence_state_background_loop(app)   <- the 12 emitter call sites
+      if not render_web_dyno:
+          start_live_refresh_background_loop()        <- also skipped on web
+
+- **Live web env: `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP = false`.**
+  `render.yaml` sets it `"false"` for web and `"true"` for the worker.
+- **No other caller exists on web.** `syndicate/blueprints/**` has ZERO
+  references to either emitter function, so no request path can produce one —
+  which is why hitting `/api/ops/memory` repeatedly tonight emitted nothing.
+- **Confirmed empirically, not just by reading:** web has REBOOTED many times
+  since (newest gunicorn boot 2026-08-19T00:48:07Z) and has still never emitted.
+  A restart cannot fix a loop that is configured not to start.
+
+**WHAT IS STILL NOT PROVEN: which change on ~2026-08-13/14 flipped it.** The gate
+dates from 2026-07-04 and the blueprint's `false` from 2026-07-25, both well
+before the last emission at 2026-08-14T18:55:39Z — so for those three weeks the
+SERVICE-level env must have carried a `true` that drifted from the blueprint.
+**The leading candidate is the FIVE `render.yaml` pushes on 2026-08-13**, each of
+which fires `blueprint_sync`, and a sync rewrites the service's WHOLE env block
+from the blueprint — overwriting exactly that kind of manual `true`. **This is
+NOT confirmed:** Render exposes no history of env-var values, so the pre-08-13
+service value is unrecoverable. Candidate, not finding.
 
 **THE SYMPTOM AS IT WAS, for anyone reading an older receipt:**
 `deploy_preflight.py` returned `UNKNOWN` for web — "sample is 356656s old (limit

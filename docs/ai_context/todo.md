@@ -423,11 +423,39 @@ check.
 > about how the evidence was obtained, and the receipt is only ever read after
 > the fact.
 >
-> **WHAT IS STILL OPEN:** why web stopped emitting `ALL_PROCESS_MEMORY` on
-> 2026-08-14. It no longer blocks anything, so it drops in priority — but it is
-> a service that silently stopped emitting a diagnostic, which is worth knowing
-> before something else depends on it. Lead unchanged: loop ownership moves
-> between services via env flags with no diff. **Do not add a fifth guess.**
+> **THE MECHANISM IS FOUND AND VERIFIED `[2026-08-19]`, and the earlier lead was
+> right in kind:** loop ownership does move via an env flag with no diff.
+> `syndicate/app.py:_start_background_loops()` RETURNS EARLY on a Render web dyno
+> unless `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is true, and it is
+> **`false`** on live web (and `"false"` for web in `render.yaml`, `"true"` for
+> the worker). That gate sits in front of the only 12 emitter call sites web has;
+> `syndicate/blueprints/**` contains ZERO references to either emitter function,
+> so no request path can produce one — which is why hitting `/api/ops/memory`
+> repeatedly emitted nothing.
+>
+> **Confirmed empirically, not only by reading the code:** web has rebooted many
+> times since (newest gunicorn boot `2026-08-19T00:48:07Z`) and has still never
+> emitted. A restart cannot start a loop that is configured off.
+>
+> **This is not a fifth guess** — the previous four were mechanisms proposed to
+> explain the symptom; this one is read off the code path and the live config,
+> and is confirmed by the reboots.
+>
+> **STILL UNPROVEN: which change on ~2026-08-13/14 flipped it.** The gate dates
+> from 07-04 and the blueprint's `false` from 07-25, both well before the last
+> emission at `2026-08-14T18:55:39Z` — so the SERVICE env must have carried a
+> `true` that had drifted from the blueprint. Leading candidate: the **five
+> `render.yaml` pushes on 2026-08-13**, each firing `blueprint_sync`, which
+> rewrites a service's WHOLE env block from the blueprint and would overwrite
+> exactly that manual `true`. **Not confirmed — Render exposes no history of
+> env-var values, so the pre-08-13 value is unrecoverable.** Candidate, not
+> finding.
+>
+> **WHAT TO DECIDE, not investigate:** whether web SHOULD run that loop. It is
+> off by deliberate design (`render.yaml` comments say the intelligence work runs
+> on the REQUEST path there), so the emitter's silence may be correct behaviour
+> and the diagnostic simply mis-sited. Preflight no longer depends on it either
+> way.
 
 > **RETRACTION 2026-08-18 — read this before the body. The heading of this item
 > used to assert "no web code path emits `ALL_PROCESS_MEMORY`" and called it
