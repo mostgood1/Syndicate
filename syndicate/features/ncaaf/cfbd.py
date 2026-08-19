@@ -292,11 +292,40 @@ class CfbdClient:
 
     @classmethod
     def from_env(cls, *, base_url: str = CFBD_API_BASE, timeout: float = 30.0) -> "CfbdClient":
+        """Client from the environment, loading `.env` first if it is not already there.
+
+        THE LOADER LIVES HERE BECAUSE EVERY CALLER SHARES THIS CHOKE POINT.
+        Measured 2026-08-19: of the seven `build_ncaaf_*_snapshot.py` builders,
+        only TWO (`roster`, `player_game_stats`) carried their own `_load_env()`.
+        The other five -- team_registry, returning_production, coach_continuity,
+        transfer_portal, player_identity -- called this constructor directly and
+        died with "Missing CFBD API key" when run from a normal shell, even with
+        a populated `.env` beside them. Five of seven builders were effectively
+        unrunnable, which is a large part of why several had never produced
+        output.
+
+        Fixing it in five copies would have left the sixth and seventh to drift.
+        """
         for env_var in CFBD_ENV_VARS:
             api_key = _safe_text(os.environ.get(env_var))
             if api_key:
                 return cls(api_key, base_url=base_url, timeout=timeout)
-        raise RuntimeError("Missing CFBD API key. Set CFBD_API_KEY or COLLEGEFOOTBALLDATA_API_KEY.")
+        # Not in the process environment -- try `.env` before giving up. Kept
+        # AFTER the environment scan so an explicitly exported key always wins.
+        try:
+            from dotenv import load_dotenv  # type: ignore
+
+            load_dotenv()
+        except Exception:
+            pass
+        for env_var in CFBD_ENV_VARS:
+            api_key = _safe_text(os.environ.get(env_var))
+            if api_key:
+                return cls(api_key, base_url=base_url, timeout=timeout)
+        raise RuntimeError(
+            "Missing CFBD API key. Set CFBD_API_KEY or COLLEGEFOOTBALLDATA_API_KEY "
+            "in the environment, or place it in the repo-root .env."
+        )
 
     def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}{path}"
