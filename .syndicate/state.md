@@ -1872,20 +1872,24 @@ client-side JS). Trace the served `book` field to its writer before acting.
   `adapters.py:_team_player_usage` already aggregates correctly and nothing
   consumes it). `offensive_metrics`/`advanced_metrics`/`market_features` are
   **100% fed**.
-- **NCAAF SERVES 16 GAMES AND THE MODEL IS NULL ON ALL 16** `[measured against
-  PRODUCTION 2026-08-18]`. `predictions.home_mean/away_mean/margin_mean/
-  total_mean` and all six probabilities are `null`; `smartsim_reasons` `[]`.
-  **Cause: `CFBD_API_KEY` is ABSENT on all three services** (live env-vars, not
-  `render.yaml`); `generate_smartsim2_ncaaf_projections.py:57` raises, the
-  autorun dies, the artifact is never written. Logs: **21 of 21
-  `SEASON_PROJECTION_ARTIFACT_MISSING` are `sport=ncaaf`, 0 `sport=nfl`** —
-  positive control. `interval_seconds=86400` → **once-daily, NOT a relaunch
-  loop, not burning worker cycles.** Two-arm test: no key → `RuntimeError`;
-  with key → 99 games → 51 FBS-vs-FBS → 136 PPA teams → 50/51 rated.
-  **Everything downstream of the key works**, incl. `#445`'s guard (verified by
-  CONTENT in deployed blob `00e9a49f`). **Season opens 2026-08-29.** Deploy
-  request filed: `.syndicate/deploy/requests/20260818T154432Z-football-model-owner.md`.
-  `#458`.
+- **NCAAF PICKS ARE SUPPRESSED IN PRODUCTION — the margin model LOSES to the
+  closing line** `[measured 2026-08-19, live web 8833cfd6 19:18:07Z]`.
+  `/ncaaf/api/picks?week=1` serves **0 cards (was 12)** with a suppression
+  `empty_state`; `/ncaaf/api/cards?week=1` still serves **51 games** and NFL
+  picks still serve 12 — only the BET is withheld. Evidence: prior-season 2024
+  SP+ scoring realised 2025 margins, n=220, closing spread on the same games —
+  **model MAE 13.763 vs market 11.586, paired dMAE +2.176, SE 0.518, t=+4.20.**
+  Every scale 6..24 loses, so it is the MODEL, not a constant. By week:
+  **+1.815 (wk1-3) → +4.111 (wk7-9)** — staleness is a real driver and the
+  opener is where the model is closest. Gate (default-DENY, a market opens only
+  on a recorded win): `syndicate/features/football/pick_gate.py`. Plan and exit
+  criterion: `docs/ai_context/ncaaf_beat_the_close_strategy.md`.
+  **CALIBRATED IS NOT COMPETITIVE** — the earlier "margins fixed, SD 1.74 →
+  15.37, ratio 1.06" was a DISPERSION match and said nothing about accuracy,
+  which had never been tested until now. `CFBD_API_KEY` is set (user, 08-18).
+  refresh-worker `f2eb719d` (SP+ ratings + as-of PPA leak fix) live 18:51:08Z,
+  stage 1 verified by content; **STAGE 2 STILL OWED** — ~51/51 non-null
+  `predictions.home_mean`, 86400s autorun, ≤24h. Season opens **2026-08-29**.
 - **DO NOT diagnose NCAAF from a local checkout.** `load_features(sport="ncaaf")`
   returns **0 games locally** while production serves 16. I filed that local zero
   as a production defect and retracted it. `data/**` lossy mirror, as CLAUDE.md

@@ -642,22 +642,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **NCAAF MARGINS CALIBRATED (SD 1.74 -> 15.37, ratio 1.06). Totals still 1.67x, carrier IDENTIFIED (scoring rate 20.8->53.9%). Two model leaks fixed, 2026 data built. Payload experiment NULL.** — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — OPEN — **NCAAF PICKS SUPPRESSED LIVE (web `8833cfd6`, 19:18:07Z): the margin model LOSES to the close, MAE 13.763 vs 11.586, paired +2.176 at 4.2 sigma. Margins are calibrated, NOT competitive.** — opened 2026-08-18 — session: football-model-owner
 - Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
-  treatment MLB and soccer have. **Testable:** a gating checklist exists and runs;
-  every model input is leak-free and reachable; board defects measured on the
-  SERVED payload.
-- Files: `syndicate/features/football/**`, `syndicate/features/ncaaf/cards.py`,
+  treatment MLB and soccer have. **Testable:** gating checklist runs; inputs
+  leak-free and reachable; defects measured on the SERVED payload.
+- Files: `syndicate/features/football/**`, `syndicate/features/ncaaf/{cards,picks}.py`,
   `syndicate/features/nfl/preseason_cards.py`,
   `syndicate/features/shared/{publication_adapter,game_board_contract}.py`,
   `scripts/{football_sim_input_checklist,backfill_nfl_historical_odds,generate_smartsim2_ncaaf_projections}.py`,
-  `docs/ai_context/{model_engine_standard,football_sim_engine_reference,nfl_feature_payload_preregistration}.md`,
-  `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form}.py`
-- **NOT claimed:** `syndicate/features/shared/artifact_publisher.py` — held by
-  `basketball-model-owner`; allowlist patterns handed to them via `send_message`.
-  `scripts/deploy_preflight.py` — `repo-coordination`'s charter; defect handed over.
-- Status: **14 commits, all on `origin/main`, 0 unpushed.** 3 web deploys live and
-  measured (`5fdabc46`, `4c3b0aa5`, `841b6d84`). `CFBD_API_KEY` set by the user.
+  `docs/ai_context/{model_engine_standard,football_sim_engine_reference,nfl_feature_payload_preregistration,ncaaf_beat_the_close_strategy,ncaaf_data_pipeline}.md`,
+  `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form,football_pick_gate}.py`
+- **NOT claimed:** `shared/artifact_publisher.py` (basketball-model-owner),
+  `scripts/deploy_preflight.py` (repo-coordination). Both handed over.
+- Status: **2 deploys live+VERIFIED.** web `8833cfd6` 19:18:07Z — picks 0 cards
+  (was 12) + suppression empty_state; projections still 51, NFL still 12.
+  refresh-worker `f2eb719d` 18:51:08Z — SP+ ratings + as-of PPA leak fix.
+- **OWED:** `f2eb719d` STAGE 2 — needs ~51/51 non-null `predictions.home_mean`
+  on `/ncaaf/api/cards?week=1`, 86400s autorun, <=24h. **Shipped, not proven.**
+  Local `main` has unpushed commits incl. other lanes'.
+- Next: the gate is a PAUSE, not a fix. Plan + exit criterion in
+  `docs/ai_context/ncaaf_beat_the_close_strategy.md`. Gap by week +1.815 (wk1-3)
+  -> +4.111 (wk7-9): staleness is a real driver; the opener is closest.
+- **Do not** retune `SP_RATING_SCALE` (all scales 6..24 lose; 10 vs 13 = 0.7σ)
+  or retry the three dead scalar fixes.
 - **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
 - **Phase 3 DONE, n=269: NULL** (`dCRPS +0.0226`, 0.97 SE). Payload does not
   ship; Phase 4 moot. The ratings path carries 4.2x the leverage and production
