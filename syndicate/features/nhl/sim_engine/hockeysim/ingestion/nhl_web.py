@@ -79,6 +79,27 @@ class NhlWebIngestClient:
                 pass
         return data
 
+    def play_by_play(self, game_id: str, *, use_cache: bool = True) -> Optional[Dict]:
+        """`plays[]` with event coordinates -- the substrate for a real shot-quality (xG) model
+        (`historical_truth/shot_xg_model.py`). Same cache-first convention as `boxscore()`, its own
+        cache key (`playbyplay_{gid}.json`) so both endpoints for a game can be cached side by
+        side without collision."""
+        gid = str(game_id)
+        path = self.cache_dir / f"playbyplay_{gid}.json"
+        if use_cache and path.exists() and path.stat().st_size > 0:
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        data = self._get(f"{_NHLE_BASE}/gamecenter/{gid}/play-by-play")
+        if data is not None:
+            try:
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(data), encoding="utf-8")
+            except OSError:
+                pass
+        return data
+
     def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
         """The team's last ``n`` finished game ids strictly before ``before_date`` this season."""
         data = self._get(f"{_NHLE_BASE}/club-schedule-season/{team_abbr}/{season}")

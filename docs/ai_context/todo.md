@@ -469,7 +469,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, and ALL 6 non-neutral goal/shot/block-rate multiplier calibrations FIXED (only `pp_goal_cal_mult` intentionally left neutral); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, and a real xG (expected goals) model FIXED (only `pp_goal_cal_mult` intentionally left neutral); `shots_per_60`/`blocks_per_60`/`penalties_per_60`/`faceoff_win_pct`/player-weights genuinely absent** — FOUND, MEASURED, PARTIALLY FIXED 2026-08-18, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -708,6 +708,36 @@ Full detail: `hockeysim_engine_reference.md` §2b.
   independently validated — this pass preserves it through a shared scale, it
   doesn't re-derive it; no strength-state-split truth source exists to fit it
   against.
+- **Real xG (expected goals) model — built, closing the LAST genuinely-absent
+  input this item tracked.** Full report:
+  `docs/reports/hockeysim_xg_model_report.md`. `xgf_per_60`/`xga_per_60` had a
+  reader (`load_team_xg_map`, wired from a prior session) but no producer
+  anywhere — neither the `landing` nor `boxscore` feed carries shot location.
+  Bulk-fetched the SEPARATE `play-by-play` endpoint (new
+  `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py`,
+  1,312 games, 1,307 new fetches, 0 failures, ~492s) and built a real
+  `sklearn` logistic shot-quality model (`historical_truth/shot_xg_model.py`)
+  on distance, angle, shot type, strength state (from `situationCode`),
+  rebound, and empty-net — fit on 112,888 Fenwick shot attempts (blocked
+  shots excluded, same convention every public NHL xG model uses, since a
+  block's recorded coordinate is the block point, not the shooter's release
+  point). Team identity is deliberately NOT a feature, so the model can't
+  overfit to a specific team and the full-data-fit model safely scores every
+  shot for the team-level aggregation (the train/holdout split validates
+  calibration only). **Holdout-validated** (262 games never trained on):
+  AUC=0.7450 (in line with public models on a comparable feature set),
+  Brier=0.0667 (beats the naive base-rate baseline ≈0.0685), calibration
+  table tracking closely across all 10 deciles. **League aggregate**:
+  xGF/60=xGA/60=3.1826, within ~1.8% of the real, truth-calibrated
+  `league_baseline_goals_per_60` (3.1269) already used elsewhere. **Real
+  per-team spread**: CAR (3.83)/COL (3.69) highest, CHI (2.73)/SEA (2.80)
+  lowest — matches known 2025-26 team strength, external validation in the
+  same style as EDM's independently-measured best PP. **Stated plainly, not
+  hidden**: `is_rebound` and the tip-in/deflected shot-type coefficients came
+  out negative — the opposite sign hockey intuition predicts, a real measured
+  finding flagged as an open question, not adjusted to match a prior.
+  `scripts/nhl_sim_input_checklist.py`'s alarm count drops from 9 to **7**,
+  the lowest measured this session.
 
 **NOT FIXED — genuinely absent, not merely unfed (measured via the corrected
 checklist, 9 mirrored dates, 10 team-sides, 297 players):**
@@ -738,13 +768,6 @@ checklist, 9 mirrored dates, 10 team-sides, 297 players):**
   these two, once the fetch happens, needs to avoid double-counting against
   `pp_pct`/`pk_pct`'s already-real goal-rate signal (mechanism vs estimator,
   `model_engine_standard.md` §4.4).
-- `xgf_per_60`/`xga_per_60` — loader (`load_team_xg_map`) and allowlist both
-  exist now; **no producer of `team_xg_*.csv` exists anywhere** in this
-  checkout or `vendor/`. The reader code was re-homed from
-  `vendor/nhl_betting_repo/nhl_betting/data/team_xg.py` but the underlying
-  shot-quality data never was. Falls back gracefully to `goals_per_60` (a
-  legitimate, if cruder, proxy), so this degrades rather than breaks — but is
-  genuinely absent, not merely unfed.
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

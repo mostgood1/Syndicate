@@ -368,11 +368,67 @@ to match real output, it doesn't remove the underlying basis mismatch itself.
 
 ---
 
+## 2i. A real xG (expected goals) model — the last genuinely-absent gap from §5
+
+Full report: `docs/reports/hockeysim_xg_model_report.md`. `xgf_per_60`/`xga_per_60` had a reader
+(`loaders.load_team_xg_map`, wired into `build_team_features`/`build_game_features` from a PRIOR
+session) but NO PRODUCER — `projection.py`'s `_offense_rate`/`_defense_rate` silently fell back to
+`goals_per_60`, then the league baseline, on every team, every game. This builds a real producer.
+
+**New data, not a new reader**: neither the `landing` feed nor the `boxscore` feed carries shot
+location. `play-by-play` (`/v1/gamecenter/{id}/play-by-play`) does — every Fenwick event carries
+`xCoord`/`yCoord`, `shotType`, `situationCode`. `NhlWebIngestClient.play_by_play()` (new) +
+`scripts/fetch_nhl_playbyplay_cache.py` (new) bulk-fetched all 1,312 regular-season games (1,307
+new fetches, 0 failures, ~492s).
+
+**Fenwick, not Corsi**: `blocked-shot` events record the BLOCK coordinate, not the shooter's
+release point — using it for distance/angle would systematically understate distance. Every public
+NHL xG model fits on Fenwick (SOG + missed + goals) for exactly this reason; so does this one.
+
+**`sign(xCoord)`, not `homeTeamDefendingSide` bookkeeping**: a shot recorded in the offensive zone
+has coordinates naturally closer to the net it's attacking, so `sign(xCoord)` identifies the
+attacked net directly — the same standard shortcut public NHL xG models use, trading a little
+noise on rare neutral-zone attempts for a much simpler implementation.
+
+**Model**: `sklearn.linear_model.LogisticRegression` on distance, angle, shot type (one-hot),
+strength state (one-hot, from `situationCode`), is-rebound (same-team Fenwick attempt within 3s),
+is-empty-net. **Team identity is deliberately NOT a feature** — the model cannot overfit to a
+specific team's shooting/goaltending quality, so scoring every shot with the model fit on the FULL
+dataset is safe for the team-level aggregation; the holdout split exists only to validate
+calibration.
+
+**Holdout validation** (games the model never trained on, 262 games / 22,218 shots): **AUC=0.7450**
+(in line with public models on a comparable feature set), **Brier=0.0667** (beats the naive
+base-rate baseline ≈0.0685), and a calibration table monotonic and closely tracked across all 10
+deciles of predicted probability — see the full report for the table.
+
+**Aggregation**: league avg xGF/60 = xGA/60 = **3.1826**, within ~1.8% of the real, truth-calibrated
+`league_baseline_goals_per_60` (3.1269) this codebase already uses — the expected structural
+property of a well-fit logistic model's mean prediction matching its mean outcome. Real per-team
+spread: CAR (3.83)/COL (3.69) highest, CHI (2.73)/SEA (2.80) lowest — matches known 2025-26 team
+strength (Carolina/Colorado strong possession teams, Chicago rebuilding), external validation in
+the same style as EDM's independently-measured best PP (§2d/§2f).
+
+**Stated plainly, not glossed over**: `is_rebound` (−0.1269) and the tip-in/deflected shot-type
+coefficients came out NEGATIVE — the opposite sign hockey intuition predicts. A real, measured
+finding, not adjusted to match a prior; flagged as an open question in the full report, not chased
+further this pass.
+
+**Checklist impact**: alarm count drops from 9 to **7**, the lowest measured this session.
+
+**What remains open**: no rush-shot feature, no per-shooter/goaltender talent layer (deliberately —
+would need a genuinely new signal, not this shot-quality base), and not independently re-verified
+against the goal/shot-multiplier calibrations (§2d-§2h) since `xgf_per_60`/`xga_per_60` feed a
+different code path (the pregame projection / main board) than those calibrations tuned (the
+possession/segment props sim) — see §3's "main-board / props-engine split" note.
+
+---
+
 ## 3. Input provenance — where each input is produced and applied
 
 | input | produced by | applied in | population `[this checkout]` |
 |---|---|---|---|
-| `xgf_per_60` / `xga_per_60` | **no producer exists** — `load_team_xg_map` reads `team_xg_{season}.csv`, which nothing writes | `projection._offense_rate` / `_defense_rate` (falls back to `goals_per_60`, then league baseline) | 0% — genuinely absent, §5 |
+| `xgf_per_60` / `xga_per_60` | **NEW**: `historical_truth/shot_xg_model.py` + `scripts/build_nhl_xg_artifact.py`, a real logistic shot-quality model fit on 112,888 play-by-play Fenwick shots (§2i) | `projection._offense_rate` / `_defense_rate` (falls back to `goals_per_60`, then league baseline) | 0% → 100% after §2i; the last genuinely-absent input from this row's original §5 listing |
 | `elo_rating` | **NEW**: `historical_truth/elo_builder.py` + `scripts/build_nhl_elo_artifact.py`, from 1,312 cached real games | `projection._elo_win_prob`, gated at `elo_blend_weight` (default `0.0`) | 100% after the fix (§4); blend deliberately still off |
 | `goals_per_60` | `apply_projection` back-fills from `proj_home_goals`/`proj_away_goals` (**NEW** this session) | `player_props.py`'s `TeamRates` construction, then `engine.py` (shots/goals allocation, saves) | was 0% (stuck at the stale `2.9` default) → 100%, matchup-adjusted, after the fix |
 | `shots_per_60`, `blocks_per_60`, `penalties_per_60`, `faceoff_win_pct` | **no producer exists** — `build_team_features` never sets them | same `TeamRates` construction, direct passthrough (`player_props.py:43-48`) | 0% — genuinely absent, §5 |
@@ -419,7 +475,9 @@ concept.
 | `historical_truth.boxscore_shot_strength.compute_team_shot_rate_index` + `pp_shot_index`/`pk_shot_index_allowed` wired into `engine.py` (§2f) — a NEW per-team mechanism, not a calibration | built, tested (reachability + loader + unit tests), verified the existing global calibration did not need re-fitting | reachable by default; a REAL behavior change (per-team shot-volume variation, previously nonexistent) |
 | `historical_truth.boxscore_block_rate.compute_team_block_rate_index` + `block_rate_index` wired into `engine.py` (§2g) — a NEW per-team mechanism, closing the last special-teams gap | built, tested (reachability + loader + unit tests), verified the league-wide average block count did not shift (24.635 neutral vs 24.475 real-indexed, 200 pairings) | reachable by default; a REAL behavior change (per-team block-volume variation, previously nonexistent) |
 | `scripts/calibrate_nhl_block_rate.py` + calibrated `block_rate_ev=0.4784`/`block_rate_pk=0.5847`/`block_rate_pp_def=0.3721` (§2h) — a single shared scale factor, the only degree of freedom 1 league-wide target supports for 3 constants | built, run (proportional-correction fit, 5 iterations), verified twice on the full round-robin (14.2606 neutral-index / 14.2583 real-index vs 14.1905 target), locked in a test | reachable by default; a REAL behavior change (overall block volume ~6.3% higher, matching truth instead of an unmeasured vendor guess) |
-| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**9 alarms**, down from 16 once `special_teams_cal` became reachable) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
+| `NhlWebIngestClient.play_by_play()` + `scripts/fetch_nhl_playbyplay_cache.py` — bulk-fetched 1,312 real games (1,307 new, 0 failures) | built, run | new substrate; the play-by-play endpoint had never been fetched before this session at all |
+| `historical_truth/shot_xg_model.py` + `scripts/build_nhl_xg_artifact.py` — a real logistic xG model (distance/angle/shot-type/strength/rebound/empty-net), fit on 112,888 Fenwick shots (§2i) | built, run, holdout-validated (AUC=0.7450, Brier=0.0667, calibration table tracked across all 10 deciles), tested (21 new unit + loader tests) | reachable by default; the LAST genuinely-absent input from §5's original listing — closes it entirely for `xgf_per_60`/`xga_per_60` |
+| `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, exits 1 (**7 alarms**, down from 16 once `special_teams_cal` became reachable, then further once §2i landed) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up |
 
 **All of it is additive and reachable-by-default** — no new flag was
 introduced that needs to be flipped later. The one thing deliberately left OFF
@@ -439,7 +497,7 @@ measurement before leaning on it for props at scale.
 
 ---
 
-## 5. Genuinely absent (not merely unfed) — 9 alarms, `scripts/nhl_sim_input_checklist.py`
+## 5. Genuinely absent (not merely unfed) — 7 alarms, `scripts/nhl_sim_input_checklist.py`
 
 `[measured against this checkout: 9 mirrored dates 2026-06-02..2026-07-09,
 10 team-sides, 297 players — per §7, UNMEASURED against Render, not 0%,
@@ -451,8 +509,6 @@ until checked there]`
   0.0%   faceoff_win_pct    FAIL  consumed but NEVER populated
   0.0%   penalties_per_60   FAIL  consumed but NEVER populated
   0.0%   shots_per_60       FAIL  consumed but NEVER populated
-  0.0%   xga_per_60         FAIL  consumed but NEVER populated
-  0.0%   xgf_per_60         FAIL  consumed but NEVER populated
 
 --- HockeyPlayerFeatures ---
   0.0%   block_weight       FAIL  consumed but NEVER populated
@@ -464,9 +520,11 @@ until checked there]`
 are FIXED this session, §4, and no longer appear above; see §2b for how an
 earlier pass of this document mis-attributed 7 OTHER keys to that field.
 `special_teams_cal`'s 7 keys are also no longer here — wired reachable, §2c —
-though none of them has been CALIBRATED away from its neutral default yet, a
-distinct claim from "fixed"; the checklist reports this explicitly rather than
-folding it into a plain `ok`.)
+though only `pp_goal_multiplier` is still at its neutral default (deliberately,
+§2d), the rest truth-calibrated (§2d/§2e/§2h). `xgf_per_60`/`xga_per_60` are
+ALSO no longer here — real producer built, §2i, the last genuinely-absent
+input this document tracked; removing those exact two rows is why the count
+dropped from 9 to 7.)
 
 Each of the remaining fields needs **real per-team/per-player data the current
 truth loader does not capture** — the same "needs a definition first"
@@ -479,29 +537,17 @@ class `elo_rating`, `goals_per_60`, and `special_teams` were:
   The `api-web.nhle.com` landing feed likely carries more than
   `nhl_statsweb_loader.parse_landing` currently extracts; extending the parser
   is the first step, not the last.
-- **`xgf_per_60`/`xga_per_60`**: the reader (`load_team_xg_map`) and the
-  allowlist entry both exist now. The underlying shot-quality model needed to
-  produce `team_xg_*.csv` does not — this is a real xG model (shot location,
-  type, on-ice state), not a rate a truth-loader extension alone would give.
-  Falls back to `goals_per_60` gracefully in the meantime.
 - **Player weights** (`shot_weight`/`goal_weight`/`block_weight`): usage-share
   weighting for the props allocator; needs per-player game logs the current
   loaders don't read.
-- **`special_teams_cal`'s league-wide calibration — DONE for 3 of 4 multiplier
-  keys, §2d/§2e.** `pk_goal_cal_mult` (0.4645), `pp_shot_cal_mult` (0.9108), and
-  `pk_shot_cal_mult` (0.3369) are now truth-calibrated; `pp_goal_cal_mult`
-  measured statistically indistinguishable from neutral and was correctly left
-  at `1.0`. **Genuinely still open**: real PER-TEAM PP/PK shot-volume
-  differentiation (as opposed to the league-wide multiplier just calibrated) —
-  unlike goals, which have the real per-team `pp_pct`/`pk_pct` signal to layer
-  a correction on top of, there is no per-team shot-volume signal at all yet.
-  Building one needs a NEW `HockeyTeamFeatures` field and a NEW consumption
-  formula in `engine.py` (no existing per-team analog to extend), a real
-  modelling project, not a calibration pass. The data now exists to support it
-  (`historical_truth.boxscore_shot_strength.TeamShotStrengthRates`, from the
-  same boxscore bulk fetch, §2e) if a future pass wants to build it. Block
-  rates (`block_rate_*`) remain uncalibrated — no truth target for
-  blocked-shot rate by strength state in either parser yet.
+
+**Everything else this section originally flagged as open is now built.**
+`xgf_per_60`/`xga_per_60` (§2i, this document's own last remaining "genuinely
+absent" input) now have a real producer. `special_teams_cal`'s league-wide
+calibration is DONE for every key except `pp_goal_cal_mult` (deliberately
+left neutral, §2d). Per-team PP/PK shot-volume differentiation is built
+(§2f). Per-team AND absolute block-rate calibration are both built (§2g/§2h).
+None of that is re-explained here — see the referenced sections.
 
 ---
 
@@ -527,8 +573,8 @@ not turn on a blend weight just because the plumbing now works.**
 withheld-pending-caution — it is a measured result that says a naive win/loss
 Elo, at least at the currently-configured home-ice bump, does not clear the
 bar. A goal-differential Elo, a multi-season sample, or Elo informed by the
-(currently also-absent) xG signal are the natural next attempts, not
-re-sweeping this same formulation.
+now-real xG signal (§2i) are the natural next attempts, not re-sweeping this
+same formulation.
 
 ---
 

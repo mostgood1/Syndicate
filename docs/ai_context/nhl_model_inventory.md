@@ -209,9 +209,34 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   faceoff multiplier's interaction with the new per-team shot/block indices
   (§2f/§2g) — the faceoff effect is EV-only by default and untouched by this
   pass.
-- Did not build a real xG (expected goals) model — the reader and allowlist
-  exist; the shot-quality model producing the data does not, and building one
-  is a distinct, substantial modelling project, not an input-population fix.
+- **Did** build a real xG (expected goals) model (reference doc §2i, full
+  report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
+  absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
+  (`load_team_xg_map`, already wired from a prior session) but no producer;
+  neither existing truth source carries shot location, so this bulk-fetched
+  the SEPARATE `play-by-play` endpoint (`NhlWebIngestClient.play_by_play()` +
+  `scripts/fetch_nhl_playbyplay_cache.py`, 1,312 games, 1,307 new fetches, 0
+  failures) and built a real `sklearn` logistic shot-quality model
+  (`historical_truth/shot_xg_model.py`) on distance, angle, shot type,
+  strength state, rebound, and empty-net features — fit on 112,888 Fenwick
+  shot attempts (blocked shots excluded; their recorded coordinate is the
+  block point, not the release point, the same convention every public NHL
+  xG model uses). Deliberately did NOT include team identity as a feature, so
+  the model can't overfit to a specific team and the full-data-fit model can
+  safely score every shot for the team-level aggregation. **Holdout-validated**
+  (262 games the model never trained on): AUC=0.7450 (in line with public
+  models on a comparable feature set), Brier=0.0667 (beats the naive
+  base-rate baseline), and a calibration table tracking closely across all 10
+  deciles. **League-wide aggregate**: xGF/60=xGA/60=3.1826, within ~1.8% of
+  the real, truth-calibrated `league_baseline_goals_per_60` (3.1269) already
+  used elsewhere — the expected structural property of a well-fit logistic
+  model. **Real per-team spread, external sanity check**: CAR (3.83)/COL
+  (3.69) rate highest, CHI (2.73)/SEA (2.80) lowest — matches known 2025-26
+  team strength. Stated plainly rather than hidden: `is_rebound` and the
+  tip-in/deflected shot-type coefficients came out negative, the opposite
+  sign hockey intuition predicts — a real, measured finding, flagged as an
+  open question rather than adjusted to match a prior. Closes the checklist's
+  alarm count from 9 to 7, the lowest measured this session.
 - Did not turn on `elo_blend_weight` — measured that a naive win/loss Elo
   shows no edge over a constant baseline at the current `elo_home_adv`, and
   left the mechanism populated-but-off with that measurement recorded

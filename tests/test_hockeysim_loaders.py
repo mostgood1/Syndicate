@@ -109,6 +109,18 @@ def test_build_team_features_without_xg_is_league_average(synth_root):
     assert bos.xgf_per_60 is None and bos.xga_per_60 is None
 
 
+def test_build_game_features_populates_xg_end_to_end(synth_root):
+    """The full loader path (what `build_slate_features` drives in production) actually reaches
+    `xgf_per_60`/`xga_per_60` -- mirrors `test_build_game_features_populates_elo_end_to_end` below,
+    now that `scripts/build_nhl_xg_artifact.py` is a real producer for this CSV, not just a shape
+    the reader was written against with no writer (`hockeysim_engine_reference.md` §5/§2i)."""
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    assert game.home.xgf_per_60 == 3.60 and game.home.xga_per_60 == 2.50
+    assert game.away.xgf_per_60 == 2.40 and game.away.xga_per_60 == 3.60
+
+
 # ---------------------------------------------------------------------------
 # Elo — `docs/ai_context/hockeysim_engine_reference.md`: `elo_rating` was CONSUMED
 # (projection.py's `_elo_win_prob`) with no producer anywhere; these are the
