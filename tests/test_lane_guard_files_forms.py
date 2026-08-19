@@ -141,6 +141,27 @@ OPEN lane claims any `data/wnba_source/**` path (grepped `lanes.md`, clean).
     assert "lanes.md" not in got
 
 
+def test_does_not_touch_present_tense_is_not_claimed(guard):
+    """2026-08-19: `basketball-model-owner` wrote "Does NOT touch
+    board_enrichment.py, run_live_odds_refresh_worker.py, or
+    wnba_fixture_identity.py (held by ...)." -- the recognized marker "held by"
+    sits AFTER the filenames, so the old marker set ("not touched" but not
+    "not touch") had nothing earlier to cut at and read all three as claims.
+    That blocked an unrelated lane from editing a file this sentence explicitly
+    disclaims."""
+    text = """\
+### demo-lane — OPEN — opened 2026-08-18 — session: demo
+- Files: `syndicate/features/shared/mine.py`. Does NOT touch \
+`syndicate/features/shared/theirs.py`, `other_file.py`, or `third_file.py` \
+(held by some-other-lane / another-lane).
+"""
+    got = {p for _, p in claims(guard, text)}
+    assert "syndicate/features/shared/mine.py" in got
+    assert "syndicate/features/shared/theirs.py" not in got
+    assert "other_file.py" not in got
+    assert "third_file.py" not in got
+
+
 def test_worktree_relative_syndicate_path_is_exempt():
     """2026-08-18: the `.syndicate`/`.claude` exemption checked a path relative
     to `CLAUDE_PROJECT_DIR`, which only ever equals ".syndicate/..." for edits

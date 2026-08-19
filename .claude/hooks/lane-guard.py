@@ -75,11 +75,23 @@ PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 # `Read-only dependency:`. Erring toward skipping is the safe direction here --
 # a missed claim leaves an edit unguarded, while a phantom claim blocks the
 # lane's own owner and has no override short of editing someone else's ledger.
+#
+# "not touch" (present tense) was MISSING. Measured 2026-08-19:
+# basketball-model-owner wrote "Does NOT touch board_enrichment.py,
+# run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by
+# wnba-live-tier / wnba-phase2-migration)." -- the recognized marker "held by"
+# sits AFTER the three filenames, so `_claimable_prefix` had nothing earlier to
+# cut at and included all three as claims. That blocked `wnba-edge-263` from
+# editing `board_enrichment.py`, a file the sentence explicitly disclaims and
+# whose named would-be claimants were both already closed. "not touch" is a
+# substring of the existing "not touched", so it subsumes that entry (covers
+# both tenses) without changing where either function looks for it.
 _DISCLAIMER_MARKERS = (
     "not claimed",
     "collision check",
     "read-only dependency",
     "not touched",
+    "not touch",
     "held by",
     "claimed by",
     "ownership checked",
