@@ -104,7 +104,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   (a scheduled-task run), and `send_message` refuses to send from those. The
   ledger is the channel; that is why this is here and not a DM.
 
-### ask-sport-coverage — OPEN — ROUTING WIN LIVE + MEASURED 25->38/52 ZERO REGRESSIONS; K6 FIX IN origin/main BUT UNDEPLOYED (riding along, predicate UNMEASURED); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
+### ask-sport-coverage — RELEASED 2026-08-19 (orphan sweep 2; owner `ask-sport-coverage` = "Ask the Syndicate quick ask improvements" + fork, BOTH archived 2026-08-17) — ROUTING WIN LIVE + MEASURED 25->38/52 ZERO REGRESSIONS; K6 FIX IN origin/main BUT UNDEPLOYED (riding along, predicate UNMEASURED); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `ask-sport-coverage` no longer exists in the roster.
 > **SINGLE NEXT ACTION:** fire `deploy/ask-k6-2026-08-15` (`3d68dfe4`, cut from
@@ -546,7 +546,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 
 
 
-### grading-blocker-settled-zero — OPEN — opened 2026-08-16 — session: alt-line-shortlist-watch
+### grading-blocker-settled-zero — RELEASED 2026-08-19 (orphan sweep 2; owner "Alt line shortlist watch" archived 08-17, AND "Betting settlement data" — the plausible subject-owner this lane was spared for earlier tonight — archived 00:45Z) — opened 2026-08-16 — session: alt-line-shortlist-watch
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED — no live owner.** Session
 > `alt-line-shortlist-watch` no longer exists in the roster.
 > **SINGLE NEXT ACTION:** re-measure `settled`. The reading this lane opened on
@@ -590,7 +590,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
 
-### live-edge-basis — OPEN — opened 2026-08-17 — session: ask-answer-substance
+### live-edge-basis — RELEASED 2026-08-19 (orphan sweep 2; owner `ask-answer-substance` absent from the roster including archived) — opened 2026-08-17 — session: ask-answer-substance
 > **[SWEEP 2026-08-17 12:1x CDT] OWNER IDLE, NOT GONE.** The
 > `ask-answer-substance` fork still exists in the roster but is not running.
 > This is the only open lane whose owner is recoverable by resuming a session.
