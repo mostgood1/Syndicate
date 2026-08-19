@@ -1258,3 +1258,53 @@ front of me, found it sound, and stopped one dependency short.
 **What finally worked:** extracting the deploy TREE and executing the script
 inside it — imports resolved, ran to a clean diagnosis. Not the working copy, not
 the diff: **the artifact that will actually run.**
+
+## 2026-08-19 — RULE: to find where variance is CREATED, decompose the outcome. Correlating its inputs finds what MOVES WITH it, which is a different question.
+
+**Evidence.** NCAAF projected total SD was 1.67x the market's. I proposed three
+mechanisms, each plausible, each swept, each wrong:
+
+1. **The team-strength index clamp** was too narrow, saturating 36 of 138 teams.
+   Widened it — margins got WORSE (15.97 -> 15.27) and totals worse (7.51 ->
+   9.55). Reverted.
+2. **The yardage weight asymmetry** (`offense*3.0 - defense*2.2`) meant a good
+   offense added more than a good defense subtracted. Swept to parity and past
+   it — total SD moved 7.45..7.83, and parity was the WORST row.
+3. **The `scoring_environment` asymmetry** (`offense*0.18 - defense*0.08`, 2.25x)
+   — found by CORRELATING every candidate against the totals, where
+   `RATING net SUM` scored r=0.782 on totals and only -0.141 on margins, a
+   beautifully clean separation. Swept 0.18/0.08 down to 0.06/0.06. **A 3x
+   reduction moved total SD by 0.07 points.**
+
+**The correlation was real and still useless.** `offense_index` correlates 0.628
+with totals because BOTH are downstream of the ratings — it is a fellow traveller,
+not a cause. Every one of those three levers damps an INPUT to a loop whose
+OUTPUT compounds: `drive_success_probability` feeds four-down sequences, so a
+modest prior change barely moves the converted scoring rate.
+
+**What worked, in one run:** decompose the outcome into factors that are
+EXHAUSTIVE by construction.
+
+    total = drives x scoring_rate x points_per_scoring_drive
+
+    game        total   drives   score%   pts/score
+    LOWEST       27.5    24.4    20.8%      5.43
+    HIGHEST      68.6    20.0    53.9%      6.35
+
+Scoring rate swings **2.6x** and carries the spread; drives move slightly and in
+the CORRECT direction (down, because scoring drives burn clock); points-per-score
+is flat. Because the three factors multiply to the whole, the carrier MUST be one
+of them — no mechanism needed to be guessed.
+
+- **The rule:** when a distribution is wrong, write the outcome as a product or
+  sum of factors that reconstruct it exactly, then measure each. That identifies
+  the carrier in one pass. Correlating candidate inputs ranks them by how much
+  they travel with the outcome, which is not the same thing and cost three sweeps.
+- **Three failed sweeps is the signal to stop proposing mechanisms**, not to
+  propose a fourth.
+- **Cheap tell that a lever is the wrong one:** its effect size. A 3x parameter
+  change producing a 1% output change means you are not on the causal path at
+  all, rather than that the parameter needs tuning further.
+- Related: the 60-seed sweeps read ~30% high on total SD versus the 300-seed
+  production run (7.51 vs 5.77). Fine for RANKING settings, wrong for quoting a
+  level — I nearly reported 2.17x as the model's dispersion when it was 1.67x.
