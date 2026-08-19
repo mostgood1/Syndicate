@@ -1277,6 +1277,52 @@ TTL) — then either re-acquire and fire, or resume waiting.** Full narrative:
   Report committed: `reports/nfl_passing_attempts_skew_stability_check.json`.
 - Blocked by: none.
 
+### nfl-yardage-blend-stability — OPEN — opened 2026-08-19 — session: nfl-yardage-blend-stability
+- Goal: `nfl-passing-attempts-skew-extrapolation` checked whether a CLIPPED
+  weight (passing_attempts, capped at 1.0) was hiding a real, stable
+  correction beyond the boundary -- and found the fit-half number (1.14)
+  did not replicate (independent half wanted 0.88). That raises the same
+  question for the other markets: were THEIR shipped weights (never
+  clipped, so the boundary check doesn't apply) actually estimated with
+  reasonable stability, or is the whole blend-weight family this noisy?
+  **Testable outcome:** compute the same closed-form optimal weight
+  independently on both halves (2022-2023 and 2024-2025, never using one
+  to select and the other to score, just comparing two independent
+  estimates) for `receiving_yards` (shipped w=0.216) and `rushing_yards`
+  (shipped w=0.573) -- report whether each pair of independent estimates
+  agrees closely enough to trust the shipped constant, or whether it's as
+  unstable as passing_attempts turned out to be.
+- Files:
+  - New analysis script under `scripts/` (generalizes
+    `scripts/check_passing_attempts_skew_stability.py` to take `--stat`,
+    reusing `calibrate_nfl_cover_probability_blend.py`'s
+    `optimal_blend_weight`/`collect_aligned_prob_pairs`).
+  - `syndicate/features/nfl/props.py` — `_COVER_PROBABILITY_BLEND_WEIGHT`'s
+    `receiving_yards`/`rushing_yards` entries, ONLY if the check finds a
+    real, stable reason to change them.
+  - Read-only reference: `scripts/backtest_nfl_props.py`,
+    `scripts/calibrate_nfl_cover_probability_blend.py`,
+    `scripts/compare_nfl_cover_probability_models.py`,
+    `scripts/check_passing_attempts_skew_stability.py`,
+    `reports/nfl_cover_probability_blend_calibration.json`.
+- Hypothesis: `rushing_yards` (the larger shipped weight, 0.573, and the
+  second-largest realized OOS improvement of any market at +0.0046) is
+  more likely to replicate than `receiving_yards` (shipped w=0.216, but
+  its ORIGINAL one-way OOS improvement was tiny, +0.000065 -- a market
+  whose measured benefit was already close to noise-sized is a natural
+  candidate for an unstable underlying estimate too).
+- Falsification test: for either market, if the independent half's
+  optimal weight lands far from the fit half's (different sign relative
+  to the shipped value's neighborhood, or a magnitude more than roughly
+  2x apart), the shipped constant is not well-estimated and should be
+  treated as unreliable -- reported as such, not defended.
+- Verification: both halves' independently-computed optimal weights
+  stated side by side for each market, with an explicit stable/unstable
+  verdict per market and, if unstable, a decision on whether the shipped
+  weight should move toward the more conservative (closer to 0) estimate
+  or be left as-is with the instability disclosed.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
