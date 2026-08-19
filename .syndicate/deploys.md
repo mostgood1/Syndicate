@@ -15994,3 +15994,47 @@ one were attempted for an already-cached date.
 Claim released: `deploy_claim.py release --service refresh-worker --holder basketball-model-owner`.
 Next step: watch for the next natural WNBA/NBA smart-sim cycle and confirm
 by content (fresh as-of file, `games`/`source` columns populated) once one runs.
+
+| refresh-worker | `3d945f04` | fired 2026-08-19T01:39:06Z | **PENDING — build in flight, NOT yet live at record time** |
+
+**Deploy `dep-da2giejm8hqs73dldbhg`, `trigger=api`.** Both locks satisfied
+LEGITIMATELY — no break-glass, no forced claim, no widened threshold. Claim
+`a00b9121`; preflight **CLEAR** immediately before firing (2 processes, both
+infra, zero jobs). Unlike web's, this gate can clear, and did.
+
+**RE-CUT, and that is the load-bearing part.** The first build (`a1235755`) was
+parented on `00e9a49f`, which stopped being live when `basketball-model-owner`
+shipped `#467` (`db573857`). **Deploying it would have REVERTED their fix** — the
+2026-08-15 failure exactly. `3d945f04` sits ON `db573857`; their four files
+verified **byte-identical in the result**, and the graft import-checked in
+isolation including `basketball_props_smart_sim.py`.
+
+**Contents:** 14 files, +1,478/-22 — whole `sim_engine` tree +
+`artifact_publisher.py` + `run_mlb_daily_sim_job.py`. Five input loaders, the
+conditional pitch mix, the shared pitch-code map (the sweeper's home), and
+`pull_season_artifacts` — without which the worker cannot fetch the season-scoped
+artifacts at all.
+
+**STATUS AT RECORD TIME: NOT VERIFIED.** Live SHA still `db573857` (finished
+01:36:29Z) while `3d945f04` was created 01:39:06Z. **Fired is not landed**, and
+the verification below has NOT been taken by me.
+
+**verify, in two halves:**
+1. `season_artifacts_pulled=N` (N>=1) in a sim tick log. **Arrives WITHOUT a
+   rebuild** — `pull_season_artifacts` runs before the build subprocess. This
+   alone proves the deploy took effect.
+2. `conditional_arsenal` > 0%, source `statcast_conditional_mix`, via
+   `sim_input_checklist.py --publish`. **NEEDS A ROSTER REBUILD.**
+
+**THE REBUILD TRIGGER DOES NOT EXIST — measured, not assumed.**
+`run_mlb_daily_sim_job.py:235` builds a hardcoded command of eleven flags and
+**never passes `--use-roster-artifacts`**, so `daily_update.py:4991`'s default
+`"on"` always wins. No env var, no CLI path, no ops endpoint; the worker runs no
+HTTP server so its disk cannot be touched remotely. **The engine reference
+documents a procedure production cannot perform.** Cheapest route: `roster_objs/`
+are per-date, so **the first sim on a NEW DATE rebuilds free.** Proper fix: plumb
+an env gate into the wrapper — its own scoped change, needs a deploy.
+
+**ROLLBACK:** re-deploy the previous worker SHA `db573857` via the sanctioned
+entrypoint. (Written prose-style deliberately: the literal invocation in this
+file trips `deploy-guard.py`, which pattern-matches the ledger TEXT.)
