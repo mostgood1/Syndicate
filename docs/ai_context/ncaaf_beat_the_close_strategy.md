@@ -98,27 +98,83 @@ here. Worth confirming before banking lever #3.
 
 ## 3. The strategy
 
-### Stage 0 — instrument, now, before the opener *(prerequisite for everything)*
+### Stage 0 — instrument — **BUILT 2026-08-19**
 
 The gate cannot open on evidence that is never collected. Generation deliberately
 continues under suppression for exactly this reason: **a gate that blinds its own
 exit criterion never opens.**
 
-Record for every NCAAF game, every week: model margin, closing line, opening
-line, realised margin. That single table answers every question below and costs
-nothing but a writer. Without it, the 2026 season passes and the gate is still
-closed in January on 2025 evidence.
+| piece | where |
+|---|---|
+| ledger contract, upsert, coverage, evaluator | `syndicate/features/football/pick_ledger.py` |
+| CFBD writer (backfill + weekly) | `scripts/build_ncaaf_pick_ledger.py` |
+| tests | `tests/test_football_pick_ledger.py` (21) |
 
-### Stage 1 — beat the OPENING line before trying to beat the close
+One row per **(game × provider)**, carrying model margin, opening line, closing
+line and realised result. Run it:
 
-The closing line is the hardest target in sports betting; it absorbs every
-injury report and every sharp bet. **The opening line is materially softer.**
-A model that cannot beat the open has no business being pointed at the close,
-and a model that beats the open but not the close is a *timing* problem, not an
-*accuracy* problem — a completely different and much easier fix.
+```bash
+py -3 scripts/build_ncaaf_pick_ledger.py --season 2026 --week 1
+```
 
-This reframes the exit criterion usefully: measure against **both** lines and
-learn which gap is real.
+**It BACKFILLS, so it did not have to accrue over a season.** CFBD serves
+`spreadOpen`/`overUnderOpen` retrospectively (~74% of lines) and final scores
+ride the same payload — which is why Stage 1 was answered the day the ledger was
+written rather than in January.
+
+Design choices that are load-bearing, each from a measured failure:
+
+- **Per-provider, never a consensus.** Collapsing books lost +2.79 ROI points of
+  price-shopping value once already, and averaging is not reversible.
+- **An opening line is never rewritten once observed.** Otherwise a later
+  capture silently turns open-vs-close into close-vs-close.
+- **Missing opens are COUNTED, not backfilled from the close** (`open_missing`),
+  which would answer the open question with the close's own number.
+- **Leaked rating sources are flagged and never pooled with clean ones.** The
+  2025 backfill is 100% leaked (`cfbd_ppa_season_2025`); a win on such rows must
+  not reopen a market.
+- **Idempotent.** Safe on a weekly autorun; re-running does not inflate its own
+  denominator.
+
+**Current state:** 2025 backfilled (2,530 rows / 888 games / 3 books, all graded
+rows leaked); 2024 backfilled **market-only — 2,380 rows, 0 gradable**, because
+no 2024 projections exist. Generating 2024 projections with the *current* SP+
+model is the cheapest route to a genuinely clean out-of-sample number, and is
+the next concrete task.
+
+**Still to wire:** the ledger path is not in `HOT_ARTIFACT_PATTERNS`, so it
+cannot be read or published through the ops API. `artifact_publisher.py` is held
+by `basketball-model-owner`; the pattern
+`*_source/data/pick_ledger/pick_ledger_*.csv` has been handed to them.
+
+### Stage 1 — beat the OPENING line first — **TESTED 2026-08-19, AND IT FAILS**
+
+The theory: the close absorbs every injury report and every sharp bet, while the
+open is materially softer. A model beating the open but not the close would have
+a *timing* problem, not an *accuracy* one — a far easier fix.
+
+**The ledger answered this immediately, because CFBD serves `spreadOpen`
+retrospectively.** Full 2025 season, 2,530 rows over 888 games and 3 books:
+
+| target | n | model MAE | market MAE | paired ΔMAE | t | verdict |
+|---|---|---|---|---|---|---|
+| vs CLOSE | 2235 | 15.294 | 11.876 | **+3.419** | +16.33 | MODEL_WORSE |
+| vs OPEN | 2175 | 15.231 | 11.872 | **+3.358** | +16.08 | MODEL_WORSE |
+
+**The open is only 0.06 MAE softer than the close, and the model loses to both
+by ~3.4.** So this is not a timing problem and there is no easier target hiding
+behind the close. **Stage 1 is closed as a shortcut** — it was worth one query
+and it is now answered.
+
+Losing to all three books individually (Bovada +3.50, DraftKings +3.23, ESPN Bet
++3.51) also rules out "we were graded against one unusually sharp book".
+
+**Caveat that makes this stronger, not weaker:** every graded row above uses
+`cfbd_ppa_season_2025` — a **LEAKED** rating source (season-aggregate PPA rating
+a team by the very games it predicts; the as-of fix moved correlation-with-
+outcome 0.663 → 0.509). These numbers therefore *flatter* the model, and it
+still loses by 3.4. The ledger flags this automatically and refuses to pool
+leaked with clean rows — a WIN on leaked rows must never reopen a market.
 
 ### Stage 2 — fix what is already built but unplumbed *(cheapest real work)*
 
