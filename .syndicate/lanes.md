@@ -1,4 +1,4 @@
-# Syndicate — Work Lanes
+﻿# Syndicate — Work Lanes
 
 > Lanes are exclusive by file path. Two lanes may not claim the same file.
 > Max concurrent OPEN lanes: 3 (see `state.md`).
@@ -888,7 +888,7 @@ been separately measured there.
   (`w=0`).
 - Blocked by: none.
 
-### soccer-odds-capture-cadence-gap — OPEN — **`steps=0` is CONFIRMED GENUINELY EMPTY, not a reporting-schema mismatch (resolved 2026-08-19 ~23:16Z) — see finding below. Both deploys (`2431df26`) landed on live-odds-worker and web earlier. Bug is in the soccer odds-fetch path itself, reproduces on a DIFFERENT service under a manual trigger too — not scheduler/cadence-specific.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
+### soccer-odds-capture-cadence-gap — OPEN — **FIX LANDED on `origin/main` (`3e8264bd`, content-verified) 2026-08-19 ~23:40Z. NOT YET DEPLOYED. `#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request — every call has 422'd since, every league, matching the regression date exactly against the last good capture found anywhere in the shard. Next: deploy to live-odds-worker (+ refresh-worker if it also runs this script) behind claim+preflight, then re-verify book_quotes freshness.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
   refreshes within a bounded window (target: <24h old for a match kicking
   off within the next day) instead of sitting 8-10 days stale.
@@ -896,6 +896,13 @@ been separately measured there.
   <today>.jsonl` for a slate with same-day kickoffs; every distinct
   match's h2h/totals/spreads `captured_at` is <24h old, not just some.
 - Files:
+  - `scripts/fetch_soccer_oddsapi_odds_local.py` — **claimed 2026-08-19,
+    THE ACTUAL FIX: `_game_markets()` no longer merges `_segment_market_map()`
+    into the bulk-endpoint request (root cause, see below). Landed on
+    `origin/main` as `3e8264bd`; not yet deployed to any service.**
+  - `tests/test_fetch_soccer_oddsapi_odds_local.py` — **new file, claimed
+    2026-08-19, regression tests for the fix above (4 tests, passing, landed
+    with the fix).**
   - `syndicate/features/shared/artifact_publisher.py` — **claimed 2026-08-19,
     narrow: ONE new `HOT_ARTIFACT_PATTERNS` line
     (`reports/refresh_status/latest/soccer_pregame_autorun_status.json`)
@@ -1048,18 +1055,78 @@ live — see "still needs verification" below).**
   only for the STEP-LIST-BUILDING logic `_build_soccer_steps`, not for
   the actual fetch call each step makes — that fetch call is now the
   prime suspect and has NOT yet been read/traced).
-- **Next concrete step for whoever continues:** trace the actual soccer
-  fetch call inside `refresh_odds_sources.py` (not just
-  `_build_soccer_steps`, which only lists steps — find where a soccer
-  step's `generation` actually executes and writes rows) for a silent
-  empty-result path: swallowed exception, empty response treated as
-  success, wrong league slug reaching the source, or a request that 200s
-  with zero rows. `odds_refresh_20260819_225403`'s own result artifact
-  (`reports/migration_runs/2026-08-19/odds_refresh_20260819_225403/
-  odds_refresh.json`) would show this directly if reachable — not
-  currently in `HOT_ARTIFACT_PATTERNS` and lives under `reports/
-  migration_runs/`, previously noted as not cross-service visible at all;
-  confirm that before spending time on a read path for it.
+- **ROOT CAUSE CONFIRMED 2026-08-19 ~23:25Z, tested directly against the
+  live OddsAPI (not inferred, not from logs).** Pulled `ODDS_API_KEY` from
+  `live-odds-worker`'s own Render env vars and replicated `fetch_game_odds`
+  exactly (same URL, same params, same live market list pulled from
+  `market_segments.py`) for `mls` and `la_liga` — both returned **HTTP 422**:
+  ```
+  {"error_code": "INVALID_MARKET", "message": "Markets not supported by this
+  endpoint: alternate_spreads, alternate_spreads_h1, alternate_spreads_h2,
+  alternate_totals, alternate_totals_h1, alternate_totals_h2, h2h_3_way,
+  h2h_3_way_h1, h2h_3_way_h2, h2h_h1, h2h_h2, spreads_h1, spreads_h2,
+  totals_h1, totals_h2"}
+  ```
+  Retried with ONLY `h2h,totals,spreads` (`DEFAULT_GAME_MARKETS`): **HTTP
+  200**, real events — **31 for MLS, 14 for La Liga**, live right now, each
+  with 8-11 bookmakers. The odds exist and are fetchable; the code was
+  asking for markets this endpoint rejects.
+  - **Mechanism:** `_game_markets()` in `fetch_soccer_oddsapi_odds_local.py`
+    merges `_segment_market_map()` (h1/h2 + alternate-line keys, from the
+    shared `market_segments.py` vocabulary) into the REQUESTED market list
+    for the BULK `/sports/{sport}/odds` endpoint. `market_segments.py`'s own
+    docstring says that vocabulary is for **per-event** requests ("Each
+    segment market is a distinct OddsAPI market key on a per-event
+    request"). MLB's fetcher has a separate per-event path
+    (`_event_wants_full_game_markets` in `fetch_mlb_oddsapi_local.py`) gated
+    specifically for segment markets and wrapped in its own
+    `except requests.HTTPError` — which is why MLB's capture kept working
+    (confirmed: it grew live during this session's own triggered run,
+    `STREAM_TAIL_OK`/`PUBLISH_OK`, see above). Soccer's fetcher never grew
+    that second path; it just bulk-requested everything in one comma-joined
+    `markets=` param, and one unsupported key 422s the WHOLE request —
+    every league, every time, no partial credit.
+  - **Regression pinned to the exact commit and date:** `77c0ee49` (`#343:
+    wire every sport's interval capture to the one shared vocabulary`),
+    **2026-08-10 21:17:39 -0500**. This lines up EXACTLY with the earlier,
+    independently-measured fact "freshest capture found anywhere in the
+    file: 2026-08-11" — the regression date and the last-good-capture date
+    are the same event, not a coincidence. Soccer game-odds capture has
+    been broken for every league, every cycle, for 9 days straight.
+  - **Same failure class the code already fixed once**, on a bigger scale:
+    the file's own comment already documents removing `btts`/
+    `draw_no_bet`/`double_chance` for this exact reason (HTTP 422,
+    2026-07-21) — `#343` reintroduced the same class of bug with 15 new
+    keys nobody checked against this specific endpoint.
+- **FIX LANDED on `origin/main` 2026-08-19 ~23:40Z as `3e8264bd` (content-
+  verified: `git show origin/main:scripts/fetch_soccer_oddsapi_odds_local.py`
+  carries the fix). Written and committed in this lane's own worktree
+  (`C:\tmp\syndicate-sessions\soccer-odds-capture-cadence-gap`), never the
+  primary tree. NOT YET DEPLOYED — no service is running this commit yet.**
+  `_game_markets()` reverted to return `DEFAULT_GAME_MARKETS` only (still
+  honors the `ODDS_API_SOCCER_GAME_MARKETS` env override outright).
+  `_segment_market_map()` itself is UNCHANGED and correctly kept for
+  TAGGING (`_append_soccer_book_quotes`'s `market_map=` argument) — only
+  the REQUEST list was narrowed, so this does not touch how returned
+  quotes get labeled. 4 new regression tests in
+  `tests/test_fetch_soccer_oddsapi_odds_local.py`, passing; existing
+  `test_all_sports_segment_wiring.py` (14 tests) and
+  `test_soccer_odds_coverage.py` (9 tests) still pass unmodified.
+- **Next concrete step for whoever continues:** land the fix
+  (`session_worktree.py land`), then deploy to whichever service(s) run
+  soccer's pregame odds capture (`live-odds-worker` is the confirmed
+  producer; `refresh-worker` also executes this same script under the
+  manual-trigger path used to diagnose this) behind the standard
+  claim+preflight protocol. Verify post-deploy the same way this was
+  diagnosed: re-pull `soccer_source/tracking/book_quotes/<date>.jsonl` and
+  confirm today's matches carry a fresh `captured_at`, not just that the
+  job completed without error.
+  Deferred, not abandoned — the original `steps=0` reporting-schema
+  question (does `_report_previous_soccer_pregame_run` correctly surface a
+  per-league 422 as `failed=N`, or does it swallow it into `steps=0`?) is
+  now secondary: whether or not that reporting gap also exists, THIS fix
+  removes the actual cause of the empty captures. Worth a look after
+  deploy/verify, not before.
 
 **FALSIFICATION RESOLVED 2026-08-19 21:5xZ — CONFIRMED FROM LOGS, not
 inference.** Did not wait on the `HOT_ARTIFACT_PATTERNS` addition (asked
@@ -1316,51 +1383,6 @@ history directly:
   script's own tests already use.
 - Blocked by: none, pending the `run_refresh_worker.py` coordination note
   above.
-
-### daily-update-backup-truncation — OPEN — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
-- Goal: the `Daily Update` backup step stops reporting SUCCESS while silently
-  dropping 99.9% of what it was asked to back up. Testable: a run that
-  truncates says so, in the job output, with the ratio.
-- Files: `.github/workflows/daily-update.yml`
-- NOT claimed: `syndicate/blueprints/ops.py` (the endpoint is CORRECT — it
-  reports `truncated` faithfully; the caller ignores it). Read-only there.
-- **MEASURED 2026-08-19 23:4xZ against production web, single fetch each:**
-  - `/api/ops/artifacts/export` (exactly what step 12 calls, no params):
-    `ok=True`, **`count=8`**, **`truncated=True`**, `bytes=20,947,993`.
-  - `/api/ops/artifacts/export?names_only=1` (full inventory):
-    **`count=7909`**, `bytes=8,457,851,138`.
-  - So the "cold-start safety net" captures **8 of 7,909 files (0.10%)** and
-    **20.9MB of 8.46GB (0.25%)** — always the same first-8 MLB files, because
-    the scan walks `HOT_ARTIFACT_PATTERNS` in order and stops at the 24MB
-    budget (`_artifact_export_budget_bytes`, `ops.py:1493`).
-  - Step 12 checks **only `$response.ok`**. It never reads `truncated`, prints
-    "Wrote 8 artifact file(s)", and the workflow goes green.
-- Hypothesis for WHY the caller is shaped wrong: the endpoint is built for
-  INCREMENTAL pulls — its own comment says "the watermark keeps those small"
-  and it takes `?since=<epoch>`. The workflow passes no `since`, so it asks
-  for the entire 8.46GB set every single run and necessarily truncates.
-- Falsification test: pass a recent `?since=` and see whether the response
-  comes back `truncated=False` with a plausible daily delta. If it still
-  truncates, the budget — not the missing watermark — is the binding constraint.
-- **FALSIFICATION TEST RAN. MY HYPOTHESIS WAS WRONG — recorded rather than
-  quietly dropped.** `?since=` helps a lot and is still nowhere near enough:
-  last-24h = 438 files / 796,432,566 bytes (**33x** the 24MB budget); last-6h =
-  284 / 387,460,652; last-1h = 253 / 378,455,457 (**15x**). A daily run with a
-  perfect watermark would still truncate at ~3% of its own delta. **The budget
-  is a binding constraint too**, so "add a watermark" is not the fix.
-- What makes it decidable: the top 10 files are **68.1%** of the one-hour delta
-  and are all append-only growers (`book_quotes/*.jsonl`, `odds_history/*.json`,
-  `book_grid/*.json`), while **209 of 253 changed files are <1MB and total
-  30,613,218 bytes**. Excluding the giants puts the whole small-file tail within
-  reach of a modest budget raise.
-- **SHIPPED:** truncation is now reported (`Write-Warning` + `GITHUB_STEP_SUMMARY`
-  with both numbers). Deliberately NOT a `throw` — `#480` had just established
-  what a permanently-red gate costs. Both branches executed, not eyeballed.
-- Verification: a truncated pull is visible in the job log with both numbers.
-  Whether the backup should then be made COMPLETE is a design decision with
-  repo-size consequences (8.46GB cannot go into git) and is the user's call,
-  not this lane's — see `#481`.
-- Blocked by: user decision on backup scope (asked 2026-08-19).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
