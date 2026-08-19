@@ -1179,7 +1179,7 @@ unsaved anywhere.
 
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
-  (§1–§2l, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
+  (§1–§2o, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
   `#463`/`#470`.
 - **Special teams, per-team AND league-calibrated**: PP/PK goal conversion
   (`pk_goal_cal_mult=0.4645`, `pp_goal_cal_mult=1.0` deliberately neutral —
@@ -1231,12 +1231,32 @@ unsaved anywhere.
   still far below what MLB's own much larger sample needed to find its own
   noise floor. Puck-line odds are not exposed by the production route at
   all; `--source both` covers it from local files (n=3).
+- **Faceoff-zone track (§2m/§2n/§2o) fully closed**: `_faceoff_multipliers`
+  was gated `faceoff_ev_only=True` but fed `TeamRates.faceoff_win_pct`, an
+  ALL-SITUATIONS blend — three per-team indices now close that. `faceoff_ev_index`
+  (EV-only, fallback tier). `faceoff_oz_index` (offensive-zone-specific,
+  preferred over EV when present — a refinement of the same consumption
+  point, not a separate mechanism). `faceoff_dz_index` (defensive-zone-
+  specific, an ADDITIONAL multiplicative layer composed with the OZ/EV
+  chain, not a fourth tier — a DZ win both suppresses the opponent's shots
+  and springs the winner's own transition chance, a dual effect a single
+  fallback chain can't represent). `zoneCode` confirmed empirically
+  relative to the WINNER (two draws at identical rink coordinates showed
+  opposite zone labels depending who won, not a fixed rink frame). OZ and
+  DZ confirmed genuinely independent, not mirror images: measured
+  correlation 0.69 across all 32 teams. Every index verified not to shift
+  the league-wide average shot count (992-pairing round-robin each time,
+  all under 0.5%, one under 0.02%). 356 hockeysim/nhl tests pass (up from
+  254 at session start).
 - **Genuinely still open**: player-level usage-weight producer's small-sample
   floor (< 5 games falls back to heuristic, by design); the vendor's
   original block-rate EV:PK:PP-def ratio (0.45:0.55:0.35) was never itself
   validated, only scaled; xG model's rebound/tip-in coefficient sign is an
   open question; `#470`'s market-backtest sample (n=14-15) is nowhere near
-  powered — re-run as the season resumes and dates accumulate.
+  powered — re-run as the season resumes and dates accumulate;
+  neutral-zone faceoff rates were computed but have no consumption point;
+  `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the
+  vendor's uncalibrated defaults.
 
 
 ## [model-skill] MODEL SKILL (`#428`) — measured vs not
@@ -2743,3 +2763,38 @@ likely why several snapshots had never been produced.
 **None of it reaches the sim.** The generator is team-rating only. See
 `docs/ai_context/ncaaf_data_pipeline.md` for the builders, their dependency
 order, and the team_id-vs-name traps.
+
+
+## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, TWO CALIBRATION DEFECTS OPEN `[verified 2026-08-19]`
+
+`syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
+rate) + `props._nfl_prop_model_probability` (Normal-CDF cover probability) —
+the live NFL player-prop model — had never been backtested before this.
+`scripts/backtest_nfl_props.py` (new) measured it over 152,919 real
+(player, week, stat) rows, 2022-2025, complete local nflverse pbp (no
+"Render is truth" caveat — historical/static data). **8 of 9 markets beat a
+constant baseline both in-sample and out-of-sample** (fit 2022-2023, scored
+2024-2025); `interceptions` genuinely shows no skill (corr 0.045). Full
+table: `docs/ai_context/todo.md` `#471`, `.syndicate/deploys.md` 2026-08-19.
+
+**Two open, diagnosed-not-fixed calibration defects**: (1) every count/yardage
+market is overconfident near its own mean (predicts ~50% cover, actual
+~37-44%) — real box-score stats are right-skewed, `Normal(mean, stdev)`
+can't represent that; (2) `anytime_td` at a rolling rate of exactly 0.0
+predicts 0%, real hit rate ~13-14% (small-sample MLE, needs shrinkage).
+
+**Production artifact-allowlist gap, confirmed live**:
+`/api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv`
+returns `count: 0`. Both `HOT_ARTIFACT_PATTERNS` entries for this filename
+require a `data/processed/` segment; NFL's real file
+(`nfl_source/oddsapi_player_props_<season>_wk<week>.csv`) has none, so
+production's true real-odds coverage is currently unverifiable from web and
+the backup/mirror-refresh pathway can never pull it back either.
+`artifact_publisher.py` is held by `basketball-model-owner` — flagged in
+`#471`, not fixed here (same file-handoff convention `football-model-owner`
+already used).
+
+**NFL has no distribution/PMF at all** for player props — confirmed
+independently by `convergence-phase7-crps`'s 165-file/160-date check. This
+backtest measures the ceiling of a mean+stdev approximation, not a real
+simulated ladder like MLB's pitcher props.
