@@ -3822,8 +3822,49 @@ def _bootstrap_local_boxscores_history_for_props(*, source_root: Path, date_str:
         _append_log(log_file, f"local boxscores bootstrap failed: {exc}")
         return False, f"local boxscores bootstrap failed: {exc}"
 
-    if int(result.get("history_rows") or 0) > 0 and str(result.get("wrote") or "").strip():
-        _append_log(log_file, f"bootstrapped local boxscores history via ESPN: {result.get('wrote')}")
+    wrote = str(result.get("wrote") or "").strip()
+    history_rows = int(result.get("history_rows") or 0)
+    new_rows = int(result.get("rows") or 0)
+    days_checked = int(result.get("days_checked") or 0)
+    days_fetch_failed = int(result.get("days_fetch_failed") or 0)
+
+    if history_rows > 0 and wrote and new_rows == 0:
+        # `history_rows` (the OLD success condition) is the file's cumulative
+        # total, which stays >0 forever once any history exists -- checking it
+        # alone cannot distinguish "genuinely refreshed" from "wrote the same
+        # existing_history back unchanged because the ESPN pull for this
+        # lookback window returned zero rows". That gap let a persistently
+        # failing fetch report as unconditional success on every tick: measured
+        # in production, boxscores_history.csv's own max game date stayed
+        # frozen at 2026-06-30 while its mtime kept advancing every bootstrap
+        # (fresh writes of stale content). `days_fetch_failed` distinguishes a
+        # real fetch failure (ESPN scoreboard call itself came back empty) from
+        # a legitimate zero-games lookback window.
+        #
+        # Leniency is preserved on purpose: this still returns True (does not
+        # hard-block props/predictions -- `_ensure_player_logs_for_props_refresh`
+        # treats False here as fatal for the whole predict-props phase), but
+        # now says so LOUDLY via a flush=True print so it reaches Render's log
+        # collector (logger.info does not -- CLAUDE.md), instead of the prior
+        # silent, indistinguishable-from-healthy log line.
+        reason = (
+            f"ESPN bootstrap wrote {wrote} but added 0 new rows across "
+            f"{days_checked} lookback days ({days_fetch_failed} fetch failures) -- "
+            f"boxscore history is NOT actually advancing"
+        )
+        _append_log(log_file, f"local boxscores bootstrap STALLED (tolerated): {reason}")
+        print(
+            f"[refresh_wnba_oddsapi_props] BOXSCORE_BOOTSTRAP_STALLED date={date_str} "
+            f"days_checked={days_checked} days_fetch_failed={days_fetch_failed} history_rows={history_rows}",
+            flush=True,
+        )
+        return True, None
+
+    if history_rows > 0 and wrote:
+        _append_log(
+            log_file,
+            f"bootstrapped local boxscores history via ESPN: {wrote} (+{new_rows} new rows, {history_rows} total)",
+        )
         return True, None
     reason = str(result.get("error") or "local boxscores bootstrap wrote no history rows").strip()
     _append_log(log_file, f"local boxscores bootstrap unavailable: {reason}")
