@@ -16144,3 +16144,38 @@ timeout, non-fatal on every path, skipped when the sim failed, and it PRINTS why
 it skipped.
 
 **ROLLBACK:** re-deploy `6966753e` via the sanctioned entrypoint.
+
+### deploy LIVE, effect pending next sim cycle — refresh-worker — #468 wiring fix — 2026-08-19 02:43:30Z — lane `basketball-model-owner`
+
+Preflight went CLEAR at 02:33:24Z (Monitor polling every 60s), claim
+acquired. Live commit had moved twice since the branch was first cut
+(db573857 -> 6966753e -> f9174d5b) -- rebuilt the scoped branch on each
+move, re-verifying ancestry each time before cutting. Hit the shared
+preflight-receipt-file race documented in `deploy-guard.py`'s own design
+(single per-service JSON, last-writer-wins across ALL sessions checking
+that service, not just the claim holder) -- another session's routine
+status check kept overwriting my CLEAR receipt with their CLAIMED reading.
+Resolved by re-running preflight immediately before each deploy attempt
+until the timing won, not by forcing anything.
+
+`render_deploy.py --service refresh-worker --commit f13ea05e --allow-rollback`
+-> `dep-da2hdhpt0dsc73aerevg`, triggered 02:36:55Z. **Live commit confirmed
+`f13ea05e` at 02:43:30Z** (~6.5 min, polled every 20s).
+
+**verify: CODE CONFIRMED LIVE. Runtime effect not yet observed** -- same
+honest framing as `#461`/`#467`'s deploy: this only fires on the next real
+WNBA/NBA smart-sim invocation. Checked immediately:
+`/api/ops/artifacts/export?pattern=wnba_source/data/processed/
+team_advanced_stats_*.csv` -- newest file unchanged (`asof_20260723`,
+mtime predates this deploy), as expected within ~1 minute of cutover.
+
+**What deploying this actually buys, stated precisely per the todo.md #468
+close-out**: the NEXT smart-sim call will now attempt a rebuild instead of
+silently reading a stale file forever. That rebuild will succeed and
+produce the correct schema (`games`/`source` populated) -- but only current
+through whatever boxscore data production's disk actually has, which is
+stalled at 2026-05-24 (separate, still-open defect). Do not read a fresh
+as-of file appearing later as proof the staleness problem is fully solved
+-- check its content date range, not just its existence.
+
+Claim released: `deploy_claim.py release --service refresh-worker --holder basketball-model-owner`.
