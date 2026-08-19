@@ -970,6 +970,126 @@ def _wnba_live_margin_win_prob(
     return ((1.0 - blend_w) * pregame_p_home_win) + (blend_w * live_win_prob)
 
 
+def _wnba_live_cover_prob(
+    pregame_p_home_cover: float | None,
+    live_margin: float | None,
+    home_spread: float | None,
+    elapsed_min: float | None,
+) -> float | None:
+    """Live P(home covers), blended toward the pregame cover probability.
+
+    `#475`. THE TWO DEFECTS THIS FIXES, both measured:
+
+    1. **The scale never decayed.** The old call was
+       `_margin_win_prob(live_margin + home_spread, scale=7.5)` -- a CONSTANT.
+       A home team up 10 against a -3.5 spread published p_cover=0.7041 with
+       38 minutes left and *the identical* 0.7041 with 1 minute left. Time
+       remaining is the single most important input to a live cover
+       probability and it was not an input at all: badly overconfident early,
+       badly underconfident late.
+    2. **It ignored the pregame anchor entirely.** `betting["p_home_cover"]`
+       -- which since `wnba-edge-263` is the sim's own REAL Monte Carlo cover
+       probability, not a transform -- was used only as a null-fallback. The
+       moneyline path next door already blends toward its pregame anchor
+       (`_wnba_live_margin_win_prob`); spread did not, so a tip-off-adjacent
+       live estimate immediately discarded the best pregame information the
+       engine has.
+
+    Fixed by mirroring the win-prob path exactly: a time-decaying scale
+    (shrinks as the clock runs down, so a fixed margin maps to a more extreme
+    probability late) blended toward the pregame value by elapsed fraction.
+    Same constants as `_wnba_live_margin_win_prob` deliberately -- one live
+    time-decay convention for this sport, not two that can drift apart. Those
+    constants remain un-backtested (ported, as that function's own comment
+    says); this change makes spread WRONG-IN-THE-SAME-WAY as moneyline rather
+    than wrong in its own separate way, which is the prerequisite for
+    calibrating both at once later.
+    """
+    if home_spread is None:
+        return pregame_p_home_cover
+    if live_margin is None or elapsed_min is None:
+        return pregame_p_home_cover
+    min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
+    scale = 6.0 + 0.35 * min_left
+    live_cover_prob = _margin_win_prob(live_margin + home_spread, scale=scale)
+    if live_cover_prob is None:
+        return pregame_p_home_cover
+    if pregame_p_home_cover is None:
+        return live_cover_prob
+    blend_w = max(0.0, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
+    return ((1.0 - blend_w) * pregame_p_home_cover) + (blend_w * live_cover_prob)
+
+
+def _wnba_live_total_projection(
+    pregame_total_projection: float | None,
+    current_total: float | None,
+    elapsed_min: float | None,
+) -> float | None:
+    """Live projected final total: points already scored PLUS a pace-based
+    estimate of the points still to come, anchored on the pregame projection.
+
+    `#475`. THE DEFECT: the old `pace_total = current_total / elapsed_fraction`
+    is a naive linear extrapolation off a 5% floor, so early-game noise is
+    multiplied by up to 20x. Measured: 12 points scored 2 minutes in projects
+    to a 240-point final -- a 75-point error against a 165 line, published as
+    a real number the over/under probability was then derived from.
+
+    The fix is the standard shape for this: never extrapolate the whole game
+    from a sliver of it. Points ALREADY SCORED are known exactly; only the
+    REMAINING minutes need estimating, and that estimate blends the live
+    observed rate toward the pregame projected rate by how much of the game
+    has actually been played. At tip-off it is the pregame projection; at the
+    final buzzer it is the actual total; in between it moves smoothly and
+    cannot explode.
+    """
+    if current_total is None or elapsed_min is None:
+        return pregame_total_projection
+    elapsed = max(0.0, min(float(_WNBA_REGULATION_MINUTES), float(elapsed_min)))
+    minutes_left = max(0.0, float(_WNBA_REGULATION_MINUTES) - elapsed)
+    if minutes_left <= 0.0:
+        return current_total
+    if elapsed <= 0.0:
+        return pregame_total_projection
+    live_rate = current_total / elapsed
+    if pregame_total_projection is not None and pregame_total_projection > 0:
+        pregame_rate = float(pregame_total_projection) / float(_WNBA_REGULATION_MINUTES)
+        # Weight the live rate by elapsed fraction: barely trusted at tip-off,
+        # fully trusted by the end. Same blend convention as the win/cover
+        # probabilities above.
+        blend_w = max(0.0, min(1.0, elapsed / float(_WNBA_REGULATION_MINUTES)))
+        rate = ((1.0 - blend_w) * pregame_rate) + (blend_w * live_rate)
+    else:
+        rate = live_rate
+    return float(current_total) + (rate * minutes_left)
+
+
+def _wnba_live_total_over_prob(
+    pregame_p_total_over: float | None,
+    projected_total: float | None,
+    total_line: float | None,
+    elapsed_min: float | None,
+) -> float | None:
+    """Live P(total goes over), from the anchored projection above.
+
+    `#475`. Same two fixes as `_wnba_live_cover_prob`: the old call used a
+    CONSTANT `scale=10.5` (so remaining time did not affect the probability at
+    all) and ignored the pregame `p_total_over` anchor except as a null
+    fallback. Scale is wider than the spread's because a total's uncertainty
+    spans BOTH teams' remaining scoring, not a margin between them.
+    """
+    if total_line is None or projected_total is None or elapsed_min is None:
+        return pregame_p_total_over
+    min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
+    scale = 8.0 + 0.50 * min_left
+    live_over_prob = _margin_win_prob(projected_total - total_line, scale=scale)
+    if live_over_prob is None:
+        return pregame_p_total_over
+    if pregame_p_total_over is None:
+        return live_over_prob
+    blend_w = max(0.0, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
+    return ((1.0 - blend_w) * pregame_p_total_over) + (blend_w * live_over_prob)
+
+
 def _wnba_metric_text(value: Any) -> str | None:
     # Mirrors home.py's _prop_metric_text/_score_value formatting convention
     # (whole numbers unadorned, one decimal otherwise) without importing
@@ -988,7 +1108,8 @@ def _wnba_game_lens_markets(
     *,
     live_home_win_prob: float | None,
     live_margin: float | None,
-    pace_total: float | None,
+    projected_total: float | None,
+    elapsed_min: float | None,
 ) -> dict[str, dict[str, Any]]:
     # Phase B (Layer 2 task): home.py's gameLens consumer
     # (_game_bet_candidates_from_game, lines ~2384-2453) is already sport-
@@ -1016,7 +1137,14 @@ def _wnba_game_lens_markets(
 
     home_spread = betting.get("home_spread")
     if home_spread is not None and live_margin is not None:
-        live_home_cover_prob = _margin_win_prob(live_margin + home_spread, scale=7.5)
+        # `#475`: time-decaying scale + blend toward the sim's own pregame
+        # cover probability, instead of a constant scale that ignored both.
+        live_home_cover_prob = _wnba_live_cover_prob(
+            _safe_float(betting.get("p_home_cover")),
+            live_margin,
+            _safe_float(home_spread),
+            elapsed_min,
+        )
         markets["spread"] = {
             "pick": f"Home {_wnba_metric_text(home_spread) or ''}".strip(),
             "selection": "home",
@@ -1027,7 +1155,15 @@ def _wnba_game_lens_markets(
 
     total_line = betting.get("total")
     if total_line is not None:
-        live_total_over_prob = _margin_win_prob(pace_total - total_line, scale=10.5) if pace_total is not None else None
+        # `#475`: `pace_total` (naive current/elapsed_fraction extrapolation,
+        # up to 20x off a 5% floor) is replaced by an anchored projection --
+        # points already scored plus a blended-rate estimate of the rest.
+        live_total_over_prob = _wnba_live_total_over_prob(
+            _safe_float(betting.get("p_total_over")),
+            projected_total,
+            _safe_float(total_line),
+            elapsed_min,
+        )
         markets["total"] = {
             "pick": f"Over {_wnba_metric_text(total_line) or ''}".strip(),
             "line": total_line,
@@ -1077,10 +1213,19 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
         model_home_win_prob = pregame_p_home_win
     source = "live_projection" if (is_live and live_margin is not None and elapsed_min is not None) else "pregame"
     current_total = (home_pts + away_pts) if home_pts is not None and away_pts is not None else None
-    pace_total: float | None = None
+    # `#475`: anchored on the pregame projected total rather than linearly
+    # extrapolating the whole game from however little has been played.
+    # `pred_total` is the sim's own pregame projection, the same field
+    # game_cards carries; falls back to the market total line when absent so
+    # the anchor is never simply missing.
+    pregame_total_projection = _safe_float(betting.get("pred_total"))
+    if pregame_total_projection is None:
+        pregame_total_projection = _safe_float(betting.get("total"))
+    projected_total: float | None = None
     if source == "live_projection" and current_total is not None and elapsed_min:
-        elapsed_fraction = max(0.05, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
-        pace_total = current_total / elapsed_fraction
+        projected_total = _wnba_live_total_projection(
+            pregame_total_projection, current_total, elapsed_min
+        )
     # Only populate markets for a genuinely live row -- a pregame-only game
     # already gets plain betting-dict-sourced Moneyline/Spread/Total
     # candidates straight from home.py; gameLens markets exist to carry an
@@ -1091,7 +1236,8 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
             betting,
             live_home_win_prob=model_home_win_prob,
             live_margin=live_margin,
-            pace_total=pace_total,
+            projected_total=projected_total,
+            elapsed_min=elapsed_min,
         )
         if source == "live_projection"
         else {}
@@ -1106,7 +1252,11 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "homeMargin": live_margin,
                 "homeScore": home_pts,
                 "awayScore": away_pts,
-                "total": pace_total,
+                # `#475`: the anchored projection, not the old naive
+                # current/elapsed_fraction extrapolation. This field is
+                # PUBLISHED, so the old value was a user-visible number that
+                # could read 240 on a 165-total game two minutes in.
+                "total": projected_total,
             },
             "modelHomeWinProb": model_home_win_prob,
             "baselineHomeWinProb": pregame_p_home_win,
