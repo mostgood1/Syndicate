@@ -30,6 +30,16 @@ FOUR DECISIONS, each one a place this could have produced a plausible wrong numb
    _source_betting so there is exactly one margin->probability transform site").
    A second copy here would drift silently.
 
+   `#263`, 2026-08-19, UPDATED: `_margin_win_prob` is no longer the ONLY h2h
+   source. `basketball-model-owner`'s producer commit (`6933d263`, their
+   smart-sim domain -- not this lane's call to make unilaterally) threads the
+   sim's own real per-game Monte Carlo `p_home_win` through `game_cards`, and
+   it is now PRIMARY whenever a completed sim reached that game --
+   `_margin_win_prob` becomes the FALLBACK for games without one, never a
+   second copy that could drift. The `edge_vs_market_pct` withholding two
+   decisions below is UNCHANGED by this -- source quality and validation
+   status are different questions.
+
 3. Spreads and totals get `projected` ONLY, with probability left null -- UNLESS
    the row's own line is the sim's own market line (`#263`, below). This is the
    module rule from `wnba_projections`: the sim ships MEANS with no distribution
@@ -165,10 +175,19 @@ def load_wnba_game_projections(selected_date: str) -> WnbaGameProjectionIndex:
             # `""`, and `_as_float("")` is `None`, so an older row degrades to
             # exactly decision 3's original behaviour (probability null) with
             # no special-casing needed here.
+            "p_home_win": _as_float(row.get("p_home_win")),
             "p_home_cover": _as_float(row.get("p_home_cover")),
             "p_total_over": _as_float(row.get("p_total_over")),
-            "sim_market_home_spread": _as_float(row.get("sim_market_home_spread")),
-            "sim_market_total": _as_float(row.get("sim_market_total")),
+            # `basketball-model-owner`'s producer commit (`6933d263`) named
+            # these columns `market_home_spread`/`market_total`, WITHOUT a
+            # `sim_` prefix -- confirmed by reading the landed diff, not
+            # assumed from the pre-commit plan this module's docstring/tests
+            # were written against. The internal dict key here keeps the
+            # `sim_market_*` name (distinguishes it from `home_spread`/
+            # `total`, the book-quoted columns already on the same row) --
+            # only the CSV column being READ changes.
+            "sim_market_home_spread": _as_float(row.get("market_home_spread")),
+            "sim_market_total": _as_float(row.get("market_total")),
         }
         h, a = _norm_team(home), _norm_team(away)
         if h and a:
@@ -287,14 +306,23 @@ def attach_wnba_game_projections(
 
         projection: dict[str, Any] | None = None
         if market == "h2h":
-            prob_home = _home_win_prob(entry.get("pred_margin"))
+            # `#263`, 2026-08-19. `basketball-model-owner`'s call (their
+            # smart-sim domain, not this lane's to make unilaterally --
+            # `6933d263`): the sim's own `p_home_win` is a per-game empirical
+            # Monte Carlo estimate, not an approximation of one, so it is the
+            # PRIMARY source whenever a completed sim reached this game.
+            # `_margin_win_prob` becomes the FALLBACK for rows without one --
+            # not deleted, not a second copy to drift from, exactly the same
+            # degrade-gracefully shape `pred_margin`/`pred_total` already use.
+            sim_prob_home = entry.get("p_home_win")
+            prob_home = sim_prob_home if sim_prob_home is not None else _home_win_prob(entry.get("pred_margin"))
             if prob_home is not None:
                 home_name = str(row.get("home_team") or "").strip()
                 projection = {
                     "model_prob_over": round(prob_home, 4),
                     "side": home_name,
                     "projected": entry.get("pred_margin"),
-                    "basis": "margin_win_prob",
+                    "basis": "sim_win_probability" if sim_prob_home is not None else "margin_win_prob",
                     "source": "wnba_game_cards",
                     # THE ONLY BRANCH HERE THAT SET NEITHER AN EDGE NOR A REASON.
                     # `spreads` and `totals` below both state
@@ -322,11 +350,20 @@ def attach_wnba_game_projections(
                     # of 0.6502 = +31.7 pp, on a projection whose own
                     # `model_skill` reads `sample_games: 0, "model never
                     # backtested"`. Publishing a 31-point moneyline edge off an
-                    # unvalidated margin model is the clamp failure mode --
-                    # a confident number from an input nobody has checked.
-                    # Turning this on is a modelling decision, not a plumbing
-                    # one, and it belongs with whoever validates the margin
-                    # model.
+                    # unvalidated model is the clamp failure mode -- a
+                    # confident number from an input nobody has checked.
+                    #
+                    # `#263`, 2026-08-19: `p_home_win` becoming the primary
+                    # probability SOURCE (above) does not answer this. Source
+                    # quality and validation status are different axes -- a
+                    # real per-game Monte Carlo estimate from an unvalidated
+                    # sim is still an unvalidated number, and could in
+                    # principle be MORE confidently wrong than a crude
+                    # transform if the sim itself carries a systematic bias.
+                    # `basketball-model-owner`'s decision was scoped to "which
+                    # probability to use", not "is it safe to price an edge
+                    # off it" -- turning this on is still a separate call for
+                    # whoever backtests the sim, not implied by the first one.
                     "edge_unavailable_reason": (
                         "this projection's producer does not compute a "
                         "probability-space edge, so none was priced"

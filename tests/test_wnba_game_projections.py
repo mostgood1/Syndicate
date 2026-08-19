@@ -20,6 +20,7 @@ from __future__ import annotations
 from syndicate.features.shared.wnba_game_projections import (
     WnbaGameProjectionIndex,
     attach_wnba_game_projections,
+    load_wnba_game_projections,
 )
 
 HOME, AWAY = "Las Vegas Aces", "Washington Mystics"
@@ -29,6 +30,7 @@ def _index(
     margin: float | None = 7.5,
     total: float | None = 163.5,
     *,
+    p_home_win: float | None = None,
     p_home_cover: float | None = None,
     p_total_over: float | None = None,
     sim_market_home_spread: float | None = None,
@@ -38,6 +40,7 @@ def _index(
     index.by_teams[(HOME.lower(), AWAY.lower())] = {
         "pred_margin": margin,
         "pred_total": total,
+        "p_home_win": p_home_win,
         "p_home_cover": p_home_cover,
         "p_total_over": p_total_over,
         "sim_market_home_spread": sim_market_home_spread,
@@ -303,10 +306,13 @@ def test_live_market_suppresses_the_edge_even_at_market_line():
     assert "pregame projection" in projection["edge_unavailable_reason"]
 
 
-def test_h2h_is_untouched_by_the_spreads_totals_subfix():
-    # Regression guard while h2h's OWN question (sim p_home_win vs
-    # _margin_win_prob) sits open with basketball-model-owner: an index entry
-    # now carrying the new #263 fields must not change h2h's behaviour at all.
+def test_h2h_falls_back_to_the_margin_transform_when_no_sim_probability_exists():
+    # `basketball-model-owner`'s question (sim p_home_win vs _margin_win_prob)
+    # is now ANSWERED (`6933d263`): p_home_win is primary when present. This
+    # is the fallback half -- a game with the OTHER #263 fields populated
+    # (p_home_cover, sim_market_home_spread -- both spreads/totals concerns,
+    # irrelevant to h2h) but no p_home_win at all must still degrade to the
+    # margin transform exactly as before, not silently produce no projection.
     row = _row("h2h")
     index = _index(margin=7.5, p_home_cover=0.9, sim_market_home_spread=2.0)
     attach_wnba_game_projections([row], index)
@@ -315,3 +321,112 @@ def test_h2h_is_untouched_by_the_spreads_totals_subfix():
     assert projection["basis"] == "margin_win_prob"
     assert projection.get("edge_vs_market_pct") is None
     assert "producer does not compute" in projection["edge_unavailable_reason"]
+
+
+def test_h2h_prefers_the_sims_real_win_probability_when_present():
+    # The answered half. `p_home_win` is a per-game empirical Monte Carlo
+    # estimate -- when a completed sim reached this game, it is PRIMARY over
+    # the fixed-scale margin transform, per `basketball-model-owner`'s call.
+    row = _row("h2h")
+    index = _index(margin=7.5, p_home_win=0.82)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.82, "must read the sim's own probability, not re-derive it from the mean"
+    assert projection["basis"] == "sim_win_probability"
+    assert projection["side"] == HOME
+    # The edge-withholding policy is UNCHANGED by the source improving --
+    # source quality and validation status are different questions (see the
+    # module's own comment on this).
+    assert projection.get("edge_vs_market_pct") is None
+    assert "producer does not compute" in projection["edge_unavailable_reason"]
+
+
+def test_h2h_sim_probability_of_zero_is_not_mistaken_for_absent():
+    # `entry.get("p_home_win")` returning `0.0` is a REAL, legitimate
+    # probability (a completely one-sided sim result), not "missing" --
+    # `is not None`, not truthiness, is what the join must test on. A naive
+    # `if sim_prob_home:` would silently fall back to the margin transform
+    # here and this test would catch it.
+    row = _row("h2h")
+    index = _index(margin=-25.0, p_home_win=0.0)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] == 0.0
+    assert projection["basis"] == "sim_win_probability"
+
+
+# --- load_wnba_game_projections: reads the REAL game_cards column names ----
+#
+# The exact gap that shipped a real bug: this module's `entry` dict key is
+# `sim_market_home_spread`, but every existing test above builds a
+# WnbaGameProjectionIndex BY HAND and never exercises the loader's actual
+# `row.get(...)` calls -- so a mismatch between that internal key and the
+# real CSV column name (`basketball-model-owner` shipped `market_home_spread`,
+# no `sim_` prefix) would pass every test above while being silently dead in
+# production. This is the loader's parse path, not the join's.
+
+
+def _patch_game_cards_rows(monkeypatch, rows):
+    monkeypatch.setattr(
+        "syndicate.features.wnba.cards._load_game_cards_csv_rows_from_keyvalue",
+        lambda selected_date: rows,
+    )
+
+
+def test_loader_reads_the_real_column_names_not_the_internal_key_names(monkeypatch):
+    # Shaped exactly like the real game_cards_<date>.csv header
+    # (_GAME_CARDS_HEADER_ORDER in refresh_wnba_oddsapi_props.py, confirmed
+    # against the landed producer commit `6933d263`): market_home_spread /
+    # market_total, NOT sim_market_home_spread / sim_market_total.
+    row = {
+        "home_team": HOME,
+        "visitor_team": AWAY,
+        "home_tri": "LVA",
+        "away_tri": "WAS",
+        "pred_margin": "7.5",
+        "pred_total": "163.5",
+        "p_home_win": "0.82",
+        "p_home_cover": "0.59",
+        "p_total_over": "0.6",
+        "market_home_spread": "-10.5",
+        "market_total": "169.5",
+    }
+    _patch_game_cards_rows(monkeypatch, [row])
+    index = load_wnba_game_projections("2026-08-19")
+
+    assert index.games == 1
+    entry = index.lookup(HOME, AWAY)
+    assert entry is not None
+    assert entry["p_home_win"] == 0.82
+    assert entry["p_home_cover"] == 0.59
+    assert entry["p_total_over"] == 0.6
+    # The internal key stays `sim_market_*` -- only the SOURCE column changed.
+    assert entry["sim_market_home_spread"] == -10.5
+    assert entry["sim_market_total"] == 169.5
+
+
+def test_loader_degrades_gracefully_on_a_row_written_before_263(monkeypatch):
+    # An older game_cards row predating this column set. DictReader + .get()
+    # on a real CSV returns "" for a missing column, not KeyError -- and
+    # _as_float("") is None, which is decision 3's original, correct blank.
+    row = {
+        "home_team": HOME,
+        "visitor_team": AWAY,
+        "pred_margin": "7.5",
+        "pred_total": "163.5",
+    }
+    _patch_game_cards_rows(monkeypatch, [row])
+    index = load_wnba_game_projections("2026-08-19")
+
+    entry = index.lookup(HOME, AWAY)
+    assert entry is not None
+    assert entry["p_home_win"] is None
+    assert entry["sim_market_home_spread"] is None
+
+    # And the full join still degrades correctly through to the margin
+    # transform -- the end-to-end path, not just the loader in isolation.
+    row_h2h = _row("h2h")
+    attach_wnba_game_projections([row_h2h], index)
+    assert row_h2h["projection"]["basis"] == "margin_win_prob"
