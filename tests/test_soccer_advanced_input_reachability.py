@@ -269,3 +269,98 @@ def test_espn_match_stats_join_reaches_possession_and_set_piece():
     assert match.possession_metrics.get("away_possession_share") == 0.40
     assert match.set_piece_metrics.get("home_set_piece_goal_share") == 0.4
     assert match.set_piece_metrics.get("away_set_piece_goal_share") == 0.1
+
+
+def test_walk_forward_availability_never_leaks_the_future():
+    """`_merge_walk_forward_availability`'s whole reason to exist: a team's
+    core XI for a given match must come from PRIOR matches only. Six
+    matches, same 11-man XI throughout except the 6th where 4 regulars are
+    rested -- the walk-forward share for that 6th match must reflect the
+    absence, and the FIRST match (no prior history at all) must get no value
+    rather than one built from matches that haven't happened yet.
+    """
+    from syndicate.features.soccer.ingestion.espn_match_stats import _merge_walk_forward_availability
+
+    core = [str(i) for i in range(11)]
+    bench = [str(i) for i in range(11, 15)]
+    rows = []
+    for day in range(1, 6):
+        rows.append({"date": f"2026-01-{day:02d}T00:00Z", "home_team": "Ajax", "away_team": "Foil",
+                     "home_starter_ids": list(core), "away_starter_ids": list(core)})
+    # 6th match: Ajax rests its first 4 regulars for 4 bench players.
+    rotated = core[4:] + bench
+    rows.append({"date": "2026-01-06T00:00Z", "home_team": "Ajax", "away_team": "Foil",
+                 "home_starter_ids": rotated, "away_starter_ids": list(core)})
+
+    _merge_walk_forward_availability(rows, window=10, min_prior_matches=5)
+
+    assert "home_starters_available_share" not in rows[0], (
+        "match 1 has zero prior matches -- must get no value, not one built from the future"
+    )
+    assert rows[5]["home_starters_available_share"] == pytest.approx(7 / 11), (
+        "Ajax's core XI (from 5 identical prior matches) is `core`; this match started 7 of them"
+    )
+    assert rows[5]["away_starters_available_share"] == pytest.approx(1.0), (
+        "Foil started its full historical core -- full availability"
+    )
+
+
+def test_availability_is_per_fixture_not_ratings_derived():
+    """UNLIKE possession/set-piece, `starters_available_share` must NOT flow
+    through `ratings` (a rolling per-team average) -- it is this fixture's
+    own value, passed as a direct param, the same pattern already used for
+    `home_starter_ids`/`away_starter_ids`. Absent for a fixture with no known
+    value rather than a fabricated 0.5 (`_availability_index`'s own neutral
+    default), mirroring the ppda None-not-zero contract."""
+    match_without = build_soccer_match_features(
+        league="eredivisie", date="2026-08-19", home_team="Ajax", away_team="PSV",
+        ratings={"ajax": {"attack_rating": 0.1}, "psv": {"attack_rating": 0.05}},
+    )
+    assert match_without.availability_metrics == {}
+
+    match_with = build_soccer_match_features(
+        league="eredivisie", date="2026-08-19", home_team="Ajax", away_team="PSV",
+        ratings={"ajax": {"attack_rating": 0.1}, "psv": {"attack_rating": 0.05}},
+        home_starters_available_share=0.727, away_starters_available_share=1.0,
+    )
+    assert match_with.availability_metrics.get("home_starters_available_share") == 0.727
+    assert match_with.availability_metrics.get("away_starters_available_share") == 1.0
+    # Feeding a value that happens to also exist as a ratings key must not
+    # leak into team_metrics/etc -- the two containers stay independent.
+    assert "starters_available_share" not in match_with.team_metrics
+
+
+def test_availability_reaches_the_engine_and_differs_by_side():
+    """Off vs on through the full engine, mirroring `test_off_differs_from_on`
+    -- and per-side, mirroring `test_each_side_is_scored_with_its_own_numbers`:
+    a lopsided availability (home full-strength, away missing most regulars)
+    must not collapse to the same priors for both sides."""
+    from syndicate.features.soccer.sim_engine.soccersim.contracts import (
+        PossessionState, SoccerSimSimulationInput,
+    )
+    from syndicate.features.soccer.sim_engine.soccersim.league_profiles import get_league_profile
+    from syndicate.features.soccer.sim_engine.soccersim.possession_priors import build_possession_priors
+
+    profile = get_league_profile("eredivisie")
+    state = PossessionState(possession_owner="home", pitch_position=50, phase="open_play", half=1, clock_remaining=2700)
+
+    def priors(payload):
+        si = SoccerSimSimulationInput(home_team="Ajax", away_team="PSV", seed=7,
+                                       home_attack_rating=0.1, home_defense_rating=-0.05,
+                                       away_attack_rating=0.05, away_defense_rating=0.0,
+                                       feature_generation_payload=payload)
+        return build_possession_priors(si, possession_state=state, profile=profile)
+
+    # "availability" -- `_extract_block`'s accepted name for this container
+    # (`possession_priors.py:311`), NOT "availability_metrics" (the
+    # SoccerMatchFeatures FIELD name -- adapters.py::_engine_input is the
+    # layer that renames one to the other, and this test bypasses it to
+    # target the engine directly, so it must match the engine's own name).
+    off = priors({"availability": {}})
+    on_full = priors({"availability": {"home_starters_available_share": 1.0}})
+    on_thin = priors({"availability": {"home_starters_available_share": 0.3}})
+
+    assert off.availability_index != on_full.availability_index, "feeding availability changed nothing -- the input is inert"
+    assert on_full.availability_index > on_thin.availability_index, (
+        "a full-strength home side must not score a LOWER availability index than a thin one"
+    )

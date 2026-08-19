@@ -1,0 +1,27 @@
+{
+  "receptions": {
+    "stat": "receptions",
+    "shipped_weight": 0.137,
+    "half_a": {
+      "seasons": [
+        2022,
+        2023
+      ],
+      "n": 35055,
+      "w_optimal": 0.1367
+    },
+    "half_b": {
+      "seasons": [
+        2024,
+        2025
+      ],
+      "n": 34523,
+      "w_optimal": 0.0771
+    },
+    "same_sign": true,
+    "ratio": 1.7735,
+    "stable": true,
+    "recommendation": "no change -- shipped weight is well-supported",
+    "verdict": "stable"
+  }
+}

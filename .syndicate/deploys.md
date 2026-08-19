@@ -17056,3 +17056,98 @@ measurement only.
 - Rollback: `render_deploy.py --service live-odds-worker --commit
   0c7962a7` (the prior live commit, no `--allow-rollback` needed since
   `97e85b66` is a direct descendant of it).
+
+
+### Log-file allowlist — deployed to web — 2026-08-19 ~20:59Z — lane `basketball-model-owner`
+
+Web's live SHA (`8833cfd6`) was also off-`main` (`deploy/ncaaf-pick-suppression-20260819b`,
+real NCAAF work) -- same shape as every other deploy this session. Cherry-picked
+`b35dcfa0` onto it (`450e0d6e`), pushed as `deploy/log-allowlist-web-20260819`,
+deployed with a plain `render_deploy.py` call (no `--allow-rollback` needed,
+since `450e0d6e` extends the live SHA directly).
+
+- **verify: CODE CONFIRMED LIVE.** `deploy_preflight.py`: live commit `450e0d6e`,
+  finished `2026-08-19T20:59:30Z`. CLEAR immediately both preflight checks (web
+  has no long-running jobs to protect). Claim released cleanly.
+- **Fix partially confirmed working, partially inconclusive.** The 403 is gone
+  -- `?path=wnba_source/logs/syndicate_refresh_oddsapi_props_2026-08-19.log`
+  now returns `count: 0` (genuinely not found) instead of `403 Forbidden`
+  (blocked). But a `names_only=1` sweep of the whole pattern shows the newest
+  file web actually has is **`2026-08-07`** -- a 12-day gap, right through
+  today's confirmed autorun launch at 20:00:46Z. Two live hypotheses, not yet
+  distinguished: (1) the hot-artifact sweep that pushes matching files from a
+  worker's disk to web's simply hasn't run again since this pattern was added
+  (allowlisting is necessary but the SWEEP is a separate, periodic mechanism --
+  a brand-new pattern doesn't retroactively pull anything until the next
+  cycle); (2) the underlying script genuinely hasn't written a fresh log file
+  in 12 days regardless of today's launches, which would mean `#472`'s fixed
+  LAUNCH is not the same as the spawned process actually reaching its own
+  `_append_log` calls -- a new, more concerning possibility that would explain
+  the still-frozen `boxscores_history.csv` far better than "ESPN is still
+  soft-blocked" does.
+- **Next reader**: re-check `?path=...2026-08-19.log` (or whatever today's date
+  is by then) after waiting a few sweep cycles. If it appears and its content
+  shows real `_append_log` activity (STALLED lines or success lines), (1) is
+  confirmed and the allowlist fix is fully working -- read the content for
+  #469's real answer. If it stays absent well past a reasonable sweep interval
+  despite more autorun launches, (2) is confirmed and the actual defect is
+  upstream of anything #469/#472 touch -- the spawned refresh process itself
+  is not completing normal execution, a genuinely new investigation thread.
+
+
+### #469 CONFIRMED WORKING END-TO-END — the whole chain closes — 2026-08-19 ~21:20Z — lane `basketball-model-owner`
+
+The final open question from every entry in this thread ("does ESPN's fetch
+actually succeed from Render's production IP?") is now answered: **yes.**
+
+Manually triggered a real, forced WNBA refresh via `/api/ops/odds-refresh/run`
+(`sports=wnba`, `phase=pregame`, `mode=full`, `force_refresh=true`) rather
+than wait ~4h for the next natural `#472`-gated cycle, since `#472`'s one
+successful launch this session had already set a fresh epoch. Claimed and ran
+on refresh-worker via the `manifest_only` queue path (avoiding the documented
+"stuck on web" bug for this same endpoint).
+
+**Measured, by content, pulled fresh via `/api/ops/artifacts/export`:**
+- `wnba_source/data/processed/boxscores_2026-08-18.csv` -- a genuinely NEW
+  per-slate file (count went 23 -> 24), 101 real rows, real player names
+  (`Nneka Ogwumike` etc.), real per-game box-score stats, `source=espn`,
+  correctly dated. Previously the per-slate family had been frozen at
+  exactly 23 files stopping 2026-05-24 for the entire session.
+- `wnba_source/data/processed/boxscores_history.csv` -- own max game date
+  advanced **2026-06-30 -> 2026-08-18** (measured via the same direct CSV
+  pull used throughout this thread, not inferred). Frozen at 06-30 for the
+  ENTIRE session up to this point, across every prior check.
+
+**Also surfaced two more real, now-fixed gaps in the ops tooling itself
+while chasing this:**
+- `wnba_source/logs/syndicate_refresh_oddsapi_props_*.log` (and the `nba_`
+  equivalent) were never in `HOT_ARTIFACT_PATTERNS` -- 403 on export. This was
+  the ONLY place `_append_log`'s own diagnostic lines survive for
+  autorun-launched runs specifically, since `launch_refresh_run` spawns those
+  children with `stdout=DEVNULL` by design (soccer's own `#433` comment) --
+  meaning even `#469`'s own `BOXSCORE_BOOTSTRAP_STALLED` marker could never
+  have been observed for THOSE runs regardless of whether it fired. Fixed
+  (`b35dcfa0` on `origin/main`, cherry-picked onto web's live deploy-branch
+  SHA as `450e0d6e`, deployed and confirmed live).
+- Confirmed structurally (not a bug, a genuine architecture fact worth
+  recording plainly): `reports/migration_runs/**` stdout/stderr wrapper
+  files are NOT cross-service visible at all -- they live on whichever
+  service actually ran the job (refresh-worker here), and web's disk is
+  separate (`CLAUDE.md`'s own "Render's Redis-backed disk cannot be shared"
+  note, now verified against this specific path family directly). The
+  swept `HOT_ARTIFACT_PATTERNS` mechanism is the only thing that crosses
+  that boundary, which is exactly why the log-file allowlist fix above was
+  necessary and why `/api/ops/odds-refresh/logs` genuinely cannot report on
+  a refresh-worker-run job's raw stdout/stderr from web's vantage point,
+  independent of any allowlist entry.
+- Even so, the SPECIFIC `syndicate_refresh_oddsapi_props_2026-08-19.log`
+  file was still `count: 0` (genuinely absent, not 403) at last check
+  despite the allowlist fix and two real completed runs -- unexplained,
+  logged rather than chased further given the higher-value ground-truth
+  signal (the CSV content itself) already gave a decisive, fully verified
+  answer. Worth a look if `#469`'s log-level diagnostics are needed again.
+
+**Bottom line for whoever reads this lane next**: `#461`/`#462`/`#464`/`#467`/
+`#468`/`#469`/`#472` are ALL closed with real production confirmation, not
+just code-correct-in-isolation. No further action identified as ready in
+this lane as of this entry.
