@@ -1,6 +1,138 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — REACHABILITY FIX SHIPPED 2026-08-19 (`fd1930b2`), lane `basketball-model-owner`. Boxscore-capture half STILL OPEN — see bottom.
+### `#470` — **NHL never had a market-comparison backtest -- the instrument that answers "does this show an edge," distinct from every calibration `#463` closed** — BUILT, MEASURED, HONESTLY CAVEATED 2026-08-19, lane `nhl-model-owner`
+
+Full report: `docs/reports/hockeysim_market_backtest_report.md`, reference doc
+`docs/ai_context/hockeysim_engine_reference.md` §8. `scripts/grade_nhl_predictions_vs_market.py`
+(new) scores real published moneyline/total/puck-line predictions against real settled outcomes
+AND the real market's own de-vigged price on the same rows, using Brier score
+(`syndicate/features/shared/model_scoring.py::brier_score`) and `devig()`
+(`syndicate/features/shared/opportunity_signals.py`) — mirroring MLB's `convergence-phase7-crps`
+lane methodology (`scripts/grade_mlb_hitter_props_vs_market.py`) exactly, the backtest NHL never
+had despite `#463` closing every input-completeness gap this session found.
+
+**Not circular, confirmed by reading the code, not assumed**: `predictions_{date}.csv`'s
+`p_home_ml`/`p_over`/`p_home_pl_-1.5` come from `adapters.build_game_prediction`, which only calls
+`game_market_sim.simulate_from_period_lambdas` on `period_goal_lambdas` -- `market_anchoring.py`'s
+circularity risk (already flagged, `hockeysim_engine_reference.md` §7) only touches the SEPARATE
+props pipeline (`build_prop_projections`), never this code path.
+
+**A real bug found while building this, not after**: the first run reported `n=8` from 5 files;
+investigating showed 4 of those files (`predictions_2026-06-12/13/14.csv`,
+`predictions_2026-07-09.csv`) are byte-identical duplicates of `predictions_2026-06-11.csv`
+(confirmed with a plain `diff`) -- the prediction pipeline re-serving the last real slate under
+new date-stamped filenames after the playoff series it covered had ended, rather than genuinely
+having no games. Scoring these as separate observations would have silently inflated `n` with 4
+literal duplicates of one game. Fixed with an explicit dedup on `(date, home_abbr, away_abbr)`
+(using the CSV's own `date` column, not the unreliable filename), every dropped duplicate counted
+under `duplicate_stale_file_row`, never silently discarded. **This staleness pattern is a real,
+separate production-pipeline finding, not just a backtest artifact** -- flagged as an open
+follow-up, not chased down this pass.
+
+**Measured, and stated as plainly as every other finding this session**: n=3-4 per market
+(moneyline, total, puck line) after dedup -- market wins all three (Brier 0.2061 vs 0.2630
+moneyline; 0.2115 vs 0.2294 total; 0.2133 vs 0.2146 puck line). This sample is nowhere near
+powered enough to support a real "beats/loses" verdict -- MLB's own much larger sample (hundreds
+of props/market) still found its RNG noise floor exceeded the effects it measured, and this run's
+sample is far smaller than that. **This proves the harness is correct end-to-end on real data. It
+is NOT a statistically powered verdict either way.** Local `predictions_<date>.csv` coverage is the
+binding constraint, not the harness -- pointing `--root` at a fuller mirror needs no script changes.
+
+**Join discipline** (matching `grade_mlb_hitter_props_vs_market.py`'s own hard-won convention):
+every row that fails to score is counted under a named reason (`no_settled_outcome`, `no_model`,
+`no_market`, `push`, `devig_failed`, `duplicate_stale_file_row`) -- nothing silently dropped.
+`devig()` passed both sides of every market. A market whose base rate falls at or outside
+`[0.001, 0.999]` is refused, not reported (Brier is degenerate there) -- not triggered this run,
+but load-bearing at scale.
+
+**What remains open**: the stale-file duplication itself (a real production-pipeline defect, not
+this script's problem to fix); local coverage is too thin for a real verdict (needs either a
+fuller regular-season mirror pulled from production, or continuous re-runs as dates accumulate);
+puck-line odds coverage is thinner than moneyline/total (1 of 4 matched games had none) -- worth
+checking whether that's a genuine market-availability gap or a capture gap at scale.
+
+### `#469` — **`#468`'s "no caller of boxscore-capture exists anywhere" was wrong — a real, ENABLED, ESPN-based caller runs every ~2h and silently reports success while adding zero rows** — DIAGNOSED AND FIXED 2026-08-19 (`1fa94eb8`), lane `basketball-model-owner`. Deploy to live-odds-worker pending a clear preflight window (job-in-flight HOLD as of first attempt).
+
+**Correction to `#468`'s bottom section, stated plainly**: that entry said
+"no caller of `update-boxscores-history`/`backfill-boxscores` exists
+anywhere" — TRUE only for those two specific vendor-CLI function names.
+A parallel, Syndicate-owned, ESPN-based mechanism does the same job under
+a different name and IS wired in: `run_live_odds_refresh_worker.py`'s
+`_launch_autorun_wnba_pregame_refresh` (confirmed live: `SYNDICATE_ENABLE_
+WNBA_PREGAME_REFRESH_AUTORUN=true`, interval 7200s, on `live-odds-worker`
+right now) launches `refresh_odds_sources.py --sports wnba --phase pregame`
+every ~2h, which subprocesses `refresh_wnba_oddsapi_props.py` → `main()` →
+`_run_refresh_via_cli` → `_ensure_player_logs_for_props_refresh` →
+`_bootstrap_local_boxscores_history_for_props` →
+`bootstrap_boxscores_history_local` (ESPN site API). Confirmed reachable
+by full call-chain trace, not inference.
+
+**The real bug, found and fixed**: `_bootstrap_local_boxscores_history_
+for_props`'s success check tested `result["history_rows"]` — the file's
+CUMULATIVE total, which is >0 forever once any history exists — instead
+of `result["rows"]`, the CURRENT pull's own contribution. A completely
+failed ESPN fetch (zero new rows across the whole lookback window) still
+writes `existing_history` back unchanged and reports success, because
+"the file has rows" was never false. Live production evidence, pulled
+fresh via `/api/ops/artifacts/export?path=wnba_source/data/processed/
+boxscores_history.csv` on 2026-08-19: mtime 11h old (bootstrap IS running,
+IS "succeeding," on schedule) but content's own max game date frozen at
+2026-06-30 (3889 rows, unchanged) — i.e. this has been silently failing on
+every ~2h tick for roughly seven weeks while reporting healthy.
+
+**Fix** (`syndicate/features/shared/basketball_boxscores_history.py`,
+`_bootstrap_local_boxscores_history_for_props` in `scripts/refresh_wnba_
+oddsapi_props.py`): now distinguishes a real fetch failure (`_espn_
+scoreboard_local` returning a falsy `{}`, only possible on an actual HTTP/
+exception failure — a genuinely gameless day returns a truthy dict with an
+empty `events` list) from a legitimate zero-games day, tracked as `days_
+checked`/`days_fetch_failed`. When new rows are genuinely zero, the
+function still returns success (leniency preserved on purpose —
+`_ensure_player_logs_for_props_refresh` treats `False` as fatal for the
+WHOLE predict-props phase, so flipping this to a hard failure risked
+stopping props/predictions generation entirely, a worse regression than
+stale boxscores) but now emits a loud `print(..., flush=True)`
+`BOXSCORE_BOOTSTRAP_STALLED` marker (reaches Render's log collector —
+`logger.info` does not) plus a proper log-file line, instead of a line
+indistinguishable from success.
+
+**Also changed**: ESPN's undocumented site API got a browser-shaped
+`User-Agent` (was the literal string `"syndicate/1.0"`) in `_http_get_
+json_local` — the standard, low-risk shape of fix for "public media API
+soft-blocks a custom bot UA from a datacenter/cloud egress IP, 200 OK with
+an empty body, works fine from a residential dev IP" — which is consistent
+with (not proven to be the sole cause of) what was measured. **Whether
+this alone un-sticks the data is UNVERIFIED** — it cannot be tested from a
+dev machine, since a dev machine's IP was never the failure mode being
+guarded against. The `days_fetch_failed` counter this same fix adds is
+what will make the next read decisive either way, once deployed and
+observed on a live tick.
+
+**Verified, not assumed**: live ESPN pull via the real, unmodified
+`bootstrap_boxscores_history_local` (before AND after the UA change) —
+674 real rows, 2026-08-09..08-18, `days_fetch_failed=0` — proves the
+mechanism itself works end-to-end when reachable. Two `_bootstrap_local_
+boxscores_history_for_props` behavior cases exercised directly: working
+bootstrap still returns `(True, None)` with a normal log line; a
+monkeypatched stalled case (`rows=0`, `history_rows=3889`, pre-existing
+`wrote` path) still returns `(True, None)` — leniency confirmed intact —
+but now prints `BOXSCORE_BOOTSTRAP_STALLED` and logs the STALLED line.
+`tests/test_wnba_refresh_runner.py`/`test_nba_refresh_runner.py`: 4
+pre-existing failures, confirmed via `git stash` to fail identically on
+`a67019cf` with none of these 3 files touched (unrelated `force_refresh`
+kwarg mismatch in an NBA test fixture) — not caused by this change, not
+fixed by this change, out of scope.
+
+**Still open after this fix**: whether the UA change (or anything else)
+actually resolves the zero-new-rows failure requires observing a live
+production tick post-deploy — `days_fetch_failed` on the next STALLED-or-
+silent tick answers it. If `days_fetch_failed` stays high after deploy,
+the UA was not the (or not the only) cause and this needs a further pass
+(candidates: Render's outbound IP specifically blocklisted rather than
+UA-gated, a proxy/TLS difference, or a different ESPN endpoint behavior
+under load). NBA not compared apples-to-apples for the identical defect.
+
+### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — REACHABILITY FIX SHIPPED 2026-08-19 (`fd1930b2`), lane `basketball-model-owner`. Boxscore-capture half corrected and fixed — see `#469`.
 
 **Reachability fix, verified end-to-end with real data, not assumed:**
 `_load_team_advanced_stats_asof_local` (`basketball_props_smart_sim.py`,

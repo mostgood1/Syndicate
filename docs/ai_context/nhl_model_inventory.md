@@ -326,3 +326,22 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   push deploy the way MLB's roster-artifact reuse trap does — but the elo/xG
   allowlist and `goals_per_60` fix still need a normal code deploy to reach
   Render like any other `.py` change.
+- **Did** build a real market-comparison backtest (reference doc §8, full
+  report `docs/reports/hockeysim_market_backtest_report.md`) — the instrument
+  that answers "does this show an edge," distinct from every calibration
+  above, which only checks aggregate-statistic match. `scripts/grade_nhl_predictions_vs_market.py`
+  scores real published moneyline/total/puck-line predictions (real market
+  odds already embedded on the same CSV row) against real settled outcomes
+  (the same boxscore cache this session's work already bulk-fetched), using
+  Brier score and `devig()`, mirroring MLB's `convergence-phase7-crps`
+  methodology. Confirmed non-circular by reading `adapters.py` directly
+  (`build_game_prediction` never touches `market_anchoring.py`, a genuinely
+  separate code path). **Found a real bug in the process**: 4 of 5 local
+  prediction files turned out to be byte-identical stale duplicates of an
+  earlier date (confirmed with `diff`), which would have silently inflated
+  the sample with non-independent observations — fixed with an explicit
+  dedup, counted not dropped. Measured n=3–4 per market after dedup, market
+  wins all three — but stated as plainly as every other finding this
+  session: that sample is nowhere near powered enough to support a real
+  verdict, and the run's value is proving the harness correct end-to-end on
+  real data, not settling whether hockeysim has an edge.

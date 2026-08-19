@@ -737,3 +737,39 @@ production question:
   service actually generates NHL artifacts (still to be pinned down precisely
   per the point above), the same "worker publishes the bounded report" pattern
   MLB's checklist uses.
+
+---
+
+## 8. A market-comparison backtest — the instrument that answers "does this show an edge"
+
+Full report: `docs/reports/hockeysim_market_backtest_report.md`. Everything in §2 (calibrations)
+and §6 (Elo) checks whether the engine matches real AGGREGATE statistics, or scores one
+sub-component's own narrow target (the xG model's holdout AUC). None of it checks whether a
+specific game's PUBLISHED prediction beats the price a real market already set — the only question
+that actually answers "does this show an edge," and the question `todo.md`'s `#463` was explicitly
+asked after closing. `scripts/grade_nhl_predictions_vs_market.py` (new) is that check, mirroring
+MLB's `convergence-phase7-crps` lane methodology (`scripts/grade_mlb_hitter_props_vs_market.py`).
+
+**Metric: Brier score**, not CRPS — this compares two probability FORECASTS (model, market)
+against one binary outcome; CRPS scores a distribution against a realized value (§6's job, not
+this one). **Not circular**: `predictions_{date}.csv`'s `p_home_ml`/`p_over`/`p_home_pl_-1.5` come
+from `adapters.build_game_prediction`, which only calls `simulate_from_period_lambdas` on
+`period_goal_lambdas` — confirmed by reading the code, not assumed. `market_anchoring.py`'s
+circularity risk (noted above) applies to the PROPS pipeline, a genuinely different code path this
+backtest never touches. Real settled outcomes come from the same boxscore cache §2e/§2g/§2i/§2j/§2k
+already bulk-fetched; real market odds are already embedded in `predictions_{date}.csv` itself.
+
+**A real bug found while building this**: the first run showed `n=8` from 5 files; 4 of those files
+turned out to be **byte-identical duplicates** of an earlier date (confirmed with a plain `diff`,
+not assumed) — the prediction pipeline re-serving the last real slate under new date-stamped
+filenames after the playoff series it covered had ended, rather than genuinely having no games.
+Fixed with an explicit dedup on `(date, home_abbr, away_abbr)`, counted under
+`duplicate_stale_file_row`, not silently dropped. **This staleness pattern is itself a real,
+separate production-pipeline finding, not just a backtest artifact** — worth its own follow-up.
+
+**Measured**: n=3–4 per market (moneyline, total, puck line) after dedup — the market wins all
+three (0.2061 vs 0.2630 moneyline; 0.2115 vs 0.2294 total; 0.2133 vs 0.2146 puck line). **Stated as
+plainly as everywhere else in this document**: n=3–4, all from one playoff series, cannot support a
+real verdict either way — this proves the harness is correct end-to-end on real data, not that the
+engine has or lacks an edge. Local `predictions_<date>.csv` coverage is the binding constraint, not
+the harness; pointing `--root` at a fuller mirror needs no script changes.
