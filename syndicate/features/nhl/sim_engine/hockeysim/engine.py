@@ -24,12 +24,15 @@ import numpy as np
 from .state import GameState, TeamState, PlayerState, Event
 from .models import RateModels, TeamRates, PlayerRates
 from .historical_truth.faceoff_decay_model import (
+    draw_strength_zone,
+    expected_multipliers_strength_zone,
     segment_average_multipliers,
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
     segment_average_multipliers_oz,
     segment_average_multipliers_pk_role,
     segment_average_multipliers_pp_role,
+    segment_average_multipliers_strength_zone,
 )
 
 
@@ -162,6 +165,20 @@ class SimConfig:
     # index exists -- this reuses the SAME general (OZ->EV->blend) percentage resolution as an
     # approximation, a real, stated limitation. Default ON. `False` disables the layer entirely.
     faceoff_strength_state_model: bool = True
+    # §2z: the strength-state mechanism's own "What this does NOT do" section named this directly --
+    # NZ/DZ/OZ draws that happen DURING a PP/PK segment were not separately modeled, only role. A
+    # direct joint (role, zone) segment-level check found a real, large, DISTINCT effect from the
+    # role-only average: PP-role+DZ (a power-play team winning its own defensive-zone draw, a rare
+    # 3.7% tail) is dramatically LESS favorable than the PP-role average; PK-role+OZ (a shorthanded
+    # team winning an offensive-zone draw, a rarer 2.9% tail) is dramatically MORE favorable than
+    # the PK-role average (`docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`). No
+    # per-team joint signal is feasible at these sample sizes (PK+O: 197 draws leaguewide, median 6
+    # PER TEAM across a WHOLE SEASON) -- this is population-level only, a real, stated limitation,
+    # and the PK+O cell itself is too thin even for its own POPULATION curve (`_STRENGTH_ZONE_CURVE_FUNCS`
+    # points it at the flat PK-role curve instead). Only takes effect when
+    # `faceoff_strength_state_model=True` (the umbrella gate this refines). Default ON. `False`
+    # falls back to the flat role-only mechanism unchanged, for rollback/A-B.
+    faceoff_strength_state_zone_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -264,6 +281,48 @@ def _strength_state_multipliers(
     if pp_side_wins_draw:
         return w_pp / e_pp_side, o_pp / e_pk_side
     return o_pk / e_pp_side, w_pk / e_pk_side
+
+
+def _strength_state_zone_multipliers(
+    p_pp_side_wins: float, pp_side_wins_draw: bool,
+    w_zone: float, o_zone: float,
+    e_w_pp: float, e_o_pp: float, e_w_pk: float, e_o_pk: float,
+) -> Tuple[float, float]:
+    """Return `(m_pp_side, m_pk_side)` for §2z's joint role-and-zone refinement -- a generalization
+    of `_strength_state_multipliers` that adds a SECOND random dimension (WHICH ZONE the winner's
+    draw happened in) while preserving that function's own `E[m_pp_side] == E[m_pk_side] == 1.0`
+    guarantee EXACTLY, not approximately.
+
+    `w_zone`/`o_zone` are the WINNER's own (role, zone) joint curve's `winner_mult`/`other_mult` at
+    THIS specific segment's length AND the zone actually drawn for it
+    (`segment_average_multipliers_strength_zone`, `historical_truth/faceoff_decay_model.py`) --
+    only the winner's own curve is ever read here, exactly like `_strength_state_multipliers` only
+    ever reads ONE curve's `winner_mult`/`other_mult` pair (whichever role won), never both. `e_w_pp`/
+    `e_o_pp`/`e_w_pk`/`e_o_pk` are the ZONE-MARGINALIZED EXPECTATIONS
+    (`expected_multipliers_strength_zone`) -- the real, measured population-level zone distribution
+    weighting each of the three joint curves' own value for each role, computed ONCE per segment
+    regardless of which zone actually gets drawn.
+
+    WHY THIS IS EXACT, NOT AN APPROXIMATION OF `_strength_state_multipliers`. Let `p = p_pp_side_wins`.
+    Conditional on the win/loss outcome, the realized (role, zone) multiplier is DETERMINISTIC once
+    the outcome AND the zone are both known; the zone itself is drawn AFTER the outcome, from the
+    SAME fixed population distribution `e_w_pp` etc. were computed against. So, unconditionally:
+    `E[m_pp_side] = [p * E_zone|PPwins[w_pp(zone)] + (1-p) * E_zone|PKwins[o_pk(zone)]] / e_pp_side`.
+    The numerator's two terms are, BY DEFINITION (not by an assumed decomposition of some other
+    curve), exactly `e_w_pp` and `e_o_pk` -- `expected_multipliers_strength_zone` computes them as
+    precisely that weighted sum. So `e_pp_side = p*e_w_pp + (1-p)*e_o_pk` makes the ratio exactly
+    1.0, for ANY zone-curve shapes and ANY population zone distribution -- the same derivation
+    `_strength_state_multipliers` itself uses, just with the flat role-only `w_pp`/`o_pk` replaced
+    by their zone-EXPECTED counterparts for the denominator only; the NUMERATOR still uses the
+    SPECIFIC zone actually drawn (`w_zone`/`o_zone`), which is what carries the real, measured
+    zone-conditional signal through to the engine's output. If `w_zone == e_w_pp` (or `e_w_pk`) and
+    `o_zone == e_o_pk` (or `e_o_pp`) -- i.e., no zone differentiation, using the expected values
+    directly -- this reduces to exactly `_strength_state_multipliers`'s own output."""
+    e_pp_side = max(1e-6, p_pp_side_wins * e_w_pp + (1.0 - p_pp_side_wins) * e_o_pk)
+    e_pk_side = max(1e-6, p_pp_side_wins * e_o_pp + (1.0 - p_pp_side_wins) * e_w_pk)
+    if pp_side_wins_draw:
+        return w_zone / e_pp_side, o_zone / e_pk_side
+    return o_zone / e_pp_side, w_zone / e_pk_side
 
 
 class PossessionSimulator:
@@ -1314,13 +1373,31 @@ class PeriodSimulator:
                 st_denom = max(1e-6, float(st_h_pct) + float(st_a_pct))
                 p_home_wins_st_draw = max(0.05, min(0.95, float(st_h_pct) / st_denom))
                 p_pp_side_wins = p_home_wins_st_draw if seg_is_home_pp else (1.0 - p_home_wins_st_draw)
-                pp_decay = segment_average_multipliers_pp_role(seg_len)
-                pk_decay = segment_average_multipliers_pk_role(seg_len)
                 pp_side_wins_draw = self.rng.random() < p_pp_side_wins
-                m_pp_side, m_pk_side = _strength_state_multipliers(
-                    p_pp_side_wins, pp_side_wins_draw,
-                    pp_decay.winner_mult, pp_decay.other_mult, pk_decay.winner_mult, pk_decay.other_mult,
-                )
+                if bool(getattr(self.cfg, "faceoff_strength_state_zone_model", True)):
+                    # §2z: a joint role-AND-zone refinement -- a real, large, DISTINCT effect from
+                    # the role-only average (`hockeysim_faceoff_strength_zone_joint_report.md`).
+                    # `_strength_state_zone_multipliers` PRESERVES the exact-normalization proof
+                    # above unchanged (see its own docstring) -- the zone is an INDEPENDENT random
+                    # draw, from the REAL measured population zone distribution for whichever role
+                    # actually won, applied only to the WINNER's own curve.
+                    winner_role = "PP" if pp_side_wins_draw else "PK"
+                    zone_drawn = draw_strength_zone(winner_role, self.rng.random())
+                    joint = segment_average_multipliers_strength_zone(winner_role, zone_drawn, seg_len)
+                    e_pp = expected_multipliers_strength_zone("PP", seg_len)
+                    e_pk = expected_multipliers_strength_zone("PK", seg_len)
+                    m_pp_side, m_pk_side = _strength_state_zone_multipliers(
+                        p_pp_side_wins, pp_side_wins_draw,
+                        joint.winner_mult, joint.other_mult,
+                        e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult,
+                    )
+                else:
+                    pp_decay = segment_average_multipliers_pp_role(seg_len)
+                    pk_decay = segment_average_multipliers_pk_role(seg_len)
+                    m_pp_side, m_pk_side = _strength_state_multipliers(
+                        p_pp_side_wins, pp_side_wins_draw,
+                        pp_decay.winner_mult, pp_decay.other_mult, pk_decay.winner_mult, pk_decay.other_mult,
+                    )
                 if seg_is_home_pp:
                     m_st_h, m_st_a = m_pp_side, m_pk_side
                 else:

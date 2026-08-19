@@ -1,0 +1,255 @@
+{
+  "games": 1312,
+  "cells": [
+    {
+      "role": "PP",
+      "zone": "O",
+      "window": 10.0,
+      "n": 6653,
+      "winner_share": 0.9371,
+      "role_only_winner_share": 0.9329,
+      "delta": 0.0042
+    },
+    {
+      "role": "PP",
+      "zone": "O",
+      "window": 15.0,
+      "n": 6653,
+      "winner_share": 0.9159,
+      "role_only_winner_share": 0.9103,
+      "delta": 0.0055
+    },
+    {
+      "role": "PP",
+      "zone": "O",
+      "window": 30.0,
+      "n": 6653,
+      "winner_share": 0.8885,
+      "role_only_winner_share": 0.879,
+      "delta": 0.0095
+    },
+    {
+      "role": "PP",
+      "zone": "N",
+      "window": 10.0,
+      "n": 1080,
+      "winner_share": 0.8444,
+      "role_only_winner_share": 0.9329,
+      "delta": -0.0884
+    },
+    {
+      "role": "PP",
+      "zone": "N",
+      "window": 15.0,
+      "n": 1080,
+      "winner_share": 0.8515,
+      "role_only_winner_share": 0.9103,
+      "delta": -0.0589
+    },
+    {
+      "role": "PP",
+      "zone": "N",
+      "window": 30.0,
+      "n": 1080,
+      "winner_share": 0.8019,
+      "role_only_winner_share": 0.879,
+      "delta": -0.0771
+    },
+    {
+      "role": "PP",
+      "zone": "D",
+      "window": 10.0,
+      "n": 300,
+      "winner_share": 0.5714,
+      "role_only_winner_share": 0.9329,
+      "delta": -0.3614
+    },
+    {
+      "role": "PP",
+      "zone": "D",
+      "window": 15.0,
+      "n": 300,
+      "winner_share": 0.6667,
+      "role_only_winner_share": 0.9103,
+      "delta": -0.2437
+    },
+    {
+      "role": "PP",
+      "zone": "D",
+      "window": 30.0,
+      "n": 300,
+      "winner_share": 0.7647,
+      "role_only_winner_share": 0.879,
+      "delta": -0.1143
+    },
+    {
+      "role": "PK",
+      "zone": "O",
+      "window": 10.0,
+      "n": 197,
+      "winner_share": 0.88,
+      "role_only_winner_share": 0.4313,
+      "delta": 0.4487
+    },
+    {
+      "role": "PK",
+      "zone": "O",
+      "window": 15.0,
+      "n": 197,
+      "winner_share": 0.7059,
+      "role_only_winner_share": 0.3755,
+      "delta": 0.3304
+    },
+    {
+      "role": "PK",
+      "zone": "O",
+      "window": 30.0,
+      "n": 197,
+      "winner_share": 0.5072,
+      "role_only_winner_share": 0.2749,
+      "delta": 0.2323
+    },
+    {
+      "role": "PK",
+      "zone": "N",
+      "window": 10.0,
+      "n": 904,
+      "winner_share": 0.6316,
+      "role_only_winner_share": 0.4313,
+      "delta": 0.2003
+    },
+    {
+      "role": "PK",
+      "zone": "N",
+      "window": 15.0,
+      "n": 904,
+      "winner_share": 0.5059,
+      "role_only_winner_share": 0.3755,
+      "delta": 0.1304
+    },
+    {
+      "role": "PK",
+      "zone": "N",
+      "window": 30.0,
+      "n": 904,
+      "winner_share": 0.332,
+      "role_only_winner_share": 0.2749,
+      "delta": 0.057
+    },
+    {
+      "role": "PK",
+      "zone": "D",
+      "window": 10.0,
+      "n": 5600,
+      "winner_share": 0.3902,
+      "role_only_winner_share": 0.4313,
+      "delta": -0.0411
+    },
+    {
+      "role": "PK",
+      "zone": "D",
+      "window": 15.0,
+      "n": 5600,
+      "winner_share": 0.3484,
+      "role_only_winner_share": 0.3755,
+      "delta": -0.0272
+    },
+    {
+      "role": "PK",
+      "zone": "D",
+      "window": 30.0,
+      "n": 5600,
+      "winner_share": 0.259,
+      "role_only_winner_share": 0.2749,
+      "delta": -0.0159
+    }
+  ],
+  "role_only": [
+    {
+      "role": "PP",
+      "window": 10.0,
+      "n": 8033,
+      "winner_share": 0.9329
+    },
+    {
+      "role": "PP",
+      "window": 15.0,
+      "n": 8033,
+      "winner_share": 0.9103
+    },
+    {
+      "role": "PP",
+      "window": 30.0,
+      "n": 8033,
+      "winner_share": 0.879
+    },
+    {
+      "role": "PK",
+      "window": 10.0,
+      "n": 6701,
+      "winner_share": 0.4313
+    },
+    {
+      "role": "PK",
+      "window": 15.0,
+      "n": 6701,
+      "winner_share": 0.3755
+    },
+    {
+      "role": "PK",
+      "window": 30.0,
+      "n": 6701,
+      "winner_share": 0.2749
+    }
+  ],
+  "per_team_feasibility": [
+    {
+      "role": "PP",
+      "zone": "O",
+      "teams": 32,
+      "min": 164,
+      "median": 210,
+      "max": 258
+    },
+    {
+      "role": "PP",
+      "zone": "N",
+      "teams": 32,
+      "min": 23,
+      "median": 33,
+      "max": 48
+    },
+    {
+      "role": "PP",
+      "zone": "D",
+      "teams": 32,
+      "min": 5,
+      "median": 8,
+      "max": 16
+    },
+    {
+      "role": "PK",
+      "zone": "O",
+      "teams": 32,
+      "min": 1,
+      "median": 6,
+      "max": 11
+    },
+    {
+      "role": "PK",
+      "zone": "N",
+      "teams": 32,
+      "min": 14,
+      "median": 29,
+      "max": 41
+    },
+    {
+      "role": "PK",
+      "zone": "D",
+      "teams": 32,
+      "min": 140,
+      "median": 170,
+      "max": 244
+    }
+  ]
+}

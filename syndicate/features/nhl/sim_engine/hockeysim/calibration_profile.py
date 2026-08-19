@@ -140,9 +140,16 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     faceoff_nz_discrete_event_model=True,
     # §2x: the first faceoff mechanism to apply during a PP/PK segment -- every mechanism above is
     # gated EV-only. Real segment-level check: winner share 0.93 at 10s when the already-advantaged
-    # team also wins the draw, only 0.43->0.27 when the shorthanded team wins it. Reuses the general
-    # OZ->EV->blend percentage resolution (no dedicated PP/PK-specific per-team index exists).
+    # team also wins the draw, only 0.43->0.27 when the shorthanded team wins it. §2y closed its own
+    # stated limitation with a real per-team `faceoff_pp_role_index`/`faceoff_pk_role_index`.
     faceoff_strength_state_model=True,
+    # §2z: a joint role-AND-zone refinement -- a real, large, DISTINCT effect from the role-only
+    # average (PP-role+DZ, a rare 3.7% tail, is dramatically LESS favorable than the PP-role
+    # average; PK-role+OZ, a rarer 2.9% tail, is dramatically MORE favorable than the PK-role
+    # average). Population-level only -- no per-team joint signal is feasible at these sample sizes
+    # (PK+O: 197 draws leaguewide, median 6/team/SEASON). The exact-normalization proof this reuses
+    # is unchanged from §2x; only takes effect when `faceoff_strength_state_model=True`.
+    faceoff_strength_state_zone_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

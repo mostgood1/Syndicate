@@ -8,12 +8,20 @@ from __future__ import annotations
 import pytest
 
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+    draw_strength_zone,
+    expected_multipliers_strength_zone,
     segment_average_multipliers,
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
     segment_average_multipliers_oz,
     segment_average_multipliers_pk_role,
+    segment_average_multipliers_pk_role_dz,
+    segment_average_multipliers_pk_role_nz,
     segment_average_multipliers_pp_role,
+    segment_average_multipliers_pp_role_dz,
+    segment_average_multipliers_pp_role_nz,
+    segment_average_multipliers_pp_role_oz,
+    segment_average_multipliers_strength_zone,
 )
 
 
@@ -300,3 +308,178 @@ def test_pk_role_non_positive_or_invalid_input_returns_neutral_baseline(bad):
     result = segment_average_multipliers_pk_role(bad)
     assert result.winner_mult == 1.0
     assert result.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Joint role-and-zone curves (§2z) -- five dedicated curves (PP+O, PP+N, PP+D, PK+N, PK+D);
+# PK+O (197 real draws, too thin) intentionally falls back to the flat PK-role curve, tested
+# separately below via the dispatcher.
+# ---------------------------------------------------------------------------
+
+_JOINT_CURVE_FUNCS = {
+    ("PP", "O"): segment_average_multipliers_pp_role_oz,
+    ("PP", "N"): segment_average_multipliers_pp_role_nz,
+    ("PP", "D"): segment_average_multipliers_pp_role_dz,
+    ("PK", "N"): segment_average_multipliers_pk_role_nz,
+    ("PK", "D"): segment_average_multipliers_pk_role_dz,
+}
+
+
+def test_pp_role_oz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pp_role_oz(5.0)
+    assert result.winner_mult == pytest.approx(1.9271, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.0729, abs=1e-4)
+
+
+def test_pp_role_nz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pp_role_nz(5.0)
+    assert result.winner_mult == pytest.approx(1.4997, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.5003, abs=1e-4)
+
+
+def test_pp_role_dz_short_segment_matches_the_first_bucket_exactly():
+    """The thinnest curve kept this pass -- a real, measured zero-winner-shots first bucket."""
+    result = segment_average_multipliers_pp_role_dz(5.0)
+    assert result.winner_mult == pytest.approx(0.0, abs=1e-4)
+    assert result.other_mult == pytest.approx(2.0, abs=1e-4)
+
+
+def test_pk_role_nz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pk_role_nz(5.0)
+    assert result.winner_mult == pytest.approx(1.6111, abs=1e-4)
+    assert result.other_mult == pytest.approx(0.3889, abs=1e-4)
+
+
+def test_pk_role_dz_short_segment_matches_the_first_bucket_exactly():
+    result = segment_average_multipliers_pk_role_dz(5.0)
+    assert result.winner_mult == pytest.approx(1.0, abs=1e-4)
+    assert result.other_mult == pytest.approx(1.0, abs=1e-4)
+
+
+@pytest.mark.parametrize("key", list(_JOINT_CURVE_FUNCS.keys()))
+@pytest.mark.parametrize("seg_len", [1.0, 5.0, 15.0, 40.0, 45.0, 60.0, 90.0, 200.0, 1200.0])
+def test_joint_curve_mean_of_winner_and_other_is_always_one(key, seg_len):
+    """Same mean-1-per-bucket invariant as every other curve this session built -- required for
+    `_strength_state_zone_multipliers`'s own exact-normalization proof to hold."""
+    fn = _JOINT_CURVE_FUNCS[key]
+    result = fn(seg_len)
+    assert (result.winner_mult + result.other_mult) / 2.0 == pytest.approx(1.0, abs=1e-4)
+
+
+@pytest.mark.parametrize("fn", list(_JOINT_CURVE_FUNCS.values()))
+@pytest.mark.parametrize("bad", [0.0, -5.0, None, "not-a-number"])
+def test_joint_curve_non_positive_or_invalid_input_returns_neutral_baseline(fn, bad):
+    result = fn(bad)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+def test_pp_role_dz_is_meaningfully_weaker_than_pp_role_oz():
+    """The real, large, measured finding this pass: a power-play team winning its own DEFENSIVE-
+    zone draw (a rare tail) is dramatically LESS favorable than winning in its own offensive zone
+    (the majority case) -- confirms the two curves are genuinely distinct, not near-duplicates."""
+    oz = segment_average_multipliers_pp_role_oz(15.0)
+    dz = segment_average_multipliers_pp_role_dz(15.0)
+    assert oz.winner_mult > dz.winner_mult
+
+
+def test_pk_role_dz_is_meaningfully_weaker_than_pk_role_nz():
+    """The mirror finding for PK-role: winning a shorthanded draw in the DEFENSIVE zone (the
+    majority case) is meaningfully worse than winning one in the NEUTRAL zone."""
+    dz = segment_average_multipliers_pk_role_dz(15.0)
+    nz = segment_average_multipliers_pk_role_nz(15.0)
+    assert nz.winner_mult > dz.winner_mult
+
+
+# ---------------------------------------------------------------------------
+# `segment_average_multipliers_strength_zone` -- the (role, zone) dispatcher, including the
+# floored PK+O fallback.
+# ---------------------------------------------------------------------------
+
+def test_dispatcher_routes_to_the_matching_joint_curve():
+    direct = segment_average_multipliers_pp_role_oz(30.0)
+    dispatched = segment_average_multipliers_strength_zone("PP", "O", 30.0)
+    assert dispatched == direct
+
+
+def test_dispatcher_is_case_insensitive():
+    assert segment_average_multipliers_strength_zone("pp", "o", 30.0) == \
+        segment_average_multipliers_strength_zone("PP", "O", 30.0)
+
+
+def test_dispatcher_pk_o_falls_back_to_the_flat_pk_role_curve():
+    """PK+O (197 real draws, median 6/team/season) is too data-thin to trust its own curve -- the
+    dispatcher must route it to the flat PK-role curve instead, not a dedicated (and unreliable)
+    PK+O curve."""
+    dispatched = segment_average_multipliers_strength_zone("PK", "O", 30.0)
+    fallback = segment_average_multipliers_pk_role(30.0)
+    assert dispatched == fallback
+
+
+def test_dispatcher_unrecognized_combination_returns_neutral_baseline():
+    result = segment_average_multipliers_strength_zone("XX", "O", 30.0)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+    result2 = segment_average_multipliers_strength_zone("PP", "X", 30.0)
+    assert result2.winner_mult == 1.0
+    assert result2.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# `expected_multipliers_strength_zone` -- the zone-marginalized expectation
+# `_strength_state_zone_multipliers`'s own normalization needs.
+# ---------------------------------------------------------------------------
+
+def test_expected_multipliers_matches_a_direct_weighted_sum():
+    """Not a black-box check -- recomputes the weighted sum independently (using the SAME real
+    zone probabilities, imported directly) and confirms the function returns exactly that, not an
+    approximation or a different weighting scheme."""
+    from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+        _STRENGTH_ZONE_PROBS,
+    )
+    seg_len = 42.5
+    expected_winner = sum(
+        p * segment_average_multipliers_strength_zone("PP", z, seg_len).winner_mult
+        for z, p in _STRENGTH_ZONE_PROBS["PP"].items()
+    )
+    result = expected_multipliers_strength_zone("PP", seg_len)
+    assert result.winner_mult == pytest.approx(expected_winner, abs=1e-4)
+
+
+def test_expected_multipliers_unrecognized_role_returns_neutral_baseline():
+    result = expected_multipliers_strength_zone("XX", 30.0)
+    assert result.winner_mult == 1.0
+    assert result.other_mult == 1.0
+
+
+# ---------------------------------------------------------------------------
+# `draw_strength_zone` -- maps a uniform draw to a zone using the real population proportions.
+# ---------------------------------------------------------------------------
+
+def test_draw_strength_zone_is_deterministic_for_the_same_inputs():
+    assert draw_strength_zone("PP", 0.1) == draw_strength_zone("PP", 0.1)
+
+
+def test_draw_strength_zone_pp_low_u_is_offensive_zone():
+    """PP-role's population is 82.8% offensive-zone -- a low `u` must land there."""
+    assert draw_strength_zone("PP", 0.01) == "O"
+
+
+def test_draw_strength_zone_pk_low_u_is_offensive_zone():
+    """PK-role's population is only 2.9% offensive-zone -- a very low `u` still lands there (it's
+    listed first in the fixed iteration order), but a mid-range `u` should NOT."""
+    assert draw_strength_zone("PK", 0.01) == "O"
+    assert draw_strength_zone("PK", 0.5) == "D"  # PK-role is 83.6% defensive-zone
+
+
+def test_draw_strength_zone_covers_the_full_unit_interval_without_gaps():
+    """Every `u` in `[0, 1)` must resolve to a real zone -- no silent `None`/crash at any point,
+    including right at the boundary between cumulative probability segments."""
+    for i in range(1000):
+        u = i / 1000.0
+        assert draw_strength_zone("PP", u) in ("O", "N", "D")
+        assert draw_strength_zone("PK", u) in ("O", "N", "D")
+
+
+def test_draw_strength_zone_unrecognized_role_falls_back_to_offensive():
+    assert draw_strength_zone("XX", 0.5) == "O"

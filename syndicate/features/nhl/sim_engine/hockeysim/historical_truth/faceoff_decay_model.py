@@ -141,7 +141,7 @@ structural effect the data gives no reason to believe fades that quickly.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 # Real, measured marginal buckets (seconds since the faceoff, non-overlapping, each independently
 # truncated at the next real EV faceoff). `winner_mult`/`other_mult` are the bucket's own raw
@@ -318,6 +318,119 @@ _PK_ROLE_CONVERGED_MULT_WINNER = 0.4332  # held flat at the LAST measured bucket
 _PK_ROLE_CONVERGED_MULT_OTHER = 1.5668   # as PP-role above
 
 
+# ---------------------------------------------------------------------------
+# JOINT role-and-zone curves (§2z), added in a later pass -- see
+# `docs/reports/hockeysim_faceoff_strength_zone_joint_report.md` for the full measurement. The
+# strength-state mechanism's own "What this does NOT do" section named this directly: a PP/PK
+# draw's ZONE (relative to the WINNER, same convention as every zone index in this package) has a
+# real, large, measurable effect DISTINCT from the role-only average above -- winning a power-play
+# draw in your own offensive zone (83% of PP-role draws) is close to the PP-role average by
+# construction, but winning one in your own DEFENSIVE zone (a rare, 3.7% tail) is dramatically
+# LESS favorable, and the reverse holds for PK-role: winning a shorthanded draw in the OFFENSIVE
+# zone (a rare, 2.9% tail) is dramatically MORE favorable than the PK-role average.
+#
+# PK+O (only 197 real draws leaguewide, median 6 per team across a WHOLE SEASON) is the one cell
+# too data-thin to trust its own curve -- `_STRENGTH_ZONE_CURVES["PK"]["O"]` intentionally points
+# at the flat PK-role curve (`segment_average_multipliers_pk_role`) instead of a dedicated one, a
+# real, stated, data-driven floor, not silently dropped. Every other cell (PP+O 6,653; PP+N 1,080;
+# PP+D 300; PK+N 904; PK+D 5,600) has its own real, measured curve below -- PP+D and PK+O's SIBLING
+# cell (300 draws) sits right at a reasonable floor and is kept, with its own noise -- see its first
+# bucket (0.0/2.0, a real zero-winner-shots bucket from only ~19 draws) reported as measured, not
+# smoothed, same discipline as the DZ curve's own noisy excursion.
+#
+# `_STRENGTH_ZONE_PROBS` are the REAL, MEASURED population shares of each zone WITHIN each role
+# (draw-count based, not covered-seconds or per-team -- no per-team joint signal is remotely
+# feasible at these sample sizes, see the report's own per-team feasibility table). Used to draw
+# WHICH zone a PP/PK segment's assumed draw lands in (population-level only, not per-team --
+# a real, stated limitation) and, critically, to compute the EXACT zone-marginalized expectation
+# `expected_multipliers_strength_zone` needs so the combined mechanism's own exact-normalization
+# proof (`engine.py::_strength_state_zone_multipliers`) holds precisely regardless of which curve
+# values are plugged in per zone -- see that function's own docstring for the derivation.
+
+_STRENGTH_ZONE_PROBS: Dict[str, Dict[str, float]] = {
+    "PP": {"O": 6653 / 8033, "N": 1080 / 8033, "D": 300 / 8033},
+    "PK": {"O": 197 / 6701, "N": 904 / 6701, "D": 5600 / 6701},
+}
+
+# PP-role, OFFENSIVE-zone draws (6,653 real draws) -- close to the flat PP-role curve by
+# construction (83% of the PP-role population), slightly stronger at every bucket.
+_PP_ROLE_OZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.9271, 0.0729),
+    (5.0, 10.0, 1.8446, 0.1554),
+    (10.0, 15.0, 1.7463, 0.2537),
+    (15.0, 20.0, 1.7585, 0.2415),
+    (20.0, 30.0, 1.6649, 0.3351),
+    (30.0, 45.0, 1.6749, 0.3251),
+    (45.0, 60.0, 1.6283, 0.3717),
+    (60.0, 90.0, 1.5729, 0.4271),
+]
+_PP_ROLE_OZ_CONVERGED_MULT_WINNER = 1.5729
+_PP_ROLE_OZ_CONVERGED_MULT_OTHER = 0.4271
+
+# PP-role, NEUTRAL-zone draws (1,080 real draws) -- meaningfully weaker than OZ, still well above
+# baseline throughout.
+_PP_ROLE_NZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.4997, 0.5003),
+    (5.0, 10.0, 1.6922, 0.3078),
+    (10.0, 15.0, 1.7499, 0.2501),
+    (15.0, 20.0, 1.6000, 0.4000),
+    (20.0, 30.0, 1.5226, 0.4774),
+    (30.0, 45.0, 1.4930, 0.5070),
+    (45.0, 60.0, 1.5393, 0.4607),
+    (60.0, 90.0, 1.5021, 0.4979),
+]
+_PP_ROLE_NZ_CONVERGED_MULT_WINNER = 1.5021
+_PP_ROLE_NZ_CONVERGED_MULT_OTHER = 0.4979
+
+# PP-role, DEFENSIVE-zone draws (300 real draws, the thinnest curve built this pass that is still
+# kept) -- the power-play team winning a draw in ITS OWN defensive zone is still favorable on
+# average, but far less dominant than OZ/NZ, and genuinely noisy at the extremes (the first bucket,
+# ~19 draws, saw literally zero winner shots -- reported as measured, not smoothed).
+_PP_ROLE_DZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 0.0000, 2.0000),
+    (5.0, 10.0, 1.3333, 0.6667),
+    (10.0, 15.0, 1.4444, 0.5556),
+    (15.0, 20.0, 1.5000, 0.5000),
+    (20.0, 30.0, 1.5833, 0.4167),
+    (30.0, 45.0, 1.5161, 0.4839),
+    (45.0, 60.0, 1.3333, 0.6667),
+    (60.0, 90.0, 1.2800, 0.7200),
+]
+_PP_ROLE_DZ_CONVERGED_MULT_WINNER = 1.2800
+_PP_ROLE_DZ_CONVERGED_MULT_OTHER = 0.7200
+
+# PK-role, NEUTRAL-zone draws (904 real draws) -- a shorthanded team winning a draw in the neutral
+# zone is a real, meaningfully SMALLER penalty than DZ, though still a net negative throughout most
+# of the window (unlike OZ, which is a net positive -- see the report's own winner-share table).
+_PK_ROLE_NZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.6111, 0.3889),
+    (5.0, 10.0, 0.7586, 1.2414),
+    (10.0, 15.0, 0.4376, 1.5624),
+    (15.0, 20.0, 0.3720, 1.6280),
+    (20.0, 30.0, 0.4770, 1.5230),
+    (30.0, 45.0, 0.4396, 1.5604),
+    (45.0, 60.0, 0.4568, 1.5432),
+    (60.0, 90.0, 0.4603, 1.5397),
+]
+_PK_ROLE_NZ_CONVERGED_MULT_WINNER = 0.4603
+_PK_ROLE_NZ_CONVERGED_MULT_OTHER = 1.5397
+
+# PK-role, DEFENSIVE-zone draws (5,600 real draws) -- close to the flat PK-role curve by
+# construction (84% of the PK-role population), the majority-zone case.
+_PK_ROLE_DZ_DECAY_CURVE: List[Tuple[float, float, float, float]] = [
+    (0.0, 5.0, 1.0000, 1.0000),
+    (5.0, 10.0, 0.6085, 1.3915),
+    (10.0, 15.0, 0.5366, 1.4634),
+    (15.0, 20.0, 0.3315, 1.6685),
+    (20.0, 30.0, 0.3868, 1.6132),
+    (30.0, 45.0, 0.3757, 1.6243),
+    (45.0, 60.0, 0.3649, 1.6351),
+    (60.0, 90.0, 0.4159, 1.5841),
+]
+_PK_ROLE_DZ_CONVERGED_MULT_WINNER = 0.4159
+_PK_ROLE_DZ_CONVERGED_MULT_OTHER = 1.5841
+
+
 @dataclass(frozen=True)
 class SegmentFaceoffMultipliers:
     """The winner's and the other team's TIME-WEIGHTED AVERAGE shot-generation multiplier over one
@@ -432,3 +545,107 @@ def segment_average_multipliers_pk_role(seg_len_seconds: float) -> SegmentFaceof
         seg_len_seconds, _PK_ROLE_DECAY_CURVE,
         converged_winner=_PK_ROLE_CONVERGED_MULT_WINNER, converged_other=_PK_ROLE_CONVERGED_MULT_OTHER,
     )
+
+
+def segment_average_multipliers_pp_role_oz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PP-role, OFFENSIVE-zone joint curve (§2z) -- see the module docstring's joint section."""
+    return _integrate_curve(
+        seg_len_seconds, _PP_ROLE_OZ_DECAY_CURVE,
+        converged_winner=_PP_ROLE_OZ_CONVERGED_MULT_WINNER, converged_other=_PP_ROLE_OZ_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_pp_role_nz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PP-role, NEUTRAL-zone joint curve (§2z) -- see the module docstring's joint section."""
+    return _integrate_curve(
+        seg_len_seconds, _PP_ROLE_NZ_DECAY_CURVE,
+        converged_winner=_PP_ROLE_NZ_CONVERGED_MULT_WINNER, converged_other=_PP_ROLE_NZ_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_pp_role_dz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PP-role, DEFENSIVE-zone joint curve (§2z) -- see the module docstring's joint section. The
+    thinnest curve kept this pass (300 real draws) -- real, noisier than the others, kept as
+    measured rather than smoothed."""
+    return _integrate_curve(
+        seg_len_seconds, _PP_ROLE_DZ_DECAY_CURVE,
+        converged_winner=_PP_ROLE_DZ_CONVERGED_MULT_WINNER, converged_other=_PP_ROLE_DZ_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_pk_role_nz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PK-role, NEUTRAL-zone joint curve (§2z) -- see the module docstring's joint section."""
+    return _integrate_curve(
+        seg_len_seconds, _PK_ROLE_NZ_DECAY_CURVE,
+        converged_winner=_PK_ROLE_NZ_CONVERGED_MULT_WINNER, converged_other=_PK_ROLE_NZ_CONVERGED_MULT_OTHER,
+    )
+
+
+def segment_average_multipliers_pk_role_dz(seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """PK-role, DEFENSIVE-zone joint curve (§2z) -- see the module docstring's joint section."""
+    return _integrate_curve(
+        seg_len_seconds, _PK_ROLE_DZ_DECAY_CURVE,
+        converged_winner=_PK_ROLE_DZ_CONVERGED_MULT_WINNER, converged_other=_PK_ROLE_DZ_CONVERGED_MULT_OTHER,
+    )
+
+
+# `PK`+`O` (197 real draws, median 6/team/season) is the one cell too data-thin to trust its own
+# curve -- points at the flat PK-role curve instead, a real, stated floor (see the module
+# docstring's joint section). Every other cell has its own dedicated curve above.
+_STRENGTH_ZONE_CURVE_FUNCS = {
+    "PP": {"O": segment_average_multipliers_pp_role_oz, "N": segment_average_multipliers_pp_role_nz,
+           "D": segment_average_multipliers_pp_role_dz},
+    "PK": {"O": segment_average_multipliers_pk_role, "N": segment_average_multipliers_pk_role_nz,
+           "D": segment_average_multipliers_pk_role_dz},
+}
+
+
+def segment_average_multipliers_strength_zone(role: str, zone: str, seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """The joint (role, zone) curve, integrated over `seg_len_seconds` -- §2z's per-draw dispatcher.
+    `role` must be `"PP"`/`"PK"`, `zone` must be `"O"`/`"N"`/`"D"` (both upper-cased internally); an
+    unrecognized combination returns the no-effect baseline (1.0, 1.0), never raises."""
+    fn = _STRENGTH_ZONE_CURVE_FUNCS.get(str(role).strip().upper(), {}).get(str(zone).strip().upper())
+    if fn is None:
+        return SegmentFaceoffMultipliers(1.0, 1.0)
+    return fn(seg_len_seconds)
+
+
+def draw_strength_zone(role: str, u: float) -> str:
+    """Map a uniform random draw `u` (`[0, 1)`) to a zone (`"O"`/`"N"`/`"D"`) using the REAL
+    measured population proportions for `role` (`_STRENGTH_ZONE_PROBS`) -- population-level only,
+    not per-team (no per-team joint signal is feasible at these sample sizes, see the module
+    docstring's joint section). Iterates zones in a FIXED order (`"O"`, `"N"`, `"D"`) so the mapping
+    is deterministic given the same `u` and `role`, matching every other RNG-mapping helper in this
+    package. Falls back to `"O"` for an unrecognized `role` -- never raises."""
+    probs = _STRENGTH_ZONE_PROBS.get(str(role).strip().upper())
+    if not probs:
+        return "O"
+    cum = 0.0
+    for zone in ("O", "N", "D"):
+        cum += probs.get(zone, 0.0)
+        if u < cum:
+            return zone
+    return "D"  # floating-point edge case at u very close to 1.0 -- last zone in the fixed order
+
+
+def expected_multipliers_strength_zone(role: str, seg_len_seconds: float) -> SegmentFaceoffMultipliers:
+    """`E_zone[winner_mult]`/`E_zone[other_mult]` for `role`, at `seg_len_seconds` -- the REAL
+    population-measured zone distribution (`_STRENGTH_ZONE_PROBS`) weighting each of the three
+    joint curves' own integrated value. This is the exact quantity `engine.py`'s
+    `_strength_state_zone_multipliers` needs for its own normalization denominator -- see that
+    function's docstring for why using this (rather than the flat role-only curve) keeps the
+    combined mechanism's `E[applied_mult] == 1.0` guarantee EXACT, not approximate: it is DEFINED
+    as precisely the weighted sum the proof requires, not derived from an assumed decomposition of
+    the role-only curve (which would only hold approximately, since a rate is not linear in the
+    way a share is)."""
+    role_key = str(role).strip().upper()
+    probs = _STRENGTH_ZONE_PROBS.get(role_key, {})
+    winner_area = 0.0
+    other_area = 0.0
+    for zone, p in probs.items():
+        m = segment_average_multipliers_strength_zone(role_key, zone, seg_len_seconds)
+        winner_area += p * m.winner_mult
+        other_area += p * m.other_mult
+    if not probs:
+        return SegmentFaceoffMultipliers(1.0, 1.0)
+    return SegmentFaceoffMultipliers(winner_mult=round(winner_area, 6), other_mult=round(other_area, 6))

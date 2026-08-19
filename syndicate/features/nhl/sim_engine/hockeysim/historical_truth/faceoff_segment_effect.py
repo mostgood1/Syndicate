@@ -37,6 +37,18 @@ methodology as every zone-specific check, applied to a population the EV-only ex
 draws where the WINNER had the skater advantage (a team already on the man advantage also winning
 the draw); `winner_role="PK"` isolates draws where the WINNER was shorthanded (the team killing a
 penalty winning the draw, e.g. to clear the zone).
+
+JOINT ROLE-AND-ZONE (§2z), added in a later pass -- the next axis the strength-state report's own
+"What this does NOT do" section named directly: NZ/DZ/OZ draws that happen DURING a PP/PK segment
+are not separately modeled, only role (§2x) and role-specific per-team win rate (§2y). Both `role`
+and `zone` are already extracted per faceoff event (see `_TimedEvent` above), so
+`compute_post_faceoff_shots_by_role_and_zone` combines both filters directly -- same window/
+truncation methodology as every other function in this module, restricted to draws matching BOTH
+`winner_role` AND `winner_zone` at once. Used by `scripts/calibrate_nhl_faceoff_strength_zone_joint.py`
+to check whether the zone a PP/PK draw happens to be won in has a measurable effect DISTINCT from
+the role-only average already shipped -- see that script's own docstring, and
+`docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`, for what was found and why it was
+NOT wired as a new engine mechanism despite a real, large, coherent effect.
 """
 from __future__ import annotations
 
@@ -243,6 +255,59 @@ def compute_post_faceoff_shots_by_strength_role(
     window_total = 0.0
     for i, ev in enumerate(events):
         if not ev.is_faceoff or ev.team_id is None or ev.role != role_filter:
+            continue
+        n_faceoffs += 1
+
+        window_end = min(ev.seconds + window_seconds, _PERIOD_LENGTH_SECONDS)
+        next_faceoff_time: Optional[float] = None
+        for later in events[i + 1:]:
+            if later.period != ev.period:
+                break
+            if later.is_faceoff:
+                next_faceoff_time = later.seconds
+                break
+        actual_end = window_end if next_faceoff_time is None else min(window_end, next_faceoff_time)
+        window_total += max(0.0, actual_end - ev.seconds)
+
+        for later in events[i + 1:]:
+            if later.period != ev.period or later.seconds > actual_end:
+                break
+            if later.is_shot and later.team_id is not None:
+                if later.team_id == ev.team_id:
+                    winner_shots += 1
+                else:
+                    other_shots += 1
+
+    return GamePostFaceoffShots(
+        game_id=str(payload.get("id") or ""),
+        n_faceoffs=n_faceoffs, winner_shots=winner_shots, other_shots=other_shots,
+        window_seconds_total=window_total,
+    )
+
+
+def compute_post_faceoff_shots_by_role_and_zone(
+    payload: Dict, *, window_seconds: float = 15.0, winner_role: str, winner_zone: str,
+) -> Optional[GamePostFaceoffShots]:
+    """Same methodology as `compute_post_faceoff_shots_by_strength_role`, additionally restricted
+    to the WINNER's own zone at the draw (`"O"`/`"N"`/`"D"`, relative to the winner -- same
+    convention as `compute_post_faceoff_shots`'s `winner_zone`). Isolates, e.g., `winner_role="PK"`
+    + `winner_zone="O"`: a shorthanded team winning a draw in the OFFENSIVE zone -- rare, but when
+    it happens, does it behave differently than the PK-role average (`winner_role="PK"` alone)?
+    Returns `None` for a payload with no `plays` list; a game with zero matching draws returns a
+    record with `n_faceoffs==0`, so the caller's own aggregate (and, critically, its own DRAW-COUNT
+    floor -- some (role, zone) combinations are real but rare, see the calibration script) decides
+    whether to trust a given combination at all.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("plays"), list):
+        return None
+    role_filter = str(winner_role).strip().upper()
+    zone_filter = str(winner_zone).strip().upper()
+    events = _extract_timed_events(payload, include_non_ev=True)
+
+    n_faceoffs = winner_shots = other_shots = 0
+    window_total = 0.0
+    for i, ev in enumerate(events):
+        if not ev.is_faceoff or ev.team_id is None or ev.role != role_filter or ev.zone != zone_filter:
             continue
         n_faceoffs += 1
 

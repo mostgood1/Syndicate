@@ -20,6 +20,7 @@ from syndicate.features.nhl.sim_engine.hockeysim.engine import (
     SimConfig,
     _resolve_strength_state_faceoff_pct,
     _strength_state_multipliers,
+    _strength_state_zone_multipliers,
 )
 
 
@@ -526,6 +527,90 @@ class HockeySimEngineTest(unittest.TestCase):
             no_role_totals, with_role_totals,
             msg="per-seed total-shot vectors are IDENTICAL -- faceoff_pp_role_index/"
                 "faceoff_pk_role_index are not being read.",
+        )
+
+    def test_strength_state_zone_multipliers_expectation_is_exactly_one_for_any_p(self) -> None:
+        """Direct mathematical proof of `_strength_state_zone_multipliers`'s own claim, §2z: for
+        ANY win probability `p`, marginalizing over BOTH the win/loss outcome AND the zone draw
+        (weighted by the REAL measured population zone distribution), `E[m_pp_side] ==
+        E[m_pk_side] == 1.0` EXACTLY -- computed analytically here, not just checked empirically
+        via round-robin. Uses the REAL joint curve values and REAL zone probabilities so this is
+        grounded in the actual measured population, not a synthetic case too mild to expose a bug
+        the way §2x's own naive-combination bug needed a real-data check to surface."""
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+            _STRENGTH_ZONE_PROBS,
+            expected_multipliers_strength_zone,
+            segment_average_multipliers_strength_zone,
+        )
+        seg_len = 42.5
+        e_pp = expected_multipliers_strength_zone("PP", seg_len)
+        e_pk = expected_multipliers_strength_zone("PK", seg_len)
+        for p in (0.05, 0.3, 0.5, 0.7, 0.95):
+            e_m_pp = 0.0
+            e_m_pk = 0.0
+            for zone, pz in _STRENGTH_ZONE_PROBS["PP"].items():
+                joint = segment_average_multipliers_strength_zone("PP", zone, seg_len)
+                m_pp, m_pk = _strength_state_zone_multipliers(
+                    p, True, joint.winner_mult, joint.other_mult,
+                    e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult)
+                e_m_pp += p * pz * m_pp
+                e_m_pk += p * pz * m_pk
+            for zone, pz in _STRENGTH_ZONE_PROBS["PK"].items():
+                joint = segment_average_multipliers_strength_zone("PK", zone, seg_len)
+                m_pp, m_pk = _strength_state_zone_multipliers(
+                    p, False, joint.winner_mult, joint.other_mult,
+                    e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult)
+                e_m_pp += (1.0 - p) * pz * m_pp
+                e_m_pk += (1.0 - p) * pz * m_pk
+            self.assertAlmostEqual(e_m_pp, 1.0, places=4, msg=f"E[m_pp_side] failed at p={p}")
+            self.assertAlmostEqual(e_m_pk, 1.0, places=4, msg=f"E[m_pk_side] failed at p={p}")
+
+    def test_strength_state_zone_multipliers_reduces_to_flat_when_zone_equals_expectation(self) -> None:
+        """If the realized zone's own values EQUAL the zone-expected values (no differentiation),
+        `_strength_state_zone_multipliers` must reduce to exactly `_strength_state_multipliers`'s
+        own output -- confirms the generalization doesn't change anything beyond what the zone
+        draw actually contributes."""
+        p, wins = 0.62, True
+        e_w_pp, e_o_pp, e_w_pk, e_o_pk = 1.7, 0.3, 0.5, 1.5
+        flat = _strength_state_multipliers(p, wins, e_w_pp, e_o_pp, e_w_pk, e_o_pk)
+        zone_same = _strength_state_zone_multipliers(
+            p, wins, e_w_pp, e_o_pp, e_w_pp, e_o_pp, e_w_pk, e_o_pk)
+        self.assertAlmostEqual(flat[0], zone_same[0], places=9)
+        self.assertAlmostEqual(flat[1], zone_same[1], places=9)
+
+    def test_faceoff_strength_state_zone_model_flag_actually_changes_output(self) -> None:
+        """Reachability for §2z: `faceoff_strength_state_zone_model=True` (the default) must
+        produce a DIFFERENT per-seed event stream than `False` (the flat role-only mechanism),
+        holding every other input identical -- same vector-comparison technique as §2y's own
+        reachability test, for the same underlying reason (the zone layer's own mean-1 design
+        means a mean-total-shots comparison is an unreliable low-sample signal here too)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        cfg_on = build_nhl_sim_config(overrides={
+            "faceoff_strength_state_model": True, "faceoff_strength_state_zone_model": True})
+        cfg_off = build_nhl_sim_config(overrides={
+            "faceoff_strength_state_model": True, "faceoff_strength_state_zone_model": False})
+
+        def _totals(profile: SimConfig) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        on_totals = _totals(cfg_on)
+        off_totals = _totals(cfg_off)
+        self.assertNotEqual(
+            on_totals, off_totals,
+            msg="per-seed total-shot vectors are IDENTICAL -- faceoff_strength_state_zone_model "
+                "is not gating anything.",
         )
 
     def test_resolve_strength_state_faceoff_pct_prefers_role_index_over_oz(self) -> None:

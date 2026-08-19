@@ -1125,6 +1125,37 @@ production role-index data vs the two keys stripped) — noise-level, consistent
 mean-invariance property above, not evidence the mechanism has no real effect. Full report:
 `docs/reports/hockeysim_faceoff_strength_state_role_index_report.md`.
 
+**§2z, closing the strength-state report's own "What this does NOT do" gap**: NZ/DZ/OZ draws that
+happen DURING a PP/PK segment were not separately modeled, only role. A joint (role, zone) segment
+check (`docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`) found a real, large, directly
+consistent effect — PP-role+DZ (a rare 3.7% tail) dramatically LESS favorable than PP-role's own
+average; PK-role+OZ (a rarer 2.9% tail) dramatically MORE favorable than PK-role's own average, both
+matching the general OZ>NZ>DZ ordering the even-strength curves already established. **Measured
+before building, matching the NZ precedent**: a per-team joint index checked and confirmed
+infeasible for 4 of 6 cells (PK+O: 197 draws leaguewide, median 6/team across a WHOLE SEASON) —
+this is population-level only, a real stated limitation. Five of six cells (PP+O/N/D, PK+N/D) got
+their own dedicated discrete-event curve; the sixth (PK+O) falls back to the flat PK-role curve, a
+real, stated, data-driven floor.
+
+**A generalized exact-normalization proof, not a fresh derivation from scratch**:
+`_strength_state_zone_multipliers` (`engine.py`) reuses `_strength_state_multipliers`'s exact
+structure — only the denominator changes, from the flat role-only curve to the ZONE-MARGINALIZED
+expectation (`expected_multipliers_strength_zone`, a real weighted sum using the measured
+population zone proportions), computed once per segment regardless of which zone is drawn; the
+numerator still uses the SPECIFIC zone actually drawn. `E[applied_mult]=1.0` follows by the SAME
+algebra §2x's own proof used, with no assumed decomposition of the role-only curve into its zone
+parts (which would only hold approximately for a rate, exactly for a share). If the drawn zone's
+values equal the zone-expected values, the function provably reduces to
+`_strength_state_multipliers`'s own output — a direct test confirms this.
+
+**Verified two ways**: analytically (`E[]=1.0` to 4 decimal places at 5 win probabilities, real
+curve values and real zone proportions) and empirically (round-robin delta -0.055%, 992 pairings,
+real production data — noise-level, matching the mean-invariance property, not evidence of no
+effect, same reasoning as §2y's own round-robin). 27 new decay-curve/dispatcher/helper unit tests
+(182 total), 4 new engine tests. **605 hockeysim/nhl tests pass overall** (up from 519). Checklist
+re-confirmed full PASS (no new consumed field — population-level constants, not a per-team CSV
+column). Full report: `docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

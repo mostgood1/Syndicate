@@ -76,10 +76,14 @@ def _bucket_counts_for_game(
     of that bucket's nominal width was never actually "available".
 
     `winner_zone`, when given (`"O"`/`"N"`/`"D"`), restricts which draws are STUDIED to those the
-    winner took in their own matching zone -- e.g. `"D"` builds the DZ-specific decay curve. Mutually
-    exclusive with `winner_role` (`"PP"`/`"PK"`), which restricts to PP/PK-STRENGTH draws by the
-    winner's own skater-count role -- the population EV faceoffs (and the zone filter, which only
-    ever applies to EV draws) never includes at all.
+    winner took in their own matching zone -- e.g. `"D"` builds the DZ-specific decay curve.
+    `winner_role` (`"PP"`/`"PK"`) restricts to PP/PK-STRENGTH draws by the winner's own skater-count
+    role -- the population EV faceoffs (and the zone filter alone, which only ever applies to EV
+    draws by default) never includes. GIVEN TOGETHER (§2z), both filters apply AT ONCE -- the
+    winner's own role AND their own zone at the SAME draw -- building the joint curve
+    `docs/reports/hockeysim_faceoff_strength_zone_joint_report.md` uses; `_extract_timed_events`
+    already tags BOTH `zone` and `role` on every faceoff event regardless of strength state (zone
+    extraction was never EV-gated), so no new extraction logic is needed to combine them.
     """
     zone_filter = str(winner_zone).strip().upper() if winner_zone else None
     role_filter = str(winner_role).strip().upper() if winner_role else None
@@ -136,11 +140,8 @@ def main() -> int:
                      help="restrict to draws the winner took in their own matching zone")
     ap.add_argument("--winner-role", default=None, choices=(None, "PP", "PK"),
                      help="restrict to PP/PK-strength draws by the winner's own skater-count role "
-                          "(mutually exclusive with --winner-zone)")
+                          "-- combine with --winner-zone (§2z) to build the JOINT role+zone curve")
     args = ap.parse_args()
-    if args.winner_zone and args.winner_role:
-        print("REFUSED: --winner-zone and --winner-role are mutually exclusive", file=sys.stderr)
-        return 1
 
     root = args.root or _nhl_source_root()
     playbyplay = _load_regular_season_playbyplay(root)
@@ -164,7 +165,15 @@ def main() -> int:
             total_covered[b] += c[b]
         total_faceoffs += n
 
-    print(f"total {'EV' if not args.winner_role else args.winner_role + '-role'} faceoffs: {total_faceoffs}\n")
+    if args.winner_role and args.winner_zone:
+        pop_label = f"{args.winner_role}-role+{args.winner_zone}-zone"
+    elif args.winner_role:
+        pop_label = f"{args.winner_role}-role"
+    elif args.winner_zone:
+        pop_label = f"{args.winner_zone}-zone"
+    else:
+        pop_label = "EV"
+    print(f"total {pop_label} faceoffs: {total_faceoffs}\n")
     print(f"{'bucket':>12}  {'winner/100s':>12}  {'other/100s':>11}  {'ratio':>7}  {'covered_s':>12}")
     curve = []
     for b, (lo, hi) in enumerate(_BUCKETS):

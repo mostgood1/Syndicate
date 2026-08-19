@@ -1445,6 +1445,25 @@ overall (up from 497), checklist full PASS with both new keys AST-derived. **Rou
 -0.131% (992 pairings, real production data), noise-level, consistent with the mean-invariance
 property above, not evidence the mechanism has no real effect.
 
+**Addendum, same day: closed the strength-state report's own "What this does NOT do" gap with a
+joint role-and-zone refinement built** (reference doc §2z, full report
+`docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`). NZ/DZ/OZ draws happening DURING a
+PP/PK segment were not separately modeled, only role. A joint (role, zone) segment check found a
+real, large, DIRECTLY consistent effect (PP-role+DZ, a rare 3.7% tail, dramatically LESS favorable
+than the PP-role average; PK-role+OZ, a rarer 2.9% tail, dramatically MORE favorable than the
+PK-role average) -- matching the general OZ>NZ>DZ ordering the even-strength curves already
+established. **Measured before building, matching the NZ precedent**: a per-team joint index
+checked and confirmed infeasible for 4 of 6 cells (PK+O: 197 draws leaguewide, median 6/team across
+a WHOLE SEASON) -- population-level only, a real stated limitation. Five of six cells got their own
+dedicated discrete-event curve; PK+O falls back to the flat PK-role curve, a real, stated,
+data-driven floor. `_strength_state_zone_multipliers` (`engine.py`) reuses
+`_strength_state_multipliers`'s exact-normalization structure without re-deriving it from scratch
+-- only the denominator changes, to the zone-marginalized expectation
+(`expected_multipliers_strength_zone`); the numerator uses the specific zone drawn. Verified
+analytically (`E[]=1.0` to 4 decimal places at 5 win probabilities) and empirically (round-robin
+delta **-0.055%**, 992 pairings, real production data -- noise-level). 27 new unit tests (182
+total), 4 new engine tests, 605 hockeysim/nhl tests pass overall (up from 519), checklist full PASS.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable
