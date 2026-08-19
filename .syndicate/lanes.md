@@ -870,6 +870,76 @@ been separately measured there.
   (`w=0`).
 - Blocked by: none.
 
+### soccer-odds-capture-cadence-gap — OPEN — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
+- Goal: soccer's h2h/totals/spreads game-market odds capture actually
+  refreshes within a bounded window (target: <24h old for a match kicking
+  off within the next day) instead of sitting 8-10 days stale.
+  **Testable outcome:** re-pull `soccer_source/tracking/book_quotes/
+  <today>.jsonl` for a slate with same-day kickoffs; every distinct
+  match's h2h/totals/spreads `captured_at` is <24h old, not just some.
+- Files:
+  - `scripts/run_live_odds_refresh_worker.py` (defines
+    `_launch_autorun_soccer_pregame_refresh`, the SOLE producer, 4h
+    cadence) — **CAUTION: this file has real uncommitted changes sitting
+    in the PRIMARY shared tree right now, not mine, likely from the
+    informally-referenced "OOM band" session (flagged stale 40h in the
+    roster, no formal lane header found — nothing to collide with per
+    `lane-guard`, but the uncommitted diff itself is real).** Do not edit
+    in the primary tree; use a dedicated worktree
+    (`scripts/session_worktree.py open --lane soccer-odds-capture-cadence-gap`)
+    for any actual edit so that diff is never touched.
+  - `scripts/run_refresh_worker.py` (referenced alongside the above in
+    prior sessions' notes — confirm its actual soccer-relevance before
+    editing; `phase=live` there has 0 odds steps by design per `#148`,
+    so it may not be where the fix belongs at all)
+  - `scripts/refresh_odds_sources.py` (soccer step-builder, `_build_wnba_steps`
+    sibling for soccer — read first, likely where the actual HTTP fetch
+    step lives)
+  - Read-only reference: `.syndicate/state.md` `[soccer]` section — the
+    prior investigation's full history, DEAD hypotheses, and the now-
+    contradicted "SUPERSEDED 2026-08-17" note.
+- Hypothesis: `_launch_autorun_soccer_pregame_refresh` has stopped firing
+  successfully again (or was never actually fixed on 08-17 — that read
+  used aggregate `quote_rows`/`dates_with_rows` counts, which can stay
+  healthy-looking while specific matches never get a fresh capture, the
+  exact "healthy sibling masks an outage" shape `learnings.md` already
+  names). NOT league-specific (this session's own measurement: 8 of 8
+  affected matches span MLS AND La Liga) — that hypothesis is DEAD twice
+  over now.
+- **Already established, measured 2026-08-19 (do not re-derive):**
+  - **8 of 8** distinct matches with TODAY's kickoffs, checked across
+    every league present in the shard, have their freshest h2h/totals/
+    spreads `captured_at` at **211-236 hours old (8.8-9.8 days)**.
+    Freshest capture found anywhere in the file: 2026-08-11.
+  - This directly contradicts `state.md`'s `[soccer]` note "SUPERSEDED
+    2026-08-17 21:3xZ — capture is WORKING" — that note's own evidence
+    (`quote_rows 16,044`, `dates_with_rows` spanning many dates) never
+    checked PER-MATCH freshness, only that SOME rows existed somewhere.
+  - **Already DEAD, from the prior session (state.md `[soccer]`), do not
+    retry:** step truncation at #27 of 50 (falsified by a scoped ~6-step
+    run that captured nothing); three-specific-leagues (all ten were
+    affected then; this session's finding — MLS + La Liga both affected
+    now — is independent confirmation).
+  - **Known blocker from the prior session:** the run's own logs are
+    UNREADABLE FROM WEB — `launch_refresh_run` spawns the child with
+    `stdout=DEVNULL, stderr=DEVNULL` onto the WORKER's own disk, and
+    Render's log collector only captures a service's own top-level
+    stdout. A log-based diagnosis failed for 4 days before on this exact
+    account; do not restart from "read the logs."
+- Falsification test: confirm `_launch_autorun_soccer_pregame_refresh` is
+  still being INVOKED at all (a scheduler-liveness question, separate
+  from whether its fetch succeeds) — e.g. a process-list check on
+  live-odds-worker at a moment straddling its 4h cadence boundary, or any
+  observable side effect it writes regardless of fetch outcome. If it is
+  firing but the FETCH itself fails, the bug is downstream (HTTP/auth/
+  odds-source), not the scheduler — say so and retarget rather than
+  assuming the scheduler is the fault by default.
+- Verification: re-pull the book_quotes shard for a live same-day slate
+  after any fix and confirm ALL distinct matches (not a sample) show
+  `captured_at` inside the target window. Report the per-match count,
+  not just "capture resumed."
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
