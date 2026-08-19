@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 420 rules `[generated]`
+## Index — 422 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1394,3 +1394,35 @@ resulting diffs were clean, non-overlapping single-line/list-append changes,
 confirmed by `git diff --stat` before trusting it). Not fixed at the source —
 `PATHISH_RE` still needs a slash-requirement carve-out for prose bullets, or a
 bare-filename allowlist, for whoever owns `lane-guard.py` next.
+## 2026-08-19 — RULE: "this cannot be automated" is a claim like any other. Name the predicate you tried.
+
+- The rule going forward: **before concluding something is not enforceable, state
+  the specific predicate you tested and why it fails. If you cannot name one, you
+  have described the first idea you had, not the problem.** The useful move is
+  almost always to narrow the target: not "detect appending", but "detect the one
+  SHAPE of appending that causes the damage".
+
+**MEASURED, and it is the second unverified mechanism I asserted in one session.**
+At a checkpoint I wrote that `state.md`'s "EDIT THE LINE" rule could not be
+enforced, because "no predicate can distinguish *this section grew because a fact
+changed* from *someone appended instead of editing*". True of appending in
+general — and irrelevant, because the failure that forced THREE collapses has a
+narrow observable form: a **dated `### ` sub-heading**, a chronology built one
+append at a time. That predicate is trivial, and it shipped an hour later.
+
+**THE SECOND HALF OF THE FIX WAS THE DELTA, not the pattern.** `state.md` already
+contains 2 dated sub-headings, so a STATE check would fire on the status quo
+forever and be ripped out within a day. Comparing the file BEFORE and AFTER the
+edit forbids adding a third while saying nothing about the two present. **A
+predicate that is unusable as a state check is often fine as a delta check** —
+worth trying before declaring the thing unenforceable.
+
+**PAIR IT WITH ROUTING.** The guard does not merely refuse: a dated record is
+often legitimate and simply belongs in `deploys.md`, `lanes.md` or
+`learnings.md`, so the block message names the home. A guard that forbids without
+saying where to go instead gets overridden, and an override habit costs more than
+the guard was worth.
+
+**Related:** the same session asserted that a mid-flight hook could not protect
+running sessions, which one tool call disproved. Both were mechanisms invented to
+explain an observation, stated with more confidence than the evidence carried.
