@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 426 rules `[generated]`
+## Index — 427 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1129,3 +1129,38 @@ and I had followed it all session, using pathspec commits specifically to avoid
 this. I reached for `-A` because the change spanned three files instead of one.
 **A rule you keep for the easy case and drop for the slightly harder one is not
 a rule you have.**
+
+## 2026-08-19 — RULE: when diagnosis has failed repeatedly, look for the fix that does not need the cause.
+
+- The rule going forward: **after two or three wrong causes for one symptom, stop
+  buying lottery tickets on the fourth and ask whether a fix exists that is
+  correct under ALL of them.** Such a fix is available more often than it looks,
+  because a symptom usually has more than one route to the same evidence — and it
+  is strictly safer, since it cannot be invalidated by the answer arriving later.
+
+**MEASURED.** `deploy_preflight.py` returned UNKNOWN for web because the service
+stopped emitting the `ALL_PROCESS_MEMORY` log line it sampled. FOUR causes were
+claimed for that silence and every one was wrong (broken sampler / missing psutil
+/ deleted emitter / no caller on web). The fix shipped instead reads web's
+process list live from its own `/api/ops/memory` — **the same processes, the same
+container, a different route** — and is correct whichever cause turns out to be
+real. First run: `web CLEAR` against `refresh-worker HOLD, 7 jobs`, the workers'
+path untouched.
+
+**THE TELL THAT SUCH A FIX EXISTED** was that every break-glass had ALREADY been
+doing it by hand: both emergency grants that week substituted exactly this
+reading and recorded it as the evidence the deploy was safe. **When people are
+routinely working around a broken check with a manual step, that step is usually
+the fix — promote it rather than continuing to repair the original path.**
+
+**IT DOES NOT CLOSE THE DIAGNOSIS AND MUST NOT PRETEND TO.** The cause is still
+unknown and is recorded as such, at lower priority because nothing is blocked. A
+symptom fix that gets written up as a root-cause fix is how a silent defect
+survives — a service that stopped emitting a diagnostic is still worth
+understanding before something else comes to depend on it.
+
+**FALSIFY IN THE BLOCKING DIRECTION.** A guard that only ever returns its
+permissive verdict is worse than one that never does, so the tests that count are
+the ones that must FAIL: a job present → HOLD, the untouched path still → HOLD,
+and an unreachable source → UNKNOWN rather than CLEAR. An empty result must read
+as a FAILED READ, never as an idle service.

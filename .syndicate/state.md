@@ -2208,10 +2208,27 @@ for twice. Newest truth wins; the superseded claims are recorded below as VOID
 rather than deleted, because two of them are *actionable and wrong* and someone
 remembering them would do damage. Full prior text is in git history.
 
-**THE SYMPTOM, which nothing below disputes:** `deploy_preflight.py` returns
-`UNKNOWN` for web — "sample is 356656s old (limit 180s)", 4.1 days and only
-ageing. The guard requires a CLEAR within 15 min, so **web's preflight is
-permanently unsatisfiable and every web deploy needs a break-glass grant.** A
+**THE SYMPTOM IS FIXED `[2026-08-19]`. `deploy_preflight.py` is SERVICE-AWARE:**
+web's process list is read live from its own `/api/ops/memory`; the workers keep
+the `ALL_PROCESS_MEMORY` log path, which works for them. Measured on the first
+run after the change — `web CLEAR, sample_source api:/api/ops/memory, age 0.0s,
+jobs 0` against `refresh-worker HOLD, log path, age 26s, jobs 7`. **Web no longer
+needs a break-glass grant to deploy.** The fix does NOT depend on the cause, and
+that was deliberate: four causes had been claimed and all four were wrong, so
+anything resting on a fifth guess would have been the fifth mistake. Falsified in
+the blocking direction too — a job on web yields HOLD, and an unreachable
+endpoint falls back to the log path and yields UNKNOWN, never CLEAR.
+
+**WHAT REMAINS IS THE CAUSE, and only that:** web has not emitted
+`ALL_PROCESS_MEMORY` since 2026-08-14. It no longer blocks anything, so it is a
+lower-priority question — but a service that silently stopped emitting a
+diagnostic is worth understanding before something else comes to depend on it.
+
+**THE SYMPTOM AS IT WAS, for anyone reading an older receipt:**
+`deploy_preflight.py` returned `UNKNOWN` for web — "sample is 356656s old (limit
+180s)", 4.1 days and only ageing. The guard requires a CLEAR within 15 min, so
+web's preflight was permanently unsatisfiable and every web deploy needed a
+break-glass grant. A
 guard that must be broken on every use has stopped being a guard. Tracked as
 `todo.md` `#465`.
 
