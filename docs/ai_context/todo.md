@@ -1019,7 +1019,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, AND the discrete-event engine redesign the validation demanded) fully built through to a shipped mechanism change** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, the discrete-event engine redesign the validation demanded, AND a DZ-specific re-examination that found the shipped mechanism's WIRING DIRECTION may be backwards) fully built through to a shipped mechanism change plus an honestly-flagged open correction** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -1647,8 +1647,69 @@ literal game-clock reconstruction (would need real per-second time-stepping,
 substantially larger than this pass); PP/PK segments remain entirely
 untouched by any decay-curve logic (`faceoff_ev_only` still gates this
 whole mechanism to even-strength only) -- no post-faceoff study was run
-for special-teams draws. **This closes the faceoff-zone track this session
-set out to build, validate, AND (where the validation demanded it) redesign.**
+for special-teams draws.
+
+**Sixth addendum, same day: DZ-specific segment validation -- and it
+CONTRADICTS the mechanism's own justification, not confirms it.** Full
+report: `docs/reports/hockeysim_faceoff_dz_segment_validation_report.md`.
+The fifth addendum flagged this as the one faceoff-zone mechanism never
+separately measured: §2o's own docstring claimed a DZ win both suppresses
+the opponent's shots AND springs the winner's own transition chance --
+both predicting the SAME direction as the general EV/OZ effect (winner
+out-shoots loser). This addendum tests that directly.
+
+Extended `historical_truth/faceoff_segment_effect.py` with a `winner_zone`
+filter -- backward compatible, `None` reproduces the exact prior behavior,
+all 13 pre-existing tests unchanged -- restricting the SAME winner/other
+post-faceoff counting the fourth addendum already validated to draws the
+winner took in THEIR OWN zone.
+
+**Result, consistent across all 4 window sizes tested, and consistently
+BACKWARDS**: DZ winner share 0.4189 (10s), 0.4639 (15s), 0.4723 (20s),
+0.4665 (30s) -- 19,458 real DZ draws. **The team that wins its own
+defensive-zone draw is OUT-SHOT, not out-shooting, in the following
+seconds, at every window.** This is the OPPOSITE direction from what the
+mechanism's justification predicted.
+
+**OZ-specific comparison confirms the technique and isolates DZ as the
+real anomaly, not a method artifact**: winning your own OZ draw shows an
+EVEN STRONGER positive effect than the blended population (0.9309 winner
+share at 10s, 13.47x ratio, vs the blended population's 0.7935/3.84x) --
+exactly the direction the OZ mechanism assumes, which is why DZ's opposite
+result is a real finding about DZ specifically.
+
+**A real, coherent alternative explanation**: a DZ draw happens because
+the puck was already in that zone when the stoppage occurred -- winning it
+does not instantly clear it. The team that just lost the draw is often
+STILL the team applying pressure moments later (a loose-puck battle, a
+blocked clear), which the data is consistent with.
+
+**What this means for the shipped mechanism, stated as carefully as the
+finding itself**: `engine.py`'s `faceoff_dz_index` currently boosts the
+DZ-WINNING team's own shots (`m_dz_h` applied to `lam_h`) -- this
+measurement suggests that WIRING DIRECTION may be backwards relative to a
+faithful, real-data-grounded model. **This is NOT a finding against
+`faceoff_dz_index` itself** -- the per-team relative differentiation
+remains independently verified (real spread, correct zero-sum
+normalization, genuine independence from OZ at r=0.69) -- only the
+direction it's composed into the engine is now in question.
+**Deliberately NOT fixed in this pass**, matching the exact same
+measure-first-redesign-second discipline the fourth->fifth addenda
+followed for the general case.
+
+**Verified**: 4 new unit tests for the `winner_zone` filter (population
+match, exclusion, `None` backward-compatibility, and that the truncation
+boundary still considers every EV faceoff regardless of ITS OWN zone). 17
+total tests pass in the segment-effect file (13 pre-existing + 4 new).
+
+**What remains genuinely open**: whether/how to change the DZ mechanism's
+wiring direction (the natural next step, not attempted here -- and "the
+winner gets fewer shots" does not automatically imply "model it as
+suppressing the winner," since an effect this specific may itself need
+discrete-event treatment rather than a simple sign flip on a still-flat
+constant). **This closes the faceoff-zone track this session set out to
+build, validate, redesign, AND (for DZ specifically) re-examine against
+its own justification.**
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

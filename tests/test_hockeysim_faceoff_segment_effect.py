@@ -19,10 +19,13 @@ def _mmss(seconds: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
-def _faceoff(owner_id, seconds, period=1, situation="1551"):
+def _faceoff(owner_id, seconds, period=1, situation="1551", zone=None):
+    details = {"eventOwnerTeamId": owner_id}
+    if zone is not None:
+        details["zoneCode"] = zone
     return {"typeDescKey": "faceoff", "situationCode": situation,
             "periodDescriptor": {"number": period}, "timeInPeriod": _mmss(seconds),
-            "details": {"eventOwnerTeamId": owner_id}}
+            "details": details}
 
 
 def _shot(owner_id, seconds, period=1, situation="1551", kind="shot-on-goal"):
@@ -149,3 +152,50 @@ def test_summary_empty_is_zeroed_not_a_crash():
     summary = summarize_post_faceoff_shots([])
     assert summary.n_games == 0
     assert summary.winner_share == 0.0
+
+
+# ---------------------------------------------------------------------------
+# `winner_zone` filter -- the population `hockeysim_faceoff_dz_segment_validation_report.md`
+# needs to test the DZ mechanism's dual offense/defense claim directly.
+# ---------------------------------------------------------------------------
+
+def test_winner_zone_filter_keeps_only_matching_draws():
+    rec = compute_post_faceoff_shots(_payload([
+        _faceoff(HOME_ID, 0, zone="D"),
+        _shot(HOME_ID, 5),
+        _faceoff(AWAY_ID, 50, zone="O"),  # different draw, different zone -- excluded
+        _shot(AWAY_ID, 55),
+    ]), window_seconds=15, winner_zone="D")
+    assert rec.n_faceoffs == 1
+    assert rec.winner_shots == 1
+    assert rec.other_shots == 0
+
+
+def test_winner_zone_filter_excludes_non_matching_draws_entirely():
+    rec = compute_post_faceoff_shots(_payload([
+        _faceoff(HOME_ID, 0, zone="O"),
+        _shot(HOME_ID, 5),
+    ]), window_seconds=15, winner_zone="D")
+    assert rec.n_faceoffs == 0
+    assert rec.winner_shots == 0
+
+
+def test_winner_zone_filter_none_matches_original_unfiltered_behaviour():
+    plays = [_faceoff(HOME_ID, 0, zone="D"), _shot(HOME_ID, 5),
+             _faceoff(AWAY_ID, 50, zone="O"), _shot(AWAY_ID, 55)]
+    unfiltered = compute_post_faceoff_shots(_payload(plays), window_seconds=15)
+    assert unfiltered.n_faceoffs == 2
+    assert unfiltered.winner_shots == 2
+
+
+def test_winner_zone_filter_truncation_boundary_uses_any_zone_not_just_matching():
+    """The NEXT-faceoff truncation boundary must consider EVERY EV faceoff, regardless of ITS OWN
+    zone -- truncation is about not double-counting a shot, not about which draws are studied."""
+    rec = compute_post_faceoff_shots(_payload([
+        _faceoff(HOME_ID, 0, zone="D"),
+        _faceoff(AWAY_ID, 10, zone="O"),  # different zone, but still truncates draw 1's window
+        _shot(HOME_ID, 12),
+    ]), window_seconds=15, winner_zone="D")
+    assert rec.n_faceoffs == 1  # only the "D" draw is studied
+    assert rec.winner_shots == 0  # the shot at t=12 falls after draw 1's truncated window (ends t=10)
+    assert rec.other_shots == 0  # and draw 2 (zone "O") isn't studied at all under this filter

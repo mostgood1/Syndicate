@@ -62,6 +62,7 @@ class _TimedEvent:
     team_id: Optional[int]
     is_faceoff: bool
     is_shot: bool
+    zone: Optional[str] = None  # faceoff events only -- the WINNER's own zone ("O"/"N"/"D")
 
 
 def _extract_timed_events(payload: Dict) -> List[_TimedEvent]:
@@ -93,8 +94,12 @@ def _extract_timed_events(payload: Dict) -> List[_TimedEvent]:
             team_id = details.get("eventOwnerTeamId")
         else:
             team_id = details.get("eventOwnerTeamId")  # the shooting team, same field name
+        # `zoneCode` is relative to the WINNER (`faceoff_ev_index.py`'s §2n docstring: confirmed
+        # empirically -- two draws at identical rink coordinates showed opposite zone labels
+        # depending who won). Only meaningful for faceoff events; `None` for shots.
+        zone = str(details.get("zoneCode")).strip().upper() if (is_faceoff and details.get("zoneCode")) else None
         out.append(_TimedEvent(period=period, seconds=seconds, team_id=team_id,
-                                is_faceoff=is_faceoff, is_shot=is_shot))
+                                is_faceoff=is_faceoff, is_shot=is_shot, zone=zone))
     return out
 
 
@@ -116,25 +121,40 @@ _PERIOD_LENGTH_SECONDS = 1200.0  # 20-minute regulation period; a conservative c
 # the cap only ever matters for a draw taken in the final `window_seconds` of a period.
 
 
-def compute_post_faceoff_shots(payload: Dict, *, window_seconds: float = 15.0) -> Optional[GamePostFaceoffShots]:
+def compute_post_faceoff_shots(
+    payload: Dict, *, window_seconds: float = 15.0, winner_zone: Optional[str] = None,
+) -> Optional[GamePostFaceoffShots]:
     """Parse one `playbyplay` payload. Returns `None` if the payload carries no `plays` list at
-    all (never raises); a game with zero EV faceoffs returns a record with `n_faceoffs==0` rather
-    than `None`, so the caller's own aggregate decides whether to trust it.
+    all (never raises); a game with zero EV faceoffs (or zero matching `winner_zone`, if given)
+    returns a record with `n_faceoffs==0` rather than `None`, so the caller's own aggregate
+    decides whether to trust it.
 
     For each EV faceoff, the window is bounded by whichever comes first: the fixed
     `window_seconds`, the NEXT EV faceoff in the same period (so a shot is never attributed to
     more than one draw), or the period's own end -- two small scans per draw (find the boundary,
     then count shots up to it), not a single mutating pass, so the truncation logic stays simple
     and independently checkable.
+
+    `winner_zone`, when given (`"O"`/`"N"`/`"D"`), restricts to draws where the WINNER's OWN zone
+    matches -- e.g. `"D"` isolates draws a team won in their own defensive zone, the population
+    `hockeysim_faceoff_dz_segment_validation_report.md` needs to test the DZ mechanism's dual
+    offense/defense claim directly, the same way the unfiltered (default) population already
+    tested the EV/OZ claim. The NEXT-faceoff truncation boundary is always the next EV faceoff
+    REGARDLESS of its own zone (truncation is about not double-counting a shot across two windows,
+    not about which draws are being studied) -- only which draws COUNT as a studied event is
+    zone-filtered, never which events can end one.
     """
     if not isinstance(payload, dict) or not isinstance(payload.get("plays"), list):
         return None
     events = _extract_timed_events(payload)
+    zone_filter = str(winner_zone).strip().upper() if winner_zone else None
 
     n_faceoffs = winner_shots = other_shots = 0
     window_total = 0.0
     for i, ev in enumerate(events):
         if not ev.is_faceoff or ev.team_id is None:
+            continue
+        if zone_filter is not None and ev.zone != zone_filter:
             continue
         n_faceoffs += 1
 

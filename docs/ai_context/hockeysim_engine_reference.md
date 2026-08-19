@@ -845,10 +845,55 @@ league-wide aggregate barely moved (992-pairing round-robin, 61.938 legacy vs 61
 −0.12%); 390 hockeysim/nhl tests pass with the new mechanism as default, including exact-seed
 determinism tests, despite the new mechanism consuming an extra RNG draw per EV segment.
 
-**What remains genuinely open**: DZ's own segment-level effect (never separately measured); the
-"one faceoff per segment" approximation is not a literal game-clock reconstruction; PP/PK segments
-remain entirely untouched by any decay-curve logic (`faceoff_ev_only` still gates this whole
-mechanism to even-strength only) — no post-faceoff study was run for special-teams draws.
+**What this section flagged as open — DZ's own segment-level effect — measured next, §2s, and the
+result contradicts the mechanism's own justification.**
+
+---
+
+## 2s. DZ-specific segment validation — a real effect, the WRONG direction
+
+Full report: `docs/reports/hockeysim_faceoff_dz_segment_validation_report.md`. §2o's own
+justification for `faceoff_dz_index` claimed a dual effect: a team that wins its own DZ draw both
+suppresses the opponent's shots AND springs its own transition chance — both predicting the SAME
+direction as the general EV/OZ effect (the faceoff winner out-shoots the loser). This section tests
+that directly, and the real data says otherwise.
+
+**Extended `faceoff_segment_effect.py` with a `winner_zone` filter** (backward compatible — `None`
+reproduces the exact prior behavior, all 13 pre-existing tests unchanged) — restricts the same
+winner/other post-faceoff counting §2q already validated to draws the winner took in their OWN
+zone.
+
+**Result, consistent across all 4 window sizes tested — and consistently backwards**: DZ winner
+share 0.4189 at 10s, 0.4639 at 15s, 0.4723 at 20s, 0.4665 at 30s (19,458 real DZ draws) — the team
+that wins its own defensive-zone draw is OUT-SHOT, not out-shooting, in the following seconds, at
+every window. **OZ-specific comparison confirms the technique and isolates DZ as the real
+anomaly**: winning your own OZ draw shows an EVEN STRONGER positive effect than the blended
+population (0.9309 winner share at 10s, 13.47x ratio) — exactly the expected direction, which is
+why the DZ result's opposite direction is a genuine finding about DZ specifically, not a method
+artifact.
+
+**A real, coherent alternative explanation**: a DZ draw happens because the puck was already in
+that zone when the stoppage occurred — winning it doesn't instantly transport the puck to center
+ice. The team that just lost the draw is often STILL the team applying pressure moments later (a
+loose-puck battle, a blocked clear), which the data is consistent with.
+
+**What this means for the shipped mechanism, stated carefully**: `engine.py`'s `faceoff_dz_index`
+currently boosts the DZ-WINNING team's own shots (`m_dz_h` applied to `lam_h`) — this measurement
+suggests that direction may be backwards relative to a faithful, real-data-grounded model. This is
+**not** a finding against `faceoff_dz_index` itself (the per-team relative differentiation remains
+independently verified — real spread, correct normalization, genuine independence from OZ at
+r=0.69) — only the WIRING DIRECTION composing it into the engine is now in question. **Deliberately
+not fixed in this pass**, matching the same discipline §2q→§2r followed: measure first, redesign
+once the shape of the fix is clear, not in the same pass as the measurement.
+
+**Verified**: 4 new unit tests for the `winner_zone` filter (population match, exclusion, `None`
+backward-compatibility, and that the truncation boundary still considers every EV faceoff
+regardless of ITS OWN zone). 17 total tests pass in the segment-effect test file.
+
+**What remains genuinely open**: whether/how to change the DZ mechanism's wiring direction (the
+natural next step, not attempted here — and "the winner gets fewer shots" doesn't automatically
+imply "model it as suppressing the winner," since a segment-level effect this specific may itself
+need discrete-event treatment rather than a simple sign flip on a still-flat constant).
 
 ---
 
@@ -915,6 +960,7 @@ concept.
 | `compute_team_faceoff_nz_index` + `scripts/calibrate_nhl_faceoff_nz_index.py` (§2p) — checks whether ANY faceoff-zone index correlates with real season-aggregate `shots_per_60`, not just whether it's normalized correctly | built, run — every correlation (NZ/OZ/DZ/EV) under 0.02 in magnitude, indistinguishable from zero across all 32 teams | **deliberately NOT wired** — real measurement found no basis to; function is tested (5 unit tests) but not added to the CSV producer, loader, or `engine.py`, avoiding the exact "populated but dead" anti-pattern §2l already fixed once |
 | `historical_truth/faceoff_segment_effect.py` + `scripts/validate_nhl_faceoff_segment_effect.py`/`build_nhl_faceoff_decay_curve.py` (§2q) — checks the mechanism's claimed LOCAL, segment-level effect directly, not just season aggregates | built, run — real, large, sharp, short-lived effect confirmed (3.84x-7.15x near a draw, decaying to 1.00x by 60-90s, 58,762 real EV faceoffs) | measurement-only; flips the §2p null result's interpretation but changes no engine behavior by itself |
 | `historical_truth/faceoff_decay_model.py` + `engine.py`'s `faceoff_discrete_event_model` (§2r) — the redesign §2q's own finding required: a discrete per-draw event with a real decay curve, not a per-segment constant | built, tested (17 unit + 2 reachability), verified the league-wide average barely moved (61.938 legacy vs 61.864 discrete-event, −0.12%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the one genuinely new flag this session's additive work introduced (`False` restores the exact pre-redesign mechanism); 392 tests pass with it as the default, including exact-seed determinism tests |
+| `faceoff_segment_effect.py`'s new `winner_zone` filter + `scripts/validate_nhl_faceoff_dz_segment_effect.py` (§2s) — tests the DZ mechanism's dual claim directly, the one faceoff-zone mechanism §2r left unmeasured | built, run (19,458 real DZ draws, 4 window sizes) — **winner share BELOW 0.5 at every window (0.42-0.47)**, the OPPOSITE direction from the mechanism's own justification; OZ-specific comparison confirms the technique (0.93 winner share, even stronger than the blended population) | measurement-only, changes no engine behavior by itself — flags the shipped `faceoff_dz_index` WIRING DIRECTION (not the index itself) as now in question, a distinct next step deliberately not attempted this pass |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
 **Almost all of it is additive and reachable-by-default with no flag to flip** — the one exception

@@ -416,6 +416,33 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   (some real shifts begin off a line change); DZ's own segment-level effect
   was never separately measured, still uses the legacy diff-based math; PP/PK
   segments remain entirely untouched by any decay-curve logic.
+- **Did** build the DZ-specific segment validation the item above left open
+  (reference doc §2s, full report
+  `docs/reports/hockeysim_faceoff_dz_segment_validation_report.md`) — and
+  the result CONTRADICTS the mechanism's own justification. §2o's
+  docstring claimed a dual effect (DZ win suppresses the opponent AND
+  springs the winner's own transition chance), both predicting the winner
+  out-shoots the loser, same direction as the general EV/OZ effect.
+  Extended `faceoff_segment_effect.py` with a `winner_zone` filter
+  (backward compatible, all 13 pre-existing tests unchanged) and measured
+  directly: **DZ winner share sits BELOW 0.5 at every one of 4 window
+  sizes tested (0.42-0.47, 19,458 real DZ draws)** — the team that wins its
+  own defensive-zone draw is OUT-SHOT, not out-shooting, in the following
+  seconds. **OZ-specific comparison confirms the technique rather than a
+  method artifact**: winning your own OZ draw shows an EVEN STRONGER
+  positive effect than the blended population (0.93 winner share at 10s,
+  13.47x ratio) — exactly the expected direction, isolating DZ as the real
+  anomaly. A coherent alternative explanation: a DZ draw happens because
+  the puck was already in that zone; winning it doesn't instantly clear it,
+  and the team that lost the draw is often still applying pressure moments
+  later. **What this means for the shipped mechanism, stated carefully**:
+  `faceoff_dz_index`'s WIRING DIRECTION (currently boosts the DZ-winning
+  team's own shots) may be backwards relative to a faithful model — this is
+  NOT a finding against the per-team index itself (still independently
+  verified: real spread, correct normalization, genuine OZ independence at
+  r=0.69), only against how it's composed into the engine. **Deliberately
+  NOT fixed this pass**, matching the same measure-first discipline §2q→§2r
+  followed. 4 new unit tests, 17 total in the segment-effect file.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader
