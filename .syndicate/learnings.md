@@ -1468,3 +1468,51 @@ production for that whole window on a model measured, once anyone looked, to
 lose to the closing line at 16 sigma. Fixed by a default-DENY serving gate
 (`syndicate/features/football/pick_gate.py`) plus the Stage 0 ledger
 (`pick_ledger.py`) that makes the accuracy question answerable at all.
+
+
+## An absent log marker is only evidence if the marker's transport actually reaches you `[2026-08-19]`
+
+**What we believed:** repeated checks of `BOXSCORE_BOOTSTRAP_STALLED` never
+appearing in Render's log collector, across many hours and multiple real
+runs, was treated as inconclusive-leaning-toward-still-broken evidence
+about `#469`'s ESPN fetch — the marker's own `print(..., flush=True)` had
+been specifically added so it WOULD be observable, so its absence felt
+like it should mean something.
+
+**What was actually true:** it meant nothing, for a whole class of runs.
+`launch_refresh_run` spawns autorun-launched children with
+`stdout=DEVNULL` by explicit design (soccer's own pre-existing `#433`
+code comment explains why) — so no `print()` from inside
+`refresh_wnba_oddsapi_props.py`, including this exact marker, could ever
+reach Render's log collector for THOSE specific runs, regardless of
+whether the underlying condition it reports on ever occurred. Every
+"still no STALLED marker" observation during that stretch was reading a
+transport gap as a negative result.
+
+**How we found out:** the user pushed back twice on "still frozen, still
+waiting" as an answer before the actual mechanism got read rather than
+assumed. Reading `launch_refresh_run`'s own code (not just its
+docstring/comment, the actual spawn call) showed the DEVNULL redirect
+directly. The script's own `_append_log` FILE turned out to be the one
+surviving signal, but had never been allowlisted either — a second,
+independent gap in the SAME diagnostic chain, only found by trying to
+read that file and hitting a 403.
+
+**The rule going forward:** before treating an expected log marker's
+absence as a negative result, confirm the marker's actual transport
+reaches you for the SPECIFIC invocation path being tested — a detached/
+fire-and-forget subprocess, a different launch mode, or a different
+service can silently sever stdout capture while the underlying code still
+runs exactly as written. When in doubt, verify with a marker or file
+KNOWN to exist for that exact path (a positive control) before trusting a
+negative one. This is the same shape as the file-vs-stdout gap already
+documented for soccer's own reporting (`#433`) — it cost real
+investigation time again here specifically because the SPECIFIC launch
+path (`launch_mode="web_process"` from the WNBA/soccer pregame autorun)
+hadn't been checked against it before, only assumed to behave like other,
+already-verified invocation paths.
+
+**Cost:** several hours of "still no marker, still inconclusive" reporting
+that was never going to resolve on its own, until the transport gap itself
+was found and fixed (allowlisting `_append_log`'s own file) and a manual
+trigger was used to get a real, direct answer instead.
