@@ -1377,3 +1377,43 @@ clothes.
   where it actually reads the value from, or hand the decision to the user.
 - Cost: two blocked deploy attempts, ~5 minutes, no production impact (the
   guard did its job correctly both times).
+
+## `#472` — a quiet autorun is not evidence it is idle `[2026-08-19]`
+
+**What we believed:** WNBA's pregame autorun going silent for 5+ hours after
+a fresh deploy was benign — smart-sim generation is tied to actual game
+slates, not a fixed interval, so a quiet stretch with no game imminent
+reads as correctly-skipped, not broken.
+
+**What was actually true:** it was failing on every tick, repeatedly, and
+each failure silently cost a full 4-hour retry window. The autorun's own
+except-block wrote a fresh, full-interval-resetting epoch on ANY exception,
+including plain mutex contention (`launch_refresh_run`'s "already active"
+ValueError) where NOTHING was actually attempted — some other job (a
+legitimately in-flight MLB resim) just held the shared single-run slot.
+Soccer's identical, copy-pasted autorun had the same defect.
+
+**How we found out:** the user pushed back once ("well that tells me
+there's a problem") on the "benign cadence" framing, and again ("this
+should not cause a 5 hour delay") after a first, still-too-generous
+explanation. Both times the fix was to actually read
+`/api/ops/live-refresh/state` and the raw log stream instead of reasoning
+from a plausible-sounding mechanism. The production timestamps settled it:
+WNBA succeeded cleanly at ~4h intervals all day (01:24/05:24/09:29/13:35Z),
+then went dark the moment it first collided with a job that was still
+verifiably running (confirmed via its own pid switching mid-investigation,
+not assumed).
+
+**The rule going forward:** a scheduled job going quiet for longer than its
+own stated interval is not "no trigger yet" until you have checked whether
+it is actually TRYING and losing — read the live state/logs for the actual
+attempt-and-failure pattern before accepting an absence as benign. And
+separately: any retry/backoff logic must distinguish "we tried and
+genuinely need to wait" from "we didn't get a turn" — collapsing both into
+one epoch/cooldown timestamp turns ordinary resource contention into a
+multi-hour outage.
+
+**Cost:** ~1 extra investigation cycle before the user's second, sharper
+pushback forced the real trace; the underlying bug (fixed in `97e85b66`)
+had likely been silently starving WNBA's refresh cadence for longer than
+just this session's window, unmeasured.

@@ -2635,19 +2635,60 @@ being live changes nothing observable until either the vendor CLI is
 invoked directly against Render, or `basketball_props_smart_sim.py` is
 wired to call an equivalent builder itself.
 
-**Secondary, independent finding**: even reachability alone wouldn't fix
-it — the underlying boxscore capture is ALSO stalled. Dated per-slate files
-(`boxscores_2026-*.csv`) stop at 2026-05-24; the aggregate
-`boxscores_history.csv` has a fresh mtime but its data stops at 2026-06-30.
-No caller of `update-boxscores-history`/`backfill-boxscores` exists
-anywhere in `syndicate/`, `scripts/`, or `pipeline/` — same unreachability
-shape, a different function.
+**`#468` reachability fix IS NOW LIVE AND DEPLOYED, updated 2026-08-19**:
+wiring shipped and deployed to BOTH refresh-worker (`f13ea05e`) and
+live-odds-worker (`e1d1bcf4`/`0c7962a7` lineage) — confirmed working
+end-to-end on a REAL production sim call (not just isolated test): a
+genuine `smart_sim_2026-08-19_WSH_TOR.json` run rebuilt 3 fresh
+`team_advanced_stats_2026_asof_*` files where one stale file existed
+before, mtime jumped clean off the pre-fix frozen baseline. Measurement:
+`.syndicate/deploys.md`, "`#468` + `#469` — EFFECT CONFIRMED" entry.
+
+**Boxscore capture (was: "no caller exists anywhere" — that specific claim
+was WRONG, corrected 2026-08-19).** A parallel, Syndicate-owned, ESPN-based
+mechanism (`_ensure_player_logs_for_props_refresh` ->
+`_bootstrap_local_boxscores_history_for_props` ->
+`bootstrap_boxscores_history_local`) IS reachable from `main()` and runs on
+every refresh tick — the "no caller" finding was true only of the vendor
+CLI's own functions. Real root cause (`#469`, filed and fixed): the
+bootstrap checked cumulative `history_rows` instead of the pull's own new
+`rows`, so a fetch adding zero rows still reported success — silently, for
+weeks. Root-caused further: ESPN's site API likely soft-blocks a
+datacenter-shaped User-Agent from Render's egress IP. Fixed (silent-success
+detection + browser UA) and deployed to both services (`0c7962a7`
+live-odds-worker, `23e70a80` cherry-picked onto refresh-worker's live SHA
+`6631748c` since that SHA is off-`main`, on `deploy/469-pt3-refresh-worker`).
+
+**A SECOND, deeper bug (`#469` pt3) then masked the first fix**:
+`_player_logs_ready` treated the bootstrap's OWN mtime-refreshing stalled
+write as "ready" for a full 12h window, so the diagnostic code (and the
+retry) almost never actually ran. Fixed: mtime-freshness now only governs
+the genuine `player_logs.parquet`/`.csv` artifacts; the boxscore fallback
+path is gated purely on content-date staleness plus a dedicated 30-minute
+attempt-backoff marker (mirrors this file's own `_predict_date_*` pattern).
+
+**A THIRD bug (`#472`) then explained why even THAT fix's effect stayed
+unobserved for 5+ hours**: `_launch_autorun_wnba_pregame_refresh` (and its
+identical twin, `_launch_autorun_soccer_pregame_refresh`) wrote a fresh,
+full-interval-resetting epoch on EVERY launch failure, including plain
+mutex contention from `launch_refresh_run`'s "already active" check — so
+one lost race against another job (confirmed: a legitimately in-flight MLB
+resim chain) cost the FULL 4h cadence instead of a short retry. Measured
+live: WNBA succeeded cleanly at ~4h intervals all day (01:24/05:24/09:29/
+13:35Z) then went 5+ hours dark the moment it first collided. Fixed
+(`97e85b66`, on `origin/main`, **NOT YET DEPLOYED** — live-odds-worker's
+claim was held by another session for the rest of this session).
+
+**Runtime effect of `#469`'s ESPN fix is STILL UNOBSERVED as of this
+entry** — not because it doesn't work, but because the `#472` starvation
+bug has prevented the WNBA refresh from getting a long enough uncontended
+run to test it. `boxscores_history.csv`'s own max game date was still
+frozen at 2026-06-30 at end of session.
 
 **Unmeasured**: whether NBA has the identical reachability defect (NBA's
 own staleness is plausibly just offseason, not compared apples-to-apples).
-Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`.
-**Filed as `todo.md` `#468`** — a NEW, separate defect from the
-cache-freshness bug `#461` already fixed. NOT FIXED as of this entry.
+Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
+`.syndicate/log/2026-08-19.md`.
 
 ## [mlb-sim-log-unreachable] RETRACTED — THE SIM LOG *IS* REACHABLE REMOTELY `[2026-08-19]`
 
