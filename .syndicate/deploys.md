@@ -17093,3 +17093,61 @@ since `450e0d6e` extends the live SHA directly).
   despite more autorun launches, (2) is confirmed and the actual defect is
   upstream of anything #469/#472 touch -- the spawned refresh process itself
   is not completing normal execution, a genuinely new investigation thread.
+
+
+### #469 CONFIRMED WORKING END-TO-END — the whole chain closes — 2026-08-19 ~21:20Z — lane `basketball-model-owner`
+
+The final open question from every entry in this thread ("does ESPN's fetch
+actually succeed from Render's production IP?") is now answered: **yes.**
+
+Manually triggered a real, forced WNBA refresh via `/api/ops/odds-refresh/run`
+(`sports=wnba`, `phase=pregame`, `mode=full`, `force_refresh=true`) rather
+than wait ~4h for the next natural `#472`-gated cycle, since `#472`'s one
+successful launch this session had already set a fresh epoch. Claimed and ran
+on refresh-worker via the `manifest_only` queue path (avoiding the documented
+"stuck on web" bug for this same endpoint).
+
+**Measured, by content, pulled fresh via `/api/ops/artifacts/export`:**
+- `wnba_source/data/processed/boxscores_2026-08-18.csv` -- a genuinely NEW
+  per-slate file (count went 23 -> 24), 101 real rows, real player names
+  (`Nneka Ogwumike` etc.), real per-game box-score stats, `source=espn`,
+  correctly dated. Previously the per-slate family had been frozen at
+  exactly 23 files stopping 2026-05-24 for the entire session.
+- `wnba_source/data/processed/boxscores_history.csv` -- own max game date
+  advanced **2026-06-30 -> 2026-08-18** (measured via the same direct CSV
+  pull used throughout this thread, not inferred). Frozen at 06-30 for the
+  ENTIRE session up to this point, across every prior check.
+
+**Also surfaced two more real, now-fixed gaps in the ops tooling itself
+while chasing this:**
+- `wnba_source/logs/syndicate_refresh_oddsapi_props_*.log` (and the `nba_`
+  equivalent) were never in `HOT_ARTIFACT_PATTERNS` -- 403 on export. This was
+  the ONLY place `_append_log`'s own diagnostic lines survive for
+  autorun-launched runs specifically, since `launch_refresh_run` spawns those
+  children with `stdout=DEVNULL` by design (soccer's own `#433` comment) --
+  meaning even `#469`'s own `BOXSCORE_BOOTSTRAP_STALLED` marker could never
+  have been observed for THOSE runs regardless of whether it fired. Fixed
+  (`b35dcfa0` on `origin/main`, cherry-picked onto web's live deploy-branch
+  SHA as `450e0d6e`, deployed and confirmed live).
+- Confirmed structurally (not a bug, a genuine architecture fact worth
+  recording plainly): `reports/migration_runs/**` stdout/stderr wrapper
+  files are NOT cross-service visible at all -- they live on whichever
+  service actually ran the job (refresh-worker here), and web's disk is
+  separate (`CLAUDE.md`'s own "Render's Redis-backed disk cannot be shared"
+  note, now verified against this specific path family directly). The
+  swept `HOT_ARTIFACT_PATTERNS` mechanism is the only thing that crosses
+  that boundary, which is exactly why the log-file allowlist fix above was
+  necessary and why `/api/ops/odds-refresh/logs` genuinely cannot report on
+  a refresh-worker-run job's raw stdout/stderr from web's vantage point,
+  independent of any allowlist entry.
+- Even so, the SPECIFIC `syndicate_refresh_oddsapi_props_2026-08-19.log`
+  file was still `count: 0` (genuinely absent, not 403) at last check
+  despite the allowlist fix and two real completed runs -- unexplained,
+  logged rather than chased further given the higher-value ground-truth
+  signal (the CSV content itself) already gave a decisive, fully verified
+  answer. Worth a look if `#469`'s log-level diagnostics are needed again.
+
+**Bottom line for whoever reads this lane next**: `#461`/`#462`/`#464`/`#467`/
+`#468`/`#469`/`#472` are ALL closed with real production confirmation, not
+just code-correct-in-isolation. No further action identified as ready in
+this lane as of this entry.
