@@ -2770,7 +2770,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, ONE OF TWO CALIBRATION DEFECTS FIXED `[verified 2026-08-19]`
+## [nfl-player-props-model] NFL PLAYER-PROP MODEL: FIRST BACKTEST RUN, REAL SKILL FOUND, BOTH CALIBRATION DEFECTS FIXED — `#471` FULLY CLOSED `[verified 2026-08-19]`
 
 `syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
 rate) + `props._nfl_prop_model_probability` (Normal-CDF cover probability) —
@@ -2794,11 +2794,28 @@ closes most of the gap, a ~4pp residual stays, stated not hidden. Real
 trade-off: `anytime_td`'s point MAE got WORSE (0.358→0.386), correct for
 a probability market (Brier is the graded metric) but a real cost.
 
-**Defect 1 still OPEN, diagnosed-not-fixed**: every count/yardage market
-is overconfident near its own mean (predicts ~50% cover, actual ~37-44%)
-— real box-score stats are right-skewed, `Normal(mean, stdev)` can't
-represent that. Needs a different fix than shrinkage (a shape problem,
-not a small-n problem).
+**Defect 1 FIXED, TUNED, MEASURED out-of-sample `[2026-08-19, lane
+nfl-player-props-skew-fix, 5def74df]`**: every count/yardage market's
+Normal-CDF cover probability was overconfident near its own mean (~50%
+predicted, ~37-44% actual) — real box-score stats are right-skewed,
+`Normal(mean, stdev)` can't represent that. **First attempt (pure
+log-normal, method-of-moments) was a NULL RESULT** — improved 4 of 8
+markets, WORSENED the other 4 by overcorrecting; recorded (`reports/nfl_
+cover_probability_model_comparison.json`), not shipped. **Real fix: a
+per-market Normal/log-normal BLEND weight, closed-form Brier-minimizing**
+(Brier is convex in a linear blend of two fixed probabilities — no grid
+search), selected on 2022-2023, reported on 2024-2025:
+`passing_attempts` w=1.0 (Brier 0.2062→0.1998), `rushing_yards` w=0.573
+(0.2157→0.2111), smaller real gains on 3 more markets; `passing_tds`/
+`interceptions` showed no real OOS benefit and ship UNCHANGED (w=0) —
+not forced through. Full-scale re-run confirms the same shape
+(`passing_attempts` Brier 0.1919→0.1836). Section 1 point-accuracy MAE
+confirmed byte-identical before/after — no regression to any beats-
+baseline verdict. Deliberately stdlib-only, no `scipy` (a declared-but-
+never-imported dependency).
+
+**`#471` is now FULLY CLOSED** — both calibration defects it found are
+fixed and measured out-of-sample.
 
 **Production artifact-allowlist gap, confirmed live**:
 `/api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv`
