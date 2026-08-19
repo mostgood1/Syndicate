@@ -3803,7 +3803,26 @@ def _file_is_fresh(path: Path, *, max_age_minutes: int) -> bool:
 
 
 def _player_logs_ready(source_root: Path, *, max_age_minutes: int) -> bool:
-    paths = _active_player_logs_paths(source_root) + _active_player_logs_fallback_paths(source_root)
+    # #469 pt3: deliberately does NOT include _active_player_logs_fallback_paths
+    # (boxscores_history.csv/boxscores_*.csv) here anymore. Their writer,
+    # _bootstrap_local_boxscores_history_for_props, refreshes the file's mtime
+    # on EVERY attempt -- success or a fully failed ESPN fetch alike (#469 pt2's
+    # own fix: it still writes existing_history back unchanged and still calls
+    # _write_history). mtime freshness cannot distinguish "genuinely refreshed"
+    # from "just wrote unchanged stale content back", so this used to report
+    # "ready" for a full REFRESH_PLAYER_LOGS_MAX_AGE_HOURS (12h default) window
+    # after a single stalled write -- during which _ensure_player_logs_for_props_
+    # refresh short-circuited HERE, before ever reaching the content-date-aware
+    # boxscore_history_is_stale check further down, so the bootstrap (and its
+    # BOXSCORE_BOOTSTRAP_STALLED marker) never ran again until the mtime aged
+    # out. Confirmed in production 2026-08-19: boxscores_history.csv's own max
+    # game date stayed frozen at 2026-06-30 across 11+ hours post-deploy while
+    # its mtime kept advancing every ~12h and the STALLED marker never printed
+    # once -- this early-return was masking #469 pt2's own diagnostic. The
+    # genuine player_logs artifacts (parquet/csv) are unaffected: they are only
+    # ever written wholesale on a real successful build, so mtime freshness is
+    # a valid signal for them.
+    paths = _active_player_logs_paths(source_root)
     return any(_file_is_fresh(path, max_age_minutes=max_age_minutes) for path in paths)
 
 
@@ -3902,6 +3921,18 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
         if not boxscore_history_is_stale(source_root / "data" / "processed", max_age_days=max_age_days):
             return True, None
 
+        # #469 pt3: content is genuinely stale, so _player_logs_ready no longer
+        # masks this -- but without SOME cooldown, a persistently failing ESPN
+        # fetch would now re-run the bootstrap's full lookback-window scoreboard
+        # sweep on every single refresh tick (this worker was already measured
+        # at 98% container memory the same day). Gate re-attempts on their own
+        # marker, deliberately NOT the data file's mtime (that's the exact
+        # coupling that caused the masking bug above).
+        cooldown_minutes = _boxscore_bootstrap_backoff_minutes()
+        if _boxscore_bootstrap_recently_attempted(source_root=source_root, cooldown_minutes=cooldown_minutes):
+            return True, None
+        _mark_boxscore_bootstrap_attempt(source_root=source_root)
+
     bootstrapped_ok, bootstrap_error = _bootstrap_local_boxscores_history_for_props(
         source_root=source_root,
         date_str=date_str,
@@ -3915,6 +3946,47 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
         return False, bootstrap_error or "player_logs not found and no local boxscores fallback is available; run fetch-player-logs"
     _append_log(log_file, "player_logs missing and source fetch fallback is disabled in Syndicate-only mode")
     return False, "player_logs missing and no local fetch fallback is available"
+
+
+def _boxscore_bootstrap_backoff_marker_path(*, source_root: Path) -> Path:
+    # Not date_str-keyed like _predict_date_*: the bootstrap's own lookback
+    # window already spans many days per call, so one cooldown per source_root
+    # is the right granularity -- a per-date marker would reset to "never
+    # attempted" every midnight and defeat the cooldown within a single stall.
+    return source_root / "data" / "processed" / ".boxscore_bootstrap_attempt.json"
+
+
+def _boxscore_bootstrap_recently_attempted(*, source_root: Path, cooldown_minutes: float) -> bool:
+    if cooldown_minutes <= 0:
+        return False
+    marker_path = _boxscore_bootstrap_backoff_marker_path(source_root=source_root)
+    try:
+        payload = json.loads(marker_path.read_text(encoding="utf-8"))
+        started_at = dt.datetime.fromisoformat(str(payload.get("started_at") or ""))
+    except Exception:
+        return False
+    age_minutes = (dt.datetime.now(dt.timezone.utc) - started_at).total_seconds() / 60.0
+    return age_minutes < cooldown_minutes
+
+
+def _mark_boxscore_bootstrap_attempt(*, source_root: Path) -> None:
+    marker_path = _boxscore_bootstrap_backoff_marker_path(source_root=source_root)
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps({"started_at": dt.datetime.now(dt.timezone.utc).isoformat()}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def _boxscore_bootstrap_backoff_minutes() -> float:
+    raw = (os.environ.get("REFRESH_BOXSCORE_BOOTSTRAP_BACKOFF_MINUTES") or "30").strip()
+    try:
+        return max(0.0, float(raw))
+    except Exception:
+        return 30.0
 
 
 def _predict_date_backoff_marker_path(*, source_root: Path, date_str: str) -> Path:
