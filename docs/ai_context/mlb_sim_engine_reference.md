@@ -54,8 +54,32 @@ already exist — the build that would read it never runs.
 
 **Procedure for landing any new input:**
 1. publish the input artifact to the mounted disk;
-2. **rebuild rosters** — `--use-roster-artifacts=off`, or clear `roster_objs/`
-   for the target date;
+2. **rebuild rosters** — set **`SYNDICATE_MLB_ROSTER_REBUILD_DATE=<YYYY-MM-DD>`**
+   on refresh-worker and let that date's sim run.
+
+   **Until 2026-08-18 this step was IMPOSSIBLE in production**, and this document
+   asserted it anyway. `run_mlb_daily_sim_job.py` built a hardcoded command of
+   eleven flags and never passed `--use-roster-artifacts`, so
+   `daily_update.py`'s default (`on` = reuse) always won. There was no env var,
+   no CLI path and no ops endpoint, and the worker runs no HTTP server so its
+   disk could not be cleared remotely either.
+
+   The gate is **DATE-SCOPED, not on/off, deliberately**: a rebuild is the
+   expensive path, and a plain flag left set silently pays that cost on every
+   run forever. A date matches at most one day and is inert by the next morning
+   whether or not anyone remembers it. `always` exists for a deliberate
+   multi-day rebuild and says what it is.
+
+   **Absent means today's behaviour, not `off`** — with the var unset the flag
+   is not passed at all. Adding the key changes nothing until it is set.
+
+   It **prints on both paths** (`ROSTER_REBUILD armed` / `ROSTER_REBUILD inert:
+   gate=... does not match date=...`), because a silently mis-set gate is
+   indistinguishable from a rebuild that ran — which is the failure the gate
+   exists to make visible.
+
+   Cheapest alternative, no env change: `roster_objs/` are per-date, so the
+   **first sim on a NEW DATE rebuilds for free.**
 3. run `sim_input_checklist.py --publish` and confirm the field left the FAIL list;
 4. only then measure effect.
 

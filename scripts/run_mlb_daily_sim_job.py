@@ -267,6 +267,39 @@ def main() -> int:
         # --allow-empty-current-oddsapi above) is enough.
         "--refresh-current-oddsapi", "off",
     ]
+    # ROSTER REBUILD GATE. `#440`.
+    #
+    # `daily_update.py --use-roster-artifacts` defaults to "on" and this wrapper
+    # never passed it, so the worker ALWAYS reused `roster_objs/` serialised
+    # before any new input field existed -- and there was no env var, no CLI
+    # path and no ops endpoint to say otherwise. The worker runs no HTTP server,
+    # so its disk cannot be touched remotely either. The engine reference
+    # documented "rebuild rosters" as the procedure for landing a new input and
+    # production could not perform it.
+    #
+    # DATE-SCOPED ON PURPOSE. A plain on/off flag is a footgun: a rebuild is the
+    # EXPENSIVE path, and one left set silently pays that cost on every run
+    # forever. A date matches at most one day of runs and is inert by the next
+    # morning -- it expires whether or not anyone remembers to unset it.
+    # `always` exists for a deliberate multi-day rebuild and says what it is.
+    #
+    # ABSENT MEANS TODAY'S BEHAVIOUR, NOT "off": with the var unset the flag is
+    # not passed at all and `daily_update.py`'s own default ("on" = reuse) still
+    # decides. Adding this key changes nothing until it is set.
+    _rebuild = str(os.environ.get("SYNDICATE_MLB_ROSTER_REBUILD_DATE") or "").strip()
+    if _rebuild:
+        if _rebuild.lower() == "always" or _rebuild == str(args.date):
+            command.extend(["--use-roster-artifacts", "off"])
+            print(f"[mlb_sim_job] ROSTER_REBUILD armed date={args.date} "
+                  f"gate={_rebuild} -- rebuilding, NOT reusing roster_objs",
+                  flush=True)
+        else:
+            # Emitted so a mis-set gate is visible. Silence here would be
+            # indistinguishable from "the rebuild ran", which is the failure
+            # this whole gate exists to make observable.
+            print(f"[mlb_sim_job] ROSTER_REBUILD inert: gate={_rebuild} "
+                  f"does not match date={args.date}", flush=True)
+
     only_game_pks = str(args.only_game_pks or "").strip()
     if only_game_pks:
         command.extend(["--only-game-pks", only_game_pks])
