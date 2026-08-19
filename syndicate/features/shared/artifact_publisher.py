@@ -316,6 +316,21 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "mlb_source/source_artifacts/data/eval/batches/*/sim_vs_actual_*.json",
     "wnba_source/source_artifacts/data/processed/boxscores_history.csv",
     "wnba_source/data/processed/boxscores_history.csv",
+    # `#469`/`#472`, 2026-08-19: `refresh_wnba_oddsapi_props.py`'s own
+    # `_append_log` writes to `<source_root>/logs/syndicate_refresh_
+    # oddsapi_props_<date>.log` (confirmed live, real process cmdline:
+    # `--log-file /opt/render/project/data/wnba_source/logs/
+    # syndicate_refresh_oddsapi_props_2026-08-18.log`) -- but that file was
+    # NEVER allowlisted (confirmed: 403 on export). This left the boxscore-
+    # bootstrap's own diagnostic lines (STALLED/success reasons) genuinely
+    # unreadable for autorun-launched runs specifically: `launch_refresh_run`
+    # spawns the child with stdout=DEVNULL by design (soccer's own comment,
+    # `#433`), so the `print(..., flush=True)` STALLED marker never reaches
+    # Render's log collector either -- `_append_log`'s file is the ONLY
+    # surviving signal for those runs. One file per date, same bounded shape
+    # as the already-allowlisted per-date artifacts above.
+    "wnba_source/logs/syndicate_refresh_oddsapi_props_*.log",
+    "nba_source/logs/syndicate_refresh_oddsapi_props_*.log",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
     # `docs/ai_context/basketball_sim_engine_reference.md` Sec7 / `todo.md`
