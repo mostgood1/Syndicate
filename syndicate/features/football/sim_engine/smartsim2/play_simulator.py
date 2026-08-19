@@ -351,7 +351,9 @@ def simulate_play(
     clock_consumed = max(3, int(round(rng.normalvariate(priors.expected_clock_seconds * clock_base, 4.0))))
 
     if outcome == PlayOutcome.GAIN:
-        base_gain = (5.6 + priors.drive_success_probability * 4.5 + offense_rating * 3.0 - defense_rating * 2.2) * profile.drive_yardage_multiplier
+        base_gain = (5.6 + priors.drive_success_probability * 4.5
+                     + offense_rating * profile.rating_offense_weight
+                     - defense_rating * profile.rating_defense_weight) * profile.drive_yardage_multiplier
         yard_multiplier = 0.6 if play_state.down >= 3 else 0.0
         yards_gained = max(0, int(round(rng.normalvariate(base_gain + yard_multiplier, 3.2))))
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
@@ -379,7 +381,9 @@ def simulate_play(
         )
 
     if outcome == PlayOutcome.EXPLOSIVE_GAIN:
-        base_gain = (9.0 + priors.explosive_play_probability * 18.0 + offense_rating * 4.0 - defense_rating * 2.5) * profile.explosive_yardage_multiplier
+        base_gain = (9.0 + priors.explosive_play_probability * 18.0
+                     + offense_rating * profile.explosive_rating_offense_weight
+                     - defense_rating * profile.explosive_rating_defense_weight) * profile.explosive_yardage_multiplier
         yards_gained = max(6, min(55, int(round(rng.normalvariate(base_gain, 7.0)))))
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
         end_possession_state = replace(

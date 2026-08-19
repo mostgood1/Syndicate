@@ -35,6 +35,49 @@ class CalibrationProfile:
     # Explosive-play yardage magnitude: multiplies the EXPLOSIVE_GAIN yardage
     # base in play_simulator.simulate_play.
     explosive_yardage_multiplier: float = 1.0
+    # HOW TEAM RATING CONVERTS TO YARDAGE, and why these are asymmetric.
+    #
+    # `play_simulator` computed `offense_rating * 3.0 - defense_rating * 2.2`
+    # for ordinary gains and `* 4.0 / * 2.5` for explosive ones. Because the
+    # offense weight EXCEEDS the defense weight, a strong offense adds more
+    # than a strong defense subtracts -- so a game between two good teams
+    # inflates the TOTAL even though the MARGIN is unaffected (margin depends
+    # on the difference of these terms, total on their sum).
+    #
+    # Measured 2026-08-19 on the NCAAF 2026 wk1 slate: total SD 5.77 against a
+    # market 3.46 (1.67x), while the total MEAN was close (51.56 vs 53.02) --
+    # the scoring level right, only the spread wide.
+    #
+    # THAT ASYMMETRY IS *NOT* THE CAUSE OF THE WIDE TOTALS. I predicted it was
+    # and swept these weights to find out; total SD barely moved, and PARITY --
+    # the setting the sum-vs-difference argument says should fix it -- made
+    # totals WORSE:
+    #
+    #     off/def   ex off/def    margin SD   total SD
+    #     3.0/2.2     4.0/2.5        15.97       7.51   <- shipped
+    #     3.0/2.6     4.0/3.2        16.43       7.45
+    #     3.0/3.0     4.0/4.0        17.12       7.83   <- parity, worse
+    #     2.6/3.0     3.4/4.0        15.96       7.69
+    #     2.4/3.2     3.0/4.2        16.07       7.78
+    #
+    # (60 seeds, so the absolutes run ~30% high against the 300-seed
+    # production figure of 5.77; the RELATIVE comparison is what matters here.)
+    #
+    # These fields are kept anyway -- they make a hardcoded constant tunable
+    # per sport and cost nothing at their defaults -- but they DO NOT fix the
+    # total spread, and re-sweeping them is a dead end. The remaining
+    # over-dispersion is generated upstream, most likely in `drive_priors`
+    # `scoring_environment` or the drive/touchdown probability chain, and that
+    # is where the next investigation belongs.
+    #
+    # DEFAULTS REPRODUCE THE PREVIOUS HARDCODED VALUES EXACTLY, so NFL -- whose
+    # profile is the frozen Production Candidate -- is byte-identical unless a
+    # profile overrides them.
+    rating_offense_weight: float = 3.0
+    rating_defense_weight: float = 2.2
+    explosive_rating_offense_weight: float = 4.0
+    explosive_rating_defense_weight: float = 2.5
+
     # Ordinary-gain yardage magnitude ("drive-yardage generation"): multiplies
     # the GAIN outcome's yardage base in play_simulator.simulate_play.
     drive_yardage_multiplier: float = 1.0
