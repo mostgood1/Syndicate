@@ -252,3 +252,33 @@ def test_status_never_raises_on_an_unwritable_path(monkeypatch):
     """A status write must never fail the sim job it is reporting on."""
     monkeypatch.setattr(lb, "daily_ladders_path", lambda d: Path("/nonexistent\x00/x.json"))
     assert lb.write_status_artifact("2026-05-28", {"outcome": "rebuilt"}) is None
+
+
+def test_a_freshly_touched_file_with_STALE_CONTENT_is_stale(wired, tmp_path):
+    """The exact production failure, 2026-08-19.
+
+    The artifact is SYNCED onto the worker from web, so its mtime is whenever
+    the sync ran while its `generatedAt` is the last real build. `is_stale` read
+    mtime, saw a recent file, and returned `fresh` for a 28-hour-old artifact —
+    which kept the ladders serving "Market line: -" through four correct deploys.
+    """
+    base = wired({7: _sim_payload()}, {"pitcher_props": {}})
+    dest = base / "daily_ladders_2026-05-28.json"
+    dest.write_text(json.dumps({
+        "generatedAt": "2026-08-18T18:20:25+00:00",   # a day old
+        "groups": {"pitcher": {"strikeouts": {"rows": [1]}}},
+    }), encoding="utf-8")
+    # mtime is NOW -- newer than every input. Only the content betrays it.
+    st = lb.is_stale("2026-05-28", [7])
+    assert st["stale"] is True, f"stale content read as fresh: {st}"
+
+
+def test_unreadable_artifact_does_not_default_to_fresh(wired, tmp_path):
+    """An unknown must not take the permissive branch. A corrupt artifact that
+    reads as `fresh` would suppress every future rebuild silently."""
+    base = wired({7: _sim_payload()}, {"pitcher_props": {}})
+    dest = base / "daily_ladders_2026-05-28.json"
+    dest.write_text("{ not json", encoding="utf-8")
+    st = lb.is_stale("2026-05-28", [7])
+    assert isinstance(st.get("stale"), bool)
+    assert st.get("reason") != "artifact_missing"

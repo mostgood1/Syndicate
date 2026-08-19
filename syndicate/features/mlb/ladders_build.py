@@ -345,6 +345,40 @@ def is_stale(date_str: str, game_pks: list[int] | None = None) -> dict[str, Any]
     except Exception:
         return {"stale": True, "reason": "artifact_missing"}
 
+    # *** COMPARE THE CONTENT CLOCK, NOT THE FILE CLOCK. ***
+    #
+    # Measured 2026-08-19 by the status artifact this module writes: the trigger
+    # fired, called `is_stale`, and got `{"stale": false, "reason": "fresh"}` for
+    # an artifact whose own `generatedAt` was 2026-08-18T18:20 — 28 hours old.
+    #
+    # `st_mtime` is the wrong clock. The artifact is SYNCED onto the worker's
+    # disk from web, so its mtime is whenever the sync last touched it, while its
+    # CONTENT is whatever the last real build produced. A file can therefore look
+    # newly-written and be a day stale inside, which is exactly what kept the
+    # ladders serving "Market line: -" through four correct deploys.
+    #
+    # `generatedAt` is written by `build_ladders_artifact` on every real build,
+    # so the honest timestamp was in the file the whole time. Fall back to mtime
+    # only when the content carries no timestamp — an artifact from before this
+    # field existed should not be treated as infinitely fresh.
+    effective = dest_mtime
+    try:
+        doc = json.loads(dest.read_text(encoding="utf-8"))
+        raw = str((doc or {}).get("generatedAt") or "").strip()
+        if raw:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            content_ts = parsed.timestamp()
+            # Take the OLDER of the two. A synced file cannot make stale content
+            # look fresh, and a rewritten file cannot make fresh content look old.
+            effective = min(dest_mtime, content_ts)
+    except Exception:
+        # Unreadable or unparseable -> fall through on mtime. Deliberately NOT
+        # "assume fresh": an unknown must not default to the permissive branch.
+        effective = dest_mtime
+    dest_mtime = effective
+
     for side in ("pitcher", "hitter"):
         odds_path = (daily_snapshot_oddsapi_hitter_props_path(date_str) if side == "hitter"
                      else daily_snapshot_oddsapi_pitcher_props_path(date_str))
