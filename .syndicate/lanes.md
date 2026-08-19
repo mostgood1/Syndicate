@@ -1337,7 +1337,7 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   `reports/nfl_yardage_blend_stability_check.json`.
 - Blocked by: none.
 
-### nfl-tds-interceptions-blend-stability — OPEN — opened 2026-08-19 — session: nfl-tds-interceptions-blend-stability
+### nfl-tds-interceptions-blend-stability — CLOSED-VERIFIED 2026-08-19 — CONFIRMED w=0 was right for both: passing_tds half A/B = 0.3155/0.0217 (ratio 14.55x), interceptions = 0.1329/0.0287 (ratio 4.62x) -- both unstable, both decay toward zero on the more recent half. No code change. `284d4436` on `origin/main`. — session: nfl-tds-interceptions-blend-stability
 - Goal: `passing_tds` and `interceptions` are the two markets
   `nfl-player-props-skew-fix` shipped at `w=0` (Normal-only, no log-normal
   blend at all) because their ONE-WAY test (weight fit on 2022-2023,
@@ -1377,6 +1377,20 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   stated side by side, explicit stable/unstable verdict per market, and —
   only if stable and positive — a Brier check at the proposed weight
   before any code change.
+- **RAN. Hypothesis CONFIRMED — falsification test did NOT fire, `w=0`
+  stays correct for both.** `scripts/check_nfl_blend_weight_stability.py
+  --stats passing_tds,interceptions`: `passing_tds` half A (2022-2023,
+  n=4459) w=0.3155, half B (2024-2025, n=4539) w=**0.0217** — ratio
+  14.55x. `interceptions` half A (n=3890) w=0.1329, half B (n=3795)
+  w=**0.0287** — ratio 4.62x. **Both markets' independent estimate DECAYS
+  TOWARD ZERO on the more recent half** rather than flipping sign
+  erratically — consistent with genuinely weak-signal markets
+  (`interceptions` already had no measured point-accuracy skill at all in
+  `#471`'s original backtest, corr 0.045). The conservative estimate for
+  each (0.0217, 0.0287) is itself barely above the shipped `0.0`,
+  confirming the original decision was already at or below what even a
+  cautious reading supports. **No code change made.** Report:
+  `reports/nfl_tds_interceptions_blend_stability_check.json`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

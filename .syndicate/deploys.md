@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-08-19 — PASSING_TDS + INTERCEPTIONS BLEND WEIGHTS: STABILITY CHECKED, w=0 CONFIRMED CORRECT — lane `nfl-tds-interceptions-blend-stability`
+
+**NO DEPLOY. Local analysis only** (new report, `284d4436` on
+`origin/main`). No production code changed.
+
+`nfl-player-props-skew-fix` shipped `passing_tds`/`interceptions` at
+`w=0` (Normal-only) after their one-way OOS test came back slightly
+negative. Checked whether a MORE CONSERVATIVE weight (the approach that
+validated `rushing_yards`/`receiving_yards`) would have generalized where
+the fit-half's exact number didn't — same pre-registered criterion (same
+sign AND ratio<=2.0x).
+
+    passing_tds     half A (2022-2023, n=4459) w=0.3155
+                     half B (2024-2025, n=4539) w=0.0217   ratio 14.55x
+    interceptions    half A (n=3890) w=0.1329
+                     half B (n=3795) w=0.0287               ratio 4.62x
+
+**Both UNSTABLE — confirms `w=0` was already correct.** Notably, both
+markets' independent estimate DECAYS TOWARD ZERO on the more recent half
+rather than flipping sign erratically, consistent with genuinely
+weak-signal markets (`interceptions` already had no measured
+point-accuracy skill at all in `#471`'s original backtest, corr 0.045).
+The conservative estimate for each (0.0217, 0.0287) sits barely above the
+shipped `0.0` — the original decision was already at or below what even
+a cautious reading would support.
+
+**This closes out the full blend-weight family**: `passing_attempts`
+(unstable, capped at boundary), `rushing_yards`/`receiving_yards`
+(stable, well-supported), `passing_tds`/`interceptions` (unstable, `w=0`
+confirmed) — all 5 non-trivial markets in `_COVER_PROBABILITY_BLEND_
+WEIGHT` now individually stability-checked against independent data.
+
+Verify: `reports/nfl_tds_interceptions_blend_stability_check.json`.
+
+---
+
 ## 2026-08-19 — RECEIVING_YARDS + RUSHING_YARDS BLEND WEIGHTS: STABILITY CHECKED, BOTH CONFIRMED STABLE — lane `nfl-yardage-blend-stability`
 
 **NO DEPLOY. Local analysis only** (new script + report, `83679a7a` on
