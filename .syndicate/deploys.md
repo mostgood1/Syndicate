@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-08-19 — WNBA `#263` LAYER 2 MODEL_EDGE_PCT FIX — PENDING — lane `wnba-edge-263`
+
+**Goal:** `/api/board/layer2-shortlist?sport=wnba` reports
+`per_sport_ingest.wnba.rows_with_model_edge > 0`, up from the measured
+**0 of 1,072** candidates on 2026-08-19. Both halves — props (real empirical
+sim ladder) and game lines (spreads/totals at the sim's own market line, h2h
+via real `p_home_win`) — landed on `origin/main` (4 commits) plus
+`basketball-model-owner`'s producer half (`6933d263`), full detail and both
+sessions' cross-checks in `.syndicate/lanes.md` under `wnba-edge-263`.
+
+**Scope, corrected before deploy.** The raw `origin/main` diff against each
+service's live SHA was 340 files / 107k lines — contaminated by ~15 other
+concurrent lanes' unrelated work landing on the shared trunk. Split into the
+TRUE scope: **6 files, 1058 insertions / 29 deletions**
+(`wnba_projections.py`, `wnba_game_projections.py`, `board_enrichment.py`,
+`refresh_wnba_oddsapi_props.py`, both test files), built as two scoped
+cherry-pick branches — `deploy/wnba-263-refresh-worker` (`579f70d7`, onto live
+`23e70a80`) and `deploy/wnba-263-live-odds-worker` (`218a5ded`, onto live
+`0c7962a7`) — each a verified descendant of its own target's actual live SHA,
+56/56 tests passing on both.
+
+**Expected effect:** `game_cards_<date>.csv`/`props_recommendations_<date>.csv`
+regenerate with 5 new columns on the next WNBA refresh cycle post-deploy (that
+export path rebuilds unconditionally, confirmed not existence-gated), then
+`rows_with_model_edge` goes non-zero within ~1-2 min of that (refresh-worker's
+board loop ticks every 60s). No precise WNBA refresh-cadence number available
+to pin a window tighter than "next cycle" — will report the actual observed
+timing, not assert one in advance.
+
+**Blast radius:** both `refresh-worker` (4GB) and `live-odds-worker` (2GB)
+restart, stop-then-start, no overlapping instances. live-odds-worker's fire
+kills whatever's in flight at that instant (precedented/accepted for this
+service — no idle window during active hours). refresh-worker checked for a
+clean window at fire time.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 23e70a80 --allow-rollback`
+/ `py -3 scripts/render_deploy.py --service live-odds-worker --commit 0c7962a7 --allow-rollback`.
+
+**Measured:** _(pending — reminder: read `per_sport_ingest.wnba` post-deploy,
+this session)_
+
+---
+
 ## 2026-08-19 — NFL COVER-PROBABILITY MEAN-OVERCONFIDENCE FIX, `#471` NOW FULLY CLOSED — lane `nfl-player-props-skew-fix`
 
 **NO DEPLOY. Library function change, same class as the anytime_td fix.**
@@ -16560,3 +16603,60 @@ preflight immediately before the deploy call was required each retry
 - Claim: refresh-worker's claim expired naturally during the wait: no
   release call needed, confirmed via `deploy_preflight.py` reporting
   `deploy claim   none` post-deploy.
+
+---
+
+## 2026-08-19 18:51:08Z — refresh-worker `f2eb719d` — NCAAF SP+ ratings + as-of PPA leak fix
+
+    lane:      football-model-owner
+    service:   refresh-worker (srv-d91dpertqb8s73co8ls0)
+    sha:       f2eb719d  (scoped graft, parent 23e70a80, branch deploy/ncaaf-sp-ratings-20260819b)
+    deploy:    dep-da2vhl2bkg8c73d6ju9g   trigger=api   fired 18:41:24Z, live 18:51:08Z
+    claim:     acquired 18:27:54Z, released after verify
+    rollback:  deploy 23e70a80 (this graft's parent)
+
+**verify: STAGE 1 PASSED — by CONTENT, not by deploy status.**
+
+    live commit reads f2eb719d  (preflight, 18:5xZ)
+    git show f2eb719d:scripts/generate_smartsim2_ncaaf_projections.py | grep -c load_sp_ratings  -> 2
+    git show f2eb719d:syndicate/features/ncaaf/cfbd.py            | grep -c load_dotenv          -> 2
+
+**verify: STAGE 2 STILL OPEN, up to 24h.** The deploy does NOT produce
+projections. The season-projection autorun is on an 86400s timer. PASS is
+**~51 of 51** games carrying a non-null `predictions.home_mean` on
+`/ncaaf/api/cards?week=1`, with `rating_source` reading
+`cfbd_sp_plus_2026[scale=10]`. **`16 of 16` is impossible** — the board cap fix
+is already live. Until that reading exists, this deploy is SHIPPED, NOT PROVEN.
+
+### What made this deploy safe, and it was not the claim alone
+
+The claim EXPIRED under `nfl-player-props-backtest` at 47.8 min without them
+deploying; taken by the normal expired-claim path, not a force.
+
+**Before taking it I checked the Render deploys API for an IN-FLIGHT deploy.**
+A live-SHA read structurally cannot see one: a deploy still BUILDING leaves the
+old SHA reading live, so "live == my parent" looks safe while a newer SHA is
+seconds from landing. That is the 2026-08-15 revert mechanism exactly. Result:
+none in flight, live settled at 23e70a80 = this graft's parent, so it composed
+and needed no rebuild. Graft integrity re-asserted at deploy time: `diff-tree`
+listed exactly the two intended files, both blobs byte-identical to
+`origin/main`.
+
+**Preflight then returned HOLD on 7 in-flight MLB sim jobs** (`run_mlb_daily_sim_job.py`
+-> `daily_update.py --workflow ui-daily` + spawn children) and I did not deploy.
+Watcher polled to jobs=0 at 18:39:44Z; deployed 18:41:24Z. The MLB sim completed
+rather than being killed.
+
+### SHIPS A KNOWN DEFECT, stated so it is not discovered
+
+Totals serve at **1.67x market dispersion** (model SD 5.77 vs 3.46). Margins are
+calibrated, totals are not. Carrier identified (drive-loop scoring rate
+20.8% -> 53.9% against a real ~35-45%); the fix is in `drive_simulator`, shared
+with NFL, and needs its own NFL-impact measurement.
+
+**And a larger one measured the same day:** NCAAF margins **lose to the closing
+line** — model MAE 13.763 vs market 11.586 over 220 games, paired dMAE +2.176,
+SE 0.518, t=+4.20. Every scale 6..24 loses. This deploy makes margins
+CALIBRATED, not COMPETITIVE. NCAAF picks are consequently suppressed at the
+serving layer (`syndicate/features/football/pick_gate.py`); projections still
+publish and display.

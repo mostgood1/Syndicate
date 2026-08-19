@@ -6,11 +6,32 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.blueprints.ncaaf import picks as ncaaf_picks_route
+from syndicate.features.football import pick_gate
+from syndicate.features.football.pick_gate import MarketVerdict
 from syndicate.features.ncaaf.picks import build_picks_page_context
 from syndicate.features.ncaaf.picks import build_smartsim_picks_page_context
 
 
 class NcaafPicksLocalTests(unittest.TestCase):
+    """Which SOURCE the picks board routes to -- engine rows, standalone
+    SmartSim2, or summary artifacts.
+
+    These run with the serving gate FORCED OPEN. NCAAF markets are all
+    suppressed as of 2026-08-19 (the model loses to the close by +2.176 MAE),
+    and that gate short-circuits build_smartsim_picks_page_context before any
+    source is chosen. Left closed, every assertion here would be testing the
+    suppressed board instead of the routing it was written to protect -- and
+    would keep passing if the routing broke. Serving POLICY is owned by
+    tests/test_football_pick_gate.py; this file owns SOURCE SELECTION.
+    """
+
+    def setUp(self) -> None:
+        opened = dict(pick_gate._SERVING_REGISTRY)
+        for market in ("spread", "moneyline", "total"):
+            opened[("ncaaf", market)] = MarketVerdict(servable=True, reason="TEST: routing fixture")
+        patcher = patch.dict(pick_gate._SERVING_REGISTRY, opened, clear=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
     def test_smartsim_picks_runtime_uses_prediction_rows(self) -> None:
         runtime_rows = [
             {

@@ -62,7 +62,14 @@ class NcaafPickCardMarketStampTests(unittest.TestCase):
                 {"home_team": "UGA", "away_team": "BAMA", "market": "", "side": "?", "provider": "book", "edge": 0.02},
             ]
         }
-        cards = ncaaf_picks._collapse_results(summary)
+        # Stamping is tested with the serving gate OPEN. NCAAF markets are all
+        # suppressed as of 2026-08-19 (the model loses to the close), so with
+        # the gate closed this asserts nothing about stamping -- it would pass
+        # on an empty list forever and stop guarding the prop-mislabel bug the
+        # moment a market reopens. See NcaafPickServingGateTests for the
+        # suppression behaviour itself.
+        with patch.object(ncaaf_picks, "filter_pick_rows", lambda sport, rows, **kw: (list(rows), {})):
+            cards = ncaaf_picks._collapse_results(summary)
         self.assertEqual(len(cards), 4)
         for card in cards:
             self.assertTrue(
