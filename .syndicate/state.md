@@ -2317,13 +2317,20 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   whether folding them in would flip their earlier kept-despite-non-
   significant decision — it did not: t=+1.65 and t=-1.82, both still not
   significant).
-  **THE PAIRED BACKTEST VALIDATION WAS STILL RUNNING AT LAST CHECKPOINT
-  (~17:08Z) — NOT YET COMPLETE. Do not report `starters_available_share` as
-  accuracy-validated or operationally trusted until it lands.**
+  **UPDATE 2026-08-19 ~17:2xZ, SUPERSEDES "still running" above: THE PAIRED
+  BACKTEST LANDED.** eredivisie, 126 matches, 300 sims, vs the possession/
+  set-piece baseline: mean Brier delta -0.0049 (favorable direction), SE
+  0.0037, t=-1.31, 95% CI [-0.0121, +0.0024] — **not significant**, same gap
+  between regression significance and paired-test significance as
+  `clean_sheet_rate`, but the OPPOSITE direction (favorable, not
+  unfavorable). **Disposition: KEPT**, same as `possession_share`/
+  `set_piece_goal_share` (real infra already landed, no known-good default
+  abandoned, weak-but-favorable evidence) — not discarded like
+  `clean_sheet_rate`. Still BACKTEST-HONEST ONLY per above, not live-wired.
   Regression significance was necessary but not sufficient for
   `clean_sheet_rate` earlier this session (significant in the pooled fit,
   then failed its paired accuracy test, discarded) — the identical caution
-  applies here.
+  applied here and the outcome differed only in direction, not in rigor.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
