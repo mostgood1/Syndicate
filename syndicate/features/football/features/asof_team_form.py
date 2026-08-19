@@ -277,6 +277,70 @@ def team_form_asof(
     return merged
 
 
+# The constants `_offense_strength` / `_defense_strength` centre each term on.
+# Read from drive_priors.py's own arithmetic, not guessed:
+#     (offensive_epa or 0.0) * 0.55                -> centred on 0.0
+#     ((success_rate or 0.5) - 0.5) * 1.2          -> centred on 0.5
+#     ((red_zone_efficiency or 0.5) - 0.5) * 0.8   -> centred on 0.5
+#     ((explosive_play_rate or 0.1) - 0.1) * 0.9   -> centred on 0.1
+#     ((pass_rate or 0.5) - 0.5) * 0.6             -> centred on 0.5
+ENGINE_CENTRE = {
+    "offensive_epa": 0.0,
+    "success_rate": 0.5,
+    "red_zone_efficiency": 0.5,
+    "explosive_play_rate": 0.1,
+    "pass_rate": 0.5,
+    "defensive_epa": 0.0,
+    "success_rate_allowed": 0.5,
+}
+
+
+def league_means(forms: dict[str, TeamForm]) -> dict[str, float]:
+    """League mean per term, over the SAME as-of window as `forms`.
+
+    THIS MUST BE AS-OF TOO, and that is the whole reason it takes `forms`
+    rather than reading the season itself. A full-season league mean would
+    reintroduce leakage through the back door: it encodes end-of-season
+    information into a week-6 prediction. Derived from the already-filtered
+    forms, so it inherits their window by construction and cannot drift from it.
+    """
+    out: dict[str, float] = {}
+    fed = [f for f in forms.values() if f.is_fed]
+    for term in ENGINE_CENTRE:
+        vals = [getattr(f, term) for f in fed]
+        vals = [v for v in vals if v is not None]
+        if vals:
+            out[term] = sum(vals) / len(vals)
+    return out
+
+
+def _recentre(value: float | None, term: str, means: dict[str, float]) -> float | None:
+    """Express `value` as a deviation from the league mean, in engine units.
+
+    WHY THIS EXISTS, measured 2026-08-19. `_offense_strength` centres each term
+    on a hardcoded constant, and those constants do not match real NFL
+    distributions -- it assumes `success_rate` 0.500 against a league mean of
+    0.422, and `explosive_play_rate` 0.100 against 0.066. Feeding raw values put
+    the league mean `offense_index` at **0.405 against an engine neutral of
+    0.500**, pushing EVERY team below neutral and suppressing every game's
+    scoring environment by ~2.6 points of total.
+
+    The engine's rates were fitted with these terms ABSENT, so its defaults ARE
+    its calibration. Re-centring restores the term's evident intent -- "how far
+    from average is this team" -- without touching engine code, and it keeps the
+    unfed path exactly neutral: a team with no data emits nothing, the engine
+    falls back to its own constant, and the term contributes zero.
+
+    RE-CENTRED IN THE BUILDER, NOT THE ENGINE, because a league mean is a
+    property of a LEAGUE and `drive_priors` is shared with NCAAF, whose
+    distributions differ. A constant baked into the engine would be wrong for
+    one of the two sports.
+    """
+    if value is None or term not in means:
+        return None
+    return ENGINE_CENTRE[term] + (value - means[term])
+
+
 def build_payload(
     home_team: str,
     away_team: str,
@@ -300,19 +364,25 @@ def build_payload(
     if h is None or a is None or not h.is_fed or not a.is_fed:
         return {}
 
+    means = league_means(forms)
+
     def put(d: dict[str, Any], key: str, value: float | None) -> None:
         if value is not None:
             d[key] = value
 
+    def rc(form: TeamForm, term: str) -> float | None:
+        """Re-centred on the as-of league mean. See `_recentre`."""
+        return _recentre(getattr(form, term), term, means)
+
     offensive: dict[str, Any] = {}
-    put(offensive, "offensive_epa", h.offensive_epa)
-    put(offensive, "home_offensive_epa", h.offensive_epa)
-    put(offensive, "away_offensive_epa", a.offensive_epa)
-    put(offensive, "success_rate", h.success_rate)
-    put(offensive, "home_success_rate", h.success_rate)
-    put(offensive, "away_success_rate", a.success_rate)
-    put(offensive, "red_zone_efficiency", h.red_zone_efficiency)
-    put(offensive, "explosive_play_rate", h.explosive_play_rate)
+    put(offensive, "offensive_epa", rc(h, "offensive_epa"))
+    put(offensive, "home_offensive_epa", rc(h, "offensive_epa"))
+    put(offensive, "away_offensive_epa", rc(a, "offensive_epa"))
+    put(offensive, "success_rate", rc(h, "success_rate"))
+    put(offensive, "home_success_rate", rc(h, "success_rate"))
+    put(offensive, "away_success_rate", rc(a, "success_rate"))
+    put(offensive, "red_zone_efficiency", rc(h, "red_zone_efficiency"))
+    put(offensive, "explosive_play_rate", rc(h, "explosive_play_rate"))
     # PROE IS DELIBERATELY NOT EMITTED, and this is an engine trap worth naming.
     # `_offense_strength` reads
     #   _first_float(offensive_metrics, ["pass_rate_over_expectation", "proe",
@@ -322,22 +392,22 @@ def build_payload(
     # while a pass RATE is centered near 0.5. Feeding PROE cost -0.244 on the
     # offense score for every team. Emitting only the true rate lets the alias
     # chain fall through to `home_pass_rate`, which the 0.5 baseline fits.
-    put(offensive, "home_pass_rate", h.pass_rate)
-    put(offensive, "away_pass_rate", a.pass_rate)
+    put(offensive, "home_pass_rate", rc(h, "pass_rate"))
+    put(offensive, "away_pass_rate", rc(a, "pass_rate"))
 
     defensive: dict[str, Any] = {}
-    put(defensive, "defensive_epa", h.defensive_epa)
-    put(defensive, "home_defensive_epa", h.defensive_epa)
-    put(defensive, "away_defensive_epa", a.defensive_epa)
-    put(defensive, "success_rate_allowed", h.success_rate_allowed)
-    put(defensive, "home_success_rate_allowed", h.success_rate_allowed)
-    put(defensive, "away_success_rate_allowed", a.success_rate_allowed)
+    put(defensive, "defensive_epa", rc(h, "defensive_epa"))
+    put(defensive, "home_defensive_epa", rc(h, "defensive_epa"))
+    put(defensive, "away_defensive_epa", rc(a, "defensive_epa"))
+    put(defensive, "success_rate_allowed", rc(h, "success_rate_allowed"))
+    put(defensive, "home_success_rate_allowed", rc(h, "success_rate_allowed"))
+    put(defensive, "away_success_rate_allowed", rc(a, "success_rate_allowed"))
 
     advanced: dict[str, Any] = {}
-    put(advanced, "home_offensive_epa", h.offensive_epa)
-    put(advanced, "away_offensive_epa", a.offensive_epa)
-    put(advanced, "home_defensive_epa", h.defensive_epa)
-    put(advanced, "away_defensive_epa", a.defensive_epa)
+    put(advanced, "home_offensive_epa", rc(h, "offensive_epa"))
+    put(advanced, "away_offensive_epa", rc(a, "offensive_epa"))
+    put(advanced, "home_defensive_epa", rc(h, "defensive_epa"))
+    put(advanced, "away_defensive_epa", rc(a, "defensive_epa"))
     # `def_pressure_avg` is deliberately ABSENT: nflverse pbp carries `sack` but
     # not a pressure rate, and deriving "pressure" from sacks alone would be a
     # different statistic wearing the same name. Left unfed and documented.
@@ -353,6 +423,16 @@ def build_payload(
             "away_source": a.source,
             "home_plays": h.plays,
             "away_plays": a.plays,
+            # THE EMITTED METRICS ARE DEVIATIONS, NOT RAW RATES. A reader seeing
+            # `success_rate: 0.578` would otherwise reasonably believe this team
+            # succeeds on 57.8% of plays; it actually means +7.8 points of
+            # success rate above the as-of league mean, expressed in the units
+            # the engine centres on. The raw values and the means used are kept
+            # here so the transformation is inspectable and reversible.
+            "recentred": True,
+            "league_means": {k: round(v, 5) for k, v in sorted(means.items())},
+            "raw_home": {t: getattr(h, t) for t in sorted(ENGINE_CENTRE)},
+            "raw_away": {t: getattr(a, t) for t in sorted(ENGINE_CENTRE)},
         },
     }
     return payload
