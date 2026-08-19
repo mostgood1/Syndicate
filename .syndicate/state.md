@@ -136,6 +136,21 @@ That story ended; do not re-open it from the archive.**
   `state_key_check.py`, which still runs. Exceeding 180,000 is a signal to
   collapse BY OWNER, not to raise again.
 
+- **2026-08-19 — WEB DOES NOT RUN THE INTELLIGENCE-STATE LOOP.** Asked directly
+  after `#465`'s mechanism was traced to that loop being gated off on web.
+  **Chosen: keep it off.** This CONFIRMS the existing configuration and requires
+  NO change — verified rather than assumed, live env against `render.yaml`, zero
+  drift: `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `false` on web,
+  `true` on refresh-worker, `false` on live-odds-worker, and the blueprint says
+  the same three. **No `render.yaml` push is owed, which also means no
+  `blueprint_sync` and no production blast radius.**
+  Consequence to hold onto: **web emitting no `ALL_PROCESS_MEMORY` is now
+  EXPECTED BEHAVIOUR, not a defect.** The emitter lives inside worker loops by
+  design; web was never meant to run them. Anyone who finds web's log silent
+  should stop here rather than reopen it — that silence cost four wrong causes
+  already. `deploy_preflight.py` no longer depends on the log line for web
+  (it reads `/api/ops/memory`), so nothing is blocked by this being off.
+
 Product decisions, not engineering ones. Do not re-take them.
 
 1. **The LLM is NOT meant to be on.** `ANTHROPIC_API_KEY` stays absent. The
