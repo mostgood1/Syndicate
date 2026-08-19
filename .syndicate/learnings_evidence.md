@@ -7556,6 +7556,16 @@ against reality" cannot be a one-off:
 |---|---|---|
 | MLB | build a state vector | it **already existed** in full (`LiveSituation`) and was discarded — serialisation, not derivation |
 | WNBA | "needs a possession count" | possessions are **underivable** — no FGA/TOV/OREB/FTA anywhere |
+> **RECONCILED 2026-08-18, `basketball-model-owner` (`todo.md` `#467`):** this
+> row is about the LIVE `live_state` in-game payload specifically, not a
+> platform-wide claim — `syndicate/features/shared/game_shape.py:427-472`
+> already scoped it that way the same day. `boxscores_history.csv`'s real,
+> 100%-populated FGA/TOV/OREB/FTA columns DO feed a real Dean-Oliver
+> possession estimate (`advanced_stats_boxscores.py:90-92`) that drives the
+> pregame smart-sim engine (measured: neutralizing the resulting
+> pace/off_rtg/def_rtg flips simulated win probability ~45-50 points). Read
+> this row as "not derivable from the live payload," not "not derivable at
+> all."
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ### 2026-08-16 — STATE THAT EMBEDS THE MODEL'S OWN OUTPUT MAKES CONDITIONING CIRCULAR. Soccer is the only sport here that does it
