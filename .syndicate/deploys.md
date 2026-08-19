@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-08-19 — refresh-worker CLAIM FORCE-BROKEN AGAIN, SAME COLLISION — plus a self-correction on the test used
+
+**NO DEPLOY.** Claim hygiene, and a correction to this session's own
+earlier reasoning.
+
+**Root cause, now actually understood** (fixed separately this session:
+`.claude/commands/lane.md` no longer writes the shared bare
+`.syndicate/.current-lane`, only the per-session marker `deploy-guard.py`
+and `lane-guard.py` already prefer — see that commit for the full
+mechanism). This entry is the SAME `refresh-worker` claim found earlier
+today under holder `nfl-receptions-blend-stability` (token
+`7fceea861a1f8590`, acquired `22:10:26Z`) — never resolved after the
+first sighting, just re-confirmed and cleared now.
+
+**Audited ALL 4 services' current claims against `lanes.md` status before
+touching anything**, a materially better test than the one used earlier
+today:
+
+| service | holder | lane status | verdict |
+|---|---|---|---|
+| `web` | `soccer-odds-capture-cadence-gap` | OPEN, header states it is actively waiting to deploy web | legitimate, untouched |
+| `refresh-worker` | `nfl-receptions-blend-stability` | CLOSED (verified single occurrence in `lanes.md`) | confirmed collision |
+| `syndicate` / `live-odds-worker` | free | — | n/a |
+
+**Self-correction, stated plainly rather than left standing**: the
+EARLIER force-break today justified itself partly on "`Get-Process -Id
+<pid>` returned nothing, so the holding session is gone." That reasoning
+was WRONG. Read `deploy_claim.py`'s source: `"pid": os.getpid()` records
+the PID of the one-shot `acquire` SCRIPT itself, which exits within
+moments of running on every single acquisition, legitimate or not — it
+is not a persistent per-session daemon and was never a valid liveness
+signal for "is the owning session still working." The earlier DECISION to
+force-break was still reasonable on its own terms (natural TTL expiry was
+minutes away regardless, nothing was blocked on it, explicit user
+direction both times) — but the stated justification should not be
+repeated or cited as a working method. **The lane-status cross-check
+above is the real signal and is what this force-break actually rests
+on.**
+
+`deploy_claim.py acquire --service refresh-worker --holder
+stale-claim-cleanup --force` → acquired, replacing the 22.1-min-old
+claim. Immediately released back to `free` (no deploy queued or needed —
+explicit user instruction: "nothing needs it right now"). Confirmed via
+`deploy_claim.py status`: `refresh-worker` free, `web` still correctly
+held by its legitimate owner, others free.
+
+---
+
 ## 2026-08-19 — WEB: NFL PROP CALIBRATION FIXES — MEASURED LIVE (follow-up to the PENDING row above)
 
 **`dep-da32ecou01pc73fojijg` -> `status=live`, `commit=f149f5e2`,
