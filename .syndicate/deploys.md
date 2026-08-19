@@ -5,6 +5,71 @@
 
 ---
 
+## 2026-08-19 — NFL PLAYER-PROP RATE MODEL, FIRST BACKTEST EVER RUN — lane `nfl-player-props-backtest`
+
+**NO DEPLOY. Local tooling only** (new script + tests, `40db4d50` on
+`origin/main`), same class as `#440`/`#470`. Nothing in a request path or a
+worker loop changed. Full write-up: `docs/ai_context/todo.md` `#471`.
+
+`py -3 scripts/backtest_nfl_props.py --seasons 2022,2023,2024,2025`
+
+**152,919 (player, week, stat) observations, 2,406 players, 4 complete real
+NFL seasons** (local nflverse play-by-play — historical/static, the
+CLAUDE.md "Render is truth" caution does not apply to seasons already
+played). This is `player_stats.player_rate` + `props._nfl_prop_model_probability`
+-- the actual model behind the board's NFL player props today -- and it had
+never been backtested at all before this.
+
+| market | n | corr | MAE model | MAE base | OOS debiased beats base? |
+|---|---|---|---|---|---|
+| passing_yards | 2,278 | 0.708 | 58.22 | 90.94 | YES |
+| passing_attempts | 2,653 | 0.823 | 6.45 | 15.04 | YES |
+| passing_tds | 2,000 | 0.342 | 0.872 | 0.958 | YES |
+| rushing_yards | 9,375 | 0.704 | 14.23 | 24.05 | YES |
+| rushing_attempts | 10,073 | 0.819 | 2.21 | 4.86 | YES |
+| receptions | 14,879 | 0.596 | 1.41 | 1.82 | YES |
+| receiving_yards | 14,751 | 0.572 | 18.71 | 24.10 | YES |
+| interceptions | 1,845 | 0.045 | 0.709 | 0.697 | **NO measured skill** |
+| anytime_td | 16,991 | 0.235 | 0.358 | 0.410 | YES |
+
+Out-of-sample split: fit bias/baseline on 2022-2023, score on 2024-2025 (real
+temporal holdout, not a re-shuffle). 8 of 9 markets hold up out-of-sample —
+real signal. `interceptions` correctly reported as no skill rather than
+folded into a portfolio average.
+
+**Two calibration defects found, both actionable, neither fixed yet:**
+1. Every yardage/count market is calibrated at the tails, overconfident near
+   its own mean (predicts ~50% cover, actual ~37-44%) — consistent with
+   right-skewed real box-score distributions, which `Normal(mean, stdev)`
+   cannot represent.
+2. `anytime_td` at a rolling rate of exactly 0.0 predicts 0%, actual hit rate
+   ~13-14% — small-sample MLE (`n` as low as 2), needs shrinkage.
+
+**Two methodology bugs caught and fixed IN this session before the numbers
+above were trusted** (both documented inline in `backtest_nfl_props.py`,
+recorded so neither is rediscovered): a tuple-sort tie artifact that
+manufactured a fake 0%-then-100% calibration swing, and a pooled-market
+decile that mixed 9 structurally different probability distributions into
+one unreadable curve (the exact `learnings.md` 2026-08-13 trap).
+
+**Section 3 (real-market hit rate) measured 0 rows** — confirmed why, not
+assumed: the local mirror's only populated real-odds file is `2025 wk22`,
+outside REG season and therefore outside `player_rate`'s scope entirely.
+
+**Artifact-allowlist gap confirmed against PRODUCTION, not just the local
+mirror**: `curl .../api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv`
+→ `count: 0`. Both existing `HOT_ARTIFACT_PATTERNS` globs for this filename
+require a `data/processed/` segment; NFL's real file has none. Flagged in
+`todo.md` `#471` to `basketball-model-owner` (holds `artifact_publisher.py`)
+rather than edited here — same handoff convention `football-model-owner`
+already used for this exact file.
+
+Verify: `reports/nfl_props_backtest_2022_2025.json` (committed, full
+per-market detail); 13 new tests in `tests/test_backtest_nfl_props.py`, all
+passing.
+
+---
+
 ### #394 — hash guard
 - Deployed: 2026-08-12 20:26
 - Change: compare the computed checksum instead of merely sending it, so

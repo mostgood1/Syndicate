@@ -2677,3 +2677,69 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 **Until then, every `verify:` naming a sim-job print is unusable**, and the
 `#440` chain cannot be closed. Both `deploys.md` and
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
+
+
+## [ncaaf-margin-calibration] NCAAF MARGINS ARE CALIBRATED; TOTALS ARE NOT `[verified 2026-08-19]`
+
+**Margins fixed and measured** on the 2026 wk1 slate (51 games, 300 seeds):
+
+| metric | before | after | market | ratio |
+|---|---|---|---|---|
+| margin SD | 1.74 | **15.37** | 14.46 | **1.06** |
+| margin max | 7.80 | **50.64** | 49.50 | |
+| total SD | 2.56 | 5.77 | 3.46 | **1.67** |
+
+**The cause was the RATING SOURCE, not the engine.** CFBD PPA `overall` is a
+per-play rate (SD 0.089); its differential rendered as margin SD ~2.3 through the
+engine's ~17-pts-per-unit transfer. **SP+ replaces it** — points-per-game, and it
+beat PPA on realised margins in two independent prior-season->next-season pairs
+(r 0.506 vs 0.372; residual SD 17.63 vs 18.97, ~740 games each). `SP_RATING_SCALE
+= 10.0`, calibrated on the real slate.
+
+**TOTALS: the carrier is SCORING RATE, identified by decomposition.**
+`total = drives x score% x pts/score` is exhaustive; across the slate's extremes
+score% runs **20.8% -> 53.9% (2.6x)** while drives move only 24.4 -> 19.8 and
+points-per-score is near flat. Real CFB converts ~35-45%. **TD share also runs
+60.7% -> 83.8% against a real ~55-60%** — field goals are under-used at the top
+end, which will distort FG props and alternate totals.
+
+**THREE SCALAR FIXES FOR TOTALS ARE DEAD — do not retry:** the index clamp
+(made margins AND totals worse, reverted), the yardage weight asymmetry (parity
+was worse), and the `scoring_environment` weight asymmetry (a 3x reduction moved
+total SD 0.07 pts, reverted). **They all damp INPUTS to a loop whose outputs
+compound** across four-down sequences. The fix is in how `drive_simulator`
+converts drives, and it is shared with NFL.
+
+## [ncaaf-ratings-leak] NCAAF RATINGS WERE LEAKED FOR BACKTESTS — FIXED `[verified 2026-08-19]`
+
+`/ppa/teams?year=S` is season-aggregate and contains the game being predicted:
+**r 0.663 vs 0.509 as-of** over 558 games of 2024, a 30% inflation of apparent
+skill. Fixed to aggregate `/ppa/games` over weeks < N.
+
+**Two traps recorded because each produced a wrong result during the fix:**
+`/ppa/teams` **accepts `week=N` and silently ignores it** (identical rows and
+values), so the obvious fix is a no-op; and `/ppa/games` without
+`seasonType=regular` returns the **College Football Playoff** under "week 1",
+importing January games into a week-8 rating — strictly worse than the leak it
+replaced. The tell was an impossible count (10 prior games through week 7), not
+a failing test.
+
+**The 2026 opener is unaffected either way** — no in-season history means the
+2025 prior-season fallback, verified.
+
+## [ncaaf-2026-data] NCAAF 2026 DATA IS BUILT AND SLATE-COMPLETE `[verified 2026-08-19]`
+
+Coverage checked against the **94 FBS teams the wk1 slate needs**, not against
+last year's totals: roster 15,442 rows / 138 teams / **0 missing**; coach
+continuity 138 / **0**; returning production 136 / 2 (North Dakota State and
+Sacramento State are FCS->FBS transitions with no prior FBS production —
+legitimate); transfers 3,288 touching 137 teams / **0**.
+
+**Five of seven builders could not run at all** — only `roster` and
+`player_game_stats` loaded `.env`; the rest died on "Missing CFBD API key" from a
+normal shell. Fixed at the shared choke point (`CfbdClient.from_env`). That is
+likely why several snapshots had never been produced.
+
+**None of it reaches the sim.** The generator is team-rating only. See
+`docs/ai_context/ncaaf_data_pipeline.md` for the builders, their dependency
+order, and the team_id-vs-name traps.

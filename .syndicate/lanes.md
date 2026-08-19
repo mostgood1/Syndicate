@@ -535,17 +535,20 @@ across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will no
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
-### nhl-model-owner — OPEN — CHECKLIST FULL PASS + dead-gate REMOVED + first market-comparison backtest built (`#470`, real production data) — session: nhl-model-owner
+### nhl-model-owner — OPEN — CHECKLIST FULL PASS + dead-gate REMOVED + market-comparison backtest (`#470`) + faceoff-zone track (EV/OZ/DZ, `#463`) all CLOSED — session: nhl-model-owner
 - Goal: NHL sim engine reaches the same deep-dive rigor MLB/soccer already have —
   **testable outcome MET**: `python scripts/nhl_sim_input_checklist.py` exits 0.
-  Extended goal, also MET this session: does the resulting model show any
-  edge over a real market — `scripts/grade_nhl_predictions_vs_market.py`
-  (`#470`) answers that, pulling real production data, not just the local
-  mirror. Full detail: `docs/ai_context/hockeysim_engine_reference.md`
-  §1–§2l, §8/§8b, `docs/ai_context/nhl_model_inventory.md`, `todo.md`
-  `#463`/`#470`, `.syndicate/log/2026-08-19.md` (this checkpoint's full
-  narrative by file/verified/believed/dead-ends), `.syndicate/state.md`
-  `[nhl-sim-engine]`.
+  Extended goal, also MET: does the resulting model show any edge over a
+  real market — `scripts/grade_nhl_predictions_vs_market.py` (`#470`)
+  answers that, pulling real production data, not just the local mirror.
+  Third extension, also MET: does the faceoff-driven shot-share mechanism
+  actually use zone-appropriate data — three per-team faceoff indices
+  (EV-blended, offensive-zone, defensive-zone) built and wired. Full
+  detail: `docs/ai_context/hockeysim_engine_reference.md` §1–§2o, §8/§8b,
+  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`,
+  `.syndicate/log/2026-08-19.md` (full narrative by
+  file/verified/believed/dead-ends across all checkpoints today),
+  `.syndicate/state.md` `[nhl-sim-engine]`.
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_*.py`/`scripts/grade_nhl_predictions_vs_market.py`/`scripts/calibrate_nhl_*.py`
   (producer/calibration/backtest scripts), `docs/ai_context/hockeysim_engine_reference.md`,
@@ -555,27 +558,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Dead gate CLOSED, not left open**: `HockeyTeamFeatures.blocks_per_60`/
   `penalties_per_60` were confirmed dead (proven, not assumed) AND confirmed
   to have no legitimate consumption mechanism that wouldn't double-count
-  already-live real data (blocks: the calibrated per-shot `block_rate_*`
-  mechanism; penalties: `special_teams.committed_per_game` already drives
-  PP/PK segment generation). Removed from `HockeyTeamFeatures`/`TeamRates`
+  already-live real data. Removed from `HockeyTeamFeatures`/`TeamRates`
   and every call site across 15 files, not just documented.
-- **New this session, on top of the full-PASS checklist**: a real
-  market-comparison backtest (`#470`) — the instrument that answers "does
-  this show an edge," distinct from every calibration the checklist proves.
-  Pulls real PRODUCTION data (`--source production`, public
-  `/nhl/api/cards/dates` route, no admin token) in addition to the thin
-  local mirror. Found and fixed two real bugs by checking real responses,
-  not assuming: stale-duplicate prediction files, and `lookahead_applied`'s
-  actual meaning (date-fallback, not live adjustment). Measured n=14-15
-  moneyline/total (up from n=3-4 local-only) — explicitly NOT a powered
-  verdict, stated with equal weight to every other caveat this session.
+- **Market-comparison backtest (`#470`) built and extended to real production
+  data** — the instrument that answers "does this show an edge," distinct
+  from every calibration the checklist proves. `--source production` pulls
+  the public `/nhl/api/cards/dates` route (no admin token). Found and fixed
+  two real bugs by checking real responses, not assuming: stale-duplicate
+  prediction files, and `lookahead_applied`'s actual meaning (date-fallback,
+  not live adjustment). Measured n=14-15 moneyline/total — explicitly NOT a
+  powered verdict, stated with equal weight to every other caveat.
+- **Faceoff-zone track (§2m/§2n/§2o) fully closed**: `_faceoff_multipliers`
+  was gated EV-only but fed an all-situations blend — three per-team
+  indices now close that, in order: EV-blended (fallback tier 1),
+  offensive-zone (preferred over EV when present, tier 0 — a refinement,
+  not a separate mechanism), defensive-zone (an ADDITIONAL multiplicative
+  layer composed with the OZ/EV chain, not a fourth tier — winning a DZ
+  draw both suppresses the opponent's shots AND springs the winner's own
+  transition chance, a dual effect a fallback chain can't represent).
+  `zoneCode` confirmed empirically relative to the WINNER (two draws at the
+  identical rink coordinates showed opposite zone labels depending who
+  won), OZ/DZ confirmed genuinely independent (correlation 0.69, not
+  ±1.0). Every index verified not to shift the league-wide shot average
+  (992-pairing round-robin each time, all landed under 0.5% — one under
+  0.02%) and reachability/priority/gating-tested, not just populated.
 - Verification: `python scripts/nhl_sim_input_checklist.py` — full PASS.
-  323 hockeysim/nhl tests pass throughout (unchanged since the last
-  addition — this class of script is validated by running it against real
-  data, matching MLB's own precedent). Nothing deployed (offline
-  artifact-producer + engine-wiring work only; next NHL refresh-worker/web
-  deploy picks it up). All commits pushed to `origin/main`, confirmed via
-  `git merge-base --is-ancestor` after every push this session.
+  356 hockeysim/nhl tests pass (up from 254 at session start). Nothing
+  deployed (offline artifact-producer + engine-wiring work only; next NHL
+  refresh-worker/web deploy picks it up). All commits pushed to
+  `origin/main`, confirmed via `git merge-base --is-ancestor` after every
+  push — latest confirmed tip `fc7c717d` (this lane's work) with
+  `361d0498` (another session's checkpoint, pushed alongside) on top.
 - Blocked by: none
 
 ### basketball-model-owner — OPEN — **#468's WIRING FIX LIVE on BOTH refresh-worker (`f13ea05e`) and live-odds-worker (`e1d1bcf4`), verified end-to-end with real data pre-deploy (uncached-date build + stale-schema rebuild, both correct). #469 (boxscore-capture root cause — earlier "no caller found" hypothesis was WRONG, see below) FOUND+FIXED+DEPLOYED to live-odds-worker (`e1d1bcf4`). #467 LIVE on refresh-worker. #462 LIVE+VERIFIED on web. #464 CLOSED. Runtime effect of #468/#469 on a real served prediction NOT YET OBSERVED — WNBA smart-sim fires per-game, not on a fixed interval, and the next real game (TOR@WSH) is ~19h out from 2026-08-19T04:xxZ.** inventory pass SHIPPED (#460-#469 filed) — opened 2026-08-18 — session: basketball-model-owner
@@ -629,7 +642,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **Phase 3 COMPLETE: VERDICT NULL (dCRPS +0.0226, 0.97 SE, n=269). Board defects SHIPPED+MEASURED; two model LEAKS fixed. Payload does not ship; Phase 4 moot.** — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — OPEN — **NCAAF MARGINS CALIBRATED (SD 1.74 -> 15.37, ratio 1.06). Totals still 1.67x, carrier IDENTIFIED (scoring rate 20.8->53.9%). Two model leaks fixed, 2026 data built. Payload experiment NULL.** — opened 2026-08-18 — session: football-model-owner
 - Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
   treatment MLB and soccer have. **Testable:** a gating checklist exists and runs;
   every model input is leak-free and reachable; board defects measured on the
@@ -646,17 +659,383 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Status: **14 commits, all on `origin/main`, 0 unpushed.** 3 web deploys live and
   measured (`5fdabc46`, `4c3b0aa5`, `841b6d84`). `CFBD_API_KEY` set by the user.
 - **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
-- **Phase 3 DONE, n=269:** `dCRPS +0.0226 (0.97 SE)`, `dMAE +0.0256 (0.88 SE)`.
-  **NULL per the pre-registered rule — does not ship.** Mechanism: the payload is
-  worth 4.1% of the 13.5-pt margin SD; the ratings path is worth 17.2% and
-  production already uses it, already as-of. **Phase 4 is moot** — nothing to
-  re-fit for a mechanism that does not move the output.
-- **OWED:** (1) NCAAF opener verification — key live but autorun had not fired
-  since; PASS = ~51 of 51 non-null `predictions.home_mean`, watcher armed.
-  (2) allowlist `smartsim2_*projections_*.csv` + `recommendations_summary` —
-  with `basketball-model-owner`. (3) web cannot pass preflight — with
+- **Phase 3 DONE, n=269: NULL** (`dCRPS +0.0226`, 0.97 SE). Payload does not
+  ship; Phase 4 moot. The ratings path carries 4.2x the leverage and production
+  already uses it.
+- **NCAAF MARGINS CALIBRATED** — SD 1.74 -> 15.37 (market 14.46, ratio 1.06), max
+  margin 7.80 -> 50.64 (market 49.50). Cause was the rating SOURCE: PPA is a
+  per-play rate, replaced by SP+ (points/game), backtested r 0.506 vs 0.372 over
+  ~740 games/season in two independent pairs.
+- **TOTALS 1.67x, CARRIER IDENTIFIED, NOT FIXED.** `total = drives x score% x
+  pts/score`; score% runs 20.8% -> 53.9% across the slate against a real ~35-45%,
+  while drives barely move. **Three scalar fixes are DEAD and must not be
+  retried** (index clamp, yardage weights, scoring_environment weights) — all
+  damp inputs to a loop whose outputs compound. The fix is in `drive_simulator`'s
+  conversion and is SHARED WITH NFL, so it needs its own NFL-impact measurement.
+- **NCAAF ratings leak fixed** (r 0.663 -> 0.509 as-of, 30% inflation). Opener
+  unaffected — no in-season history means the prior-season fallback.
+- **2026 data built and slate-complete** (94-team coverage verified); five of
+  seven builders were unrunnable and are fixed at the choke point.
+- **OWED:** (1) **NOTHING IS DEPLOYED** — production still serves 0 of 51; the
+  worker autorun has not fired since the key landed and no football code is live.
+  (2) NCAAF opener verification, PASS = ~51 of 51 non-null
+  `predictions.home_mean`. (3) totals scoring-rate compression — evidence in
+  `log/2026-08-19.md`. (4) allowlist `smartsim2_*projections_*.csv` — with
+  `basketball-model-owner`. (5) web cannot pass preflight — with
   `repo-coordination`.
+- **NOT A CAPABILITY, don't mistake for a gap:** NCAAF props. No route, no
+  module, and `SmartSim2SimulationOutput` has NO player-level fields — the engine
+  never tracks players. Props would be a build, not a wiring fix.
 - Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
+
+### wnba-edge-263 — OPEN — opened 2026-08-19 — session: wnba-edge-263
+- Goal: WNBA Layer 2 rows carry a real `model_edge_pct` (or an honestly-labeled
+  approximation) instead of `None` on every row. **Testable outcome:**
+  `/api/board/layer2-shortlist?sport=wnba` on a live slate reports
+  `per_sport_ingest.wnba.rows_with_model_edge > 0`, up from the measured
+  **0 of 1,072** candidates on 2026-08-19 (verified live, by content — see
+  below).
+- Files:
+  - `syndicate/features/shared/basketball_props_recommendations.py` —
+    `_build_model_map` (line 132) reads only `mean_*`/`pred_*` columns from
+    `props_predictions_<date>.csv` and silently drops the `sd_*` columns that
+    file already carries (confirmed present in the writer,
+    `basketball_props_predictions.py:346-357`).
+  - `syndicate/features/shared/wnba_projections.py` — `WnbaProjectionIndex` /
+    `attach_wnba_projections` hard-null `model_prob_over` /
+    `edge_vs_market_pct` on every row (`probability_fields: "null by
+    design"`), because the `model` dict they read from
+    `props_recommendations_<date>.csv` is means-only by construction.
+  - `tests/test_wnba_projections.py`, `tests/test_basketball_props_recommendations.py`
+  - **Read-only reference, do NOT edit without raising with
+    `basketball-model-owner`** (holds write access to both):
+    `syndicate/features/shared/basketball_props_predictions.py`,
+    `vendor/wnba_betting_repo/src/wnba_betting/props_edges.py`. Also do not
+    touch `syndicate/features/shared/artifact_publisher.py`
+    (`HOT_ARTIFACT_PATTERNS`) — same owner, raise instead of take, per that
+    lane's own "hand off, don't take" convention with `football-model-owner`.
+  - **Coordination note:** this lane sits inside `basketball-model-owner`'s
+    active WNBA smart-sim domain (`#460`-`#469`) but does not claim any file
+    they hold — `basketball_props_recommendations.py` and `wnba_projections.py`
+    are outside their stated write-access list. Flagged, not blocked.
+  - **ADDED 2026-08-19, spreads/totals sub-fix:**
+    `syndicate/features/shared/wnba_game_projections.py`,
+    `tests/test_wnba_game_projections.py` — checked against every OPEN lane's
+    Files block, zero overlap (not under `syndicate/features/{nba,wnba,ncaab}/**`,
+    `basketball-model-owner`'s read-only scope — lives in `shared/`).
+    **`tests/test_wnba_game_market_projections.py` DROPPED from scope on
+    inspection** — it tests `syndicate/features/wnba/cards.py`
+    (`_source_betting`/`_source_game_market_recommendations`), a different,
+    unrelated WNBA UI path that never imports `wnba_game_projections.py` and
+    that this sub-fix does not touch. Originally listed on a name-match with
+    "wnba_game_market_projections" alone; wrong, corrected before writing code.
+  - **BLOCKED, not taken: `scripts/refresh_wnba_oddsapi_props.py`.**
+    `lane-guard` caught this live — `basketball-model-owner`'s Files block
+    (line 583) explicitly holds WRITE on this exact file for `#469`'s
+    silent-success fix. The producer half of the spreads/totals sub-fix
+    (`_smart_sim_projection_index`, `_sim_projection_fields`,
+    `_GAME_CARDS_HEADER_ORDER` — all three at the lines scoped above) needs
+    this file. **Not editing it.** Proceeding on the consumer half
+    (`wnba_game_projections.py`) against the NEW column names as a contract,
+    with synthetic fixtures carrying them, so it activates the moment the
+    producer half lands — by either owner.
+- Hypothesis: the sim already computes a real per-market probability/edge for
+  WNBA props. `props_edges.py::compute_props_edges` prices each `play` using
+  `sd_pts`/`sd_reb`/... (preferring the simulated sd, falling back to a
+  league-level constant sigma when absent — `_safe_sd_series` +
+  `fallback_sig`), and that edge already reaches
+  `props_recommendations_<date>.csv`'s `plays`/`top_play` columns. The
+  `wnba_projections.py` path that feeds Layer 2 is a SEPARATE, later-built join
+  that goes back to `props_predictions_<date>.csv` for MEANS ONLY and
+  explicitly nulls the probability fields — it never reads what `props_edges.py`
+  already computed. So this is very likely a **threading problem** (surface an
+  edge that already exists downstream), not a **new-model problem** (derive a
+  distribution from scratch) — confirmed on production 2026-08-19:
+  `props_recommendations_2026-08-19.csv`'s `model` cell is means-only
+  (`{'pts': 12.15, 'reb': 3.94, ...}`, no `_sd` keys) for every player sampled.
+- Falsification test: pull a live slate's `props_recommendations_<date>.csv`
+  and check whether `plays[].edge`/`ev_pct` on the SAME (player, market, line)
+  as a Layer 2 row is a real, sport-appropriate probability edge and not a
+  placeholder/constant. **Partial disconfirmation already observed**: the one
+  row sampled 2026-08-19 (Veronica Burton) had `ladders: []` and
+  `sim_ladders: []` — empty — so those two columns are NOT a usable source;
+  `plays[].edge` itself is the one still untested. If `plays[].edge` turns out
+  equally degenerate for most rows, the fix has to go one level deeper into
+  `props_edges.py`'s own sd inputs, and this lane's scope grows — say so rather
+  than forcing the threading story to fit.
+
+**RUN 2026-08-19, on production `props_recommendations_2026-08-19.csv` (20
+players, GSV/MIN/TOR/WSH — the exact two games that reached Layer 2 today).**
+
+- **`plays[].edge` HALF-CONFIRMS.** 165 play entries across 16 of 20 players
+  (4 have zero plays); **140 distinct edge values, range 0.0007-0.412, mean
+  0.065** — a real, varying computation, not a placeholder or constant. The
+  `props_edges.py` sd-based pricing IS alive in production. `ladders`/
+  `sim_ladders` are empty on ALL 20 rows (0/20) — confirmed dead, drop them
+  from the plan entirely.
+- **BUT COVERAGE IS THE CATCH, and it lands exactly on today's one prop row.**
+  Veronica Burton's `plays` covers ast/pa/ra/reb/threes — **not `pts`** — while
+  the ONE prop that actually reached today's Layer 2 shortlist is her
+  `player_points` line (13.5). `props_edges.py` never priced that specific
+  (player, market) pair, so a join keyed on (player, market, line) would leave
+  **this exact row** at `None` even after the fix. Threading `plays[].edge`
+  helps WNBA props in general wherever `props_edges.py` covered the market —
+  it would not have moved a single number on today's board.
+- **AND THE BIGGER MISS: 11 of today's 12 WNBA rows are `game`-kind
+  (spreads_alt/totals_alt/h2h), not props.** Those come from a completely
+  separate file, `game_cards_<date>.csv` (pulled and inspected live), whose
+  columns are `pred_margin, pred_total` — **means only, no sigma column at
+  all**, not even an unused one. `basketball_props_smart_sim.py` computes
+  `final_total_sigma`/`final_margin_sigma` in-memory (its `QuarterSummaryLocal`
+  dataclass) but nothing persists them into `game_cards`. This is the SAME
+  shape of defect as the props one (a real sigma computed, then dropped before
+  the artifact boundary) but a DIFFERENT file, and — unlike props — the sigma
+  isn't sitting on disk waiting to be read; it has to be added to the
+  `game_cards` export first. **This is the higher-leverage half of the fix for
+  what the board actually shows today: 11 of 12 rows, not 1 of 12.**
+- **SCOPE THEREFORE GROWS, exactly as this test was written to allow for.**
+  Two independent sub-fixes, not one:
+  1. **Props** (existing scope, coverage-limited): thread `props_edges.py`'s
+     `plays[].edge` into the Layer 2 prop row when a (player, market, line)
+     match exists; leave `None` honestly when it does not (as it would not
+     have today, for Burton's `pts`).
+  2. **Game lines** (NEW, higher-leverage, not yet scoped to a file list):
+     persist `final_margin_sigma`/`final_total_sigma` out of
+     `basketball_props_smart_sim.py`'s in-memory sim into `game_cards_<date>.csv`
+     at export, then give `board_enrichment.py`'s WNBA game-projection path
+     (wherever it reads `game_cards`) a probability-space edge for
+     spreads/totals/h2h the same way MLB's margin model already does for game
+     markets. File-level trace for sub-fix 2 is NOT done yet — next step.
+- Verification: on a live production build, `per_sport_ingest.wnba` reports
+  `rows_with_model_edge > 0` with values that are NOT constant/degenerate
+  across rows, and each row carries a field that HONESTLY states whether its
+  edge came from a simulated sd or a fallback sigma — never silently upgrading
+  a heuristic default to look like a measured one (mirrors `#242`'s house rule
+  against fabricated values). Add a test asserting a row with no usable sd
+  anywhere stays `None`, never a fabricated number. **Given the measured
+  coverage gap, "done" for props means bounded, attributable coverage — not
+  100% — and the game-line sub-fix needs its own verification once scoped.**
+- Blocked by: none.
+
+**GAME-LINE PRODUCER TRACED 2026-08-19 — BETTER THAN SCOPED. Not a sigma-persistence
+job; the sim already publishes real probabilities and nothing reads them.**
+
+Pulled today's actual artifacts, `smart_sim_2026-08-19_GSV_MIN.json` and
+`_WSH_TOR.json` (609KB/606KB, the REAL vendored engine output — not the
+`basketball_props_smart_sim.py` `_local` fallback I traced first, which uses a
+different, legacy `quarters` key that this real payload doesn't even have). The
+persisted `score` block already carries, per game, from real Monte Carlo
+(**n_sims=100**, worth flagging as thin):
+
+```
+home_mean, away_mean, margin_mean, total_mean,
+home_q/away_q/margin_q/total_q: {p10, p50, p90},
+p_home_win, p_away_win, p_home_cover, p_total_over
+```
+
+`p_home_cover`/`p_total_over` are computed **against the market line the sim
+was given** (`market.market_home_spread=2.0`, `market.market_total=164.5` for
+GSV/MIN) — i.e. these are real, model-free, empirically-simulated probabilities,
+not a fitted/Normal approximation. `periods.q1..q4/h1/h2` carry the identical
+shape per segment. No raw draw array is persisted anywhere (checked `intervals`/
+`intervals_1m` too) — only 3-point quantiles, so a full arbitrary-line CDF isn't
+directly available, only the one line the sim priced.
+
+**The break, confirmed against these exact files:**
+`_smart_sim_projection_index` (`scripts/refresh_wnba_oddsapi_props.py:2812-2851`)
+— the function that populates `game_cards_<date>.csv`'s `pred_margin`/
+`pred_total` — tries `payload["quarters"]` first (**absent**, that key belongs
+to the `_local` fallback engine, not this real payload), falls through to
+`payload["periods"]["q1..q4"]`, and pulls out **only `home_mean`/`away_mean`
+per quarter**, summing them. Confirmed by exact match: summed quarters equal
+`score.margin_mean`/`score.total_mean` to the JSON's own precision
+(-9.32/163.08, identical to what's live in `game_cards`'s `pred_margin`/
+`pred_total` today). **Everything else in `score` — `p_home_win`,
+`p_home_cover`, `p_total_over`, `margin_q`, `total_q` — is read out of the same
+already-open file and then dropped.** This is a cheaper, higher-confidence fix
+than the sigma-threading plan: no reconstruction needed, just read three more
+keys off a payload the function already parses.
+
+**REVISED SUB-FIX 2, replacing the "persist final_margin_sigma/final_total_sigma"
+plan (that plan targeted the `_local` fallback engine, which is not what's
+running):**
+1. `scripts/refresh_wnba_oddsapi_props.py` — `_smart_sim_projection_index`:
+   also read `payload["score"]["p_home_win"]`, `["p_home_cover"]`,
+   `["p_total_over"]`, `["margin_q"]`, `["total_q"]`; write them as new
+   `game_cards` columns (additive — do not touch `pred_margin`/`pred_total` or
+   reorder `OUTPUT_COLUMNS`, per the existing `#262`/reader-compat rule already
+   in this file's own comments).
+2. `syndicate/features/shared/wnba_game_projections.py` —
+   `attach_wnba_game_projections`: for **h2h**, a policy choice now exists —
+   keep `_margin_win_prob(pred_margin)` (current, "the one sanctioned
+   transform") or switch to the sim's own `p_home_win` directly (model-free,
+   arguably better, but a second producer for the same number if not done
+   carefully — flag, don't decide unilaterally). For **spreads/totals AT THE
+   SIM'S OWN MARKET LINE**, `p_home_cover`/`p_total_over` can populate
+   `model_prob_over` directly — real progress. For **spreads_alt/totals_alt AT
+   A DIFFERENT LINE** (10 of today's 11 game rows), the single-point
+   probability does not apply; would need a `margin_q`/`total_q`-derived
+   approximate CDF, honestly labeled as coarse (n=100) — or stay `None` for alt
+   lines specifically, which is still strictly better than today (main lines
+   go from 0% to priced).
+3. Still deliberately NOT touching `h2h`'s `edge_vs_market_pct` gate — that
+   null is a **stated model-validation policy decision**
+   (`model_skill: sample_games=0, "model never backtested"`), not a plumbing
+   gap, and stays with whoever owns validating the margin model.
+- Next concrete step: confirm with `basketball-model-owner` (adjacent active
+  WNBA lane) whether `p_home_win` vs `_margin_win_prob` is theirs to decide,
+  since it touches validated-model territory, before writing code for h2h.
+  Sub-fix 2's spreads/totals-at-market-line half has no such dependency and can
+  proceed first. **Message sent 2026-08-19, queued for after their in-flight
+  turn.**
+
+**SPREADS/TOTALS-AT-MARKET-LINE SUB-FIX — FULLY SCOPED 2026-08-19, no
+dependency on `basketball-model-owner`'s answer. Ready to implement.**
+
+Choke points confirmed by reading, not guessed — every `game_cards` write path
+already funnels through ONE function, so this is a 2-file change, not N:
+
+1. **`scripts/refresh_wnba_oddsapi_props.py:2812` `_smart_sim_projection_index`**
+   — extend to also pull `payload["score"]["p_home_cover"]`,
+   `["p_total_over"]`, and `payload["market"]["market_home_spread"]`,
+   `["market_total"]` (the LINE the sim priced — needed for the gate below,
+   NOT assumed identical to `game_cards`'s own `home_spread`/`total`, even
+   though measured equal on today's two games). Store all four alongside the
+   existing `pred_margin`/`pred_total` in the same index entry.
+2. **`_sim_projection_fields` (same file, line 2515)** — single choke point,
+   confirmed by grep: all **3** `game_cards` row-building call sites (2591,
+   2729, 2798) spread `**_sim_projection_fields(...)` into the row, so
+   returning the 4 new keys from this ONE function threads them everywhere
+   with no per-branch duplication.
+3. **`_GAME_CARDS_HEADER_ORDER` (line 2209)** — **MUST add the 4 new column
+   names to this list, appended at the end.** `csv.DictWriter` here uses
+   `fieldnames=_GAME_CARDS_HEADER_ORDER` with the DEFAULT `extrasaction`
+   (`"raise"`) — an unlisted key in a row dict is a hard `ValueError` at build
+   time, not a silent drop. That's a safety net (a missed column fails the
+   build loudly) but it means step 1-2's new keys are INERT, not additive,
+   until this list is updated in the SAME change. `wnba/cards.py`'s
+   `_load_game_cards_csv_rows_from_keyvalue` reads via plain `csv.DictReader`
+   with no fixed fieldname allowlist, so the READ side needs no change.
+4. **`syndicate/features/shared/wnba_game_projections.py`**:
+   - `WnbaGameProjectionIndex`/`load_wnba_game_projections` — index the 4 new
+     columns alongside `pred_margin`/`pred_total`.
+   - `attach_wnba_game_projections` — for `spreads`/`totals` (h2h excluded,
+     blocked on the message above): compute `edge_vs_market_pct` **only when
+     the row's own `line` matches the entry's `sim_market_home_spread` /
+     `sim_market_total` within a small float epsilon** (main lines only —
+     10 of today's 11 game rows are `spreads_alt`/`totals_alt` and will
+     correctly stay `None` under this gate, with an honest NEW reason string,
+     e.g. `"sim priced only the game's own line (<X>); this is an alternate
+     line"` — distinct from the current blanket
+     `"sim ships a margin/total mean, not a distribution"`, which will
+     become false once this ships and must not linger as the reason on rows
+     it no longer describes).
+   - **REUSE, do not hand-roll a 5th edge computation.** `prop_projections.py`
+     (`_no_vig_over_probability`, line 747) and `live_edge_policy.py`
+     (`live_edge_unavailable_reason`, line 61) are both pure, already-shared,
+     already-imported-elsewhere functions (WNBA's OWN prop path imports
+     `live_edge_unavailable_reason` already). Call the SAME pattern
+     `prop_projections.py:918-946` uses (`fair = _no_vig_over_probability(row)`,
+     `edge = round((model_prob - fair) * 100.0, 2)`, live-suppression check
+     first) rather than inventing new math — the alternative (a full switch to
+     `attach_projections`/`project_game_market`'s shared pipeline) would fix
+     `#329`'s "fourth producer" duplication for good but means touching
+     `prop_projections.py`, which MLB/soccer/NFL also depend on — bigger,
+     riskier, and NOT required to close `#263`. Flagged as a follow-on, not
+     taken here.
+5. **Tests**: `tests/test_wnba_game_projections.py`,
+   `tests/test_wnba_game_market_projections.py` — cases: (a) row line == sim
+   market line → `model_prob_over`/`edge_vs_market_pct` populate; (b) row line
+   != sim market line (alt) → stays `None`, new reason string, never a
+   fabricated number; (c) `_GAME_CARDS_HEADER_ORDER` round-trip test (write
+   then `DictReader` back) so a future column addition can't silently regress
+   into the same `extrasaction` trap; (d) h2h untouched by this sub-fix
+   (regression guard while the h2h question is still open with
+   `basketball-model-owner`).
+- Verification: on a live build, `game_cards_<date>.csv` carries the 4 new
+  columns; `/api/board/layer2-shortlist?sport=wnba` shows `model_edge_pct` non-null
+  on spreads/totals rows sitting AT the main line, still null (with the new
+  reason) on alt lines — both readable in `per_sport_ingest.wnba`.
+
+**CONSUMER HALF IMPLEMENTED, TESTED, COMMITTED 2026-08-19 — NOT PUSHED.**
+Own worktree (`C:\tmp\syndicate-sessions\wnba-edge-263`, branch
+`session/wnba-edge-263`), commit `6135559e`, `git diff --stat` confirmed only
+the two intended files touched (318 insertions / 13 deletions,
+`wnba_game_projections.py` + `tests/test_wnba_game_projections.py`).
+- `WnbaGameProjectionIndex` entries now carry `p_home_cover`/`p_total_over`/
+  `sim_market_home_spread`/`sim_market_total`, defaulting to `None` — an older
+  `game_cards` row (predates the producer half) degrades to exactly the prior
+  behaviour, verified by test, not just asserted.
+- `attach_wnba_game_projections` gates spreads/totals `model_prob_over`/
+  `edge_vs_market_pct` on the row's line matching the sim's own market line
+  (`_lines_match`, 1e-6 tolerance). Reuses `_no_vig_over_probability` +
+  `_edge_unavailable_reason` (`prop_projections.py`) and
+  `live_edge_unavailable_reason` (`live_edge_policy.py`) rather than a fifth
+  edge implementation — same functions MLB/soccer/NFL's game markets already
+  call.
+- New reason string for alt lines, distinct from the old "not a distribution"
+  one which becomes false once the main line prices: `"sim priced only its
+  own market line (<X>); this is an alternate line the sim's 3-point quantile
+  summary cannot answer"`.
+- h2h untouched — verified by a dedicated regression test with the new index
+  fields populated, confirming they don't leak into h2h's branch.
+- **16/16 tests pass** (9 original unchanged + 7 new): main-line spreads,
+  main-line totals, alt-line honest-reason, sim-line-absent degrades to
+  original reason, one-sided-book-at-market-line reports via the shared
+  reason function, live-market suppression, h2h regression guard. Also ran
+  `tests/test_wnba_fixture_identity.py` + `tests/test_wnba_projections.py`
+  (69 total) clean — no adjacent regressions.
+- **INERT until the producer half lands** — `game_cards` rows have none of
+  the 4 new columns today, so this ships zero behavior change on its own.
+  Correctly additive: confirmed a build with the columns absent degrades to
+  the original mean-only reason via `test_sim_line_absent_keeps_the_original_mean_only_reason`.
+- **NOT PUSHED to `origin/main`** — commit sits local to the worktree branch
+  pending the producer half (still with `basketball-model-owner`, message
+  queued) so the two land together rather than shipping dead columns-reading
+  code with nothing to read.
+
+### nfl-player-props-backtest — CLOSED-VERIFIED 2026-08-19 — measured 152,919 rows/2,406 players/4 seasons; 8 of 9 markets beat baseline in AND out of sample; two calibration defects + one allowlist gap flagged. Full write-up `todo.md` `#471`, measurement `deploys.md`. — opened 2026-08-19 — session: nfl-player-props-backtest
+- Goal: measure whether `syndicate/features/nfl/player_stats.py`'s rolling
+  season-to-date rate model (mean/stdev per player per stat, feeding
+  `syndicate/features/nfl/props.py`'s Normal-CDF cover probability) predicts
+  anything, across ALL players/weeks/markets — not just the sparse weeks that
+  happen to carry real quoted odds. Reference rigor: `scripts/backtest_mlb_props.py`
+  (per-market denominators, DNP exclusion, constant-baseline comparison) and the
+  MLB pitcher-ladder "ultimate outcome" pattern (`syndicate/features/mlb/pitcher_ladders.py`
+  → `k_ladder_targets.py`) as the bar for what a mature player-production model
+  looks like. **Testable outcome:** a new backtest script reports, per of the 9
+  `STAT_KEYS` in `player_stats.py`, `n`, `mae_model` vs `mae_constant_baseline`,
+  and (wherever a real quoted line exists) hit-rate of the Normal-CDF cover call
+  against the real settled outcome — run over real, complete nflverse pbp seasons
+  already on disk (2022-2025, `data/nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
+  local historical/static data, not a "Render is truth" live-state question).
+- Files (all NEW or read-only — collision-checked 2026-08-19 against every OPEN
+  lane in `lanes.md`; zero overlap):
+  - `scripts/backtest_nfl_props.py` (NEW)
+  - `tests/test_backtest_nfl_props.py` (NEW)
+  - Read-only reference (NOT claimed for write): `syndicate/features/nfl/player_stats.py`,
+    `syndicate/features/nfl/props.py`, `syndicate/features/mlb/pitcher_ladders.py`,
+    `syndicate/features/mlb/k_ladder_targets.py`, `scripts/backtest_mlb_props.py`.
+- **NOT claimed, deliberately:** `syndicate/features/football/**`,
+  `syndicate/features/ncaaf/cards.py`, `syndicate/features/nfl/preseason_cards.py`,
+  `scripts/football_sim_input_checklist.py` — all held by `football-model-owner`
+  (NCAAF/game-margin focus, Phase 3 closed NULL). This lane is player-props-only
+  and does not touch that lane's files.
+- Hypothesis (stated before measuring): the rate model is UNDER-VALIDATED —
+  `player_stats.player_rate` has never been backtested against real outcomes at
+  all (only used live), and it carries no distribution (confirmed by
+  `convergence-phase7-crps`: NFL absent from every projection-spread family
+  checked, 165 files/160 dates). I predict it beats a constant per-stat baseline
+  on volume markets (attempts, receptions) and underperforms or ties on
+  high-variance yardage/TD markets.
+- Falsification test: if `mae_model` >= `mae_constant_baseline` on a market, the
+  model has no measured value there and that must be reported as such, not
+  papered over — same discipline `backtest_mlb_props.py`'s docstring states.
+- Verification: a report (written to `reports/` and `.syndicate/deploys.md`)
+  with per-market `n`, MAE-vs-baseline, and — for the weeks with real odds
+  (`oddsapi_player_props_2025_wk10..22.csv`) — cover hit-rate, with the sample
+  size stated next to every number (rule: "a rate, not a count").
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

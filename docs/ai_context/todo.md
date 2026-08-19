@@ -1,5 +1,83 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#471` — **NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill; two concrete calibration defects found** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
+
+`scripts/backtest_nfl_props.py` (new, 13 tests) — mirrors `backtest_mlb_props.py`'s per-market
+denominator discipline and in-sample/out-of-sample split (this repo's `convergence-phase7-crps`/
+`#470` methodology, applied to NFL), extended with a per-market ladder-calibration section (the
+MLB pitcher-ladder "ultimate outcome" pattern — grading a model at several thresholds around its
+own mean, not just one quoted line — applied to a model that has NO real simulated distribution,
+only `Normal(mean, stdev)` fitted from `player_stats.player_rate`'s rolling history).
+
+**Why this had never been measured**: real quoted NFL player-prop odds only cover ~13 sparse weeks
+(the-odds-api's live-only fetch, no historical backfill — `props.py`'s own docstring says so). A
+backtest gated on odds availability would measure the model on a tiny, recency-biased slice. This
+one does not gate on odds at all for its main measurement — it grades every real, complete NFL
+game 2022-2025 (real nflverse play-by-play, already on disk) against the model's own predicted
+mean, and treats the odds-gated check as a separate, smaller section.
+
+**Measured, real numbers**: 8 of 9 markets (`passing_yards/attempts/tds`, `rushing_yards/attempts`,
+`receptions`, `receiving_yards`, `anytime_td`) beat a constant per-player-pool baseline BOTH
+in-sample and out-of-sample (fit 2022-2023, scored 2024-2025) — real signal, not overfitting.
+`interceptions` shows no measured skill (corr 0.04), reported honestly rather than folded into an
+average. Full per-market MAE/correlation/bias table in `reports/nfl_props_backtest_2022_2025.json`.
+
+**Two concrete, actionable calibration defects, both new findings**:
+1. Every yardage/count market is well-calibrated at the tails but systematically OVERCONFIDENT near
+   its own mean — predicts ~50% cover probability where the real hit rate is ~37-44%. Consistent
+   with real box-score stats being right-skewed (mean > median), which a `Normal(mean, stdev)`
+   approximation cannot represent. Fixing this needs either a skewed distribution or an empirical
+   quantile approach, not a bigger sample.
+2. `anytime_td` badly underestimates players whose rolling rate happens to be exactly 0.0 (predicted
+   0%, real hit rate ~13-14%) — a small-sample MLE artifact (`n` can be as low as 2 games under
+   `player_rate`'s own floor) that needs shrinkage toward a position/league baseline, not more data.
+
+**A real methodology bug was found and fixed IN this session, worth recording so it isn't
+rediscovered**: the first version of the calibration bucketer used `sorted(zip(probs, outcomes))`,
+which sorts ties in probability by OUTCOME as the tuple's secondary key — and the `offset=0`
+synthetic threshold (line == the player's own mean) produces a massive exact-0.5 tie cluster. That
+silently split the tie cluster into an all-miss bucket and an all-hit bucket, producing a fake
+0%-then-100% whipsaw that looked like a severe calibration defect and was actually a sort artifact.
+Fixed by sorting on probability only; see the inline comment in `_reliability_buckets`.
+
+**A separate pooling bug was also caught before shipping**: the first version of the ladder section
+pooled all 9 markets into one set of deciles — exactly the "pooled denominator" trap this repo's own
+`learnings.md` (2026-08-13) already names. Different markets have structurally different probability
+distributions, so a pooled decile mixed them and produced gaps that swung sign bucket to bucket with
+no actionable read. Fixed to report per-market, with a pooled table kept only as an explicitly
+labeled "informational only, do not read this alone" summary.
+
+**Real-market hit-rate section returned 0 gradable rows, and that is itself a finding, not a null
+result to shrug off**: the local mirror's only populated real-odds file is `2025 wk22`, which is
+outside REG season entirely (`player_stats` only aggregates `season_type=="REG"`) and therefore
+structurally outside `player_rate`'s scope — every one of that file's 65 rows fails the join for
+that reason, confirmed by reading the code, not assumed.
+
+**A genuine artifact-allowlist gap, confirmed against production, flagged not fixed**: checked
+`/api/ops/artifacts/export?pattern=nfl_source/oddsapi_player_props_*.csv` on production —
+`count: 0`. Read `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py`): both existing
+`oddsapi_player_props_*.csv` globs require a `data/processed/` path segment, but NFL's real file
+lives at `nfl_source/oddsapi_player_props_<season>_wk<week>.csv` — no `processed/` directory at
+all, so neither pattern matches. NBA/WNBA hit this exact gap-class already and got a dedicated
+allowlist line (see the comment directly above those two patterns in the file); NFL never did. This
+means production's true real-odds coverage — which may or may not be richer than this local
+mirror's single populated week — is currently **unverifiable** from web, and the backup/mirror-
+refresh pathway (`/api/ops/artifacts/export`, per CLAUDE.md) can never pull it back either way.
+**Not fixed here**: `artifact_publisher.py` is held by `basketball-model-owner` (per
+`football-model-owner`'s own precedent of handing off allowlist additions rather than taking the
+file — see that lane's block in `lanes.md`). Whoever owns that file next: add a
+`nfl_source/oddsapi_player_props_*.csv` pattern (no `data/processed/` segment), then re-run
+`scripts/backtest_nfl_props.py`'s Section 3 against whatever production actually has.
+
+**What remains open, in order**: (1) the allowlist gap above — unblocks verifying real production
+odds coverage and re-running Section 3 for real; (2) the two calibration defects are diagnosed but
+not fixed — a skewed/empirical-quantile model for point 1, shrinkage estimator for point 2, neither
+built yet; (3) this backtest only covers the 9 markets `player_stats.STAT_KEYS` already extracts —
+no distribution/PMF exists for NFL at all (confirmed absent independently by `convergence-phase7-
+crps`'s 165-file/160-date check), so a real MLB-pitcher-ladder-grade engine (simulated PMF, priced
+ladder of thresholds) does not exist for NFL and this backtest measures the ceiling of a
+mean+stdev approximation, not a full sim.
+
 ### `#470` — **NHL never had a market-comparison backtest -- the instrument that answers "does this show an edge," distinct from every calibration `#463` closed** — BUILT, MEASURED, HONESTLY CAVEATED 2026-08-19, lane `nhl-model-owner`
 
 Full report: `docs/reports/hockeysim_market_backtest_report.md`, reference doc
