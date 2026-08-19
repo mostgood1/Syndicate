@@ -1153,7 +1153,7 @@ history directly:
   (added 2026-07-16 14:24Z). The next scheduled run is the first real test.
 - Blocked by: none.
 
-### nfl-injuries-fetcher — OPEN — opened 2026-08-19 — session: nfl-injuries-fetcher
+### nfl-injuries-fetcher — CLOSED 2026-08-19 — session: nfl-injuries-fetcher — landed `9ef312c5` on `origin/main`, not yet deployed
 - Goal: `syndicate/features/nfl/injury_adjustment.py` (the one place real
   player-level data reaches the NFL sim today) depends on `injuries_
   {season}.csv`, which has NO producer anywhere in this repo -- only a
@@ -1217,13 +1217,28 @@ history directly:
   fails exactly the scenario `#441` measured (mounted disk has the file,
   checkout does not, no `upcoming_recs_*.csv` present) before applying the
   fix, so the fix is proven necessary, not just applied by precedent.
-- Verification: new tests pass; full NFL test suite still passes (no
-  regression); the fetcher's own `--json` output shows a real download
-  against the live nflverse injuries release for a real season; `py -3
-  scripts/football_sim_input_checklist.py` (read-only reference, not
-  touched) re-run informationally to see if this changes anything it
-  reports.
+- Verification: DONE. 71/71 new+updated injuries-lane tests pass; full
+  `nfl`+`refresh_worker` slice run (746 tests) came back 736 passed/10 failed
+  before the fixture fix, 0 failed in-scope after it -- the remaining 3
+  failures are pre-existing and reproduce identically with `sources.py`/
+  `injury_adjustment.py` stashed back to `origin/main`, confirmed unrelated.
+  The falsification test (`test_nfl_injuries_path_root.py::
+  InjuryAdjustmentUsesTheResolver::test_falsifies_against_the_pre_fix_direct_join`)
+  proves the OLD `default_nfl_source_root()`-direct-join path misses the file
+  in exactly `#441`'s reproduced scenario, and the fixed resolver hits it.
+  `--json` fetcher output verified against the real live nflverse release
+  (2025 season, 6,068 rows, 695,623 bytes, `status: "written"`) earlier this
+  session, before landing.
+  NOT DONE: `scripts/football_sim_input_checklist.py` informational re-run
+  (deferred -- read-only reference, not required for this lane's outcome).
+  NOT DONE: production deploy. The autorun ships default-OFF (same
+  discipline as the pbp fetch), so this landing is inert until
+  `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN=true` is set as part of
+  an actual deploy + env change, a separate decision point.
 - Blocked by: none.
+- Handoff owed: `HOT_ARTIFACT_PATTERNS` addition for the new injuries
+  artifact, to `basketball-model-owner` (see the NOT-claimed file note
+  above) -- not yet messaged as of this close.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
