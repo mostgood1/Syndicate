@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#471` — **NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill; two concrete calibration defects found** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
+### `#471` — **NFL player-prop rate model backtested across ALL players/weeks/markets for the first time (152,919 rows, 2022-2025) — 8 of 9 markets show real, out-of-sample-verified skill; two concrete calibration defects found. Defect 1 (anytime_td shrinkage) FIXED+TUNED+MEASURED, see addendum below. Defect 2 (mean-overconfidence) not started.** — BUILT+MEASURED 2026-08-19, lane `nfl-player-props-backtest`
 
 `scripts/backtest_nfl_props.py` (new, 13 tests) — mirrors `backtest_mlb_props.py`'s per-market
 denominator discipline and in-sample/out-of-sample split (this repo's `convergence-phase7-crps`/
@@ -77,6 +77,53 @@ no distribution/PMF exists for NFL at all (confirmed absent independently by `co
 crps`'s 165-file/160-date check), so a real MLB-pitcher-ladder-grade engine (simulated PMF, priced
 ladder of thresholds) does not exist for NFL and this backtest measures the ceiling of a
 mean+stdev approximation, not a full sim.
+
+#### `#471` ADDENDUM 2026-08-19 — **Defect "anytime_td underestimated at small n" FIXED, TUNED, MEASURED out-of-sample — lane `nfl-player-props-calibration-fix`**
+
+Per user instruction ("start with the anytime_td shrinkage"), defect (2) from the original entry
+(rolling rate of exactly 0.0 predicting 0% against a real 13-14% hit rate) is fixed. Defect (1)
+(yardage/count markets overconfident near their own mean) is **NOT started**, separate follow-up.
+
+**Fix**: `syndicate/features/nfl/player_stats.py` gains a Gamma-Poisson conjugate shrinkage
+estimator — `anytime_td_rate`, `shrink_count_mean`, `_anytime_td_league_prior` /
+`_anytime_td_league_week_totals` — blending each player's raw rolling mean toward a data-derived,
+no-lookahead league-wide prior: `posterior = (n*raw + k*prior) / (n+k)`. Vanishes as a player's own
+sample grows, so it does the most work exactly where the defect was measured (n=2-4) and barely
+touches an established player. `syndicate/features/nfl/props.py`'s `nfl_props_rows_for_week` now
+calls this instead of raw `player_rate` for the `anytime_td` market specifically — the other 8
+markets are confirmed byte-identical in the regenerated backtest report, untouched.
+
+**`k` TUNED, not guessed**: new `scripts/calibrate_nfl_anytime_td_shrinkage.py` sweeps `k` in
+`{0..30}`, **SELECTS on 2022-2023** (a genuine convex minimum at k=12: fit-Brier 0.1905 at k=0 ->
+0.1606 at k=12 -> 0.1621 at k=30, not a monotone "more shrinkage is free" artifact), and **only
+REPORTS on 2024-2025** (never re-selected there) — the identical fit/score discipline
+`backtest_nfl_props.py`'s own out-of-sample bias correction already uses.
+
+**MEASURED, out-of-sample, 8,464 held-out rows**:
+- Brier score: **0.1973 (k=0, pre-fix) -> 0.1680 (k=12)** — real improvement, not noise.
+- The exact defect bucket (`raw_mean == 0.0`, n=2,814): predicted probability moved
+  **0.0% -> 18.0%** against a real **14.1%** hit rate — closes most of the gap. **Stated honestly,
+  not oversold**: this overshoots slightly (18.0% vs 14.1%), a real residual, not a perfect fix.
+- Ladder calibration (`backtest_nfl_props.py` Section 2, all 16,991 rows): every decile bucket now
+  within **+0.01 to +0.07** of calibrated (worst pre-fix bucket was **-0.144**). Brier
+  **0.1939 -> 0.1643**.
+- **Trade-off disclosed, not hidden**: point-accuracy MAE on `anytime_td` got **WORSE**
+  (0.358 -> 0.386) because shrinkage pulls the many true-zero rows up toward ~0.15-0.20 — the
+  correct cost for a **probability market** (Brier is the metric that matters for a betting
+  probability), reported rather than papered over.
+
+**Tests**: 23 new (`tests/test_nfl_player_stats.py`, `tests/test_nfl_props.py`); 614 pre-existing
+NFL tests still pass (3 unrelated pre-existing failures — `generate_smartsim2_nfl_projections.py`
+pbp-resolution tests — confirmed identical with this change stashed out, not a regression).
+
+**Verified on `origin/main` by content**: `30caf008`, `player_stats.py` carries
+`ANYTIME_TD_SHRINKAGE_K = 12.0` and `props.py` calls `anytime_td_rate(season, week, player_id)`.
+`reports/nfl_props_backtest_2022_2025.json` regenerated to reflect the fix;
+`reports/nfl_anytime_td_shrinkage_calibration.json` is the tuning sweep's own record.
+
+**Next**: defect (1), yardage/count markets overconfident near their own mean (predicts ~50% cover,
+actual ~37-44%) — needs a skewed/empirical-quantile approach, not shrinkage (this is a shape
+problem, not a small-sample problem). Not started.
 
 ### `#470` — **NHL never had a market-comparison backtest -- the instrument that answers "does this show an edge," distinct from every calibration `#463` closed** — BUILT, MEASURED, HONESTLY CAVEATED 2026-08-19, lane `nhl-model-owner`
 

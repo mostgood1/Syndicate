@@ -593,7 +593,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 ### basketball-model-owner — OPEN — **#468's WIRING FIX LIVE on BOTH refresh-worker (`f13ea05e`) and live-odds-worker (`e1d1bcf4`), verified end-to-end with real data pre-deploy (uncached-date build + stale-schema rebuild, both correct). #469 (boxscore-capture root cause — earlier "no caller found" hypothesis was WRONG, see below) FOUND+FIXED+DEPLOYED to live-odds-worker (`e1d1bcf4`). #467 LIVE on refresh-worker. #462 LIVE+VERIFIED on web. #464 CLOSED. Runtime effect of #468/#469 on a real served prediction NOT YET OBSERVED — WNBA smart-sim fires per-game, not on a fixed interval, and the next real game (TOR@WSH) is ~19h out from 2026-08-19T04:xxZ.** inventory pass SHIPPED (#460-#469 filed) — opened 2026-08-18 — session: basketball-model-owner
 - Goal: Basketball's counterpart to the Modeling (MLB), Soccer, and Football sessions — bring the NBA/WNBA smart-sim engine up to `docs/ai_context/model_engine_standard.md`. Original scope (checklist + pipeline-trace + inventory docs, #440 fallback reachability) SHIPPED. Extended scope this session: `#461` (WNBA `games` column, code-fixed, deployed, and now WIRED — `#468`), allowlist gap `#462` (live), population gap `#464` (closed), dead-gate bug `#467` (live), reachability defect `#468` (wiring shipped AND deployed), boxscore-capture stall `#469` (root cause found and fixed, deployed). Current goal: observe #468/#469's effect on a real served WNBA prediction once the next game's pregame sim cycle fires (~19h out); no further code work identified as ready until that reading comes back. NCAAB still has no sim engine — documented design gap, deliberately not backfilled.
-- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`'s dead-gate fix, `#468`'s wiring fix — 3 new functions: `_team_adv_stats_cache_is_fresh_local`, `_import_advanced_stats_builders_local`, `_ensure_team_advanced_stats_asof_local`), `syndicate/features/shared/artifact_publisher.py` (`#462`'s `HOT_ARTIFACT_PATTERNS` additions only), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`'s cache-freshness guard), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix + ESPN User-Agent change). Read-only over the rest of `basketball_props_*.py`, `syndicate/features/{nba,wnba,ncaab}/**`. Does NOT touch board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration).
+- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`'s dead-gate fix, `#468`'s wiring fix — 3 new functions: `_team_adv_stats_cache_is_fresh_local`, `_import_advanced_stats_builders_local`, `_ensure_team_advanced_stats_asof_local`), `syndicate/features/shared/artifact_publisher.py` (`#462`'s `HOT_ARTIFACT_PATTERNS` additions only), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`'s cache-freshness guard), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix + ESPN User-Agent change). Read-only over the rest of `basketball_props_*.py`, `syndicate/features/{nba,wnba,ncaab}/**`. Not touched: board_enrichment.py, run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by wnba-live-tier / wnba-phase2-migration -- both since CLOSED per this file's own "HOLD RELEASED" note, so board_enrichment.py is unclaimed by any OPEN lane as of 2026-08-19).
 - Hypothesis (#468's second half, CLOSED — was WRONG): "no caller of update-boxscores-history/backfill-boxscores found anywhere" was true only of the VENDOR CLI's own functions. A PARALLEL Syndicate-owned mechanism (`_ensure_player_logs_for_props_refresh` → `_bootstrap_local_boxscores_history_for_props` → `bootstrap_boxscores_history_local`, ESPN-based) IS reachable from `main()` and runs on every autorun tick. The real cause, measured 2026-08-19: `_bootstrap_local_boxscores_history_for_props` checked the file's cumulative `history_rows` (always >0 once any history exists) instead of the current pull's own `rows`, so a fetch that added zero new rows still reported success — silently, for weeks (`boxscores_history.csv`'s max game date frozen at 2026-06-30 while mtime kept advancing every ~2h tick). Root-caused further: ESPN's site API soft-blocks a custom bot User-Agent (`syndicate/1.0`) from Render's datacenter egress IP (200 OK, empty body) while a browser-shaped UA and/or residential IP works.
 - #469 fix: (1) `basketball_boxscores_history.py` tracks `days_checked`/`days_fetch_failed` so an empty scoreboard payload is distinguishable from a genuine no-games day; (2) `refresh_wnba_oddsapi_props.py` keeps the existing leniency (does not hard-block predict-props) but now emits a loud `flush=True` `BOXSCORE_BOOTSTRAP_STALLED` marker instead of a silent, healthy-looking log line when new rows are genuinely zero; (3) ESPN User-Agent changed to browser-shaped. Verified via a live unmodified-code ESPN pull (674 real rows, 2026-08-09..08-18) both before and after the UA change — did not regress the working path.
 - Verification: `#461`/`#462`/`#467`/`#468`(wiring)/`#469` — all code DONE and all now LIVE (refresh-worker `f13ea05e`, live-odds-worker `e1d1bcf4`, web `b775255a`). Runtime effect of `#468`/`#469` on a real served prediction still unobserved — not stuck, just untriggered: WNBA smart-sim generation is tied to actual game slates (newest `smart_sim_*.json` artifact was 5.9h old at last check, predating this deploy), and the next real game is ~19h out. Re-check `/api/ops/artifacts/export?pattern=wnba_source/*/team_advanced_stats_*.csv` for a fresh as-of file, and worker logs for `BOXSCORE_BOOTSTRAP_STALLED` (absence of it on the next tick is the `#469` positive signal), once that window passes.
@@ -957,6 +957,22 @@ already funnels through ONE function, so this is a 2-file change, not N:
   on spreads/totals rows sitting AT the main line, still null (with the new
   reason) on alt lines — both readable in `per_sport_ingest.wnba`.
 
+**REBASE SAFETY RE-CHECKED WHILE WAITING, 2026-08-19 ~16:4xZ.** `git fetch` +
+`git log --oneline HEAD..origin/main -- <path>`, per claimed file, not a bulk
+diff (a bulk `git diff HEAD origin/main --name-status` is the WRONG check here
+— it lists every file EITHER side touched, including this branch's own
+uncommitted-upstream edits, and briefly read as a false conflict signal before
+I caught it). Correct result: **zero** new origin/main commits on
+`wnba_projections.py` / `wnba_game_projections.py` / `board_enrichment.py` /
+either test file since this branch's base. The one shared file that DID move
+(`scripts/refresh_wnba_oddsapi_props.py`, `0c7962a7` — basketball-model-owner's
+own `#469` fix) edits lines ~3803-3980 (boxscore-bootstrap freshness), nowhere
+near `_GAME_CARDS_HEADER_ORDER` (~2209) / `_sim_projection_fields` (~2515) /
+`_smart_sim_projection_index` (~2812), the three spots the producer-half diff
+spec (above) targets — so that ask stays conflict-free too. Also visible on
+origin/main: the lane-guard disclaimer-marker fix shipped (`f52fc91b`,
+`0a7fdbeb`) — `task_73b93c64` resolved.
+
 **CONSUMER HALF IMPLEMENTED, TESTED, COMMITTED 2026-08-19 — NOT PUSHED.**
 Own worktree (`C:\tmp\syndicate-sessions\wnba-edge-263`, branch
 `session/wnba-edge-263`), commit `6135559e`, `git diff --stat` confirmed only
@@ -993,6 +1009,131 @@ the two intended files touched (318 insertions / 13 deletions,
   pending the producer half (still with `basketball-model-owner`, message
   queued) so the two land together rather than shipping dead columns-reading
   code with nothing to read.
+
+**PROPS SUB-FIX — SCOPED, IMPLEMENTED, TESTED, COMMITTED 2026-08-19 — NOT
+PUSHED. A better fix than originally scoped: real empirical PMF, not a
+reconstructed Normal CDF.**
+
+- **User asked to solve WNBA props too.** Original scope (thread `sd_*` from
+  `props_predictions_<date>.csv` through `_build_model_map`, reconstruct a
+  Normal CDF in `wnba_projections.py`) was SUPERSEDED before writing code —
+  found a better source while checking whether `sd_pts` was measured or a
+  heuristic fallback.
+- **`cards_sim_detail_<date>.json` (confirmed live on production 2026-08-19,
+  1.4MB) already carries a full ~100-draw EMPIRICAL PMF per player per stat**
+  — `players[side][i]["prop_ladders"][stat]["ladder"]`, a list of
+  `{total, hitProb}` where `hitProb(T) = P(actual >= T)` (verified: Veronica
+  Burton's `pts` ladder — `total=2, hitProb=1.0` down to `total=30,
+  hitProb=0.01`, monotonic, matching `hitCount`/`n_sims` exactly). This
+  directly answers the EXACT coverage gap the falsification test found
+  (Burton's `player_points` 13.5 had no play in `props_edges.py`'s output)
+  — this artifact has her `pts` distribution regardless.
+- **This repo's own 2026-08-16 FORBIDDEN rule** ("letting a FITTED MODEL
+  judge when a model-free measurement is available") says the empirical
+  ladder outranks a reconstructed Normal CDF — so building the Normal
+  approximation I'd originally scoped would have shipped the KNOWINGLY WORSE
+  of two available options.
+- **Found and did NOT adopt: `syndicate/features/shared/basketball_market_board.py`**
+  — a whole parallel, ALREADY-BUILT, already-tested (`tests/test_basketball_market_board.py`)
+  NBA+WNBA market/odds board with its own `_prob_over` (Normal-CDF) and
+  sim-distribution join. **Zero live callers anywhere in the codebase** —
+  built and unreachable, the exact `model_engine_standard.md` pattern
+  CLAUDE.md warns about. REUSED its `_prob_over` naming precedent and its
+  citation style (not its code — that function stops at Normal-approximation,
+  the empirical ladder is better). **Flagged, not wired in** — verifying and
+  activating a second unwired subsystem is separate, larger work from closing
+  `#263`, and doing so silently inside this lane would hide a real finding
+  inside an unrelated commit.
+- **Files (all outside `basketball-model-owner`'s claimed scope, verified):**
+  `syndicate/features/shared/wnba_projections.py`,
+  `syndicate/features/shared/board_enrichment.py` (the WNBA call site — see
+  lane-guard false-positive note below), `tests/test_wnba_projections.py`.
+  Read-only reuse (import only, no edit): `syndicate/features/wnba/cards.py`'s
+  `_artifact_games_index` (their read-only-claimed scope — importing a
+  function is not writing to the file, same precedent as
+  `_margin_win_prob`/`_load_game_cards_csv_rows_from_keyvalue` already
+  imported from the same file in the game-line sub-fix), `syndicate/features/wnba/sources.py`'s
+  `processed_path`.
+- **Design**: `WnbaPropDistributionIndex` + `load_wnba_prop_distributions`
+  (reads `cards_sim_detail_<date>.json` via `wnba/cards.py`'s OWN parser, not
+  re-derived) + `_hit_prob_over(ladder, line)` (pure function: gap-filling
+  ladder lookup — the ~100-draw ladder has gaps at untouched integer totals,
+  and the correct read is the NEXT PRESENT total's hitProb, found by
+  scanning ascending, never a direct key lookup). `attach_wnba_projections`
+  takes an OPTIONAL `distribution_index` param (every existing caller that
+  omits it is byte-identical to before `#263`, verified by test) and, when a
+  ladder matches AND the row has a line, computes the real probability and
+  reuses `_attach_sim_probability_edge` (imported from
+  `wnba_game_projections.py` — REUSED, not a 6th edge computation; nothing
+  in that helper is game-specific).
+- **LANE-GUARD FALSE POSITIVE HIT AND WORKED AROUND, NOT SILENTLY.**
+  `board_enrichment.py` was blocked as "claimed by basketball-model-owner"
+  despite their own Files line explicitly saying "Does NOT touch
+  board_enrichment.py ... (held by wnba-live-tier / wnba-phase2-migration)"
+  — both of which are CLOSED. Root cause, read from `lane-guard.py` itself:
+  `_DISCLAIMER_MARKERS` has `"not touched"` but not `"not touch"`/`"does not
+  touch"`, and the recognized `"held by"` marker sits AFTER the filenames in
+  that sentence, so `_claimable_prefix` included them as claims. The guard's
+  own code comment names this exact failure mode and says the only remedy is
+  editing the ledger text (`.syndicate/**` is guard-exempt by design) — done,
+  minimal reword to `"Not touched:"`, meaning unchanged, verified the edit
+  unblocked the guard. **Flagged as a real code bug for `repo-coordination`
+  via `spawn_task` (`task_73b93c64`)** rather than left as a one-off patch —
+  the tense gap will refire on any other "does not touch" phrasing.
+- **Tests: 32/32 pass in `test_wnba_projections.py`** (13 original unchanged
+  + 19 new): `_hit_prob_over` in isolation (direct hit, whole-number
+  rounding, gap-fill, beyond-max honest zero, below-min, out-of-order input,
+  malformed/empty input), `WnbaPropDistributionIndex.ladder_for` (market
+  mapping, unknown player, unmapped market), the full `attach_wnba_projections`
+  wiring (matched line → real prob + edge, no-index-supplied exact
+  regression guard, index-present-but-no-ladder-for-this-player fallback,
+  no-line-means-no-lookup, one-sided-book reason, live suppression,
+  attributable `rows_with_distribution` count, conditional
+  `probability_fields` string), and the loader's graceful empty-index
+  degrade. Also ran `test_wnba_game_projections.py` +
+  `test_wnba_fixture_identity.py` + `test_live_edge_policy.py` (95 total)
+  clean. Smoke-tested `board_enrichment.attach_projections(sport="wnba")`
+  directly against a nonexistent date — degrades to the exact pre-`#263`
+  `reason` string, no crash.
+- **NOT PUSHED**, same reasoning as the game-line sub-fix: additive and
+  inert on its own (a build with no `cards_sim_detail` reachable degrades to
+  today's behaviour, verified by test), but landing it alongside the
+  game-line half means one push, one verification window, not two.
+- **Read-path risk RE-EXAMINED while waiting on basketball-model-owner —
+  DOWNGRADED from "unresolved" to "same mechanism the ALREADY-WORKING props
+  path already depends on," not fully closed (refresh-worker has no HTTP
+  server, so its disk cannot be queried directly — this is as far as it goes
+  without a live deploy).**
+  - The concern: `load_wnba_prop_distributions` reads via plain
+    `processed_path` (pathlib), the same pattern `game_cards` needed a
+    keyvalue dual-write ON TOP OF after being found invisible cross-service.
+  - Confirmed `_export_cards_sim_detail_snapshot` (`refresh_wnba_oddsapi_props.py:5414`)
+    writes ONLY to local disk (`out_path.write_text(...)`, no keyvalue) —
+    the SAME shape `game_cards` had before its fix, so the concern was not
+    invented.
+  - **But `cards_sim_detail_*.json` is already on `HOT_ARTIFACT_PATTERNS`**
+    (`artifact_publisher.py:93,171` — confirmed present, not assumed), and
+    that allowlist drives a GENERIC filesystem sweep
+    (`sweep_changed_hot_artifacts`, called from `live_refresh_loop.py` /
+    `live_lens_loop.py` on every tick, not by the producer script itself —
+    confirmed `refresh_wnba_oddsapi_props.py` has ZERO direct calls to it)
+    that pushes worker->web, plus `pull_hot_artifacts` (web->refresh-worker,
+    every ~30s). This is the IDENTICAL mechanism `props_recommendations_<date>.csv`
+    already rides — and that path demonstrably WORKS today (WNBA prop
+    projections ARE live on the board, `pct_projected: 76.2%` measured
+    earlier this session). Being on the same allowlist means
+    `cards_sim_detail` should follow the same route, not a special case.
+  - **What this does NOT prove**: that refresh-worker's disk has it RIGHT
+    NOW. Refresh-worker runs no HTTP server, so there is no query that can
+    show its disk state directly — `/api/ops/wnba/artifact-counts` (checked)
+    only reports whichever service answers the HTTP request (web), and
+    doesn't even list `cards_sim_detail` among its checked files. The
+    `#263` verification step below is still the real test, not a formality.
+- Verification (both sub-fixes, next real step): on a live build,
+  `per_sport_ingest.wnba.rows_with_model_edge` reports the numerator and
+  denominator for BOTH halves — `prop_coverage.rows_with_distribution` and
+  the game-line `at_market_line` count — not just a combined total, so a
+  partial win on one half is legible rather than averaged away.
 
 ### nfl-player-props-backtest — CLOSED-VERIFIED 2026-08-19 — measured 152,919 rows/2,406 players/4 seasons; 8 of 9 markets beat baseline in AND out of sample; two calibration defects + one allowlist gap flagged. Full write-up `todo.md` `#471`, measurement `deploys.md`. — opened 2026-08-19 — session: nfl-player-props-backtest
 - Goal: measure whether `syndicate/features/nfl/player_stats.py`'s rolling
@@ -1037,7 +1178,7 @@ the two intended files touched (318 insertions / 13 deletions,
   size stated next to every number (rule: "a rate, not a count").
 - Blocked by: none.
 
-### nfl-player-props-calibration-fix — OPEN — opened 2026-08-19 — session: nfl-player-props-calibration-fix
+### nfl-player-props-calibration-fix — CLOSED-VERIFIED 2026-08-19 — defect 1 (anytime_td shrinkage) FIXED+TUNED+MEASURED out-of-sample, `30caf008` on `origin/main`, verified by content. Defect 2 (yardage/count mean-overconfidence) NOT started — see todo.md `#471` addendum. — session: nfl-player-props-calibration-fix
 - Goal: fix the two calibration defects `#471` found and measured but did not
   fix. **Testable outcome, defect 1 (this pass):** `anytime_td`'s predicted
   probability at a rolling rate of exactly 0.0 stops reading as 0% when the
@@ -1075,6 +1216,20 @@ the two intended files touched (318 insertions / 13 deletions,
   after the change; Section 1's `anytime_td` OOS row and Section 2's
   `anytime_td` calibration buckets (low end specifically) both improve,
   with the numbers stated, not just "looks better".
+- **DONE, verification MET.** `k` tuned out-of-sample (2022-2023 fit,
+  2024-2025 score-only) at a genuine convex minimum, k=12:
+  Brier 0.1973 (k=0) -> 0.1680 (k=12), 8,464 held-out rows. Ladder
+  calibration's worst bucket gap went from -0.144 to +0.013-+0.068 across
+  all 10 deciles. The exact defect bucket (raw_mean==0.0): predicted
+  0.0% -> 18.0% vs a real 14.1% hit rate -- most of the gap closed, a
+  residual stated honestly, not claimed as perfect. Trade-off disclosed:
+  anytime_td's point-accuracy MAE got WORSE (0.358->0.386), the correct
+  cost for a probability market (Brier is the metric that matters here).
+  8 of 9 other markets confirmed byte-identical, untouched. 23 new tests,
+  614 pre-existing NFL tests still pass (3 unrelated pre-existing
+  failures, confirmed identical with this change stashed out). Full
+  writeup: `docs/ai_context/todo.md` `#471` addendum,
+  `.syndicate/deploys.md` 2026-08-19.
 - Blocked by: none.
 
 ### lane-guard-disclaimer-marker-fix — CLOSED 2026-08-19 — fix shipped and verified, `f52fc91b` live on `origin/main`. — session: lane-guard-disclaimer-marker-fix
@@ -1117,6 +1272,26 @@ the two intended files touched (318 insertions / 13 deletions,
   `930a0a1e`, which already carried an unrelated same-day commit to the
   same file — merged, not overwritten; both disclaimer-marker additions
   survive). Landed via `session_worktree.py` (own worktree, own index).
+
+### lane-guard-not-touch-marker-fix — CLOSED 2026-08-19 — fix shipped and verified, `0a7fdbeb` live on `origin/main`. — session: (unlaned, single-turn user-directed fix)
+- Goal: `_DISCLAIMER_MARKERS` recognizes "not touch"/"does not touch" (present
+  tense), not just "not touched". **DONE.**
+- Files: `.claude/hooks/lane-guard.py` (one string added, same tuple as the
+  sibling block above — no other logic touched), `tests/test_lane_guard_files_forms.py`
+  (`test_does_not_touch_present_tense_is_not_claimed`).
+- Trigger: user-reported and measured live 2026-08-19 —
+  `basketball-model-owner` wrote "Does NOT touch board_enrichment.py,
+  run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by ...)."
+  "held by" sits after the filenames, so `_claimable_prefix` had nothing
+  earlier to cut at and read all three as claims, blocking `wnba-edge-263`
+  from a file the sentence explicitly disclaimed.
+- Coordinated before editing: `send_message` to the session showing
+  `your lane: repo-coordination` in its own `deploy-guard` output (this file's
+  claims are held by `repo-coordination`); no objection, proceeded (additive,
+  test-covered). Full narrative: `.syndicate/log/2026-08-19.md`.
+- Verification: `pytest tests/test_lane_guard_files_forms.py` 10/10 pass;
+  `0a7fdbeb` confirmed on `origin/main` post-push.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

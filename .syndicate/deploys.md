@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-08-19 — NFL ANYTIME_TD SHRINKAGE FIX, TUNED AND MEASURED OUT-OF-SAMPLE — lane `nfl-player-props-calibration-fix`
+
+**NO DEPLOY. Local tooling + a production code path, but the code change
+is a library function, not a running service** — same class as `#471`
+itself. `30caf008` on `origin/main`, verified by content. Full write-up:
+`docs/ai_context/todo.md` `#471` addendum.
+
+Fixes the first of the two calibration defects `#471` measured: `syndicate/
+features/nfl/player_stats.py`'s raw per-player `anytime_td` rate predicted
+0% for any player with a rolling mean of exactly 0.0 (2-4 scoreless
+games), when the real hit rate for that exact bucket was ~13-14%. New
+Gamma-Poisson shrinkage (`anytime_td_rate`), wired into
+`syndicate/features/nfl/props.py`'s `nfl_props_rows_for_week` for the
+`anytime_td` market only — the other 8 markets confirmed byte-identical.
+
+`py -3 scripts/calibrate_nfl_anytime_td_shrinkage.py` — `k` selected on
+2022-2023 (genuine convex minimum, k=12), reported (not re-selected) on
+2024-2025, 8,464 held-out rows:
+
+| metric | k=0 (pre-fix) | k=12 (shipped) |
+|---|---|---|
+| Brier score | 0.1973 | 0.1680 |
+| raw_mean==0.0 bucket: predicted | 0.0% | 18.0% |
+| raw_mean==0.0 bucket: actual | 14.1% | 14.1% |
+
+Closes most of the gap (0%→18% against a real 14.1%), does not eliminate
+it — a real, stated residual (overshoots by ~4pp), not claimed as perfect.
+
+**`py -3 scripts/backtest_nfl_props.py` re-run confirms the same shape at
+full scale (16,991 rows, not just the held-out slice)**: Section 2 ladder
+calibration's worst decile-bucket gap went from **-0.144 to
++0.013..+0.068** across all 10 buckets; Brier **0.1939 → 0.1643**.
+
+**Trade-off measured and reported, not hidden**: `anytime_td`'s
+point-accuracy MAE got WORSE (0.358 → 0.386) — shrinkage pulls the many
+true-zero rows up toward ~0.15-0.20, correct for a probability market
+(Brier is what matters for a betting probability) but a real MAE cost.
+
+Verify: `reports/nfl_anytime_td_shrinkage_calibration.json` (the tuning
+sweep, committed), `reports/nfl_props_backtest_2022_2025.json`
+(regenerated to reflect the fix). 23 new tests
+(`tests/test_nfl_player_stats.py`, `tests/test_nfl_props.py`), all
+passing; 614 pre-existing NFL tests still pass (3 unrelated pre-existing
+failures confirmed identical with this change stashed out).
+
+**Not done**: defect 2 (yardage/count markets overconfident near their own
+mean, predicts ~50% cover vs actual ~37-44%) — a shape problem (real
+box-score data is right-skewed), needs a different fix than shrinkage.
+
+---
+
 ## 2026-08-19 — NFL PLAYER-PROP RATE MODEL, FIRST BACKTEST EVER RUN — lane `nfl-player-props-backtest`
 
 **NO DEPLOY. Local tooling only** (new script + tests, `40db4d50` on
