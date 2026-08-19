@@ -16,6 +16,7 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
     build_nhl_sim_config,
     run_hockeysim_game,
 )
+from syndicate.features.nhl.sim_engine.hockeysim.engine import SimConfig
 
 
 def _roster(team: str, base_pid: int) -> list[dict]:
@@ -322,6 +323,71 @@ class HockeySimEngineTest(unittest.TestCase):
             f"faceoff_dz_index=0.3 when nothing else differs -- got strong={strong_mean:.3f} "
             f"weak={weak_mean:.3f}. If this fails, faceoff_dz_index is present on "
             f"HockeyTeamFeatures.special_teams but not reachable in engine.py.",
+        )
+
+    def test_faceoff_discrete_event_model_flag_actually_changes_output(self) -> None:
+        """Reachability test for the §2r redesign: `faceoff_discrete_event_model=True` (the
+        default) must produce measurably different simulated output than `False` (the exact
+        pre-redesign diff-based mechanism), holding every other input identical -- proves the
+        flag actually gates something, not just that it exists on `SimConfig`."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 1.6}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 0.5}
+        cfg_legacy = build_nhl_sim_config(overrides={"faceoff_discrete_event_model": False})
+        cfg_discrete = build_nhl_sim_config(overrides={"faceoff_discrete_event_model": True})
+
+        def _mean_home_shots(profile: SimConfig) -> float:
+            totals = []
+            for s in range(80):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        legacy_mean = _mean_home_shots(cfg_legacy)
+        discrete_mean = _mean_home_shots(cfg_discrete)
+        self.assertNotAlmostEqual(
+            legacy_mean, discrete_mean, places=1,
+            msg=f"legacy diff-based mean={legacy_mean:.3f} and discrete-event mean={discrete_mean:.3f} "
+                f"should differ -- if they match, faceoff_discrete_event_model is not gating anything.",
+        )
+
+    def test_faceoff_discrete_event_model_still_reflects_a_real_per_team_edge(self) -> None:
+        """The redesign must preserve the underlying per-team differentiation, not just change the
+        functional form arbitrarily: a team with a real `faceoff_oz_index` edge must still
+        out-shoot a weaker one on average UNDER THE NEW DEFAULT MECHANISM specifically (not just
+        under the legacy one, which the OZ reachability test above already covers)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong = dict(base, faceoff_oz_index=1.8)
+        weak = dict(base, faceoff_oz_index=0.3)
+        cfg = build_nhl_sim_config(overrides={"faceoff_discrete_event_model": True})
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=base, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong)
+        weak_mean = _mean_home_shots(weak)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"Under the discrete-event mechanism, faceoff_oz_index=1.8 must still produce more "
+            f"HOME shots on average than faceoff_oz_index=0.3 -- got strong={strong_mean:.3f} "
+            f"weak={weak_mean:.3f}. If this fails, the redesign lost the per-team signal.",
         )
 
     def test_faceoff_dz_index_requires_both_sides_to_activate(self) -> None:

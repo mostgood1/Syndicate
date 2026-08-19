@@ -102,6 +102,15 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     faceoff_mult_clip_low=0.90,
     faceoff_mult_clip_high=1.10,
     faceoff_ev_only=True,
+    # §2r: discrete-event redesign, on by default. `hockeysim_faceoff_segment_validation_report.md`
+    # measured a real, large, sharp, short-lived post-faceoff shot effect (3.84x at 10s, decayed to
+    # ~1.0x by 60-90s, 58,762 real EV faceoffs) that the diff-based mechanism above (`faceoff_alpha`
+    # etc, still used when this is False) cannot represent -- it applies one constant multiplier
+    # across an entire ~40-45s segment from season-long win rate, a category error for an effect
+    # this concentrated. `historical_truth/faceoff_decay_model.py` simulates a discrete draw per EV
+    # segment and applies the real measured decay curve's time-weighted average instead. Round-robin
+    # verified: -0.12% league-wide shot delta vs the legacy mechanism, well within noise.
+    faceoff_discrete_event_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

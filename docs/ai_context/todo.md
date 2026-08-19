@@ -1019,7 +1019,7 @@ characteristic of WNBA's shorter operational history in this app and there
 is nothing to fix -- only to keep documented so it is not mistaken for a
 regression later.
 
-### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
+### `#463` — **NHL's props/boxscore engine ran EVERY team as exactly league-average, always AND simulated shorthanded goals/shots at 2-3x the real rate. `elo_rating`, `goals_per_60`-staleness, `special_teams` (PP%/PK% GOAL conversion + per-team PP/PK SHOT-volume + per-team BLOCK-rate differentiation), `special_teams_cal`'s wiring, ALL 6 non-neutral goal/shot/block-rate multiplier calibrations, a real xG (expected goals) model, `shots_per_60`/`faceoff_win_pct`, and player usage weights (`shot_weight`/`goal_weight`/`block_weight`) FIXED -- checklist now a full PASS. `blocks_per_60`/`penalties_per_60`: populated, proven a CONFIRMED DEAD GATE, then REMOVED entirely (neither could gain a legitimate consumer without duplicating already-live real data) -- CLOSED, not deferred. Faceoff-zone track (EV/OZ/DZ/NZ indices, season-aggregate calibration check, segment-level validation, AND the discrete-event engine redesign the validation demanded) fully built through to a shipped mechanism change** — FOUND, MEASURED, FULLY CLOSED 2026-08-18/19, lane `nhl-model-owner`
 
 Full write-up: `docs/ai_context/hockeysim_engine_reference.md`,
 `docs/ai_context/nhl_model_inventory.md`. Gate: `py -3 scripts/nhl_sim_input_checklist.py`
@@ -1582,8 +1582,73 @@ conversion exists); an engine redesign representing faceoffs as discrete
 events with the measured decay profile (a substantially larger project);
 whether this local effect explains any of the real per-team OZ/DZ/NZ
 spread (not tested, a natural follow-up). 373 hockeysim/nhl tests pass (13
-new), checklist unaffected (nothing new added as a consumed field). This
-closes the faceoff-zone track this session set out to build and validate.
+new), checklist unaffected (nothing new added as a consumed field).
+
+**Fifth addendum, same day: the discrete-event redesign itself -- built,
+not just left as a follow-up.** Full report:
+`docs/reports/hockeysim_faceoff_discrete_event_redesign_report.md`. The
+fourth addendum's own conclusion was explicit: recalibrating `faceoff_alpha`'s
+SIZE cannot fix a mismatch in the mechanism's SHAPE (a spike-then-decay
+effect vs. one flat per-segment constant). This addendum is that redesign.
+
+First extended the measurement to the engine's ACTUAL segment length
+(~40-45s, `target_seg`) and beyond: `scripts/build_nhl_faceoff_decay_curve.py`
+computes real MARGINAL (non-overlapping, each independently truncated at
+the next real faceoff) post-faceoff shot-rate buckets in ONE pass over the
+same 1,312-game cache -- 7.15x at (0,5]s decaying smoothly to 1.00x by
+(60,90]s, where the effect is fully converged (winner/other rates within
+0.2% of each other) -- not extrapolated past measured data.
+
+`historical_truth/faceoff_decay_model.py::segment_average_multipliers`
+time-weight-averages this real curve over a segment's actual length, each
+bucket normalized so `(winner_mult + other_mult) / 2 == 1.0` by
+construction -- the same invariant every per-team index this session built
+already uses, so redistributing shots between the winning and losing team
+never shifts a segment's own expected total. `engine.py`'s new
+`faceoff_discrete_event_model` flag (**default ON** -- the one genuinely
+new flag this session's otherwise-flagless additive work introduced,
+existing purely for rollback/A-B comparison, not because anyone needs to
+flip it): resolves each side's percentage via the SAME existing OZ->EV->blend
+fallback chain (§2n unchanged), normalizes to a win probability, simulates
+a discrete Bernoulli draw for who wins that segment's (assumed single)
+faceoff, applies the decay curve to winner and loser instead of one
+constant derived from a season-long win-rate DIFFERENCE. The separately-
+composed DZ layer (§2o) is unchanged either way.
+
+**Stated plainly what this does NOT model**: not every ~40-45s engine
+segment corresponds to a real faceoff at its exact start (some real shifts
+begin off a line change, no stoppage) -- this treats every EV segment as
+if one occurs. Real EV faceoffs/game (58,762 / 1,312 games ~= 44.8) are the
+same order of magnitude as the engine's own EV segment count/game, so the
+approximation is directionally reasonable, not a literal game-clock
+reconstruction.
+
+**Verified**: 17 unit tests on the pure decay-curve function (exact bucket
+reproduction at short lengths, monotonic decay, long-segment convergence,
+the mean-1.0 invariant across 9 segment lengths, invalid-input handling);
+2 new reachability tests (`faceoff_discrete_event_model=True` vs `False`
+produce measurably different output; a real per-team `faceoff_oz_index`
+edge still shows up under the NEW default mechanism specifically, proving
+the redesign preserved the underlying signal rather than just changing the
+functional form arbitrarily); league-wide aggregate barely moved
+(992-pairing round-robin, legacy 61.938 vs discrete-event 61.864 avg total
+shots/game, a -0.12% delta); **392 hockeysim/nhl tests pass with the new
+mechanism as the default** (up from 373), including exact-seed determinism
+tests, despite the new mechanism consuming an additional RNG draw per EV
+segment and shifting the downstream random stream. Checklist re-confirmed
+full PASS (nothing new added as a consumed `HockeyTeamFeatures`/CSV field
+-- this changes HOW an already-consumed signal is applied, not what's
+consumed).
+
+**What remains genuinely open**: DZ's own segment-level effect was never
+separately measured, still uses the legacy diff-based math, composed on
+top either way; the "one faceoff per segment" approximation is not a
+literal game-clock reconstruction (would need real per-second time-stepping,
+substantially larger than this pass); PP/PK segments remain entirely
+untouched by any decay-curve logic (`faceoff_ev_only` still gates this
+whole mechanism to even-strength only) -- no post-faceoff study was run
+for special-teams draws. **This closes the faceoff-zone track this session
+set out to build, validate, AND (where the validation demanded it) redesign.**
 
 ### `#462` — **basketball smart-sim inputs have NO `HOT_ARTIFACT_PATTERNS` coverage — every field this lane's checklist audits is unauditable through `/api/ops/artifacts/*`** — FOUND, FIXED, AND DEPLOYED 2026-08-18, lane `basketball-model-owner`, VERIFIED LIVE IN PRODUCTION
 

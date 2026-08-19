@@ -388,6 +388,34 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   redesign, not a calibration pass, explicitly out of scope this pass. 373
   hockeysim/nhl tests pass (13 new), checklist unaffected (nothing new
   added as a consumed field).
+- **Did** build the discrete-event faceoff engine redesign §2q's own
+  finding required (reference doc §2r, full report
+  `docs/reports/hockeysim_faceoff_discrete_event_redesign_report.md`) —
+  not just a sanity check, the actual mechanism change. First extended the
+  measurement to the engine's real segment length: `scripts/build_nhl_faceoff_decay_curve.py`
+  computes MARGINAL (non-overlapping) post-faceoff shot-rate buckets in one
+  pass over the same 1,312-game cache, out to (60,90]s where the effect is
+  fully converged (winner/other rates within 0.2%) — not extrapolated.
+  `historical_truth/faceoff_decay_model.py::segment_average_multipliers`
+  time-weight-averages this real curve over a segment's actual length, each
+  bucket normalized to mean 1.0 (same invariant every per-team index this
+  session built already uses). `engine.py`'s new
+  `faceoff_discrete_event_model` flag (**default ON**, the one genuinely
+  new flag this session's otherwise-flagless additive work introduced):
+  simulates a discrete Bernoulli draw per EV segment from the SAME
+  OZ→EV→blend percentages already resolved, applies the decay curve to
+  winner/loser instead of one segment-wide constant. **Verified**: 17 unit
+  tests on the pure curve function, 2 new reachability tests (flag changes
+  output; a real per-team OZ edge still shows up under the NEW mechanism
+  specifically), league-wide aggregate barely moved (992-pairing
+  round-robin, 61.938 legacy vs 61.864 discrete-event, −0.12%), 392
+  hockeysim/nhl tests pass with the new mechanism as default — including
+  exact-seed determinism tests, despite the mechanism consuming an extra
+  RNG draw per EV segment. **Stated plainly what this does NOT model**: not
+  every engine segment corresponds to a real faceoff at its exact start
+  (some real shifts begin off a line change); DZ's own segment-level effect
+  was never separately measured, still uses the legacy diff-based math; PP/PK
+  segments remain entirely untouched by any decay-curve logic.
 - **Did** build a real xG (expected goals) model (reference doc §2i, full
   report `docs/reports/hockeysim_xg_model_report.md`) — the last genuinely-
   absent input this document tracked. `xgf_per_60`/`xga_per_60` had a reader

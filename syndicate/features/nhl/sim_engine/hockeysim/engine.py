@@ -23,6 +23,7 @@ import numpy as np
 
 from .state import GameState, TeamState, PlayerState, Event
 from .models import RateModels, TeamRates, PlayerRates
+from .historical_truth.faceoff_decay_model import segment_average_multipliers
 
 
 @dataclass
@@ -103,6 +104,15 @@ class SimConfig:
     faceoff_mult_clip_low: float = 0.90
     faceoff_mult_clip_high: float = 1.10
     faceoff_ev_only: bool = True
+    # §2r: `hockeysim_faceoff_segment_validation_report.md` measured a real, large, SHARP,
+    # SHORT-LIVED post-faceoff shot-generation effect (3.84x in the first 10s, decayed to ~1.0x by
+    # 60-90s) and flagged the diff-based `_faceoff_multipliers` above -- one CONSTANT multiplier
+    # across an entire ~40-45s segment, from SEASON-LONG win rate -- as the wrong functional form
+    # for it. `historical_truth/faceoff_decay_model.py` is the redesign: simulate a discrete draw
+    # at the segment's start, apply the REAL measured decay curve's time-weighted average over the
+    # segment's actual length. Default ON (backed by real measurement, strictly more faithful);
+    # `False` restores the exact pre-redesign diff-based mechanism for rollback/A-B comparison.
+    faceoff_discrete_event_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -1070,7 +1080,22 @@ class PeriodSimulator:
                     ev_only, faceoff_oz_idx_away_raw, faceoff_ev_idx_away_raw,
                     float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
                 )
-                m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
+                # §2r: discrete-event redesign, default ON -- simulate WHICH team wins this
+                # segment's (assumed single) faceoff from the SAME resolved percentages the old
+                # diff-based mechanism used, then apply the REAL measured decay curve's
+                # time-weighted average over the segment's actual length, instead of one constant
+                # multiplier derived from the season-long win-rate DIFFERENCE. `False` restores the
+                # exact pre-redesign mechanism unchanged, for rollback/A-B comparison.
+                if bool(getattr(self.cfg, "faceoff_discrete_event_model", True)):
+                    denom = max(1e-6, float(fo_h_pct) + float(fo_a_pct))
+                    p_home_wins_draw = max(0.05, min(0.95, float(fo_h_pct) / denom))
+                    decay = segment_average_multipliers(seg_len)
+                    if self.rng.random() < p_home_wins_draw:
+                        m_fo_h, m_fo_a = decay.winner_mult, decay.other_mult
+                    else:
+                        m_fo_h, m_fo_a = decay.other_mult, decay.winner_mult
+                else:
+                    m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
                 lam_h = float(lam_h) * float(m_fo_h)
                 lam_a = float(lam_a) * float(m_fo_a)
                 # DEFENSIVE-ZONE index (§2o) -- an ADDITIONAL layer composed with the adjustment

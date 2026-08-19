@@ -807,11 +807,48 @@ scales a segment-long multiplier, not a per-draw spike; they are not the same ki
 faithful model would need to represent faceoffs as discrete, time-limited events with a real decay
 profile — a genuine engine redesign, not a calibration pass, and substantially out of scope here.
 
-**What remains genuinely open**: a properly-scoped recalibration of the segment-wide mechanism
-using this report's decay curve as a directional sanity check (not attempted — the basis mismatch
-means no single clean conversion exists); an engine redesign representing faceoffs as discrete
-events with the measured decay profile (a substantially larger project); whether this local effect
-explains any of the real per-team OZ/DZ/NZ spread (§2n/§2o/§2p) — not tested, a natural follow-up.
+**What this section originally flagged as future work — built next, §2r, not just sanity-checked.**
+
+---
+
+## 2r. Discrete-event faceoff redesign — the engine change, not just the calibration
+
+Full report: `docs/reports/hockeysim_faceoff_discrete_event_redesign_report.md`. §2q's own
+conclusion was explicit: recalibrating `faceoff_alpha`'s SIZE cannot fix a mismatch in the
+mechanism's SHAPE (a spike-then-decay effect vs. one flat constant). This section is that redesign.
+
+**Extended the measurement first**: `scripts/build_nhl_faceoff_decay_curve.py` computes real
+MARGINAL (non-overlapping) post-faceoff shot-rate buckets covering the engine's actual ~40-45s
+segment length and beyond, in one pass over the same 1,312-game cache (58,762 EV faceoffs):
+7.15x at (0,5]s decaying smoothly to 1.00x by (60,90]s — fully converged, not extrapolated.
+
+**The model**: `historical_truth/faceoff_decay_model.py::segment_average_multipliers(seg_len)` —
+each bucket normalized so `(winner_mult + other_mult) / 2 == 1.0` by construction (same invariant
+every per-team index this session built already uses), time-weight-averaged over the segment's
+actual length. `engine.py`'s new `faceoff_discrete_event_model` flag (default `True`): resolves
+each side's percentage via the EXISTING OZ→EV→blend chain (unchanged), normalizes to a win
+probability, simulates a discrete Bernoulli draw for who wins that segment's faceoff, applies the
+decay curve to winner/loser. `False` restores the exact pre-redesign mechanism. The DZ layer (§2o)
+is unchanged, composed on top either way — its own segment-level effect was never separately
+measured, a distinct open item.
+
+**Stated plainly, what this does NOT model**: not every engine segment corresponds to a real
+faceoff at its exact start (some real shifts begin off a line change, no stoppage) — this treats
+every EV segment as if one occurs. Real EV faceoffs/game (≈44.8) are the same order of magnitude as
+the engine's own EV segment count/game, so the approximation is directionally reasonable, not a
+literal game-clock reconstruction.
+
+**Verified**: 17 unit tests on the pure decay function (exact bucket reproduction, monotonic decay,
+long-segment convergence, the mean-1.0 invariant across 9 lengths); 2 new reachability tests (the
+flag changes output; a real per-team OZ edge still shows up under the new default mechanism);
+league-wide aggregate barely moved (992-pairing round-robin, 61.938 legacy vs 61.864 discrete-event,
+−0.12%); 390 hockeysim/nhl tests pass with the new mechanism as default, including exact-seed
+determinism tests, despite the new mechanism consuming an extra RNG draw per EV segment.
+
+**What remains genuinely open**: DZ's own segment-level effect (never separately measured); the
+"one faceoff per segment" approximation is not a literal game-clock reconstruction; PP/PK segments
+remain entirely untouched by any decay-curve logic (`faceoff_ev_only` still gates this whole
+mechanism to even-strength only) — no post-faceoff study was run for special-teams draws.
 
 ---
 
@@ -876,10 +913,15 @@ concept.
 | `compute_team_faceoff_oz_index` + `faceoff_oz_index` wired into `engine.py` via `_resolve_faceoff_pct` (§2n) — a zone-specific refinement of §2m, preferred over the flat EV index when present | built, run (1,312 playbyplay games, 38,120 OZ-attributed faceoffs, mean index 0.99973 across 32 teams — a DIFFERENT ranking than the EV index, confirming a distinct signal), verified the league-wide average did not shift (62.138 neutral vs 61.937 real-indexed, 992-pairing round-robin), tested (10 unit + 1 loader + 1 reachability + 1 priority-over-EV-index) | reachable by default; three-tier fallback (OZ → EV → all-situations blend) preserves every prior tier's reachability |
 | `compute_team_faceoff_dz_index` + `faceoff_dz_index` wired into `engine.py` as an ADDITIONAL multiplicative layer (§2o) — NOT the OZ index's mirror image (measured correlation 0.69), composed with (not replacing) the OZ/EV chain | built, run (same 1,312 games, 38,120 DZ-attributed faceoffs, mean index 1.00063 across 32 teams), verified the league-wide average did not shift (61.940 neutral vs 61.934 real-indexed, 992-pairing round-robin — ~0.01%, essentially zero), tested (7 unit + 1 loader + 1 reachability + 1 both-sides-required gating) | reachable by default, gated on BOTH sides carrying the index (no fallback tier since nothing previously consumed this signal); completes all 3 faceoff-zone signals §2m's gap analysis opened |
 | `compute_team_faceoff_nz_index` + `scripts/calibrate_nhl_faceoff_nz_index.py` (§2p) — checks whether ANY faceoff-zone index correlates with real season-aggregate `shots_per_60`, not just whether it's normalized correctly | built, run — every correlation (NZ/OZ/DZ/EV) under 0.02 in magnitude, indistinguishable from zero across all 32 teams | **deliberately NOT wired** — real measurement found no basis to; function is tested (5 unit tests) but not added to the CSV producer, loader, or `engine.py`, avoiding the exact "populated but dead" anti-pattern §2l already fixed once |
+| `historical_truth/faceoff_segment_effect.py` + `scripts/validate_nhl_faceoff_segment_effect.py`/`build_nhl_faceoff_decay_curve.py` (§2q) — checks the mechanism's claimed LOCAL, segment-level effect directly, not just season aggregates | built, run — real, large, sharp, short-lived effect confirmed (3.84x-7.15x near a draw, decaying to 1.00x by 60-90s, 58,762 real EV faceoffs) | measurement-only; flips the §2p null result's interpretation but changes no engine behavior by itself |
+| `historical_truth/faceoff_decay_model.py` + `engine.py`'s `faceoff_discrete_event_model` (§2r) — the redesign §2q's own finding required: a discrete per-draw event with a real decay curve, not a per-segment constant | built, tested (17 unit + 2 reachability), verified the league-wide average barely moved (61.938 legacy vs 61.864 discrete-event, −0.12%, 992-pairing round-robin) | **reachable, DEFAULT ON** — the one genuinely new flag this session's additive work introduced (`False` restores the exact pre-redesign mechanism); 392 tests pass with it as the default, including exact-seed determinism tests |
 | `scripts/nhl_sim_input_checklist.py` — the gating checklist `model_engine_standard.md` §1 requires; corrected mid-session per §2b, updated again for §2c | built, **exits 0 — full PASS** (down from 16 alarms at the start of this session) | not yet wired into `/preflight` or `migration_gate.py` — next step for whoever picks this up; also does not (and structurally cannot, at its current 1-hop scope) distinguish "populated" from "reachable" — see §2j |
 
-**All of it is additive and reachable-by-default** — no new flag was
-introduced that needs to be flipped later. The one thing deliberately left OFF
+**Almost all of it is additive and reachable-by-default with no flag to flip** — the one exception
+is §2r's `faceoff_discrete_event_model`, added DEFAULT ON specifically because it's backed by a
+real measurement and a round-robin verification showing the league-wide aggregate barely moves; it
+exists as a flag (rather than an unconditional replacement) purely for rollback/A-B comparison, not
+because anyone needs to flip it on. The other thing deliberately left OFF
 is `elo_blend_weight`, and §6 explains why with a measurement, not caution
 alone. `special_teams`'s PP%/PK%/committed-per-game feed the engine's EXISTING
 goal-rate adjustment unconditionally (no new gate to flip), so populating it
