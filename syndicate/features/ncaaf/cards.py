@@ -207,7 +207,15 @@ def _resolve_ncaaf_active_season_and_weeks() -> tuple[int, list[int]]:
         return (_legacy_default_season_from_summary_index() or 2025), []
     active_season = max(all_seasons)
     weeks = sorted(set(engine_seasons.get(active_season, [])) | set(smartsim2_seasons.get(active_season, [])))
-    return active_season, weeks
+    # Navigation must not offer a week the board will refuse to populate.
+    # `_smartsim2_projection_index` returns {} beyond the pregame window, so
+    # without this filter a stale future-week artifact left on the mounted disk
+    # still appears in the week list and resolves to a page with zero games --
+    # a label and a body that disagree, which reads as an outage rather than as
+    # "not simmed yet". Keep at least one week so the board never navigates to
+    # nothing at all.
+    in_window = [w for w in weeks if _week_is_within_pregame_window(active_season, w)]
+    return active_season, (in_window or weeks[:1])
 
 
 def _ncaaf_default_active_week(season: int, weeks: list[int]) -> int:
@@ -578,6 +586,36 @@ def _public_trial_visible_for_request() -> bool:
     return False
 
 
+def _week_is_within_pregame_window(season: int, week: int) -> bool:
+    """Is this week close enough to kickoff that a simulation means anything?
+
+    A sim is a PREGAME artifact: you sim in the pregame window and re-sim on
+    injury and lineup news before kickoff. A projection for a game three months
+    out is not an early answer, it is a stale one -- the ratings that produced
+    it will have been superseded many times before the game is played, and this
+    is measured rather than assumed: the model-vs-market margin gap runs +1.815
+    at weeks 1-3 and +4.111 by weeks 7-9, driven by exactly that staleness
+    (`docs/ai_context/ncaaf_beat_the_close_strategy.md` section 2).
+
+    `ncaaf_target_week` is the lowest week still holding an unplayed game --
+    i.e. the week currently being prepared. Weeks at or before it are servable:
+    the target week is the pregame window, and earlier weeks are completed
+    games whose projections remain valid as a record. Anything AFTER it is a
+    game nobody has simmed for real yet.
+
+    Fails OPEN (returns True) when the target week cannot be determined, because
+    a schedule that will not load must not silently blank the whole board -- a
+    missing input should degrade to the previous behaviour, not to nothing.
+    """
+    target = ncaaf_target_week(season)
+    if target is None:
+        return True
+    try:
+        return int(week) <= int(target)
+    except (TypeError, ValueError):
+        return True
+
+
 @lru_cache(maxsize=16)
 def _smartsim2_projection_index(season: int, week: int) -> dict[tuple[str, str], SmartSimNcaafProjection]:
     """Shadow-mode lookup for SmartSim 2.0 projections, keyed by (home, away).
@@ -585,7 +623,16 @@ def _smartsim2_projection_index(season: int, week: int) -> dict[tuple[str, str],
     Returns an empty dict (never raises) when the artifact for this season/week
     has not been generated yet -- SmartSim 2.0 availability must never affect
     the legacy engine's own output. See smartsim_shadow_mode_report.md.
+
+    Also returns empty for a week BEYOND the pregame window, whatever is on
+    disk. That guard is load-bearing rather than tidy: `bootstrap_data_root`
+    copies committed artifacts onto the web service's mounted disk and NEVER
+    prunes, so deleting a stale future-week artifact from git does not remove it
+    from the disk web actually reads. Without this the board would keep serving
+    months-old projections for unplayed games that no longer exist in the repo.
     """
+    if not _week_is_within_pregame_window(season, week):
+        return {}
     data_root = default_ncaaf_source_root() / "data"
     try:
         projections = read_projection_artifact(season=season, week=week, data_root=data_root)
