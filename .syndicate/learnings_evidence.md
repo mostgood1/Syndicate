@@ -11012,3 +11012,48 @@ one file.**
 attribution gives "not proven guilty", never "proven innocent". This is its
 mirror: proving something did not cause X says nothing about whether X's suspect
 works.
+
+## 2026-08-19 — CORRECTION: shared-file carry reaches plain files too, and it reads as nothing to commit, not as loss
+
+**What we believed.** Two hook-script docstrings
+(`.claude/hooks/ledger-commit-guard.py`, `.claude/hooks/ledger-postwrite-check.py`)
+had been edited to replace stale `lanes-append-guard.py` references with the
+actual wired filename, `ledger-append-guard.py` (the earlier rename, `677e47c8`,
+had left the docstring prose behind). The edits were made, confirmed against the
+working tree, and left uncommitted pending the user's explicit go-ahead — normal
+practice for a non-ledger code file per this session's own confirm-before-commit
+rule.
+
+**What was actually true.** By the time the user said "commit this," the edits
+were no longer pending — they were already committed, on `origin/main`, inside a
+parallel `github-actions[bot]` checkpoint, `f5953d4c` ("checkpoint 6: psutil
+declared where it is actually needed..."), authored 21:53:33 -0500. That commit's
+own message names the carry explicitly: *"Also folded in: two hook docstrings
+still naming lanes-append-guard.py after the rename to ledger-append-guard.py...
+hooks run FROM DISK so drift between the working copy and the committed copy is
+worth closing rather than leaving."* The other session read the same working
+tree, saw the uncommitted fix already sitting there, and committed it as part of
+its own unrelated bundle — not maliciously, not by a blind `git add -A`, but as a
+deliberate "this is sitting here, may as well land it" call.
+
+**How we found out.** `git add` on the two specific paths, then
+`git diff --cached --stat` — empty. That is the tell: a real edit that was just
+made should never produce an empty staged diff. `git log --oneline -1 -- <path>`
+named `f5953d4c`, a commit this session had not made. `git blame -L 9,9 <path>`
+on each changed line confirmed the exact text and attributed it to that commit,
+in two calls, with no ambiguity.
+
+**The rule going forward.** [[a session worktree protects your INDEX, not your
+EDIT]] (08-18) was scoped to "shared ledger file" in its own wording and its
+evidence's "THREE OUTCOMES" breakdown only cites `.syndicate/*.md` examples. This
+is the same SHARED-FILE CARRY outcome — "the edit must be in the shared file to
+be live, shared state working correctly" — on a file that is neither a ledger
+file nor `.syndicate/*`. The mechanism is the shared working tree, not the file's
+role. Any uncommitted edit anywhere in this tree is carriable by the next session
+that commits, and the correct response to "did my edit go through" is a check
+(`git diff --cached`, then `git log -1 -- <path>` if empty), not an assumption
+either way.
+
+**Cost.** Zero. The fix is correct, on `origin/main`, verified by content. What
+was lost was attribution and atomicity of the commit, not the work — worth
+logging as a confirmed mechanism, not as a defect to fix.
