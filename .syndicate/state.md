@@ -2619,3 +2619,87 @@ merge larger.
   `tests/test_lane_guard_files_forms.py`, which already has fixture coverage
   that happens not to trigger bug 2 (`PLAIN_WRAPPED`'s first line has no
   colon, so it sidesteps the bug by coincidence, not by testing against it).
+
+
+## [football-model-leaks] FOOTBALL — TWO MODEL LEAKS, BOTH FIXED `[verified 2026-08-19, lane football-model-owner]`
+
+**The football feature payload was LEAKED.** `build_nflverse_game_metrics`
+computes EPA/success-rate/pass-rate from **the game being predicted** —
+`_match_game_rows` filters pbp to that one matchup+week. Measured over 285 games
+of 2023: **r = 0.988** against the final margin. Replacement
+`syndicate/features/football/features/asof_team_form.py` certifies at **r = 0.235**
+via an in-module assertion, not just a test.
+
+**NCAAF ratings were LEAKED for backtests.** `/ppa/teams?year=S` is
+season-aggregate. Measured over 558 games of 2024: full-season **r = 0.663** vs
+as-of **0.509** — 30% inflation. Fixed to aggregate `/ppa/games` over weeks < N.
+**`/ppa/teams` ACCEPTS `week=N` AND IGNORES IT** (identical rows and values), so
+the obvious fix is a silent no-op. **`seasonType=regular` is load-bearing**: without
+it `/ppa/games?week=1` returns the College Football Playoff, importing January
+games into a week-8 rating — worse than the leak it replaced. **The 2026 opener is
+UNAFFECTED** (no in-season history → 2025 prior-season fallback, verified).
+
+**A population checklist CANNOT detect leakage.** A leaked field is 100%
+populated by construction and passes every check this repo has — the input
+checklist marked these FED, reachability passed, unit tests passed.
+
+## [football-board-defects] FOOTBALL BOARDS — THREE DEFECTS SHIPPED AND MEASURED `[2026-08-18/19]`
+
+- **NCAAF served 16 of 51.** Three hardcoded 16-caps; 16 is the NFL's natural
+  slate, correct there and wrong for a 50-60 game sport. Now 80. Post-deploy
+  51/49/57/56/56/66, week 1 matching CFBD's independent count exactly.
+- **Both NFL boards served no spread or total.** `total_mean`/`margin_mean` 0% on
+  16/16; `_shared_predictions` never read `sim.periods.full`. Now 100%.
+- **Preseason projections were 13.1 days stale**, invisible until
+  `projection_provenance` was published.
+
+## [football-engine-levers] FOOTBALL ENGINE — THE PAYLOAD IS THE WEAK LEVER `[measured 2026-08-19]`
+
+**`feature_generation_payload` moves margin 0.553 pts; the RATINGS path moves it
+2.322 — 4.2x, or 17.2% vs 4.1% of the 13.5-pt margin SD.** `build_drive_priors`
+builds ONE game-level profile (never reads `away_*_rating`); per-team
+differentiation is in `play_simulator.py:258-259`, on the ratings path.
+**All three generate scripts ALREADY pass ratings, and NFL's are already as-of**
+(`_mean_epa(..., before_week=week)`). The unwired payload was real and is the
+wrong lever.
+
+**Engine baselines do not match real NFL distributions** — `success_rate` assumed
+0.500 vs a league mean of 0.422, `explosive_play_rate` 0.100 vs 0.066. Raw values
+put league-mean `offense_index` at 0.405 vs a neutral 0.500 and suppressed every
+game's total by ~2.6 pts. Re-centring on the **as-of** league mean restores 0.500.
+
+### CONFIRMED — the emitter trace, and `psutil` was never the cause `[2026-08-19]`
+
+**Upgrades the PROVISIONAL trace above to CONFIRMED, on direct evidence rather
+than inference.** Two lines from the SAME tick of the SAME process on
+refresh-worker, read from the Render logs API 2026-08-19T01:50:41:
+
+    PROCESS_ENUM_DEBUG {"error_count": 1, "errors": ["psutil_unavailable:ImportError"], ...}
+    ALL_PROCESS_MEMORY {"accounted_rss_mb": 1312.168, "container_memory_headroom_mb": 1811.645, ...}
+
+**The worker emits `ALL_PROCESS_MEMORY` WHILE psutil is unavailable.** It falls
+back to procfs and enumerates fine. So:
+
+- **`psutil` is DEFINITIVELY not the cause** of web's dead preflight. The
+  retraction filed earlier was right, and this is now measured rather than
+  argued. **Installing it would have changed nothing.**
+- **The caller trace is CONFIRMED.** The emitting line arrives from
+  `live_lens_loop` — `start_live_lens_loop` is imported by
+  `run_live_odds_refresh_worker.py` and by nothing else, and `app.py` starts the
+  live-refresh and intelligence-state loops but NOT live-lens. **Web has no
+  caller. It is not broken; it was never wired.**
+- Therefore **`deploy_preflight.py` gates every service on a WORKER-ONLY
+  signal**, and web's preflight has never been satisfiable. Tonight's
+  break-glass was not an exception to a working gate — it was the only path web
+  has ever had.
+- **The fix is to make preflight service-aware**, NOT to add periodic work to a
+  web process. A web deploy has no long job to land on: measured tonight, 4
+  processes, all infrastructure, zero jobs.
+
+**FOUR causes were proposed for this symptom and three were refuted** (broken
+sampler / missing psutil / deleted emitter). This is the fourth and the only one
+with direct evidence. **Instrument check that made it trustworthy:** the Render
+logs `text=` filter was verified to work first — four strings visible in the
+unfiltered feed each returned rows — so a null result from it is now evidence of
+absence rather than of a broken query. **Earlier tonight I reported nulls from a
+query I had never proven could return non-null.**
