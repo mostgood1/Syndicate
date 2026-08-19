@@ -8672,3 +8672,251 @@ double-count's own effect is larger than the wiring's, `94578cbc` is helpful
 not harmful, and the wiring's real +0.0487 stdev effect remains
 UNADDRESSED -- this re-fit attempt was aimed at closing that gap and did not
 succeed cleanly.
+
+
+## RELEASED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-19
+
+Moved verbatim by `scripts/archive_released_lanes.py`; nothing summarised or
+deleted. Every slug here held ZERO file claims at move time, verified against
+`lane-guard.py`'s own `_claims()` — so `lane-guard` lost no protection.
+Slugs: lane-guard-disclaimer-marker-fix, lane-guard-not-touch-marker-fix, nfl-player-props-backtest, nfl-player-props-calibration-fix, nfl-player-props-skew-fix.
+
+### nfl-player-props-backtest — CLOSED-VERIFIED 2026-08-19 — measured 152,919 rows/2,406 players/4 seasons; 8 of 9 markets beat baseline in AND out of sample; two calibration defects + one allowlist gap flagged. Full write-up `todo.md` `#471`, measurement `deploys.md`. — opened 2026-08-19 — session: nfl-player-props-backtest
+- Goal: measure whether `syndicate/features/nfl/player_stats.py`'s rolling
+  season-to-date rate model (mean/stdev per player per stat, feeding
+  `syndicate/features/nfl/props.py`'s Normal-CDF cover probability) predicts
+  anything, across ALL players/weeks/markets — not just the sparse weeks that
+  happen to carry real quoted odds. Reference rigor: `scripts/backtest_mlb_props.py`
+  (per-market denominators, DNP exclusion, constant-baseline comparison) and the
+  MLB pitcher-ladder "ultimate outcome" pattern (`syndicate/features/mlb/pitcher_ladders.py`
+  → `k_ladder_targets.py`) as the bar for what a mature player-production model
+  looks like. **Testable outcome:** a new backtest script reports, per of the 9
+  `STAT_KEYS` in `player_stats.py`, `n`, `mae_model` vs `mae_constant_baseline`,
+  and (wherever a real quoted line exists) hit-rate of the Normal-CDF cover call
+  against the real settled outcome — run over real, complete nflverse pbp seasons
+  already on disk (2022-2025, `data/nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
+  local historical/static data, not a "Render is truth" live-state question).
+- Files (all NEW or read-only — collision-checked 2026-08-19 against every OPEN
+  lane in `lanes.md`; zero overlap):
+  - `scripts/backtest_nfl_props.py` (NEW)
+  - `tests/test_backtest_nfl_props.py` (NEW)
+  - Read-only reference (NOT claimed for write): `syndicate/features/nfl/player_stats.py`,
+    `syndicate/features/nfl/props.py`, `syndicate/features/mlb/pitcher_ladders.py`,
+    `syndicate/features/mlb/k_ladder_targets.py`, `scripts/backtest_mlb_props.py`.
+- **NOT claimed, deliberately:** `syndicate/features/football/**`,
+  `syndicate/features/ncaaf/cards.py`, `syndicate/features/nfl/preseason_cards.py`,
+  `scripts/football_sim_input_checklist.py` — all held by `football-model-owner`
+  (NCAAF/game-margin focus, Phase 3 closed NULL). This lane is player-props-only
+  and does not touch that lane's files.
+- Hypothesis (stated before measuring): the rate model is UNDER-VALIDATED —
+  `player_stats.player_rate` has never been backtested against real outcomes at
+  all (only used live), and it carries no distribution (confirmed by
+  `convergence-phase7-crps`: NFL absent from every projection-spread family
+  checked, 165 files/160 dates). I predict it beats a constant per-stat baseline
+  on volume markets (attempts, receptions) and underperforms or ties on
+  high-variance yardage/TD markets.
+- Falsification test: if `mae_model` >= `mae_constant_baseline` on a market, the
+  model has no measured value there and that must be reported as such, not
+  papered over — same discipline `backtest_mlb_props.py`'s docstring states.
+- Verification: a report (written to `reports/` and `.syndicate/deploys.md`)
+  with per-market `n`, MAE-vs-baseline, and — for the weeks with real odds
+  (`oddsapi_player_props_2025_wk10..22.csv`) — cover hit-rate, with the sample
+  size stated next to every number (rule: "a rate, not a count").
+- Blocked by: none.
+
+### nfl-player-props-calibration-fix — CLOSED-VERIFIED 2026-08-19 — defect 1 (anytime_td shrinkage) FIXED+TUNED+MEASURED out-of-sample, `30caf008` on `origin/main`, verified by content. Defect 2 (yardage/count mean-overconfidence) NOT started — see todo.md `#471` addendum. — session: nfl-player-props-calibration-fix
+- Goal: fix the two calibration defects `#471` found and measured but did not
+  fix. **Testable outcome, defect 1 (this pass):** `anytime_td`'s predicted
+  probability at a rolling rate of exactly 0.0 stops reading as 0% when the
+  real hit rate for that bucket is ~13-14% (measured, `reports/nfl_props_
+  backtest_2022_2025.json`) — a shrinkage estimator blends the raw small-n
+  rate toward a data-derived league baseline, tuned and verified out-of-sample
+  via `scripts/backtest_nfl_props.py`'s own existing harness (re-run, not
+  rebuilt). **Defect 2 (yardage/count markets overconfident near their own
+  mean — predicts ~50% cover, actual ~37-44%) is explicitly SECOND, not
+  started this pass** — user instruction was "start with the anytime_td
+  shrinkage".
+- Files:
+  - `syndicate/features/nfl/player_stats.py` — new shrinkage function,
+    additive (does not change `player_rate`'s existing signature/behavior for
+    any other market).
+  - `syndicate/features/nfl/props.py` — `_nfl_prop_model_probability`'s
+    `anytime_td` branch switches to the shrunk rate.
+  - `tests/test_nfl_player_stats.py`, `tests/test_nfl_props.py` — updated/new
+    tests for the shrinkage behavior.
+  - `scripts/backtest_nfl_props.py` — read/run only this pass (used to tune
+    and verify the shrinkage constant out-of-sample); not expected to need
+    edits, but not ruled out if the tuning needs a CLI hook.
+  - Read-only reference: `docs/ai_context/todo.md` `#471` (the source of the
+    defect), `reports/nfl_props_backtest_2022_2025.json` (baseline numbers).
+- Hypothesis: a Gamma-Poisson (count) shrinkage toward the population's own
+  empirical anytime_td-per-game mean, weighted by a small pseudo-count `k`,
+  closes most of the 0%-predicted/13-14%-actual gap for n=2-4 samples without
+  measurably hurting players who already have a real history (large n is
+  barely pulled).
+- Falsification test: if the shrunk estimator's out-of-sample Brier score on
+  `anytime_td` (scored 2024-2025, tuned on 2022-2023) is not better than the
+  unshrunk baseline's, the hypothesis is wrong and this reports a null result
+  rather than shipping a change that doesn't help.
+- Verification: re-run `scripts/backtest_nfl_props.py --seasons 2022,2023,2024,2025`
+  after the change; Section 1's `anytime_td` OOS row and Section 2's
+  `anytime_td` calibration buckets (low end specifically) both improve,
+  with the numbers stated, not just "looks better".
+- **DONE, verification MET.** `k` tuned out-of-sample (2022-2023 fit,
+  2024-2025 score-only) at a genuine convex minimum, k=12:
+  Brier 0.1973 (k=0) -> 0.1680 (k=12), 8,464 held-out rows. Ladder
+  calibration's worst bucket gap went from -0.144 to +0.013-+0.068 across
+  all 10 deciles. The exact defect bucket (raw_mean==0.0): predicted
+  0.0% -> 18.0% vs a real 14.1% hit rate -- most of the gap closed, a
+  residual stated honestly, not claimed as perfect. Trade-off disclosed:
+  anytime_td's point-accuracy MAE got WORSE (0.358->0.386), the correct
+  cost for a probability market (Brier is the metric that matters here).
+  8 of 9 other markets confirmed byte-identical, untouched. 23 new tests,
+  614 pre-existing NFL tests still pass (3 unrelated pre-existing
+  failures, confirmed identical with this change stashed out). Full
+  writeup: `docs/ai_context/todo.md` `#471` addendum,
+  `.syndicate/deploys.md` 2026-08-19.
+- Blocked by: none.
+
+### lane-guard-disclaimer-marker-fix — CLOSED 2026-08-19 — fix shipped and verified, `f52fc91b` live on `origin/main`. — session: lane-guard-disclaimer-marker-fix
+- Goal: `_DISCLAIMER_MARKERS` in `.claude/hooks/lane-guard.py` recognizes
+  "read-only reference" as a disclaimer phrase, so a `Files` bullet like
+  `Read-only reference: docs/ai_context/todo.md` stops being misread as an
+  exclusive claim. **DONE.**
+- Files: `.claude/hooks/lane-guard.py` — one string added to the existing
+  `_DISCLAIMER_MARKERS` tuple (same list that already holds `"read-only
+  dependency"`), no other logic touched — and `tests/test_lane_guard_files_forms.py`
+  (one new regression test, `test_read_only_reference_disclaimer_is_skipped`).
+- **Collision check, stated explicitly:** this path sits inside
+  `repo-coordination`'s claimed territory (`.claude/hooks/`,
+  lines 616-617 above). `repo-coordination` is recorded UNMAPPED by the
+  2026-08-18 orphan sweep (line 53 of this file) — no live session in the
+  roster resolves to it, so there is no one to message. Left guarded there
+  rather than released, so this lane does NOT take over that charter; it
+  claims only this one file for this one string addition and should be
+  folded back into `repo-coordination` (or closed on its own) once a live
+  owner resurfaces.
+- Trigger: measured live 2026-08-19 — `nfl-player-props-calibration-fix`'s
+  block wrote `Read-only reference: docs/ai_context/todo.md` (an explicit
+  disclaimer, not a claim), and the guard's `_is_disclaimer`/
+  `_claimable_prefix` did not recognize the phrase, so it blocked
+  `nhl-model-owner` from editing `todo.md` — a file every lane in this repo
+  edits as a shared append-only ledger.
+- Hypothesis: n/a (mechanical fix, not diagnostic).
+- Falsification test: n/a.
+- Verification: construct a lanes.md fixture containing a
+  `Read-only reference:` bullet and confirm `_claims()` no longer yields
+  that path as a claim; run the hook's existing test suite if one covers
+  `_DISCLAIMER_MARKERS`. **DONE** — added
+  `test_read_only_reference_disclaimer_is_skipped` to
+  `tests/test_lane_guard_files_forms.py`; full suite 11/11 pass. Also ran
+  the fixed guard directly against the real, live `.syndicate/lanes.md`
+  (not just the fixture): `docs/ai_context/todo.md` no longer appears in
+  `_claims()`'s output.
+- Blocked by: none.
+- **Shipped:** `f52fc91b` on `origin/main` (rebased clean onto
+  `930a0a1e`, which already carried an unrelated same-day commit to the
+  same file — merged, not overwritten; both disclaimer-marker additions
+  survive). Landed via `session_worktree.py` (own worktree, own index).
+
+### lane-guard-not-touch-marker-fix — CLOSED 2026-08-19 — fix shipped and verified, `0a7fdbeb` live on `origin/main`. — session: (unlaned, single-turn user-directed fix)
+- Goal: `_DISCLAIMER_MARKERS` recognizes "not touch"/"does not touch" (present
+  tense), not just "not touched". **DONE.**
+- Files: `.claude/hooks/lane-guard.py` (one string added, same tuple as the
+  sibling block above — no other logic touched), `tests/test_lane_guard_files_forms.py`
+  (`test_does_not_touch_present_tense_is_not_claimed`).
+- Trigger: user-reported and measured live 2026-08-19 —
+  `basketball-model-owner` wrote "Does NOT touch board_enrichment.py,
+  run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by ...)."
+  "held by" sits after the filenames, so `_claimable_prefix` had nothing
+  earlier to cut at and read all three as claims, blocking `wnba-edge-263`
+  from a file the sentence explicitly disclaimed.
+- Coordinated before editing: `send_message` to the session showing
+  `your lane: repo-coordination` in its own `deploy-guard` output (this file's
+  claims are held by `repo-coordination`); no objection, proceeded (additive,
+  test-covered). Full narrative: `.syndicate/log/2026-08-19.md`.
+- Verification: `pytest tests/test_lane_guard_files_forms.py` 10/10 pass;
+  `0a7fdbeb` confirmed on `origin/main` post-push.
+- Blocked by: none.
+
+### nfl-player-props-skew-fix — CLOSED-VERIFIED 2026-08-19 — Normal/log-normal PER-MARKET BLEND, closed-form OOS-tuned, `5def74df` on `origin/main`, verified by content. Pure log-normal was a NULL result (overcorrected 4 of 8 markets) — recorded, not shipped. 6 of 8 markets improved; 2 (passing_tds, interceptions) correctly shipped unchanged (no real OOS benefit). — session: nfl-player-props-skew-fix
+- Goal: fix `#471` defect 1 (renumbered from the calibration-fix lane's
+  "defect 1" — the yardage/count-market one, not `anytime_td` which is
+  already fixed): every count/yardage market's Normal-CDF cover
+  probability is overconfident near its own mean (predicts ~50% cover,
+  actual ~37-44%). **Testable outcome:** a re-run of
+  `scripts/backtest_nfl_props.py`'s Section 2 ladder calibration shows the
+  mid-deciles (currently the worst gap, +0.06 to +0.13 across all 7
+  affected markets) materially closer to calibrated, with no regression
+  to Section 1's beats-baseline verdicts on any of the 7 markets.
+- Files:
+  - `syndicate/features/nfl/props.py` — `_nfl_prop_model_probability`'s
+    non-`anytime_td` branch (currently a plain `NormalDist(mean,
+    stdev).cdf(line)`).
+  - `scripts/backtest_nfl_props.py` — read/run to validate; may need a
+    small edit if the fix needs new substrate the current collector
+    doesn't already provide.
+  - New comparison/validation script under `scripts/` (name TBD),
+    mirroring `scripts/calibrate_nfl_anytime_td_shrinkage.py`'s
+    fit-vs-report discipline if the fix has any tunable parameter, or a
+    plain before/after comparison if it does not (log-normal moment
+    matching has none — deterministic given mean/stdev).
+  - `tests/test_nfl_props.py` — new tests for the new probability path.
+  - Read-only reference: `docs/ai_context/todo.md` `#471` (source of the
+    defect), `reports/nfl_props_backtest_2022_2025.json` (baseline),
+    `syndicate/features/nfl/player_stats.py` (NOT expected to need edits
+    — this defect is about the probability TRANSFORM, not the rate
+    estimate itself, unlike the anytime_td fix).
+- Hypothesis: real NFL box-score count/yardage stats are right-skewed
+  (mean > median), which `Normal(mean, stdev)` cannot represent (it is
+  symmetric by construction) — that mismatch alone should account for the
+  observed pattern (well-calibrated at both tails, overconfident in the
+  middle, since a Normal puts too much mass exactly at/near its own mean
+  relative to a right-skewed distribution's true, lower-than-50%
+  P(X>mean)). A log-normal fit via method-of-moments (same mean/stdev
+  inputs already computed, no new upstream data needed, no scipy
+  dependency required — closed-form via `statistics.NormalDist(0,1).cdf`
+  on the log-transformed line) should close most of the gap. `scipy` is
+  already a declared dependency (`requirements.txt`) but is not currently
+  imported anywhere in `syndicate/` or `scripts/` — a Gamma-distribution
+  alternative stays on the table if log-normal underperforms, but adding
+  scipy as this repo's FIRST live runtime scipy import is a larger,
+  riskier move than a stdlib-only fix and should not be reached for
+  first.
+- Falsification test: if a side-by-side comparison (Normal vs log-normal
+  cover probability, same rows, same Brier/calibration methodology
+  `backtest_nfl_props.py` Section 2 already uses) does not close the
+  mid-decile gap, or closes it at the cost of the tail calibration that
+  is currently fine, the hypothesis is wrong and this reports a null
+  result rather than shipping a change that trades one defect for
+  another.
+- Verification: `scripts/backtest_nfl_props.py --seasons 2022,2023,2024,2025`
+  re-run post-fix; Section 1 shows no market flipping from "beats
+  baseline" to "no measured skill" (point-accuracy MAE is a DIFFERENT
+  metric than cover probability and should be unaffected, but must be
+  checked, not assumed); Section 2's per-market bucket gaps stated
+  before/after, same honesty standard as the anytime_td fix (report the
+  trade-off if one exists, do not hide it).
+- **DONE, verification MET, falsification test FIRED ONCE (kept, not
+  hidden) then a second approach passed.** `scripts/compare_nfl_
+  cover_probability_models.py` measured pure log-normal as a NULL
+  result — Brier improved on 4/8 markets, WORSENED on 4/8 by
+  overcorrecting. `scripts/calibrate_nfl_cover_probability_blend.py`
+  found the real fix: a per-market Normal/log-normal blend weight `w`,
+  closed-form Brier-minimizing (no grid search — Brier is convex in a
+  linear blend), selected on 2022-2023, reported on 2024-2025:
+  `passing_attempts w=1.0` (Brier 0.2062→0.1998), `rushing_yards w=0.573`
+  (0.2157→0.2111), `rushing_attempts w=0.550`, `passing_yards w=0.689`,
+  `receiving_yards`/`receptions` small real weights. `passing_tds` and
+  `interceptions` showed NO real OOS benefit and SHIP UNCHANGED (w=0) —
+  a fitted correction that doesn't generalize was not forced through.
+  Full-scale re-run (16,991+ rows/market) confirms the same shape:
+  passing_attempts Brier 0.1919→0.1836, its worst bucket gap
+  +0.082→-0.010. Section 1 point-accuracy MAE confirmed BYTE-IDENTICAL
+  before/after (programmatic diff, not eyeballed) — no regression to any
+  beats-baseline verdict. 8 new tests, 620 NFL tests pass (3 unrelated
+  pre-existing failures, confirmed identical with this change stashed
+  out). Full writeup: `docs/ai_context/todo.md` `#471` addendum 2,
+  `.syndicate/deploys.md` 2026-08-19.
+- Blocked by: none.
+
