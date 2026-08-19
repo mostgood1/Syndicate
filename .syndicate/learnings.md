@@ -1417,3 +1417,54 @@ multi-hour outage.
 pushback forced the real trace; the underlying bug (fixed in `97e85b66`)
 had likely been silently starving WNBA's refresh cadence for longer than
 just this session's window, unmeasured.
+
+---
+
+## 2026-08-19 — OVERTURNED: a model matching the market's DISPERSION is not a model that can BEAT it
+
+**Applies to every sport lane in this repo, not just NCAAF.** Several are
+currently tuning models by comparing spread-of-predictions against
+spread-of-market, and that is the belief this overturns.
+
+**What was believed.** Earlier the same day I moved NCAAF margins from SD 1.74
+to 15.37 against a market SD of 14.46 — ratio 1.06 — and reported it as the
+margin model being fixed. It was a real improvement: the previous state priced
+every college game as a coin flip. But "fixed" was the wrong word and the
+language implied something never tested.
+
+**What is true.** Dispersion is a PROXY. A model can spread its predictions
+exactly like the market's and still put them in the wrong places. Measured
+against realised results:
+
+    full 2025 season, 2,530 rows / 888 games / 3 books
+      vs CLOSING line  n=2235  model MAE 15.294  market 11.876  +3.419  t=+16.33
+      vs OPENING line  n=2175  model MAE 15.231  market 11.872  +3.358  t=+16.08
+
+The model was *calibrated* and *not competitive*, and only the first had ever
+been measured. It also loses to all three books individually, so it is not an
+artefact of one sharp book.
+
+**The same error was sitting one layer down**, which is what makes this a class
+rather than an incident: `SP_RATING_SCALE=10` had been chosen because it made
+dispersion match. Scored for ACCURACY the optimum is ~13 — but paired, that is
+dMAE −0.168, SE 0.225, **t=−0.74, not significant**, so the constant stayed. Two
+numbers chosen against a proxy, one real problem underneath both.
+
+**Also overturned, and it is a widely-held betting belief:** "beat the OPENING
+line first, it is softer." The open here is **0.06 MAE softer than the close**
+and the model loses to both by ~3.4. There is no easier target hiding behind the
+close; this is an accuracy problem, not a timing one. Worth one query, and now
+answered — do not re-derive it.
+
+**The rule going forward.** Before reporting any model quantity as fixed,
+improved, or good, name the thing it was scored AGAINST. If the answer is
+another model quantity (dispersion, calibration, a residual correlation, an
+internal consistency check) rather than a REALISED OUTCOME, say so in the same
+sentence. Proxy agreement and accuracy are different claims and the first is
+routinely mistaken for the second — four times in one session here.
+
+**Cost:** a "margins fixed" claim carried for hours; NCAAF picks served live in
+production for that whole window on a model measured, once anyone looked, to
+lose to the closing line at 16 sigma. Fixed by a default-DENY serving gate
+(`syndicate/features/football/pick_gate.py`) plus the Stage 0 ledger
+(`pick_ledger.py`) that makes the accuracy question answerable at all.

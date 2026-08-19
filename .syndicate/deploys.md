@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-08-19 — RECEPTIONS BLEND WEIGHT: STABILITY CHECKED, CONFIRMED STABLE — `#471` FULL CONSTANT AUDIT COMPLETE — lane `nfl-receptions-blend-stability`
+
+**NO DEPLOY. Local analysis only** (new report, `922e2ab7` on
+`origin/main`). No production code changed.
+
+`receptions` was the last un-checked market in `#471`'s blend-weight
+family. Shipped `w=0.137` off the SMALLEST one-way OOS improvement of any
+weighted market (+0.000016) — the lane's own pre-stated hypothesis leaned
+toward instability on that basis.
+
+    half A (2022-2023, n=35055): w=0.1367
+    half B (2024-2025, n=34523): w=0.0771
+    ratio: 1.77x -- same sign, within the pre-registered 2.0x threshold
+
+**STABLE — the hypothesis was WRONG, stated plainly rather than only
+reporting the confirmations.** A tiny original one-way improvement did
+NOT predict instability here, unlike the pattern the lane assumed going
+in. No code change made.
+
+**THIS COMPLETES THE FULL `#471` BLEND-WEIGHT + SHRINKAGE-CONSTANT
+AUDIT.** Every tuned constant now individually checked against
+genuinely independent data (6 total, across 6 separate lanes this
+session):
+
+| constant | half A | half B | ratio | verdict |
+|---|---|---|---|---|
+| `rushing_yards` w | 0.5731 | 0.5717 | 1.00x | stable |
+| `anytime_td` shrinkage k | 12.0 | 12.0 | 1.00x (exact) | stable |
+| `receptions` w | 0.1367 | 0.0771 | 1.77x | stable |
+| `receiving_yards` w | 0.2158 | 0.1242 | 1.74x | stable |
+| `passing_attempts` w | 1.1409 | 0.8842 | opposite sides of 1.0 | unstable — capped |
+| `passing_tds` w | 0.3155 | 0.0217 | 14.55x | unstable — shipped w=0 |
+| `interceptions` w | 0.1329 | 0.0287 | 4.62x | unstable — shipped w=0 |
+
+Every shipped constant is now either confirmed well-supported by
+independent data, or deliberately held at its safe/conservative value
+where the evidence didn't replicate. No open questions remain in this
+family.
+
+Verify: `reports/nfl_receptions_blend_stability_check.json`.
+
+---
+
 ## 2026-08-19 — ANYTIME_TD SHRINKAGE k=12.0: STABILITY CHECKED, PERFECT MATCH — lane `nfl-anytime-td-shrinkage-stability`
 
 **NO DEPLOY. Local analysis only** (new script + report, `5f39c9a3` on

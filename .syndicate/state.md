@@ -1890,6 +1890,20 @@ client-side JS). Trace the served `book` field to its writer before acting.
   refresh-worker `f2eb719d` (SP+ ratings + as-of PPA leak fix) live 18:51:08Z,
   stage 1 verified by content; **STAGE 2 STILL OWED** — ~51/51 non-null
   `predictions.home_mean`, 86400s autorun, ≤24h. Season opens **2026-08-29**.
+- **The model loses to the OPENING line too, so there is no softer target.**
+  `[measured 2026-08-19, full 2025 season, 2,530 rows / 888 games / 3 books]`
+  vs close n=2235 **+3.419** (t=+16.33); vs open n=2175 **+3.358** (t=+16.08).
+  The open is **0.06 MAE softer than the close** — this is an ACCURACY problem,
+  not a timing one, and "beat the open first" is dead as a shortcut. Loses to
+  Bovada/DraftKings/ESPN Bet individually, so not an artefact of one sharp book.
+  Those rows are 100% LEAKED (`cfbd_ppa_season_2025`), which FLATTERS the model
+  and makes the verdict stronger, not weaker.
+- **Stage 0 instrumentation EXISTS** — `syndicate/features/football/pick_ledger.py`
+  + `scripts/build_ncaaf_pick_ledger.py`, one row per (game × provider) carrying
+  model margin / OPENING line / CLOSING line / realised result. **It BACKFILLS**:
+  CFBD serves `spreadOpen` retrospectively (~74%) with finals on the same
+  payload, which is why the open question was answered the day it was written.
+  2025 backfilled (2,530 rows); 2024 market-only until the clean backtest lands.
 - **DO NOT diagnose NCAAF from a local checkout.** `load_features(sport="ncaaf")`
   returns **0 games locally** while production serves 16. I filed that local zero
   as a production defect and retracted it. `data/**` lossy mirror, as CLAUDE.md
