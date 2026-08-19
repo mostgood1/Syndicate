@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Producer: real boxscore per-player stats -> `player_rates_{season}.csv`.
+"""Producer: real boxscore + playbyplay per-player stats -> `player_rates_{season}.csv`.
 
 Closes the last 3 genuinely-absent `HockeyPlayerFeatures` fields
 `docs/ai_context/hockeysim_engine_reference.md` §5 tracked: `shot_weight`/`goal_weight`/
@@ -11,6 +11,14 @@ replaces that heuristic with real, individually differentiated per-player data w
 Uses the SAME `boxscore` cache §2e/§2g/§2j already bulk-fetched (no new fetch) --
 `playerByGameStats.{home,away}Team.{forwards,defense}[]` already carries `sog`/`goals`/
 `blockedShots` per skater per game.
+
+§2zz: ALSO writes `faceoff_weight` from the SAME `playbyplay` cache the zone/role/joint faceoff
+work already bulk-fetched -- the FIRST player-level dimension the faceoff mechanism has ever had.
+NOT sourced from the boxscore (unlike the three fields above) -- see
+`historical_truth/player_game_rates.py`'s own docstring for the real, measured artifact (22% of
+per-game `faceoffWinningPctg` values are an exact 0.0/1.0, almost always a low-draw game) that
+made a naive boxscore-average approach unusable, and why TRUE win/total counts from `playbyplay`
+are used instead.
 
 Usage:
   py -3 scripts/build_nhl_player_rates_artifact.py
@@ -35,7 +43,8 @@ from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.nhl_statsweb_l
     NhlStatsWebTruthLoader,
 )
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.player_game_rates import (  # noqa: E402
-    MIN_GAMES_FOR_PLAYER_WEIGHT, build_player_game_dataset, compute_player_rate_aggregates,
+    MIN_GAMES_FOR_PLAYER_WEIGHT, build_player_game_dataset, compute_player_faceoff_aggregates,
+    compute_player_rate_aggregates, parse_playbyplay_player_faceoffs, parse_playbyplay_roster_names,
 )
 
 
@@ -63,17 +72,40 @@ def _load_boxscores(root: Path, game_ids: List[str]) -> List[dict]:
     return out
 
 
-def _write_csv(path: Path, aggregates: dict) -> int:
+def _load_playbyplay(root: Path, game_ids: List[str]) -> List[dict]:
+    cache_dir = root / "data" / "ingestion_cache"
+    out = []
+    for gid in game_ids:
+        p = cache_dir / f"playbyplay_{gid}.json"
+        if not p.exists():
+            continue
+        try:
+            out.append(json.loads(p.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            continue
+    return out
+
+
+def _write_csv(path: Path, aggregates: dict, faceoff_aggregates: dict) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows = sorted(aggregates.items())
+    all_ids = sorted(set(aggregates.keys()) | set(faceoff_aggregates.keys()))
     with path.open("w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["player_id", "full_name", "position", "shot_weight", "goal_weight",
-                    "block_weight", "games"])
-        for pid, agg in rows:
-            w.writerow([pid, agg.full_name, agg.position, agg.shot_weight, agg.goal_weight,
-                        agg.block_weight, agg.games])
-    return len(rows)
+                    "block_weight", "games", "faceoff_weight", "faceoff_draws", "faceoff_games"])
+        for pid in all_ids:
+            agg = aggregates.get(pid)
+            fagg = faceoff_aggregates.get(pid)
+            full_name = agg.full_name if agg else (fagg.full_name if fagg else "")
+            position = agg.position if agg else (fagg.position if fagg else "")
+            w.writerow([
+                pid, full_name, position,
+                agg.shot_weight if agg else "", agg.goal_weight if agg else "",
+                agg.block_weight if agg else "", agg.games if agg else "",
+                fagg.faceoff_weight if fagg else "", fagg.draws if fagg else "",
+                fagg.games if fagg else "",
+            ])
+    return len(all_ids)
 
 
 def main() -> int:
@@ -113,13 +145,31 @@ def main() -> int:
               f"shot_weight={a.shot_weight:.4f} goal_weight={a.goal_weight:.4f} "
               f"block_weight={a.block_weight:.4f}")
 
+    playbyplay = _load_playbyplay(root, game_ids)
+    faceoff_aggregates: dict = {}
+    if playbyplay:
+        per_game_records = [parse_playbyplay_player_faceoffs(g) for g in playbyplay]
+        per_game_names = [parse_playbyplay_roster_names(g) for g in playbyplay]
+        faceoff_aggregates = compute_player_faceoff_aggregates(per_game_records, per_game_names)
+        print(f"  faceoff_weight (§2zz): {len(playbyplay)} playbyplay games, "
+              f"{len(faceoff_aggregates)} players rated")
+        ftop = sorted(faceoff_aggregates.values(), key=lambda a: -a.faceoff_weight)[:5]
+        print("  top-5 faceoff_weight (sanity check against known real faceoff specialists):")
+        for a in ftop:
+            print(f"    {a.full_name:20s} pos={a.position} games={a.games:3d} draws={a.draws:4d} "
+                  f"faceoff_weight={a.faceoff_weight:.4f}")
+    else:
+        print(f"  (no playbyplay cache under {root / 'data' / 'ingestion_cache'} -- "
+              f"faceoff_weight will be absent. Run scripts/fetch_nhl_playbyplay_cache.py to "
+              f"populate it.)")
+
     out_dir = root / "data" / "processed"
     written = []
     if season:
         p = out_dir / f"player_rates_{season}.csv"
-        written.append((p, _write_csv(p, aggregates)))
+        written.append((p, _write_csv(p, aggregates, faceoff_aggregates)))
     p_latest = out_dir / "player_rates_latest.csv"
-    written.append((p_latest, _write_csv(p_latest, aggregates)))
+    written.append((p_latest, _write_csv(p_latest, aggregates, faceoff_aggregates)))
     for path, n in written:
         print(f"wrote {path} ({n} players)")
     return 0

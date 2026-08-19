@@ -453,6 +453,165 @@ def test_build_game_features_populates_player_rates_end_to_end(synth_root):
     assert dman.block_weight == 1.8
 
 
+# ---------------------------------------------------------------------------
+# Per-player `faceoff_weight` (§2zz) -- a NEW source (playbyplay-derived), read from the SAME
+# `player_rates_*.csv` file, and consumed at the TEAM level via `compute_lineup_faceoff_pct`
+# (not by `build_player_features`/`HockeyPlayerFeatures` -- see `contracts.py`'s own note on why).
+# ---------------------------------------------------------------------------
+
+
+def test_load_player_rates_map_backward_compat_without_faceoff_weight_column(synth_root):
+    """The shared `synth_root` fixture's own `player_rates_2025-2026.csv` has no `faceoff_weight`
+    column at all -- confirms the pre-existing CSV shape still loads cleanly and simply omits the
+    key, rather than injecting a guessed default."""
+    m = loaders.load_player_rates_map("2026-03-15", root=synth_root)
+    assert "faceoff_weight" not in m[101]
+
+
+def test_load_player_rates_map_reads_faceoff_weight_when_present(tmp_path):
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "player_rates_2025-2026.csv").write_text(
+        "player_id,full_name,position,shot_weight,goal_weight,block_weight,games,"
+        "faceoff_weight,faceoff_draws,faceoff_games\n"
+        "301,Ace Center,C,2.1,0.3,0.2,80,0.58,720,80\n"
+        "302,Weak Center,C,1.5,0.2,0.4,70,0.39,510,70\n",
+        encoding="utf-8",
+    )
+    m = loaders.load_player_rates_map(date, root=tmp_path)
+    assert m[301]["faceoff_weight"] == 0.58
+    assert m[302]["faceoff_weight"] == 0.39
+
+
+def test_compute_lineup_faceoff_pct_toi_weighted_average():
+    rows = [
+        {"player_id": "1", "proj_toi": "18.0"},
+        {"player_id": "2", "proj_toi": "12.0"},
+    ]
+    rates = {1: {"faceoff_weight": 0.60}, 2: {"faceoff_weight": 0.40}}
+    result = loaders.compute_lineup_faceoff_pct(rows, rates)
+    assert result == pytest.approx((18.0 * 0.60 + 12.0 * 0.40) / 30.0, abs=1e-4)
+
+
+def test_compute_lineup_faceoff_pct_no_qualifying_players_returns_none():
+    rows = [{"player_id": "1", "proj_toi": "18.0"}]
+    assert loaders.compute_lineup_faceoff_pct(rows, {}) is None
+
+
+def test_compute_lineup_faceoff_pct_ignores_players_with_zero_or_missing_toi():
+    """A player with real `faceoff_weight` data but no confirmed `proj_toi` this game (e.g. a
+    healthy scratch still carrying season rate data) must not silently count toward the average
+    with a zero weight -- excluded entirely, not treated as a zero contribution."""
+    rows = [
+        {"player_id": "1", "proj_toi": "0.0"},
+        {"player_id": "2", "proj_toi": "15.0"},
+    ]
+    rates = {1: {"faceoff_weight": 0.90}, 2: {"faceoff_weight": 0.50}}
+    result = loaders.compute_lineup_faceoff_pct(rows, rates)
+    assert result == pytest.approx(0.50, abs=1e-4)
+
+
+def test_compute_lineup_faceoff_pct_single_qualifying_player_is_enough():
+    rows = [
+        {"player_id": "1", "proj_toi": "18.0"},
+        {"player_id": "2", "proj_toi": "12.0"},  # no rate data
+    ]
+    rates = {1: {"faceoff_weight": 0.55}}
+    result = loaders.compute_lineup_faceoff_pct(rows, rates)
+    assert result == pytest.approx(0.55, abs=1e-4)
+
+
+def test_compute_lineup_faceoff_pct_missing_player_id_skipped():
+    rows = [{"proj_toi": "18.0"}]
+    assert loaders.compute_lineup_faceoff_pct(rows, {1: {"faceoff_weight": 0.55}}) is None
+
+
+def test_build_game_features_attaches_faceoff_lineup_pct_to_special_teams(tmp_path):
+    """The full loader path: a real, individually-differentiated lineup produces a
+    `special_teams["faceoff_lineup_pct"]` key -- NOT an override of `faceoff_win_pct` itself,
+    which a first draft did and was caught, before shipping, as unreachable in practice (see
+    `build_game_features`'s own docstring for why)."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    games = tmp_path / "data" / "odds" / "games" / f"date={date}"
+    proc.mkdir(parents=True)
+    games.mkdir(parents=True)
+    (proc / "team_rates_2025-2026.csv").write_text(
+        "abbr,shots_per_60,faceoff_win_pct,games,faceoffs\n"
+        "BOS,32.1,0.50,82,4700\n"
+        "CHI,26.3,0.50,82,4650\n",
+        encoding="utf-8",
+    )
+    (proc / "player_rates_2025-2026.csv").write_text(
+        "player_id,full_name,position,shot_weight,goal_weight,block_weight,games,faceoff_weight\n"
+        "101,Star Center,C,3.8,0.6,0.3,80,0.65\n",  # well above the team's 0.50 season average
+        encoding="utf-8",
+    )
+    (proc / f"lineups_{date}.csv").write_text(
+        "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
+        "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n"
+        "103,Bruins Starter,G,,,,60.0,0.9,Boston Bruins\n",
+        encoding="utf-8",
+    )
+    (games / "scoreboard.csv").write_text(
+        "gamePk,gameDate,home,away,home_goals,away_goals,gameState\n"
+        f"9001,{date}T23:00:00Z,Boston Bruins,Chicago Blackhawks,,,FUT\n",
+        encoding="utf-8",
+    )
+    game = loaders.build_game_features(
+        "9001", date, "Boston Bruins", "Chicago Blackhawks", root=tmp_path,
+    )
+    assert game.home.special_teams["faceoff_lineup_pct"] == pytest.approx(0.65, abs=1e-4)
+    # faceoff_win_pct itself is UNCHANGED -- the override design was reverted, not just hidden
+    assert game.home.faceoff_win_pct == pytest.approx(0.50, abs=1e-4)
+
+
+def test_build_game_features_omits_the_key_without_lineup_data(synth_root):
+    """The shared `synth_root` fixture's lineup player (id 101) has no `faceoff_weight` in its
+    `player_rates_2025-2026.csv` -- `faceoff_lineup_pct` must simply be absent, not defaulted."""
+    game = loaders.build_game_features(
+        "9001", "2026-03-15", "Boston Bruins", "Chicago Blackhawks", root=synth_root,
+    )
+    assert "faceoff_lineup_pct" not in game.home.special_teams
+
+
+def test_build_game_features_apply_lineup_faceoff_pct_false_disables_the_layer(tmp_path):
+    """`apply_lineup_faceoff_pct=False` is the real, stated rollback switch -- confirms it omits
+    the key entirely even when real lineup data IS available."""
+    date = "2026-03-15"
+    proc = tmp_path / "data" / "processed"
+    games = tmp_path / "data" / "odds" / "games" / f"date={date}"
+    proc.mkdir(parents=True)
+    games.mkdir(parents=True)
+    (proc / "team_rates_2025-2026.csv").write_text(
+        "abbr,shots_per_60,faceoff_win_pct,games,faceoffs\n"
+        "BOS,32.1,0.50,82,4700\n"
+        "CHI,26.3,0.50,82,4650\n",
+        encoding="utf-8",
+    )
+    (proc / "player_rates_2025-2026.csv").write_text(
+        "player_id,full_name,position,shot_weight,goal_weight,block_weight,games,faceoff_weight\n"
+        "101,Star Center,C,3.8,0.6,0.3,80,0.65\n",
+        encoding="utf-8",
+    )
+    (proc / f"lineups_{date}.csv").write_text(
+        "player_id,full_name,position,line_slot,pp_unit,pk_unit,proj_toi,confidence,team\n"
+        "101,Star Center,C,L1,1,,19.5,0.9,Boston Bruins\n",
+        encoding="utf-8",
+    )
+    (games / "scoreboard.csv").write_text(
+        "gamePk,gameDate,home,away,home_goals,away_goals,gameState\n"
+        f"9001,{date}T23:00:00Z,Boston Bruins,Chicago Blackhawks,,,FUT\n",
+        encoding="utf-8",
+    )
+    game = loaders.build_game_features(
+        "9001", date, "Boston Bruins", "Chicago Blackhawks", root=tmp_path,
+        apply_lineup_faceoff_pct=False,
+    )
+    assert "faceoff_lineup_pct" not in game.home.special_teams
+
+
 def test_build_player_features_flags_starting_goalie(synth_root):
     lineups = loaders.load_lineups("2026-03-15", root=synth_root)
     goalies = loaders.load_starting_goalies("2026-03-15", root=synth_root)

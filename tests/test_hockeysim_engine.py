@@ -678,6 +678,110 @@ class HockeySimEngineTest(unittest.TestCase):
             f"weak={weak_mean:.3f}.",
         )
 
+    def test_faceoff_lineup_model_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2zz: `faceoff_lineup_model=True` (the default) must produce a
+        DIFFERENT per-seed event stream than `False`, when both sides carry real
+        `faceoff_lineup_pct` data -- proves the flag actually gates something.
+
+        Per-seed HOME-shot vectors, not a mean-TOTAL-shots comparison, deliberately:
+        `_faceoff_multipliers` is a SYMMETRIC diff-based mechanism (`m_home=1+alpha*diff`,
+        `m_away=1-alpha*diff`) -- it shifts shots FROM one side TO the other, leaving the
+        TOTAL largely unchanged (confirmed: a first draft's mean-total comparison found
+        62.800 vs 63.200, a real but sub-places=0 difference at only 120 seeds, the SAME
+        low-sensitivity trap the earlier role-index reachability test hit). The
+        `test_faceoff_lineup_model_direction` test below already proves the differential moves in
+        the expected direction with a clean mean comparison -- this test only needs to prove the
+        flag is READ at all, which the per-seed HOME-shot vector does directly and reliably."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_lineup_pct": 0.62}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_lineup_pct": 0.38}
+        cfg_on = build_nhl_sim_config(overrides={"faceoff_lineup_model": True})
+        cfg_off = build_nhl_sim_config(overrides={"faceoff_lineup_model": False})
+
+        def _home_shot_totals(profile: SimConfig) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return totals
+
+        on_totals = _home_shot_totals(cfg_on)
+        off_totals = _home_shot_totals(cfg_off)
+        self.assertNotEqual(
+            on_totals, off_totals,
+            msg="per-seed HOME-shot vectors are IDENTICAL -- faceoff_lineup_model is not gating "
+                "anything.",
+        )
+
+    def test_faceoff_lineup_model_direction(self) -> None:
+        """A team with a HIGH `faceoff_lineup_pct` (tonight's actual dressed centers, not the
+        season aggregate) must produce MORE of its own shots on average than a LOW one -- same
+        direction as the general OZ/EV mechanism (a team that wins more draws generates more
+        shots), confirming the sign wasn't inverted while wiring this new layer."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        neutral_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_lineup_pct": 0.5}
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong_lineup = dict(base, faceoff_lineup_pct=0.62)
+        weak_lineup = dict(base, faceoff_lineup_pct=0.38)
+        cfg = build_nhl_sim_config(overrides={"faceoff_lineup_model": True})
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(120):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=neutral_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong_lineup)
+        weak_mean = _mean_home_shots(weak_lineup)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"faceoff_lineup_pct=0.62 must produce MORE HOME shots on average than 0.38 -- got "
+            f"strong={strong_mean:.3f} weak={weak_mean:.3f}.",
+        )
+
+    def test_faceoff_lineup_model_requires_both_sides(self) -> None:
+        """Bilateral-gate discipline, matching DZ/NZ: if only ONE side has real
+        `faceoff_lineup_pct` data, the layer must not fire at all (never a one-sided adjustment)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home_only = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_lineup_pct": 0.62}
+        st_away_no_data = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        st_home_neutral = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        cfg = build_nhl_sim_config(overrides={"faceoff_lineup_model": True})
+
+        def _totals(st_home: dict, st_away: dict) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        one_sided_totals = _totals(st_home_only, st_away_no_data)
+        neither_totals = _totals(st_home_neutral, st_away_no_data)
+        self.assertEqual(
+            one_sided_totals, neither_totals,
+            msg="a one-sided faceoff_lineup_pct changed output -- the bilateral gate is not "
+                "enforced.",
+        )
+
     def test_faceoff_oz_specific_curve_flag_actually_changes_output(self) -> None:
         """Reachability test for §2v: `faceoff_oz_specific_curve=True` (the default, dramatically
         stronger OZ-specific decay curve) must produce measurably different output than `False`

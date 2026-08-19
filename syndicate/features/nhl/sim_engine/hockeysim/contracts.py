@@ -56,6 +56,14 @@ class HockeyPlayerFeatures:
     shot_weight: Optional[float] = None
     goal_weight: Optional[float] = None
     block_weight: Optional[float] = None
+    # NOTE, §2zz: a player-level `faceoff_weight` (TRUE season win/total draws, playbyplay-sourced
+    # -- `historical_truth/player_game_rates.py`) exists in `player_rates_map`, but is deliberately
+    # NOT a field on THIS dataclass. Unlike `shot_weight`/`goal_weight`/`block_weight` (read
+    # directly by `_weighted_choice` for per-event attribution), the faceoff signal is consumed at
+    # the TEAM level (`features/loaders.py::compute_lineup_faceoff_pct`, folded into
+    # `HockeyTeamFeatures.faceoff_win_pct` before this dataclass is even built) -- adding it here
+    # too would be a second, unreachable copy of the same data with no reader, exactly the
+    # "presence is not reachability" trap this package's own standard warns against.
     line_slot: Optional[str] = None  # L1..L4 / D1..D3
     pp_unit: Optional[int] = None
     pk_unit: Optional[int] = None

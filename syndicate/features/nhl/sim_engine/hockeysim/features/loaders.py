@@ -14,6 +14,7 @@ features, never an exception, matching the "degraded/empty state, not on-request
 from __future__ import annotations
 
 import csv
+import dataclasses
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -185,16 +186,21 @@ def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, 
 
 
 def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int, Dict[str, float]]:
-    """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..}}`` for a date.
+    """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..,
+    "faceoff_weight":..}}`` for a date.
 
-    Written by ``scripts/build_nhl_player_rates_artifact.py`` from real boxscore per-skater stats --
-    closes the last 3 genuinely-absent ``HockeyPlayerFeatures`` fields
-    ``docs/ai_context/hockeysim_engine_reference.md`` §5 tracked. UNLIKE the team-rates producer,
-    keyed by integer player id, not team abbreviation -- season-wide, so the SAME candidate-order
-    convention (season file, then ``_latest``) still applies, just with a per-player row shape.
-    Returns an empty map when unavailable, so `HockeyPlayerFeatures` falls back to `None` on these
-    fields, which `engine.py`'s own position/TOI heuristic already handles gracefully -- a missing
-    file degrades to that existing fallback, it does not break.
+    Written by ``scripts/build_nhl_player_rates_artifact.py`` from real boxscore per-skater stats
+    (the first three keys -- closes the 3 genuinely-absent ``HockeyPlayerFeatures`` fields
+    ``docs/ai_context/hockeysim_engine_reference.md`` §5 tracked) and real `playbyplay` per-skater
+    faceoff counts (`faceoff_weight`, §2zz -- a genuinely different source, see
+    `historical_truth/player_game_rates.py`'s own docstring for why). UNLIKE the team-rates
+    producer, keyed by integer player id, not team abbreviation -- season-wide, so the SAME
+    candidate-order convention (season file, then ``_latest``) still applies, just with a
+    per-player row shape. Returns an empty map when unavailable, so `HockeyPlayerFeatures` falls
+    back to `None` on these fields, which `engine.py`'s own position/TOI heuristic (for the first
+    three) and `compute_lineup_faceoff_pct`'s own season-aggregate fallback (for the fourth)
+    already handle gracefully -- a missing file degrades to those existing fallbacks, it does not
+    break.
     """
     proc = _processed_dir(root)
     season = _season_code_for_date(date)
@@ -216,6 +222,7 @@ def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int
         sw = _to_float(lower.get("shot_weight"))
         gw = _to_float(lower.get("goal_weight"))
         bw = _to_float(lower.get("block_weight"))
+        fw = _to_float(lower.get("faceoff_weight"))
         entry: Dict[str, float] = {}
         if sw is not None:
             entry["shot_weight"] = sw
@@ -223,6 +230,8 @@ def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int
             entry["goal_weight"] = gw
         if bw is not None:
             entry["block_weight"] = bw
+        if fw is not None:
+            entry["faceoff_weight"] = fw
         if entry:
             out[pid] = entry
     return out
@@ -477,6 +486,53 @@ def build_player_features(
     return tuple(players)
 
 
+# A single dressed player with real faceoff data is enough to prefer the lineup-aware value over
+# the team's season aggregate -- the aggregate itself is already season-long and stable; requiring
+# MORE than one qualifying player before trusting a real, individually-measured signal would just
+# throw away real data for no real protection (`faceoff_weight` itself is already floor-protected
+# at MIN_DRAWS_FOR_PLAYER_FACEOFF_WEIGHT=100 real draws before a player gets a value at all).
+MIN_QUALIFYING_PLAYERS_FOR_LINEUP_FACEOFF_PCT = 1
+
+
+def compute_lineup_faceoff_pct(
+    team_rows: List[Dict[str, str]], player_rates_map: Dict[int, Dict[str, float]],
+) -> Optional[float]:
+    """TOI-weighted average of tonight's dressed roster's own individual `faceoff_weight` values
+    (§2zz) -- closes the gap between a team's SEASON-LONG `faceoff_win_pct` (blind to who's
+    actually dressed tonight: injuries, scratches, line changes) and its ACTUAL roster.
+
+    No explicit "centers only" filter is needed -- `faceoff_weight` is only ever populated for
+    players who cleared `MIN_DRAWS_FOR_PLAYER_FACEOFF_WEIGHT` (100 real draws/season), which in
+    practice selects almost exclusively for players who actually take draws regularly (centers, in
+    real hockey), without this package's roster/lineup data needing the finer C/L/R position split
+    it does not carry (`historical_truth/player_game_rates.py`'s own docstring has the full
+    reasoning). Returns `None` (never a guessed value) when fewer than
+    `MIN_QUALIFYING_PLAYERS_FOR_LINEUP_FACEOFF_PCT` dressed players have individual data, or when
+    every qualifying player's own `proj_toi` is non-positive -- the caller keeps the team's
+    existing `faceoff_win_pct` unchanged in that case, same "no data means no override" discipline
+    as every other signal in this package."""
+    weighted_sum = 0.0
+    weight_total = 0.0
+    n_qualifying = 0
+    for row in team_rows:
+        pid = _safe_int(row.get("player_id"))
+        if pid is None:
+            continue
+        rates = player_rates_map.get(pid)
+        fw = rates.get("faceoff_weight") if rates else None
+        if fw is None:
+            continue
+        toi = _to_float(row.get("proj_toi")) or 0.0
+        if toi <= 0.0:
+            continue
+        weighted_sum += toi * float(fw)
+        weight_total += toi
+        n_qualifying += 1
+    if n_qualifying < MIN_QUALIFYING_PLAYERS_FOR_LINEUP_FACEOFF_PCT or weight_total <= 0.0:
+        return None
+    return round(weighted_sum / weight_total, 4)
+
+
 def _safe_int(value: object) -> Optional[int]:
     try:
         if value is None or str(value).strip() == "":
@@ -505,6 +561,7 @@ def build_game_features(
     project: bool = True,
     anchor_to_market: bool = False,
     anchor_weight: float = 0.35,
+    apply_lineup_faceoff_pct: bool = True,
 ) -> HockeyGameFeatures:
     """Assemble a fully-featured, projection-primed :class:`HockeyGameFeatures` for one game.
 
@@ -514,6 +571,22 @@ def build_game_features(
     lambdas are then anchored toward the book (Phase 4, opt-in; no-op without odds).
     Pre-loaded maps may be passed (slate loader shares them across games); otherwise they are
     read per call. Unavailable inputs degrade to league-average / empty, never an exception.
+
+    ``apply_lineup_faceoff_pct`` (§2zz, default `True`): when tonight's dressed lineup carries
+    real per-player `faceoff_weight` data, a TOI-weighted average of the ACTUAL roster's own
+    individual rates (`compute_lineup_faceoff_pct`) is attached as `special_teams
+    ["faceoff_lineup_pct"]` -- a real, stated rollback switch, not a hidden behavior change;
+    `False` omits the key entirely.
+
+    NOT wired as an override of `faceoff_win_pct` itself -- a first draft did exactly that and
+    was caught, before shipping, as UNREACHABLE in practice: `faceoff_win_pct` is
+    `_resolve_faceoff_pct`'s BOTTOM fallback tier, behind the OZ/EV-specific per-team indices this
+    session already built (§2m/§2n) and, for strength-state segments, the role-specific index too
+    (§2y) -- all of which are 100% populated in real production data (`nhl_sim_input_checklist.py`),
+    so that tier is never actually reached. `faceoff_lineup_pct` is instead consumed as an
+    ADDITIONAL multiplicative layer (`engine.py`'s `faceoff_lineup_model`), the SAME "always
+    composed, never shadowed by a higher tier" pattern the DZ/NZ layers already use -- see that
+    flag's own docstring.
     """
     if xg_map is None:
         xg_map = load_team_xg_map(date, root=root)
@@ -533,17 +606,30 @@ def build_game_features(
     home = build_team_features(home_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map, rates_map=rates_map)
     away = build_team_features(away_name, xg_map=xg_map, elo_map=elo_map, special_teams_map=special_teams_map, rates_map=rates_map)
 
+    home_ab = home.abbrev or _abbr(home_name)
+    away_ab = away.abbrev or _abbr(away_name)
+    home_rows = lineups.get(home_ab, []) if home_ab else []
+    away_rows = lineups.get(away_ab, []) if away_ab else []
+
+    if apply_lineup_faceoff_pct:
+        home_lineup_pct = compute_lineup_faceoff_pct(home_rows, player_rates_map or {})
+        if home_lineup_pct is not None:
+            home = dataclasses.replace(
+                home, special_teams={**home.special_teams, "faceoff_lineup_pct": home_lineup_pct})
+        away_lineup_pct = compute_lineup_faceoff_pct(away_rows, player_rates_map or {})
+        if away_lineup_pct is not None:
+            away = dataclasses.replace(
+                away, special_teams={**away.special_teams, "faceoff_lineup_pct": away_lineup_pct})
+
     if project:
         home, away, _proj = apply_projection(home, away, profile=profile)
 
-    home_ab = home.abbrev or _abbr(home_name)
-    away_ab = away.abbrev or _abbr(away_name)
     home_players = build_player_features(
-        lineups.get(home_ab, []) if home_ab else [], starting_goalie=(goalies or {}).get(home_ab or ""),
+        home_rows, starting_goalie=(goalies or {}).get(home_ab or ""),
         player_rates_map=player_rates_map,
     )
     away_players = build_player_features(
-        lineups.get(away_ab, []) if away_ab else [], starting_goalie=(goalies or {}).get(away_ab or ""),
+        away_rows, starting_goalie=(goalies or {}).get(away_ab or ""),
         player_rates_map=player_rates_map,
     )
 

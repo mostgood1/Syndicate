@@ -1541,6 +1541,24 @@ analytically (`E[]=1.0` to 4 decimal places at 5 win probabilities) and empirica
 delta **-0.055%**, 992 pairings, real production data -- noise-level). 27 new unit tests (182
 total), 4 new engine tests, 605 hockeysim/nhl tests pass overall (up from 519), checklist full PASS.
 
+**Addendum, same day: built the first PLAYER-level faceoff signal** (reference doc §2zz, full
+report `docs/reports/hockeysim_player_faceoff_rate_report.md`). Every faceoff mechanism above
+operates on TEAM-level rates only. Real per-player win rate from `playbyplay`'s `winningPlayerId`/
+`losingPlayerId` (Claude Giroux 0.6308/799 draws, Jonathan Toews 0.6209/1026 draws, ~0.30 weak,
+league average 0.4867, 238 players at a 100-real-draw floor). **A real data trap caught before
+building on it**: the boxscore's own `faceoffWinningPctg` field looked usable, but 22% of real
+center-games show an EXACT 0.0/1.0 (low-draw games) -- a naive average-of-per-game-rates put real
+active centers at a literal 0.0000 across 68-82 games. Fixed with TRUE win/total counts, never an
+average of ratios. **A reachability bug caught before shipping**: a first draft overrode
+`TeamRates.faceoff_win_pct` directly -- completely dead weight, since that's the BOTTOM fallback
+tier, behind the already-100%-populated OZ/EV/role indices. Fixed by composing it as an ADDITIONAL
+multiplicative layer instead (`faceoff_lineup_model`), the same pattern DZ/NZ use, gated `ev_only`
+only (strength-state extension a real, stated next step). Verified: 31 new unit tests, checklist
+shows `faceoff_lineup_pct` 100% populated against the REAL local mirror (genuine end-to-end
+reachability), 634 hockeysim/nhl tests pass overall (up from 605). Round-robin: **-0.112%** (real
+per-team lineup data), noise-level; a no-data control confirmed an EXACT 0.000% delta, proving the
+bilateral gate correctly no-ops.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable

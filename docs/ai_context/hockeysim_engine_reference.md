@@ -1156,6 +1156,40 @@ effect, same reasoning as §2y's own round-robin). 27 new decay-curve/dispatcher
 re-confirmed full PASS (no new consumed field — population-level constants, not a per-team CSV
 column). Full report: `docs/reports/hockeysim_faceoff_strength_zone_joint_report.md`.
 
+**§2zz, the first PLAYER-level faceoff signal**: every faceoff mechanism above operates on
+TEAM-level rates, never on which specific players are dressed tonight. `historical_truth/
+player_game_rates.py` gained a real per-player faceoff win rate from `playbyplay`'s
+`winningPlayerId`/`losingPlayerId` — real, hockey-sensible spread (Claude Giroux 0.6308/799 draws,
+Jonathan Toews 0.6209/1026 draws, down to ~0.30 for weak centers, league average 0.4867, 238
+players clearing a 100-real-draw floor). **A real trap in the data itself, caught before building
+on it**: the boxscore's own `faceoffWinningPctg` per-game field looked usable at first, but a
+direct spot-check found 22% of real center-games show an EXACT 0.0/1.0 (almost always a 1-3-draw
+game) — a naive average-of-per-game-rates put several real, active centers at a literal `0.0000`
+across 68-82 games. Fixed with TRUE win/total counts from `playbyplay` instead, never an average of
+ratios.
+
+**A reachability bug caught before shipping — the same discipline every piece this session has
+used**: the first design overrode `TeamRates.faceoff_win_pct` directly with a TOI-weighted lineup
+average. This was COMPLETELY DEAD WEIGHT in production: `faceoff_win_pct` is
+`_resolve_faceoff_pct`'s bottom fallback tier, behind the per-team OZ/EV indices (§2m/§2n) and the
+role-specific index (§2y) — ALL 100% populated in real data, so that tier is never reached. Fixed
+by composing it as an ADDITIONAL multiplicative layer instead (`faceoff_lineup_model`), the SAME
+"always applies regardless of which tier resolved the base percentage" pattern DZ/NZ already use —
+`special_teams["faceoff_lineup_pct"]` (a direct 0-1 percentage) via `_faceoff_multipliers` (the
+simple diff-based mechanism, not a discrete-event curve — a persistent per-game roster-quality
+adjustment, not a discrete event with its own decay shape). Gated `ev_only` only this pass, matching
+DZ/NZ exactly — strength-state segments are a real, stated, deliberately-narrow next step.
+
+**Verified**: 31 new unit tests (parser/aggregate functions including two that directly
+discriminate true win/total counts from a naive average-of-rates; `compute_lineup_faceoff_pct`
+and the CSV column; `build_game_features`'s layer attachment including the rollback flag; 3 engine
+reachability/direction/bilateral-gate tests). `nhl_sim_input_checklist.py`: `faceoff_lineup_pct`
+shows up automatically (AST-derived) at 100.0% populated against the REAL local mirror — genuine
+end-to-end reachability, not a synthetic-fixture-only pass. **634 hockeysim/nhl tests pass overall**
+(up from 605). **Round-robin**: -0.112% (992 pairings, real per-team lineup data from the local
+mirror) — noise-level; a separate no-data control confirmed an EXACT 0.000% delta, proving the
+bilateral gate correctly no-ops. Full report: `docs/reports/hockeysim_player_faceoff_rate_report.md`.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

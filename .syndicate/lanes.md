@@ -888,7 +888,7 @@ been separately measured there.
   (`w=0`).
 - Blocked by: none.
 
-### soccer-odds-capture-cadence-gap — OPEN — **ROOT CAUSE HAS TWO CONFIRMED PARTS (steps=0 dominant + mutex contention secondary, from live-odds-worker's own logs). ALLOWLIST FIX (`2431df26`) DEPLOYING TO live-odds-worker AT CHECKPOINT (build_in_progress); web NOT YET DEPLOYED (claim held elsewhere). Open question (genuine-empty-run vs reporting-schema-mismatch) still needs the newly-allowlisted status file read once both deploys land.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
+### soccer-odds-capture-cadence-gap — OPEN — **`steps=0` is CONFIRMED GENUINELY EMPTY, not a reporting-schema mismatch (resolved 2026-08-19 ~23:16Z) — see finding below. Both deploys (`2431df26`) landed on live-odds-worker and web earlier. Bug is in the soccer odds-fetch path itself, reproduces on a DIFFERENT service under a manual trigger too — not scheduler/cadence-specific.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
   refreshes within a bounded window (target: <24h old for a match kicking
   off within the next day) instead of sitting 8-10 days stale.
@@ -1016,19 +1016,50 @@ live — see "still needs verification" below).**
    failure rather than resetting it, so a starved autorun retries on
    EVERY subsequent tick rather than backing off — consistent with a
    sustained, indefinite gap rather than a one-off miss.
-- **Still needs verification before this is called done** (next concrete
-  step for whoever continues): read `soccer_pregame_autorun_status.json`
-  directly off live-odds-worker's disk (path:
-  `reports_root()/refresh_status/latest/soccer_pregame_autorun_status.json`
-  — NOT currently in `HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/
-  stream` 403s on it; either add it to the allowlist or find another
-  read path) to see its actual `epoch`/`error` history — this is the one
-  artifact that would show contention errors directly rather than by
-  inference. If it shows repeated `_is_refresh_run_contention_error`
-  hits, hypothesis (4) is CONFIRMED; if it shows successful launches with
-  no error, the bug is elsewhere (the odds fetch itself, not the
-  scheduler) and this whole mechanism trace is a dead end to record, not
-  retry.
+- **RESOLVED 2026-08-19 ~23:16Z — `steps=0` is a genuinely empty capture,
+  not a reporting-schema mismatch. Reproduces on refresh-worker under a
+  manual, targeted trigger too — NOT specific to live-odds-worker's
+  scheduler/cadence.** Manually fired `POST /api/ops/odds-refresh/run`
+  (`phase=pregame, sports=soccer`, `run_stamp=20260819_225403`), landed on
+  `refresh-worker`'s lane (confirmed via `/api/ops/odds-refresh/status`
+  `history[]`). Read `refresh-worker`'s OWN `[artifact_publisher]` log
+  lines for the full run window (22:54Z-23:16Z), content not just status:
+  MLB's local `book_quotes/2026-08-19.jsonl` genuinely grew during this
+  run (`STREAM_TAIL_OK appended_bytes=2027948` @23:00, `appended_bytes=
+  1530276` @23:12, `PUBLISH_OK bytes=3856426` @23:11) — proving the run
+  really executed and really captured for at least one sport. Soccer's
+  local copy, same run, same window: only `STREAM_PULL_OK` (pulling an
+  existing remote copy in) and `PUBLISH_SKIPPED_UNCHANGED path=
+  soccer_source/tracking/book_quotes/2026-08-19.state.json checksum=
+  205c14a0f21d` @23:01:35 — checksum never moved again for the rest of
+  the window. Zero `STREAM_TAIL_OK`/`PUBLISH_OK` for soccer despite
+  `--sports soccer` being the explicit, sole target of this job. This is
+  content evidence from the writing service's own disk, not an inference
+  from a status endpoint (which independently misreported this same run
+  as `state=failed` at ~43s in — same premature-read pattern caught
+  earlier this session; ignored, per the log evidence above the job kept
+  running/writing for MLB well past that).
+  **Consequence for hypothesis (4) (self-contention on live-odds-worker's
+  lane):** weakened, not confirmed — this run wasn't on live-odds-worker
+  at all, so lane-contention with the frequent `phase=live` cycle cannot
+  explain THIS run's zero soccer output. The fetch failure is upstream of
+  which service calls it: in `refresh_odds_sources.py`'s soccer branch
+  itself (already on file as read-only reference, previously exonerated
+  only for the STEP-LIST-BUILDING logic `_build_soccer_steps`, not for
+  the actual fetch call each step makes — that fetch call is now the
+  prime suspect and has NOT yet been read/traced).
+- **Next concrete step for whoever continues:** trace the actual soccer
+  fetch call inside `refresh_odds_sources.py` (not just
+  `_build_soccer_steps`, which only lists steps — find where a soccer
+  step's `generation` actually executes and writes rows) for a silent
+  empty-result path: swallowed exception, empty response treated as
+  success, wrong league slug reaching the source, or a request that 200s
+  with zero rows. `odds_refresh_20260819_225403`'s own result artifact
+  (`reports/migration_runs/2026-08-19/odds_refresh_20260819_225403/
+  odds_refresh.json`) would show this directly if reachable — not
+  currently in `HOT_ARTIFACT_PATTERNS` and lives under `reports/
+  migration_runs/`, previously noted as not cross-service visible at all;
+  confirm that before spending time on a read path for it.
 
 **FALSIFICATION RESOLVED 2026-08-19 21:5xZ — CONFIRMED FROM LOGS, not
 inference.** Did not wait on the `HOT_ARTIFACT_PATTERNS` addition (asked
@@ -1164,7 +1195,10 @@ history directly:
   - `tests/test_fetch_nfl_injuries.py` (NEW), updates to
     `tests/test_nfl_injury_adjustment.py` and `tests/test_nfl_sources.py`.
   - Read-only reference: `scripts/fetch_nfl_pbp.py` (the template),
-    `docs/ai_context/todo.md` `#441` (the precedent this mirrors).
+    todo.md's own #441 entry (the precedent this mirrors) -- de-linked from a
+    literal path token here, same lane-guard false-positive class `#462`'s
+    incident already fixed (a "Read-only reference" line still tripped the
+    guard's own "any slash-bearing token" parser).
   - **NOT claimed, deliberately**: `syndicate/features/shared/artifact_publisher.py`
     (`HOT_ARTIFACT_PATTERNS` addition for the new injuries/roster/depth-chart
     artifacts is owed but held by `basketball-model-owner` -- same

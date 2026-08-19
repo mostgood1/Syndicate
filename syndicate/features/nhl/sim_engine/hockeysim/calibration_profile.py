@@ -150,6 +150,12 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # (PK+O: 197 draws leaguewide, median 6/team/SEASON). The exact-normalization proof this reuses
     # is unchanged from §2x; only takes effect when `faceoff_strength_state_model=True`.
     faceoff_strength_state_zone_model=True,
+    # §2zz: the first PLAYER-level faceoff signal -- a TOI-weighted average of tonight's ACTUAL
+    # dressed roster's own real, playbyplay-sourced faceoff win rates (real spread: ~63% top
+    # centers, ~30% weak ones, ~50% league average). Wired as an ADDITIONAL multiplicative layer
+    # (matching DZ/NZ), NOT a `faceoff_win_pct` override -- a first draft override was caught as
+    # UNREACHABLE (behind the already-100%-populated OZ/EV/role tiers) before shipping.
+    faceoff_lineup_model=True,
 )
 
 # `#440` Part 4 Phase 5 -- the versioned-profile seam.

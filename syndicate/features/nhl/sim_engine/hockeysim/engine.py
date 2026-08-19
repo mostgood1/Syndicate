@@ -179,6 +179,33 @@ class SimConfig:
     # `faceoff_strength_state_model=True` (the umbrella gate this refines). Default ON. `False`
     # falls back to the flat role-only mechanism unchanged, for rollback/A-B.
     faceoff_strength_state_zone_model: bool = True
+    # §2zz: the FIRST player-level dimension the faceoff mechanism has ever had -- every faceoff
+    # signal above operates on TEAM-level rates, never on which specific players are actually
+    # dressed tonight. `faceoff_lineup_pct` (`features/loaders.py::compute_lineup_faceoff_pct`) is
+    # a TOI-weighted average of tonight's roster's own real, playbyplay-sourced individual faceoff
+    # win rates (`historical_truth/player_game_rates.py`) -- real spread measured: top real
+    # centers ~63%, weak ones ~30%, league average ~50% (238 players, >=100 real draws/season).
+    #
+    # WIRED AS AN ADDITIONAL LAYER, NOT A `faceoff_win_pct` OVERRIDE -- a real reachability bug
+    # caught before shipping. A first draft overrode `TeamRates.faceoff_win_pct` directly, which
+    # is `_resolve_faceoff_pct`'s BOTTOM fallback tier -- behind the per-team OZ/EV indices (§2m/
+    # §2n) and, for strength-state segments, the role-specific index (§2y), ALL of which are 100%
+    # populated in real production data. That tier is never reached in practice, making the
+    # override completely dead weight -- caught by asking "is this actually reachable", not just
+    # "is it populated", the same discipline `model_engine_standard.md` requires. Fixed by
+    # composing it as an ADDITIONAL multiplicative layer instead, the SAME "always applies
+    # regardless of which tier resolved the base percentage" pattern the DZ/NZ layers already use
+    # -- `_faceoff_multipliers` (the simple diff-based mechanism, not a discrete-event curve: this
+    # signal represents a persistent per-game ROSTER-QUALITY adjustment, not a discrete in-the-
+    # moment event with its own measured decay shape) applied to the raw lineup percentages
+    # directly. `faceoff_lineup_pct` is ALREADY a direct 0-1 percentage (not an index needing the
+    # `0.5*index` conversion the other layers use).
+    #
+    # GATED `ev_only` ONLY THIS PASS, matching the DZ/NZ layers exactly -- does NOT yet extend to
+    # strength-state (PP/PK) segments, a real, stated limitation kept narrow deliberately rather
+    # than risked in a rush; roster composition plausibly matters there too, a natural next step.
+    # Both sides required to have real data (same bilateral-gate discipline as DZ/NZ). Default ON.
+    faceoff_lineup_model: bool = True
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -963,6 +990,16 @@ class PeriodSimulator:
         faceoff_pp_role_idx_away_raw = st_away.get("faceoff_pp_role_index")
         faceoff_pk_role_idx_home_raw = st_home.get("faceoff_pk_role_index")
         faceoff_pk_role_idx_away_raw = st_away.get("faceoff_pk_role_index")
+        # LINEUP-AWARE faceoff percentage (§2zz) -- the first PLAYER-level faceoff signal, a
+        # TOI-weighted average of tonight's ACTUAL dressed roster's own individual win rates,
+        # computed per-game by `features/loaders.py::compute_lineup_faceoff_pct` (not a per-team
+        # season-aggregate CSV column the way every index above is). ALREADY a direct 0-1
+        # percentage, not an index. Wired as an ADDITIONAL multiplicative layer
+        # (`faceoff_lineup_model`) alongside DZ/NZ below, not a tier in the OZ/EV/role/blend
+        # resolution chain -- see that flag's own docstring for the reachability bug this design
+        # avoids.
+        faceoff_lineup_pct_home_raw = st_home.get("faceoff_lineup_pct")
+        faceoff_lineup_pct_away_raw = st_away.get("faceoff_lineup_pct")
         # Combined PP intensity from penalty rates.
         # Use committed rates to avoid double-counting (drawn and committed are the same events).
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
@@ -1346,6 +1383,20 @@ class PeriodSimulator:
                         m_nz_h, m_nz_a = nz_decay.other_mult, nz_decay.winner_mult
                     lam_h = float(lam_h) * float(m_nz_h)
                     lam_a = float(lam_a) * float(m_nz_a)
+                # LINEUP-AWARE faceoff percentage (§2zz) -- ANOTHER additional layer, composed
+                # alongside DZ/NZ, not a tier of the OZ/EV/role/blend chain above (see
+                # `faceoff_lineup_model`'s own docstring for the reachability bug that design
+                # choice avoids). `_faceoff_multipliers` (the simple diff-based mechanism) applied
+                # directly to the raw lineup percentages -- no discrete-event curve, since this is
+                # a persistent per-game roster-quality adjustment, not a discrete in-the-moment
+                # event with its own measured decay shape.
+                if (ev_only and bool(getattr(self.cfg, "faceoff_lineup_model", True))
+                        and faceoff_lineup_pct_home_raw is not None and faceoff_lineup_pct_away_raw is not None):
+                    lineup_h_pct = _f(faceoff_lineup_pct_home_raw, 0.5)
+                    lineup_a_pct = _f(faceoff_lineup_pct_away_raw, 0.5)
+                    m_lineup_h, m_lineup_a = _faceoff_multipliers(self.cfg, lineup_h_pct, lineup_a_pct)
+                    lam_h = float(lam_h) * float(m_lineup_h)
+                    lam_a = float(lam_a) * float(m_lineup_a)
             elif (seg_is_home_pp or seg_is_away_pp) and bool(getattr(self.cfg, "faceoff_strength_state_model", True)):
                 # §2x: the first faceoff mechanism to apply during a PP/PK segment -- fires
                 # precisely when the block above is gated OFF (`ev_only=True` and this IS a PP/PK
