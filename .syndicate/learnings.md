@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 409 rules `[generated]`
+## Index — 410 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1751,3 +1751,50 @@ checked. **Verify an alarming reading as hard as a comforting one.**
 SECOND check of a different shape over the same question — a set comparison
 against a backup, a line-conservation count, a planted canary, reading the raw
 `repr()`. Redundancy of METHOD, not of attention.
+
+## 2026-08-19 — RULE: no active owner, no claims. And a liveness read EXPIRES.
+
+- The rule going forward: **a lane whose owning session is archived, absent from
+  the roster, or silent for hours MUST NOT hold file claims.** Releasing claims
+  is NOT closing the lane — its findings stand and it can be reopened. Audit the
+  full claim set against the roster **including archived**, because
+  `include_archived: false` hides exactly the evidence the question needs.
+
+**THE HALF THAT WAS ALREADY A RULE, and the half that was not.**
+[[A STALE-BUT-"RUNNING" SESSION IS INVISIBLE TO EVERY ORPHAN CHECK]] (08-18)
+established *how to judge liveness*: `isRunning` is a CLAIM, not a reading —
+judge by `lastActivityAt`. Confirmed twice over tonight: between two roster
+reads minutes apart, `isRunning` flipped `true -> false` on a session active 4
+minutes earlier and `false -> true` on another, while a third read `RUNNING`
+continuously through 20 hours of silence. **But nothing said what to DO about
+it.** That rule named `refresh-worker-oom-recurrence` explicitly, `lanes.md`
+already carried "flagged running (stale 40h)", and its 7 claims — including the
+two files the live `#465` investigation needed — sat guarded for another day
+because no rule consumed the observation. **A rule that diagnoses without
+prescribing waits for a human who may not come.**
+
+**A LIVENESS READ EXPIRES. RE-TAKE IT; DO NOT TRUST YOUR OWN EARLIER SWEEP.**
+Measured tonight, and it is the part most likely to be skipped:
+`grading-blocker-settled-zero` was DELIBERATELY SPARED in the first sweep
+because a running session ("Betting settlement data") looked like its true owner
+by SUBJECT, even though the lane header named a different, archived one. That
+session was archived at 00:45Z. **The reason for sparing it evaporated within
+hours, and only a fresh census caught it.** Sweep results are perishable in the
+same way [[feedback_rebaseline_before_judging]] describes for baselines.
+
+**METHOD, in order:**
+1. claim set from `lane-guard.py`'s OWN `_claims()` — not the looser copy in
+   `check_lane_invariants.py`, which disagreed by 32 claims over one file;
+2. roster WITH archived; map each claim-holding lane to its session;
+3. release where the owner is archived/absent; flag, don't guess, where it is
+   merely idle — and say what the flag is blocking;
+4. verify the claim set before/after **as a SET, never a count** — two claims
+   swapping owners leaves the count identical and is a catastrophe.
+
+**THIS CANNOT BE MECHANISED WITH CURRENT TOOLING, which is why it needs a
+standing pass.** Liveness comes from the session roster (an MCP call), not from
+the filesystem, so no hook or checker can read it. `check_lane_invariants.py`
+can see a contested file and a stray section; it is structurally blind to
+"this lane's owner died". Until something bridges that, this is a periodic
+coordinator job — 65 -> 47 claims and 12 -> 5 lanes in one pass tonight, after
+which every remaining holder had acted within 35 minutes.
