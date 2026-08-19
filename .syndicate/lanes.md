@@ -820,7 +820,7 @@ been separately measured there.
   scheduler — files above are NOT the right ones for whoever continues
   this; re-scope before touching code.
 
-### nfl-receptions-blend-stability — OPEN — opened 2026-08-19 — session: nfl-receptions-blend-stability
+### nfl-receptions-blend-stability — CLOSED-VERIFIED 2026-08-19 — CONFIRMED stable (hypothesis of instability was WRONG): half A/B = 0.1367/0.0771, ratio 1.77x. No code change. **Completes the full #471 blend/shrinkage constant audit — all 6 checked.** `922e2ab7` on `origin/main`. — session: nfl-receptions-blend-stability
 - Goal: `receptions` is the last un-checked market from `#471`'s blend-
   weight family. Shipped `w=0.137` off a fit-half optimum of 0.1367 --
   the SMALLEST measured one-way OOS improvement of any weighted market
@@ -851,6 +851,22 @@ been separately measured there.
 - Verification: both halves' independently-computed optimal weights
   stated side by side, explicit stable/unstable verdict, same criterion
   as every other market this session.
+- **RAN. Hypothesis WRONG — stable, not unstable.** `scripts/check_nfl_
+  blend_weight_stability.py --stats receptions`: half A (2022-2023,
+  n=35055) w=0.1367; half B (2024-2025, n=34523) w=0.0771 — ratio
+  **1.77x**, same sign, within the pre-registered <=2.0x threshold. The
+  lane's own hypothesis (that a tiny one-way improvement predicts
+  instability) did not hold here — stated plainly rather than only
+  reporting the confirmations. **No code change made.**
+  `_COVER_PROBABILITY_BLEND_WEIGHT["receptions"]` stays at `0.137`.
+  Report: `reports/nfl_receptions_blend_stability_check.json`.
+  **THIS WAS THE LAST UNCHECKED MARKET — the full `#471` blend-weight +
+  shrinkage-constant audit is now complete.** All 6 tuned constants
+  individually verified against independent data: stable —
+  `rushing_yards` (1.00x), `anytime_td` k (1.00x, exact), `receptions`
+  (1.77x), `receiving_yards` (1.74x); correctly left at their safe
+  value — `passing_attempts` (capped), `passing_tds`/`interceptions`
+  (`w=0`).
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
