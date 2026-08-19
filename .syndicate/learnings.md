@@ -1308,3 +1308,47 @@ of them — no mechanism needed to be guessed.
 - Related: the 60-seed sweeps read ~30% high on total SD versus the 300-seed
   production run (7.51 vs 5.77). Fine for RANKING settings, wrong for quoting a
   level — I nearly reported 2.17x as the model's dispersion when it was 1.67x.
+
+## 2026-08-19 — CORRECTION: `git commit -- <paths>` fixes the shared INDEX. It is the DELIVERY MECHANISM for a shared FILE. I applied it to both and caused two more incidents.
+
+**This corrects my own 2026-08-18 entry**, which concluded that pathspec-on-the-
+commit is "the only thing that survives me being in a hurry". That is true for a
+shared INDEX and false for a shared FILE, and the earlier entry says so further
+down — I read the headline and not the caveat.
+
+**Four attribution incidents in one session, in two distinct classes:**
+
+*Shared index (pathspec DOES fix):*
+1. `d46be8a0` swallowed another session's `scripts/archive_released_lanes.py`
+   (169 lines) via a chained `add && commit`. Caught, split, recovered.
+2. `b65e1f76` swallowed another session's `state.md` correction the same way.
+   Not caught — another session committed on top before I looked.
+
+*Shared file (pathspec does NOT fix, and is the vector):*
+3. My `lanes.md` pathspec commit carried two other sessions' NEW lane blocks
+   (`wnba-edge-263`, `nfl-player-props-backtest`) — because `git commit -- <path>`
+   commits the WORKING-TREE version of that path, including their unstaged edits.
+4. My own daily log was committed under ANOTHER session's message
+   (`361d0498`), the same hazard running the other direction.
+
+**No content was lost in any of the four.** The cost is attribution: four commits
+now describe work their messages do not mention, and two lanes' entries are
+recorded under a football commit.
+
+**How to apply — pick the tool by what is SHARED, not by habit:**
+
+| what is contended | tool |
+|---|---|
+| the INDEX (other sessions have things staged) | `git commit -m "..." -- <paths>` |
+| the FILE (`lanes.md`, `state.md`, `todo.md`, `log/*.md`) | the BLOB recipe — rebuild from `HEAD:<file>`, `hash-object -w`, `update-index`, then commit with NO pathspec |
+
+**The tell I ignored twice:** an insertion count far larger than what I wrote.
+`lanes.md` came back `+386` on what was meant to be an in-place status edit. I
+read the number, noted it, and committed anyway — a check whose result you do not
+act on is not a check.
+
+**And the honest scoreboard:** I was told once, explicitly, to stop chaining add
+and commit. I stopped chaining, adopted pathspec, and then produced two NEW
+incidents of a different class with it. Fixing the named instance without
+understanding the category is how the same failure returns wearing different
+clothes.
