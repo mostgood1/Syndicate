@@ -89,6 +89,23 @@ def _load_history(league: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _load_espn_match_stats(league: str) -> list[dict[str, Any]]:
+    """Possession%/set-piece-goal-share rows, if a backfill exists for this
+    league (`espn_match_stats.py`, run offline via
+    `aggregate_season_match_stats` -- not fetched live here, same reasoning
+    `_load_history` already has for reading pre-fetched CSVs rather than
+    hitting a market API per run). Absent file -> empty list -> `espn_stats=`
+    is optional at the call site, so a league with no backfill yet degrades
+    to exactly today's behaviour rather than failing."""
+    path = REPO_ROOT / "data" / "soccer_source" / league / "history" / "espn_match_stats.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
 def _outcome(row: dict[str, Any]) -> str | None:
     try:
         home, away = float(row["home_goals"]), float(row["away_goals"])
@@ -154,7 +171,7 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
     if not history:
         return {"league": league, "error": "no committed history"}
 
-    team_rows = team_rows_from_match_history(history)
+    team_rows = team_rows_from_match_history(history, espn_stats=_load_espn_match_stats(league))
 
     # Coverage, printed rather than assumed -- the repo rule for anything built
     # on `data/**`.

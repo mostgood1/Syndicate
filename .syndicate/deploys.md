@@ -16265,3 +16265,77 @@ checks `#469` specifically should still pull `boxscores_history.csv`'s own
 max game date (not just its mtime) and check live-odds-worker's log stream
 for `BOXSCORE_BOOTSTRAP_STALLED`, per the standing instruction in the
 `#469` entry above -- this entry does not discharge that check.
+
+### #469 pt3 — root cause found: #469 pt2 was masking itself — 2026-08-19 ~15:55Z — lane `basketball-model-owner`
+
+Checking `#469`'s effect (requested: "check #469 now") found it was NOT
+working in production, and found why. `_player_logs_ready` included the
+boxscore-fallback paths (`boxscores_history.csv`/`boxscores_*.csv`) in its
+mtime-freshness check. Their writer refreshes mtime on EVERY bootstrap
+attempt, success or fully-failed alike (`#469` pt2's own fix still writes
+`existing_history` back unchanged and still calls `_write_history`). A
+single stalled write therefore made `_player_logs_ready` report "ready"
+for a full `REFRESH_PLAYER_LOGS_MAX_AGE_HOURS` window (12h default) --
+during which `_ensure_player_logs_for_props_refresh` short-circuited
+BEFORE ever reaching the content-date-aware `boxscore_history_is_stale`
+check `#469` pt2 relies on. The bootstrap, and its `BOXSCORE_BOOTSTRAP_
+STALLED` marker, never ran again until the stale mtime aged out on its own.
+
+**Measured, ~11h post-`#469`-deploy:** `boxscores_history.csv`'s own max
+game date frozen at 2026-06-30 the entire window (pulled fresh via
+`/api/ops/artifacts/export?path=...`, real content, not inferred); its
+mtime 6.97h old (touched, but unchanged content); per-slate
+`boxscores_2026-*.csv` files unchanged at exactly 23 files stopping
+2026-05-24 (identical to the pre-session baseline); `BOXSCORE_BOOTSTRAP_
+STALLED` absent from BOTH live-odds-worker and refresh-worker logs across
+three explicit 4-hour sweeps each (`scripts/render_logs.py`, driving the
+backward paging manually -- its built-in pager gives up after one empty
+page on a zero-match window, confirmed by contrast against an "ESPN"
+sanity search that DID find 24 real matches and paged correctly).
+refresh-worker logged 112 real invocations of `refresh_wnba_oddsapi_
+props.py` in the same window (confirms the script runs there too, not
+just live-odds-worker) and was independently measured at 98% container
+memory (4015.9/4096MB) the same day -- ruling out "just remove the mtime
+check, retry every tick" as a safe fix.
+
+**Fix (`0c7962a7`):** `_player_logs_ready` now only checks the genuine
+`player_logs.parquet`/`.csv` artifacts by mtime (valid for those -- only
+written wholesale on real success). The boxscore-fallback path's
+freshness is decided entirely by the existing `boxscore_history_is_stale`
+check. Added a dedicated attempt-backoff marker (`REFRESH_BOXSCORE_
+BOOTSTRAP_BACKOFF_MINUTES`, default 30min) mirroring this file's own
+`_predict_date_*` pattern, keyed on its own marker file rather than the
+data file's mtime -- the exact coupling that caused the bug.
+
+**Verified pre-deploy** with a scratch copy of the real (stale)
+`boxscores_history.csv` content, mtime forced to "now" (the exact
+production shape): `_player_logs_ready` → False (was True); full
+`_ensure_player_logs_for_props_refresh` → bootstrap actually called, 1
+call (was 0, unreachable); second call inside the 30min cooldown → still
+1 call (no retry-storm); after cooldown expires → 2 calls (re-attempts
+correctly). All 4 assertions pass. `tests/test_{wnba,nba}_refresh_
+runner.py`: 111 passed, same 4 pre-existing-and-unrelated failures as
+before this change (confirmed identical failure signature).
+
+- **verify: CODE CONFIRMED LIVE on live-odds-worker (`0c7962a7`, finished
+  2026-08-19T15:55:33Z). refresh-worker NOT YET DEPLOYED** -- its claim is
+  held by session `nfl-player-props-backtest` (actively in use, 7+ min and
+  climbing at last check, not stale -- not force-breaking an active claim).
+  Whoever deploys refresh-worker next should pick this commit up too;
+  until then, refresh-worker keeps running the OLD masked logic even
+  though live-odds-worker no longer does.
+- **Effect on actual boxscore data NOT yet observed** -- same honest
+  framing as every prior entry in this thread. The fix restores
+  reachability and adds retry backoff; it does NOT by itself prove ESPN's
+  fetch will succeed from Render's production egress IP (the UA-soft-block
+  risk `#469` pt2 flagged is still unconfirmed either way, precisely
+  because the bootstrap was never actually retried enough times to test
+  it). Next reader: check `boxscores_history.csv`'s own max game date
+  advancing past 2026-06-30, or `BOXSCORE_BOOTSTRAP_STALLED` now actually
+  appearing in logs (loud confirmation it's retrying and still failing,
+  which would point back at the IP/UA theory) versus continued total
+  silence (which would mean this fix still isn't reaching the bootstrap
+  for some other reason).
+- Claim: live-odds-worker released (`deploy_claim.py release --service
+  live-odds-worker --token c474b50117ce60ee`). refresh-worker: never
+  acquired, held by another session throughout.
