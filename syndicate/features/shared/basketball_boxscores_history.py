@@ -222,11 +222,27 @@ def bootstrap_boxscores_history_local(*, processed_root: Path, date_str: str, le
         return {"date": str(date_str), "rows": 0, "history_rows": 0, "wrote": None, "error": "invalid_end_date"}
     start_date = end_date - pd.Timedelta(days=max(0, int(lookback_days) - 1))
 
+    # Diagnostics for the caller (`_bootstrap_local_boxscores_history_for_props`):
+    # `_espn_scoreboard_local` swallows every fetch exception/non-OK status and
+    # returns `{}` (falsy). A genuinely gameless day returns a TRUTHY dict with
+    # an empty `events` list, so `scoreboard` being falsy specifically means the
+    # HTTP call itself failed -- not "no games" -- and is distinguishable from
+    # here without touching the fetch helper. This was previously invisible:
+    # the loop below silently accumulated zero rows on total fetch failure,
+    # `combined` fell back to `existing_history` unchanged, and the write below
+    # still succeeded (fresh mtime, stale content) -- the exact shape that let
+    # boxscores_history.csv sit frozen at 2026-06-30 while its own mtime kept
+    # advancing every bootstrap tick, reporting as "handled" indefinitely.
+    days_checked = 0
+    days_fetch_failed = 0
     frames = []
     current = start_date
     while current <= end_date:
         current_date = current.strftime("%Y-%m-%d")
+        days_checked += 1
         scoreboard = espn_scoreboard(processed_root=processed_root, date_str=current_date, league_code=league_code, force=False)
+        if not scoreboard:
+            days_fetch_failed += 1
         events = scoreboard.get("events") if isinstance(scoreboard, dict) else None
         day_rows: list[dict[str, Any]] = []
         if isinstance(events, list):
@@ -291,4 +307,6 @@ def bootstrap_boxscores_history_local(*, processed_root: Path, date_str: str, le
         "history_rows": int(len(combined)),
         "wrote": wrote,
         "error": None if wrote else "write_failed",
+        "days_checked": int(days_checked),
+        "days_fetch_failed": int(days_fetch_failed),
     }

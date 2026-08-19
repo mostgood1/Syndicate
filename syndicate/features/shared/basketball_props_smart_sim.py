@@ -343,9 +343,26 @@ def _http_get_json_local(url: str, *, timeout: int = 18) -> dict[str, Any]:
     try:
         import requests
 
+        # `site.web.api.espn.com` is ESPN's undocumented site API. A custom
+        # UA ("syndicate/1.0") worked fine from a residential dev IP but is
+        # exactly the shape (bot-like UA + datacenter/cloud egress IP) public
+        # media APIs commonly soft-block: request "succeeds" at the transport
+        # level and comes back empty rather than erroring, which is
+        # indistinguishable from "no games that day" downstream. Measured in
+        # production: boxscores_history.csv's own bootstrap kept "succeeding"
+        # (fresh mtime) while its data stayed frozen for weeks -- consistent
+        # with every ESPN call from Render's egress IP coming back empty. A
+        # real browser UA is the standard, low-risk mitigation for this exact
+        # failure shape.
         response = requests.get(
             url,
-            headers={"Accept": "application/json", "User-Agent": "syndicate/1.0"},
+            headers={
+                "Accept": "application/json",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+            },
             timeout=int(timeout),
         )
         if not response.ok:
