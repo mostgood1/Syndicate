@@ -2606,3 +2606,48 @@ sessions' intent in files I had not read. Recorded instead.
 graft that must be re-cut against the live SHA.** That is the cost of deferring,
 and it compounds: each graft pushes the worker further from main and makes this
 merge larger.
+
+## [locked-cards-retuned-no-autorun] `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]`
+
+- The only builder, `build_season_betting_cards_manifest.py`, is invoked two
+  ways and **neither runs on Render**: the routine season-wide path only
+  exists inside `daily_update.py` (GHA-only, `scripts/daily_update.ps1`,
+  Render never calls it); the single-date backfill inside
+  `run_refresh_worker.py` is manually env-var-gated
+  (`MLB_BETTING_DAY_BACKFILL_DATE`).
+- **The GHA cron itself defaults to backup-only**, not the full pipeline —
+  `run_full_pipeline` defaults `false`; its own text calls the full-pipeline
+  path a "manual fallback for backfills/recovery."
+- Consequence, measured: the pregame odds freeze (`#265`/`#440` Phase 7) is
+  fixed and improving (1→11→15 games captured, 08-16→08-18), but
+  `season_betting_day_2026_08_17.json` still has exactly 2 games / `ml=1`,
+  because nothing ever rebuilds it against the improved freeze. Full trace:
+  `docs/ai_context/todo.md` under `#265`.
+- **NOT FIXED.** Next step if picked up: decide whether to add a routine,
+  feature-flagged autorun (generalizing the existing single-date backfill) or
+  fix the GHA default — either is a real, scoped change, neither attempted.
+
+## [lane-guard-disclaimer-and-worktree-exemption-bugs] TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]`
+
+- **Bug 1:** the `.syndicate`/`.claude` exemption (`rel.startswith(".syndicate")`)
+  is computed relative to `CLAUDE_PROJECT_DIR` (the primary tree). Editing the
+  same logical file via a `session_worktree.py` worktree produces a
+  `../../../tmp/...`-style relative path that never starts with `.syndicate`,
+  so the exemption silently fails to apply and the file gets claim-checked
+  like ordinary code.
+- **Bug 2:** in `_claims()`, the initial `- Files:` line's content goes
+  straight to `_paths_in()` without `_claimable_prefix()` first — unlike
+  continuation lines, which do get it. A same-line disclaimer clause after the
+  path list (e.g. "Collision check: ... grepped `lanes.md`, clean.") is read
+  as claims, not prose. **Live instance:** `basketball-model-owner` appears to
+  claim `lanes.md` itself, purely from a collision-check aside on its own
+  Files line.
+- Together these blocked a routine worktree edit to `.syndicate/lanes.md`
+  this session (worked around by landing via a different session's sweep,
+  not by fixing the guard). **NOT FIXED** — a design was drafted
+  (`.claimable_prefix()` applied to the initial Files line too; exemption
+  check based on path substring rather than root-relative prefix) but never
+  written to a file. Regression tests belong in
+  `tests/test_lane_guard_files_forms.py`, which already has fixture coverage
+  that happens not to trigger bug 2 (`PLAIN_WRAPPED`'s first line has no
+  colon, so it sidesteps the bug by coincidence, not by testing against it).

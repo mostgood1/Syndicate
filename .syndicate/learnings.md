@@ -1644,3 +1644,25 @@ mechanical locks were free (claim available, preflight reachable) and I read
 *free locks as permission*. The policy hold lives in `lanes.md` and nothing
 mechanical enforces it. **Read the lane ledger for the SERVICE before deploying,
 not just the locks.**
+
+### 2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE WORDING OF IT
+
+Set a backgrounded poll loop to watch `deploy_preflight.py --service
+refresh-worker` until idle, exiting on `grep -q "in flight"` being ABSENT from
+the output. It exited after one cycle — reported as idle. **It was not.** 7
+`[JOB]` processes were still listed in that exact cycle's output; the script
+had returned `CLAIMED` (a claim held by another lane) rather than `HOLD`, and
+`CLAIMED` responses never print the "N job(s) in flight" line at all,
+regardless of how many jobs are actually running underneath. The grep target
+was one wording of "busy," not the set of all of them.
+
+**RULE: when polling a tool with multiple exit paths, key the loop's exit
+condition on the STRUCTURAL signal (here: counting actual `[JOB]` process
+lines) not on TEXT that only appears on some of those paths.** A status
+message's wording is an implementation detail of one branch; a poll loop that
+depends on it is blind to every other branch that reaches the same underlying
+state without using that wording. Caught before being reported as a real
+result — the corrected loop (counting `[JOB]` lines directly) ran cleanly to a
+genuine idle read minutes later. Same family as
+[[feedback_gate_on_the_output_not_the_input]] — gate on what the state
+actually is, not on the one message you expected it to print.
