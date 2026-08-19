@@ -528,6 +528,25 @@ def main() -> None:
     print(f"elapsed_seconds={elapsed:.1f}")
     print(f"artifact_path={path}")
 
+    # PUBLISH TO WEB -- same gap as NCAAF, measured there 2026-08-19: the
+    # worker regenerates this artifact on its own disk, web reads a DIFFERENT
+    # disk, and nothing pushes it across, so the run is inert for the board.
+    # Fixed in both generators together because the allowlist pattern covers
+    # both and leaving one half-fixed would leave the same defect live.
+    #
+    # Best-effort: publish_hot_artifact never raises and returns False when
+    # unconfigured (every local run), unallowlisted, or on a network error.
+    # The artifact on disk is correct regardless; a failed transfer must not
+    # fail generation.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(Path(path))
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
+        published = False
+        print(f"artifact_publish_error={type(exc).__name__}: {exc}", flush=True)
+    print(f"artifact_published={published}", flush=True)
+
 
 if __name__ == "__main__":
     main()
