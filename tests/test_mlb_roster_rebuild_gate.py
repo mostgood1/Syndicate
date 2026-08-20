@@ -190,3 +190,106 @@ def test_checklist_gate_off_is_honoured(monkeypatch):
 def test_checklist_skipped_when_the_sim_failed(monkeypatch):
     """A failed sim leaves rosters half-written; auditing them reports noise."""
     assert not _run_capturing_checklist(monkeypatch, None, sim_rc=1)
+
+
+# ------------------------------------------------------- ladder direct publish
+
+def _run_capturing_ladder_publish(monkeypatch, tmp_path, *, mtime_offset: float,
+                                  stale: bool = False):
+    """Drive the REAL main() and capture the ladder publish attempt.
+
+    `mtime_offset` is seconds relative to `started_epoch`: positive means the
+    file was (re)written during this run, negative means it predates it.
+
+    The whole point of the block under test is that the SWEEP will not ship this
+    artifact -- it is over `_PUBLISH_MAX_BYTES` -- so a test that only asserted
+    "the sweep ran" would pass while web went on serving a day-old ladder, which
+    is the bug this exists to close.
+    """
+    import syndicate.features.shared.artifact_publisher as ap
+    import syndicate.features.mlb.sources as srcs
+    from syndicate.features.mlb import ladders_build as lb
+
+    lad = tmp_path / "daily_ladders_2026_08_19.json"
+    lad.write_text('{"x": 1}', encoding="utf-8")
+
+    published: list = []
+    statuses: list = []
+
+    class _P:
+        returncode = 0
+
+        def poll(self):
+            return 0
+
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(job.subprocess, "Popen", lambda cmd, **kw: _P())
+    monkeypatch.setattr(job.subprocess, "run", lambda cmd, **kw: _P())
+    monkeypatch.setattr(job, "_hydrate_vendor_oddsapi_mirror", lambda *a, **k: None)
+    monkeypatch.setattr(job, "publish_changed_hot_artifacts", lambda *a, **k: 0)
+    monkeypatch.setattr(job, "bootstrap_mlb_player_game_log", lambda *a, **k: {})
+    monkeypatch.setattr(job, "pull_season_artifacts", lambda *a, **k: 0)
+
+    monkeypatch.setattr(lb, "discover_game_pks", lambda d: [1, 2])
+    monkeypatch.setattr(lb, "is_stale", lambda d, p=None: {"stale": stale, "reason": "t"})
+    monkeypatch.setattr(lb, "write_ladders_artifact", lambda d, p: {"rows": 1})
+    monkeypatch.setattr(lb, "write_status_artifact",
+                        lambda d, payload: statuses.append(payload))
+    monkeypatch.setattr(srcs, "daily_ladders_path", lambda d: str(lad))
+    monkeypatch.setattr(ap, "publish_hot_artifact",
+                        lambda p, **kw: published.append(str(p)) or True)
+
+    # Pin the file's mtime relative to the run's start. `started_epoch` is taken
+    # inside main() from time.time(), so freeze that to a known value.
+    base = 1_700_000_000.0
+    monkeypatch.setattr(job.time, "time", lambda: base)
+    os_utime_target = base + mtime_offset
+    import os as _os
+    _os.utime(lad, (os_utime_target, os_utime_target))
+
+    monkeypatch.setattr(sys, "argv", [
+        "run_mlb_daily_sim_job.py", "--date", "2026-08-19", "--season", "2026",
+        "--sims", "1", "--workers", "1",
+    ])
+    try:
+        job.main()
+    except SystemExit:
+        pass
+    except Exception:
+        pass
+    return published, statuses
+
+
+def test_ladder_published_directly_when_rewritten_this_run(monkeypatch, tmp_path):
+    published, statuses = _run_capturing_ladder_publish(
+        monkeypatch, tmp_path, mtime_offset=+30)
+    assert published, "ladder was never published directly -- the sweep drops it at 12MB"
+    assert statuses, "no status artifact written"
+    dp = statuses[-1].get("directPublish") or {}
+    assert dp.get("attempted") is True and dp.get("ok") is True, dp
+
+
+def test_ladder_not_republished_when_unchanged(monkeypatch, tmp_path):
+    """13MB on every 15-minute tick is not free -- an unchanged file must not go up."""
+    published, statuses = _run_capturing_ladder_publish(
+        monkeypatch, tmp_path, mtime_offset=-30)
+    assert not published, f"re-uploaded an unchanged 13MB artifact: {published}"
+    dp = (statuses[-1].get("directPublish") or {}) if statuses else {}
+    assert dp.get("attempted") is False
+    assert dp.get("reason") == "unchanged_this_run", dp
+
+
+def test_ladder_published_even_when_our_block_skipped_as_fresh(monkeypatch, tmp_path):
+    """The case that produced the measurement.
+
+    `daily_update` has its OWN ladder writer. On the 00:55Z run it refreshed the
+    file while this block correctly reported `skipped_fresh` -- so a gate keyed
+    on our own outcome would have skipped the publish and left web stale, which
+    is precisely the bug. Keying on the FILE is what makes this correct.
+    """
+    published, statuses = _run_capturing_ladder_publish(
+        monkeypatch, tmp_path, mtime_offset=+30, stale=False)
+    assert statuses[-1].get("outcome") == "skipped_fresh"
+    assert published, "skipped_fresh must still publish a file that changed this run"
