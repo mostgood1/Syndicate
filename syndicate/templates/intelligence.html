@@ -609,17 +609,41 @@
     return null;
   }
 
+  // The Over/Under direction, read from `side` -- NOT `selection`. For a
+  // prop, `selection` holds the PLAYER's name (redundant with the title,
+  // e.g. selection="Andres Gimenez" for an over/under RBI prop), so the
+  // word "Over"/"Under" itself lives only in `side`. Measured live
+  // 2026-08-20: 306 of 306 over/under rows on the board -- every prop
+  // candidate that carries a real over/under side, plus every game total
+  // whose `selection` happens to equal "Over"/"Under" verbatim -- never
+  // showed the word anywhere on the card, because `propLine` only ever
+  // read `selection`/`pick` and this dedicated fallback did not exist.
+  // Scoped strictly to "over"/"under" so it can never mislabel an h2h
+  // side ("home"/"away") or a spread side as a total direction.
+  function displaySide(item) {
+    const side = String(item.side || "").trim().toLowerCase();
+    if (side === "over") return "Over";
+    if (side === "under") return "Under";
+    return null;
+  }
+
   // The one line that must always answer "what is this bet, actually" --
   // separate from the title, which can legitimately just be a player or
   // team name.
   function propLine(item) {
     const title = displayTitle(item);
     const selection = displaySelection(item);
+    const side = displaySide(item);
     const market = String(item.market || item.market_label || "").trim();
     const line = displayLine(item);
     const parts = [];
-    if (selection && selection !== title) parts.push(selection);
-    if (line && !(selection && selection.includes(line))) parts.push(line);
+    // `side` first and unconditionally when present -- it is the one piece
+    // that must never be silently dropped, unlike `selection`, which is
+    // legitimately redundant with the title often enough that skipping it
+    // there is correct.
+    if (side) parts.push(side);
+    if (selection && selection !== title && selection !== side) parts.push(selection);
+    if (line && !(selection && selection.includes(line)) && !(side && line === side)) parts.push(line);
     if (market) parts.push(market);
     return parts.length ? parts.join(" · ") : null;
   }
@@ -696,9 +720,26 @@
 
   function displayProjection(item) {
     const projection = item.sim_projection ?? item.projected ?? item.projected_sim;
-    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
-    const numeric = Number(projection);
-    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
+      const numeric = Number(projection);
+      return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    }
+    // Moneyline/h2h has no natural NUMBER to project (there is no runs/points
+    // total or spread margin for a straight win/lose pick) -- measured live
+    // 2026-08-20: 109 of 114 h2h rows were blank here for exactly that
+    // reason, while totals/spreads mostly weren't. `model_probability` is
+    // already attached to these rows by the backend (layer2_board.py) as the
+    // model's probability for THIS row's own `selection`/`side` -- reusing an
+    // existing, backend-computed field, not inventing one; per that file's
+    // own comment, "an invented projection on a betting board is worse than
+    // an empty cell", which is exactly why this stays scoped to markets that
+    // actually carry the field rather than deriving a number from odds.
+    const market = String(item.market || item.market_label || "").trim().toLowerCase();
+    const isMoneyline = market === "h2h" || market === "h2h_3_way" || market === "moneyline";
+    if (!isMoneyline) return null;
+    const prob = Number(item.model_probability);
+    if (!Number.isFinite(prob) || prob <= 0 || prob > 1) return null;
+    return `${(prob * 100).toFixed(1)}%`;
   }
 
   // #124/#126: live_total is the GAME's live total (runs/points scored),
@@ -1228,6 +1269,23 @@
     if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
     const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
     const market = String(item.market || item.market_label || "").trim();
+    // A game-total/spread pick has no team side (the backend correctly
+    // sends the placeholder "—" for `team`/`team_name`/`player_team"` on
+    // those rows), so `team` is null and the subtitle used to fall
+    // straight through to the sport alone -- "WNBA", nothing else. That
+    // left an "Under"/"Over" card with NO matchup anywhere on it: the
+    // title is the selection ("Under"), the subtitle was sport-only, and
+    // propLine() deliberately drops the selection from the detail line
+    // when it equals the title (correct, to avoid "Under · Under"). The
+    // matchup was always available (displayMatchup, used elsewhere for the
+    // mini game-card grouping) -- it just was never wired into this card's
+    // own header. Falling back to it here is what actually answers "which
+    // game is this a total/spread on" for the ~180 game rows a day where
+    // `team` is legitimately absent, not a bug in `team` itself.
+    const subtitleContext = (team && team !== title) ? team : (() => {
+      const matchup = displayMatchup(item);
+      return matchup && matchup !== title ? matchup : null;
+    })();
 
     return `
       <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}">
@@ -1236,7 +1294,7 @@
             ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" />` : ""}
             <div>
               <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(title)}</div>
-              <div class="board-card__subtitle">${team && team !== title ? `${escapeHtml(team)} · ` : ""}${escapeHtml(sport)}</div>
+              <div class="board-card__subtitle">${subtitleContext ? `${escapeHtml(subtitleContext)} · ` : ""}${escapeHtml(sport)}</div>
             </div>
           </div>
           <div class="board-card__edge">${(edge * 100).toFixed(1)}%</div>
