@@ -3,7 +3,30 @@
 Written 2026-08-14 by the memory-guard session at close. Self-contained: assume
 zero context from that session.
 
-## The one thing to fix
+## STATUS UPDATE 2026-08-19 — read this before acting on anything below
+
+**"The one thing to fix" below IS DONE.** The streaming cutover shipped: pass a
+`consumer=` to `build_intelligence_overview` and each sport's row is released
+before the next hydrates, so peak is MAX and not SUM
+(`intelligence.py`, `_emit`/`sport_row = None`). The thin-pool-merge blocker this
+handoff said to decide first was decided, and a second floor
+(`_OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES = 1500MB`) now admits the seven
+cheap sports while MLB keeps the full 3000MB gate.
+
+**So the live question is no longer "turn SUM into MAX". It is the sentence
+after it: MLB alone.** Two reductions to that path were cut on 2026-08-19 by lane
+`mlb-overview-hydration-cost` — a feed/live prune (`allPlays` is 66% of a
+document nothing reads; peak RSS 142.9 → 114.5MB locally, output byte-identical)
+and the removal of a dead per-build odds_history shard load (~125MB, worker-only,
+consulting a `games` key the shard has never had). **Neither is deployed.**
+
+Full numbers, method, the tests that hold the invariants, and what is explicitly
+NOT claimed: `#387` in `docs/ai_context/todo.md`. The follow-up question the dead
+branch was asking is filed as `#483`.
+
+The "Do NOT do these" list below is still current and still binding.
+
+## The one thing to fix (DONE — see the status update above)
 
 `build_intelligence_overview` (`syndicate/features/intelligence.py:2620`) holds
 **every sport's fully hydrated overview simultaneously**. The loop's own comment

@@ -2175,9 +2175,84 @@ def _daily_sim_updated_at_by_game(selected_date: str, game_pks: list[int]) -> di
     return out
 
 
+# `#387`. THE TWO SECTIONS OF A StatsAPI feed/live PAYLOAD THAT NOTHING IN
+# `syndicate/` READS, AND THEY ARE MOST OF THE PAYLOAD.
+#
+# `_daily_actual_by_game` holds one complete feed/live document per game live
+# for the whole of `build_cards_page_context` -- 15 of them on a full slate --
+# and `handoff_refresh_worker_oom.md` measured that loader as the largest single
+# contributor to the call. Measured over the 15 documents of 2026-06-14
+# (`data/mlb_source/.../feed_live/2026/2026-06-14`, 12,605,243 JSON bytes total):
+#
+#     66.38%   8,367,599   liveData.plays.allPlays
+#     20.23%   2,549,800   liveData.boxscore.teams        <- READ (_iter_team_players)
+#      6.60%     832,548   gameData.players
+#      3.05%     384,392   liveData.plays.playsByInning
+#      1.24%     156,438   liveData.plays.currentPlay     <- READ
+#      0.38%      47,415   liveData.linescore             <- READ
+#
+# **A DENYLIST, DELIBERATELY, NOT AN ALLOWLIST.** An allowlist of "the slices we
+# believe are consumed" silently drops anything the trace missed, and this
+# payload is read from ~12 sites across the module. A denylist can only remove
+# what has been PROVEN unread, so every other consumer keeps working byte for
+# byte -- which is also what makes the parity test in
+# `tests/test_mlb_cards_feed_live_prune.py` meaningful rather than tautological.
+#
+# PROVEN UNREAD, whole repo, not just this module: `allPlays` is read only by
+# offline analysis scripts (`scripts/mlb_run_expectancy.py`,
+# `mlb_win_expectancy.py`, `mlb_leverage_index.py`, `mlb_substitution_profile.py`,
+# `build_mlb_manager_tendencies.py`) and by `vendor/mlb_bettingv2/`. Every one of
+# those opens the feed/live file off disk itself -- none goes through
+# `_daily_actual_by_game` -- and this prune touches only the in-memory dict, never
+# the artifact. `playsByInning` is read nowhere at all.
+#
+# NOT A CACHE AND NOT A COPY. `load_json_or_gz_file` parses fresh on every call
+# and memoises nothing, so rebuilding the two nested dicts here cannot corrupt a
+# shared object; and the pruned document is what the caller retains, so this
+# reduces RETENTION across the slate, which is the shape the loader's cost has.
+# The parse peak of one document is unchanged -- `json.load` must materialise
+# `allPlays` before anything can drop it. That is stated so the measurement is
+# not over-read: this is a retention fix, not a parse fix.
+_FEED_LIVE_UNREAD_PLAY_SECTIONS = ("allPlays", "playsByInning")
+
+
+def _feed_live_prune_enabled() -> bool:
+    """Kill switch. Default ON; `SYNDICATE_MLB_FEED_LIVE_PRUNE=0` restores the
+    full payload without a code change, and gives the `off != on` reachability
+    test `model_engine_standard.md` requires for anything behind a flag."""
+    raw = str(os.environ.get("SYNDICATE_MLB_FEED_LIVE_PRUNE") or "").strip().lower()
+    if not raw:
+        return True
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _prune_feed_live_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop `liveData.plays.{allPlays,playsByInning}`; leave everything else.
+
+    Returns the payload UNCHANGED (same object) when there is nothing to drop,
+    so the common no-op case costs one dict lookup rather than three shallow
+    copies.
+    """
+    live_data = payload.get("liveData")
+    if not isinstance(live_data, dict):
+        return payload
+    plays = live_data.get("plays")
+    if not isinstance(plays, dict):
+        return payload
+    if not any(key in plays for key in _FEED_LIVE_UNREAD_PLAY_SECTIONS):
+        return payload
+    pruned_plays = {key: value for key, value in plays.items() if key not in _FEED_LIVE_UNREAD_PLAY_SECTIONS}
+    pruned_live = dict(live_data)
+    pruned_live["plays"] = pruned_plays
+    pruned = dict(payload)
+    pruned["liveData"] = pruned_live
+    return pruned
+
+
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     today_iso = central_today_iso()
+    prune = _feed_live_prune_enabled()
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
@@ -2188,7 +2263,11 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
         if not isinstance(payload, dict) and selected_date == today_iso:
             payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
-            out[int(game_pk)] = payload
+            # Pruned at the point of RETENTION, after every branch above has had
+            # its say -- `_actual_payload_is_live` reads `gameData.status`, which
+            # the prune never touches, but ordering it here means a future branch
+            # cannot accidentally be handed a reduced document.
+            out[int(game_pk)] = _prune_feed_live_payload(payload) if prune else payload
     return out
 
 
@@ -2284,28 +2363,67 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     confirmed via Layer 1, which already reads this same odds artifact and
     shows them correctly for the identical games.
     """
-    today_iso = central_today_iso()
-    render_web_dyno = _render_web_dyno()
     # #265/#317: live lines, backfilled from the pregame freeze for games the
     # live file has already dropped. See load_oddsapi_game_lines_doc -- live
     # still wins every event it carries.
     game_lines_doc = load_oddsapi_game_lines_doc(selected_date) if selected_date else None
-    shared_game_lines_doc = (
-        load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
-        if selected_date == today_iso and not render_web_dyno
-        else None
-    )
-    if isinstance(shared_game_lines_doc, dict):
-        shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []
-        shared_game_lines_date = str(shared_game_lines_doc.get("date") or shared_game_lines_doc.get("selected_date") or "").strip()
-        shared_game_lines_mode = str(shared_game_lines_doc.get("mode") or shared_game_lines_doc.get("generation_mode") or "").strip().lower()
-        shared_game_lines_retrieved_at = str(shared_game_lines_doc.get("retrieved_at") or shared_game_lines_doc.get("retrievedAt") or "").strip()
-        if shared_game_lines_games and (
-            shared_game_lines_date in {"", selected_date}
-            or shared_game_lines_mode in {"live", "refresh", "latest"}
-            or shared_game_lines_retrieved_at
-        ):
-            game_lines_doc = shared_game_lines_doc
+    # `#387`, 2026-08-19. REMOVED: a full odds_history shard load that COULD NOT
+    # AFFECT THIS FUNCTION'S OUTPUT, on the one path `#387` is about.
+    #
+    # What stood here:
+    #
+    #     shared_game_lines_doc = load_odds_history_payload_for_sport(
+    #         "mlb", resolve_current_shard_key("mlb", selected_date)
+    #     ) if selected_date == today_iso and not render_web_dyno else None
+    #     if isinstance(shared_game_lines_doc, dict):
+    #         shared_game_lines_games = shared_game_lines_doc.get("games") ... or []
+    #         ...
+    #         if shared_game_lines_games and (...):
+    #             game_lines_doc = shared_game_lines_doc      # <- the only use
+    #
+    # `shared_game_lines_doc` fed NOTHING ELSE here, so the load mattered only if
+    # `shared_game_lines_games` was truthy. **An odds_history shard has no
+    # `games` key and never has had one.** The shards have exactly one writer,
+    # `odds_refresh_tracking._write_odds_history_artifact`, called three times
+    # with one literal document (`odds_refresh_tracking.py:1859`):
+    #
+    #     {"schema_version", "sport", "shard_key", "date", "updated_at",
+    #      "history_limit", "markets"}
+    #
+    # `markets`-keyed, and that is how every other consumer reads it --
+    # `basketball_market_board.py`, `soccer/market_board.py`, `odds_lifecycle.py`
+    # and this module's own `_mlb_odds_history_payload` all take `markets`.
+    # `git log -S` over the writer finds no revision that ever emitted `games`.
+    # So `shared_game_lines_games` was `[]` on every call ever made, the branch
+    # could not fire, and `game_lines_doc` was never replaced.
+    #
+    # WHAT IT COST. Worker-only (`not render_web_dyno`), today-only -- which on
+    # the refresh-worker is EVERY board build -- and uncached: the `cache=`
+    # parameter exists on that function and this call site did not use it. The
+    # MLB shard was measured at 19,798,176 bytes / 3,436 markets, and `#435`
+    # measured this JSON family at ~6.3x file bytes resident, i.e. **~125MB of
+    # transient per build**, in the unmarked region after `cards_context_end`
+    # that `.syndicate/deploys.md` (2026-08-16 04:5xZ) names as where the
+    # excursion sits. That entry called this "the best candidate on the table"
+    # and asked for a bounded in-pass measurement. The measurement was not the
+    # missing piece -- the WRITER's schema was, and it is readable from here.
+    #
+    # NOT A BEHAVIOUR CHANGE, and the invariant is asserted rather than assumed:
+    # `tests/test_mlb_cards_feed_live_prune.py::test_odds_history_shard_has_no_games_key`
+    # fails if the shard schema ever grows a `games` key, which is the only
+    # condition under which this removal would have been wrong.
+    #
+    # LEFT ALONE DELIBERATELY: the sibling load in `source_cards_api_payload`
+    # (`:2455`) reads the same shard and is NOT dead -- it takes `updated_at` off
+    # the doc into `shared_game_lines_refreshed_at`, which feeds
+    # `latest_live_odds_refreshed_at`. It also already passes `cache=`. Its
+    # `games` branch is dead for the same reason; the freshness read is not.
+    #
+    # STILL OPEN, and filed rather than fixed here: if the INTENT was for the
+    # freshest tracked lines to reach the Layer 2 board, that intent has never
+    # been served on this path, and rewiring it to read `markets` is a
+    # correctness change with its own cost -- not something to slip into a
+    # memory fix. See `#483` in `docs/ai_context/todo.md`.
     game_lines_index = _tracked_game_lines_index(game_lines_doc)
     enriched_games: list[dict[str, Any]] = []
     for game in games:
