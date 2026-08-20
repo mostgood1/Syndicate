@@ -19460,3 +19460,33 @@ after the destructive call, not before it.
 another session's work until proven otherwise. `git status --porcelain` says
 WHAT changed and never WHO. Move to your own worktree instead of cleaning
 someone else's.
+
+## SHIPPED-VERIFIED, WITH A REAL GAP FOUND 2026-08-20 21:18Z -- refresh-worker deploy -- NFL injuries/roster/depth-chart artifact allowlist, live 08bd601f
+- Lane: nfl-artifact-allowlist-add. Preflight PASS, scoped to the target
+  commit, after a genuine `HOLD` window (MLB sim + odds/soccer jobs) --
+  waited, not overridden.
+- Scope note: cherry-picked the same 2 files from `2cb773e4` onto
+  refresh-worker's live SHA at fire time (`a0396411`), as `08bd601f`,
+  pushed to `deploy/nfl-artifact-allowlist-refresh-worker`.
+- `dep-da3mr5jtqb8s739si3qg`, live 21:18:35.358944Z, commit
+  content-verified == `08bd601f` via the deploy API response.
+- **Paired with the web deploy above (`c5c1b0b5`) -- both services now
+  agree on `HOT_ARTIFACT_PATTERNS`.**
+- **verify: attempted a REAL end-to-end check
+  (`GET /api/ops/artifacts/export?pattern=...` against production, both
+  the injuries and rosters patterns) -- `count: 0` for both, `ok: true`
+  (endpoint reachable, not an auth/config error).** Traced why rather
+  than assuming staleness: **NOTHING CALLS `publish_hot_artifact()` FOR
+  ANY OF THESE THREE ARTIFACTS.** `fetch_nfl_injuries.py` has no publish
+  call site at all. `roster_snapshot_builder.py`/`depth_chart_snapshot_
+  builder.py`'s own `publish=` flag (which the refresh-worker autorun's
+  script args don't even pass) only appends `_publish` to the local
+  FILENAME -- confirmed by reading `roster_snapshot_output_path`
+  directly, it never calls the push function. **This allowlist deploy is
+  therefore necessary but NOT sufficient** -- exactly the `#208` lesson
+  this same file's own comments already state ("allowlisting PERMITS a
+  transfer, it does not MAKE one happen"), now measured as a real,
+  current gap rather than a hypothetical one. Fixing the missing publish
+  call sites is a separate piece of work, not done in this deploy --
+  flagged to the user rather than assumed complete.
+- Rollback: redeploy refresh-worker at the prior SHA (`a0396411`).
