@@ -1773,25 +1773,24 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   8,393`. **These are two different joins and at most one describes the board a
   user sees.** Settle this before raising coverage.
 - ~~**SOCCER GAME ODDS HAVE NOT BEEN CAPTURED FOR ANY LEAGUE SINCE 08-10/08-11.**~~
-  ~~**SUPERSEDED 2026-08-17 21:3xZ — capture is WORKING.**~~ **RE-OPENED AND
-  CORRECTED 2026-08-19, lane `soccer-odds-capture-cadence-gap`: the 08-17
-  "supersede" was itself wrong — it read AGGREGATE health (`quote_rows`,
-  `dates_with_rows` spanning many dates) as proof of PER-MATCH freshness,
-  which it never checked. Measured 2026-08-19: 8 of 8 same-day-kickoff
-  matches, across MLS AND La Liga, had their freshest h2h/totals/spreads
-  capture 211-236 HOURS old (8.8-9.8 days) — the original 08-14 finding was
-  never actually fixed, it just stopped being visible in the aggregate.
-  **Root cause, confirmed directly from `render_logs.py` reading
-  live-odds-worker's own stdout (not inferred): TWO distinct failure modes.**
-  (1) `steps=0` on every clean pregame cycle sampled — the run launches and
-  completes with no error but the reporting artifact shows zero steps
-  processed. DOMINANT cause; NOT YET FULLY EXPLAINED — could be a genuinely
-  empty run or a schema mismatch in the reporting code's own artifact parse,
-  see the lane for the open question. (2) Real mutex contention
-  (`ValueError: A refresh run is already active`), confirmed but secondary —
-  it started hours after `steps=0` cycles had already failed with no
-  contention involved. **Do not re-cite the 08-17 note as current; this
-  entry supersedes it.**
+  ~~**SUPERSEDED 2026-08-17 — capture is WORKING.**~~ ~~**RE-OPENED 2026-08-19,
+  steps=0 dominant cause, NOT YET FULLY EXPLAINED.**~~ **FIXED AND VERIFIED
+  2026-08-20, lane `soccer-odds-capture-cadence-gap`. Root cause, confirmed
+  against production OddsAPI directly (not inferred): `_game_markets()`
+  (`scripts/fetch_soccer_oddsapi_odds_local.py`) merged h1/h2 segment keys
+  into the market list for the BULK `/sports/{sport}/odds` endpoint, which
+  422s on an unsupported key across the WHOLE request — every capture had
+  produced zero rows since `#343` shipped (2026-08-10 21:17:39 -0500, date
+  matches the last good capture exactly). This IS what `steps=0` was: a
+  silent per-request failure, not a scheduler or reporting-artifact bug.
+  Fixed by narrowing the bulk-endpoint market list back to
+  `DEFAULT_GAME_MARKETS` (h2h/totals/spreads); `_segment_market_map()`
+  unchanged, still correct for tagging. Deployed to BOTH producers
+  (`live-odds-worker` `575decf3`, `refresh-worker` `b2f4b197`). **VERIFIED
+  from the writing service's own disk-content log** (not a status endpoint):
+  real `book_quotes` growth observed post-deploy, 6 of 8 originally-stale
+  matches re-confirmed with `captured_at` minutes old. 2 matches not
+  individually re-checked.**
 - **THERE IS EXACTLY ONE PRODUCER and it is not refresh-worker.** `phase=pregame`
   builds 50 steps including 10 odds steps; `phase=live` builds 20 steps and **0
   odds steps** — and refresh-worker's soccer autorun runs `phase="live"`, so it
@@ -1825,6 +1824,38 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   Report soccer backtest accuracy as **unmeasured**. Production is unaffected —
   `build_soccer_artifacts` predicts forward.
 - Soccer sims are ENABLED and running; one sim job = one league-date (`#282`).
+
+---
+
+## [wnba] WNBA
+
+- **Live in-game odds capture was silently dead for the full duration of any
+  live game — fixed 2026-08-20, lane `wnba-live-odds-capture-gap`.** Root
+  cause: the general combined `phase=live` sweep (`sports=mlb,wnba,soccer`,
+  one launch per ~60-70s tick) genuinely takes several minutes to run, so
+  almost every tick's `launch_refresh_run` collided with its OWN
+  still-running prior launch (`ValueError: A refresh run is already
+  active`) — confirmed live, repeating every ~65-70s for 16+ minutes
+  straight against `live-odds-worker`'s own lane. NOT `#343`-shaped
+  (ruled out directly against production OddsAPI). Fixed with an
+  independent, WNBA-only live-phase autorun
+  (`_launch_autorun_wnba_live_refresh`,
+  `scripts/run_live_odds_refresh_worker.py`), own 240s cadence, own
+  explicit refresh lane, `mode="fast"` to avoid the SmartSim OOM risk of
+  running the full pipeline every few minutes. Deployed and env-verified
+  live 2026-08-20 13:31:11Z (`SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1`
+  on `live-odds-worker`). **NOT YET behaviorally verified** — no WNBA game
+  was live at deploy time, so `WNBA_LIVE_AUTORUN_LAUNCHED` has never fired
+  for real. Next reader: check for that log line on the next live WNBA
+  game and re-pull its `book_quotes` shard for a post-kickoff
+  `captured_at`.
+- **Layer-2 shortlist per-game cap removed 2026-08-20** —
+  `SYNDICATE_SHORTLIST_ROWS_PER_GAME` was 6 (a global default, not
+  WNBA-specific, but WNBA's edges concentrated heavily on one game a
+  night, so it was the sport most visibly capped). Set to `0` on
+  `refresh-worker` + redeployed. VERIFIED: WNBA's shortlist selection went
+  from 6 rows (one game, at the cap) to 100 rows (70 game + 30 prop,
+  spread across many games), confirmed stable hours later.
 
 ---
 
