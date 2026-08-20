@@ -3994,6 +3994,128 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
     return False, "player_logs missing and no local fetch fallback is available"
 
 
+def _refresh_derived_basketball_artifacts(*, source_root: Path, date_str: str, log_file: Path, league_code: str = "wnba") -> dict[str, str]:
+    """Rebuild the locally-derived sim inputs, worker-side, on the SAME disk
+    the sim reads from.
+
+    `#479`. THE GAP: `#474` (home-court advantage), `#476` (calibration) and
+    `#477` (player_logs) all shipped as one-shot CLI builders with NOTHING
+    scheduled to run them -- confirmed by grep across both worker entrypoints
+    and both refresh orchestrators: zero references. Their artifacts existed
+    only because they were run by hand locally, so production would never
+    regenerate them as data moved. Built-but-unscheduled is the same class of
+    dead as `#467`/`#468`'s built-but-unreachable, just one layer out.
+
+    WHY HERE, AND WHY NO ALLOWLIST IS NEEDED. Every consumer of these
+    artifacts is the SIM, which runs worker-side and reads them from its own
+    `processed_root` (`_load_home_court_advantage_local`,
+    `_load_player_logs_processed`, `_load_intervals_*`). `HOT_ARTIFACT_
+    PATTERNS` governs publishing worker->WEB, which is a different question --
+    so building them inside the refresh that both workers already run puts
+    each artifact on the same disk as its reader, with no cross-service
+    transfer involved. (Allowlisting them is still worth doing for external
+    auditability via `/api/ops/artifacts/export`; it is not needed for them
+    to FUNCTION, which is why this does not block on it.)
+
+    BOTH workers run this script, so each builds its own copy. The inputs are
+    deterministic files on that worker's disk, so the copies agree without
+    any coordination.
+
+    NEVER FATAL. Each builder is wrapped independently: a failure logs and is
+    skipped, because none of these artifacts is required for a refresh to
+    produce a board -- the sim degrades to its pre-`#474`/`#476`/`#477`
+    behaviour, which is exactly today's production behaviour. A refresh that
+    died because a calibration file could not be fitted would be a strict
+    regression.
+    """
+    results: dict[str, str] = {}
+    processed_root = source_root / "data" / "processed"
+
+    # The builders resolve their OWN root from `<LEAGUE>_BETTING_DATA_ROOT`
+    # (falling back to the repo checkout), not from the `source_root` this
+    # refresh is operating on. In production those agree, because both come
+    # from the same env var -- but that is an unstated coupling, and if it
+    # ever broke the builders would silently write to a DIFFERENT disk
+    # location than the sim reads from, which is precisely the class of
+    # failure `#468` was. Bind them explicitly for the duration of the call
+    # so the two cannot disagree, and restore afterwards so nothing else in
+    # this process sees a mutated environment.
+    env_key = "WNBA_BETTING_DATA_ROOT" if str(league_code).strip().lower() == "wnba" else "NBA_BETTING_DATA_ROOT"
+    previous_env = os.environ.get(env_key)
+    os.environ[env_key] = str(source_root / "data")
+    try:
+        return _refresh_derived_basketball_artifacts_inner(
+            processed_root=processed_root, date_str=date_str, log_file=log_file,
+            league_code=league_code, results=results,
+        )
+    finally:
+        if previous_env is None:
+            os.environ.pop(env_key, None)
+        else:
+            os.environ[env_key] = previous_env
+
+
+def _refresh_derived_basketball_artifacts_inner(*, processed_root: Path, date_str: str, log_file: Path, league_code: str, results: dict[str, str]) -> dict[str, str]:
+
+    # player_logs.csv FIRST: the split mechanisms read it, and it is derived
+    # from boxscores_history.csv which the bootstrap above has just ensured.
+    try:
+        from scripts.build_basketball_player_logs import build_player_logs
+
+        season = _season_year_from_date_str(date_str)
+        built = build_player_logs(league_code=league_code, season=season, min_rows=200)
+        if built.get("ok"):
+            frame = built.pop("frame", None)
+            if frame is not None:
+                out_path = processed_root / "player_logs.csv"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                frame.to_csv(out_path, index=False)
+                results["player_logs"] = f"ok rows={built.get('rows_written')}"
+            else:
+                results["player_logs"] = "skipped: no frame"
+        else:
+            results["player_logs"] = f"skipped: {built.get('reason')}"
+    except Exception as exc:  # noqa: BLE001
+        results["player_logs"] = f"failed: {type(exc).__name__}: {exc}"
+
+    # home_court_advantage.json: needs the same boxscores+schedule join.
+    try:
+        from scripts.build_basketball_home_court_advantage import compute_home_court_advantage
+
+        season = _season_year_from_date_str(date_str)
+        hca = compute_home_court_advantage(league_code=league_code, season=season, min_games=40)
+        if hca.get("ok"):
+            (processed_root / "home_court_advantage.json").write_text(
+                json.dumps(hca, indent=2, default=str), encoding="utf-8"
+            )
+            results["home_court_advantage"] = (
+                f"ok eff_mult_delta={hca.get('eff_mult_delta')} games={hca.get('games_used')}"
+            )
+        else:
+            results["home_court_advantage"] = f"skipped: {hca.get('reason')}"
+    except Exception as exc:  # noqa: BLE001
+        results["home_court_advantage"] = f"failed: {type(exc).__name__}: {exc}"
+
+    for name, detail in results.items():
+        _append_log(log_file, f"derived artifact {name}: {detail}")
+    print(
+        f"[refresh_wnba_oddsapi_props] DERIVED_ARTIFACTS date={date_str} league={league_code} "
+        + " ".join(f"{k}={v.split(':')[0].split(' ')[0]}" for k, v in results.items()),
+        flush=True,
+    )
+    return results
+
+
+def _season_year_from_date_str(date_str: str) -> int:
+    """Season year for a basketball date. WNBA seasons are single-year, so
+    the calendar year is the season -- unlike NBA, whose season spans a
+    year boundary."""
+    try:
+        return int(str(date_str).strip()[:4])
+    except Exception:
+        return dt.date.today().year
+
+
 def _boxscore_bootstrap_backoff_marker_path(*, source_root: Path) -> Path:
     # Not date_str-keyed like _predict_date_*: the bootstrap's own lookback
     # window already spans many days per call, so one cooldown per source_root
@@ -4557,6 +4679,19 @@ def _run_refresh_via_cli(
             state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
         else:
             if _env_bool("WNBA_ISOLATE_AFTER_PLAYER_LOGS", False): return state
+            # `#479`: rebuild the locally-derived sim inputs now -- AFTER the
+            # boxscore bootstrap above has ensured fresh history, and BEFORE
+            # the sim runs and reads them. Never fatal; see the helper.
+            if _env_bool("REFRESH_BUILD_DERIVED_ARTIFACTS", True):
+                try:
+                    _refresh_derived_basketball_artifacts(
+                        source_root=source_root,
+                        date_str=date_str,
+                        log_file=log_file,
+                        league_code="wnba",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    _append_log(log_file, f"derived artifact refresh failed (non-fatal): {exc}")
             if _env_bool("WNBA_ISOLATE_BEFORE_PREDICTIONS", False): return state
             game_predictions_ok, game_predictions_error = _ensure_game_predictions_for_props_refresh(
                 source_root=source_root,
