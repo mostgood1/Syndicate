@@ -17904,3 +17904,59 @@ few rows. The ladders wiring is in place, so enabling later is one line in
 - `dep-da3fo30ae00c73ap29e0`, status=build_in_progress at fire time.
 - Measurement: [PENDING — confirm the live SHA matches the deployed commit above, and a log search for
   the new autorun's own marker shows zero hits in the post-deploy window, proving inertness]
+
+### #481 — WNBA live win/cover scale refit — web — 2026-08-20 13:13:26Z — lane `basketball-model-owner`
+
+Scoped cherry-pick `ba1d3368` (`#481` = `7afbdd1a`) onto web's live SHA
+`75c526f5`, which was off-main -- deploying `origin/main` would have carried
+295 files / 68,868 insertions from four other lanes. Clean auto-merge, 1 file,
++41/-2. Branch `deploy/481-live-scale-web-20260820`.
+
+- **verify: CODE CONFIRMED LIVE BY CONTENT** -- live commit `ba1d3368`
+  finished 13:13:26Z; `_WNBA_LIVE_MARGIN_SCALE` present (3 refs) and the old
+  `scale = 6.0 + 0.35` gone (0 refs) in the deployed tree. Verified by
+  CONTENT, not ancestry: a cherry-pick makes a new SHA, so
+  `merge-base --is-ancestor` returns NO for a correct deploy (that mistake
+  was made on this same service earlier, see the `#475` entry).
+  Web responding post-restart (401 on an auth-gated route = alive, not 502).
+
+- **THE MEASUREMENT, taken BEFORE deploy and the reason for it.** The live
+  win-prob path had never been backtested -- its own comment said the
+  constants were ported and unverified. Graded by replaying cached ESPN
+  play-by-play through the real shipped function over **212 games /
+  73,878 live samples**, scored against actual outcomes:
+
+      Brier               0.1896 -> 0.1644   (-13.3%)
+      worst calib gap    -0.240  -> -0.054
+      held-out test       0.1922 -> 0.1661   (game-level split, 106 train
+                                              games / 36,482 test samples)
+
+  The defect was DISPERSION, not bias -- aggregate means were already
+  unbiased (0.573 pred vs 0.571 actual), which is why nothing looked wrong
+  at the top line. Samples priced 0.6-0.7 actually won 91.3%; samples priced
+  0.3-0.4 won 11.6%. Everything was compressed toward 0.5 by a scale ~2.5x
+  too wide.
+
+- **NOT YET OBSERVED ON A SERVED PAYLOAD.** No WNBA game is in progress, so
+  the live board cannot be checked against a real in-flight game yet. The
+  offline grade above is the substantive evidence; the served-payload
+  confirmation is owed on the next live slate. Next reader: on a live game,
+  compare `markets.moneyline.p_win` against the same `(margin, elapsed)` --
+  a 10-point lead with ~1 minute left should now read ~0.99, not ~0.82.
+
+- **Scope deliberately NOT extended to totals.** `_wnba_live_total_over_prob`
+  keeps `8.0 + 0.50*min_left`: a total is combined scoring, not a margin's
+  sign, and this fit says nothing about it. Refitting needs historical market
+  totals, unavailable here. Left alone rather than changed on a guess.
+
+- Rollback: redeploy web at the prior SHA `75c526f5` via the sanctioned
+  `render_deploy` entrypoint (command omitted here verbatim -- the deploy
+  guard pattern-matches it even inside a ledger file, see note below).
+- Claim released: `deploy_claim.py release --service web --token 947ef82daccf0477`
+
+**Incidental finding, worth knowing:** `deploy-guard.py` matches on the
+deploy command text ANYWHERE in a Bash invocation, including inside a
+heredoc writing documentation. Recording a rollback command verbatim in this
+ledger is therefore blocked as though it were a deploy. Not a bug worth
+chasing -- the guard failing closed is correct -- but future entries should
+describe the rollback rather than paste it, as this one now does.
