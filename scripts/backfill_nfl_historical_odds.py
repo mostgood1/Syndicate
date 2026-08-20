@@ -179,16 +179,51 @@ def slate_dates(season: int) -> list[str]:
     return sorted(dates)
 
 
+def preseason_slate_dates(season: int) -> list[str]:
+    """Distinct PRESEASON game dates, from the preseason schedule mirror.
+
+    `slate_dates` cannot serve preseason: it reads the nflverse pbp mirror, and
+    that mirror is REGULAR + POST only — measured 2026-08-20, `pbp_2024.csv`
+    spans 2024-09 .. 2025-02 with **no August at all**. The preseason schedule
+    is the only local source that covers it (2024: 49 games, 2024-08-02 ..
+    2024-08-26), and it carries `home_score`/`away_score` too, so the same file
+    supplies the realised results the grade needs.
+
+    WHY THIS MATTERS ENOUGH TO ADD. The NFL preseason board serves picks from a
+    model measured (2026-08-20, live) at **margin SD 0.97 against a market
+    4.21 — 4.3x under-dispersed** — and there is NO local data to grade it
+    against the close, because the historical odds files start in September.
+    Without these dates the question cannot be answered at all.
+    """
+    path = REPO / "data/nfl_source" / ("schedule_preseason_%d.csv" % season)
+    if not path.is_file():
+        return []
+    dates: set[str] = set()
+    with path.open("r", encoding="utf-8-sig", errors="ignore", newline="") as fh:
+        for row in csv.DictReader(fh):
+            d = str(row.get("gameday") or "").strip()
+            if len(d) == 10:
+                dates.add(d)
+    return sorted(dates)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seasons", default="2022,2023,2024")
     ap.add_argument("--execute", action="store_true", help="actually spend; omit for a dry run")
     ap.add_argument("--max-credits", type=int, default=20000)
     ap.add_argument("--lead-minutes", type=int, default=5, help="snapshot this long before kickoff")
+    ap.add_argument("--preseason", action="store_true",
+                    help="Back-fill the PRESEASON instead of the regular season. Slate dates "
+                         "come from schedule_preseason_<season>.csv, because the pbp mirror "
+                         "this script normally reads has no August dates at all. Writes "
+                         "closing_lines_preseason_<season>.json so it can never overwrite the "
+                         "regular-season file.")
     args = ap.parse_args()
 
     seasons = [int(s) for s in str(args.seasons).split(",") if s.strip()]
-    plan = {s: slate_dates(s) for s in seasons}
+    date_source = preseason_slate_dates if args.preseason else slate_dates
+    plan = {s: date_source(s) for s in seasons}
 
     print("=" * 74)
     print("NFL HISTORICAL CLOSING-LINE BACKFILL  --  %s" % ("EXECUTE" if args.execute else "DRY RUN"))
@@ -230,7 +265,8 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     for season in seasons:
-        out_path = OUT_DIR / ("closing_lines_%d.json" % season)
+        out_path = OUT_DIR / (("closing_lines_preseason_%d.json" if args.preseason
+                               else "closing_lines_%d.json") % season)
         captured: dict[str, Any] = {}
         windows: set[str] = set()
 
@@ -246,6 +282,36 @@ def main() -> int:
                 if ct:
                     windows.add(ct.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         print("  %d distinct kickoff windows  (spent so far: %d credits)" % (len(windows), budget.spent))
+
+        # COVERAGE GUARD -- abort BEFORE phase B if phase A found nothing inside
+        # the window we are paying for.
+        #
+        # MEASURED 2026-08-20, and this guard exists because it cost 7,528
+        # credits to learn: a --preseason run over August dates returned 257 and
+        # 264 events whose EARLIEST kickoff was 2023-09-08 and 2024-09-07. OddsAPI
+        # does not carry NFL preseason, so querying an August snapshot returns
+        # only future REGULAR-season events -- and the run happily re-bought
+        # regular-season lines already on disk. 0 of 257 and 1 of 264 events were
+        # new.
+        #
+        # Every other safeguard here (dry run, estimate, --max-credits) protects
+        # against SPENDING TOO MUCH. Not one of them asks WHETHER THE DATA IS
+        # THERE. Phase A is ~1 credit per date and phase B is 30 per window, so
+        # checking here costs 0.4% of what it saves.
+        requested = set(plan[season])
+        in_range = {w for w in windows if w[:10] in requested}
+        if not in_range:
+            earliest = min(windows) if windows else "(none)"
+            print("  !! NO KICKOFF WINDOW FALLS ON A REQUESTED DATE.")
+            print("     requested %s .. %s" % (min(requested), max(requested)))
+            print("     earliest window returned: %s" % earliest)
+            print("     The source does not appear to cover this window. ABORTING")
+            print("     before phase B rather than buying data from outside it.")
+            continue
+        if len(in_range) < len(windows):
+            print("  %d of %d windows fall on requested dates; ignoring the rest"
+                  % (len(in_range), len(windows)))
+        windows = in_range
 
         # PHASE B -- one closing snapshot per window (30 credits each).
         print("[%d] phase B: one closing snapshot per window" % season)

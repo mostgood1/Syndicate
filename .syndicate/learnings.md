@@ -2279,3 +2279,49 @@ say explicitly that it is untried. And when a check returns "absent", establish
 what a PRESENT reading would look like on that instrument before treating the
 absence as an answer — three instruments in a row here reported absence that was
 about the instrument, not the world.
+
+---
+
+## 2026-08-20 — FORBIDDEN: buying data before probing that it EXISTS. Cost: 7,528 credits for 1 new row
+
+**I verified the COST of a purchase carefully and never verified the PREMISE.**
+
+NFL preseason picks are served from a model measured at 4.3x under-dispersed
+(margin SD 0.97 vs a market 4.21, live), and no local data could grade it —
+`historical_odds/closing_lines_*.json` covers September to February only. So I
+extended the backfill script with a `--preseason` mode, dry-ran it, estimated
+4,048 credits, set an 8,000 ceiling with 2x headroom against the script's own
+documented overrun history, and executed.
+
+**Result: 7,528 credits spent, ZERO preseason games captured.**
+
+    2023  257 events, earliest kickoff 2023-09-08   (preseason ran 08-02..08-28)
+    2024  264 events, earliest kickoff 2024-09-07
+    new events not already on disk:  2023 -> 0 of 257
+                                     2024 -> 1 of 264
+
+**OddsAPI does not carry NFL preseason.** Querying its historical events
+endpoint at an August date returns only FUTURE regular-season events, so every
+credit re-bought regular-season lines already sitting in the repo.
+
+**The error is not the estimate — the estimate was fine and the ceiling caught
+the 1.86x overrun exactly as designed.** The error is that every one of those
+safeguards protects against SPENDING TOO MUCH and not one of them asks WHETHER
+THE DATA IS THERE. I treated "NFL is covered by OddsAPI" as implying "all NFL
+phases are covered". Coverage of a sport does not imply coverage of its
+preseason, its lower divisions, or any other segment.
+
+**THE RULE.** Before any paid backfill, spend the smallest possible amount to
+prove the data EXISTS — here, ONE events call at ONE in-range date, 1 credit,
+and read the earliest `commence_time` that comes back. If it is outside the
+window you are buying, stop. A dry run costs nothing and validates ARITHMETIC;
+only a real probe validates COVERAGE, and the two are not substitutes.
+
+**Generalises past OddsAPI:** any paid or rate-limited source. The question
+"can I afford this?" and "is the thing I want in there?" are independent, and
+answering the first with rigour creates a false sense of having answered both.
+
+**Consequence that still stands:** NFL preseason CANNOT be graded against the
+close — not from local data and not from OddsAPI. Any decision about serving
+NFL preseason picks rests on the under-dispersion proxy plus default-deny, and
+must be labelled as such rather than as a measured loss.
