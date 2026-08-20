@@ -1108,6 +1108,44 @@ history directly:
   proof.
 - Blocked by: none.
 
+### wnba-live-odds-capture-gap — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
+  game goes live, instead of freezing at its last pregame quote.
+  **Testable outcome:** for a WNBA game currently in live state, re-pull
+  `wnba_source/tracking/book_quotes/<date>.jsonl` and confirm at least one
+  market's `captured_at` is newer than the game's own kickoff time.
+- Files:
+  - `scripts/refresh_odds_sources.py` (`_build_wnba_steps`) — read-only
+    reference until the actual defect location is confirmed; do not edit
+    without re-claiming narrowly, same convention the soccer lane used for
+    this same file.
+  - Not claimed, read-only reference: `scripts/run_live_odds_refresh_worker.py`
+    — likely relevant (soccer's autorun equivalent lived here), not yet
+    confirmed WNBA has an analogous live-phase launcher at all.
+- Hypothesis: WNBA's live-phase odds fetch either (a) does not exist as a
+  distinct step from the soccer-style `phase=live` odds capture, or (b)
+  exists but is failing/never firing, structurally similar to `#343`
+  (soccer's bulk-endpoint 422) but a different mechanism, since WNBA's
+  fetch script and market list have never been touched by that fix.
+- **Already established, measured 2026-08-20 ~02:18Z (do not re-derive):**
+  Minnesota Lynx @ Golden State Valkyries (kickoff 2026-08-20T02:10:00Z):
+  every h2h/spreads/totals/prop market for this matchup shares ONE
+  `captured_at` (`2026-08-20T00:31:28Z`) — 99 minutes BEFORE kickoff, zero
+  refreshes since, 107+ min stale at check time. Distinct from the sim-side
+  gap already documented in `per_sport_ingest.wnba.enrichment.
+  live_projections` (`reason: "no live re-sim wired for wnba"`) — that is
+  about projections, this is about the underlying MARKET QUOTE, which a
+  pure book-price EV play does not need a sim for at all.
+- Falsification test: find a WNBA-specific `phase=live` odds-fetch step
+  that DID run recently for this game (any log evidence of an attempt,
+  success or failure) — if one exists and simply failed silently, the
+  hypothesis narrows to (b); if none exists at all in the step-builder,
+  hypothesis (a) is confirmed and this is a missing feature, not a bug.
+- Verification: re-pull the book_quotes shard post-fix for a live WNBA
+  game and confirm a fresh in-game capture, same method used to verify
+  `soccer-odds-capture-cadence-gap`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
