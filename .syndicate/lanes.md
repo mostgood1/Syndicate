@@ -1231,7 +1231,7 @@ history directly:
   falls back to the `dict.items` method.
 - Blocked by: none.
 
-### nfl-team-abbr-az-alias — OPEN — opened 2026-08-20 — session: nfl-team-abbr-az-alias
+### nfl-team-abbr-az-alias — CLOSED-VERIFIED 2026-08-20 — landed `8a87e822` on `origin/main`, NOT yet deployed — opened 2026-08-20 — session: nfl-team-abbr-az-alias
 - Goal: production roster-snapshot autorun (armed this session, deploy
   `dep-da3g2mj7uimc73ajjtig`) crashed on its FIRST real run against real
   nflverse data -- `ValueError: Roster snapshot validation failed: row 91
@@ -1267,11 +1267,37 @@ history directly:
   ideally a manual re-run of `build_nfl_roster_snapshot.py --season 2026`
   against real network data succeeds with Arizona rows included (network
   permitting from this environment).
-- Blocked by: none. NOT deploying this fix yet -- will hand the deploy
-  decision back after landing on `origin/main` (the crash is contained:
-  the autorun rate-limits to one attempt per 21600s interval, so it is
-  not hammering anything, just silently failing once every 6 hours until
-  fixed).
+- Verification: DONE. `test_az_resolves_to_ari` confirmed to FAIL on
+  unpatched code (stashed, re-ran, restored -- not just asserted) before
+  trusting the fix. `canonical_team_abbr("AZ") == "ARI"` post-fix,
+  confirmed against the real live nflverse feed's full 32-code set
+  (`OtherRealNflverseCodesAlreadyResolve`), not just the one code that
+  crashed. Full nfl/football test slice: 33 pre-existing failures, all
+  confirmed identical and unrelated by the same stash-and-reproduce
+  method against unmodified code -- zero regressions from this change.
+  NOT DONE: a live re-run of `build_nfl_roster_snapshot.py` against real
+  network data (the fix is verified at the unit/fixture level; the next
+  scheduled autorun tick against production, or a manual dry-run, is the
+  first real-data confirmation).
+- Dead end hit and recovered from, recorded so it isn't silently repeated:
+  a `git stash` / re-run-tests-on-unpatched-code / `git stash pop`
+  sequence used to verify the falsification test partially failed to
+  reapply -- the pop kept the stash rather than dropping it because two
+  INCIDENTAL runtime-noise files (`reports/manifests/nfl.json`,
+  `reports/refresh_state.json`, touched by every test run regardless of
+  this change) conflicted, and the pop's exit code did not distinguish
+  "applied everything except the noise" from "applied nothing." All
+  three real code files were confirmed reverted before the recovery
+  (`git diff --stat` showed nothing, `canonical_team_abbr("AZ")` was
+  back to returning `"AZ"`) -- caught by verifying the fix was still
+  live rather than trusting the pop's own success message. Recovered via
+  `git checkout stash@{0} -- <the 3 real files>`, confirmed content
+  matched the stash diff, then dropped the stash.
+- Blocked by: none. NOT deploying this fix to production yet -- the
+  crash is contained (the autorun rate-limits to one attempt per 21600s
+  interval, not hammering anything, just silently failing once every 6h
+  until fixed) and the deploy decision is being handed back rather than
+  fired autonomously.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
