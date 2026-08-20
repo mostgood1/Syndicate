@@ -115,6 +115,49 @@ class ValidationRefusesDegenerateDownloads(unittest.TestCase):
             self.assertEqual(leftovers, [])
 
 
+class PublishesToWebOnSuccess(unittest.TestCase):
+    """`nfl-artifact-publish-wiring`: THE FALSIFICATION CASE. Before this
+    lane, this script had no publish call site at all -- confirmed live
+    2026-08-20, `/api/ops/artifacts/export` returned `count: 0` after the
+    allowlist fix alone. `HOT_ARTIFACT_PATTERNS` PERMITS the transfer;
+    this is what makes one happen."""
+
+    def test_a_healthy_write_calls_publish_hot_artifact_with_the_real_path(self):
+        body = _csv_bytes(_good_rows(fetcher.MIN_ROWS + 100))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(fetcher, "nfl_artifact_output_root", return_value=root), \
+                 patch.object(fetcher, "_download_to", side_effect=_writer_for(body)), \
+                 patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", return_value=True) as mock_publish:
+                result = fetcher.fetch_season(2025, force=True, timeout=5)
+            dest = root / "tracking" / "nflverse" / "injuries" / "injuries_2025.csv"
+            mock_publish.assert_called_once_with(dest)
+            self.assertTrue(result["published"])
+
+    def test_publish_failure_does_not_fail_the_fetch(self):
+        body = _csv_bytes(_good_rows(fetcher.MIN_ROWS + 100))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(fetcher, "nfl_artifact_output_root", return_value=root), \
+                 patch.object(fetcher, "_download_to", side_effect=_writer_for(body)), \
+                 patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", side_effect=RuntimeError("network down")):
+                result = fetcher.fetch_season(2025, force=True, timeout=5)
+            self.assertEqual(result["status"], "written")
+            self.assertFalse(result["published"])
+            self.assertIn("RuntimeError", result["publish_error"])
+
+    def test_rejected_write_does_not_attempt_to_publish(self):
+        short = _csv_bytes(_good_rows(10))  # under MIN_ROWS
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(fetcher, "nfl_artifact_output_root", return_value=root), \
+                 patch.object(fetcher, "_download_to", side_effect=_writer_for(short)), \
+                 patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact") as mock_publish:
+                result = fetcher.fetch_season(2025, force=True, timeout=5)
+            self.assertEqual(result["status"], "rejected")
+            mock_publish.assert_not_called()
+
+
 class UnavailableSeasonIsNotAFailure(unittest.TestCase):
     def test_404_on_a_season_with_no_release_yet_does_not_fail_the_run(self):
         """A season with no injury reports published yet is NORMAL, not a

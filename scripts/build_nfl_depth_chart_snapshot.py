@@ -92,6 +92,24 @@ def main() -> int:
     print(f"depth_rows_loaded={len(depth_rows)}")
     print(f"rows_written={len(result.rows)}")
     print(f"output_path={result.output_path}")
+
+    # PUBLISH TO WEB -- `nfl-artifact-publish-wiring`: same gap as the
+    # roster-snapshot sibling. `--publish` here only renames the local
+    # file, it never pushed anything cross-service. `HOT_ARTIFACT_
+    # PATTERNS` was fixed to allowlist this artifact
+    # (`nfl-artifact-allowlist-add`), but the allowlist only PERMITS the
+    # transfer -- confirmed live 2026-08-20, `/api/ops/artifacts/export`
+    # returned `count: 0` because nothing ever called the push.
+    # Unconditional, same pattern
+    # `generate_smartsim2_nfl_projections.py` already uses.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(result.output_path)
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail the build
+        published = False
+        print(f"artifact_publish_error={type(exc).__name__}: {exc}", flush=True)
+    print(f"artifact_published={published}", flush=True)
     return 0
 
 

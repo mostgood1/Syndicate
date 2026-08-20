@@ -212,6 +212,23 @@ def fetch_season(season: int, *, force: bool, timeout: int) -> dict[str, object]
         _discard()
         raise
     result["status"] = "written"
+
+    # PUBLISH TO WEB -- `nfl-artifact-publish-wiring`: this file had NO
+    # publish call site at all before this. `HOT_ARTIFACT_PATTERNS` was
+    # fixed to allowlist it (`nfl-artifact-allowlist-add`), but the
+    # allowlist only PERMITS the transfer -- confirmed live 2026-08-20,
+    # `/api/ops/artifacts/export` returned `count: 0` because nothing
+    # ever called the push. Same pattern
+    # `generate_smartsim2_nfl_projections.py` already uses: best-effort,
+    # never fails the fetch itself.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(destination)
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail the fetch
+        published = False
+        result["publish_error"] = f"{type(exc).__name__}: {exc}"
+    result["published"] = published
     return result
 
 
@@ -237,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         status = result.get("status")
         extra = ""
         if status == "written":
-            extra = f"{result.get('rows')} rows, {result.get('bytes')} bytes"
+            extra = f"{result.get('rows')} rows, {result.get('bytes')} bytes, published={result.get('published')}"
         elif status == "rejected":
             extra = "; ".join(result.get("problems") or [])
         elif status in {"unavailable", "http_error", "download_failed"}:
