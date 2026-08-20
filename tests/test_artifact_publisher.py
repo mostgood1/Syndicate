@@ -197,6 +197,20 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertTrue(is_hot_artifact_relative_path("nba_source/source_artifacts/data/processed/oddsapi_player_props_2026-07-23.csv"))
         self.assertTrue(is_hot_artifact_relative_path("wnba_source/data/processed/oddsapi_player_props_2026-07-23.csv"))
 
+    def test_accepts_nfl_injuries_roster_and_depth_chart_artifacts(self) -> None:
+        # `nfl-injuries-fetcher` / `nfl-roster-depth-autorun`, 2026-08-20:
+        # all three were written worker-side by real refresh-worker
+        # autoruns but never allowlisted -- production presence was
+        # unauditable from `/api/ops/artifacts/export` despite the roster-
+        # snapshot autorun measurably writing 2,930 real rows the same day.
+        self.assertTrue(is_hot_artifact_relative_path("nfl_source/tracking/nflverse/injuries/injuries_2026.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("nfl_source/source_artifacts/data/processed/rosters/roster_2026_snapshot.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("nfl_source/source_artifacts/data/processed/depth/depth_2026_snapshot.csv"))
+        # Scoped to nfl_source specifically -- must NOT bleed into another
+        # sport's differently-shaped tree under the same subdirectory names.
+        self.assertFalse(is_hot_artifact_relative_path("mlb_source/tracking/nflverse/injuries/injuries_2026.csv"))
+        self.assertFalse(is_hot_artifact_relative_path("wnba_source/source_artifacts/data/processed/rosters/roster_2026_snapshot.csv"))
+
     def test_accepts_mlb_player_game_log_and_statcast_features(self) -> None:
         # #163: written by refresh-worker (run_mlb_daily_sim_job.py's post-sim
         # hook / the Statcast regen), read on web by Ask The Syndicate --
