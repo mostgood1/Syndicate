@@ -66,6 +66,13 @@ PITCHER_PROPS: dict[str, dict[str, Any]] = {
     "hits_allowed":  {"dist": "hits_dist",          "mean": "hits_mean",          "odds": "hits_allowed",   "label": "Hits allowed"},
     "earned_runs":   {"dist": "earned_runs_dist",   "mean": "er_mean",            "odds": "earned_runs",    "label": "Earned runs"},
     "walks_allowed": {"dist": "walks_dist",         "mean": "walks_mean",         "odds": "walks_allowed",  "label": "Walks allowed"},
+    # `None` HERE IS PERMANENT AND CORRECT, not an oversight. OddsAPI publishes
+    # no pitches-thrown or batters-faced market for MLB: searched 2026-08-20
+    # across scripts/, syndicate/ and pipeline/ and there is no such market key
+    # anywhere in the platform -- every `pitches`/`batters_faced` hit is one of
+    # our OWN sim fields (features/mlb/cards.py, shared/game_shape.py), never a
+    # book market. These two ladders are sim-only by nature; a reader seeing 0
+    # market lines here is seeing the truth, not a bug. Do not re-investigate.
     "pitches":       {"dist": "pitches_dist",       "mean": "pitches_mean",       "odds": None,             "label": "Pitches"},
     "batters_faced": {"dist": "batters_faced_dist", "mean": "batters_faced_mean", "odds": None,             "label": "Batters faced"},
 }
@@ -77,10 +84,26 @@ HITTER_PROPS: dict[str, dict[str, Any]] = {
     "total_bases":       {"dist": "total_bases_dist",     "mean": "tb_mean",  "odds": "batter_total_bases",     "label": "Total bases"},
     "runs":              {"dist": "runs_dist",            "mean": "r_mean",   "odds": "batter_runs_scored",     "label": "Runs"},
     "rbi":               {"dist": "rbi_dist",             "mean": "rbi_mean", "odds": "batter_rbis",            "label": "RBI"},
-    "hitter_strikeouts": {"dist": "strikeouts_dist",      "mean": "so_mean",  "odds": None,                     "label": "Strikeouts"},
-    "doubles":           {"dist": "doubles_dist",         "mean": "2b_mean",  "odds": None,                     "label": "Doubles"},
-    "triples":           {"dist": "triples_dist",         "mean": "3b_mean",  "odds": None,                     "label": "Triples"},
-    "stolen_bases":      {"dist": "stolen_bases_dist",    "mean": "sb_mean",  "odds": None,                     "label": "Stolen bases"},
+    # `batter_strikeouts` IS fetched -- it is in `DEFAULT_HITTER_MARKETS` in
+    # scripts/fetch_mlb_oddsapi_local.py and has a line preference there. The
+    # `None` this replaces was my own placeholder, and it meant the builder
+    # never looked for a market that was already being paid for. `#440`.
+    "hitter_strikeouts": {"dist": "strikeouts_dist",      "mean": "so_mean",  "odds": "batter_strikeouts",      "label": "Strikeouts"},
+    # WIRED BUT NOT YET FED, deliberately and visibly. These three are valid
+    # OddsAPI keys and are already modelled elsewhere in the platform
+    # (shared/mlb_prop_calibration.py, shared/prop_projections.py,
+    # shared/live_projection_join.py) -- but they are NOT in
+    # `DEFAULT_HITTER_MARKETS`, so nothing fetches them and these rows will read
+    # 0 until that list changes. Mapping them here rather than leaving `None`
+    # makes the remaining work exactly one line in the fetcher instead of a
+    # rediscovery. Cost of that line, measured 2026-08-20: OddsAPI player props
+    # bill per market per event, burn is ~87,635 credits/day and 3,391,356
+    # remain against the 5M cap = 39 days, i.e. about the rest of the season
+    # with no slack. Adding 3 markets to a 7-market hitter fetch is ~+43% on
+    # that path. That is a spend decision, not a code decision.
+    "doubles":           {"dist": "doubles_dist",         "mean": "2b_mean",  "odds": "batter_doubles",         "label": "Doubles"},
+    "triples":           {"dist": "triples_dist",         "mean": "3b_mean",  "odds": "batter_triples",         "label": "Triples"},
+    "stolen_bases":      {"dist": "stolen_bases_dist",    "mean": "sb_mean",  "odds": "batter_stolen_bases",    "label": "Stolen bases"},
 }
 
 

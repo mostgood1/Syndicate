@@ -314,3 +314,68 @@ def test_a_parse_failure_is_NAMED_not_swallowed(wired, tmp_path):
     dest.write_text(json.dumps({"generatedAt": "not-a-timestamp"}), encoding="utf-8")
     ev = (lb.is_stale("2026-05-28", [7]) or {}).get("evidence") or {}
     assert "parseError" in ev, f"a parse failure left no trace: {ev}"
+
+
+# ------------------------------------------------- market key wiring (#440)
+
+def test_hitter_strikeouts_is_wired_to_the_market_that_is_actually_fetched():
+    """`batter_strikeouts` is paid for on every hitter fetch and was unused.
+
+    This asserts the JOIN KEY equals the key the fetcher requests, read from
+    the fetcher itself rather than retyped -- a hardcoded string here would
+    pass while the two drifted apart, which is the exact defect being fixed.
+    """
+    import scripts.fetch_mlb_oddsapi_local as fetcher
+    from syndicate.features.mlb.ladders_build import HITTER_PROPS
+
+    wired = HITTER_PROPS["hitter_strikeouts"]["odds"]
+    assert wired is not None, "hitter_strikeouts left unwired"
+    assert wired in fetcher.DEFAULT_HITTER_MARKETS, (
+        f"{wired!r} is not in DEFAULT_HITTER_MARKETS -- the join can never fire"
+    )
+
+
+def test_every_wired_hitter_market_is_a_real_key_and_fed_ones_are_fetched():
+    """Separates 'wired and fed' from 'wired but not fetched' EXPLICITLY.
+
+    doubles/triples/stolen_bases are deliberately wired ahead of the fetcher, so
+    this test must not demand they be fetched -- but it must also not let a
+    typo'd key masquerade as that deliberate state.
+    """
+    import scripts.fetch_mlb_oddsapi_local as fetcher
+    from syndicate.features.mlb.ladders_build import HITTER_PROPS
+
+    known_unfed = {"batter_doubles", "batter_triples", "batter_stolen_bases"}
+    for prop, spec in HITTER_PROPS.items():
+        key = spec["odds"]
+        if key is None:
+            continue
+        assert key.startswith("batter_"), f"{prop}: {key!r} is not a batter market key"
+        assert key in fetcher.DEFAULT_HITTER_MARKETS or key in known_unfed, (
+            f"{prop}: {key!r} is neither fetched nor a known-unfed key -- likely a typo"
+        )
+
+
+def test_pitcher_props_without_a_market_stay_none():
+    """OddsAPI has no pitches-thrown or batters-faced market.
+
+    Pinned so a future 'fix the Nones' pass cannot invent a key that no book
+    publishes and quietly produce a join that always misses.
+    """
+    from syndicate.features.mlb.ladders_build import PITCHER_PROPS
+    assert PITCHER_PROPS["pitches"]["odds"] is None
+    assert PITCHER_PROPS["batters_faced"]["odds"] is None
+
+
+def test_wired_pitcher_markets_match_the_fetchers_mapping():
+    import scripts.fetch_mlb_oddsapi_local as fetcher
+    from syndicate.features.mlb.ladders_build import PITCHER_PROPS
+
+    produced = set(fetcher.PITCHER_MARKET_KEY_MAP.values())
+    for prop, spec in PITCHER_PROPS.items():
+        key = spec["odds"]
+        if key is None:
+            continue
+        assert key in produced, (
+            f"{prop}: {key!r} is not produced by PITCHER_MARKET_KEY_MAP {sorted(produced)}"
+        )
