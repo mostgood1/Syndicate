@@ -2509,3 +2509,55 @@ their trust in the file.
 (`git_bash_mangles_rev_path_args`, from a false "file ABSENT") and I hit it
 anyway** — which is why it belongs here, in the file that is read at session
 start, rather than only in a memory that is recalled by relevance.
+
+---
+
+## 2026-08-20 — "strictly dominated" is a different diagnosis from "broken", and it changes the fix
+
+**The NCAAF model has REAL predictive power and is still worthless for betting.
+Those are compatible, and I spent a session treating them as if they were not.**
+
+Measured on 751 clean out-of-sample games, fitting
+`actual = a + b*market + w*(model - market)`:
+
+    b (market)           +0.990   CI [+0.909, +1.076]   closing line UNBIASED
+    w (model deviation)  -0.028   CI [-0.130, +0.069]   ZERO information
+
+    r(market, actual) +0.645   R^2 41.6%
+    r(model,  actual) +0.421   R^2 17.8%
+    r(model,  market) +0.671
+
+The model explains 17.8% of realised margin variance — genuine signal, not a
+broken engine. But its DEVIATION from the market explains nothing, with a CI
+tight enough to rule out even 10% weight. Everything it knows, the market
+already knows; where they differ, it is noise.
+
+**WHY THIS MATTERS MORE THAN THE VERDICT.** Every remedy attempted failed, and I
+was treating each failure as its own puzzle: the ATS thresholds (filtering
+harder made it WORSE), the blend weight, the subset search, three scalar totals
+fixes, a scale sweep from 6 to 24, a 5.8-sigma returning-production feature.
+**They are all the same fact.** A strictly dominated model has no threshold, no
+weight and no subset that helps, because its unique variance is noise rather
+than signal concentrated somewhere. Recognising domination early would have
+saved most of those experiments.
+
+**The diagnostic that distinguishes the two cases, and it is cheap:**
+
+    BROKEN     low r(model, actual)         -> fix the engine
+    DOMINATED  decent r(model, actual) BUT
+               w ~ 0 on the deviation       -> the engine is fine; it is
+                                               MISSING INPUTS the market has
+
+One regression on a ledger answers it in seconds. Run it BEFORE the threshold
+sweeps, not after.
+
+**It also killed a framing I had been repeating.** I called the model
+"under-dispersed" — true for NFL preseason (SD 0.97 vs a market 4.21) and FALSE
+for NCAAF, where the model is OVER-dispersed (15.14 vs 13.16 vs a realised
+20.33). Carrying one sport's shape onto another produced a wrong mental model of
+the defect and pointed at `SP_RATING_SCALE`, which §0 had already exonerated
+across every value from 6 to 24.
+
+**The actionable number:** the gap is **23.8 points of R^2** (41.6 − 17.8). That
+is the size of what the market knows and the model does not, and it only closes
+with information the model currently lacks — not by re-weighting what it has.

@@ -515,3 +515,62 @@ superseded.
 **Do not substitute MAE for this.** MAE is a useful diagnostic for the ENGINE
 and it is not evidence of playability. Both are now measurable in minutes from
 the ledger, so there is no excuse for shipping on the cheaper one.
+
+---
+
+## 10. THE DIAGNOSIS — the model is not broken, it is STRICTLY DOMINATED
+
+**Measured 2026-08-20, NCAAF 2024, 751 clean out-of-sample games.** This
+supersedes the vaguer framings above and is the most useful statement of where
+the model actually stands.
+
+Fit `actual = a + b*market + w*(model − market)`:
+
+    b (market)           +0.990   95% CI [+0.909, +1.076]
+    w (model deviation)  -0.028   95% CI [-0.130, +0.069]
+
+| | r with realised | R² |
+|---|---|---|
+| closing line | **+0.645** | **41.6%** |
+| our model | +0.421 | 17.8% |
+| r(model, market) | +0.671 | — |
+
+**Three facts, and together they close the question:**
+
+1. **The market is unbiased.** b = 0.99 with a CI spanning 1.0 — a textbook
+   efficient line. There is no favourite/underdog mispricing to harvest.
+2. **The model has REAL signal.** R² = 17.8% is not noise, and not a broken
+   engine. Whatever else is wrong, the ratings carry genuine information.
+3. **But its DEVIATION from the market carries NONE.** w = −0.028 with a CI
+   ruling out even 10% weight. Everything the model knows, the market already
+   knows; where they differ, the model is wrong.
+
+**This is what "strictly dominated" means, and why every remedy tried has
+failed.** No ATS threshold helps (§8 — filtering harder made it worse). No blend
+weight helps (w ≈ 0, so the optimal blend is 100% market). No subset helps,
+because the model's unique variance is noise rather than signal concentrated
+somewhere. The failures were not bad luck; they are all the same fact.
+
+### It also corrects "under-dispersed"
+
+That framing was NFL-preseason-specific (model SD 0.97 vs market 4.21). For
+NCAAF the model is **over-dispersed**: SD 15.14 against a market 13.16, against
+a realised 20.33. So the problem is NOT the spread of the model's opinions and
+tuning `SP_RATING_SCALE` was never going to fix it — §0 already showed every
+scale from 6 to 24 loses. **The issue is that the unique part of those opinions
+is noise.**
+
+### What this makes the next move
+
+The gap is **23.8 points of R²** (41.6 − 17.8). That is the quantified size of
+"what the market knows and the model does not", and it is the only number worth
+attacking. It will not close by re-weighting what the model already has — it
+closes by feeding it information it currently lacks, which is exactly the §1
+ranking: injuries and availability first, situational second.
+
+**The corollary for the 64 unfed payload keys:** most of them are metrics
+DERIVED FROM PAST PERFORMANCE, and past performance is precisely what SP+
+already encodes and what the market has fully priced. Expect them to land in the
+model's *shared* 17.8%, not in the missing 23.8%. Injury and availability data is
+different in kind — it is information about the FUTURE lineup, which no
+performance metric contains. Prioritise accordingly.
