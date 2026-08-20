@@ -18095,3 +18095,25 @@ period yields that on broken code, and `learnings.md` forbids concluding it from
 a log search at all.
 
 **rollback:** redeploy `041188cb`.
+
+## SHIPPED-VERIFIED 2026-08-20 13:31Z -- live-odds-worker deploy -- flip SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1
+- Follows the 13:17Z entry above (that deploy landed the autorun code, inert by design).
+- Env var set via the single-key endpoint (value=1), confirmed via read-only GET before deploying.
+- deploy_preflight.py's target-commit redundancy check correctly flagged a same-SHA redeploy as HOLD
+  (b5cf8ac2 already live) -- no override flag exists for "intentional same-commit redeploy to pick up an
+  env var", a real tooling gap. Worked around by producing a genuinely new, non-redundant commit
+  (cb322dd1, comment-only, documents exactly why it exists) rather than bypassing the guard.
+- Claim + target-scoped preflight CLEAR at 13:23:38Z. Deployed dep-da3fvquk1f9s73erdrc0, live at
+  13:31:11Z, commit content-verified == cb322dd1. Landed the same content onto origin/main separately
+  (2908373d) so it is not orphaned on the deploy branch.
+- verify: PARTIAL. Confirmed -- env var reads "1" on the live service; zero WNBA_LIVE_AUTORUN_ERROR
+  since deploy; LIVE ODDS REFRESH TICK still firing normally (True). NOT yet confirmed -- no WNBA game
+  was live at deploy time (all three of today's games still pregame, kickoffs 00:00Z/02:00Z tomorrow), so
+  the actual end-to-end behavior (WNBA_LIVE_AUTORUN_LAUNCHED firing, book_quotes captured_at newer than
+  kickoff) has not been observed yet. Next reader: check render_logs.py for WNBA_LIVE_AUTORUN_LAUNCHED
+  once one of tonight's WNBA games goes live, and re-pull book_quotes for that matchup to confirm a
+  fresh in-game capture -- the actual falsification test this lane was opened against.
+- Rollback: unset the env var (stops future launches without a deploy -- this is a one-shot
+  rate-limited launch per cadence, not a persistent loop) and/or redeploy live-odds-worker to the
+  prior commit (superseded, prefix b5cf).
+- Claim released.
