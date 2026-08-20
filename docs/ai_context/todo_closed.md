@@ -16,6 +16,214 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 ---
 
+
+## Closed 2026-08-20 — WNBA advanced-data coverage: eleven items, lane `basketball-model-owner`
+
+**Read the ID note first.** These were shipped and deployed over 2026-08-19..20
+but were **never filed in `todo.md` while the work was happening** — they lived
+only in `.syndicate/lanes.md` and the daily log. They are filed here on lane
+release. Consequence: four of the numbers used in COMMIT MESSAGES were taken by
+another lane in the meantime, and commit messages cannot be rewritten. So:
+
+| commit message says | filed here as | why |
+|---|---|---|
+| `#472`, `#474`—`#479` | same numbers | those IDs were still free |
+| `#480` | `#489` | `#480` went to a CI-red item |
+| `#481` | `#490` | `#481` went to the artifact-backup item |
+| `#482` | `#491` | `#482` went to a CI-schedule item |
+| `#483` | `#492` | `#483` went to an MLB Layer-2 lines item |
+
+**The collision has a cause worth fixing:** `todo_closed.md`'s header says new
+work "takes the next free number (see the counter at the top of `todo.md`)".
+**There is no such counter** — grep finds none. With no counter and no entry
+filed at claim time, two lanes picking numbers hours apart will collide, which
+is exactly what happened. File the entry when you take the number, not when you
+ship.
+
+### `#472` — **refresh mutex contention overwrote the epoch, so a lane that lost the race reported itself as having just run** — FIXED 2026-08-20
+
+`_is_refresh_run_contention_error` added to `scripts/run_live_odds_refresh_worker.py`;
+both the soccer and WNBA except-blocks now preserve the ORIGINAL epoch when the
+failure is contention (`ValueError` containing `already active`) rather than
+stamping a fresh one. Before: a contended lane looked freshly-run and was skipped
+for a full cycle.
+
+### `#474` — **the basketball sim had NO home/away split at all; `home_adj`/`away_adj` were purely team-quality multipliers** — FIXED 2026-08-19
+
+`scripts/build_basketball_home_court_advantage.py` (new) builds
+`home_court_advantage.json` from real schedule+boxscore joins. Measured WNBA
+home advantage **+2.07 points, t=1.75**. Wired into
+`syndicate/features/shared/basketball_props_smart_sim.py`.
+
+### `#475` — **three defects in the WNBA live cover/total probability path** — FIXED 2026-08-19
+
+`syndicate/features/wnba/cards.py`: time-decaying scale, pregame-anchor blend,
+and an anchored total projection. Superseded in part by `#490` below, which
+refit the constant this introduced.
+
+### `#476` — **four calibration artifacts were consumed by the sim and never built** — FIXED 2026-08-19/20
+
+`scripts/build_basketball_sim_calibration.py` (new) builds them from paired
+production sim-vs-actual history. The interval-calibration half is what surfaced
+`#478` and `#489`.
+
+### `#477` — **three opponent/career/venue split mechanisms were dead because `player_logs.csv` had no `MATCHUP` column** — FIXED 2026-08-19
+
+`scripts/build_basketball_player_logs.py` (new) derives `player_logs.csv` from
+`boxscores_history.csv` + schedule. `MATCHUP` was the ONLY missing column, and it
+is what `_matchup_opponent`/`_matchup_home_flag` parse. **Verified firing in
+production: splits went 0 —> 21/21/47 while `#467`'s control held at 54.**
+
+### `#478` — **our own boxscore simulator hardcoded `segment_seconds: 180`, and the vendored engine trusts the caller over its own correct 150s** — FIXED 2026-08-20
+
+`_local_simulate_pbp_game_boxscore` in
+`syndicate/features/shared/basketball_props_smart_sim.py` passed a hardcoded 180;
+`smart_sim.py:4174-4176` prefers the passed value. Replaced with
+`_local_boxscore_geometry(league_code)`, derived from the league's
+`quarter_minutes`. `_simulate_pbp_game_boxscore_local` was ALSO dropping
+`league_code` on the fallback path — it now threads it through.
+
+**The filed hypothesis was wrong.** I suspected the vendored league config. The
+cause was our own hardcoded constant overriding a correct default.
+
+### `#479` — **the two new derived builders had no scheduled caller** — FIXED 2026-08-20
+
+`_refresh_derived_basketball_artifacts` added to
+`scripts/refresh_wnba_oddsapi_props.py` + call site. **Production logs prove both
+run every cycle:** `player_logs ok rows=3178` /
+`home_court_advantage ok delta=+0.0151 games=138`.
+
+### `#489` (commits say `#480`) — **a stale interval time-profile could be loaded against a changed geometry** — FIXED 2026-08-20
+
+Guard in `_load_intervals_time_profile_local(*, processed_root, league_code=None)`
+refuses a profile whose `measured.segment_seconds` does not match current
+geometry, printing `INTERVALS_TIME_PROFILE_REFUSED`. Companion to `#478`: without
+it, `#478`'s fix would silently consume profiles built under the wrong geometry.
+
+### `#490` (commits say `#481`) — **the WNBA live win-prob path was severely UNDERCONFIDENT; the defect was dispersion, not bias, which is why it survived** — FIXED 2026-08-20
+
+212 games / 73,878 live samples of cached ESPN play-by-play replayed through the
+REAL shipped function. `scale = 6.0 + 0.35 * min_left` replaced by a single
+fitted constant `_WNBA_LIVE_MARGIN_SCALE = 2.1` in both
+`_wnba_live_margin_win_prob` and `_wnba_live_cover_prob`.
+
+- Brier **0.1896 —> 0.1644 (—13.3%)**; held-out **0.1922 —> 0.1661** on a
+  GAME-LEVEL split (samples within a game are autocorrelated).
+- Worst calibration gap **—0.240 —> —0.054**. Samples priced 0.6—0.7 actually won
+  **91.3%**.
+- The mean was already unbiased (0.573 vs 0.571) — which is precisely why years
+  of eyeballing the average never caught it.
+- `_wnba_live_total_over_prob` deliberately LEFT at `8.0 + 0.50*min_left`: it is a
+  different quantity and was not fitted. Do not assume the same constant applies.
+
+**Not verified on a served payload.** Graded offline against production data. A
+scheduled check (`verify-wnba-live-scale-481`) was armed for a live game and had
+NOT run at lane release.
+
+### `#491` (commits say `#482`) — **`#479`'s builders were working the whole time; the INSTRUMENT was blind** — FIXED 2026-08-20
+
+Neither `player_logs.csv` nor `home_court_advantage.json` was in
+`HOT_ARTIFACT_PATTERNS`, and `/api/ops/artifacts/export` serves WEB's disk — so a
+builder running correctly on a worker was invisible. Allowlist entries added to
+`syndicate/features/shared/artifact_publisher.py`.
+
+**The near-miss worth keeping:** when the allowlist landed, the export reported
+`player_logs.csv count=1` and I nearly called `#479` confirmed. It was a
+**pre-existing 85-day-old file** with data ending 2026-05-24 and **no `MATCHUP`
+column**. Presence is not proof; the watcher was rebuilt to test CONTENT.
+
+### `#492` (commits say `#483`) — **the home-court builder would publish a NEGATIVE home-court advantage for the sim to consume** — FIXED 2026-08-20
+
+`scripts/build_basketball_home_court_advantage.py` now refuses its own output on
+two gates: `non_positive_home_advantage` (sign) and
+`estimate_indistinguishable_from_zero` (power, `min_t_stat` default 1.0, CLI
+`--min-t-stat`). Triggered by a real `-0.0116` estimate from 46 games, itself
+produced by `#488`'s divergence. **This is a symptom guard; `#488` is the cause.**
+
+
+### `#469` — **CLOSED AND VERIFIED ON REAL DATA 2026-08-20. `#468`'s "no caller of boxscore-capture exists anywhere" was wrong — a real, ENABLED, ESPN-based caller ran every ~2h and silently reported success while adding zero rows.** Deployed to live-odds-worker AND refresh-worker; `boxscores_history.csv` now reaches **2026-08-18 (6,755 rows, 98 dates)** where it had been frozen at 2026-06-30. Longest-running open item in the lane — closed on a measurement, not a code read — lane `basketball-model-owner`
+
+**Correction to `#468`'s bottom section, stated plainly**: that entry said
+"no caller of `update-boxscores-history`/`backfill-boxscores` exists
+anywhere" — TRUE only for those two specific vendor-CLI function names.
+A parallel, Syndicate-owned, ESPN-based mechanism does the same job under
+a different name and IS wired in: `run_live_odds_refresh_worker.py`'s
+`_launch_autorun_wnba_pregame_refresh` (confirmed live: `SYNDICATE_ENABLE_
+WNBA_PREGAME_REFRESH_AUTORUN=true`, interval 7200s, on `live-odds-worker`
+right now) launches `refresh_odds_sources.py --sports wnba --phase pregame`
+every ~2h, which subprocesses `refresh_wnba_oddsapi_props.py` → `main()` →
+`_run_refresh_via_cli` → `_ensure_player_logs_for_props_refresh` →
+`_bootstrap_local_boxscores_history_for_props` →
+`bootstrap_boxscores_history_local` (ESPN site API). Confirmed reachable
+by full call-chain trace, not inference.
+
+**The real bug, found and fixed**: `_bootstrap_local_boxscores_history_
+for_props`'s success check tested `result["history_rows"]` — the file's
+CUMULATIVE total, which is >0 forever once any history exists — instead
+of `result["rows"]`, the CURRENT pull's own contribution. A completely
+failed ESPN fetch (zero new rows across the whole lookback window) still
+writes `existing_history` back unchanged and reports success, because
+"the file has rows" was never false. Live production evidence, pulled
+fresh via `/api/ops/artifacts/export?path=wnba_source/data/processed/
+boxscores_history.csv` on 2026-08-19: mtime 11h old (bootstrap IS running,
+IS "succeeding," on schedule) but content's own max game date frozen at
+2026-06-30 (3889 rows, unchanged) — i.e. this has been silently failing on
+every ~2h tick for roughly seven weeks while reporting healthy.
+
+**Fix** (`syndicate/features/shared/basketball_boxscores_history.py`,
+`_bootstrap_local_boxscores_history_for_props` in `scripts/refresh_wnba_
+oddsapi_props.py`): now distinguishes a real fetch failure (`_espn_
+scoreboard_local` returning a falsy `{}`, only possible on an actual HTTP/
+exception failure — a genuinely gameless day returns a truthy dict with an
+empty `events` list) from a legitimate zero-games day, tracked as `days_
+checked`/`days_fetch_failed`. When new rows are genuinely zero, the
+function still returns success (leniency preserved on purpose —
+`_ensure_player_logs_for_props_refresh` treats `False` as fatal for the
+WHOLE predict-props phase, so flipping this to a hard failure risked
+stopping props/predictions generation entirely, a worse regression than
+stale boxscores) but now emits a loud `print(..., flush=True)`
+`BOXSCORE_BOOTSTRAP_STALLED` marker (reaches Render's log collector —
+`logger.info` does not) plus a proper log-file line, instead of a line
+indistinguishable from success.
+
+**Also changed**: ESPN's undocumented site API got a browser-shaped
+`User-Agent` (was the literal string `"syndicate/1.0"`) in `_http_get_
+json_local` — the standard, low-risk shape of fix for "public media API
+soft-blocks a custom bot UA from a datacenter/cloud egress IP, 200 OK with
+an empty body, works fine from a residential dev IP" — which is consistent
+with (not proven to be the sole cause of) what was measured. **Whether
+this alone un-sticks the data is UNVERIFIED** — it cannot be tested from a
+dev machine, since a dev machine's IP was never the failure mode being
+guarded against. The `days_fetch_failed` counter this same fix adds is
+what will make the next read decisive either way, once deployed and
+observed on a live tick.
+
+**Verified, not assumed**: live ESPN pull via the real, unmodified
+`bootstrap_boxscores_history_local` (before AND after the UA change) —
+674 real rows, 2026-08-09..08-18, `days_fetch_failed=0` — proves the
+mechanism itself works end-to-end when reachable. Two `_bootstrap_local_
+boxscores_history_for_props` behavior cases exercised directly: working
+bootstrap still returns `(True, None)` with a normal log line; a
+monkeypatched stalled case (`rows=0`, `history_rows=3889`, pre-existing
+`wrote` path) still returns `(True, None)` — leniency confirmed intact —
+but now prints `BOXSCORE_BOOTSTRAP_STALLED` and logs the STALLED line.
+`tests/test_wnba_refresh_runner.py`/`test_nba_refresh_runner.py`: 4
+pre-existing failures, confirmed via `git stash` to fail identically on
+`a67019cf` with none of these 3 files touched (unrelated `force_refresh`
+kwarg mismatch in an NBA test fixture) — not caused by this change, not
+fixed by this change, out of scope.
+
+**Still open after this fix**: whether the UA change (or anything else)
+actually resolves the zero-new-rows failure requires observing a live
+production tick post-deploy — `days_fetch_failed` on the next STALLED-or-
+silent tick answers it. If `days_fetch_failed` stays high after deploy,
+the UA was not the (or not the only) cause and this needs a further pass
+(candidates: Render's outbound IP specifically blocklisted rather than
+UA-gated, a proxy/TLS difference, or a different ESPN endpoint behavior
+under load). NBA not compared apples-to-apples for the identical defect.
+
+---
+
 ## Closed 2026-08-10 — the memory excursion whose stage name was a bystander, and the instrument that could not see it (`#327`)
 
 
