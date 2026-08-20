@@ -437,3 +437,81 @@ row per game gives SE 0.454 and t=+0.87. **Per-book rows overstated
 significance 3.4x** and would have produced a confident, false "the model loses"
 finding. Per-provider storage is right (price shopping is worth +2.79 ROI
 points) — but the unit of ANALYSIS is the game.
+
+---
+
+## 8. STAGE 4 RESULT — there is no playable subset, and the model loses to NO MODEL AT ALL
+
+**Measured 2026-08-20.** §3 Stage 4 proposed that beating the close on *every*
+game is the wrong bar, and the model only needs to be right on the games it
+BETS. That is a sound idea and it was tested properly. It failed.
+
+### The metric was wrong until now, and that mattered
+
+Everything before this graded **MAE** — how close the projected margin lands.
+That is not a betting decision. A model can carry worse MAE and still be
+playable if its DISAGREEMENTS are directionally right. So this grades **ATS**:
+bet the side the model favours, against the **52.4% breakeven at −110** (not
+50% — a 51% system loses money, and using 50% is how a losing strategy reads as
+an edge).
+
+### NCAAF 2024, clean out-of-sample, 751 games — filtering makes it WORSE
+
+| \|edge\| ≥ | bets | ATS W% | vs 52.4% | 95% CI | dog% |
+|---|---|---|---|---|---|
+| 0 | 735 | 46.8% | −5.6 | [43.2, 50.4] | 60% |
+| 3 | 591 | 47.0% | −5.3 | [43.0, 51.1] | 62% |
+| 5 | 490 | 48.2% | −4.2 | [43.8, 52.6] | 63% |
+| 10 | 281 | **45.2%** | −7.2 | [39.5, 51.0] | 64% |
+
+**No threshold clears breakeven, and the largest edges are the WORST.** The
+"only serve the strong picks" instinct fails in the direction opposite to the
+one that would help.
+
+### THE DECISIVE TEST — the model vs a mindless side bet
+
+An under-dispersed model always says "closer than the market thinks", so it
+always fades the favourite. That makes its apparent edge indistinguishable from
+a blind underdog bet — unless you check.
+
+| | always bet the underdog | the model's picks | **model adds** |
+|---|---|---|---|
+| NFL preseason (95 bets) | **58.9%** | 54.7% | **−4.2 pts** |
+| NCAAF 2024 (735 bets) | **51.2%** | 46.8% | **−4.4 pts** |
+
+**The model is worse than ignoring it.** NFL preseason's 54.7% looked positive
+in isolation; it was riding a dog fade and DEGRADING it. Two sports, two
+models, two sample sizes, near-identical subtraction — wherever the model's
+opinion is strong enough to deviate from the naive side, it is wrong more often
+than not.
+
+*(Neither dog fade clears breakeven either — NFL CI [48.9, 68.3], NCAAF
+[47.5, 54.8], both spanning 52.4%. The finding is NOT "bet underdogs instead".)*
+
+---
+
+## 9. THE EXIT CRITERION, REPLACED
+
+The old criterion — "model paired error at or below the closing line's" — is
+**necessary but far too weak**, because a model can approach the close on MAE
+while still losing money ATS and still being worse than a naive side bet. It is
+superseded.
+
+**A market reopens in `pick_gate._SERVING_REGISTRY` only when ALL FOUR hold:**
+
+1. **BEATS THE NAIVE BASELINE.** ATS win rate strictly above the better of
+   *always bet the underdog* and *always bet the favourite*, on the same games.
+   This is the new gate and the one the model currently fails by ~4.3 points in
+   both sports. A model that cannot beat a coin-flip-with-a-rule has no claim
+   on a bet slip.
+2. **CLEARS BREAKEVEN WITH CONFIDENCE.** 95% CI lower bound above **52.4%** —
+   not the point estimate, the lower bound, and not 50%.
+3. **OUT-OF-SAMPLE.** Measured on a season that played no part in building or
+   tuning it, with any subset PRE-SPECIFIED before it is tested.
+4. **HONEST DENOMINATOR.** Report bets, not rows. Per-book rows overstated
+   significance **3.4×** on the NFL grade (t=+4.00 → +0.87 once collapsed to
+   games), because the same game repeats across books.
+
+**Do not substitute MAE for this.** MAE is a useful diagnostic for the ENGINE
+and it is not evidence of playability. Both are now measurable in minutes from
+the ledger, so there is no excuse for shipping on the cheaper one.

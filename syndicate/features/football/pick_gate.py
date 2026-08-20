@@ -220,13 +220,37 @@ def notice_for(sport: str, suppressed: Mapping[str, int] | None = None) -> dict[
             }
             for m in markets
         ],
-        "lift_condition": (
-            "Re-run the model-vs-market comparison on realised results. A market "
-            "opens when the model's paired error is at or below the closing "
-            "line's on the same games -- update _SERVING_REGISTRY with that "
-            "measurement, never by loosening the default."
-        ),
+        "lift_condition": LIFT_CONDITION,
     }
+
+
+#: What it now takes to reopen a market. REPLACED 2026-08-20 -- the old
+#: condition ("paired error at or below the closing line's") is NECESSARY BUT
+#: FAR TOO WEAK: a model can approach the close on MAE while still losing money
+#: against the spread AND still being worse than a mindless side bet.
+#:
+#: Measured on 751 clean out-of-sample NCAAF games and 95 NFL preseason games:
+#:
+#:                        always bet the dog   the model   model adds
+#:     NFL preseason            58.9%            54.7%       -4.2 pts
+#:     NCAAF 2024               51.2%            46.8%       -4.4 pts
+#:
+#: The model is WORSE THAN IGNORING IT, in both sports, by nearly the same
+#: margin. NCAAF ATS also gets WORSE as the edge filter tightens (46.8% at any
+#: edge, 45.2% at 10+ points), so "serve only the strong picks" fails in the
+#: direction opposite to the one that would help.
+LIFT_CONDITION = (
+    "A market reopens ONLY when all four hold, measured with "
+    "scripts/grade_football_playability.py: (1) ATS win rate strictly above the "
+    "better naive baseline -- always-bet-the-underdog or always-bet-the-favourite "
+    "-- on the same games; the model currently LOSES to that baseline by ~4.3 "
+    "points in both NCAAF and NFL. (2) 95% CI LOWER BOUND above the 52.4% "
+    "breakeven at -110, not the point estimate and not 50%. (3) Out-of-sample, "
+    "on a season that played no part in building or tuning it, with any subset "
+    "PRE-SPECIFIED before testing. (4) Denominator in BETS, not rows -- per-book "
+    "rows overstated significance 3.4x on the NFL grade. MAE is a diagnostic for "
+    "the engine and is NOT evidence of playability; do not substitute it."
+)
 
 
 def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
@@ -261,12 +285,10 @@ def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
             }
             for m in blocked
         ],
-        "lift_condition": (
-            "Re-run the model-vs-market comparison on realised results. A market "
-            "opens when the model's paired error is at or below the closing "
-            "line's on the same games -- update _SERVING_REGISTRY with that "
-            "measurement, never by loosening the default."
-        ),
+        # Same constant as notice_for(). This is the copy the SERVED board
+        # renders, so a divergence here would show users a criterion that is no
+        # longer the one in force -- two copies where only one gets updated.
+        "lift_condition": LIFT_CONDITION,
     }
 
 

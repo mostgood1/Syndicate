@@ -26,6 +26,7 @@ from unittest.mock import patch
 
 from syndicate.features.football import pick_gate
 from syndicate.features.football.pick_gate import MarketVerdict
+from syndicate.features.football.pick_gate import LIFT_CONDITION
 from syndicate.features.football.pick_gate import board_notice
 from syndicate.features.football.pick_gate import filter_pick_rows
 from syndicate.features.football.pick_gate import is_servable
@@ -72,6 +73,49 @@ class DefaultDenyTests(unittest.TestCase):
         self.assertGreater(verdict.model_metric, verdict.market_metric)
         self.assertIn("12.212", verdict.summary())
         self.assertIn("OUT-OF-SAMPLE", verdict.detail)
+
+
+class LiftConditionTests(unittest.TestCase):
+    """The exit criterion, REPLACED 2026-08-20 and pinned so it cannot drift.
+
+    The old condition -- "paired error at or below the closing line's" -- was
+    necessary but far too weak: a model can approach the close on MAE while
+    still losing money ATS and still being WORSE THAN A MINDLESS SIDE BET.
+    Measured: the model trails always-bet-the-underdog by 4.4 points in NCAAF
+    (735 bets) and 4.2 in NFL preseason (95 bets).
+    """
+
+    def test_criterion_names_the_naive_baseline(self) -> None:
+        """The bar the model currently FAILS, and the reason it was replaced."""
+        self.assertIn("naive baseline", LIFT_CONDITION)
+        self.assertIn("underdog", LIFT_CONDITION)
+
+    def test_criterion_uses_breakeven_not_fifty_percent(self) -> None:
+        """A 51% system loses money; 50% is how a loser reads as an edge."""
+        self.assertIn("52.4%", LIFT_CONDITION)
+        self.assertIn("LOWER BOUND", LIFT_CONDITION)
+
+    def test_criterion_refuses_mae_as_evidence(self) -> None:
+        """MAE is an ENGINE diagnostic, not proof of playability."""
+        self.assertIn("NOT evidence of playability", LIFT_CONDITION)
+
+    def test_criterion_requires_bets_not_rows(self) -> None:
+        """Per-book rows overstated significance 3.4x on the NFL grade."""
+        self.assertIn("BETS, not rows", LIFT_CONDITION)
+
+    def test_both_notice_paths_serve_the_same_criterion(self) -> None:
+        """board_notice is what the LIVE page renders.
+
+        Two copies where only one gets updated would show users a criterion
+        that is no longer in force -- which is how the old one survived this
+        long in the served payload.
+        """
+        _, suppressed = filter_pick_rows("ncaaf", [{"market": "spread"}])
+        self.assertEqual(notice_for("ncaaf", suppressed)["lift_condition"], LIFT_CONDITION)
+        self.assertEqual(
+            board_notice("ncaaf", ("spread", "moneyline", "total"))["lift_condition"],
+            LIFT_CONDITION,
+        )
 
 
 class MarketSpellingTests(unittest.TestCase):

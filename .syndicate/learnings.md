@@ -2363,3 +2363,53 @@ in a row, all pointing at an innocent API.
 phase B is right and would have caught this at 28 credits), AND before believing
 any negative result about an external system, prove your request was
 well-formed — ideally against a case you KNOW should return data.
+---
+
+## 2026-08-20 — MAE IS NOT PLAYABILITY. The model loses to a mindless side bet.
+
+**I spent most of a session measuring the wrong quantity.** Every NCAAF and NFL
+verdict up to this point graded **MAE** — how close the projected margin lands.
+That is an ENGINE diagnostic. It is not a betting decision, and the two can
+disagree: a model can carry worse MAE and still be playable if its
+DISAGREEMENTS with the market are directionally right.
+
+The user asked to "serve the ones that show playable". Testing that properly —
+ATS, against the **52.4% breakeven at −110**, not 50% — produced a harder answer
+than any MAE result had:
+
+    NCAAF 2024, clean out-of-sample, 751 games
+        |edge| >= 0    46.8% ATS      |edge| >= 10   45.2% ATS
+    Filtering HARDER makes it WORSE. There is no threshold where a playable
+    subset appears; the "only serve strong picks" instinct fails in the
+    direction opposite to the one that would help.
+
+**THE TEST THAT MATTERED, and it nearly went unrun.** An under-dispersed model
+always says "closer than the market thinks", so it always fades the favourite —
+making its apparent edge indistinguishable from a blind underdog bet unless you
+check. NFL preseason had just read 54.7% ATS and looked positive:
+
+                           always bet the dog   the model   model adds
+        NFL preseason            58.9%            54.7%      -4.2 pts
+        NCAAF 2024               51.2%            46.8%      -4.4 pts
+
+**The model is WORSE THAN IGNORING IT.** The NFL "edge" was riding a dog fade
+and DEGRADING it. Two sports, two models, two sample sizes, near-identical
+subtraction — wherever the model's opinion is strong enough to deviate from the
+naive side, it is wrong more often than not.
+
+**The generalisable rule: always benchmark a model against the dumbest strategy
+that produces the same BETS**, not just against the market. "Beats the close"
+and "beats always-bet-X" are different bars, and a systematically biased model
+clears neither while appearing to clear the first on a favourable sample. The
+`dog%` column is the tell: 92–100% means the threshold is selecting a SIDE, not
+a signal.
+
+**Also recorded:** per-book rows overstated significance **3.4x** on the NFL
+grade (t=+4.00 → +0.87 once collapsed to one row per game), because the same
+game repeats across 14 books. Store per-provider — price shopping is worth +2.79
+ROI points — but ANALYSE per game.
+
+**Acted on, not just noted:** `pick_gate.LIFT_CONDITION` now requires beating the
+naive baseline, a CI lower bound above 52.4%, out-of-sample pre-specified
+subsets, and denominators in bets. `scripts/grade_football_playability.py`
+measures it, and `LiftConditionTests` pins it so it cannot be quietly weakened.
