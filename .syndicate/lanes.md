@@ -663,31 +663,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **DIAGNOSIS COMPLETE: the model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%, deviation w=-0.028). EVERY lever measured and DEAD — injuries, situational, returning production, scale, blending. Picks SUPPRESSED live; new ATS exit criterion deployed and verified 8/8.** — opened 2026-08-18 — session: football-model-owner
-- Status: **All work on `origin/main`, verified by content.** web `ea6f431f`
-  live 15:55:25Z (new LIFT_CONDITION, 8/8 probes); NCAAF picks suppressed;
-  projections 51 games at SP+ (max 50.60); NFL picks 12 and untouched.
-- **THE ONE FACT THAT MATTERS:** the model is dominated, not broken. It has real
-  signal (R² 17.8%) but its deviation from the market carries none (w=-0.028,
-  CI [-0.130,+0.069]). No threshold, weight or subset can help — that single
-  fact explains every failed remedy, so STOP re-testing them.
-- **DO NOT RETRY (all measured dead):** injuries (NFL market prices them; and
-  NCAAF has no feed — CFBD 74 endpoints, ESPN 1 stale record/60 teams);
-  situational factors (all 8 priced, 1,746 games); returning production (pooled
-  t=-0.89, code removed); `SP_RATING_SCALE` (all scales 6..24 lose); blending
-  (w≈0 → 100% market); the three scalar totals fixes; "beat the OPEN first".
-- **Harnesses, all on origin — run these BEFORE building anything:**
-  `grade_football_model_weight.py` (dominated vs broken),
-  `grade_football_playability.py` (ATS vs naive baselines),
-  `test_ncaaf_situational_edge.py` (market-residual test),
-  `test_nfl_injury_market_edge.py`, `probe_ncaaf_injury_feed.py`.
-- **NEXT ACTION for whoever picks this up:** there is no measured lever left.
-  Either (a) re-run the injury/situational tests on MORE SEASONS — both rest on
-  one season and are "no evidence" not "proven no effect" — or (b) accept that
-  NCAAF/NFL margins are not a product and redirect. Do NOT build a feature
-  without first regressing the market residual on it.
+### football-model-owner — OPEN — **ALL LEVERS RESOLVED. Model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%). Injuries settled PRICED on 17 seasons / 4,431 games. Picks suppressed live. No measured lever remains.** — opened 2026-08-18 — session: football-model-owner
+- Status: **All work on `origin/main` (`9ce663fe`), verified by content.** web
+  `ea6f431f` live; NCAAF picks suppressed; board serves SP+ week 1 (51 games,
+  max 50.60); NFL picks untouched.
+- **THE ONE FACT:** the model is dominated, not broken — real signal (R² 17.8%)
+  but its deviation from the market carries none (w=−0.028, CI [−0.130,+0.069]).
+  No threshold, weight or subset can help. STOP re-testing them.
+- **DO NOT RETRY — all measured dead:** injuries (PRICED, 17 seasons, 4,431
+  games; a 4-season run said otherwise and was a false positive); situational
+  (all 8 priced, 1,746 games); returning production (pooled t=−0.89, code
+  removed); `SP_RATING_SCALE` (every scale 6..24 loses); blending (w≈0);
+  the three scalar totals fixes; "beat the OPEN first".
+- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` has `spread_line`
+  back to 1999, free, 2.2 MB. It IS the home-margin prediction (r=+0.431; MAE
+  10.264 as-is vs 14.645 negated). OddsAPI historical NFL starts 2020.
+- **Harnesses — run BEFORE building anything:**
+  `grade_football_model_weight.py`, `grade_football_playability.py`,
+  `test_ncaaf_situational_edge.py`, `test_nfl_injury_market_edge.py`,
+  `probe_ncaaf_injury_feed.py`.
+- **NEXT ACTION:** no measured lever remains. Either accept NCAAF/NFL margins
+  are not a product and redirect, or find an input class that is NOT
+  performance-derived and NOT already priced. Whatever it is, regress the market
+  residual on it FIRST — and state the detectable-effect floor before calling
+  any result null.
 - **UNCOMMITTED:** `data/nfl_source/historical_odds/closing_lines_preseason_*.json`
-  — 2,728 credits of purchased odds, untracked by directory convention.
+  — 2,728 credits, untracked by convention, and still the ONLY preseason line
+  source (`games.csv` is regular-season only).
 
 ### soccer-odds-capture-cadence-gap — CLOSED-VERIFIED 2026-08-20 01:25Z — **`#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request for every league, 9 days straight; fixed (`3e8264bd`), deployed to both live-odds-worker (`575decf3`) and refresh-worker (`b2f4b197`, cherry-picked onto their scoped live SHA), and VERIFIED with real production data: a manual pregame trigger post-deploy produced genuine fresh captures across the full soccer book_quotes shard, and 6 of the originally-8 stale MLS/La Liga matches now show `captured_at` 3 minutes old. Full evidence chain in `.syndicate/deploys.md`'s 2026-08-20 01:25Z entry.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
@@ -1173,6 +1175,59 @@ history directly:
   rather than renders empty when a rail dict lacks an `items` key, because Jinja
   falls back to the `dict.items` method.
 - Blocked by: none.
+
+### soccer-board-mlb-parity — OPEN — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
+- Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
+  carry the same information classes MLB's do. **Single testable outcome:** on a
+  fixed slate date, soccer's card renders (a) market tiles carrying selection +
+  price + model + edge rather than bare probabilities, (b) a box-score panel
+  built from real match state on a completed/live match instead of
+  "Box score unavailable", and (c) information density within 2x of MLB's
+  measured 544 leaf-text-items/Mpx — against soccer's measured 139 today.
+- Files:
+  - `syndicate/features/shared/game_board_contract.py` — the shared normalizer.
+    `_build_box_sections` clobbers a sport's own sections (:775, unconditional
+    assignment); `market_tiles` setdefault (:764) derives from `metrics[:4]`;
+    `_build_prop_status_rows` (:706) drops every synthesized row; the live
+    market-tile branch (:791) is unreachable when `metrics` is non-empty.
+  - `syndicate/features/soccer/cards.py` — **DECLARED OVERLAP, see Blocked by.**
+  - `syndicate/blueprints/soccer.py` — `/soccer` redirect (:87) and a new
+    date-scoped cross-league cards route.
+  - `syndicate/features/soccer/sources.py` — week->date resolution.
+  - `syndicate/templates/soccer/`, `syndicate/static/soccer/` (new files).
+  - `tests/test_soccer_*` (new), `.syndicate/*`.
+- The cross-session TODO list is deliberately NOT claimed here:
+  `mlb-overview-hydration-cost` already holds it and a second claim reads as
+  contested. I still reconcile my items into it at checkpoint, per CLAUDE.md.
+- **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, `adapters.py`,
+  ratings, `ingestion/*` — all held by `soccer-model-dispersion`. I do not
+  change what the model produces, only what the board does with it.
+- Hypothesis (diagnostic half, already tested): soccer's thin card is NOT a
+  missing-data problem — the data is in the payload and the shared normalizer
+  discards it. **CONFIRMED 2026-08-20 against production**, before any edit:
+  `/soccer/epl/api/cards` carries `betting.home_ml -590`, `away_ml +1400`,
+  `spread -1.5`, `total 2.5` and six per-market EV fields, while all four
+  rendered tiles read a bare probability with the matchup string repeated as
+  every sub-label. A completed MLS match (HOU 1-0 LA) carries `home.score`/
+  `away.score` in the same payload and renders "Box score unavailable".
+- Falsification test: if the same payloads had shown null prices / null EV /
+  no scores, the finding would be a data gap and this lane would be wrong to
+  open as UI work. They did not. Re-run `curl /soccer/<league>/api/cards` and
+  read `betting` + `home.score` before trusting any later claim here.
+- Verification: `scripts/ui_layout_probe.py` before/after on the soccer board
+  (the durable instrument named in `state.md [ui-board-cards]`), plus the
+  leaf-text-density measurement above re-taken against the SAME production
+  service, plus `python -m unittest tests.test_archives` green. A density
+  number taken against a dev box is not the reading.
+- Blocked by: none, but **DECLARED OVERLAP**: `soccer-model-dispersion` (OPEN,
+  session `Soccer Session (fork)`, not running as of 2026-08-20 16:4xZ) claims
+  `syndicate/features/soccer/` with the parenthetical scope "(sim engine,
+  adapters, ratings, `ingestion/espn_match_stats.py`)". `cards.py` sits in that
+  directory and outside that parenthetical. I read it as not claimed, notified
+  that session with the exact file list before editing, and am proceeding on
+  that reading with the user's decision. **If that lane says otherwise, stop.**
+  Recording it here rather than omitting it, because a silent overlap is the
+  failure mode the lane protocol exists to prevent.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

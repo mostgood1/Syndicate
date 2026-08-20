@@ -2491,3 +2491,45 @@ seductive number I produced today and it means nothing on its own.
 could have detected.** If that floor is larger than the effect worth having,
 the honest verdict is UNRESOLVED, not DEAD — and the fix is more data, not a
 conclusion.
+
+---
+
+## 2026-08-20 — A NULL HAS A SAMPLE SIZE. I called a lever dead, revived it, then buried it properly.
+
+**The same question answered three ways as n grew, and only the third was
+honest about its own power.**
+
+    272 games (2025)       all null            -> I wrote "THE INJURY LEVER IS DEAD"
+  1,083 games (2022-25)    two measures |t|>2  -> forced to correct: "UNRESOLVED"
+  4,431 games (2009-25)    all null again      -> RESOLVED, with the floor stated
+
+I had spent the whole day refusing to over-read POSITIVE results and then
+over-read a NEGATIVE one. The section's own limits paragraph said n=272 could
+not detect a small effect; the headline said "dead" anyway. **"No effect
+detected" is a statement about the test's POWER, and dropping that turns a
+provisional finding into a false certainty.**
+
+**What the final answer looks like when done properly:** all four measures null
+(best t=−1.74) AND *"at this n the test detects a slope of ~0.18 pts; the
+observed is −0.146"*. That second clause is the difference between "dead" and
+"dead, and here is what I could have seen".
+
+**THE FOUR-SEASON REVIVAL WAS A FALSE POSITIVE, and the per-season table is the
+only thing that caught it.** Pooled 2022-25 read t=−2.10 and −2.23. Across 17
+seasons the slopes swing **+0.7291, +0.7061, −0.9451, −0.8005**, with THREE
+crossing |t|=2 in BOTH directions and 12 of 17 negative against ~8.5 expected by
+chance. **Pooled significance without per-season replication is one finding, not
+seventeen.** Print the per-season table beside every pooled row.
+
+**AND THE DATA I ALMOST BOUGHT WAS FREE.** The plan was ~10,000 OddsAPI credits
+to backfill 2018-2021. Two probes cost 3 credits and replaced it entirely:
+OddsAPI historical NFL returns **zero events for 2018/2019** (coverage starts
+2020; empty responses are not billed), and **nflverse `schedules/games.csv`
+already carries `spread_line` and `total_line` back to 1999** in 2.2 MB
+alongside final scores.
+
+This is the SECOND time in one day that "buy the data" was the wrong move and a
+cheap probe was the right one — after 7,528 credits went on a wrong sport key.
+**Before any purchase: (1) does the vendor have it, (2) does something local
+already have it.** The second question is the one I skipped both times, and the
+answer here had been sitting in the repo's own ingestion module the whole time.
