@@ -17926,3 +17926,77 @@ window on broken code too. NOT "no OOM kills", which a quiet period yields for
 free.
 
 **rollback:** redeploy `041188cb`.
+
+
+## PENDING (supersedes the `4c11e37f` row above) — refresh-worker `5ad1d96e` — `#387`
+
+Lane `mlb-overview-hydration-cost`. `/preflight` run 2026-08-20 13:0xZ
+(08:0x CDT). **Reasoning gate PASS. Mechanical gate NOT taken — see blockers.**
+
+    target    5ad1d96e  (branch deploy/mlb-overview-hydration-cost)
+    base      041188cb  refresh-worker's LIVE SHA -- NOT main (unchanged)
+    was       4c11e37f  superseded; two defects found by the checklist
+
+**THE CHECKLIST FOUND TWO REAL DEFECTS. That is the point of running it.**
+
+1. **`4c11e37f` had NO production-observable signal that the prune fired.** The
+   three prior candidates for this excursion — deepcopy, ledger accumulation,
+   three-loads-to-one — were each deployed, exercised, and then could not be
+   shown to have moved the transient, because every available reading was a
+   container aggregate confounded by slate size, boot age and concurrent load.
+   Deploying a fourth the same way repeats the pattern exactly. `da963689` +
+   `5ad1d96e` add, worker-only, once per `_daily_actual_by_game` call:
+
+       [mlb_cards] FEED_LIVE_PRUNE enabled=True date=... games=15 pruned=15 plays_dropped=1067
+
+   It counts WORK DONE (attributable), not memory saved (not attributable).
+   **`pruned=0` while `games>0` means the branch is inert and the deploy must
+   NOT be scored as a win.**
+
+2. **The parity harness was comparing the wrong channel.** It captured stdout,
+   so it compared the serialised object PLUS anything the subject printed. The
+   moment the line above existed, parity reported DIFFERENT by 3 bytes
+   (`enabled=True/False`, `pruned=15/0`) on a change that is provably
+   output-neutral. Payload now goes to a temp file. **The web arm stayed
+   IDENTICAL throughout, and that asymmetry is what identified the harness
+   rather than the code** — the emitter is worker-only.
+
+   Also fixed (`da963689`): both invariant comments named a test file AND a test
+   that do not exist — `test_mlb_cards_feed_live_prune.py` (real file:
+   `test_mlb_cards_worker_hydration_cost.py`) and `..._shard_has_no_games_key`
+   (real test: `..._shard_schema_has_no_games_key`). Both comments are
+   load-bearing: they are the stated justification for the denylist and for
+   removing the dead shard load.
+
+**RE-MEASURED after all three commits** (15-game slate, 4 repeats, steady state,
+worker path, local RSS — ratio only, not a production magnitude):
+
+    peak RSS     ON 114.5MB   OFF 142.8MB    -28.3MB / -19.8%
+    transient    ON  +36.4MB  OFF  +52.3MB
+    retained     ON   +4.9MB  OFF  +11.3MB
+    parity       worker games list / worker page context / web page context -- all IDENTICAL
+    tests        10/10
+
+**BLOCKERS AS OF 13:07Z — mechanical gate not taken, nothing touched:**
+- **claim HELD by `nfl-autorun-production-arm`, re-acquired 1.3 min earlier.** It
+  had EXPIRED at ~13:02Z and was taken again; a live session mid-work, not stale.
+  Not forced. All three services are claimed right now by three different lanes
+  (`web` → basketball-model-owner, `live-odds-worker` → wnba-live-odds-capture-gap).
+- **preflight HOLD: 3 jobs in flight** — `refresh_odds_sources.py`,
+  `run_refresh_odds_job.py`, `build_soccer_artifacts.py --league serie_a`.
+
+**ALSO NOTED, and it matters for the measurement window:** refresh-worker
+restarted at **13:02:48Z on the SAME SHA `041188cb`** (RSS 147MB vs 1350MB
+before). Any memory reading taken now is boot-confounded — the floor IS the
+ratchet, and every fix looks good for five minutes after a boot. The verify
+below must be taken against a comparably-aged process, not against a fresh one.
+
+**verify: (owed).** Primary discriminator is the emitted line itself —
+`FEED_LIVE_PRUNE enabled=True pruned=N` with `N == games` on a real MLB slate
+proves the branch fired. Only then is the memory reading worth taking:
+`cards_context_actual_games_loaded` → `cards_context_games_built` container delta
+for a 15-game slate, same-clock against `041188cb`. NOT "no OOM kills" — a quiet
+period yields that on broken code, and `learnings.md` forbids concluding it from
+a log search at all.
+
+**rollback:** redeploy `041188cb`.
