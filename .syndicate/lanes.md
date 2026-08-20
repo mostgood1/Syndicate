@@ -641,31 +641,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **DIAGNOSIS COMPLETE: the model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%, deviation w=-0.028). EVERY lever measured and DEAD — injuries, situational, returning production, scale, blending. Picks SUPPRESSED live; new ATS exit criterion deployed and verified 8/8.** — opened 2026-08-18 — session: football-model-owner
-- Status: **All work on `origin/main`, verified by content.** web `ea6f431f`
-  live 15:55:25Z (new LIFT_CONDITION, 8/8 probes); NCAAF picks suppressed;
-  projections 51 games at SP+ (max 50.60); NFL picks 12 and untouched.
-- **THE ONE FACT THAT MATTERS:** the model is dominated, not broken. It has real
-  signal (R² 17.8%) but its deviation from the market carries none (w=-0.028,
-  CI [-0.130,+0.069]). No threshold, weight or subset can help — that single
-  fact explains every failed remedy, so STOP re-testing them.
-- **DO NOT RETRY (all measured dead):** injuries (NFL market prices them; and
-  NCAAF has no feed — CFBD 74 endpoints, ESPN 1 stale record/60 teams);
-  situational factors (all 8 priced, 1,746 games); returning production (pooled
-  t=-0.89, code removed); `SP_RATING_SCALE` (all scales 6..24 lose); blending
-  (w≈0 → 100% market); the three scalar totals fixes; "beat the OPEN first".
-- **Harnesses, all on origin — run these BEFORE building anything:**
-  `grade_football_model_weight.py` (dominated vs broken),
-  `grade_football_playability.py` (ATS vs naive baselines),
-  `test_ncaaf_situational_edge.py` (market-residual test),
-  `test_nfl_injury_market_edge.py`, `probe_ncaaf_injury_feed.py`.
-- **NEXT ACTION for whoever picks this up:** there is no measured lever left.
-  Either (a) re-run the injury/situational tests on MORE SEASONS — both rest on
-  one season and are "no evidence" not "proven no effect" — or (b) accept that
-  NCAAF/NFL margins are not a product and redirect. Do NOT build a feature
-  without first regressing the market residual on it.
+### football-model-owner — OPEN — **ALL LEVERS RESOLVED. Model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%). Injuries settled PRICED on 17 seasons / 4,431 games. Picks suppressed live. No measured lever remains.** — opened 2026-08-18 — session: football-model-owner
+- Status: **All work on `origin/main` (`9ce663fe`), verified by content.** web
+  `ea6f431f` live; NCAAF picks suppressed; board serves SP+ week 1 (51 games,
+  max 50.60); NFL picks untouched.
+- **THE ONE FACT:** the model is dominated, not broken — real signal (R² 17.8%)
+  but its deviation from the market carries none (w=−0.028, CI [−0.130,+0.069]).
+  No threshold, weight or subset can help. STOP re-testing them.
+- **DO NOT RETRY — all measured dead:** injuries (PRICED, 17 seasons, 4,431
+  games; a 4-season run said otherwise and was a false positive); situational
+  (all 8 priced, 1,746 games); returning production (pooled t=−0.89, code
+  removed); `SP_RATING_SCALE` (every scale 6..24 loses); blending (w≈0);
+  the three scalar totals fixes; "beat the OPEN first".
+- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` has `spread_line`
+  back to 1999, free, 2.2 MB. It IS the home-margin prediction (r=+0.431; MAE
+  10.264 as-is vs 14.645 negated). OddsAPI historical NFL starts 2020.
+- **Harnesses — run BEFORE building anything:**
+  `grade_football_model_weight.py`, `grade_football_playability.py`,
+  `test_ncaaf_situational_edge.py`, `test_nfl_injury_market_edge.py`,
+  `probe_ncaaf_injury_feed.py`.
+- **NEXT ACTION:** no measured lever remains. Either accept NCAAF/NFL margins
+  are not a product and redirect, or find an input class that is NOT
+  performance-derived and NOT already priced. Whatever it is, regress the market
+  residual on it FIRST — and state the detectable-effect floor before calling
+  any result null.
 - **UNCOMMITTED:** `data/nfl_source/historical_odds/closing_lines_preseason_*.json`
-  — 2,728 credits of purchased odds, untracked by directory convention.
+  — 2,728 credits, untracked by convention, and still the ONLY preseason line
+  source (`games.csv` is regular-season only).
 
 ### soccer-odds-capture-cadence-gap — CLOSED-VERIFIED 2026-08-20 01:25Z — **`#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request for every league, 9 days straight; fixed (`3e8264bd`), deployed to both live-odds-worker (`575decf3`) and refresh-worker (`b2f4b197`, cherry-picked onto their scoped live SHA), and VERIFIED with real production data: a manual pregame trigger post-deploy produced genuine fresh captures across the full soccer book_quotes shard, and 6 of the originally-8 stale MLS/La Liga matches now show `captured_at` 3 minutes old. Full evidence chain in `.syndicate/deploys.md`'s 2026-08-20 01:25Z entry.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually

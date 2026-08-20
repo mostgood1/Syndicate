@@ -1968,11 +1968,22 @@ independent sports**. NCAAF ATS gets WORSE as the edge filter tightens
 | lever | verdict |
 |---|---|
 | situational (8 factors) | PRICED. 1,746 games, no \|t\|≥2. Positive control t=+2.70 |
-| injuries | PRICED by the NFL market. 272 games, 4 measures null; ATS 54.5/50.0/58.3%, all CIs span 52.4%, non-monotonic |
+| injuries | **PRICED — RESOLVED on 4,431 games / 17 seasons (2009-25)**. All 4 measures null (best −1.74). Power stated: detects ~0.18 pts, observed −0.146. A 4-season run read t=−2.10/−2.23 and that was a FALSE POSITIVE — per-season slopes swing +0.73/+0.71/−0.95/−0.80 with 3 seasons crossing \|t\|=2 in BOTH directions. ATS 51.3/51.1/52.1/59.5%, none clearing 52.4% |
 | returning production | pooled ΔMAE −0.062, t=−0.89. **Code REMOVED** |
 | `SP_RATING_SCALE` | every scale 6..24 loses |
 | blending | w≈0 → optimal blend is 100% market |
 | three scalar totals fixes | measured dead |
+
+**NFL CLOSING LINES ARE FREE AND LOCAL — do not buy them.** nflverse
+`schedules/games.csv` (2.2 MB) carries `spread_line` and `total_line` back to
+**1999** alongside final scores; fetch via
+`ingestion/nflverse_ingestion.py`-style release URLs, cached under
+`tracking/nflverse/schedules_games.csv`. **`spread_line` IS the home-margin
+prediction** (positive = home favoured), verified empirically: r=+0.431 with
+realised home margin, MAE **10.264 as-is vs 14.645 negated**. Using it negated
+inverts every conclusion while producing plausible numbers.
+**OddsAPI historical NFL starts in 2020** — 2018/2019 return zero events (billed
+0 credits), so a pre-2020 backfill buys nothing.
 
 **NO USABLE NCAAF INJURY FEED.** CFBD's OpenAPI spec: **74 endpoints, none**.
 ESPN core — NFL control **597 fresh injuries / 8 teams** vs CFB **1 record
