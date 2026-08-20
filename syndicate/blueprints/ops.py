@@ -1102,6 +1102,60 @@ def api_ops_ncaaf_season_weeks() -> Any:
 _PUBLISH_STREAM_CHUNK_BYTES = 1024 * 1024
 
 
+_PUBLISH_DIVERGENCE_SHRINK_RATIO = 0.80
+_PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
+
+
+def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publisher: str):
+    """(should_refuse, marker) for `#488` -- two services overwriting one path.
+
+    THE INCIDENT. `wnba_source/data/processed/boxscores_history.csv` read
+    6,755 rows / max date 2026-08-18, then 3,889 rows / 2026-06-30 twenty
+    minutes later. Nothing had lost data: live-odds-worker's copy (with
+    `#469`'s ESPN capture) and refresh-worker's stale copy were alternately
+    overwriting one destination, last writer wins. Downstream that produced
+    `player_logs` builds of 3,178 and 1,363 rows, and a home-court constant
+    of -0.0116 from 46 games -- a NEGATIVE home-court advantage published for
+    the sim to consume.
+
+    WHY SIZE ALONE IS NOT THE TEST. A service legitimately shrinks its own
+    artifact (retention pruning), and refusing that would break real writes.
+    The signature of divergence is a large shrink FROM A DIFFERENT PUBLISHER
+    than last wrote the path. One service pruning its own file is untouched.
+
+    WHY UNKNOWN IS NOT TREATED AS SAME-PUBLISHER. An older sender omits the
+    header. Mapping absent onto "same publisher" is the permissive branch and
+    would silence exactly the case this exists to catch, so unknown is
+    reported as UNKNOWN and allowed through with a marker -- visible, not
+    silent, and never a hard block on a sender that predates this.
+    """
+    try:
+        target = data_root() / Path(relative_path)
+        if not target.is_file():
+            return False, None
+        existing = int(target.stat().st_size)
+    except Exception:
+        return False, None
+    if existing <= 0 or incoming_bytes <= 0:
+        return False, None
+    ratio = float(incoming_bytes) / float(existing)
+    if ratio >= _PUBLISH_DIVERGENCE_SHRINK_RATIO:
+        if publisher:
+            _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
+        return False, None
+    last = _PUBLISH_LAST_PUBLISHER.get(relative_path)
+    who = publisher or "UNKNOWN"
+    marker = (
+        f"[ops.publish] PUBLISH_DIVERGENCE path={relative_path} publisher={who} "
+        f"last_publisher={last or 'UNKNOWN'} incoming_bytes={incoming_bytes} "
+        f"existing_bytes={existing} ratio={ratio:.3f}"
+    )
+    cross = bool(publisher and last and publisher != last)
+    if publisher:
+        _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
+    return cross, marker + (" verdict=REFUSED" if cross else " verdict=ALLOWED_WITH_WARNING")
+
+
 def _publish_streamed_body() -> Any:
     """Receive a raw streamed artifact body, one chunk resident at a time.
 
@@ -1155,6 +1209,22 @@ def _publish_streamed_body() -> Any:
                     }
                 ),
                 400,
+            )
+        publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
+        refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
+        if marker:
+            print(marker, flush=True)
+        if refuse:
+            temp_path.unlink(missing_ok=True)
+            return (
+                jsonify({
+                    "ok": False,
+                    "error": "publish refused: would replace a larger artifact written by a different publisher",
+                    "relative_path": relative_path,
+                    "bytes": written,
+                    "publisher": publisher,
+                }),
+                409,
             )
         os.replace(temp_path, target_path)
     except Exception as exc:
