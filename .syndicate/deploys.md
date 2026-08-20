@@ -19725,3 +19725,114 @@ sim projections, win probabilities and market tiles on that card are still
 being read from a 2026-07-20 artifact. Worth its own lane.
 
 Claim released.
+
+---
+
+## 2026-08-20 ~22:1xZ — CORRECTION SWEEP — which of this session's soccer findings rest on a MONTH-OLD artifact
+
+**No deploy. An audit of my own entries above, prompted by a preflight that
+failed on measurability.** Every soccer reading I took today came from web,
+and web is serving an artifact stamped `generated_at 2026-07-20`.
+
+### The extent, measured — it is NOT uniform, and assuming it was would have been the same error again
+
+| league | recommendations artifact | |
+|---|---|---|
+| epl | `2026-07-20T21:32:18` | **STALE** |
+| la_liga | `2026-07-20T21:33:36` | **STALE** |
+| bundesliga | `2026-07-20T21:33:58` | **STALE** |
+| ligue_1 | `2026-07-20T21:35:48` | **STALE** |
+| mls | `2026-08-20T21:31:27` | **FRESH (today)** |
+| serie_a | — | no artifact (`count=0`) |
+
+The four stale stamps fall inside **three and a half minutes of each other**,
+which reads as ONE publish event rather than four independent failures. That
+belongs to `soccer-stale-artifact-overwrite`; recorded here because it is
+cheap for them and expensive to rediscover.
+
+**mls being FRESH is what makes this an audit rather than a shrug** — the
+pipeline demonstrably can write current artifacts, so "everything soccer is
+stale" would have been false. mls could not serve as a control for the
+live-score question, though: its fresh artifact has `matches: 0`.
+
+### Findings that are WEAKENED — the one that could invert
+
+**`"17 of 28 priced — the join is fine, ZERO priced players unmatched"` (20:08Z
+entry, and the ~21:3xZ correction that settled it).** The 17 came from
+`picks_*.csv`; the 28 came from the STALE sim list. **A stale list is a
+SUPERSET** — 28 names where a fresh build would carry ~23 — so "every priced
+player is findable in the sim" is strictly EASIER to satisfy against it. My
+null result was obtained in the exact direction staleness favours, which is
+when a null result is least worth trusting. **The conclusion that
+`_normalize_player_name` is not dropping anyone is NOT SAFE and must be
+re-run against a fresh artifact.** The downstream inference — that the gap is
+a stale squad list rather than a join failure — inherits that doubt, which
+matters because it is the premise of `5848f64d`.
+
+### Findings whose MECHANISM survives but whose MAGNITUDES do not
+
+- **Density 139 → 363/Mpx, box tab 30 → 238 items, card 1074 → 970px.** The
+  LAYOUT findings are DOM facts and independent of data: the stack was
+  one-column at every width, `overview-main` really was 756 x 996 px holding
+  twelve leaf values, the callout really did drop `row.value`. But the item
+  COUNTS are a 28-row squad table; on a fresh 23-player squad the box tab is
+  nearer 200 than 238 and the density figure falls with it. **The 2x-of-MLB
+  bar was met on stale-inflated counts.** MLB's side of that comparison is
+  sound — it was serving live in-progress games with real scores.
+- **22 em-dash cells** — same table, same stale 28.
+- **`player_props` truncation and `scoreline_probabilities` read by nothing** —
+  both are CODE facts, confirmed at both call sites. Only the illustrative
+  numbers (28 players, 3-0 at 14.0%) are stale.
+
+### The squad fix `5848f64d` — mechanism sound, EVERY NUMBER LOCAL-ONLY
+
+`players_*.csv` and `rosters_*.csv` return **HTTP 403, not allowlisted**. So
+the inputs the builder actually reads cannot be exported, and every figure in
+that commit — `epl 600 -> 480`, `Arsenal 28 -> 23`, `1,970 wrongly dropped by
+a roster filter`, `121 rescued` — is a LOCAL MIRROR number. CLAUDE.md is
+explicit that the mirror is never evidence about production. The mechanism is
+code-exact and was executed, but if production's `players_2025.csv` differs
+from the mirror's, the magnitudes move.
+
+**This also double-blocks that deploy's verification:** the served artifact is
+a month old AND the inputs are unreadable. Two independent reasons the
+"Arsenal 28 → 23" reading cannot be taken today.
+
+**Worth someone's lane:** `players_*.csv` and `rosters_*.csv` are
+worker-written, web-read, and absent from `HOT_ARTIFACT_PATTERNS` — the same
+shape as the three soccer odds/props/picks patterns that were added for
+exactly this reason (`artifact_publisher.py`, the "never allowlisted even
+though the dispatcher has scheduled them" note).
+
+### Findings that survive INTACT
+
+- **The league-slug 404** (`93b6d5a4`). Pure routing, no artifact in the path,
+  and verified on the served site AFTER deploy: 7/7 bad slugs 404 across
+  page/api/game/team shapes, 10/10 canonical leagues 200, case variants and
+  the four non-league routes 200.
+- **The ribbon captioning the match with the FIRST HALF.** `lens_rows[0]` vs a
+  game-level row is structural; period rows exist in any build. The 1.6-vs-3.5
+  illustration is stale, the defect is not.
+- **All layout/template defects** listed above — DOM-measured, data-independent.
+
+### And the characterization I overstated
+
+`00541a8d` says `live_home_score`/`live_away_score` "ARE NOT A SCORE ... a
+placeholder the artifact builder writes". What I actually established is
+narrower: they are the string `"0"` on 12 of 12 sampled artifacts INCLUDING
+`status_state == "pre"`. **I never observed a LIVE match whose real score was
+non-zero while the artifact said 0** — the one live fixture available
+(401882908) was genuinely 0-0, so it could not discriminate, and the fresh mls
+artifact has no matches. The FIX is still right for an independent reason:
+those fields are wired from `_fetch_fixtures`' ESPN payload and are not a live
+feed, so a live card must not render them. But "proven placeholder" is not
+what the evidence supports, and `_real_live_score`'s docstring should read as
+"not a live feed" rather than "a placeholder".
+
+### The rule this earns
+
+**A stale input does not just make a number wrong — it makes a NULL RESULT
+untrustworthy in a specific direction.** The join finding did not fail loudly;
+it succeeded more easily than it should have, and succeeded is what I wrote
+down. When re-auditing against staleness, sort findings by which way the
+staleness pushes them, not by whether they look wrong.
