@@ -1041,9 +1041,46 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `/mlb/api/cards` payload showing ladder-derived chips on pregame sides that
   have no pitcher recommendation (George Kirby is the control — he has a prop
   row, no pick, and no chip today). Reading written to `deploys.md`.
-- **Blocked by:** none. Deploy target is refresh-worker (the writer) — claim
-  required, and web is currently 502ing on `/api/ops/version`, which is
-  somebody else's deploy and must be clear before I measure anything.
+- **Blocked by:** none. Deploy target is refresh-worker (the writer).
+
+#### DEPLOY GATE NOTES `[2026-08-20 18:0xZ, this lane]`
+
+**1. `deploy_preflight.py` said CLEAR while a board build WAS in flight.** It
+reported `CLEAR: only infrastructure processes running` at 18:05:44Z. Ninety
+seconds later `check_deploy_safety.py` reported `Board build IN FLIGHT on
+refresh-worker (started 18:04:16Z)` — i.e. the build had already been running
+for 88 seconds when preflight called it clear. **Not a contradiction, a blind
+spot:** preflight enumerates OS processes, and the board build runs IN-PROCESS
+inside `run_refresh_worker.py` (pid 39). There is no child process for it to
+see, so no board build can ever appear in that check. Preflight's process list
+is evidence about SUBPROCESSES only. **Run `check_deploy_safety.py` as well —
+preflight passing is not the same fact.** Filed under `learnings.md`'s
+instrument-blindness rule: a healthy reading is evidence only once you know what
+makes it read unhealthy.
+
+**2. ANCESTRY SAID REVERT; CONTENT SAID CUMULATIVE. Content was right.**
+refresh-worker's live SHA `39570b24` is NOT an ancestor of `origin/main`, and
+`git log origin/main..39570b24` lists 20 commits / 88 files / 18,582 insertions
+— which reads like deploying main would revert the native ladders builder, the
+`041188cb` direct-publish ceiling fix, the soccer `#343` fix, WNBA `#263` and
+the whole vendor sim-engine track. **It would not.** That diff is measured
+against the MERGE-BASE, not against what is live. Measured directly
+(`git diff 39570b24 a54dffa3`):
+
+    code files DELETED by deploying a54dffa3 ... 0
+    vendor/mlb_bettingv2/sim_engine/{conditional_mix,pitch_model,batted_ball}.py ... IDENTICAL
+    syndicate/features/shared/{artifact_publisher,basketball_props_smart_sim}.py ... IDENTICAL
+    scripts/run_mlb_daily_sim_job.py ... IDENTICAL
+    syndicate/features/shared/live_refresh_loop.py ... +24 -0 (main AHEAD)
+    syndicate/features/mlb/ladders_build.py ... +119 -11 == exactly this lane's change
+
+  The only deletions are 13 regenerable `data/ncaaf_source/*.csv` mirror files.
+  So main is a SUPERSET of the live SHA by value; those 20 commits reached main
+  under different SHAs via rebase/cherry-pick. This is `learnings.md`'s "test
+  deployment by content, not ancestry" — and it is why `render_deploy.py` needs
+  `--allow-rollback` here despite this not being a rollback. **Anyone repeating
+  this check: `origin/main..<live>` is the WRONG command; `git diff <live>
+  <target>` is the right one.**
 
 ### soccer-board-mlb-parity — OPEN — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. STAYS OPEN: the stated target was density within 2x of MLB (569 → 285) and 176 misses it.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
 - Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
