@@ -803,6 +803,90 @@ class MatchBoxTests(unittest.TestCase):
         self.assertIn('statuses={"in", "post"}', src)
 
 
+class StaleArtifactStateTests(unittest.TestCase):
+    """A STALE `recommendations_*.json` blanked the card three hours after
+    full time, and every score source was correctly refusing it.
+
+    Measured on production 2026-08-20 21:45Z, minutes after the card fix went
+    live: `/soccer/api/cards?date=2026-08-20` served Alaves @ Rayo Vallecano
+    with NO score, while `match_box` in the same `live_state_2026-08-20.json`
+    carried `final: true`, `1-1`, both goals and full team stats, written 90
+    seconds earlier. Web was reading the GIT-TRACKED MIRROR of the
+    recommendations artifact -- `generated_at 2026-07-20`, a month stale,
+    `status_state: "pre"`.
+
+    The score path was right. The STATE path was reading a cold-start mirror
+    that `CLAUDE.md` says is "not a snapshot of what production computed"."""
+
+    STALE_ARTIFACT = {
+        "event_id": "401882908",
+        "match_id": "401882908",
+        "date": "2026-08-20",
+        # The real values from the month-old git mirror.
+        "kickoff": "2026-08-20T19:00Z",
+        "status_state": "pre",
+        "live_home_score": "0",
+        "live_away_score": "0",
+        "matchup": {"home_team": "Rayo Vallecano", "away_team": "Alaves"},
+        "win_probability": {"home": 0.55, "draw": 0.25, "away": 0.20},
+        "team_projection": {"home_mean": 1.5, "away_mean": 1.0, "total_mean": 2.5},
+        "total_distribution": {},
+        "volume_projection": {},
+        "periods": {},
+        "top_props": [],
+    }
+
+    FRESH_BOX = {
+        "event_id": "401882908",
+        "status_state": "post",
+        "final": True,
+        "status_detail": "FT",
+        "score_home": "1",
+        "score_away": "1",
+        "home_team": "Rayo Vallecano",
+        "away_team": "Alaves",
+        "teams": {},
+        "goals": [],
+    }
+
+    def test_a_fresh_box_upgrades_a_stale_pre(self) -> None:
+        self.assertEqual(
+            cards._effective_state_with_box("pre", "2026-08-20T19:00Z", self.FRESH_BOX),
+            "post",
+        )
+
+    def test_without_the_box_the_stale_artifact_still_wins(self) -> None:
+        """`off != on`: the upgrade must be what changes the answer."""
+        self.assertEqual(
+            cards._effective_state_with_box("pre", "2026-08-20T19:00Z", None), "pre"
+        )
+
+    def test_the_kickoff_refusal_still_applies_to_the_box(self) -> None:
+        """An upgrade goes back through `_effective_status_state`, so a `post`
+        whose kickoff is days away is refused whichever source claimed it."""
+        self.assertEqual(
+            cards._effective_state_with_box("pre", "2026-09-25T19:00Z", self.FRESH_BOX),
+            "pre",
+        )
+
+    def test_it_cannot_downgrade_a_started_match(self) -> None:
+        self.assertEqual(
+            cards._effective_state_with_box("post", "2026-08-20T19:00Z", None), "post"
+        )
+        self.assertEqual(
+            cards._effective_state_with_box(
+                "in", "2026-08-20T19:00Z", {"status_state": "post"}
+            ),
+            "in",
+        )
+
+    def test_a_box_with_no_usable_state_changes_nothing(self) -> None:
+        for box in ({}, {"status_state": ""}, {"status_state": "pre"}, {"status_state": None}):
+            self.assertEqual(
+                cards._effective_state_with_box("pre", "2026-08-20T19:00Z", box), "pre", box
+            )
+
+
 class DateBoardTests(unittest.TestCase):
     def test_the_date_board_orders_live_first_and_finals_last(self) -> None:
         games = [

@@ -1398,6 +1398,57 @@ def _match_box_sections(
     return sections
 
 
+def _effective_state_with_box(status_state: Any, kickoff: Any, match_box: dict[str, Any] | None) -> str:
+    """`_effective_status_state`, but a FRESH per-match reading may upgrade it.
+
+    THE FAILURE THIS FIXES, measured on production 2026-08-20 21:45Z, minutes
+    after the card fix went live. `/soccer/api/cards?date=2026-08-20` served
+    Alaves @ Rayo Vallecano with NO score, three hours after it finished 1-1 --
+    while `match_box` in the same request's own `live_state_2026-08-20.json`
+    carried `final: true`, `detail: 'FT'`, `1-1`, both goals and full team
+    stats, written 90 seconds earlier.
+
+    THE CAUSE IS NOT THE SCORE PATH, IT IS THE STATE PATH. The state came from
+    `recommendations_2026-08-20.json`, and web was reading the GIT-TRACKED
+    MIRROR of that file -- `generated_at 2026-07-20T21:33:36`, a month stale,
+    `status_state: "pre"`, `live_home_score: "0"`. Every score source is gated
+    on `effective_state`, correctly, so a stale `"pre"` locked out a reading
+    that was sitting on the same disk and was current. `CLAUDE.md` says the
+    git-tracked trees are "a cold-start safety net ... not a snapshot of what
+    production computed"; this is that, deciding a live surface.
+
+    So the freshest, most specific reading is allowed to say the match has
+    started. `match_box.status_state` is ESPN's own scoreboard state for that
+    exact event id, written by `poll_soccer_live_state` on its last tick.
+
+    ONLY EVER AN UPGRADE, and never past the same guard. It cannot downgrade a
+    started match (`in`/`post` returns immediately), and the upgraded value is
+    put back through `_effective_status_state`, so the kickoff refusal still
+    applies -- a `post` whose kickoff is days away is still refused, whichever
+    source claimed it. A fixture that has not kicked off has no `match_box`
+    entry at all (the poller writes only `in` and `post`), so this cannot
+    invent a state for one.
+    """
+    state = _effective_status_state(status_state, kickoff)
+    if state in {"in", "post"}:
+        return state
+    if not isinstance(match_box, dict):
+        return state
+    box_state = str(match_box.get("status_state") or "").strip().lower()
+    if box_state not in {"in", "post"}:
+        return state
+    upgraded = _effective_status_state(box_state, kickoff)
+    if upgraded != state:
+        # Counted where it happens: an upgrade means the artifact was stale,
+        # and a silent correction hides that from whoever owns the artifact.
+        print(
+            f"[soccer_cards] STATE_UPGRADED_FROM_MATCH_BOX artifact={state} "
+            f"box={box_state} -> {upgraded} event={match_box.get('event_id')}",
+            flush=True,
+        )
+    return upgraded
+
+
 def _match_to_game(
     match: dict[str, Any],
     *,
@@ -1421,16 +1472,13 @@ def _match_to_game(
     # fetch, the score line and the badge previously each re-read the raw
     # `status_state`, so a guard applied to one of them would have left the
     # others still presenting a match its own kickoff says has not started.
-    effective_state = _effective_status_state(status_state, match.get("kickoff"))
+    # `match_box` FIRST, and fetched UNCONDITIONALLY, because it is allowed to
+    # decide the state -- see `_effective_state_with_box`. It is a dict lookup
+    # in a payload `live_state_payload` has already loaded, so asking for it on
+    # every match costs nothing.
+    match_box = _match_box_state(league, str(match.get("date") or "")[:10], event_id)
+    effective_state = _effective_state_with_box(status_state, match.get("kickoff"), match_box)
     live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
-    # Fetched for `post` as well as `in`: a finished match has no `games`
-    # entry at all (the poller fetches `statuses={"in"}` for that section), so
-    # `match_box` is the only per-match reading it ever has.
-    match_box = (
-        _match_box_state(league, str(match.get("date") or "")[:10], event_id)
-        if effective_state in {"in", "post"}
-        else None
-    )
 
     betting = _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team)
     prop_picks = _prop_picks_by_player(league, week, season)
