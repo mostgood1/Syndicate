@@ -271,6 +271,49 @@ class DateBoardTests(unittest.TestCase):
         order = [game["gamePk"] for game in sorted(games, key=cards._kickoff_sort_key)]
         self.assertEqual(order, ["l", "s", "f"])
 
+    def test_the_slate_date_is_central_not_utc(self) -> None:
+        """Reported by the user and confirmed on the SERVED board 2026-08-20:
+        eight MLS matches played on 08-19 Central appeared on the 08-20 board,
+        already Final.
+
+        Their real kickoffs, straight off the production payload -- 7:00 to
+        9:30 PM Central on the 19th, which is 00:00Z-02:30Z on the 20th. A
+        `[:10]` slice of the UTC stamp files an entire North American evening
+        onto the next day. `CLAUDE.md` documents this for NCAAF; the first cut
+        of the date board was written against UTC anyway.
+        """
+        played_on_the_19th_central = [
+            "2026-08-20T00:00Z",  # STL @ SKC
+            "2026-08-20T00:30Z",  # ATL @ MIN
+            "2026-08-20T01:30Z",  # LAF @ COL
+            "2026-08-20T01:30Z",  # DAL @ RSL
+            "2026-08-20T01:30Z",  # ATX @ SEA
+            "2026-08-20T02:30Z",  # SD  @ POR
+            "2026-08-20T02:30Z",  # SJ  @ LA
+            "2026-08-20T02:30Z",  # HOU @ VAN
+        ]
+        for kickoff in played_on_the_19th_central:
+            self.assertEqual(cards._central_slate_date(kickoff), "2026-08-19", kickoff)
+        # The one match that really was on the 20th (ALA @ RAY, 2:00 PM CT).
+        self.assertEqual(cards._central_slate_date("2026-08-20T19:00Z"), "2026-08-20")
+
+    def test_the_central_day_boundary_is_a_conversion_not_a_fixed_offset(self) -> None:
+        """05:00Z is midnight Central in CDT and 11:00 PM the previous day in
+        CST. A hardcoded offset passes in August and silently breaks in
+        November, which is the failure this repo keeps re-learning."""
+        self.assertEqual(cards._central_slate_date("2026-08-21T04:59Z"), "2026-08-20")
+        self.assertEqual(cards._central_slate_date("2026-08-21T05:00Z"), "2026-08-21")
+        # CST side of the year: 06:00Z is midnight Central, 05:59Z is not.
+        self.assertEqual(cards._central_slate_date("2026-11-20T05:59Z"), "2026-11-19")
+        self.assertEqual(cards._central_slate_date("2026-11-20T06:00Z"), "2026-11-20")
+
+    def test_an_unparseable_kickoff_is_excluded_rather_than_defaulted_in(self) -> None:
+        """`feedback_unknown_must_not_default_permissive`: an absent date must
+        not land on whatever board happens to be asking."""
+        self.assertIsNone(cards._central_slate_date(None))
+        self.assertIsNone(cards._central_slate_date(""))
+        self.assertIsNone(cards._central_slate_date("not-a-date"))
+
     def test_one_broken_league_does_not_blank_the_whole_board(self) -> None:
         """`learnings.md`: a per-league exception swallowed into an unreadable
         dict is how a live-lens outage stayed silent for days.

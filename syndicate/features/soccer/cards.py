@@ -1366,6 +1366,34 @@ def build_cards_page_context(league: str, week: int | None = None, season: int |
 # ---------------------------------------------------------------------------
 
 
+def _central_slate_date(kickoff: Any) -> str | None:
+    """The CENTRAL calendar date a kickoff belongs to.
+
+    Was `str(scheduled_start_utc)[:10]`, and that was wrong in production for
+    most of an evening slate. Reported by the user 2026-08-20 and confirmed:
+    the board for 2026-08-20 carried EIGHT MLS matches that were played on
+    2026-08-19 Central. Their UTC kickoffs are 00:00Z-02:30Z on the 20th --
+    a 7:00-9:30 PM Central start on the 19th -- so a UTC date slice files a
+    whole evening of North American football onto the following day, and the
+    cards arrive already Final.
+
+    `CLAUDE.md` documents this exact trap for NCAAF ("28 of 157 real 2026
+    kickoffs were previously filed under their UTC day... the platform's
+    display timezone is Central everywhere; `central_today_iso()` is the
+    slate clock"), and this function was written against UTC anyway. It is
+    also why the fix is a CENTRAL conversion rather than a fixed offset:
+    the offset changes with DST and the slate clock does not.
+
+    Reuses `_parse_kickoff`, which already owns the naive-stamp convention
+    for this file, rather than adding a second parse that could disagree
+    with the status badge about what a kickoff means.
+    """
+    parsed = _parse_kickoff(kickoff)
+    if parsed is None:
+        return None
+    return parsed.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+
+
 def _kickoff_sort_key(game: dict[str, Any]) -> tuple:
     """Kickoff order, with live matches first and finals last.
 
@@ -1396,7 +1424,7 @@ def date_games(date_str: str) -> list[dict[str, Any]]:
             season = default_season(league)
             week = default_week(league, season, reference_date=date_str)
             for game in week_games(league, week, season):
-                if str(game.get("scheduled_start_utc") or "")[:10] != date_str:
+                if _central_slate_date(game.get("scheduled_start_utc")) != date_str:
                     continue
                 games.append(game)
         except Exception as exc:  # noqa: BLE001
