@@ -52,9 +52,17 @@ function chipForGame(group) {
   const matchup = String(group.matchup||'').trim().toLowerCase();
   return gameChipsByMatchup.get(`${sport}|${matchup}`) || null;
 }
+// `deriveGameCards` REASSIGNS gameKeyMergeMap (`gameKeyMergeMap = new Map()`),
+// and here that name is a Function PARAMETER -- so the assignment rebinds the
+// parameter and the outer `let` above keeps pointing at the original, forever
+// empty, Map. Reading the outer one makes the merge map look like it was never
+// populated. `getMergeMap` closes over the parameter binding, so it sees what
+// the function actually built.
 const fn = new Function('state','gameChipsById','gameChipsByMatchup','gameKeyMergeMap','gameKey','displayMatchup','recommendationState','chipForGame',
-  src + '; return deriveGameCards;');
-const deriveGameCards = fn(state,gameChipsById,gameChipsByMatchup,gameKeyMergeMap,gameKey,displayMatchup,recommendationState,chipForGame);
+  src + '; return { deriveGameCards, getMergeMap: () => gameKeyMergeMap };');
+const built = fn(state,gameChipsById,gameChipsByMatchup,gameKeyMergeMap,gameKey,displayMatchup,recommendationState,chipForGame);
+const deriveGameCards = built.deriveGameCards;
+const getMergeMap = built.getMergeMap;
 
 function mkChip(sport,key,away,home,st,start){
   return {sport,game_key:key,matchup:`${away} @ ${home}`,state:st,start_time_utc:start,
@@ -128,3 +136,95 @@ console.log('ASSERT a today game with NO rows appears:', n2.includes('MMM @ NNN'
 console.log('ASSERT ...and it is a count-0 card       :', (out2.find(g=>g.matchup==='MMM @ NNN')||{}).count === 0 ? 'PASS' : 'FAIL');
 console.log('ASSERT a today chip in-sport is kept    :', n2.includes('III @ JJJ') ? 'PASS' : 'FAIL');
 console.log('ASSERT 00:30Z is yesterday CT, excluded :', !n2.includes('OOO @ PPP') ? 'PASS' : 'FAIL');
+
+// --------------------------------------------------------------------------
+// ONE CARD PER REAL GAME WHEN THE SAME GAME ARRIVES IN TWO TEXT FORMS.
+//
+// Production defect, 2026-08-20: the Layer 2 rail listed today's NFL preseason
+// games TWICE. Two pipelines seat rows for the same game with different ids AND
+// different matchup text --
+//
+//   nfl|401873286                        "LV @ HOU"                             1 row
+//     ESPN id, candidate_type=game, board_lane=watchlist
+//   nfl|a697012ab3bb18d3549ff1bce61ed4da  "Las Vegas Raiders @ Houston Texans"  10 rows
+//     OddsAPI event id, source=layer2_shortlist, board_lane=opportunity
+//
+// -- and BOTH resolved to the same chip (one by id, one via the #365 full-name
+// index). The merge pass could not see it, because it bucketed on matchup TEXT
+// before ever comparing chips.
+//
+// THIS SECTION DISCRIMINATES. Against the pre-change function, case A fails
+// (2 cards, not 1). Cases B and C pass before and after: B is the guard that
+// keeps the fix from over-merging, C is #165 follow-up #3, which the fix must
+// not regress. A test where all three pass on both versions would prove nothing.
+// --------------------------------------------------------------------------
+function resetChips() {
+  gameChipsById.clear();
+  gameChipsByMatchup.clear();
+  // No gameKeyMergeMap.clear() here: deriveGameCards replaces that map on every
+  // call, and the binding visible at THIS scope is not the one it replaces
+  // (see getMergeMap above). Clearing it would be theatre.
+}
+// Indexed the way loadGameChips() does it: by id, by ABBR matchup, and by FULL
+// NAMES (#365). The full-name index is what the OddsAPI-form group joins on.
+function seatChip(chip, awayName, homeName) {
+  gameChipsById.set(`${chip.sport}|${chip.game_key}`, chip);
+  gameChipsByMatchup.set(`${chip.sport}|${chip.matchup.toLowerCase()}`, chip);
+  gameChipsByMatchup.set(`${chip.sport}|${awayName.toLowerCase()} @ ${homeName.toLowerCase()}`, chip);
+}
+// 2026-08-21T00:00Z is 7:00P CT on the TWENTIETH -- the real LV @ HOU kickoff,
+// and a date the UTC clock would file under the wrong day.
+const nflChip = mkChip('nfl', '401873286', 'LV', 'HOU', 'pregame', '2026-08-21T00:00:00Z');
+const ESPN_ROW = {sport:'nfl',sport_slug:'nfl',event_id:'401873286',
+                  matchup:'LV @ HOU',market_state:'pregame',game_date:'2026-08-20'};
+const ODDS_ROW = {sport:'nfl',sport_slug:'nfl',event_id:'a697012ab3bb18d3549ff1bce61ed4da',
+                  matchup:'Las Vegas Raiders @ Houston Texans',market_state:'pregame',game_date:'2026-08-20'};
+
+state.date = '2026-08-20';
+state.sport = 'all';
+
+// --- CASE A: the reported defect. Same game, same day, two text forms. ------
+resetChips();
+seatChip(nflChip, 'Las Vegas Raiders', 'Houston Texans');
+const outA = deriveGameCards([ESPN_ROW, ODDS_ROW]);
+console.log();
+console.log('two text forms of ONE game ->', outA.length, 'card(s):', outA.map(g=>g.matchup).join(' | '));
+console.log('ASSERT abbr + full-name forms merge     :', outA.length === 1 ? 'PASS' : 'FAIL');
+// The rows must not be lost in the merge: 1 + 1, and BOTH keys resolve to the
+// surviving card, or clicking it would filter the board to one family's rows.
+console.log('ASSERT the merged card keeps both rows  :', outA[0] && outA[0].count === 2 ? 'PASS' : 'FAIL');
+const canonical = outA[0] ? outA[0].key : null;
+const mergeMap = getMergeMap();
+const bothResolve = mergeMap.get('nfl|401873286') === canonical
+                 && mergeMap.get('nfl|a697012ab3bb18d3549ff1bce61ed4da') === canonical;
+console.log('ASSERT both ids resolve to that card    :', bothResolve ? 'PASS' : 'FAIL');
+
+// --- CASE B: the guard. Same TEAMS, different DAYS, must stay two cards. ----
+// gameChipsByMatchup is keyed on the team pair with NO date, so a LATER game
+// between the same two teams text-resolves to TODAY's chip. Merging on that
+// would silently delete a real game from the schedule -- #165 follow-up #1,
+// which cost two genuinely different games their card.
+resetChips();
+seatChip(nflChip, 'Las Vegas Raiders', 'Houston Texans');
+state.date = null; // the combined multi-day window, where both days are in play
+const outB = deriveGameCards([ESPN_ROW, {...ODDS_ROW, game_date:'2026-08-27'}]);
+console.log();
+console.log('same teams on TWO days ->', outB.length, 'card(s):', outB.map(g=>g.matchup).join(' | '));
+console.log('ASSERT a later game is NOT merged away  :', outB.length === 2 ? 'PASS' : 'FAIL');
+
+// --- CASE C: #165 follow-up #3 must not regress. ----------------------------
+// Same matchup TEXT, and the stray duplicate carries its own RESOLVABLE BUT
+// WRONG date (824892 stamped 07-31 while showing the same live score as 824894,
+// dated 07-30). Same-text groups therefore merge UNCONDITIONALLY -- the date
+// guard in case B applies only ACROSS text forms, and adding it here would
+// stop merging exactly the case that motivated the merge pass.
+resetChips();
+const mlbChip = mkChip('mlb','824894','WSH','ATL','live','2026-08-20T23:00:00Z');
+seatChip(mlbChip, 'Washington Nationals', 'Atlanta Braves');
+const outC = deriveGameCards([
+  {sport:'mlb',sport_slug:'mlb',event_id:'824894',matchup:'WSH @ ATL',market_state:'live',game_date:'2026-08-20'},
+  {sport:'mlb',sport_slug:'mlb',event_id:'824892',matchup:'WSH @ ATL',market_state:'live',game_date:'2026-07-31'},
+]);
+console.log();
+console.log('same text, duplicate has a WRONG date ->', outC.length, 'card(s)');
+console.log('ASSERT #165 follow-up #3 still merges   :', outC.length === 1 ? 'PASS' : 'FAIL');

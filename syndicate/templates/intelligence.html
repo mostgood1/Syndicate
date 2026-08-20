@@ -1505,6 +1505,27 @@
   // entirely -- picking a game should widen focus, not require first
   // finding it past filters that already exclude it.
   function deriveGameCards(items) {
+    // The chip's own calendar day, in CENTRAL. Used in TWO places below: the
+    // cross-text merge guard, and the rail's date filter. It used to be
+    // declared just above the date filter, i.e. BELOW the merge pass -- hence
+    // this move to the top of the function rather than a hoist out of it,
+    // which would put it outside the slice tests/js/game_rail_derive.test.mjs
+    // extracts.
+    //
+    // Central, because the board's day is Central (`central_today_iso`) and a
+    // 7:30P CT game reads as TOMORROW in UTC -- an 08-16T00:30Z chip is Aug 15
+    // locally, and bucketing it by UTC date would file it under today.
+    const chipCentralDate = (chip) => {
+      const raw = chip && chip.start_time_utc;
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return null;
+      try {
+        return parsed.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      } catch (e) {
+        return null;
+      }
+    };
     const sportPool = items.filter((item) => {
       if (state.sport === "all") return true;
       return String(item.sport_slug || item.sport || "").trim().toLowerCase() === state.sport;
@@ -1595,31 +1616,109 @@
     // that identical chip object are unambiguously the same real game
     // regardless of what their own date fields claim -- checked first,
     // date-clustering only applies to groups with no chip at all.
+    //
+    // CHIP IDENTITY IS NOW CHECKED ACROSS THE WHOLE POOL, NOT INSIDE A
+    // MATCHUP-TEXT BUCKET.
+    //
+    // Everything above was already right about WHY two groups are the same
+    // game ("two groups sharing that identical chip object are unambiguously
+    // the same real game"). It just could never act on it: the entire pass was
+    // nested inside a `sport|matchup text` index, so two groups whose matchup
+    // TEXT differs were never compared at all, however obviously they shared a
+    // chip.
+    //
+    // MEASURED on production 2026-08-20, and it is the reported defect --
+    // today's two NFL preseason games each arrive as TWO groups, from two
+    // pipelines, with two different id spaces AND two different text forms:
+    //
+    //   nfl|401873286                        "LV @ HOU"                            1 row
+    //     ESPN id, candidate_type=game, board_lane=watchlist
+    //     (_NFLDataProvider.games() -> game_market_recommendations)
+    //   nfl|a697012ab3bb18d3549ff1bce61ed4da  "Las Vegas Raiders @ Houston Texans"  10 rows
+    //     OddsAPI event id, source=layer2_shortlist, board_lane=opportunity
+    //
+    // BOTH resolve to the SAME chip -- the first by id, the second through the
+    // #365 full-name index -- and both seated their own mini card. The chip
+    // feed itself is clean (`/api/board/game-chips?sports=nfl` returned 2
+    // chips, 2 distinct game_keys), so this was never a chip-side bug, and the
+    // count-0 seeding block below was not the source either: both duplicates
+    // are ROW-derived groups.
+    //
+    // Blast radius, simulated over the live payload for all 8 sports: 96
+    // groups, 35 chip-resolved, exactly 2 chips hit by more than one group --
+    // both NFL. Every other sport was already clean, so this adds two merges
+    // and changes nothing else.
     gameKeyMergeMap = new Map();
-    const matchupIndex = new Map();
+    const clusters = [];
+    const chipClusters = new Map();
+    const chiplessKeys = [];
     for (const group of groups.values()) {
-      const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
-      if (!matchupIndex.has(matchupIndexKey)) matchupIndex.set(matchupIndexKey, []);
-      matchupIndex.get(matchupIndexKey).push(group.key);
-    }
-    for (const groupKeys of matchupIndex.values()) {
-      if (groupKeys.length < 2) continue;
-      const chipClusters = new Map();
-      const chiplessKeys = [];
-      for (const key of groupKeys) {
-        const chip = chipForGame(groups.get(key));
-        if (chip) {
-          if (!chipClusters.has(chip)) chipClusters.set(chip, []);
-          chipClusters.get(chip).push(key);
-        } else {
-          chiplessKeys.push(key);
-        }
+      const chip = chipForGame(group);
+      if (chip) {
+        if (!chipClusters.has(chip)) chipClusters.set(chip, []);
+        chipClusters.get(chip).push(group.key);
+      } else {
+        chiplessKeys.push(group.key);
       }
-      const clusters = [...chipClusters.values()];
-      if (chiplessKeys.length) {
-        const realDates = [...new Set(chiplessKeys.map((key) => groups.get(key).fallbackDate).filter(Boolean))];
+    }
+    for (const [chip, chipKeys] of chipClusters) {
+      if (chipKeys.length < 2) continue;
+      const byText = new Map();
+      for (const key of chipKeys) {
+        const text = groups.get(key).matchup.trim().toLowerCase();
+        if (!byText.has(text)) byText.set(text, []);
+        byText.get(text).push(key);
+      }
+      // SAME matchup text: merge unconditionally, exactly as before. This is
+      // #165 follow-up #3's deliberate choice and must NOT acquire a date
+      // check -- WSH @ ATL's stray duplicate carried its own RESOLVABLE BUT
+      // WRONG date (824892 stamped 07-31 while showing the same live score as
+      // 824894, dated 07-30), so a date guard here would stop merging it.
+      if (byText.size < 2) {
+        clusters.push(chipKeys);
+        continue;
+      }
+      // Text DIFFERS -- the new cross-text case, and the one place a wrong
+      // merge could HIDE a real game: `gameChipsByMatchup` is keyed on the
+      // team pair with NO date, so a group for a later game between the same
+      // two teams can text-resolve to TODAY's chip. Require date
+      // compatibility with the chip before joining across text forms.
+      //
+      // Text buckets stay atomic, so a bucket that fails the date check keeps
+      // whatever merge its own members already had rather than being broken
+      // apart -- an incompatible bucket is left exactly as this pass found it,
+      // which is the pre-fix behaviour and therefore cannot regress anything.
+      const chipDate = chipCentralDate(chip);
+      const joined = [];
+      for (const textKeys of byText.values()) {
+        const compatible = textKeys.some((key) => {
+          const date = groups.get(key).fallbackDate;
+          // Absent on either side is NOT evidence of a different day. Same
+          // rule as the rail filter below: an undated group is kept, not
+          // dropped.
+          return !date || !chipDate || date === chipDate;
+        });
+        if (compatible) joined.push(...textKeys);
+        else clusters.push(textKeys);
+      }
+      clusters.push(joined);
+    }
+    if (chiplessKeys.length) {
+      // A group with NO chip has no identity signal to cluster on, so it falls
+      // back to the original rule unchanged: same sport+matchup text, then
+      // date-clustered within that.
+      const matchupIndex = new Map();
+      for (const key of chiplessKeys) {
+        const group = groups.get(key);
+        const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
+        if (!matchupIndex.has(matchupIndexKey)) matchupIndex.set(matchupIndexKey, []);
+        matchupIndex.get(matchupIndexKey).push(key);
+      }
+      for (const groupKeys of matchupIndex.values()) {
+        if (groupKeys.length < 2) continue;
+        const realDates = [...new Set(groupKeys.map((key) => groups.get(key).fallbackDate).filter(Boolean))];
         const dateClusters = new Map();
-        for (const key of chiplessKeys) {
+        for (const key of groupKeys) {
           const date = groups.get(key).fallbackDate;
           // A dateless group joins the one real date in play when there's
           // exactly one (the original same-day scenario this fix targets
@@ -1635,30 +1734,30 @@
         }
         clusters.push(...dateClusters.values());
       }
-      for (const clusterKeys of clusters) {
-        if (clusterKeys.length < 2) continue;
-        let canonicalKey = clusterKeys[0];
-        let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
-        for (const candidateKey of clusterKeys.slice(1)) {
-          const candidateGroup = groups.get(candidateKey);
-          const candidateHasChip = Boolean(chipForGame(candidateGroup));
-          const better = (candidateHasChip && !canonicalHasChip) || (candidateHasChip === canonicalHasChip && candidateGroup.count > groups.get(canonicalKey).count);
-          if (better) {
-            canonicalKey = candidateKey;
-            canonicalHasChip = candidateHasChip;
-          }
+    }
+    for (const clusterKeys of clusters) {
+      if (clusterKeys.length < 2) continue;
+      let canonicalKey = clusterKeys[0];
+      let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
+      for (const candidateKey of clusterKeys.slice(1)) {
+        const candidateGroup = groups.get(candidateKey);
+        const candidateHasChip = Boolean(chipForGame(candidateGroup));
+        const better = (candidateHasChip && !canonicalHasChip) || (candidateHasChip === canonicalHasChip && candidateGroup.count > groups.get(canonicalKey).count);
+        if (better) {
+          canonicalKey = candidateKey;
+          canonicalHasChip = candidateHasChip;
         }
-        const canonicalGroup = groups.get(canonicalKey);
-        for (const mergedKey of clusterKeys) {
-          gameKeyMergeMap.set(mergedKey, canonicalKey);
-          if (mergedKey === canonicalKey) continue;
-          const mergedGroup = groups.get(mergedKey);
-          canonicalGroup.count += mergedGroup.count;
-          canonicalGroup.hasLive = canonicalGroup.hasLive || mergedGroup.hasLive;
-          canonicalGroup.allFinal = canonicalGroup.allFinal && mergedGroup.allFinal;
-          canonicalGroup.fallbackDate = canonicalGroup.fallbackDate || mergedGroup.fallbackDate;
-          groups.delete(mergedKey);
-        }
+      }
+      const canonicalGroup = groups.get(canonicalKey);
+      for (const mergedKey of clusterKeys) {
+        gameKeyMergeMap.set(mergedKey, canonicalKey);
+        if (mergedKey === canonicalKey) continue;
+        const mergedGroup = groups.get(mergedKey);
+        canonicalGroup.count += mergedGroup.count;
+        canonicalGroup.hasLive = canonicalGroup.hasLive || mergedGroup.hasLive;
+        canonicalGroup.allFinal = canonicalGroup.allFinal && mergedGroup.allFinal;
+        canonicalGroup.fallbackDate = canonicalGroup.fallbackDate || mergedGroup.fallbackDate;
+        groups.delete(mergedKey);
       }
     }
     // EVERY GAME ON THE SLATE, NOT ONLY THE ONES WITH AN OPPORTUNITY.
@@ -1716,20 +1815,9 @@
     // The multi-day defect was never about sports -- it was the date. Filtering
     // on Central date alone keeps soccer's 21 today and drops its 69 spread
     // across 08-15..08-28.
-    // Central, because the board's day is Central (`central_today_iso`) and a
-    // 7:30P CT game reads as TOMORROW in UTC -- the 08-16T00:30Z chip above is
-    // Aug 15 locally, and bucketing it by UTC date would file it under today.
-    const chipCentralDate = (chip) => {
-      const raw = chip && chip.start_time_utc;
-      if (!raw) return null;
-      const parsed = new Date(raw);
-      if (Number.isNaN(parsed.getTime())) return null;
-      try {
-        return parsed.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-      } catch (e) {
-        return null;
-      }
-    };
+    // (`chipCentralDate` is defined at the top of this function -- the merge
+    // pass above needs it too, and it used to be declared right here, below
+    // that pass.)
     const railDate = String(state.date || "").slice(0, 10) || null;
     const claimedChips = new Set();
     for (const group of groups.values()) {
