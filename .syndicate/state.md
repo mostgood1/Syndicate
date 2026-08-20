@@ -2079,7 +2079,21 @@ market-relative scoreboard.
 - **CI WAS TIME-DEPENDENT — structurally RED ~5 HOURS EVERY DAY — NOW FIXED AND
   VERIFIED INSIDE THE WINDOW** `[run 32323646103, `df8aec91`, 02:09Z, 2026-08-20,
   #482]`. 11 consecutive failures 01:24-01:53Z in the same UTC band without the
-  fix, then green with it. 7 `test_archives` tests computed "today" with
+  fix, then green with it. **Held overnight: 18 of 19 runs inside 00:00-05:00Z
+  green**, a band that was previously 100% red.
+- **Test assertions must not depend on the ambient `data/` mirror**
+  `[#487, 2026-08-20]`. The one remaining overnight failure was
+  `test_archive_launch_links_and_tracker_copy` asserting home-page markers that
+  `_home_sport_stack.html` only renders when a sport is present and
+  `active_today` — i.e. a function of what the mirror held for
+  `central_today_iso()`, not of the page. `build_home_overview` is now pinned to
+  a fixture there. **`#480`, `#482` and `#487` are all closed; CI is green in
+  both time windows.**
+- **`Daily Update`'s cron is REMOVED** `[#486, 2026-08-20, user decision]` —
+  "we no longer use that daily update feature, everything runs on render."
+  `workflow_dispatch` kept for manual backfill/recovery. Confirmed it did not
+  fire on 08-20. Its steps 12-13 have not executed since 2026-07-15 and were
+  never proven end to end. 7 `test_archives` tests computed "today" with
   `date.today()` — the runner's date, **UTC** on GHA — while the routes use
   `central_today_iso()`. CDT is UTC-5, so **00:00-05:00Z they disagree** and the
   suite fails no matter what was pushed. Evidence is a clock, not a diff: 16

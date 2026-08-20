@@ -2413,3 +2413,42 @@ ROI points — but ANALYSE per game.
 naive baseline, a CI lower bound above 52.4%, out-of-sample pre-specified
 subsets, and denominators in bets. `scripts/grade_football_playability.py`
 measures it, and `LiftConditionTests` pins it so it cannot be quietly weakened.
+
+
+## 2026-08-20 — FORBIDDEN: an assertion whose subject is a TEMPLATE must not take the ambient `data/` mirror as its input. Pin the fixture, then prove the pin is load-bearing.
+
+`test_archive_launch_links_and_tracker_copy` asserted five home-page markers
+(`Live slate`, `Compact rail`, `Pregame only`, `Open Live Lens`, `Live only`).
+Its own comment says these exist so that losing one fails the build — i.e. the
+subject is the TEMPLATE. But `_home_sport_stack.html` renders them **per sport**,
+and `Live slate` needs `sport.active_today`, so the assertions actually depended
+on `build_home_overview()` finding a sport for whatever date
+`central_today_iso()` resolved to. **The test's subject and the test's input were
+different things.**
+
+Measured: CI run `32331841627` at 23:28 CT 2026-08-19 rendered the sport stack
+completely empty (`0 sports tracked`) and failed. The same test passed at 06:25
+CT and 08:08 CT. **The page was correct at every one of those moments.**
+
+**Rules:**
+- If the thing under test is a contract (template markup, a payload shape, a
+  route's wiring), **supply the data**. Ambient `data/` is an input nobody
+  controls: it varies by hour, by checkout, and by whatever the mirror last
+  synced — and per `CLAUDE.md` it is a lossy mirror that is never evidence about
+  production anyway.
+- **Pinning is only half the fix, and the dangerous half is the other one.** A
+  pinned test that can no longer fail is worse than a flaky one, because it
+  reads as coverage. Run the off != on probe: break the fixture and confirm the
+  test fails. Here, flipping `active_today` to `False` produced
+  `AssertionError: 'Live slate' not found` — that is what makes the green
+  meaningful.
+- **A green run proves only what its conditions covered.** `#487`'s CI greens
+  all ran outside the failing window with a populated mirror, so they prove NO
+  REGRESSION and nothing about the empty-slate case; the structural argument and
+  the probe are what carry that. Same trap as the 2026-08-20 streak entry above.
+
+**Incidental, and a real landmine:** Jinja's `rail['items']` on a plain dict
+without an `items` key does **not** render empty. Subscript falls back to
+attribute access, returns the `dict.items` METHOD, and iteration dies with
+`TypeError: 'builtin_function_or_method' object is not iterable`. Any rail dict —
+fixture or real — that omits `items` raises rather than degrades.
