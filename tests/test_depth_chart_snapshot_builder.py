@@ -113,6 +113,35 @@ def test_write_depth_snapshot_csv_emits_expected_file(tmp_path: Path) -> None:
     assert "p1" in content
 
 
+def test_real_nflverse_az_team_code_does_not_crash_validation() -> None:
+    """`nfl-team-abbr-az-alias`: same real-data shape as the roster
+    builder's regression test -- nflverse's real feeds use `AZ`, not
+    `ARI`, for Arizona."""
+    roster_rows = [
+        {"player_id": "p9", "player_name": "Echo Player", "team": "AZ", "position": "QB"},
+    ]
+    depth_rows = [
+        {
+            "player_id": "p9",
+            "player_name": "Echo Player",
+            "team": "AZ",
+            "position": "QB",
+            "depth_rank": 1,
+            "role": "starter",
+            "starter_flag": True,
+            "source_system": "demo_depth_feed",
+        },
+    ]
+
+    rows = build_depth_snapshot_rows(roster_rows=roster_rows, depth_rows=depth_rows, source_file="demo_depth_feed.csv")
+
+    assert len(rows) == 1
+    assert rows[0]["team"] == "ARI"
+
+    issues = validate_depth_snapshot_rows(rows)
+    assert issues == []
+
+
 def test_validate_depth_snapshot_rows_rejects_invalid_team_and_role_context() -> None:
     rows = [
         {

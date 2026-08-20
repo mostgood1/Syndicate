@@ -2196,7 +2196,7 @@ def _daily_sim_updated_at_by_game(selected_date: str, game_pks: list[int]) -> di
 # payload is read from ~12 sites across the module. A denylist can only remove
 # what has been PROVEN unread, so every other consumer keeps working byte for
 # byte -- which is also what makes the parity test in
-# `tests/test_mlb_cards_feed_live_prune.py` meaningful rather than tautological.
+# `tests/test_mlb_cards_worker_hydration_cost.py` meaningful rather than tautological.
 #
 # PROVEN UNREAD, whole repo, not just this module: `allPlays` is read only by
 # offline analysis scripts (`scripts/mlb_run_expectancy.py`,
@@ -2253,6 +2253,28 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
     out: dict[int, dict[str, Any]] = {}
     today_iso = central_today_iso()
     prune = _feed_live_prune_enabled()
+    # `#387`. PROOF THE BRANCH FIRED, not proof the outcome improved.
+    #
+    # Three prior candidates for this excursion -- the deepcopy, the ledger
+    # accumulation, the three-loads-to-one -- were each deployed, exercised, and
+    # then could NOT be shown to have moved the transient, because every
+    # available reading was a container-level aggregate confounded by slate size,
+    # boot age and concurrent load. `.syndicate/deploys.md` records all three as
+    # "live and exercised, not one shown to move it".
+    #
+    # So this counts the WORK DONE, which is attributable, rather than the memory
+    # saved, which is not: how many documents were pruned, and how many play
+    # records were dropped. `len()` on a list already in memory -- no
+    # serialisation, no second pass. A build where `pruned=0` while `games>0`
+    # means the prune is inert and the deploy must not be scored as a win; a
+    # `plays_dropped` that tracks the slate means it is doing exactly what the
+    # 66.38% measurement predicted.
+    #
+    # Worker-only and once per CALL, not per game: `#387`'s own log channel
+    # already carries ~125 lines/minute and a per-game line would bury the
+    # `overview_counts` rows it sits next to.
+    pruned_docs = 0
+    plays_dropped = 0
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
@@ -2267,7 +2289,23 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
             # its say -- `_actual_payload_is_live` reads `gameData.status`, which
             # the prune never touches, but ordering it here means a future branch
             # cannot accidentally be handed a reduced document.
-            out[int(game_pk)] = _prune_feed_live_payload(payload) if prune else payload
+            if prune:
+                reduced = _prune_feed_live_payload(payload)
+                if reduced is not payload:
+                    pruned_docs += 1
+                    all_plays = ((payload.get("liveData") or {}).get("plays") or {}).get("allPlays")
+                    if isinstance(all_plays, list):
+                        plays_dropped += len(all_plays)
+                payload = reduced
+            out[int(game_pk)] = payload
+    if not _render_web_dyno() and game_pks:
+        # print, not logger.info -- #37, logger.info never reaches Render's
+        # collector, which is most of why this path stayed invisible for weeks.
+        print(
+            f"[mlb_cards] FEED_LIVE_PRUNE enabled={prune} date={selected_date} "
+            f"games={len(out)} pruned={pruned_docs} plays_dropped={plays_dropped}",
+            flush=True,
+        )
     return out
 
 
@@ -2409,7 +2447,7 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     # missing piece -- the WRITER's schema was, and it is readable from here.
     #
     # NOT A BEHAVIOUR CHANGE, and the invariant is asserted rather than assumed:
-    # `tests/test_mlb_cards_feed_live_prune.py::test_odds_history_shard_has_no_games_key`
+    # `tests/test_mlb_cards_worker_hydration_cost.py::test_odds_history_shard_schema_has_no_games_key`
     # fails if the shard schema ever grows a `games` key, which is the only
     # condition under which this removal would have been wrong.
     #

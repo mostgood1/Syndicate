@@ -2280,6 +2280,68 @@ what a PRESENT reading would look like on that instrument before treating the
 absence as an answer — three instruments in a row here reported absence that was
 about the instrument, not the world.
 
+## 2026-08-20 — OVERTURNED (pre-registered): soccer is not under-dispersed anymore, and fixing dispersion + missing inputs did not close the gap to the market
+
+`soccer-model-dispersion` opened 2026-08-18 on a measured, specific
+hypothesis: the model's Brier loss to the closing line was because it was
+UNDER-DISPERSED (mean model `stdev(P home)` 0.1575 vs market's 0.1811,
+narrower in 8 of 9 leagues) -- not because its ratings were wrong, its
+under-confidence itself. The lane wrote its own falsification test BEFORE
+any fix was attempted: *"If the Brier gap does not close while stdev rises
+to market's, under-dispersion is NOT the binding constraint and the cause is
+the ratings/inputs, not the spread. That is a real outcome and must be
+recorded, not retried with a bigger knob."*
+
+Roughly 14 hours of work followed: an xG double-count fix (the model had
+been silently weighting goals-as-xG at 0.36 instead of 0.22 in one term),
+a falsified shots-weight shrink reverted, three genuinely missing inputs
+sourced and wired end-to-end (`possession_share`, `set_piece_goal_share`,
+`starters_available_share`), a fourth (`pace_seconds_per_event`) sourced,
+tested, and correctly abandoned on its own cheap falsifier, a
+market-confidence prior wired and disclosed as methodologically weak by
+construction, and — the largest single fix — a backtest-vs-production
+pipeline mismatch that had been silently rating 5 of 9 leagues from the
+wrong data source since the backtest was written.
+
+**The 2026-08-20 re-run measured exactly the falsification condition.** Mean
+model stdev rose to 0.1922, past market's 0.1859 -- under-dispersion is
+gone. The Brier gap did not close: still worse than market in 8 of 9
+leagues, `belgian_pro_league` the same single exception as the original
+diagnosis, completely unchanged by the entire session's work.
+
+**Why this is recorded as a success for the process, not a failure of the
+session.** A hypothesis that gets tested and falsified by a test written
+before the work started is not a wasted session -- it is the single most
+trustworthy kind of negative result available, because nobody could have
+retrofit the test to fit the outcome. The alternative -- declaring the
+gap "narrower" on a different match set, or quietly moving to a sixth input
+field without ever checking the falsification condition -- was available and
+was not taken.
+
+**The general rule.** When a hypothesis names a SPECIFIC mechanism (here:
+"the spread is too narrow"), the falsification test must isolate that
+mechanism from every other plausible cause, and the fix that follows must be
+checked against the SAME test that motivated it -- not just "did some
+number get better." Fixing dispersion and separately improving input
+completeness are BOTH good engineering, and BOTH were necessary regardless
+of outcome (an under-fed engine and an under-dispersed one are real defects
+on their own terms) -- but neither is evidence for the hypothesis that
+motivated the work unless the specific falsification condition is checked,
+not just "the model changed and something moved."
+
+**What the next hypothesis has to be, precisely because this one is now
+closed off:** not "the spread is wrong" (tested, false) and not "an input is
+missing" (the checklist alarms remaining are genuine data-availability gaps,
+not misrouted producers, after this session's sweep) -- the remaining
+candidate is systematic BIAS in what the ratings compute, which requires a
+different diagnostic (reliability-curve decomposition per league/bucket, not
+a pooled regression or a stdev check) than anything this session ran.
+
+Related: [[project_e2e_assessment_aug_2026]] (the standing note that soccer's
+model accuracy was "unmeasured" before this lane existed is now further
+refined -- it IS measured, repeatedly, and the measurement has converged on
+a specific negative result rather than remaining an open question).
+
 ---
 
 ## 2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEVER diagnose a vendor from your own broken query
@@ -2363,57 +2425,38 @@ in a row, all pointing at an innocent API.
 phase B is right and would have caught this at 28 credits), AND before believing
 any negative result about an external system, prove your request was
 well-formed — ideally against a case you KNOW should return data.
----
+## An unbiased mean hides a broken distribution `[2026-08-20]`
 
-## 2026-08-20 — MAE IS NOT PLAYABILITY. The model loses to a mindless side bet.
+**What we believed:** the WNBA live win-probability path was roughly fine. Its
+constants were admittedly un-backtested, but nothing pointed at them, and any
+aggregate check looked clean.
 
-**I spent most of a session measuring the wrong quantity.** Every NCAAF and NFL
-verdict up to this point graded **MAE** — how close the projected margin lands.
-That is an ENGINE diagnostic. It is not a betting decision, and the two can
-disagree: a model can carry worse MAE and still be playable if its
-DISAGREEMENTS with the market are directionally right.
+**What was actually true:** it was severely UNDERCONFIDENT. Graded over 212
+games / 73,878 live samples, samples it priced 0.6-0.7 actually won **91.3%**;
+samples it priced 0.3-0.4 won **11.6%**. The scale was ~2.5x too wide and
+compressed every probability toward 0.5. Brier 0.1896 -> 0.1644 after refit.
 
-The user asked to "serve the ones that show playable". Testing that properly —
-ATS, against the **52.4% breakeven at −110**, not 50% — produced a harder answer
-than any MAE result had:
+**Why it survived so long:** the MEAN was already right — 0.573 predicted vs
+0.571 actual. Every summary statistic that averages over samples said the
+model was unbiased, and it WAS unbiased. The defect was in the second moment,
+not the first. A calibration table by predicted-probability bucket exposes it
+in one glance; no amount of staring at aggregate accuracy ever would.
 
-    NCAAF 2024, clean out-of-sample, 751 games
-        |edge| >= 0    46.8% ATS      |edge| >= 10   45.2% ATS
-    Filtering HARDER makes it WORSE. There is no threshold where a playable
-    subset appears; the "only serve strong picks" instinct fails in the
-    direction opposite to the one that would help.
+**The rule:** for any probability output, "is the average right" and "is the
+distribution right" are different questions, and only the second one tells you
+whether an individual price is usable. Bucket predictions and compare each
+bucket's mean prediction to its realised rate. A model can be perfectly
+unbiased on average while being wrong on literally every bet you place with it.
 
-**THE TEST THAT MATTERED, and it nearly went unrun.** An under-dispersed model
-always says "closer than the market thinks", so it always fades the favourite —
-making its apparent edge indistinguishable from a blind underdog bet unless you
-check. NFL preseason had just read 54.7% ATS and looked positive:
-
-                           always bet the dog   the model   model adds
-        NFL preseason            58.9%            54.7%      -4.2 pts
-        NCAAF 2024               51.2%            46.8%      -4.4 pts
-
-**The model is WORSE THAN IGNORING IT.** The NFL "edge" was riding a dog fade
-and DEGRADING it. Two sports, two models, two sample sizes, near-identical
-subtraction — wherever the model's opinion is strong enough to deviate from the
-naive side, it is wrong more often than not.
-
-**The generalisable rule: always benchmark a model against the dumbest strategy
-that produces the same BETS**, not just against the market. "Beats the close"
-and "beats always-bet-X" are different bars, and a systematically biased model
-clears neither while appearing to clear the first on a favourable sample. The
-`dog%` column is the tell: 92–100% means the threshold is selecting a SIDE, not
-a signal.
-
-**Also recorded:** per-book rows overstated significance **3.4x** on the NFL
-grade (t=+4.00 → +0.87 once collapsed to one row per game), because the same
-game repeats across 14 books. Store per-provider — price shopping is worth +2.79
-ROI points — but ANALYSE per game.
-
-**Acted on, not just noted:** `pick_gate.LIFT_CONDITION` now requires beating the
-naive baseline, a CI lower bound above 52.4%, out-of-sample pre-specified
-subsets, and denominators in bets. `scripts/grade_football_playability.py`
-measures it, and `LiftConditionTests` pins it so it cannot be quietly weakened.
-
+**Corollary that cost me a wrong conclusion in the same session:** when fitting
+a replacement, fit INSIDE the real function's structure. My first fit used a
+bare logistic while the shipped function also blends toward a pregame anchor,
+so part of the apparent gain came from silently dropping the blend rather than
+from the scale. Refitting within the real structure gave the honest number
+(+0.0261). And the variant that scored best of all — blend removed entirely —
+was an ARTIFACT of grading with a neutral 0.5 anchor, which makes blending
+toward it pure noise by construction. In production that anchor is a real
+estimate. A fit is only as meaningful as the harness's fidelity to production.
 
 ## 2026-08-20 — FORBIDDEN: an assertion whose subject is a TEMPLATE must not take the ambient `data/` mirror as its input. Pin the fixture, then prove the pin is load-bearing.
 
