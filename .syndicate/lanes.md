@@ -922,6 +922,57 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
+### layer2-board-chip-race — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: fix a confirmed render-order race on the Layer 2 board's compact
+  game-card strip -- a follow-on to `layer2-board-pick-clarity` /
+  `layer2-board-movement-display`, both CLOSED, same file.
+  **Testable outcome:** on a fresh page load, today's real games' mini
+  cards render directly in the chip-based (scores/live-status) style,
+  with no visible flash-then-relayout from the plain fallback style.
+- Files: `syndicate/templates/intelligence.html` (`loadGameChips()`,
+  the initial synchronous render call site at the bottom of the IIFE,
+  `renderGameCards`/`deriveGameCards` if the fix ends up needing to gate
+  the strip's own first paint rather than just reordering two calls).
+- Hypothesis: n/a (root-caused already, see below).
+- **Already established, measured 2026-08-20 (do not re-derive):**
+  - The board's mini game-card strip has two render styles: a chip-based
+    one (team abbrs, live score, status token) when `chipForGame(group)`
+    finds a match in `gameChipsById`/`gameChipsByMatchup`, and a plain
+    fallback (matchup text only) when it doesn't.
+  - **This is NOT a chip-matching bug.** Measured live against the
+    production board (`/api/board/game-chips`, `/api/intelligence/query`):
+    of 89 total game groups, 56 failed to match a chip -- but re-scoped to
+    ONLY today's (`game_date` 2026-08-20) real games, **15 of 15 (100%)
+    matched.** Every one of the 56 apparent mismatches was a future-dated
+    game (1-3 days out, `source_board_date` 2026-08-20 spanning a
+    multi-day `combined_board_window`), where a scoreboard chip correctly
+    does not exist yet. The simpler card for those is correct, expected
+    behaviour, not a defect.
+  - **The real, reproducible cause is a load-order race.** On page load,
+    if `initialIntelligenceResponse` is present (server-rendered, the
+    normal case), `renderIntelligence(merged)` runs SYNCHRONOUSLY
+    (`intelligence.html:2547-2552`) -- including the first paint of the
+    mini game-card strip -- while `gameChipsById`/`gameChipsByMatchup`
+    are still their initial empty `Map()`s, because `loadGameChips()`
+    is not called until the NEXT line, 2557. So the strip's first paint
+    is always the plain fallback style for every game, including today's
+    real ones, and then re-renders into the richer chip style a moment
+    later once `loadGameChips()`'s fetch resolves (it calls
+    `renderBoardBody()` itself, `intelligence.html:1322`). Confirmed by
+    code read (call-site line numbers), not yet reproduced with a timed
+    screenshot/network-waterfall capture -- that is the next concrete
+    step, not a re-derivation of the mechanism.
+- Falsification test: n/a, implementation lane, mechanism confirmed by
+  code read. If a timed capture shows the strip using the chip style on
+  its FIRST paint even before `loadGameChips()`'s network request
+  resolves, the mechanism above is wrong and needs re-diagnosis.
+- Verification: reload the live board with network throttling (or just a
+  slow enough connection to observe the transition) and confirm no
+  visible flash-then-relayout for today's games; re-run this session's
+  same "100% chip-match for today" measurement post-deploy as a
+  regression check that the reorder did not break matching itself.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
