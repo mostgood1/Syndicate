@@ -37,6 +37,36 @@ takes the STAGED blob, and those differ precisely when someone has staged one
 version and edited another. Guessing wrong here would either miss the defect or
 block a clean commit.
 
+WHICH TREE, and WHICH ENV -- both fixed 2026-08-20, both re-made here after
+`commit-guard.py` had already learned them. Details and the measurements live in
+`commit_context.py`; the short version:
+
+  (a) THE GUARD READ A DIFFERENT REPO THAN THE ONE BEING COMMITTED. `root` was
+      `CLAUDE_PROJECT_DIR`, the PRIMARY tree, while this repo's own protocol
+      puts every session in its own worktree. Measured from
+      `C:/tmp/syndicate-sessions/soccer-board-mlb-parity`: blocked over
+      `layer2-board-chip-race` and `mlb-pregame-ladder-schema` having two blocks
+      each -- in the PRIMARY tree. The worktree's `lanes.md`, the file the
+      commit would actually record, had exactly one block per slug and
+      `check_lane_invariants.py` returned INVARIANTS HOLD there.
+
+      The message below claimed it "Checked the content each commit would
+      actually record ... not merely the file on disk". That was false in the
+      worktree case in the way that matters most: not merely a stale file, a
+      DIFFERENT REPOSITORY. And the remedy it printed --
+      `trim_lane_blocks.py --apply` -- would, run in the tree the guard was
+      complaining about, rewrite TWO OTHER SESSIONS' lane blocks to satisfy a
+      check about a file the committing session never touched. A guard that
+      prints a destructive remedy for someone else's file is worse than no
+      guard. The refusal now names the tree it read and only suggests the trim
+      when that tree is the one being committed from.
+
+  (b) THE DOCUMENTED OVERRIDE WAS UNREACHABLE. `SYNDICATE_ALLOW_LEDGER_COMMIT=1
+      git commit ...` as an inline prefix is still just text when a PreToolUse
+      hook runs -- the shell has not assigned it yet -- so `os.environ.get`
+      never saw it and the escape hatch this file printed did not exist. Same
+      defect `commit-guard.py` fixed 2026-08-17; same fix, shared code.
+
 FAILS OPEN on anything it cannot determine -- no git, no file, an unparseable
 command -- like every other guard here. A guard that blocks real work is one
 people rip out. Override: `SYNDICATE_ALLOW_LEDGER_COMMIT=1 git commit ...`
@@ -50,13 +80,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from ledger_invariants import TRACKED, violations
+    from commit_context import command_cwd, env_set_for_command, worktree_root
 except Exception:
     sys.exit(0)
 
-LANES = ".syndicate/lanes.md"
 ALLOW_ENV = "SYNDICATE_ALLOW_LEDGER_COMMIT"
-HEADER_RE = re.compile(r"(?m)^###\s+(\S+)\s")
-ARCHIVE_RE = re.compile(r"(?m)^## Archived lanes")
+# The lane/archive regexes that used to live here were dead: the predicates
+# moved to `ledger_invariants.py` and nothing re-read them. A second copy of a
+# predicate in the file that enforces it is exactly the drift that module exists
+# to prevent, so they are gone rather than kept "for reference".
 # `git commit`, allowing `git -C x commit` and `git --no-pager commit`.
 COMMIT_RE = re.compile(r"\bgit\b(?:\s+-{1,2}[^\s]+(?:\s+[^\s]+)?)*\s+commit\b")
 
@@ -98,8 +130,6 @@ def _content_to_be_committed(root, command, rel):
 
 
 def main():
-    if os.environ.get(ALLOW_ENV, "").strip() == "1":
-        return 0
     try:
         payload = json.load(sys.stdin)
     except Exception:
@@ -107,10 +137,23 @@ def main():
     if payload.get("tool_name", "") not in ("Bash", "PowerShell"):
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
-    if not COMMIT_RE.search(command):
+    m = COMMIT_RE.search(command)
+    if not m:
         return 0
 
-    root = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+    # The override, read from the COMMAND as well as the environment: an inline
+    # `VAR=1 git commit ...` prefix has not been assigned yet when this runs.
+    if env_set_for_command(command, m.start(), ALLOW_ENV):
+        return 0
+
+    # The tree the commit will actually be recorded in -- NOT CLAUDE_PROJECT_DIR,
+    # which is the primary checkout and is a different repository whenever the
+    # session is in its own worktree. See `commit_context.py`.
+    cwd = command_cwd(command, m.start(), payload)
+    root = (worktree_root(cwd) if cwd else None) or cwd
+    if not root:
+        return 0
+
     report = []
     for rel in TRACKED:
         try:
@@ -132,12 +175,19 @@ def main():
             sys.stderr.write(f"  * {what}\n{how}\n")
         sys.stderr.write("\n")
     sys.stderr.write(
+        f"Tree read:   {root}\n"
+        "             (the worktree this commit runs in -- resolved from the\n"
+        "             command's cwd, not from CLAUDE_PROJECT_DIR. Any cleanup\n"
+        "             suggested above applies to THIS tree. If that path is not\n"
+        "             where you are working, say so -- it is a guard bug, and\n"
+        "             running the cleanup would rewrite another tree's file.)\n"
         "Checked the content each commit would actually record (staged blob for a\n"
         "plain commit, working file for a pathspec or -a commit) -- not merely the\n"
         "file on disk.\n"
-        "Verify with: py -3 scripts/check_lane_invariants.py\n"
-        "             py -3 scripts/state_key_check.py\n"
-        f"Override:    {ALLOW_ENV}=1 git commit ...\n")
+        f"Verify with: cd {root} && py -3 scripts/check_lane_invariants.py\n"
+        f"             cd {root} && py -3 scripts/state_key_check.py\n"
+        f"Override:    {ALLOW_ENV}=1 git commit ...   (as a prefix on the command\n"
+        "             itself; `export` on a preceding line works too)\n")
     return 2
 
 

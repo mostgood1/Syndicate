@@ -32,6 +32,16 @@ legitimate -- it simply belongs in `deploys.md`, `lanes.md` or `learnings.md`,
 which is what the file's own header already says. The message names the right
 home instead of leaving the writer stuck.
 
+IT FINDS THE LEDGER BY THE PATH, NOT BY `CLAUDE_PROJECT_DIR`. Fixed 2026-08-20,
+when this guard was found SILENTLY INERT for every session working the way the
+protocol says to work: each session lives in its own linked worktree, so the
+edited file is `C:/tmp/syndicate-sessions/<lane>/.syndicate/state.md` while
+`CLAUDE_PROJECT_DIR` is still the primary checkout, and the `relpath` between
+them matches neither ledger name. Measured with one violating edit against both
+trees: primary `exit=2 BLOCKED`, worktree `exit=0 ALLOWED`. An inert guard and a
+satisfied guard are indistinguishable from outside -- this one read as passing
+for as long as it existed. Tests: `test_ledger_append_guard.py`.
+
 FAILS OPEN on any parse or read error. Off switch: `SYNDICATE_LEDGER_GUARD=off`.
 """
 import json
@@ -95,16 +105,40 @@ def main():
         return 0
 
     path = (payload.get("tool_input") or {}).get("file_path") or ""
-    root = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-    try:
-        rel = os.path.relpath(path, root).replace("\\", "/")
-    except Exception:
-        return 0
-    if rel not in (LANES, STATE):
+
+    # IDENTIFY THE LEDGER BY THE PATH ITSELF, not by its position relative to
+    # `CLAUDE_PROJECT_DIR`. Fixed 2026-08-20; this guard was SILENTLY INERT for
+    # every session working the documented way.
+    #
+    # `scripts/session_worktree.py` puts each session in its own linked
+    # worktree, so the file being edited is
+    # `C:/tmp/syndicate-sessions/<lane>/.syndicate/state.md` while
+    # `CLAUDE_PROJECT_DIR` is still the primary checkout. `relpath` of the two
+    # is `../../../../../tmp/syndicate-sessions/<lane>/.syndicate/state.md`,
+    # which is never `.syndicate/state.md`, so the function returned 0 BEFORE
+    # evaluating a single predicate.
+    #
+    # MEASURED, the identical violating edit (adding a dated `### ` sub-heading
+    # to state.md) run against both trees:
+    #     primary tree   exit=2  BLOCKED
+    #     worktree       exit=0  ALLOWED -- the guard never ran
+    # An inert guard and a satisfied guard are indistinguishable from the
+    # outside, which is why this survived: it looked like it was passing.
+    #
+    # The SECOND half of the same bug: the content was then read from
+    # `os.path.join(root, rel)` -- the PRIMARY file -- while `old_string` came
+    # from the WORKTREE file. Even had the gate matched, `old not in text` would
+    # make `_after` return None and the guard fail open. So the base file is now
+    # the edited file itself. Both trees mirror the same internal layout, so a
+    # trailing-segment match is correct in either.
+    norm = path.replace("\\", "/").rstrip("/")
+    rel = next((c for c in (LANES, STATE)
+                if norm == c or norm.endswith("/" + c)), None)
+    if rel is None:
         return 0
 
     try:
-        with open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace") as fh:
+        with open(path, encoding="utf-8", errors="replace") as fh:
             current = fh.read()
         after = _after(payload, current)
         if after is None:

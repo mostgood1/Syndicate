@@ -183,19 +183,17 @@ COMMIT_RE = re.compile(
 # exist on disk" question has no single correct base. Skipped, and named as a
 # gap in the docstring rather than passed off as safe.
 DECOUPLED_RE = re.compile(r"(?:^|\s)git\s[^;&|]*?--(?:git-dir|work-tree)(?:=|\s)")
-_DASH_C_RE = re.compile(r"(?:^|\s)-C(?:\s+|=)(\"[^\"]*\"|'[^']*'|\S+)")
-# `cd DIR`, with the shell quoting forms that actually appear in this repo's
-# commands. Options (`cd -P`) are stepped over; a bare `cd` (to $HOME) is not
-# matched, which is correct -- it is never followed by a repo-relative commit.
-_CD_RE = re.compile(
-    r"(?:^|[;&|]|\s)cd\s+(?:-[A-Za-z]+\s+)*(\"[^\"]*\"|'[^']*'|[^\s;&|]+)")
 
-
-def _unquote(token):
-    token = token.strip()
-    if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
-        return token[1:-1]
-    return token
+# `command_cwd` / `worktree_root` / `env_set_for_command` moved to
+# `commit_context.py` on 2026-08-20, unchanged. They were learned HERE, but
+# `ledger-commit-guard.py` was written later without either and re-made both
+# mistakes in production -- blocking a worktree session over the primary tree's
+# lanes.md, and printing an override its own hook could not read. Sharing the
+# code is the only version of that fix that stays fixed.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from commit_context import (  # noqa: E402
+    _unquote, command_cwd, env_set_for_command, worktree_root,
+)
 
 
 # --------------------------------------------------------------------------
@@ -275,38 +273,6 @@ def shell_words(text):
     if started:
         words.append("".join(cur))
     return words
-
-
-def env_set_for_command(cmd, before, name):
-    """Will `name` be set for the git this command runs?
-
-    THE HOOK'S OWN ENV IS ONLY HALF THE ANSWER. A PreToolUse hook runs before
-    the shell, so `export GIT_INDEX_FILE=...` -- the literal recipe this file
-    prints in its refusal -- is invisible to `os.environ`. Every override this
-    guard documented was therefore unreachable, and the session that followed
-    the printed instructions was blocked by the same guard that printed them.
-
-    Matches `export VAR=v`, a bare `VAR=v`, and the `VAR=v git commit` prefix.
-    Last write before the commit wins, so an intervening `unset` counts. An
-    empty value is NOT set, which matches `os.environ.get()` being falsy for "".
-    """
-    if os.environ.get(name):
-        return True
-    head = cmd[:before]
-    events = []
-    assign = re.compile(r"(?:^|[;&|(]|\s)(?:export\s+)?" + re.escape(name)
-                        + r"=(\"[^\"]*\"|'[^']*'|[^\s;&|)]*)")
-    for m in assign.finditer(head):
-        events.append((m.start(), bool(_unquote(m.group(1)))))
-    unset = re.compile(r"(?:^|[;&|(]|\s)unset\s+(?:-v\s+)?"
-                       r"(?:[A-Za-z_][A-Za-z0-9_]*\s+)*" + re.escape(name)
-                       + r"(?![A-Za-z0-9_])")
-    for m in unset.finditer(head):
-        events.append((m.start(), False))
-    if not events:
-        return False
-    events.sort()
-    return events[-1][1]
 
 
 # `git commit` options that consume a SEPARATE following word. Options whose
@@ -390,57 +356,6 @@ def pathspec_limited(words):
     if include:
         return False                   # measured: --include carried the revert
     return bool(from_file or paths)
-
-
-def command_cwd(cmd, commit_pos, payload):
-    """The directory `git commit` will actually run in.
-
-    A guard that reads a different tree than the command touches is not a
-    weaker guard, it is a guard answering a different question -- it both cries
-    wolf about someone else's index and stays silent about the one at risk.
-    """
-    base = None
-    for candidate in ((payload.get("cwd") or "").strip(),
-                      os.environ.get("CLAUDE_PROJECT_DIR") or "",
-                      os.getcwd()):
-        if candidate and os.path.isdir(candidate):
-            base = candidate
-            break
-    if base is None:
-        return None
-
-    # Apply every `cd` that precedes the commit, in order: `cd a && cd b && git
-    # commit` lands in b, and a relative second hop resolves against the first.
-    for m in _CD_RE.finditer(cmd):
-        if m.start() >= commit_pos:
-            break
-        target = _unquote(m.group(1))
-        if not target or target.startswith("-"):
-            continue
-        base = target if os.path.isabs(target) else os.path.join(base, target)
-
-    # `-C` on the commit invocation itself wins: git applies it last.
-    prefix = cmd[commit_pos:]
-    m = _DASH_C_RE.search(prefix.split("commit", 1)[0])
-    if m:
-        target = _unquote(m.group(1))
-        if target:
-            base = target if os.path.isabs(target) else os.path.join(base, target)
-
-    return base if os.path.isdir(base) else None
-
-
-def worktree_root(cwd):
-    """The top level of the worktree containing `cwd`.
-
-    Predicate 1 joins repo-relative paths onto this to ask "is it still on
-    disk", so it must be the tree the commit belongs to, not the main one.
-    """
-    out = _git(cwd, "rev-parse", "--show-toplevel")
-    if not out:
-        return None
-    root = out.decode("utf-8", "replace").strip()
-    return root if root and os.path.isdir(root) else None
 
 
 def _git(root, *args):
