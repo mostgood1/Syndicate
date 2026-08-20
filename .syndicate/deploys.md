@@ -18246,3 +18246,58 @@ blind instrument. **A null result needs its window stated and, when the emitter
 is periodic, a wait long enough to cover one full period of the thing you are
 watching** — here, one full overview pass across every date the worker builds,
 not just the first date it happened to reach.
+
+### `#474`/`#478`/`#479`/`#480` — sim-side bundle now on BOTH workers — 2026-08-20 ~15:00Z — lane `basketball-model-owner`
+
+Closes the fragmented deploy state recorded at the previous checkpoint. Every
+item is now live on the service that actually runs it.
+
+**Final matrix, verified BY CONTENT on each live SHA (not by ancestry --
+all three are cherry-picks onto off-main SHAs, so `merge-base` would say NO
+for correct deploys):**
+
+    item          web ba1d3368   refresh-worker 41f79353   live-odds 98d9b7ec
+    #474 hca          --                 LIVE                    LIVE
+    #478 geo          --                 LIVE                    LIVE
+    #479 sched        --                 LIVE                    LIVE
+    #480 guard        --                 LIVE                    LIVE
+    #475 cover       LIVE                 --                     LIVE
+    #481 scale       LIVE                 --                      --
+
+The `--` cells are correct by design, not gaps. Sim-side items
+(`#474`/`#478`/`#479`/`#480`) matter only where the sim/refresh runs -- both
+workers. Board-side items (`#475`/`#481`) are computed at SERVE time in
+`syndicate/features/wnba/cards.py`, which only web executes.
+
+**That last claim was CHECKED, not assumed**, because the asymmetry looked
+like a gap: `live-odds-worker` carries `#475` but not `#481`. Searched for
+worker-side callers of `_wnba_live_margin_win_prob` /
+`_build_wnba_game_lens` / `build_cards_page_context`. The two hits in
+worker-reachable files (`live_lens_loop.py:461`,
+`refresh_wnba_oddsapi_props.py:2477`) are both COMMENTS, not calls; the real
+callers are web blueprints (`home.py`, `intelligence.py`) plus two offline
+tools (`audit_migration.py`, `measure_cards_context_rss.py`). So no worker
+computes a live probability and `#481` is correctly web-only.
+
+**`refresh-worker` genuinely needed this bundle** -- verified before
+deploying rather than assumed: 44 invocations of `refresh_wnba_oddsapi_props.py`
+in the preceding 6h of its logs. It was not a no-op deploy.
+
+- **Deploys**: `live-odds-worker` `98d9b7ec` finished 14:46:38Z (cherry-pick
+  of `#480` onto `cb322dd1`); `refresh-worker` `41f79353` finished 15:00:28Z
+  (four cherry-picks `d928d0fe`/`11b41d0e`/`d520d93d`/`5413b7d0` onto
+  `d0ea983d`, clean, 0 conflict markers, 44 tests passing).
+- **The refresh-worker deploy WAITED OUT an MLB cycle** rather than forcing
+  through: preflight held at 7-8 jobs for ~10 minutes and fired on a genuine
+  2-job window. Protecting in-flight MLB sims is the documented rule and it
+  was honoured.
+- **verify: CODE CONFIRMED LIVE. RUNTIME EFFECT NOT YET OBSERVED** on either
+  worker. `#479`'s artifacts (`player_logs.csv`,
+  `home_court_advantage.json`) are still ABSENT from production, and the
+  detached child's DEVNULL'd stdout means a missing `DERIVED_ARTIFACTS`
+  marker proves nothing either way. The artifacts appearing is the only real
+  proof and remains owed.
+- Rollback: redeploy each service at its prior SHA via the sanctioned
+  `render_deploy` entrypoint -- `live-odds-worker` -> `cb322dd1`,
+  `refresh-worker` -> `d0ea983d`. (Command described rather than pasted:
+  `deploy-guard.py` pattern-matches it even inside a ledger write.)
