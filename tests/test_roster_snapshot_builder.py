@@ -58,6 +58,35 @@ class RosterSnapshotBuilderTests(unittest.TestCase):
         issues = validate_roster_snapshot_rows(rows)
         self.assertEqual(issues, [])
 
+    def test_real_nflverse_az_team_code_does_not_crash_validation(self) -> None:
+        """`nfl-team-abbr-az-alias`: the exact production shape. nflverse's
+        real roster_2026.csv release uses `AZ`, not `ARI`, for Arizona --
+        every existing fixture in this file uses full team names
+        ("Philadelphia Eagles" etc.), which happened to normalize
+        correctly and never exercised this code path. This crashed the
+        real roster-snapshot autorun's FIRST production run
+        (`ValueError: Roster snapshot validation failed: row 91 has
+        invalid team AZ; ...`, ~90 rows, every Cardinals player)."""
+        source_rows = [
+            {
+                "player_id": "00-004",
+                "player_name": "D. Player",
+                "player_display_name": "Delta Player",
+                "team": "AZ",
+                "position": "WR",
+                "season": 2026,
+                "week": 1,
+            },
+        ]
+
+        rows = build_roster_snapshot_rows(season=2026, snapshot_date="2026-07-13", source_rows=source_rows)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["team"], "ARI")
+
+        issues = validate_roster_snapshot_rows(rows)
+        self.assertEqual(issues, [])
+
     def test_write_roster_snapshot_csv_emits_expected_file(self) -> None:
         source_rows = [
             {
