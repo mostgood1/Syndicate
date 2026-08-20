@@ -98,9 +98,19 @@ That story ended; do not re-open it from the archive.**
   is not the cause". It was wrong, and instructively so — peak is PER-PASS, not
   cumulative, so halving 2 scans to 1 cut DURATION and could never move the peak.
   "Kills continued" was evidence of the wrong lever, not the wrong suspect.
-- **MLB's hydration cost has two named, measured components, and both are CUT ON
-  `main` (`ab99d236`) AND NOT DEPLOYED `[measured 2026-08-19, lane
-  mlb-overview-hydration-cost]`.** (a) `liveData.plays.allPlays` is **66.38%** of
+- **MLB's hydration cost has two named, measured components. Both are on `main`
+  and both are LIVE on refresh-worker as `d0ea983d` since 2026-08-20T13:59:33Z,
+  with the prune PROVEN TO FIRE IN PRODUCTION `[verified 2026-08-20 14:00Z, lane
+  mlb-overview-hydration-cost]`.** Production evidence, 3 of 3 builds
+  `pruned == games`, two different slate dates:
+  `FEED_LIVE_PRUNE enabled=True date=2026-08-19 games=15 pruned=15 plays_dropped=1125`
+  on a COMPLETED slate (vs 1,067 measured locally on a 15-game completed slate),
+  and `plays_dropped=1` on the same day's PREGAME slate, which is correct
+  behaviour — there is no play-by-play yet to drop, so `plays_dropped` scaling
+  with slate completeness is the signature of it working, not of it being inert.
+  Deployed off-main by necessity: re-cut onto `3b816546` because refresh-worker
+  runs an off-main deploy-branch chain and the branch prepared 20 minutes earlier
+  had become a rollback of another lane's live work. (a) `liveData.plays.allPlays` is **66.38%** of
   a StatsAPI feed/live document and `playsByInning` **3.05%** — measured over 15
   documents, 12,605,243 JSON bytes — and **nothing in `syndicate/` reads either**;
   `_daily_actual_by_game` held one full document per game for the whole build.
@@ -110,9 +120,15 @@ That story ended; do not re-open it from the archive.**
   loaded the whole odds_history shard to consult `doc["games"]` — **that key does
   not exist and never has** (one writer, one literal schema, `markets`-keyed;
   three real shard copies on disk confirm), so the branch could never fire.
-  Removed. **NEITHER IS EVIDENCE ABOUT THE ~2GB EXCURSION** — the shard's ~125MB
-  is a production-only derivation (19,798,176 B x `#435`'s ~6.3x) and is NOT in
-  the RSS numbers, which are the prune alone.
+  Removed. **NEITHER IS EVIDENCE ABOUT THE ~2GB EXCURSION, AND THE DEPLOY DID
+  NOT CHANGE THAT** — the shard's ~125MB is a production-only derivation
+  (19,798,176 B x `#435`'s ~6.3x) and is NOT in the RSS numbers, which are the
+  prune alone. Dropping 1,125 play records off the retained set is a different
+  claim from moving the transient, and the post-deploy memory reading is
+  boot-confounded (process up ~1 min, container 1249MB / 30.5%). **The
+  live-slate window (~22:00Z-05:00Z) against a comparably-aged process is the
+  only reading that can settle it and it HAS NOT BEEN TAKEN.** Kill switch
+  without a deploy: `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`.
 - **`#387`'s "one thing to fix" — turn overview peak from SUM into MAX — ALREADY
   SHIPPED.** `build_intelligence_overview` takes a `consumer=` and releases each
   sport before the next hydrates, and a second floor
