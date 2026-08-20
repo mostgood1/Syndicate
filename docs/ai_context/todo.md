@@ -1764,7 +1764,7 @@ the headroom invariant against the LIVE calibration profile -- if `alpha`/`diff_
 raised without re-checking this, the test catches it before the clip could silently start
 flattening a real effect mid-segment. `calibration_profile.py`'s comment updated accordingly.
 
-**Two smaller items remain genuinely open, disclosed rather than swept into "closed" this time**:
+**Two smaller items were flagged, disclosed rather than swept into "closed" at that point**:
 (1) the alpha fit's `faceoff_weight` input is each player's SEASON-long average, which includes
 the very game being predicted -- not a leave-one-out fit; judged small enough not to change the
 "leave alpha unchanged" conclusion, but never actually re-run holding it out. (2) the
@@ -1773,13 +1773,30 @@ the redesign shipped) has never been revisited by any of the ~10 addenda built o
 -- a standing structural simplification underlying every discrete-event curve (EV/OZ/DZ/NZ/
 strength-state/joint/lineup-aware), not a blocking bug, but an honest gap, not a closed one.
 
+**Addendum, same day: the leave-one-out refit -- run, not just reasoned about**, closing item (1)
+above. `scripts/calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own
+faceoff win/loss counts from every dressed player's rate before predicting that specific game --
+`O(games)` by construction: the full-season win/total counts are accumulated ONCE, then each
+game's own contribution is subtracted per player for that game's prediction only, never
+re-aggregated from scratch. **Result, all 1,312 games usable, 0 skipped**: `slope=0.0960` (vs
+in-sample `0.1086`), `R²=0.0021`, `t=1.668`, `p≈0.095`, implied `alpha=0.1919`, 95% CI
+`[-0.034, 0.418]`. **Confirms the original judgment, doesn't just restate it**: modestly weaker
+and less significant than the in-sample fit -- exactly the direction removing in-sample leakage
+should push it, exactly the small magnitude the earlier report predicted -- and the decision does
+not change: the vendor's `alpha=0.35` still sits comfortably inside the leave-one-out confidence
+interval. Verified: the leave-one-out subtraction arithmetic and `parse_playbyplay_player_faceoffs`
+both checked against hand-computed synthetic cases; boxscore/playbyplay `id` fields confirmed to
+agree (a real join precondition checked, not assumed) before trusting the per-game match.
+
 **This closes the faceoff-track's own open-items list -- for real this time, with the mult_clip
-gap named and closed rather than glossed over, and the two smaller items above stated as open, not
-silently absorbed into "zero."** EV, OZ, DZ, NZ, strength-state role, per-team role index, joint
+gap named and closed rather than glossed over, item (1) above run and confirmed rather than left
+as reasoning alone, and item (2) stated as the one thing still genuinely open, not silently
+absorbed into "zero."** EV, OZ, DZ, NZ, strength-state role, per-team role index, joint
 role-zone, player-level lineup-aware (both EV-only and strength-state), the legacy diff-based
-mechanism's sensitivity constants, and now its output clip bounds -- every item this session's own
-addenda ever flagged as open has a closing addendum, whether that closure built something,
-measured and confirmed a default was fine, or proved a bound can't bind.
+mechanism's sensitivity constants, its output clip bounds, and now the alpha fit's own leave-one-out
+confirmation -- every item this session's own addenda ever flagged as open has a closing addendum,
+whether that closure built something, measured and confirmed a default was fine, proved a bound
+can't bind, or re-ran a prior judgment call to confirm it held.
 
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting

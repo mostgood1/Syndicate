@@ -765,7 +765,18 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   headroom. Confirmed for literally any input (exhaustive `[0,1]x[0,1]` sweep, zero deviation
   everywhere between clipped and un-clipped output), not just the observed real range. Locked in
   a regression test against the live calibration profile so a future `alpha`/`diff_clip` change
-  gets caught before the clip could silently start binding. Two smaller items remain genuinely
-  open, disclosed rather than swept in: the alpha fit's in-sample `faceoff_weight` (season average
+  gets caught before the clip could silently start binding. Two smaller items were flagged,
+  disclosed rather than swept in: the alpha fit's in-sample `faceoff_weight` (season average
   including the predicted game itself, not leave-one-out) and the discrete-event engine's
   "one faceoff per real segment" approximation (never revisited since it was first stated).
+- **Did** run the leave-one-out refit, not just reason about it. `scripts/
+  calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own faceoff counts
+  from every dressed player's rate before predicting that game -- `O(games)`, full-season counts
+  accumulated once, each game's own contribution subtracted per player only for that game's own
+  prediction. Result: `slope=0.0960` (vs in-sample `0.1086`), `R²=0.0021`, `p≈0.095`, implied
+  `alpha=0.1919`, 95% CI `[-0.034, 0.418]` -- all 1,312 games usable, 0 skipped. **Confirms, not
+  just restates**, the original judgment: modestly weaker than the in-sample fit, exactly the
+  direction removing leakage should push it, decision unchanged -- the vendor's `0.35` still sits
+  comfortably inside the interval. The discrete-event engine's "one faceoff per segment"
+  approximation is the one item that remains genuinely open, a structural engine-design question
+  distinct from calibration, never blocking anything currently shipped.

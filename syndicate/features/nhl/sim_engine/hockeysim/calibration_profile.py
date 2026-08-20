@@ -115,6 +115,11 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # guess would not be an improvement. `faceoff_diff_clip=0.12` separately confirmed sensible
     # against the real observed |lineup_pct_diff| distribution (p95=0.085, max=0.158) -- it clips
     # only the most extreme ~5% of real cases, not an arbitrary bound.
+    # LEAVE-ONE-OUT REFIT CONFIRMS THIS, not just the in-sample fit above (`scripts/
+    # calibrate_nhl_faceoff_alpha_loo.py`, same report, second addendum): excluding each game's OWN
+    # faceoff counts from every dressed player's rate before predicting THAT game gives
+    # slope=0.0960 (vs in-sample 0.1086), alpha=0.1919, 95% CI `[-0.034, 0.418]` -- modestly weaker,
+    # exactly the direction removing in-sample leakage should push it, same decision either way.
     faceoff_alpha=0.35,
     faceoff_diff_clip=0.12,
     # `faceoff_mult_clip_*` CLOSED WITH A PROOF, not a measurement (same-day addendum to the
