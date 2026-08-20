@@ -1803,3 +1803,35 @@ shared-clone hazard.
 **Cost:** caught and corrected with a follow-up commit before any other
 session built on the bad state; content-verified restored via diff-tree
 against the true prior tip.
+
+## 2026-08-19 — A commit's own summary line overclaimed "closes to zero" while its body text said otherwise
+
+A faceoff-calibration commit's message read "This closes the faceoff-track's
+own open-items list to zero." The report it shipped alongside, in the SAME
+commit, had its own "What this does NOT do" section stating plainly that
+`faceoff_mult_clip_low`/`faceoff_mult_clip_high` were never touched. Both
+were true at the same time: the narrower claim (the two constants actually
+checked) was accurate; the summary sentence wrapped around it was not. The
+gap survived one full commit-and-push cycle before being caught.
+
+**Caught by:** treating a "we closed X" claim as a hypothesis to re-verify,
+not a fact to build on — re-reading the full text of the report that made
+the claim (not just its headline) surfaced the contradiction inside the
+SAME document. A dedicated re-check pass (an Explore agent asked to read
+every faceoff addendum end to end and confirm or refute "closed to zero")
+found it directly.
+
+**The rule going forward:** a summary sentence and the detail underneath it
+can drift apart within a single piece of work, not just across sessions —
+check a "fully closed" / "zero remaining" claim against the SAME document's
+own caveats section before repeating it in a lane block, todo.md, or a
+user-facing summary. This is a sibling to
+[[feedback_retraction_is_not_innocence]] (withdrawing a claim doesn't
+prove the opposite) and to [[feedback_gate_on_the_output_not_the_input]]
+(check what a document actually says, not what its own headline implies it
+says) — here the discrepancy was inside one document, not between two.
+
+**Cost:** low — caught in the next work session on the same lane, before
+any other session or deploy relied on the overclaim. Fixed with a
+correction addendum on the record (not a silent edit) plus the actually-
+open item closed with a proof.

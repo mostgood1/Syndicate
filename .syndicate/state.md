@@ -1198,7 +1198,7 @@ unsaved anywhere.
 
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
-  (§1–§2o, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
+  (§1–§2zzz, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
   `#463`/`#470`.
 - **Special teams, per-team AND league-calibrated**: PP/PK goal conversion
   (`pk_goal_cal_mult=0.4645`, `pp_goal_cal_mult=1.0` deliberately neutral —
@@ -1250,32 +1250,44 @@ unsaved anywhere.
   still far below what MLB's own much larger sample needed to find its own
   noise floor. Puck-line odds are not exposed by the production route at
   all; `--source both` covers it from local files (n=3).
-- **Faceoff-zone track (§2m/§2n/§2o) fully closed**: `_faceoff_multipliers`
-  was gated `faceoff_ev_only=True` but fed `TeamRates.faceoff_win_pct`, an
-  ALL-SITUATIONS blend — three per-team indices now close that. `faceoff_ev_index`
-  (EV-only, fallback tier). `faceoff_oz_index` (offensive-zone-specific,
-  preferred over EV when present — a refinement of the same consumption
-  point, not a separate mechanism). `faceoff_dz_index` (defensive-zone-
-  specific, an ADDITIONAL multiplicative layer composed with the OZ/EV
-  chain, not a fourth tier — a DZ win both suppresses the opponent's shots
-  and springs the winner's own transition chance, a dual effect a single
-  fallback chain can't represent). `zoneCode` confirmed empirically
-  relative to the WINNER (two draws at identical rink coordinates showed
-  opposite zone labels depending who won, not a fixed rink frame). OZ and
-  DZ confirmed genuinely independent, not mirror images: measured
-  correlation 0.69 across all 32 teams. Every index verified not to shift
-  the league-wide average shot count (992-pairing round-robin each time,
-  all under 0.5%, one under 0.02%). 356 hockeysim/nhl tests pass (up from
-  254 at session start).
-- **Genuinely still open**: player-level usage-weight producer's small-sample
-  floor (< 5 games falls back to heuristic, by design); the vendor's
-  original block-rate EV:PK:PP-def ratio (0.45:0.55:0.35) was never itself
-  validated, only scaled; xG model's rebound/tip-in coefficient sign is an
-  open question; `#470`'s market-backtest sample (n=14-15) is nowhere near
-  powered — re-run as the season resumes and dates accumulate;
-  neutral-zone faceoff rates were computed but have no consumption point;
-  `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the
-  vendor's uncalibrated defaults.
+- **Faceoff track FULLY CLOSED (§2m through §2zzz)**, not just the
+  EV/OZ/DZ zone slice: `_faceoff_multipliers` was gated
+  `faceoff_ev_only=True` but fed `TeamRates.faceoff_win_pct`, an
+  ALL-SITUATIONS blend — closed in stages, each verified not to shift the
+  league-wide average shot count (992-pairing round-robin every time, all
+  well under 1%): (1) EV/OZ/DZ/NZ per-team zone indices + discrete-event
+  decay curves (`zoneCode` confirmed empirically relative to the WINNER,
+  not a fixed rink frame; OZ/DZ confirmed genuinely independent, r=0.69
+  not ±1.0); (2) a strength-state (PP/PK) mechanism — the first faceoff
+  effect outside even strength — where a naive combination of two curves
+  inflated league shots +4.478%, found by the SAME round-robin check and
+  fixed with an exact per-segment normalization down to +0.203%; (3) a
+  per-team PP/PK-role-specific win index refining that mechanism; (4) a
+  joint role×zone investigation that correctly DECLINED a full curve
+  build — 4 of 6 population cells too data-thin (as few as 197 league-wide
+  draws); (5) a player-level lineup-aware layer (real per-player
+  `faceoffWinningPctg`-derived rates, TOI-weighted per tonight's confirmed
+  roster) for both EV-only and strength-state segments; (6)
+  `faceoff_alpha`/`faceoff_diff_clip` calibrated against 1,312 real games
+  (95% CI `[-0.005, 0.439]` comfortably contains the vendor's `0.35` —
+  decision: left unchanged, backed by measurement not left uncalibrated by
+  default) plus a leave-one-out refit confirming that judgment; (7)
+  `faceoff_mult_clip_low`/`high` closed with an algebraic proof (max
+  possible swing `0.042` is strictly inside the clip's `0.10` headroom for
+  ANY input, confirmed by an exhaustive `[0,1]×[0,1]` sweep), after an
+  earlier "closes to zero" claim was found to have overstated itself and
+  was corrected on the record rather than left standing. 638 hockeysim/nhl
+  tests pass (up from 254 at session start). **Genuinely still open, the
+  one item**: the discrete-event engine's "one faceoff assumed per real
+  segment" approximation — a structural engine-design question, never
+  revisited since the redesign shipped, not currently blocking anything.
+- **Genuinely still open (non-faceoff)**: player-level usage-weight
+  producer's small-sample floor (< 5 games falls back to heuristic, by
+  design); the vendor's original block-rate EV:PK:PP-def ratio
+  (0.45:0.55:0.35) was never itself validated, only scaled; xG model's
+  rebound/tip-in coefficient sign is an open question; `#470`'s
+  market-backtest sample (n=14-15) is nowhere near powered — re-run as the
+  season resumes and dates accumulate.
 
 
 ## [model-skill] MODEL SKILL (`#428`) — measured vs not
