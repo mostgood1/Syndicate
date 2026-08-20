@@ -1032,13 +1032,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   regression check that the reorder did not break matching itself.
 - Blocked by: none.
 
-### mlb-pregame-ladder-schema — OPEN — **FIX DEPLOYED AND LIVE (`a54dffa3`, refresh-worker, 18:27:40Z) BUT NOT YET PROVEN IN PRODUCTION — IT HAS NOT EXECUTED ONCE. ROOT CAUSE IS A BROKEN FALLBACK, NOT A DATA OUTAGE AND NOT A RACE: `daily_update.py:3694` (run by the sim job at `run_mlb_daily_sim_job.py:237`) is the NORMAL producer and writes 26 fields WITH ladders; `#440`'s native builder is a FALLBACK that fires ONLY when the vendor stage errors (`daily_update.py:3684`) and until this fix emitted 10 fields without `gamePk`/`pitcherId`/`ladder[]`. The board broke when the fallback fired after a failed daily update. **NO PRODUCTION LEVER FORCES A NATIVE REBUILD** — force-mlb-resim runs `daily_update` first — so production wiring stays UNPROVEN by design.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+### mlb-pregame-ladder-schema — CLOSED-SHIPPED-UNVERIFIED 2026-08-20 — **Code shipped and LIVE (`a54dffa3`, refresh-worker 18:27:40Z); pregame ladder chips + starter-name gate fixed, proven locally over real production inputs (18/18 starters, was 0/18). NOT PROVEN IN PRODUCTION and never will be from this lane: the native builder is a fallback that fires only when the vendor stage errors, so it has not executed once (`outcome: skipped_fresh`). THE UNDISCHARGED VERIFICATION OBLIGATION IS TRANSFERRED, NOT DROPPED — it is item 1 of `mlb-native-ladders-producer`, which now holds the files.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
 - **Goal:** every pregame MLB starter with a sim distribution and a market line
   renders its ladder chips, and the NAME renders whether or not it has chips.
-- **Files:** `syndicate/features/mlb/ladders_build.py`,
-  `syndicate/static/mlb/cards_source.js`, `tests/test_mlb_ladders_build.py`.
-  `cards.py` deliberately NOT claimed — the reader is correct as written and is
-  held by `mlb-overview-hydration-cost`.
+- **Files:** none — released to `mlb-native-ladders-producer`.
 - **On `origin/main`:** `a54dffa3` (fix), `19b64fcd` (deploy-gate findings),
   `0a2ad516` (deploys.md + a correction to this lane's own overclaim). Worktree
   clean, nothing unpushed.
@@ -1220,6 +1217,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `projected == live_projection` only 1/48 (a real coincidental match, not
   a residual bug). Full measurement in `deploys.md`.
 - Blocked by: none.
+
+
+### mlb-native-ladders-producer — OPEN — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`): today the vendored Flask frontend writes this artifact on EVERY cycle (`daily_update.py:3694`) and Syndicate's native builder is a fallback that fires only when that stage errors.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+- **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
+  `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
+  stamped on the SERVED artifact — with the vendor ladders stage removed from
+  `daily_update.py`, and both consumers (top-props board, compact-card pregame
+  chips) rendering unchanged.
+- **Files:** `syndicate/features/mlb/ladders_build.py`, `tests/test_mlb_ladders_build.py`, `scripts/run_mlb_daily_sim_job.py`, `tests/test_run_mlb_daily_sim_job.py`.
+- **INHERITED OBLIGATION (item 1, from `mlb-pregame-ladder-schema`):** `a54dffa3`
+  is live and UNVERIFIED in production. Discharge by arming
+  `SYNDICATE_MLB_LADDERS_FORCE_DATE=<central date>` on refresh-worker and reading
+  `generatedBy == syndicate.features.mlb.ladders_build` PLUS populated
+  `ladder[]`/`gamePk` on 18/18 pitcher rows. **Chips on the board prove NOTHING**
+  — the vendor writer renders them either way. Knob shipped (`c99b259c`); env var
+  NOT set (Claude's PUT is classifier-blocked; needs a dashboard edit) and the
+  deploy is parked on it.
+- **Gap to parity, measured 2026-08-20:** 4 presenter fields (`lineupOrder`,
+  `paMean`, `matchupReasons`, `matchupSummary`) read by `ladders_common.py`, and
+  hitter ladders 0/234 vs vendor 234/234. The other 14 vendor-only fields are NOT
+  blockers: `modeProb`/`modeCount`/`overLineCount` have 0 consumers;
+  `marketLinesByStat`/`pregameMarketLine` are read only as FALLBACKS behind
+  `marketLine`, which native already emits; the rest are cosmetic.
+- **Hitter ladders: decide, do not default.** No consumer reads them, and
+  `learnings.md` 2026-08-20 records this artifact silently exceeding
+  `_PUBLISH_MAX_BYTES`. Native+pitcher ladders is 635,001 B vs the vendor's
+  9,518,280 B, so 234 hitter ladders is the biggest size lever here. Do not add
+  them without a consumer.
+- **Do not delete the vendor stage until native is proven on the normal path.**
+  The board currently runs on the vendor artifact; removing its writer first
+  converts a degraded path into an outage.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

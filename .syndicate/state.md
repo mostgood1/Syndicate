@@ -3405,6 +3405,58 @@ independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
+## [mlb-vendor-exit-audit] MLB VENDOR EXIT — 18 OF 20 PIPELINE STAGES HAVE NO NATIVE PRODUCER `[2026-08-20, MEASURED]`
+
+**Syndicate's MLB module is a READ LAYER over vendor-produced artifacts.** Of the
+22 modules in `syndicate/features/mlb/`, **exactly two write anything**:
+`ladders_build.py` and `live_lens.py`. The other 20 — `cards.py`,
+`top_props.py`, `hr_targets.py`, `pitcher_ladders.py`, `betting_card.py`,
+`season.py` — are readers and presenters.
+
+**The names invite the opposite conclusion and that is the trap.**
+`top_props.py`, `hr_targets.py` and `roster_snapshot_builder.py` all read like
+producers; all three contain **zero** `json.dump` / `write_text` calls, and the
+roster one is not even MLB (`syndicate/features/football/ingestion/`). Verify a
+producer by whether it WRITES, never by its name.
+
+`vendor/mlb_bettingv2/tools/daily_update.py` runs **20 stages**. Native coverage:
+
+| stage | native producer |
+|---|---|
+| `current_day_oddsapi` | **YES** — `scripts/refresh_odds_sources.py` (13 writes) |
+| `current_day_ladders_artifact` | **PARTIAL** — `ladders_build.py`; 4 presenter fields short (`lineupOrder`, `paMean`, `matchupReasons`, `matchupSummary`), hitter ladders 0/234 |
+| `prior_day_live_lens` | **UNCONFIRMED** — `live_lens.py` writes 3 artifacts; not verified to be this stage's output |
+| the other **17** | **NONE** |
+
+The 17: `prior_day_feed_live_refresh`, `prior_day_card_settlement`,
+`live_pitcher_corrections`, `prior_day_eval_report`, `season_publish`,
+`prior_day_top_props_artifact`, `current_day_overwrite_prep`,
+`current_day_multi_profile`, `hr_target_history_reconcile`,
+`current_day_top_props_artifact`, `current_day_ladder_audit_artifact`,
+`current_day_season_frontend_artifacts`, `next_day_forward_build`,
+`current_day_batting_lineups`, `current_day_probable_pitchers`,
+`current_day_roster_snapshot`, `render_frontend_validation`.
+
+**METHOD AND ITS LIMIT, so nobody over-reads the number.** Audited by *who
+writes the artifact*. A stage whose output is genuinely obsolete shows as a
+false gap — `current_day_overwrite_prep`, `next_day_forward_build`,
+`render_frontend_validation` and `season_publish` read as vendor-internal
+plumbing that may need no port at all. So: **~14 stages of real work, ~4 to
+triage**, not a flat 18.
+
+**SEQUENCING:** `current_day_multi_profile` is the SIM itself and every
+downstream stage consumes its output — it decides whether this is a port or a
+rewrite, and it should be scoped before any plan for the rest is committed to.
+
+**THIS CONTRADICTS A DOCUMENTED FACT.** MLB is described as the reference module
+with "no source-app fallback" and the first fully local runtime contract. For
+the ladders artifact that is FALSE: the vendored Flask frontend
+(`daily_update.py:3694`) writes it on every cycle, and the native builder is a
+fallback that fires only when the vendor stage errors
+(`daily_update.py:3684`). `ladders_build.py`'s own docstring claims it retired
+the vendor writer; it did not. That docstring caused two successive
+misdiagnoses on 2026-08-20.
+
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
 ### ONE WRITER PLUS A BROKEN FALLBACK -- NOT A RACE `[2026-08-20T19:2xZ, VERIFIED -- SUPERSEDES THE "RACE" FRAMING BELOW]`
