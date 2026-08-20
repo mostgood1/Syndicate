@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import unittest
 from io import StringIO
 from pathlib import Path
@@ -100,13 +101,22 @@ def _write_players(source_root, season: int, rows: str) -> None:
     (players_dir / f"players_{season}.csv").write_text(_PLAYER_HEADER + rows, encoding="utf-8")
 
 
-def _write_roster(source_root, names: list[str]) -> None:
-    roster_dir = source_root / "epl" / "api" / "rosters"
-    roster_dir.mkdir(parents=True, exist_ok=True)
-    body = "team_id,team,player_id,player_name,jersey,position\n" + "".join(
-        f"1,Arsenal,{900 + i},{name},{i},F\n" for i, name in enumerate(names)
+def _patch_roster(module, names: list[str]):
+    """Control what the ESPN roster says, at the READ.
+
+    `_current_roster_names` goes through `sources.roster_rows`, which resolves
+    across `_source_roots()` -- the runtime disk AND the git-shipped repo
+    fallback. A roster CSV written into a TemporaryDirectory is therefore
+    never read, and a test that wrote one would pass by accident whenever the
+    name it invented happens to exist in the real repo roster (both "Nwaneri"
+    and "Viktor Gyokeres" do). Patching the read is the only way these assert
+    on their own fixture.
+    """
+    return patch.object(
+        module,
+        "roster_rows",
+        return_value=tuple({"player_name": name} for name in names),
     )
-    (roster_dir / "rosters_2026.csv").write_text(body, encoding="utf-8")
 
 
 class DepartedPlayerTests(unittest.TestCase):
@@ -149,8 +159,9 @@ class DepartedPlayerTests(unittest.TestCase):
             source_root = Path(tmp_dir)
             _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Nwaneri"))
             _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
-            _write_roster(source_root, ["Stays", "Nwaneri"])
-            rows = self._module()._load_player_rows("epl", source_root)
+            module = self._module()
+            with _patch_roster(module, ["Stays", "Nwaneri"]):
+                rows = module._load_player_rows("epl", source_root)
         self.assertEqual({r["player_name"] for r in rows}, {"Stays", "Nwaneri"})
 
     def test_the_roster_never_deletes_a_player_it_omits(self) -> None:
@@ -163,8 +174,9 @@ class DepartedPlayerTests(unittest.TestCase):
             source_root = Path(tmp_dir)
             _write_players(source_root, 2024, _player_row(2024, "u1", "Current"))
             _write_players(source_root, 2025, _player_row(2025, "u1", "Current"))
-            _write_roster(source_root, ["SomebodyElse"])
-            rows = self._module()._load_player_rows("epl", source_root)
+            module = self._module()
+            with _patch_roster(module, ["SomebodyElse"]):
+                rows = module._load_player_rows("epl", source_root)
         self.assertEqual({r["player_name"] for r in rows}, {"Current"})
 
     def test_roster_match_ignores_diacritics(self) -> None:
@@ -176,8 +188,9 @@ class DepartedPlayerTests(unittest.TestCase):
             source_root = Path(tmp_dir)
             _write_players(source_root, 2024, _player_row(2024, "u1", "A") + _player_row(2024, "u2", "Viktor Gyokeres"))
             _write_players(source_root, 2025, _player_row(2025, "u1", "A"))
-            _write_roster(source_root, ["Viktor Gy\u00f6keres"])
-            rows = self._module()._load_player_rows("epl", source_root)
+            module = self._module()
+            with _patch_roster(module, ["Viktor Gy\u00f6keres"]):
+                rows = module._load_player_rows("epl", source_root)
         self.assertIn("Viktor Gyokeres", {r["player_name"] for r in rows})
 
     def test_a_single_season_league_is_untouched(self) -> None:
@@ -216,8 +229,11 @@ class DepartedPlayerTests(unittest.TestCase):
             source_root = Path(tmp_dir)
             _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
             _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
-            rows = self._module()._load_player_rows("epl", source_root)
+            module = self._module()
+            with _patch_roster(module, []), patch("sys.stdout", new_callable=StringIO) as out:
+                rows = module._load_player_rows("epl", source_root)
         self.assertEqual({r["player_name"] for r in rows}, {"Stays"})
+        self.assertIn("SOCCER_ROSTER_EMPTY", out.getvalue())
 
     def test_against_the_real_mirror_the_known_departures_go_and_the_known_squad_stays(self) -> None:
         """The production case that started this, end to end on real data."""
@@ -233,6 +249,52 @@ class DepartedPlayerTests(unittest.TestCase):
         # really priced by the book.
         for current in ("Ethan Nwaneri", "Reiss Nelson"):
             self.assertIn(current, arsenal)
+
+class RosterReadReachabilityTests(unittest.TestCase):
+    """The rescue shipped INERT and this is the test that would have caught it.
+
+    The first version globbed `source_root / league / "api" / "rosters"` -- a
+    SINGLE root. Measured in production 2026-08-20 23:17:45Z on the first
+    artifact rebuilt by the deployed code: Arsenal 28 -> 21 with
+    `rescued_by_roster` effectively zero, dropping Ethan Nwaneri and Reiss
+    Nelson, both really at the club and both really priced. Locally the same
+    code returned 23, because locally that one root happens to hold the file.
+
+    `sources._api_read_path` iterates `_source_roots()` -- runtime disk AND
+    the git-shipped repo fallback -- and `rosters_*.csv` is absent from
+    `HOT_ARTIFACT_PATTERNS`, so on a worker the fallback is the ONLY route to
+    it. Asserting the READ PATH, not the outcome: an outcome test passes on a
+    dev box either way, which is exactly how this reached production.
+    """
+
+    def test_the_roster_is_read_through_sources_not_a_single_root_glob(self) -> None:
+        """Asserts the CALL, not the source text.
+
+        The first version of this test grepped the file for the old glob
+        expression -- and failed, because that string still appears in the
+        COMMENT explaining why the glob was wrong. A test that a comment can
+        break is testing prose. Patching `roster_rows` and asserting it is
+        actually invoked tests the mechanism: if anyone reverts to a direct
+        glob, this goes red regardless of what the comments say.
+        """
+        module = _load_module(Path(__file__).resolve().parents[1])
+        with patch.object(module, "roster_rows", return_value=({"player_name": "X"},)) as mocked:
+            names = module._current_roster_names("epl")
+        mocked.assert_called_once()
+        self.assertEqual(names, {"x"})
+
+    def test_every_league_roster_is_git_tracked_so_the_fallback_can_find_it(self) -> None:
+        """The fallback only works on files the checkout actually ships. If a
+        league's roster ever stops being tracked, its rescues go silently to
+        zero on every worker -- the same failure, one file at a time."""
+        import subprocess
+
+        out = subprocess.run(
+            ["git", "ls-files", "data/soccer_source/*/api/rosters/rosters_*.csv"],
+            capture_output=True, text=True, cwd=Path(__file__).resolve().parents[1],
+        ).stdout
+        tracked = [line for line in out.splitlines() if line.strip()]
+        self.assertGreaterEqual(len(tracked), 10, f"only {len(tracked)} roster files tracked")
 
 if __name__ == "__main__":
     unittest.main()

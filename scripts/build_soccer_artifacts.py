@@ -37,6 +37,8 @@ from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
 from syndicate.features.soccer.features.lineups import _norm_player_name
+from syndicate.features.soccer.sources import default_season
+from syndicate.features.soccer.sources import roster_rows
 from syndicate.features.soccer.features.loaders import team_rows_from_match_history
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
@@ -96,7 +98,7 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
     return compute_team_ratings(rows, as_of=as_of, window=45)
 
 
-def _current_roster_names(league: str, source_root: Path) -> set[str]:
+def _current_roster_names(league: str, source_root: Path | None = None) -> set[str]:
     """Normalized names on the club's CURRENT ESPN roster, best effort.
 
     Used ONLY to RESCUE a player from the season filter below, never to drop
@@ -123,23 +125,52 @@ def _current_roster_names(league: str, source_root: Path) -> set[str]:
     different normalizers would let a player be kept by one and unresolvable
     by the other.
     """
-    roster_dir = source_root / league / "api" / "rosters"
-    paths = sorted(roster_dir.glob("rosters_*.csv"))
-    if not paths:
-        return set()
+    # READS THROUGH `roster_rows`, NOT A DIRECT GLOB. The first version of
+    # this globbed `source_root / league / "api" / "rosters"` -- ONE root --
+    # and it was INERT IN PRODUCTION while passing locally.
+    #
+    # Measured 2026-08-20 23:17:45Z, first artifact rebuilt by the deployed
+    # code: Arsenal 28 -> 21, all five departed players correctly gone, and
+    # `rescued_by_roster` EFFECTIVELY ZERO -- 21 is exactly the
+    # `players_2025.csv` count. Ethan Nwaneri and Reiss Nelson, both really at
+    # the club and both carrying a real bookmaker price, were dropped. Locally
+    # the same code returned 23.
+    #
+    # `sources._api_read_path` iterates `_source_roots()` -- the runtime disk
+    # AND a git-shipped repo fallback -- and its own docstring says why:
+    # "`_api_root` resolves `_source_roots()[0]` -- the runtime disk only --
+    # and `preferred_source_roots` appends a repo fallback on Render precisely
+    # so a git-shipped artifact stays reachable when that disk never received
+    # it. Every read below threw the fallback away unread, and the cost was
+    # the whole soccer sim." A single-root glob throws the fallback away in
+    # exactly that way. `rosters_*.csv` is also absent from
+    # `HOT_ARTIFACT_PATTERNS`, so the worker's disk has no route to receive
+    # it and the fallback is the ONLY way this file is ever readable there.
     try:
-        frame = pd.read_csv(paths[-1])
+        rows = roster_rows(league, default_season(league))
     except Exception as error:
         print(
             f"[build_soccer_artifacts] SOCCER_ROSTER_READ_FAILED league={league} "
-            f"path={paths[-1]} error={error} (no roster rescues this build; "
-            "players fall back to the season rule)",
+            f"error={error} (no roster rescues this build; players fall back "
+            "to the season rule)",
             flush=True,
         )
         return set()
-    if "player_name" not in frame.columns:
-        return set()
-    return {_norm_player_name(name) for name in frame["player_name"] if str(name).strip()}
+    names = {
+        _norm_player_name(row.get("player_name"))
+        for row in rows
+        if str(row.get("player_name") or "").strip()
+    }
+    if not names:
+        # Not fatal -- the season rule still applies -- but it is the
+        # difference between dropping 5 phantoms and dropping 7 players, so
+        # it must never be silent again.
+        print(
+            f"[build_soccer_artifacts] SOCCER_ROSTER_EMPTY league={league} "
+            f"season={default_season(league)} (no roster rescues this build)",
+            flush=True,
+        )
+    return names
 
 
 def _drop_departed_players(
