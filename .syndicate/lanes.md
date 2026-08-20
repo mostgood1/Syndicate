@@ -1005,9 +1005,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
 
-- **LIVE MATCH STATE SHIPPED `[2026-08-20T21:3xZ]`, session `aeb71be7` (lane
-  taken over; `56b563e0` is out of the active roster). ON `origin/main` as
-  `ca75e0a1` (7 files, +995/-45) + ledger `e87be287`. NOT DEPLOYED.** All
+- **LIVE MATCH STATE SHIPPED AND DEPLOYED `[2026-08-20T21:4xZ]`, session
+  `aeb71be7` (lane taken over; `56b563e0` is out of the active roster). On
+  `origin/main` as `ca75e0a1`; LIVE as grafts `bd4b1a67` (live-odds-worker,
+  21:33:45Z) and `075226dd` (web, 21:41:5xZ) -- both `--allow-off-main`,
+  measurement in `deploys.md`. Production reads `ALA 1 - 1 RAY` Final with real
+  Goals + Match stats sections, 0 pre-kickoff games showing a score, and 10 of
+  10 leagues publishing a `match_box` key absent at the parent SHA.
+  **ONE PATH STILL UNWITNESSED IN PRODUCTION: the LIVE CLOCK** -- every
+  production reading is of a FINISHED match, which correctly has no clock. It
+  was measured locally at the 70th and 83rd minutes pre-deploy. Next MLS
+  kickoffs ~23:30Z would close it.** All
   three gaps closed: real live AND final score, clock/period on the card, real
   live+final box sections. Verified on live La Liga 401882908 in BOTH states
   (83' 1-0, then FT 1-1 with `games` empty -- the finished case that

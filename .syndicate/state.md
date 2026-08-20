@@ -71,14 +71,19 @@ Collapsing those is owed work, not a bug in the tool.
 
 ## [soccer-live-match-state] Soccer cards can show live match state (VERIFIED 2026-08-20, NOT DEPLOYED)
 
-`origin/main` `ca75e0a1`. Soccer's card serves a real score in BOTH live and
-final states, a live clock, and a real box score. Verified end to end against
+`origin/main` `ca75e0a1`; LIVE in production as grafts `bd4b1a67`
+(live-odds-worker, 21:33:45Z) and `075226dd` (web, 21:41:5xZ). Soccer's card
+serves a real score in BOTH live and final states, a live clock, and a real box
+score. Verified end to end against
 La Liga fixture 401882908 in both states: at 83' the card read 1-0 with
 `live_state.clock "83'"`; after full time it read Final 1-1 with a "Final
 score" section, both goals (48' Camello, 84' Mariano) and team stats
-(possession 51.8/48.2, shots 15/8). **NOT ON ANY SERVICE YET** -- web needs a
-deploy for the card, live-odds-worker for `poll_soccer_live_state` to write
-`match_box`.
+(possession 51.8/48.2, shots 15/8). Verified on the SERVED surface after deploy:
+`/soccer/api/cards?date=2026-08-20` reads `ALA 1 - 1 RAY` Final with Goals +
+Match stats ahead of the sim box, 0 pre-kickoff games showing a score; 10 of 10
+leagues published a `match_box` key that does not exist at the parent SHA.
+**The LIVE CLOCK is NOT verified in production** -- every production reading so
+far is of a FINISHED match, which correctly has no clock.
 
 Three facts worth not rediscovering:
 
