@@ -3255,7 +3255,43 @@ Preflight **HOLD** — an MLB sim is in flight (`run_mlb_daily_sim_job.py` pid 1
 the ~109 artifacts it publishes. Poller running until it drains.
 
 
-### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<< `[refreshed 2026-08-20T03:1xZ]`
+### >>> DEPLOY CANDIDATE, refresh-worker: `1ef337c0` `[2026-08-20T13:3xZ]` <<<
+
+**`deploy/mlb-mix-and-markets` = `1ef337c0`, parent `041188cb` (the LIVE SHA).**
+4 files, +323/-4, additive. All four verified BYTE-IDENTICAL at `041188cb` and
+at each change's base (or absent, for the two new tests) — an exact add.
+
+**PRIMARY, and MEASURABLE — the conditional mix was never called.**
+`apply_conditional_mix_to_pitcher` had exactly one caller anywhere, including
+on main: `scripts/validate_crn_pa_seeding.py`, a validation script. The roster
+build never invoked it, so `roster_artifact.py` faithfully serialised
+`conditional_arsenal: {}` forever. Production's own `sim_input_report`
+(host=worker) read **`conditional_arsenal 0.0%` on 2026-08-19 AND 2026-08-20**
+with the artifact published, allowlisted and reachable the whole time.
+
+**verify:** the FIRST `sim_input_report_<date>.json` written after the deploy
+must show `conditional_arsenal` / `count_bucket_map` / `conditional_arsenal_source`
+NON-ZERO. Read it at
+`/api/ops/artifacts/export?pattern=*sim_input_report*`. This is a reading of a
+PUBLISHED ARTIFACT, not a log line — the sim's stdout goes to a disk file the
+Render log API cannot serve.
+
+**THE ROSTER-REBUILD THEORY IS RETIRED — do not spend more time on it.**
+`--use-roster-artifacts` only reuses an artifact for the SAME date that also
+passes `_roster_artifact_matches_inputs`, so a fresh game date always rebuilds.
+2026-08-20's rosters WERE built fresh and still came out empty. No env gate and
+no forced rebuild could ever have fixed this. `SYNDICATE_MLB_ROSTER_REBUILD_DATE`
+is now irrelevant to the conditional mix.
+
+**RIDEALONG folded in, zero marginal cost:** `hitter_strikeouts` joins
+`batter_strikeouts`. Its own preflight FAILED standalone on measurability
+(0 players observed 08-16..19 → the reading would be 0→0), which is what a
+ridealong is for. Expect it to stay 0 until books post that market; that is
+NOT evidence the wiring failed.
+
+**rollback:** redeploy `041188cb`.
+
+### >>> (superseded) STANDING RIDEALONG <<< `[refreshed 2026-08-20T03:1xZ]`
 
 **The branch this block used to name is SPENT.** `deploy/worker-ladders-ridealong`
 / `5c2851a4` shipped inside `041188cb` (live 02:03:08Z) — native builder, tests
