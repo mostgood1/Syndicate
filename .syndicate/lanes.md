@@ -976,6 +976,73 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   regression check that the reorder did not break matching itself.
 - Blocked by: none.
 
+### mlb-pregame-ladder-schema — OPEN — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+- **Goal (single testable outcome):** every pregame MLB starter with a sim
+  distribution and a market line renders its ladder chips on the compact card —
+  and the starter's NAME renders whether or not it has chips. Today: 0 of 18
+  sides get a ladder-derived chip, and 12 of 18 render no name at all.
+- **Files:**
+  - `syndicate/features/mlb/ladders_build.py`
+  - `tests/test_mlb_ladders_build.py`
+  - `syndicate/static/mlb/cards_source.js`
+  - `.syndicate/*`
+
+  Respectively: the writer that must restore the fields the cards reader joins
+  on, the cards-reader consumption test, and the starter-name/badge decoupling.
+- **`docs/ai_context/todo.md` DELIBERATELY NOT CLAIMED.**
+  `check_lane_invariants.py` flagged it contested against
+  `mlb-overview-hydration-cost` the moment I claimed it, so I dropped it rather
+  than run a second holder on the file the `#71` check reads. The todo entry
+  for this work gets reconciled at close, against whoever holds it then. Noting
+  it here because an unrecorded skip of the `#71` check looks identical to
+  forgetting it.
+- **NOT claimed, deliberately:** `syndicate/features/mlb/cards.py` is held by
+  the OPEN `mlb-overview-hydration-cost` lane. **The fix does not need it** —
+  the reader is correct as written; only its input regressed. Scoping the fix
+  to the writer is what makes this collision-free, not a compromise on it.
+- **Hypothesis (stated before fixing, MEASURED not believed):** the pregame
+  ladder chips are dead because `#440`'s native writer pinned its output schema
+  to the TOP-PROPS reader (`ladders_common.pitcher_rows_from_summary`) and
+  dropped the three fields the CARDS reader needs. Confirmed against
+  production's own copy, `generatedBy syndicate.features.mlb.ladders_build`,
+  generated 2026-08-20T16:46:16Z:
+
+      pitcher/strikeouts: n=18  ladder=0  gamePk=0  marketLine=18
+      ... all 7 pitcher stats + all 10 hitter stats, 3,978 rows: ladder=0 gamePk=0
+
+  Row schema today is 10 fields. The git-tracked May mirror (vendor writer) has
+  26, including `gamePk`, `pitcherId`, `ladder[{total,hitProb}]`. Reader dies at
+  `cards.py:1166` (`gamePk is None -> continue`, which also makes the
+  `pitcherName` fallback two lines down unreachable) and again at
+  `cards.py:1102` (`not ladder_rows -> return None`).
+- **Falsification test:** if the join or the inputs were the problem rather
+  than the schema, the artifact would show unmatched players or absent market
+  lines. It shows neither — `matchedPlayers 18, oddsPlayers 18, unmatchedOdds 0,
+  unmatchedSimNames 0`, and 18/18 rows carry BOTH `simCount>0` and a
+  `marketLine` on all four badge stats. Inputs are complete; only the emitted
+  shape is short. If a schema fix does NOT produce chips, the hypothesis is
+  wrong and the next suspect is `_filter_badges_to_current_market`.
+- **DESIGN CONSTRAINT, from `learnings.md` 2026-08-20 ("An artifact can OUTGROW
+  the publish ceiling, and the failure is silent"):** this same artifact hit
+  `_PUBLISH_MAX_BYTES` at 13,678,982 bytes and was refused SILENTLY for 28
+  hours. Adding arrays back to it is the exact move that re-arms that failure.
+  So: `ladder[]` goes on PITCHER rows only (18 rows, the sole consumer is
+  `cards.py:1102`), never on the 234-row hitter groups, and **the resulting
+  artifact size gets MEASURED against 12,582,912 and written down** — not
+  assumed small. Today's copy is 684,325 bytes, so there is headroom; the
+  number is the evidence, not the headroom.
+- **Verification:** (1) a test that runs the REAL cards reader
+  (`_pregame_starter_ladder_badges_for_pitcher`) over this writer's REAL output
+  and asserts a non-empty badge list — the reachability test whose absence let
+  this ship silently, since every existing test passed throughout; (2) the
+  measured artifact size vs the publish ceiling; (3) after deploy, the served
+  `/mlb/api/cards` payload showing ladder-derived chips on pregame sides that
+  have no pitcher recommendation (George Kirby is the control — he has a prop
+  row, no pick, and no chip today). Reading written to `deploys.md`.
+- **Blocked by:** none. Deploy target is refresh-worker (the writer) — claim
+  required, and web is currently 502ing on `/api/ops/version`, which is
+  somebody else's deploy and must be clear before I measure anything.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

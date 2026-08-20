@@ -22,9 +22,34 @@ the output schema is pinned by the existing native consumer:
                                                .so_mean
     MARKET  `daily_snapshot_oddsapi_pitcher_props_path(date)`
               -> pitcher_props[<lowercase name>].strikeouts.line
-    SCHEMA  `ladders_common.pitcher_rows_from_summary` reads pitcherName, team,
-            matchup, marketLine, mean, mode, overLineProb, simCount
+    SCHEMA  THIS ARTIFACT HAS TWO CONSUMERS AND BOTH ARE LOAD-BEARING.
+            1. `ladders_common.pitcher_rows_from_summary` (top-props board)
+               reads pitcherName, team, matchup, marketLine, mean, mode,
+               overLineProb, simCount.
+            2. `cards.py::_pregame_starter_ladder_badges_for_pitcher` (the
+               compact board's pregame starter chips) additionally needs
+               **gamePk, pitcherId and ladder[{total,hitProb}]** -- it joins on
+               gamePk (`cards.py:1166`) and returns None on an empty ladder
+               (`cards.py:1102`).
     SHAPE   groups.pitcher.strikeouts.rows[]  (`_extract_prop_group`)
+
+**THE SCHEMA REGRESSION THIS FILE ALREADY CAUSED ONCE.** The list above named
+only consumer 1 until 2026-08-20, and this module emitted only consumer 1's
+fields. Consumer 2 was named in the paragraph above as an inherited reader and
+then not served. Result: from the cutover until 2026-08-20, EVERY pregame
+starter ladder chip on the MLB board was dead -- 3,978 rows with `ladder=0` and
+`gamePk=0`, 0 of 18 starters carrying a chip -- and because the compact card
+hides the starter's NAME along with its chips, 12 of 18 pregame sides rendered
+no starter at all. Nothing failed: the join was perfect (`matchedPlayers 18,
+oddsPlayers 18, unmatchedOdds 0`), `is_stale` said fresh, every test passed, and
+no log line was emitted. The user reported it from the board.
+
+**So: a reader added to the list above is a reader this module must be TESTED
+against.** `test_the_real_native_reader_consumes_the_output` covers consumer 1
+and passed throughout the outage; `test_the_CARDS_reader_consumes_the_output`
+now covers consumer 2. Adding a third consumer means adding a third such test --
+a name grep for the field will not catch this, because the field name is present
+in the reader and simply absent from the data.
 
 `mode` is the argmax of the histogram and `overLineProb` is the mass above the
 line — arithmetic on data that already exists, not a new model.
@@ -146,6 +171,53 @@ def _dist_stats(dist: Any, line: float | None) -> dict[str, Any]:
     return {"mode": mode, "overLineProb": over, "simCount": total}
 
 
+def _dist_ladder(dist: Any) -> list[dict[str, Any]]:
+    """The CUMULATIVE ladder `P(X >= total)` over an outcome histogram.
+
+    **This exists because dropping it silently killed a whole board surface.**
+    The compact card's pregame starter chips are built by
+    `cards.py::_starter_ladder_badge_from_ladder_row`, which walks exactly this
+    list and returns `None` the moment it is empty. When `#440` replaced the
+    vendor writer, the output schema was pinned to the TOP-PROPS reader
+    (`ladders_common.pitcher_rows_from_summary`), which does not read a ladder —
+    so this field, `gamePk` and `pitcherId` all stopped being emitted, and every
+    pregame ladder chip on the MLB board went dark with passing tests, no error
+    and no log line. Measured on production 2026-08-20: 3,978 rows, `ladder=0`
+    on every one of them; 0 of 18 starters carried a ladder-derived chip.
+
+    `hitProb` is `P(X >= total)`, matching the vendor artifact this replaced
+    (verified against `daily_ladders_2026_05_29.json`: `total=0 -> hitProb=1.0`,
+    monotonically non-increasing) and matching what the reader's `min_hit_prob`
+    floors are calibrated against. Getting this direction wrong would not throw
+    — it would render confidently wrong chips.
+
+    **Deliberately unfiltered.** The reader owns the thresholds (`> marketLine`,
+    `min_hit_prob`, `max_rungs`), and duplicating them here is the coupling that
+    caused this bug in the first place. The size control is the CALLER's — see
+    `_rows_for_prop`, which puts this on pitcher rows only.
+    """
+    if not isinstance(dist, dict) or not dist:
+        return []
+    counts: dict[int, int] = {}
+    for k, v in dist.items():
+        try:
+            counts[int(k)] = int(v)
+        except Exception:
+            continue
+    total = sum(counts.values())
+    if total <= 0:
+        return []
+    ladder: list[dict[str, Any]] = []
+    at_or_above = total
+    for outcome in sorted(counts):
+        # Ascending `total`, because the reader takes the LAST surviving rung's
+        # probability as the badge's `hitProb` and its `max_rungs` cap slices
+        # from the front.
+        ladder.append({"total": int(outcome), "hitProb": round(at_or_above / total, 4)})
+        at_or_above -= counts[outcome]
+    return ladder
+
+
 def _market_lines(date_str: str, side: str = "pitcher") -> dict[str, dict[str, Any]]:
     """{normalised player name -> {odds prop -> {line, over_odds}}}"""
     if side == "hitter":
@@ -233,8 +305,19 @@ def _prop_group(rows, spec, *, matched, odds_total, unmatched_odds, unmatched_si
     return group
 
 
-def _rows_for_prop(entries, spec, market, name_key):
-    """entries: iterable of (player_id, sim_stats, meta{name,team,opponent,matchup})"""
+def _rows_for_prop(entries, spec, market, name_key, *, with_ladder: bool = False):
+    """entries: iterable of (player_id, sim_stats, meta{name,team,opponent,matchup,gamePk})
+
+    `with_ladder` IS THE SIZE CONTROL, and it is a caller decision on purpose.
+    `learnings.md` 2026-08-20: this artifact reached 13,678,982 bytes against
+    the publish sweep's `_PUBLISH_MAX_BYTES` of 12,582,912, was refused
+    SILENTLY, and web served a 28-hour-old copy while every other link in the
+    chain read correct. Putting a per-outcome array back on all 3,978 rows is
+    exactly the move that re-arms that. So the ladder goes on the 18 PITCHER
+    rows, whose sole consumer is `cards.py:1102`, and not on the 234-row hitter
+    groups, which have no consumer for it at all (`grep '"ladder"'` over
+    `syndicate/`: one MLB hit, and it is the cards reader).
+    """
     rows = []
     matched = 0
     unmatched_sim = []
@@ -261,9 +344,15 @@ def _rows_for_prop(entries, spec, market, name_key):
                 except Exception:
                     line = None
         stats_out = _dist_stats(stats.get(spec["dist"]), line)
-        rows.append({
+        row = {
             name_key: name or f"id {pid}",
             "playerId": pid,
+            # `gamePk` and `pitcherId` are what the CARDS reader joins on; the
+            # flat fields above are what the TOP-PROPS reader reads. Two
+            # consumers, one artifact -- serving only one of them is how this
+            # regressed. `pitcherId` is int because `cards.py` compares it with
+            # `int(pitcher_id)`; `playerId` stays a str for the existing reader.
+            "gamePk": meta.get("gamePk"),
             "team": meta.get("team") or "",
             "opponent": meta.get("opponent") or "",
             "matchup": meta.get("matchup") or "",
@@ -272,7 +361,15 @@ def _rows_for_prop(entries, spec, market, name_key):
             "mode": stats_out["mode"],
             "overLineProb": stats_out["overLineProb"],
             "simCount": stats_out["simCount"],
-        })
+        }
+        if name_key == "pitcherName":
+            try:
+                row["pitcherId"] = int(pid)
+            except (TypeError, ValueError):
+                row["pitcherId"] = None
+        if with_ladder:
+            row["ladder"] = _dist_ladder(stats.get(spec["dist"]))
+        rows.append(row)
 
     return _prop_group(
         rows, spec,
@@ -284,18 +381,26 @@ def _rows_for_prop(entries, spec, market, name_key):
 
 
 def _pitcher_entries(date_str, game_pks):
-    for _pk, payload in _sim_games(date_str, game_pks):
+    """`gamePk` is threaded into meta, NOT discarded as `_pk`.
+
+    `cards.py::_pregame_starter_ladder_badges_for_pitcher` joins on it FIRST
+    (`cards.py:1166`: `if row_game_pk is None ... continue`), which means an
+    absent `gamePk` also makes the `pitcherName` fallback below it unreachable —
+    the row can never match no matter how good the name is. It was already in
+    hand here and thrown away.
+    """
+    for game_pk, payload in _sim_games(date_str, game_pks):
         sim = payload.get("sim") if isinstance(payload.get("sim"), dict) else {}
         props = sim.get("pitcher_props") if isinstance(sim.get("pitcher_props"), dict) else {}
         starters = _starter_index(payload)
         for pid, stats in props.items():
             if isinstance(stats, dict):
-                yield str(pid), stats, (starters.get(str(pid)) or {})
+                yield str(pid), stats, {**(starters.get(str(pid)) or {}), "gamePk": int(game_pk)}
 
 
 def _hitter_entries(date_str, game_pks):
     """Hitters carry `name` and `team` on the entry itself, so no starter index."""
-    for _pk, payload in _sim_games(date_str, game_pks):
+    for game_pk, payload in _sim_games(date_str, game_pks):
         sim = payload.get("sim") if isinstance(payload.get("sim"), dict) else {}
         props = sim.get("hitter_props") if isinstance(sim.get("hitter_props"), dict) else {}
         away = _team_abbr(payload, "away")
@@ -310,6 +415,7 @@ def _hitter_entries(date_str, game_pks):
                 "team": team,
                 "opponent": opp,
                 "matchup": f"{away} @ {home}".strip(" @"),
+                "gamePk": int(game_pk),
             }
 
 
@@ -317,7 +423,8 @@ def build_pitcher_strikeout_rows(date_str, game_pks):
     """Named entry point kept: this is the group the compact card reads first."""
     entries = list(_pitcher_entries(date_str, game_pks))
     return _rows_for_prop(entries, PITCHER_PROPS["strikeouts"],
-                          _market_lines(date_str, "pitcher"), "pitcherName")
+                          _market_lines(date_str, "pitcher"), "pitcherName",
+                          with_ladder=True)
 
 
 def discover_game_pks(date_str: str) -> list[int]:
@@ -457,7 +564,8 @@ def build_ladders_artifact(date_str: str, game_pks: list[int]) -> dict[str, Any]
         "generatedBy": "syndicate.features.mlb.ladders_build",
         "groups": {
             "pitcher": {
-                key: _rows_for_prop(pitcher_entries, spec, pitcher_market, "pitcherName")
+                key: _rows_for_prop(pitcher_entries, spec, pitcher_market, "pitcherName",
+                                    with_ladder=True)
                 for key, spec in PITCHER_PROPS.items()
             },
             "hitter": {
