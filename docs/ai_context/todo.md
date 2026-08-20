@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#495` — **A pre-existing red in `test_intelligence_state.py` was the TEST, not the product: it asserted a `force_refresh` kwarg that `#387` deliberately removed. FIXED AND PROVED STILL-DISCRIMINATING.** — FOUND+FIXED+VERIFIED 2026-08-20, lane `intel-empty-pool-fallback-test`
+
+`tests/test_intelligence_state.py::IntelligenceStateTests::test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool`
+failed on `origin/main`. Spawned out of lane `layer2-rail-duplicate-nfl-cards`,
+which correctly refused to attribute it (that lane touched no Python).
+
+#### The verdict: THE ASSERTION WAS THE STALE SIDE. The empty-pool fallback is correct.
+
+The failure diff is **exactly one kwarg and nothing else**:
+
+    Expected: collect_all_recommendations(selected_date='2026-06-10', force_refresh=True, log_pipeline=False, overview=[])
+      Actual: collect_all_recommendations(selected_date='2026-06-10',                    log_pipeline=False, overview=[])
+
+Everything the test exists to check was already passing underneath it — the
+branch fired (`COLLECT_SPAN_EXIT stage=collect_all_recommendations:empty_fallback
+rows=20`) and `result == richer_pool`. **That is what makes this decidable rather
+than a coin-flip between the two sides.** Had the delta been anything more —
+wrong rows, branch not taken, fallback skipped — the code would have been the
+stale side instead.
+
+`#387` removed `force_refresh` from that call site
+(`syndicate/features/intelligence.py:10527-10542`) with its reasoning written
+into the code: `collect_all_recommendations` forwards `force_refresh` to
+`build_intelligence_overview` **only inside `if overview is None`**
+(`intelligence.py:10264-10265`), and that site passes an overview, so the flag
+never reached its branch. Keeping the literal in the assertion preserved the
+removed kwarg in the one place a reader would go looking, and turned a correct
+code change into a permanent red.
+
+Fix: drop the kwarg from the assertion, and say in a comment why it must not
+come back. `tests/test_intelligence_state.py` only.
+
+#### Verified — including that the corrected assertion can still FAIL
+
+Per the 08-16 rule (*a verifier that cannot FAIL cannot PASS*), a loosened
+assertion is not a fix. Proved by perturbation: adding a fourth kwarg
+(`force_refresh=False`) to the production call site makes the corrected test
+**fail**; the call site was then restored **byte-identical** (sha256
+`f8d0f67a36d546d8…` before and after, `git diff` empty). It asserts the exact
+kwarg set, not a subset.
+
+- named test: **PASS**
+- `-k "fallback_merge or candidate_identity"` in the same file: **4 passed**
+- `tests/test_candidate_fallback_gate.py`: **4 passed**
+- `syndicate/features/intelligence.py`: **unchanged**
+
+#### Two corrections to the ledger that fall out of this
+
+1. **`state.md` `[test-baselines]` is stale.** It records this file as carrying
+   **two** pre-existing failures, the second being
+   `..._recomputes_when_cached_snapshot_is_stale`. Re-measured 2026-08-20 on
+   `main`: that test **passes** (72s). The baseline line is dated 08-14/15 and
+   was measured against the deployed lineage at `2b14fbeb`; it should not be
+   inherited as current.
+2. **`#387`'s "it was already inert here" is true of the call site it was
+   written about, and NOT universally.** The streamed board caller
+   (`pipeline/intelligence_state.py:4636-4653`) passes `overview=None` on
+   purpose, so on that path `force_refresh` **does** reach
+   `build_intelligence_overview` — dropping it changed a forced re-hydration
+   into a cached one. **Deliberately not "fixed" here:** restoring it would
+   reinstate exactly the re-hydration `#387` removed for memory reasons, and
+   the branch is unreachable in production today anyway — the same caller sets
+   `apply_empty_pool_fallback=not board_l2a_fallback_enabled()`, so `#385` gates
+   the empty-pool fallback OFF while Layer 2 owns the board. Whoever revisits
+   `#385`'s gate owns this question too; it is a live behaviour delta the
+   moment that gate opens.
+
 ### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** STAYS OPEN: the boot that would have proven it was KILLED 63 SECONDS IN by a `/healthz` timeout, and the lock it left behind made the NEXT boot skip the sync entirely — so no complete bootstrap has run since the fix. Readings are clean but bounded to the first root. **Discharging reading is one log line, and the released web claim means the next session's web deploy supplies it** — lane `soccer-stale-artifact-overwrite`
 
 **THE SYMPTOM.** `/soccer/api/cards` served the finished La Liga match

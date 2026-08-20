@@ -3671,7 +3671,16 @@ class IntelligenceStateTests(unittest.TestCase):
                 overview=[], preferences={}, odds_history_by_sport={}, selected_date="2026-06-10"
             )
 
-        mocked_richer.assert_called_once_with(selected_date="2026-06-10", force_refresh=True, log_pipeline=False, overview=[])
+        # NO force_refresh. `#387` removed it from this call site on purpose:
+        # collect_all_recommendations only forwards force_refresh to
+        # build_intelligence_overview inside `if overview is None`, and this
+        # site passes an overview, so the kwarg never reached its branch.
+        # Asserting it kept the removed literal alive in the one place a
+        # reader would check, and made this test red on `origin/main` while
+        # the branch under test was behaving correctly. Assert the exact
+        # kwarg set, not a subset -- dropping or renaming any of the three
+        # must still fail here.
+        mocked_richer.assert_called_once_with(selected_date="2026-06-10", log_pipeline=False, overview=[])
         self.assertEqual(result, richer_pool)
 
     def test_collect_candidates_with_fallback_merge_unions_thin_pool_with_richer_pool(self) -> None:
