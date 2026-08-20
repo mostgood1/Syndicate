@@ -17869,7 +17869,7 @@ markets -- in the same snapshot `batter_home_runs` covered 46 players while
 few rows. The ladders wiring is in place, so enabling later is one line in
 `DEFAULT_HITTER_MARKETS`.
 
-## 2026-08-20 — refresh-worker: nfl-autorun-production-arm (PENDING)
+## 2026-08-20 — refresh-worker: nfl-autorun-production-arm — SHIPPED, ONE OF TWO AUTORUNS BROKE ON REAL DATA
 
 - **Candidate:** `3b816546` (direct child of live SHA `041188cb`) -- arm the
   two `nfl-roster-depth-autorun` autoruns
@@ -17888,8 +17888,24 @@ few rows. The ladders wiring is in place, so enabling later is one line in
   rollback risk either direction), or unset the two env vars (stops future
   launches without a deploy -- one-shot rate-limited subprocess, not a
   persistent loop).
-- **Measurement:** PENDING -- fill in after deploy + log verification.
-- Reminder timestamp: 2026-08-20T04:15Z (approx, session-relative).
+- **Measurement:** Deployed `dep-da3g2mj7uimc73ajjtig`, live
+  13:36:29Z, after a ~2.5h preflight HOLD (continuously busy job queue --
+  no true lull, only a genuine `CLEAR` window between soccer-league
+  build iterations). Verified via production logs:
+  - `NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING` at 13:42:34Z -- clean, no
+    traceback, correctly rate-limited on subsequent ticks. **PASS.**
+  - `NFL_ROSTER_SNAPSHOT_LAUNCHING` at 13:40:31Z -- crashed immediately:
+    `ValueError: Roster snapshot validation failed: row 91 has invalid
+    team AZ; ...` (~90 rows, every Arizona Cardinals player). **FAIL.**
+    Root cause traced and FIXED on `origin/main` (`8a87e822`, lane
+    `nfl-team-abbr-az-alias`) -- `canonical_team_abbr("AZ")` had no
+    alias entry for nflverse's own "AZ" team code. **Fix is NOT yet
+    deployed** -- refresh-worker still runs the pre-fix commit as of this
+    entry. Impact is contained (rate-limited to one attempt per 21600s,
+    not a storm), but the next session should deploy the fix and
+    re-verify a clean `NFL_ROSTER_SNAPSHOT_LAUNCHING` -> successful write
+    before considering this fully closed.
+- Reminder timestamp: 2026-08-20T13:15Z.
 
 ## SHIPPED-VERIFIED 2026-08-20 13:17Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
 - Preflight PASS (full checklist run via `/preflight` skill). Claim + mechanical preflight CLEAR at
