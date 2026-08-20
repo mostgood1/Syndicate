@@ -3940,15 +3940,58 @@ def _load_intervals_band_calibration_local(*, processed_root: Path) -> dict[str,
         return None
 
 
-def _load_intervals_time_profile_local(*, processed_root: Path) -> dict[str, Any] | None:
+def _load_intervals_time_profile_local(*, processed_root: Path, league_code: str | None = None) -> dict[str, Any] | None:
+    """Load the interval time profile, REFUSING one fitted for a different
+    segment geometry than the engine is currently using.
+
+    `#480`. WHY THIS GUARD EXISTS, and why a comment would not have been
+    enough. `#476`'s profile was fitted while `#478`'s bug was live, so it
+    was measured against 180s segments on a 600s quarter and its segment-4
+    multiplier is 0.819 -- an 18% DOWN-correction whose entire job was to
+    cancel a bias that `#478` has now removed at the source. Applied to
+    corrected 150s segments it would suppress a segment that no longer needs
+    suppressing: a double-correction, silently, in the direction of the
+    original bug.
+
+    The profile stamps `measured.segment_seconds`, so the mismatch is
+    detectable rather than merely knowable. Refusing on mismatch converts
+    "somebody must remember to rebuild this after the deploy" into an
+    invariant the code enforces on its own -- the same lesson `#467`/`#468`
+    taught about inputs that are CONSUMED but silently wrong: a neutral
+    default is indistinguishable from a working feature at every level
+    except the data.
+
+    Refusal is fail-SAFE: returning None means the engine applies no time
+    profile at all, which is exactly the uncorrected behaviour that was in
+    place before `#476` and is correct while awaiting a post-`#478` refit.
+    """
     file_path = processed_root / "intervals_time_profile.json"
     if not file_path.exists():
         return None
     try:
         obj = json.loads(file_path.read_text(encoding="utf-8"))
-        return obj if isinstance(obj, dict) else None
     except Exception:
         return None
+    if not isinstance(obj, dict):
+        return None
+    fitted_raw = (obj.get("measured") or {}).get("segment_seconds") if isinstance(obj.get("measured"), dict) else None
+    if fitted_raw is not None:
+        try:
+            fitted = int(round(float(fitted_raw)))
+            current = int(_local_boxscore_geometry(league_code)[0])
+        except Exception:
+            return obj
+        if fitted != current:
+            print(
+                f"[basketball_props_smart_sim] INTERVALS_TIME_PROFILE_REFUSED "
+                f"league={league_code or 'nba'} fitted_segment_seconds={fitted} "
+                f"current_segment_seconds={current} -- profile was fitted for a "
+                f"different geometry; ignoring it rather than double-correcting. "
+                f"Rebuild with scripts/build_basketball_interval_calibration.py",
+                flush=True,
+            )
+            return None
+    return obj
 
 
 def _load_player_stat_calibration_local(*, processed_root: Path) -> dict[str, Any] | None:
@@ -4237,7 +4280,7 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             league=_league_for_code_local(league_code),
         ),
         "_load_intervals_band_calibration": lambda: _load_intervals_band_calibration_local(processed_root=processed_root),
-        "_load_intervals_time_profile": lambda: _load_intervals_time_profile_local(processed_root=processed_root),
+        "_load_intervals_time_profile": lambda: _load_intervals_time_profile_local(processed_root=processed_root, league_code=league_code),
         "_load_player_stat_calibration": lambda: _load_player_stat_calibration_local(processed_root=processed_root),
     }
     try:

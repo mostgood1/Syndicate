@@ -2507,9 +2507,31 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   Understat branch does not fold in ESPN possession/set-piece even though
   `espn_match_stats.json` already exists for all 5 of those leagues — a
   real, separate opportunity, out of scope for this fix.
-  **9-league re-run against the FIXED pipeline is IN FLIGHT as of this
-  checkpoint (PID 14132, launched ~19:33Z). Do not report a Brier/stdev
-  number against the 08-15 baseline until it lands.**
+  **UPDATE 2026-08-20 ~06:2xZ, SUPERSEDES "IN FLIGHT" above — THE 9-LEAGUE
+  RE-RUN LANDED. THE LANE'S TESTABLE OUTCOME IS NOT MET, AND THE SESSION'S
+  CORE HYPOTHESIS IS FALSIFIED BY ITS OWN PRE-REGISTERED TEST.**
+  `reports/soccer_backtest/h2h_calibration_2026-08-19_fixed_pipeline_all9_s300_limit120.json`
+  (session worktree, not committed). Weighted model Brier 0.5718 vs market
+  0.5604 (gap +0.0114, n=1049) — **worse than market in 8 of 9 leagues,
+  identically to the 08-15 baseline; belgian_pro_league is again the ONE
+  exception, unchanged by an entire session of input-quality work.** Mean
+  model stdev(P home) rose from **0.1575 to 0.1922**, PAST market's own
+  0.1859 — the model is no longer under-dispersed. **This is exactly the
+  outcome the lane's own falsification test (written before any of this
+  session's work) was designed to catch: "if the Brier gap does not close
+  while stdev rises to market's, under-dispersion is NOT the binding
+  constraint." Stdev rose past market's. The gap did not close. Recorded as
+  an OVERTURNED belief in `learnings.md`, 2026-08-20.**
+  Caveat per the lane's own standing rule ("a gap on a different match set
+  proves nothing"): the raw gap number (+0.0139 -> +0.0114) is NOT reported
+  as an improvement — n differs (1112 vs 1049; bundesliga scored only 71 of
+  an expected ~120) — the dispersion and worse-in-8/9 findings are the
+  load-bearing ones, not the raw gap. This does NOT mean the input-quality
+  work (xG dedup/possession/set-piece/availability/market_confidence/
+  pipeline fix) was wasted — each was decided on its own evidence and those
+  decisions stand — it means the SPREAD specifically is not what is holding
+  the model back, and the next hypothesis must be about systematic bias in
+  the ratings/inputs, not another dispersion knob.
   **`market_features.confidence` sourced, wired (CLI-gated, default OFF),
   and paired-tested — KEPT AS BUILT, not promoted further.** `_market_prior_
   index` has read `model_probability`/`confidence`/`edge` since the engine
@@ -2972,11 +2994,51 @@ separate, scoped work, zero current production impact since NBA is
 offseason (Oct–June window) with no dedicated autorun even attempting
 this path. Full writeup: `.syndicate/deploys.md` `#473` entry.
 
+**`#478`, root-caused 2026-08-20 — the WNBA sim published NBA segment
+geometry, and the cause was OURS.** The engine computes `seg_seconds` from
+`LEAGUE.regulation_period_seconds` CORRECTLY (600/4 = 150 for WNBA; verified
+the live SHA's `league.py` sets 600 and `LEAGUE` is a module constant). Then
+`smart_sim.py:4174-4176` OVERRIDES its own correct value with whatever
+`segment_seconds` the per-sim box dict reports — and Syndicate's own fallback
+(`_local_simulate_pbp_game_boxscore`) hardcoded 180 with 12 minute-buckets for
+either league. A WNBA sim therefore published 4x180s = 720s of segments over a
+600s quarter. Measured against 89 paired production games: predicted segment-4
+share 0.183 vs actual 0.120 (52% over-prediction) while the whole-game total
+stayed correct — a pure SHAPE error. Fixed by deriving geometry from the
+league (`_local_boxscore_geometry`) and threading `league_code` into the
+fallback, which was being dropped. **My filed hypothesis (a missing/zero
+vendored league value) was WRONG** — checked, not assumed.
+
+**`#481`, measured 2026-08-20 — the WNBA live win-probability path was
+severely underconfident, and had never been backtested.** Graded by replaying
+cached ESPN play-by-play through the REAL shipped function over 212 games /
+73,878 live samples: Brier **0.1896 -> 0.1644 (-13.3%)**, worst calibration gap
+**-0.240 -> -0.054**, held-out test 0.1922 -> 0.1661 on a GAME-LEVEL split.
+The failure was DISPERSION, not bias — aggregate means were already unbiased
+(0.573 pred vs 0.571 actual), which is why it survived; samples priced 0.6-0.7
+actually won 91.3%. Scale `6.0 + 0.35*min_left` replaced by a single
+`_WNBA_LIVE_MARGIN_SCALE = 2.1` (the fitted time coefficient is 0.00 because
+the pregame blend already carries time dependence). Applied to cover too, NOT
+to totals (different quantity, unfitted). LIVE on web `ba1d3368`.
+**Validated OFFLINE ONLY — no served-payload confirmation yet.**
+
+**WNBA does not re-sim live; MLB does `[2026-08-20]`.** 0 basketball matches
+for `resim` in `live_refresh_loop.py`; MLB has `mlb_needs_resim_game_pks()` +
+`fingerprint_change`. WNBA applies analytic transforms to a PREGAME sim, so
+the transform's quality IS the live model quality. Live re-sim cost measured
+on the real engine at production settings: **4.90s / 5.9 MB per game** —
+compute is not the blocker. The refresh mutex is **per-service and already
+enabled** (`SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES: "true"`, distinct lanes),
+so soccer/WNBA contention is a PLACEMENT problem, not architecture. The real
+constraint is DATA: WNBA `live_state` carries only score/clock/period — no
+live player state — so a re-sim would re-run pregame projections from a new
+score and add little for game lines and nothing for props.
+
 **Unmeasured**: whether the ESPN fetch keeps succeeding on future natural
 cycles (one verified data point exists, the pattern isn't established
 yet).
 Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
-`.syndicate/log/2026-08-19.md`.
+`.syndicate/log/2026-08-19.md`, `.syndicate/log/2026-08-20.md`.
 
 ## [mlb-sim-log-unreachable] RETRACTED — THE SIM LOG *IS* REACHABLE REMOTELY `[2026-08-19]`
 

@@ -21,7 +21,12 @@ class TeamIdentity:
 
 
 _TEAM_IDENTITY_ROWS: tuple[TeamIdentity, ...] = (
-    TeamIdentity("ARI", "Arizona Cardinals", "Arizona Cardinals", "Arizona", "NFC", "NFC West", ("ARI", "ARIZONA CARDINALS", "ARIZONA", "CARDINALS")),
+    # "AZ" is nflverse's own team code for Arizona (confirmed live against
+    # the real roster_2026.csv release, 2026-08-20) -- every OTHER code in
+    # that feed already matched this table exactly; AZ was the one gap,
+    # and it crashed the real roster-snapshot autorun's validation on its
+    # first production run (~90 rows, every Cardinals player rejected).
+    TeamIdentity("ARI", "Arizona Cardinals", "Arizona Cardinals", "Arizona", "NFC", "NFC West", ("ARI", "AZ", "ARIZONA CARDINALS", "ARIZONA", "CARDINALS")),
     TeamIdentity("ATL", "Atlanta Falcons", "Atlanta Falcons", "Atlanta", "NFC", "NFC South", ("ATL", "ATLANTA FALCONS", "ATLANTA", "FALCONS")),
     TeamIdentity("BAL", "Baltimore Ravens", "Baltimore Ravens", "Baltimore", "AFC", "AFC North", ("BAL", "BALTIMORE RAVENS", "BALTIMORE", "RAVENS")),
     TeamIdentity("BUF", "Buffalo Bills", "Buffalo Bills", "Buffalo", "AFC", "AFC East", ("BUF", "BUFFALO BILLS", "BUFFALO", "BILLS")),
