@@ -893,64 +893,34 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   verified against a real live game, only unit-tested with a monkeypatched return value.
 - Blocked by: none.
 
-### layer2-board-movement-display — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
-- Goal: fix #5 from this session's audit (line movement / steam moves not
-  showing on the Layer 2 board), root-caused as a FRONTEND bug, not a
-  backend/data one.
-  **Testable outcome:** a `tracked`/`flat` row's card shows real movement
-  text (direction + delta + since-open time), not silence; a row carrying
-  `steam: true` shows the steam badge.
-- Files: `syndicate/templates/intelligence.html` (`renderMovement()`,
-  `isSteamCandidate()`; root cause already isolated, not diagnostic from
-  here).
-- Hypothesis: n/a (root-caused already, see below).
-- **Already established, measured 2026-08-20 (do not re-derive):**
-  - **Backend movement tracking (`#372`, shipped 2026-08-16, commit
-    `1d03855e`, already live on web/refresh-worker) WORKS.** Confirmed the
-    CLV opening ledger is real and populated
-    (`reports/intelligence/clv_openings/2026-08-20.jsonl`, 1,124 lines
-    today). `_movement_from_opening()`
-    (`syndicate/features/shared/layer2_board.py:1502`) computes and attaches
-    a full set of TOP-LEVEL fields per row: `movement_state` (`tracked`/
-    `flat`/`no_comparable_price`/`no_opening_for_row`/`no_openings`/
-    `unkeyable`/`not_tracked`), `movement_direction`/`movement_line_direction`
-    (`toward`/`against`/`flat`/`unknown_side`), `movement_price_delta`,
-    `movement_line_delta`, `movement_open_price`, `movement_open_line`,
-    `movement_open_bookmaker`, `movement_book`, `movement_basis`
-    (`same_book`/`best_of_n`/`line_moved`), `movement_since`,
-    `movement_opened_at`, `movement_age_seconds`, and -- separately --
-    `steam: true` + human-readable `steam_reason` when the row meets the
-    size-and-clock steam bar (`>=15 price points AND within 3h of our own
-    publish`). Measured live against the board's own 461-card production
-    payload: `movement_state` breakdown `tracked=77, flat=102,
-    not_tracked=271 (correct, by design, for alt-lines/props),
-    no_opening_for_row=1, no_comparable_price=6` -- **a 96% real match
-    rate against the CLV ledger for eligible markets**, not a broken join.
-  - **The bug is entirely in `renderMovement()`
-    (`intelligence.html:850`).** It only ever reads `item.line_odds_movement`
-    (a legacy/mostly-empty field -- only 4 of 461 live rows have it) and a
-    separate nested `item.movement` object (also legacy, always
-    `{trend:"flat", delta:null, history:[]}` regardless of the real
-    top-level data) -- it never reads ANY of the top-level `movement_*`
-    fields the Aug 16 backend fix actually populates. For the 179
-    genuinely-tracked rows (`tracked` + `flat`), the real, computed
-    movement data reaches the browser and is silently never rendered.
-    Presence, not reachability -- same class this repo has hit repeatedly.
-  - **Steam badge, separately broken the same way.** `isSteamCandidate()`
-    (`intelligence.html:1061`) checks `candidate_type === "steam"` only.
-    `candidate_type` is missing on 506 of 512 rows measured earlier this
-    session (a `layer2_shortlist`-sourced board never carries it). The REAL
-    steam signal for these rows is the boolean `item.steam` field set
-    directly by `_movement_from_opening`, which the badge check never
-    reads at all.
-- Falsification test: n/a, this is an implementation lane not a diagnostic
-  one -- both root causes were confirmed against live production data
-  before this lane opened.
-- Verification: re-load the live board post-deploy; spot-check at least
-  one row with `movement_state="tracked"`/`"flat"` for visible movement
-  text, and (if any row currently carries `steam: true`) confirm the steam
-  badge renders for it.
+### layer2-board-movement-display — CLOSED-VERIFIED 2026-08-20 17:28Z — **Both fixes live on web (`d77dfb9a`), verified against the board's own production payload: 169 of 169 tracked/flat rows now render real movement text. Steam badge logic fixed and confirmed correct by code; no live steam event to observe at deploy time (a real, expected quiet state, not a gap).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal (met): fix #5 (movement/steam not showing), root-caused as a
+  FRONTEND bug -- the Aug 16 backend fix (`#372`, commit `1d03855e`)
+  already worked, computing real movement data into top-level fields
+  nothing in the template read.
+- Files: `syndicate/templates/intelligence.html` only.
+- **Fix, as planned:** `renderMovement()` now checks `movement_state`
+  first (`tracked`/`flat`/`no_opening_for_row`/`no_openings`/`unkeyable`/
+  `no_comparable_price`/`not_tracked`) and renders real text from
+  `movement_price_delta`/`movement_line_delta`/`movement_direction`/
+  `movement_opened_at` when present, distinguishing "no opening recorded"
+  from "flat" from "not tracked" -- legacy shapes kept as a fallback.
+  `isSteamCandidate()` now also checks the real `item.steam` boolean
+  (previously checked only `candidate_type === "steam"`, a field from a
+  different pipeline that never reaches these rows).
+- **Verification: DONE, measured against live production.** Deployed to
+  `web` (scoped branch off web's own live SHA `0ddd8ede`, the earlier
+  #2/#3 fix), live `d77dfb9a` at 17:28:30Z. Re-pulled the board's own
+  production payload post-deploy (456 cards): **169 of 169 tracked/flat
+  rows (100%)** now render real movement text (e.g. "Odds +226 · 12h
+  ago", "Flat · 12h ago"). `steamRows: 0` at verification time -- no row
+  currently clears the `>=15 points within 3h` bar, a real and expected
+  state given how rare that event is, not a rendering gap; the badge
+  logic itself is confirmed correct by code review.
+- Full measurement chain in `.syndicate/deploys.md`'s 2026-08-20 17:28Z
+  entry.
 - Blocked by: none.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
