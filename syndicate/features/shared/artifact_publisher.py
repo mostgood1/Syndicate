@@ -1927,12 +1927,35 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
 #
 # `refresh-worker` runs no HTTP server, so a push cannot reach it -- pulling is
 # the only option, and it has to be asked for explicitly.
+# LEADING `*` IS LOAD-BEARING -- do not "tidy" it away. `#440`.
+#
+# The export endpoint matches with `fnmatch(relative_path, pattern)`
+# (`ops.py:1349`), and `relative_path` is the FULL path, e.g.
+# `mlb_source/source_artifacts/data/arsenal/arsenal_2026.json`. fnmatch anchors
+# at both ends, so the bare filename form matches NOTHING:
+#
+#     fnmatch(".../arsenal/arsenal_2026.json", "arsenal_*.json")  -> False
+#     fnmatch(".../arsenal/arsenal_2026.json", "*arsenal_*.json") -> True
+#
+# MEASURED 2026-08-20: with the bare form, all five requests returned zero
+# files, `pull_season_artifacts()` returned 0, and EVERY season-scoped sim input
+# was absent from the refresh-worker's disk -- `sim_input_report.season_artifacts`
+# read `exists=False` for all five. Downstream that read as
+# `pitch_type_whiff_mult` / `conditional_arsenal` / `statcast_splits_*` sitting
+# at 0.0% while the artifacts were built, allowlisted, published, schema-valid
+# on web, and their consumers provably reached. Four hypotheses died before the
+# probe made the disk readable.
+#
+# It was invisible because this function's `SEASON_PULL pattern=... written=0`
+# line prints to the sim job's stdout, which is redirected to a disk file that
+# Render's log API cannot serve (control: `[artifact_publisher]` lines reach the
+# collector, `[mlb_sim_job]` lines return zero hits).
 _SEASON_ARTIFACT_PATTERNS: tuple[str, ...] = (
-    "arsenal_*.json",
-    "quality_*.json",
-    "batted_ball_*.json",
-    "pitch_splits_*.json",
-    "conditional_mix_*.json",
+    "*arsenal_*.json",
+    "*quality_*.json",
+    "*batted_ball_*.json",
+    "*pitch_splits_*.json",
+    "*conditional_mix_*.json",
 )
 
 
