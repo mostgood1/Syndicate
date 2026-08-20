@@ -4934,6 +4934,66 @@ def _as_boxscore(game_result) -> Dict[str, Any]:
     }
 
 
+def apply_conditional_mix_to_rosters(*rosters, season: int, game_pk=None) -> int:
+    """Attach each pitcher's count x hand pitch mix. Returns how many were covered.
+
+    WHY THIS FUNCTION EXISTS. `models.py` declared `conditional_arsenal` /
+    `count_bucket_map`, `roster_artifact.py` serialised them, and
+    `conditional_mix.py` could populate them -- but NOTHING IN THE BUILD PATH
+    EVER CALLED IT. Every layer was individually correct and the feature was
+    inert: production's `sim_input_report` read `conditional_arsenal 0.0%` on
+    both 2026-08-19 and 2026-08-20 while the artifact sat published and
+    reachable. A neutral default ({}) is indistinguishable from a working
+    feature at every level except the data.
+
+    It is a FUNCTION rather than an inline block so the reachability test can
+    drive the REAL code. A test that re-implements the loop would pass while
+    production shipped the opposite -- the failure mode that nearly landed an
+    inverted roster-rebuild gate in this same `#440` lane.
+
+    Call it UNCONDITIONALLY, not only when writing artifacts: the in-memory
+    rosters feed the SIM regardless, and on the reuse path the profiles come
+    from an artifact that may predate these fields, so applying here repairs
+    that in memory instead of waiting for a rebuild that may never come.
+
+    Never fatal. An absent artifact degrades to prior behaviour (0 applied),
+    it does not lose the slate. Kill switch: SYNDICATE_MLB_CONDITIONAL_MIX=off.
+    """
+    if str(os.environ.get("SYNDICATE_MLB_CONDITIONAL_MIX", "on")).strip().lower() == "off":
+        print("[daily_update] CONDITIONAL_MIX disabled by env", flush=True)
+        return 0
+    try:
+        from sim_engine.data.conditional_mix import apply_conditional_mix_to_pitcher
+    except Exception as exc:
+        print(f"[daily_update] CONDITIONAL_MIX unavailable: {exc}", flush=True)
+        return 0
+
+    applied = 0
+    seen = 0
+    for roster in rosters:
+        lineup = getattr(roster, "lineup", None)
+        if lineup is None:
+            continue
+        pitchers = [getattr(lineup, "pitcher", None)]
+        pitchers.extend(list(getattr(lineup, "bullpen", None) or []))
+        for prof in pitchers:
+            if prof is None:
+                continue
+            seen += 1
+            try:
+                if apply_conditional_mix_to_pitcher(prof, season=int(season)):
+                    applied += 1
+            except Exception:
+                # one uncovered pitcher must not fail the game build
+                pass
+    print(
+        f"[daily_update] CONDITIONAL_MIX applied={applied}/{seen} "
+        f"season={int(season)} game_pk={game_pk}",
+        flush=True,
+    )
+    return applied
+
+
 def main() -> int:
     # Keep existing progress prints visible in real time during long-running daily updates.
     for stream_name in ("stdout", "stderr"):
@@ -7604,6 +7664,10 @@ def main() -> int:
                     )
                 except Exception:
                     pass
+
+        apply_conditional_mix_to_rosters(
+            away_roster, home_roster, season=int(args.season), game_pk=game_pk
+        )
 
         if (
             str(getattr(args, "write_roster_artifacts", "off")) == "on"
