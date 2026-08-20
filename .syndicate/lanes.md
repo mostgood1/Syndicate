@@ -104,7 +104,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   (a scheduled-task run), and `send_message` refuses to send from those. The
   ledger is the channel; that is why this is here and not a DM.
 
-### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED. v2 IS PROVEN TO RECORD — 3,748 ROWS, 2026-08-17. WHAT IS STILL UNMEASURED IS THE v2 DISCRIMINATOR AND DEDUP; THE EVALUATION HAS NOT STARTED.**
+### live-game-line-projection — OPEN, UNOWNED — **HEADER CORRECTED `[2026-08-20T20:3xZ]`: THE EVALUATION HAS BEEN RUNNING ALL ALONG.** `live_gameline_score` is computed every board build and served on `/api/board/book-grid?sport=mlb`; nothing RETAINED it. Reading 20:13Z, `priceable_only` (985/985, the sound cut): model brier 0.28706 vs market 0.24700, **diff +0.04006 — model TRAILS**. BOUND: `games_with_outcome: 3`; the n=985/1449/2799 counts are repeated snapshots of the same 3 games, and MAE runs the OTHER way (0.447 vs 0.483). `all_records` is UNSOUND (n 1526 vs 1449). **v2 DISCRIMINATOR PROVEN** — written 38 > priceable 31, and again 34 > 27, on two live builds. Now accumulating nightly via `live-gameline-accuracy-snapshot` (23:25 CT, before the slate roll); underpowered until pooled games ~100. Allowlist `d7dbdbd2` added for ROW-LEVEL work — not needed for the headline. — opened 2026-08-16
 > **[SWEEP 2026-08-17 12:1x CDT] ORPHANED CONFIRMED** — session
 > `live-gameline-eval` no longer exists in the roster, so "UNOWNED" is now a
 > measured fact rather than a checkpoint note.
