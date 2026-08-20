@@ -362,6 +362,28 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # lane instead -- confirmed git-tracked at
     # `data/nba_source/source_artifacts/data/processed/boxscores_history.csv`)
     # -- so no new pattern is needed for either name.
+    # `#482`. `#477` made `player_logs.csv` a REAL, separately-built artifact
+    # (derived from boxscores+schedule), and `#474` added
+    # `home_court_advantage.json`. Both are written worker-side by `#479`'s
+    # scheduled builders and READ worker-side by the sim, so neither needs to
+    # cross for the engine to work -- the allowlist is not a functional
+    # dependency here.
+    #
+    # They are listed anyway because WITHOUT them the artifacts are
+    # UNOBSERVABLE: `/api/ops/artifacts/export` serves WEB's disk, and only an
+    # allowlisted publish sweep moves a worker file there. That made `#479`
+    # unverifiable -- an absent reading meant "not built" and "built but
+    # invisible" identically, which is exactly the instrument-blindness trap
+    # where a null result gets mistaken for evidence.
+    #
+    # NOTE: this supersedes the older comment a few lines above claiming
+    # `player_logs` is "NOT a separate artifact" and is computed in-memory
+    # from `boxscores_history.csv`. That was true when written and `#477`
+    # made it false.
+    "*_source/source_artifacts/data/processed/player_logs.csv",
+    "*_source/data/processed/player_logs.csv",
+    "*_source/source_artifacts/data/processed/home_court_advantage.json",
+    "*_source/data/processed/home_court_advantage.json",
     "*_source/source_artifacts/data/processed/team_advanced_stats_*.csv",
     "*_source/data/processed/team_advanced_stats_*.csv",
     "*_source/source_artifacts/data/processed/smart_sim_total_calibration.json",
@@ -504,6 +526,24 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # allowlist alone (allowlisting only PERMITS a push; something has to make
     # it).
     "*_source/tracking/book_quotes/*.jsonl",
+    # LIVE GAMELINE LEDGER. `#440` / live-game-line-projection.
+    #
+    # The board's model-vs-market record: `model_home_win_prob`,
+    # `market_fair_prob`, `edge_pp`, `priceable`, `sigma`, `prob_std_err`,
+    # `sims_run`, quote age and the sharp-book set -- one row per market per
+    # build. 3,748 rows were recorded on 2026-08-17 and NOT ONE has ever been
+    # evaluated, because the file is UNREADABLE OFF-WORKER: it is written to
+    # the refresh-worker's disk and `/api/ops/artifacts/stream` returned
+    # `403 path is not an allowed hot artifact` -- re-verified 2026-08-18 and
+    # again 2026-08-20, no pattern matched. The lane's own note said whoever
+    # picks it up "needs the artifact route, or the allowlist entry first".
+    #
+    # STREAMED, like book_quotes above and for the same reason: the file caps
+    # at 20,000 rows, which lands near `_PUBLISH_MAX_BYTES`, so the sweep would
+    # refuse it exactly as it refused the MLB ladder at 13.7MB on 2026-08-20.
+    # `pull_streamed_artifact` is the route; the sweep is not.
+    "*_source/data/live_gameline_ledger/live_gameline_ledger_*.jsonl",
+    "*_source/source_artifacts/data/live_gameline_ledger/live_gameline_ledger_*.jsonl",
     # The change log's SIDECAR, and without it the log is only half readable
     # across services. `append_book_quotes` writes rows only when (line, price)
     # CHANGES, and records "when did we last OBSERVE this market" in
@@ -868,6 +908,10 @@ def _publish_streamed(
                     "Content-Length": str(size),
                     "X-Artifact-Path": relative_path,
                     "X-Artifact-Checksum": checksum,
+                    # `#488`: lets the receiver detect two services alternately
+                    # overwriting one path. Absent on older senders, which the
+                    # receiver handles as UNKNOWN rather than as "same sender".
+                    "X-Artifact-Publisher": _publisher_identity(),
                     "Authorization": f"Bearer {token}",
                 },
             )
@@ -1119,6 +1163,23 @@ def _publish_skip_reason(path: Path, today: date) -> str | None:
     if size > _PUBLISH_MAX_BYTES:
         return f"too_large:{size}"
     return None
+
+
+def _publisher_identity() -> str:
+    """Which service is sending this artifact.
+
+    `#488`. The receiver cannot otherwise tell "one service pruned its own
+    file" from "a second service just overwrote the first's newer copy with
+    an older one" -- and those need opposite responses. `SYNDICATE_REFRESH_LANE`
+    is already set per-service in `render.yaml` (web / refresh-worker /
+    live-odds-worker), so this reuses an identity that exists rather than
+    inventing one.
+
+    Empty when unset. The receiver treats unknown as UNKNOWN and says so,
+    rather than assuming same-publisher, because assuming same-publisher is
+    the permissive branch and would silence exactly the case this detects.
+    """
+    return str(os.environ.get("SYNDICATE_REFRESH_LANE") or "").strip()
 
 
 def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepResult:

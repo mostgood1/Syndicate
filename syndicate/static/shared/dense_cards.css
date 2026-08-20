@@ -441,9 +441,49 @@ a.cards-head-team-name:focus-visible {
 
    Measured on the soccer card before/after: active panel 996px -> see the
    lane's closing reading. */
+/* The three numbers below were tuned by PROBING THE LIVE PAGE, not guessed
+   and not measured locally. The local mirror has no captured odds, so the
+   lens row is gated out and the overview grid collapses to a shape
+   production never renders -- a local reading said the stack was 1232px wide
+   when in production it is 464px. Injected candidate rules into the served
+   card and measured each one before writing any of them here.
+
+   What the probe found, on the production card at 1280px:
+
+     - `.cards-panel-card--overview-main` was 756 x 996 px holding TWELVE
+       leaf values. It was not that big because it had content; it was
+       stretching to the grid row height set by the stack beside it. That one
+       card was 753,000 px^2 of card for twelve numbers -- by a wide margin
+       the largest piece of wasted space on the board.
+     - The stack held 60 values in the NARROW 463px column while the sparse
+       card had the wide one. The ratio was backwards.
+
+   Effect, measured in sequence on the live card:
+
+     align-items only          card 1379px, visible 996px, density  57
+     + column rebalance        card 1188px, visible 805px, density  71
+     + 255px stack columns     card  970px, visible 587px, density  97
+
+   `align-items: start` is what stops the stretch; the rebalance gives the
+   dense column the room; 255px is the largest minmax that still yields THREE
+   stack columns inside the widened area (813/3 = 271px). Verified at the
+   same time: no stat table scrolls, and body overflow is 0. */
+@media (min-width: 900px) {
+  .cards-overview-grid {
+    align-items: start;
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+  }
+}
+
+/* A single lens row was filling a 594px grid area for the same stretch
+   reason. Rows keep their natural height; the area no longer inflates them. */
+.cards-live-lens-grid {
+  align-content: start;
+}
+
 @media (min-width: 760px) {
   .cards-panel-stack {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
     align-items: start;
   }
 

@@ -18854,6 +18854,114 @@ does no heavy computation. Pre-existing, belongs with `#440`'s owner.
 
 ---
 
+## 2026-08-20 18:45Z + 18:59Z — web `bfdd0179`, `0514f2d7` — the density gap, closed
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       bfdd0179 (graft onto live aab29212) -> 0514f2d7 (stacked)
+    on main:   379147e0 carries bfdd0179's code; 0514f2d7's CSS landed after
+    deploys:   dep-da3kjebncjis73authmg live 18:45:45Z
+               dep-da3kp5ajnfac739k7a10 live 18:59:52Z
+    claim:     held 18:36:47Z, released after the closing read
+    preflight: CLEAR both times; live SHA re-read before each graft
+    rollback:  deploy aab29212 (the parent this pair sits on)
+
+**Decomposing MLB's card first changed the diagnosis.** Its 917 leaf values
+are mostly in HIDDEN tabs -- box 566, props 134, only 166 visible. So
+"139 vs 569" was never one problem. It was a thin visible panel AND a nearly
+empty box tab, and they needed different fixes.
+
+**Two things were published and unread.** `player_props` is a TOP-LEVEL key
+on the recommendations artifact carrying the FULL squad -- 28 players, 13
+fields each -- while `cards.py` read `match["top_props"]`, which the artifact
+builder caps at EIGHT, and rendered six. `/soccer/<league>/props` had been
+reading the full key all along. And `scoreline_probabilities` -- 25 exact
+scores, the correct-score market -- was read by NOTHING.
+
+**Three layout defects, all in the SHARED card, so every sport on it paid:**
+no table primitive at all (a sport could publish nine numbers per player and
+the name/detail/value list could show three); `.cards-panel-stack` was a
+one-column grid at every width; and the top-play callout printed a row's
+label and caption and DROPPED `row.value` -- "Model total" with no total.
+
+**THE FIRST DEPLOY DID NOT WORK AND THE INSTRUMENT SAID SO.** `bfdd0179`
+went live and production read **255**/Mpx total against **427** measured
+locally, with the visible panel going BACKWARDS to 57. The CSS was deployed
+and correct -- `curl` on the served stylesheet confirmed the rule present
+with no later override. It could not fire.
+
+**Why the local reading was wrong, which is the part worth keeping.** The
+local mirror has no captured odds, so the lens row is gated out and
+`.cards-overview-grid` collapses into a shape production never renders.
+Locally the panel stack measured 1232px wide; in production it is **464px**,
+because the grid is 756/464 and the stack sits in the NARROW column.
+`minmax(320px, 1fr)` cannot split 464px. The rule matched, applied, and
+changed nothing. **A local LAYOUT reading is not evidence about production
+layout when the local DATA shape differs** -- the same lesson as CLAUDE.md's
+mirror rule, arriving through CSS instead of through a backtest.
+
+So the second deploy's numbers were **probed against the LIVE page** --
+candidate rules injected into the served card and measured one at a time --
+rather than guessed or re-measured locally:
+
+    baseline (bfdd0179 live)   card 1379px  visible 996px  density  57
+    align-items: start         card 1379px  visible 996px  density  57   (main 996 -> 331)
+    + column rebalance         card 1188px  visible 805px  density  71
+    + 255px stack columns      card  970px  visible 587px  density  97
+
+The probe found `.cards-panel-card--overview-main` at **756 x 996 px holding
+TWELVE leaf values** -- not because it had content, but because it stretched
+to a grid row height set by the stack beside it. 753,000 px^2 for twelve
+numbers, the largest single piece of waste on the board, while the stack held
+60 values in the narrow column. The ratio was backwards and nothing was
+pinned to its own height.
+
+**verify: PASSED. Closing reading on the SERVED card, probe removed
+(`probeStillInjected: false`), same match and viewport as the lane's opening
+measurement.**
+
+| reading | lane open | after `547b541b` | **now** | MLB, same session |
+|---|---|---|---|---|
+| card height | 1074 px | 878 px | **970 px** | 1121 px |
+| leaf items | 188 | 195 | **443** | 945 |
+| total density | **139**/Mpx | 176 | **363**/Mpx | 663/Mpx |
+| visible-panel density | 51/Mpx | 51 | **97**/Mpx | 169/Mpx |
+| em-dash cells | 6 | 0 | **0** | — |
+| box tab items | 30 | 30 | **238** | 566 |
+| stat tables | 0 | 0 | **10x2 + 28x8** | — |
+| body overflow | 0 | 0 | **0** | 7 px (pre-existing, MLB) |
+
+**THE TARGET IS MET.** The lane's stated bar was density within 2x of MLB.
+MLB re-measured at 663 this session (it rises as games go live and lens rows
+accumulate), so the bar is 331 and soccer reads **363**. On the visible panel
+the ratio is 97 vs 169 -- 1.74x, also inside 2x. Stating the MLB number as a
+range, not a constant: it was 544 when this lane opened and 663 now, on the
+same page, because live games add lens rows. A ratio against a moving
+denominator has to name when it was taken.
+
+**Blast radius verified on the SERVED pages, not assumed.** The CSS is shared
+by every sport on the generic card:
+
+| surface | reading | verdict |
+|---|---|---|
+| MLB | loads `cards_exact.css`, NOT `dense_cards.css` -- untouched | PASS |
+| NCAAF | 51 cards, 649px, density 139, body overflow 0 | PASS |
+| NFL | 16 cards, 779px, density 113, **0 clipped elements**, overflow 0 | PASS |
+| NHL / WNBA / NBA | do not load `dense_cards.css`; NBA/WNBA serve 0 cards | N/A |
+| soccer mobile 375px | single column, tables do not scroll, overflow 0 | PASS |
+
+Lane E's zero-overflow result holds at 1280px and 375px, which was the
+specific risk in adding an 8-column table to a shared card.
+
+Coverage is stated rather than hidden: all 28 published rows for COV@ARS are
+Arsenal players and none Coventry, so the away section names the gap instead
+of rendering an empty column that reads as a bug.
+
+18 new tests (32 in the lane's file). `test_archives` 31 failures, IDENTICAL
+by name to the origin/main baseline.
+
+---
+
 ## 2026-08-20 19:09:55Z — refresh-worker `db469003` — CONSOLIDATED, 9 files, five lanes
 
     lane:      football-model-owner (acting as consolidation point)
