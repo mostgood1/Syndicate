@@ -19166,3 +19166,24 @@ everywhere (no sport has a live game with a trustworthy score right now).
   list. `picks_{date}.csv` is not in `HOT_ARTIFACT_PATTERNS` (403 on
   `/api/ops/artifacts/export`), so this could not be settled from here. **A
   LEAD, not a finding.**
+
+## SHIPPED-VERIFIED 2026-08-20 20:20Z -- web deploy -- layer2-board-chip-race, deployed via football-modeling-session's second consolidation graft (454f3caa)
+- Reconciliation gap, found and fixed same session: this fix landed on origin/main
+  (164a38bf) hours earlier but was never actually deployed -- moved on to other
+  work without a dedicated deploy. Caught during end-of-session checkpoint by
+  content-checking web's live SHA and finding the marker absent.
+- Coordinated the same way as the earlier layer2-live-projection-actual ride-along:
+  messaged football-model-owner (who had just taken the web claim for their own,
+  unrelated 67-file graft) rather than force a separate deploy slot. They folded
+  it in.
+- Deploy live: 454f3caa, finished 20:20:28Z. Content-verified: intelligence.html
+  carries gameChipsLoadedOnce (9 hits including the marker comment);
+  board_cards.css carries .game-mini-card--skeleton. Site healthy post-deploy
+  (HTTP 200 on /).
+- verify: content-verified only, not a live timed-capture of the actual render
+  behavior (same honest gap already noted in the lane's own close -- the fix was
+  confirmed by code read plus a Node syntax check, not a screenshot/network-
+  waterfall of the fix actually preventing the flash-then-relayout in a real
+  browser). Whoever next touches the game-card strip should close that gap if
+  it becomes relevant.
+- Claim: none held by me (rode along). No release needed.
