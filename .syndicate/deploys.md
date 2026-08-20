@@ -18423,3 +18423,19 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   (already documented in layer2_board.py's own comment: "only projection
   is genuinely sparse... a real COVERAGE gap, not a plumbing one"), not a
   frontend defect, and correctly left blank rather than fabricated.
+
+## PENDING 2026-08-20 17:21Z -- web deploy -- Layer 2 board movement/steam display fix (#5), scoped onto live SHA 0ddd8ede
+- Lane: layer2-board-movement-display. Preflight PASS via full checklist.
+  Claim + target-scoped preflight CLEAR at 17:20:54Z.
+- Scope note: same pattern as every web deploy this session -- cherry-picked
+  the one fix commit (4edbf774 on origin/main) cleanly onto web's own live
+  SHA (0ddd8ede, the earlier #2/#3 fix), no conflicts, as d77dfb9a.
+- Expected effect: rows carrying movement_state=tracked/flat (179 of 461
+  measured pre-fix) show real movement text on the next board load instead
+  of nothing; any row carrying steam=true shows the existing "Steam" badge.
+  No backend/data change -- pure client-side template edit.
+- Rollback: redeploy web at the prior SHA (0ddd8ede).
+- `dep-da3jf1bbc2fs7397o0eg`, status=build_in_progress at fire time.
+- Measurement: [PENDING -- confirm live commit == d77dfb9a, then re-pull the
+  live board's own production payload and re-run the same movement_state
+  render-coverage count against it]
