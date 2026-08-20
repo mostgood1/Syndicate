@@ -295,106 +295,6 @@ def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
     return index
 
 
-#: SP+ points added per 1 SD of returning production, split across offense and
-#: defense so the team's NET rating moves by this amount.
-#:
-#: DERIVATION, measured 2026-08-19 (`ncaaf_data_pipeline.md` section 7):
-#:   returning production for season S is published in the offseason, so it is
-#:   strictly prior information. Against how much a team ACTUALLY moved --
-#:   final SP+(S) residualised on final SP+(S-1) -- it reads pooled
-#:   r = +0.207 over n=786, ~5.8 sigma, POSITIVE IN ALL SIX SEASONS
-#:   independently (2019, 2021-25; 2020 excluded, COVID). Year-over-year
-#:   movement has SD ~8.4 SP+ points, so r * SD = 0.207 * 8.4 ~= 1.74 points
-#:   per SD of returning production.
-#:
-#: AND IT IS NOT ALREADY IN SP+. Preseason SP+ residualised on the prior
-#: season's final reads r = +0.035 against returning production, incremental
-#: R^2 +0.000 -- while RECRUITING reads +0.482 through the identical residual.
-#: That recruiting figure is the positive control: it proves the residual can
-#: DETECT an ingredient, so the +0.035 is a real absence rather than a blind
-#: probe. Without it this adjustment would be double-counting, which is the
-#: mechanism-vs-estimator trap in model_engine_standard section 4.4.
-#: BACKTESTED AND NOT SHIPPED, 2026-08-19. Paired, identical games/seeds/ratings,
-#: only this adjustment differing -- 2023 SP+ on 2024 games, leak-free, n=749:
-#:
-#:     OFF MAE 15.778  ->  ON MAE 15.630
-#:     paired dMAE -0.149   SE 0.094   t = -1.58   NOT SIGNIFICANT
-#:
-#: The point estimate FAVOURS the adjustment and the direction matches the
-#: 5.8-sigma prior above, but |t| < 2 and `SP_RATING_SCALE` was held to exactly
-#: that bar the same day (t=-0.74). Shipping this on weaker evidence than other
-#: changes were rejected on would be inconsistent, and a mechanism with a real
-#: prior and a favourable-but-unproven measurement is section 4.4's trap in its
-#: most persuasive form.
-#:
-#: NOT deleted, because the test is UNDER-POWERED rather than negative: at
-#: SE 0.094 an effect this size needs roughly double the sample to resolve.
-#: A second leak-free season (2023 SP+ -> 2023 games, or 2024 -> 2025) would
-#: settle it either way. Behind `--returning-production` until then.
-#:
-#: It does NOT change the serving decision regardless: ON vs the closing line is
-#: still +3.442 (t=+9.83).
-RETURNING_PRODUCTION_SP_POINTS_PER_SD = 1.74
-
-
-def load_returning_production(season: int) -> dict[str, float]:
-    """`{norm(team): percent_ppa}` for `season`, from CFBD.
-
-    Empty dict on any failure: this is an ADJUSTMENT to a working rating, so a
-    fetch problem must degrade to plain SP+ rather than fail the run.
-    """
-    try:
-        payload = _cfbd_get("/player/returning", {"year": season})
-    except Exception:
-        return {}
-    out: dict[str, float] = {}
-    if isinstance(payload, list):
-        for row in payload:
-            team = row.get("team")
-            value = row.get("percentPPA")
-            if not team or value is None:
-                continue
-            try:
-                out[norm(team)] = float(value)
-            except (TypeError, ValueError):
-                continue
-    return out
-
-
-def returning_production_adjustment(
-    team: str,
-    rp_index: dict[str, float],
-    rp_stats: tuple[float, float],
-) -> float:
-    """SP+ points to add to this team, from returning production. 0.0 if unknown.
-
-    Standardised against the LEAGUE's own spread this season, so the units are
-    "SDs of returning production" regardless of how CFBD's scale drifts year to
-    year -- the coefficient was derived in those units.
-
-    Returns 0.0 for an unmatched team. That is a genuine no-op (add nothing),
-    not the neutral-default trap: the team still carries its full SP+ rating,
-    and `rating_source` records how many teams were adjusted so a silent
-    collapse to zero coverage is visible rather than looking like a working run.
-    """
-    mean, sd = rp_stats
-    if sd <= 0:
-        return 0.0
-    value = rp_index.get(norm(team))
-    if value is None:
-        return 0.0
-    return ((value - mean) / sd) * RETURNING_PRODUCTION_SP_POINTS_PER_SD
-
-
-def returning_production_stats(rp_index: dict[str, float]) -> tuple[float, float]:
-    """(mean, sd) of the league's returning production this season."""
-    values = list(rp_index.values())
-    if len(values) < 2:
-        return (0.0, 0.0)
-    mean = statistics.fmean(values)
-    return (mean, statistics.pstdev(values))
-
-
 def sp_offense_defense_rating(team: str, sp_index: dict[str, tuple[float, float]],
                               means: tuple[float, float]) -> tuple[float, float] | None:
     """SP+ components -> engine ratings, centred on the league mean.
@@ -467,8 +367,6 @@ def build_projection(
     seeds: int = SEEDS_PER_GAME,
     sp_index: dict[str, tuple[float, float]] | None = None,
     sp_means: tuple[float, float] = (0.0, 0.0),
-    rp_index: dict[str, float] | None = None,
-    rp_stats: tuple[float, float] = (0.0, 0.0),
 ) -> SmartSimNcaafProjection:
     # SP+ FIRST, PPA AS FALLBACK. SP+ is points-per-game and backtests better on
     # margin (r 0.506 vs 0.372, residual SD 17.63 vs 18.97 over 740 games); PPA
@@ -479,33 +377,7 @@ def build_projection(
     away_sp = sp_offense_defense_rating(away_team, sp_index or {}, sp_means)
     if home_sp is not None and away_sp is not None:
         (home_off, home_def), (away_off, away_def) = home_sp, away_sp
-        # RETURNING PRODUCTION, applied to the RATING rather than through
-        # `feature_generation_payload`. Measured 2026-08-19, the payload path is
-        # worth ~4.1% of margin SD against the ratings path's ~17.2%, and the NFL
-        # payload experiment on that weaker lever returned a measured NULL. A
-        # signal this small only has a chance of mattering on the strong lever.
-        #
-        # Split evenly across offense and defense so the team's NET rating moves
-        # by the coefficient. The coefficient was derived against OVERALL SP+
-        # movement (offense and defense combined), so loading it entirely onto
-        # offense would apply a whole-team effect to half the team and mis-scale
-        # it -- even though percentPPA is itself an offensive measure.
-        #
-        # Divided by SP_RATING_SCALE because the coefficient is in SP+ POINTS and
-        # these ratings are already scaled. Skipping that would apply the
-        # adjustment 10x.
-        rp_index = rp_index or {}
-        home_adj = returning_production_adjustment(home_team, rp_index, rp_stats)
-        away_adj = returning_production_adjustment(away_team, rp_index, rp_stats)
-        home_off += (home_adj / 2.0) / SP_RATING_SCALE
-        home_def += (home_adj / 2.0) / SP_RATING_SCALE
-        away_off += (away_adj / 2.0) / SP_RATING_SCALE
-        away_def += (away_adj / 2.0) / SP_RATING_SCALE
     else:
-        # PPA fallback carries NO returning-production adjustment: the
-        # coefficient is calibrated in SP+ points against SP+ movement and means
-        # nothing on a per-play PPA rate. Applying it here would be a units
-        # error wearing the costume of a feature.
         home_off, home_def = offense_defense_rating(home_team, ppa_index)
         away_off, away_def = offense_defense_rating(away_team, ppa_index)
 
@@ -566,13 +438,6 @@ def main() -> None:
     parser.add_argument("--leaked-season-ppa", action="store_true",
                         help="use season-aggregate PPA (LEAKED for a completed season). "
                              "Reproduces pre-2026-08-19 behaviour for comparison only.")
-    parser.add_argument("--returning-production", action="store_true",
-                        help="Enable the returning-production rating adjustment. "
-                             "OFF BY DEFAULT -- backtested and NOT significant "
-                             "(paired dMAE -0.149, SE 0.094, t=-1.58 over 749 "
-                             "leak-free 2024 games). Kept opt-in so the "
-                             "measurement can be repeated on more seasons "
-                             "without shipping an unproven mechanism.")
     parser.add_argument("--ratings-season", type=int, default=None,
                         help="Season whose SP+ ratings to use. Defaults to --season. "
                              "SET IT TO THE PRIOR SEASON TO BACKTEST A COMPLETED ONE: "
@@ -620,25 +485,8 @@ def main() -> None:
     ratings_season = args.ratings_season if args.ratings_season is not None else args.season
     sp_index = load_sp_ratings(ratings_season)
     sp_means = sp_league_means(sp_index)
-    # Returning production is published in the OFFSEASON of the season being
-    # projected, so it is keyed on args.season (the games), not ratings_season
-    # (the ratings). Keying it on the ratings season would make a prior-season
-    # backtest use the WRONG year's roster churn.
-    rp_index: dict[str, float] = load_returning_production(args.season) if args.returning_production else {}
-    rp_stats = returning_production_stats(rp_index)
     if sp_index:
         rating_source = f"cfbd_sp_plus_{ratings_season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
-    # Record the adjustment IN the rating source, with its coverage. The pick
-    # ledger segments by rating_source, so an adjusted run must be
-    # distinguishable from an unadjusted one or the two get pooled and neither
-    # can be graded. The team count is there because a silent collapse to zero
-    # coverage (a CFBD change, a name-match break) would otherwise look exactly
-    # like a working run producing no effect.
-    if rp_index:
-        rating_source += f"+rp{RETURNING_PRODUCTION_SP_POINTS_PER_SD:g}pts_n{len(rp_index)}"
-    log(f"RETURNING_PRODUCTION teams={len(rp_index)} mean={rp_stats[0]:.4f} sd={rp_stats[1]:.4f} "
-        f"enabled={args.returning_production}")
-    print(f"returning_production_teams={len(rp_index)}")
     if ratings_season != args.season:
         log(f"RATINGS_SEASON_OVERRIDE ratings={ratings_season} games={args.season} "
             f"(prior-season ratings -> leak-free backtest)" )
@@ -670,8 +518,6 @@ def main() -> None:
             ppa_index=ppa_index,
             sp_index=sp_index,
             sp_means=sp_means,
-            rp_index=rp_index,
-            rp_stats=rp_stats,
             rating_source=rating_source,
             seeds=args.seeds,
         )

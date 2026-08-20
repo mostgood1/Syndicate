@@ -310,7 +310,7 @@ unmeasured market and the board.
 
 ---
 
-## 6. Returning production as a rating adjustment — BUILT, BACKTESTED, NOT SHIPPED
+## 6. Returning production as a rating adjustment — BUILT, BACKTESTED, **REMOVED**
 
 Stage 2 called this "the cheapest real work". It was built, measured, and the
 measurement did not clear the bar. Recording it in full because a null that is
@@ -349,11 +349,40 @@ were rejected on would be inconsistent, and a mechanism carrying a real prior
 plus a favourable-but-unproven measurement is §4.4's trap in its most persuasive
 form.
 
-**Why it is not deleted.** The test is **under-powered, not negative**. At
-SE 0.094 an effect this size needs roughly double the sample to resolve. It sits
-behind `--returning-production` (off by default), so the resolution is one flag
-and one backtest, not a rebuild.
+### SETTLED 2026-08-19 — the second season did not replicate, and the code is GONE
 
-**To settle it:** generate a second leak-free season (2023 SP+ → 2023 games, or
-2024 → 2025) and re-run the paired comparison pooled across both. If it holds at
-−0.15 with n≈1500, t reaches ≈−2.2 and it ships. If it shrinks, it comes out.
+A second leak-free season (2024 SP+ → 2025 games, same method, same seeds) came
+back with the **opposite sign**:
+
+| season | n | ΔMAE | SE | t |
+|---|---|---|---|---|
+| 2024 | 749 | −0.149 | 0.094 | −1.58 |
+| **2025** | 758 | **+0.023** | 0.103 | +0.22 |
+| **pooled** | **1507** | **−0.062** | 0.070 | **−0.89** |
+
+Not under-powered any more — effectively null. At the pooled effect size,
+reaching |t| = 2 would need **n ≈ 7,581**, roughly ten seasons. The 2024 −0.149
+was noise, and shipping on it would have shipped noise.
+
+**Code REMOVED** (coefficient, loader, adjustment, flag, application — 154
+lines). A confirmed-dead mechanism behind a permanently-off flag is deferred
+clutter, not optionality. The measurement stays here so it is not rebuilt.
+
+### THE LESSON, AND IT IS THE SESSION'S THEME ONE LEVEL UP
+
+The prior was **5.8σ** and it was real — but it was measured against **SP+
+MOVEMENT**, not against game margins. The chain had two links:
+
+    returning production predicts SP+ movement     HELD, r=+0.207, 5.8σ
+    therefore it improves MARGIN accuracy          FAILED, t=-0.89
+
+**A highly significant result against a PROXY did not transfer to the
+objective.** Same class as "calibrated is not competitive" — dispersion matched
+the market and said nothing about accuracy — except here the proxy was itself a
+rigorous, multi-season, positive-controlled measurement. Rigour in validating
+the proxy does not make the proxy the target.
+
+**Applies directly to the remaining 64 unfed keys:** every argument for wiring
+them is currently of the same shape ("this metric correlates with something the
+model should know"). None has been tested against realised margins. Expect most
+to behave like this one, and require the margin test before building, not after.
