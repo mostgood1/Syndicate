@@ -1114,7 +1114,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   populated fixture before trusting either the pattern or the test.
 - Blocked by: none.
 
-### nfl-artifact-publish-wiring — OPEN — opened 2026-08-20 — session: nfl-artifact-publish-wiring
+### nfl-artifact-publish-wiring — CLOSED-VERIFIED 2026-08-20 — landed `4feb5fa7` on `origin/main`, NOT yet deployed — opened 2026-08-20 — session: nfl-artifact-publish-wiring
 - Goal: `nfl-artifact-allowlist-add` deployed the allowlist to both
   services (web `c5c1b0b5`, refresh-worker `08bd601f`), then a real
   `/api/ops/artifacts/export` call against production returned `count: 0`
@@ -1146,12 +1146,19 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   it IS called with the real written path after a successful write, for
   each of the 3 scripts -- if this test passes on the CURRENT (unfixed)
   code, the diagnosis was wrong.
-- Verification: falsification test fails pre-fix / passes post-fix for
-  all 3 scripts; full test slice for these 3 files + artifact_publisher
-  has no regressions; ideally a live re-run (network permitting) shows
-  `artifact_published=True` in output and a subsequent
-  `/api/ops/artifacts/export` call returns a nonzero count for at least
-  one pattern.
+- Verification: DONE at the code level. 4 new falsification tests
+  confirmed to genuinely FAIL on unpatched code (clean stash of all 6
+  changed files, re-ran, restored -- not just asserted): "Expected
+  'publish_hot_artifact' to be called once. Called 0 times." 17 tests
+  total pass post-fix. Full nfl/artifact_publisher slice: 32
+  pre-existing failures, confirmed identical whether or not this fix is
+  applied.
+  NOT DONE: a live re-run against real network data -- the next natural
+  autorun tick (roster/depth-chart rate-limited ~6h from their last real
+  run, injuries not yet armed) is the first real-world confirmation.
+  This fix is NOT DEPLOYED to either service yet -- lands on
+  `origin/main` only; deploying it is a separate decision, same
+  discipline as every other change this session.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
