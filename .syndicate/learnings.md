@@ -2425,3 +2425,35 @@ in a row, all pointing at an innocent API.
 phase B is right and would have caught this at 28 credits), AND before believing
 any negative result about an external system, prove your request was
 well-formed — ideally against a case you KNOW should return data.
+## An unbiased mean hides a broken distribution `[2026-08-20]`
+
+**What we believed:** the WNBA live win-probability path was roughly fine. Its
+constants were admittedly un-backtested, but nothing pointed at them, and any
+aggregate check looked clean.
+
+**What was actually true:** it was severely UNDERCONFIDENT. Graded over 212
+games / 73,878 live samples, samples it priced 0.6-0.7 actually won **91.3%**;
+samples it priced 0.3-0.4 won **11.6%**. The scale was ~2.5x too wide and
+compressed every probability toward 0.5. Brier 0.1896 -> 0.1644 after refit.
+
+**Why it survived so long:** the MEAN was already right — 0.573 predicted vs
+0.571 actual. Every summary statistic that averages over samples said the
+model was unbiased, and it WAS unbiased. The defect was in the second moment,
+not the first. A calibration table by predicted-probability bucket exposes it
+in one glance; no amount of staring at aggregate accuracy ever would.
+
+**The rule:** for any probability output, "is the average right" and "is the
+distribution right" are different questions, and only the second one tells you
+whether an individual price is usable. Bucket predictions and compare each
+bucket's mean prediction to its realised rate. A model can be perfectly
+unbiased on average while being wrong on literally every bet you place with it.
+
+**Corollary that cost me a wrong conclusion in the same session:** when fitting
+a replacement, fit INSIDE the real function's structure. My first fit used a
+bare logistic while the shipped function also blends toward a pregame anchor,
+so part of the apparent gain came from silently dropping the blend rather than
+from the scale. Refitting within the real structure gave the honest number
+(+0.0261). And the variant that scored best of all — blend removed entirely —
+was an ARTIFACT of grading with a neutral 0.5 anchor, which makes blending
+toward it pure noise by construction. In production that anchor is a real
+estimate. A fit is only as meaningful as the harness's fidelity to production.
