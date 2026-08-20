@@ -5510,7 +5510,129 @@ stopped then), so "no `LAYER2_SHORTLIST` since 10:56" is a real absence and not
 a search-window artifact. Worth stating because the worker is chatty enough that
 100 unfiltered lines cover only ~20 seconds.
 
-### `#387` — **OPEN, UNOWNED. CONFIRMED LIVE 2026-08-19 ~20:3xZ CT: the 3000MB MLB floor is a deliberate circuit breaker, correctly firing under real load — do not lower it.** Real fix is still `build_cards_page_context` running HYDRATED on the worker with `force_refresh=True`; nobody has done that work yet.
+### `#483` — **THE FRESHEST TRACKED LINES HAVE NEVER REACHED THE LAYER 2 MLB BOARD, AND THE CODE THAT WAS MEANT TO CARRY THEM READ A KEY THAT DOES NOT EXIST.** OPEN, UNOWNED — split out of `#387` 2026-08-19
+
+`_enrich_games_with_tracked_market_lines` (`mlb/cards.py`) loaded the odds_history
+shard on the worker and looked for `doc["games"]` before adopting it over
+`load_oddsapi_game_lines_doc`'s document. The shard is `markets`-keyed and has no
+`games` key — see `#387` for the proof — so the adoption branch never fired.
+
+`#387` REMOVED THE LOAD, because a read that cannot change the output is pure
+cost. **It did not answer the question the dead branch was asking**, and that
+question is a real one: if the intent was for the freshest tracked lines to reach
+Layer 2's MLB game candidates, that intent has never once been served.
+
+**Do not "fix" this by pointing it at `markets`.** That is a correctness change
+with its own cost — it re-adds a multi-hundred-MB per-build read to the single
+most OOM-sensitive path in the repo, on the worker, and the `markets` shape is
+not the `games` shape `_tracked_game_lines_index` consumes. It needs a decision
+about whether Layer 2 wants shard freshness at all, and if so a design that does
+not re-materialise the shard per build.
+
+**First step is free and needs no deploy:** compare, for one production date,
+what `load_oddsapi_game_lines_doc` carries against what the shard's `markets`
+carry, per game and per market. If the live doc is already as fresh, this closes
+as "no gap" and the removal in `#387` is the whole story.
+
+### `#387` — **OPEN, OWNED (`mlb-overview-hydration-cost`). THE REAL FIX IS STARTED, NOT FINISHED: two reductions to the MLB hydration path are CUT AND LOCALLY MEASURED, NOT DEPLOYED.** The 3000MB floor stays exactly where it is — it is a circuit breaker, and nothing here has yet earned the right to lower it.
+
+**WORK DONE 2026-08-19/20, lane `mlb-overview-hydration-cost`. TWO CHANGES, ONE
+MEASURED LOCALLY AND ONE PROVEN INERT BY SCHEMA. NEITHER IS DEPLOYED.**
+
+**1. `liveData.plays.allPlays` / `playsByInning` are pruned from every feed/live
+document the cards builder retains** (`mlb/cards.py`, `_prune_feed_live_payload`,
+called from `_daily_actual_by_game`). `_daily_actual_by_game` is the loader
+`handoff_refresh_worker_oom.md` measured as the largest single contributor to
+this call, and it holds one complete StatsAPI document per game live for the
+whole build. Measured over the 15 documents of 2026-06-14 (12,605,243 JSON
+bytes): `allPlays` is **66.38%** of the payload and `playsByInning` **3.05%**,
+and **neither is read anywhere in `syndicate/`** — every `allPlays` reader is an
+offline script or `vendor/`, and each opens the artifact off disk itself, so the
+in-memory prune cannot reach them. A DENYLIST deliberately, not an allowlist:
+it can only remove what has been proven unread, so all ~12 other consumers of
+this document keep working byte for byte.
+
+**MEASURED, `scripts/measure_cards_context_rss.py`, 15-game slate, worker path
+(`SYNDICATE_WEB_DYNO=0`), 5 repeats each, prune the only variable:**
+
+```
+                        prune OFF (control)   prune ON      change
+peak RSS                    142.9 MB          114.5 MB      -28.4 MB  (-19.9%)
+   per-repeat spread     142.7-143.1        114.1-114.9
+steady transient            +55.7 MB           +35.0 MB     -37%
+steady retained             +11.8 MB            +2.8 MB     -76%
+_daily_actual_by_game
+   retention alone           +13.6 MB            +1.9 MB     -86%
+serialised games list      343,503 B          343,503 B     IDENTICAL
+```
+
+**RSS, NOT `tracemalloc`, AND THAT IS THE POINT.**
+`handoff_refresh_worker_oom.md` records that every local measurement in the
+original incident used `tracemalloc`, whose peak does not move when a loader
+parses a large document and frees it before the next one starts — while
+production measures cgroup `memory.current`, which ratchets. The harness samples
+process RSS on a thread so a transient inside one call is visible at all.
+
+**2. A whole odds_history shard load was REMOVED from
+`_enrich_games_with_tracked_market_lines` because it could not affect the
+output.** It read the shard only to consult `doc["games"]` — and an odds_history
+shard has no `games` key and never has had one. One writer
+(`odds_refresh_tracking._write_odds_history_artifact`), one literal document
+(`{schema_version, sport, shard_key, date, updated_at, history_limit, markets}`),
+`markets`-keyed, which is how every other consumer reads it; `git log -S` finds
+no revision that emitted `games`; and all three real shard copies on disk
+confirm `has_games=False`. So the branch could never fire and `game_lines_doc`
+was never replaced.
+
+Worker-only (`not render_web_dyno`), today-only — **which on refresh-worker is
+every board build** — and uncached, though `cache=` has existed on that function
+all along. At the shard's measured 19,798,176 bytes and `#435`'s ~6.3x
+file-bytes-resident for this JSON family, **~125MB of transient per build**,
+sitting in exactly the unmarked region after `cards_context_end` that
+`.syndicate/deploys.md` (2026-08-16 04:5xZ) named as *"the best candidate on the
+table"* and asked for an in-pass measurement of. **The measurement was never the
+missing piece — the WRITER's schema was, and it is readable from the repo.**
+
+**THE 125MB IS NOT IN THE TABLE ABOVE AND MUST NOT BE ADDED TO IT.** The local
+mirror carries no dated odds_history shard and the harness runs a PAST date, so
+this path is not exercised locally at all. The 28.4MB is the prune alone. The
+shard figure is a production-only claim derived from a file size and a published
+ratio, and it stays labelled that way until a worker log says otherwise.
+
+**WHAT IS ASSERTED RATHER THAN ASSUMED.**
+`tests/test_mlb_cards_worker_hydration_cost.py`, 10 tests:
+- `test_odds_history_shard_schema_has_no_games_key` parses the WRITER's dict
+  literal and fails if the schema ever grows `games` — the only condition under
+  which the removal would have been wrong.
+- `test_enrichment_never_loads_the_odds_history_shard` — a reinstated load would
+  pass every behavioural test in the suite, which is precisely why it survived.
+- `test_flag_off_keeps_the_full_payload_and_flag_on_prunes_it` — reachability
+  (`off != on`) before correctness, per `model_engine_standard.md`.
+- per-reader parity across `_actual_payload_is_live` / `_source_status` /
+  `_live_progress_fraction` / `_current_pitching_side` / `_iter_team_players`.
+Plus `scripts/measure_cards_context_rss.py --parity`, whole-slate byte equality.
+
+Kill switch: `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`. Default ON.
+
+**WHAT THIS DOES *NOT* CLAIM.** It does not claim the ~2GB production excursion
+is fixed. Three named candidates before this one (deepcopy, ledger accumulation,
+the three-loads-to-one) were each live, exercised, and moved the transient by
+nothing measurable. The honest statement is: **the largest named loader on this
+path is now ~70% smaller and a per-build multi-hundred-MB dead read is gone, both
+with byte-identical output.** Whether that is enough for MLB to clear a 3000MB
+floor under real load is a PRODUCTION question and is unanswered.
+
+**NEXT, AND IT NEEDS A DEPLOY.** Ship to refresh-worker behind claim+preflight,
+one change per deploy, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb` —
+the rate of it, against a same-clock-window baseline, not a post-deploy hour
+(`#387`'s own boot confound: only a cold process clears the bar). Judge on
+`sports_done` distribution and on `BOARD_OVERVIEW_READY sports=`, not on whether
+the worker survived.
+
+**DO NOT LOWER `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`.** Nothing above changes that.
+See the retraction below.
+
+**(prior status, retained)** OPEN, UNOWNED. CONFIRMED LIVE 2026-08-19 ~20:3xZ CT: the 3000MB MLB floor is a deliberate circuit breaker, correctly firing under real load — do not lower it. Real fix is still `build_cards_page_context` running HYDRATED on the worker with `force_refresh=True`; nobody has done that work yet.
 
 **CONFIRMED 2026-08-19 20:29-20:34 CT, unrelated session (soccer-odds-capture-
 cadence-gap), independent of the analysis below.** Investigating a "no MLB on
