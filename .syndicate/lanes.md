@@ -584,7 +584,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `.syndicate/log/2026-08-20.md`, NOT duplicated here. Canonical status
   docs: `docs/ai_context/hockeysim_engine_reference.md` §1–§2B,
   `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`
-  (**§2A/§2B's own todo.md addendum NOT YET WRITTEN — see Blocked by**).
+  (**§2A/§2B's own addendum WRITTEN 2026-08-20 ~20:2xZ, under `#470`** — the
+  `mlb-overview-hydration-cost` claim on the todo document was released,
+  user-authorized, after confirming its owning session no longer exists — see
+  `.syndicate/log/2026-08-20.md` for the full unblock narrative).
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_*.py` / `scripts/grade_nhl_predictions_vs_market.py` /
   `scripts/calibrate_nhl_*.py` / `scripts/build_nhl_*.py` /
@@ -630,20 +633,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   commits pushed to `origin/main`, confirmed via `git merge-base
   --is-ancestor` after every push — latest confirmed tip `86a729cd`
   (strength-state multi-event extension).
-- Blocked by: `docs/ai_context/todo.md`'s own §2A/§2B addendum is blocked
-  by `mlb-overview-hydration-cost`'s active `Files:` claim on that same
-  file (still OPEN as of this checkpoint) — a persistent Monitor
-  (`blo3omza7`, this session) polls every 30s and will fire the moment it
-  clears; not forced through. **Re-checked directly, not just via the
-  monitor, ~19:4xZ**: `lanes.md` still reads `open=1 claims_todo=1` for
-  that lane; the closing reading it's waiting on, scheduled task
-  `mlb-387-live-slate-read`, has `enabled:true`, `nextRunAt
-  2026-08-21T03:15Z` (22:15 CDT tonight) and **no `lastRunAt`** — not
-  fired yet. `todo.md` itself is currently mid-edit, uncommitted, by
-  another live session (`basketball-model-owner`, real `#469`/`#488`
-  content) — one more reason not to force an addendum in right now. A
-  second background check (`bshzf7r5h`) is armed for +30min at the
-  user's request.
+- Blocked by: none — **RESOLVED 2026-08-20 ~20:2xZ.** The todo-document
+  addendum was the last open item. `mlb-overview-hydration-cost`'s claim on
+  it was checked twice (Monitor `blo3omza7`, plus a direct re-read) and
+  found still OPEN with its owning session (`80b3e432`) confirmed gone from
+  the session roster entirely (archived or not). User explicitly authorized
+  proceeding despite the stale claim. Released just that one path from the
+  other lane's `Files:` block (narrow, reversible, code/test files left
+  claimed), added the §2A/§2B addendum, confirmed `ledger-postwrite-check.py`
+  still EXIT:0. One self-inflicted near-miss on the way: the first release
+  edit re-mentioned the bare filename on a later continuation line with no
+  disclaimer marker, which `lane-guard.py`'s own parser picked up as a fresh
+  accidental claim on itself — caught by simulating the hook directly
+  (`echo <payload> | python .claude/hooks/lane-guard.py`) rather than
+  guessing from the error text, fixed by removing the bare re-mention.
 
 ### repo-coordination — OPEN — **POSSIBLY ORPHANED, unconfirmed `[flagged 2026-08-19]`: no currently-running session found narrating its own work under `repo-coordination` — every hit is a session reading the shared `lanes.md` digest or its own guard output (one session's transcript shows `your lane: repo-coordination` printed to a session that is clearly NOT this lane — `Modeling Session (fork 2)` / `abf487e4…` — the exact bare-file misattribution bug fixed earlier 2026-08-19, not evidence of real ownership). No `.current-lane.<session_id>` marker exists for it. Not closed and not force-reassigned on this evidence alone — a live session claiming this lane should confirm by opening it fresh (which now also backfills its own per-session marker).** deployment, assignment and documentation. NOT any sport, model or engine. — opened 2026-08-18 — session: repo-coordination
 
