@@ -2247,3 +2247,35 @@ worker disk vs web disk — and it should be the FIRST fork, not the last.
 Corollary that cost the most time: a size ceiling makes a failure that GROWS
 INTO EXISTENCE. Nothing was deployed on the day it broke; the file crossed a
 line. "It used to work and stopped, with no deploy" should raise SIZE early.
+
+## 2026-08-20 — I NAMED A VERIFICATION CHECK WITHOUT CONFIRMING THE INSTRUMENT COULD SEE
+
+At checkpoint I wrote into `state.md`: "settle it by checking whether roster
+artifact mtimes moved after 02:03Z". That check is **impossible**. `roster_objs/`
+is worker-local and never published: the read-side allowlist looks like it
+permits it, because `fnmatch` lets `*` cross `/`, but the publish SWEEP uses
+`Path.glob`, where `*` does NOT. Export returns 0 files.
+
+So a future session would have followed a confident instruction into a dead end,
+and the instruction carried my authority because it sat in `state.md` next to
+verified facts.
+
+Then three fallback readings each failed for a DIFFERENT reason, and each looked
+like a negative result rather than a blind one:
+- log search for the `ROSTER_REBUILD armed` print: 0 hits — but wrapper stdout
+  is redirected to disk and never reaches Render's collector.
+- sim status `command`: carries the right argv, but the endpoint served an
+  IN-FLIGHT run's launcher record, and completed status files are not exported.
+- `ALL_PROCESS_MEMORY` cmdlines: stored TRUNCATED to the script path, so the
+  flag — appended late in argv — could never appear.
+
+**How to apply.** `fnmatch`-vs-`glob` is a real trap in this repo: they disagree
+on `/`, so "it matches the allowlist" does NOT mean "it is published". Check the
+SWEEP's semantics, not the reader's.
+
+More generally: **a named verification is a claim, and it needs the same
+evidence as any other.** Before writing "check X to settle it", run X once, or
+say explicitly that it is untried. And when a check returns "absent", establish
+what a PRESENT reading would look like on that instrument before treating the
+absence as an answer — three instruments in a row here reported absence that was
+about the instrument, not the world.

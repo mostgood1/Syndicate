@@ -3293,8 +3293,31 @@ VERIFIED still set 03:07:35Z via `/v1/services/.../env-vars`. **EXPIRES 05:00Z.*
 Whether the 02:03 deploy already spent it is **UNKNOWN — not determined.** The
 sim-log tail shows no roster line, but the flag prints at the START of a run and
 the endpoint serves only the last 8000 chars, so that absence is about the
-WINDOW, not the run. Settle it by checking whether roster artifact mtimes moved
-after 02:03Z; do not infer it from the log tail.
+WINDOW, not the run.
+
+**THE CHECK THIS BLOCK ORIGINALLY NAMED DOES NOT WORK — corrected 03:3xZ.** I
+said "check whether roster artifact mtimes moved after 02:03Z". You cannot:
+`roster_objs/` is WORKER-LOCAL. The read allowlist appears to permit it
+(`fnmatch` lets `*` cross `/`), but the SWEEP uses `Path.glob`, where `*` does
+not cross `/`, so `snapshots/<date>/roster_objs/*.json` is never published.
+Confirmed by export: **0 files visible on web.**
+
+Every other reading is blind too, each for a DIFFERENT reason, which is worth
+knowing before anyone spends the time again:
+- `ROSTER_REBUILD armed` in Render logs: 0 hits, because the wrapper's stdout is
+  redirected to a disk file and never reaches the collector.
+- sim status `command`: it DOES carry the inner `daily_update` argv, but the ops
+  endpoint served an IN-FLIGHT run's launcher record (`startedAt: None`), and
+  completed `*_status.json` files are not exported.
+- `ALL_PROCESS_MEMORY` cmdlines: stored TRUNCATED (`tools/daily_update.py`, no
+  argv) and the flag is appended late, so its "absent" is about the truncation.
+
+**So: whether the gate fired is NOT KNOWABLE from here.** Do not record either
+answer. The cheap resolution is to stop asking and re-arm: point
+`SYNDICATE_MLB_ROSTER_REBUILD_DATE` at the NEXT slate and let it ride with the
+next refresh-worker deploy (the var needs a DEPLOY to inject, not a restart, so
+it composes with the ridealong above). That trades one bounded rebuild for
+certainty.
 
 **BUILT.** `f86b24a3` + `6a213156`.
 **Nothing imports `flask_frontend` any more.**
