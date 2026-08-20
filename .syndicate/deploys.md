@@ -20087,3 +20087,96 @@ globs `HOT_ARTIFACT_PATTERNS` across the whole data root — a full filesystem w
 on the same disk a boot sync walks, on a container whose workers were already at
 ~600 MB of 2 GB. Prefer `?path=` for a single artifact, and never issue an
 inventory export during a boot window.
+
+---
+
+## 2026-08-20 22:47Z–23:43Z — workers `4b56bac1`/`82702632` then `2db7e821`/`7eb99f14` — the departed-player squad fix, VERIFIED
+
+    lane:      soccer-board-mlb-parity
+    services:  live-odds-worker AND refresh-worker (both build soccer artifacts --
+               checked, not assumed; both were caught mid-build)
+    round 1:   4b56bac1 (onto bd4b1a67) live 22:47:36Z
+               82702632 (onto d1a897b2) live 22:54:29Z
+    round 2:   2db7e821 (onto 4b56bac1) live 23:41:52Z
+               7eb99f14 (onto 82702632) live 23:32:14Z
+    on main:   5848f64d, then b3f158cd
+    claims:    taken and released each round
+    rollback:  deploy bd4b1a67 / d1a897b2
+
+**Unblocked first.** The preflight for this had FAILED earlier on
+measurability: web was serving an artifact `generated_at 2026-07-20`, so the
+verification reading could not move. Once `soccer-stale-artifact-overwrite`
+landed (`32148cac`) and artifacts went fresh, two things were re-derived on
+CURRENT data before deploying anything:
+
+- **The bug is real, not an artifact of staleness.** A freshly-built artifact
+  (`22:36:36`) still carried 28 Arsenal players with all five departed names.
+- **The join finding did not invert.** The correction sweep flagged "zero
+  priced players unmatched" as untrustworthy because a stale list is a
+  superset. Re-run against the fresh artifact: still zero.
+
+### Round 1 shipped a HALF-WORKING fix, and its own verification caught it
+
+First artifact rebuilt by the deployed code, **23:17:45Z**: Arsenal **28 → 21**,
+all five departed players gone — and `rescued_by_roster` effectively **zero**.
+21 is exactly the `players_2025.csv` count. **Ethan Nwaneri and Reiss Nelson,
+both genuinely at the club and both carrying a real bookmaker price, were
+dropped.** The same code returned 23 locally.
+
+**Cause: a single-root glob.** `_current_roster_names` globbed
+`source_root / league / "api" / "rosters"`. `sources._api_read_path` iterates
+`_source_roots()` — the runtime disk AND a git-shipped repo fallback — and its
+docstring says exactly why: *"Every read below threw the fallback away unread,
+and the cost was the whole soccer sim."* **I had read that docstring earlier
+in the same session, while tracing something else, and did not apply it.**
+`rosters_*.csv` is also absent from `HOT_ARTIFACT_PATTERNS`, so a worker's
+disk has no route to receive it — the fallback was the ONLY way that file
+could ever be read there, and a single-root glob could not have worked in
+production under any circumstances.
+
+Round 2 reads `roster_rows(league, default_season(league))`. **The
+load-bearing assumption was checked BEFORE deploying this time:** all 10
+leagues' `rosters_2026.csv` are git-tracked, so the fallback has something to
+find.
+
+### verify: PASSED — closing reading on the SERVED artifact
+
+    generated_at        2026-08-20T23:43:04   (after the 23:41:52Z deploy)
+    Arsenal squad       23                    (was 28)
+    departed remaining  NONE
+    roster-rescued kept Ethan Nwaneri, Reiss Nelson
+
+Gated on `generated_at`, not elapsed time — both facts had to move together.
+A fresh stamp with 28 would have meant inert code; a stale stamp would have
+meant the reading was not about this change at all. That gate is what turned
+round 1's partial failure into a finding instead of a false PASS.
+
+The rebuild was triggered deliberately, scoped `sports=soccer
+soccer_leagues=epl phase=live`. Verified code-exact first that
+`soccer_{league}_odds`, `_props` and `_picks` are all `phases=("pregame",)`
+while `_artifacts` is `("pregame", "live")` — so this ran ONE artifact step
+and spent **zero OddsAPI credits**, against a budget at ~93% projected burn.
+
+### What this cost and what it bought
+
+Five phantom Arsenal players gone, two real priced players preserved. The
+five two-season leagues carried 160–215 stale-only players each; by the
+builder's own reasoning about duplicates, every one was diluting a real
+teammate's shot and prop allocation.
+
+**Both deploys waited for a preflight window** rather than landing on a
+running build — the first attempt returned `HOLD: 3 job(s) in flight` on both
+workers, and soccer artifact builds were near-continuous, so each round meant
+watching for a gap.
+
+### The rule this earns
+
+**A fix that reads a file must be tested against the ROOT PRODUCTION READS
+FROM, not the root that happens to be present locally.** Round 1 passed every
+test, ran correctly on real data, and was structurally inert on the only
+machine that matters. The tests could not have caught it either: they wrote a
+fixture roster into a TemporaryDirectory the production path never consults,
+and would have passed by ACCIDENT once the read moved, because the names they
+invented ("Nwaneri", "Viktor Gyökeres") exist in the real repo roster. They
+now patch the read and assert against their own fixture, plus one test that
+patches `roster_rows` and asserts it is actually CALLED.
