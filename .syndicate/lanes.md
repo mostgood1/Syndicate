@@ -1114,6 +1114,46 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   populated fixture before trusting either the pattern or the test.
 - Blocked by: none.
 
+### nfl-artifact-publish-wiring — OPEN — opened 2026-08-20 — session: nfl-artifact-publish-wiring
+- Goal: `nfl-artifact-allowlist-add` deployed the allowlist to both
+  services (web `c5c1b0b5`, refresh-worker `08bd601f`), then a real
+  `/api/ops/artifacts/export` call against production returned `count: 0`
+  for both patterns. Traced (not assumed): NOTHING calls
+  `publish_hot_artifact()` for any of the 3 NFL artifacts --
+  `fetch_nfl_injuries.py` has no publish call site at all;
+  `roster_snapshot_builder.py`/`depth_chart_snapshot_builder.py`'s own
+  `publish=` flag only appends `_publish` to the local filename, never
+  pushes cross-service, and the refresh-worker autorun doesn't even pass
+  it. `#208`'s lesson measured as a real, current gap: the allowlist
+  permits the transfer, nothing makes it happen. **Testable outcome:**
+  after the next real autorun run of each script, a production
+  `/api/ops/artifacts/export` call for each of the 3 patterns returns
+  `count >= 1`, not 0.
+- Files:
+  - `scripts/fetch_nfl_injuries.py` -- add a best-effort
+    `publish_hot_artifact()` call in `fetch_season()` right after a
+    successful write, mirroring `generate_smartsim2_nfl_projections.py`'s
+    exact pattern (try/except, never fails the fetch itself, records
+    `published` in the result dict).
+  - `scripts/build_nfl_roster_snapshot.py` -- same pattern after
+    `write_roster_snapshot_csv()` returns, using `result.output_path`.
+  - `scripts/build_nfl_depth_chart_snapshot.py` -- same pattern after
+    `write_depth_snapshot_csv()` returns, using `result.output_path`.
+- Hypothesis: n/a -- root cause already traced by reading the actual
+  call sites (`grep` for `publish_hot_artifact(` across the whole repo),
+  not guessed.
+- Falsification test: a test mocking `publish_hot_artifact` and asserting
+  it IS called with the real written path after a successful write, for
+  each of the 3 scripts -- if this test passes on the CURRENT (unfixed)
+  code, the diagnosis was wrong.
+- Verification: falsification test fails pre-fix / passes post-fix for
+  all 3 scripts; full test slice for these 3 files + artifact_publisher
+  has no regressions; ideally a live re-run (network permitting) shows
+  `artifact_published=True` in output and a subsequent
+  `/api/ops/artifacts/export` call returns a nonzero count for at least
+  one pattern.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
