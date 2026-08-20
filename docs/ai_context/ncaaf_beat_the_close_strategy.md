@@ -86,7 +86,7 @@ told*. Ranked by expected points of MAE, most promising first:
 |---|---|---|---|
 | 1 | **Injuries / availability** — starting QB out is worth 7–14 pts in CFB | nothing; no injury input exists anywhere in the pipeline | large |
 | 2 | **In-season updating** — reprices every week on results | SP+ refetched per run, but no in-week signal | medium, see §2 |
-| 3 | **Situational** — rest days, travel, lookahead/letdown, weather, altitude | none | medium |
+| 3 | ~~**Situational** — rest, travel, altitude~~ **MEASURED ZERO, §11** | none | **none — the market prices all of it** |
 | 4 | **Personnel depth** — portal churn, suspensions, opt-outs | data BUILT (rosters, transfers, continuity) and **unwired** | unknown |
 | 5 | **Motivation/context** — rivalry, bowl positioning, coach hot seat | none | small |
 
@@ -574,3 +574,72 @@ already encodes and what the market has fully priced. Expect them to land in the
 model's *shared* 17.8%, not in the missing 23.8%. Injury and availability data is
 different in kind — it is information about the FUTURE lineup, which no
 performance metric contains. Prioritise accordingly.
+
+---
+
+## 11. SITUATIONAL FACTORS — MEASURED AND DEAD. Do not build them.
+
+**Measured 2026-08-20 on 1,746 games (2024+2025), BEFORE building anything.**
+`scripts/test_ncaaf_situational_edge.py`.
+
+§1 ranked situational factors a "medium" lever on intuition. They are worth
+**zero**, and the test that shows it took two minutes.
+
+### The right question, and it is not the obvious one
+
+"Do rest and travel affect football games?" — obviously yes. **"Does the MARKET
+MISPRICE them?"** — a completely different claim, and the only one worth
+building on. The model is strictly dominated (§10), so an input the bookmakers
+already price lands in the shared 17.8% of R² and changes nothing. That is
+precisely how returning production failed after a 5.8σ prior.
+
+So regress the market's OWN ERROR on each factor:
+
+    market_residual = realised_margin − market_margin        (home side)
+
+| variable | n | slope | SE | t | verdict |
+|---|---|---|---|---|---|
+| rest_diff | 1485 | −0.0571 | 0.0893 | −0.64 | priced |
+| travel_km | 1490 | +0.0006 | 0.0004 | +1.57 | priced |
+| elev_gain_m | 1486 | +0.0007 | 0.0008 | +0.93 | priced |
+| tz_shift_h | 1486 | −0.3319 | 0.3670 | −0.90 | priced |
+| neutral_site | 1746 | −1.1029 | 1.9700 | −0.56 | priced |
+| is_dome | 1746 | +1.8615 | 2.1056 | +0.88 | priced |
+| conference_game | 1746 | −0.9954 | 0.7518 | −1.32 | priced |
+| kick_hour_utc | 1746 | −0.0814 | 0.0448 | −1.82 | priced |
+
+**Not one reaches |t| = 2**, and with 8 tests ~0.4 false positives are expected
+by chance, so even the −1.82 is unremarkable.
+
+### The POSITIVE CONTROL — why this null is trustworthy
+
+A null means nothing if the test cannot detect anything. The residual's own mean
+is the control:
+
+    market residual mean +0.983   SE 0.365   t = +2.70   SIGNIFICANT
+
+**The market DOES have a detectable bias — it slightly under-prices home teams —
+so the instrument works.** The eight nulls are real absences, not a blind probe.
+
+### And that bias is still not playable
+
+    always bet the home team:  1713 bets, 51.4% ATS
+    95% CI [49.0%, 53.7%]      breakeven 52.4%
+
+Real but too small: +0.98 points on a 15.2-point residual SD moves the cover
+rate ~2.6 points, landing on the vig. It fails the §9 criterion at step 2.
+
+### What this costs and what it saves
+
+Two minutes, against the **multi-hour build-measure-revert cycle** that returning
+production consumed for the same eventual answer. **Run the market-residual test
+BEFORE building any feature.** If the market already prices it, there is nothing
+to win, and no amount of engineering quality changes that.
+
+**Remaining candidates after §7, §8, §10 and this section:** injuries and
+availability — the only class describing the FUTURE lineup rather than past
+performance, and therefore the only one that cannot already be inside SP+. But
+NCAAF has **no injury data source** (CFBD's 74-endpoint spec has none), and NFL's
+equivalent adjustment was backtested and **HURT** (60.98% → 56.44%). That lever
+needs a real availability feed and causal impact estimation, not another
+schedule-derived metric.

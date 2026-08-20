@@ -1,4 +1,4 @@
-# Syndicate — Learnings
+﻿# Syndicate — Learnings
 
 > **Append only.** Rules must be obeyable by a session with zero context.
 > `FORBIDDEN` = never do this again. `EXONERATED` = ruled out, stop
@@ -2644,3 +2644,49 @@ was not scoped to what I actually changed*.
 **Why this rates a FORBIDDEN rather than a note:** the failure is SILENT and
 INVERTED — the intent was "add my line", the effect was "delete four hundred of
 theirs", and every command involved is one people run daily.
+---
+
+## 2026-08-20 — TEST THE MARKET'S ERROR BEFORE BUILDING A FEATURE. Two minutes vs hours.
+
+**The question is never "does X affect the game". It is "does the MARKET
+MISPRICE X".** Those are different claims and only the second is worth building.
+
+Asked to wire situational factors into NCAAF (rest, travel, altitude, timezone,
+neutral site, dome, kick time, conference), I regressed the MARKET'S OWN ERROR on
+each one FIRST, on 1,746 games:
+
+    market_residual = realised_margin - market_margin
+
+    rest_diff -0.64   travel_km +1.57   elev_gain +0.93   tz_shift -0.90
+    neutral   -0.56   is_dome   +0.88   conference -1.32  kick_hour -1.82
+
+**Not one reaches |t|=2.** The market prices all of it. Building those eight
+features would have re-derived information already in the line — landing in the
+model's SHARED variance, not the missing part — which is exactly how the
+returning-production feature failed after a 5.8-sigma prior.
+
+**Cost: two minutes.** The returning-production equivalent cost a build, two
+full-season backtests, a revert and ~3 hours of compute to reach the same kind
+of answer. The ordering is the entire lesson.
+
+**THE POSITIVE CONTROL IS NOT OPTIONAL, and it nearly went unrun again.** Eight
+nulls in a row should immediately raise "can this test detect anything?" The
+residual's own mean answers it: **+0.983, SE 0.365, t=+2.70** — the market really
+does under-price home teams, so the instrument works and the nulls are real
+absences. Without that line the whole table would have been worthless, the same
+way recruiting at +0.482 was what made the SP+/returning-production null usable.
+
+**A statistically real bias is still not automatically playable.** That same home
+bias: 1,713 bets, **51.4% ATS, CI [49.0%, 53.7%]** against a 52.4% breakeven.
+Significant in the regression and unbettable in practice, because +0.98 points on
+a 15.2-point residual SD moves the cover rate ~2.6 points — onto the vig.
+"Significant" and "profitable" are different tests and the second is stricter.
+
+**The standing practice.** For any proposed model input, in this order:
+1. Regress the market residual on it. Null -> STOP, do not build.
+2. Include a positive control in the same table, or the null proves nothing.
+3. If it survives, check it is PLAYABLE (ATS vs breakeven), not merely
+   significant.
+4. Only then build, with a reachability test.
+
+`scripts/test_ncaaf_situational_edge.py` is the reusable harness.
