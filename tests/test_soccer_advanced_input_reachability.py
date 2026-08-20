@@ -364,3 +364,42 @@ def test_availability_reaches_the_engine_and_differs_by_side():
     assert on_full.availability_index > on_thin.availability_index, (
         "a full-strength home side must not score a LOWER availability index than a thin one"
     )
+
+
+def test_market_confidence_reaches_the_engine():
+    """Off vs on through the full engine, mirroring `test_off_differs_from_on`.
+
+    UNLIKE every other field in this file, `market_prior_index` is
+    match-level, not per-side -- `_market_prior_index` never takes a `side=`
+    argument (`possession_priors.py`), so this test does NOT assert a
+    home/away asymmetry the way availability's does; the same value applies
+    to both teams' priors by design (see the "scoring_environment" framing
+    football's identical `_market_prior_index` uses)."""
+    from syndicate.features.soccer.sim_engine.soccersim.contracts import (
+        PossessionState, SoccerSimSimulationInput,
+    )
+    from syndicate.features.soccer.sim_engine.soccersim.league_profiles import get_league_profile
+    from syndicate.features.soccer.sim_engine.soccersim.possession_priors import build_possession_priors
+
+    profile = get_league_profile("eredivisie")
+    state = PossessionState(possession_owner="home", pitch_position=50, phase="open_play", half=1, clock_remaining=2700)
+
+    def priors(payload):
+        si = SoccerSimSimulationInput(home_team="Ajax", away_team="PSV", seed=7,
+                                       home_attack_rating=0.1, home_defense_rating=-0.05,
+                                       away_attack_rating=0.05, away_defense_rating=0.0,
+                                       feature_generation_payload=payload)
+        return build_possession_priors(si, possession_state=state, profile=profile)
+
+    # "market_features" -- `_extract_block`'s first accepted name
+    # (`possession_priors.py:312`) and also the SoccerMatchFeatures FIELD
+    # name; unlike availability/tempo, `adapters.py::_engine_input` does NOT
+    # rename this one, confirmed by reading it before writing this test.
+    off = priors({"market_features": {}})
+    on_confident = priors({"market_features": {"confidence": 0.85}})
+    on_toss_up = priors({"market_features": {"confidence": 0.34}})
+
+    assert off.market_prior_index != on_confident.market_prior_index, "feeding confidence changed nothing -- the input is inert"
+    assert on_confident.market_prior_index > on_toss_up.market_prior_index, (
+        "a market heavily favoring one side must not score a LOWER market_prior_index than a toss-up"
+    )

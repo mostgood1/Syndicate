@@ -1,4 +1,4 @@
-# Syndicate — Work Lanes
+﻿# Syndicate — Work Lanes
 
 > Lanes are exclusive by file path. Two lanes may not claim the same file.
 > Max concurrent OPEN lanes: 3 (see `state.md`).
@@ -744,7 +744,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   never tracks players. Props would be a build, not a wiring fix.
 - Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
 
-### soccer-odds-capture-cadence-gap — OPEN — **FIX LANDED on `origin/main` (`3e8264bd`, content-verified) 2026-08-19 ~23:40Z. NOT YET DEPLOYED. `#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request — every call has 422'd since, every league, matching the regression date exactly against the last good capture found anywhere in the shard. Next: deploy to live-odds-worker (+ refresh-worker if it also runs this script) behind claim+preflight, then re-verify book_quotes freshness.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
+### soccer-odds-capture-cadence-gap — CLOSED-VERIFIED 2026-08-20 01:25Z — **`#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request for every league, 9 days straight; fixed (`3e8264bd`), deployed to both live-odds-worker (`575decf3`) and refresh-worker (`b2f4b197`, cherry-picked onto their scoped live SHA), and VERIFIED with real production data: a manual pregame trigger post-deploy produced genuine fresh captures across the full soccer book_quotes shard, and 6 of the originally-8 stale MLS/La Liga matches now show `captured_at` 3 minutes old. Full evidence chain in `.syndicate/deploys.md`'s 2026-08-20 01:25Z entry.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
   refreshes within a bounded window (target: <24h old for a match kicking
   off within the next day) instead of sitting 8-10 days stale.
