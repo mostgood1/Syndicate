@@ -17868,3 +17868,25 @@ markets -- in the same snapshot `batter_home_runs` covered 46 players while
 `batter_hits` covered 3 and `batter_runs_scored` 2 -- so the spend buys very
 few rows. The ladders wiring is in place, so enabling later is one line in
 `DEFAULT_HITTER_MARKETS`.
+
+## 2026-08-20 — refresh-worker: nfl-autorun-production-arm (PENDING)
+
+- **Candidate:** `3b816546` (direct child of live SHA `041188cb`) -- arm the
+  two `nfl-roster-depth-autorun` autoruns
+  (`NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`,
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`) on
+  refresh-worker. Env vars already SET on the service (dashboard, verified
+  via read-only GET); this deploy is the missing second half --
+  `[[project_render_env_needs_deploy]]`.
+- **Expected effect:** `NFL_ROSTER_SNAPSHOT_LAUNCHING` and
+  `NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING` each appear in refresh-worker logs
+  within 5 min of deploy going live (first run, no marker yet).
+- **Blast radius:** refresh-worker only. Blocked ~2h so far on preflight
+  HOLD -- a continuously busy job queue (MLB daily sim, odds refresh,
+  per-league soccer artifact builds cycling with no observed lull).
+- **Rollback:** redeploy refresh-worker to `041188cb` (direct parent, no
+  rollback risk either direction), or unset the two env vars (stops future
+  launches without a deploy -- one-shot rate-limited subprocess, not a
+  persistent loop).
+- **Measurement:** PENDING -- fill in after deploy + log verification.
+- Reminder timestamp: 2026-08-20T04:15Z (approx, session-relative).
