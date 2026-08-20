@@ -2448,3 +2448,46 @@ mean anything, exactly as recruiting at +0.482 validated the SP+ residual.
 **Harnesses:** `grade_football_model_weight.py` (dominated vs broken),
 `grade_football_playability.py` (ATS vs naive baselines),
 `test_ncaaf_situational_edge.py` (market-residual screen).
+
+---
+
+## 2026-08-20 — I CALLED A LEVER "DEAD" ON ONE SEASON AND HAD TO CORRECT IT ON FOUR
+
+**Same error I had spent the day catching in others' shape, committed in my own
+headline.**
+
+On 272 NFL games all four injury-burden measures came back null (best t=−1.81),
+and I wrote: *"THE INJURY LEVER IS DEAD — the NFL market prices injuries."* The
+section's own limits paragraph said n=272 was one season and this was "no
+evidence of an edge, NOT proven no edge". **The caveat was right and the headline
+ignored it.** Extending to 2022–2025 (1,083 games):
+
+    weighted_diff   t -2.10   SIGNIFICANT
+    skill_out_diff  t -2.23   SIGNIFICANT
+
+Quadrupling n turned my confident null into a live question.
+
+**A NULL HAS A SAMPLE SIZE TOO.** I have been rigorous about not over-reading
+positive results — the whole 5-guises entry above is about that — and applied
+none of that discipline to a negative one. "No effect detected at n=272" is a
+statement about the POWER of the test, and stating it as "dead" strips exactly
+the information that made it provisional. **Underpowered nulls need the same
+label as underpowered positives.**
+
+**What kept the correction from being a reversal.** The lever is still not
+actionable, and for the reason the pooled number hides: per-season the slope
+runs −0.09 / **+0.11** / −0.78 / −0.51. One season flat, one the WRONG SIGN,
+significance carried by two. That is the identical shape that killed returning
+production (2024 t=−1.58, 2025 opposite sign, pooled t=−0.89). **Pooled
+significance without per-season replication is one finding, not four.** Always
+print the per-season table beside the pooled row —
+`test_nfl_injury_market_edge.py` now does.
+
+**And the ATS bar still fails**: 52.9 / 53.3 / 58.9% with CI lower bounds
+49.3 / 48.6 / 49.7, none clearing 52.4%. The 58.9% on 112 bets is the most
+seductive number I produced today and it means nothing on its own.
+
+**The rule: before declaring a lever dead, state the smallest effect the test
+could have detected.** If that floor is larger than the effect worth having,
+the honest verdict is UNRESOLVED, not DEAD — and the fix is more data, not a
+conclusion.
