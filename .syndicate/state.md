@@ -2055,8 +2055,10 @@ market-relative scoreboard.
   `[re-measured 2026-08-19, lane ci-green]` — **but only OUTSIDE 00:00-05:00Z,
   and only on a Central machine.** See the next line; the unqualified version of
   this line was wrong.
-- **CI IS TIME-DEPENDENT: it was structurally RED ~5 HOURS EVERY DAY**
-  `[measured 2026-08-20, #482]`. 7 `test_archives` tests computed "today" with
+- **CI WAS TIME-DEPENDENT — structurally RED ~5 HOURS EVERY DAY — NOW FIXED AND
+  VERIFIED INSIDE THE WINDOW** `[run 32323646103, `df8aec91`, 02:09Z, 2026-08-20,
+  #482]`. 11 consecutive failures 01:24-01:53Z in the same UTC band without the
+  fix, then green with it. 7 `test_archives` tests computed "today" with
   `date.today()` — the runner's date, **UTC** on GHA — while the routes use
   `central_today_iso()`. CDT is UTC-5, so **00:00-05:00Z they disagree** and the
   suite fails no matter what was pushed. Evidence is a clock, not a diff: 16

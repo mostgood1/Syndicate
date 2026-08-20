@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#482` — **CI WAS STRUCTURALLY RED ~5 HOURS EVERY DAY, ON THE CLOCK RATHER THAN ON ANY PUSH: 7 tests assert a UTC "today" against a product that is Central** — FOUND+FIXED 2026-08-20 ~02:0xZ, lane `ci-green`
+### `#482` — **CLOSED. CI WAS STRUCTURALLY RED ~5 HOURS EVERY DAY, ON THE CLOCK RATHER THAN ON ANY PUSH: 7 tests asserted a UTC "today" against a Central product. VERIFIED FIXED INSIDE THE FAILING WINDOW — run `32323646103`, 02:09Z, green, against 11 consecutive failures in the same band without it.** — FOUND+FIXED+VERIFIED 2026-08-20, lane `ci-utc-midnight-window`
 
 Found on a second `/checkpoint` by re-reading CI instead of trusting the
 "green" recorded an hour earlier. **This is a THIRD cause, independent of
@@ -63,6 +63,22 @@ Confirmed the window is live at the time of the fix:
 **So CI inside 00:00-05:00Z is the real test, and it is a natural experiment
 available right now** — the next run after the push lands inside the window.
 Do not close this on the local pass.
+
+#### VERIFIED 2026-08-20 02:09Z — closed on a CI run inside the window, with a control
+
+Run **32323646103**, head `df8aec91`, executed **02:09Z (inside 00:00-05:00Z)**:
+`Run archive regression suite` **success** + `Ledger coherence` **success**.
+
+The control is the eleven runs immediately before it, same UTC band, without the
+fix — `63a2341d` 01:24Z, `32913a8b` 01:26Z, `6dc5a59d` 01:27Z, `089c42bd`
+01:30Z, `bed4f580` 01:32Z, `d2c748b5` 01:33Z, `ee08b9bc` 01:33Z, `c3d17f7f`
+01:34Z, `f026ae88` 01:35Z, `8c21d51d` 01:41Z, `f968d242` 01:53Z — **all
+failure**. Eleven reds then one green, inside one hour band, one bit different.
+The falsification test did not fire.
+
+That is the comparison `#480`'s "CI green again" lacked: it compared **across the
+midnight boundary** rather than across the change, which is why a real, daily,
+five-hour outage read as fixed. Rule in `learnings.md` 2026-08-20.
 
 ### `#481` — **THE DAILY ARTIFACT BACKUP CAPTURES 0.10% OF WHAT IT IS ASKED TO BACK UP, AND REPORTS SUCCESS. Truncation is now VISIBLE (shipped); making the backup COMPLETE needs a scope decision** — FOUND+MEASURED 2026-08-19, lane `daily-update-backup-truncation`
 

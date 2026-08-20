@@ -17722,3 +17722,52 @@ over the 45 completed runs then visible.
 the word "again" doing work it had not earned — a 16-run streak inside one
 28-minute window is one observation of a time-varying system, not sixteen.
 Rule recorded in `learnings.md` 2026-08-20.
+
+
+## 2026-08-20 02:09Z — `#482` CONFIRMED FIXED **INSIDE THE WINDOW THAT WAS BREAKING IT** — lane `ci-utc-midnight-window`
+
+**NOT a Render deploy.** No service touched, no claim, no preflight,
+`render.yaml` untouched. Recorded because it is a measurement of a fix.
+
+**verify:** run **32323646103**, head `df8aec91`, executed at **02:09Z — inside
+00:00-05:00Z**, both gated steps green:
+
+    success  Run archive regression suite
+    success  Ledger coherence (enforced -- lanes.md, todo.md, state.md)
+
+**Why this reading counts and the earlier one did not.** `#480`'s green block ran
+23:25-23:53Z, entirely OUTSIDE the failure window, so it could not have detected
+this. This run is inside it, with an adjacent control:
+
+| time | head | fix present | CI |
+|---|---|---|---|
+| 01:24Z | `63a2341d` | ABSENT | failure |
+| 01:26Z | `32913a8b` | ABSENT | failure |
+| 01:27Z | `6dc5a59d` | ABSENT | failure |
+| 01:30Z | `089c42bd` | ABSENT | failure |
+| 01:32Z | `bed4f580` | ABSENT | failure |
+| 01:33Z | `d2c748b5` | ABSENT | failure |
+| 01:33Z | `ee08b9bc` | ABSENT | failure |
+| 01:34Z | `c3d17f7f` | ABSENT | failure |
+| 01:35Z | `f026ae88` | ABSENT | failure |
+| 01:41Z | `8c21d51d` | ABSENT | failure |
+| 01:53Z | `f968d242` | ABSENT | failure |
+| **02:09Z** | **`df8aec91`** | **PRESENT** | **success** |
+
+**Eleven consecutive failures then one success, all within the same UTC hour
+band, one bit different.** That is the controlled comparison the earlier
+"CI green again" entry lacked — it compared across the boundary instead of
+across the change.
+
+**The three causes, and what each is now worth:**
+
+| id | cause | status |
+|---|---|---|
+| `#480` | `test_archives` pinned a retired template literal | FIXED, verified outside window and again here |
+| `#481` | backup captured 0.10% and reported success | FIXED + hand-run (174/216, 80.6%); **workflow-level still unproven** |
+| `#482` | 7 tests assert UTC `today` vs a Central product | **FIXED, verified inside the window** |
+
+**Still open, unchanged by this:** `Daily Update`'s steps 12-13 have not run
+since 2026-07-15. That job fires at 06:00Z, **outside** this window, so `#482`
+never affected it and this result says nothing about it. The next scheduled run
+is still the first end-to-end test of `#481`.

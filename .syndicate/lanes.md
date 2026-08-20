@@ -1071,7 +1071,7 @@ history directly:
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
 - Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
 
-### ci-utc-midnight-window — OPEN — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+### ci-utc-midnight-window — CLOSED 2026-08-20 — **`#482` CONFIRMED FIXED INSIDE the 00:00-05:00Z window: run `32323646103` (`df8aec91`, 02:09Z) green on both gated steps, against 11 consecutive failures 01:24-01:53Z in the same band without it. CI is no longer red on the clock.** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
   independent cause. `#480` and `#481` are done and are not reopened by this.
 - Goal: `CI` is green INSIDE 00:00-05:00Z, not just outside it. Testable: a run
@@ -1097,6 +1097,15 @@ history directly:
   with or without the fix. Window confirmed live at fix time (UTC 2026-08-20 vs
   Central 2026-08-19). **Only a CI run inside 00:00-05:00Z proves it**, and one
   is available immediately — quote the run id, do not predict it.
+- **VERIFICATION RAN, inside the failing condition, with a control.** Run
+  `32323646103`, head `df8aec91`, 02:09Z: `Run archive regression suite` success
+  + `Ledger coherence` success. Immediately prior, same UTC band, without the
+  fix: 11 consecutive failures (`63a2341d` 01:24Z through `f968d242` 01:53Z).
+  Falsification test did NOT fire. Full table in `deploys.md`.
+- Local evidence, stated for what it is worth: `tests.test_archives` 383 OK
+  (skipped=2) and the 7 touched tests OK — but this box is Central, so that
+  shows no regression and proves nothing about the window. The CI run is the
+  proof.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
