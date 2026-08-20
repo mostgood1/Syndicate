@@ -3047,3 +3047,35 @@ header ("THE EVALUATION HAS NOT STARTED" when the scorer had been running all
 along); a later push restored the stale text. Verify a ledger edit is still
 present at checkpoint -- content-probe `origin/main`, do not assume your commit
 being an ancestor means your LINE survived.
+
+## 2026-08-20 — A MUTATION TEST THAT MUTATES THE WRONG MODULE READS AS "VACUOUS SUITE"
+
+**The rule.** Before concluding a suite is vacuous because a mutation left it
+green, confirm the code you mutated is the code that suite's SUBJECT actually
+executes. A false "vacuous" verdict is as costly as a false green: it argues for
+deleting or distrusting a test that works.
+
+**Evidence.** Mutating `ledger_invariants.py` (disabling the duplicate-lane
+predicate) correctly turned `test_ledger_commit_guard` and
+`test_ledger_postwrite_check` red, and left `test_ledger_append_guard` GREEN --
+which looked like proof that suite measured nothing. It was not:
+`ledger-append-guard.py` does not import `ledger_invariants` at all; it carries
+its own `_counts()` and `STATE_DATED_SUB`. Mutating THOSE turned it red with 3
+failing cases.
+
+**How to apply.** Grep the subject for the import before choosing a mutation
+target. Sibling to the existing rule that a mutation test which mutates a
+COMMENT proves the opposite of what it looks like -- both failures are the same
+shape: the mutation never reached the executed path, so the result says nothing
+about the suite either way.
+
+**Left open, in remit of `repo-coordination`:** that `ledger-append-guard.py`
+duplicates the lanes predicate instead of importing the shared one is exactly
+the drift `ledger_invariants.py` exists to prevent. Not fixed -- the guard is
+correct today, and consolidating it is a separate change with its own risk.
+
+**Also 2026-08-20, same shape, different tool:** a `py -3 -c "..."` one-liner in
+Git Bash silently ate every backticked identifier as command substitution and
+appended a mangled rule to this file. Backticks are unavoidable in ledger prose.
+Write the text to a FILE and append from that -- never inline it in a
+double-quoted shell string.

@@ -687,10 +687,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     rewritten two OTHER lanes' blocks; `ledger-append-guard.py` was fully
     INERT in every worktree. Both fixed + measured, shared resolver in
     `commit_context.py`, 33 new tests. `commit-guard.py` refactor proven a
-    behavioural no-op. **Neither new suite is in CI.** Cross-lane edit taken
-    under explicit user instruction while this lane was flagged possibly
-    orphaned. Detail: `.syndicate/log/2026-08-20.md`.
-  - `ledger-postwrite-check.py` line 62 has the same primary-tree bug, NOT fixed.
+    behavioural no-op. Cross-lane edit taken under explicit user instruction
+    while this lane was flagged possibly orphaned.
+    Detail: `.syndicate/log/2026-08-20.md`.
+  - **CLOSED — all four guards fixed, all four suites ENFORCED in CI**
+    `[2026-08-20]`: `f73d163e` fixed `ledger-postwrite-check.py` (blind to
+    worktree Bash writes, and it blamed whichever session observed the change);
+    `86ec6b42` wired all four suites in, **verified green on the Linux runner**
+    (run 32415246596 — 16/16, 17/17, 16/16, 10/10). Enforced rather than
+    tolerated because each suite was mutation-tested first. `lane-guard` is
+    EXONERATED: same mangled relpath, absorbed by exact-or-suffix matching — do
+    NOT "fix" its `root`, the PRIMARY tree is correct for it.
   - `land` reports the ledger checkers rather than gating on them.
   - The new deploy predicate has never gated a real deploy; `OFF_MAIN` has never
     fired in anger; no preflight receipt consumed live. First real deploy tests it.

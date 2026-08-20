@@ -588,16 +588,29 @@ unsaved anywhere.
   lane-guard the PRIMARY `lanes.md` is the CORRECT source, because cross-session
   claim exclusivity is inherently global. That is the opposite of
   `ledger-commit-guard`, which must read the tree being committed.
-- **`ledger-postwrite-check.py` STILL resolves against the primary tree**
-  `[known 2026-08-20, NOT fixed, NOT tested]` (line 62). PostToolUse and
-  warning-only, so the cost is misattribution, not a block — observed blaming an
-  unrelated `grep` for pre-existing primary-tree duplicates.
-- **Tests exist now:** `.claude/hooks/test_ledger_commit_guard.py` (16 cases)
-  and `test_ledger_append_guard.py` (17 cases), both self-contained — they build
-  throwaway repos. **They do so because the first version asserted against the
-  live primary tree and three cases flipped mid-run when a parallel session
-  trimmed the real duplicates.** A guard test that reads shared mutable ledger
-  state measures the ledger, not the guard. **NOT wired into CI.**
+- **`ledger-postwrite-check.py` FIXED** `[verified 2026-08-20, `f73d163e`]`. It
+  now watches the worktree the command ran in AND the primary checkout, deduped
+  to one scan when they are the same, with per-tree state so neither silences
+  the other. It had been blind to worktree Bash writes — **the one thing it
+  exists to catch** — and it blamed whichever session happened to observe the
+  change (seen firing at a `grep`). It reports that a file CHANGED and is
+  broken, says it may be another session, and NAMES THE TREE. Two things the
+  work turned up, both measured: `abspath` does not expand Windows 8.3 short
+  names, so the same tree deduped as two and was reported twice (caught by a
+  "reported exactly once" assertion, not by inspection); and finding the root
+  via `git rev-parse` costs **41ms on EVERY Bash call** vs **0.0ms** for a
+  filesystem walk to the directory holding `.syndicate/lanes.md` — same answer,
+  so the walk is used. End-to-end 162ms → 106ms, ~100ms of it Python booting.
+- **ALL FOUR HOOK SUITES ARE ENFORCED IN CI** `[verified 2026-08-20 on the
+  Linux runner, `86ec6b42`, run 32415246596 green in 3m18s]`: 16/16, 17/17,
+  16/16, 10/10. Enforced, not `continue-on-error`, because each was
+  **mutation-tested** first — disable the predicate under test and every suite
+  goes red, so a green run means the guards work rather than that the suite is
+  vacuous. All four build throwaway repos under the OS temp dir; they are
+  stdlib-only, shell-free and need no repo history, so CI's shallow clone cannot
+  bite them the way it does `todo_id_reconcile`. **They never read the live
+  ledger** — the first version did, and a parallel session trimming real
+  duplicates mid-run flipped three cases from pass to fail.
 - **`lane-guard` is blind to `.claude/**` AND `.syndicate/**` by design**
   (`lane-guard.py:244`, one `rel.startswith` test covering both), so the
   enforcement layer cannot protect the directory it lives in — and every real
