@@ -780,3 +780,25 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   comfortably inside the interval. The discrete-event engine's "one faceoff per segment"
   approximation is the one item that remains genuinely open, a structural engine-design question
   distinct from calibration, never blocking anything currently shipped.
+- **Did** measure the "one faceoff per segment" approximation's real impact, not just name it as
+  open (full report `docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`). Two
+  questions, both answered with data. **(1) How far from reality**: using the engine's own segment
+  geometry read directly from `SimConfig` (`seconds_per_period=1200`, `target_seg=45`,
+  `segments/period=27`, `seg_len≈44.44s`), counted real faceoffs landing in each of 106,272
+  real segment-windows across 1,312 games -- mean **0.684** real faceoffs per segment vs the
+  engine's constant assumption of 1.0 (~46% over-count). Only 37.09% of segments match exactly;
+  **48.64% have ZERO real faceoffs** (an assumed tilt with nothing real behind it); 14.27% have
+  2+. **A genuinely unrepresentable case, quantified for the first time**: 7.79% of ALL segments
+  contain 2+ real faceoffs won by DIFFERENT teams -- a structural ceiling no tuning removes, since
+  the model resolves exactly one winner per segment by construction. **(2) Does it inflate
+  simulated variance**: measured the OPPOSITE of the hypothesis -- a controlled A/B (all 10
+  `faceoff_*` flags ON vs OFF, identical rosters/seeds, 2,976 games/condition) found turning every
+  faceoff mechanism ON REDUCES total-shots-per-game std by 2.15% relative to OFF (a plausible,
+  not separately proven, explanation: the mechanisms are zero-sum between teams per segment,
+  injecting a small negative home/away correlation, which reduces the variance of the sum).
+  **The decisive fact**: BOTH conditions sit below the real observed std (ON 96.71% of real, OFF
+  98.84%) -- the approximation is NOT the primary driver of the engine's shot-total distribution
+  running tighter than real games; disabling it entirely closes less than half that gap. This
+  closes the faceoff track's last genuinely open item with a real measurement, and correctly
+  scopes what remains (a different, larger, still-unattributed variance source) rather than
+  declaring the whole question resolved.

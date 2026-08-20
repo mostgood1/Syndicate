@@ -1,0 +1,21 @@
+{
+  "real": {
+    "n": 1312,
+    "mean": 55.657,
+    "std": 8.2953
+  },
+  "sim_on": {
+    "n": 2976,
+    "mean": 61.7833,
+    "std": 8.0228
+  },
+  "sim_off": {
+    "n": 2976,
+    "mean": 61.8367,
+    "std": 8.1994
+  },
+  "mean_delta_on_vs_off_pct": -0.0864,
+  "std_delta_on_vs_off_pct": -2.1542,
+  "on_std_over_real_std": 0.9671,
+  "off_std_over_real_std": 0.9884
+}

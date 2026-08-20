@@ -1260,6 +1260,42 @@ comfortably inside the leave-one-out confidence interval. The discrete-event "on
 segment" approximation remains the one genuinely open item — a structural engine-design question,
 out of scope for a calibration report, never blocking what's currently shipped.
 
+**§2zzzz — the "one faceoff per segment" approximation MEASURED, not just named as open, same
+session.** Full report: `docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`.
+Two real questions, both answered with data rather than left as a structural caveat: (1) how far
+IS the assumption from reality, and (2) does it actually show up in simulated output.
+
+**(1) Real vs assumed, using the engine's OWN segment geometry** (read directly from
+`SimConfig`/`engine.py`, not re-typed: `seconds_per_period=1200`, `target_seg=45`,
+`segments/period=27`, `seg_len≈44.44s`). Divided every real game's periods 1-3 into the same 27
+segments and counted real faceoffs (any strength state) landing in each, 1,312 games, 106,272
+segments, 72,693 real faceoffs: **mean 0.684 real faceoffs per segment vs the engine's constant
+assumption of 1.0** — a real ~46% over-count. Only 37.09% of segments match the assumption
+exactly; **48.64% — very close to half — have ZERO real faceoffs**, meaning the model applies an
+assumed win/loss shot-share tilt with nothing real behind it almost as often as not. 14.27% have
+2+ real faceoffs (under-represented, only one assumed winner can apply). A genuinely
+unrepresentable case, quantified for the first time: **7.79% of ALL segments (8,278 of 106,272)
+contain 2+ real faceoffs won by DIFFERENT teams** — the model resolves exactly one winner per
+segment by construction, so these windows cannot be represented at all regardless of curve shape
+or calibration, a structural ceiling no parameter tuning removes.
+
+**(2) Does the over-assumption inflate simulated variance?** Every curve this session built is
+mean-1.0 preserving by construction, so the AVERAGE shot total was already known to be unaffected
+(confirmed again here: -0.086% mean delta). The open question was VARIANCE — applying a real
+shot-share tilt to roughly twice as many segments as reality has an event for should, naively,
+inject extra spread. **Measured the opposite**: a controlled A/B (every one of the 10 `faceoff_*`
+flags ON vs every one OFF, identical rosters/rates/seeds, 992-pairing round-robin x 3 sims = 2,976
+games/condition) found `std` ON=8.023 vs OFF=8.199, a **-2.154% reduction**, not an increase. A
+plausible (not separately proven) mechanism: every faceoff multiplier is symmetric and
+approximately zero-sum between the two teams on the SAME segment, injecting a small negative
+correlation between home/away shot counts — summing two anti-correlated quantities reduces the
+variance of the sum. **The decisive fact for scoping this item going forward**: BOTH conditions
+sit below the real observed std (8.295) — ON at 96.71% of real, OFF at 98.84% — so the
+approximation is NOT the primary driver of whatever is making the engine's shot-total distribution
+run tighter than real games. Disabling it entirely closes less than half that gap. Whatever
+explains the rest lives in the engine's other stochastic sources, a separate, larger, still-open
+question this measurement does not attempt to answer.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

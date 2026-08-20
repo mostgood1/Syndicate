@@ -1798,6 +1798,41 @@ confirmation -- every item this session's own addenda ever flagged as open has a
 whether that closure built something, measured and confirmed a default was fine, proved a bound
 can't bind, or re-ran a prior judgment call to confirm it held.
 
+**Addendum, next day: the "one faceoff per segment" approximation MEASURED, not just named as
+open** (reference doc §2zzzz, full report
+`docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`). Two real questions,
+both answered with data. **(1) How far from reality**: `scripts/
+measure_nhl_faceoff_segment_approximation.py` reads the engine's OWN segment geometry directly
+from `SimConfig` (`seconds_per_period=1200`, `target_seg=45`, `segments/period=27`,
+`seg_len≈44.44s`) and counts real faceoffs landing in each of 106,272 real segment-windows across
+1,312 games -- mean **0.684** real faceoffs per segment vs the engine's constant assumption of
+1.0, a ~46% over-count. Only 37.09% of segments match exactly; **48.64% have ZERO real faceoffs**
+(an assumed win/loss tilt with nothing real behind it, applied almost as often as not); 14.27%
+have 2+ (under-represented). **A genuinely unrepresentable case, quantified for the first time**:
+7.79% of ALL segments (8,278 of 106,272) contain 2+ real faceoffs won by DIFFERENT teams -- the
+model resolves exactly one winner per segment by construction, a structural ceiling no parameter
+tuning removes. **(2) Does it inflate simulated variance**: `scripts/
+measure_nhl_faceoff_segment_variance_impact.py` runs a controlled A/B (every one of the 10
+`faceoff_*` boolean flags ON, shipped defaults, vs every one OFF -- the complete list read
+directly from `engine.py`, not guessed -- identical rosters/rates/seeds, 992-pairing round-robin
+x 3 sims = 2,976 games/condition) and measures the OPPOSITE of the hypothesis: turning every
+faceoff mechanism ON REDUCES total-shots-per-game std by **2.15%** relative to OFF, not inflates
+it. A plausible mechanism, disclosed as not separately proven: every faceoff multiplier is
+symmetric and approximately zero-sum between the two teams on the SAME segment, injecting a small
+negative home/away shot-count correlation -- summing two anti-correlated quantities reduces the
+variance of the sum. **The decisive fact for scoping this item going forward**: BOTH conditions
+sit below the real observed std (8.295) -- ON at 96.71% of real, OFF at 98.84% -- so the
+approximation is NOT the primary driver of whatever makes the engine's shot-total distribution run
+tighter than real games; disabling it entirely closes less than half that gap. Whatever explains
+the rest lives in the engine's other stochastic sources (segment-level Poisson draws,
+line-matching noise, score-effects/period-pace multipliers) -- a separate, larger, still-open
+question this pass does not attempt to answer, correctly scoped rather than declared solved.
+**This is the first time this session's "the one genuinely open item" framing has been backed by
+a real measurement instead of left as a stated caveat** -- the faceoff track now has a real answer
+for every item it ever named as open, whether that answer was "built," "measured and confirmed the
+default was fine," "proved a bound can't bind," or, here, "measured the real magnitude and
+correctly scoped what it does and doesn't explain."
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable

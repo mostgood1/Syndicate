@@ -1,0 +1,24 @@
+{
+  "games": 1312,
+  "seconds_per_period": 1200,
+  "target_seg": 45.0,
+  "segments_per_period": 27,
+  "seg_len": 44.4444,
+  "n_segments_total": 106272,
+  "n_real_faceoffs_counted": 72693,
+  "mean_real_faceoffs_per_segment": 0.684,
+  "distribution": {
+    "0": 51687,
+    "1": 39416,
+    "2": 12544,
+    "3": 2339,
+    "4": 261,
+    "5": 22,
+    "6": 3
+  },
+  "pct_zero_real_faceoffs": 48.6365,
+  "pct_exactly_one": 37.0897,
+  "pct_two_or_more": 14.2738,
+  "n_segments_multi_winner_conflict": 8278,
+  "pct_segments_multi_winner_conflict": 7.7894
+}
