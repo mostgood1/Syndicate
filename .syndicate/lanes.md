@@ -1050,9 +1050,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `live-odds-worker` to serve `match_box`). **DO NOT fix the name join with a
   token-subset matcher** -- the squad contains `Gabriel`, `Gabriel Jesus` AND
   `Gabriel Martinelli`; any fix must refuse on ambiguity.
-- **LANDMINE:** `soccer/cards.py` and `tests/test_soccer_board_mlb_parity.py`
-  in the PRIMARY tree are stale pre-fix copies that would revert `43c82b3c`.
-  Do not `git add` either from there.
+- **The primary-tree LANDMINE is RESOLVED `[re-checked 22:0xZ]`** -- a merge
+  brought both files forward; `git status` on `soccer/cards.py` and
+  `tests/test_soccer_board_mlb_parity.py` is clean there and the tree carries
+  `_artifact_score`/`_effective_state_with_box`. The duplicate ledger commit
+  `f9f6fcd8` was absorbed too; the primary tree is no longer ahead of
+  `origin/main`.
+- **Cause (2) of the price lead -- the stale squad -- was fixed by ANOTHER
+  session**: `5848f64d` "the squad was every player who had EVER played in the
+  league", recorded INERT by its own lane (worker code, no worker carries it).
+  Cause (1), the feed->sim NAME JOIN on word order, is still open.
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`

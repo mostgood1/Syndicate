@@ -3221,3 +3221,59 @@ smaller: **explicit file lists, never `-k`, on this repo.**
 that makes the full suite unusable for every lane. 8,135 tests imported to run
 765 is why nobody runs it, and why a green suite was not available as a deploy
 gate when three services shipped tonight.
+
+## 2026-08-20 A POST-DEPLOY VERIFICATION READ ONCE CAN BE AN ARTIFACT OF TIMING, NOT A PROPERTY OF THE SYSTEM
+
+A soccer card deploy was verified at 21:42:5xZ against the served surface --
+`/soccer/api/cards` returned `ALA 1 - 1 RAY`, Final, with real Goals and Match
+stats sections. Honest measurement, right endpoint, right instant, and it went
+into `deploys.md` as `verify: PASSED`.
+
+**Three minutes later the same endpoint served the same fixture with no score
+and no box**, and stayed that way across six consecutive reads. The passing
+reading had depended on a transiently fresh input artifact; web then fell back
+to a month-old git-tracked mirror (`generated_at 2026-07-20`,
+`status_state "pre"`) and every score source correctly refused it.
+
+Nothing was wrong with the code, the deploy, or the measurement. The claim
+"this works" was simply not supported by one sample, and it was caught only
+because the surface happened to be re-read for an unrelated reason.
+
+**How to apply.**
+1. **Read a deploy's verification surface at least twice, minutes apart.** A
+   single post-deploy sample cannot distinguish "the fix works" from "the
+   inputs happened to be good at that instant".
+2. **State the INPUTS in the `verify:` field, not only the output.** The second
+   reading here is strong precisely because it records that the underlying
+   artifact was STILL STALE while the card was correct. The first recorded only
+   the card.
+3. Existing `verify:` entries in `deploys.md` that rest on one immediate
+   post-deploy sample are weaker evidence than they look.
+
+Related: [[feedback_watcher_over_spot_check]] (poll until async effects land --
+this is its mirror image: poll to see whether a good effect PERSISTS),
+[[feedback_measure_same_instant]], [[feedback_isolate_the_source_you_changed]].
+
+## 2026-08-20 A CORRECT REFUSAL ON STALE INPUT IS INDISTINGUISHABLE FROM A BROKEN FEATURE
+
+Soccer's card gates every score source on `effective_state`, deliberately, so a
+fixture that has not kicked off cannot render a fabricated 0-0. Given a
+month-old artifact saying `status_state: "pre"`, it correctly published no
+score -- for a match that had finished 1-1 three hours earlier.
+
+**The gate did exactly its job and the user-visible result was a blank card.**
+Meanwhile the right answer sat on the same disk, in the same request: the live
+poller's `match_box` carried `final: true`, `FT`, `1-1`, both goals and full
+team stats, written ninety seconds before.
+
+**How to apply.** When a guard refuses, ask what the refusal is protecting
+against and whether a FRESHER, more specific source could answer the same
+question. A guard keyed on one input silently inherits that input's staleness.
+The fix here was not to weaken the guard -- it still refuses an impossible
+`post`, and still cannot invent a state for a fixture with no `match_box` entry
+-- but to let a better-sourced reading answer the state question, and to LOG
+when it overrides, so the staleness surfaces instead of being absorbed.
+
+Related: [[feedback_unknown_must_not_default_permissive]] (its converse:
+unknown must not default permissive, but KNOWN-FRESH must not lose to
+known-stale), [[project_render_source_of_truth]].

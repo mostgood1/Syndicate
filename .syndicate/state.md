@@ -85,6 +85,18 @@ leagues published a `match_box` key that does not exist at the parent SHA.
 **The LIVE CLOCK is NOT verified in production** -- every production reading so
 far is of a FINISHED match, which correctly has no clock.
 
+**A SECOND WEB DEPLOY (`79cb457e`, 22:00:0xZ) WAS NEEDED, and the reason is a
+standing hazard:** web reads the GIT-TRACKED MIRROR of
+`recommendations_2026-08-20.json` (`generated_at 2026-07-20`, `status_state
+"pre"`), so every score source correctly refused it and the card went blank
+three minutes after a green verification. `_effective_state_with_box` lets the
+fresher per-match `match_box` reading set the state (upgrade-only; the kickoff
+refusal still applies; a fixture with no `match_box` entry cannot be upgraded).
+Now 6 of 6 reads serve `ALA 1 - 1 RAY` Final with real box sections WHILE THE
+ARTIFACT IS STILL STALE. **The staleness itself is NOT fixed** -- that card's
+sim projections, win probabilities and market tiles are still read from a
+2026-07-20 artifact. Handed to a separate session.
+
 Three facts worth not rediscovering:
 
 - **`live_home_score`/`live_away_score` in `recommendations_*.json` are REAL.**
