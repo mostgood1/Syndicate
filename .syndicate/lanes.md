@@ -735,7 +735,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
-- Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
+- Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `.syndicate/*`.
+  **Released 2026-08-20 ~20:1xZ, user-authorized: the todo document.** Owning session `80b3e432`
+  confirmed gone (not found in the session roster, archived or not); `nhl-model-owner` (session
+  `46352c78`) took it to add its own, unrelated §2A/§2B addendum under `#470`, additive only, no
+  touch to any `#387`-related content. The rest of this claim (the code/test files) stands, and
+  covers any future `#387` writeup there too, until the scheduled closing reading
+  (`mlb-387-live-slate-read`, 22:15 CDT) resolves the lane.
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
@@ -1064,6 +1070,106 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
 
+- **LIVE MATCH STATE SHIPPED TO `origin/main` `[2026-08-20T21:1xZ]`, session
+  `aeb71be7` (lane taken over -- `56b563e0` is no longer in the active session
+  roster). NOT DEPLOYED. Commit `5ddf29ee`, 7 files, +995/-45.** All three
+  gaps in the handoff were upstream of the card, and TWO OF THEM HAD A WRONG
+  DIAGNOSIS ON RECORD. Verified against a genuinely live fixture (La Liga
+  401882908, ALA @ RAY), not a fixture file.
+  - **SCORE -- a key-name mismatch, not a missing feature.** The poller writes
+    `score_home`/`score_away` (verbatim from `build_live_state`);
+    `_real_live_score` looked for `home_score`/`home_goals`/`home`. It
+    returned None while the real score sat in the file it had just read.
+    Measured: poller had `score_home: 1, score_away: 0`, card had nothing.
+  - **THE "PLACEHOLDER" VERDICT ON `live_home_score` WAS WRONG, and it cost
+    soccer any score at all on a FINAL match.** The field is ESPN's own
+    `competitors[].score` (`build_soccer_artifacts.py:289` <- `fetch_events`),
+    real at every point in a match's life; it reads "0" before kickoff because
+    that is what a scoreboard says before kickoff. THE SAMPLE COULD NOT HAVE
+    SHOWN OTHERWISE: a census of every git-tracked recommendations artifact
+    finds `status_state == "pre"` on **all 57 matches in them**, so "always 0"
+    and "0 until kickoff" were indistinguishable in it. Read from ESPN the
+    same day through that same field: live 401882908 gives '1'/'0', completed
+    Atletico Madrid v Malaga gives '2'/'0'. The defect was publishing it
+    UNGATED -- `d9a23a38` gated the score STRING and left the score FIELDS the
+    card head reads unconditional. Now gated in `_artifact_score`, and it is
+    the ONLY score path a finished match has (the poller fetches
+    `statuses={"in"}` and writes nothing for one).
+  - **CLOCK -- never asked for.** `build_live_state`'s docstring says live
+    callers "must source the actual current clock from ESPN's live status and
+    pass it explicitly"; `poll_soccer_live_state` never did, so the cutoff was
+    the nominal 5400s and EVERY live match returned half 2 / 0.0s remaining.
+    That is what `shared_game_state`'s `clock: ""`/`period: null` was.
+    **NOT ONLY DISPLAY:** `project_live_match` and `goal_in_window_probability`
+    project the REMAINDER from that state, so the live lens was projecting
+    nothing forward. `fetch_events` had the clock and dropped it -- and its
+    local `status` is ESPN's `status.type`, which has NO clock; the real
+    `clock`/`displayClock`/`period` sit one level up.
+  - **BOX -- the data was in a payload already being fetched.** ESPN's
+    `boxscore.teams` (28 stats a side) + `keyEvents` goals, both in the same
+    `fetch_match_summary` the poller already calls, so it costs no extra HTTP
+    call. New `ingestion/espn_match_box.py`; written under a `match_box` key
+    covering `in` AND `post`, SEPARATE from `games` (which `live_lens.py`
+    reads, and where a finished match would present as live). Rides inside the
+    already-allowlisted `live_state_*.json` -- **no `artifact_publisher.py`
+    edit, which is claimed by `nfl-artifact-allowlist-add` and
+    `live-game-line-projection`.** A final box is fetched once, ever.
+  - Cross-sport bonus, pre-existing: `_actual_score_section` rendered the
+    period from `_first_number`'s float, so every live card read
+    "Live score -- 2.0 12:45". Reproduced on an NFL payload.
+  - **Verification: 21 of the new tests FAIL without the change, 66 pass with
+    it; 188 pass across ten affected suites.** One pre-existing failure
+    (`test_soccer_cards.py::AbbreviationFallbackTests`, an accent/branding
+    lookup) reproduces with the change stashed and is NOT mine.
+- **THE SQUAD PRICE-COVERAGE LEAD IS SETTLED, and BOTH stated hypotheses were
+  wrong `[2026-08-20T21:0xZ]`.** Measured on production epl 2026-08-21
+  (Coventry City @ Arsenal), 28 sim squad rows / 17 priced.
+  - **`_normalize_player_name` IS EXONERATED. 17 of 17 priced rows join a sim
+    row; zero orphans.** The join this lead accused is clean.
+  - **It is also NOT a bookmaker top-N cap.** The book offers **47 distinct
+    players** in `player_goal_scorer_anytime` for that fixture -- far more
+    than 17.
+  - **The real cause is that the sim's squad list and the book's list come
+    from different sources with NO reconciliation, and 10 of the 11 unpriced
+    players are absent from the odds feed entirely.** Three distinct reasons,
+    which is why no single hypothesis fit:
+    1. **A DIFFERENT name-join failure, inside `build_soccer_picks`'s
+       feed->sim join, on WORD ORDER and NAME LENGTH -- not accents.** Sim
+       `"Gabriel"` (10.9% scorer) is offered as **`"Magalhaes Gabriel"`**;
+       sim `"Martin Zubimendi"` (6.0%) as **`"Martin Zubimendi Ibanez"`**.
+       `_normalize_player_name` folds diacritics and whitespace only, so both
+       miss.
+    2. **The squad IS partly stale**, as suspected: Tierney, Partey,
+       Sterling, Jorginho, Kiwior are departed and the book correctly never
+       lists them.
+    3. Trossard (15.9%), Timber, Saliba are current players the book simply
+       does not list for THIS fixture -- a cup tie with heavy rotation.
+       David Raya is offered card/shot props but no scorer price: he is the
+       goalkeeper, which is correct.
+  - **The user's exact example resolves:** Mosquera (0.3%) has a price because
+    the book lists him; Trossard (15.9%) does not because the book does not.
+    Probability was never the selector.
+  - **DO NOT "FIX" THIS WITH A TOKEN-SUBSET MATCHER. The sim squad contains
+    `"Gabriel"`, `"Gabriel Jesus"` AND `"Gabriel Martinelli"`** -- a subset
+    match would assign `"Magalhaes Gabriel"`'s price to one of the wrong two.
+    A wrong price on a card is worse than a missing one (Lane F, the
+    fabricated 0-0). Any fix must REFUSE on ambiguity, and that is a separate
+    piece of work, deliberately not shipped in this pass.
+  - Secondary, unchased: the picks CSV prices **Reiss Nelson**, who is not in
+    the current feed for that fixture -- the picks were graded against an
+    older feed snapshot.
+- **The brief's claim that soccer's `recommendations_*.json` and `picks_*.csv`
+  are NOT allowlisted is WRONG -- both patterns are in
+  `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py:460`, `:474`) and BOTH
+  export 200 with real content.** Re-measured directly; that blocker does not
+  exist.
+- **LANDMINE IN THE PRIMARY SHARED TREE, still there:**
+  `syndicate/features/soccer/cards.py` and
+  `tests/test_soccer_board_mlb_parity.py` carry STALE PRE-FIX copies written
+  19:42Z that would REVERT `43c82b3c` (19:58:55Z, on `origin/main`) -- the
+  commit that stopped the card publishing a fabricated 0-0. **Do not
+  `git add` either from the primary tree.** This session worked in
+  `C:\tmp\syndicate-sessions\soccer-board-mlb-parity` and did not commit them.
 ### mlb-native-ladders-producer — OPEN — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`): today the vendored Flask frontend writes this artifact on EVERY cycle (`daily_update.py:3694`) and Syndicate's native builder is a fallback that fires only when that stage errors.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
