@@ -1,5 +1,44 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#486` — **`Daily Update`'s CRON IS REMOVED. The feature is not used — Render owns generation AND durability — and repairing it had put a ~51MB/day push to `main` three hours from firing** — DONE 2026-08-20 `[user decision]`
+
+**User, 2026-08-20:** *"we no longer use that daily update feature, everything
+runs on render."*
+
+**Why this was urgent rather than tidy-up.** The job had not reached its
+commit/push step since **2026-07-15** — an account billing lock killed every run
+pre-step through 08-15, then `#480`'s test failure blocked it. Fixing `#480` and
+`#482` cleared that path for the first time in five weeks, and `#481` had just
+rebuilt the pull to fetch the entire small-file tail. The next 06:00Z run would
+therefore have pushed **~370 files / ~51,538,751 bytes to `main`, daily**. That
+is an unwanted side effect of repairing a job nobody wanted running, and it was
+~3h40m away when the schedule was removed.
+
+**Change:** the `schedule: cron: '0 6 * * *'` trigger is deleted.
+`workflow_dispatch` is **kept deliberately** — `run_full_pipeline=true` remains
+the manual fallback for a backfill or recovery, and the rebuilt backup pull
+still works for a deliberate one-off snapshot. Nothing in this workflow runs on
+its own now. Restoring the cron is re-adding two lines.
+
+**What this retires and what it does not:**
+
+- **Retires:** the daily automatic artifact backup into git. Per `CLAUDE.md` the
+  `data/**` tree was always *"a cold-start safety net... not a snapshot of what
+  production computed"*, and Render is the source of truth.
+- **Does NOT retire:** `#481`'s rebuild itself, which stays correct and is what
+  a manual dispatch will now use — inventory via `?names_only=1`, a per-file
+  cap, then `?path=` per file. If the cron ever comes back it comes back fixed.
+- **Does NOT touch `CI`.** `ci.yml` is a separate, live workflow; `#480` and
+  `#482` are real fixes to it and are unaffected.
+
+**Honest note on `#481`.** That was real work on a path the user does not use.
+The workflow's own comments say Render owns *generation* while still describing
+the git backup as a wanted safety net, so it read as live — but the question
+"is this whole job still wanted?" was never asked before rebuilding it. **Ask
+what still consumes a thing before improving it.** The measurement it produced
+(the backup was capturing 0.10%, and the hot set is 7,909 files / 8.46GB) is
+independently useful and stays on the record.
+
 ### `#482` — **CLOSED. CI WAS STRUCTURALLY RED ~5 HOURS EVERY DAY, ON THE CLOCK RATHER THAN ON ANY PUSH: 7 tests asserted a UTC "today" against a Central product. VERIFIED FIXED INSIDE THE FAILING WINDOW — run `32323646103`, 02:09Z, green, against 11 consecutive failures in the same band without it.** — FOUND+FIXED+VERIFIED 2026-08-20, lane `ci-utc-midnight-window`
 
 Found on a second `/checkpoint` by re-reading CI instead of trusting the

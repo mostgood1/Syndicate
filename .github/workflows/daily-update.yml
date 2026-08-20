@@ -1,8 +1,24 @@
 name: Daily Update
 
 on:
-  schedule:
-    - cron: '0 6 * * *'
+  # SCHEDULE REMOVED 2026-08-20 `[user decision]`: "we no longer use that daily
+  # update feature, everything runs on render." Render's refresh-worker and
+  # live-odds-worker own generation AND durability; the git tree under `data/`
+  # is a deliberately lossy cold-start mirror (see CLAUDE.md), not a backup
+  # anyone reads.
+  #
+  # THE CONCRETE REASON IT HAD TO COME OUT NOW, not "sometime": this job had not
+  # reached its commit step since 2026-07-15 -- first an account billing lock
+  # killed every run pre-step, then `#480`'s test failure blocked it. Fixing
+  # `#480` and `#482` cleared that path, and `#481` rebuilt the pull to fetch the
+  # whole small-file tail. The next 06:00Z run would therefore have `git push`ed
+  # ~370 files / ~51MB to `main` and repeated it daily -- an unwanted side effect
+  # of repairing a job nobody wanted running.
+  #
+  # `workflow_dispatch` is deliberately KEPT: `run_full_pipeline=true` is still
+  # the manual fallback for a backfill or a recovery run, and the backup pull
+  # still works if someone ever wants a snapshot on purpose. Nothing here runs on
+  # its own any more. To restore the cron, re-add the two `schedule:` lines.
   workflow_dispatch:
     inputs:
       date:

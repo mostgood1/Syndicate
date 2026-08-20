@@ -2062,3 +2062,86 @@ window you sampled is not the same as a cause that fits the report.
 - **A local pass on a Central dev box is not evidence about a UTC runner**, for
   the same structural reason `conftest.py` is not evidence about `unittest`
   (2026-08-19, same session): the harness differs from the gate's harness.
+
+
+## 2026-08-19 — READ THE WRITER BEFORE INSTRUMENTING THE READER. A branch that turns on a key is answered by the SCHEMA, not by a deploy.
+
+**Overturned belief, recorded verbatim from `.syndicate/deploys.md`
+(2026-08-16 04:5xZ):** the uncached odds_history shard load inside
+`_enrich_games_with_tracked_market_lines` was *"the best candidate on the table"*
+for the refresh-worker's ~2GB excursion, and the entry closed with *"What would
+settle it: one bounded in-pass measurement around `:2294` (bytes read, parse
+peak, call count per build), **which needs a deploy**."*
+
+**It did not need a deploy, and the "candidate" was not a candidate — it was
+DEAD CODE.** The load existed only to consult `doc["games"]` before adopting the
+shard over another document. odds_history shards have no `games` key. That is
+answerable from the repo in about three minutes:
+
+- **one writer** — `odds_refresh_tracking._write_odds_history_artifact`, called
+  three times with a single dict literal (`:1859`):
+  `{schema_version, sport, shard_key, date, updated_at, history_limit, markets}`
+- **every other consumer reads `markets`** — `basketball_market_board.py`,
+  `soccer/market_board.py`, `odds_lifecycle.py`, and the same module's own
+  `_mlb_odds_history_payload`
+- **`git log -S'"games": '` over the writer** — no revision ever emitted it
+- **three real shard copies on disk** — `has_games=False` on all three
+
+So the branch could never fire, `game_lines_doc` was never replaced, and a
+worker-only, every-build, uncached multi-hundred-MB read was pure cost. Three
+sessions had it in view and each reached for a deploy-and-measure.
+
+**THE RULE.** When a consumer's expensive work is gated on a key being PRESENT,
+the cheapest discriminator is the WRITER's schema, not instrumentation of the
+reader. Instrumentation tells you the branch did not fire on the days you
+watched; the writer tells you it can never fire. **Those are different claims and
+only the second one lets you delete the code.** Applies to any `if
+doc.get(k): <expensive>` — read the producer before you plan a measurement, and
+before you record the reader as a "candidate".
+
+**Corollary, and it is why this hid so well:** the load changed no output, so
+every behavioural test in the suite passed with it and passes without it. Dead
+cost is invisible to correctness tests by construction. The guard that replaces
+the deleted code must therefore assert the INVARIANT, not the behaviour —
+`tests/test_mlb_cards_worker_hydration_cost.py::test_odds_history_shard_schema_has_no_games_key`
+parses the writer's literal and fails if `games` is ever added, which is the only
+condition under which the removal would have been wrong.
+
+**Not a licence to delete on a hunch.** The standard met here was four
+independent confirmations (single writer, literal schema, `git log -S`, real
+artifacts on disk) plus an asserted invariant plus a regression guard that fails
+if the read returns. Fewer than that is a belief.
+
+
+## 2026-08-20 — FORBIDDEN: never repair, rebuild or optimise a scheduled job without first establishing that anything still CONSUMES it. Fixing a dead job can be worse than leaving it broken.
+
+I found `Daily Update`'s artifact backup capturing **0.10%** of what it claimed,
+measured it properly, asked the user to choose a scope, and rebuilt it to
+**80.6%**. Good work on a feature the user then said they do not use:
+*"we no longer use that daily update feature, everything runs on render."*
+
+**The rebuild was not merely wasted — it was actively harmful, and nearly
+shipped.** The job had not reached its commit/push step since 2026-07-15
+(billing lock, then `#480`). My `#480` and `#482` fixes cleared that path, and
+`#481` widened the pull. **The next scheduled run — ~3h40m away — would have
+pushed ~370 files / ~51MB to `main`, every day.** A broken job pushes nothing;
+the repaired one pushes 51MB/day into a repo whose owner does not read it.
+
+**What I had and did not use.** `CLAUDE.md` says the `data/**` tree is *"a
+cold-start safety net... not a snapshot of what production computed"* and that
+Render is the source of truth; the workflow's own header says Render *"now
+generates this data live and continuously -- this Action no longer regenerates
+it."* Every one of those describes a job being hollowed out. I read them as
+context for *how* to fix the backup rather than as evidence about *whether* to.
+
+**Rules:**
+- Before improving any scheduled/automated job, answer **"what reads its
+  output, and when did that consumer last need it?"** If the answer is not
+  concrete, ask the user before doing the work — not after.
+- **A long outage is itself evidence.** Five weeks dead with nobody noticing is
+  a fact about demand, not just about the bug. I treated "it has been broken
+  since 2026-07-15" purely as urgency; it was equally a signal nobody depended
+  on it.
+- When repairing an unblocked path, **enumerate what the repair lets happen
+  next.** The dangerous moment is not the broken state, it is the first
+  successful run after the fix.
