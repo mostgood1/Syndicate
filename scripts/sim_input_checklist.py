@@ -143,7 +143,16 @@ EXPECTED_SPARSE = {
     "batted_ball_weight": "same",
     # BVP is SPARSE BY NATURE, not by defect. A batter only has history against
     # starters he has actually faced, so ~14% coverage is the correct answer and
-    # 100% would be impossible. Measured 13.9% after the 2026-08-18 cache fix.
+    # 100% would be impossible.
+    #
+    # **THE "13.9%" THIS COMMENT USED TO CITE WAS NOT A PRODUCTION NUMBER**
+    # `[corrected 2026-08-20]`. It was measured under `--simulate-rebuild`,
+    # and that path calls `apply_starter_bvp_hr_multipliers` UNCONDITIONALLY,
+    # while production reaches it only through `if bvp_hr_on:`. In production
+    # these fields read 0.0%, because BVP is switched OFF by config -- see
+    # `_disabled_by_config`. Quoting a simulate-mode number beside fields that
+    # are zero in production is the true-but-misleading shape that sends the
+    # next reader hunting a regression that never happened.
     # Listing these matters: a checklist that flags correct behaviour as FAILURE
     # gets ignored, and then it misses the real ones.
     "vs_pitcher_hr_mult": "batter has history only vs starters actually faced",
@@ -154,6 +163,44 @@ EXPECTED_SPARSE = {
 }
 SPARSE_FLOOR = 0.20
 POPULATED_FLOOR = 0.50
+
+
+def _disabled_by_config(date_str=None):
+    """Fields unfed BY DELIBERATE CONFIGURATION, not by defect. `#440`.
+
+    WHY THIS IS A SEPARATE CATEGORY. `FAIL` must mean "something is wrong".
+    Five of the fifteen failures reported on 2026-08-20 were the `vs_pitcher_*`
+    BVP fields, zero because `FORWARD_BVP_MATCHUP_MODE = "off"` -- a modelling
+    decision with a stated re-entry condition ("until the matchup path proves
+    net value on a cleaner holdout"), not a breakage. Reporting them
+    identically to the four genuine defects found that same day is how a gating
+    check loses its meaning, and it is what pulled a session into tracing a
+    non-bug for half an hour.
+
+    READ FROM THE REAL CONFIG, never hardcoded: flipping the switch back on
+    returns these fields to ordinary FAIL/ok accounting automatically. A
+    hardcoded exemption list would keep excusing them long after they should
+    work -- which is the same failure mode as the neutral default this whole
+    checklist exists to catch.
+    """
+    out = {}
+    try:
+        from sim_engine.forward_tuning import (FORWARD_BVP_MATCHUP_MODE,
+                                               should_use_forward_tuning)
+    except Exception:
+        return out
+    try:
+        forward = should_use_forward_tuning(date_str) if date_str else True
+    except Exception:
+        forward = True
+    if forward and str(FORWARD_BVP_MATCHUP_MODE).strip().lower() != "on":
+        why = ("bvp_hr=off via FORWARD_BVP_MATCHUP_MODE=%r -- daily_update gates "
+               "the whole BVP block on `if bvp_hr_on:`" % (FORWARD_BVP_MATCHUP_MODE,))
+        for f in ("vs_pitcher_hr_mult", "vs_pitcher_k_mult", "vs_pitcher_bb_mult",
+                  "vs_pitcher_inplay_mult", "vs_pitcher_history"):
+            out[f] = why
+    return out
+
 
 
 def engine_source() -> str:
@@ -299,6 +346,8 @@ def main() -> int:
     print("  a field FAILS when the engine READS it and nothing FEEDS it\n")
 
     failures, warnings, rows = [], [], []
+    disabled = []
+    disabled_cfg = _disabled_by_config(getattr(args, 'date', None))
     for kind, model in (("batter", BatterProfile), ("pitcher", PitcherProfile)):
         print(f"\n--- {kind.upper()} " + "-" * (70 - len(kind)))
         entries = []
@@ -310,7 +359,12 @@ def main() -> int:
         for pct, name, is_consumed in sorted(entries):
             sparse = name in EXPECTED_SPARSE
             bucket = None
-            if is_consumed and pct == 0.0:
+            if is_consumed and pct == 0.0 and name in disabled_cfg:
+                # DISABLED != BROKEN. Checked BEFORE the zero-is-failure rule,
+                # which is otherwise correct and would swallow the distinction.
+                status = "disabled  unfed BY CONFIG, not a defect"
+                disabled.append((kind, name, disabled_cfg[name]))
+            elif is_consumed and pct == 0.0:
                 # zero is a failure even for an expected-sparse field: "sometimes
                 # absent" and "never present" are different claims.
                 status, bucket = "FAIL  consumed but NEVER populated", failures
@@ -339,6 +393,10 @@ def main() -> int:
         print("  numbers are identical to a build where the feature does not exist.")
     else:
         print("PASS: every field the engine reads is populated above its floor.")
+    if disabled:
+        print("\n  %d field(s) unfed BY CONFIG -- not defects, not counted as failures:" % len(disabled))
+        for kind, name, why in disabled:
+            print("    %-8s %-32s %s" % (kind, name, why))
     if warnings:
         print(f"\n  {len(warnings)} thin field(s) — not failing, worth a look:")
         for kind, name, pct in warnings:
@@ -373,6 +431,9 @@ def main() -> int:
             # the link that four hypotheses could not read remotely
             "season_artifacts": _season_artifact_probe(),
             "failures": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in failures],
+            # unfed BY CONFIG -- deliberately OUTSIDE `failures`, so nfail
+            # means "things that are wrong"
+            "disabled": [{"kind": k, "field": f, "reason": w} for k, f, w in disabled],
             "warnings": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in warnings],
             "rows": rows,
         }, indent=2), encoding="utf-8")
