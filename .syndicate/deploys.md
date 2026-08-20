@@ -19366,3 +19366,97 @@ the app registers no 404 handler at all, so `/nfl/api/nope` and
   each have put a peer's in-flight work at risk. `git worktree add` +
   cherry-pick + push touched none of it, and the files were confirmed still
   present and still growing afterwards.
+
+---
+
+## 2026-08-20 ~21:3xZ — CORRECTION to the 18:45Z and 20:08Z entries — the artifacts WERE exportable and the join WAS fine
+
+**No deploy. Two claims I wrote into this file were wrong, both from the same
+mistake, and one of them is now settled the opposite way.**
+
+**WRONG:** *"`picks_{date}.csv` is not in `HOT_ARTIFACT_PATTERNS` (403 on
+`/api/ops/artifacts/export`), so this could not be settled from here."*
+**WRONG:** *"soccer's `recommendations_*.json` is NOT in
+`HOT_ARTIFACT_PATTERNS`"* (also carried in `state.md`'s `[soccer]` section,
+which should be corrected there by that section's owner).
+
+Both patterns are allowlisted, and have been:
+
+    artifact_publisher.py  "soccer_source/*/api/recommendations/recommendations_*.json"
+    artifact_publisher.py  "soccer_source/*/api/picks/picks_*.csv"
+
+**What actually happened.** I requested
+`path=soccer_source/epl/api/picks` — a DIRECTORY — against a glob that
+matches a FILE. The endpoint answered `403 {"error":"path is not an allowed
+hot artifact."}`, which is a correct and precise answer to what I asked. I
+read it as "picks are not allowlisted" and wrote that down. Re-run with
+`soccer_source/epl/api/picks/picks_2026-08-21.csv`: **200, count=1.**
+
+**This is the SECOND time in one session that my own malformed request became
+a claim about the system.** The first was `/soccer/laliga/cards`, where I
+concluded four leagues were serving EPL data. The difference is worth keeping:
+*there* the system genuinely was permissive and the finding was real once
+re-derived; *here* the system said exactly what was wrong and I mis-read it.
+**A 403 naming a path is a fact about the PATH. Re-issue a well-formed request
+before it becomes a fact about the SYSTEM.** Caught by the
+`soccer-live-score-clock-box` session, not by me.
+
+### The lead is now SETTLED, and it is not what I guessed
+
+The 20:08Z entry filed this as *"either a name-join failure or a stale squad
+list"*. Measured against the real artifact, `picks_2026-08-21.csv` (EPL,
+Arsenal v Coventry):
+
+    picks CSV rows                     32
+    PROP rows                          17
+    distinct priced players            17
+    sim publishes                      28
+    priced players NOT found in sim     0   <-- the join direction that would
+                                              show a name-match failure
+    sim players with no pick row       11
+
+**The name join is fine.** Zero priced players failed to match, so
+`_normalize_player_name` is not dropping anyone. The odds feed simply carried
+17 priced players, and the card is showing exactly what exists.
+
+The 11 without a price are Raya (GK, 0.0% — never priced), several defenders,
+and — the informative part — **Partey, Tierney, Jorginho, Sterling and Kiwior,
+all of whom have left Arsenal.** That points at a STALE SQUAD LIST in the sim
+rather than anything wrong with pricing or joining, which is a real lead but a
+different one, owned upstream in `build_soccer_artifacts.py`, not on the card.
+
+**So the "Mosquera at 0.3% is priced, Trossard at 15.9% is not" oddity is
+upstream feed content, not a defect in our join** — and the earlier entry's
+implication that our code might be losing rows is withdrawn. Withdrawing it
+does not make the squad-list question innocent; that one is open.
+
+### Also corrected: `82621374` was NOT double-pushed
+
+The `soccer-live-score-clock-box` session reported that its
+`session_worktree.py land` said "landing 2 commit(s)" and pushed my 404 commit
+along with its own — we were both in the worktree
+`C:\tmp\syndicate-sessions\soccer-board-mlb-parity`. **Verified before
+acting: `git log origin/main --grep="unknown league slug"` returns exactly
+ONE commit, `82621374`.** I had already landed it via a throwaway worktree;
+their rebase correctly dropped the duplicate patch. Nothing to revert.
+
+### And a shared-worktree collision that I probably caused
+
+Two sessions were editing one worktree. Their symptom was two `Edit` calls on
+`syndicate/features/soccer/cards.py` reporting success and never reaching
+disk. **The likeliest cause is mine:** at ~21:2xZ I ran
+`git checkout -- syndicate/features/soccer/cards.py` in that tree to clear
+what I called a "leftover duplicate" — a 67-line diff I had not written. I
+checked that `_real_live_score` was on `origin/main` before discarding and
+concluded the working copy was redundant. That check could not distinguish
+"already landed" from "someone else's work in progress on top of it", and I
+did not consider the second reading. `git checkout --` has no undo.
+
+The later 463-line diff in that same tree I did NOT touch — I landed through
+`git worktree add` + cherry-pick specifically to avoid it — but that care came
+after the destructive call, not before it.
+
+**Rule this earns:** in a tree you did not create, an unexplained diff is
+another session's work until proven otherwise. `git status --porcelain` says
+WHAT changed and never WHO. Move to your own worktree instead of cleaning
+someone else's.
