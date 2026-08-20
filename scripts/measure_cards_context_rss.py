@@ -153,22 +153,41 @@ def _capture(expr: str, *, date_value: str, prune: str, dyno: str) -> str | None
     result -- a parity check that compares a value against itself.
     """
     import subprocess
+    import tempfile
 
+    # THE PAYLOAD GOES TO A FILE, NOT STDOUT, AND THAT IS LOAD-BEARING.
+    #
+    # This originally captured `sys.stdout`, which silently made the comparison
+    # "the serialised object PLUS anything the code under test happened to
+    # print". The moment `_daily_actual_by_game` gained its `FEED_LIVE_PRUNE`
+    # line, parity reported DIFFERENT by 3 bytes -- `enabled=True/False` and
+    # `pruned=15/0` -- on a change that is provably output-neutral. A harness
+    # that fails when the subject adds a log line is measuring the wrong channel,
+    # and the failure looks exactly like a real regression.
+    #
+    # The web arm stayed IDENTICAL throughout, because the emitter is worker-only
+    # -- which is what identified the harness as the culprit rather than the code.
     root = str(Path(__file__).resolve().parents[1])
+    handle, out_path = tempfile.mkstemp(suffix=".json")
+    os.close(handle)
     code = (
         "import json,sys;"
         f"sys.path.insert(0, r'{root}');"
         f"{expr}"
-        "sys.stdout.write(json.dumps(_v, sort_keys=True, default=str))"
+        f"open(r'{out_path}','w',encoding='utf-8')"
+        ".write(json.dumps(_v, sort_keys=True, default=str))"
     )
     env = dict(os.environ)
     env["SYNDICATE_MLB_FEED_LIVE_PRUNE"] = prune
     env["SYNDICATE_WEB_DYNO"] = dyno
-    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(result.stderr[-3000:], flush=True)
-        return None
-    return result.stdout
+    try:
+        result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(result.stderr[-3000:], flush=True)
+            return None
+        return Path(out_path).read_text(encoding="utf-8")
+    finally:
+        Path(out_path).unlink(missing_ok=True)
 
 
 def _parity(date_value: str) -> int:
