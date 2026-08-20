@@ -1023,112 +1023,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   regression check that the reorder did not break matching itself.
 - Blocked by: none.
 
-### mlb-pregame-ladder-schema — OPEN — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
-- **Goal (single testable outcome):** every pregame MLB starter with a sim
-  distribution and a market line renders its ladder chips on the compact card —
-  and the starter's NAME renders whether or not it has chips. Today: 0 of 18
-  sides get a ladder-derived chip, and 12 of 18 render no name at all.
-- **Files:**
-  - `syndicate/features/mlb/ladders_build.py`
-  - `tests/test_mlb_ladders_build.py`
-  - `syndicate/static/mlb/cards_source.js`
-  - `.syndicate/*`
-
-  Respectively: the writer that must restore the fields the cards reader joins
-  on, the cards-reader consumption test, and the starter-name/badge decoupling.
-- **`docs/ai_context/todo.md` DELIBERATELY NOT CLAIMED.**
-  `check_lane_invariants.py` flagged it contested against
-  `mlb-overview-hydration-cost` the moment I claimed it, so I dropped it rather
-  than run a second holder on the file the `#71` check reads. The todo entry
-  for this work gets reconciled at close, against whoever holds it then. Noting
-  it here because an unrecorded skip of the `#71` check looks identical to
-  forgetting it.
-- **NOT claimed, deliberately:** `syndicate/features/mlb/cards.py` is held by
-  the OPEN `mlb-overview-hydration-cost` lane. **The fix does not need it** —
-  the reader is correct as written; only its input regressed. Scoping the fix
-  to the writer is what makes this collision-free, not a compromise on it.
-- **Hypothesis (stated before fixing, MEASURED not believed):** the pregame
-  ladder chips are dead because `#440`'s native writer pinned its output schema
-  to the TOP-PROPS reader (`ladders_common.pitcher_rows_from_summary`) and
-  dropped the three fields the CARDS reader needs. Confirmed against
-  production's own copy, `generatedBy syndicate.features.mlb.ladders_build`,
-  generated 2026-08-20T16:46:16Z:
-
-      pitcher/strikeouts: n=18  ladder=0  gamePk=0  marketLine=18
-      ... all 7 pitcher stats + all 10 hitter stats, 3,978 rows: ladder=0 gamePk=0
-
-  Row schema today is 10 fields. The git-tracked May mirror (vendor writer) has
-  26, including `gamePk`, `pitcherId`, `ladder[{total,hitProb}]`. Reader dies at
-  `cards.py:1166` (`gamePk is None -> continue`, which also makes the
-  `pitcherName` fallback two lines down unreachable) and again at
-  `cards.py:1102` (`not ladder_rows -> return None`).
-- **Falsification test:** if the join or the inputs were the problem rather
-  than the schema, the artifact would show unmatched players or absent market
-  lines. It shows neither — `matchedPlayers 18, oddsPlayers 18, unmatchedOdds 0,
-  unmatchedSimNames 0`, and 18/18 rows carry BOTH `simCount>0` and a
-  `marketLine` on all four badge stats. Inputs are complete; only the emitted
-  shape is short. If a schema fix does NOT produce chips, the hypothesis is
-  wrong and the next suspect is `_filter_badges_to_current_market`.
-- **DESIGN CONSTRAINT, from `learnings.md` 2026-08-20 ("An artifact can OUTGROW
-  the publish ceiling, and the failure is silent"):** this same artifact hit
-  `_PUBLISH_MAX_BYTES` at 13,678,982 bytes and was refused SILENTLY for 28
-  hours. Adding arrays back to it is the exact move that re-arms that failure.
-  So: `ladder[]` goes on PITCHER rows only (18 rows, the sole consumer is
-  `cards.py:1102`), never on the 234-row hitter groups, and **the resulting
-  artifact size gets MEASURED against 12,582,912 and written down** — not
-  assumed small. Today's copy is 684,325 bytes, so there is headroom; the
-  number is the evidence, not the headroom.
-- **Verification:** (1) a test that runs the REAL cards reader
-  (`_pregame_starter_ladder_badges_for_pitcher`) over this writer's REAL output
-  and asserts a non-empty badge list — the reachability test whose absence let
-  this ship silently, since every existing test passed throughout; (2) the
-  measured artifact size vs the publish ceiling; (3) after deploy, the served
-  `/mlb/api/cards` payload showing ladder-derived chips on pregame sides that
-  have no pitcher recommendation (George Kirby is the control — he has a prop
-  row, no pick, and no chip today). Reading written to `deploys.md`.
-- **Blocked by:** none. Deploy target is refresh-worker (the writer) — claim
-  required, and web was 502ing on `/api/ops/version` (somebody else's deploy)
-  at one point during this lane's work; cleared before measuring.
-
-#### DEPLOY GATE NOTES `[2026-08-20 18:0xZ, this lane]`
-
-**1. `deploy_preflight.py` said CLEAR while a board build WAS in flight.** It
-reported `CLEAR: only infrastructure processes running` at 18:05:44Z. Ninety
-seconds later `check_deploy_safety.py` reported `Board build IN FLIGHT on
-refresh-worker (started 18:04:16Z)` — i.e. the build had already been running
-for 88 seconds when preflight called it clear. **Not a contradiction, a blind
-spot:** preflight enumerates OS processes, and the board build runs IN-PROCESS
-inside `run_refresh_worker.py` (pid 39). There is no child process for it to
-see, so no board build can ever appear in that check. Preflight's process list
-is evidence about SUBPROCESSES only. **Run `check_deploy_safety.py` as well —
-preflight passing is not the same fact.** Filed under `learnings.md`'s
-instrument-blindness rule: a healthy reading is evidence only once you know what
-makes it read unhealthy.
-
-**2. ANCESTRY SAID REVERT; CONTENT SAID CUMULATIVE. Content was right.**
-refresh-worker's live SHA `39570b24` is NOT an ancestor of `origin/main`, and
-`git log origin/main..39570b24` lists 20 commits / 88 files / 18,582 insertions
-— which reads like deploying main would revert the native ladders builder, the
-`041188cb` direct-publish ceiling fix, the soccer `#343` fix, WNBA `#263` and
-the whole vendor sim-engine track. **It would not.** That diff is measured
-against the MERGE-BASE, not against what is live. Measured directly
-(`git diff 39570b24 a54dffa3`):
-
-    code files DELETED by deploying a54dffa3 ... 0
-    vendor/mlb_bettingv2/sim_engine/{conditional_mix,pitch_model,batted_ball}.py ... IDENTICAL
-    syndicate/features/shared/{artifact_publisher,basketball_props_smart_sim}.py ... IDENTICAL
-    scripts/run_mlb_daily_sim_job.py ... IDENTICAL
-    syndicate/features/shared/live_refresh_loop.py ... +24 -0 (main AHEAD)
-    syndicate/features/mlb/ladders_build.py ... +119 -11 == exactly this lane's change
-
-  The only deletions are 13 regenerable `data/ncaaf_source/*.csv` mirror files.
-  So main is a SUPERSET of the live SHA by value; those 20 commits reached main
-  under different SHAs via rebase/cherry-pick. This is `learnings.md`'s "test
-  deployment by content, not ancestry" — and it is why `render_deploy.py` needs
-  `--allow-rollback` here despite this not being a rollback. **Anyone repeating
-  this check: `origin/main..<live>` is the WRONG command; `git diff <live>
-  <target>` is the right one.**
-
+### mlb-pregame-ladder-schema — OPEN — **FIX DEPLOYED AND LIVE (`a54dffa3`, refresh-worker, 18:27:40Z) BUT NOT YET PROVEN IN PRODUCTION — IT HAS NOT EXECUTED ONCE. ROOT CAUSE IS A BROKEN FALLBACK, NOT A DATA OUTAGE AND NOT A RACE: `daily_update.py:3694` (run by the sim job at `run_mlb_daily_sim_job.py:237`) is the NORMAL producer and writes 26 fields WITH ladders; `#440`'s native builder is a FALLBACK that fires ONLY when the vendor stage errors (`daily_update.py:3684`) and until this fix emitted 10 fields without `gamePk`/`pitcherId`/`ladder[]`. The board broke when the fallback fired after a failed daily update. **NO PRODUCTION LEVER FORCES A NATIVE REBUILD** — force-mlb-resim runs `daily_update` first — so production wiring stays UNPROVEN by design.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+- **Goal:** every pregame MLB starter with a sim distribution and a market line
+  renders its ladder chips, and the NAME renders whether or not it has chips.
+- **Files:** `syndicate/features/mlb/ladders_build.py`,
+  `syndicate/static/mlb/cards_source.js`, `tests/test_mlb_ladders_build.py`.
+  `cards.py` deliberately NOT claimed — the reader is correct as written and is
+  held by `mlb-overview-hydration-cost`.
+- **On `origin/main`:** `a54dffa3` (fix), `19b64fcd` (deploy-gate findings),
+  `0a2ad516` (deploys.md + a correction to this lane's own overclaim). Worktree
+  clean, nothing unpushed.
+- **Local evidence (real production inputs, real reader):** 18/18 starters get
+  >=1 ladder badge, was 0/18. Control George Kirby 0 -> `K up to 7 / H up to 8 /
+  BB up to 2`.
+- **BLOCKED ON A READING, not on work.** Native writer status artifact reads
+  `outcome: "skipped_fresh"` (18:56:57Z): the vendor's write is always newer
+  than the sims, so `is_stale` correctly answers `fresh` and the native builder
+  never runs. **PROVEN only when the served
+  `daily_ladders_<date>.json` carries `generatedBy ==
+  syndicate.features.mlb.ladders_build` AND populated `ladder[]`/`gamePk` on
+  18/18 pitcher rows. Chips on the board prove NOTHING — the vendor writer
+  renders them with or without this deploy.**
+- **NEXT ACTION for whoever picks this up:** force one native rebuild and read
+  the status artifact + `generatedBy`. Until then this deploy is UNVERIFIED.
+- **Narrative, evidence and dead ends:** `.syndicate/log/2026-08-20.md`.
+  Deploy record + gate findings: `.syndicate/deploys.md` 18:27:40Z entry.
+- **Raised, not taken:** web rebuilding a 9.5MB artifact inside a request
+  handler contradicts the worker-split rule. Belongs to `#440`'s owner.
 ### soccer-board-mlb-parity — OPEN — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. **DENSITY TARGET NOW MET (`bfdd0179` + `0514f2d7`, live 18:59:52Z): 363/Mpx against a 2x bar of 331 (MLB re-read at 663 this session), card 1074 → 970px, box tab 30 → 238 items, visible panel 51 → 97/Mpx. The FIRST of those two deploys DID NOT WORK — production read 255 where local read 427, because the local mirror has no odds and the overview grid collapses to a shape production never renders; the fix was probed against the LIVE page. Blast radius verified on NFL, NCAAF and mobile: 0 clipped elements, 0 body overflow. MLB does not load this stylesheet.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
 - Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
   carry the same information classes MLB's do. **Single testable outcome:** on a
@@ -1230,7 +1151,7 @@ against the MERGE-BASE, not against what is live. Measured directly
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
 
-### layer2-live-projection-actual — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### layer2-live-projection-actual — CLOSED-VERIFIED 2026-08-20 19:24Z — **Deployed via football-modeling-session's consolidation graft (db469003), not my own claim. Live-verified on the actual served surface (boardContract.cards): 36/48 live MLB prop cards now carry a populated Actual, 36/48 a populated Live projection, and only 1/48 still shows Projected == Live (was 34/40 identical pre-fix).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: fix two confirmed backend gaps in the Layer 2 board's live-game
   Projected/Live/Actual semantics -- item #4 of the original user audit.
   **Testable outcome:** on a live MLB prop row, `Projected` shows the
@@ -1274,10 +1195,21 @@ against the MERGE-BASE, not against what is live. Measured directly
   confirmed by direct code read plus a live production data pull (89
   rows fetched from `/api/board/layer2-shortlist?sport=mlb` during 6
   live MLB games, 2026-08-20 ~18:10Z).
-- Verification: re-pull live MLB prop rows post-deploy during a live
-  game; confirm `Projected` != `Live` on rows where the sim genuinely
-  differs pregame-vs-live, and `Actual` is populated (non-null) on rows
-  where `actual_so_far` exists upstream.
+- **Verification: DONE, 2026-08-20 19:24Z.** Deploy rode along in
+  football-modeling-session's consolidated graft after both sessions hit
+  the same contended refresh-worker claim repeatedly (cross-session
+  coordination, not a separate claim of my own). Content-verified both
+  files at the live SHA. First read hit a stale pre-deploy artifact
+  (written_at before the deploy) -- waited ~15 min for the real rebuild
+  cycle rather than trust it. Checked the SERVED surface
+  (`/api/intelligence/query`'s `boardContract.cards`, what
+  `displayProjection`/`displayLiveProjection`/`displayLiveActual` in
+  `intelligence.html` actually read -- the raw `/api/board/layer2-shortlist`
+  row shape is a DIFFERENT, nested representation and checking only that
+  is not sufficient for this class of fix): 48 live MLB prop cards,
+  `actual` populated 36/48 (75%), `live_projection` populated 36/48 (75%),
+  `projected == live_projection` only 1/48 (a real coincidental match, not
+  a residual bug). Full measurement in `deploys.md`.
 - Blocked by: none.
 
 
