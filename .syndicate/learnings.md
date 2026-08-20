@@ -2692,3 +2692,40 @@ two unrelated mechanisms sharing a word. state.md is never read by the digest at
 all; learnings.md is read for headings only; lanes.md truncates on lane COUNT.
 I trimmed 34 KB from lanes.md and the section it feeds still truncates. **Before
 optimising a number, read the code that consumes it.**
+
+---
+
+## 2026-08-20 — A WORKTREE COMMIT LEAVES THE SHARED TREE STALE, AND STALE IS A REVERT WAITING
+
+**Working from a worktree is the right way to avoid the shared index. It has a
+cost nobody had written down: the shared tree does not learn about it.**
+
+I trimmed `lanes.md` twice today from worktrees — 134,022 → 98,118 B via
+`trim_lane_blocks.py`, plus lane-block edits — and pushed both. The PRIMARY tree
+kept its old copy: **127,558 B against origin's 106,084, 21 KB stale.** The next
+session to edit `lanes.md` in that tree and push would have carried the pre-trim
+content forward and **silently reverted the trim**, along with every lane edit
+landed upstream in between. Not a conflict, not an error — a clean overwrite
+with a plausible diff.
+
+**The rule: after committing from a worktree, sync the shared tree's copy back,
+and verify by HASH.** Size alone would have said "roughly right" here; the two
+files differed by a block count and 21 KB, and I only trusted it after a SHA-1
+comparison.
+
+**Two constraints that shape HOW you sync, both measured:**
+
+1. **`git reset --keep origin/main` ABORTS while another session holds an
+   uncommitted file** — it hit `.syndicate/deploys.md`. That is the guard doing
+   its job, not a failure. A whole-branch sync is simply unavailable on a busy
+   shared tree, so the move is a single-file
+   `git checkout origin/main -- <path>`.
+2. **`git checkout <rev> -- <path>` WRITES THE SHARED INDEX.** Leaving it staged
+   hands the next session's bare `git commit` a file it never touched. **Commit
+   it yourself**, with a message saying it is a sync, so the index returns clean.
+
+**And check before you sync**: the target file must be clean against local HEAD
+(or you destroy someone's uncommitted edits), and the local commits must be
+cherry-EQUIVALENT to upstream (or you are discarding real work). Both were
+verified here — 19 of 19 equivalent — which is what made the repair safe rather
+than lucky.

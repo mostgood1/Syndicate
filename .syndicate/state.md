@@ -1974,6 +1974,18 @@ independent sports**. NCAAF ATS gets WORSE as the edge filter tightens
 | blending | w≈0 → optimal blend is 100% market |
 | three scalar totals fixes | measured dead |
 
+**A WORKTREE COMMIT DOES NOT UPDATE THE PRIMARY TREE, AND THE GAP IS A REVERT
+HAZARD** `[measured 2026-08-20]`. Today's `lanes.md` trims were committed from
+worktrees; the SHARED tree's copy stayed at **127,558 B against origin's
+106,084** — 21 KB stale. Any session editing `lanes.md` there and pushing would
+have silently REVERTED the 34 KB trim and every lane edit landed since. After
+working from a worktree, **sync the shared tree's copy back**, and verify by
+HASH not by size. Note `git reset --keep origin/main` correctly ABORTS while
+another session holds an uncommitted file (it hit `deploys.md`), so the safe
+move is a single-file `git checkout origin/main -- <path>` followed by a commit —
+`checkout <rev> -- <path>` writes the index EVERY session shares, and a stray
+staged file is what gets swept into someone else's commit.
+
 **THE SESSION DIGEST DOES NOT READ state.md, AND READS ONLY HEADINGS FROM
 learnings.md** `[measured 2026-08-20 from .claude/hooks/session-start.sh]`.
 state.md's own size costs nothing at session start — the hook's header records
