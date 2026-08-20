@@ -1833,6 +1833,47 @@ for every item it ever named as open, whether that answer was "built," "measured
 default was fine," "proved a bound can't bind," or, here, "measured the real magnitude and
 correctly scoped what it does and doesn't explain."
 
+**Addendum, same session: STARTED the engine-architecture redesign the measurement above scoped**
+(reference doc §2A, full report `docs/reports/hockeysim_faceoff_multi_event_segment_report.md`).
+Replaces "exactly one faceoff, always, every segment" with the REAL measured distribution:
+`sample_segment_faceoff_count` draws `N∈{0..6}` from the actual 106,272-segment measurement (not a
+fitted Poisson -- the real counts were already in hand, more faithful than fitting a curve to
+them). `_multi_event_segment_multipliers` averages N independent discrete-event draws, each
+reusing the SAME `_integrate_curve` machinery every curve already used (already generic over any
+segment length) over an equal `seg_len/N` sub-window. `N==0` (48.64% of real segments) now applies
+NO tilt at all -- the direct fix for the single largest share of the mismatch. Primary/OZ, DZ, and
+NZ share ONE `n_faceoffs` draw per segment (they describe facets of the SAME real event stream for
+that segment, zone is a property OF a draw, not a separate draw -- a real design decision, not an
+oversight). The lineup-aware layer is correctly EXCLUDED (a persistent roster-quality signal, not
+a discrete event). Scoped to EV-gated segments only this pass -- strength-state (PP/PK) segments'
+own single-draw mechanism is untouched, a stated next step, matching every other layer's own
+"narrow first, extend later" pattern. New flag `faceoff_multi_event_segment_model`, default ON,
+`False` restores the exact pre-redesign single-draw behavior for rollback.
+
+**Why the mean is provably unaffected**: every curve is mean-1.0 preserving per bucket; summing N
+independent Poisson processes with rate `base/N * multiplier_i` gives a combined rate of
+`base * mean(multiplier_i)` -- Poisson rates add exactly, so `E[m_home]+E[m_away]==2.0` holds for
+ANY win probability and ANY N, checked directly against the real curve at every sub-length the
+redesign actually uses, not by statistical convergence. **Verified**: reachability
+(distribution-shape, not mean-only), per-team edge preserved under the new mechanism specifically,
+the exact analytical proof, and a 992-pairing/2,976-game round-robin where the mean moved +0.275%
+(noise-level, safe to ship on that basis).
+
+**An honest, non-confirming result, stated plainly rather than adjusted to fit expectations.** The
+natural hypothesis was that removing the unwarranted tilt on 48.64% of zero-faceoff segments would
+move simulated shot-total variance CLOSER to the real observed value. **Measured the opposite** --
+std moved from 96.71% of real (the OLD single-draw default) to **96.03%**, a further compression,
+not an improvement. A plausible (not separately proven) reason: averaging multiple independent
+zero-sum draws together (when N>=2) reduces the realized variance of that average -- the same
+law-of-large-numbers effect that makes an average of several coin flips less extreme than any one
+flip -- combined with N==0 segments now contributing zero variance where they previously
+contributed some. **This does not invalidate the redesign** (mean unaffected, per-team signal
+intact, proofs hold) but the redesign should NOT be sold as fixing the variance gap -- if anything
+it REINFORCES the prior measurement's own conclusion that the true cause lives elsewhere in the
+engine's other stochastic sources, not in the faceoff mechanism at all. Exactly the kind of
+honestly-reported non-confirming result this session's own discipline exists to surface rather
+than quietly drop.
+
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
 absent data to neutral 1.0), which silently made the already-reachable
@@ -5389,7 +5430,38 @@ stopped then), so "no `LAYER2_SHORTLIST` since 10:56" is a real absence and not
 a search-window artifact. Worth stating because the worker is chatty enough that
 100 unfiltered lines cover only ~20 seconds.
 
-### `#387` — **MEASURED 2026-08-14: THE GUARD HAS NEVER ONCE BEEN SATISFIED. 97 of 100 runs produced NOTHING.** Not a stale constant — a threshold this container cannot meet
+### `#387` — **OPEN, UNOWNED. CONFIRMED LIVE 2026-08-19 ~20:3xZ CT: the 3000MB MLB floor is a deliberate circuit breaker, correctly firing under real load — do not lower it.** Real fix is still `build_cards_page_context` running HYDRATED on the worker with `force_refresh=True`; nobody has done that work yet.
+
+**CONFIRMED 2026-08-19 20:29-20:34 CT, unrelated session (soccer-odds-capture-
+cadence-gap), independent of the analysis below.** Investigating a "no MLB on
+the Layer 2 board" report, found the guard firing live and repeatedly:
+
+```
+20:29:53  OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor_mb=3000 sports_done=0
+          current_mb=3446.8  headroom_mb=2339.1
+20:32:59  same                                      current_mb=3585.4  headroom_mb=2740.0
+20:34:53  same                                      current_mb=3611.0  headroom_mb=2715.7
+```
+
+Every reading has 2.3-2.7GB of headroom — comfortably above the OTHER seven
+sports' 1500MB floor (which is why NFL/soccer/WNBA kept showing up while MLB
+alone dropped) — but below MLB's 3000MB requirement. `refresh-worker` was
+genuinely busy (84-88% of its 4GB ceiling): that session's own manual soccer
+odds-refresh trigger, two of its own deploys, plus whatever else was
+concurrent. First read of this ticket suggested "127MB stage, 23x over-
+reserved, lower it" — that framing is the ALREADY-RETRACTED one below (see
+"RETRACTED 2026-08-14 05:1xZ"); re-reading the full ticket before acting
+caught it. **Nothing here changes the retraction's conclusion — this is a
+second, independent confirmation that the guard is doing its job, five days
+later, under a different session's load.** MLB's board reappeared on its own
+once load eased; no code touched.
+
+**THIS TITLE ITSELF WAS STALE UNTIL TONIGHT** — it still read "not a stale
+constant, a threshold this container cannot meet" from the 2026-08-14 05:1xZ
+snapshot, one retraction behind the ticket's own body. Corrected above.
+
+**MEASURED 2026-08-14: THE GUARD HAS NEVER ONCE BEEN SATISFIED (superseded,
+see retraction below). 97 of 100 runs produced NOTHING.**
 
 **THIS IS THE LARGEST CORRECTNESS DEFECT FOUND ON 2026-08-13/14, larger than the
 `#423` leak.** The leak at least permitted intermittent builds. This has emptied

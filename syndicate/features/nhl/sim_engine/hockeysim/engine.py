@@ -26,6 +26,7 @@ from .models import RateModels, TeamRates, PlayerRates
 from .historical_truth.faceoff_decay_model import (
     draw_strength_zone,
     expected_multipliers_strength_zone,
+    sample_segment_faceoff_count,
     segment_average_multipliers,
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
@@ -220,6 +221,59 @@ class SimConfig:
     # is already True (the block this fires inside is itself gated on it). Same bilateral-gate
     # discipline (both sides required). Default ON.
     faceoff_lineup_model_strength_state: bool = True
+    # §2A -- the engine-architecture redesign the "one faceoff per segment" impact measurement
+    # (`docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`) was built to scope,
+    # not just measure. That report found the engine's own segment geometry assumes exactly 1.0
+    # real faceoffs per ~44.4s segment when the real measured mean is 0.684 -- 48.64% of segments
+    # have ZERO real faceoffs (an assumed win/loss tilt applied with nothing real behind it) and
+    # 14.27% have 2+ (under-represented, only one assumed winner can apply). This flag draws the
+    # REAL faceoff count for each EV segment from that measured empirical distribution
+    # (`sample_segment_faceoff_count`) ONCE per segment, shared across every discrete-event layer
+    # below (primary/OZ, DZ, NZ -- they describe facets of the SAME real event stream for that
+    # segment, not independent draws) rather than each drawing its own. `N==0` applies NO tilt at
+    # all for that segment (fixing the single largest share of the mismatch outright); `N>=1`
+    # splits the segment into N equal sub-windows (position-within-segment timing is itself
+    # unmeasured, so equal spacing is the most neutral assumption available, stated as a scope
+    # limit, not a claim of precision beyond what's measured) and applies an independent
+    # discrete-event winner draw + decay-curve integration to EACH sub-window using its own
+    # (shorter) length -- the SAME `_integrate_curve` machinery every curve already uses, since it
+    # was already generic over any segment length. `False` restores the exact single-draw,
+    # full-segment-length behavior every discrete-event mechanism has used since it shipped.
+    # Deliberately scoped to EV-gated segments only THIS PASS (mirrors every other layer's own
+    # "narrow first" pattern) -- strength-state (PP/PK) segments' own assumed-single-draw mechanism
+    # is untouched, a stated next step, not silently extended without its own verification.
+    faceoff_multi_event_segment_model: bool = True
+
+
+def _multi_event_segment_multipliers(
+    rng: random.Random, n_faceoffs: int, seg_len: float, p_home_wins: float, curve_fn,
+) -> Tuple[float, float]:
+    """Average `(m_home, m_away)` over `n_faceoffs` independent discrete-event draws, each applying
+    `curve_fn` (one of the `segment_average_multipliers*` functions) over an equal
+    `seg_len / n_faceoffs`-length sub-window -- the shared mechanics behind §2A's multi-event-per-
+    segment redesign, used identically by the primary/OZ, DZ, and NZ layers (each supplies its own
+    `p_home_wins`/`curve_fn`, all sharing the SAME `n_faceoffs` draw for a given segment).
+
+    `n_faceoffs <= 0` returns the neutral `(1.0, 1.0)` baseline directly -- no real faceoff in this
+    segment, no applied tilt, the fix for the 48.64% of real segments the measurement found with
+    zero real faceoffs. Mathematically equivalent to summing `n_faceoffs` independent sub-segment
+    Poisson draws (Poisson rates add), so the caller applies the RETURNED average multiplier to the
+    segment's FULL, un-split lambda -- no extra bookkeeping needed at the call site, and no new
+    normalization proof required beyond the one every individual curve already carries (each is
+    mean-1.0 preserving per bucket, so an average of N such draws is too)."""
+    if n_faceoffs <= 0:
+        return 1.0, 1.0
+    sub_len = seg_len / n_faceoffs
+    sum_h = sum_a = 0.0
+    for _ in range(n_faceoffs):
+        decay = curve_fn(sub_len)
+        if rng.random() < p_home_wins:
+            sum_h += decay.winner_mult
+            sum_a += decay.other_mult
+        else:
+            sum_h += decay.other_mult
+            sum_a += decay.winner_mult
+    return sum_h / n_faceoffs, sum_a / n_faceoffs
 
 
 def _faceoff_multipliers(cfg: SimConfig, home_pct: float, away_pct: float) -> Tuple[float, float]:
@@ -1295,6 +1349,14 @@ class PeriodSimulator:
             # Applies a small symmetric shift between teams, clamped to avoid destabilizing calibration.
             ev_only = bool(getattr(self.cfg, "faceoff_ev_only", True))
             if ((not ev_only) or ((not seg_is_home_pp) and (not seg_is_away_pp))):
+                # §2A: draw the REAL number of faceoffs for THIS segment ONCE, shared across every
+                # discrete-event layer below (primary/OZ, DZ, NZ) -- they describe facets of the
+                # SAME real event stream for this segment (zone is a property OF a real draw, not a
+                # separate draw), so they share one N rather than each drawing independently. Only
+                # drawn when the flag is on; `None` otherwise (the pre-redesign call sites below
+                # never consult it, matching their exact original behavior when this is off).
+                multi_event_on = bool(getattr(self.cfg, "faceoff_multi_event_segment_model", True))
+                n_faceoffs = sample_segment_faceoff_count(self.rng) if multi_event_on else None
                 # PREFER the OZ-specific index (§2n) over the EV-blended index (§2m) over the
                 # all-situations `faceoff_win_pct` blend, in that order, when this segment IS
                 # actually even-strength -- 0.5 is the natural fair-average baseline a 1.0-centered
@@ -1314,11 +1376,11 @@ class PeriodSimulator:
                     float(getattr(rates.away, "faceoff_win_pct", 0.5) or 0.5),
                 )
                 # §2r: discrete-event redesign, default ON -- simulate WHICH team wins this
-                # segment's (assumed single) faceoff from the SAME resolved percentages the old
-                # diff-based mechanism used, then apply the REAL measured decay curve's
-                # time-weighted average over the segment's actual length, instead of one constant
-                # multiplier derived from the season-long win-rate DIFFERENCE. `False` restores the
-                # exact pre-redesign mechanism unchanged, for rollback/A-B comparison.
+                # segment's faceoff(s) from the SAME resolved percentages the old diff-based
+                # mechanism used, then apply the REAL measured decay curve's time-weighted average,
+                # instead of one constant multiplier derived from the season-long win-rate
+                # DIFFERENCE. `False` restores the exact pre-redesign mechanism unchanged, for
+                # rollback/A-B comparison.
                 if bool(getattr(self.cfg, "faceoff_discrete_event_model", True)):
                     denom = max(1e-6, float(fo_h_pct) + float(fo_a_pct))
                     p_home_wins_draw = max(0.05, min(0.95, float(fo_h_pct) / denom))
@@ -1333,11 +1395,20 @@ class PeriodSimulator:
                         bool(getattr(self.cfg, "faceoff_oz_specific_curve", True))
                         and faceoff_oz_idx_home_raw is not None and faceoff_oz_idx_away_raw is not None
                     )
-                    decay = segment_average_multipliers_oz(seg_len) if use_oz_curve else segment_average_multipliers(seg_len)
-                    if self.rng.random() < p_home_wins_draw:
-                        m_fo_h, m_fo_a = decay.winner_mult, decay.other_mult
+                    curve_fn = segment_average_multipliers_oz if use_oz_curve else segment_average_multipliers
+                    if multi_event_on:
+                        # §2A: N real faceoffs (possibly zero) instead of one assumed draw over the
+                        # segment's full length -- see `_multi_event_segment_multipliers`'s own
+                        # docstring for the sub-window/Poisson-additivity derivation.
+                        m_fo_h, m_fo_a = _multi_event_segment_multipliers(
+                            self.rng, n_faceoffs, seg_len, p_home_wins_draw, curve_fn,
+                        )
                     else:
-                        m_fo_h, m_fo_a = decay.other_mult, decay.winner_mult
+                        decay = curve_fn(seg_len)
+                        if self.rng.random() < p_home_wins_draw:
+                            m_fo_h, m_fo_a = decay.winner_mult, decay.other_mult
+                        else:
+                            m_fo_h, m_fo_a = decay.other_mult, decay.winner_mult
                 else:
                     m_fo_h, m_fo_a = _faceoff_multipliers(self.cfg, fo_h_pct, fo_a_pct)
                 lam_h = float(lam_h) * float(m_fo_h)
@@ -1352,18 +1423,25 @@ class PeriodSimulator:
                     dz_a_pct = 0.5 * _f(faceoff_dz_idx_away_raw, 1.0)
                     # §2u: the proper redesign -- the SAME discrete-event treatment §2r gave the
                     # general EV/OZ case, fit to the DZ-specific segment population. Simulates who
-                    # wins the segment's (assumed single) DZ draw from the SAME resolved
-                    # percentages, then applies the REAL measured DZ decay curve -- whose direction
-                    # is baked in from measurement (winner_mult < 1, other_mult > 1 in most
-                    # buckets), so no separate direction flag is needed on this path. Default ON.
+                    # wins the segment's DZ draw(s) from the SAME resolved percentages, then applies
+                    # the REAL measured DZ decay curve -- whose direction is baked in from
+                    # measurement (winner_mult < 1, other_mult > 1 in most buckets), so no separate
+                    # direction flag is needed on this path. Default ON. §2A: shares the SAME
+                    # `n_faceoffs` draw as the primary layer above -- one real event stream, not two.
                     if bool(getattr(self.cfg, "faceoff_dz_discrete_event_model", True)):
                         dz_denom = max(1e-6, float(dz_h_pct) + float(dz_a_pct))
                         p_home_wins_dz_draw = max(0.05, min(0.95, float(dz_h_pct) / dz_denom))
-                        dz_decay = segment_average_multipliers_dz(seg_len)
-                        if self.rng.random() < p_home_wins_dz_draw:
-                            m_dz_h, m_dz_a = dz_decay.winner_mult, dz_decay.other_mult
+                        if multi_event_on:
+                            m_dz_h, m_dz_a = _multi_event_segment_multipliers(
+                                self.rng, n_faceoffs, seg_len, p_home_wins_dz_draw,
+                                segment_average_multipliers_dz,
+                            )
                         else:
-                            m_dz_h, m_dz_a = dz_decay.other_mult, dz_decay.winner_mult
+                            dz_decay = segment_average_multipliers_dz(seg_len)
+                            if self.rng.random() < p_home_wins_dz_draw:
+                                m_dz_h, m_dz_a = dz_decay.winner_mult, dz_decay.other_mult
+                            else:
+                                m_dz_h, m_dz_a = dz_decay.other_mult, dz_decay.winner_mult
                     else:
                         # Legacy diff-based fallback -- itself still governed by
                         # `faceoff_dz_direction_fixed` (§2t's sign fix): `True` (default) applies
@@ -1393,11 +1471,18 @@ class PeriodSimulator:
                     nz_a_pct = 0.5 * _f(faceoff_nz_idx_away_raw, 1.0)
                     nz_denom = max(1e-6, float(nz_h_pct) + float(nz_a_pct))
                     p_home_wins_nz_draw = max(0.05, min(0.95, float(nz_h_pct) / nz_denom))
-                    nz_decay = segment_average_multipliers_nz(seg_len)
-                    if self.rng.random() < p_home_wins_nz_draw:
-                        m_nz_h, m_nz_a = nz_decay.winner_mult, nz_decay.other_mult
+                    # §2A: shares the SAME `n_faceoffs` draw as the primary/DZ layers above.
+                    if multi_event_on:
+                        m_nz_h, m_nz_a = _multi_event_segment_multipliers(
+                            self.rng, n_faceoffs, seg_len, p_home_wins_nz_draw,
+                            segment_average_multipliers_nz,
+                        )
                     else:
-                        m_nz_h, m_nz_a = nz_decay.other_mult, nz_decay.winner_mult
+                        nz_decay = segment_average_multipliers_nz(seg_len)
+                        if self.rng.random() < p_home_wins_nz_draw:
+                            m_nz_h, m_nz_a = nz_decay.winner_mult, nz_decay.other_mult
+                        else:
+                            m_nz_h, m_nz_a = nz_decay.other_mult, nz_decay.winner_mult
                     lam_h = float(lam_h) * float(m_nz_h)
                     lam_a = float(lam_a) * float(m_nz_a)
                 # LINEUP-AWARE faceoff percentage (§2zz) -- ANOTHER additional layer, composed

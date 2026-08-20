@@ -19,9 +19,13 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
 from syndicate.features.nhl.sim_engine.hockeysim.engine import (
     SimConfig,
     _faceoff_multipliers,
+    _multi_event_segment_multipliers,
     _resolve_strength_state_faceoff_pct,
     _strength_state_multipliers,
     _strength_state_zone_multipliers,
+)
+from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+    segment_average_multipliers,
 )
 
 
@@ -409,21 +413,33 @@ class HockeySimEngineTest(unittest.TestCase):
 
     def test_faceoff_strength_state_model_flag_actually_changes_output(self) -> None:
         """Reachability test for §2x: `faceoff_strength_state_model=True` (the default) must
-        produce measurably different TOTAL shot output than `False`, holding every other input
+        produce measurably different HOME shot output than `False`, holding every other input
         identical -- proves the flag actually gates a real PP/PK-segment mechanism, the first one
         to apply outside EV segments (`faceoff_ev_only` gates everything else off during a power
-        play or penalty kill)."""
+        play or penalty kill).
+
+        HOME shots specifically, not the game TOTAL -- matching every other discrete-event
+        reachability test in this file (e.g. `test_faceoff_discrete_event_model_flag_actually_
+        changes_output` above). `_strength_state_multipliers` is EXACTLY mean-1.0-preserving by
+        construction (`hockeysim_faceoff_strength_state_report.md`'s whole point): it redistributes
+        shots BETWEEN home and away, it does not move the game TOTAL on average. A total-shots
+        version of this test was checking a second-order artifact of that redistribution rather
+        than the mechanism's own real, large, documented effect -- caught when it started flaking
+        after an unrelated upstream change (§2A) shifted how many random draws precede this
+        mechanism in the shared RNG stream, exposing that the total-shots signal was never robust
+        to begin with, not a regression in the mechanism itself."""
         rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
         lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
         lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
         # A high committed_per_game on both sides guarantees plenty of PP/PK segments across the
-        # sample so the effect isn't diluted away by mostly-EV games.
+        # sample so the effect isn't diluted away by mostly-EV games. HOME favored on both PP-role
+        # and OZ index so the redistribution has a consistent, detectable direction.
         st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.3}
         st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 0.7}
         cfg_on = build_nhl_sim_config(overrides={"faceoff_strength_state_model": True})
         cfg_off = build_nhl_sim_config(overrides={"faceoff_strength_state_model": False})
 
-        def _mean_total_shots(profile: SimConfig) -> float:
+        def _mean_home_shots(profile: SimConfig) -> float:
             totals = []
             for s in range(120):
                 gs, events = run_hockeysim_game(
@@ -431,11 +447,11 @@ class HockeySimEngineTest(unittest.TestCase):
                     lineup_home=lineup_h, lineup_away=lineup_a,
                     st_home=st_home, st_away=st_away, profile=profile, seed=s,
                 )
-                totals.append(sum(1 for e in events if e.kind == "shot"))
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
             return statistics.mean(totals)
 
-        on_mean = _mean_total_shots(cfg_on)
-        off_mean = _mean_total_shots(cfg_off)
+        on_mean = _mean_home_shots(cfg_on)
+        off_mean = _mean_home_shots(cfg_off)
         self.assertNotAlmostEqual(
             on_mean, off_mean, places=0,
             msg=f"on_mean={on_mean:.3f} and off_mean={off_mean:.3f} should differ -- if they "
@@ -1020,6 +1036,112 @@ class HockeySimEngineTest(unittest.TestCase):
             strong_mean, weak_mean,
             f"Under the discrete-event mechanism, faceoff_oz_index=1.8 must still produce more "
             f"HOME shots on average than faceoff_oz_index=0.3 -- got strong={strong_mean:.3f} "
+            f"weak={weak_mean:.3f}. If this fails, the redesign lost the per-team signal.",
+        )
+
+    def test_multi_event_segment_multipliers_zero_faceoffs_is_neutral(self) -> None:
+        """§2A: `n_faceoffs=0` (the single most common real outcome, 48.64% of real segments) must
+        return the exact no-effect baseline -- no faceoff-driven tilt applied at all."""
+        rng = __import__("random").Random(1)
+        m_h, m_a = _multi_event_segment_multipliers(rng, 0, 44.44, 0.55, segment_average_multipliers)
+        self.assertEqual((m_h, m_a), (1.0, 1.0))
+
+    def test_multi_event_segment_multipliers_matches_the_curve_exactly_when_p_is_certain(self) -> None:
+        """Exact arithmetic check of the averaging logic, no Monte Carlo noise: with
+        `p_home_wins=1.0` (home wins every draw with certainty), EVERY one of the N draws takes the
+        winner branch, so the N-draw average must equal EXACTLY the underlying curve's own
+        `(winner_mult, other_mult)` at `sub_len = seg_len / n` -- confirms the sum-then-divide
+        averaging is correct, independent of any RNG behavior."""
+        import random
+        rng = random.Random(0)
+        seg_len = 44.44
+        for n in (1, 2, 3, 5):
+            sub_len = seg_len / n
+            expected = segment_average_multipliers(sub_len)
+            m_h, m_a = _multi_event_segment_multipliers(rng, n, seg_len, 1.0, segment_average_multipliers)
+            self.assertAlmostEqual(m_h, expected.winner_mult, places=6)
+            self.assertAlmostEqual(m_a, expected.other_mult, places=6)
+
+    def test_multi_event_segment_multipliers_expectation_is_exactly_one_for_any_p(self) -> None:
+        """Analytical proof, not a statistical approximation: `E[m_h] + E[m_a] == p*w + (1-p)*o +
+        p*o + (1-p)*w == w + o == 2.0` EXACTLY for ANY win probability `p` and ANY `n` -- `n` does
+        not even appear in the closed-form expectation, since averaging N i.i.d. draws changes only
+        the VARIANCE of the result, never the mean. Checked directly against the real curve's own
+        `winner_mult + other_mult` sum (always 2.0 by construction, the same mean-1.0-preserving
+        property every curve in this module already carries) at each `sub_len` the redesign will
+        actually use, rather than relying on large-sample statistical convergence."""
+        seg_len = 44.44
+        for n in (1, 2, 3, 5, 6):
+            sub_len = seg_len / n
+            decay = segment_average_multipliers(sub_len)
+            self.assertAlmostEqual(
+                decay.winner_mult + decay.other_mult, 2.0, places=6,
+                msg=f"n={n} sub_len={sub_len:.4f}: the curve itself must stay mean-1.0-preserving "
+                    f"at every sub-window length the multi-event redesign actually calls it with.",
+            )
+
+    def test_faceoff_multi_event_segment_model_flag_actually_changes_output(self) -> None:
+        """Reachability test for §2A: `faceoff_multi_event_segment_model=True` (the default) must
+        produce measurably different simulated output than `False` (the exact pre-redesign
+        single-assumed-draw-per-segment mechanism), holding every other input identical."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 1.6}
+        st_away = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0, "faceoff_oz_index": 0.5}
+        cfg_single = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": False})
+        cfg_multi = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": True})
+
+        def _shot_totals(profile: SimConfig) -> list[int]:
+            totals = []
+            for s in range(150):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        single_totals = _shot_totals(cfg_single)
+        multi_totals = _shot_totals(cfg_multi)
+        single_std = statistics.pstdev(single_totals)
+        multi_std = statistics.pstdev(multi_totals)
+        self.assertNotAlmostEqual(
+            single_std, multi_std, places=1,
+            msg=f"single-draw std={single_std:.3f} and multi-event std={multi_std:.3f} should "
+                f"differ -- if they match, faceoff_multi_event_segment_model is not gating anything.",
+        )
+
+    def test_faceoff_multi_event_segment_model_still_reflects_a_real_per_team_edge(self) -> None:
+        """The redesign must preserve the underlying per-team differentiation under the NEW default
+        mechanism specifically: a team with a real `faceoff_oz_index` edge must still out-shoot a
+        weaker one on average, N-faceoffs-per-segment or not."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base = {"pp_pct": 0.2, "pk_pct": 0.8, "committed_per_game": 3.0}
+        strong = dict(base, faceoff_oz_index=1.8)
+        weak = dict(base, faceoff_oz_index=0.3)
+        cfg = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": True})
+
+        def _mean_home_shots(st_home: dict) -> float:
+            totals = []
+            for s in range(150):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=base, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
+            return statistics.mean(totals)
+
+        strong_mean = _mean_home_shots(strong)
+        weak_mean = _mean_home_shots(weak)
+        self.assertGreater(
+            strong_mean, weak_mean,
+            f"Under the multi-event mechanism, faceoff_oz_index=1.8 must still produce more HOME "
+            f"shots on average than faceoff_oz_index=0.3 -- got strong={strong_mean:.3f} "
             f"weak={weak_mean:.3f}. If this fails, the redesign lost the per-team signal.",
         )
 

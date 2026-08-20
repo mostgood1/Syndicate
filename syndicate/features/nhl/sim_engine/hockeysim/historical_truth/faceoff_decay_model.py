@@ -140,6 +140,7 @@ structural effect the data gives no reason to believe fades that quickly.
 """
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -649,3 +650,51 @@ def expected_multipliers_strength_zone(role: str, seg_len_seconds: float) -> Seg
     if not probs:
         return SegmentFaceoffMultipliers(1.0, 1.0)
     return SegmentFaceoffMultipliers(winner_mult=round(winner_area, 6), other_mult=round(other_area, 6))
+
+
+# ---------------------------------------------------------------------------
+# MULTI-EVENT-PER-SEGMENT redesign, added in a later pass -- closes the LAST genuinely open
+# faceoff-track item, `docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`:
+# every curve above integrates a decay shape over a segment's FULL length, ASSUMING exactly one
+# real faceoff occurred at its start. That report measured the real distribution directly (106,272
+# real segment-windows, using the engine's own segment geometry): mean 0.684 real faceoffs per
+# segment, not the assumed constant 1.0 -- 48.64% of segments have ZERO real faceoffs (an assumed
+# tilt with nothing real behind it), 37.09% have exactly one (matching the assumption), 14.27% have
+# two or more (under-represented by a single assumed winner).
+#
+# `sample_segment_faceoff_count` draws N from that REAL empirical distribution (not a fitted
+# Poisson or other parametric approximation -- the real counts are already in hand, so using them
+# directly is more faithful than fitting a curve to them) so `engine.py`'s segment loop can, for
+# N==0, apply NO faceoff-driven tilt at all (fixing the single largest share of the mismatch
+# outright), and for N>=1, split the segment into N equal sub-windows (a stated simplification --
+# no real intra-segment POSITION data has been measured yet, so equal spacing is the most neutral
+# assumption available, not a claim of precision beyond what's measured) and apply an independent
+# discrete-event draw + decay-curve integration to EACH sub-window using its own (shorter) length,
+# exactly the same `_integrate_curve` machinery every curve above already uses -- these functions
+# were already generic over ANY `seg_len_seconds`, so no change to the curve math itself was
+# needed, only to how many times and over what window lengths `engine.py` calls it.
+#
+# WHY THE MEAN STAYS UNCHANGED, BY CONSTRUCTION. Every curve above is mean-1.0 preserving per
+# bucket (winner_mult + other_mult == 2.0 always). Summing N independent Poisson processes, each
+# with rate `base_lambda/N * multiplier_i`, gives a combined Poisson with rate
+# `base_lambda * mean_i(multiplier_i)` (Poisson rates add; this is exact, not approximate) -- so
+# averaging N independent draws' multipliers together and applying that average to the FULL
+# segment's base lambda is mathematically equivalent to summing N separate sub-segment draws, with
+# no new normalization proof required beyond the one every individual curve already carries.
+_SEGMENT_FACEOFF_COUNT_DIST: List[Tuple[int, int]] = [
+    # (real faceoff count in a segment, segments observed) -- 1,312 games, 106,272 real
+    # engine-geometry segment-windows, periods 1-3 only (see the report for OT/shootout scope).
+    (0, 51687), (1, 39416), (2, 12544), (3, 2339), (4, 261), (5, 22), (6, 3),
+]
+_SEGMENT_FACEOFF_COUNTS = [n for n, _ in _SEGMENT_FACEOFF_COUNT_DIST]
+_SEGMENT_FACEOFF_WEIGHTS = [w for _, w in _SEGMENT_FACEOFF_COUNT_DIST]
+
+
+def sample_segment_faceoff_count(rng: random.Random) -> int:
+    """Draw a real, empirically-distributed faceoff count for one engine segment, using `rng`
+    (the SAME `random.Random` instance `engine.py`'s segment loop already threads through for
+    every other stochastic draw in this file -- no new RNG source, no reseeding). Returns an `int`
+    in `{0, 1, 2, 3, 4, 5, 6}`, weighted by the real measured distribution above -- `0` is the
+    single most common outcome (48.64% of real segments), not a rare edge case, so callers MUST
+    handle it as a genuine "no faceoff-driven effect at all" branch, not an afterthought."""
+    return rng.choices(_SEGMENT_FACEOFF_COUNTS, weights=_SEGMENT_FACEOFF_WEIGHTS, k=1)[0]

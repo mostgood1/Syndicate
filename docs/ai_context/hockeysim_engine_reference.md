@@ -1296,6 +1296,40 @@ run tighter than real games. Disabling it entirely closes less than half that ga
 explains the rest lives in the engine's other stochastic sources, a separate, larger, still-open
 question this measurement does not attempt to answer.
 
+**§2A — starting the engine-architecture redesign §2zzzz scoped.** Full report:
+`docs/reports/hockeysim_faceoff_multi_event_segment_report.md`. Replaces "exactly one faceoff,
+always, every segment" with the REAL measured distribution: `sample_segment_faceoff_count` draws
+`N ∈ {0..6}` from the actual 106,272-segment measurement (not a fitted Poisson — the real counts
+were already in hand). `_multi_event_segment_multipliers` averages `N` independent discrete-event
+draws, each reusing the SAME `_integrate_curve` machinery (already generic over any segment
+length) over an equal `seg_len/N` sub-window. `N==0` (48.64% of real segments) now applies NO tilt
+at all — the direct fix for the largest share of the mismatch. Primary/OZ, DZ, and NZ share ONE
+`n_faceoffs` draw per segment (they describe the SAME real event stream, zone is a property OF a
+draw, not a separate one) — a real design decision, not an oversight. The lineup-aware layer is
+correctly excluded (a persistent roster-quality signal, not a discrete event). Scoped to EV-gated
+segments only this pass — strength-state (PP/PK) segments' own single-draw mechanism is untouched,
+a stated next step. New flag `faceoff_multi_event_segment_model`, default ON.
+
+**Why the mean is provably unaffected**: every curve is mean-1.0 preserving per bucket; summing N
+independent Poisson processes with rate `base/N * multiplier_i` gives a combined rate of
+`base * mean(multiplier_i)` — Poisson rates add exactly, so `E[m_home]+E[m_away]==2.0` holds for
+ANY win probability and ANY N, checked directly against the real curve, not by statistical
+convergence. **Verified**: reachability (distribution-shape, not mean-only — this redesign's whole
+point is distributional), per-team edge preserved under the new mechanism, exact analytical proof,
+mean moved +0.275% (noise-level) on a 2,976-game round-robin.
+
+**An honest, non-confirming result, stated plainly rather than adjusted to fit expectations**: the
+natural hypothesis was that fixing the 48.64%-zero-faceoff mismatch would move simulated variance
+CLOSER to real. **Measured the opposite** — std moved from 96.71% of real to **96.03%**, a further
+compression, not an improvement. A plausible (not separately proven) reason: averaging multiple
+independent zero-sum draws together (when N≥2) reduces the realized variance of that average, the
+same law-of-large-numbers effect that makes an average of several coin flips less extreme than any
+one flip — combined with N==0 segments now contributing zero variance where they previously
+contributed some. **This does not invalidate the redesign** (mean unaffected, per-team signal
+intact, proofs hold) but it means the redesign should NOT be sold as fixing the variance gap — if
+anything it REINFORCES §2zzzz's own conclusion that the true cause lives elsewhere in the engine's
+other stochastic sources, not in the faceoff mechanism at all.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

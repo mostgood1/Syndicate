@@ -10,6 +10,7 @@ import pytest
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
     draw_strength_zone,
     expected_multipliers_strength_zone,
+    sample_segment_faceoff_count,
     segment_average_multipliers,
     segment_average_multipliers_dz,
     segment_average_multipliers_nz,
@@ -483,3 +484,47 @@ def test_draw_strength_zone_covers_the_full_unit_interval_without_gaps():
 
 def test_draw_strength_zone_unrecognized_role_falls_back_to_offensive():
     assert draw_strength_zone("XX", 0.5) == "O"
+
+
+# ---------------------------------------------------------------------------
+# `sample_segment_faceoff_count` -- the §2A multi-event-per-segment redesign's empirical draw,
+# closing the "one faceoff per segment" approximation
+# `hockeysim_faceoff_segment_approximation_impact_report.md` measured against real data.
+# ---------------------------------------------------------------------------
+
+def test_sample_segment_faceoff_count_is_deterministic_for_a_seeded_rng():
+    """Same seed, same draw -- the function must be a pure consumer of the RNG it's given, no
+    hidden global state."""
+    import random
+    a = sample_segment_faceoff_count(random.Random(7))
+    b = sample_segment_faceoff_count(random.Random(7))
+    assert a == b
+
+
+def test_sample_segment_faceoff_count_only_returns_measured_values():
+    """Every draw must land in the real measured support {0..6} -- no value the real 106,272-
+    segment measurement never actually produced."""
+    import random
+    rng = random.Random(11)
+    seen = {sample_segment_faceoff_count(rng) for _ in range(5000)}
+    assert seen <= {0, 1, 2, 3, 4, 5, 6}
+
+
+def test_sample_segment_faceoff_count_matches_the_real_measured_distribution():
+    """Large-sample draw should reproduce the REAL measured shares closely: 0 is the single most
+    common outcome (48.64% of real segments, not a rare edge case), 1 the second most common
+    (37.09%), and the mean should land near the measured 0.684 -- not the model's OLD constant
+    assumption of 1.0."""
+    import random
+    rng = random.Random(2026)
+    n = 200_000
+    counts = [0] * 7
+    for _ in range(n):
+        counts[sample_segment_faceoff_count(rng)] += 1
+    share_zero = counts[0] / n
+    share_one = counts[1] / n
+    mean = sum(i * c for i, c in enumerate(counts)) / n
+    assert share_zero == pytest.approx(0.4864, abs=0.01)
+    assert share_one == pytest.approx(0.3709, abs=0.01)
+    assert mean == pytest.approx(0.684, abs=0.02)
+    assert share_zero > share_one  # zero is the single most common outcome, not one

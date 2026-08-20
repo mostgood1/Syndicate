@@ -802,3 +802,22 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   closes the faceoff track's last genuinely open item with a real measurement, and correctly
   scopes what remains (a different, larger, still-unattributed variance source) rather than
   declaring the whole question resolved.
+- **Did** START the engine-architecture redesign the measurement above scoped (reference doc §2A,
+  full report `docs/reports/hockeysim_faceoff_multi_event_segment_report.md`). Replaces "exactly
+  one faceoff, always, every segment" with the REAL measured distribution:
+  `sample_segment_faceoff_count` draws `N∈{0..6}` from the actual 106,272-segment measurement (not
+  a fitted approximation -- the real counts were already in hand). `N==0` (48.64% of real
+  segments) now applies NO tilt at all -- the direct fix for the largest share of the mismatch.
+  Primary/OZ, DZ, and NZ share ONE `n_faceoffs` draw per segment (they describe the SAME real
+  event stream, not independent ones -- a real design decision). Scoped to EV-gated segments only
+  this pass; strength-state (PP/PK) segments untouched, a stated next step. New flag
+  `faceoff_multi_event_segment_model`, default ON. **Verified**: mean-preservation proved exactly
+  (`E[m_home]+E[m_away]==2.0` for any N, checked against the real curve, not statistically),
+  reachability (distribution-shape), per-team edge preserved, mean moved +0.275% on a 2,976-game
+  round-robin (noise-level). **An honest, non-confirming result, not adjusted to fit
+  expectations**: the hypothesis was that fixing the zero-faceoff mismatch would move variance
+  CLOSER to real -- measured the OPPOSITE, std moved from 96.71% of real to **96.03%**, a further
+  compression. Shipped anyway (mean-neutral, architecturally more honest, and the variance
+  question was already known to be separate and larger) but stated plainly as NOT the fix for that
+  gap -- if anything this REINFORCES the prior measurement's own conclusion that the true cause
+  lives elsewhere in the engine's other stochastic sources.
