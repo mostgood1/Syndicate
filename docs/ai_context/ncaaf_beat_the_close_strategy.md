@@ -643,3 +643,59 @@ NCAAF has **no injury data source** (CFBD's 74-endpoint spec has none), and NFL'
 equivalent adjustment was backtested and **HURT** (60.98% → 56.44%). That lever
 needs a real availability feed and causal impact estimation, not another
 schedule-derived metric.
+
+---
+
+## 12. THE INJURY FEED SEARCH — no usable free source. Measured, not assumed.
+
+**Measured 2026-08-20.** `scripts/probe_ncaaf_injury_feed.py` re-runs this in one
+command; do that in-season rather than trusting an August reading.
+
+| source | result |
+|---|---|
+| **CFBD** | **No injury endpoint.** Enumerated the OpenAPI spec: 74 endpoints, only `/player/portal` and `/roster` are availability-shaped. Not a gap in my guessing — the whole surface was listed. |
+| **ESPN core API** | Endpoint EXISTS at `/leagues/college-football/teams/{id}/injuries` and returns a valid envelope, but is **effectively empty for CFB**. |
+| **ESPN site API** | 403 from this environment regardless of User-Agent. |
+
+### The measurement, with its positive control
+
+    NFL (control)      8 teams   597 injuries   8/8 covered    oldest date    1 day
+    college-football  60 teams     1 injury     1/60 covered   oldest date 2097 days
+
+**The NFL control is what makes this conclusive.** 597 fresh records prove the
+probe, the schema and the network path all work; the CFB number is therefore a
+real absence and not a broken query. The single CFB record is dated
+**2020-11-21** — stale by nearly six years, so it is not availability data at
+all. Without the control this table would have been another self-inflicted null,
+which this session produced three times before catching the pattern.
+
+### The structural reason — this is a property of the SPORT
+
+**The NCAA has no mandatory injury report.** The NFL compels official
+participation and game-status filings; college programs are under no such
+obligation and many coaches deliberately withhold availability as competitive
+advantage. So college injury data is thinner and less reliable *everywhere*, not
+just at ESPN. Any vendor, paid or free, inherits that ceiling.
+
+### And a feed alone would not be enough
+
+NFL has excellent injury data and its adjustment was backtested and **HURT** —
+full-season win accuracy **60.98% → 56.44%** across 264 games with a modeled
+injury, because the impact estimates were historical averages confounded by
+opponent strength and game script. **The feed is the easy half; causal impact
+estimation is the hard half, and it is the half that failed.**
+
+### Where that leaves the lever
+
+Injuries remain the only untested class that describes the FUTURE lineup rather
+than past performance — the one thing that cannot already be inside SP+, and
+therefore the only remaining candidate for the missing 23.8% of R² (§10). But
+pursuing it now requires a **paid feed decision** (SportsDataIO, Sportradar and
+Rotowire all sell CFB injury data; none is wired here and none can be signed up
+for without an account and payment credentials), and then the causal work NFL
+skipped.
+
+**Honest recommendation:** prototype the causal impact estimator on **NFL**,
+where the data already exists and the naive version is already measured as
+failing. If a better estimator cannot beat the naive one there, buying a CFB
+feed would be buying the easy half of a problem whose hard half is unsolved.
