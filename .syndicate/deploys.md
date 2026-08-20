@@ -19546,3 +19546,78 @@ had been quoting. The 31 were NFL/NBA/NCAAB route tests another session fixed
 on main hours ago. Re-derived against clean `origin/main` rather than banked
 as a win — a stale baseline hands you someone else's result in whichever
 direction it has drifted.
+
+
+---
+
+## SHIPPED-VERIFIED 2026-08-20 21:33:45Z + 21:41:5xZ -- soccer live match state, BOTH services
+
+    lane:      soccer-board-mlb-parity   (session aeb71be7)
+    source:    origin/main ca75e0a1
+    worker:    bd4b1a67  graft, parent a381d652, deploy/consolidated-live-odds-worker
+               dep-da3n29m7bikc73bcf8g0  trigger=api  live 21:33:45Z   3 files
+    web:       075226dd  graft, parent 93b6d5a4, deploy/consolidated-web
+               dep-da3n60ijnfac739ooic0  trigger=api  live 21:41:5xZ   3 files
+    rollback:  live-odds-worker -> a381d652 ;  web -> 93b6d5a4
+
+**GRAFTS, NOT MAIN, and `--allow-off-main` on both preflights.** Neither live
+SHA is an ancestor of `origin/main`: web was 93b6d5a4 and live-odds-worker
+a381d652, and `main..` counts **239 commits** for the worker. Deploying the tip
+would have been a mass upgrade of unreviewed drift, not this lane's change.
+Each graft was parented on the LIVE SHA read at build time, carried exactly the
+requested paths, and every blob was asserted identical to `origin/main`.
+
+Worker first, web second, deliberately: the producer had to be writing
+`match_box` before the card that reads it went live.
+
+### verify: PASSED -- on the SERVED surface, both halves, and a regression check
+
+**web -- `/soccer/api/cards?date=2026-08-20`:**
+
+    ALA 1 - 1 RAY   status='Final'   live_state={'final': True, 'in_progress': False}
+    box sections = ['Goals', 'Match stats', 'ALA squad projections', 'RAY squad projections']
+
+    games carrying a SCORE    1/1
+    games carrying a REAL BOX 1/1
+    pre-kickoff games showing a score  0    <- the fabricated 0-0 cannot recur
+
+The real box renders BEFORE the sim box, which is the MLB ordering. **Before
+this deploy that card had no score at all** -- `43c82b3c` had removed the
+artifact field as a source, and the live poller writes no `games` entry for a
+finished match, so a completed fixture had no score path whatsoever.
+
+**live-odds-worker -- published artifacts via `/api/ops/artifacts/export`:**
+
+    10 of 10 leagues wrote `match_box`   generated 21:42:5xZ (after the 21:33:45Z deploy)
+    la_liga 401882908  final=True  detail='FT'  score=1-1
+      goals   [("48'", 'Sergio Camello'), ("84'", 'Mariano')]
+      home    Possession 48.2%  Shots 8  On target 3  Corners 9  Saves 2
+              Fouls 14  Yellow 1  Passes 326  Pass % 80%  Tackles 17
+
+`match_box PRESENT` on all ten is the reading that proves the NEW code ran on
+the worker -- the key does not exist at the parent SHA. `games=0` everywhere is
+correct: no match was in play at 21:42Z.
+
+### NOT VERIFIED IN PRODUCTION -- the live clock
+
+Every production reading above is of a **finished** match, which correctly has
+no clock. The clock path (`status_display_clock` -> `live_state.clock` ->
+`shared_game_state` -> "Live score -- 83'" and the chip token) was measured
+only LOCALLY, against live fixture 401882908 at the 70th and 83rd minutes
+before the deploy. **It has not been observed on a production card with a match
+actually in play.** Next MLS kickoffs are ~23:30Z; that is the reading that
+would close it, and until someone takes it this is shipped-but-unwitnessed.
+
+Also unmeasured: the box pass on a heavy multi-league slate. A finished box is
+fetched once and cached thereafter, but the FIRST tick of a busy day fetches one
+ESPN summary per finished match per league. Bounded by construction, not
+observed.
+
+### Preflight
+
+Both CLEAR, both with the claim held by this lane. live-odds-worker showed only
+the two infrastructure processes -- it is the odds SOURCE OF TRUTH and a deploy
+mid-capture truncates it, so that check is not a formality. web showed only
+gunicorn.
+
+Claims released after the readings above.
