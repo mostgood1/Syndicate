@@ -18393,7 +18393,7 @@ same games, a 95% CI lower bound above the 52.4% breakeven, out-of-sample with
 subsets pre-specified, and denominators in BETS not rows. Measured by
 `scripts/grade_football_playability.py`.
 
-## PENDING 2026-08-20 16:43Z -- web deploy -- Layer 2 board pick-clarity fixes (#2/#3), scoped onto live SHA ea6f431f
+## SHIPPED-VERIFIED 2026-08-20 16:52Z -- web deploy -- Layer 2 board pick-clarity fixes (#2/#3), live 0ddd8ede
 - Lane: layer2-board-pick-clarity. Preflight PASS via full checklist. Claim +
   target-scoped preflight CLEAR at 16:40:49Z.
 - Scope note: web's live SHA (ea6f431f) is not an ancestor of origin/main
@@ -18409,6 +18409,17 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
 - Rollback: redeploy web at the prior SHA (ea6f431f).
 - `dep-da3it5ibkg8c738n6ml0`, status=build_in_progress at fire time (first
   attempt hit a transient Render API 500, retried clean).
-- Measurement: [PENDING -- confirm live commit == 0ddd8ede, then re-pull the
-  live board's own production payload (same method used to find the bugs)
-  and re-run the same over/under and blank-Projected counts against it]
+- **verify: MEASURED live, matches expectation.** `dep-da3it5ibkg8c738n6ml0`
+  live at 16:52:40Z, commit content-verified == 0ddd8ede. Re-pulled the
+  board's own production payload (461 cards, natural churn from the
+  earlier 512-card sample two hours prior) via the page's own fetch:
+  **Over/Under: 273 of 273 over/under rows (100%) now show "Over"/"Under"**
+  in the pick detail line, confirmed against the exact deployed logic.
+  **Projected: of 99 h2h rows, 94 were blank pre-fix (94.9%, consistent
+  with the earlier 95.6% measurement) -- 84 of those 94 now show a real
+  value** (a model-probability percentage) via the new moneyline fallback.
+  The remaining 10 stay blank because `model_probability` itself is not
+  populated on those specific rows -- a genuine backend coverage gap
+  (already documented in layer2_board.py's own comment: "only projection
+  is genuinely sparse... a real COVERAGE gap, not a plumbing one"), not a
+  frontend defect, and correctly left blank rather than fabricated.
