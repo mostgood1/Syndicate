@@ -442,6 +442,48 @@ def _build_lens_rows(game: dict[str, Any], period_rows: list[dict[str, Any]]) ->
     return out
 
 
+# A lens row whose label names the whole game rather than a segment of it.
+_GAME_LEVEL_LABELS = frozenset({"full game", "full", "game", "final", "full time", "ft"})
+
+
+def _primary_lens_row(lens_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The lens row that describes the WHOLE game.
+
+    The card ribbon captions the matchup with one line and it took
+    `lens_rows[0]`. On the BOARD, where the per-period rows are gated out,
+    that happens to be the full-game row. On the GAME DETAIL page, where
+    soccer publishes `sim.periods` (h1, h2) and all three rows survive, row 0
+    is the FIRST HALF.
+
+    Measured on production `/soccer/epl/game/401879301`, 2026-08-20: the
+    always-visible ribbon read "Projected total 1.6" directly beneath a
+    summary reading "(total 3.5)". 1.6 is the first half. The panels below
+    were correct -- 1.6 / 1.8 / 3.5 -- so the page stated a HALF's total as
+    the GAME's in the one place a reader looks first.
+
+    Chosen by CONTENT and then by LABEL, never by position:
+      1. the row carrying a game-level win probability (`home_pct`) -- exactly
+         what separates the full-game row from the halves, which carry null
+         there and the null placeholder for market and edge;
+      2. failing that, a label naming the whole game;
+      3. failing that, the LAST row, since period rows are built
+         chronologically and the whole-game row is appended after them.
+
+    Same philosophy as `_build_lens_rows`: gate on what the row CONTAINS, so a
+    sport that starts publishing per-period output needs no change here.
+    """
+    rows = [row for row in lens_rows if isinstance(row, dict)]
+    if not rows:
+        return None
+    for row in rows:
+        if row.get("home_pct") is not None:
+            return row
+    for row in rows:
+        if _safe_text(row.get("label"), "").strip().lower() in _GAME_LEVEL_LABELS:
+            return row
+    return rows[-1]
+
+
 def _game_win_probabilities(game: dict[str, Any]) -> tuple[float | None, float | None, float | None]:
     """(home, away, draw) win probability for the game, or Nones.
 
@@ -850,6 +892,7 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     # LENS is gated -- see _build_lens_rows for what a row has to have to earn
     # a panel.
     normalized["shared_lens_rows"] = _build_lens_rows(normalized, period_rows)
+    normalized["shared_lens_primary"] = _primary_lens_row(normalized["shared_lens_rows"])
     normalized["shared_probability_rows"] = _build_probability_rows(normalized, period_rows)
     normalized["shared_total_rows"] = _build_total_rows(period_rows)
     # Was an UNCONDITIONAL assignment until 2026-08-20, which is the same bug

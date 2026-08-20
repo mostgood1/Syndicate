@@ -1186,3 +1186,23 @@ a.cards-head-team-name:focus-visible {
   font-variant-numeric: tabular-nums;
   margin-left: 8px;
 }
+
+/* Live score in the card head. Added 2026-08-20 after the live La Liga match
+   401882908 rendered status "Live", slate context "0-0", and no score in the
+   head at all -- the head had only ever drawn crests and an "@". */
+.cards-head-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.cards-head-score-sep {
+  opacity: 0.55;
+  font-weight: 500;
+}
