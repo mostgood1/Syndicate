@@ -3079,3 +3079,100 @@ Git Bash silently ate every backticked identifier as command substitution and
 appended a mangled rule to this file. Backticks are unavoidable in ledger prose.
 Write the text to a FILE and append from that -- never inline it in a
 double-quoted shell string.
+
+## 2026-08-20 A SAMPLE THAT CONTAINS ONLY ONE STATE CANNOT DIAGNOSE A STATE MACHINE
+
+`live_home_score`/`live_away_score` were declared "a placeholder the artifact
+builder writes, not a reading" on the evidence that they were the string "0"
+on 12 of 12 sampled matches. The field is in fact ESPN's own
+`competitors[].score`, real at every point in a match's life.
+
+**The sample could not have shown that.** A census of every git-tracked
+recommendations artifact finds `status_state == "pre"` on **all 57 matches in
+them** -- there was no started match anywhere in the local mirror. "Always 0"
+and "0 until kickoff" are indistinguishable in a sample drawn entirely from
+before kickoff, and "0" is exactly what a correct reading looks like there.
+
+The verdict then propagated into a FIX (`43c82b3c`) that removed the field as
+a source, and into a TEST asserting it must never be read -- so soccer lost
+any score at all on a FINAL match, which no other source covers. The poller
+only fetches `statuses={"in"}`.
+
+**How to apply.** Before calling a field a placeholder, print the distribution
+of the STATE the field is supposed to vary with, and say how many rows sat in
+each. If one bucket is empty, the sample cannot support a claim about it --
+go to the live source and read one. Two HTTP calls settled this: live fixture
+401882908 read '1'/'0', completed Atletico Madrid v Malaga read '2'/'0'.
+
+This is `CLAUDE.md`'s "Render is the source of truth" rule in a new costume:
+the local mirror was not merely thin, it was thin IN THE ONE DIMENSION the
+question turned on. Related: [[feedback_rate_not_count]] (a denominator),
+[[feedback_read_the_field_you_already_have]].
+
+## 2026-08-20 A DOCSTRING THAT NAMES ITS OWN PRECONDITION IS A CHECKABLE CLAIM
+
+`build_live_state`'s docstring says, in as many words, that `as_of_seconds=None`
+is "**not** a substitute for a true live clock" and that "live callers must
+source the actual current clock from ESPN's live status and pass it
+explicitly." The one live caller, `poll_soccer_live_state.poll_league`, did not
+-- so the cutoff was nominal full time and EVERY live match came back half 2
+with 0.0 seconds remaining, for as long as the feature has existed.
+
+Nothing failed. The field was populated, the type was right, the tests were
+green, and the card rendered an empty clock rather than a wrong one.
+
+It was not only cosmetic: `project_live_match` and `goal_in_window_probability`
+both project the REMAINDER of the match from that state, so the live lens was
+projecting nothing forward while reporting healthy.
+
+**How to apply.** When a function's docstring states a precondition on its
+CALLERS, that is a grep, not prose -- enumerate the call sites and check each
+one. This module had already been bitten by exactly this shape (the
+`_load_team_ratings(as_of)` outage, whose own comment says "a signature change
+needs a caller census, not a spot-check of the caller you just edited") and
+the census was never widened to the other preconditions in the same file.
+
+Related: [[feedback_presence_is_not_reachability]],
+[[feedback_confirm_the_code_ran]].
+
+## 2026-08-20 A LOCAL VARIABLE NAMED FOR THE PARENT OF WHAT IT HOLDS
+
+`espn_lineups.fetch_events` had `status = (competition.get("status") or {}).get("type")`.
+Everything it read off `status` -- `state`, `detail` -- genuinely lives on
+`.type`, so the name looked right and the code was correct for years.
+
+Then the live CLOCK was needed. `status.get("clock")` returns None, because
+`clock`/`displayClock`/`period` sit on the OUTER `competition.status`, one
+level above. The reading is silent: three fields, all None, on a match very
+much in progress.
+
+**How to apply.** When adding a field to an existing extractor, dump the raw
+node you are reading from and confirm the field is on THAT node -- do not
+infer it from the variable's name. Renaming to `status_block` / `status` made
+the two levels visible and the bug impossible to restate.
+
+Related: [[feedback_read_the_field_you_already_have]].
+
+## 2026-08-20 THE EDIT TOOL REPORTED SUCCESS ON A WRITE THAT NEVER REACHED DISK
+
+Two consecutive `Edit` calls against
+`C:\tmp\syndicate-sessions\soccer-board-mlb-parity\syndicate\features\soccer\cards.py`
+returned success. Neither landed: a later `grep` found the old text intact and
+`git diff --stat` showed 18 insertions where ~60 were expected. A third edit
+DID land -- and it called a function the lost edit was supposed to have
+created, so the file would have raised `NameError` at import if it had been
+committed unchecked.
+
+The first of those edits had been BLOCKED by `lane-guard` moments earlier
+(shared global lane marker); the retry after writing the per-session marker
+reported success without effect.
+
+**How to apply.** After an `Edit` on a hook-guarded path, verify the text is on
+disk -- `grep` for the new symbol, or `git diff --stat` for a plausible line
+count -- before building anything on top of it. A syntax check is not enough:
+the file parsed fine, because the missing piece was a definition, not a
+statement. This session switched to writing edits through a script that
+asserts its anchor count and re-greps afterwards.
+
+Related: [[feedback_confirm_the_code_ran]],
+[[project_commit_guard_remediation_incomplete]].
