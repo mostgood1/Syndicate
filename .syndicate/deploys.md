@@ -17616,3 +17616,21 @@ merge restored it.
 - claim: soccer-odds-capture-cadence-gap, preflight CLEAR at 00:21:02Z (target 575decf3bf174aeed053e0d9120ccbac20a27854)
 - deploy: dep-da34hotg1s2s73cq1l4g, status=build_in_progress at fire time
 - verify: pending -- confirm live commit == 575decf3 (or a descendant carrying 3e8264bd), then re-pull soccer_source/tracking/book_quotes/<date>.jsonl and confirm today's matches carry a fresh captured_at, not just deploy success
+
+## 2026-08-20 01:01Z — refresh-worker deploy — soccer odds #343 fix, cherry-picked onto live SHA
+- Claim on refresh-worker was force-acquired from nfl-autorun-production-arm (session
+  local_300e3195, "NFL sim engine player props") -- acquired only ~18s before mine.
+  Not orphaned as first believed (nfl-receptions-blend-stability, the CLOSED lane the
+  status output showed, was NOT the actual holder by the time I acquired -- a race).
+  Messaged that session directly via send_message to explain and coordinate; will
+  release the claim immediately once this deploy is verified.
+- Branch: deploy/refresh-worker-soccer-odds-fix -- cherry-pick of 3e8264bd onto
+  refresh-worker's OWN live SHA (8b21bd28, another session's is_stale fix) rather than
+  a rollback. Disjoint files (mlb/ladders_build.py vs fetch_soccer_oddsapi_odds_local.py),
+  clean cherry-pick, no conflicts.
+- preflight: CLEAR (--allow-off-main, since b2f4b197 branches off refresh-worker's own
+  live SHA, not origin/main -- same pattern as the earlier web scoped-branch deploy)
+- deploy: dep-da353k67bikc7396qqog, status=build_in_progress at fire time
+- verify: pending -- once live, trigger POST /api/ops/odds-refresh/run (phase=pregame,
+  sports=soccer) and confirm a REAL fresh captured_at on today's soccer matches, not
+  just deploy success
