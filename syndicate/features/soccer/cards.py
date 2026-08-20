@@ -516,6 +516,30 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
     }
 
 
+def _real_live_score(live_state: dict[str, Any] | None, side: str) -> Any:
+    """A live score ONLY when the live poller actually reported one.
+
+    Deliberately does NOT fall back to the recommendations artifact's
+    `live_{side}_score`: those are the constant "0" placeholder described at
+    the call site. A missing score must read as missing, never as nil-nil.
+    """
+    if not isinstance(live_state, dict):
+        return None
+    for key in (f"{side}_score", f"{side}_goals", side):
+        value = live_state.get(key)
+        if isinstance(value, dict):
+            value = value.get("score", value.get("goals"))
+        if value is None or isinstance(value, bool):
+            continue
+        text = str(value).strip()
+        if text and text.lstrip("-").isdigit():
+            # An int, not the artifact's stringly-typed "0": the caller puts
+            # this straight into `away.score`/`home.score`, and the template
+            # guards on `is not none`, so a real 0 must stay a real 0.
+            return int(text)
+    return None
+
+
 def _live_match_state(league: str, date_str: str, event_id: str) -> dict[str, Any] | None:
     if not date_str or not event_id:
         return None
@@ -1219,9 +1243,22 @@ def _match_to_game(
 
     betting = _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team)
     prop_picks = _prop_picks_by_player(league, week, season)
-    home_score = match.get("live_home_score")
-    away_score = match.get("live_away_score")
-    score_text = f"{away_score}-{home_score}" if effective_state in {"in", "post"} and home_score is not None else "-"
+    # `live_home_score` / `live_away_score` ARE NOT A SCORE. Measured across
+    # every git-tracked recommendations artifact, 2026-08-20: both fields are
+    # the string "0" on 12 of 12 sampled matches INCLUDING `status_state ==
+    # "pre"` -- fixtures that had not kicked off. The artifact builder writes
+    # a placeholder, not a reading, and nine consecutive 0-0 results across a
+    # league's completed slate is not a plausible set of soccer scores.
+    #
+    # Publishing them as `away.score`/`home.score` put a FABRICATED 0-0 on any
+    # live match -- the exact failure Lane F removed from seven other sites in
+    # `game_board_contract.py`. Soccer has no trustworthy per-match live score
+    # in the card payload today, so it publishes NONE and the card renders its
+    # empty state. A real score belongs here when the live poller supplies one
+    # (`_live_match_state` reads `live_state_payload`, which is where it would
+    # arrive); until then absence is the honest value.
+    home_score = _real_live_score(live_state, "home")
+    away_score = _real_live_score(live_state, "away")
 
     summary = (
         f"Projected {away_team} {_fmt_num(team_projection.get('away_mean'), 1)} @ {home_team} "

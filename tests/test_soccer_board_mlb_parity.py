@@ -431,6 +431,40 @@ class LiveScoreTests(unittest.TestCase):
         self.assertIn("game.home.score is not none", tpl)
 
 
+class FabricatedScoreTests(unittest.TestCase):
+    """`live_home_score`/`live_away_score` in the recommendations artifact are
+    the STRING "0" on 12 of 12 sampled matches, including `status_state ==
+    "pre"` fixtures that had not kicked off. They are a placeholder the
+    builder writes, not a reading -- nine consecutive 0-0 results across a
+    league's completed slate is not a plausible set of soccer scores.
+
+    Publishing them as a score put a fabricated 0-0 on every live match."""
+
+    def test_absent_live_state_yields_no_score(self) -> None:
+        self.assertIsNone(cards._real_live_score(None, "home"))
+        self.assertIsNone(cards._real_live_score({}, "home"))
+
+    def test_a_genuine_zero_from_the_poller_survives(self) -> None:
+        """0-0 is a real and common soccer score. The guard must reject
+        ABSENCE, not falsiness, or it would suppress a true nil-nil."""
+        self.assertEqual(cards._real_live_score({"home_score": 0}, "home"), 0)
+
+    def test_a_real_score_is_returned(self) -> None:
+        self.assertEqual(cards._real_live_score({"away_score": 2}, "away"), 2)
+        self.assertEqual(cards._real_live_score({"home": {"score": 3}}, "home"), 3)
+
+    def test_non_numeric_is_rejected_rather_than_rendered(self) -> None:
+        self.assertIsNone(cards._real_live_score({"home_score": "--"}, "home"))
+
+    def test_the_artifact_placeholder_is_never_the_source(self) -> None:
+        """REACHABILITY: the fix is worth nothing if the caller still reads the
+        artifact field. Assert the placeholder key is not consulted."""
+        src = io.open("syndicate/features/soccer/cards.py", encoding="utf-8").read()
+        self.assertNotIn('match.get("live_home_score")', src)
+        self.assertNotIn('match.get("live_away_score")', src)
+        self.assertIn('_real_live_score(live_state, "home")', src)
+
+
 class DateBoardTests(unittest.TestCase):
     def test_the_date_board_orders_live_first_and_finals_last(self) -> None:
         games = [
