@@ -890,6 +890,59 @@
 
   function renderMovement(item) {
     const sparkline = _movementSparkline(item);
+
+    // THE CURRENT, AUTHORITATIVE SOURCE (`#372`, shipped 2026-08-16,
+    // `_movement_from_opening` in layer2_board.py) -- top-level
+    // `movement_*` fields computed against the CLV opening ledger, not
+    // the two legacy shapes below (`item.line_odds_movement` and the
+    // nested `item.movement` object). Measured live 2026-08-20: those two
+    // legacy shapes covered 4 of 461 rows between them, while these
+    // top-level fields carried real tracked/flat data for 179 -- the
+    // backend fix reached production and computed real movement for the
+    // large majority of eligible rows, and nothing here ever read it.
+    // Checked FIRST, ahead of everything below, which now exists only as
+    // a fallback for any row not yet routed through that function.
+    const state = String(item.movement_state || "").trim().toLowerCase();
+    if (state === "not_tracked") {
+      return '<span class="board-blotter__muted" title="The odds tracker keeps line history for h2h, totals and spreads only — this market has no series to move">Not tracked</span>';
+    }
+    if (state === "no_opening_for_row" || state === "no_openings" || state === "unkeyable") {
+      return '<span class="board-blotter__muted" title="This row has no matching opening price recorded yet — check back after the next capture cycle">No opening recorded</span>';
+    }
+    if (state === "no_comparable_price") {
+      return '<span class="board-blotter__muted" title="The line moved since we published this row, so the price at open and now are not the same bet">No comparable price</span>';
+    }
+    if (state === "tracked" || state === "flat") {
+      const priceDelta = numericValue(item.movement_price_delta);
+      const lineDelta = numericValue(item.movement_line_delta);
+      const parts = [];
+      if (priceDelta !== null && priceDelta !== 0) {
+        parts.push(`Odds ${priceDelta > 0 ? "+" : ""}${priceDelta}`);
+      }
+      if (lineDelta !== null && lineDelta !== 0) {
+        parts.push(`Line ${lineDelta > 0 ? "+" : ""}${lineDelta}`);
+      }
+      const label = parts.length ? parts.join(" · ") : "Flat";
+      // `movement_direction` covers price; `movement_line_direction` is the
+      // fallback for a line-only move (spreads/totals with no comparable
+      // price -- see `movement_basis === "line_moved"`). "toward"/"against"
+      // are already resolved against the BETTOR's side server-side (that
+      // resolution, done wrong once, is the single defect this repo has
+      // paid for the most in this area -- see `_movement_from_opening`'s
+      // own comment) -- map straight to the existing up/down arrow classes
+      // rather than re-deriving anything client-side.
+      const direction = item.movement_direction || item.movement_line_direction || "flat";
+      const arrowDir = direction === "toward" ? "up" : direction === "against" ? "down" : "flat";
+      const sinceAgo = formatRelativeTime(item.movement_opened_at);
+      const agoText = sinceAgo ? ` · ${sinceAgo}` : "";
+      // The steam BADGE (renderCard's own badges row, "⚡ Steam") already
+      // covers `item.steam` once isSteamCandidate() reads it -- see below.
+      // No second indicator here; this line stays the plain movement fact.
+      return `<span class="board-card__movement-arrow--${arrowDir}">${_movementArrow(arrowDir)}</span> ${escapeHtml(label)}${escapeHtml(agoText)}${sparkline}`;
+    }
+
+    // Fallback below: legacy shapes, for any row this session's audit did
+    // not measure carrying real data in (`state` above was empty/unknown).
     const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
     // #368: "we do not measure this" is a different answer from "it has not
     // moved", and both used to render an identical bare dash -- which is why
@@ -1100,6 +1153,16 @@
   }
 
   function isSteamCandidate(item) {
+    // `item.steam === true` is the REAL signal for a layer2_shortlist-sourced
+    // row (set directly by `_movement_from_opening` in layer2_board.py when
+    // a price move clears its size-and-clock bar -- ">=15 points AND within
+    // 3h of our own publish"). `candidate_type === "steam"` is a SEPARATE,
+    // older signal from a different candidate pipeline (recommendation_engine.py)
+    // that never carries through to these rows -- measured live 2026-08-20:
+    // `candidate_type` was missing on 506 of 512 board rows, so this check
+    // alone could never fire for the board this function actually serves.
+    // Both checked, neither replaces the other.
+    if (item.steam === true) return true;
     return String(item.candidate_type || item.type || "").trim().toLowerCase() === "steam";
   }
 
