@@ -5389,7 +5389,38 @@ stopped then), so "no `LAYER2_SHORTLIST` since 10:56" is a real absence and not
 a search-window artifact. Worth stating because the worker is chatty enough that
 100 unfiltered lines cover only ~20 seconds.
 
-### `#387` — **MEASURED 2026-08-14: THE GUARD HAS NEVER ONCE BEEN SATISFIED. 97 of 100 runs produced NOTHING.** Not a stale constant — a threshold this container cannot meet
+### `#387` — **OPEN, UNOWNED. CONFIRMED LIVE 2026-08-19 ~20:3xZ CT: the 3000MB MLB floor is a deliberate circuit breaker, correctly firing under real load — do not lower it.** Real fix is still `build_cards_page_context` running HYDRATED on the worker with `force_refresh=True`; nobody has done that work yet.
+
+**CONFIRMED 2026-08-19 20:29-20:34 CT, unrelated session (soccer-odds-capture-
+cadence-gap), independent of the analysis below.** Investigating a "no MLB on
+the Layer 2 board" report, found the guard firing live and repeatedly:
+
+```
+20:29:53  OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor_mb=3000 sports_done=0
+          current_mb=3446.8  headroom_mb=2339.1
+20:32:59  same                                      current_mb=3585.4  headroom_mb=2740.0
+20:34:53  same                                      current_mb=3611.0  headroom_mb=2715.7
+```
+
+Every reading has 2.3-2.7GB of headroom — comfortably above the OTHER seven
+sports' 1500MB floor (which is why NFL/soccer/WNBA kept showing up while MLB
+alone dropped) — but below MLB's 3000MB requirement. `refresh-worker` was
+genuinely busy (84-88% of its 4GB ceiling): that session's own manual soccer
+odds-refresh trigger, two of its own deploys, plus whatever else was
+concurrent. First read of this ticket suggested "127MB stage, 23x over-
+reserved, lower it" — that framing is the ALREADY-RETRACTED one below (see
+"RETRACTED 2026-08-14 05:1xZ"); re-reading the full ticket before acting
+caught it. **Nothing here changes the retraction's conclusion — this is a
+second, independent confirmation that the guard is doing its job, five days
+later, under a different session's load.** MLB's board reappeared on its own
+once load eased; no code touched.
+
+**THIS TITLE ITSELF WAS STALE UNTIL TONIGHT** — it still read "not a stale
+constant, a threshold this container cannot meet" from the 2026-08-14 05:1xZ
+snapshot, one retraction behind the ticket's own body. Corrected above.
+
+**MEASURED 2026-08-14: THE GUARD HAS NEVER ONCE BEEN SATISFIED (superseded,
+see retraction below). 97 of 100 runs produced NOTHING.**
 
 **THIS IS THE LARGEST CORRECTNESS DEFECT FOUND ON 2026-08-13/14, larger than the
 `#423` leak.** The leak at least permitted intermittent builds. This has emptied
