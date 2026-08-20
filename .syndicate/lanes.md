@@ -650,11 +650,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 ### football-model-owner — OPEN — **CONSOLIDATION SHIPPED: 114 files / 5+ lanes / 3 deploys, all content-verified. Found the test suite's collection hang and RETRACTED my own false failure report.** — opened 2026-08-18 — session: football-model-owner
 - Status: **everything on `origin/main`, ahead 0.** Consolidated deploys live:
   refresh-worker `db469003`, live-odds-worker `a381d652`, web `454f3caa`.
-- **THE SUITE IS SLOW FROM TEST INTERACTION, NOT COLLECTION.** Collection of
-  all 8,900 tests is 6.06s. 66 soccer files run singly total 249.9s; the same
-  67 in ONE process take 875.8s (3.50x). Files are fast alone, slow together —
-  cost is superlinear in FILE COUNT PER PROCESS. Keep runs to a few files;
-  a bigger `-k` will not help and explicit lists are not faster (875.8 vs 822.4).
+- **THE SOCCER SUITE IS SLOW BECAUSE OF ONE FILE.**
+  `tests/test_soccer_market_anchoring.py` alone: 13 passed in **1,064s**. The
+  other 41 soccer files total ~136s; collection of all 8,900 tests is 6.06s.
+  Eight tests run Monte Carlo (`simulations=300`) inside a solver loop.
+  **`--deselect` it and soccer finishes in ~2 min.** My earlier 'collection'
+  and 'test interaction' claims were BOTH measurement bugs — a `timeout 300`
+  killed this file and wrote `none`, which my baseline sum then dropped.
 
 - **I RETRACTED my own "~12 failures" report** — it was progress dots from a
   run killed mid-collection. Run to completion: 765 passed, 0 failed. **A partial

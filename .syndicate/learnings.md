@@ -3306,3 +3306,53 @@ against a 67-file run. Each was written down as measured before it was measured.
 Two files vs sixty-seven differs in count AND in selection mechanism; attributing
 the gap to the mechanism was unfounded. And a ratio needs both terms measured
 over the SAME population — check the denominator's `n` before dividing.
+
+---
+
+## 2026-08-20 — A TIMEOUT WROTE `none` AND I DIVIDED BY IT. Four false diagnoses, one root habit.
+
+**The answer was one slow file. It took four wrong theories to get there, and
+every one of them was MY measurement, not the system.**
+
+    tests/test_soccer_market_anchoring.py ALONE   13 passed in 1,064s (17m44s)
+    the other 41 soccer files                     ~136s combined
+    collect-only, all 8,900 tests                    6.06s
+
+Eight tests calling `simulated_home_win_probability(simulations=300)` and
+`solve_market_rating_shift(simulations=100)` — Monte Carlo inside a solver loop.
+Ordinary slow compute, visible in the source in ten seconds of reading.
+
+**THE FOUR WRONG ANSWERS, in order:**
+
+1. **"~12 failures in the deployed areas."** Progress dots from a run killed at
+   25%, read as results. Truth: 765 passed, 0 failed. I proposed rolling back
+   three verified deploys on it.
+2. **"The cost is COLLECTION."** Two data points, wrong variable. Collection is
+   6.06s.
+3. **"Explicit file lists, not `-k`."** Backwards — explicit was SLOWER
+   (875.8 vs 822.4). The 5-second run behind the theory was fast because it was
+   TWO FILES.
+4. **"Superlinear test interaction, 4.76x."** **The instructive one.** My timing
+   loop ran `timeout 300 pytest "$f"`, which KILLED the 17-minute file and wrote
+   the literal string `none`. My parser skipped `none` rows, so the baseline
+   silently EXCLUDED the most expensive file — then I divided a 67-file total by
+   a 66-file sum and called the gap "interaction". Files 1-25 showed 1.0x only
+   because the file is #31.
+
+**THE ROOT HABIT: a missing measurement is not a zero, and a timeout MANUFACTURES
+missing measurements from exactly the cases that matter most** — the slowest
+ones. A timeout is a sampling filter biased against your own hypothesis.
+
+**RULES.**
+- When a timing loop can time out, record the TIMEOUT explicitly and make the
+  aggregate REFUSE to compute rather than silently dropping the row. `none` in a
+  data file must never reach a `sum()`.
+- Before dividing, assert both terms cover the SAME population — compare the `n`
+  of numerator and denominator, and print it.
+- **Read the source of the slow thing before theorising about the runner.** Two
+  `simulations=` kwargs would have ended this at attempt one; instead I profiled
+  pytest four times.
+
+**Cost:** roughly three hours, four ledger corrections, and a proposed rollback
+of 114 verified files. The deploys were never at risk — every one was verified
+by content and served payload, independent of any test.

@@ -2153,29 +2153,35 @@ move is a single-file `git checkout origin/main -- <path>` followed by a commit 
 `checkout <rev> -- <path>` writes the index EVERY session shares, and a stray
 staged file is what gets swept into someone else's commit.
 
-**THE TEST SUITE IS SLOW FROM TEST INTERACTION, NOT COLLECTION — and my first
-diagnosis was WRONG** `[measured 2026-08-20, corrected same session]`.
+**THE SOCCER SUITE IS SLOW BECAUSE OF ONE FILE. Both of my earlier diagnoses
+were measurement bugs** `[bisected 2026-08-20]`.
 
-    collect-only, all 8,900 tests        6.06s   <- collection is NOT the cost
-    66 soccer files run ONE AT A TIME  249.9s   (183.9s net of ~1s startup each)
-    the SAME 67 files in ONE process   875.8s
-    -> 3.50x the sum, 4.76x net.  Median file: 2.29s.  Slowest: 38.30s.
+    tests/test_soccer_market_anchoring.py  ALONE  13 passed in 1,064s (17m44s)
+    the other 41 soccer files                     ~136s combined
+    collect-only, all 8,900 tests                    6.06s
 
-**Files are FAST alone and SLOW together**, so the cost is accumulated in-process
-state — a fixture or cache that grows across modules — NOT collection, NOT a few
-slow tests. Slowest four are `test_soccersim_distribution` (38.3s),
-`test_soccer_team_ratings_as_of` (23.0), `test_soccer_live_lens` (21.7),
-`test_soccer_adapter` (20.7); everything else is ~2s.
+Eight tests in that ONE file: 241s, 163s, 124s, 122s, 120s, 118s, 116s, 55s.
+They call `simulated_home_win_probability(simulations=300)` and
+`solve_market_rating_shift(simulations=100)` — **Monte Carlo inside a solver
+loop**, so every solver iteration runs hundreds of match simulations. Real
+compute; not a fixture, not collection, not accumulated state.
 
-**RETRACTED, both halves:** I recorded "the cost is COLLECTION" and "use explicit
-file lists, not `-k`". Both false. Collection is 6s, and explicit files were
-SLOWER (875.8s vs `-k`'s 822.4s). The 5-second run that produced that theory was
-fast because it was TWO FILES, not because it avoided `-k`.
+**RETRACTED — THREE claims, all mine, all from measurement bugs:**
+1. *"The cost is COLLECTION."* No: collection is 6.06s for all 8,900 tests.
+2. *"Use explicit file lists, not `-k`."* No: explicit was SLOWER (875.8 vs 822.4).
+3. *"Superlinear TEST INTERACTION, 4.76x."* **No — and this is the instructive
+   one.** My per-file timing loop used `timeout 300`, which KILLED this file and
+   wrote `none`. It never entered the "sum of individual runs", so the baseline
+   was missing the single most expensive file. Files 1-25 showed 1.0x only
+   because this file is #31. **There is no interaction effect.**
 
-**Practical rule that survives:** keep a run to a handful of files. 3 files = 74
-tests in 2.97s; 67 files = 646 tests in 875.8s. The penalty is superlinear in
-FILE COUNT PER PROCESS, so `-p xdist` or batching would help and a bigger `-k`
-will not.
+**What is actually true:** one pathologically slow file dominates. Anyone running
+soccer tests should `--deselect tests/test_soccer_market_anchoring.py` (or fix
+its simulation counts) and the rest finish in ~2 minutes.
+
+**Note on precision:** the same file measured 511s inside a 42-file run and
+1,064s alone, because several runs overlapped on this machine. Treat the
+magnitude as "8-17 minutes, dominant either way", not a precise constant.
 
 **CONSOLIDATED DEPLOYS ARE THE WORKING PATTERN FOR A BUSY DAY** `[2026-08-20]`.
 114 files / 5+ lanes / **3 deploys**: refresh-worker `db469003` (9 files,
