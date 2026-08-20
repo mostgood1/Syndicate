@@ -2620,3 +2620,40 @@ cheap probe was the right one — after 7,528 credits went on a wrong sport key.
 **Before any purchase: (1) does the vendor have it, (2) does something local
 already have it.** The second question is the one I skipped both times, and the
 answer here had been sitting in the repo's own ingestion module the whole time.
+
+---
+
+## 2026-08-20 — TRIMMING state.md AND learnings.md DOES NOT FIX THE DIGEST. Measured.
+
+**I told the user both files "arrive lossy at session start". That was wrong,
+and I had not read the hook that builds the digest.**
+
+`.claude/hooks/session-start.sh`, measured:
+
+- **`state.md` is NEVER read by the digest.** Its own header records why: v1
+  cat-ed state.md and spent the entire ~2KB budget on it, so the operational
+  sections never reached context. That was fixed long ago. **state.md's byte
+  size costs nothing at session start** — it costs only whoever opens the file.
+- **`learnings.md` is read for HEADINGS ONLY**, via
+  `grep -E '^###.*(FORBIDDEN|EXONERATED)'`, capped at `RULE_CAP=450`. Body bytes
+  are never read. **Trimming entry bodies cannot change what the digest shows.**
+- **`lanes.md` OPEN LANES is capped at `LANE_CAP=600`** on slug+goal text. With
+  11 open lanes that payload is ~748 B, so it truncates **regardless of file
+  size**. Trimming lanes.md from 134KB to 100KB did NOT stop that section
+  truncating — the driver is lane COUNT, not bytes.
+
+**AND A REAL DEFECT THE MEASUREMENT EXPOSED.** The grep requires `###`, but
+learnings.md entries are written at `##`. Counted on origin:
+
+    headings matching the digest's grep (^###) :  9
+    FORBIDDEN/EXONERATED written at ## level   : 35   <- INVISIBLE to every session
+
+**Only 9 of 44 standing rules reach any session**, and the 35 that do not
+include several written today. A rule nobody is shown is not a rule. Handed to
+`repo-coordination`, which claims that hook.
+
+**The general lesson: before optimising a number, read the code that consumes
+it.** "Over budget" was a byte comparison against a per-file cap; I assumed it
+described the digest's behaviour and spent effort on the wrong quantity. The
+byte caps and the digest's caps are unrelated mechanisms that happen to share
+the word "cap".
