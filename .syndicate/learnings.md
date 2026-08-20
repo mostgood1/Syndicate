@@ -2729,3 +2729,49 @@ comparison.
 cherry-EQUIVALENT to upstream (or you are discarding real work). Both were
 verified here — 19 of 19 equivalent — which is what made the repair safe rather
 than lucky.
+
+## 2026-08-20 — A STALE-BASE PUSH DOES NOT LOSE WORK ONCE; IT POISONS THE BASE
+
+I staged a blob against an older `origin/main` and pushed. It silently reverted
+`#482`'s four allowlist entries. I restored them. **Then `#488` based their work
+on MY clobbered version and removed them a second time** — their change was
+unrelated and blameless; my revert had become their starting point.
+
+That is the part worth generalising: a stale-base push is not a self-contained
+mistake you can undo. Every session that pulls after you inherits the deletion,
+and the second loss arrives wearing someone else's name. On a repo with parallel
+sessions the blast radius is time-extended, not bounded to your own commit.
+
+It was caught only because the pushed numstat read **27 deletions where my change
+was -5**.
+
+**How to apply.**
+- Before ANY push built from a blob: `git diff --numstat <base> <commit>` and
+  account for the deletion count. If it exceeds what you deleted on purpose, you
+  are reverting someone. This is the single cheapest check in the repo.
+- Re-read `origin/main` immediately before constructing the tree, not at the
+  start of the task. Mine was minutes stale and that was enough.
+- Restoring must be ADDITIVE on the current tip — re-insert at the original
+  anchor — never "push my good version back", which re-clobbers whatever landed
+  in between.
+- If you discover your revert propagated, say so in the commit message and name
+  the innocent commit. `#488` would otherwise show up in `git log` as the session
+  that deleted the entries.
+
+## 2026-08-20 — A MUTATION TEST THAT MUTATES A COMMENT PROVES THE OPPOSITE OF WHAT IT LOOKS LIKE
+
+To check my new tests were load-bearing I replaced `"*arsenal_*.json"` with the
+bare form and ran them. **16 passed.** The honest reading of that is "these tests
+are worthless"; the true reading was that `str.replace(..., 1)` had hit the FIRST
+occurrence — inside the explanatory comment I had just written — and the tuple
+was never touched.
+
+A green mutation run is evidence about the mutation as much as the test. Both
+"the test is weak" and "the mutation did not happen" produce it, and they demand
+opposite responses.
+
+**How to apply.** Assert the mutation took effect before trusting the result —
+re-import the symbol and print it, or anchor on a form that appears exactly once
+(here: leading indentation plus trailing comma). Documenting a bug in a comment
+NEXT TO the code makes the code and its description textually identical, which is
+precisely what defeats a naive replace.

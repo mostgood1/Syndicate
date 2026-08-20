@@ -18620,3 +18620,57 @@ the previous day in CST. An unparseable kickoff returns None and is EXCLUDED
 rather than defaulting onto the asking board. 11 new assertions anchored to
 the eight kickoffs above plus both DST boundaries; 91 targeted tests green.
 
+---
+
+## refresh-worker `39570b24` — SEASON-ARTIFACT PULL FIXED AND MEASURED — `#440`
+
+    deploy    dep-da3jr83bc2fs7398joqg, live 2026-08-20T17:54:04Z
+    parent    df04c294 (the LIVE SHA). Base re-verified AT CUT TIME: live->main
+              diff was exactly +28/-5 with the five deletions being precisely the
+              bare patterns replaced, and the #482/#477/#474 allowlist entries
+              already present at df04c294 and untouched.
+
+**ROOT CAUSE: one missing `*`.** `_SEASON_ARTIFACT_PATTERNS` held bare filename
+globs. The export endpoint matches `fnmatch(relative_path, pattern)`
+(`ops.py:1349`) against the FULL path, and fnmatch anchors both ends:
+
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "arsenal_*.json")  -> False
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "*arsenal_*.json") -> True
+
+Five requests, zero files, every season-scoped sim input absent from the worker.
+
+**MEASURED, the reading that proves it (sim_input_report, host=worker):**
+
+    BEFORE  gen 17:22:58Z   all five exists=False
+    AFTER   gen 18:03:12Z   arsenal          exists=True n_pitchers=466 bytes=546,739
+                            conditional_mix  exists=True n_pitchers=728 bytes=476,461
+                            batted_ball      exists=True n_pitchers=509 bytes=219,440
+                            quality          exists=True n_pitchers=509 bytes=79,053
+                            pitch_splits     exists=True n_pitchers=305 bytes=225,010
+
+Byte counts match web's copies exactly, so the transport is intact, not truncated.
+
+**THE FIELDS ARE STILL 0.0% AND THAT IS EXPECTED — STATED BEFORE THE READING,
+NOT AFTER.** Presence and population are SEPARATE milestones. The pull runs at
+sim start; this run then REUSED today's rosters (built ~07:37Z, eight hours
+before the artifacts arrived), and the appliers only write these fields during a
+roster BUILD. `nfail` stays 15 until a rebuild happens with the artifacts
+present.
+
+**WHAT THIS UNBLOCKS.** This morning's conditional-mix wiring (`85296826`) was
+INERT for this reason, not for a fault in the wiring: `conditional_mix_2026.json`
+had never been on the worker. Tomorrow's deferred verification would have failed
+regardless of any roster rebuild. It can now actually succeed.
+
+**verify on 2026-08-21:** first `sim_input_report_2026-08-21.json` — the 08-21
+slate's first build is a genuine rebuild with the artifacts present. Expect
+`nfail` 15 -> 6: `conditional_arsenal`, `count_bucket_map`,
+`conditional_arsenal_source`, `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult` and the four `statcast_splits_*` clearing, with the five
+`vs_pitcher_*` entries STILL present (BVP path, untouched by this work). Still
+15 on a fresh generated_at means a SIXTH cause and must be reopened.
+
+**STILL OPEN, explicitly not fixed by this:** the five `vs_pitcher_*` batter
+fields (separate BVP path), and `vendor/*/data/` statcast caches remaining
+ephemeral and unpublishable — my theory that the latter caused the arsenal
+failure was WRONG, but the fragility is real and undocumented.
