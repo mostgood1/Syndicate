@@ -17611,3 +17611,44 @@ merge. An earlier attempt also had to move an untracked file aside
 (`scripts/build_basketball_home_court_advantage.py`, another lane's `#474`
 work) — backed up first, and verified byte-identical apart from CRLF after the
 merge restored it.
+
+### #478 — WNBA sim buckets intervals with NBA quarter geometry (found via #476) — 2026-08-19
+
+NOT FIXED, filed. Found while building `#476`'s interval calibration.
+
+Production `smart_sim_*.json` reports `intervals.segment_seconds: 180` with
+segment labels `Q1 12-9 / 9-6 / 6-3 / 3-0` -- a 4x180s = 720s = TWELVE-minute
+quarter. **WNBA quarters are 600 seconds.** So the sim buckets scoring as if
+segment 4 were a full 180s window when only 60s of game clock remains in it.
+
+Measured against 89 paired production games (sim `mu` vs ESPN play-by-play
+actuals, bucketed with the same geometry on both sides):
+
+    predicted segment-4 share   0.183
+    actual segment-4 share      0.120
+    sim over-predicts seg 4 by  52%   (8.12 pts vs 5.34 actual)
+
+The whole-game TOTAL is fine (sim 177.0 vs actual 177.8) -- this is purely a
+mis-shaped time distribution, which is exactly what any per-segment or
+quarter-derivative market would be priced off.
+
+**Suspected mechanism** (read from source, not yet proven against a live
+process): `smart_sim.py:4128` is
+`quarter_seconds = int(getattr(LEAGUE, "regulation_period_seconds", 12*60) or (12*60))`.
+The vendored WNBA league sets `regulation_period_seconds = 600`
+(`league.py:43`), so a 720 in production implies production runs a build where
+that attribute is absent or zero and the NBA fallback wins. Note the `or`
+triggers on ZERO as well as on missing -- a config setting it to 0 would
+silently become NBA geometry with no error.
+
+**Why filed rather than fixed here**: the fix is in vendored engine geometry,
+not in this lane's files, and changing quarter geometry shifts every
+per-segment output at once -- it needs its own before/after measurement
+rather than riding along inside a calibration commit.
+
+**Interaction with `#476`, important for whoever takes this.**
+`intervals_time_profile.json` currently COMPENSATES for this bug (it pushes
+points out of segment 4). The artifact stamps `fitted_segment_seconds: 180`
+and carries an explicit `geometry_warning` for exactly this reason: **if the
+geometry is corrected, that profile MUST be rebuilt**, or it will
+double-correct a bias that no longer exists.
