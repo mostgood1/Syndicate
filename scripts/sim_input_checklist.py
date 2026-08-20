@@ -73,6 +73,62 @@ def _data_root() -> Path:
     return Path(root).expanduser().resolve() if root else (REPO / "data")
 
 
+def _season_artifact_probe(season: int = 2026) -> dict:
+    """Is each season-scoped sim input actually PRESENT AND LOADABLE here?
+
+    WHY THIS EXISTS. `pitch_type_whiff_mult` read 0.0% in production on
+    2026-08-20 while the arsenal artifact was published, schema-valid on web
+    (466/466 pitchers carrying the multipliers), the consumer was provably
+    REACHED (the calls on both sides of it populated at 76.87%), and the real
+    `apply_arsenal_to_pitcher` populated 5/5 pitchers when run against the real
+    file locally. Four hypotheses died against that evidence. The one link
+    nobody could read was the simplest: **does the file exist on the WORKER at
+    build time?**
+
+    `pull_season_artifacts()` runs before the build and its own docstring warns
+    that "a return of 0 is not proof of success" -- and its `SEASON_PULL`
+    diagnostics are INVISIBLE, because the sim job's stdout is redirected to a
+    disk file that Render's log API cannot serve (confirmed by control:
+    `[artifact_publisher]` lines reach the collector, `[mlb_sim_job]` lines
+    return zero hits).
+
+    Cheap on purpose: stat + parse + count. No network, no per-pitcher work.
+    This is the probe `--simulate-rebuild` cannot safely be on a worker near its
+    memory cap, since that path calls the per-pitcher BVP fetch.
+    """
+    root = _data_root()
+    specs = (
+        ("arsenal", f"mlb_source/source_artifacts/data/arsenal/arsenal_{season}.json",
+         ("pitchers", "batters")),
+        ("conditional_mix", f"mlb_source/source_artifacts/data/conditional_mix/conditional_mix_{season}.json",
+         ("pitchers",)),
+        ("batted_ball", f"mlb_source/source_artifacts/data/batted_ball/batted_ball_{season}.json",
+         ("pitchers", "batters")),
+        ("quality", f"mlb_source/source_artifacts/data/quality/quality_{season}.json",
+         ("pitchers", "batters")),
+        ("pitch_splits", f"mlb_source/source_artifacts/data/pitch_splits/pitch_splits_{season}.json",
+         ("pitchers",)),
+    )
+    out = {"data_root": str(root), "season": int(season), "files": []}
+    for name, rel, keys in specs:
+        p = root / rel
+        row = {"name": name, "path": str(p), "exists": False}
+        try:
+            row["exists"] = p.is_file()
+            if row["exists"]:
+                row["bytes"] = int(p.stat().st_size)
+                row["mtime"] = float(p.stat().st_mtime)
+                doc = json.loads(p.read_text(encoding="utf-8"))
+                row["loadable"] = True
+                for k in keys:
+                    row[f"n_{k}"] = len(doc.get(k) or {})
+        except Exception as exc:
+            row["loadable"] = False
+            row["error"] = f"{type(exc).__name__}: {exc}"[:160]
+        out["files"].append(row)
+    return out
+
+
 SNAPSHOTS = _data_root() / "mlb_source/source_artifacts/data/daily_pitcher_props/snapshots"
 
 # Fields that are legitimately sparse. Documented so a low number here is not
@@ -314,6 +370,8 @@ def main() -> int:
                 # falls back to REPO/data on a dev box and that is "local".
                 "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
             "rosters": len(paths), "counts": n,
+            # the link that four hypotheses could not read remotely
+            "season_artifacts": _season_artifact_probe(),
             "failures": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in failures],
             "warnings": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in warnings],
             "rows": rows,

@@ -437,9 +437,24 @@ def main() -> int:
     if ok and str(os.environ.get("SYNDICATE_MLB_INPUT_CHECKLIST") or "on").strip().lower() not in ("0", "off", "false"):
         try:
             _cl_games = str(os.environ.get("SYNDICATE_MLB_INPUT_CHECKLIST_GAMES") or "8").strip()
+            # `--simulate-rebuild` applies every applier IN-PROCESS, which is the
+            # only way to prove from the worker whether an input is readable
+            # there. It is OPT-IN and OFF by default for a measured reason: that
+            # path calls `apply_starter_bvp_hr_multipliers`, the PER-PITCHER
+            # network fetch that `arsenal.py` documents as ~309 calls / ~80 min,
+            # and this child has a 180s hard timeout on a worker that has run at
+            # 87.9% of its memory cap. Left on by default it would convert a
+            # bounded audit into a timeout that reports nothing.
+            #
+            # Prefer `season_artifacts` in the published report -- it answers
+            # "is the input present and loadable HERE" with a stat and a parse,
+            # no network, and it is always on.
+            _cl_extra = []
+            if str(os.environ.get("SYNDICATE_MLB_INPUT_CHECKLIST_SIMULATE") or "").strip().lower() in ("1", "on", "true"):
+                _cl_extra = ["--simulate-rebuild"]
             _cl = subprocess.run(
                 [sys.executable, str(REPO_ROOT / "scripts" / "sim_input_checklist.py"),
-                 "--games", _cl_games, "--publish", "--warn-only"],
+                 "--games", _cl_games, "--publish", "--warn-only"] + _cl_extra,
                 cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=180,
             )
             _tail = (_cl.stdout or _cl.stderr or "").strip().splitlines()
