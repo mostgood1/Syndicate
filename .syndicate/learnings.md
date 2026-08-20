@@ -1928,3 +1928,95 @@ of truth, git is a lossy mirror" caution is a sibling of this -- both are
 matters" traps), and this session's own earlier xG-double-count fix (a
 different flavor of the same family: code that is locally correct and
 globally wrong).
+## 2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.
+
+I told the user a roster-rebuild gate set for `2026-08-19` had **expired
+unspent**, and separately keyed a status-artifact watcher on `2026-08-20`. Both
+were wrong for the same reason: **00:xx UTC is 19:xx CT on the PREVIOUS day.**
+The slate date rolls at 05:00Z, not 00:00Z. The gate was still live with ~3.5
+hours to spare, and the watcher spent ~30 minutes reading a document from
+`23:08:01Z` that no sim was going to update, reporting `evidence=no` each time
+and looking exactly like a failed deploy.
+
+This is the SECOND time this session pattern has cost real time (see the earlier
+"report local time, not UTC" correction). The failure is not arithmetic — it is
+reading a UTC clock and reasoning about a CT-keyed artifact without converting.
+
+**How to apply:** any artifact keyed by SLATE date — ladders, sims, status
+documents, rebuild gates — is on Central time. Before concluding a document is
+missing, stale, or expired, convert: `slate_date = (utc - 5h).date()`. A watcher
+keyed on the wrong date does not return "nothing happened", it returns a
+CONFIDENT WRONG ANSWER, because the document it is polling really does exist and
+really is old.
+
+---
+
+## 2026-08-19 — a single read of a MULTI-WORKER service is not a measurement
+
+Distinct from the "read it 60 seconds after deploy" entry above, and it bit in
+the same hour. That one was about TIMING — an async sync had not landed yet.
+This one is about SAMPLING: the service genuinely returns different answers to
+identical requests, and one read gives you whichever worker answered.
+
+**Measured.** After deploying the NCAAF SP+ artifact I probed
+`/ncaaf/api/cards?week=1` once, saw the SP+ signature, and reported PASS. Probing
+**12 times** returned **9 PPA / 3 SP+** — the board was serving two different
+models depending on which gunicorn worker handled the request. Cause:
+`WEB_CONCURRENCY > 1` means several worker PROCESSES each build the app
+independently and each holds its own `lru_cache` of the projection index. Workers
+that read the mounted disk before `bootstrap_data_root` synced cached the OLD
+artifact; workers that read after cached the new one. Both answers persist until
+the workers restart.
+
+**Why one sample is worse than useless here:** it is not noisy-but-centred, it is
+BIMODAL. A single read does not give you an estimate with error bars, it gives
+you one of two categorical answers, and which one is pure luck. I got the
+flattering one and banked it.
+
+**The rule going forward.** Verifying anything on a multi-worker service —
+post-deploy or not — means PROBING REPEATEDLY and reporting the distribution,
+not a value. If the probes disagree, that disagreement IS the finding: it means
+the workers hold different state, and a deploy (which restarts them) is what
+resolves it. Report "10/10" or "9 of 12", never a bare reading.
+
+**Corollary that generalises past web:** any cache keyed per-process, per-worker
+or per-container makes "what does the service return" a distribution question.
+The same applies to the refresh-worker's own caches and to anything read through
+a load balancer.
+
+**Cost:** one wrong PASS reported to the user, inside the same hour as a wrong
+FAIL from the timing version. Two opposite errors, one root habit — reading once
+and treating the answer as the truth.
+## Ancestry is the wrong test for a cherry-picked deploy `[2026-08-20]`
+
+**Believed:** `git merge-base --is-ancestor <fix> <live_sha>` tells you whether
+a fix is live.
+
+**Actually:** a cherry-pick creates a NEW commit with a new SHA, so the
+ORIGINAL commit is never an ancestor of it. Checking `#475` on web that way
+returned NO for a deploy that was completely correct — the test was wrong, not
+the deploy. Nearly reported a successful deploy as failed.
+
+**Rule:** for any cherry-picked/scoped deploy — which on this repo is MOST of
+them, because service live-SHAs are usually off-main — verify by CONTENT
+(`git show <live_sha>:<path> | grep <the new symbol>`), never by ancestry.
+Ancestry is only valid when deploying a commit that literally descends from
+what is live.
+
+## `HOT_ARTIFACT_PATTERNS` is about worker→web, not "can the sim see it" `[2026-08-20]`
+
+**Believed:** `#474`'s and `#477`'s new artifacts were blocked from production
+by the missing allowlist entries, so the work was inert until another lane
+added them.
+
+**Actually:** every consumer of those artifacts is the SIM, which runs
+worker-side and reads them from its own `processed_root`.
+`HOT_ARTIFACT_PATTERNS` governs PUBLISHING worker→WEB. A builder running
+inside the worker refresh writes to the same disk its reader uses, so no
+allowlist is involved in making it work. The allowlist buys external
+auditability via `/api/ops/artifacts/export` — worth having, not blocking.
+
+**Rule:** before treating an allowlist entry as a blocker, name the READER and
+the disk it reads from. "Producer and consumer are both worker-side" and
+"needs to cross to web" are different problems with different fixes, and
+conflating them makes a lane wait on another lane for no reason.
