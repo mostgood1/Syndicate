@@ -43,9 +43,22 @@ from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
 from syndicate.features.soccer.ingestion.espn_live_state import build_live_state
+from syndicate.features.soccer.ingestion.espn_match_box import build_match_box
 from syndicate.features.soccer.sources import active_leagues_for_date
 
 _GOAL_WINDOWS_SECONDS = {"next_10_min": 600.0, "next_5_min": 300.0}
+
+
+def _as_of_seconds(event: dict[str, Any]) -> float | None:
+    """ESPN's live match clock in seconds, or None if it did not report one."""
+    value = event.get("status_clock_seconds")
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0.0 else None
 
 
 def _team_player_rows(player_rows: list[dict[str, Any]], team_name: str) -> list[dict[str, Any]]:
@@ -64,6 +77,110 @@ def _rating_for(ratings: dict[str, dict[str, float]], team_name: str) -> dict[st
     return ratings[matched]
 
 
+def _build_match_boxes(
+    league: str,
+    iso_date: str,
+    *,
+    out_path: Path,
+    summaries: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Per-match box scores for every `in` and `post` fixture on this date.
+
+    Soccer's box tab rendered only sim squad projections -- no counterpart to
+    MLB's real "Live / final box" -- while the numbers for one sat unused in
+    the match summary this poller was already fetching. See
+    `ingestion/espn_match_box.py`.
+
+    A FINISHED MATCH IS FETCHED ONCE, EVER. `live_lens_loop` ticks this
+    roughly every 60s across ten leagues, so re-deriving every completed
+    fixture's box on every tick would add an ESPN summary call per finished
+    match per minute, all day, to recompute a value that cannot change --
+    exactly the "worker periodic work is never free" failure that caused a
+    production restart loop under `#241`. A `post` box already carrying
+    `final: true` in the artifact on disk is carried forward untouched.
+
+    An in-progress match IS re-derived every tick, because its box is the
+    thing that is moving.
+
+    Failures are per-event and non-fatal: a box score is a display nicety and
+    must never take down the live-lens projection, which is the product.
+    """
+    compact = iso_date.replace("-", "")
+    window = f"{compact}-{compact}"
+    try:
+        events = fetch_events(league, date_windows=[window], statuses={"in", "post"})
+    except Exception as error:
+        print(
+            f"[soccer_live_state] BOX_EVENTS_FAILED league={league} date={iso_date} "
+            f"error={type(error).__name__}: {error}",
+            flush=True,
+        )
+        return {}
+
+    prior: dict[str, Any] = {}
+    if out_path.exists():
+        try:
+            existing = json.loads(out_path.read_text(encoding="utf-8"))
+            candidate = existing.get("match_box") if isinstance(existing, dict) else None
+            if isinstance(candidate, dict):
+                prior = candidate
+        except Exception:
+            prior = {}
+
+    boxes: dict[str, Any] = {}
+    reused = 0
+    for event in events:
+        event_id = str(event.get("event_id") or "")
+        if not event_id:
+            continue
+        is_final = str(event.get("status_state") or "") == "post"
+        cached = prior.get(event_id)
+        if is_final and isinstance(cached, dict) and cached.get("final"):
+            boxes[event_id] = cached
+            reused += 1
+            continue
+        summary = summaries.get(event_id)
+        if summary is None:
+            try:
+                summary = fetch_match_summary(league, event_id)
+            except Exception as error:
+                print(
+                    f"[soccer_live_state] BOX_SUMMARY_FAILED league={league} "
+                    f"event={event_id} error={type(error).__name__}: {error}",
+                    flush=True,
+                )
+                continue
+        try:
+            record = build_match_box(summary, event_id=event_id)
+        except Exception as error:
+            print(
+                f"[soccer_live_state] BOX_BUILD_FAILED league={league} "
+                f"event={event_id} error={type(error).__name__}: {error}",
+                flush=True,
+            )
+            continue
+        record["final"] = is_final
+        record["status_state"] = event.get("status_state")
+        record["status_detail"] = event.get("status_detail")
+        record["status_display_clock"] = event.get("status_display_clock")
+        record["status_period"] = event.get("status_period")
+        # ESPN's scoreboard score, alongside the keyEvents-derived one in
+        # `games`. For a FINAL match this is the only score that exists --
+        # nothing writes a `games` entry for a finished fixture.
+        record["score_home"] = event.get("home_score")
+        record["score_away"] = event.get("away_score")
+        record["home_team"] = event.get("home_team")
+        record["away_team"] = event.get("away_team")
+        boxes[event_id] = record
+    if reused:
+        print(
+            f"[soccer_live_state] BOX_REUSED league={league} date={iso_date} "
+            f"final_cached={reused} built={len(boxes) - reused}",
+            flush=True,
+        )
+    return boxes
+
+
 def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
     compact = iso_date.replace("-", "")
     window = f"{compact}-{compact}"
@@ -72,6 +189,9 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
     out_path = api_root / "live_state" / f"live_state_{iso_date}.json"
 
     games: dict[str, Any] = {}
+    # Summaries fetched by the live-lens pass below, reused by the box pass so
+    # an in-progress match costs ONE `fetch_match_summary`, not two.
+    summaries: dict[str, dict[str, Any]] = {}
     if live_events:
         # `as_of` is REQUIRED and this call was missing it, which is the whole
         # live-lens outage. `_load_team_ratings(league, source_root, as_of)`
@@ -112,9 +232,40 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
             event_id = str(event.get("event_id") or "")
             if not event_id:
                 continue
+            # THE REAL CLOCK, PASSED. `build_live_state`'s own docstring says
+            # `as_of_seconds=None` means "full match" and is "the right default
+            # for backtesting against a completed match", and that it is "**not**
+            # a substitute for a true live clock" -- live callers "must source
+            # the actual current clock from ESPN's live status and pass it
+            # explicitly." This caller never did.
+            #
+            # WHAT THAT COST, measured 2026-08-20: with no `as_of_seconds`, the
+            # cutoff is the nominal full-time 5400s, so
+            # `_current_half_and_clock_remaining` returns `(2, 0.0)` for EVERY
+            # live match -- half 2, nothing left to play. Those are the two
+            # fields the card reads for its clock and period, which is why
+            # `shared_game_state` carried `clock: ""` and `period: null` on
+            # fixture 401882908 while it was genuinely in play. Passing ESPN's
+            # `clock` (4200.0 at the 70th minute) returns `(2, 1200.0)`.
+            #
+            # It is NOT only a display bug. `project_live_match` and
+            # `goal_in_window_probability` both project the REMAINDER of the
+            # match from this state, so a live lens that believed every match
+            # had 0 seconds left was projecting nothing forward at all.
+            #
+            # `None` when ESPN omits the clock, which restores the previous
+            # behaviour for that event alone rather than inventing a position.
+            as_of_seconds = _as_of_seconds(event)
             try:
                 summary = fetch_match_summary(league, event_id)
-                live_state = build_live_state(summary, event_id=event_id, home_team=event.get("home_team"), away_team=event.get("away_team"))
+                summaries[event_id] = summary
+                live_state = build_live_state(
+                    summary,
+                    event_id=event_id,
+                    home_team=event.get("home_team"),
+                    away_team=event.get("away_team"),
+                    as_of_seconds=as_of_seconds,
+                )
             except Exception as error:
                 print(f"skip {event_id}: {error}")
                 continue
@@ -142,6 +293,14 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "away_team": live_state["away_team"],
                 "half": live_state["half"],
                 "clock_remaining": live_state["clock_remaining"],
+                # ESPN's own rendering of the same instant, carried through
+                # verbatim so the card shows "80'" rather than re-deriving a
+                # minute from `half`+`clock_remaining` and disagreeing with
+                # every scoreboard on the internet about stoppage time
+                # (ESPN says "90'+7'"; the arithmetic would say "90'").
+                "status_display_clock": event.get("status_display_clock"),
+                "status_period": event.get("status_period"),
+                "status_detail": event.get("status_detail"),
                 "score_home": live_state["score_home"],
                 "score_away": live_state["score_away"],
                 "home_red_cards": live_state["home_red_cards"],
@@ -157,16 +316,32 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "live_player_props": [row.to_dict() for row in sorted(live_props, key=lambda r: r.projected_final_shots, reverse=True)[:12]],
             }
 
+    match_box = _build_match_boxes(league, iso_date, out_path=out_path, summaries=summaries)
+
     payload = {
         "league": league,
         "date": iso_date,
         "generated_at": pd.Timestamp.now("UTC").isoformat(),
         "count": len(games),
         "games": games,
+        # A SEPARATE KEY FROM `games`, deliberately. `games` means "matches in
+        # play" -- `syndicate/features/soccer/live_lens.py` reads it directly
+        # and a finished match appearing there would present a settled result
+        # as live. `match_box` spans `in` AND `post`, because the card needs a
+        # box score in both states and the FINAL one is the case soccer has
+        # never had at all.
+        #
+        # Carried inside this artifact rather than a new file because
+        # `soccer_source/*/api/live_state/live_state_*.json` is ALREADY in
+        # `HOT_ARTIFACT_PATTERNS`; a new path would need an allowlist entry in
+        # `artifact_publisher.py`, which is claimed by two other open lanes,
+        # and an unallowlisted artifact cannot reach web at all.
+        "match_box": match_box,
+        "match_box_count": len(match_box),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    print(f"wrote {out_path} ({len(games)} live games)")
+    print(f"wrote {out_path} ({len(games)} live games, {len(match_box)} box scores)", flush=True)
     return payload
 
 

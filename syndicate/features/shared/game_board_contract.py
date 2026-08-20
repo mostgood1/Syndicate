@@ -761,6 +761,16 @@ def _format_score(value: float | None) -> str:
     return f"{value:.0f}"
 
 
+def _period_display(value: Any) -> str:
+    """A period number as a human would write it: "2", never "2.0"."""
+    if value is None or isinstance(value, bool):
+        return ""
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return str(int(number)) if number.is_integer() else str(value)
+    return str(value).strip()
+
+
 def _actual_score_section(game: dict[str, Any]) -> dict[str, Any] | None:
     """The REAL score, when the game has one.
 
@@ -794,7 +804,12 @@ def _actual_score_section(game: dict[str, Any]) -> dict[str, Any] | None:
         return None
     state = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
     clock = str(state.get("clock") or "").strip()
-    period = str(state.get("period") or "").strip()
+    # `_period_display`, not `str()`. `publication_adapter._shared_game_state`
+    # runs the period through `_first_number`, which returns a FLOAT, so this
+    # rendered every live card's caption as "Live score -- 2.0 12:45".
+    # Cross-sport and pre-existing -- reproduced on an NFL payload while
+    # wiring soccer's clock, which is how it was noticed.
+    period = _period_display(state.get("period"))
     when = " ".join(part for part in (period, clock) if part).strip()
     if final:
         title, body = "Final score", "The result as played."

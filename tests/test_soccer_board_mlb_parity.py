@@ -49,6 +49,73 @@ PROD_PROJECTION = {"away_mean": 0.8, "home_mean": 2.7, "total_mean": 3.49, "marg
 PREGAME = {"final": False, "in_progress": False}
 
 
+
+# The real `match_box` record `poll_soccer_live_state.poll_league` wrote for
+# La Liga fixture 401882908 (ALA @ RAY) on 2026-08-20 -- taken from the
+# artifact the poller actually produced, not hand-written to match the code.
+MATCH_BOX = {
+    "event_id": "401882908",
+    "teams": {
+        "home": {
+            "team": "Rayo Vallecano",
+            "stats": {
+                "Possession": "49.8%",
+                "Shots": "8",
+                "On target": "3",
+                "Corners": "9",
+                "Pass %": "80%",
+            },
+        },
+        "away": {
+            "team": "Alaves",
+            "stats": {
+                "Possession": "50.2%",
+                "Shots": "10",
+                "On target": "1",
+                "Corners": "4",
+                "Pass %": "80%",
+            },
+        },
+    },
+    "goals": [
+        {
+            "team": "Rayo Vallecano",
+            "scorer": "Sergio Camello",
+            "clock": "48'",
+            "clock_seconds": 2839.0,
+            "own_goal": False,
+        }
+    ],
+    "final": False,
+    "status_state": "in",
+    "score_home": "1",
+    "score_away": "0",
+    "home_team": "Rayo Vallecano",
+    "away_team": "Alaves",
+}
+
+
+def _live_match(*, status_state: str, kickoff: str) -> dict:
+    """A recommendations-artifact match in the shape `_match_to_game` reads,
+    carrying the REAL ESPN scores for completed Atletico Madrid v Malaga."""
+    return {
+        "event_id": "401874931",
+        "match_id": "401874931",
+        "date": "2026-08-20",
+        "kickoff": kickoff,
+        "status_state": status_state,
+        "live_home_score": "2",
+        "live_away_score": "0",
+        "matchup": {"home_team": "Atletico Madrid", "away_team": "Malaga"},
+        "win_probability": {"home": 0.55, "draw": 0.25, "away": 0.20},
+        "team_projection": {"home_mean": 1.5, "away_mean": 1.0, "total_mean": 2.5},
+        "total_distribution": {},
+        "volume_projection": {},
+        "periods": {},
+        "top_props": [],
+    }
+
+
 def _tiles(**overrides):
     kwargs = dict(
         away_abbr="COV",
@@ -432,13 +499,28 @@ class LiveScoreTests(unittest.TestCase):
 
 
 class FabricatedScoreTests(unittest.TestCase):
-    """`live_home_score`/`live_away_score` in the recommendations artifact are
-    the STRING "0" on 12 of 12 sampled matches, including `status_state ==
-    "pre"` fixtures that had not kicked off. They are a placeholder the
-    builder writes, not a reading -- nine consecutive 0-0 results across a
-    league's completed slate is not a plausible set of soccer scores.
+    """The score must never be INVENTED -- and the earlier reading of HOW it
+    was being invented was itself wrong, which is why this class is worth
+    reading carefully.
 
-    Publishing them as a score put a fabricated 0-0 on every live match."""
+    THE ORIGINAL DIAGNOSIS: `live_home_score`/`live_away_score` in the
+    recommendations artifact were "the string '0' on 12 of 12 sampled matches
+    including `status_state == 'pre'`", therefore "a placeholder the builder
+    writes, not a reading", therefore unusable.
+
+    WHY THAT WAS WRONG, measured 2026-08-20. `build_soccer_artifacts.py:289`
+    sets both from `fetch_events`'s `home_score`/`away_score`, which is ESPN's
+    own `competitors[].score`. A census of EVERY git-tracked recommendations
+    artifact finds `status_state == "pre"` on ALL 57 matches in them -- the
+    sample contained no started match, so it could not tell "always 0" from
+    "0 until kickoff". Read straight from ESPN through that same field the
+    same day: live fixture 401882908 gives '1'/'0', and completed Atletico
+    Madrid v Malaga gives '2'/'0'.
+
+    So the field is real. The defect was that the card published it UNGATED,
+    so a fixture that had not kicked off rendered 0-0. The fix is the GATE,
+    not the removal -- and the removal cost soccer any score at all on a
+    FINAL match, which no other source covers."""
 
     def test_absent_live_state_yields_no_score(self) -> None:
         self.assertIsNone(cards._real_live_score(None, "home"))
@@ -447,22 +529,278 @@ class FabricatedScoreTests(unittest.TestCase):
     def test_a_genuine_zero_from_the_poller_survives(self) -> None:
         """0-0 is a real and common soccer score. The guard must reject
         ABSENCE, not falsiness, or it would suppress a true nil-nil."""
-        self.assertEqual(cards._real_live_score({"home_score": 0}, "home"), 0)
+        self.assertEqual(cards._real_live_score({"score_home": 0}, "home"), 0)
 
     def test_a_real_score_is_returned(self) -> None:
-        self.assertEqual(cards._real_live_score({"away_score": 2}, "away"), 2)
+        self.assertEqual(cards._real_live_score({"score_away": 2}, "away"), 2)
         self.assertEqual(cards._real_live_score({"home": {"score": 3}}, "home"), 3)
 
     def test_non_numeric_is_rejected_rather_than_rendered(self) -> None:
-        self.assertIsNone(cards._real_live_score({"home_score": "--"}, "home"))
+        self.assertIsNone(cards._real_live_score({"score_home": "--"}, "home"))
 
-    def test_the_artifact_placeholder_is_never_the_source(self) -> None:
-        """REACHABILITY: the fix is worth nothing if the caller still reads the
-        artifact field. Assert the placeholder key is not consulted."""
+    def test_the_pollers_own_key_is_the_one_read(self) -> None:
+        """THE BUG THIS CLASS EXISTS FOR, and it was a key-name mismatch.
+
+        `poll_soccer_live_state.poll_league` writes `score_home`/`score_away`
+        -- verbatim from `build_live_state`. `_real_live_score` looked only
+        for `home_score`/`home_goals`/`home`, so it returned None while the
+        real score sat in the file it had just read.
+
+        Asserted against the poller's EXACT payload shape, not a hand-made
+        dict that happens to match the new code."""
+        poller_entry = {
+            "event_id": "401882908",
+            "home_team": "Rayo Vallecano",
+            "away_team": "Alaves",
+            "half": 2,
+            "clock_remaining": 420.0,
+            "score_home": 1,
+            "score_away": 0,
+        }
+        self.assertEqual(cards._real_live_score(poller_entry, "home"), 1)
+        self.assertEqual(cards._real_live_score(poller_entry, "away"), 0)
+
+    def test_the_artifact_score_is_gated_on_state_not_removed(self) -> None:
+        match = {"live_home_score": "2", "live_away_score": "0"}
+        # Before kickoff it means nothing and must not reach the card.
+        self.assertIsNone(cards._artifact_score(match, "home", "pre"))
+        # Once the match is real it IS the score -- and for a FINAL match it
+        # is the only source that exists.
+        self.assertEqual(cards._artifact_score(match, "home", "post"), 2)
+        self.assertEqual(cards._artifact_score(match, "away", "post"), 0)
+        self.assertEqual(cards._artifact_score(match, "home", "in"), 2)
+
+    def test_the_artifact_score_is_an_int_so_a_real_zero_survives(self) -> None:
+        """The template guards on `is not none`, so the stringly-typed "0"
+        must become a real int 0 and not be mistaken for absence."""
+        value = cards._artifact_score({"live_away_score": "0"}, "away", "post")
+        self.assertIsInstance(value, int)
+        self.assertEqual(value, 0)
+
+    def test_a_pre_fixture_publishes_no_score(self) -> None:
+        """REACHABILITY, and the regression `d9a23a38` shipped: it gated the
+        score STRING on `effective_state` while assigning `home_score`/
+        `away_score` above it unconditionally -- and the card head reads the
+        latter. Asserted through `_match_to_game`, the real caller."""
+        game = cards._match_to_game(
+            _live_match(status_state="pre", kickoff="2026-09-25T19:30Z"),
+            league="la_liga",
+            week=1,
+            season=2026,
+            squad_props=[],
+        )
+        self.assertIsNone(game["away"]["score"])
+        self.assertIsNone(game["home"]["score"])
+
+    def test_an_impossible_final_drops_the_score_with_the_badge(self) -> None:
+        """`_effective_status_state` refuses a `post` whose kickoff is days
+        away. The score must be refused with it -- a card that has just
+        decided a match has not started cannot also show its result."""
+        game = cards._match_to_game(
+            _live_match(status_state="post", kickoff="2026-09-25T19:30Z"),
+            league="la_liga",
+            week=1,
+            season=2026,
+            squad_props=[],
+        )
+        self.assertIsNone(game["home"]["score"])
+        self.assertFalse(game["live_state"]["final"])
+
+    def test_a_finished_match_gets_a_score_with_no_live_state(self) -> None:
+        """The case the removal broke. `poll_soccer_live_state` fetches
+        `statuses={"in"}` for its `games` block, so a finished match has no
+        entry there; without the artifact fallback its card can never show a
+        result."""
+        game = cards._match_to_game(
+            _live_match(status_state="post", kickoff="2026-08-20T19:30Z"),
+            league="la_liga",
+            week=1,
+            season=2026,
+            squad_props=[],
+        )
+        self.assertEqual(game["home"]["score"], 2)
+        self.assertEqual(game["away"]["score"], 0)
+        self.assertTrue(game["live_state"]["final"])
+
+
+class LiveClockTests(unittest.TestCase):
+    """`shared_game_state` carried `clock: ""` and `period: null` on a match
+    genuinely in progress (verified on La Liga 401882908 while
+    `live_state.in_progress` was true). MLB's live card shows "BOTTOM 6";
+    soccer showed nothing."""
+
+    def test_build_live_state_without_a_clock_reports_no_time_remaining(self) -> None:
+        """THE ROOT CAUSE, asserted directly. `build_live_state`'s default
+        cutoff is nominal full time, so every live match came back as half 2
+        with 0.0 seconds left -- which is what the card was reading."""
+        from syndicate.features.soccer.ingestion.espn_live_state import (
+            _current_half_and_clock_remaining,
+        )
+
+        self.assertEqual(_current_half_and_clock_remaining(5400.0), (2, 0.0))
+        # ESPN's real clock at the 70th minute of fixture 401882908.
+        self.assertEqual(_current_half_and_clock_remaining(4200.0), (2, 1200.0))
+
+    def test_the_poller_passes_espns_clock(self) -> None:
+        """REACHABILITY: the new field is worth nothing if the caller still
+        omits `as_of_seconds`."""
+        src = io.open("scripts/poll_soccer_live_state.py", encoding="utf-8").read()
+        self.assertIn("as_of_seconds=as_of_seconds", src)
+        self.assertIn('event.get("status_clock_seconds")', src)
+
+    def test_fetch_events_reads_the_clock_off_the_outer_status_block(self) -> None:
+        """The pre-existing local `status` is ESPN's `status.type`, which has
+        no clock at all. Reading the clock off it returns None on a match
+        that is very much in play."""
+        src = io.open(
+            "syndicate/features/soccer/ingestion/espn_lineups.py", encoding="utf-8"
+        ).read()
+        self.assertIn('"status_clock_seconds": status_block.get("clock")', src)
+
+    def test_live_state_block_publishes_the_clock(self) -> None:
+        block = cards._live_state_block(
+            "in", "2026-08-20T19:30Z", {"status_display_clock": "83'", "status_period": 2}
+        )
+        self.assertTrue(block["in_progress"])
+        self.assertEqual(block["clock"], "83'")
+
+    def test_no_period_key_because_the_minute_already_encodes_it(self) -> None:
+        """`_actual_score_section` renders "{period} {clock}"; soccer's "83'"
+        cannot be in the first half, so publishing both read "2 83'"."""
+        block = cards._live_state_block(
+            "in", "2026-08-20T19:30Z", {"status_display_clock": "83'", "status_period": 2}
+        )
+        self.assertNotIn("period", block)
+
+    def test_no_clock_is_published_for_a_match_not_in_progress(self) -> None:
+        for state in ("pre", "post"):
+            block = cards._live_state_block(
+                state, "2026-08-20T19:30Z", {"status_display_clock": "FT"}
+            )
+            self.assertNotIn("clock", block, state)
+
+    def test_no_status_string_leaks_into_the_flag_haystack(self) -> None:
+        """`game_chip_scoreboard._game_flags` folds `live_state["status"]`
+        into a substring search. A display string there would reintroduce the
+        prose-matching `_live_state_block` was built to replace."""
+        block = cards._live_state_block(
+            "in", "2026-08-20T19:30Z", {"status_display_clock": "83'"}
+        )
+        self.assertNotIn("status", block)
+
+    def test_the_chip_token_is_the_minute_not_a_period_prefix(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _live_status_token
+
+        game = {"live_state": {"in_progress": True, "final": False, "clock": "83'"}}
+        self.assertEqual(_live_status_token("soccer", game), "83'")
+        # The generic branch would have produced a bare period prefix.
+        self.assertIsNone(_live_status_token("soccer", {"live_state": {}}))
+
+    def test_a_period_number_renders_as_an_integer(self) -> None:
+        """Cross-sport and pre-existing: `_shared_game_state` runs the period
+        through `_first_number`, which returns a float, so every live card
+        read "Live score -- 2.0 12:45"."""
+        section = contract._actual_score_section(
+            {
+                "away": {"abbr": "GB", "name": "Packers", "score": 10},
+                "home": {"abbr": "PIT", "name": "Steelers", "score": 7},
+                "live_state": {"in_progress": True, "final": False},
+                "shared_game_state": {"live": True, "period": 2.0, "clock": "12:45"},
+            }
+        )
+        self.assertEqual(section["title"], "Live score -- 2 12:45")
+
+
+class MatchBoxTests(unittest.TestCase):
+    """MLB's box tab renders a real "Live / final box" AND a "Sim box".
+    Soccer's rendered only sim squad projections, while ESPN's own team
+    totals and goal list sat unused in the match summary the poller was
+    already fetching."""
+
+    def test_team_stats_and_goals_become_sections(self) -> None:
+        sections = cards._match_box_sections(
+            MATCH_BOX, away_abbr="ALA", home_abbr="RAY", final=True
+        )
+        titles = [section["title"] for section in sections]
+        self.assertEqual(titles, ["Goals", "Match stats"])
+        goals = sections[0]
+        self.assertEqual(goals["columns"], ["Min", "Scorer", "Team"])
+        self.assertEqual(goals["table_rows"][0][1], "Sergio Camello")
+        stats = sections[1]
+        self.assertEqual(stats["columns"], ["Stat", "ALA", "RAY"])
+        self.assertIn(["Possession", "50.2%", "49.8%"], stats["table_rows"])
+
+    def test_no_reading_yields_no_section_rather_than_a_table_of_dashes(self) -> None:
+        self.assertEqual(
+            cards._match_box_sections(None, away_abbr="A", home_abbr="H", final=False), []
+        )
+        self.assertEqual(
+            cards._match_box_sections({}, away_abbr="A", home_abbr="H", final=False), []
+        )
+
+    def test_a_stat_only_one_team_reported_is_dropped_not_misaligned(self) -> None:
+        """Iterating one side's dict alone would silently shift a row's
+        columns, so a stat present on one side only must drop out."""
+        lopsided = {
+            "teams": {
+                "away": {"stats": {"Shots": "10", "Offsides": "1"}},
+                "home": {"stats": {"Shots": "8"}},
+            },
+            "goals": [],
+        }
+        sections = cards._match_box_sections(
+            lopsided, away_abbr="A", home_abbr="H", final=True
+        )
+        self.assertEqual(sections[0]["table_rows"], [["Shots", "10", "8"]])
+
+    def test_an_own_goal_is_labelled_not_dropped(self) -> None:
+        """A card that silently drops an own goal disagrees with its own
+        scoreline."""
+        box = {
+            "teams": {},
+            "goals": [
+                {"team": "Alaves", "scorer": "A Defender", "clock": "12'", "own_goal": True}
+            ],
+        }
+        sections = cards._match_box_sections(box, away_abbr="A", home_abbr="H", final=True)
+        self.assertEqual(sections[0]["table_rows"][0][1], "A Defender (OG)")
+
+    def test_the_real_box_is_ordered_before_the_sim_box(self) -> None:
         src = io.open("syndicate/features/soccer/cards.py", encoding="utf-8").read()
-        self.assertNotIn('match.get("live_home_score")', src)
-        self.assertNotIn('match.get("live_away_score")', src)
-        self.assertIn('_real_live_score(live_state, "home")', src)
+        self.assertLess(
+            src.index("*_match_box_sections("), src.index("*_squad_box_sections(")
+        )
+
+    def test_percentage_conventions_are_declared_per_stat(self) -> None:
+        """ESPN mixes them in ONE list: `possessionPct` is 0-100 while
+        `passPct` is a 0-1 fraction, and `value` is null on both, so nothing
+        in the payload distinguishes them."""
+        from syndicate.features.soccer.ingestion import espn_match_box as box
+
+        stats = [
+            {"name": "possessionPct", "displayValue": "50.3", "value": None},
+            {"name": "passPct", "displayValue": "0.8", "value": None},
+        ]
+        self.assertEqual(box._stat_display(stats, "possessionPct", box._PCT_0_100), "50.3%")
+        self.assertEqual(box._stat_display(stats, "passPct", box._PCT_FRACTION), "80%")
+
+    def test_a_final_box_already_on_disk_is_not_refetched(self) -> None:
+        """`live_lens_loop` ticks every ~60s across ten leagues. Re-deriving
+        every completed fixture's box on each tick would add an ESPN call per
+        finished match per minute to recompute a value that cannot change --
+        the `#241` "worker periodic work is never free" failure."""
+        src = io.open("scripts/poll_soccer_live_state.py", encoding="utf-8").read()
+        self.assertIn(
+            'if is_final and isinstance(cached, dict) and cached.get("final")', src
+        )
+
+    def test_the_box_is_a_separate_key_from_games(self) -> None:
+        """`games` means "in play" -- `live_lens.py` reads it directly, and a
+        finished match appearing there would present a settled result as
+        live."""
+        src = io.open("scripts/poll_soccer_live_state.py", encoding="utf-8").read()
+        self.assertIn('"match_box": match_box', src)
+        self.assertIn('statuses={"in", "post"}', src)
 
 
 class DateBoardTests(unittest.TestCase):
