@@ -1045,6 +1045,107 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   required, and web is currently 502ing on `/api/ops/version`, which is
   somebody else's deploy and must be clear before I measure anything.
 
+### soccer-board-mlb-parity — OPEN — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. STAYS OPEN: the stated target was density within 2x of MLB (569 → 285) and 176 misses it.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
+- Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
+  carry the same information classes MLB's do. **Single testable outcome:** on a
+  fixed slate date, soccer's card renders (a) market tiles carrying selection +
+  price + model + edge rather than bare probabilities, (b) a box-score panel
+  built from real match state on a completed/live match instead of
+  "Box score unavailable", and (c) information density within 2x of MLB's
+  measured 544 leaf-text-items/Mpx — against soccer's measured 139 today.
+- Files:
+  - `syndicate/features/shared/game_board_contract.py` — the shared normalizer.
+    `_build_box_sections` clobbers a sport's own sections (:775, unconditional
+    assignment); `market_tiles` setdefault (:764) derives from `metrics[:4]`;
+    `_build_prop_status_rows` (:706) drops every synthesized row; the live
+    market-tile branch (:791) is unreachable when `metrics` is non-empty.
+  - `syndicate/features/soccer/cards.py` — **DECLARED OVERLAP, see Blocked by.**
+  - `syndicate/blueprints/soccer.py` — `/soccer` redirect (:87) and a new
+    date-scoped cross-league cards route.
+  - `syndicate/features/soccer/sources.py` — week->date resolution.
+  - `syndicate/templates/soccer/`, `syndicate/static/soccer/` (new files).
+  - `tests/test_soccer_*` (new), `.syndicate/*`.
+- The cross-session TODO list is deliberately NOT claimed here:
+  `mlb-overview-hydration-cost` already holds it and a second claim reads as
+  contested. I still reconcile my items into it at checkpoint, per CLAUDE.md.
+- **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, `adapters.py`,
+  ratings, `ingestion/*` — all held by `soccer-model-dispersion`. I do not
+  change what the model produces, only what the board does with it.
+- Hypothesis (diagnostic half, already tested): soccer's thin card is NOT a
+  missing-data problem — the data is in the payload and the shared normalizer
+  discards it. **CONFIRMED 2026-08-20 against production**, before any edit:
+  `/soccer/epl/api/cards` carries `betting.home_ml -590`, `away_ml +1400`,
+  `spread -1.5`, `total 2.5` and six per-market EV fields, while all four
+  rendered tiles read a bare probability with the matchup string repeated as
+  every sub-label. A completed MLS match (HOU 1-0 LA) carries `home.score`/
+  `away.score` in the same payload and renders "Box score unavailable".
+- Falsification test: if the same payloads had shown null prices / null EV /
+  no scores, the finding would be a data gap and this lane would be wrong to
+  open as UI work. They did not. Re-run `curl /soccer/<league>/api/cards` and
+  read `betting` + `home.score` before trusting any later claim here.
+- Verification: `scripts/ui_layout_probe.py` before/after on the soccer board
+  (the durable instrument named in `state.md [ui-board-cards]`), plus the
+  leaf-text-density measurement above re-taken against the SAME production
+  service, plus `python -m unittest tests.test_archives` green. A density
+  number taken against a dev box is not the reading.
+- **What shipped into the commit** (audit findings A-H, all measured on
+  production 2026-08-20 before any edit):
+  - **A. Landing.** `/soccer` -> `/soccer/cards?date=` across all ten
+    leagues. The old redirect landed on EPL matchweek 1 = ONE fixture,
+    kicking off the next day, out of 92 across the ten leagues. Soccer's
+    board was the only one keyed by (league, matchweek) rather than date and
+    each league runs its own calendar (MLS wk21 Aug 16-22 = 31 fixtures,
+    Bundesliga wk1 = Aug 28 = 1). The per-league board is untouched.
+  - **B. Market tiles.** Soccer now builds its own, mirroring
+    `mlb/cards.py::_market_tiles`. The generic `metrics[:4]` fallback showed
+    a bare probability with "COV @ ARS" as all four sub-labels while
+    `home_ml -590` / `away_ml +1400` / `total 2.5` / `spread -1.5` sat
+    unused on the same payload, and dropped BTTS + Over 2.5 to the cap.
+  - **C. Box score.** THREE instances of one clobber in `_normalize_game`
+    (`shared_box_sections`, `shared_prop_rows`, and the live tile branch)
+    each overwrote what the sport supplied. The July fix for
+    `shared_top_play_rows` had already named this shape and was never
+    applied to its neighbours. Also added a REAL score section: a completed
+    MLS match carried `home.score`/`away.score` and rendered "Box score
+    unavailable" because the builder read only the sim.
+  - **D. Props.** Joined to `build_soccer_picks`' captured price/edge via
+    props.py's OWN normaliser (not a second one). Rows are no longer
+    `is_synthesized`, so the status table stops rendering empty (0 -> 8).
+  - **E/F/G/H.** Top-play field mapping (value column held the MATCHUP
+    string); empty lens stat cells no longer rendered; the live tile branch
+    made reachable (it was guarded on a key the setdefault above it had
+    already filled — unreachable for any sport publishing `metrics`);
+    finished matches show a result instead of "not yet simulated".
+- **Edge is model-minus-market, deliberately NOT `betting.*_ev`.**
+  `build_soccer_picks.py:131` computes EV against ITS model prob, a
+  different vintage: `away_ml_ev 0.575` at +1400 implies ~10.5% where the
+  card renders 7.0%. Both fields stay on `betting` for other readers.
+- **Verification so far:** 19 new tests anchored to the production payloads
+  (4 assert reachability, off != on); 88 targeted soccer/board tests green;
+  `tests.test_archives` 31 failures before AND after, **the same 31 by
+  name** (diff clean) — all `data/`-dependent NFL/NBA/NCAAB tests that
+  cannot pass where `data/` is excluded by design. Rendered locally against
+  real artifacts: card height 1074 -> 829px, em-dash cells 6 -> 0, repeated
+  matchup sub-labels 4 -> 0, box sections 1 -> 2, prop status rows 0 -> 8.
+- **THE OPEN THREAD, and it is the one that matters:** the density number
+  that opened this lane (MLB 544 vs soccer 139 items/Mpx) has NOT been
+  re-taken against production. A local reading cannot take it — the mirror
+  has no picks/props for these dates, so the tiles that carry the new
+  content are empty locally. `_market_tiles` run over the real production
+  payload returns "COV ML +1400 | Model 7.0% | Market 6.3% | Edge +0.7 pts",
+  which proves the CODE and not the BOARD. Deploy web, then re-measure with
+  `scripts/ui_layout_probe.py` plus the leaf-density count, same service,
+  same instant. **A local reading must not be written up as the result.**
+- Blocked by: none, but **DECLARED OVERLAP**: `soccer-model-dispersion` (OPEN,
+  session `Soccer Session (fork)`, not running as of 2026-08-20 16:4xZ) claims
+  `syndicate/features/soccer/` with the parenthetical scope "(sim engine,
+  adapters, ratings, `ingestion/espn_match_stats.py`)". `cards.py` sits in that
+  directory and outside that parenthetical. I read it as not claimed, notified
+  that session with the exact file list before editing, and am proceeding on
+  that reading with the user's decision. **If that lane says otherwise, stop.**
+  Recording it here rather than omitting it, because a silent overlap is the
+  failure mode the lane protocol exists to prevent.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -18477,3 +18477,146 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   confidence the fix is correct; this entry exists so a future session
   doesn't mistake "deployed" for "confirmed working against real data in
   production."
+## 2026-08-20 17:49Z — web `528272e1` — the soccer card stops discarding its own market data
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       528272e1  (scoped graft, parent d77dfb9a = the LIVE SHA,
+               branch deploy/soccer-board-parity-20260820, 6 files)
+    on main:   NO -- and deliberately. See "why off-main" below.
+    deploy:    dep-da3jodpt0dsc73frkkfg  trigger=api  fired 17:41:11Z, live 17:49:25Z
+    claim:     acquired 17:35:00Z, released after verify
+    preflight: CLEAR (only infrastructure processes), target 528272e1, sample age 0s
+    rollback:  deploy d77dfb9a (this graft's parent). Reverts the soccer board
+               only; every other lineage commit is in the parent.
+
+**WHY OFF-MAIN, when the standing rule is "deploy a commit that is on
+`origin/main`".** The rule exists to stop deploy N silently reverting deploy
+N-1. Here it would have CAUSED that. The change landed on main as `51b7e765`
+(main's tip). Web's live SHA `d77dfb9a` is **not on main**, and `origin/main..
+d77dfb9a` is **ten commits** that exist nowhere else:
+
+    d77dfb9a layer2 renderMovement/isSteamCandidate   0ddd8ede layer2 Over/Under + blank Projected
+    ea6f431f REPLACED lift condition                  b4f90650 #482 allowlist
+    ba1d3368 #481 live-scale refit                    75c526f5 #475 live cover/total
+    6b23d6fa NCAAF pregame window                     17986fb5 soccer autorun allowlist
+    ebf301ae NCAAF wk1 SP+                            f149f5e2 NFL prop calibration
+
+Deploying main's tip would have reverted all ten -- the 2026-08-15 shape at
+ten times the scope. Grafted onto the live SHA instead, which is what every
+commit in that lineage already did. **Verified BEFORE deploying, not assumed:**
+`diff-tree 528272e1` = exactly the 6 intended files, and all ten commits above
+are ancestors of the graft.
+
+**verify: PASSED. The measurement this lane was opened to take, re-taken on the
+SERVED page after deploy -- same match, same service, same 1280px viewport.**
+
+`/soccer/epl/cards`, COV @ ARS, the identical card benchmarked before any edit:
+
+| reading | before (pre-deploy, same URL) | after | MLB, same instant |
+|---|---|---|---|
+| card height | 1074 px | **878 px** | 1268 px |
+| leaf text items | 188 | **195** | 917 |
+| density (items/Mpx) | **139** | **176** (+27%) | **569** |
+| em-dash placeholder cells | 6 | **0** | 6 |
+| matchup string repeated as tile sub-label | 4 | **0** | 0 |
+| box sections | 1 (generic) | **2** (player stat lines restored) | n/a |
+| prop status rows | 0 | **8** | n/a |
+
+Served tiles now carry a price, both probabilities and the edge:
+
+    BEST 1X2 EDGE   COV ML +1400   Model 8.7% | Market 6.3% | Edge +2.4 pts
+    TOTAL GOALS     OVER 2.5 -178  Model 3.24 | Line 2.5 | Market 64.0%
+    HANDICAP        ARS -1.5       Proj margin 1.68 | vs line 0.18
+    BEST PROP EDGE  Kai Havertz anytime +150   Model 25.8% | Edge -14.6%
+
+Landing page: `GET /soccer` -> 302 -> `/soccer/cards?date=2026-08-20` (was
+`/soccer/epl/cards`). The date board served **9 matches across 2 leagues** for
+2026-08-20 and 8 of 9 correctly marked Final; `/soccer/api/cards?date=` 200,
+114,132 bytes. Prop prices are real and served: 3 of 9 cards carry a market
+price, and priced prop rows read `Odds +380 | Edge -10.3%`.
+
+**THE TARGET WAS MISSED AND I AM NOT ROUNDING IT UP.** The lane's stated
+testable outcome was density "within 2x of MLB" -- MLB 569 means 285, and
+soccer reached **176**. That is +27% on the pre-deploy number and still a
+**3.2x gap**. Part is intrinsic (MLB has nine innings of lens rows and two
+full prop tables; soccer has two halves), but not all of it, and the lane
+stays OPEN on that basis rather than being declared done on the improvement.
+
+**Blast radius verified, not assumed:**
+
+| check | reading | verdict |
+|---|---|---|
+| graft scope | `diff-tree` = exactly 6 files | PASS |
+| ten lineage commits retained | all 10 are ancestors of 528272e1 | PASS |
+| MLB card unaffected | 917 items / 569 density, card renders | PASS |
+| tests on the GRAFT base, not just main | `test_archives` 32 fail on `d77dfb9a` alone and 32 on the graft, same names -- my commit adds **zero** | PASS |
+| targeted suites | 88 soccer/board-contract tests green | PASS |
+
+**A note on the 31-vs-32 discrepancy, since it looks like a regression and is
+not.** Against `origin/main` the archive baseline is 31 failures; against
+`d77dfb9a` it is 32. The extra one is
+`HomeBoardTests.test_home_page_poll_preserves_date_query`, and it fails on
+`d77dfb9a` **without** my commit -- pre-existing in that lineage, surfaced by
+grafting onto it, not introduced here. Flagged for whoever owns that lineage.
+All of these failures are `data/`-dependent and cannot pass in a worktree
+where `data/` is excluded by design.
+
+---
+
+## 2026-08-20 18:07Z — web `547b541b` — the soccer date board was filtering on the WRONG CLOCK
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       547b541b  (stacked on 528272e1, the then-live SHA, 2 files)
+    deploy:    dep-da3k0s8jo6nc73eq297g  trigger=api  fired 17:59:19Z, live 18:07:09Z
+    claim:     acquired 17:57Z, released after verify
+    preflight: CLEAR, live commit confirmed still 528272e1 before stacking
+    also on main: `9849e9b5` — the fix is NOT stranded on the deploy branch
+    rollback:  deploy 528272e1 (restores the UTC filter — do not; it is the bug)
+
+**Found by the USER against the deployed board, ~15 minutes after my own
+"verify: PASSED" on the deploy above.** `/soccer/cards?date=2026-08-20`
+carried eight MLS matches played on 08-19, all already Final.
+
+    STL@SKC 00:00Z  ATL@MIN 00:30Z  LAF@COL 01:30Z  DAL@RSL 01:30Z
+    ATX@SEA 01:30Z  SD@POR  02:30Z  SJ@LA   02:30Z  HOU@VAN 02:30Z
+
+Every one is a 7:00-9:30 PM CENTRAL kickoff on the 19th. `date_games`
+filtered on `str(scheduled_start_utc)[:10]`, so a whole evening of North
+American football landed on the next day's board.
+
+**This rule was already written down and I did not apply it.** `CLAUDE.md`:
+"NCAAF kickoffs file on their CENTRAL day — 28 of 157 real 2026 kickoffs were
+previously filed under their UTC day. The platform's display timezone is
+Central everywhere; `central_today_iso()` is the slate clock." Not a new
+lesson — the same one, in a new file.
+
+**Why my verification missed it, which is the part worth keeping.** I checked
+that the board RETURNED matches (9 across 2 leagues) and that the tiles
+carried prices. I never checked that the matches returned were the matches
+that belong on that date. The instrument answered "is there content" when the
+question was "is the content correct" — and 8 Final cards on a board titled
+today is exactly the shape a count-based check cannot see. A denominator
+without a predicate.
+
+**verify: PASSED on the SERVED payload, three dates, zero off-date cards.**
+Predicate this time, not a count: for every served card, convert
+`scheduled_start_utc` to Central and assert it equals the requested date.
+
+| date | matches served | leagues | cards whose CENTRAL date != requested |
+|---|---|---|---|
+| 2026-08-19 | 16 | MLS 15, La Liga 1 | **0** |
+| 2026-08-20 | 1 | La Liga 1 | **0** |
+| 2026-08-21 | 4 | Ligue 1, Belgian, EPL, La Liga | **0** |
+
+The eight moved to the 19th, where they were played. 08-20 went 9 -> 1, which
+is correct: only ALA @ RAY (19:00Z = 2:00 PM CT) was ever on that date.
+
+Fix is a CONVERSION through `CENTRAL_TIMEZONE` reusing `_parse_kickoff` (this
+file's existing naive-stamp owner, so the board and the status badge cannot
+disagree), not a fixed offset — 05:00Z is midnight Central in CDT and 11:00 PM
+the previous day in CST. An unparseable kickoff returns None and is EXCLUDED
+rather than defaulting onto the asking board. 11 new assertions anchored to
+the eight kickoffs above plus both DST boundaries; 91 targeted tests green.
+
