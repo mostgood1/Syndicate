@@ -2690,3 +2690,48 @@ a 15.2-point residual SD moves the cover rate ~2.6 points — onto the vig.
 4. Only then build, with a reachability test.
 
 `scripts/test_ncaaf_situational_edge.py` is the reusable harness.
+
+---
+
+## 2026-08-20 — a regression slope IMPLIES an edge; only the ATS test DEMONSTRATES one. They disagree.
+
+Testing whether the NFL market misprices injuries, the weighted burden measure
+came back at **t=−1.81 with the intuitive sign**. Extrapolating that slope:
+0.508 points per unit × a burden SD of 2.63 = **1.34 points**, which converts to
+roughly **53.5% ATS** — above the 52.4% breakeven. A tidy, plausible,
+build-worthy result.
+
+**Then I bet it.** Same games, betting the less-injured side:
+
+    |weighted_diff| >= 1 : 189 bets   54.5% ATS  CI [47.4, 61.4]
+    |weighted_diff| >= 2 : 118 bets   50.0% ATS  CI [41.1, 58.9]
+    |weighted_diff| >= 4 :  36 bets   58.3% ATS  CI [42.2, 72.9]
+
+Every CI spans 52.4%, and the sequence is **NON-MONOTONIC**. A real effect
+strengthens as the edge filter tightens; this wanders. The implied 53.5% never
+materialised because it came from extrapolating a slope that was not significant
+in the first place.
+
+**Why a slope can lie about betting.** A regression fits the WHOLE distribution
+and is dominated by the many small-differential games; a bet is placed only on
+the tail. Fitting the middle and extrapolating to the tail assumes a linearity
+nobody checked. And converting "points of edge" to "ATS%" via a rule of thumb
+compounds it.
+
+**MY OWN OUTPUT INVITED THE ERROR.** The first version of the harness printed
+`-> COULD clear it IF real` from the slope alone. That is a conditional that
+reads as encouragement, and I wrote it. A tool that reports the flattering
+half of an analysis will eventually persuade its author. The ATS table is now
+printed unconditionally beside every regression in
+`scripts/test_nfl_injury_market_edge.py`.
+
+**The rule:** for any claim about betting, the regression is the SCREEN and the
+ATS record on the bets you would actually place is the TEST. Never report the
+first without the second, and never convert one into the other with a
+coefficient.
+
+**Related, same day:** this is the third distinct way a plausible number nearly
+shipped — after (1) a 5.8σ proxy that did not transfer to the objective, and
+(2) per-book rows overstating significance 3.4× versus per-game. All three were
+caught by asking "what would I actually bet, and how many independent bets is
+that?"

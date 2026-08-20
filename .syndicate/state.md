@@ -2000,6 +2000,43 @@ client-side JS). Trace the served `book` field to its writer before acting.
   Bovada/DraftKings/ESPN Bet individually, so not an artefact of one sharp book.
   Those rows are 100% LEAKED (`cfbd_ppa_season_2025`), which FLATTERS the model
   and makes the verdict stronger, not weaker.
+- **THE NCAAF MODEL IS STRICTLY DOMINATED — not broken, and that changes the
+  fix** `[measured 2026-08-20, 751 clean out-of-sample games]`. Fitting
+  `actual = a + b*market + w*(model-market)`: **b=+0.990** CI [0.909,1.076] (the
+  closing line is UNBIASED) and **w=-0.028** CI [-0.130,+0.069] (the model's
+  deviation carries ZERO information). r(market,actual)=+0.645 → R² **41.6%**;
+  r(model,actual)=+0.421 → R² **17.8%**. The model has REAL signal and is
+  strictly dominated: everything it knows the market knows, and where they
+  differ it is noise. **Gap = 23.8 points of R².** This ONE fact explains every
+  failed remedy — no threshold, weight or subset helps a dominated model.
+  Diagnostic: `scripts/grade_football_model_weight.py`.
+- **THE MODEL LOSES TO A MINDLESS SIDE BET** `[measured 2026-08-20]`.
+  always-bet-the-underdog **51.2%** vs the model's **46.8%** (NCAAF, 735 bets);
+  **58.9%** vs **54.7%** (NFL preseason, 95 bets) — **−4.4 and −4.2 points in two
+  independent sports**. NCAAF ATS gets WORSE as the edge filter tightens
+  (46.8% → 45.2% at 10+ points), so "serve only the strong picks" fails in the
+  direction opposite to the one that would help.
+- **EVERY LEVER IS NOW MEASURED, AND ALL ARE DEAD** `[2026-08-20]`.
+  **Situational** (rest/travel/altitude/tz/neutral/dome/conference/kick-hour):
+  all 8 priced, 1,746 games, no |t|≥2 — positive control t=+2.70 proves the
+  instrument. **Injuries**: the NFL market prices them, 272 games, all 4 burden
+  measures null, direct ATS 54.5/50.0/58.3% with every CI spanning 52.4% and
+  NON-MONOTONIC. **Returning production**: pooled ΔMAE −0.062, t=−0.89, code
+  REMOVED. **Ratings tuning**: every scale 6..24 loses. **Blending**: w≈0, so
+  the optimal blend is 100% market.
+- **NO USABLE NCAAF INJURY FEED** `[measured 2026-08-20]`. CFBD's OpenAPI spec
+  enumerated: **74 endpoints, none injury-shaped**. ESPN core API — NFL control
+  **597 fresh injuries across 8 teams** vs CFB **1 record across 60, dated
+  2020-11-21 (2,097 days stale)**. Structural cause: the NCAA has **no mandatory
+  injury report**, so every vendor inherits that ceiling.
+  Re-check in-season: `scripts/probe_ncaaf_injury_feed.py`.
+- **THE PICK-GATE EXIT CRITERION WAS REPLACED** `[2026-08-20, web `ea6f431f`
+  live 15:55:25Z, verified 8/8 probes]`. The old bar (paired MAE ≤ the close)
+  was necessary but far too weak. Now `pick_gate.LIFT_CONDITION` requires: ATS
+  above the better naive baseline, a 95% CI LOWER bound above 52.4%,
+  out-of-sample with subsets pre-specified, and denominators in BETS not rows
+  (per-book rows overstated significance **3.4×**). Measured by
+  `scripts/grade_football_playability.py`; pinned by `LiftConditionTests`.
 - **THE BOARD SERVES SP+, WEEK 1 ONLY** `[measured 2026-08-19, web 6b23d6fa,
   MULTI-PROBE 10 probes/week]`. Weeks 1/5/12 each 10/10 -> 51 games, `|margin|`
   SD **12.93**, max **50.60** (old PPA: 1.58 / 7.80). Every week resolves to

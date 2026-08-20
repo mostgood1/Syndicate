@@ -641,75 +641,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **SP+ IS LIVE ON THE BOARD (web `6b23d6fa`, verified 10/10 probes/week); picks still SUPPRESSED (+3.563 vs close, clean out-of-sample). Returning production measured t=-1.58, NOT shipped. 2nd-season backtest IN FLIGHT.** — opened 2026-08-18 — session: football-model-owner
-- Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
-  treatment MLB and soccer have. **Testable:** gating checklist runs; inputs
-  leak-free and reachable; defects measured on the SERVED payload.
-- Files: `syndicate/features/football/**`, `syndicate/features/ncaaf/{cards,picks}.py`,
-  `syndicate/features/nfl/preseason_cards.py`,
-  `syndicate/features/shared/{publication_adapter,game_board_contract}.py`,
-  `scripts/{football_sim_input_checklist,backfill_nfl_historical_odds,generate_smartsim2_ncaaf_projections}.py`,
-  `docs/ai_context/{model_engine_standard,football_sim_engine_reference,nfl_feature_payload_preregistration,ncaaf_beat_the_close_strategy,ncaaf_data_pipeline}.md`,
-  `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form,football_pick_gate}.py`
-- **NOT claimed:** `shared/artifact_publisher.py` (basketball-model-owner),
-  `scripts/deploy_preflight.py` (repo-coordination). Both handed over.
-- Status: **4 deploys live+VERIFIED; everything on `origin/main` (ahead 0).**
-  web `6b23d6fa` — SP+ board, pregame window, wk2-15 deleted, 10/10 probes/week.
-  web `8833cfd6` — picks suppressed. refresh-worker `f2eb719d` — SP+ ratings.
-- **IN FLIGHT:** 2025 arms for the returning-production verdict (`bufuamhht`,
-  ~3 of 15 week-pairs; pooled comparison chained `bt1ww1ijh`). **NO POOLED
-  RESULT — do not quote one.** Ship only on pooled |t| >= 2.
-- **UNCOMMITTED, deliberately:** 15 untracked `smartsim2_projections_2024_wk*.csv`
-  in `data/ncaaf_source/data/` are BACKTEST artifacts (the RP ON arm), read by
-  the pooled job. **Do not `git add` them.**
-- **DEAD, do not retry:** `f2eb719d`'s stage-2 criterion (`predictions.home_mean`
-  is null on this path STRUCTURALLY — unfalsifiable, use margin dispersion from
-  `metrics`); triggering the season-projection autorun (no worker run reaches
-  the board); `SP_RATING_SCALE` retuning; the three scalar totals fixes; "beat
-  the OPEN first" (0.06 MAE softer, measured).
-- **Handed off:** `pick_ledger_*.csv` allowlist -> `basketball-model-owner`;
-  `smartsim2_projections_*.csv` allowlist -> `soccer-odds-capture-cadence-gap`.
-  Both hold `artifact_publisher.py`. The publish wiring is INERT until the
-  second lands.
-- **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
-- **Phase 3 DONE, n=269: NULL** (`dCRPS +0.0226`, 0.97 SE). Payload does not
-  ship; Phase 4 moot. The ratings path carries 4.2x the leverage and production
-  already uses it.
-- **NCAAF MARGINS CALIBRATED** — SD 1.74 -> 15.37 (market 14.46, ratio 1.06), max
-  margin 7.80 -> 50.64 (market 49.50). Cause was the rating SOURCE: PPA is a
-  per-play rate, replaced by SP+ (points/game), backtested r 0.506 vs 0.372 over
-  ~740 games/season in two independent pairs.
-- **TOTALS 1.67x, CARRIER IDENTIFIED, NOT FIXED.** `total = drives x score% x
-  pts/score`; score% runs 20.8% -> 53.9% across the slate against a real ~35-45%,
-  while drives barely move. **Three scalar fixes are DEAD and must not be
-  retried** (index clamp, yardage weights, scoring_environment weights) — all
-  damp inputs to a loop whose outputs compound. The fix is in `drive_simulator`'s
-  conversion and is SHARED WITH NFL, so it needs its own NFL-impact measurement.
-- **NCAAF ratings leak fixed** (r 0.663 -> 0.509 as-of, 30% inflation). Opener
-  unaffected — no in-season history means the prior-season fallback.
-- **2026 data built and slate-complete** (94-team coverage verified); five of
-  seven builders were unrunnable and are fixed at the choke point.
-- **DEPLOY PENDING, BUILT AND READY:** `f2eb719d`, branch
-  `deploy/ncaaf-sp-ratings-20260819b`, 2 files on live SHA `23e70a80`, blobs
-  identical to `origin/main`. **Blocked on the refresh-worker claim** held by
-  `nfl-player-props-backtest`; `--force` was attempted (user-directed) and denied
-  by the permission classifier — not worked around. Full recipe, two-stage
-  verify, staleness precondition and the known-defect disclosure are in
-  `.syndicate/deploy/requests/20260819T163000Z-ncaaf-sp-ratings.md`.
-  **REFRESH-WORKER IS CONTENDED** — three sessions inside an hour, and my first
-  graft was invalidated once already by a deploy landing mid-wait. Re-check the
-  live SHA before firing.
-- **OWED:** (1) **NOTHING IS DEPLOYED** — production still serves 0 of 51; the
-  worker autorun has not fired since the key landed and no football code is live.
-  (2) NCAAF opener verification, PASS = ~51 of 51 non-null
-  `predictions.home_mean`. (3) totals scoring-rate compression — evidence in
-  `log/2026-08-19.md`. (4) allowlist `smartsim2_*projections_*.csv` — with
-  `basketball-model-owner`. (5) web cannot pass preflight — with
-  `repo-coordination`.
-- **NOT A CAPABILITY, don't mistake for a gap:** NCAAF props. No route, no
-  module, and `SmartSim2SimulationOutput` has NO player-level fields — the engine
-  never tracks players. Props would be a build, not a wiring fix.
-- Narrative + evidence: `.syndicate/log/2026-08-18.md`. History: `lanes_history.md`.
+### football-model-owner — OPEN — **DIAGNOSIS COMPLETE: the model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%, deviation w=-0.028). EVERY lever measured and DEAD — injuries, situational, returning production, scale, blending. Picks SUPPRESSED live; new ATS exit criterion deployed and verified 8/8.** — opened 2026-08-18 — session: football-model-owner
+- Status: **All work on `origin/main`, verified by content.** web `ea6f431f`
+  live 15:55:25Z (new LIFT_CONDITION, 8/8 probes); NCAAF picks suppressed;
+  projections 51 games at SP+ (max 50.60); NFL picks 12 and untouched.
+- **THE ONE FACT THAT MATTERS:** the model is dominated, not broken. It has real
+  signal (R² 17.8%) but its deviation from the market carries none (w=-0.028,
+  CI [-0.130,+0.069]). No threshold, weight or subset can help — that single
+  fact explains every failed remedy, so STOP re-testing them.
+- **DO NOT RETRY (all measured dead):** injuries (NFL market prices them; and
+  NCAAF has no feed — CFBD 74 endpoints, ESPN 1 stale record/60 teams);
+  situational factors (all 8 priced, 1,746 games); returning production (pooled
+  t=-0.89, code removed); `SP_RATING_SCALE` (all scales 6..24 lose); blending
+  (w≈0 → 100% market); the three scalar totals fixes; "beat the OPEN first".
+- **Harnesses, all on origin — run these BEFORE building anything:**
+  `grade_football_model_weight.py` (dominated vs broken),
+  `grade_football_playability.py` (ATS vs naive baselines),
+  `test_ncaaf_situational_edge.py` (market-residual test),
+  `test_nfl_injury_market_edge.py`, `probe_ncaaf_injury_feed.py`.
+- **NEXT ACTION for whoever picks this up:** there is no measured lever left.
+  Either (a) re-run the injury/situational tests on MORE SEASONS — both rest on
+  one season and are "no evidence" not "proven no effect" — or (b) accept that
+  NCAAF/NFL margins are not a product and redirect. Do NOT build a feature
+  without first regressing the market residual on it.
+- **UNCOMMITTED:** `data/nfl_source/historical_odds/closing_lines_preseason_*.json`
+  — 2,728 credits of purchased odds, untracked by directory convention.
 
 ### soccer-odds-capture-cadence-gap — CLOSED-VERIFIED 2026-08-20 01:25Z — **`#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request for every league, 9 days straight; fixed (`3e8264bd`), deployed to both live-odds-worker (`575decf3`) and refresh-worker (`b2f4b197`, cherry-picked onto their scoped live SHA), and VERIFIED with real production data: a manual pregame trigger post-deploy produced genuine fresh captures across the full soccer book_quotes shard, and 6 of the originally-8 stale MLS/La Liga matches now show `captured_at` 3 minutes old. Full evidence chain in `.syndicate/deploys.md`'s 2026-08-20 01:25Z entry.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
 - Goal: soccer's h2h/totals/spreads game-market odds capture actually
