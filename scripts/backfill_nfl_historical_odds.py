@@ -60,6 +60,13 @@ sys.path.insert(0, str(REPO))
 
 API_BASE = "https://api.the-odds-api.com/v4"
 SPORT = "americanfootball_nfl"
+#: OddsAPI exposes the preseason as a SEPARATE SPORT KEY, and this is not a
+#: detail -- it is the whole reason the first --preseason run failed. Querying
+#: the REGULAR-season key at an August date returns future REGULAR-season
+#: events, which look entirely plausible and cost 7,528 credits to discover.
+#: Verified 2026-08-20: /historical/.../americanfootball_nfl_preseason/events
+#: at 2024-08-10 returns 11 events, all August; at 2023-08-12, 8 events.
+SPORT_PRESEASON = "americanfootball_nfl_preseason"
 MARKETS = ("h2h", "spreads", "totals")
 REGIONS = "us"
 PBP_DIR = REPO / "data/nfl_source/tracking/nflverse/pbp"
@@ -222,6 +229,7 @@ def main() -> int:
     args = ap.parse_args()
 
     seasons = [int(s) for s in str(args.seasons).split(",") if s.strip()]
+    sport = SPORT_PRESEASON if args.preseason else SPORT
     date_source = preseason_slate_dates if args.preseason else slate_dates
     plan = {s: date_source(s) for s in seasons}
 
@@ -273,7 +281,7 @@ def main() -> int:
         # PHASE A -- learn real kickoff times (1 credit each).
         print("\n[%d] phase A: discovering kickoff windows over %d dates" % (season, len(plan[season])))
         for date_str in plan[season]:
-            payload = _get("/historical/sports/%s/events" % SPORT,
+            payload = _get("/historical/sports/%s/events" % sport,
                            {"date": "%sT12:00:00Z" % date_str},
                            api_key=api_key, budget=budget)
             data = (payload or {}).get("data") if isinstance(payload, dict) else payload
@@ -320,7 +328,7 @@ def main() -> int:
             if kickoff is None:
                 continue
             at = (kickoff - timedelta(minutes=args.lead_minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            payload = _get("/historical/sports/%s/odds" % SPORT,
+            payload = _get("/historical/sports/%s/odds" % sport,
                            {"date": at, "regions": REGIONS, "markets": ",".join(MARKETS),
                             "oddsFormat": "american"},
                            api_key=api_key, budget=budget)
@@ -347,7 +355,7 @@ def main() -> int:
                 print("    %d/%d windows, %d games, %d credits" % (i, len(windows), len(captured), budget.spent))
 
         out_path.write_text(json.dumps({
-            "season": season, "sport": SPORT, "markets": list(MARKETS), "regions": REGIONS,
+            "season": season, "sport": sport, "markets": list(MARKETS), "regions": REGIONS,
             "lead_minutes": args.lead_minutes, "windows": len(windows),
             "games": len(captured), "events": captured,
         }, indent=2), encoding="utf-8")

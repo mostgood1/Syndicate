@@ -2282,7 +2282,7 @@ about the instrument, not the world.
 
 ---
 
-## 2026-08-20 — FORBIDDEN: buying data before probing that it EXISTS. Cost: 7,528 credits for 1 new row
+## 2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEVER diagnose a vendor from your own broken query
 
 **I verified the COST of a purchase carefully and never verified the PREMISE.**
 
@@ -2300,8 +2300,9 @@ documented overrun history, and executed.
     new events not already on disk:  2023 -> 0 of 257
                                      2024 -> 1 of 264
 
-**OddsAPI does not carry NFL preseason.** Querying its historical events
-endpoint at an August date returns only FUTURE regular-season events, so every
+**~~OddsAPI does not carry NFL preseason.~~ THAT CONCLUSION WAS FALSE — see the
+correction at the end of this entry.** What was true: querying the endpoint I
+queried, at an August date, returned only future regular-season events, so every
 credit re-bought regular-season lines already sitting in the repo.
 
 **The error is not the estimate — the estimate was fine and the ceiling caught
@@ -2325,3 +2326,40 @@ answering the first with rigour creates a false sense of having answered both.
 close — not from local data and not from OddsAPI. Any decision about serving
 NFL preseason picks rests on the under-dispersion proxy plus default-deny, and
 must be labelled as such rather than as a measured loss.
+
+### CORRECTION, same day, after the user asked "are you sure you're looking correctly"
+
+**They were right and I was wrong. OddsAPI DOES carry NFL preseason.** It lives
+under a SEPARATE SPORT KEY, `americanfootball_nfl_preseason`, which
+`/v4/sports?all=true` lists as active. Verified with 1-credit probes:
+
+    /historical/sports/americanfootball_nfl_preseason/events
+        2024-08-10 -> 11 events, ALL August
+        2023-08-12 ->  8 events, ALL August
+
+The real bug: this script hardcodes `SPORT = "americanfootball_nfl"`. My
+`--preseason` flag changed the DATE SOURCE and **not the sport key**, so it
+asked the regular-season endpoint for August and got exactly what that endpoint
+correctly returns — future regular-season games. A flag that must change two
+things and changes one is indistinguishable from a working flag, because the
+output is well-formed either way.
+
+**THE DEEPER ERROR, and it is worse than the wasted credits.** I concluded a
+fact about the VENDOR — "OddsAPI does not carry NFL preseason" — from the output
+of MY OWN BROKEN REQUEST, wrote it into this file and into a commit message as
+established fact, and used it to tell the user that measuring NFL preseason was
+impossible. A null result from a query you have not verified is a statement
+about YOUR QUERY, not about the world. This file already carries
+"absent signal is about the emitter"; I applied it to log lines and not to an
+HTTP response.
+
+**Compounding it:** while investigating I wrote two follow-up probes that read
+the key only from `.env` — but `ODDS_API_KEY` lives in `os.environ`, and `.env`
+is 157 bytes with no odds key at all. They sent an EMPTY key and got 401s, which
+I briefly read as more evidence about the vendor. Three self-inflicted signals
+in a row, all pointing at an innocent API.
+
+**What actually holds:** probe before buying (the guard added between phase A and
+phase B is right and would have caught this at 28 credits), AND before believing
+any negative result about an external system, prove your request was
+well-formed — ideally against a case you KNOW should return data.
