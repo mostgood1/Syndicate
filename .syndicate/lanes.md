@@ -1108,7 +1108,7 @@ history directly:
   proof.
 - Blocked by: none.
 
-### wnba-live-odds-capture-gap — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### wnba-live-odds-capture-gap — OPEN — **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, NOT `#343`-shaped. WNBA's phase=live odds fetch works fine in isolation; the COMBINED sports=mlb,wnba,soccer sweep starves it. No code fix landed yet.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
   game goes live, instead of freezing at its last pregame quote.
   **Testable outcome:** for a WNBA game currently in live state, re-pull
@@ -1141,9 +1141,58 @@ history directly:
   success or failure) — if one exists and simply failed silently, the
   hypothesis narrows to (b); if none exists at all in the step-builder,
   hypothesis (a) is confirmed and this is a missing feature, not a bug.
-- Verification: re-pull the book_quotes shard post-fix for a live WNBA
-  game and confirm a fresh in-game capture, same method used to verify
-  `soccer-odds-capture-cadence-gap`.
+  **RESOLVED: hypothesis (b), but not `#343`-shaped — see below.**
+- **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, tested directly, not inferred.**
+  1. `_build_wnba_steps` (`scripts/refresh_odds_sources.py:828`) DOES fire
+     for `phases=("pregame","live")` — hypothesis (a) is dead.
+  2. Replicated the exact discovery + per-event `/odds` call this fetcher
+     makes (`fetch_basketball_oddsapi_props_local.py`, event_id
+     `09563bab4edf9cf2073ee946ad95d61b`, Lynx@Valkyries) directly against
+     production OddsAPI: **HTTP 200, 8 bookmakers, every market present.**
+     This is NOT `#343` — the market list is fine (this fetcher already
+     uses the safe discover-then-intersect pattern, unlike soccer's old
+     naive bulk request; its own code comment even cites `#343` by name as
+     the reason it was built this way).
+  3. Confirmed genuinely stale via the unambiguous `event_id` join (not a
+     team-name mismatch in the diagnostic): 6,981 rows for this event, all
+     frozen at `captured_at=2026-08-20T00:31:28Z`, 2+ hours stale.
+  4. **The autonomous sweep's own outcome log admits the failure directly:**
+     `[live_refresh_loop] ODDS_SWEEP_OUTCOME sport=wnba wrote=False
+     exists=True since_launch_s=193 sidecar_age_s=7449` (02:35:49Z) — no
+     inference needed, the sweep says it did not write.
+  5. **Fired a manually SCOPED trigger** (`POST /api/ops/odds-refresh/run`,
+     `phase=live, sports=wnba` ONLY — no mlb, no soccer) and it succeeded
+     immediately: `PUBLISH_OK path=wnba_source/tracking/book_quotes/
+     2026-08-19.jsonl bytes=6983198` at 02:37:07Z. Re-pulled the shard:
+     7,851 rows (up from 6,981), latest `captured_at` **1.7 minutes old**.
+     Verification step (below) is DONE for this specific game.
+  - **Mechanism:** `live_refresh_loop.py`'s sweep calls
+    `launch_refresh_run(sports=launch_sports, ...)` ONCE per tick with ALL
+    active sports combined (`sports=mlb,wnba,soccer`) — one subprocess, one
+    `refresh_odds_sources.py --sports mlb,wnba,soccer` invocation. Step
+    order follows `REGISTRY`'s insertion order: `mlb` (heaviest, most
+    complex live-phase work) runs BEFORE `wnba`. Under load, MLB's own
+    live-phase cost appears to consume the sweep's effective time/resource
+    budget before WNBA's step gets a turn — same general SHAPE as soccer's
+    pre-`#433` problem (a heavy sport starving a lighter one sharing one
+    combined run), but the mechanism is scheduling/ordering within ONE
+    process, not a market-list API error. NOT yet proven which specific
+    resource is exhausted (wall-clock step budget vs memory vs something
+    else) — that is the next open question, not this session's finding.
+- **Not done yet — no code fix.** The manual trigger only fixed THIS one
+  game, THIS one cycle; the combined sweep will still starve WNBA on its
+  next autonomous tick. A real fix needs either: reordering WNBA ahead of
+  MLB in the combined run (mirrors `#433`'s soccer fix shape), splitting
+  WNBA into its OWN separate sweep call independent of MLB/soccer, or
+  giving each sport an enforced per-step time budget within the combined
+  run. Whoever picks this up should re-read `_apply_pregame_sport_cadence`
+  and the `ODDS_SWEEP_LAUNCHED` call site in `live_refresh_loop.py` before
+  choosing — the fix should not touch `_build_wnba_steps` itself, which is
+  confirmed correct.
+- Verification: DONE for one isolated manual trigger (above); NOT YET done
+  for the autonomous sweep post-fix — that requires the actual code change
+  first, then re-observing a real `ODDS_SWEEP_OUTCOME sport=wnba wrote=True`
+  on a normal (not manually scoped) tick.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
