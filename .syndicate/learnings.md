@@ -2495,3 +2495,60 @@ without an `items` key does **not** render empty. Subscript falls back to
 attribute access, returns the `dict.items` METHOD, and iteration dies with
 `TypeError: 'builtin_function_or_method' object is not iterable`. Any rail dict —
 fixture or real — that omits `items` raises rather than degrades.
+
+
+### 2026-08-20 — FORBIDDEN: never read a ledger file with `git show <rev>:<path>` from Git Bash. It returns EMPTY, and empty reads as "another session deleted it"
+
+**What happened.** Checkpointing `#387`, I checked whether my deploy record had
+survived a concurrent session's merge:
+
+    git show "origin/main:.syndicate/deploys.md" | grep -c "d0ea983d"   -> 0
+    git show "origin/main:.syndicate/lanes.md"   | grep -c "^### "      -> 0
+
+Zero lane blocks in `lanes.md`. Fourteen lane slugs present in my copy and
+absent from main. The merge commit's own message said *"deploys.md — theirs
+wholesale"*. Every piece of evidence agreed, and I was one step from filing an
+incident saying **another session's merge had deleted the entire lane ledger and
+every lane's deploy record**.
+
+**All of it was false.** MSYS path conversion rewrote the argument:
+
+    origin/main:.syndicate/deploys.md   ->   origin\main;.syndicate\deploys.md
+
+`git show` then failed (once loudly, `fatal: ambiguous argument`; thereafter
+silently to an empty stream, because the failure went to stderr and only stdout
+was piped into `grep -c`). Re-read in PowerShell:
+
+    lanes.md bytes 126,326   lane blocks 14   my block 1
+    deploys.md  d0ea983d x4   plays_dropped=1125 x1
+
+**Nothing was lost. Nothing needed restoring.**
+
+**Why this one is dangerous specifically.** The failure mode is not "an error" —
+it is *a clean zero*, and a clean zero from a ledger file is indistinguishable
+from deletion. Worse, it points AT A NAMED PEER. The conclusion I nearly
+committed was not "my tooling is broken", it was "session X destroyed the
+ledger" — a false accusation, in writing, in the shared record, about work
+another session had done correctly. `#retraction-is-not-innocence` cuts both
+ways: an accusation retracted later still cost the accused session's next reader
+their trust in the file.
+
+**Two independent rules, and the second is the general one:**
+
+1. **On Windows, `<rev>:<path>` goes through PowerShell, never Git Bash.** Also
+   affects `git cat-file`, `git diff <rev>:<path>`, `git log <rev> -- <path>`.
+   `MSYS_NO_PATHCONV=1` works but is one forgotten prefix away from the same
+   silent zero; the shell choice is the durable fix.
+2. **A destructive conclusion about ANOTHER session must be reproduced with a
+   second, differently-shaped instrument before it is written down.** The tell
+   here was available and I walked past it: the *same* Git Bash command against
+   `syndicate/features/mlb/cards.py` returned 3 and 5 — non-zero — while every
+   `.syndicate/*` path returned 0. Paths with a leading dot failed; paths
+   without one worked. **A "deletion" that lands exactly on the paths whose
+   syntax differs is a tooling artifact, not an act.** Partition your null
+   results by the shape of the query before you believe them.
+
+**This rule already existed in personal memory
+(`git_bash_mangles_rev_path_args`, from a false "file ABSENT") and I hit it
+anyway** — which is why it belongs here, in the file that is read at session
+start, rather than only in a memory that is recalled by relevance.
