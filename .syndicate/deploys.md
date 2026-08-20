@@ -19648,3 +19648,80 @@ Claims released after the readings above.
   one of those three scripts actually launch should check
   `artifact_published=` in its output and re-run the export check.
 - Rollback: redeploy refresh-worker at the prior SHA (`08bd601f`).
+
+
+---
+
+## SHIPPED-VERIFIED 2026-08-20 22:00:0xZ -- web `79cb457e` -- THE FIRST VERIFICATION WAS TRUE AND NOT DURABLE
+
+    lane:      soccer-board-mlb-parity   (session aeb71be7)
+    source:    origin/main 4b4533b5
+    web:       79cb457e  graft, parent 075226dd (this lane's own previous deploy)
+               dep-da3nf03rn74s73foa2c0  trigger=api  live 22:00:0xZ   1 file
+    rollback:  deploy 075226dd
+
+**WHY THERE IS A SECOND DEPLOY.** The 21:41Z entry above recorded
+`verify: PASSED` on a reading taken at 21:42:5xZ: `/soccer/api/cards` served
+`ALA 1 - 1 RAY` Final with real Goals and Match stats. That reading was
+**true when taken and false three minutes later.** At 21:45Z the same endpoint
+served the same fixture with **no score and no box**, and held there across
+**six consecutive reads** -- so not per-worker variance, not a cache blip.
+
+**The cause was not the code.** Web was reading the **GIT-TRACKED MIRROR** of
+`recommendations_2026-08-20.json`: `generated_at 2026-07-20T21:33:36`, a month
+stale, `status_state: "pre"`, `live_home_score: "0"` -- byte-identical to
+`data/soccer_source/la_liga/api/recommendations/recommendations_2026-08-20.json`
+in the checkout. `CLAUDE.md` says those trees are "a cold-start safety net ...
+not a snapshot of what production computed". Here one was deciding a live
+surface.
+
+**Every score source is gated on `effective_state`, correctly**, so the gate
+did exactly its job on bad input. Meanwhile `match_box` in the SAME
+`live_state_2026-08-20.json` -- written 90 seconds earlier by the poller
+deployed at 21:33Z -- carried `final: true`, `FT`, `1-1`, both goals and full
+team stats. The right answer was on the same disk, in the same request, locked
+out by a month-old opinion about whether the match had kicked off.
+
+`_effective_state_with_box` lets that fresher, per-match, ESPN-sourced reading
+say the match has started. Only ever an UPGRADE; the upgraded value goes back
+through `_effective_status_state`, so the kickoff refusal still applies; and a
+fixture that has not kicked off has no `match_box` entry at all, so it cannot
+invent a state.
+
+### verify: PASSED, and this one is the stronger reading
+
+    /soccer/api/cards?date=2026-08-20   6 of 6 consecutive reads:
+      ALA 1 - 1 RAY   status='Final'   live_state={'final': True, 'in_progress': False}
+      box = ['Goals', 'Match stats', 'ALA squad projections', 'RAY squad projections']
+
+    games carrying a SCORE    1/1
+    games carrying a REAL BOX 1/1
+    pre-kickoff games showing a score  0    <- PASS, no fabricated 0-0
+    10 of 10 leagues still publishing match_box   gen 21:58:58Z
+
+**Taken WHILE the underlying artifact is still the month-old stale one** --
+re-read at verification time, `generated_at 2026-07-20`, `status_state "pre"`.
+That is what makes this stronger than the 21:42Z reading: the first depended on
+a transiently fresh artifact, this one holds in spite of a stale one.
+
+### THE LESSON, and it is the reason this entry exists
+
+**A green reading taken once, immediately after a deploy, can be an artifact of
+timing rather than a property of the system.** The first `verify: PASSED` was
+honestly measured and would have stood in this ledger as proof of something
+that was not true three minutes later. It was caught only by re-reading the
+same surface a second time for an unrelated reason.
+
+Deploy verification should be read at least twice, separated by minutes, and
+the second read should say what the INPUTS were -- not just what the output
+was. `verify:` fields in this file that record a single post-deploy sample are
+weaker evidence than they look.
+
+### STILL BROKEN, NOT THIS LANE'S
+
+**Some producer is serving web a month-old `recommendations_*.json` mirror.**
+The card is now resilient to it, which is not the same as it being fixed: the
+sim projections, win probabilities and market tiles on that card are still
+being read from a 2026-07-20 artifact. Worth its own lane.
+
+Claim released.

@@ -1015,7 +1015,21 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   **ONE PATH STILL UNWITNESSED IN PRODUCTION: the LIVE CLOCK** -- every
   production reading is of a FINISHED match, which correctly has no clock. It
   was measured locally at the 70th and 83rd minutes pre-deploy. Next MLS
-  kickoffs ~23:30Z would close it.** All
+  kickoffs ~23:30Z would close it.**
+- **A SECOND WEB DEPLOY WAS NEEDED, and the first `verify: PASSED` is why
+  `[2026-08-20T22:00Z, web `79cb457e`]`.** That first reading was true when
+  taken and FALSE THREE MINUTES LATER: web is reading the GIT-TRACKED MIRROR of
+  `recommendations_2026-08-20.json` (`generated_at 2026-07-20`, `status_state
+  "pre"`), so every score source correctly refused it while `match_box` on the
+  same disk carried `final: true, 1-1`. `_effective_state_with_box` lets the
+  fresher per-match ESPN reading set the state; upgrade-only, kickoff refusal
+  still applies. Now 6 of 6 reads serve `ALA 1 - 1 RAY` Final with real box
+  sections WHILE THE ARTIFACT IS STILL STALE.
+- **STILL BROKEN, NOT THIS LANE'S: some producer is serving web a month-old
+  `recommendations_*.json` mirror.** The card is resilient to it now, which is
+  not the same as fixed -- the sim projections, win probabilities and market
+  tiles on that card are still read from a 2026-07-20 artifact. Worth its own
+  lane. All
   three gaps closed: real live AND final score, clock/period on the card, real
   live+final box sections. Verified on live La Liga 401882908 in BOTH states
   (83' 1-0, then FT 1-1 with `games` empty -- the finished case that
