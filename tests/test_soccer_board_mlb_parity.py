@@ -261,6 +261,116 @@ class PropRowTests(unittest.TestCase):
         self.assertEqual(tiles[3]["label"], "Best prop edge")
 
 
+# Two real rows from `player_props` in
+# data/soccer_source/epl/api/recommendations/recommendations_2026-08-21.json.
+SQUAD = [
+    {
+        "player_name": "Kai Havertz", "team": "Arsenal", "side": "home", "position": "F M S",
+        "match_id": "401879301", "anytime_scorer_probability": 0.258,
+        "expected_shots": 1.21, "expected_shots_on_target": 0.43,
+        "expected_minutes_share": 0.539,
+    },
+    {
+        "player_name": "Thomas Partey", "team": "Arsenal", "side": "home", "position": "D M S",
+        "match_id": "401879301", "anytime_scorer_probability": 0.0488,
+        "expected_shots": 0.6002, "expected_shots_on_target": 0.211,
+        "expected_minutes_share": 0.8921,
+    },
+]
+
+
+class SquadBoxTests(unittest.TestCase):
+    def _sections(self, squad=None, picks=None):
+        return cards._squad_box_sections(
+            squad_props=SQUAD if squad is None else squad,
+            prop_picks=picks or {},
+            away_team="Coventry City", home_team="Arsenal",
+            away_abbr="COV", home_abbr="ARS", live_state=None,
+        )
+
+    def test_every_published_player_reaches_the_table(self) -> None:
+        """The data was one truncation away the whole time.
+
+        `cards.py` read `match["top_props"]`, capped at 8 by the artifact
+        builder; the full roster is the payload's top-level `player_props`
+        (28 rows for this fixture), which the props page already read.
+        """
+        home = [s for s in self._sections() if s["title"].startswith("ARS")][0]
+        self.assertEqual(len(home["table_rows"]), 2)
+        self.assertEqual(home["columns"][0], "Player")
+        self.assertEqual(len(home["columns"]), len(home["table_rows"][0]))
+
+    def test_rows_are_ordered_by_scorer_probability(self) -> None:
+        home = [s for s in self._sections() if s["title"].startswith("ARS")][0]
+        self.assertEqual(home["table_rows"][0][0], "Kai Havertz")
+
+    def test_a_side_with_no_published_players_says_so(self) -> None:
+        """All 28 rows for COV@ARS are Arsenal players and none Coventry. An
+        empty column that says nothing is indistinguishable from a bug."""
+        away = [s for s in self._sections() if s["title"].startswith("COV")][0]
+        self.assertFalse(away.get("table_rows"))
+        self.assertIn("No player projections", away["body"])
+        self.assertIn("Coventry City", away["body"])
+
+    def test_captured_price_and_edge_reach_the_table(self) -> None:
+        sections = self._sections(picks={"kai havertz": {"price": 150, "edge": -0.146}})
+        home = [s for s in sections if s["title"].startswith("ARS")][0]
+        row = home["table_rows"][0]
+        self.assertEqual(row[-2], "+150")
+        self.assertEqual(row[-1], "-14.6%")
+
+    def test_a_player_without_a_price_renders_a_placeholder_not_a_number(self) -> None:
+        home = [s for s in self._sections() if s["title"].startswith("ARS")][0]
+        self.assertEqual(home["table_rows"][0][-2:], ["-", "-"])
+
+
+class ScorelineTests(unittest.TestCase):
+    # The real distribution from the same artifact.
+    DIST = {"3-0": 0.14, "2-0": 0.1267, "1-0": 0.10, "3-1": 0.0933, "2-1": 0.0867,
+            "1-1": 0.06, "4-1": 0.0533, "0-1": 0.04, "2-2": 0.04, "3-2": 0.04, "5-0": 0.0333}
+
+    def test_scorelines_are_published_at_all(self) -> None:
+        """`scoreline_probabilities` is on every simulated match and was read
+        by NOTHING on the card -- the correct-score market, unrendered."""
+        section = cards._scoreline_section(self.DIST, away_abbr="COV", home_abbr="ARS")
+        self.assertIsNotNone(section)
+        self.assertEqual(len(section["table_rows"]), 10)
+
+    def test_scorelines_render_away_first_matching_the_card_header(self) -> None:
+        """Artifact keys are home-away; the card header is AWAY @ HOME. If the
+        table kept artifact order the same match would read in two directions
+        on one card."""
+        section = cards._scoreline_section(self.DIST, away_abbr="COV", home_abbr="ARS")
+        # "3-0" is home 3, away 0 -> the Arsenal-favourite peak.
+        self.assertEqual(section["table_rows"][0][0], "COV 0 - ARS 3")
+        self.assertEqual(section["table_rows"][0][1], "14.0%")
+
+    def test_ordered_by_probability(self) -> None:
+        section = cards._scoreline_section(self.DIST, away_abbr="COV", home_abbr="ARS")
+        pcts = [float(r[1].rstrip("%")) for r in section["table_rows"]]
+        self.assertEqual(pcts, sorted(pcts, reverse=True))
+
+    def test_absent_distribution_yields_no_section_rather_than_an_empty_one(self) -> None:
+        self.assertIsNone(cards._scoreline_section(None, away_abbr="COV", home_abbr="ARS"))
+        self.assertIsNone(cards._scoreline_section({}, away_abbr="COV", home_abbr="ARS"))
+
+
+class BoxSectionSurvivalTests(unittest.TestCase):
+    def test_soccer_supplied_table_sections_survive_normalization(self) -> None:
+        """REACHABILITY. These are worth nothing if the shared normalizer
+        rebuilds them away, which is what it did before this lane."""
+        own = [{"title": "ARS squad projections", "body": "",
+                "columns": ["Player", "xSh"], "table_rows": [["Kai Havertz", "1.21"]], "rows": []}]
+        game = {
+            "away": {"abbr": "COV", "name": "Coventry"},
+            "home": {"abbr": "ARS", "name": "Arsenal"},
+            "live_state": {"final": False, "in_progress": False},
+            "status": "Fri, Aug 21",
+            "shared_box_sections": own,
+        }
+        self.assertEqual(contract._normalize_game(game)["shared_box_sections"], own)
+
+
 class DateBoardTests(unittest.TestCase):
     def test_the_date_board_orders_live_first_and_finals_last(self) -> None:
         games = [

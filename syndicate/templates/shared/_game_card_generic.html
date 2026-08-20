@@ -249,6 +249,41 @@
           {% endif %}
         </div>
 
+        {% set headline = game.shared_headline_section if game.shared_headline_section is defined else None %}
+        {% if headline and headline.columns and headline.table_rows %}
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">{{ headline.kicker | default('Distribution', true) }}</div>
+              <div class="cards-table-title"><strong>{{ headline.title }}</strong></div>
+            </div>
+            <span class="cards-chip">Sim</span>
+          </div>
+          {% if headline.body %}<div class="cards-callout-copy">{{ headline.body }}</div>{% endif %}
+          <div class="cards-table-wrap cards-statgrid-wrap">
+            <table class="cards-statgrid">
+              <thead>
+                <tr>
+                  {% for col in headline.columns %}
+                    <th{% if not loop.first %} class="cards-statgrid-num"{% endif %}>{{ col }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for trow in headline.table_rows %}
+                  <tr>
+                    {% for cell in trow %}
+                      {% if loop.first %}<th scope="row" class="cards-statgrid-name">{{ cell }}</th>
+                      {% else %}<td class="cards-statgrid-num">{{ cell }}</td>{% endif %}
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
         <div class="cards-panel-card">
           <div class="cards-box-head">
             <div>
@@ -259,9 +294,10 @@
           </div>
           {% if top_play_rows %}
             <div class="cards-callout-list">
-              {% for row in top_play_rows[:5] %}
+              {% for row in top_play_rows[:8] %}
                 <div class="cards-callout">
                   <strong>{{ row.name }}</strong>
+                  {% if row.value %}<span class="cards-callout-value">{{ row.value }}</span>{% endif %}
                   {#- `row.detail or row.heading` fell back to the PANEL TITLE,
                       which is a constant across the list -- so a five-row list
                       printed the same caption five times, directly under the
@@ -288,6 +324,32 @@
             <span class="cards-chip">{{ 'Live' if live_state else 'Sim' }}</span>
           </div>
           <div class="cards-callout-copy">{{ section.body }}</div>
+          {% if section.columns and section.table_rows %}
+            <div class="cards-table-wrap cards-statgrid-wrap">
+              <table class="cards-statgrid">
+                <thead>
+                  <tr>
+                    {% for col in section.columns %}
+                      <th{% if not loop.first %} class="cards-statgrid-num"{% endif %}>{{ col }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for trow in section.table_rows %}
+                    <tr>
+                      {% for cell in trow %}
+                        {% if loop.first %}
+                          <th scope="row" class="cards-statgrid-name">{{ cell }}</th>
+                        {% else %}
+                          <td class="cards-statgrid-num">{{ cell }}</td>
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
           {% if section.rows %}
             <div class="cards-table-wrap">
               <div class="cards-table-list">
@@ -302,7 +364,13 @@
                 {% endfor %}
               </div>
             </div>
-          {% else %}
+          {% elif not (section.columns and section.table_rows) and not section.body %}
+            {#- Only when the section has NOTHING to say. A section carrying a
+                table, or a body that already explains the absence, was
+                printing this generic line UNDER its own specific one --
+                "No player projections were published for Coventry City in
+                this match." immediately followed by "No box rows are
+                available for this game yet." Two empty states, one gap. -#}
             <div class="cards-empty-copy">No box rows are available for this game yet.</div>
           {% endif %}
         </div>
