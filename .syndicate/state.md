@@ -2052,7 +2052,19 @@ market-relative scoreboard.
   `test_intelligence.py` specifically; the line above is the direct measurement.
 - Full suite: **526 passed, 0 failed** after the soccer `as_of` fix `[08-15]`.
 - `tests.test_archives` (what CI runs) — **383 pass, 2 skipped, ~6 min**
-  `[re-measured 2026-08-19, lane ci-green]`.
+  `[re-measured 2026-08-19, lane ci-green]` — **but only OUTSIDE 00:00-05:00Z,
+  and only on a Central machine.** See the next line; the unqualified version of
+  this line was wrong.
+- **CI IS TIME-DEPENDENT: it was structurally RED ~5 HOURS EVERY DAY**
+  `[measured 2026-08-20, #482]`. 7 `test_archives` tests computed "today" with
+  `date.today()` — the runner's date, **UTC** on GHA — while the routes use
+  `central_today_iso()`. CDT is UTC-5, so **00:00-05:00Z they disagree** and the
+  suite fails no matter what was pushed. Evidence is a clock, not a diff: 16
+  consecutive greens 2026-08-19 23:25-23:53Z, then 29 consecutive reds from
+  23:57Z; across 45 runs, 28 failures inside the window vs 11 successes outside.
+  **Fix applied (assert `central_today_iso()`); a Central dev box CANNOT
+  reproduce it, so only a CI run inside the window proves it.** `Daily Update`
+  runs 06:00Z and is outside the window.
 - **CI RUNS `unittest`, NOT `pytest`, AND `conftest.py` DOES NOT EXIST TO IT**
   `[verified 2026-08-19]`. `ci.yml` runs `python -m unittest tests.test_archives`
   and `daily-update.yml` runs 13 modules the same way, while the documented

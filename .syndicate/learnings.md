@@ -2020,3 +2020,45 @@ auditability via `/api/ops/artifacts/export` — worth having, not blocking.
 the disk it reads from. "Producer and consumer are both worker-side" and
 "needs to cross to web" are different problems with different fixes, and
 conflating them makes a lane wait on another lane for no reason.
+
+
+## 2026-08-20 — OVERTURNED: I reported "CI is green" and closed the lane on a 16-run green streak that did not span the hours CI actually fails. **A streak is a SAMPLE. Check whether it covers the condition that breaks the thing.**
+
+I fixed `#480`, watched **16 consecutive green runs** (2026-08-19 23:25-23:53Z),
+wrote "CI green and holding" into `deploys.md`, `state.md` and the daily log,
+and closed the lane. Every one of those runs was **before UTC midnight**.
+
+From 23:57Z the next **29 consecutive runs failed**, on a cause that had been
+there the whole time: 7 tests in `tests/test_archives.py` computed "today" with
+`date.today()` — the runner's date, **UTC** on GHA — while every route under
+test uses `central_today_iso()`. CDT is UTC-5, so **00:00-05:00Z the two
+disagree** and CI is **structurally red about five hours a day, on the clock,
+regardless of what anyone pushes**. Bucketed over 45 completed runs: 28 failures
+inside the window, 11 successes outside.
+
+**What I actually verified was "CI is green at 23:40Z."** I reported "CI is
+green." Those differ by exactly the hours that matter, and the whole point of
+the original request — *"anytime we deploy to git there are CI errors"* — was
+most likely THIS defect, which I then wrote off as fixed.
+
+**The tell I had and ignored:** the user's complaint was *"anytime"*. I found a
+cause that explained a 26-hour continuous outage and stopped, without asking
+whether it explained the *shape* of what they described. A cause that fits the
+window you sampled is not the same as a cause that fits the report.
+
+**Rules:**
+- Before declaring a periodic gate healthy, ask **what makes it fail** and
+  confirm the evidence spans that. For anything time-dependent, that means a
+  run in each phase — here, one inside 00:00-05:00Z and one outside.
+- **A green streak with a uniform property is one observation, not N.** Sixteen
+  runs inside a 28-minute window are sixteen samples of the same minute-scale
+  condition.
+- **`date.today()` in a test is a latent timezone bug in any repo whose product
+  is timezone-pinned.** Assert against the SAME clock the product uses. This one
+  had already been found once —
+  `test_wnba_cards_api_without_date_uses_today` carries a comment naming the
+  cause precisely — and fixed in only that single test. **Fix the choke point
+  every caller shares, not the instance in front of you.**
+- **A local pass on a Central dev box is not evidence about a UTC runner**, for
+  the same structural reason `conftest.py` is not evidence about `unittest`
+  (2026-08-19, same session): the harness differs from the gate's harness.

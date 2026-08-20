@@ -26,6 +26,15 @@ def _paths_match(expected: Path | str, actual: Path | str) -> bool:
     return expected_norm == actual_norm
 
 from syndicate.app import create_app
+# The slate date is US CENTRAL everywhere in the app (central_today_iso,
+# syndicate/features/shared/timezone.py). `date.today()` is the RUNNER's
+# date, which on GitHub Actions is UTC -- so from 00:00Z to 05:00Z the two
+# disagree and every "without a date, uses today" assertion fails. That made
+# CI structurally red for ~5 hours a day, on the clock rather than on any
+# push: 16 consecutive green runs 2026-08-19 23:25-23:53Z, then 29
+# consecutive red from 23:57Z (a run created at 23:57Z asserts just after
+# midnight UTC). Assert against the same source the app uses. `#482`.
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
 from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
@@ -309,7 +318,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((((tracked.get("segments") or {}).get("first5") or {}).get("totals") or {}).get("line"), 5.5)
 
     def test_mlb_cards_api_payload_prefers_shared_odds_history_for_today(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         context = {
             "date": today_date,
             "prev_date": today_date,
@@ -355,7 +364,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(tracked.get("retrievedAt"), "2026-07-01T08:15:00Z")
 
     def test_mlb_cards_api_payload_prefers_shared_odds_history_refresh_time_for_today(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         context = {
             "date": today_date,
             "prev_date": today_date,
@@ -5597,7 +5606,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn(f"/mlb/season/{resolved_season}?date={resolved_date}", html)
 
     def test_mlb_cards_api_without_date_uses_today(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         response = self.client.get("/mlb/api/cards")
         payload = response.get_json()
 
@@ -5706,7 +5715,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertTrue(merged.get("simContextAvailable"))
 
     def test_nba_cards_api_without_date_preserves_today_request(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         response = self.client.get("/nba/api/cards")
         payload = response.get_json()
 
@@ -5715,7 +5724,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(payload.get("requested_date"), today_date)
 
     def test_nhl_cards_bundle_without_date_preserves_today_request(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         response = self.client.get("/nhl/api/cards/bundle")
         payload = response.get_json()
 
@@ -6016,7 +6025,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("WNBA Game Cards", body)
 
     def test_ncaab_cards_api_without_date_uses_today(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         response = self.client.get("/ncaab/api/cards")
         payload = response.get_json()
 
@@ -6318,7 +6327,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertTrue(any(link.get("href") == "/mlb/hitter-ladders?date=2026-05-18" for link in (hitter.get("module_links") or [])))
 
     def test_archive_launch_links_and_tracker_copy(self) -> None:
-        today_date = date.today().isoformat()
+        today_date = central_today_iso()
         latest_mlb_date = "2026-06-10"
         ncaab_launch_season = ncaab_season_for_date(today_date)
         ncaab_season_launch_date = default_ncaab_season_date(ncaab_launch_season)

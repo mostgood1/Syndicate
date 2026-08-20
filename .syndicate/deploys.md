@@ -17699,3 +17699,26 @@ Additive, 2 files, no schema or contract change, so rollback is a plain redeploy
 - **VERDICT: the #343 regression is fixed and confirmed with real production data,
   not just a deploy success or a live API test.** soccer-odds-capture-cadence-gap
   can close.
+
+
+### CORRECTION 2026-08-20 ~02:0xZ to the entry above — **"CI GREEN AGAIN" WAS TRUE OF THE HOURS I SAMPLED AND FALSE OF THE DAY**
+
+The measurement above stands exactly as written: run `32312838316` was green,
+`#480`'s attribution table is correct, and the fix is real. **The conclusion
+drawn from it was too broad.**
+
+Every run in that green block ran **23:25-23:53Z — all of it before UTC
+midnight**. From 23:57Z the next **29 consecutive runs failed** on a third,
+pre-existing cause (`#482`): 7 `test_archives` tests assert a `date.today()`
+"today" (UTC on the runner) against routes that use `central_today_iso()`, so
+**00:00-05:00Z CI is red regardless of what anyone pushes** — ~5 hours a day,
+and almost certainly the bulk of what *"anytime we deploy to git there are CI
+errors"* was describing.
+
+`28 failures inside 00:00-05:00Z / 11 successes outside / 1 failure outside`
+over the 45 completed runs then visible.
+
+**What this costs the earlier entry:** nothing about `#480`. What it removes is
+the word "again" doing work it had not earned — a 16-run streak inside one
+28-minute window is one observation of a time-varying system, not sixteen.
+Rule recorded in `learnings.md` 2026-08-20.

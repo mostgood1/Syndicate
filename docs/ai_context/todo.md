@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#482` — **CI WAS STRUCTURALLY RED ~5 HOURS EVERY DAY, ON THE CLOCK RATHER THAN ON ANY PUSH: 7 tests assert a UTC "today" against a product that is Central** — FOUND+FIXED 2026-08-20 ~02:0xZ, lane `ci-green`
+
+Found on a second `/checkpoint` by re-reading CI instead of trusting the
+"green" recorded an hour earlier. **This is a THIRD cause, independent of
+`#480` and `#481`, and it is the one most likely to have produced the original
+complaint** — "anytime we deploy to git there are CI errors."
+
+**The 7 tests, all `tests/test_archives.py`, all `AssertionError: '2026-08-19'
+!= '2026-08-20'`:**
+
+    ArchiveRouteTests.test_archive_launch_links_and_tracker_copy
+    ArchiveRouteTests.test_mlb_cards_api_without_date_uses_today
+    ArchiveRouteTests.test_nba_cards_api_without_date_preserves_today_request
+    ArchiveRouteTests.test_ncaab_cards_api_without_date_uses_today
+    ArchiveRouteTests.test_nhl_cards_bundle_without_date_preserves_today_request
+    DateArchiveHelperTests.test_mlb_cards_api_payload_prefers_shared_odds_history_for_today
+    DateArchiveHelperTests.test_mlb_cards_api_payload_prefers_shared_odds_history_refresh_time_for_today
+
+**Mechanism.** They computed the expected day with `date.today()` — the
+RUNNER's date, which on GitHub Actions is **UTC**. Every route under test
+computes its day with `central_today_iso()`
+(`syndicate/features/shared/timezone.py:20`). CDT is UTC-5, so **from 00:00Z to
+05:00Z the two disagree** and every "no date given, uses today" assertion fails.
+**The product is correct** — a US sports board keys on Central — so this is
+`#480`'s shape again: a test asserting something the product deliberately does
+not do.
+
+**EVIDENCE — the outcome tracks the CLOCK, not the commits.** Consecutive runs:
+
+    2026-08-19T23:25Z .. 23:53Z    16 runs   ALL success
+    2026-08-19T23:57Z .. 01:41Z    29 runs   ALL failure
+
+The flip is UTC midnight, not a push. The first red is a run *created* at
+23:57Z — it evaluates its assertions ~3-6 min in, just past midnight. Bucketed
+over 45 completed runs: **28 failures inside 00:00-05:00Z, 11 successes
+outside, 1 failure outside** (a pre-`#480` run).
+
+**Someone had already found this and fixed only their own test.**
+`test_wnba_cards_api_without_date_uses_today` uses `default_wnba_date()` and
+carries the comment *"default_date() is central_today_iso(), not date.today()
+-- the slate date is Central everywhere, and the two differ late at night on
+non-Central machines."* Exactly right, and the other seven kept the bug. **Fix
+the choke point every caller shares, not the one in front of you.**
+
+**Fix:** `tests/test_archives.py` imports `central_today_iso` and all 7 sites
+now assert against it. Zero `date.today().isoformat()` remain in the file.
+
+**Swept, not assumed:** none of the other 13 modules `daily-update.yml` runs
+through `unittest` uses `date.today()`, so the defect is confined to this file.
+
+**Verification note — a local pass here is NOT proof.** This dev machine is
+Central, so `date.today() == central_today_iso()` on it and the 7 tests pass
+either way; the local run shows no regression but cannot exercise the failure.
+Confirmed the window is live at the time of the fix:
+
+    runner-local date.today() : 2026-08-19
+    UTC today (what GHA sees) : 2026-08-20
+    central_today_iso()       : 2026-08-19
+    WINDOW ACTIVE RIGHT NOW   : True
+
+**So CI inside 00:00-05:00Z is the real test, and it is a natural experiment
+available right now** — the next run after the push lands inside the window.
+Do not close this on the local pass.
+
 ### `#481` — **THE DAILY ARTIFACT BACKUP CAPTURES 0.10% OF WHAT IT IS ASKED TO BACK UP, AND REPORTS SUCCESS. Truncation is now VISIBLE (shipped); making the backup COMPLETE needs a scope decision** — FOUND+MEASURED 2026-08-19, lane `daily-update-backup-truncation`
 
 Found while answering "what about the daily update workflow" after `#480` fixed
