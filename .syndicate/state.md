@@ -1873,6 +1873,61 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ---
 
+## [layer2_board_display] LAYER 2 BOARD -- USER-VISIBLE DISPLAY BUGS, 2026-08-20 AUDIT
+
+**All five items from the 2026-08-20 user-directed board audit are FIXED and
+LIVE-VERIFIED.** `syndicate/templates/intelligence.html` unless noted.
+
+- **Over/Under picks now show direction.** `propLine()` dropped the
+  selection word (`"Under"`/`"Over"`) whenever it matched the card's
+  fallback title, which is EXACTLY when both were the same placeholder
+  value. **VERIFIED live: 273/273 (100%)** over/under rows show direction
+  post-fix.
+- **Projected is no longer blank for most moneyline rows.**
+  `displayProjection()` had no fallback for h2h (no natural number to
+  project pregame). Added a probability-derived fallback. **VERIFIED
+  live: 84 of 94** previously-blank h2h `Projected` cells now populated
+  (remaining 10 lack `model_probability` upstream — a real backend
+  coverage gap, correctly left blank, not fabricated).
+- **Live-game Projected/Live/Actual semantics fixed, backend.** Two
+  independent gaps: (1) `live_projection_join.py` preserved the pregame
+  number under `sim_projected` (`#412`) but then still overwrote
+  `projected` itself with the live re-sim value three lines later,
+  contradicting its own comment — measured 34/40 live rows with
+  `projected == live_projected` pre-fix. (2) `_live_projection_columns`
+  (`layer2_board.py`) never mapped `actual_so_far` to `actual` at all —
+  zero hits repo-wide before the fix. **VERIFIED live (on the actual
+  served surface, `boardContract.cards` — the raw `/api/board/layer2-
+  shortlist` row shape exposes this data differently and checking only
+  that is NOT sufficient for this class of fix): 36/48** live MLB prop
+  cards now show a populated `Actual` and a distinct `Live` projection.
+- **Movement/steam display fixed.** `renderMovement()` only read the
+  legacy `line_odds_movement` nested shape; the real data moved to
+  top-level `movement_state`/`movement_price_delta`/etc months ago
+  (`#372`) and the frontend never followed — every tracked/flat row
+  rendered blank regardless of real movement data existing. **VERIFIED
+  live: 169/169 (100%)** tracked/flat rows now render real movement text
+  (e.g. "Odds +226 · 12h ago"). Steam badge logic confirmed correct by
+  code read; no real steam event occurred during the verification window
+  to observe directly (`steamRows: 0` at check time — a real, expected
+  state given the size-and-clock bar, not a rendering gap).
+- **Compact game-card "uniformity" was a render-order race, NOT a
+  chip-matching bug.** Original hypothesis REFUTED by measurement: chip-
+  matching is 100% correct for today's real games (15/15). The actual
+  cause: `loadGameChips()` fired AFTER the synchronous initial render, so
+  the mini-card strip's first paint always used the chip-less fallback
+  style — even for today's real games — then visibly relaid out once
+  chips arrived a moment later. Fixed: fetch chips first, gate the
+  strip's first paint on a `gameChipsLoadedOnce` flag with a sized
+  skeleton placeholder instead of the wrong-shape fallback.
+  **NOT live-verified with a timed capture** — confirmed by code read
+  (exact line numbers for both bug and fix) plus the existing
+  `deriveGameCards` Node harness (unaffected, still 10/10), not by
+  screenshot/network-waterfall. Flag this gap to whoever next touches
+  the game-card strip.
+
+---
+
 - **The soccer projection read was ONE DATE against a SEVEN-DATE quote window**
   `[moved here 2026-08-18 from a WNBA state snapshot]`. `#379`'s widening shipped
   inert — its only caller never passed `window_dates`. Fixed (`b4d82364`), **NOT
