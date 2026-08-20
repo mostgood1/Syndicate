@@ -103,6 +103,80 @@ from syndicate.features.wnba.cards import _default_live_event_ids as wnba_defaul
 from syndicate.features.intelligence_audit import _scored_candidates
 
 
+
+# A deterministic sport for the home sport-stack contract assertions.
+#
+# `#487`. The home stack's markers -- "Compact rail", "Pregame only",
+# "Live only" -- are rendered PER SPORT by shared/_home_sport_stack.html, and
+# "Live slate" additionally requires `sport.active_today`. So asserting them
+# against whatever `build_home_overview()` happens to return makes the test a
+# function of the checkout's mirror AND the wall clock: `build_home_overview`
+# filters on `show_on_home` and `_active_sport_slugs()`, and the date it builds
+# for is `central_today_iso()`.
+#
+# MEASURED: CI run 32331841627 at 23:28 CT 2026-08-19 rendered
+# `<section class="sport-stack">` completely EMPTY with "0 sports tracked", and
+# the test failed on `assertIn("Live slate", home)`. The same test passed at
+# 06:25 CT and again locally at 08:08 CT, because by then the resolved date had
+# rolled to one the mirror had games for. Nothing about the page was broken.
+#
+# Pinning the overview makes these assertions test the TEMPLATE CONTRACT, which
+# is what their comment says they are for, instead of testing whether today's
+# mirror happens to be populated. A marker disappearing from the template still
+# fails the test; an empty slate no longer does.
+#
+# `items` is supplied on every rail deliberately: the template does
+# `compact_rail['items']`, and on a plain dict WITHOUT that key Jinja falls back
+# to attribute access and hands back the `dict.items` METHOD, which then fails
+# as `TypeError: 'builtin_function_or_method' object is not iterable`. A rail
+# fixture missing `items` does not render empty -- it raises.
+_HOME_STACK_FIXTURE_SPORT = {
+    "slug": "mlb",
+    "name": "MLB",
+    "phase": "Reference module",
+    "status": "Phase-1 complete",
+    "summary": "Fixture sport pinning the home sport-stack contract.",
+    "context_label": "2026-08-20",
+    "active_today": True,
+    "show_on_home": True,
+    "games_count": 3,
+    "props_count": 2,
+    "active_game_count": 3,
+    "hydrated_game_count": 3,
+    "data_health": "partial",
+    "data_warnings": [],
+    "freshness_label": "Live \u00b7 8:12 AM",
+    "slate_label": "Live today",
+    "home_anchor": "home-sport-mlb",
+    "hub_href": "/mlb/hub",
+    "primary_href": "/mlb",
+    "primary_label": "Open MLB hub",
+    "betting_href": "/mlb/season/2026/betting-card",
+    "dashboard_games": [],
+    "feature_links": [],
+    "overview_stats": [],
+    "surfaces": [],
+    "game_bar": {},
+    "props_bar": {},
+    "prop_opportunities": {},
+    "runtime_contract": {},
+    "home_rails": {
+        "compact": {
+            "title": "Compact game rail",
+            "items": [],
+            "links": [{"href": "/mlb/live-lens", "label": "Open Live Lens"}],
+        },
+        "pregame": {"title": "Pregame props", "items": [], "links": []},
+        "live": {"title": "Top Live Props", "items": [], "links": []},
+    },
+}
+
+
+def _pinned_home_overview(*_args, **_kwargs):
+    """Stand-in for build_home_overview: one active sport, always."""
+    return [dict(_HOME_STACK_FIXTURE_SPORT)]
+
+
 class IntelligenceAuditScoringTests(unittest.TestCase):
     def test_scored_candidates_support_full_partial_and_minimal_modes(self) -> None:
         candidates = [
@@ -6355,7 +6429,17 @@ class ArchiveRouteTests(unittest.TestCase):
         # Board, so the per-sport dashboard copy below ("Active sports",
         # the live-rail strip, the sport-stack tags) is asserted against
         # the dashboard HTML still served by the /api/home poll endpoint.
-        home_payload = self.client.get("/api/home").get_json()
+        # Pinned, not ambient -- see _pinned_home_overview above.
+        # _HOME_PAYLOAD_CACHE is cleared as well: this no-date request resolves
+        # to central_today_iso(), for which api_home already forces a refresh
+        # (`refresh_requested or selected_date == central_today_iso()`), so the
+        # cache is bypassed today anyway -- but clearing it keeps that true if
+        # that condition is ever narrowed, and stops a payload this test builds
+        # from leaking into a later test on the same date.
+        with patch("syndicate.blueprints.home.build_home_overview", _pinned_home_overview), patch.dict(
+            "syndicate.blueprints.home._HOME_PAYLOAD_CACHE", {}, clear=True
+        ):
+            home_payload = self.client.get("/api/home?refresh=1").get_json()
         home = str((home_payload or {}).get("html") or "")
 
         self.assertEqual(mlb_launch_date, latest_mlb_date)

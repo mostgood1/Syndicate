@@ -1063,13 +1063,64 @@ history directly:
   log lines (or a named skip reason) in production logs -- not the env
   var alone.
 
-### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be
+### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
 - Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
 - Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
+- **RESULT `[2026-08-19]` — the hypothesis was HALF RIGHT, and the half that was
+  wrong is the more useful finding.** The projection idea ("the worker keeps only
+  `games`, so skip the page furniture") was not needed: the two real costs were
+  *inside* what the worker does read.
+  - **Feed/live prune.** `liveData.plays.allPlays` is **66.38%** of a StatsAPI
+    feed/live document and `playsByInning` a further **3.05%** (measured over the
+    15 documents of 2026-06-14, 12,605,243 JSON bytes), and **nothing in
+    `syndicate/` reads either** — every `allPlays` reader is an offline script or
+    `vendor/`, each opening the artifact off disk itself. `_daily_actual_by_game`
+    holds one such document per game live for the whole build. Denylist, not
+    allowlist, so every other consumer is untouched.
+  - **A dead shard load.** `_enrich_games_with_tracked_market_lines` read the
+    whole odds_history shard to consult `doc["games"]`. **The shard has no
+    `games` key and never has had one** — one writer, one literal schema, `git
+    log -S` finds no revision that emitted it, and all three real shard copies on
+    disk confirm `has_games=False`. Worker-only, today-only (= every board
+    build), uncached. `.syndicate/deploys.md` 2026-08-16 called this "the best
+    candidate on the table" and asked for an in-pass measurement to settle it;
+    **the WRITER's schema settles it, and was readable the whole time.**
+- **VERIFICATION RAN.** `scripts/measure_cards_context_rss.py`, worker path
+  (`SYNDICATE_WEB_DYNO=0`), 15-game slate, 5 repeats per arm, prune the only
+  variable:
+
+      peak RSS       142.9 MB -> 114.5 MB   (-28.4 MB, -19.9%)
+        spread    142.7-143.1   114.1-114.9
+      transient       +55.7 MB ->  +35.0 MB
+      retained        +11.8 MB ->   +2.8 MB
+      _daily_actual_by_game retention  +13.6 MB -> +1.9 MB
+      serialised games list   343,503 B both arms -- IDENTICAL
+
+  RSS on a sampling thread, **not `tracemalloc`** — `handoff_refresh_worker_oom.md`
+  records tracemalloc as structurally blind to this exact failure mode.
+  10 tests in `tests/test_mlb_cards_worker_hydration_cost.py`, incl. the
+  reachability pair (`off != on`) and a schema-coupling test that fails if the
+  shard ever grows a `games` key. 103 MLB cards tests green. The 6 red
+  `test_archives` cases are PRE-EXISTING in a `data/`-less worktree — verified by
+  re-running them on a stashed tree, same 6.
+- **FALSIFICATION NOT TRIGGERED, and the limits are stated rather than implied.**
+  (a) No candidate-path consumer reads the dropped sections. (b) `off != on`, so
+  the mechanism fires. **BUT:** the ~125MB shard figure is NOT in the table — the
+  local mirror has no dated shard and the harness runs a PAST date, so that path
+  is never exercised locally. It is a production-only claim derived from a
+  measured file size (19,798,176 B) and `#435`'s ~6.3x resident ratio.
+- **NOT CLAIMED: that the ~2GB production excursion is fixed.** Three named
+  candidates before this one were live, exercised, and moved the transient by
+  nothing measurable. Ship, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`
+  as a RATE against a same-clock-window baseline — never a post-deploy hour,
+  because only a cold process clears that bar.
+- Landed `ab99d236` on `origin/main`. **No deploy made, no claim taken.**
+  Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
+
 
 ### ci-utc-midnight-window — CLOSED 2026-08-20 — **`#482` CONFIRMED FIXED INSIDE the 00:00-05:00Z window: run `32323646103` (`df8aec91`, 02:09Z) green on both gated steps, against 11 consecutive failures 01:24-01:53Z in the same band without it. CI is no longer red on the clock.** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
@@ -1106,6 +1157,45 @@ history directly:
   (skipped=2) and the 7 touched tests OK — but this box is Central, so that
   shows no regression and proves nothing about the window. The CI run is the
   proof.
+- Blocked by: none.
+
+### home-stack-test-data-dependence — CLOSED 2026-08-20 — **Hypothesis HELD. Overview pinned to a fixture; test passes at any hour, full suite 383 OK. Reachability proved off != on (flipping `active_today` fails it).** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Goal: `test_archive_launch_links_and_tracker_copy` stops depending on whether
+  the ambient mirror happens to have active sports for the resolved date.
+  Testable: it passes at any hour, including 23:2x CT where it failed.
+- Files: `tests/test_archives.py`
+- **The defect, measured.** Run `32331841627` (23:28 CT 2026-08-19) failed
+  `assertIn("Live slate", home)` at line 6400. `Live slate`, `Compact rail`,
+  `Pregame only`, `Open Live Lens` and `Live only` are all rendered PER SPORT by
+  `shared/_home_sport_stack.html`; the failing page had
+  `<section class="sport-stack">` completely EMPTY and `0 sports tracked`, so
+  none were emitted. Not a date-arithmetic bug — a data-availability one.
+- **NOT a `#482` regression — `#482` UNMASKED it.** Pre-fix (01:39Z) this same
+  test died at line **6357** on the UTC-date assertion; post-fix it gets past
+  that and reaches **6400**. The first failure had been hiding the second, which
+  is the "a failing test hides everything after it" pattern already in
+  `learnings.md`.
+- Hypothesis: `build_home_overview` filters on `show_on_home` +
+  `_active_sport_slugs()`, and `_home_selected_date(None)` is Central-today, so
+  the set of sports rendered depends on what the checkout's mirror holds for
+  THAT date. 23:28 CT resolved to 2026-08-19 (empty); 06:25 CT and 08:08 CT
+  resolved to 2026-08-20 (non-empty) and passed.
+- Falsification test: if the hypothesis is right, patching the overview seam
+  with a fixed sport makes the assertions pass regardless of clock or mirror.
+  If it still fails, the emptiness comes from somewhere below that seam.
+- Verification: the test passes with the overview seam pinned, AND the full
+  `tests.test_archives` suite stays green.
+- **FALSIFICATION TEST RAN, hypothesis HELD:** pinning the overview seam makes
+  the assertions pass regardless of clock or mirror, so the emptiness did come
+  from that seam and not below it.
+- **REACHABILITY (off != on), run before trusting the pass:** flipping the
+  fixture's `active_today` to `False` fails the test with
+  `AssertionError: 'Live slate' not found`, exit 1. The pin is consulted and the
+  assertion still bites. Restored and verified against the pre-probe file.
+- Verified: target test exit 0; full `tests.test_archives` **383 OK (skipped=2)**.
+- Incidental finding recorded in `#487`: the template's `rail['items']` RAISES
+  rather than renders empty when a rail dict lacks an `items` key, because Jinja
+  falls back to the `dict.items` method.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

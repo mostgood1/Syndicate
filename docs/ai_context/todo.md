@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#487` — **CLOSED. The home sport-stack assertions were a function of the MIRROR and the CLOCK, not of the page. Pinned to a fixture; reachability proved off != on** — FOUND+FIXED+VERIFIED 2026-08-20, lane `home-stack-test-data-dependence`
+
+The one overnight CI failure left after `#482`. **Not a `#482` regression — `#482`
+unmasked it**, which the line numbers show exactly: pre-fix this same test died
+at line **6357** on the UTC-date assertion; post-fix it gets past that and
+reaches line **6400**. The first failure had been hiding the second.
+
+**The defect.** `assertIn("Live slate", home)` and its four neighbours
+(`Compact rail`, `Pregame only`, `Open Live Lens`, `Live only`) are rendered
+**per sport** by `shared/_home_sport_stack.html`, and `Live slate` additionally
+needs `sport.active_today`. The test asserted them against whatever
+`build_home_overview()` happened to return — and that function filters on
+`show_on_home` + `_active_sport_slugs()` for the date `central_today_iso()`
+resolves to. So the assertions were a function of what the checkout's mirror
+held for today.
+
+**MEASURED:** CI run `32331841627`, 23:28 CT 2026-08-19 — the page rendered
+`<section class="sport-stack">` **completely empty** with `0 sports tracked`,
+and the test failed. The same test passed at 06:25 CT, and locally at 08:08 CT,
+because the resolved date had rolled to one the mirror had games for. **Nothing
+about the home page was broken on either side.**
+
+**Fix.** `build_home_overview` is pinned to `_pinned_home_overview` — one sport,
+`active_today=True` — for the duration of the `/api/home` fetch, so the
+assertions test the **template contract**, which is what their own comment says
+they are for, rather than whether today's slate happens to be populated. A
+marker disappearing from the template still fails the test; an empty slate no
+longer does.
+
+**REACHABILITY TESTED BEFORE CORRECTNESS, per the model-engine standard — off
+!= on:** flipping the fixture's `active_today` to `False` makes the test **fail**
+with `AssertionError: 'Live slate' not found` (exit 1). So the pin is genuinely
+consulted and the assertion still catches a real change; it is not passing
+vacuously. Restored, and the restore verified against the pre-probe file.
+
+**A template landmine found while building the fixture, worth knowing.** The
+template does `compact_rail['items']`. On a plain dict **without** an `items`
+key, Jinja falls back to attribute access and returns the `dict.items` **method**,
+which then dies as `TypeError: 'builtin_function_or_method' object is not
+iterable`. A rail dict missing `items` does **not** render empty — it raises. The
+fixture supplies `items` on all three rails deliberately.
+
+**Verified:** the test passes; full `tests.test_archives` **383 OK (skipped=2),
+exit 0**.
+
 ### `#486` — **`Daily Update`'s CRON IS REMOVED. The feature is not used — Render owns generation AND durability — and repairing it had put a ~51MB/day push to `main` three hours from firing** — DONE 2026-08-20 `[user decision]`
 
 **User, 2026-08-20:** *"we no longer use that daily update feature, everything
