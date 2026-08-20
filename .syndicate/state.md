@@ -3338,6 +3338,70 @@ simulated ladder like MLB's pitcher props.
 
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
+### ONE WRITER PLUS A BROKEN FALLBACK -- NOT A RACE `[2026-08-20T19:2xZ, VERIFIED -- SUPERSEDES THE "RACE" FRAMING BELOW]`
+
+**The trigger path, traced end to end.** Per sim cycle:
+
+    run_mlb_daily_sim_job.py:237   shells out to vendor/.../tools/daily_update.py
+    daily_update.py:3694           writes the VENDOR 26-field ladders artifact
+    run_mlb_daily_sim_job.py:488   native is_stale() -> artifact seconds old -> SKIP
+
+So the vendor writer is the NORMAL producer and `#440`'s native builder is a
+**FALLBACK that fires only when the vendor pipeline ERRORS** --
+`daily_update.py:3684` skips its ladders stage exactly when
+`current_stage.status == "error"`. The two do not race for the file; the native
+one runs only where the vendor one gave up.
+
+**Therefore the MLB pregame-chip outage was: the fallback fired after a failed
+daily update, and the fallback wrote a schema the board cannot read.** That fits
+the 16:46 native-stamped artifact and the sim ledger's many MLB runs that start
+and never reach a terminal state.
+
+**Consequence for verification: there is NO production lever that forces a
+native rebuild.** `SYNDICATE_MLB_LADDERS_REFRESH` is on/off not force;
+`is_stale` has no force branch; `/api/ops/live-refresh/force-mlb-resim` runs the
+sim job, which runs `daily_update` first, so the native path skips again. Proof
+requires either inducing a vendor-stage failure or shipping a force knob.
+`a54dffa3` is correct by local measurement over real production inputs (18/18)
+and its production wiring is UNPROVEN by design, because the path runs rarely.
+
+**The vendor writer was NOT retired.** `ladders_build.py`'s docstring says the
+only thing that ever wrote `daily_ladders_<date>.json` was the vendor frontend
+and that this module replaces it. **False.**
+`vendor/mlb_bettingv2/tools/web/flask_frontend.py:4057` still rebuilds the
+artifact ON-REQUEST whenever it reads stale, and emits a **26-field** row schema
+WITH `ladder[]`, `gamePk`, `pitcherId`. The native builder emits **10** fields
+and none of those three. Both write the same path; last writer wins.
+
+Observed on production, same file, same day:
+
+    16:46:16Z  generatedBy=syndicate.features.mlb.ladders_build   ladder 0/18
+    18:19:09Z  no generatedBy  (vendor)                           ladder 18/18
+    18:56:23Z  no generatedBy  (vendor)                           ladder 18/18
+
+**Consequence:** `cards.py`'s pregame starter chips need `gamePk` + `ladder`, so
+they FLAP -- dead after a native write, alive after a vendor write. The MLB board
+rendering no pregame chips AND no starter NAME (the JS gated the name on the
+badge list) is this, not a data outage.
+
+**`generatedBy` is the discriminator** -- only the native writer stamps it
+(`ladders_build.py:564`). Any claim about which writer produced a given copy
+must cite it. Size differs by an order of magnitude too: native 684,325 B vs
+vendor 9,518,280 B, the latter within 3MB of `_PUBLISH_MAX_BYTES`.
+
+**Fix `a54dffa3` is LIVE on refresh-worker `[18:27:40Z]` and so far INERT.** The
+native writer has not run since: its status artifact reads
+`outcome: "skipped_fresh"` at 18:56:57Z, because the vendor's write is always
+newer than the sims so `is_stale` correctly answers `fresh`. **The board being
+correct right now is the VENDOR writer's doing, not the deploy's.** Unproven in
+production until a served artifact carries `generatedBy=...ladders_build` AND
+populated `ladder[]`.
+
+**Web rebuilding a 9.5MB artifact inside a request handler contradicts the
+worker-split rule** (web does no heavy computation). Known, unowned, out of
+scope for the lane that found it.
+
+
 ### ROOT CAUSE FOUND AND MEASURED `[2026-08-20 ~01:00Z]` — THE SWEEP WAS REFUSING IT ON SIZE
 
     daily_ladders_2026_08_19.json      13,678,982 bytes

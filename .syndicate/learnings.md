@@ -2864,3 +2864,44 @@ hold when you have written the wrong thing successfully. And when documenting a
 bug in a comment beside the code, the comment and the code become textually
 identical — which is exactly what defeats a naive anchored replace, so anchor on
 something unique to the code (leading indentation, trailing comma).
+## 2026-08-20 — FORBIDDEN: concluding a producer was REPLACED because a module says it replaced it
+
+`ladders_build.py`'s docstring opens: *"The only thing that ever wrote
+`daily_ladders_<date>.json` was `write_daily_ladders_artifact` inside the VENDOR
+Flask frontend."* I read that as settled history and diagnosed on top of it. It
+is **false today**: `flask_frontend.py:4057` still rebuilds that artifact
+on-request, and emits a **26-field** row schema against the native builder's
+**10**. Both write the same path. Last writer wins.
+
+**What that cost.** I measured the artifact once (16:46:16Z, `ladder=0` on all
+3,978 rows) and reported *"every pregame chip has been dead every day since the
+cutover."* Two hours later the same path served a vendor-written copy with
+`ladder=18/18`. The true behaviour was **flapping**, not an outage. My commit
+message shipped with the overclaim in it, and I had to correct it on the record.
+
+**The general rule, and it is not about ladders.** A module's account of what it
+REPLACED is a claim about the world at the time it was written, by an author who
+had reason to believe it. It is not a fact about today, and it is the kind of
+claim that decays silently — nothing fails when a retired producer keeps
+running. Treat "X was retired / X is the only writer / Y is dead code" in prose
+as a HYPOTHESIS with a cheap test: **grep for live callers, then look at what is
+actually being produced.** Here one field settled it — only the native writer
+stamps `generatedBy`, so every copy says which writer made it.
+
+Related and reinforcing: [[feedback_presence_is_not_reachability]] (a deployed
+fix can be inert — this one IS: `outcome: "skipped_fresh"`, the native builder
+has not run once since deploy) and
+[[feedback_isolate_the_source_you_changed]] (a field with two possible producers
+verifies nothing until you know which one filled it).
+
+**Second-order trap this created, worth naming separately.** Because the vendor
+writer keeps the file fresh, `is_stale` correctly answers `fresh` and the native
+builder SKIPS — so the fix cannot prove itself by waiting. And because the
+vendor output is CORRECT, **the board looks fixed while the deploy has never
+executed.** A green-looking surface was the strongest available evidence for the
+wrong conclusion. When two producers can satisfy the same symptom, the
+verification must name the producer, not the symptom.
+
+**Cost:** low — caught before the checkpoint, by reading the writer's own status
+artifact instead of the board. Would have been a false "verified" in
+`deploys.md` otherwise.
