@@ -699,3 +699,74 @@ skipped.
 where the data already exists and the naive version is already measured as
 failing. If a better estimator cannot beat the naive one there, buying a CFB
 feed would be buying the easy half of a problem whose hard half is unsolved.
+
+---
+
+## 13. THE INJURY LEVER IS DEAD — the NFL market prices injuries. Measured.
+
+**Measured 2026-08-20**, `scripts/test_nfl_injury_market_edge.py`, full 2025 NFL
+regular season, 272 games joined.
+
+§12 recommended prototyping a causal injury estimator on NFL, where the data
+exists. **That recommendation was executed, and the pre-build test killed it
+before a line of estimator was written.**
+
+### The prior question the recommendation skipped
+
+Building a better estimator assumes there is something to capture. But NFL
+injury reports are **mandatory and public** — every book sees the same report at
+the same time — and the NFL line is the most efficient in sport. If it already
+prices injuries, no estimator, however causal, produces an edge.
+
+    market_residual = realised − market_margin        (home side)
+
+| burden measure | n | slope | SE | t | verdict |
+|---|---|---|---|---|---|
+| out_diff | 272 | −0.3386 | 0.2903 | −1.17 | priced |
+| qb_out_diff | 272 | −1.4728 | 1.6083 | −0.92 | priced |
+| weighted_diff | 272 | −0.5085 | 0.2811 | −1.81 | priced |
+| skill_out_diff | 272 | −0.2495 | 0.5529 | −0.45 | priced |
+
+**Positive control:** burden genuinely varies — `out_diff` spans −8 to +10 with
+SD 2.56 — so these nulls are real absences, not a degenerate regressor.
+
+### The direct ATS test, which is what actually decides it
+
+`weighted_diff` read t=−1.81 with the intuitive sign, and extrapolating that
+slope implies ~1.34 points and ~53.5% ATS — above breakeven. **That
+extrapolation is wrong**, and betting it is what the direct test measures:
+
+    |weighted_diff| >= 1 : 189 bets   54.5% ATS  CI [47.4, 61.4]
+    |weighted_diff| >= 2 : 118 bets   50.0% ATS  CI [41.1, 58.9]
+    |weighted_diff| >= 4 :  36 bets   58.3% ATS  CI [42.2, 72.9]
+
+**Every CI spans 52.4%, and the sequence is NON-MONOTONIC.** A real effect
+strengthens as the edge filter tightens; this wanders 54.5 → 50.0 → 58.3, which
+is the signature of noise. The regression slope implied an edge the actual bets
+do not produce.
+
+### What this closes
+
+**The injury lever is dead for NFL** — the market has the information. And **a
+fortiori for NCAAF**: worse data (§12 — 1 stale record across 140 teams), no
+mandatory reporting, and whatever availability news does leak would be priced by
+the same mechanism that prices the NFL's.
+
+Every lever in §1 is now measured rather than ranked on intuition:
+
+| lever | status |
+|---|---|
+| injuries / availability | **DEAD — market prices it (§13)** |
+| in-season rating updates | partially quantified (§2), but §10 shows the model's deviation carries no information |
+| situational | **DEAD — market prices all 8 factors (§11)** |
+| personnel depth / returning production | **DEAD — measured null, code removed (§6)** |
+| motivation / context | untested, and the smallest of the five |
+
+### Honest limits
+
+n=272 is ONE season; CIs run ±8–15 ATS points, so this is **"no evidence of an
+edge"** rather than **"proven no edge"**. More seasons of nflverse injury data
+would tighten it. But the practical conclusion is unchanged: there is nothing
+measured here to build a causal estimator ON, and building one would be
+committing days to an unmeasured hope — the exact pattern that returning
+production established costs hours to unwind.
