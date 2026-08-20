@@ -143,7 +143,14 @@ class LiveProbabilityFollowsLiveProjectionTests(unittest.TestCase):
         projection = grid[0]["projection"]
 
         self.assertEqual(coverage["rows_live_projected"], 1)
-        self.assertEqual(projection["projected"], 4.786)
+        # `layer2-live-projection-actual`, 2026-08-20: `projected` now stays the
+        # PREGAME number (this fixture's own `4.932`, set in `_grid()`) rather
+        # than being overwritten with the live number -- that overwrite was
+        # `#412`'s own incomplete half, see `live_projection_join.py`. The join
+        # still correctly captured the live number; it now lives under its own
+        # name.
+        self.assertEqual(projection["projected"], 4.932)
+        self.assertEqual(projection["live_projected"], 4.786)
         self.assertIsNone(projection["model_prob_over"])
         self.assertIn("model_prob_over_unavailable_reason", projection)
         self.assertEqual(coverage["rows_live_prob_withheld"], 1)
@@ -168,6 +175,14 @@ class LiveProbabilityFollowsLiveProjectionTests(unittest.TestCase):
         # The property the report was actually about, asserted directly: a row
         # may not claim the under with its projection and the over with its
         # probability. 7 of 13 live pitcher rows did exactly that.
+        #
+        # `layer2-live-projection-actual`, 2026-08-20: compared against
+        # `live_projected`, not `projected`. `projected` is now the PREGAME
+        # number by design (it must stay put -- see the fix above) and a
+        # pregame projection disagreeing in direction with a LIVE probability,
+        # mid-game, is an expected and honest state, not the straddle defect
+        # this test guards. `live_projected` and `model_prob_over` are the
+        # pair that must agree, because both are live-basis.
         for live_prob in (None, 0.31):
             with self.subTest(live_prob=live_prob):
                 grid = _grid()
@@ -176,7 +191,7 @@ class LiveProbabilityFollowsLiveProjectionTests(unittest.TestCase):
                 probability = projection["model_prob_over"]
                 if probability is None:
                     continue
-                self.assertEqual(projection["projected"] > grid[0]["line"], probability > 0.5)
+                self.assertEqual(projection["live_projected"] > grid[0]["line"], probability > 0.5)
 
     def test_a_second_tick_does_not_record_the_live_number_as_the_sims(self):
         grid = _grid()

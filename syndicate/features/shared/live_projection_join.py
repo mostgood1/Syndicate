@@ -403,6 +403,19 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # move from "we projected 6.5" to "now 4.2, with 3 already in the book".
         # Only stamp them once: a second tick must not record the live number as
         # the sim's.
+        #
+        # `layer2-live-projection-actual`, 2026-08-20: `#412` only did HALF of
+        # this. `sim_projected` was correctly seeded from the pregame number
+        # here, but the `.update()` below still wrote `hit["live_projection"]`
+        # over `projected` ITSELF a few lines down -- the exact field
+        # `displayProjection()` reads for the board's Projected column
+        # (`sim_projection ?? projected ?? projected_sim`; `sim_projected`
+        # maps to `sim_projection` upstream and is frequently absent, so most
+        # rows fell through to the now-live `projected`). Measured live:
+        # 34 of 40 live MLB prop rows (85%) had `projected == live_projected`.
+        # `projected` is no longer touched below -- once set here it is never
+        # written again in this function, so it stays whatever it already was
+        # when this row first arrived: the pregame number.
         projection.setdefault("sim_projected", projection.get("projected"))
         projection.setdefault("sim_basis", projection.get("basis"))
         projection.setdefault("sim_source", projection.get("source"))
@@ -435,7 +448,18 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         projection.update(
             {
                 "basis": "live_resim",
-                "projected": hit["live_projection"],
+                # NOT "projected": hit["live_projection"] -- see the comment
+                # above `sim_projected`'s setdefault. `live_projected` is the
+                # live number's own, correctly-named field; `projected` stays
+                # whatever it already was (the pregame value) so the two can
+                # be shown side by side rather than one silently becoming the
+                # other. `model_prob_over` is intentionally NOT given the same
+                # treatment: the edge must price against the LIVE market, so
+                # it needs the live probability regardless of what the
+                # Projected column displays -- that is a separate concern
+                # from display provenance, and `sim_model_prob_over` above
+                # already preserves the pregame probability for anything that
+                # wants it.
                 "live_projected": hit["live_projection"],
                 "model_prob_over": live_prob_over,
                 "actual_so_far": hit.get("actual_so_far"),
