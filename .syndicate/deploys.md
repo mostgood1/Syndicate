@@ -18114,3 +18114,45 @@ blind instrument. **A null result needs its window stated and, when the emitter
 is periodic, a wait long enough to cover one full period of the thing you are
 watching** — here, one full overview pass across every date the worker builds,
 not just the first date it happened to reach.
+
+
+---
+
+## PENDING — refresh-worker `85296826` (`deploy/mlb-mix-and-markets-v2`) — `#440`
+
+    preflight PASS 2026-08-20T15:35Z. claim held by convergence-phase7-crps
+              since 15:07:44Z (ttl 2700s -> EXPIRES ~15:52Z).
+    parent    41f79353 (the LIVE SHA, live 15:00:28Z) -- verified an ANCESTOR of
+              the target, so this cannot revert it. Both base blobs still match
+              live: an exact add.
+    scope     4 files, +323/-4. TWO substantive changes, not one, and that is
+              deliberate: we are NOT diagnosing, the subsystems are disjoint
+              (roster build vs ladders builder), and the second is a zero-cost
+              ridealong whose standalone preflight FAILED on measurability.
+
+**RE-CUT ONCE ALREADY.** The first cut `1ef337c0` had parent `041188cb` and went
+stale while waiting for the claim: the worker moved to `41f79353` at 15:00:28Z,
+which builds on `041188cb` and adds 12 files including `run_refresh_worker.py`
+(+460) and `mlb/cards.py` (+174/-18). Deploying it would have SILENTLY REVERTED
+another lane's shipped work. A claim serialises deploys; it cannot make them
+cumulative. Re-reading the live SHA at deploy time is what caught it.
+
+**expected effect (number + window):** first `sim_input_report` after live --
+sims every ~15-20 min, build ~4 min, so within ~30 min -- `conditional_arsenal`
+and `count_bucket_map` go 0.0% -> non-zero over 134 pitchers. Offline coverage
+was 77.1% (395/512), so expect >50%. Still 0.0% == the fix is INERT.
+
+**baseline, read live at 15:35Z:** report `2026-08-20T14:52:41Z` (host=worker)
+`conditional_arsenal 0.0`, `count_bucket_map 0.0`.
+
+**verify:** `/api/ops/artifacts/export?pattern=*sim_input_report*`. A PUBLISHED
+ARTIFACT, not a log line -- the sim's stdout goes to a disk file the Render log
+API cannot serve. The ladder ridealong is expected to stay 0 until books post
+`batter_strikeouts`; that is NOT evidence its wiring failed.
+
+**rollback:** `python scripts/render_deploy.py --service refresh-worker --commit 41f79353`
+
+**BLOCKED ON PERMISSION, not on the gates.** Both locks are satisfied; the
+harness auto-mode classifier denied `render_deploy.py`. Not worked around.
+
+**measurement:** <pending>
