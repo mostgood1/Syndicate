@@ -19621,3 +19621,30 @@ mid-capture truncates it, so that check is not a formality. web showed only
 gunicorn.
 
 Claims released after the readings above.
+
+## SHIPPED-VERIFIED 2026-08-20 21:57Z -- refresh-worker deploy -- publish_hot_artifact calls wired for injuries/roster/depth-chart, live d1a897b2
+- Lane: nfl-artifact-publish-wiring. Preflight PASS, scoped to the target
+  commit, after a genuine `HOLD` window (soccer artifact build stuck on
+  `championship` league for several minutes) -- waited, not overridden.
+- Scope note: cherry-picked the 3 script files from `4feb5fa7` onto
+  refresh-worker's live SHA at fire time (`08bd601f`, itself the
+  allowlist deploy from earlier this session), as `d1a897b2`, pushed to
+  `deploy/nfl-artifact-publish-wiring`.
+- `dep-da3ndp3m8hqs73ceu5q0`, live 21:57:44.75028Z, commit
+  content-verified == `d1a897b2` via the deploy API response.
+- **This completes the full chain from this session's own finding:**
+  allowlist deployed (web `c5c1b0b5`, refresh-worker `08bd601f`) -> real
+  export check found `count: 0` -> traced to no publish call sites ->
+  fixed and now deployed (`d1a897b2`). All three layers (data exists ->
+  allowlist permits -> code actually pushes) are now live together for
+  the first time.
+- **verify: code-level confirmed live. End-to-end confirmation (a real
+  `/api/ops/artifacts/export` call returning a nonzero count) still
+  requires the NEXT real autorun run of one of the three scripts** --
+  roster/depth-chart are rate-limited to ~6h from their last real run
+  (2026-08-20T19:41:42Z, so next window ~01:41:42Z), and injuries fetch
+  remains unarmed (deliberately, separate scope, offered as a ridealong
+  to `football-model-owner` earlier this session). Whoever next observes
+  one of those three scripts actually launch should check
+  `artifact_published=` in its output and re-run the export check.
+- Rollback: redeploy refresh-worker at the prior SHA (`08bd601f`).
