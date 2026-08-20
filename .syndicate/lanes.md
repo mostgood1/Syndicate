@@ -1092,7 +1092,7 @@ history directly:
   proof.
 - Blocked by: none.
 
-### wnba-live-odds-capture-gap — OPEN — **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, NOT `#343`-shaped. WNBA's phase=live odds fetch works fine in isolation; the COMBINED sports=mlb,wnba,soccer sweep starves it. No code fix landed yet.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### wnba-live-odds-capture-gap — OPEN, VERIFICATION PENDING — **FIX SHIPPED AND DEPLOYED (commit `170505ec`, deploy `b5cf8ac2` live 13:15:46Z; flag flip `cb322dd1` live 13:31:11Z). Isolated WNBA-only live-phase autorun, own lane+cadence, mode=fast. No WNBA game has been live since the flag flipped, so real end-to-end behavior is UNOBSERVED — that is the one thing left.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
   game goes live, instead of freezing at its last pregame quote.
   **Testable outcome:** for a WNBA game currently in live state, re-pull
@@ -1163,20 +1163,33 @@ history directly:
     process, not a market-list API error. NOT yet proven which specific
     resource is exhausted (wall-clock step budget vs memory vs something
     else) — that is the next open question, not this session's finding.
-- **Not done yet — no code fix.** The manual trigger only fixed THIS one
-  game, THIS one cycle; the combined sweep will still starve WNBA on its
-  next autonomous tick. A real fix needs either: reordering WNBA ahead of
-  MLB in the combined run (mirrors `#433`'s soccer fix shape), splitting
-  WNBA into its OWN separate sweep call independent of MLB/soccer, or
-  giving each sport an enforced per-step time budget within the combined
-  run. Whoever picks this up should re-read `_apply_pregame_sport_cadence`
-  and the `ODDS_SWEEP_LAUNCHED` call site in `live_refresh_loop.py` before
-  choosing — the fix should not touch `_build_wnba_steps` itself, which is
-  confirmed correct.
-- Verification: DONE for one isolated manual trigger (above); NOT YET done
-  for the autonomous sweep post-fix — that requires the actual code change
-  first, then re-observing a real `ODDS_SWEEP_OUTCOME sport=wnba wrote=True`
-  on a normal (not manually scoped) tick.
+- **FIX IMPLEMENTED 2026-08-20 ~03:0xZ, deployed and flag-flipped 13:07-13:31Z.**
+  `_launch_autorun_wnba_live_refresh()` (`scripts/run_live_odds_refresh_worker.py`) mirrors the
+  existing pregame autorun's shape: its own 240s cadence, its own EXPLICIT refresh lane
+  (`live-odds-worker-wnba-live`, so it can never contend with the combined sweep's lane), `mode=
+  "fast"` (skips the SmartSim prediction/edges/export pipeline that `test_wnba_pregame_autorun.py`'s
+  own comment warns would OOM this 2GB service if run every few minutes), gated on
+  `_wnba_has_live_game` specifically — not merely "WNBA active today". Default OFF, same
+  convention as every other autorun in this file. 22 new tests
+  (`tests/test_wnba_live_refresh_autorun.py`), 73/73 passing across every file touching the module.
+- **Deploy history, both scoped off the LIVE SHA (origin/main had drifted 47+ commits ahead by
+  deploy time — see `deploys.md` for the full "exactly one substantive change" reasoning):**
+  1. `170505ec` landed on `main`; `b5cf8ac2` (scoped, parent `d520d93d`) deployed 13:15:46Z, code
+     default-OFF, verified genuinely inert (zero `WNBA_LIVE_AUTORUN` log lines post-deploy).
+  2. `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1` set on the service; `cb322dd1` (comment-only,
+     produced specifically because `deploy_preflight.py` has no override for an intentional
+     same-commit redeploy — a real tooling gap worth fixing separately) deployed 13:31:11Z. Content
+     landed on `main` too (`2908373d`), not orphaned on the deploy branch.
+- **verify: PARTIAL.** Confirmed: env var reads `"1"` live, zero `WNBA_LIVE_AUTORUN_ERROR`, tick loop
+  healthy. NOT confirmed: no WNBA game was live at deploy time (all three of today's games still
+  pregame, kickoffs 00:00Z/02:00Z the next day) — `WNBA_LIVE_AUTORUN_LAUNCHED` has never fired for
+  real. **This is the one thing left, and it is the lane's actual falsification test.**
+- Next concrete step for whoever continues: once a WNBA game goes live, `render_logs.py --service
+  live-odds-worker --text WNBA_LIVE_AUTORUN_LAUNCHED` should show it firing within one 240s cycle of
+  kickoff; re-pull that game's `book_quotes` shard and confirm a `captured_at` newer than kickoff.
+  If it does NOT fire, re-check `_wnba_has_live_game`'s two sub-checkers
+  (`_wnba_has_live_game_via_artifact`, `_espn_has_live_game`) directly — not yet independently
+  verified against a real live game, only unit-tested with a monkeypatched return value.
 - Blocked by: none.
 
 ### home-stack-test-data-dependence — CLOSED 2026-08-20 — **Hypothesis HELD. Overview pinned to a fixture; test passes at any hour, full suite 383 OK. Reachability proved off != on (flipping `active_today` fails it).** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
