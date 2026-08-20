@@ -3021,3 +3021,29 @@ about which endpoint actually feeds the template before writing the
 measurement, not after. Would have been a false "not working" read in
 `deploys.md` otherwise -- the inverse of the usual near-miss, a fix wrongly
 believed BROKEN instead of wrongly believed working.
+
+## 2026-08-20 -- A READING OF SHARED MUTABLE STATE EXPIRES AT THE INSTANT IT IS TAKEN
+
+I measured the primary tree's SHARED INDEX, found 38 files staged by another
+session, and reported that to the user as a live hazard. Forty minutes later I
+proposed clearing it. By then the 38 were GONE -- that session had committed or
+reset -- and the index held 2 files whose staged content was byte-identical to
+the working tree, so clearing lost nothing. I had described a danger that no
+longer existed and built a rescue ref that captured almost nothing.
+
+The precaution was correct in form: before a destructive act I checked what would
+be lost, and found 18 staged snapshots differing from disk. The DEFECT was
+treating that check as still-valid at the moment of acting.
+
+**How to apply.** For anything shared and mutable -- the index, a deploy claim,
+a live SHA, `lanes.md`, an in-flight job list -- re-take the measurement in the
+SAME step that acts on it, not in the step that decided to act. This is the same
+failure as deploying a branch cut against a stale live SHA, which cost a re-cut
+earlier the same day; the shape is identical and so is the fix.
+
+**Corollary, suffered rather than inflicted this time.** A ledger correction is
+not durable until it survives the next push. `162b3d57` corrected a FALSE lane
+header ("THE EVALUATION HAS NOT STARTED" when the scorer had been running all
+along); a later push restored the stale text. Verify a ledger edit is still
+present at checkpoint -- content-probe `origin/main`, do not assume your commit
+being an ancestor means your LINE survived.
