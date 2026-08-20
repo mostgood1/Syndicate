@@ -19490,3 +19490,59 @@ someone else's.
   call sites is a separate piece of work, not done in this deploy --
   flagged to the user rather than assumed complete.
 - Rollback: redeploy refresh-worker at the prior SHA (`a0396411`).
+
+---
+
+## 2026-08-20 ~21:5xZ — `5848f64d` LANDED, DEPLOYED NOWHERE — soccer's squad was every player who ever played in the league
+
+    lane:      soccer-board-mlb-parity
+    on main:   5848f64d
+    services:  NONE. This is worker code; web carries it and never runs it.
+    status:    INERT IN PRODUCTION. Not a measurement entry — a state entry,
+               so the next session does not read the fix as live.
+
+**The defect.** `_load_player_rows` concatenates every season's
+`players_*.csv` and dedupes by `player_id` keeping the newest row — asking
+"what is this player's latest row" and never "is this player still here".
+Production 2026-08-20 published a **28-man Arsenal squad** containing Partey,
+Tierney, Jorginho, Sterling and Kiwior, all departed, all carried by a 2024
+row. Reproduced exactly from the mirror: current logic yields 28, production
+published 28. Platform-wide the five two-season leagues carried **777**
+stale-only players, each diluting a real teammate's allocated shot and prop
+share by this function's own stated reasoning about duplicates.
+
+**The rule:** keep a player present in the latest stats season OR on the
+current ESPN roster; drop only when both say absent. Measured before
+choosing — using the roster as a FILTER would have wrongly deleted **1,970**
+current players (bundesliga's roster file is 142 rows against 567 with stats),
+and filtering on the season ALONE would have dropped Nwaneri and Nelson, both
+really at Arsenal and both really priced. The roster rescues 121 platform-wide.
+
+    epl 600->480 (Arsenal 28->23) | serie_a 665->537 | la_liga 666->500
+    ligue_1 650->444 | bundesliga 567->410 | other five unchanged
+
+**WHY IT IS NOT DEPLOYED, and what deploying it will require.**
+
+1. **Both workers were unavailable.** `refresh-worker` is claimed by
+   `nfl-artifact-publish-wiring`; `live-odds-worker` shows as held by
+   `soccer-board-mlb-parity` — **my own lane slug, but not me**. The
+   `soccer-live-score-clock-box` session is working in this lane's worktree
+   and appears to be claiming under its name. **Two sessions sharing one lane
+   slug makes the claim table unable to say which of us holds a service**,
+   which is the lock's whole job. Worth resolving before either of us deploys.
+2. **A soccer artifact build was in flight** — `refresh-worker` pid 2267,
+   `build_soccer_artifacts.py --league primeira_liga`. Deploying restarts the
+   service and kills it mid-build. Preflight exists for exactly this.
+3. **Deploying is necessary but NOT sufficient.** This changes how artifacts
+   are BUILT, so a worker carrying the code changes nothing until the
+   artifacts are **rebuilt**. Until then every served squad is still the stale
+   one. The verification is therefore a REBUILT artifact, not a deploy id:
+   re-read `/soccer/epl/api/props` and expect the Arsenal count to fall
+   **28 → 23** with Partey, Tierney, Jorginho, Sterling and Kiwior gone and
+   Nwaneri, Nelson and Gyökeres still present.
+
+**Baseline note.** `test_archives` is **0** failures, not the 31 this session
+had been quoting. The 31 were NFL/NBA/NCAAB route tests another session fixed
+on main hours ago. Re-derived against clean `origin/main` rather than banked
+as a win — a stale baseline hands you someone else's result in whichever
+direction it has drifted.
