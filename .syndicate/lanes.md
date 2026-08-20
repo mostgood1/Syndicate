@@ -446,15 +446,34 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — checkpointed 2026-08-19 ~17:2xZ — INPUT-QUALITY WORK DONE, ORIGINAL GOAL STILL UNMET, 9-LEAGUE RE-RUN NOT YET DONE
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~19:3xZ — 9-LEAGUE RE-RUN IN FLIGHT AGAINST A NOW-FIXED BACKTEST PIPELINE
 
 - Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
   the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
   least one non-`belgian_pro_league` league, stdev(P home) rising from
   **0.1575** toward market's **0.1811**. Baseline:
   `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
-  **This full re-run has not happened since the input work below began** —
-  next session's first move.
+- **FOUND AND FIXED 2026-08-19 ~19:2xZ, before trusting any re-run number:**
+  the backtest rated ALL 9 leagues via the goals-as-xG fallback
+  (`team_rows_from_match_history`), but `build_soccer_artifacts.py`
+  (production) reads REAL Understat xG+ppda from `team_history/*.csv` for 5
+  of them (epl/la_liga/bundesliga/serie_a/ligue_1) — the backtest was
+  measuring a different pipeline than production runs for over half the
+  leagues. Fixed by mirroring production's branch exactly
+  (`_GOALS_BASED_RATING_LEAGUES`, asserted equal by a new test,
+  `73b76b66`/landed `3ad5c8a4`). Also resolves the `ppda` CONSUMED+
+  UNPOPULATED checklist alarm for free — the data was already on disk,
+  already used live, just not in this backtest. Killed a ~1.5h-in run on the
+  OLD pipeline rather than trust its number for those 5 leagues; the 9-league
+  re-run below is against the FIXED pipeline. Full detail in the log.
+  **NOT FIXED, flagged not fixed:** production's own Understat branch does
+  NOT fold in ESPN possession/set-piece even though `espn_match_stats.json`
+  exists for all 5 of those leagues — a real, separate opportunity, out of
+  scope for this fix (which only had to match what production already does).
+- **9-LEAGUE RE-RUN IN FLIGHT** against the fixed pipeline (launched
+  ~19:3xZ). **Do not report a Brier/stdev number against the 08-15 baseline
+  until this lands — the run before this one was killed specifically because
+  its number would not have been trustworthy.**
 - Status of this session's input-quality work (full narrative in
   `.syndicate/log/2026-08-19.md`, dated entries — do not duplicate here):
   xG double-count fixed+validated+kept; shots-weight shrink reverted (was
@@ -480,11 +499,12 @@ to betting-accuracy improvements.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: re-run the full 9-league backtest against the 1,112-match
-  control set with all of this session's input changes applied, and compare
-  Brier/stdev against the 08-15 baseline per the original testable outcome
-  above. Everything landed so far is input-quality work; none of it has yet
-  been checked against the lane's own success criterion.
+- Next action: check on the in-flight 9-league re-run above, and compare its
+  Brier/stdev against the 08-15 baseline per the original testable outcome.
+  Also separately in flight: a market_features.confidence (de-vigged
+  closing-odds implied probability, small weight 0.02-0.03) paired backtest
+  on eredivisie — see log, includes a methodological caveat that any
+  improvement there is shrinkage-toward-market, not independent skill.
 - Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
@@ -1474,6 +1494,36 @@ history directly:
   the understatement is logged rather than quietly fixed.
 - **NOT proven and not claimed:** the WORKFLOW has still not run these steps
   since 2026-07-15. The next 06:00Z run is the first end-to-end test.
+- Blocked by: none.
+
+### nfl-autorun-production-arm — OPEN — opened 2026-08-19 — session: nfl-autorun-production-arm
+- Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
+  (landed and closed this session) in production, on refresh-worker
+  (`srv-d91dpertqb8s73co8ls0`). **Testable outcome:** both env vars are
+  set (single-key PUT, per `[[project_render_env_needs_deploy]]` --
+  restart does NOT re-inject them, an actual deploy is required), a
+  refresh-worker deploy carries them live, and the real launch/skip log
+  lines (`NFL_ROSTER_SNAPSHOT_LAUNCHING`/`NFL_DEPTH_CHART_SNAPSHOT_
+  LAUNCHING`, or a named skip reason) are observed in production logs --
+  not merely that the env vars are set. The sibling `nfl-injuries-
+  fetcher` autorun is deliberately NOT touched here -- user asked for
+  "both autoruns" meaning the two just discussed; arming injuries too
+  is a separate ask if wanted.
+- Files: none (pure Render config + deploy action, no repo code change).
+- Env vars to set on refresh-worker:
+  - `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
+  - `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
+- Hypothesis: n/a (a deploy, not a diagnosis).
+- Falsification test: n/a.
+- Verification: Render logs (`scripts/render_logs.py` or the events API)
+  show a real `_LAUNCHING` or a named `_SKIPPED reason=...` line for both
+  autoruns within one refresh-worker tick after the deploy --
+  `not_in_season` would be a genuine surprise (NFL is active Aug-Feb per
+  `_active_sports_for_date`, so today should NOT skip for that reason).
+  `disabled` reappearing after the env PUT would mean the deploy did not
+  actually carry the new value (the exact failure mode
+  `[[project_render_env_needs_deploy]]` documents) and is the first thing
+  to check if nothing launches.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
