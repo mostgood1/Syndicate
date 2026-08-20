@@ -2908,3 +2908,34 @@ verification must name the producer, not the symptom.
 **Cost:** low — caught before the checkpoint, by reading the writer's own status
 artifact instead of the board. Would have been a false "verified" in
 `deploys.md` otherwise.
+
+### 2026-08-20 -- a fix's data can be correct while its raw diagnostic API still shows nothing: verify against the SERVED surface, not the one that found the bug
+
+**What happened.** Fixing the Layer 2 board's live Projected/Live/Actual
+columns (`layer2-live-projection-actual`), I diagnosed and fixed the bug
+using `/api/board/layer2-shortlist`'s raw `row.projection{}` sub-object --
+the nested, build-time representation. Post-deploy, I re-checked the SAME
+endpoint and found every top-level `actual`/`live_projection`/`projected`
+field `None` on every row -- looked like the fix had not taken, despite a
+content-verified live deploy. It had taken; I was reading the wrong shape.
+`/api/board/layer2-shortlist` exposes the nested `projection{}` dict
+un-flattened. `/api/intelligence/query`'s `boardContract.cards` -- the
+surface `intelligence.html`'s `displayProjection`/`displayLiveProjection`/
+`displayLiveActual` actually read -- carries the SAME underlying data
+flattened to top-level columns via `_layer2_board_columns`/
+`_live_projection_columns`. Checking only the first endpoint after this
+class of fix would have reported a false negative in the ledger.
+
+**The rule going forward:** finding a bug via one API surface does not make
+that surface the right one to verify the fix against. Before writing
+"verified", confirm which endpoint/shape the actual consumer (the template,
+the frontend function, the downstream caller) reads, and check THAT one --
+even if it means re-deriving the check from scratch rather than reusing the
+diagnostic query. The two shapes can diverge for the exact same underlying
+field, on the exact same row, at the exact same instant.
+
+**Cost:** low -- caught immediately by checking `written_at` and reasoning
+about which endpoint actually feeds the template before writing the
+measurement, not after. Would have been a false "not working" read in
+`deploys.md` otherwise -- the inverse of the usual near-miss, a fix wrongly
+believed BROKEN instead of wrongly believed working.
