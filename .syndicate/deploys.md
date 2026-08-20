@@ -19230,3 +19230,38 @@ for refresh-worker and live-odds-worker differ by ONE CHARACTER
 (`...73co8ls0` vs `...73co8lt0`), so a *plausible* typo grafts one service's work
 onto another and looks completely normal. `SERVICE_IDS` is now IMPORTED from
 `render_deploy.py` rather than duplicated.
+
+---
+
+## 2026-08-20 20:20:34Z — web `454f3caa` — CONSOLIDATED, 67 files. BATCH COMPLETE.
+
+    sha:     454f3caa (graft, parent 00541a8d)   rollback: deploy 00541a8d
+    deploy:  dep-da3m03rrn74s73fkkn70   live 20:20:34Z
+
+**verify: PASSED — content AND served payload.** 66 of 67 files byte-identical to
+origin/main; tree changed **+14,892 / −127**; site served **3/3 probes at 51 NCAAF
+games**, picks still correctly suppressed.
+
+**THE BATCH:** refresh-worker `db469003` (9 files), live-odds-worker `a381d652`
+(38), web `454f3caa` (67) — **114 files, 5+ lanes, THREE deploys instead of a
+dozen.**
+
+**The parent moved TWICE under this graft** (`0514f2d7` → `d9a23a38` →
+`00541a8d`). The file list was RECOMPUTED each time, not reused: 67 → 68 → 67.
+The second recompute DROPPED `syndicate/features/soccer/cards.py` because the
+intervening deploy had carried it — no duplicate, no revert.
+
+**The builder REFUSED once, correctly.** Web read `d9a23a38` as live while
+`00541a8d` was `update_in_progress`; a graft on the readable SHA would have looked
+right and silently reverted them on landing. Reading the parent live is NOT
+enough — the in-flight check is what caught it.
+
+**Stated rather than implied:** the combined-state test suite NEVER REPORTED
+(five lanes' work had only been tested in isolation; the run was still executing
+at batch completion, verified computing not hung). All three deploys shipped on
+user instruction with content reviewed on origin/main — weaker than a green
+suite. No session replied to the request for pending files, so the batch was
+built from MEASURED state; anything unpushed is not in it.
+
+See `layer2-board-chip-race`'s own record of this deploy — they rode along in
+this graft rather than forcing a separate slot, which is the batching working.
