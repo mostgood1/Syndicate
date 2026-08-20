@@ -18206,3 +18206,43 @@ baseline. **NOT "no OOM kills"** — a quiet period yields that on broken code, 
 
 **rollback:** redeploy `3b816546`. Kill switch without a deploy:
 `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`.
+
+### CORRECTION, 14:0xZ — THE MECHANISM **IS** WORKING IN PRODUCTION. The entry above was written one line too early.
+
+The section above concluded "reachable, correct, and currently doing nothing"
+from two log lines. A **third** line was emitted 27 seconds after the second, and
+it is the one that answers the question:
+
+    14:00:15  FEED_LIVE_PRUNE enabled=True date=2026-08-20 games=9  pruned=9  plays_dropped=1
+    14:00:20  FEED_LIVE_PRUNE enabled=True date=2026-08-20 games=9  pruned=9  plays_dropped=1
+    14:00:47  FEED_LIVE_PRUNE enabled=True date=2026-08-19 games=15 pruned=15 plays_dropped=1125   <-- THIS
+
+**`date=2026-08-19` — yesterday's COMPLETED slate, 15 games, 1,125 play records
+dropped.** The worker hydrates the look-back date as well as today's, so both
+regimes run in the same process, minutes apart. The pregame reading was not the
+whole picture; it was the first two lines of three.
+
+**It matches the local measurement almost exactly:** 1,125 plays over 15 games
+here against **1,067 over 15 games** on 2026-06-14 locally — 75.0 vs 71.1 plays
+per game, both in the right range for completed MLB games. The 66.38%
+artifact-share premise holds in the production regime, which is precisely what
+the entry above said was unproven.
+
+**So the corrected status is:**
+- Branch fires: PROVEN (`pruned == games` on 3 of 3 builds, two different dates).
+- Mechanism does real work: PROVEN on a completed slate (1,125 records).
+- Pregame slates prune ~nothing, and that is CORRECT behaviour, not a defect —
+  there is no play-by-play yet to drop. `plays_dropped` scaling with slate
+  completeness is the signature of it working, not of it being inert.
+- **Still unproven, and unchanged: that this moves the ~2GB excursion.** Dropping
+  1,125 records off the retained set is not the same claim as fixing the
+  transient, and the memory reading is still boot-confounded (process up ~1 min).
+  The live-slate window remains the test for THAT.
+
+**Method note, because it is the recurring shape in this file.** I read the log
+27 seconds too early and wrote a conclusion from a partial window, then had to
+correct it upward. Same family as the `#440` "zero of 51" reading taken through a
+blind instrument. **A null result needs its window stated and, when the emitter
+is periodic, a wait long enough to cover one full period of the thing you are
+watching** — here, one full overview pass across every date the worker builds,
+not just the first date it happened to reach.
