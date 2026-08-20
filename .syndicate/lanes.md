@@ -1476,6 +1476,36 @@ history directly:
   since 2026-07-15. The next 06:00Z run is the first end-to-end test.
 - Blocked by: none.
 
+### nfl-autorun-production-arm — OPEN — opened 2026-08-19 — session: nfl-autorun-production-arm
+- Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
+  (landed and closed this session) in production, on refresh-worker
+  (`srv-d91dpertqb8s73co8ls0`). **Testable outcome:** both env vars are
+  set (single-key PUT, per `[[project_render_env_needs_deploy]]` --
+  restart does NOT re-inject them, an actual deploy is required), a
+  refresh-worker deploy carries them live, and the real launch/skip log
+  lines (`NFL_ROSTER_SNAPSHOT_LAUNCHING`/`NFL_DEPTH_CHART_SNAPSHOT_
+  LAUNCHING`, or a named skip reason) are observed in production logs --
+  not merely that the env vars are set. The sibling `nfl-injuries-
+  fetcher` autorun is deliberately NOT touched here -- user asked for
+  "both autoruns" meaning the two just discussed; arming injuries too
+  is a separate ask if wanted.
+- Files: none (pure Render config + deploy action, no repo code change).
+- Env vars to set on refresh-worker:
+  - `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
+  - `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
+- Hypothesis: n/a (a deploy, not a diagnosis).
+- Falsification test: n/a.
+- Verification: Render logs (`scripts/render_logs.py` or the events API)
+  show a real `_LAUNCHING` or a named `_SKIPPED reason=...` line for both
+  autoruns within one refresh-worker tick after the deploy --
+  `not_in_season` would be a genuine surprise (NFL is active Aug-Feb per
+  `_active_sports_for_date`, so today should NOT skip for that reason).
+  `disabled` reappearing after the env PUT would mean the deploy did not
+  actually carry the new value (the exact failure mode
+  `[[project_render_env_needs_deploy]]` documents) and is the first thing
+  to check if nothing launches.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
