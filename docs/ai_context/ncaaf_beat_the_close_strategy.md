@@ -307,3 +307,53 @@ unmeasured market and the board.
   1.67x market dispersion, never scored against the close at all. Over-dispersion
   actively *manufactures* edges — an inflated spread of projected totals crosses
   more lines by further, so it reads as conviction.
+
+---
+
+## 6. Returning production as a rating adjustment — BUILT, BACKTESTED, NOT SHIPPED
+
+Stage 2 called this "the cheapest real work". It was built, measured, and the
+measurement did not clear the bar. Recording it in full because a null that is
+not written down gets rebuilt.
+
+**The prior was strong and it survived two checks.** Returning production is NOT
+already inside preseason SP+ (r=+0.035, incremental R² +0.000 — with recruiting
+reading +0.482 through the identical residual as the positive control), and it
+DOES predict real year-over-year SP+ movement (pooled r=+0.207, n=786, ~5.8σ,
+positive in all six seasons independently). ~1.74 SP+ points per SD.
+
+**Wired through the RATINGS lever, not the payload** — 17.2% of margin SD versus
+the payload's 4.1%, and the NFL payload experiment on that weaker lever returned
+a measured NULL. Split evenly across offense and defense so the team's NET
+rating moves by the coefficient, which is the quantity it was calibrated against.
+
+**Reachability passed:** 50 of 51 week-1 margins moved, mean |Δ| 2.04 points.
+
+**The backtest did not.** Identical games, seeds and 2023 ratings on 2024 games,
+leak-free, n=749, only the adjustment differing:
+
+| arm | MAE |
+|---|---|
+| OFF | 15.778 |
+| ON | **15.630** |
+
+    paired ΔMAE −0.149   SE 0.094   t = −1.58   NOT SIGNIFICANT
+
+And it changes nothing about serving: ON vs the closing line is still **+3.442
+(t=+9.83)**.
+
+**Why it is not shipped.** The point estimate favours it and the direction
+matches the prior — but |t| < 2, and `SP_RATING_SCALE` was held to exactly that
+bar the same day at t=−0.74. Shipping this on weaker evidence than other changes
+were rejected on would be inconsistent, and a mechanism carrying a real prior
+plus a favourable-but-unproven measurement is §4.4's trap in its most persuasive
+form.
+
+**Why it is not deleted.** The test is **under-powered, not negative**. At
+SE 0.094 an effect this size needs roughly double the sample to resolve. It sits
+behind `--returning-production` (off by default), so the resolution is one flag
+and one backtest, not a rebuild.
+
+**To settle it:** generate a second leak-free season (2023 SP+ → 2023 games, or
+2024 → 2025) and re-run the paired comparison pooled across both. If it holds at
+−0.15 with n≈1500, t reaches ≈−2.2 and it ships. If it shrinks, it comes out.
