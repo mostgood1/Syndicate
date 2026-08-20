@@ -109,7 +109,14 @@ def test_one_grouping_covering_four_markets_does_not_collide():
     ]
     coverage = attach_live_projections(grid, index)
     assert coverage["rows_live_projected"] == 4, coverage
-    assert [r["projection"]["projected"] for r in grid] == [1.1, 2.2, 3.3, 4.4], (
+    # `layer2-live-projection-actual`, 2026-08-20: `live_projected`, not
+    # `projected` -- these fixture rows start with no pregame projection at
+    # all (`_row`'s default `projection={}`), and `projected` now stays
+    # whatever it already was rather than being overwritten with the live
+    # number, so it is never set here. `live_projected` is the join's own
+    # output and is what this test is actually checking: that the four
+    # markets did not cross wires.
+    assert [r["projection"]["live_projected"] for r in grid] == [1.1, 2.2, 3.3, 4.4], (
         "the four markets crossed wires -- the grouping is still the key somewhere"
     )
 

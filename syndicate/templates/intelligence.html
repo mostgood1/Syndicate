@@ -609,17 +609,41 @@
     return null;
   }
 
+  // The Over/Under direction, read from `side` -- NOT `selection`. For a
+  // prop, `selection` holds the PLAYER's name (redundant with the title,
+  // e.g. selection="Andres Gimenez" for an over/under RBI prop), so the
+  // word "Over"/"Under" itself lives only in `side`. Measured live
+  // 2026-08-20: 306 of 306 over/under rows on the board -- every prop
+  // candidate that carries a real over/under side, plus every game total
+  // whose `selection` happens to equal "Over"/"Under" verbatim -- never
+  // showed the word anywhere on the card, because `propLine` only ever
+  // read `selection`/`pick` and this dedicated fallback did not exist.
+  // Scoped strictly to "over"/"under" so it can never mislabel an h2h
+  // side ("home"/"away") or a spread side as a total direction.
+  function displaySide(item) {
+    const side = String(item.side || "").trim().toLowerCase();
+    if (side === "over") return "Over";
+    if (side === "under") return "Under";
+    return null;
+  }
+
   // The one line that must always answer "what is this bet, actually" --
   // separate from the title, which can legitimately just be a player or
   // team name.
   function propLine(item) {
     const title = displayTitle(item);
     const selection = displaySelection(item);
+    const side = displaySide(item);
     const market = String(item.market || item.market_label || "").trim();
     const line = displayLine(item);
     const parts = [];
-    if (selection && selection !== title) parts.push(selection);
-    if (line && !(selection && selection.includes(line))) parts.push(line);
+    // `side` first and unconditionally when present -- it is the one piece
+    // that must never be silently dropped, unlike `selection`, which is
+    // legitimately redundant with the title often enough that skipping it
+    // there is correct.
+    if (side) parts.push(side);
+    if (selection && selection !== title && selection !== side) parts.push(selection);
+    if (line && !(selection && selection.includes(line)) && !(side && line === side)) parts.push(line);
     if (market) parts.push(market);
     return parts.length ? parts.join(" · ") : null;
   }
@@ -696,9 +720,26 @@
 
   function displayProjection(item) {
     const projection = item.sim_projection ?? item.projected ?? item.projected_sim;
-    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
-    const numeric = Number(projection);
-    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
+      const numeric = Number(projection);
+      return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    }
+    // Moneyline/h2h has no natural NUMBER to project (there is no runs/points
+    // total or spread margin for a straight win/lose pick) -- measured live
+    // 2026-08-20: 109 of 114 h2h rows were blank here for exactly that
+    // reason, while totals/spreads mostly weren't. `model_probability` is
+    // already attached to these rows by the backend (layer2_board.py) as the
+    // model's probability for THIS row's own `selection`/`side` -- reusing an
+    // existing, backend-computed field, not inventing one; per that file's
+    // own comment, "an invented projection on a betting board is worse than
+    // an empty cell", which is exactly why this stays scoped to markets that
+    // actually carry the field rather than deriving a number from odds.
+    const market = String(item.market || item.market_label || "").trim().toLowerCase();
+    const isMoneyline = market === "h2h" || market === "h2h_3_way" || market === "moneyline";
+    if (!isMoneyline) return null;
+    const prob = Number(item.model_probability);
+    if (!Number.isFinite(prob) || prob <= 0 || prob > 1) return null;
+    return `${(prob * 100).toFixed(1)}%`;
   }
 
   // #124/#126: live_total is the GAME's live total (runs/points scored),
@@ -849,6 +890,59 @@
 
   function renderMovement(item) {
     const sparkline = _movementSparkline(item);
+
+    // THE CURRENT, AUTHORITATIVE SOURCE (`#372`, shipped 2026-08-16,
+    // `_movement_from_opening` in layer2_board.py) -- top-level
+    // `movement_*` fields computed against the CLV opening ledger, not
+    // the two legacy shapes below (`item.line_odds_movement` and the
+    // nested `item.movement` object). Measured live 2026-08-20: those two
+    // legacy shapes covered 4 of 461 rows between them, while these
+    // top-level fields carried real tracked/flat data for 179 -- the
+    // backend fix reached production and computed real movement for the
+    // large majority of eligible rows, and nothing here ever read it.
+    // Checked FIRST, ahead of everything below, which now exists only as
+    // a fallback for any row not yet routed through that function.
+    const state = String(item.movement_state || "").trim().toLowerCase();
+    if (state === "not_tracked") {
+      return '<span class="board-blotter__muted" title="The odds tracker keeps line history for h2h, totals and spreads only — this market has no series to move">Not tracked</span>';
+    }
+    if (state === "no_opening_for_row" || state === "no_openings" || state === "unkeyable") {
+      return '<span class="board-blotter__muted" title="This row has no matching opening price recorded yet — check back after the next capture cycle">No opening recorded</span>';
+    }
+    if (state === "no_comparable_price") {
+      return '<span class="board-blotter__muted" title="The line moved since we published this row, so the price at open and now are not the same bet">No comparable price</span>';
+    }
+    if (state === "tracked" || state === "flat") {
+      const priceDelta = numericValue(item.movement_price_delta);
+      const lineDelta = numericValue(item.movement_line_delta);
+      const parts = [];
+      if (priceDelta !== null && priceDelta !== 0) {
+        parts.push(`Odds ${priceDelta > 0 ? "+" : ""}${priceDelta}`);
+      }
+      if (lineDelta !== null && lineDelta !== 0) {
+        parts.push(`Line ${lineDelta > 0 ? "+" : ""}${lineDelta}`);
+      }
+      const label = parts.length ? parts.join(" · ") : "Flat";
+      // `movement_direction` covers price; `movement_line_direction` is the
+      // fallback for a line-only move (spreads/totals with no comparable
+      // price -- see `movement_basis === "line_moved"`). "toward"/"against"
+      // are already resolved against the BETTOR's side server-side (that
+      // resolution, done wrong once, is the single defect this repo has
+      // paid for the most in this area -- see `_movement_from_opening`'s
+      // own comment) -- map straight to the existing up/down arrow classes
+      // rather than re-deriving anything client-side.
+      const direction = item.movement_direction || item.movement_line_direction || "flat";
+      const arrowDir = direction === "toward" ? "up" : direction === "against" ? "down" : "flat";
+      const sinceAgo = formatRelativeTime(item.movement_opened_at);
+      const agoText = sinceAgo ? ` · ${sinceAgo}` : "";
+      // The steam BADGE (renderCard's own badges row, "⚡ Steam") already
+      // covers `item.steam` once isSteamCandidate() reads it -- see below.
+      // No second indicator here; this line stays the plain movement fact.
+      return `<span class="board-card__movement-arrow--${arrowDir}">${_movementArrow(arrowDir)}</span> ${escapeHtml(label)}${escapeHtml(agoText)}${sparkline}`;
+    }
+
+    // Fallback below: legacy shapes, for any row this session's audit did
+    // not measure carrying real data in (`state` above was empty/unknown).
     const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
     // #368: "we do not measure this" is a different answer from "it has not
     // moved", and both used to render an identical bare dash -- which is why
@@ -1059,6 +1153,16 @@
   }
 
   function isSteamCandidate(item) {
+    // `item.steam === true` is the REAL signal for a layer2_shortlist-sourced
+    // row (set directly by `_movement_from_opening` in layer2_board.py when
+    // a price move clears its size-and-clock bar -- ">=15 points AND within
+    // 3h of our own publish"). `candidate_type === "steam"` is a SEPARATE,
+    // older signal from a different candidate pipeline (recommendation_engine.py)
+    // that never carries through to these rows -- measured live 2026-08-20:
+    // `candidate_type` was missing on 506 of 512 board rows, so this check
+    // alone could never fire for the board this function actually serves.
+    // Both checked, neither replaces the other.
+    if (item.steam === true) return true;
     return String(item.candidate_type || item.type || "").trim().toLowerCase() === "steam";
   }
 
@@ -1228,6 +1332,23 @@
     if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
     const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
     const market = String(item.market || item.market_label || "").trim();
+    // A game-total/spread pick has no team side (the backend correctly
+    // sends the placeholder "—" for `team`/`team_name`/`player_team"` on
+    // those rows), so `team` is null and the subtitle used to fall
+    // straight through to the sport alone -- "WNBA", nothing else. That
+    // left an "Under"/"Over" card with NO matchup anywhere on it: the
+    // title is the selection ("Under"), the subtitle was sport-only, and
+    // propLine() deliberately drops the selection from the detail line
+    // when it equals the title (correct, to avoid "Under · Under"). The
+    // matchup was always available (displayMatchup, used elsewhere for the
+    // mini game-card grouping) -- it just was never wired into this card's
+    // own header. Falling back to it here is what actually answers "which
+    // game is this a total/spread on" for the ~180 game rows a day where
+    // `team` is legitimately absent, not a bug in `team` itself.
+    const subtitleContext = (team && team !== title) ? team : (() => {
+      const matchup = displayMatchup(item);
+      return matchup && matchup !== title ? matchup : null;
+    })();
 
     return `
       <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}">
@@ -1236,7 +1357,7 @@
             ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" />` : ""}
             <div>
               <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(title)}</div>
-              <div class="board-card__subtitle">${team && team !== title ? `${escapeHtml(team)} · ` : ""}${escapeHtml(sport)}</div>
+              <div class="board-card__subtitle">${subtitleContext ? `${escapeHtml(subtitleContext)} · ` : ""}${escapeHtml(sport)}</div>
             </div>
           </div>
           <div class="board-card__edge">${(edge * 100).toFixed(1)}%</div>
@@ -1280,6 +1401,18 @@
   // always share ids).
   let gameChipsById = new Map();
   let gameChipsByMatchup = new Map();
+  // `layer2-board-chip-race`. The FIRST call to `renderGameCards` almost
+  // always lands before this fetch resolves -- `initialIntelligenceResponse`
+  // (server-rendered) triggers a synchronous `renderIntelligence` on page
+  // load, while `loadGameChips()` is a network round trip that has not even
+  // started yet at that point. Without this flag, that first paint used the
+  // chip-less fallback style for EVERY game, including today's real ones,
+  // which then visibly popped into the richer chip style a moment later --
+  // read as "the compact game cards aren't uniform" because, for that one
+  // frame, they weren't. `renderGameCards` checks this and shows a stable
+  // loading placeholder instead of the wrong card shape until it flips true
+  // (success, empty response, or failure -- any settled fetch unblocks it).
+  let gameChipsLoadedOnce = false;
 
   // #165: two candidates for the SAME real game can carry two different
   // ids -- confirmed live: 89 "WSH @ ATL" MLB candidates on 824894, one
@@ -1298,7 +1431,13 @@
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
       const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`, { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        // A settled failure still unblocks the strip -- it must not hang on
+        // "Loading…" forever just because this one fetch came back non-2xx.
+        gameChipsLoadedOnce = true;
+        renderBoardBody();
+        return;
+      }
       const json = await res.json();
       const chips = Array.isArray(json.chips) ? json.chips : [];
       const byId = new Map();
@@ -1327,8 +1466,15 @@
       }
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
+      gameChipsLoadedOnce = true;
       renderBoardBody();
-    } catch (err) { /* scoreboard hydration is best-effort */ }
+    } catch (err) {
+      // Same reasoning as the !res.ok branch above -- a thrown fetch (offline,
+      // aborted, bad JSON) must still unblock the strip rather than leaving it
+      // on the loading placeholder indefinitely.
+      gameChipsLoadedOnce = true;
+      renderBoardBody();
+    }
   }
 
   function chipForGame(group) {
@@ -1702,6 +1848,25 @@
     const games = deriveGameCards(items);
     if (!games.length) {
       container.innerHTML = "";
+      return;
+    }
+    // `layer2-board-chip-race`. `deriveGameCards` needs no chip data, so
+    // the game count/matchups are already known here even before
+    // `loadGameChips()` resolves -- but EVERY card's visual shape (scores,
+    // live status vs. plain matchup text) depends on chip data, and today's
+    // real games render differently once it arrives. Rendering the real
+    // cards now, chip-less, would show that shape change live on today's
+    // slate a moment later while future-dated games stayed as they were --
+    // the exact "not uniform" symptom this fix exists for. A same-sized
+    // skeleton strip means every card goes loading -> final shape once,
+    // never wrong-shape -> final shape.
+    if (!gameChipsLoadedOnce) {
+      container.innerHTML = `
+        <h2 class="board-section-title">Games</h2>
+        <div class="game-card-strip">
+          ${games.map(() => '<div class="game-mini-card--skeleton"></div>').join("")}
+        </div>
+      `;
       return;
     }
     container.innerHTML = `
@@ -2538,6 +2703,15 @@
     });
   }
 
+  // `layer2-board-chip-race`. Fired before anything else in this block,
+  // specifically before the synchronous `renderIntelligence(merged)` a few
+  // lines down -- that call renders the game-card strip's first paint, and
+  // this fetch is what `gameChipsLoadedOnce` is waiting on. Starting it
+  // first gives it the largest possible head start; it was previously the
+  // LAST line here, meaning the strip's first paint never had a chance to
+  // see chip data at all.
+  void loadGameChips();
+
   renderFilterTabs();
   renderBetSlip();
   window.SyndicateWatchlist.init();
@@ -2554,7 +2728,6 @@
   } else {
     void loadIntelligence({});
   }
-  void loadGameChips();
 
   window.SyndicatePolling.startFromPolicy(
     {},

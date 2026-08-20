@@ -12,10 +12,46 @@ class SoccerBlueprintRouteTests(unittest.TestCase):
         app.config.update(TESTING=True)
         self.client = app.test_client()
 
-    def test_root_redirects_to_default_league_cards(self) -> None:
+    def test_root_redirects_to_todays_cross_league_board(self) -> None:
+        """Changed 2026-08-20 (`soccer-board-mlb-parity`) from a redirect to
+        EPL's matchweek board.
+
+        The old target was measured on production: EPL matchweek 1 held ONE
+        fixture, kicking off the following day, while 92 fixtures existed
+        across the ten tracked leagues. Landing cold on a single league's
+        matchweek answered a question nobody had asked; `/soccer/cards?date=`
+        answers "what is on today", which is what every other sport's board
+        does.
+        """
+        from syndicate.features.shared.timezone import central_today_iso
+
         response = self.client.get("/soccer", follow_redirects=False)
         self.assertEqual(response.status_code, 302)
+        location = response.headers["Location"]
+        self.assertIn("/soccer/cards", location)
+        self.assertIn(f"date={central_today_iso()}", location)
+
+    def test_the_per_league_matchweek_board_is_still_reachable(self) -> None:
+        """The date board ADDS a view; it must not remove the matchweek one,
+        which is still the right surface for planning a whole matchweek."""
+        response = self.client.get("/soccer/epl", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
         self.assertIn("/soccer/epl/cards", response.headers["Location"])
+
+    def test_cards_route_is_not_shadowed_by_the_league_wildcard(self) -> None:
+        """`/soccer/cards` and `/soccer/<league>` are both one segment deep.
+
+        If Werkzeug ever ranked the dynamic rule first, `/soccer/cards` would
+        be read as the league "cards", normalized to the default league, and
+        silently 302 back to EPL -- the exact bug this lane removed, restored
+        by a routing detail rather than a code change. Assert the static rule
+        wins rather than trusting that it does.
+        """
+        with patch("syndicate.blueprints.soccer.build_date_cards_page_context", return_value={}), \
+             patch("syndicate.blueprints.soccer.render_template", return_value="DATE_BOARD"):
+            response = self.client.get("/soccer/cards?date=2026-08-22")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), "DATE_BOARD")
 
     def test_league_root_redirects_to_that_leagues_cards(self) -> None:
         response = self.client.get("/soccer/mls", follow_redirects=False)

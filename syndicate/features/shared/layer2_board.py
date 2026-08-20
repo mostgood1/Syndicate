@@ -1217,13 +1217,20 @@ def _row_team(row: Mapping[str, Any], home: str, away: str) -> str | None:
 
 
 def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
-    """The LIVE re-sim's number, under the name the board's Live column reads.
+    """The LIVE re-sim's number and the live actual, under the names the
+    board's Live and Actual columns read.
 
     `intelligence.html:640` resolves the column as
     `item.live_projection ?? item.live_total` for game lines and
     `item.live_projection` for props, and nothing on an L2-A card ever set
     either -- so "Live proj." rendered an em dash on every live row while the
-    live re-sim's answer existed one level down.
+    live re-sim's answer existed one level down. Same shape for Actual
+    (`item.actual`, `intelligence.html:723`) -- added `layer2-live-
+    projection-actual`, 2026-08-20, alongside the fix that stopped `Projected`
+    itself from being overwritten with this same live number (see
+    `live_projection_join.py`'s `sim_projected` comment); the three columns
+    are meant to be read together (pregame / live / actual-so-far) and this
+    function is now what feeds two of the three.
 
     THE PREGAME NUMBER IS NOT A SUBSTITUTE AND MUST NOT BE COPIED HERE.
     Measured on the served board 2026-08-16 19:16Z, 54 live rows: every one
@@ -1232,8 +1239,8 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     the BOTTOM OF THE 5TH is a full-game number against a remaining-game line --
     two different quantities, and the comparison is meaningless in the
     direction that matters. So this reads ONLY the keys the live joins write
-    (`live_projected`, `live_model_prob_over`, `live_gameline`) and emits
-    nothing when the live join did not run.
+    (`live_projected`, `live_model_prob_over`, `actual_so_far`,
+    `live_gameline`) and emits nothing when the live join did not run.
 
     Absent stays absent. A live row with no live re-sim renders a dash, which
     is honest; a fabricated live number on a live board is the worst cell on
@@ -1257,6 +1264,19 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     )
     if live_prob is not None:
         out["live_model_probability"] = live_prob
+
+    # `layer2-live-projection-actual`, 2026-08-20: the real box-score/current-
+    # game-state value, under the name `displayLiveActual()` reads
+    # (`intelligence.html:723`, `item.actual`). `live_projection_join.py`
+    # writes it upstream as `actual_so_far` on every row it joins -- never
+    # mapped here, so the Actual column had nothing to read regardless of
+    # whether the join ran. `_as_float` rather than a plain None-check: a
+    # real 0 (nothing has happened yet) must render as 0, not fall through
+    # to the same em dash as "we have no live data for this row" -- same
+    # class of bug the `live_projection` handling above already avoids.
+    actual_value = _as_float(projection.get("actual_so_far"))
+    if actual_value is not None:
+        out["actual"] = actual_value
 
     if projection.get("live_aware") or gameline:
         out["live_aware"] = True

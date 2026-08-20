@@ -145,43 +145,101 @@ def _run_once(date_value: str) -> tuple[int, float, float, float, float]:
     return game_count, sampler.peak_bytes / (1024 * 1024), before, after, elapsed
 
 
-def _parity(date_value: str) -> int:
-    """Whole-slate byte parity between the pruned and unpruned paths.
+def _capture(expr: str, *, date_value: str, prune: str, dyno: str) -> str | None:
+    """Serialise `expr` from a fresh interpreter under one flag combination.
 
-    The unit tests assert parity per reader and per game; this asserts it over
-    the ENTIRE serialised games list the worker hands to candidate collection,
-    which is the object the reduction must not perturb. Run in subprocesses
-    because the flag is read once per loader call and module caches would
-    otherwise let run 2 serve run 1's result.
+    Subprocesses, not in-process toggling: the flag is read per loader call and
+    the module-level context cache would otherwise let arm 2 serve arm 1's
+    result -- a parity check that compares a value against itself.
     """
     import subprocess
+    import tempfile
 
+    # THE PAYLOAD GOES TO A FILE, NOT STDOUT, AND THAT IS LOAD-BEARING.
+    #
+    # This originally captured `sys.stdout`, which silently made the comparison
+    # "the serialised object PLUS anything the code under test happened to
+    # print". The moment `_daily_actual_by_game` gained its `FEED_LIVE_PRUNE`
+    # line, parity reported DIFFERENT by 3 bytes -- `enabled=True/False` and
+    # `pruned=15/0` -- on a change that is provably output-neutral. A harness
+    # that fails when the subject adds a log line is measuring the wrong channel,
+    # and the failure looks exactly like a real regression.
+    #
+    # The web arm stayed IDENTICAL throughout, because the emitter is worker-only
+    # -- which is what identified the harness as the culprit rather than the code.
     root = str(Path(__file__).resolve().parents[1])
+    handle, out_path = tempfile.mkstemp(suffix=".json")
+    os.close(handle)
     code = (
         "import json,sys;"
         f"sys.path.insert(0, r'{root}');"
-        "from syndicate.blueprints.home import _MLBDataProvider, SportContext;"
-        f"g=_MLBDataProvider().games(SportContext(slug='mlb', context_label='{date_value}'), is_active_today=False);"
-        "sys.stdout.write(json.dumps(g, sort_keys=True, default=str))"
+        f"{expr}"
+        f"open(r'{out_path}','w',encoding='utf-8')"
+        ".write(json.dumps(_v, sort_keys=True, default=str))"
     )
-    captured: dict[str, str] = {}
-    for flag in ("1", "0"):
-        env = dict(os.environ)
-        env["SYNDICATE_MLB_FEED_LIVE_PRUNE"] = flag
-        env["SYNDICATE_WEB_DYNO"] = "0"
+    env = dict(os.environ)
+    env["SYNDICATE_MLB_FEED_LIVE_PRUNE"] = prune
+    env["SYNDICATE_WEB_DYNO"] = dyno
+    try:
         result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
         if result.returncode != 0:
             print(result.stderr[-3000:], flush=True)
-            return 1
-        captured[flag] = result.stdout
+            return None
+        return Path(out_path).read_text(encoding="utf-8")
+    finally:
+        Path(out_path).unlink(missing_ok=True)
 
-    on, off = captured["1"], captured["0"]
-    print(f"prune=on  serialised_bytes={len(on):,}")
-    print(f"prune=off serialised_bytes={len(off):,}")
-    if not on or on != off:
-        print("DIFFERENT -- the prune is NOT output-neutral on this slate")
+
+def _parity(date_value: str) -> int:
+    """Byte parity between the pruned and unpruned paths, at three scopes.
+
+    The unit tests assert parity per reader and per game. This asserts it over
+    whole serialised objects, which is what catches a field nobody thought to
+    enumerate:
+
+      * the WORKER's games list -- what candidate collection is handed
+      * the WHOLE page context, worker mode -- everything else the build returns
+      * the WHOLE page context, WEB mode -- `blueprints/mlb.py:336` (`/mlb/cards`)
+        calls the same builder, and `_render_web_dyno()` selects a different half
+        of this module. Proving the worker arm alone would leave the served page
+        unproven, which is the "isolate the thing you changed" gap.
+    """
+    scopes = (
+        (
+            "worker games list",
+            "0",
+            "from syndicate.blueprints.home import _MLBDataProvider, SportContext;"
+            f"_v=_MLBDataProvider().games(SportContext(slug='mlb', context_label='{date_value}'), is_active_today=False);",
+        ),
+        (
+            "worker page context",
+            "0",
+            "from syndicate.features.mlb.cards import build_cards_page_context as _b;"
+            f"_v=_b('{date_value}');",
+        ),
+        (
+            "web page context",
+            "1",
+            "from syndicate.features.mlb.cards import build_cards_page_context as _b;"
+            f"_v=_b('{date_value}');",
+        ),
+    )
+
+    failures = 0
+    for label, dyno, expr in scopes:
+        on = _capture(expr, date_value=date_value, prune="1", dyno=dyno)
+        off = _capture(expr, date_value=date_value, prune="0", dyno=dyno)
+        if on is None or off is None:
+            return 1
+        verdict = "IDENTICAL" if on and on == off else "DIFFERENT"
+        print(f"{label:>20}  on={len(on):>9,} B  off={len(off):>9,} B  {verdict}")
+        if verdict != "IDENTICAL":
+            failures += 1
+
+    if failures:
+        print("\nthe prune is NOT output-neutral on this slate")
         return 1
-    print("IDENTICAL")
+    print("\nall scopes byte-identical -- the reduction is invisible above the loader")
     return 0
 
 

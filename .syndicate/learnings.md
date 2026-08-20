@@ -1,4 +1,4 @@
-# Syndicate — Learnings
+﻿# Syndicate — Learnings
 
 > **Append only.** Rules must be obeyable by a session with zero context.
 > `FORBIDDEN` = never do this again. `EXONERATED` = ruled out, stop
@@ -2179,6 +2179,68 @@ what a PRESENT reading would look like on that instrument before treating the
 absence as an answer — three instruments in a row here reported absence that was
 about the instrument, not the world.
 
+## 2026-08-20 — OVERTURNED (pre-registered): soccer is not under-dispersed anymore, and fixing dispersion + missing inputs did not close the gap to the market
+
+`soccer-model-dispersion` opened 2026-08-18 on a measured, specific
+hypothesis: the model's Brier loss to the closing line was because it was
+UNDER-DISPERSED (mean model `stdev(P home)` 0.1575 vs market's 0.1811,
+narrower in 8 of 9 leagues) -- not because its ratings were wrong, its
+under-confidence itself. The lane wrote its own falsification test BEFORE
+any fix was attempted: *"If the Brier gap does not close while stdev rises
+to market's, under-dispersion is NOT the binding constraint and the cause is
+the ratings/inputs, not the spread. That is a real outcome and must be
+recorded, not retried with a bigger knob."*
+
+Roughly 14 hours of work followed: an xG double-count fix (the model had
+been silently weighting goals-as-xG at 0.36 instead of 0.22 in one term),
+a falsified shots-weight shrink reverted, three genuinely missing inputs
+sourced and wired end-to-end (`possession_share`, `set_piece_goal_share`,
+`starters_available_share`), a fourth (`pace_seconds_per_event`) sourced,
+tested, and correctly abandoned on its own cheap falsifier, a
+market-confidence prior wired and disclosed as methodologically weak by
+construction, and — the largest single fix — a backtest-vs-production
+pipeline mismatch that had been silently rating 5 of 9 leagues from the
+wrong data source since the backtest was written.
+
+**The 2026-08-20 re-run measured exactly the falsification condition.** Mean
+model stdev rose to 0.1922, past market's 0.1859 -- under-dispersion is
+gone. The Brier gap did not close: still worse than market in 8 of 9
+leagues, `belgian_pro_league` the same single exception as the original
+diagnosis, completely unchanged by the entire session's work.
+
+**Why this is recorded as a success for the process, not a failure of the
+session.** A hypothesis that gets tested and falsified by a test written
+before the work started is not a wasted session -- it is the single most
+trustworthy kind of negative result available, because nobody could have
+retrofit the test to fit the outcome. The alternative -- declaring the
+gap "narrower" on a different match set, or quietly moving to a sixth input
+field without ever checking the falsification condition -- was available and
+was not taken.
+
+**The general rule.** When a hypothesis names a SPECIFIC mechanism (here:
+"the spread is too narrow"), the falsification test must isolate that
+mechanism from every other plausible cause, and the fix that follows must be
+checked against the SAME test that motivated it -- not just "did some
+number get better." Fixing dispersion and separately improving input
+completeness are BOTH good engineering, and BOTH were necessary regardless
+of outcome (an under-fed engine and an under-dispersed one are real defects
+on their own terms) -- but neither is evidence for the hypothesis that
+motivated the work unless the specific falsification condition is checked,
+not just "the model changed and something moved."
+
+**What the next hypothesis has to be, precisely because this one is now
+closed off:** not "the spread is wrong" (tested, false) and not "an input is
+missing" (the checklist alarms remaining are genuine data-availability gaps,
+not misrouted producers, after this session's sweep) -- the remaining
+candidate is systematic BIAS in what the ratings compute, which requires a
+different diagnostic (reliability-curve decomposition per league/bucket, not
+a pooled regression or a stdev check) than anything this session ran.
+
+Related: [[project_e2e_assessment_aug_2026]] (the standing note that soccer's
+model accuracy was "unmeasured" before this lane existed is now further
+refined -- it IS measured, repeatedly, and the measurement has converged on
+a specific negative result rather than remaining an open question).
+
 ---
 
 ## 2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEVER diagnose a vendor from your own broken query
@@ -2262,7 +2324,38 @@ in a row, all pointing at an innocent API.
 phase B is right and would have caught this at 28 credits), AND before believing
 any negative result about an external system, prove your request was
 well-formed — ideally against a case you KNOW should return data.
----
+## An unbiased mean hides a broken distribution `[2026-08-20]`
+
+**What we believed:** the WNBA live win-probability path was roughly fine. Its
+constants were admittedly un-backtested, but nothing pointed at them, and any
+aggregate check looked clean.
+
+**What was actually true:** it was severely UNDERCONFIDENT. Graded over 212
+games / 73,878 live samples, samples it priced 0.6-0.7 actually won **91.3%**;
+samples it priced 0.3-0.4 won **11.6%**. The scale was ~2.5x too wide and
+compressed every probability toward 0.5. Brier 0.1896 -> 0.1644 after refit.
+
+**Why it survived so long:** the MEAN was already right — 0.573 predicted vs
+0.571 actual. Every summary statistic that averages over samples said the
+model was unbiased, and it WAS unbiased. The defect was in the second moment,
+not the first. A calibration table by predicted-probability bucket exposes it
+in one glance; no amount of staring at aggregate accuracy ever would.
+
+**The rule:** for any probability output, "is the average right" and "is the
+distribution right" are different questions, and only the second one tells you
+whether an individual price is usable. Bucket predictions and compare each
+bucket's mean prediction to its realised rate. A model can be perfectly
+unbiased on average while being wrong on literally every bet you place with it.
+
+**Corollary that cost me a wrong conclusion in the same session:** when fitting
+a replacement, fit INSIDE the real function's structure. My first fit used a
+bare logistic while the shipped function also blends toward a pregame anchor,
+so part of the apparent gain came from silently dropping the blend rather than
+from the scale. Refitting within the real structure gave the honest number
+(+0.0261). And the variant that scored best of all — blend removed entirely —
+was an ARTIFACT of grading with a neutral 0.5 anchor, which makes blending
+toward it pure noise by construction. In production that anchor is a real
+estimate. A fit is only as meaningful as the harness's fidelity to production.
 
 ## 2026-08-20 — FORBIDDEN: an assertion whose subject is a TEMPLATE must not take the ambient `data/` mirror as its input. Pin the fixture, then prove the pin is load-bearing.
 
@@ -2413,6 +2506,45 @@ with information the model currently lacks — not by re-weighting what it has.
 
 ---
 
+### 2026-08-20 — FORBIDDEN: never re-apply a ledger edit with `git checkout <sha> -- <ledger-file>`. It is a REVERT of everyone else's entries, wearing the clothes of an append
+
+**What happened.** Closing out `#387`, I needed to move one 43-line note onto a
+newer `origin/main`. I ran:
+
+    git checkout 0f9dc4d8 -- .syndicate/log/2026-08-20.md
+
+That commit was built on an older `origin/main`. The checkout replaced the file
+WHOLESALE with my stale copy. The diffstat:
+
+    1 file changed, 41 insertions(+), 400 deletions(-)
+
+**400 deletions — other sessions' log entries for the same day**, staged and
+committed, one `git push` from landing. Caught only because the diffstat was
+read before pushing. Reset, then re-done as a genuine append: `43 insertions(+),
+0 deletions(-)`.
+
+**Same root cause as the OTHER defect in the same ten minutes**, which is why
+this is one rule and not two: a `str.replace(anchor, …, 1)` on `lanes.md`
+anchored on `- Blocked by: none.` — a line present in several lane blocks — and
+attached MLB pickup notes to the **soccer** lane. Both are *a ledger write that
+was not scoped to what I actually changed*.
+
+**The rules:**
+1. **Ledger files are append-mostly and multi-writer. Never restore one from a
+   revision.** To move a note across a rebase, re-append the note; do not
+   re-materialise the file.
+2. **`git diff --cached --numstat` before every ledger commit.** For an append,
+   deletions MUST be `0`. Any non-zero deletion count on a shared log/ledger is
+   a stop-and-look, not a formatting artifact.
+3. **An in-place edit must be anchored on a string unique to its block, or
+   bounded to that block's span** — slice the block, assert the anchor occurs
+   exactly once inside it, then edit. Asserting uniqueness is what caught the
+   second one.
+
+**Why this rates a FORBIDDEN rather than a note:** the failure is SILENT and
+INVERTED — the intent was "add my line", the effect was "delete four hundred of
+theirs", and every command involved is one people run daily.
+
 ---
 
 ## 2026-08-20 — ONE ERROR IN FIVE GUISES: validating against a PROXY, not the objective
@@ -2448,49 +2580,6 @@ mean anything, exactly as recruiting at +0.482 validated the SP+ residual.
 **Harnesses:** `grade_football_model_weight.py` (dominated vs broken),
 `grade_football_playability.py` (ATS vs naive baselines),
 `test_ncaaf_situational_edge.py` (market-residual screen).
-
----
-
-## 2026-08-20 — I CALLED A LEVER "DEAD" ON ONE SEASON AND HAD TO CORRECT IT ON FOUR
-
-**Same error I had spent the day catching in others' shape, committed in my own
-headline.**
-
-On 272 NFL games all four injury-burden measures came back null (best t=−1.81),
-and I wrote: *"THE INJURY LEVER IS DEAD — the NFL market prices injuries."* The
-section's own limits paragraph said n=272 was one season and this was "no
-evidence of an edge, NOT proven no edge". **The caveat was right and the headline
-ignored it.** Extending to 2022–2025 (1,083 games):
-
-    weighted_diff   t -2.10   SIGNIFICANT
-    skill_out_diff  t -2.23   SIGNIFICANT
-
-Quadrupling n turned my confident null into a live question.
-
-**A NULL HAS A SAMPLE SIZE TOO.** I have been rigorous about not over-reading
-positive results — the whole 5-guises entry above is about that — and applied
-none of that discipline to a negative one. "No effect detected at n=272" is a
-statement about the POWER of the test, and stating it as "dead" strips exactly
-the information that made it provisional. **Underpowered nulls need the same
-label as underpowered positives.**
-
-**What kept the correction from being a reversal.** The lever is still not
-actionable, and for the reason the pooled number hides: per-season the slope
-runs −0.09 / **+0.11** / −0.78 / −0.51. One season flat, one the WRONG SIGN,
-significance carried by two. That is the identical shape that killed returning
-production (2024 t=−1.58, 2025 opposite sign, pooled t=−0.89). **Pooled
-significance without per-season replication is one finding, not four.** Always
-print the per-season table beside the pooled row —
-`test_nfl_injury_market_edge.py` now does.
-
-**And the ATS bar still fails**: 52.9 / 53.3 / 58.9% with CI lower bounds
-49.3 / 48.6 / 49.7, none clearing 52.4%. The 58.9% on 112 bets is the most
-seductive number I produced today and it means nothing on its own.
-
-**The rule: before declaring a lever dead, state the smallest effect the test
-could have detected.** If that floor is larger than the effect worth having,
-the honest verdict is UNRESOLVED, not DEAD — and the fix is more data, not a
-conclusion.
 
 ---
 
@@ -2571,6 +2660,117 @@ described the digest's behaviour and spent effort on the wrong quantity. The
 byte caps and the digest's caps are unrelated mechanisms that happen to share
 the word "cap".
 
+---
+
+## 2026-08-20 — RELAXING A FILTER CAN MAKE THE OUTPUT WORSE. Selection matters as much as the match.
+
+Found that the session digest's STANDING RULES grep used `^###` while
+`learnings.md` entries are written at `##` — **8 of 43 rules matched, 35 were
+invisible to every session**, including "never point a worker publish URL at a
+public hostname". The obvious fix is one character: relax the pattern.
+
+**That would have made it worse.** 43 headings is ~4,800 B against a 450 B cap,
+and `head -c` takes lines in FILE order, which in an append-only file is OLDEST
+first. So the "fix" would have shown ~7 of the most stale rules and silently
+dropped every lesson learned since — trading 8 visible rules for 7 worse ones.
+
+**A filter has three parts and a bug in one is usually a bug in all three:**
+what MATCHES, what is SELECTED from the matches, and how the selection is
+FORMATTED to fit. I had been thinking only about the match.
+
+    match      ^###  ->  ^#{2,3}                      8 -> 43 candidates
+    select     head (oldest) -> tail (newest)         newest rules surface
+    format     full heading -> clipped to 64 chars    4 fit -> 6 fit
+    honesty    "showing 6" -> "showing 6 of 43"       tells you to go read it
+
+**AND I INTRODUCED TWO BUGS DOING IT, both caught by READING THE OUTPUT rather
+than the code.** `tail -n 14 | head -c 450` keeps the FIRST 7 of the last 14 —
+it showed rules 30-36, neither newest nor oldest — and the byte cap cut the
+final entry mid-word. The code read as "take the recent ones and cap them"; it
+did not do that. **Run the thing and look at what comes out.**
+
+**The wider point about caps:** "over budget" and "truncated in the digest" were
+two unrelated mechanisms sharing a word. state.md is never read by the digest at
+all; learnings.md is read for headings only; lanes.md truncates on lane COUNT.
+I trimmed 34 KB from lanes.md and the section it feeds still truncates. **Before
+optimising a number, read the code that consumes it.**
+
+---
+
+## 2026-08-20 — A WORKTREE COMMIT LEAVES THE SHARED TREE STALE, AND STALE IS A REVERT WAITING
+
+**Working from a worktree is the right way to avoid the shared index. It has a
+cost nobody had written down: the shared tree does not learn about it.**
+
+I trimmed `lanes.md` twice today from worktrees — 134,022 → 98,118 B via
+`trim_lane_blocks.py`, plus lane-block edits — and pushed both. The PRIMARY tree
+kept its old copy: **127,558 B against origin's 106,084, 21 KB stale.** The next
+session to edit `lanes.md` in that tree and push would have carried the pre-trim
+content forward and **silently reverted the trim**, along with every lane edit
+landed upstream in between. Not a conflict, not an error — a clean overwrite
+with a plausible diff.
+
+**The rule: after committing from a worktree, sync the shared tree's copy back,
+and verify by HASH.** Size alone would have said "roughly right" here; the two
+files differed by a block count and 21 KB, and I only trusted it after a SHA-1
+comparison.
+
+**Two constraints that shape HOW you sync, both measured:**
+
+1. **`git reset --keep origin/main` ABORTS while another session holds an
+   uncommitted file** — it hit `.syndicate/deploys.md`. That is the guard doing
+   its job, not a failure. A whole-branch sync is simply unavailable on a busy
+   shared tree, so the move is a single-file
+   `git checkout origin/main -- <path>`.
+2. **`git checkout <rev> -- <path>` WRITES THE SHARED INDEX.** Leaving it staged
+   hands the next session's bare `git commit` a file it never touched. **Commit
+   it yourself**, with a message saying it is a sync, so the index returns clean.
+
+**And check before you sync**: the target file must be clean against local HEAD
+(or you destroy someone's uncommitted edits), and the local commits must be
+cherry-EQUIVALENT to upstream (or you are discarding real work). Both were
+verified here — 19 of 19 equivalent — which is what made the repair safe rather
+than lucky.
+
+## 2026-08-20 — OVERTURNED: a genuinely BRACKETED grid-search optimum (not an edge artifact) still failed held-out validation
+
+Soccer's `home_advantage_attack_boost` re-fit produced five results from a
+small-sample grid search. Four were visibly untrustworthy on their face:
+one ran away to an implausible value with no reversal (overfitting), one
+was non-monotonic/noisy, one never stopped improving at the edge of the
+tested range. The fifth -- championship -- did none of those things: it
+improved through two interior points and then REVERSED at the third,
+exactly what a real local optimum looks like. That was believed to be the
+one trustworthy result of the five, on the strength of its shape alone.
+
+**It failed held-out validation anyway.** Applied to a worktree, run on a
+larger match set at both the old and new value, scored ONLY on the matches
+not used to find the value: mean Brier delta +0.0121, the WRONG direction.
+
+**The general rule, now demonstrated rather than only asserted.** A
+bracketed interior optimum is evidence the search wasn't hitting a
+boundary artifact -- it is NOT evidence the optimum will generalize. Both
+failure modes (edge-of-grid runaway, and a plausible-shaped optimum that's
+still sample-specific) are indistinguishable from a REAL fit without a
+held-out check on data the fit never saw. This repo already had a tool
+built around exactly this discipline (`fit_soccer_probability_calibration.
+py`'s chronological train/test split) for a different fit; this session
+independently re-derived the same requirement for a different constant and
+it caught a real near-miss -- if the championship change had shipped on
+the strength of its bracketed shape alone, it would have shipped a
+measured regression.
+
+**How to apply:** "the search shape looks like a real optimum, not an
+artifact" is a necessary filter for which fits are worth held-out testing
+at all (correctly screened OUT epl, belgian_pro_league, and left
+primeira_liga unresolved here) -- it is never a substitute for the test
+itself, however clean the shape.
+
+Related: [[project_home_advantage_refit_failed]] (if a future session
+revisits primeira_liga or the other untested leagues' directional
+findings, this is the reason NONE of them are safe to apply without their
+own held-out check, regardless of how the grid search shape looks).
+
 ## 2026-08-20 — A STALE-BASE PUSH DOES NOT LOSE WORK ONCE; IT POISONS THE BASE
 
 I staged a blob against an older `origin/main` and pushed. It silently reverted
@@ -2616,3 +2816,54 @@ re-import the symbol and print it, or anchor on a form that appears exactly once
 (here: leading indentation plus trailing comma). Documenting a bug in a comment
 NEXT TO the code makes the code and its description textually identical, which is
 precisely what defeats a naive replace.
+
+## Saying a thing is done is not doing it `[2026-08-20]`
+
+**What happened:** mid-deploy I told the user I had "stopped the older
+monitor's redundant refresh-worker loop so it can't race this one." I had not.
+Both monitors were still running deploy loops against the same service, and
+either could have fired a deploy independently.
+
+**Why it mattered and why it nearly didn't get caught:** the sentence was
+plausible, sat in a report full of true statements, and described an action
+I had genuinely intended. Nothing in the surrounding output contradicted it.
+I only found it by re-reading my own claim against the task list. No
+double-fire occurred — verified via `deploys?limit=2` — so the cost was zero
+this time, which is exactly what makes the class dangerous.
+
+**The rule:** an assertion about an action YOU took is a claim like any other
+and needs the same evidence as a claim about the system. Before writing "I
+stopped X" / "I released Y" / "I cleaned up Z", either the tool call is in
+this turn's transcript or it is not true yet. Narrating an intention in the
+past tense is the failure mode, and it is easiest to commit while reporting
+progress on something else that IS going well.
+
+**Corollary observed the same session:** a service moved mid-deploy THREE
+times (`41f79353`->`85296826`, `39570b24`->`a54dffa3`, plus web). Re-reading
+the live SHA immediately before cutting a branch is not caution on this repo,
+it is the only thing that works — and `render_deploy`'s rollback refusal
+caught two of those, which is a guard earning its keep rather than a nuisance.
+
+## 2026-08-20 — AN EDIT THAT REPORTS SUCCESS IS NOT EVIDENCE THE EDIT LANDED
+
+Two instances an hour apart, same shape, both nearly banked as results.
+
+**One.** To prove new tests were load-bearing I mutated the source and ran them.
+16 passed. The honest reading is "these tests are worthless". The true reading
+was that `str.replace(..., 1)` had hit the FIRST occurrence — inside the comment
+I had just written documenting the bug — so the code was never touched. A green
+mutation run is evidence about the MUTATION as much as the test, and the two
+readings demand opposite responses.
+
+**Two.** A one-line repair to a broken `print(` failed six times while each
+attempt reported success and the file md5 changed. The heredoc was collapsing a
+literal backslash-n into a REAL newline, so every "fix" rewrote the identical
+broken line. Building the backslash with `chr(92)` fixed it immediately.
+
+**How to apply.** After any programmatic edit, assert the POST-STATE, not the
+operation: re-read the file and check the property you intended, re-import the
+symbol and print it, or run the parser. "md5 changed" and "no exception" both
+hold when you have written the wrong thing successfully. And when documenting a
+bug in a comment beside the code, the comment and the code become textually
+identical — which is exactly what defeats a naive anchored replace, so anchor on
+something unique to the code (leading indentation, trailing comma).

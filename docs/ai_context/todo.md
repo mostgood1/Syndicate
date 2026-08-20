@@ -1,5 +1,80 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#488` — **OPEN. Two services publish DIFFERENT content to the SAME artifact path; last writer wins, silently. Platform-wide, not basketball-specific** — FOUND 2026-08-20, lane `basketball-model-owner`
+
+**THE OBSERVATION THAT EXPOSED IT.** Reading
+`wnba_source/data/processed/boxscores_history.csv` twice, ~20 minutes apart,
+via `/api/ops/artifacts/export`:
+
+    15:41Z   6,755 rows   2026-04-25 .. 2026-08-18   (98 dates)
+    16:0xZ   3,889 rows   2026-04-25 .. 2026-06-30   (56 dates)
+
+The history appeared to go BACKWARDS by ~2,900 rows and seven weeks. It had
+not: the two readings are two different workers' copies of the same logical
+artifact, alternately overwriting one destination.
+
+**PROVED PER-SERVICE from Render logs** (per-service logs are unambiguous;
+the published file is not, because it is itself last-writer-wins):
+
+    live-odds-worker  PUBLISH_OK  13:16, 13:32, 14:34, 14:47, 15:59   (content CHANGING)
+    refresh-worker    PUBLISH_SKIPPED_UNCHANGED checksum=b19b51d1c96d  10:02, 12:03
+                      PUBLISH_OK  14:17, 15:11                          (content STATIC, then pushed)
+
+`live-odds-worker`'s copy is growing (`#469`'s ESPN capture working);
+`refresh-worker`'s is frozen at the pre-`#469` state. Both POST to
+`/api/ops/artifacts/publish` for the identical relative path. Web keeps
+whichever arrived last.
+
+**WHY THIS IS A PLATFORM BUG AND NOT A BASKETBALL ONE.** Nothing in the
+publish path is sport-specific. Any artifact written by more than one service
+has this shape. The publish endpoint accepts a path and a body; it does not
+know, and cannot ask, whether the sender's copy is better, worse, or older
+than what it already holds. There is **no divergence detection and no
+staleness comparison** -- `PUBLISH_SKIPPED_UNCHANGED` compares the SENDER's
+checksum to the sender's own last publish, not to the receiver's current
+content, so two senders each think they are making progress.
+
+**MEASURED DOWNSTREAM DAMAGE, so this is not theoretical.** The same
+divergence produced two `player_logs` builds two hours apart on the same
+service: `rows=3178` (read the healthy history) and `rows=1363` (read the
+stale one). That in turn produced a home-court estimate of `-0.0116` from 46
+games -- a NEGATIVE home-court advantage, published for the sim to consume.
+`#483` now refuses that output, but `#483` is a symptom guard; this is the
+cause.
+
+**WHAT MAKES IT DANGEROUS RATHER THAN MERELY UNTIDY.** Every consumer reading
+via `/api/ops/artifacts/export` sees content that FLAPS between two versions
+with no error, no warning, and no way to tell which it got. A conclusion drawn
+from one read can be contradicted by the next with no code change in between
+-- which is exactly what happened to this lane's own diagnosis, twice in one
+session, and cost real time before the per-service logs settled it.
+
+**Candidate directions, none implemented, roughly in order of cheapness:**
+
+1. **Detect and report.** Have the receiver compare an incoming artifact
+   against what it holds (row count / max-date / mtime, per artifact family)
+   and emit a loud marker when a publish would REPLACE newer content with
+   older. Cheapest, and converts a silent corruption into a visible one --
+   the same move `#469` made for the boxscore bootstrap.
+2. **Single writer per artifact family.** Declare an owning service per path
+   pattern and make a publish from any other service a no-op plus a warning.
+   Correct, but needs an ownership map that does not exist yet.
+3. **Last-writer-wins by CONTENT recency, not arrival order.** Only accept a
+   publish whose data is at least as new as the held copy. Needs a
+   per-family notion of "newer" (max date? row count? both?) and would have
+   to fail safe when it cannot tell.
+
+**NOT a fix, and worth stating so nobody mistakes it for one:** deploying
+`#469` to `refresh-worker` (branch `60a33128`, prepared, blocked on that
+service's claim) makes the two copies AGREE for this one artifact. It does
+nothing about the mechanism, which will resurface for any other artifact the
+two services both write.
+
+**How to reproduce / verify a fix:** pick any path both services publish,
+read it via `/api/ops/artifacts/export` immediately after each service's
+`PUBLISH_OK` in its own Render log, and compare. Divergence today is visible
+within a single 2h autorun cycle.
+
 ### `#487` — **CLOSED. The home sport-stack assertions were a function of the MIRROR and the CLOCK, not of the page. Pinned to a fixture; reachability proved off != on** — FOUND+FIXED+VERIFIED 2026-08-20, lane `home-stack-test-data-dependence`
 
 The one overnight CI failure left after `#482`. **Not a `#482` regression — `#482`

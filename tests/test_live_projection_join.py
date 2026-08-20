@@ -39,7 +39,15 @@ class LiveProjectionJoinTests(unittest.TestCase):
         ]
         coverage = attach_live_projections(grid, build_live_prop_index(_snapshot()))
         self.assertEqual(coverage["rows_live_projected"], 2)
-        self.assertEqual(grid[0]["projection"]["projected"], 1.24)
+        # `layer2-live-projection-actual`, 2026-08-20: NOT projection["projected"]
+        # -- that field is reserved for the pregame number and this fixture row
+        # starts with no `projection` at all, so there is no pregame baseline to
+        # show. `live_projected` is the join's own, correctly-named output; this
+        # assertion is what the test was actually verifying (the vocabulary/name
+        # match succeeded and the live number landed), not a claim that live and
+        # pregame are the same field.
+        self.assertEqual(grid[0]["projection"]["live_projected"], 1.24)
+        self.assertNotIn("projected", grid[0]["projection"])
         self.assertTrue(grid[0]["projection"]["live_aware"])
 
     def test_pregame_rows_are_untouched(self):

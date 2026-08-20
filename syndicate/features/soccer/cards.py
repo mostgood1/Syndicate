@@ -5,10 +5,12 @@ from datetime import timezone
 from typing import Any
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import build_module_links
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import default_week
+from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
 from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import live_state_payload
@@ -21,6 +23,8 @@ from syndicate.features.soccer.sources import week_date_list
 from syndicate.features.soccer.sources import week_label
 from syndicate.features.soccer.sources import week_matches
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.soccer.props import _normalize_player_name
+from syndicate.features.soccer.props import _prop_picks_by_player
 
 
 def _safe_float(value: Any) -> float | None:
@@ -277,12 +281,147 @@ def _box_score_line(
     return f"Proj {away_abbr}-{home_abbr} · 1H {_leg(h1)} · 2H {_leg(h2)} · FT {ft}"
 
 
-def _prop_line(row: dict[str, Any]) -> str:
+def _prop_line(row: dict[str, Any], pick: dict[str, Any] | None = None) -> str:
     name = str(row.get("player_name") or "Player").strip()
     team = str(row.get("team") or "").strip()
     scorer_prob = _fmt_pct(row.get("anytime_scorer_probability"))
     shots = _fmt_num(row.get("expected_shots"), 1)
-    return f"{name} ({team}) | Anytime scorer {scorer_prob} | xShots {shots}"
+    base = f"{name} ({team}) | Anytime scorer {scorer_prob} | xShots {shots}"
+    if not pick:
+        return base
+    # The price and edge were ALREADY being computed -- by
+    # `build_soccer_picks.py::build_prop_picks`, and rendered on
+    # `/soccer/<league>/props` as "Odds +150 | Model probability 25.4% |
+    # Edge -14.6%". The CARD showed only the simulated probability, so the
+    # one number that says whether a prop is worth betting was one page away
+    # from the prop itself. Same join key, same source rows.
+    odds = _fmt_odds(pick.get("price"))
+    edge = _safe_float(pick.get("edge"))
+    parts = [base]
+    if odds:
+        parts.append(f"Odds {odds}")
+    if edge is not None:
+        parts.append(f"Edge {edge * 100.0:+.1f}%")
+    return " | ".join(parts)
+
+
+def _prop_rows_with_market(top_props: list, prop_picks: dict) -> list:
+    """Prop rows joined to their captured market price, newest-first by edge.
+
+    Rows are returned WITHOUT `is_synthesized`, which matters: the shared
+    contract's `_build_prop_status_rows` drops every synthesized row, so
+    soccer's props-status table rendered empty on every card. A row carrying
+    its own price and edge has something of its own to say, which is exactly
+    the bar that filter documents.
+    """
+    candidates = []
+    for row in top_props:
+        if not isinstance(row, dict):
+            continue
+        pick = prop_picks.get(_normalize_player_name(row.get("player_name")))
+        candidates.append((row, pick))
+    # If NOTHING in this match has a captured price, saying so once beats
+    # saying it on every row. Measured 2026-08-20 after the first cut of this
+    # function: "No market price captured" rendered 10 times on one card --
+    # a per-row note that is really a per-match fact, which is the same
+    # wasted-space shape as the matchup string repeated across four tiles.
+    # When SOME rows are priced the marker earns its place, because then it
+    # discriminates between rows instead of restating the section.
+    any_priced = any(pick and _safe_float(pick.get("price")) is not None for _, pick in candidates)
+    rows = []
+    for row, pick in candidates:
+        model_p = _safe_float(row.get("anytime_scorer_probability"))
+        edge = _safe_float((pick or {}).get("edge"))
+        odds = _fmt_odds((pick or {}).get("price"))
+        detail_parts = []
+        if odds:
+            detail_parts.append(f"Odds {odds}")
+        if edge is not None:
+            detail_parts.append(f"Edge {edge * 100.0:+.1f}%")
+        if not detail_parts and any_priced:
+            detail_parts.append("No price")
+        rows.append(
+            {
+                "heading": "Anytime goalscorer" if any_priced else "Anytime goalscorer (model only)",
+                "name": f"{str(row.get('player_name') or 'Player').strip()} ({row.get('team') or '-'})",
+                "value": _fmt_pct(model_p),
+                "detail": " | ".join(detail_parts),
+                "_edge": edge if edge is not None else float("-inf"),
+            }
+        )
+    rows.sort(key=lambda item: item["_edge"], reverse=True)
+    for row in rows:
+        row.pop("_edge", None)
+    return rows
+
+
+def _result_text(away_team: str, home_team: str, away_score: Any, home_score: Any) -> str | None:
+    away_goals = _safe_float(away_score)
+    home_goals = _safe_float(home_score)
+    if away_goals is None or home_goals is None:
+        return None
+    return f"{away_team} {away_goals:.0f} - {home_team} {home_goals:.0f}"
+
+
+def _placeholder_summary(*, away_team, home_team, week, status_state, away_score, home_score) -> str:
+    if status_state == "post":
+        result = _result_text(away_team, home_team, away_score, home_score)
+        if result:
+            return f"Final: {result}. This match was not simulated, so there is no model comparison for it."
+        return f"{away_team} at {home_team} has finished. No final score was published for it."
+    if status_state == "in":
+        result = _result_text(away_team, home_team, away_score, home_score)
+        if result:
+            return f"In progress: {result}. This match was not simulated, so there is no live model line for it."
+    return f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet."
+
+
+def _placeholder_panels(*, away_team, home_team, league, date_str, status_state, away_score, home_score) -> list:
+    """What to show for a match with no sim output.
+
+    Three genuinely different cases were collapsed into one before: a FINISHED
+    match, a LIVE match, and a fixture nobody has simulated. Only the third
+    wants the operator instruction, and printing it on the other two put a
+    build command where a reader was looking for a result.
+    """
+    result = _result_text(away_team, home_team, away_score, home_score)
+    if status_state == "post" and result:
+        return [
+            {
+                "eyebrow": "Final result",
+                "title": f"{away_team} @ {home_team}",
+                "body": "The match as played. No simulation was run for this fixture, so no model comparison is available.",
+                "items": [f"Final score: {result}"],
+                "table_groups": [
+                    {
+                        "heading": "Final",
+                        "rows": [
+                            {"name": _abbr(away_team, league), "detail": away_team, "value": _fmt_num(_safe_float(away_score), 0)},
+                            {"name": _abbr(home_team, league), "detail": home_team, "value": _fmt_num(_safe_float(home_score), 0)},
+                        ],
+                    }
+                ],
+            }
+        ]
+    if status_state == "in" and result:
+        return [
+            {
+                "eyebrow": "Live score",
+                "title": f"{away_team} @ {home_team}",
+                "body": "The score as it stands. No simulation was run for this fixture, so no live model line is available.",
+                "items": [f"Current score: {result}"],
+            }
+        ]
+    return [
+        {
+            "eyebrow": "Not yet simulated",
+            "title": f"{away_team} @ {home_team}",
+            "body": f"This fixture is on the real {league_display_name(league)} schedule for {date_str}, but SoccerSim has not simulated it yet.",
+            "items": [
+                f"Run scripts/build_soccer_artifacts.py --league {league} --date {date_str} to populate this match.",
+            ],
+        }
+    ]
 
 
 def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
@@ -324,6 +463,18 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         # projection. This is a page-level empty state, never a bettable row.
         "is_unsimulated_placeholder": True,
         "status": _status_label(status_state, fixture.get("date")),
+        "market_tiles": _market_tiles(
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+            win_prob={},
+            total_distribution={},
+            team_projection={},
+            betting={},
+            top_props=[],
+            live_state_block=_live_state_block(status_state, fixture.get("date")),
+            away_score=fixture.get("away_score"),
+            home_score=fixture.get("home_score"),
+        ),
         # THE PLACEHOLDER NEEDS THIS TOO, and it is the more dangerous of the
         # two producers to leave out. Its `summary` ends "...has not been
         # simulated yet" and its panel body says "on the real schedule for
@@ -334,7 +485,14 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         "live_state": _live_state_block(status_state, fixture.get("date")),
         "detail": date_str or league_display_name(league),
         "scheduled_start_utc": fixture.get("date"),
-        "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
+        "summary": _placeholder_summary(
+            away_team=away_team,
+            home_team=home_team,
+            week=week,
+            status_state=status_state,
+            away_score=fixture.get("away_score"),
+            home_score=fixture.get("home_score"),
+        ),
         "compact_box_line": "",
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",
@@ -346,16 +504,15 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
             {"label": "BTTS", "value": "-"},
             {"label": "Over 2.5", "value": "-"},
         ],
-        "panels": [
-            {
-                "eyebrow": "Not yet simulated",
-                "title": f"{away_team} @ {home_team}",
-                "body": f"This fixture is on the real {league_display_name(league)} schedule for {date_str}, but SoccerSim has not simulated it yet.",
-                "items": [
-                    f"Run scripts/build_soccer_artifacts.py --league {league} --date {date_str} to populate this match.",
-                ],
-            }
-        ],
+        "panels": _placeholder_panels(
+            away_team=away_team,
+            home_team=home_team,
+            league=league,
+            date_str=date_str,
+            status_state=status_state,
+            away_score=fixture.get("away_score"),
+            home_score=fixture.get("home_score"),
+        ),
     }
 
 
@@ -597,7 +754,451 @@ def _player_box_score_panel(
     }
 
 
-def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
+def _fmt_odds(price):
+    number = _safe_float(price)
+    if number is None:
+        return ""
+    return f"+{number:.0f}" if number > 0 else f"{number:.0f}"
+
+
+def _fmt_line(value):
+    number = _safe_float(value)
+    if number is None:
+        return ""
+    return f"+{number:g}" if number > 0 else f"{number:g}"
+
+
+def _edge_points(model_prob: Any, market_prob: Any) -> float | None:
+    """Model probability minus the market's devigged implied probability.
+
+    Deliberately NOT the picks pipeline's `ev` column, even though
+    `_market_data_for_match` already carries it. `build_soccer_picks.py:131`
+    computes `ev = model_prob * decimal - 1`, where its `model_prob` comes from
+    the picks run -- a DIFFERENT vintage than the sim payload this card
+    renders. Measured 2026-08-20 on COV@ARS: the card's own sim says away win
+    7.0%, while `away_ml_ev` of 0.575 at +1400 implies about 10.5%. Printing
+    the card's probability beside that EV would put two models' numbers under
+    one heading and invite the reader to treat them as one calculation. Both
+    fields stay on `betting` for anything that wants the pipeline's number;
+    the TILE compares like with like.
+    """
+    model = _safe_float(model_prob)
+    market = _safe_float(market_prob)
+    if model is None or market is None:
+        return None
+    return (model - market) * 100.0
+
+
+def _fmt_edge(points: float | None) -> str:
+    if points is None:
+        return "-"
+    return f"{points:+.1f} pts"
+
+
+def _top_play_rows(
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    away_team: str,
+    home_team: str,
+    team_projection: dict,
+    betting: dict,
+    win_prob: dict,
+    volume: dict,
+) -> list:
+    """Structured top-play rows: `name` is the thing, `value` is its number.
+
+    The generic `_build_top_play_rows` scrapes display panels, and on soccer it
+    emitted `{"name": "Projected score", "value": "Coventry City @ Arsenal",
+    "detail": "Coventry City 0.8 - Arsenal 2.7"}` -- the matchup in the value
+    column, the actual number demoted to detail, and the same matchup string
+    repeated as every row's `heading`. Measured 2026-08-20: three of the six
+    rows had the matchup as their value.
+    """
+    rows = []
+    away_mean = _safe_float(team_projection.get("away_mean"))
+    home_mean = _safe_float(team_projection.get("home_mean"))
+    if away_mean is not None and home_mean is not None:
+        rows.append(
+            {
+                "heading": "Projection",
+                "name": "Projected score",
+                "value": f"{away_abbr} {away_mean:.1f} - {home_abbr} {home_mean:.1f}",
+                "detail": f"{away_team} at {home_team}",
+            }
+        )
+    margin = _safe_float(team_projection.get("margin_mean"))
+    if margin is not None:
+        rows.append(
+            {
+                "heading": "Projection",
+                "name": "Projected margin",
+                "value": _fmt_num(margin, 2),
+                "detail": "Home perspective",
+            }
+        )
+    total_mean = _safe_float(team_projection.get("total_mean"))
+    if total_mean is not None:
+        line = _safe_float(betting.get("total"))
+        rows.append(
+            {
+                "heading": "Total goals",
+                "name": "Model total",
+                "value": _fmt_num(total_mean, 2),
+                "detail": f"Market line {line:g}" if line is not None else "No market total captured",
+            }
+        )
+    for side, abbr, team, ml_key, prob_key in (
+        ("home", home_abbr, home_team, "home_ml", "p_home_win"),
+        ("away", away_abbr, away_team, "away_ml", "p_away_win"),
+    ):
+        model_p = _safe_float(win_prob.get(side))
+        market_p = _safe_float(betting.get(prob_key))
+        price = betting.get(ml_key)
+        if model_p is None:
+            continue
+        if market_p is not None:
+            detail = f"Market {_fmt_pct(market_p)} | Edge {_fmt_edge(_edge_points(model_p, market_p))}"
+        else:
+            detail = "No market price captured"
+        odds = _fmt_odds(price)
+        rows.append(
+            {
+                "heading": "Moneyline",
+                "name": f"{abbr} win{f' ({odds})' if odds else ''}",
+                "value": _fmt_pct(model_p),
+                "detail": detail,
+            }
+        )
+    draw_p = _safe_float(win_prob.get("draw"))
+    if draw_p is not None:
+        rows.append({"heading": "Moneyline", "name": "Draw", "value": _fmt_pct(draw_p), "detail": "Three-way market"})
+    for side, abbr, team in (("away", away_abbr, away_team), ("home", home_abbr, home_team)):
+        shots = _safe_float(volume.get(f"{side}_shots"))
+        sot = _safe_float(volume.get(f"{side}_shots_on_target"))
+        corners = _safe_float(volume.get(f"{side}_corners"))
+        if shots is None and sot is None and corners is None:
+            continue
+        rows.append(
+            {
+                "heading": "Projected volume",
+                "name": f"{abbr} shots / SOT / corners",
+                "value": f"{_fmt_num(shots, 1)} / {_fmt_num(sot, 1)} / {_fmt_num(corners, 1)}",
+                "detail": team,
+            }
+        )
+    return rows
+
+
+def _market_tiles(
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    win_prob: dict,
+    total_distribution: dict,
+    team_projection: dict,
+    betting: dict,
+    top_props: list,
+    live_state_block: dict,
+    prop_picks: dict | None = None,
+    away_score: Any,
+    home_score: Any,
+) -> list:
+    """Four BET tiles, mirroring `mlb/cards.py::_market_tiles`.
+
+    Replaces the generic fallback in `game_board_contract.py` (`metrics[:4]`),
+    which rendered a bare probability per tile with the matchup string as all
+    four sub-labels -- four tiles carrying one fact and three repetitions of
+    the card's own title. Measured 2026-08-20 on production: soccer's payload
+    already held `home_ml -590`, `away_ml +1400`, `total 2.5`, `spread -1.5`
+    and both sides' devigged market probabilities, and not one reached a tile.
+    That fallback also truncated `metrics` to 4, silently dropping BTTS and
+    Over 2.5.
+
+    Every tile states its own provenance in the sub-line, because soccer's
+    market coverage is genuinely uneven -- MLS carried `betting = {}` on the
+    same sweep EPL carried a full book. A tile with no market says so, rather
+    than showing a model number under a market-shaped heading.
+    """
+    final = bool(live_state_block.get("final"))
+    in_progress = bool(live_state_block.get("in_progress"))
+
+    def tile(label, title, sub):
+        return {"label": label, "title": title, "sub": sub}
+
+    if final:
+        # A finished match has a result, not a projection. The old path sent
+        # these through the unsimulated placeholder and rendered "-" in all
+        # four tiles -- 25 of 31 MLS cards on the 2026-08-20 board.
+        away_goals = _safe_float(away_score)
+        home_goals = _safe_float(home_score)
+        if away_goals is not None and home_goals is not None:
+            if home_goals > away_goals:
+                result = f"{home_abbr} win"
+            elif away_goals > home_goals:
+                result = f"{away_abbr} win"
+            else:
+                result = "Draw"
+            return [
+                tile("Final", f"{away_abbr} {away_goals:.0f} - {home_abbr} {home_goals:.0f}", result),
+                tile("Total goals", f"{away_goals + home_goals:.0f}", "Actual"),
+                tile("Result", result, "Full time"),
+                tile("Status", "Final", "Match complete"),
+            ]
+
+    model_home = _safe_float(win_prob.get("home"))
+    model_draw = _safe_float(win_prob.get("draw"))
+    model_away = _safe_float(win_prob.get("away"))
+
+    # --- Tile 1: the 1X2 side the model likes most, versus the market ---
+    sides = [
+        (home_abbr, model_home, _safe_float(betting.get("p_home_win")), betting.get("home_ml")),
+        (away_abbr, model_away, _safe_float(betting.get("p_away_win")), betting.get("away_ml")),
+    ]
+    priced = [row for row in sides if row[1] is not None and row[2] is not None]
+    if priced:
+        abbr, model_p, market_p, price = max(priced, key=lambda row: (row[1] or 0.0) - (row[2] or 0.0))
+        ml_title = " ".join(part for part in (f"{abbr} ML", _fmt_odds(price)) if part)
+        ml_sub = f"Model {_fmt_pct(model_p)} | Market {_fmt_pct(market_p)} | Edge {_fmt_edge(_edge_points(model_p, market_p))}"
+        ml_label = "Best 1X2 edge"
+    elif model_home is not None:
+        best_abbr, best_p = home_abbr, model_home
+        if model_away is not None and model_away > best_p:
+            best_abbr, best_p = away_abbr, model_away
+        if model_draw is not None and model_draw > best_p:
+            best_abbr, best_p = "Draw", model_draw
+        ml_title = f"{best_abbr} {_fmt_pct(best_p)}"
+        ml_sub = "Model only -- no market price captured"
+        ml_label = "1X2 lean"
+    else:
+        ml_title = "No 1X2 read"
+        ml_sub = "Not simulated"
+        ml_label = "1X2"
+
+    # --- Tile 2: total goals ---
+    total_line = _safe_float(betting.get("total"))
+    over_price = betting.get("odds")
+    model_total = _safe_float(team_projection.get("total_mean"))
+    model_over_25 = _safe_float(total_distribution.get("over_2_5_probability"))
+    if total_line is not None:
+        selection = "OVER" if (model_total is not None and model_total > total_line) else "UNDER"
+        market_p = _safe_float(betting.get("p_total_over" if selection == "OVER" else "p_total_under"))
+        total_title = " ".join(part for part in (selection, f"{total_line:g}", _fmt_odds(over_price)) if part)
+        if model_total is not None and market_p is not None:
+            total_sub = f"Model {_fmt_num(model_total, 2)} | Line {total_line:g} | Market {_fmt_pct(market_p)}"
+        elif model_total is not None:
+            total_sub = f"Model {_fmt_num(model_total, 2)} | Line {total_line:g}"
+        else:
+            total_sub = f"Line {total_line:g}"
+        total_label = "Total goals"
+    elif model_total is not None:
+        total_title = _fmt_num(model_total, 2)
+        total_sub = f"Over 2.5 {_fmt_pct(model_over_25)} model" if model_over_25 is not None else "Model only -- no market total"
+        total_label = "Projected total"
+    else:
+        total_title = "No total"
+        total_sub = "Not simulated"
+        total_label = "Total goals"
+
+    # --- Tile 3: the handicap. NO model cover probability is published, so
+    # this shows the projected MARGIN against the line rather than inventing a
+    # cover number. Lane F's rule: an absent probability renders as absent.
+    home_line = _safe_float(betting.get("home_spread"))
+    margin = _safe_float(team_projection.get("margin_mean"))
+    if home_line is not None:
+        favourite = home_abbr if home_line < 0 else away_abbr
+        shown_line = home_line if home_line < 0 else -home_line
+        spread_title = f"{favourite} {_fmt_line(shown_line)}"
+        if margin is not None:
+            cushion = margin + home_line
+            spread_sub = f"Proj margin {_fmt_num(margin, 2)} | vs line {_fmt_num(cushion, 2)}"
+        else:
+            spread_sub = "No projected margin"
+        spread_label = "Handicap"
+    elif margin is not None:
+        spread_title = f"{_fmt_num(margin, 2)} margin"
+        spread_sub = "Model only -- no handicap captured"
+        spread_label = "Projected margin"
+    else:
+        spread_title = "No handicap"
+        spread_sub = "Not simulated"
+        spread_label = "Handicap"
+
+    # --- Tile 4: the leading player prop ---
+    picks = prop_picks or {}
+    priced = [
+        (row, picks.get(_normalize_player_name(row.get("player_name"))))
+        for row in top_props
+        if isinstance(row, dict)
+    ]
+    with_edge = [(row, pick) for row, pick in priced if pick and _safe_float(pick.get("edge")) is not None]
+    if with_edge:
+        # The best EDGE, not the highest probability: a 40% scorer at a price
+        # that implies 50% is not the play on the card, and showing it as the
+        # headline prop is how a model number gets read as a recommendation.
+        lead, pick = max(with_edge, key=lambda item: _safe_float(item[1].get("edge")) or 0.0)
+        edge = _safe_float(pick.get("edge")) or 0.0
+        odds = _fmt_odds(pick.get("price"))
+        prop_title = " ".join(
+            part for part in (f"{str(lead.get('player_name') or 'Player').strip()} anytime", odds) if part
+        )
+        prop_sub = f"Model {_fmt_pct(lead.get('anytime_scorer_probability'))} | Edge {edge * 100.0:+.1f}%"
+        prop_label = "Best prop edge"
+    elif priced:
+        lead = priced[0][0]
+        prop_title = f"{str(lead.get('player_name') or 'Player').strip()} anytime"
+        prop_sub = f"Model {_fmt_pct(lead.get('anytime_scorer_probability'))} | {_fmt_num(lead.get('expected_shots'), 1)} xSh"
+        prop_label = "Top prop"
+    else:
+        prop_title = "No prop rows"
+        prop_sub = "Player props not simulated"
+        prop_label = "Top prop"
+
+    if in_progress:
+        ml_label = f"LIVE {ml_label}"
+
+    return [
+        tile(ml_label, ml_title, ml_sub),
+        tile(total_label, total_title, total_sub),
+        tile(spread_label, spread_title, spread_sub),
+        tile(prop_label, prop_title, prop_sub),
+    ]
+
+
+def _squad_box_sections(
+    *,
+    squad_props: list,
+    prop_picks: dict,
+    away_team: str,
+    home_team: str,
+    away_abbr: str,
+    home_abbr: str,
+    live_state: dict | None,
+) -> list:
+    """One stat table per side, every player the sim published.
+
+    THE DATA WAS ALREADY THERE AND ON THE WRONG SIDE OF A TRUNCATION.
+    `cards.py` read `match["top_props"]`, which the artifact builder caps at
+    EIGHT. The full roster lives at the payload's TOP level as
+    `player_props` -- 28 players for COV@ARS on 2026-08-21, each with 13
+    fields including the `_if_playing` variants and `expected_minutes_share`.
+    `/soccer/<league>/props` has been reading that key all along; the card
+    never did. Measured 2026-08-20: MLB's box tab carries 566 leaf values
+    (full batting and pitching lines, real and simulated) against soccer's
+    30.
+
+    Columns mirror what MLB's box actually shows -- identity, then a row of
+    numbers -- rather than the name/detail/value list, which could only ever
+    surface three of thirteen fields.
+
+    `Odds`/`Edge` come from the same `build_soccer_picks` join the props page
+    and the prop tiles use, so a player's edge reads identically wherever it
+    appears on the card.
+    """
+    if not squad_props:
+        return []
+    columns = ["Player", "Pos", "Min%", "xSh", "xSOT", "Scorer%", "Odds", "Edge"]
+    sections = []
+    for side, team_name, abbr in (("away", away_team, away_abbr), ("home", home_team, home_abbr)):
+        rows = [row for row in squad_props if isinstance(row, dict) and str(row.get("side") or "") == side]
+        if not rows:
+            # Stated, not hidden. Soccer's player coverage is genuinely
+            # one-sided for some fixtures -- all 28 rows for COV@ARS are
+            # Arsenal players, none Coventry. An empty column that says
+            # nothing is indistinguishable from a rendering bug.
+            sections.append(
+                {
+                    "title": f"{abbr} squad projections",
+                    "body": f"No player projections were published for {team_name} in this match.",
+                    "rows": [],
+                }
+            )
+            continue
+        rows.sort(key=lambda row: _safe_float(row.get("anytime_scorer_probability")) or 0.0, reverse=True)
+        table_rows = []
+        for row in rows:
+            pick = prop_picks.get(_normalize_player_name(row.get("player_name"))) or {}
+            edge = _safe_float(pick.get("edge"))
+            table_rows.append(
+                [
+                    str(row.get("player_name") or "Player").strip(),
+                    str(row.get("position") or "-").strip() or "-",
+                    _fmt_pct(row.get("expected_minutes_share")),
+                    _fmt_num(row.get("expected_shots"), 2),
+                    _fmt_num(row.get("expected_shots_on_target"), 2),
+                    _fmt_pct(row.get("anytime_scorer_probability")),
+                    _fmt_odds(pick.get("price")) or "-",
+                    f"{edge * 100.0:+.1f}%" if edge is not None else "-",
+                ]
+            )
+        sections.append(
+            {
+                "title": f"{abbr} squad projections",
+                "body": (
+                    f"{len(table_rows)} {team_name} players. Expected minutes share, shots, shots on "
+                    "target and anytime-scorer probability from the sim, against the captured price."
+                ),
+                "columns": columns,
+                "table_rows": table_rows,
+                "rows": [],
+            }
+        )
+    return sections
+
+
+def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abbr: str) -> dict | None:
+    """The most likely exact scorelines.
+
+    `scoreline_probabilities` is published on every simulated match (25
+    entries for COV@ARS) and was read by NOTHING on the card. For a sport
+    whose correct-score market is a headline market, that is the single
+    highest-signal artifact field going unused.
+
+    The keys are `"home-away"` -- confirmed against the payload, where the
+    3.24-total Arsenal-favourite match peaks at "3-0" 14.0% and "2-0" 12.7%,
+    which is a home-heavy distribution as it must be. Rendered
+    away-first to match the card's `AWAY @ HOME` header, so the same match
+    never reads in two orders on one card.
+    """
+    if not isinstance(scoreline_probabilities, dict) or not scoreline_probabilities:
+        return None
+    ranked = sorted(
+        ((str(k), _safe_float(v)) for k, v in scoreline_probabilities.items()),
+        key=lambda item: item[1] or 0.0,
+        reverse=True,
+    )
+    table_rows = []
+    for key, prob in ranked[:10]:
+        if prob is None or "-" not in key:
+            continue
+        home_goals, _, away_goals = key.partition("-")
+        table_rows.append(
+            [
+                f"{away_abbr} {away_goals.strip()} - {home_abbr} {home_goals.strip()}",
+                _fmt_pct(prob),
+            ]
+        )
+    if not table_rows:
+        return None
+    covered = sum(prob or 0.0 for _, prob in ranked[:10])
+    return {
+        "kicker": "Correct score",
+        "title": "Most likely scorelines",
+        "body": f"Top {len(table_rows)} exact scores from the sim, {_fmt_pct(covered)} of all simulated outcomes.",
+        "columns": ["Scoreline", "Prob"],
+        "table_rows": table_rows,
+        "rows": [],
+    }
+
+
+def _match_to_game(
+    match: dict[str, Any],
+    *,
+    league: str,
+    week: int,
+    season: int,
+    squad_props: list | None = None,
+) -> dict[str, Any]:
     matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
     home_team = str(matchup.get("home_team") or "Home").strip() or "Home"
     away_team = str(matchup.get("away_team") or "Away").strip() or "Away"
@@ -616,6 +1217,8 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
     effective_state = _effective_status_state(status_state, match.get("kickoff"))
     live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
 
+    betting = _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team)
+    prop_picks = _prop_picks_by_player(league, week, season)
     home_score = match.get("live_home_score")
     away_score = match.get("live_away_score")
     score_text = f"{away_score}-{home_score}" if effective_state in {"in", "post"} and home_score is not None else "-"
@@ -692,7 +1295,56 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
                 "away": win_prob.get("away"),
             },
         },
-        "betting": _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team),
+        "betting": betting,
+        "market_tiles": _market_tiles(
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+            win_prob=win_prob,
+            total_distribution=total_distribution,
+            team_projection=team_projection,
+            betting=betting,
+            top_props=top_props,
+            prop_picks=prop_picks,
+            live_state_block=_live_state_block(effective_state, match.get("kickoff")),
+            away_score=away_score,
+            home_score=home_score,
+        ),
+        # Supplied rather than left to `_build_top_play_rows`, whose generic
+        # panel-scrape produced rows whose `value` was the MATCHUP STRING and
+        # whose real content sat in `name`/`detail` -- so the card rendered
+        # "Coventry City @ Arsenal" three times down the value column.
+        # `game_board_contract` preserves a non-empty incoming list.
+        "shared_headline_section": _scoreline_section(
+            match.get("scoreline_probabilities"),
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+        ),
+        "shared_box_sections": [
+            section
+            for section in (
+                _squad_box_sections(
+                    squad_props=squad_props or [],
+                    prop_picks=prop_picks,
+                    away_team=away_team,
+                    home_team=home_team,
+                    away_abbr=_abbr(away_team, league),
+                    home_abbr=_abbr(home_team, league),
+                    live_state=live_state,
+                )
+            )
+            if section
+        ],
+        "shared_prop_rows": _prop_rows_with_market(squad_props or top_props, prop_picks),
+        "shared_top_play_rows": _top_play_rows(
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+            away_team=away_team,
+            home_team=home_team,
+            team_projection=team_projection,
+            betting=betting,
+            win_prob=win_prob,
+            volume=volume,
+        ),
         "metrics": [
             {"label": "Home win", "value": _fmt_pct(win_prob.get("home"))},
             {"label": "Draw", "value": _fmt_pct(win_prob.get("draw"))},
@@ -729,8 +1381,11 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
             {
                 "eyebrow": "Top prop signals",
                 "title": "Anytime scorer / shots leaders",
-                "body": "Highest anytime-goalscorer probability players from the simulated player-props pass.",
-                "items": [_prop_line(row) for row in top_props[:5]] or ["No player-prop rows were available for this match."],
+                "body": "Anytime-goalscorer probability against the captured market price, best edge first.",
+                "items": [
+                    _prop_line(row, prop_picks.get(_normalize_player_name(row.get("player_name"))))
+                    for row in top_props[:5]
+                ] or ["No player-prop rows were available for this match."],
             },
         ],
     }
@@ -746,19 +1401,39 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
     if not fixtures:
         return []
     simulated_by_event_id: dict[str, dict[str, Any]] = {}
+    # `player_props` is a TOP-LEVEL key, not a per-match one, and it carries
+    # the full squad where `match["top_props"]` is capped at eight by the
+    # artifact builder. Indexed by match_id here so the card can show what
+    # `/soccer/<league>/props` has always shown.
+    squad_by_match: dict[str, list[dict[str, Any]]] = {}
     for date_str in week_date_list(league, season, week):
         payload = recommendations_payload(league, date_str) or {}
         for match in payload.get("matches") if isinstance(payload.get("matches"), list) else []:
             event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
             if event_id:
                 simulated_by_event_id[event_id] = match
+        for row in payload.get("player_props") if isinstance(payload.get("player_props"), list) else []:
+            if not isinstance(row, dict):
+                continue
+            match_id = str(row.get("match_id") or "").strip()
+            if match_id:
+                squad_by_match.setdefault(match_id, []).append(row)
 
     games: list[dict[str, Any]] = []
     for fixture in fixtures:
         event_id = str(fixture.get("event_id") or "").strip()
         simulated = simulated_by_event_id.get(event_id)
         if simulated is not None:
-            games.append(_match_to_game(simulated, league=league, week=week, season=season))
+            match_id = str(simulated.get("match_id") or simulated.get("event_id") or "").strip()
+            games.append(
+                _match_to_game(
+                    simulated,
+                    league=league,
+                    week=week,
+                    season=season,
+                    squad_props=squad_by_match.get(match_id) or squad_by_match.get(event_id) or [],
+                )
+            )
         else:
             games.append(_unsimulated_game(fixture, league=league, week=week, season=season))
     return games
@@ -833,6 +1508,188 @@ def build_cards_page_context(league: str, week: int | None = None, season: int |
                 {"label": "Simulated", "value": str(simulated_count)},
                 {"label": "Weeks available", "value": str(len(weeks) or "-")},
                 {"label": "League", "value": league_label},
+            ],
+            "cards_stylesheet": None,
+            "cards_grid_class": "cards-grid",
+            "show_source_summary": True,
+            "show_intro": True,
+            "active_sport_name": "Soccer",
+        },
+        sport="soccer",
+        module="cards",
+        source_kind="artifact_backed",
+        live_lens_integrated=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cross-league, DATE-scoped board (`soccer-board-mlb-parity`, 2026-08-20).
+#
+# Every other sport's card board is keyed by DATE. Soccer's was keyed by
+# (league, matchweek), and each league runs its own matchweek calendar, so the
+# ten leagues resolved to ten different date windows. Measured on production
+# 2026-08-20, the "current" week per league covered: EPL Aug 21 only, MLS
+# Aug 16-22, Bundesliga Aug 28 only, Serie A Aug 22-28, Belgian Aug 15-21.
+# `/soccer` redirected to EPL, so the landing page showed 1 match -- kicking
+# off the FOLLOWING day -- out of 92 across the ten leagues, with no surface
+# anywhere that answered "what is on today".
+#
+# This does not replace the per-league week board; that view is the right one
+# for planning a matchweek. It adds the view MLB has had all along.
+# ---------------------------------------------------------------------------
+
+
+def _central_slate_date(kickoff: Any) -> str | None:
+    """The CENTRAL calendar date a kickoff belongs to.
+
+    Was `str(scheduled_start_utc)[:10]`, and that was wrong in production for
+    most of an evening slate. Reported by the user 2026-08-20 and confirmed:
+    the board for 2026-08-20 carried EIGHT MLS matches that were played on
+    2026-08-19 Central. Their UTC kickoffs are 00:00Z-02:30Z on the 20th --
+    a 7:00-9:30 PM Central start on the 19th -- so a UTC date slice files a
+    whole evening of North American football onto the following day, and the
+    cards arrive already Final.
+
+    `CLAUDE.md` documents this exact trap for NCAAF ("28 of 157 real 2026
+    kickoffs were previously filed under their UTC day... the platform's
+    display timezone is Central everywhere; `central_today_iso()` is the
+    slate clock"), and this function was written against UTC anyway. It is
+    also why the fix is a CENTRAL conversion rather than a fixed offset:
+    the offset changes with DST and the slate clock does not.
+
+    Reuses `_parse_kickoff`, which already owns the naive-stamp convention
+    for this file, rather than adding a second parse that could disagree
+    with the status badge about what a kickoff means.
+    """
+    parsed = _parse_kickoff(kickoff)
+    if parsed is None:
+        return None
+    return parsed.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+
+
+def _kickoff_sort_key(game: dict[str, Any]) -> tuple:
+    """Kickoff order, with live matches first and finals last.
+
+    A soccer date board spans time zones far more than a domestic-sport one --
+    a European kickoff and an MLS kickoff on the same date are ~8 hours apart
+    -- so plain chronological order buries whatever is actually happening now.
+    """
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    if live_state.get("in_progress"):
+        bucket = 0
+    elif live_state.get("final"):
+        bucket = 2
+    else:
+        bucket = 1
+    return (bucket, str(game.get("scheduled_start_utc") or "~"), str(game.get("gamePk") or ""))
+
+
+def date_games(date_str: str) -> list[dict[str, Any]]:
+    """Every league's matches on one calendar date.
+
+    Resolves each league's own matchweek for the date via `default_week(...,
+    reference_date=)` -- the same primitive the per-league board already uses,
+    rather than a second week-resolution rule that could disagree with it.
+    """
+    games: list[dict[str, Any]] = []
+    for league in LEAGUE_DISPLAY_NAMES:
+        try:
+            season = default_season(league)
+            week = default_week(league, season, reference_date=date_str)
+            for game in week_games(league, week, season):
+                if _central_slate_date(game.get("scheduled_start_utc")) != date_str:
+                    continue
+                games.append(game)
+        except Exception as exc:  # noqa: BLE001
+            # One league's missing/!malformed schedule artifact must not blank
+            # the whole board -- that is the failure shape `learnings.md`
+            # records for `poll_active_leagues_for_tick`, where a per-league
+            # exception was swallowed into a dict nothing could read. Printed,
+            # not swallowed: `print(..., flush=True)` is the only thing that
+            # reaches Render's collector (`logger.info` does not).
+            print(f"[soccer_date_board] LEAGUE_FAILED league={league} date={date_str} err={exc}", flush=True)
+    return sorted(games, key=_kickoff_sort_key)
+
+
+def build_date_cards_page_context(date_str: str) -> dict[str, Any]:
+    from datetime import date as _date
+    from datetime import timedelta as _timedelta
+
+    selected = str(date_str or "")[:10]
+    try:
+        anchor = _date.fromisoformat(selected)
+    except ValueError:
+        anchor = _date.fromisoformat(central_today_iso())
+        selected = anchor.isoformat()
+    prev_date = (anchor - _timedelta(days=1)).isoformat()
+    next_date = (anchor + _timedelta(days=1)).isoformat()
+
+    games = date_games(selected)
+    leagues_present = sorted({str(game.get("league_display") or "") for game in games if game.get("league_display")})
+    live_count = sum(
+        1 for game in games if isinstance(game.get("live_state"), dict) and game["live_state"].get("in_progress")
+    )
+    final_count = sum(
+        1 for game in games if isinstance(game.get("live_state"), dict) and game["live_state"].get("final")
+    )
+    simulated_count = sum(1 for game in games if not game.get("is_unsimulated_placeholder"))
+
+    return apply_game_board_contract(
+        {
+            "date": selected,
+            "requested_date": selected,
+            "prev_date": prev_date,
+            "next_date": next_date,
+            "control_action": "/soccer/cards",
+            "controls_prev_href": f"/soccer/cards?date={prev_date}",
+            "controls_next_href": f"/soccer/cards?date={next_date}",
+            "control_value": selected,
+            "control_label": "Date",
+            "control_type": "date",
+            "control_name": "date",
+            "hidden_fields": [],
+            "module_links": [
+                {"label": "All leagues", "href": f"/soccer/cards?date={selected}", "active": True},
+                {"label": "Betting board", "href": "/soccer/market-board", "active": False},
+                {"label": "Hub", "href": "/soccer/hub", "active": False},
+            ],
+            "games": games,
+            "scoreboard_items": [
+                {
+                    "target_id": f"game-{game['gamePk']}",
+                    "label": f"{game['away']['abbr']} @ {game['home']['abbr']}",
+                    "status": str(game.get("league_display") or game.get("detail") or ""),
+                }
+                for game in games
+            ],
+            "source_path": "data/soccer_source/<league>/api/schedule + recommendations",
+            "source_title": "SoccerSim schedules + artifacts, all leagues",
+            "empty_state": {
+                "eyebrow": "Soccer cards",
+                "title": f"No matches are scheduled on {selected} in any tracked league",
+                "body": "This board reads every league's stored SoccerSim schedule and shows the fixtures whose kickoff falls on the selected date.",
+                "list_items": [
+                    f"Leagues checked: {len(LEAGUE_DISPLAY_NAMES)}",
+                    "Use the date control to move to a date with fixtures, or open the Hub for each league's own matchweek.",
+                ],
+            } if not games else None,
+            "using_sample_data": False,
+            "route_path": "/soccer/cards",
+            "intro_title": "Soccer Cards",
+            "intro_body": (
+                "Every tracked league's matches for the selected date, in kickoff order with live matches first. "
+                "Each league's own matchweek is resolved for this date, so a card appears here on the day it is played."
+            ),
+            "cards_control_links": [
+                {"label": "Betting board", "href": "/soccer/market-board"},
+                {"label": "Hub", "href": "/soccer/hub"},
+            ],
+            "header_stats": [
+                {"label": "Matches", "value": str(len(games))},
+                {"label": "Live", "value": str(live_count)},
+                {"label": "Final", "value": str(final_count)},
+                {"label": "Simulated", "value": f"{simulated_count}/{len(games)}" if games else "-"},
+                {"label": "Leagues", "value": str(len(leagues_present) or "-")},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",

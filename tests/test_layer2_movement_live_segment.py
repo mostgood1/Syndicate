@@ -204,6 +204,33 @@ def test_the_live_column_is_filled_only_from_live_keys():
     assert got["live_model_probability"] == 0.61
 
 
+# --------------------------------------------------------------------------
+# `layer2-live-projection-actual`, 2026-08-20: the Actual column was never
+# wired at all -- zero mapping from `actual_so_far` anywhere in this file,
+# confirmed by a repo-wide grep before this fix landed. `displayLiveActual()`
+# (intelligence.html:723) reads `item.actual` and was always fed nothing.
+# --------------------------------------------------------------------------
+
+
+def test_the_actual_column_is_filled_from_actual_so_far():
+    got = _live_projection_columns({"projection": {"actual_so_far": 3.0}})
+    assert got["actual"] == 3.0
+
+
+def test_a_real_zero_actual_is_not_dropped():
+    # A real 0 (nothing has happened yet) must render as 0, not fall through
+    # to the same em dash as "no live data for this row at all" -- the same
+    # class of bug `_as_float` already avoids for `live_projection` above.
+    got = _live_projection_columns({"projection": {"actual_so_far": 0.0}})
+    assert got["actual"] == 0.0
+    assert "actual" in got, "a real 0 must be a present key, not treated as falsy"
+
+
+def test_no_actual_key_when_actual_so_far_is_absent():
+    got = _live_projection_columns({"projection": {"live_projected": 7.2}})
+    assert "actual" not in got
+
+
 def test_the_gameline_block_is_a_fallback_source():
     got = _live_projection_columns({"live_gameline": {"live_projected": 4.4}})
     assert got["live_projection"] == 4.4 and got["live_aware"] is True

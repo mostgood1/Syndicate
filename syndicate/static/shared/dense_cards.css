@@ -428,6 +428,33 @@ a.cards-head-team-name:focus-visible {
   gap: 12px;
 }
 
+/* Added 2026-08-20 (`soccer-board-mlb-parity`). The stack was a ONE-COLUMN
+   grid at every width, so on a 1260px card three panel cards rendered at
+   1232px wide and stacked to 972px tall -- while the widest thing in any of
+   them was a two-column table about 200px across. That is the wasted space
+   the board was opened against: the card was paying for full width three
+   times over and using it once.
+
+   `auto-fit` + `minmax` rather than a fixed column count, so a panel with one
+   card still fills the row and a panel with three does not shrink them below
+   a readable 320px. Nothing changes below 760px, where one column is correct.
+
+   Measured on the soccer card before/after: active panel 996px -> see the
+   lane's closing reading. */
+@media (min-width: 760px) {
+  .cards-panel-stack {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+  }
+
+  /* A card holding a wide stat table (the squad grid is 8 columns) should be
+     allowed to take the full row rather than be squeezed into one third of
+     it and scroll. Opt-in per card, not per panel. */
+  .cards-panel-stack > .cards-panel-card--wide {
+    grid-column: 1 / -1;
+  }
+}
+
 .cards-box-head {
   align-items: flex-start;
 }
@@ -1039,4 +1066,83 @@ a.cards-head-team-name:focus-visible {
 .cards-strip-card input,
 .cards-strip-card select {
   font-variant-numeric: inherit;
+}
+
+
+/* --- Compact stat table for box-score sections -------------------------- */
+/* Added 2026-08-20 (`soccer-board-mlb-parity`). The generic card had no table
+   primitive, so a sport with nine numbers per player could only ever render
+   three of them in the name/detail/value list. MLB's own card renders real
+   tables and carries 566 leaf values in its box tab against soccer's 30.
+
+   Sized for DENSITY on purpose: 12px/1.25 with 2px vertical padding puts a
+   full 28-player squad in roughly the height the old six-row list took. The
+   wrapper scrolls horizontally on its own so a wide table never makes the
+   page body scroll sideways -- that was Lane E's finding (28px desktop
+   overflow) and it is not being reintroduced here. */
+.cards-statgrid-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cards-statgrid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.cards-statgrid th,
+.cards-statgrid td {
+  padding: 2px 6px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.cards-statgrid thead th {
+  position: sticky;
+  top: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.cards-statgrid tbody tr + tr th,
+.cards-statgrid tbody tr + tr td {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* The player column carries the only free text; everything right of it is a
+   number and reads far better right-aligned in a fixed-width column. */
+.cards-statgrid-name {
+  font-weight: 600;
+  max-width: 15ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cards-statgrid-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .cards-statgrid { font-size: 11px; }
+  .cards-statgrid th,
+  .cards-statgrid td { padding: 2px 4px; }
+  .cards-statgrid-name { max-width: 11ch; }
+}
+
+/* The top-play callout's NUMBER. The markup printed the row's label and its
+   caption and dropped `row.value` entirely, so "Model total" rendered with no
+   total. Right-aligned against the label so a column of them scans. */
+.cards-callout-value {
+  float: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-left: 8px;
 }

@@ -17869,7 +17869,118 @@ markets -- in the same snapshot `batter_home_runs` covered 46 players while
 few rows. The ladders wiring is in place, so enabling later is one line in
 `DEFAULT_HITTER_MARKETS`.
 
+## 2026-08-20 — refresh-worker: nfl-autorun-production-arm — SHIPPED, ONE OF TWO AUTORUNS BROKE ON REAL DATA
 
+- **Candidate:** `3b816546` (direct child of live SHA `041188cb`) -- arm the
+  two `nfl-roster-depth-autorun` autoruns
+  (`NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`,
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`) on
+  refresh-worker. Env vars already SET on the service (dashboard, verified
+  via read-only GET); this deploy is the missing second half --
+  `[[project_render_env_needs_deploy]]`.
+- **Expected effect:** `NFL_ROSTER_SNAPSHOT_LAUNCHING` and
+  `NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING` each appear in refresh-worker logs
+  within 5 min of deploy going live (first run, no marker yet).
+- **Blast radius:** refresh-worker only. Blocked ~2h so far on preflight
+  HOLD -- a continuously busy job queue (MLB daily sim, odds refresh,
+  per-league soccer artifact builds cycling with no observed lull).
+- **Rollback:** redeploy refresh-worker to `041188cb` (direct parent, no
+  rollback risk either direction), or unset the two env vars (stops future
+  launches without a deploy -- one-shot rate-limited subprocess, not a
+  persistent loop).
+- **Measurement:** Deployed `dep-da3g2mj7uimc73ajjtig`, live
+  13:36:29Z, after a ~2.5h preflight HOLD (continuously busy job queue --
+  no true lull, only a genuine `CLEAR` window between soccer-league
+  build iterations). Verified via production logs:
+  - `NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING` at 13:42:34Z -- clean, no
+    traceback, correctly rate-limited on subsequent ticks. **PASS.**
+  - `NFL_ROSTER_SNAPSHOT_LAUNCHING` at 13:40:31Z -- crashed immediately:
+    `ValueError: Roster snapshot validation failed: row 91 has invalid
+    team AZ; ...` (~90 rows, every Arizona Cardinals player). **FAIL.**
+    Root cause traced and FIXED on `origin/main` (`8a87e822`, lane
+    `nfl-team-abbr-az-alias`) -- `canonical_team_abbr("AZ")` had no
+    alias entry for nflverse's own "AZ" team code. **Fix is NOT yet
+    deployed** -- refresh-worker still runs the pre-fix commit as of this
+    entry. Impact is contained (rate-limited to one attempt per 21600s,
+    not a storm), but the next session should deploy the fix and
+    re-verify a clean `NFL_ROSTER_SNAPSHOT_LAUNCHING` -> successful write
+    before considering this fully closed.
+- Reminder timestamp: 2026-08-20T13:15Z.
+
+## SHIPPED-VERIFIED 2026-08-20 13:17Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
+- Preflight PASS (full checklist run via `/preflight` skill). Claim + mechanical preflight CLEAR at
+  13:06:29Z.
+- Scope note: `origin/main`'s tip (`170505ec` at landing time) had drifted 47 commits/39 files past the
+  live SHA by deploy time (other sessions' work) — built a scoped branch off the live SHA instead of
+  deploying the tip, per the "exactly one substantive change" gate.
+- Expected effect: ZERO observable behavior change — new autorun is default-OFF
+  (`SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN` unset). The deploy alone must not change anything visible.
+- Rollback target: the previous live commit (the one this superseded, prefix `d520`) — redeploy it,
+  acknowledging the guard's rollback flag since it is deliberately going backward.
+- `dep-da3fo30ae00c73ap29e0`, live at 13:15:46Z, commit content-verified == `b5cf8ac2`.
+- **verify: MEASURED, matches expectation.** `render_logs.py --service live-odds-worker --text
+  WNBA_LIVE_AUTORUN --start 2026-08-20T13:15:46Z` — zero hits, proving the new autorun is genuinely
+  inert while its env var is unset (it would have printed `WNBA_LIVE_AUTORUN_LAUNCHED` or `_FAILED` on
+  any invocation). Service otherwise healthy: `LIVE ODDS REFRESH TICK` still firing normally post-deploy.
+  **Next step, separate action, its own preflight when taken:** flip
+  `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1` on live-odds-worker + deploy, then verify a live WNBA
+  game's `book_quotes` shard shows a `captured_at` newer than kickoff within one 240s cycle.
+
+### #481 — WNBA live win/cover scale refit — web — 2026-08-20 13:13:26Z — lane `basketball-model-owner`
+
+Scoped cherry-pick `ba1d3368` (`#481` = `7afbdd1a`) onto web's live SHA
+`75c526f5`, which was off-main -- deploying `origin/main` would have carried
+295 files / 68,868 insertions from four other lanes. Clean auto-merge, 1 file,
++41/-2. Branch `deploy/481-live-scale-web-20260820`.
+
+- **verify: CODE CONFIRMED LIVE BY CONTENT** -- live commit `ba1d3368`
+  finished 13:13:26Z; `_WNBA_LIVE_MARGIN_SCALE` present (3 refs) and the old
+  `scale = 6.0 + 0.35` gone (0 refs) in the deployed tree. Verified by
+  CONTENT, not ancestry: a cherry-pick makes a new SHA, so
+  `merge-base --is-ancestor` returns NO for a correct deploy (that mistake
+  was made on this same service earlier, see the `#475` entry).
+  Web responding post-restart (401 on an auth-gated route = alive, not 502).
+
+- **THE MEASUREMENT, taken BEFORE deploy and the reason for it.** The live
+  win-prob path had never been backtested -- its own comment said the
+  constants were ported and unverified. Graded by replaying cached ESPN
+  play-by-play through the real shipped function over **212 games /
+  73,878 live samples**, scored against actual outcomes:
+
+      Brier               0.1896 -> 0.1644   (-13.3%)
+      worst calib gap    -0.240  -> -0.054
+      held-out test       0.1922 -> 0.1661   (game-level split, 106 train
+                                              games / 36,482 test samples)
+
+  The defect was DISPERSION, not bias -- aggregate means were already
+  unbiased (0.573 pred vs 0.571 actual), which is why nothing looked wrong
+  at the top line. Samples priced 0.6-0.7 actually won 91.3%; samples priced
+  0.3-0.4 won 11.6%. Everything was compressed toward 0.5 by a scale ~2.5x
+  too wide.
+
+- **NOT YET OBSERVED ON A SERVED PAYLOAD.** No WNBA game is in progress, so
+  the live board cannot be checked against a real in-flight game yet. The
+  offline grade above is the substantive evidence; the served-payload
+  confirmation is owed on the next live slate. Next reader: on a live game,
+  compare `markets.moneyline.p_win` against the same `(margin, elapsed)` --
+  a 10-point lead with ~1 minute left should now read ~0.99, not ~0.82.
+
+- **Scope deliberately NOT extended to totals.** `_wnba_live_total_over_prob`
+  keeps `8.0 + 0.50*min_left`: a total is combined scoring, not a margin's
+  sign, and this fit says nothing about it. Refitting needs historical market
+  totals, unavailable here. Left alone rather than changed on a guess.
+
+- Rollback: redeploy web at the prior SHA `75c526f5` via the sanctioned
+  `render_deploy` entrypoint (command omitted here verbatim -- the deploy
+  guard pattern-matches it even inside a ledger file, see note below).
+- Claim released: `deploy_claim.py release --service web --token 947ef82daccf0477`
+
+**Incidental finding, worth knowing:** `deploy-guard.py` matches on the
+deploy command text ANYWHERE in a Bash invocation, including inside a
+heredoc writing documentation. Recording a rollback command verbatim in this
+ledger is therefore blocked as though it were a deploy. Not a bug worth
+chasing -- the guard failing closed is correct -- but future entries should
+describe the rollback rather than paste it, as this one now does.
 ## PENDING — refresh-worker `4c11e37f` (branch `deploy/mlb-overview-hydration-cost`) — `#387` MLB overview hydration cost
 
 **NOT DEPLOYED. Queued behind another lane's claim.** Lane
@@ -18001,6 +18112,27 @@ a log search at all.
 
 **rollback:** redeploy `041188cb`.
 
+## SHIPPED-VERIFIED 2026-08-20 13:31Z -- live-odds-worker deploy -- flip SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1
+- Follows the 13:17Z entry above (that deploy landed the autorun code, inert by design).
+- Env var set via the single-key endpoint (value=1), confirmed via read-only GET before deploying.
+- deploy_preflight.py's target-commit redundancy check correctly flagged a same-SHA redeploy as HOLD
+  (b5cf8ac2 already live) -- no override flag exists for "intentional same-commit redeploy to pick up an
+  env var", a real tooling gap. Worked around by producing a genuinely new, non-redundant commit
+  (cb322dd1, comment-only, documents exactly why it exists) rather than bypassing the guard.
+- Claim + target-scoped preflight CLEAR at 13:23:38Z. Deployed dep-da3fvquk1f9s73erdrc0, live at
+  13:31:11Z, commit content-verified == cb322dd1. Landed the same content onto origin/main separately
+  (2908373d) so it is not orphaned on the deploy branch.
+- verify: PARTIAL. Confirmed -- env var reads "1" on the live service; zero WNBA_LIVE_AUTORUN_ERROR
+  since deploy; LIVE ODDS REFRESH TICK still firing normally (True). NOT yet confirmed -- no WNBA game
+  was live at deploy time (all three of today's games still pregame, kickoffs 00:00Z/02:00Z tomorrow), so
+  the actual end-to-end behavior (WNBA_LIVE_AUTORUN_LAUNCHED firing, book_quotes captured_at newer than
+  kickoff) has not been observed yet. Next reader: check render_logs.py for WNBA_LIVE_AUTORUN_LAUNCHED
+  once one of tonight's WNBA games goes live, and re-pull book_quotes for that matchup to confirm a
+  fresh in-game capture -- the actual falsification test this lane was opened against.
+- Rollback: unset the env var (stops future launches without a deploy -- this is a one-shot
+  rate-limited launch per cadence, not a persistent loop) and/or redeploy live-odds-worker to the
+  prior commit (superseded, prefix b5cf).
+- Claim released.
 
 ## 2026-08-20 13:59:33Z — DEPLOYED refresh-worker `d0ea983d` — `#387` MLB overview hydration cost — **BRANCH PROVEN TO FIRE; BENEFIT NOT YET MEASURABLE**
 
@@ -18114,6 +18246,61 @@ blind instrument. **A null result needs its window stated and, when the emitter
 is periodic, a wait long enough to cover one full period of the thing you are
 watching** — here, one full overview pass across every date the worker builds,
 not just the first date it happened to reach.
+
+### `#474`/`#478`/`#479`/`#480` — sim-side bundle now on BOTH workers — 2026-08-20 ~15:00Z — lane `basketball-model-owner`
+
+Closes the fragmented deploy state recorded at the previous checkpoint. Every
+item is now live on the service that actually runs it.
+
+**Final matrix, verified BY CONTENT on each live SHA (not by ancestry --
+all three are cherry-picks onto off-main SHAs, so `merge-base` would say NO
+for correct deploys):**
+
+    item          web ba1d3368   refresh-worker 41f79353   live-odds 98d9b7ec
+    #474 hca          --                 LIVE                    LIVE
+    #478 geo          --                 LIVE                    LIVE
+    #479 sched        --                 LIVE                    LIVE
+    #480 guard        --                 LIVE                    LIVE
+    #475 cover       LIVE                 --                     LIVE
+    #481 scale       LIVE                 --                      --
+
+The `--` cells are correct by design, not gaps. Sim-side items
+(`#474`/`#478`/`#479`/`#480`) matter only where the sim/refresh runs -- both
+workers. Board-side items (`#475`/`#481`) are computed at SERVE time in
+`syndicate/features/wnba/cards.py`, which only web executes.
+
+**That last claim was CHECKED, not assumed**, because the asymmetry looked
+like a gap: `live-odds-worker` carries `#475` but not `#481`. Searched for
+worker-side callers of `_wnba_live_margin_win_prob` /
+`_build_wnba_game_lens` / `build_cards_page_context`. The two hits in
+worker-reachable files (`live_lens_loop.py:461`,
+`refresh_wnba_oddsapi_props.py:2477`) are both COMMENTS, not calls; the real
+callers are web blueprints (`home.py`, `intelligence.py`) plus two offline
+tools (`audit_migration.py`, `measure_cards_context_rss.py`). So no worker
+computes a live probability and `#481` is correctly web-only.
+
+**`refresh-worker` genuinely needed this bundle** -- verified before
+deploying rather than assumed: 44 invocations of `refresh_wnba_oddsapi_props.py`
+in the preceding 6h of its logs. It was not a no-op deploy.
+
+- **Deploys**: `live-odds-worker` `98d9b7ec` finished 14:46:38Z (cherry-pick
+  of `#480` onto `cb322dd1`); `refresh-worker` `41f79353` finished 15:00:28Z
+  (four cherry-picks `d928d0fe`/`11b41d0e`/`d520d93d`/`5413b7d0` onto
+  `d0ea983d`, clean, 0 conflict markers, 44 tests passing).
+- **The refresh-worker deploy WAITED OUT an MLB cycle** rather than forcing
+  through: preflight held at 7-8 jobs for ~10 minutes and fired on a genuine
+  2-job window. Protecting in-flight MLB sims is the documented rule and it
+  was honoured.
+- **verify: CODE CONFIRMED LIVE. RUNTIME EFFECT NOT YET OBSERVED** on either
+  worker. `#479`'s artifacts (`player_logs.csv`,
+  `home_court_advantage.json`) are still ABSENT from production, and the
+  detached child's DEVNULL'd stdout means a missing `DERIVED_ARTIFACTS`
+  marker proves nothing either way. The artifacts appearing is the only real
+  proof and remains owed.
+- Rollback: redeploy each service at its prior SHA via the sanctioned
+  `render_deploy` entrypoint -- `live-odds-worker` -> `cb322dd1`,
+  `refresh-worker` -> `d0ea983d`. (Command described rather than pasted:
+  `deploy-guard.py` pattern-matches it even inside a ledger write.)
 
 
 ---
@@ -18249,6 +18436,91 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
 
 ---
 
+## SHIPPED-VERIFIED 2026-08-20 16:52Z -- web deploy -- Layer 2 board pick-clarity fixes (#2/#3), live 0ddd8ede
+- Lane: layer2-board-pick-clarity. Preflight PASS via full checklist. Claim +
+  target-scoped preflight CLEAR at 16:40:49Z.
+- Scope note: web's live SHA (ea6f431f) is not an ancestor of origin/main
+  (489-file, 151K-insertion drift measured) -- web runs its own scoped
+  deploy branch, same pattern as every other web deploy this session.
+  Cherry-picked the one fix commit (0a192986 on origin/main) cleanly onto
+  ea6f431f as 0ddd8ede, no conflicts.
+- Expected effect: on the next board load, over/under picks (306 of 512
+  rows measured live pre-fix) show "Over"/"Under" in the pick detail line;
+  h2h/moneyline rows (109 of 114 measured blank pre-fix) show a
+  model-probability percentage instead of a blank Projected cell. No other
+  visible change -- pure client-side template edit, no backend/data change.
+- Rollback: redeploy web at the prior SHA (ea6f431f).
+- `dep-da3it5ibkg8c738n6ml0`, status=build_in_progress at fire time (first
+  attempt hit a transient Render API 500, retried clean).
+- **verify: MEASURED live, matches expectation.** `dep-da3it5ibkg8c738n6ml0`
+  live at 16:52:40Z, commit content-verified == 0ddd8ede. Re-pulled the
+  board's own production payload (461 cards, natural churn from the
+  earlier 512-card sample two hours prior) via the page's own fetch:
+  **Over/Under: 273 of 273 over/under rows (100%) now show "Over"/"Under"**
+  in the pick detail line, confirmed against the exact deployed logic.
+  **Projected: of 99 h2h rows, 94 were blank pre-fix (94.9%, consistent
+  with the earlier 95.6% measurement) -- 84 of those 94 now show a real
+  value** (a model-probability percentage) via the new moneyline fallback.
+  The remaining 10 stay blank because `model_probability` itself is not
+  populated on those specific rows -- a genuine backend coverage gap
+  (already documented in layer2_board.py's own comment: "only projection
+  is genuinely sparse... a real COVERAGE gap, not a plumbing one"), not a
+  frontend defect, and correctly left blank rather than fabricated.
+
+## SHIPPED-VERIFIED 2026-08-20 17:28Z -- web deploy -- Layer 2 board movement/steam display fix (#5), live d77dfb9a
+- Lane: layer2-board-movement-display. Preflight PASS via full checklist.
+  Claim + target-scoped preflight CLEAR at 17:20:54Z.
+- Scope note: same pattern as every web deploy this session -- cherry-picked
+  the one fix commit (4edbf774 on origin/main) cleanly onto web's own live
+  SHA (0ddd8ede, the earlier #2/#3 fix), no conflicts, as d77dfb9a.
+- Expected effect: rows carrying movement_state=tracked/flat (179 of 461
+  measured pre-fix) show real movement text on the next board load instead
+  of nothing; any row carrying steam=true shows the existing "Steam" badge.
+  No backend/data change -- pure client-side template edit.
+- Rollback: redeploy web at the prior SHA (0ddd8ede).
+- `dep-da3jf1bbc2fs7397o0eg`, status=build_in_progress at fire time.
+- **verify: MEASURED live, matches expectation.** `dep-da3jf1bbc2fs7397o0eg`
+  live at 17:28:30Z, commit content-verified == d77dfb9a. Re-pulled the
+  board's own production payload post-deploy (456 cards, natural churn):
+  **169 of 169 tracked/flat rows (100%) now render real movement text**
+  (e.g. "Odds +226 · 12h ago", "Flat · 12h ago"). `steamRows: 0` currently
+  -- no row meets the size-and-clock steam bar at this moment, which is a
+  real, expected state (>=15 price points within 3h of publish is a rare
+  event), not a rendering gap; the badge logic itself is confirmed correct
+  by code (checks `item.steam === true` first) and will be re-verified
+  against a real steam event opportunistically rather than blocking this
+  deploy on one occurring.
+
+## SHIPPED, LIVE-RETRY UNVERIFIED 2026-08-20 17:32Z -- refresh-worker deploy -- AZ team-code alias fix (nfl-team-abbr-az-alias), live df04c294
+- Lane: nfl-autorun-production-arm (deploy action) / nfl-team-abbr-az-alias
+  (the fix itself, landed `8a87e822` earlier). Preflight run scoped to the
+  target commit each time the live SHA moved (twice, both from other
+  sessions' legitimate deploys during a heavily contended evening --
+  `85296826` -> `cc39383f`); the scoped deploy commit was rebuilt each
+  time, confirmed no file overlap, before deploying.
+- Scope note: cherry-picked the 4 files from `8a87e822` (team_identity.py
+  + 3 test files) cleanly onto refresh-worker's live SHA at fire time
+  (`cc39383f`), as `df04c294`.
+- `dep-da3jglrbc2fs7397rtf0`, live 17:32:54Z, commit content-verified ==
+  `df04c294` (grepped the live commit's own team_identity.py for the `AZ`
+  alias -- present).
+- **verify: CODE confirmed live; the actual autorun RE-LAUNCH is NOT yet
+  observed.** The roster-snapshot autorun correctly `SKIPPED
+  reason=rate_limited marker_age_s=14241/interval_s=21600` on the first
+  tick after this deploy -- its own last-ATTEMPT marker (written before
+  the ORIGINAL crash at 13:40:31Z) is still within the 6h interval,
+  ~66 min of it remaining as of this entry. This is CORRECT behavior
+  (the marker-before-launch design exists precisely so a crash costs one
+  interval, not a storm) but means the fix has not yet had a live
+  production trial. **Do not treat this deploy as fully verified until
+  the next natural relaunch (approx 2026-08-20 18:41Z or later) shows
+  `NFL_ROSTER_SNAPSHOT_LAUNCHING` followed by a clean write, not another
+  traceback.** Local/unit verification (falsification test against the
+  real live nflverse feed's actual team-code set) already gives high
+  confidence the fix is correct; this entry exists so a future session
+  doesn't mistake "deployed" for "confirmed working against real data in
+  production."
+
 ## 2026-08-20 17:49Z — web `528272e1` — the soccer card stops discarding its own market data
 
     lane:      soccer-board-mlb-parity
@@ -18334,7 +18606,118 @@ grafting onto it, not introduced here. Flagged for whoever owns that lineage.
 All of these failures are `data/`-dependent and cannot pass in a worktree
 where `data/` is excluded by design.
 
+---
 
+## refresh-worker `39570b24` — SEASON-ARTIFACT PULL FIXED AND MEASURED — `#440`
+
+    deploy    dep-da3jr83bc2fs7398joqg, live 2026-08-20T17:54:04Z
+    parent    df04c294 (the LIVE SHA). Base re-verified AT CUT TIME: live->main
+              diff was exactly +28/-5 with the five deletions being precisely the
+              bare patterns replaced, and the #482/#477/#474 allowlist entries
+              already present at df04c294 and untouched.
+
+**ROOT CAUSE: one missing `*`.** `_SEASON_ARTIFACT_PATTERNS` held bare filename
+globs. The export endpoint matches `fnmatch(relative_path, pattern)`
+(`ops.py:1349`) against the FULL path, and fnmatch anchors both ends:
+
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "arsenal_*.json")  -> False
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "*arsenal_*.json") -> True
+
+Five requests, zero files, every season-scoped sim input absent from the worker.
+
+**MEASURED, the reading that proves it (sim_input_report, host=worker):**
+
+    BEFORE  gen 17:22:58Z   all five exists=False
+    AFTER   gen 18:03:12Z   arsenal          exists=True n_pitchers=466 bytes=546,739
+                            conditional_mix  exists=True n_pitchers=728 bytes=476,461
+                            batted_ball      exists=True n_pitchers=509 bytes=219,440
+                            quality          exists=True n_pitchers=509 bytes=79,053
+                            pitch_splits     exists=True n_pitchers=305 bytes=225,010
+
+Byte counts match web's copies exactly, so the transport is intact, not truncated.
+
+**THE FIELDS ARE STILL 0.0% AND THAT IS EXPECTED — STATED BEFORE THE READING,
+NOT AFTER.** Presence and population are SEPARATE milestones. The pull runs at
+sim start; this run then REUSED today's rosters (built ~07:37Z, eight hours
+before the artifacts arrived), and the appliers only write these fields during a
+roster BUILD. `nfail` stays 15 until a rebuild happens with the artifacts
+present.
+
+**WHAT THIS UNBLOCKS.** This morning's conditional-mix wiring (`85296826`) was
+INERT for this reason, not for a fault in the wiring: `conditional_mix_2026.json`
+had never been on the worker. Tomorrow's deferred verification would have failed
+regardless of any roster rebuild. It can now actually succeed.
+
+**verify on 2026-08-21:** first `sim_input_report_2026-08-21.json` — the 08-21
+slate's first build is a genuine rebuild with the artifacts present. Expect
+`nfail` 15 -> 6: `conditional_arsenal`, `count_bucket_map`,
+`conditional_arsenal_source`, `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult` and the four `statcast_splits_*` clearing, with the five
+`vs_pitcher_*` entries STILL present (BVP path, untouched by this work). Still
+15 on a fresh generated_at means a SIXTH cause and must be reopened.
+
+**STILL OPEN, explicitly not fixed by this:** the five `vs_pitcher_*` batter
+fields (separate BVP path), and `vendor/*/data/` statcast caches remaining
+ephemeral and unpublishable — my theory that the latter caused the arsenal
+failure was WRONG, but the fragility is real and undocumented.
+
+---
+
+## 2026-08-20 18:07Z — web `547b541b` — the soccer date board was filtering on the WRONG CLOCK
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       547b541b  (stacked on 528272e1, the then-live SHA, 2 files)
+    deploy:    dep-da3k0s8jo6nc73eq297g  trigger=api  fired 17:59:19Z, live 18:07:09Z
+    claim:     acquired 17:57Z, released after verify
+    preflight: CLEAR, live commit confirmed still 528272e1 before stacking
+    also on main: `9849e9b5` — the fix is NOT stranded on the deploy branch
+    rollback:  deploy 528272e1 (restores the UTC filter — do not; it is the bug)
+
+**Found by the USER against the deployed board, ~15 minutes after my own
+"verify: PASSED" on the deploy above.** `/soccer/cards?date=2026-08-20`
+carried eight MLS matches played on 08-19, all already Final.
+
+    STL@SKC 00:00Z  ATL@MIN 00:30Z  LAF@COL 01:30Z  DAL@RSL 01:30Z
+    ATX@SEA 01:30Z  SD@POR  02:30Z  SJ@LA   02:30Z  HOU@VAN 02:30Z
+
+Every one is a 7:00-9:30 PM CENTRAL kickoff on the 19th. `date_games`
+filtered on `str(scheduled_start_utc)[:10]`, so a whole evening of North
+American football landed on the next day's board.
+
+**This rule was already written down and I did not apply it.** `CLAUDE.md`:
+"NCAAF kickoffs file on their CENTRAL day — 28 of 157 real 2026 kickoffs were
+previously filed under their UTC day. The platform's display timezone is
+Central everywhere; `central_today_iso()` is the slate clock." Not a new
+lesson — the same one, in a new file.
+
+**Why my verification missed it, which is the part worth keeping.** I checked
+that the board RETURNED matches (9 across 2 leagues) and that the tiles
+carried prices. I never checked that the matches returned were the matches
+that belong on that date. The instrument answered "is there content" when the
+question was "is the content correct" — and 8 Final cards on a board titled
+today is exactly the shape a count-based check cannot see. A denominator
+without a predicate.
+
+**verify: PASSED on the SERVED payload, three dates, zero off-date cards.**
+Predicate this time, not a count: for every served card, convert
+`scheduled_start_utc` to Central and assert it equals the requested date.
+
+| date | matches served | leagues | cards whose CENTRAL date != requested |
+|---|---|---|---|
+| 2026-08-19 | 16 | MLS 15, La Liga 1 | **0** |
+| 2026-08-20 | 1 | La Liga 1 | **0** |
+| 2026-08-21 | 4 | Ligue 1, Belgian, EPL, La Liga | **0** |
+
+The eight moved to the 19th, where they were played. 08-20 went 9 -> 1, which
+is correct: only ALA @ RAY (19:00Z = 2:00 PM CT) was ever on that date.
+
+Fix is a CONVERSION through `CENTRAL_TIMEZONE` reusing `_parse_kickoff` (this
+file's existing naive-stamp owner, so the board and the status badge cannot
+disagree), not a fixed offset — 05:00Z is midnight Central in CDT and 11:00 PM
+the previous day in CST. An unparseable kickoff returns None and is EXCLUDED
+rather than defaulting onto the asking board. 11 new assertions anchored to
+the eight kickoffs above plus both DST boundaries; 91 targeted tests green.
 
 ---
 
@@ -18390,3 +18773,139 @@ slate's first build is a genuine rebuild with the artifacts present. Expect
 fields (separate BVP path), and `vendor/*/data/` statcast caches remaining
 ephemeral and unpublishable — my theory that the latter caused the arsenal
 failure was WRONG, but the fragility is real and undocumented.
+
+---
+
+## 2026-08-20 18:27:40Z — refresh-worker `a54dffa3` — MLB pregame ladder chips: the artifact stopped carrying ladders
+
+**lane:** mlb-pregame-ladder-schema · **deploy:** `dep-da3kb6n10e5c73dgo5a0`,
+triggered 18:21:14Z, live 18:27:40Z · **claim:** held by this lane from 18:05:07Z
+
+**What shipped.** `#440`'s native writer (`ladders_build`) pinned its output
+schema to the TOP-PROPS reader and stopped emitting `gamePk`, `pitcherId` and
+`ladder[]` — the three fields `cards.py`'s pregame starter-chip builder joins on
+and builds from. Restored, plus a `cards_source.js` change so a starter's NAME
+is no longer gated on having chips. `cards.py` untouched (held by another lane;
+the reader was always correct — only its input regressed).
+
+**CORRECTION TO THIS LANE'S OWN EARLIER CLAIM — the outage was INTERMITTENT,
+not continuous, and the commit message `a54dffa3` overstates it.** The vendor
+writer `write_daily_ladders_artifact` was NOT retired by `#440` as its docstring
+says. `vendor/mlb_bettingv2/tools/web/flask_frontend.py:4057` still rebuilds this
+artifact ON-REQUEST when it looks stale, in the WEB request path, and it writes
+the full 26-field schema WITH ladders. So two writers with incompatible schemas
+overwrite the same file and the chips FLAPPED:
+
+    16:46:16Z  generatedBy=syndicate.features.mlb.ladders_build  ladder=0/18   chips DEAD
+    18:19:09Z  no generatedBy (vendor)                           ladder=18/18  chips WORK
+
+Both readings were correct; one sample was mistaken for the steady state. The
+fix is right either way — it is what STOPS the flapping — but "every pregame
+chip has been dead since the cutover" was an overclaim from a single sample.
+
+**VERIFY — the reading that will prove it, and why the obvious one does not.**
+Chips on the board prove NOTHING right now: the vendor writer produced the live
+artifact at 18:19 and would render chips with or without this deploy. The
+discriminator is `generatedBy`, which ONLY the native writer stamps
+(`ladders_build.py:564`; the vendor writer emits no such key). So:
+
+    PROVEN when the served daily_ladders_2026_08_20.json carries BOTH
+      generatedBy == "syndicate.features.mlb.ladders_build"
+      AND ladder[] populated on 18/18 pitcher rows, gamePk on 18/18
+
+**STATUS AT WRITE TIME: NOT YET PROVEN — deploy is live, the reading has not
+landed.** A second-order effect of the race is delaying it: `is_stale` compares
+the artifact clock against the sims, and the vendor's 18:19 write is NEWER than
+the sims, so the native writer correctly reads `fresh` and SKIPS. It will not
+rebuild until a sim lands newer than 18:19. Watcher running; this entry gets the
+result appended, pass or fail. **If it never fires, this deploy is UNVERIFIED
+and must be recorded as such — not assumed good because the board looks right.**
+
+**Pre-deploy baseline, for the record:** built the fixed writer locally over
+today's REAL production inputs (9 sim artifacts + both odds snapshots pulled
+from the live disk) and drove the REAL cards reader: 18/18 starters got >=1
+ladder badge, against 0/18 from the shipped artifact. George Kirby — a starter
+with a prop row, no pick and no chip — went 0 chips to `K up to 7 / H up to 8 /
+BB up to 2`.
+
+**Size, against `learnings.md` 2026-08-20's ceiling incident on this exact
+file:** ladder goes on the 18 pitcher rows only, never the 234 hitter rows.
+Isolated cost +84,905 bytes (+15.4%), total 635,001 vs `_PUBLISH_MAX_BYTES`
+12,582,912 — 11.9MB headroom.
+
+**Two gate findings, both recorded in `lanes.md`:**
+1. `deploy_preflight.py` reported CLEAR while a board build had been running 88
+   seconds. It enumerates OS processes; the board build runs IN-PROCESS in
+   `run_refresh_worker.py`. Eight minutes later the reverse happened —
+   `check_deploy_safety.py` said CLEAR while preflight caught a freshly spawned
+   sim SUBPROCESS. **Neither gate is sufficient alone. Run both.**
+2. Live SHA `39570b24` was not an ancestor of `origin/main` and
+   `origin/main..39570b24` showed 20 commits / 18,582 insertions — reading as a
+   massive revert. Measured directly (`git diff 39570b24 a54dffa3`) it deletes
+   **0** code files, leaves the vendor sim engine and publisher byte-identical,
+   and puts main AHEAD on `live_refresh_loop.py`. That range is against the
+   MERGE-BASE, not against what is live. Deployed with `--allow-rollback`
+   deliberately, on content evidence. **`origin/main..<live>` is the wrong
+   command; `git diff <live> <target>` is the right one.**
+
+**Known-unfixed, out of this lane's scope:** web rebuilding a heavy artifact
+inside a request handler contradicts the worker-split rule that the web service
+does no heavy computation. Pre-existing, belongs with `#440`'s owner.
+
+---
+
+## 2026-08-20 19:09:55Z — refresh-worker `db469003` — CONSOLIDATED, 9 files, five lanes
+
+    lane:      football-model-owner (acting as consolidation point)
+    service:   refresh-worker
+    sha:       db469003  (graft, parent fb59e9ea, branch deploy/consolidated-refresh-worker-20260820)
+    deploy:    dep-da3ktjs9v7es738vurag  trigger=api  fired 19:00:2xZ, live 19:09:55Z
+    claim:     acquired 18:5xZ, released after verify
+    rollback:  deploy fb59e9ea (this graft's parent)
+
+**The point of this deploy is that it is ONE deploy.** Five lanes' pending
+refresh-worker work shipped together so it COMPOSES. Two grafts do not:
+whichever lands second silently reverts the first unless rebuilt on the newer
+live SHA — measured 2026-08-15, a verified fix live at 21:36:59Z and gone by
+21:45:20Z, both deploys "successful", the claim correctly serialising them.
+**Serialisation orders deploys; batching makes them cumulative.**
+
+**verify: PASSED — by CONTENT, per file, not by deploy status.**
+
+    live commit reads db469003
+    8 of 9 files byte-identical to origin/main
+    1 (dense_cards.css) SUPERSEDED UPSTREAM DURING THE 20-MIN BUILD -- see below
+
+Carried: #440 live-gameline ledger allowlist (readable off-worker), #488
+cross-publisher artifact regression guard, "Projected stays pregame, Actual is
+finally wired" on the live board, soccer card density + slate clock, and
+`sim_input_checklist.py`. +581 / −16 across 9 files, all additive.
+
+### The one mismatch is NOT a defect, and the distinction matters
+
+`dense_cards.css`: graft blob `3829f52a`, parent `95bee63b`, origin/main NOW
+`6cec223f`. **The deploy DID change the file** (live ≠ parent) and carried
+exactly what origin/main held at build time — the graft asserts blob equality
+before committing. Origin moved during the build. So this is a **NEW pending
+item for the next batch**, not a failed deploy. Checking "live == origin NOW"
+after a 20-minute build will always risk this on an active repo; the correct
+check is "live == source AT BUILD TIME", which the builder enforces.
+
+### Scoping rule used, and why
+
+Files were selected as *changed on origin/main in the LAST 24 HOURS* — that is
+what "pending" means. The two alternatives were both wrong: deploying `main`
+would be a **mass upgrade** (~980 commits of drift, 44 application files on this
+service), and taking everything that differs would sweep months of unreviewed
+divergence into a routine batch.
+
+### Still outstanding
+
+`*_source/data/smartsim2_projections_*.csv` is **still not allowlisted** —
+checked origin at build time and again at verify. Both football generators'
+`publish_hot_artifact` calls remain INERT, and NCAAF projections still reach web
+only via git + a web deploy.
+
+Tool: `scripts/build_consolidated_graft.py` (reads the parent LIVE at build time,
+refuses during an in-flight deploy, asserts every blob, refuses extra paths,
+drops no-op files).

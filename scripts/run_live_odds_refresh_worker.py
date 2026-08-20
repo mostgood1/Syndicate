@@ -27,6 +27,7 @@ from syndicate.features.shared.live_refresh_loop import _run_live_refresh_tick
 from syndicate.features.shared.live_refresh_loop import _acquire_process_lock
 from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
+from syndicate.features.shared.live_refresh_loop import _wnba_has_live_game
 from syndicate.features.shared.live_lens_loop import start_live_lens_loop
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import read_json_file
@@ -312,6 +313,156 @@ def _launch_autorun_wnba_pregame_refresh() -> None:
     print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_LAUNCHED date={selected_date} phase=pregame", flush=True)
 
 
+# `wnba-live-odds-capture-gap`, 2026-08-20. The pregame autorun above keeps
+# WNBA's odds fresh before tip-off; nothing kept them fresh AFTER it, and that
+# gap is what this fixes.
+#
+# ROOT CAUSE, confirmed live, not inferred. The general combined `phase=live`
+# sweep (`live_refresh_loop.py`) launches `sports=mlb,wnba,soccer` together,
+# once per tick (`SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS`, default 60s).
+# That combined run genuinely takes several minutes end to end (soccer alone
+# runs `build_soccer_artifacts.py` sims), so almost every subsequent tick's
+# `launch_refresh_run` collides with its OWN still-running prior launch and
+# raises `ValueError: A refresh run is already active` -- confirmed directly
+# in production logs, repeating every ~65-70s for 16+ minutes straight against
+# a single service's own lane (`live-odds-worker`, pid 100 then pid 833).
+# `_assert_no_active_refresh_run` is doing exactly its job; the tick cadence
+# is just far shorter than the combined run's real duration, so the run that
+# eventually DOES land almost never includes a completed WNBA leg -- WNBA's
+# own fetch, when isolated (no mlb/soccer sharing the run), completes in
+# under 400s every time it was tested.
+#
+# THE FIX IS ISOLATION, NOT A FASTER COMBINED RUN. An independent WNBA-only
+# live trigger, same shape as the soccer/WNBA pregame autorons above:
+#   - Its OWN cadence, long enough that a single WNBA-only run reliably
+#     finishes before the next tick (measured mode=full WNBA-only duration:
+#     ~368s; this uses a distinct, explicit refresh LANE so it can never
+#     collide with the general combined sweep's lane even if both fire in
+#     the same window -- `SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES` is on in
+#     production, so an explicit `lane=` string is honored directly).
+#   - `mode="fast"`, not `"full"`. `refresh_wnba_oddsapi_props.py` runs its
+#     OddsAPI snapshot fetch (the thing that actually writes book_quotes)
+#     UNCONDITIONALLY; `mode="full"` additionally runs the SmartSim
+#     prediction/edges/export pipeline (`if refresh_mode == "full": ...`),
+#     which is real weight this needs to pay for repeatedly and does not.
+#     `test_wnba_pregame_autorun.py`'s own warning -- "a full-phase autorun
+#     here would OOM the service", against a refresh leg measured at
+#     ~1.3-1.5GB RSS -- is exactly the risk `mode="fast"` avoids by never
+#     entering that branch, which matters more here than for the pregame
+#     autorun because this one is meant to repeat every few minutes for as
+#     long as a game is live, not once per ~4h.
+#   - Gated on `_wnba_has_live_game`, not merely "WNBA active today" (the
+#     pregame gate's own check) -- there is nothing to refresh live-side
+#     when nothing is live, and firing anyway would be pure waste.
+def _wnba_live_refresh_enabled() -> bool:
+    # DEFAULT OFF, same convention as every other autorun in this file --
+    # new periodic worker work is never free (`#241`).
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _wnba_live_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_WNBA_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        # 240s: comfortable margin over the measured mode=full standalone
+        # duration (~368s is the UPPER bound this was measured against;
+        # mode=fast skips the heaviest stage, so this is conservative, not
+        # tight). Tunable without a code change once more data exists.
+        value = int(raw_value or 240)
+    except ValueError:
+        value = 240
+    return max(1, value)
+
+
+def _wnba_live_refresh_lane() -> str:
+    # Explicit and distinct from anything else, deliberately: this is what
+    # keeps this launch from ever contending with the general combined
+    # `phase=live` sweep's own (already self-colliding) lane. Overridable for
+    # tests / multi-instance setups; the default is namespaced with the
+    # service name it always runs on so a future reader does not need this
+    # comment to know it is not shared.
+    raw_value = str(os.environ.get("SYNDICATE_WNBA_LIVE_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-wnba-live"
+
+
+def _wnba_live_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "wnba_live_autorun_status.json"
+
+
+def _report_previous_wnba_live_run(last_status: dict) -> None:
+    """Same reason as `_report_previous_wnba_pregame_run` (`#433`): a launch
+    that is fire-and-forget by design must still be OBSERVABLE, or a real
+    failure here reproduces the exact silence this whole lane exists to fix.
+    """
+    if not last_status:
+        return
+    err = last_status.get("error")
+    if err:
+        print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_PREV date={last_status.get('date')} FAILED {err}", flush=True)
+        return
+    print(
+        f"[live_odds_worker] WNBA_LIVE_AUTORUN_PREV date={last_status.get('date')} "
+        f"launched=ok runStamp={last_status.get('runStamp')} artifactsDir={last_status.get('artifactsDir')}",
+        flush=True,
+    )
+
+
+def _launch_autorun_wnba_live_refresh() -> None:
+    if not _wnba_live_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    if not _wnba_has_live_game(selected_date):
+        return
+    status_path = _wnba_live_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    # BEFORE the cadence gate, same reason as every other autorun here:
+    # reporting after it would surface the previous run's outcome up to a
+    # full interval late.
+    _report_previous_wnba_live_run(last_status)
+    if last_status and not last_status.get("reported"):
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_wnba_live_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="wnba",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode="fast",
+            launch_mode="web_process",
+            lane=_wnba_live_refresh_lane(),
+        )
+    except Exception as exc:
+        if _is_refresh_run_contention_error(exc):
+            # `#472`'s fix, same shape: preserve the ORIGINAL epoch on
+            # contention so one lost mutex race costs a short retry, not a
+            # full interval.
+            write_json_file(status_path, {**last_status, "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "wnba", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "wnba",
+            "date": selected_date,
+            "artifactsDir": (result or {}).get("artifactsDir"),
+            "runStamp": (result or {}).get("runStamp"),
+            "reported": False,
+        },
+    )
+    print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast", flush=True)
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -546,6 +697,14 @@ def _run_tick() -> dict[str, object] | None:
         _launch_autorun_wnba_pregame_refresh()
     except Exception as exc:
         print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
+    # `wnba-live-odds-capture-gap`. Same independence as the two autoruns
+    # above: its own interval AND liveness gate make this a no-op except
+    # when a WNBA game is actually live and due, and its own try/except
+    # means a WNBA failure here can never take down the general tick.
+    try:
+        _launch_autorun_wnba_live_refresh()
+    except Exception as exc:
+        print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
@@ -725,3 +884,8 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+# Redeploy trigger, 2026-08-20 13:2xZ: SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN
+# was set on the live service dashboard; a restart alone does not re-inject env
+# vars on Render, so this comment-only change exists to produce a genuinely new,
+# non-redundant commit for the redeploy that actually picks it up.
