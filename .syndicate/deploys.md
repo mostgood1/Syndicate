@@ -17868,3 +17868,61 @@ markets -- in the same snapshot `batter_home_runs` covered 46 players while
 `batter_hits` covered 3 and `batter_runs_scored` 2 -- so the spend buys very
 few rows. The ladders wiring is in place, so enabling later is one line in
 `DEFAULT_HITTER_MARKETS`.
+
+
+## PENDING — refresh-worker `4c11e37f` (branch `deploy/mlb-overview-hydration-cost`) — `#387` MLB overview hydration cost
+
+**NOT DEPLOYED. Queued behind another lane's claim.** Lane
+`mlb-overview-hydration-cost`, 2026-08-20 ~03:3xZ.
+
+    target    4c11e37f  (branch deploy/mlb-overview-hydration-cost)
+    base      041188cb  refresh-worker's LIVE SHA, live 02:03:08Z -- NOT main.
+    service   refresh-worker (srv-d91dpertqb8s73co8ls0)
+
+**WHY OFF-MAIN, i.e. the `--allow-off-main` reason.** `041188cb` is NOT an
+ancestor of `origin/main` (checked, not assumed). Deploying main to this service
+would REVERT two fixes that are verified live on it: `#440`'s ladder publish
+(`041188cb`, 02:03:08Z) and the soccer bulk-odds fix (`b2f4b197`). Cutting from
+the live SHA is what makes this deploy cumulative rather than a silent revert —
+the 2026-08-15 failure mode where a verified fix went live at 21:36:59Z and was
+gone by 21:45:20Z. Serialisation is not composition.
+
+**CONTENT.** Diff vs live SHA is exactly four files — `syndicate/features/mlb/cards.py`
+(the only runtime file), `tests/test_mlb_cards_worker_hydration_cost.py`,
+`scripts/measure_cards_context_rss.py`, `docs/ai_context/handoff_overview_hydration.md`.
+The runtime file is **byte-identical to origin/main's copy** (`git diff origin/main --`
+that path is empty), so this is main's code, re-parented — not a variant.
+`docs/ai_context/todo.md` is deliberately excluded: large shared ledger, no
+runtime effect, already carries this work on main. 10/10 lane tests pass on the
+branch.
+
+**WHAT IT CHANGES.** Prunes `liveData.plays.{allPlays,playsByInning}` from every
+feed/live document `_daily_actual_by_game` retains (66.38% + 3.05% of each doc,
+read nowhere in `syndicate/`), and removes a dead ~19.8MB odds_history shard load
+in `_enrich_games_with_tracked_market_lines`. Local worker-path RSS, 15-game
+slate: peak 142.9 -> 114.5MB (-19.9%), retained +11.8 -> +2.8MB. Output-neutral:
+games list AND whole page context byte-identical in BOTH dyno modes.
+
+**BLOCKED BY (both real, both checked at 03:2x-03:3xZ):**
+1. ~~in-flight MLB sim~~ — CLEARED. `run_mlb_daily_sim_job.py --date 2026-08-19`
+   (15 game_pks) finished on its own at **03:30:51Z**; preflight went 7 jobs -> 0.
+   Nothing was killed to make room, and nothing needed to be.
+2. **deploy claim HELD by `nfl-autorun-production-arm`**, acquired ~03:28Z — 2.3
+   min old when read, i.e. a live session mid-work, NOT a stale claim. Not
+   forced. Coordination message sent asking the one question that matters: what
+   base is THEIR branch cut from. If theirs is also cut from `041188cb`, the two
+   deploys do not contain each other and whichever lands second reverts the
+   first — the claim orders us, it cannot compose us.
+
+**PLAN.** They deploy first and tell me the landed SHA; I rebase `4c11e37f` onto
+it, re-run preflight, take the claim, deploy, measure, release. Or they carry
+mine as a ridealong for one restart instead of two.
+
+**verify: (owed, not yet taken).** The reading that would prove it worked is
+`cards_context_actual_games_loaded` -> `cards_context_games_built` container
+delta on refresh-worker for a 15-game MLB slate, against the same delta on
+`041188cb`. Same-clock comparison only — the daytime lull produces a clean
+window on broken code too. NOT "no OOM kills", which a quiet period yields for
+free.
+
+**rollback:** redeploy `041188cb`.
