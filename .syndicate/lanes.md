@@ -446,74 +446,58 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~20:3xZ — 9-LEAGUE RE-RUN STILL IN FLIGHT AGAINST THE FIXED BACKTEST PIPELINE, ALL INPUT-QUALITY WORK NOW LANDED
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-20 ~06:2xZ — TESTABLE OUTCOME NOT MET; CORE HYPOTHESIS FALSIFIED BY ITS OWN PRE-REGISTERED TEST; INPUT-QUALITY AVENUE EXHAUSTED, NEXT SESSION NEEDS A NEW HYPOTHESIS
 
-- Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
-  the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
-  least one non-`belgian_pro_league` league, stdev(P home) rising from
-  **0.1575** toward market's **0.1811**. Baseline:
-  `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
-- **FOUND AND FIXED 2026-08-19 ~19:2xZ, before trusting any re-run number:**
-  the backtest rated ALL 9 leagues via the goals-as-xG fallback
-  (`team_rows_from_match_history`), but `build_soccer_artifacts.py`
-  (production) reads REAL Understat xG+ppda from `team_history/*.csv` for 5
-  of them (epl/la_liga/bundesliga/serie_a/ligue_1) — the backtest was
-  measuring a different pipeline than production runs for over half the
-  leagues. Fixed by mirroring production's branch exactly
-  (`_GOALS_BASED_RATING_LEAGUES`, asserted equal by a new test,
-  `73b76b66`/landed `3ad5c8a4`). Also resolves the `ppda` CONSUMED+
-  UNPOPULATED checklist alarm for free — the data was already on disk,
-  already used live, just not in this backtest. Killed a ~1.5h-in run on the
-  OLD pipeline rather than trust its number for those 5 leagues; the 9-league
-  re-run below is against the FIXED pipeline. Full detail in the log.
-  **NOT FIXED, flagged not fixed:** production's own Understat branch does
-  NOT fold in ESPN possession/set-piece even though `espn_match_stats.json`
-  exists for all 5 of those leagues — a real, separate opportunity, out of
-  scope for this fix (which only had to match what production already does).
-- **9-LEAGUE RE-RUN IN FLIGHT** against the fixed pipeline (launched
-  ~19:3xZ). **Do not report a Brier/stdev number against the 08-15 baseline
-  until this lands — the run before this one was killed specifically because
-  its number would not have been trustworthy.**
-- Status of this session's input-quality work (full narrative in
-  `.syndicate/log/2026-08-19.md`, dated entries — do not duplicate here):
-  xG double-count fixed+validated+kept; shots-weight shrink reverted (was
-  falsified, recorded); dispersion-overshoot mechanism fully decomposed via
-  isolated 2x2 probe, treated as a closed stopping point per explicit
-  instruction; `clean_sheet_rate` fitted (pooled, significant) but its paired
-  backtest trended unfavorably — **discarded**; `possession_share`/
-  `set_piece_goal_share` sourced, wired, pooled-regression-tested (not
-  significant, favorable trend) — **kept**; `starters_available_share`
-  sourced (walk-forward core-XI overlap from ESPN boxscores), pooled-fit
-  significant (t=+2.06), fully wired end to end
-  (commit `d1136447`, BACKTEST-HONEST ONLY — not live-wired, see log), paired
-  test now complete: mean delta -0.0049 vs the possession baseline, t=-1.31,
-  **not significant, favorable direction** — **kept**, same disposition as
-  possession/set-piece and the opposite of `clean_sheet_rate`.
-  **`market_features.confidence`** (de-vigged closing-odds implied
-  probability, `_market_prior_index`) sourced, wired CLI-gated
-  (`--wire-market-confidence`, default OFF — not unconditional like the
-  other three), paired test complete: mean delta -0.0040, t=-0.96, **not
-  significant, weaker than every other field tested this session** —
-  **kept as built, not promoted further**: this one reuses the SAME closing
-  odds the lane benchmarks against, so any improvement is shrinkage-toward-
-  market, not independent skill (`089c42bd`).
+- Goal (unchanged, still NOT met): `backtest_soccer_h2h_calibration.py`
+  reports model Brier **<= market** on at least one non-`belgian_pro_league`
+  league. Baseline: `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+- **RESULT, 2026-08-20 ~06:00Z, against the FIXED pipeline (`3ad5c8a4`) and
+  every input-quality change this session made:**
+  `reports/soccer_backtest/h2h_calibration_2026-08-19_fixed_pipeline_all9_s300_limit120.json`
+  (session worktree, not committed) — **worse than market in 8 of 9
+  leagues, `belgian_pro_league` the same single exception as 08-15,
+  unchanged.** Mean model stdev(P home) rose **0.1575 -> 0.1922**, PAST
+  market's own 0.1859 (model no longer under-dispersed). **This is the
+  lane's own pre-registered falsification outcome** ("if the Brier gap does
+  not close while stdev rises to market's, under-dispersion is NOT the
+  binding constraint") — recorded as an OVERTURNED belief in
+  `learnings.md`, 2026-08-20. Full numbers + reasoning in the log
+  (2026-08-20 entry) and `state.md`.
+- **The input-quality avenue is exhausted, not abandoned.** Every field this
+  session set out to check — xG double-count, shots-weight shrink,
+  clean_sheet_rate, possession_share, set_piece_goal_share,
+  starters_available_share, pace_seconds_per_event, ppda, the backtest/
+  production pipeline mismatch, market_features.confidence — is sourced (or
+  correctly ruled out), tested, and disposed with a stated reason. None of
+  it was wasted (the engine is measurably more complete and honest about
+  what it doesn't know than at session start), but none of it closed the
+  Brier gap either. **Do not re-open this list without new evidence that a
+  specific field is systematically BIASED, not just present or absent** —
+  that is the falsification test's actual implication: the spread was fixed
+  and it didn't help, so the next hypothesis has to be about what the
+  ratings get systematically WRONG, not another input or another knob on
+  dispersion.
 - Files: `scripts/backtest_soccer_h2h_calibration.py`,
   `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
   `scripts/soccer_sim_input_checklist.py`, `syndicate/features/soccer/` (sim
   engine, adapters, ratings, `ingestion/espn_match_stats.py`),
   `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
   `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`,
-  `tests/test_soccer_advanced_input_reachability.py`, `reports/soccer_backtest/`.
+  `tests/test_soccer_advanced_input_reachability.py`,
+  `tests/test_backtest_matches_production_rating_source.py`,
+  `reports/soccer_backtest/`.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: **the ONLY open thread now is the 9-league re-run above.**
-  Every input-quality field this session set out to check
-  (xG/shots/clean_sheet/possession/set-piece/availability/pace/ppda/
-  market_confidence) is landed, tested, and disposed (kept or discarded,
-  each with a stated reason). Check the re-run, compare against the 08-15
-  baseline per the original testable outcome, and that is this lane's
-  original goal either met or not — no more input work is queued behind it.
+- Next action: **a new hypothesis, not another input pass.** Candidates not
+  yet tried: per-league systematic bias decomposition (is the model wrong
+  the same direction every time, or randomly — the reliability tables in the
+  08-20 result suggest calibration issues at specific probability buckets,
+  not a uniform shift); whether `belgian_pro_league` being the one exception
+  says something about what's different there (league-specific effect worth
+  isolating before assuming it's noise); or stepping back to question
+  whether Brier-vs-closing-line is achievable at all for a model built on
+  this data at this sample size, separate from whether the model is "good."
 - Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
