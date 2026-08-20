@@ -18491,7 +18491,7 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   against a real steam event opportunistically rather than blocking this
   deploy on one occurring.
 
-## SHIPPED, LIVE-RETRY UNVERIFIED 2026-08-20 17:32Z -- refresh-worker deploy -- AZ team-code alias fix (nfl-team-abbr-az-alias), live df04c294
+## SHIPPED-VERIFIED 2026-08-20 19:41Z -- refresh-worker deploy -- AZ team-code alias fix CONFIRMED WORKING against real production data (nfl-team-abbr-az-alias), live df04c294
 - Lane: nfl-autorun-production-arm (deploy action) / nfl-team-abbr-az-alias
   (the fix itself, landed `8a87e822` earlier). Preflight run scoped to the
   target commit each time the live SHA moved (twice, both from other
@@ -18504,23 +18504,22 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
 - `dep-da3jglrbc2fs7397rtf0`, live 17:32:54Z, commit content-verified ==
   `df04c294` (grepped the live commit's own team_identity.py for the `AZ`
   alias -- present).
-- **verify: CODE confirmed live; the actual autorun RE-LAUNCH is NOT yet
-  observed.** The roster-snapshot autorun correctly `SKIPPED
-  reason=rate_limited marker_age_s=14241/interval_s=21600` on the first
-  tick after this deploy -- its own last-ATTEMPT marker (written before
-  the ORIGINAL crash at 13:40:31Z) is still within the 6h interval,
-  ~66 min of it remaining as of this entry. This is CORRECT behavior
-  (the marker-before-launch design exists precisely so a crash costs one
-  interval, not a storm) but means the fix has not yet had a live
-  production trial. **Do not treat this deploy as fully verified until
-  the next natural relaunch (approx 2026-08-20 18:41Z or later) shows
-  `NFL_ROSTER_SNAPSHOT_LAUNCHING` followed by a clean write, not another
-  traceback.** Local/unit verification (falsification test against the
-  real live nflverse feed's actual team-code set) already gives high
-  confidence the fix is correct; this entry exists so a future session
-  doesn't mistake "deployed" for "confirmed working against real data in
-  production."
-
+- **verify: MEASURED live, matches expectation -- CONFIRMED FIXED.**
+  The roster-snapshot autorun's rate-limit marker cleared at 19:40:24Z
+  (marker_age_s=21592, just under the 21600s interval) and the real
+  retry fired at 19:41:42.336471098Z:
+  `NFL_ROSTER_SNAPSHOT_LAUNCHING season=2026 last_attempt_age_s=21671
+  interval_s=21600`. Checked for a repeat crash by content, not assumed
+  clean from silence: zero matches for `Traceback`,
+  `build_nfl_roster_snapshot.py`, or `roster_snapshot_builder.py` in the
+  full launch window (19:41:40Z-19:42:20Z). Positive confirmation, not
+  just absence-of-crash: `rows_written=2930` appears at 19:41:42.525Z --
+  a real, successful write of the actual 2,930-player 2026 nflverse
+  roster, Arizona players included. The next tick correctly re-entered
+  `rate_limited` (marker_age_s=33) on its own fresh marker, confirming
+  normal steady-state behaviour resumed. **This closes the loop the
+  17:32Z entry above left open -- the AZ team-code fix is now confirmed
+  correct against real production data, not just unit-level fixtures.**
 ## 2026-08-20 17:49Z — web `528272e1` — the soccer card stops discarding its own market data
 
     lane:      soccer-board-mlb-parity
