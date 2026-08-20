@@ -684,6 +684,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   claim parsing fixed (52 -> 80 file claims); `state.md` keyed and its two
   stacked subjects collapsed; per-session worktrees adopted.
 - **Known open, in remit:**
+  - **SHIPPED `58c63b62` on `origin/main` `[2026-08-20]`** — the hook guards
+    were resolving paths against `CLAUDE_PROJECT_DIR`, i.e. the wrong
+    REPOSITORY once sessions moved to worktrees. `ledger-commit-guard.py`
+    blocked a clean worktree over the primary tree's lane duplicates and
+    printed `trim_lane_blocks.py --apply`, a remedy that would have
+    rewritten two OTHER lanes' blocks; `ledger-append-guard.py` was fully
+    INERT in every worktree. Both fixed + measured, shared resolver in
+    `commit_context.py`, 33 new tests. `commit-guard.py` refactor proven a
+    behavioural no-op. **Neither new suite is in CI.** Cross-lane edit taken
+    under explicit user instruction while this lane was flagged possibly
+    orphaned. Detail: `.syndicate/log/2026-08-20.md`.
+  - `ledger-postwrite-check.py` line 62 has the same primary-tree bug, NOT fixed.
   - `land` reports the ledger checkers rather than gating on them.
   - The new deploy predicate has never gated a real deploy; `OFF_MAIN` has never
     fired in anger; no preflight receipt consumed live. First real deploy tests it.

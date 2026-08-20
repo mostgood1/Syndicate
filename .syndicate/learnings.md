@@ -2909,6 +2909,88 @@ verification must name the producer, not the symptom.
 artifact instead of the board. Would have been a false "verified" in
 `deploys.md` otherwise.
 
+## 2026-08-20 — FORBIDDEN: fixing a guard bug ONLY in the guard you found it in
+
+**The rule.** When a hook/guard defect is about the ENVIRONMENT all guards share
+— which repo, which index, which env, which tree — fix it in a SHARED module and
+migrate the other guards, or the next guard written will re-make it. "Fixed" in
+one file is not fixed.
+
+**Evidence.** `commit-guard.py` was fixed on 2026-08-16 for resolving paths
+against `CLAUDE_PROJECT_DIR` instead of the worktree the commit runs in, and
+again on 2026-08-17 because a PreToolUse hook runs BEFORE the shell, so a
+`VAR=1 cmd` override it printed could never be read. Both fixes were local to
+that file. `ledger-commit-guard.py` was written afterwards and shipped with
+BOTH bugs. Measured 2026-08-20: it blocked a commit from
+`C:/tmp/syndicate-sessions/soccer-board-mlb-parity` over duplicate lane blocks
+present only in the PRIMARY tree — the worktree's own `lanes.md` was clean and
+`check_lane_invariants.py` said INVARIANTS HOLD there — and the remedy it
+printed (`trim_lane_blocks.py --apply`) would, run in the tree it was
+complaining about, have rewritten TWO OTHER SESSIONS' lane blocks to satisfy a
+check about a file the committing session never touched.
+
+**How to apply.** The shared resolver is `.claude/hooks/commit_context.py`
+(`command_cwd`, `worktree_root`, `env_set_for_command`). Import it; do not
+re-derive the tree. Before shipping a new guard, ask which of these it needs and
+whether it got them from that module. `ledger_invariants.py` already made this
+argument for PREDICATES; it is the same argument for CONTEXT.
+
+**Corollary, and the reason this hid for so long: AN INERT GUARD AND A SATISFIED
+GUARD ARE INDISTINGUISHABLE FROM OUTSIDE.** `ledger-append-guard.py` was
+COMPLETELY INERT in every worktree — `relpath(file, PRIMARY)` is
+`../../../../../tmp/...`, which matches neither ledger name, so it returned 0
+before evaluating a single predicate. It read as passing for its entire life.
+Measured, one violating edit against both trees: `primary exit=2 BLOCKED` /
+`worktree exit=0 ALLOWED`. **A guard is not verified until you have watched it
+FAIL on purpose from the environment it actually runs in** — see the standing
+rule that a healthy reading is evidence only once you know what makes it read
+unhealthy.
+
+---
+
+## 2026-08-20 — FORBIDDEN: a guard test that asserts against the live ledger
+
+**The rule.** Tests for the ledger hooks MUST build their own throwaway repos.
+Never assert against `.syndicate/*.md` in the primary tree or any worktree.
+
+**Evidence.** The first version of `test_ledger_commit_guard.py` used the live
+primary tree as its "dirty" fixture, because it genuinely had two duplicated
+lane blocks. A parallel session trimmed them MID-RUN and three cases flipped
+from pass to fail. The guard was correct; the TEST was stale. On a tree with a
+dozen concurrent sessions, live ledger state is not a fixture — it is a race.
+
+**How to apply.** `_mkrepo()` in both `test_ledger_commit_guard.py` and
+`test_ledger_append_guard.py` is the pattern: `git init` a tempdir, write the
+lanes/state content the case needs, point `CLAUDE_PROJECT_DIR` and the payload
+`cwd` at whichever throwaway tree the case is about. This also makes the two
+trees INDEPENDENTLY controllable, which is the only way to test the
+primary-vs-worktree split at all. Related: re-baseline before judging — a
+handed-down baseline expires, and here it expired inside a single session.
+
+---
+
+## 2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)
+
+**The rule.** Before generalising "guard X has the CLAUDE_PROJECT_DIR bug, so
+its siblings do too", MEASURE each one. A different matching strategy can make
+the same wrong input harmless.
+
+**Evidence.** Having found the bug in `ledger-commit-guard.py`, I predicted
+`lane-guard.py` was inert in worktrees for the same reason. It is NOT. It
+receives the identical mangled `../../../../../tmp/...` relpath, but its claim
+matching is exact-or-suffix (`rel == f or rel.endswith("/" + f) or
+f.endswith("/" + rel)`), so the suffix still matches the claim and it blocks
+correctly. Only its refusal MESSAGE prints the ugly path.
+
+**How to apply.** `lane-guard.py` is EXONERATED — do not "fix" its `root`.
+For lane-guard the PRIMARY `lanes.md` is the CORRECT source: cross-session claim
+exclusivity is inherently global, so reading the committing worktree's copy
+would be a regression. That is the OPPOSITE of `ledger-commit-guard`, which must
+read the tree being committed because it validates the content of that commit.
+Same-looking bug, opposite correct answers — which is exactly why the sweep has
+to be per-guard and evidence-based, not pattern-matched. Still outstanding:
+`ledger-postwrite-check.py` line 62, unmeasured and unfixed.
+
 ### 2026-08-20 -- a fix's data can be correct while its raw diagnostic API still shows nothing: verify against the SERVED surface, not the one that found the bug
 
 **What happened.** Fixing the Layer 2 board's live Projected/Live/Actual

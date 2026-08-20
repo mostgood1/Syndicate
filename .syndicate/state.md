@@ -558,6 +558,46 @@ unsaved anywhere.
 - **`Bash` bypasses it entirely** — the matcher is
   `Edit|Write|MultiEdit|NotebookEdit`. The guard bounds the file tools, not the
   session.
+- **A HOOK THAT RESOLVES PATHS AGAINST `CLAUDE_PROJECT_DIR` IS ANSWERING ABOUT
+  THE WRONG REPOSITORY** `[verified 2026-08-20, shipped 58c63b62]`. Every session
+  works in its own linked worktree, so `CLAUDE_PROJECT_DIR` is the PRIMARY
+  checkout while the tool call targets the worktree. Both failure directions were
+  MEASURED: `ledger-commit-guard.py` blocked a `soccer-board-mlb-parity` commit
+  over duplicate lane blocks that existed only in the primary tree (its own
+  `lanes.md` was clean, `check_lane_invariants.py` said INVARIANTS HOLD), and it
+  had never once examined a broken `lanes.md` in the committing worktree.
+  `ledger-append-guard.py` was worse — **fully INERT in every worktree**:
+  identical violating edit gave `primary exit=2 BLOCKED` / `worktree exit=0
+  ALLOWED`, because `relpath(file, PRIMARY)` is `../../../../../tmp/...` and
+  matched neither ledger name. **An inert guard and a satisfied guard are
+  indistinguishable from outside**, which is why it survived unnoticed.
+  `commit-guard.py` had already been fixed for this on 2026-08-16; the fix was
+  local to that file, so the next guard written re-made it. Shared resolver now
+  in `.claude/hooks/commit_context.py`.
+- **A `VAR=1 <cmd>` OVERRIDE PRINTED BY A PreToolUse HOOK IS UNREACHABLE UNLESS
+  THE HOOK PARSES THE COMMAND STRING** `[verified 2026-08-20]`. The hook runs
+  BEFORE the shell assigns it, so `os.environ` never sees it. Same defect
+  `commit-guard.py` fixed 2026-08-17; `ledger-commit-guard.py` shipped with the
+  broken form and printed an escape hatch that did not exist. A real exported
+  environment variable always worked.
+- **`lane-guard.py` is NOT affected, and the reason is accidental**
+  `[verified 2026-08-20]`. A worktree path yields the same mangled relpath, but
+  claim matching is exact-or-suffix (`rel.endswith("/" + f)`), which matches it
+  anyway. It blocks correctly; only its refusal MESSAGE prints the
+  `../../../../../tmp/...` form. Do not "fix" it by changing `root` — for
+  lane-guard the PRIMARY `lanes.md` is the CORRECT source, because cross-session
+  claim exclusivity is inherently global. That is the opposite of
+  `ledger-commit-guard`, which must read the tree being committed.
+- **`ledger-postwrite-check.py` STILL resolves against the primary tree**
+  `[known 2026-08-20, NOT fixed, NOT tested]` (line 62). PostToolUse and
+  warning-only, so the cost is misattribution, not a block — observed blaming an
+  unrelated `grep` for pre-existing primary-tree duplicates.
+- **Tests exist now:** `.claude/hooks/test_ledger_commit_guard.py` (16 cases)
+  and `test_ledger_append_guard.py` (17 cases), both self-contained — they build
+  throwaway repos. **They do so because the first version asserted against the
+  live primary tree and three cases flipped mid-run when a parallel session
+  trimmed the real duplicates.** A guard test that reads shared mutable ledger
+  state measures the ledger, not the guard. **NOT wired into CI.**
 - **`lane-guard` is blind to `.claude/**` AND `.syndicate/**` by design**
   (`lane-guard.py:244`, one `rel.startswith` test covering both), so the
   enforcement layer cannot protect the directory it lives in — and every real
