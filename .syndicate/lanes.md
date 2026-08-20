@@ -1047,13 +1047,78 @@ history directly:
   log lines (or a named skip reason) in production logs -- not the env
   var alone.
 
-### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be
+### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND ITS BENEFIT IS PROVEN NOTHING SO FAR (`plays_dropped=1` against 1,067 locally) — because the slate was PREGAME and `allPlays` was empty. Reachable, correct, and currently doing nothing. The live-slate window (~22:00Z-05:00Z) is the only reading that can settle the magnitude, and it has NOT been taken.** — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be — **Local measurement that motivated it: peak RSS 142.9 → 114.5 MB on a 15-game slate, byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
 - Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
-- Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
+- Blocked by: none.
+- **2026-08-20 STATUS.** Shipped on `origin/main` (`ab99d236`, `9b66e841`, `6980f910`) and deployed to
+  refresh-worker as `d0ea983d`, re-cut onto `3b816546` (the live SHA at deploy time) after
+  `nfl-autorun-production-arm` deployed mid-poll and turned the prepared branch into a rollback of
+  their work. Claim acquired 13:51:45Z after theirs expired, preflight CLEAR, released 14:0xZ.
+- **WHAT `/preflight` CAUGHT, and it was worth running.** The candidate had (a) no production-observable
+  signal that the prune fired — the exact way three prior `#387` candidates became unfalsifiable;
+  (b) a parity harness comparing stdout, so it broke the moment the new log line existed; (c) two
+  load-bearing comments naming a test file AND a test name that do not exist.
+- **STILL OWED, and it is the whole question:** re-read `FEED_LIVE_PRUNE` during the live/post-game
+  window. `plays_dropped` in the thousands = the mechanism works. Still ~0 at 02:00Z = the payloads
+  reaching this loader never carry play-by-play in production, and the 66.38% premise — true of the
+  artifact on disk — is wrong for the production regime. That would not be a small correction; it
+  would retire the main reason this change exists.
+- This lane does NOT close until that reading is taken.
+- **RESULT `[2026-08-19]` — the hypothesis was HALF RIGHT, and the half that was
+  wrong is the more useful finding.** The projection idea ("the worker keeps only
+  `games`, so skip the page furniture") was not needed: the two real costs were
+  *inside* what the worker does read.
+  - **Feed/live prune.** `liveData.plays.allPlays` is **66.38%** of a StatsAPI
+    feed/live document and `playsByInning` a further **3.05%** (measured over the
+    15 documents of 2026-06-14, 12,605,243 JSON bytes), and **nothing in
+    `syndicate/` reads either** — every `allPlays` reader is an offline script or
+    `vendor/`, each opening the artifact off disk itself. `_daily_actual_by_game`
+    holds one such document per game live for the whole build. Denylist, not
+    allowlist, so every other consumer is untouched.
+  - **A dead shard load.** `_enrich_games_with_tracked_market_lines` read the
+    whole odds_history shard to consult `doc["games"]`. **The shard has no
+    `games` key and never has had one** — one writer, one literal schema, `git
+    log -S` finds no revision that emitted it, and all three real shard copies on
+    disk confirm `has_games=False`. Worker-only, today-only (= every board
+    build), uncached. `.syndicate/deploys.md` 2026-08-16 called this "the best
+    candidate on the table" and asked for an in-pass measurement to settle it;
+    **the WRITER's schema settles it, and was readable the whole time.**
+- **VERIFICATION RAN.** `scripts/measure_cards_context_rss.py`, worker path
+  (`SYNDICATE_WEB_DYNO=0`), 15-game slate, 5 repeats per arm, prune the only
+  variable:
+
+      peak RSS       142.9 MB -> 114.5 MB   (-28.4 MB, -19.9%)
+        spread    142.7-143.1   114.1-114.9
+      transient       +55.7 MB ->  +35.0 MB
+      retained        +11.8 MB ->   +2.8 MB
+      _daily_actual_by_game retention  +13.6 MB -> +1.9 MB
+      serialised games list   343,503 B both arms -- IDENTICAL
+
+  RSS on a sampling thread, **not `tracemalloc`** — `handoff_refresh_worker_oom.md`
+  records tracemalloc as structurally blind to this exact failure mode.
+  10 tests in `tests/test_mlb_cards_worker_hydration_cost.py`, incl. the
+  reachability pair (`off != on`) and a schema-coupling test that fails if the
+  shard ever grows a `games` key. 103 MLB cards tests green. The 6 red
+  `test_archives` cases are PRE-EXISTING in a `data/`-less worktree — verified by
+  re-running them on a stashed tree, same 6.
+- **FALSIFICATION NOT TRIGGERED, and the limits are stated rather than implied.**
+  (a) No candidate-path consumer reads the dropped sections. (b) `off != on`, so
+  the mechanism fires. **BUT:** the ~125MB shard figure is NOT in the table — the
+  local mirror has no dated shard and the harness runs a PAST date, so that path
+  is never exercised locally. It is a production-only claim derived from a
+  measured file size (19,798,176 B) and `#435`'s ~6.3x resident ratio.
+- **NOT CLAIMED: that the ~2GB production excursion is fixed.** Three named
+  candidates before this one were live, exercised, and moved the transient by
+  nothing measurable. Ship, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`
+  as a RATE against a same-clock-window baseline — never a post-deploy hour,
+  because only a cold process clears that bar.
+- Landed `ab99d236` on `origin/main`. **No deploy made, no claim taken.**
+  Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
+
 
 ### ci-utc-midnight-window — CLOSED 2026-08-20 — **`#482` CONFIRMED FIXED INSIDE the 00:00-05:00Z window: run `32323646103` (`df8aec91`, 02:09Z) green on both gated steps, against 11 consecutive failures 01:24-01:53Z in the same band without it. CI is no longer red on the clock.** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
