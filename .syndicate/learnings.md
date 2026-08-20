@@ -1879,3 +1879,24 @@ sim-log endpoint serves. The discriminating class was the one that got cut. The
 answer came from the Render logs API against the worker's own refresh loop
 instead — `resource=srv-d91dpertqb8s73co8ls0&text=too_large`. **A bounded log
 line is only bounded if the bound applies to the WHOLE line.**
+
+## 2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.
+
+I told the user a roster-rebuild gate set for `2026-08-19` had **expired
+unspent**, and separately keyed a status-artifact watcher on `2026-08-20`. Both
+were wrong for the same reason: **00:xx UTC is 19:xx CT on the PREVIOUS day.**
+The slate date rolls at 05:00Z, not 00:00Z. The gate was still live with ~3.5
+hours to spare, and the watcher spent ~30 minutes reading a document from
+`23:08:01Z` that no sim was going to update, reporting `evidence=no` each time
+and looking exactly like a failed deploy.
+
+This is the SECOND time this session pattern has cost real time (see the earlier
+"report local time, not UTC" correction). The failure is not arithmetic — it is
+reading a UTC clock and reasoning about a CT-keyed artifact without converting.
+
+**How to apply:** any artifact keyed by SLATE date — ladders, sims, status
+documents, rebuild gates — is on Central time. Before concluding a document is
+missing, stale, or expired, convert: `slate_date = (utc - 5h).date()`. A watcher
+keyed on the wrong date does not return "nothing happened", it returns a
+CONFIDENT WRONG ANSWER, because the document it is polling really does exist and
+really is old.

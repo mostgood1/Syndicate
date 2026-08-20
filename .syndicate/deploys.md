@@ -17634,3 +17634,68 @@ merge restored it.
 - verify: pending -- once live, trigger POST /api/ops/odds-refresh/run (phase=pregame,
   sports=soccer) and confirm a REAL fresh captured_at on today's soccer matches, not
   just deploy success
+
+---
+
+## PENDING — refresh-worker `041188cb` (branch `deploy/mlb-ladder-publish`) — `#440` ladder publish
+
+    claimed   2026-08-20T01:18:37Z by convergence-phase7-crps (ttl 2700s -> ~02:03Z)
+    preflight HOLD at 01:19Z -- 5 jobs in flight (run_mlb_daily_sim_job.py pid 127
+              + daily_update children). NOT killed: a daily sim discards ~30min of
+              work and the ~109 artifacts it publishes. Polling until it drains.
+    base      b2f4b197 (refresh-worker's LIVE SHA, live 01:13:09Z) -- NOT main.
+              main is 432 files / 126,420 lines ahead of this service; a ~420-commit
+              jump on a live 4GB sim service is not a change to make as a side
+              effect of a one-file fix. Cutting from the LIVE SHA is what keeps
+              this CUMULATIVE with the soccer #343 deploy that just landed.
+              --allow-off-main, reason recorded here as the protocol requires.
+
+**change:** publish `daily_ladders_<date>.json` through `publish_hot_artifact`
+(streams >4MB, never consults `_publish_skip_reason`) instead of leaving it to
+the sweep, which refuses it at `_PUBLISH_MAX_BYTES`. The bound is UNTOUCHED.
+
+**why:** measured on refresh-worker `2026-08-20T00:55:00Z` --
+`SWEEP_SKIPPED_DETAIL too_large=[...daily_ladders_2026_08_19.json(13678982)]`
+against a 12,582,912 ceiling. Web has been serving an 11,716,507-byte copy
+generated `2026-08-18T18:20:25` ever since, which is why every MLB compact-card
+pitcher-prop row carried a full sim side and an EMPTY market side.
+
+**expected effect (number and window):** on the FIRST sim to complete after the
+deploy (sims run every ~15-20 min, so within ~40 min), web's exported
+`daily_ladders_<date>.json` carries a `generatedAt` from TODAY, and the status
+artifact carries `directPublish: {attempted: true, ok: true, bytes: ~13.7e6}`.
+
+**verify:** BOTH readings, and note the first is the one that matters --
+  1. `GET /api/ops/artifacts/export?pattern=*daily_ladders_2026_08_19*` on WEB ->
+     the document's own `generatedAt`, which must be today's date. This is a
+     READING OF THE SERVED PAYLOAD, not a log line: the sim job's stdout goes to
+     a disk file on the worker and Render's log API cannot serve it.
+  2. `*daily_ladders_status_2026_08_19*` -> `directPublish.ok == true`.
+A `directPublish.ok=false` with an `error` is a DIFFERENT outcome from
+`attempted=false` and must not be read as "the fix is inert" without reading it.
+
+**rollback:** redeploy `b2f4b197` (the current live SHA) on refresh-worker.
+Additive, 2 files, no schema or contract change, so rollback is a plain redeploy.
+
+**measurement:** <pending>
+
+## 2026-08-20 01:25Z — VERIFIED — soccer odds #343 fix confirmed live, real fresh captures
+- Both deploys live: live-odds-worker (575decf3, finished 00:29:51Z),
+  refresh-worker (b2f4b197 via deploy/refresh-worker-soccer-odds-fix, finished 01:13:09Z)
+- Triggered POST /api/ops/odds-refresh/run (phase=pregame, sports=soccer), run_stamp
+  20260820_011659. refresh-worker's own artifact_publisher log shows genuine PUBLISH_OK
+  growth across the soccer book_quotes shard for EVERY tracked date (08-19 through
+  08-30), not just a checksum no-op -- e.g. book_quotes/2026-08-20.jsonl bytes=10023657,
+  book_quotes/2026-08-19.state.json bytes=859667.
+- Re-pulled soccer_source/tracking/book_quotes/2026-08-19.jsonl directly (26,017 lines)
+  and re-ran the SAME per-match freshness check used throughout this investigation:
+  6 of the original 8 stale matches now show captured_at = 2026-08-20T01:22:40Z (3 min
+  old at check time), all MLS. The remaining 2 (Orlando City vs Chicago Fire, Atletico
+  Madrid vs Malaga) are still stale -- but la_liga's own odds step DID publish
+  (game_odds_current.csv, 65,314 bytes, 01:24:34Z) in this same run, so that league's
+  capture succeeded; those 2 specific matches most likely aren't currently offered by
+  books rather than a capture failure. Not yet independently confirmed, worth a
+  follow-up spot-check but does not change the verdict on the #343 fix itself.
+- **VERDICT: the #343 regression is fixed and confirmed with real production data,
+  not just a deploy success or a live API test.** soccer-odds-capture-cadence-gap
+  can close.

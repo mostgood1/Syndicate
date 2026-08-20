@@ -1932,6 +1932,30 @@ client-side JS). Trace the served `book` field to its writer before acting.
   Bovada/DraftKings/ESPN Bet individually, so not an artefact of one sharp book.
   Those rows are 100% LEAKED (`cfbd_ppa_season_2025`), which FLATTERS the model
   and makes the verdict stronger, not weaker.
+- **THE BOARD SERVES SP+, WEEK 1 ONLY** `[measured 2026-08-19, web 6b23d6fa,
+  MULTI-PROBE 10 probes/week]`. Weeks 1/5/12 each 10/10 -> 51 games, `|margin|`
+  SD **12.93**, max **50.60** (old PPA: 1.58 / 7.80). Every week resolves to
+  week 1 — the only week inside the pregame window.
+  **A SINGLE READ OF THIS SERVICE IS NOT A MEASUREMENT**: after the previous
+  deploy one sample said SP+ while 12 probes read **9 PPA / 3 SP+** (gunicorn
+  workers cache the projection index at different moments around the bootstrap
+  sync). Probe repeatedly.
+- **THE ARTIFACT REACHES WEB VIA GIT -> WEB DEPLOY -> BOOTSTRAP -> MOUNTED DISK,
+  NOT VIA THE WORKER** `[measured 2026-08-19]`. `smartsim2_projections_*.csv`
+  matches **NONE of the 127** `HOT_ARTIFACT_PATTERNS`; web reads
+  `SYNDICATE_NCAAF_SOURCE_ROOT=/opt/render/project/data/ncaaf_source` (its
+  MOUNTED DISK, not the checkout); `bootstrap_data_root` copies and **NEVER
+  prunes**. So the refresh-worker season-projection autorun regenerates a file
+  **nothing reads**, and deleting a stale artifact from git does NOT remove it
+  from the disk being served — the pregame-window guard is what stops it.
+  Both generators now call `publish_hot_artifact`, INERT until the allowlist
+  lands (handed to `soccer-odds-capture-cadence-gap`).
+- **Returning production: BUILT, MEASURED, NOT SHIPPED** `[2026-08-19]`. Wired
+  as a RATING adjustment (17.2% lever, not the 4.1% payload). Reachability
+  passed (50 of 51 margins moved). 2024 backtest, leak-free, n=749: OFF MAE
+  15.778 -> ON 15.630, paired **dMAE -0.149, SE 0.094, t=-1.58 NOT
+  SIGNIFICANT**. Opt-in behind `--returning-production`, default OFF. A second
+  season was running at checkpoint to settle it — **no pooled result yet.**
 - **Stage 0 instrumentation EXISTS** — `syndicate/features/football/pick_ledger.py`
   + `scripts/build_ncaaf_pick_ledger.py`, one row per (game × provider) carrying
   model margin / OPENING line / CLOSING line / realised result. **It BACKFILLS**:
@@ -3135,8 +3159,22 @@ never consults `_publish_skip_reason`. Same route `book_grid` (12,855,903 bytes)
 has used all along. **The bound is UNTOUCHED** — it is sweep-only by design and
 exists to stop 51MB `odds_history` shards going up every cycle.
 
-**STATUS: NOT DEPLOYED.** refresh-worker claim held by a live session
-(`soccer-odds-capture-cadence-gap`), not forced.
+**STATUS as of 2026-08-20T01:30Z: CUT AND QUEUED, NOT DEPLOYED.** Deploy branch
+`deploy/mlb-ladder-publish` = **`041188cb`**, cut from refresh-worker's LIVE SHA
+`b2f4b197` (live 01:13:09Z), NOT from main — main is 432 files / 126,420 lines
+ahead of this service and a ~420-commit jump on a live 4GB sim service is not a
+change to attach to a one-file fix. Cutting from the LIVE SHA is what keeps it
+cumulative with the soccer `#343` deploy that landed at 01:13. Verified present
+at `b2f4b197` before cutting: `publish_hot_artifact`, `daily_ladders_path`,
+`write_status_artifact`, `pull_season_artifacts`, BOTH ladders allowlist
+patterns, and the streamed transport (`_PUBLISH_STREAM_MIN_BYTES = 4MB`); the
+two touched files are byte-identical at `b2f4b197` and at the change's base, so
+it is an exact add that clobbers nothing.
+
+Claim HELD by `convergence-phase7-crps` since 01:18:37Z (ttl 2700s → ~02:03Z).
+Preflight **HOLD** — an MLB sim is in flight (`run_mlb_daily_sim_job.py` pid 127
++ `daily_update` children). Not killed: a daily sim discards ~30 min of work and
+the ~109 artifacts it publishes. Poller running until it drains.
 
 
 ### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
