@@ -17869,7 +17869,102 @@ markets -- in the same snapshot `batter_home_runs` covered 46 players while
 few rows. The ladders wiring is in place, so enabling later is one line in
 `DEFAULT_HITTER_MARKETS`.
 
+## 2026-08-20 — refresh-worker: nfl-autorun-production-arm (PENDING)
 
+- **Candidate:** `3b816546` (direct child of live SHA `041188cb`) -- arm the
+  two `nfl-roster-depth-autorun` autoruns
+  (`NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`,
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`) on
+  refresh-worker. Env vars already SET on the service (dashboard, verified
+  via read-only GET); this deploy is the missing second half --
+  `[[project_render_env_needs_deploy]]`.
+- **Expected effect:** `NFL_ROSTER_SNAPSHOT_LAUNCHING` and
+  `NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING` each appear in refresh-worker logs
+  within 5 min of deploy going live (first run, no marker yet).
+- **Blast radius:** refresh-worker only. Blocked ~2h so far on preflight
+  HOLD -- a continuously busy job queue (MLB daily sim, odds refresh,
+  per-league soccer artifact builds cycling with no observed lull).
+- **Rollback:** redeploy refresh-worker to `041188cb` (direct parent, no
+  rollback risk either direction), or unset the two env vars (stops future
+  launches without a deploy -- one-shot rate-limited subprocess, not a
+  persistent loop).
+- **Measurement:** PENDING -- fill in after deploy + log verification.
+- Reminder timestamp: 2026-08-20T04:15Z (approx, session-relative).
+
+## SHIPPED-VERIFIED 2026-08-20 13:17Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
+- Preflight PASS (full checklist run via `/preflight` skill). Claim + mechanical preflight CLEAR at
+  13:06:29Z.
+- Scope note: `origin/main`'s tip (`170505ec` at landing time) had drifted 47 commits/39 files past the
+  live SHA by deploy time (other sessions' work) — built a scoped branch off the live SHA instead of
+  deploying the tip, per the "exactly one substantive change" gate.
+- Expected effect: ZERO observable behavior change — new autorun is default-OFF
+  (`SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN` unset). The deploy alone must not change anything visible.
+- Rollback target: the previous live commit (the one this superseded, prefix `d520`) — redeploy it,
+  acknowledging the guard's rollback flag since it is deliberately going backward.
+- `dep-da3fo30ae00c73ap29e0`, live at 13:15:46Z, commit content-verified == `b5cf8ac2`.
+- **verify: MEASURED, matches expectation.** `render_logs.py --service live-odds-worker --text
+  WNBA_LIVE_AUTORUN --start 2026-08-20T13:15:46Z` — zero hits, proving the new autorun is genuinely
+  inert while its env var is unset (it would have printed `WNBA_LIVE_AUTORUN_LAUNCHED` or `_FAILED` on
+  any invocation). Service otherwise healthy: `LIVE ODDS REFRESH TICK` still firing normally post-deploy.
+  **Next step, separate action, its own preflight when taken:** flip
+  `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1` on live-odds-worker + deploy, then verify a live WNBA
+  game's `book_quotes` shard shows a `captured_at` newer than kickoff within one 240s cycle.
+
+### #481 — WNBA live win/cover scale refit — web — 2026-08-20 13:13:26Z — lane `basketball-model-owner`
+
+Scoped cherry-pick `ba1d3368` (`#481` = `7afbdd1a`) onto web's live SHA
+`75c526f5`, which was off-main -- deploying `origin/main` would have carried
+295 files / 68,868 insertions from four other lanes. Clean auto-merge, 1 file,
++41/-2. Branch `deploy/481-live-scale-web-20260820`.
+
+- **verify: CODE CONFIRMED LIVE BY CONTENT** -- live commit `ba1d3368`
+  finished 13:13:26Z; `_WNBA_LIVE_MARGIN_SCALE` present (3 refs) and the old
+  `scale = 6.0 + 0.35` gone (0 refs) in the deployed tree. Verified by
+  CONTENT, not ancestry: a cherry-pick makes a new SHA, so
+  `merge-base --is-ancestor` returns NO for a correct deploy (that mistake
+  was made on this same service earlier, see the `#475` entry).
+  Web responding post-restart (401 on an auth-gated route = alive, not 502).
+
+- **THE MEASUREMENT, taken BEFORE deploy and the reason for it.** The live
+  win-prob path had never been backtested -- its own comment said the
+  constants were ported and unverified. Graded by replaying cached ESPN
+  play-by-play through the real shipped function over **212 games /
+  73,878 live samples**, scored against actual outcomes:
+
+      Brier               0.1896 -> 0.1644   (-13.3%)
+      worst calib gap    -0.240  -> -0.054
+      held-out test       0.1922 -> 0.1661   (game-level split, 106 train
+                                              games / 36,482 test samples)
+
+  The defect was DISPERSION, not bias -- aggregate means were already
+  unbiased (0.573 pred vs 0.571 actual), which is why nothing looked wrong
+  at the top line. Samples priced 0.6-0.7 actually won 91.3%; samples priced
+  0.3-0.4 won 11.6%. Everything was compressed toward 0.5 by a scale ~2.5x
+  too wide.
+
+- **NOT YET OBSERVED ON A SERVED PAYLOAD.** No WNBA game is in progress, so
+  the live board cannot be checked against a real in-flight game yet. The
+  offline grade above is the substantive evidence; the served-payload
+  confirmation is owed on the next live slate. Next reader: on a live game,
+  compare `markets.moneyline.p_win` against the same `(margin, elapsed)` --
+  a 10-point lead with ~1 minute left should now read ~0.99, not ~0.82.
+
+- **Scope deliberately NOT extended to totals.** `_wnba_live_total_over_prob`
+  keeps `8.0 + 0.50*min_left`: a total is combined scoring, not a margin's
+  sign, and this fit says nothing about it. Refitting needs historical market
+  totals, unavailable here. Left alone rather than changed on a guess.
+
+- Rollback: redeploy web at the prior SHA `75c526f5` via the sanctioned
+  `render_deploy` entrypoint (command omitted here verbatim -- the deploy
+  guard pattern-matches it even inside a ledger file, see note below).
+- Claim released: `deploy_claim.py release --service web --token 947ef82daccf0477`
+
+**Incidental finding, worth knowing:** `deploy-guard.py` matches on the
+deploy command text ANYWHERE in a Bash invocation, including inside a
+heredoc writing documentation. Recording a rollback command verbatim in this
+ledger is therefore blocked as though it were a deploy. Not a bug worth
+chasing -- the guard failing closed is correct -- but future entries should
+describe the rollback rather than paste it, as this one now does.
 ## PENDING — refresh-worker `4c11e37f` (branch `deploy/mlb-overview-hydration-cost`) — `#387` MLB overview hydration cost
 
 **NOT DEPLOYED. Queued behind another lane's claim.** Lane
