@@ -11179,3 +11179,79 @@ lost no protection and no open lane left the session-start digest.
   `projected == live_projection` only 1/48 (a real coincidental match, not
   a residual bug). Full measurement in `deploys.md`.
 - Blocked by: none.
+
+### nhl-model-owner — OPEN — FACEOFF TRACK FULLY CLOSED incl. the multi-event engine redesign (EV/OZ/DZ/NZ + strength-state PP/PK + per-team role index + joint role-zone + player-level lineup-aware + `faceoff_alpha`/`diff_clip`/`mult_clip_*` calibrated + real-N-per-segment redesign extended to both EV and strength-state, std now 99.88% of real vs the OLD 96.71%) — session: nhl-model-owner
+- Goal MET, extended repeatedly same-session: checklist full PASS
+  (`scripts/nhl_sim_input_checklist.py` exits 0), market-comparison backtest
+  built (`#470`), and the faceoff mechanism taken from "one EV-only diff-based
+  multiplier" to a fully measured, multi-axis, real-event-count system. Full
+  narrative for every piece — what was built, what was measured, every dead
+  end (the naive strength-state combination bug, the "closes to zero"
+  overclaim later corrected, a reachability test breaking TWICE on
+  mean-based comparisons) — lives in `.syndicate/log/2026-08-19.md` and
+  `.syndicate/log/2026-08-20.md`, NOT duplicated here. Canonical status
+  docs: `docs/ai_context/hockeysim_engine_reference.md` §1–§2B,
+  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`
+  (**§2A/§2B's own addendum WRITTEN 2026-08-20 ~20:2xZ, under `#470`** — the
+  `mlb-overview-hydration-cost` claim on the todo document was released,
+  user-authorized, after confirming its owning session no longer exists — see
+  `.syndicate/log/2026-08-20.md` for the full unblock narrative).
+- Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
+  `scripts/nhl_*.py` / `scripts/grade_nhl_predictions_vs_market.py` /
+  `scripts/calibrate_nhl_*.py` / `scripts/build_nhl_*.py` /
+  `scripts/measure_nhl_faceoff_*.py`,
+  `docs/ai_context/hockeysim_engine_reference.md`,
+  `docs/ai_context/nhl_model_inventory.md`. Shared artifact-publisher
+  allowlist module: touch-and-released repeatedly — not currently claimed.
+- **Faceoff track closed**, including the last genuinely open item: the
+  discrete-event engine's "one faceoff assumed per real segment"
+  approximation was MEASURED (106,272 real segments: mean 0.684 real
+  faceoffs vs the assumed constant 1.0) then ADDRESSED via a
+  multi-event-per-segment redesign (`faceoff_multi_event_segment_model`,
+  default ON, real N∈{0..6} per segment, not a fitted approximation) —
+  built for EV segments first (honest non-confirming result: std moved
+  FURTHER from real), then extended to strength-state (PP/PK) segments,
+  which REVERSED that finding: **combined round-robin std moved from
+  96.71% of real to 99.88%**, essentially closing the gap. Mean unaffected
+  both times (+0.17-0.28%, noise-level), exact `E[]=1.0`/`E[]=2.0` proofs
+  hold for any N. Everything before this (EV→OZ→DZ→NZ discrete-event
+  curves, strength-state PP/PK role mechanism with a real
+  +4.478%→+0.203% bug found and fixed by the round-robin check, a
+  per-team PP/PK role-specific index, a joint role×zone investigation,
+  a player-level lineup-aware layer, `faceoff_alpha`/`faceoff_diff_clip`
+  calibrated against 1,312 real games + a leave-one-out refit,
+  `faceoff_mult_clip_*` closed with an algebraic proof) is unchanged from
+  the prior checkpoint. **Two corrections on the record, not silently
+  absorbed**: an earlier "closes to zero" claim overstated itself
+  (mult_clip); a reachability test broke twice on mean-based comparisons
+  and was durably fixed with the per-seed-vector technique.
+- **Dead gate CLOSED** (earlier this lane): `HockeyTeamFeatures.blocks_per_60`/
+  `penalties_per_60` proven dead and removed from every call site, not just
+  documented.
+- **Market-comparison backtest (`#470`)** built and extended to real
+  production data (`--source production`, public `/nhl/api/cards/dates`) —
+  found and fixed two real bugs (stale-duplicate prediction files,
+  `lookahead_applied`'s true meaning). n=14-15 moneyline/total — explicitly
+  NOT a powered verdict.
+- Verification: checklist full PASS, re-confirmed after every faceoff
+  addendum. 650 hockeysim/nhl tests pass (up from 254 at session start).
+  Nothing deployed this session (offline producer/calibration/engine-wiring
+  only). **Offered as a refresh-worker deploy ridealong** to the `Football
+  modeling and analytics` session via `send_message` — no reply yet. All
+  commits pushed to `origin/main`, confirmed via `git merge-base
+  --is-ancestor` after every push — latest confirmed tip `86a729cd`
+  (strength-state multi-event extension).
+- Blocked by: none — **RESOLVED 2026-08-20 ~20:2xZ.** The todo-document
+  addendum was the last open item. `mlb-overview-hydration-cost`'s claim on
+  it was checked twice (Monitor `blo3omza7`, plus a direct re-read) and
+  found still OPEN with its owning session (`80b3e432`) confirmed gone from
+  the session roster entirely (archived or not). User explicitly authorized
+  proceeding despite the stale claim. Released just that one path from the
+  other lane's `Files:` block (narrow, reversible, code/test files left
+  claimed), added the §2A/§2B addendum, confirmed `ledger-postwrite-check.py`
+  still EXIT:0. One self-inflicted near-miss on the way: the first release
+  edit re-mentioned the bare filename on a later continuation line with no
+  disclaimer marker, which `lane-guard.py`'s own parser picked up as a fresh
+  accidental claim on itself — caught by simulating the hook directly
+  (`echo <payload> | python .claude/hooks/lane-guard.py`) rather than
+  guessing from the error text, fixed by removing the bare re-mention.
