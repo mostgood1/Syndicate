@@ -1,4 +1,4 @@
-﻿# Syndicate — Work Lanes
+# Syndicate — Work Lanes
 
 > Lanes are exclusive by file path. Two lanes may not claim the same file.
 > Max concurrent OPEN lanes: 3 (see `state.md`).
@@ -446,74 +446,58 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~20:3xZ — 9-LEAGUE RE-RUN STILL IN FLIGHT AGAINST THE FIXED BACKTEST PIPELINE, ALL INPUT-QUALITY WORK NOW LANDED
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-20 ~06:2xZ — TESTABLE OUTCOME NOT MET; CORE HYPOTHESIS FALSIFIED BY ITS OWN PRE-REGISTERED TEST; INPUT-QUALITY AVENUE EXHAUSTED, NEXT SESSION NEEDS A NEW HYPOTHESIS
 
-- Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
-  the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
-  least one non-`belgian_pro_league` league, stdev(P home) rising from
-  **0.1575** toward market's **0.1811**. Baseline:
-  `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
-- **FOUND AND FIXED 2026-08-19 ~19:2xZ, before trusting any re-run number:**
-  the backtest rated ALL 9 leagues via the goals-as-xG fallback
-  (`team_rows_from_match_history`), but `build_soccer_artifacts.py`
-  (production) reads REAL Understat xG+ppda from `team_history/*.csv` for 5
-  of them (epl/la_liga/bundesliga/serie_a/ligue_1) — the backtest was
-  measuring a different pipeline than production runs for over half the
-  leagues. Fixed by mirroring production's branch exactly
-  (`_GOALS_BASED_RATING_LEAGUES`, asserted equal by a new test,
-  `73b76b66`/landed `3ad5c8a4`). Also resolves the `ppda` CONSUMED+
-  UNPOPULATED checklist alarm for free — the data was already on disk,
-  already used live, just not in this backtest. Killed a ~1.5h-in run on the
-  OLD pipeline rather than trust its number for those 5 leagues; the 9-league
-  re-run below is against the FIXED pipeline. Full detail in the log.
-  **NOT FIXED, flagged not fixed:** production's own Understat branch does
-  NOT fold in ESPN possession/set-piece even though `espn_match_stats.json`
-  exists for all 5 of those leagues — a real, separate opportunity, out of
-  scope for this fix (which only had to match what production already does).
-- **9-LEAGUE RE-RUN IN FLIGHT** against the fixed pipeline (launched
-  ~19:3xZ). **Do not report a Brier/stdev number against the 08-15 baseline
-  until this lands — the run before this one was killed specifically because
-  its number would not have been trustworthy.**
-- Status of this session's input-quality work (full narrative in
-  `.syndicate/log/2026-08-19.md`, dated entries — do not duplicate here):
-  xG double-count fixed+validated+kept; shots-weight shrink reverted (was
-  falsified, recorded); dispersion-overshoot mechanism fully decomposed via
-  isolated 2x2 probe, treated as a closed stopping point per explicit
-  instruction; `clean_sheet_rate` fitted (pooled, significant) but its paired
-  backtest trended unfavorably — **discarded**; `possession_share`/
-  `set_piece_goal_share` sourced, wired, pooled-regression-tested (not
-  significant, favorable trend) — **kept**; `starters_available_share`
-  sourced (walk-forward core-XI overlap from ESPN boxscores), pooled-fit
-  significant (t=+2.06), fully wired end to end
-  (commit `d1136447`, BACKTEST-HONEST ONLY — not live-wired, see log), paired
-  test now complete: mean delta -0.0049 vs the possession baseline, t=-1.31,
-  **not significant, favorable direction** — **kept**, same disposition as
-  possession/set-piece and the opposite of `clean_sheet_rate`.
-  **`market_features.confidence`** (de-vigged closing-odds implied
-  probability, `_market_prior_index`) sourced, wired CLI-gated
-  (`--wire-market-confidence`, default OFF — not unconditional like the
-  other three), paired test complete: mean delta -0.0040, t=-0.96, **not
-  significant, weaker than every other field tested this session** —
-  **kept as built, not promoted further**: this one reuses the SAME closing
-  odds the lane benchmarks against, so any improvement is shrinkage-toward-
-  market, not independent skill (`089c42bd`).
+- Goal (unchanged, still NOT met): `backtest_soccer_h2h_calibration.py`
+  reports model Brier **<= market** on at least one non-`belgian_pro_league`
+  league. Baseline: `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+- **RESULT, 2026-08-20 ~06:00Z, against the FIXED pipeline (`3ad5c8a4`) and
+  every input-quality change this session made:**
+  `reports/soccer_backtest/h2h_calibration_2026-08-19_fixed_pipeline_all9_s300_limit120.json`
+  (session worktree, not committed) — **worse than market in 8 of 9
+  leagues, `belgian_pro_league` the same single exception as 08-15,
+  unchanged.** Mean model stdev(P home) rose **0.1575 -> 0.1922**, PAST
+  market's own 0.1859 (model no longer under-dispersed). **This is the
+  lane's own pre-registered falsification outcome** ("if the Brier gap does
+  not close while stdev rises to market's, under-dispersion is NOT the
+  binding constraint") — recorded as an OVERTURNED belief in
+  `learnings.md`, 2026-08-20. Full numbers + reasoning in the log
+  (2026-08-20 entry) and `state.md`.
+- **The input-quality avenue is exhausted, not abandoned.** Every field this
+  session set out to check — xG double-count, shots-weight shrink,
+  clean_sheet_rate, possession_share, set_piece_goal_share,
+  starters_available_share, pace_seconds_per_event, ppda, the backtest/
+  production pipeline mismatch, market_features.confidence — is sourced (or
+  correctly ruled out), tested, and disposed with a stated reason. None of
+  it was wasted (the engine is measurably more complete and honest about
+  what it doesn't know than at session start), but none of it closed the
+  Brier gap either. **Do not re-open this list without new evidence that a
+  specific field is systematically BIASED, not just present or absent** —
+  that is the falsification test's actual implication: the spread was fixed
+  and it didn't help, so the next hypothesis has to be about what the
+  ratings get systematically WRONG, not another input or another knob on
+  dispersion.
 - Files: `scripts/backtest_soccer_h2h_calibration.py`,
   `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
   `scripts/soccer_sim_input_checklist.py`, `syndicate/features/soccer/` (sim
   engine, adapters, ratings, `ingestion/espn_match_stats.py`),
   `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
   `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`,
-  `tests/test_soccer_advanced_input_reachability.py`, `reports/soccer_backtest/`.
+  `tests/test_soccer_advanced_input_reachability.py`,
+  `tests/test_backtest_matches_production_rating_source.py`,
+  `reports/soccer_backtest/`.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: **the ONLY open thread now is the 9-league re-run above.**
-  Every input-quality field this session set out to check
-  (xG/shots/clean_sheet/possession/set-piece/availability/pace/ppda/
-  market_confidence) is landed, tested, and disposed (kept or discarded,
-  each with a stated reason). Check the re-run, compare against the 08-15
-  baseline per the original testable outcome, and that is this lane's
-  original goal either met or not — no more input work is queued behind it.
+- Next action: **a new hypothesis, not another input pass.** Candidates not
+  yet tried: per-league systematic bias decomposition (is the model wrong
+  the same direction every time, or randomly — the reliability tables in the
+  08-20 result suggest calibration issues at specific probability buckets,
+  not a uniform shift); whether `belgian_pro_league` being the one exception
+  says something about what's different there (league-specific effect worth
+  isolating before assuming it's noise); or stepping back to question
+  whether Brier-vs-closing-line is achievable at all for a model built on
+  this data at this sample size, separate from whether the model is "good."
 - Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
@@ -1063,64 +1047,13 @@ history directly:
   log lines (or a named skip reason) in production logs -- not the env
   var alone.
 
-### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
+### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
 - Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
 - Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
-- **RESULT `[2026-08-19]` — the hypothesis was HALF RIGHT, and the half that was
-  wrong is the more useful finding.** The projection idea ("the worker keeps only
-  `games`, so skip the page furniture") was not needed: the two real costs were
-  *inside* what the worker does read.
-  - **Feed/live prune.** `liveData.plays.allPlays` is **66.38%** of a StatsAPI
-    feed/live document and `playsByInning` a further **3.05%** (measured over the
-    15 documents of 2026-06-14, 12,605,243 JSON bytes), and **nothing in
-    `syndicate/` reads either** — every `allPlays` reader is an offline script or
-    `vendor/`, each opening the artifact off disk itself. `_daily_actual_by_game`
-    holds one such document per game live for the whole build. Denylist, not
-    allowlist, so every other consumer is untouched.
-  - **A dead shard load.** `_enrich_games_with_tracked_market_lines` read the
-    whole odds_history shard to consult `doc["games"]`. **The shard has no
-    `games` key and never has had one** — one writer, one literal schema, `git
-    log -S` finds no revision that emitted it, and all three real shard copies on
-    disk confirm `has_games=False`. Worker-only, today-only (= every board
-    build), uncached. `.syndicate/deploys.md` 2026-08-16 called this "the best
-    candidate on the table" and asked for an in-pass measurement to settle it;
-    **the WRITER's schema settles it, and was readable the whole time.**
-- **VERIFICATION RAN.** `scripts/measure_cards_context_rss.py`, worker path
-  (`SYNDICATE_WEB_DYNO=0`), 15-game slate, 5 repeats per arm, prune the only
-  variable:
-
-      peak RSS       142.9 MB -> 114.5 MB   (-28.4 MB, -19.9%)
-        spread    142.7-143.1   114.1-114.9
-      transient       +55.7 MB ->  +35.0 MB
-      retained        +11.8 MB ->   +2.8 MB
-      _daily_actual_by_game retention  +13.6 MB -> +1.9 MB
-      serialised games list   343,503 B both arms -- IDENTICAL
-
-  RSS on a sampling thread, **not `tracemalloc`** — `handoff_refresh_worker_oom.md`
-  records tracemalloc as structurally blind to this exact failure mode.
-  10 tests in `tests/test_mlb_cards_worker_hydration_cost.py`, incl. the
-  reachability pair (`off != on`) and a schema-coupling test that fails if the
-  shard ever grows a `games` key. 103 MLB cards tests green. The 6 red
-  `test_archives` cases are PRE-EXISTING in a `data/`-less worktree — verified by
-  re-running them on a stashed tree, same 6.
-- **FALSIFICATION NOT TRIGGERED, and the limits are stated rather than implied.**
-  (a) No candidate-path consumer reads the dropped sections. (b) `off != on`, so
-  the mechanism fires. **BUT:** the ~125MB shard figure is NOT in the table — the
-  local mirror has no dated shard and the harness runs a PAST date, so that path
-  is never exercised locally. It is a production-only claim derived from a
-  measured file size (19,798,176 B) and `#435`'s ~6.3x resident ratio.
-- **NOT CLAIMED: that the ~2GB production excursion is fixed.** Three named
-  candidates before this one were live, exercised, and moved the transient by
-  nothing measurable. Ship, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`
-  as a RATE against a same-clock-window baseline — never a post-deploy hour,
-  because only a cold process clears that bar.
-- Landed `ab99d236` on `origin/main`. **No deploy made, no claim taken.**
-  Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
-
 
 ### ci-utc-midnight-window — CLOSED 2026-08-20 — **`#482` CONFIRMED FIXED INSIDE the 00:00-05:00Z window: run `32323646103` (`df8aec91`, 02:09Z) green on both gated steps, against 11 consecutive failures 01:24-01:53Z in the same band without it. CI is no longer red on the clock.** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
@@ -1157,6 +1090,93 @@ history directly:
   (skipped=2) and the 7 touched tests OK — but this box is Central, so that
   shows no regression and proves nothing about the window. The CI run is the
   proof.
+- Blocked by: none.
+
+### wnba-live-odds-capture-gap — OPEN — **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, NOT `#343`-shaped. WNBA's phase=live odds fetch works fine in isolation; the COMBINED sports=mlb,wnba,soccer sweep starves it. No code fix landed yet.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
+  game goes live, instead of freezing at its last pregame quote.
+  **Testable outcome:** for a WNBA game currently in live state, re-pull
+  `wnba_source/tracking/book_quotes/<date>.jsonl` and confirm at least one
+  market's `captured_at` is newer than the game's own kickoff time.
+- Files:
+  - `scripts/refresh_odds_sources.py` (`_build_wnba_steps`) — read-only
+    reference until the actual defect location is confirmed; do not edit
+    without re-claiming narrowly, same convention the soccer lane used for
+    this same file.
+  - Not claimed, read-only reference: `scripts/run_live_odds_refresh_worker.py`
+    — likely relevant (soccer's autorun equivalent lived here), not yet
+    confirmed WNBA has an analogous live-phase launcher at all.
+- Hypothesis: WNBA's live-phase odds fetch either (a) does not exist as a
+  distinct step from the soccer-style `phase=live` odds capture, or (b)
+  exists but is failing/never firing, structurally similar to `#343`
+  (soccer's bulk-endpoint 422) but a different mechanism, since WNBA's
+  fetch script and market list have never been touched by that fix.
+- **Already established, measured 2026-08-20 ~02:18Z (do not re-derive):**
+  Minnesota Lynx @ Golden State Valkyries (kickoff 2026-08-20T02:10:00Z):
+  every h2h/spreads/totals/prop market for this matchup shares ONE
+  `captured_at` (`2026-08-20T00:31:28Z`) — 99 minutes BEFORE kickoff, zero
+  refreshes since, 107+ min stale at check time. Distinct from the sim-side
+  gap already documented in `per_sport_ingest.wnba.enrichment.
+  live_projections` (`reason: "no live re-sim wired for wnba"`) — that is
+  about projections, this is about the underlying MARKET QUOTE, which a
+  pure book-price EV play does not need a sim for at all.
+- Falsification test: find a WNBA-specific `phase=live` odds-fetch step
+  that DID run recently for this game (any log evidence of an attempt,
+  success or failure) — if one exists and simply failed silently, the
+  hypothesis narrows to (b); if none exists at all in the step-builder,
+  hypothesis (a) is confirmed and this is a missing feature, not a bug.
+  **RESOLVED: hypothesis (b), but not `#343`-shaped — see below.**
+- **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, tested directly, not inferred.**
+  1. `_build_wnba_steps` (`scripts/refresh_odds_sources.py:828`) DOES fire
+     for `phases=("pregame","live")` — hypothesis (a) is dead.
+  2. Replicated the exact discovery + per-event `/odds` call this fetcher
+     makes (`fetch_basketball_oddsapi_props_local.py`, event_id
+     `09563bab4edf9cf2073ee946ad95d61b`, Lynx@Valkyries) directly against
+     production OddsAPI: **HTTP 200, 8 bookmakers, every market present.**
+     This is NOT `#343` — the market list is fine (this fetcher already
+     uses the safe discover-then-intersect pattern, unlike soccer's old
+     naive bulk request; its own code comment even cites `#343` by name as
+     the reason it was built this way).
+  3. Confirmed genuinely stale via the unambiguous `event_id` join (not a
+     team-name mismatch in the diagnostic): 6,981 rows for this event, all
+     frozen at `captured_at=2026-08-20T00:31:28Z`, 2+ hours stale.
+  4. **The autonomous sweep's own outcome log admits the failure directly:**
+     `[live_refresh_loop] ODDS_SWEEP_OUTCOME sport=wnba wrote=False
+     exists=True since_launch_s=193 sidecar_age_s=7449` (02:35:49Z) — no
+     inference needed, the sweep says it did not write.
+  5. **Fired a manually SCOPED trigger** (`POST /api/ops/odds-refresh/run`,
+     `phase=live, sports=wnba` ONLY — no mlb, no soccer) and it succeeded
+     immediately: `PUBLISH_OK path=wnba_source/tracking/book_quotes/
+     2026-08-19.jsonl bytes=6983198` at 02:37:07Z. Re-pulled the shard:
+     7,851 rows (up from 6,981), latest `captured_at` **1.7 minutes old**.
+     Verification step (below) is DONE for this specific game.
+  - **Mechanism:** `live_refresh_loop.py`'s sweep calls
+    `launch_refresh_run(sports=launch_sports, ...)` ONCE per tick with ALL
+    active sports combined (`sports=mlb,wnba,soccer`) — one subprocess, one
+    `refresh_odds_sources.py --sports mlb,wnba,soccer` invocation. Step
+    order follows `REGISTRY`'s insertion order: `mlb` (heaviest, most
+    complex live-phase work) runs BEFORE `wnba`. Under load, MLB's own
+    live-phase cost appears to consume the sweep's effective time/resource
+    budget before WNBA's step gets a turn — same general SHAPE as soccer's
+    pre-`#433` problem (a heavy sport starving a lighter one sharing one
+    combined run), but the mechanism is scheduling/ordering within ONE
+    process, not a market-list API error. NOT yet proven which specific
+    resource is exhausted (wall-clock step budget vs memory vs something
+    else) — that is the next open question, not this session's finding.
+- **Not done yet — no code fix.** The manual trigger only fixed THIS one
+  game, THIS one cycle; the combined sweep will still starve WNBA on its
+  next autonomous tick. A real fix needs either: reordering WNBA ahead of
+  MLB in the combined run (mirrors `#433`'s soccer fix shape), splitting
+  WNBA into its OWN separate sweep call independent of MLB/soccer, or
+  giving each sport an enforced per-step time budget within the combined
+  run. Whoever picks this up should re-read `_apply_pregame_sport_cadence`
+  and the `ODDS_SWEEP_LAUNCHED` call site in `live_refresh_loop.py` before
+  choosing — the fix should not touch `_build_wnba_steps` itself, which is
+  confirmed correct.
+- Verification: DONE for one isolated manual trigger (above); NOT YET done
+  for the autonomous sweep post-fix — that requires the actual code change
+  first, then re-observing a real `ODDS_SWEEP_OUTCOME sport=wnba wrote=True`
+  on a normal (not manually scoped) tick.
 - Blocked by: none.
 
 ### home-stack-test-data-dependence — CLOSED 2026-08-20 — **Hypothesis HELD. Overview pinned to a fixture; test passes at any hour, full suite 383 OK. Reachability proved off != on (flipping `active_today` fails it).** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
