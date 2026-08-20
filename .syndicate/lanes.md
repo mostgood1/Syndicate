@@ -690,10 +690,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     rewritten two OTHER lanes' blocks; `ledger-append-guard.py` was fully
     INERT in every worktree. Both fixed + measured, shared resolver in
     `commit_context.py`, 33 new tests. `commit-guard.py` refactor proven a
-    behavioural no-op. **Neither new suite is in CI.** Cross-lane edit taken
-    under explicit user instruction while this lane was flagged possibly
-    orphaned. Detail: `.syndicate/log/2026-08-20.md`.
-  - `ledger-postwrite-check.py` line 62 has the same primary-tree bug, NOT fixed.
+    behavioural no-op. Cross-lane edit taken under explicit user instruction
+    while this lane was flagged possibly orphaned.
+    Detail: `.syndicate/log/2026-08-20.md`.
+  - **CLOSED — all four guards fixed, all four suites ENFORCED in CI**
+    `[2026-08-20]`: `f73d163e` fixed `ledger-postwrite-check.py` (blind to
+    worktree Bash writes, and it blamed whichever session observed the change);
+    `86ec6b42` wired all four suites in, **verified green on the Linux runner**
+    (run 32415246596 — 16/16, 17/17, 16/16, 10/10). Enforced rather than
+    tolerated because each suite was mutation-tested first. `lane-guard` is
+    EXONERATED: same mangled relpath, absorbed by exact-or-suffix matching — do
+    NOT "fix" its `root`, the PRIMARY tree is correct for it.
   - `land` reports the ledger checkers rather than gating on them.
   - The new deploy predicate has never gated a real deploy; `OFF_MAIN` has never
     fired in anger; no preflight receipt consumed live. First real deploy tests it.
@@ -1173,7 +1180,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   commit that stopped the card publishing a fabricated 0-0. **Do not
   `git add` either from the primary tree.** This session worked in
   `C:\tmp\syndicate-sessions\soccer-board-mlb-parity` and did not commit them.
-### mlb-native-ladders-producer — OPEN — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`): today the vendored Flask frontend writes this artifact on EVERY cycle (`daily_update.py:3694`) and Syndicate's native builder is a fallback that fires only when that stage errors.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
   stamped on the SERVED artifact — with the vendor ladders stage removed from
@@ -1204,7 +1211,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### nfl-artifact-allowlist-add — OPEN — opened 2026-08-20 — session: nfl-artifact-allowlist-add
+### nfl-artifact-allowlist-add — CLOSED-VERIFIED 2026-08-20 — landed `2cb773e4` on `origin/main` — opened 2026-08-20 — session: nfl-artifact-allowlist-add
 - Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
   artifact_publisher.py`) has no entries for the three new NFL artifacts
   this session's autoruns produce -- `injuries_{season}.csv`,
@@ -1229,6 +1236,19 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   depth_2026_snapshot.csv`) matches at least one pattern in the updated
   allowlist; existing allowlist tests still pass (no regression on
   prior entries).
+- Verification: DONE. New test
+  (`test_accepts_nfl_injuries_roster_and_depth_chart_artifacts`) asserts
+  all 3 real produced paths match, plus 2 negative cases confirming the
+  `nfl_source/`-scoped patterns do NOT bleed into another sport's tree
+  under the same subdirectory names. Full `test_artifact_publisher.py`:
+  97 passed, 3 subtests passed, no regressions. Cross-checked the
+  injuries pattern against the REAL resolver (not just the hardcoded
+  test string) by writing a real file at `nfl_artifact_output_root()`'s
+  actual write location and confirming `nfl_injuries_path()` resolves
+  back to it, matching the pattern -- an earlier naive check against an
+  empty checkout hit `default_nfl_source_root()`'s different miss-
+  fallback root and looked like a mismatch; re-verified against a
+  populated fixture before trusting either the pattern or the test.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

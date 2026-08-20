@@ -97,7 +97,16 @@ def fetch_events(
         payload = fetch_espn_scoreboard(league, date_range=window, timeout=timeout)
         for event in payload.get("events") or []:
             competition = (event.get("competitions") or [{}])[0]
-            status = (competition.get("status") or {}).get("type") or {}
+            # `status_block` is ESPN's `competition.status`; `status` is its
+            # nested `.type`. Kept under the old name because `state` and the
+            # detail strings genuinely live on `.type` -- but the CLOCK does
+            # not. `clock`/`displayClock`/`period` sit on the OUTER block, and
+            # reading them off `.type` returns None for all three on a match
+            # that is very much in progress. Measured on live fixture
+            # 401882908: `.type` has no `clock` key at all, while the outer
+            # block reads `clock: 4200.0, displayClock: "70'", period: 2`.
+            status_block = competition.get("status") or {}
+            status = status_block.get("type") or {}
             state = str(status.get("state") or "").lower()
             if statuses is not None and state not in statuses:
                 continue
@@ -107,6 +116,24 @@ def fetch_events(
             competitors = competition.get("competitors") or []
             home = next((c for c in competitors if c.get("homeAway") == "home"), {})
             away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+            # THE LIVE CLOCK, which this function saw and threw away.
+            #
+            # `build_live_state`'s docstring is explicit that it cannot infer a
+            # live clock ("a quiet spell with no shots/cards would make it look
+            # earlier than it is") and that "live callers must source the actual
+            # current clock from ESPN's live status and pass it explicitly".
+            # `status` is that live status, and it was already in hand here --
+            # the only caller that needed it had no way to ask for it, so
+            # `poll_soccer_live_state` called `build_live_state` with no
+            # `as_of_seconds` and got the default full-match cutoff every time.
+            #
+            # `clock` is a continuous match-clock value in SECONDS (verified
+            # against live fixture 401882908 on 2026-08-20: `clock: 4200.0`,
+            # `displayClock: "70'"`, `period: 2`) -- which is exactly the unit
+            # `build_live_state(as_of_seconds=...)` wants, no conversion.
+            # `displayClock`/`detail` are ESPN's own rendering of the same
+            # instant and are what a card should show a human ("70'", not
+            # "1200 seconds remaining in half 2").
             found[event_id] = {
                 "event_id": event_id,
                 "date": event.get("date"),
@@ -115,6 +142,11 @@ def fetch_events(
                 "away_team": (away.get("team") or {}).get("displayName"),
                 "home_score": home.get("score"),
                 "away_score": away.get("score"),
+                "status_clock_seconds": status_block.get("clock"),
+                "status_display_clock": status_block.get("displayClock"),
+                "status_period": status_block.get("period"),
+                "status_detail": status.get("detail") or status.get("shortDetail"),
+                "status_description": status.get("description"),
             }
     return list(found.values())
 

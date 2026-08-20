@@ -130,6 +130,19 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # unexpectedly matching an unrelated shallow-depth file in another
     # sport's tree.
     "nfl_source/oddsapi_player_props_*.csv",
+    # `nfl-injuries-fetcher` / `nfl-roster-depth-autorun`: the three real
+    # NFL data-ingestion artifacts wired into refresh-worker autoruns
+    # 2026-08-20, none of which were allowlisted at the time -- production
+    # presence of any of them was unauditable from `/api/ops/artifacts/
+    # export` until now. Scoped to `nfl_source/` specifically, same
+    # discipline the pattern immediately above already established (a
+    # broader `*_source/...` wildcard risks matching an unrelated
+    # shallow-depth "rosters"/"depth" dir in another sport's tree, not
+    # verified here). `#208`'s lesson still applies: allowlisting PERMITS
+    # the transfer, it does not by itself arm any autorun.
+    "nfl_source/tracking/nflverse/injuries/injuries_*.csv",
+    "nfl_source/source_artifacts/data/processed/rosters/roster_*_snapshot.csv",
+    "nfl_source/source_artifacts/data/processed/depth/depth_*_snapshot.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

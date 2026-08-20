@@ -168,6 +168,23 @@ def _live_status_token(sport: str, game: dict[str, Any]) -> str | None:
                 return f"INN {ordinal.group(1)}"
         return None
 
+    if sport == "soccer":
+        # Soccer's clock is a MINUTE COUNTING UP, not a period plus a countdown,
+        # and its own scoreboards render it that way -- "83'", "90'+7'". The
+        # generic branch below would emit "P2 " (period prefix, no clock),
+        # which is both wrong for the sport and empty of the one number a
+        # viewer wants. Same shape as the `mlb` branch above: a sport whose
+        # clock does not fit the shared model gets its own branch rather than
+        # bending the shared one.
+        #
+        # `clock` is ESPN's display string, put there by soccer's
+        # `_live_state_block`. Falls through to None when absent, which is the
+        # pre-existing behaviour -- soccer has never had a live token.
+        clock = _text(live_state.get("clock"))
+        if clock:
+            return clock
+        return None
+
     prefix = "Q" if sport in _BASKETBALL_SPORTS or sport in _FOOTBALL_SPORTS else "P"
     period = _text(live_state.get("period") or game.get("period") or live_state.get("quarter"))
     clock = _text(live_state.get("clock") or game.get("clock") or live_state.get("game_clock"))

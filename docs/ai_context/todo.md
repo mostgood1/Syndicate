@@ -1,6 +1,58 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#488` — **OPEN. Two services publish DIFFERENT content to the SAME artifact path; last writer wins, silently. Platform-wide, not basketball-specific** — FOUND 2026-08-20, lane `basketball-model-owner`
+### `#493` — **MLB VENDOR EXIT: make `ladders_build` the PRODUCER and delete the vendor ladders stage. Stage 1 of 20.** Fix SHIPPED and LIVE; production verification UNDISCHARGED — lane `mlb-native-ladders-producer`
+
+**What was wrong.** MLB pregame starter ladder chips rendered nothing, and on 12
+of 18 sides the starter's NAME vanished too. Cause was not missing data:
+`#440`'s native `ladders_build` pinned its row schema to the TOP-PROPS reader and
+dropped `gamePk`, `pitcherId` and `ladder[]` — the three fields `cards.py`'s
+pregame chip builder joins on and builds from (`cards.py:1166`, `:1102`). The
+compact card also gated the starter's NAME on the same badge list as its chips,
+so both symptoms had one cause. Fixed in `a54dffa3` (live on refresh-worker
+2026-08-20T18:27:40Z), verified locally over real production inputs: **18/18
+starters get a chip, was 0/18**.
+
+**Why it is still open.** The fix has NEVER EXECUTED in production.
+`run_mlb_daily_sim_job.py:237` runs `vendor/.../tools/daily_update.py`, whose
+line 3694 writes the VENDOR 26-field ladders artifact as a normal stage; the
+native `is_stale` check at line 488 then correctly reads `fresh` and skips. The
+native builder is a FALLBACK that fires only when the vendor stage ERRORS
+(`daily_update.py:3684`). So the board is served by the vendor writer, and
+`#440`'s builder is the degraded path — which is exactly why a broken schema
+there went unnoticed.
+
+**THE READING THAT DISCHARGES THIS — and the one that does NOT.** Chips on the
+board prove NOTHING; the vendor writer renders them either way. Proof is the
+served `daily_ladders_<date>.json` carrying BOTH
+`generatedBy == "syndicate.features.mlb.ladders_build"` AND populated
+`ladder[]`/`gamePk` on 18/18 pitcher rows:
+
+    curl -H "X-Admin-Token: $ADMIN_TOKEN"       "https://syndicate-an21.onrender.com/api/ops/artifacts/stream?path=mlb_source/source_artifacts/data/daily/ladders/daily_ladders_status_2026_08_20.json"
+
+**State at hand-off `[2026-08-20 20:37Z]`:** force knob shipped and LIVE
+(`a0396411`, 20:28:43Z, verified by CONTENT on the live SHA);
+`SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET on refresh-worker; last status
+`skipped_fresh` at 20:11:24Z, which PREDATES the deploy. The next sim cycle
+should fire it. **The knob is ONE-SHOT** (`722ed651`) — it fires once, records
+`forced` in the status artifact, and declines thereafter, so a forgotten or
+future-dated value costs one extra rebuild, never a sticky day of them.
+**`SYNDICATE_MLB_LADDERS_FORCE_DATE` should still be REMOVED from refresh-worker
+as hygiene** (Claude's env writes are classifier-blocked; needs a dashboard
+edit).
+
+**Remaining work to actually close it.** 4 presenter fields `ladders_common.py`
+reads and native does not emit (`lineupOrder`, `paMean`, `matchupReasons`,
+`matchupSummary`); a DECISION on hitter ladders (0/234 native vs 234/234 vendor
+— no consumer reads them, and this artifact has already silently blown
+`_PUBLISH_MAX_BYTES` once, so do not add them without a consumer); then delete
+the vendor ladders stage. **Do not delete it before native is proven on the
+normal path** — the board runs on the vendor artifact today.
+
+**The other 19 stages:** `state.md [mlb-vendor-exit-audit]`. 18 of 20 have no
+native producer; `current_day_multi_profile` is the sim itself and gates
+everything downstream, so scope it before planning the rest.
+
+### `#488` — **FIXED AND DEPLOYED 2026-08-20 on all three services. Two services published DIFFERENT content to the SAME artifact path; last writer won, silently. STAYS OPEN for ONE reason: the guard has never refused a real publish in production, so it is correct on 7 synthetic cases and UNPROVEN in the field** — FOUND + FIXED 2026-08-20, lane `basketball-model-owner` (lane RELEASED — unowned)
 
 **THE OBSERVATION THAT EXPOSED IT.** Reading
 `wnba_source/data/processed/boxscores_history.csv` twice, ~20 minutes apart,

@@ -204,7 +204,11 @@ def _status_label(status_state: str, kickoff: str | None) -> str:
     return _format_kickoff_display(kickoff)
 
 
-def _live_state_block(status_state: str, kickoff: Any = None) -> dict[str, Any]:
+def _live_state_block(
+    status_state: str,
+    kickoff: Any = None,
+    live_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The STRUCTURED liveness signal, which soccer knew and never published.
 
     THE DEFECT THIS FIXES, measured on production 2026-08-16 18:03Z: the soccer
@@ -253,13 +257,46 @@ def _live_state_block(status_state: str, kickoff: Any = None) -> dict[str, Any]:
     contradiction.
     """
     state = _effective_status_state(status_state, kickoff)
-    return {
+    block: dict[str, Any] = {
         # `final` wins over `in_progress` in both readers anyway, but stating
         # both explicitly keeps this readable as a state machine rather than as
         # two independent flags that could contradict each other.
         "in_progress": state == "in",
         "final": state == "post",
     }
+    # THE CLOCK AND PERIOD, which nothing published and every reader wanted.
+    #
+    # `publication_adapter._shared_game_state` builds `shared_game_state` by
+    # reading `live_state["period"]` and `live_state["clock"]`, and
+    # `game_board_contract._actual_score_section` renders them as
+    # "Live score -- {period} {clock}". Soccer emitted neither, so a match
+    # genuinely in progress served `clock: ""` and `period: null` and the card
+    # captioned a live score with nothing at all. Verified on fixture
+    # 401882908 while `live_state.in_progress` was true.
+    #
+    # `clock` carries ESPN's OWN display string ("83'", "90'+7'") rather than
+    # a minute re-derived from `half`/`clock_remaining`, which would disagree
+    # with every scoreboard about stoppage time. `period` stays the raw half
+    # number because `_shared_game_state` runs it through `_first_number` and
+    # drops anything non-numeric.
+    #
+    # NOTE the docstring above: no `status` key is added here, on purpose.
+    # `game_chip_scoreboard._game_flags` folds `live_state["status"]` into a
+    # substring haystack, and a display string in it would reintroduce exactly
+    # the prose-matching this block replaced. `clock`/`period` are NOT read by
+    # that haystack -- checked, it reads only `status` -- so they are safe.
+    if state == "in" and isinstance(live_state, dict):
+        clock = live_state.get("status_display_clock") or live_state.get("status_detail")
+        clock_text = str(clock).strip() if clock is not None else ""
+        if clock_text:
+            block["clock"] = clock_text
+        # NO `period` KEY FOR SOCCER, deliberately. `_shared_game_state` feeds
+        # both into `game_board_contract._actual_score_section`, which renders
+        # them as "{period} {clock}" -- and soccer's minute ALREADY encodes the
+        # half ("83'" cannot be in the first). Emitting both produced the
+        # redundant "Live score -- 2 83'". Every other sport's clock restarts
+        # each period and genuinely needs the number; soccer's does not.
+    return block
 
 
 def _box_score_line(
@@ -519,13 +556,21 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
 def _real_live_score(live_state: dict[str, Any] | None, side: str) -> Any:
     """A live score ONLY when the live poller actually reported one.
 
-    Deliberately does NOT fall back to the recommendations artifact's
-    `live_{side}_score`: those are the constant "0" placeholder described at
-    the call site. A missing score must read as missing, never as nil-nil.
+    `score_{side}` FIRST, because that is the key the poller actually writes.
+    `poll_soccer_live_state.poll_league` copies `build_live_state`'s
+    `score_home`/`score_away` straight through into the per-event entry, and
+    this function looked only for `{side}_score`, `{side}_goals` and `{side}`
+    -- none of which that payload has ever carried. So it returned None while
+    the real, event-derived score sat in the file it had just read. MEASURED
+    2026-08-20 against the live La Liga fixture 401882908: `build_live_state`
+    returns `score_home: 1, score_away: 0`; this returned None for both sides.
+
+    The other three keys stay as tolerated aliases, not as a description of
+    the real shape -- `score_{side}` is the one in use today.
     """
     if not isinstance(live_state, dict):
         return None
-    for key in (f"{side}_score", f"{side}_goals", side):
+    for key in (f"score_{side}", f"{side}_score", f"{side}_goals", side):
         value = live_state.get(key)
         if isinstance(value, dict):
             value = value.get("score", value.get("goals"))
@@ -540,14 +585,80 @@ def _real_live_score(live_state: dict[str, Any] | None, side: str) -> Any:
     return None
 
 
+def _artifact_score(match: dict[str, Any], side: str, effective_state: str) -> Any:
+    """The recommendations artifact's own score, ONLY once the match is real.
+
+    `live_home_score`/`live_away_score` were written off as "a placeholder the
+    artifact builder writes, not a reading". THAT DIAGNOSIS WAS WRONG, and the
+    correction is the difference between soccer having a final score and not
+    having one at all.
+
+    Traced to the source: `build_soccer_artifacts.py:289` sets these from
+    `fetch_events`'s `home_score`/`away_score`, which is ESPN's own
+    `competitors[].score` off the scoreboard endpoint. That is a real reading
+    at every point in a match's life. It reads "0" before kickoff because
+    "0" is what the scoreboard says before kickoff.
+
+    The evidence behind the "placeholder" verdict was 12 sampled matches all
+    reading "0" -- but a census of EVERY git-tracked recommendations artifact
+    (2026-08-20, 57 matches across 10 leagues) finds `status_state == "pre"`
+    on **all 57**. The sample contained no started match at all, so it could
+    not distinguish "always 0" from "0 until kickoff". Measured directly
+    against ESPN the same day, through this exact field: the in-progress
+    fixture 401882908 reads '1'/'0', and completed Atletico Madrid v Malaga
+    reads '2'/'0'.
+
+    So the defect was never the value -- it was that the card published it
+    UNGATED. `d9a23a38` gated the score STRING on `effective_state` and
+    assigned `home_score`/`away_score` above it unconditionally; the card head
+    reads the latter, so a `pre` fixture rendered 0-0.
+
+    Gated here instead, once, on the same `effective_state` every other
+    state-dependent branch already uses -- so `_effective_status_state`
+    refusing an impossible `post` drops the score along with the badge,
+    rather than leaving a score on a match the card just decided has not
+    kicked off.
+
+    This is the ONLY score path that covers a FINAL match: the live poller
+    fetches `statuses={"in"}` and writes nothing for a finished one.
+    """
+    if effective_state not in {"in", "post"}:
+        return None
+    value = match.get(f"live_{side}_score")
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    if not text or not text.lstrip("-").isdigit():
+        return None
+    # int, not the artifact's stringly-typed "0": the caller assigns this to
+    # `away.score`/`home.score` and the template guards on `is not none`, so a
+    # real 0-0 draw must survive as a real 0.
+    return int(text)
+
+
 def _live_match_state(league: str, date_str: str, event_id: str) -> dict[str, Any] | None:
+    return _live_state_entry(league, date_str, event_id, "games")
+
+
+def _match_box_state(league: str, date_str: str, event_id: str) -> dict[str, Any] | None:
+    """The per-match box record, which spans LIVE and FINAL.
+
+    A different key from `games` on purpose -- see the writer in
+    `poll_soccer_live_state._build_match_boxes`. `games` holds only matches in
+    play, so it is empty for every finished fixture; `match_box` is the only
+    per-match reading a completed match has.
+    """
+    return _live_state_entry(league, date_str, event_id, "match_box")
+
+
+def _live_state_entry(league: str, date_str: str, event_id: str, key: str) -> dict[str, Any] | None:
     if not date_str or not event_id:
         return None
     payload = live_state_payload(league, date_str)
-    games = payload.get("games") if isinstance(payload, dict) else None
-    if not isinstance(games, dict):
+    section = payload.get(key) if isinstance(payload, dict) else None
+    if not isinstance(section, dict):
         return None
-    entry = games.get(event_id)
+    entry = section.get(event_id)
     return entry if isinstance(entry, dict) else None
 
 
@@ -1215,6 +1326,78 @@ def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abb
     }
 
 
+def _match_box_sections(
+    match_box: dict[str, Any] | None,
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    final: bool,
+) -> list[dict[str, Any]]:
+    """The REAL box score -- what happened -- as card sections.
+
+    MLB's box tab renders both a "Live / final box" (real batting and pitching
+    lines) and a "Sim box" (means). Soccer rendered only the sim's squad
+    projection, so a finished match's card could not tell you the score, the
+    scorers, or a single thing either team actually did. The ESPN numbers
+    existed the whole time; nothing shaped them for a card. See
+    `ingestion/espn_match_box.py`.
+
+    Returns [] rather than a placeholder when there is no reading, so the card
+    falls through to its own empty state instead of rendering an authoritative-
+    looking table of dashes.
+    """
+    if not isinstance(match_box, dict):
+        return []
+    sections: list[dict[str, Any]] = []
+    kicker = "Final" if final else "Live"
+
+    goals = match_box.get("goals") if isinstance(match_box.get("goals"), list) else []
+    goal_rows = []
+    for goal in goals:
+        if not isinstance(goal, dict):
+            continue
+        scorer = str(goal.get("scorer") or "").strip()
+        if not scorer:
+            continue
+        if goal.get("own_goal"):
+            scorer = f"{scorer} (OG)"
+        clock = str(goal.get("clock") or "").strip()
+        goal_rows.append([clock or "-", scorer, str(goal.get("team") or "").strip() or "-"])
+    if goal_rows:
+        sections.append(
+            {
+                "kicker": kicker,
+                "title": "Goals",
+                "body": f"{len(goal_rows)} goal{'s' if len(goal_rows) != 1 else ''} as played, in order.",
+                "columns": ["Min", "Scorer", "Team"],
+                "table_rows": goal_rows,
+                "rows": [],
+            }
+        )
+
+    teams = match_box.get("teams") if isinstance(match_box.get("teams"), dict) else {}
+    away_stats = (teams.get("away") or {}).get("stats") if isinstance(teams.get("away"), dict) else None
+    home_stats = (teams.get("home") or {}).get("stats") if isinstance(teams.get("home"), dict) else None
+    if isinstance(away_stats, dict) and isinstance(home_stats, dict):
+        # Ordered by the WRITER's list, not by dict iteration over one side --
+        # a stat ESPN reported for only one team would otherwise silently
+        # reorder the table or drop out of it.
+        labels = [label for label in away_stats if label in home_stats]
+        stat_rows = [[label, str(away_stats[label]), str(home_stats[label])] for label in labels]
+        if stat_rows:
+            sections.append(
+                {
+                    "kicker": kicker,
+                    "title": "Match stats",
+                    "body": "Team totals from the match feed, not the simulation.",
+                    "columns": ["Stat", away_abbr, home_abbr],
+                    "table_rows": stat_rows,
+                    "rows": [],
+                }
+            )
+    return sections
+
+
 def _match_to_game(
     match: dict[str, Any],
     *,
@@ -1240,25 +1423,44 @@ def _match_to_game(
     # others still presenting a match its own kickoff says has not started.
     effective_state = _effective_status_state(status_state, match.get("kickoff"))
     live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
+    # Fetched for `post` as well as `in`: a finished match has no `games`
+    # entry at all (the poller fetches `statuses={"in"}` for that section), so
+    # `match_box` is the only per-match reading it ever has.
+    match_box = (
+        _match_box_state(league, str(match.get("date") or "")[:10], event_id)
+        if effective_state in {"in", "post"}
+        else None
+    )
 
     betting = _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team)
     prop_picks = _prop_picks_by_player(league, week, season)
-    # `live_home_score` / `live_away_score` ARE NOT A SCORE. Measured across
-    # every git-tracked recommendations artifact, 2026-08-20: both fields are
-    # the string "0" on 12 of 12 sampled matches INCLUDING `status_state ==
-    # "pre"` -- fixtures that had not kicked off. The artifact builder writes
-    # a placeholder, not a reading, and nine consecutive 0-0 results across a
-    # league's completed slate is not a plausible set of soccer scores.
+    # TWO SOURCES, most-trusted first, and BOTH are real readings.
     #
-    # Publishing them as `away.score`/`home.score` put a FABRICATED 0-0 on any
-    # live match -- the exact failure Lane F removed from seven other sites in
-    # `game_board_contract.py`. Soccer has no trustworthy per-match live score
-    # in the card payload today, so it publishes NONE and the card renders its
-    # empty state. A real score belongs here when the live poller supplies one
-    # (`_live_match_state` reads `live_state_payload`, which is where it would
-    # arrive); until then absence is the honest value.
+    # 1. The live poller's `live_state` (`score_home`/`score_away`), rebuilt
+    #    from ESPN's own keyEvents feed. Freshest, and the only one that moves
+    #    between artifact rebuilds -- but it exists ONLY while a match is `in`
+    #    progress, because `poll_soccer_live_state` fetches `statuses={"in"}`.
+    # 2. The recommendations artifact's `live_{side}_score`, which is ESPN's
+    #    scoreboard score and is the ONLY source that covers a FINAL match.
+    #    See `_artifact_score` for why the earlier "it's a placeholder"
+    #    reading was wrong, and what the real defect was.
+    #
+    # Both are gated on `effective_state`, so a `pre` fixture publishes NO
+    # score and the card renders its empty state rather than a fabricated
+    # 0-0 -- the failure Lane F removed from seven other sites in
+    # `game_board_contract.py`, and the one `d9a23a38` reintroduced here by
+    # gating the score STRING while leaving the score FIELDS ungated.
     home_score = _real_live_score(live_state, "home")
     away_score = _real_live_score(live_state, "away")
+    if home_score is None and away_score is None:
+        # `match_box` carries `score_home`/`score_away` in the same shape, so
+        # `_real_live_score` reads it unchanged -- including coercing ESPN's
+        # stringly-typed '1' to a real int.
+        home_score = _real_live_score(match_box, "home")
+        away_score = _real_live_score(match_box, "away")
+    if home_score is None and away_score is None:
+        home_score = _artifact_score(match, "home", effective_state)
+        away_score = _artifact_score(match, "away", effective_state)
 
     summary = (
         f"Projected {away_team} {_fmt_num(team_projection.get('away_mean'), 1)} @ {home_team} "
@@ -1298,7 +1500,7 @@ def _match_to_game(
         # Structured liveness alongside the display string above. See
         # `_live_state_block`: `status` is prose and every downstream reader
         # wants a dict, which is why soccer sat at 100% `pregame`.
-        "live_state": _live_state_block(effective_state, match.get("kickoff")),
+        "live_state": _live_state_block(effective_state, match.get("kickoff"), live_state or match_box),
         # `detail` is the card's "Slate context" slot and every non-live
         # state puts the competition name in it. It used to be overwritten
         # with the score for live/final matches, which both lost the league
@@ -1348,7 +1550,7 @@ def _match_to_game(
             betting=betting,
             top_props=top_props,
             prop_picks=prop_picks,
-            live_state_block=_live_state_block(effective_state, match.get("kickoff")),
+            live_state_block=_live_state_block(effective_state, match.get("kickoff"), live_state or match_box),
             away_score=away_score,
             home_score=home_score,
         ),
@@ -1365,7 +1567,16 @@ def _match_to_game(
         "shared_box_sections": [
             section
             for section in (
-                _squad_box_sections(
+                # REAL box first, sim box after -- the same order MLB's box tab
+                # uses, and the order that matters: on a finished match what
+                # happened outranks what was projected.
+                *_match_box_sections(
+                    match_box,
+                    away_abbr=_abbr(away_team, league),
+                    home_abbr=_abbr(home_team, league),
+                    final=effective_state == "post",
+                ),
+                *_squad_box_sections(
                     squad_props=squad_props or [],
                     prop_picks=prop_picks,
                     away_team=away_team,

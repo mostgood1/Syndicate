@@ -6,6 +6,101 @@ from unittest.mock import patch
 from syndicate.app import create_app
 
 
+class UnknownLeagueSlugTests(unittest.TestCase):
+    """A bad league slug used to serve EPL under the requested league's name.
+
+    Every handler opened with `league = normalize_league(league)`, which maps
+    anything unrecognised onto `DEFAULT_LEAGUE`. Measured on production
+    2026-08-20: `/soccer/laliga/cards` (canonical: `la_liga`) returned HTTP
+    200 with Arsenal and Coventry fixtures under a La Liga heading, and
+    `/soccer/zzz/api/cards` returned 200 with EPL data.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        self.client = app.test_client()
+
+    def test_the_near_miss_spellings_404(self) -> None:
+        """The ones a person actually types. `laliga`/`seriea`/`ligue1` are
+        one underscore away from real slugs, which is why they went unnoticed
+        -- they returned a plausible-looking page."""
+        for path in (
+            "/soccer/laliga/cards",
+            "/soccer/seriea/cards",
+            "/soccer/ligue1/cards",
+            "/soccer/premierleague/cards",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_unknown_slugs_404_on_every_route_shape(self) -> None:
+        """The gate is a `url_value_preprocessor`, so this asserts the thing
+        that makes that choice worth it: page routes, api routes and routes
+        with a SECOND parameter are all covered by the one rule."""
+        for path in (
+            "/soccer/zzz",
+            "/soccer/zzz/cards",
+            "/soccer/zzz/api/cards",
+            "/soccer/zzz/props",
+            "/soccer/zzz/api/props",
+            "/soccer/zzz/live-lens",
+            "/soccer/zzz/archive",
+            "/soccer/zzz/market-board",
+            "/soccer/zzz/game/401879301",
+            "/soccer/zzz/api/game/401879301",
+            "/soccer/zzz/team/5/roster",
+            "/soccer/zzz/api/team/5/schedule",
+            "/soccer/zzz/api/schedule",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_the_404_names_the_valid_leagues(self) -> None:
+        body = self.client.get("/soccer/zzz/cards").get_data(as_text=True)
+        self.assertIn("zzz", body)
+        self.assertIn("la_liga", body)
+
+    def test_every_real_league_still_serves(self) -> None:
+        """REGRESSION GUARD. A gate that 404s a real league is worse than the
+        bug it replaces, so this walks the full canonical set."""
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+        for slug in sorted(LEAGUE_DISPLAY_NAMES):
+            with self.subTest(slug=slug):
+                self.assertEqual(self.client.get(f"/soccer/{slug}/api/cards").status_code, 200)
+
+    def test_slugs_are_case_insensitive(self) -> None:
+        """`normalize_league` lower-cased before comparing, so uppercase URLs
+        worked. The gate must not quietly take that away."""
+        self.assertEqual(self.client.get("/soccer/EPL/api/cards").status_code, 200)
+        self.assertEqual(self.client.get("/soccer/La_Liga/api/cards").status_code, 200)
+
+    def test_routes_with_no_league_segment_are_untouched(self) -> None:
+        """Werkzeug matches these static rules ahead of `/<league>`, so the
+        preprocessor sees no `league` key for them. If that ever stopped being
+        true these would 404, which is exactly what this catches."""
+        for path in ("/soccer/hub", "/soccer/cards", "/soccer/api/cards", "/soccer/market-board"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_normalize_league_stays_permissive_for_internal_callers(self) -> None:
+        """The URL boundary is strict; the internal helper is NOT, on purpose.
+        Feature modules pass leagues that came from artifacts and config rows,
+        and a hard failure there would take down a page over a stray value."""
+        from syndicate.features.soccer.sources import (
+            DEFAULT_LEAGUE,
+            is_known_league,
+            normalize_league,
+        )
+
+        self.assertEqual(normalize_league("zzz"), DEFAULT_LEAGUE)
+        self.assertEqual(normalize_league(None), DEFAULT_LEAGUE)
+        self.assertFalse(is_known_league("zzz"))
+        self.assertFalse(is_known_league(None))
+        self.assertTrue(is_known_league("  EPL  "))
+
+
 class SoccerBlueprintRouteTests(unittest.TestCase):
     def setUp(self) -> None:
         app = create_app()
@@ -119,12 +214,29 @@ class SoccerBlueprintRouteTests(unittest.TestCase):
         mocked_render.assert_called_once()
         self.assertEqual(mocked_render.call_args.args[0], "soccer/hub.html")
 
-    def test_unknown_league_slug_normalizes_to_default_rather_than_404(self) -> None:
+    def test_unknown_league_slug_404s_and_never_reaches_the_builder(self) -> None:
+        """REVERSED 2026-08-20 (`soccer-board-mlb-parity`), by user decision.
+
+        This asserted the opposite -- 200, with the builder called for "epl".
+        It arrived as incidental characterization in `570ba09f` (a rosters /
+        schedules / week-nav feature landing) and carried no rationale: it
+        documented what `normalize_league` happened to do, not a requirement.
+
+        What that behaviour cost, measured on production 2026-08-20:
+        `/soccer/laliga/cards` -- one underscore from the canonical `la_liga`
+        -- returned 200 with Arsenal and Coventry fixtures under a La Liga
+        heading. A typo did not fail; it served another league's data under
+        the requested league's name.
+
+        The `assert_not_called` is the load-bearing half. A 404 rendered
+        after the page was already built would still have burned the work and
+        still have read the wrong artifacts.
+        """
         with patch("syndicate.blueprints.soccer.build_cards_page_context", return_value={}) as mocked_context, \
              patch("syndicate.blueprints.soccer.render_template", return_value="PAGE"):
             response = self.client.get("/soccer/not_a_real_league/cards")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(mocked_context.call_args.args[0], "epl")
+        self.assertEqual(response.status_code, 404)
+        mocked_context.assert_not_called()
 
 
 if __name__ == "__main__":
