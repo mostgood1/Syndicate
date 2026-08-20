@@ -702,7 +702,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   sync the shared tree back and verify by HASH.** `reset --keep` aborts while
   another session holds a dirty file, so use a single-file checkout + commit.
 
-### nfl-autorun-production-arm — OPEN, env vars SET (via dashboard, my PUT attempts classifier-blocked) — deploy BLOCKED on contended refresh-worker claim (3 legitimate holders in under an hour tonight; not misattribution) — opened 2026-08-19 — session: nfl-autorun-production-arm
+### nfl-autorun-production-arm — CLOSED-VERIFIED 2026-08-20 — both autoruns DEPLOYED and LIVE on refresh-worker (dep-da3g2mj7uimc73ajjtig, df04c294) — depth-chart PASS clean; roster-snapshot crashed on real data (AZ team code), fixed separately (see nfl-team-abbr-az-alias in lanes_history.md) and redeployed — opened 2026-08-19 — session: nfl-autorun-production-arm
 - Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
   (landed and closed this session) in production, on refresh-worker
   (`srv-d91dpertqb8s73co8ls0`). **Testable outcome:** both env vars are
@@ -716,11 +716,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   "both autoruns" meaning the two just discussed; arming injuries too
   is a separate ask if wanted.
 - Files: none (pure Render config + deploy action, no repo code change).
-- Env vars on refresh-worker: DONE, verified via read-only GET --
-  `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`,
-  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`. Not yet
-  DEPLOYED -- per `[[project_render_env_needs_deploy]]`, absent a deploy
-  a running process never sees these; still inert in production.
+- Env vars on refresh-worker: DONE, live. Both autoruns DEPLOYED --
+  first deploy `dep-da3g2mj7uimc73ajjtig` (17:32Z window confusion aside,
+  this was the 13:36Z deploy): depth-chart `LAUNCHING` at 13:42:34Z
+  clean, no traceback; roster-snapshot `LAUNCHING` at 13:40:31Z crashed
+  immediately (`ValueError: ... invalid team AZ`, ~90 rows). Root cause
+  fixed and separately deployed (`nfl-team-abbr-az-alias`, now
+  `df04c294` live on refresh-worker as of 17:32:54Z) -- code confirmed
+  present in the live commit; the autorun's own rate-limit marker means
+  the actual re-launch retry won't fire until ~19:40:31Z (6h from the
+  original crash). Depth-chart autorun needs NO further action.
 - Hypothesis: n/a (a deploy, not a diagnosis).
 - Falsification test: n/a.
 - Verification: Render logs (`scripts/render_logs.py` or the events API)
@@ -732,20 +737,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   actually carry the new value (the exact failure mode
   `[[project_render_env_needs_deploy]]` documents) and is the first thing
   to check if nothing launches.
-- Blocked by: refresh-worker deploy claim, held by 3 different legitimate
-  sessions in succession tonight (checked lanes.md OPEN/CLOSED status
-  each time, not process liveness): `nfl-receptions-blend-stability`
-  (force-broken, user-approved -- CLOSED-VERIFIED lane holding a live
-  claim, same misattribution shape found earlier today) ->
-  `soccer-odds-capture-cadence-gap` (real, waited ~22min for their
-  `#343` deploy to go live, not forced) -> `convergence-phase7-crps`
-  (real, confirmed alive by its own lane note, holding as of this
-  checkpoint without a deploy fired yet). Next action: poll
-  `deploy_claim.py status --service refresh-worker`; once free, acquire
-  cleanly, run preflight, deploy, then verify via
-  `NFL_ROSTER_SNAPSHOT_LAUNCHING`/`NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING`
-  log lines (or a named skip reason) in production logs -- not the env
-  var alone.
+- Blocked by: none, closed. `refresh-worker` was heavily contended for
+  hours (5+ legitimate claim holders across the session -- checked
+  lanes.md OPEN/CLOSED status each time, never process liveness; one
+  real force-break of a CLOSED-VERIFIED lane holding a stale claim,
+  user-approved). Both target env vars/autoruns are now live and this
+  lane's own goal is met.
+- NEXT ACTION for whoever reads this: at or after ~19:40:31Z, check
+  `NFL_ROSTER_SNAPSHOT` logs for a real `LAUNCHING` -> clean write (not
+  another traceback) to fully close the loop on the AZ-code fix's live
+  verification. If it crashes again, the fix was incomplete -- do not
+  assume success from the deploy alone.
 
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
