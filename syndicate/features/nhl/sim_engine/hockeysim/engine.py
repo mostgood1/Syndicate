@@ -420,6 +420,40 @@ def _strength_state_zone_multipliers(
     return o_zone / e_pp_side, w_zone / e_pk_side
 
 
+def _strength_state_single_draw(
+    rng: random.Random, p_pp_side_wins: float, seg_len: float, use_zone_model: bool,
+) -> Tuple[float, float]:
+    """One discrete-event draw's `(m_pp_side, m_pk_side)` for §2x/§2y's strength-state mechanism,
+    optionally refined by §2z's joint role-and-zone model -- factored out so both the legacy
+    single-draw-per-segment call site and §2B's multi-event-per-segment loop share the EXACT same
+    per-draw logic, calling it with `seg_len` = the FULL segment length (single-draw) or one
+    sub-window's length (multi-event), rather than duplicating the branch.
+
+    Both `_strength_state_multipliers` and `_strength_state_zone_multipliers` already guarantee
+    `E[m_pp_side] == E[m_pk_side] == 1.0` EXACTLY for ANY `p_pp_side_wins` (see their own
+    docstrings for the derivation) -- averaging N i.i.d. draws of either together preserves that
+    exact guarantee for the average, since a mean of N unbiased estimators is itself unbiased. No
+    new normalization proof is needed beyond the one each function already carries."""
+    pp_side_wins_draw = rng.random() < p_pp_side_wins
+    if use_zone_model:
+        winner_role = "PP" if pp_side_wins_draw else "PK"
+        zone_drawn = draw_strength_zone(winner_role, rng.random())
+        joint = segment_average_multipliers_strength_zone(winner_role, zone_drawn, seg_len)
+        e_pp = expected_multipliers_strength_zone("PP", seg_len)
+        e_pk = expected_multipliers_strength_zone("PK", seg_len)
+        return _strength_state_zone_multipliers(
+            p_pp_side_wins, pp_side_wins_draw,
+            joint.winner_mult, joint.other_mult,
+            e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult,
+        )
+    pp_decay = segment_average_multipliers_pp_role(seg_len)
+    pk_decay = segment_average_multipliers_pk_role(seg_len)
+    return _strength_state_multipliers(
+        p_pp_side_wins, pp_side_wins_draw,
+        pp_decay.winner_mult, pp_decay.other_mult, pk_decay.winner_mult, pk_decay.other_mult,
+    )
+
+
 class PossessionSimulator:
     """Placeholder for future possession-level simulation.
 
@@ -1526,31 +1560,31 @@ class PeriodSimulator:
                 st_denom = max(1e-6, float(st_h_pct) + float(st_a_pct))
                 p_home_wins_st_draw = max(0.05, min(0.95, float(st_h_pct) / st_denom))
                 p_pp_side_wins = p_home_wins_st_draw if seg_is_home_pp else (1.0 - p_home_wins_st_draw)
-                pp_side_wins_draw = self.rng.random() < p_pp_side_wins
-                if bool(getattr(self.cfg, "faceoff_strength_state_zone_model", True)):
-                    # §2z: a joint role-AND-zone refinement -- a real, large, DISTINCT effect from
-                    # the role-only average (`hockeysim_faceoff_strength_zone_joint_report.md`).
-                    # `_strength_state_zone_multipliers` PRESERVES the exact-normalization proof
-                    # above unchanged (see its own docstring) -- the zone is an INDEPENDENT random
-                    # draw, from the REAL measured population zone distribution for whichever role
-                    # actually won, applied only to the WINNER's own curve.
-                    winner_role = "PP" if pp_side_wins_draw else "PK"
-                    zone_drawn = draw_strength_zone(winner_role, self.rng.random())
-                    joint = segment_average_multipliers_strength_zone(winner_role, zone_drawn, seg_len)
-                    e_pp = expected_multipliers_strength_zone("PP", seg_len)
-                    e_pk = expected_multipliers_strength_zone("PK", seg_len)
-                    m_pp_side, m_pk_side = _strength_state_zone_multipliers(
-                        p_pp_side_wins, pp_side_wins_draw,
-                        joint.winner_mult, joint.other_mult,
-                        e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult,
-                    )
+                use_zone_model = bool(getattr(self.cfg, "faceoff_strength_state_zone_model", True))
+                # §2B: extends §2A's multi-event-per-segment redesign to strength-state segments --
+                # §2zz's own stated next step. Draws the REAL faceoff count for THIS segment from
+                # the same empirical distribution `sample_segment_faceoff_count` measures (it was
+                # measured over ALL segment windows regardless of strength state, so it applies here
+                # directly, no separate PP/PK-specific measurement needed). `N==0` applies NO tilt
+                # at all; `N>=1` averages N independent `_strength_state_single_draw` calls, each
+                # over an equal `seg_len/N` sub-window -- both `_strength_state_multipliers` and
+                # `_strength_state_zone_multipliers` already guarantee `E[]==1.0` EXACTLY for any
+                # `p_pp_side_wins`, so averaging N i.i.d. draws preserves that exactly, no new proof
+                # needed (see `_strength_state_single_draw`'s own docstring).
+                if bool(getattr(self.cfg, "faceoff_multi_event_segment_model", True)):
+                    n_st_faceoffs = sample_segment_faceoff_count(self.rng)
+                    if n_st_faceoffs <= 0:
+                        m_pp_side, m_pk_side = 1.0, 1.0
+                    else:
+                        sub_len = seg_len / n_st_faceoffs
+                        sum_pp = sum_pk = 0.0
+                        for _ in range(n_st_faceoffs):
+                            m_pp, m_pk = _strength_state_single_draw(self.rng, p_pp_side_wins, sub_len, use_zone_model)
+                            sum_pp += m_pp
+                            sum_pk += m_pk
+                        m_pp_side, m_pk_side = sum_pp / n_st_faceoffs, sum_pk / n_st_faceoffs
                 else:
-                    pp_decay = segment_average_multipliers_pp_role(seg_len)
-                    pk_decay = segment_average_multipliers_pk_role(seg_len)
-                    m_pp_side, m_pk_side = _strength_state_multipliers(
-                        p_pp_side_wins, pp_side_wins_draw,
-                        pp_decay.winner_mult, pp_decay.other_mult, pk_decay.winner_mult, pk_decay.other_mult,
-                    )
+                    m_pp_side, m_pk_side = _strength_state_single_draw(self.rng, p_pp_side_wins, seg_len, use_zone_model)
                 if seg_is_home_pp:
                     m_st_h, m_st_a = m_pp_side, m_pk_side
                 else:

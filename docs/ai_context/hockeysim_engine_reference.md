@@ -1330,6 +1330,45 @@ intact, proofs hold) but it means the redesign should NOT be sold as fixing the 
 anything it REINFORCES §2zzzz's own conclusion that the true cause lives elsewhere in the engine's
 other stochastic sources, not in the faceoff mechanism at all.
 
+**§2B — extended §2A to strength-state (PP/PK) segments, same session, and the conclusion above
+REVERSES.** `sample_segment_faceoff_count` was already measured over ALL segment windows
+regardless of strength state — no new measurement needed. `_strength_state_single_draw` (new)
+factors one draw's `(m_pp_side, m_pk_side)` out of the segment loop, routing to
+`_strength_state_multipliers` or `_strength_state_zone_multipliers` depending on
+`faceoff_strength_state_zone_model` — both already guarantee `E[]==1.0` EXACTLY for any win
+probability (the §2x bug-fix proof and its §2z generalization), so averaging `N` i.i.d. draws
+needed no new normalization proof, only a routing-correctness proof (a fixed-value fake RNG forces
+a deterministic draw, checked against the underlying functions called directly — no Monte Carlo
+noise). Strength-state draws its OWN `n_faceoffs`, separate from any EV segment's own draw
+(different segments, different real event streams). The lineup-aware strength-state layer (§2zz)
+stays outside the loop, unchanged. **Verified**: routing-exactness proofs, reachability and
+per-team role-index preservation via per-seed VECTOR comparison (the established robust technique
+for this mechanism family — see the test-quality note below for why).
+
+**Combined round-robin (992-pairing, 2,976 games/condition, real per-team data) REVERSES the
+EV-only finding.** Mean +0.170% (still noise-level). **Std moved from 96.71% of real to 99.88%** —
+essentially closing the gap the segment-approximation report first measured. Inferred (not
+separately isolated with a dedicated flag, but a fair attribution since the EV code path is
+unchanged between the two measurements): the strength-state extension's own marginal contribution
+is large — PP-role's curve magnitude (up to ~1.9x) dwarfs the general EV curve's, so correctly
+varying the assumed-faceoff-count during PP/PK segments swings realized shot generation far more
+per-segment than the same fix does for EV. **Read carefully, not overclaimed**: this is one
+specific, real, measured result on real 2025-26 team data, not a general proof the redesign fixes
+variance matching everywhere — but it directly refines §2zzzz's own broader conclusion: disabling
+the ENTIRE faceoff mechanism closed less than half the gap, while fixing the segment-COUNT
+assumption specifically, applied to both branches, closes nearly all of it.
+
+**A test broke twice for the same underlying reason, and the second break was fixed for good, not
+patched again.** `test_faceoff_strength_state_model_flag_actually_changes_output` failed after §2A
+(a game-TOTAL mean comparison, fixed by switching to HOME-only), then failed AGAIN after §2B (the
+HOME-only mean comparison, `32.375` vs `32.817`, close enough to miss its own threshold). Two
+mean-based versions breaking for the same reason is itself the signal: `_strength_state_multipliers`
+is exactly mean-1-preserving by construction, so no magnitude-threshold comparison on ANY single
+aggregate is a robust reachability signal for it. Fixed for good by switching to the per-seed
+VECTOR comparison every OTHER strength-state reachability test in the file already used (§2y, §2z)
+— durable against future RNG-stream shifts elsewhere in the engine, not another threshold to
+eventually outgrow.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

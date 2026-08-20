@@ -22,6 +22,7 @@ from syndicate.features.nhl.sim_engine.hockeysim.engine import (
     _multi_event_segment_multipliers,
     _resolve_strength_state_faceoff_pct,
     _strength_state_multipliers,
+    _strength_state_single_draw,
     _strength_state_zone_multipliers,
 )
 from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
@@ -413,33 +414,36 @@ class HockeySimEngineTest(unittest.TestCase):
 
     def test_faceoff_strength_state_model_flag_actually_changes_output(self) -> None:
         """Reachability test for §2x: `faceoff_strength_state_model=True` (the default) must
-        produce measurably different HOME shot output than `False`, holding every other input
+        produce a DIFFERENT per-seed event stream than `False`, holding every other input
         identical -- proves the flag actually gates a real PP/PK-segment mechanism, the first one
         to apply outside EV segments (`faceoff_ev_only` gates everything else off during a power
         play or penalty kill).
 
-        HOME shots specifically, not the game TOTAL -- matching every other discrete-event
-        reachability test in this file (e.g. `test_faceoff_discrete_event_model_flag_actually_
-        changes_output` above). `_strength_state_multipliers` is EXACTLY mean-1.0-preserving by
-        construction (`hockeysim_faceoff_strength_state_report.md`'s whole point): it redistributes
-        shots BETWEEN home and away, it does not move the game TOTAL on average. A total-shots
-        version of this test was checking a second-order artifact of that redistribution rather
-        than the mechanism's own real, large, documented effect -- caught when it started flaking
-        after an unrelated upstream change (§2A) shifted how many random draws precede this
-        mechanism in the shared RNG stream, exposing that the total-shots signal was never robust
-        to begin with, not a regression in the mechanism itself."""
+        Per-seed VECTOR comparison, not a mean -- the same technique every other strength-state
+        reachability test in this file already uses (§2y's role-index test, §2z's zone-model
+        test, §2B's multi-event test), for the same underlying reason:
+        `_strength_state_multipliers` is EXACTLY mean-1.0-preserving by construction
+        (`hockeysim_faceoff_strength_state_report.md`'s whole point) -- it redistributes shots
+        BETWEEN home and away, it does not reliably move any single aggregate statistic (total OR
+        home-only) by a THRESHOLD amount on a bounded sample. This test went through two
+        mean-based versions (game-total, then HOME-only) and BOTH broke when an unrelated upstream
+        change shifted how many random draws precede this mechanism in the shared RNG stream --
+        not because the mechanism regressed either time, but because a magnitude-threshold
+        comparison was never a robust signal for a redistribution-only effect to begin with. A
+        vector comparison only needs ONE of many seeds to land on a different `pp_side_wins_draw`
+        coin flip, which is a comparison the mechanism can't fail to satisfy while still gating
+        anything at all -- durable against future RNG-stream shifts elsewhere in the engine."""
         rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
         lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
         lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
         # A high committed_per_game on both sides guarantees plenty of PP/PK segments across the
-        # sample so the effect isn't diluted away by mostly-EV games. HOME favored on both PP-role
-        # and OZ index so the redistribution has a consistent, detectable direction.
+        # sample so the effect isn't diluted away by mostly-EV games.
         st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.3}
         st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 0.7}
         cfg_on = build_nhl_sim_config(overrides={"faceoff_strength_state_model": True})
         cfg_off = build_nhl_sim_config(overrides={"faceoff_strength_state_model": False})
 
-        def _mean_home_shots(profile: SimConfig) -> float:
+        def _totals(profile: SimConfig) -> list:
             totals = []
             for s in range(120):
                 gs, events = run_hockeysim_game(
@@ -447,15 +451,15 @@ class HockeySimEngineTest(unittest.TestCase):
                     lineup_home=lineup_h, lineup_away=lineup_a,
                     st_home=st_home, st_away=st_away, profile=profile, seed=s,
                 )
-                totals.append(sum(1 for e in events if e.kind == "shot" and e.team == "HOME"))
-            return statistics.mean(totals)
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
 
-        on_mean = _mean_home_shots(cfg_on)
-        off_mean = _mean_home_shots(cfg_off)
-        self.assertNotAlmostEqual(
-            on_mean, off_mean, places=0,
-            msg=f"on_mean={on_mean:.3f} and off_mean={off_mean:.3f} should differ -- if they "
-                f"match, faceoff_strength_state_model is not gating anything.",
+        on_totals = _totals(cfg_on)
+        off_totals = _totals(cfg_off)
+        self.assertNotEqual(
+            on_totals, off_totals,
+            msg="per-seed total-shot vectors are IDENTICAL -- faceoff_strength_state_model is not "
+                "gating anything.",
         )
 
     def test_strength_state_multipliers_expectation_is_exactly_one_for_any_p(self) -> None:
@@ -628,6 +632,151 @@ class HockeySimEngineTest(unittest.TestCase):
             on_totals, off_totals,
             msg="per-seed total-shot vectors are IDENTICAL -- faceoff_strength_state_zone_model "
                 "is not gating anything.",
+        )
+
+    def test_strength_state_single_draw_non_zone_matches_underlying_function_exactly(self) -> None:
+        """Exact routing check, no Monte Carlo noise: `_strength_state_single_draw` with
+        `use_zone_model=False` must reproduce `_strength_state_multipliers`'s own output EXACTLY
+        for a forced win and a forced loss -- confirms the extraction into a shared helper (§2B)
+        changed nothing about the pre-existing, already-proven mechanism."""
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+            segment_average_multipliers_pk_role,
+            segment_average_multipliers_pp_role,
+        )
+
+        class _FixedRandom:
+            def __init__(self, value: float) -> None:
+                self._value = value
+
+            def random(self) -> float:
+                return self._value
+
+        seg_len = 42.5
+        pp = segment_average_multipliers_pp_role(seg_len)
+        pk = segment_average_multipliers_pk_role(seg_len)
+        for p in (0.3, 0.7):
+            expected_win = _strength_state_multipliers(
+                p, True, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+            actual_win = _strength_state_single_draw(_FixedRandom(0.0), p, seg_len, False)
+            self.assertAlmostEqual(actual_win[0], expected_win[0], places=9)
+            self.assertAlmostEqual(actual_win[1], expected_win[1], places=9)
+
+            expected_loss = _strength_state_multipliers(
+                p, False, pp.winner_mult, pp.other_mult, pk.winner_mult, pk.other_mult)
+            actual_loss = _strength_state_single_draw(_FixedRandom(0.99), p, seg_len, False)
+            self.assertAlmostEqual(actual_loss[0], expected_loss[0], places=9)
+            self.assertAlmostEqual(actual_loss[1], expected_loss[1], places=9)
+
+    def test_strength_state_single_draw_zone_model_matches_underlying_function_exactly(self) -> None:
+        """Same exactness check, `use_zone_model=True` this time: a fixed RNG value drives BOTH the
+        win/loss draw AND the zone draw deterministically (`draw_strength_zone` was already
+        confirmed elsewhere to land on "O" at u=0.0 and "D" at u=0.99, for either role), so the
+        expected output can be computed directly from `_strength_state_zone_multipliers` with the
+        matching real curve/expectation values, no statistical convergence needed."""
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.faceoff_decay_model import (
+            expected_multipliers_strength_zone,
+            segment_average_multipliers_strength_zone,
+        )
+
+        class _FixedRandom:
+            def __init__(self, value: float) -> None:
+                self._value = value
+
+            def random(self) -> float:
+                return self._value
+
+        seg_len = 42.5
+        p = 0.65
+        # u=0.0 -> pp_side_wins_draw=True (0.0 < 0.65) -> winner_role="PP" -> zone="O" at u=0.0.
+        joint_win = segment_average_multipliers_strength_zone("PP", "O", seg_len)
+        e_pp = expected_multipliers_strength_zone("PP", seg_len)
+        e_pk = expected_multipliers_strength_zone("PK", seg_len)
+        expected_win = _strength_state_zone_multipliers(
+            p, True, joint_win.winner_mult, joint_win.other_mult,
+            e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult,
+        )
+        actual_win = _strength_state_single_draw(_FixedRandom(0.0), p, seg_len, True)
+        self.assertAlmostEqual(actual_win[0], expected_win[0], places=9)
+        self.assertAlmostEqual(actual_win[1], expected_win[1], places=9)
+
+        # u=0.99 -> pp_side_wins_draw=False (0.99 !< 0.65) -> winner_role="PK" -> zone="D" at u=0.99.
+        joint_loss = segment_average_multipliers_strength_zone("PK", "D", seg_len)
+        expected_loss = _strength_state_zone_multipliers(
+            p, False, joint_loss.winner_mult, joint_loss.other_mult,
+            e_pp.winner_mult, e_pp.other_mult, e_pk.winner_mult, e_pk.other_mult,
+        )
+        actual_loss = _strength_state_single_draw(_FixedRandom(0.99), p, seg_len, True)
+        self.assertAlmostEqual(actual_loss[0], expected_loss[0], places=9)
+        self.assertAlmostEqual(actual_loss[1], expected_loss[1], places=9)
+
+    def test_faceoff_multi_event_segment_model_reachability_for_strength_state(self) -> None:
+        """Reachability for §2B's extension of the multi-event redesign to strength-state
+        segments: `faceoff_multi_event_segment_model=True` vs `False` must produce a DIFFERENT
+        per-seed event stream for a PP/PK-heavy matchup, holding every other input identical --
+        same vector-comparison technique as every other strength-state reachability test in this
+        file, for the same reason (the mechanism's own mean-1 design makes a mean-total-shots
+        comparison an unreliable low-sample signal)."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        st_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.3}
+        st_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 0.7}
+        cfg_single = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": False})
+        cfg_multi = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": True})
+
+        def _totals(profile: SimConfig) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=profile, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        single_totals = _totals(cfg_single)
+        multi_totals = _totals(cfg_multi)
+        self.assertNotEqual(
+            single_totals, multi_totals,
+            msg="per-seed total-shot vectors are IDENTICAL for a PP/PK-heavy matchup -- "
+                "faceoff_multi_event_segment_model is not reaching strength-state segments.",
+        )
+
+    def test_faceoff_multi_event_segment_model_strength_state_role_edge_preserved(self) -> None:
+        """The redesign must preserve the underlying per-team role-index differentiation under the
+        multi-event mechanism specifically: a genuinely role-differentiated `faceoff_pp_role_index`/
+        `faceoff_pk_role_index` pair must still produce a DIFFERENT event stream than a flat one,
+        with `faceoff_multi_event_segment_model=True` held on both sides -- mirrors §2y's own
+        reachability test, confirming §2B did not silently break it."""
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        lineup_h = [{"player_id": r["player_id"], "line_slot": None} for r in rh]
+        lineup_a = [{"player_id": r["player_id"], "line_slot": None} for r in ra]
+        base_home = {"pp_pct": 0.22, "pk_pct": 0.78, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        base_away = {"pp_pct": 0.18, "pk_pct": 0.82, "committed_per_game": 4.5, "faceoff_oz_index": 1.0}
+        st_home_flat = dict(base_home)
+        st_away_flat = dict(base_away)
+        st_home_role = dict(base_home, faceoff_pp_role_index=1.6, faceoff_pk_role_index=0.5)
+        st_away_role = dict(base_away, faceoff_pp_role_index=1.3, faceoff_pk_role_index=0.4)
+        cfg = build_nhl_sim_config(overrides={"faceoff_multi_event_segment_model": True})
+
+        def _totals(st_home: dict, st_away: dict) -> list:
+            totals = []
+            for s in range(60):
+                gs, events = run_hockeysim_game(
+                    "HOME", "AWAY", rh, ra, _rates(),
+                    lineup_home=lineup_h, lineup_away=lineup_a,
+                    st_home=st_home, st_away=st_away, profile=cfg, seed=s,
+                )
+                totals.append(sum(1 for e in events if e.kind == "shot"))
+            return totals
+
+        flat_totals = _totals(st_home_flat, st_away_flat)
+        role_totals = _totals(st_home_role, st_away_role)
+        self.assertNotEqual(
+            flat_totals, role_totals,
+            msg="per-seed total-shot vectors are IDENTICAL under the multi-event mechanism -- "
+                "the role-index signal was lost when §2B was wired in.",
         )
 
     def test_resolve_strength_state_faceoff_pct_prefers_role_index_over_oz(self) -> None:

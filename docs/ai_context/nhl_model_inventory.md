@@ -821,3 +821,21 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   question was already known to be separate and larger) but stated plainly as NOT the fix for that
   gap -- if anything this REINFORCES the prior measurement's own conclusion that the true cause
   lives elsewhere in the engine's other stochastic sources.
+- **Did** extend §2A to strength-state (PP/PK) segments (reference doc §2B, same report) -- and
+  the conclusion above REVERSES. `sample_segment_faceoff_count` needed no new measurement (already
+  population-general). `_strength_state_single_draw` routes to either underlying mechanism, both
+  already E[]=1.0-exact for any p, so averaging N draws needed no new normalization proof, only a
+  routing-correctness proof (fixed-value fake RNG, checked against the real functions directly).
+  **Combined round-robin REVERSES the EV-only finding**: mean +0.170% (noise-level), but **std
+  moved from 96.71% of real to 99.88%** -- essentially closing the gap. Inferred (not separately
+  isolated with its own flag, a fair attribution since the EV path is unchanged between
+  measurements): the strength-state extension's own contribution is large, since PP-role's curve
+  magnitude (up to ~1.9x) dwarfs the general EV curve's. **Not overclaimed**: one specific real
+  measurement, not a general proof -- but it directly refines the segment-approximation report's
+  own conclusion: disabling the WHOLE mechanism closed less than half the gap, fixing the
+  segment-COUNT assumption on both branches closes nearly all of it. **A test broke twice for the
+  same reason, fixed for good the second time**: a mean-based reachability test failed after §2A
+  (fixed by switching aggregates), then failed AGAIN after §2B on the SAME underlying issue (no
+  magnitude-threshold comparison is robust for an exactly mean-1-preserving mechanism) -- fixed
+  durably this time via the per-seed vector comparison every other test in this mechanism family
+  already used, not another threshold to eventually outgrow.

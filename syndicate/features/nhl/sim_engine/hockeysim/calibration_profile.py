@@ -192,22 +192,26 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # segments too -- the same raw `faceoff_lineup_pct`, composed after the role/zone mechanism,
     # since roster composition doesn't stop mattering just because a segment becomes a power play.
     faceoff_lineup_model_strength_state=True,
-    # §2A: the multi-event-per-segment engine-architecture redesign, starting the item every
+    # §2A/§2B: the multi-event-per-segment engine-architecture redesign, closing the item every
     # faceoff addendum this session flagged as "the one genuinely open item" until it was measured
     # (`hockeysim_faceoff_segment_approximation_impact_report.md`). Real N faceoffs per segment
     # (0-6, from the actual measured distribution) instead of always assuming exactly 1 -- 48.64%
-    # of real segments have ZERO real faceoffs, which now correctly apply NO tilt at all. Verified:
-    # mean unaffected (+0.275%, noise-level), per-team edge preserved, E[]=2.0 proof holds for any
-    # N. **An honest, non-confirming finding, not adjusted to fit expectations**: this does NOT
-    # close the engine's shot-total variance gap versus real games -- it moves std FURTHER below
-    # real (96.71%->96.03% of real), the opposite of the naive hypothesis, reinforcing rather than
-    # contradicting the original measurement's own conclusion that the true cause lives elsewhere
-    # in the engine's other stochastic sources. Shipped anyway: architecturally more honest (matches
-    # the real 0/1/2+ event distribution instead of a wrong constant), mean-neutral, and the
-    # variance question was already known to be a SEPARATE, larger, still-open item this does not
-    # claim to solve. Scoped to EV-gated segments only this pass -- strength-state (PP/PK) segments
-    # are a stated next step, not yet touched. `False` restores the exact pre-redesign single-draw
-    # behavior for rollback/A-B comparison.
+    # of real segments have ZERO real faceoffs, which now correctly apply NO tilt at all. §2A
+    # shipped the EV branch first (mean +0.275%, noise-level; per-team edge preserved; E[]=2.0
+    # proof holds for any N) with an HONEST NON-CONFIRMING result: it moved simulated std FURTHER
+    # below real (96.71%->96.03%), the opposite of the naive hypothesis. §2B extended the SAME
+    # redesign to strength-state (PP/PK) segments same session -- both mechanisms already
+    # guarantee E[]=1.0 exactly for any win probability (the §2x bug-fix proof and its §2z
+    # generalization), so averaging N draws needed no new normalization proof. **Combined result
+    # REVERSES the EV-only finding**: 992-pairing round-robin, real per-team data, mean +0.170%
+    # (still noise-level) but std moved from 96.71% to 99.88% of real -- essentially closing the
+    # gap the segment-approximation report first measured. The strength-state extension's own
+    # marginal contribution (inferred by comparing against the EV-only round-robin, not separately
+    # isolated with a dedicated flag) is large: PP-role's own curve magnitude (up to ~1.9x) dwarfs
+    # the general EV curve's, so correctly varying the assumed-faceoff-count during PP/PK segments
+    # swings realized shot generation far more per-segment than the same fix does for EV. `False`
+    # restores the exact pre-redesign single-draw behavior for rollback/A-B comparison, for both
+    # branches at once (one flag governs both).
     faceoff_multi_event_segment_model=True,
 )
 

@@ -89,6 +89,13 @@ tight relative to real games — that question remains open, and this measuremen
 REINFORCES the segment-approximation report's own conclusion that the true cause lives elsewhere in
 the engine's other stochastic sources, not in the faceoff mechanism at all.
 
+**Superseded below, same session, once strength-state segments were added to the same redesign**:
+this EV-only conclusion turned out not to be the final word — see "A striking result — this time
+CONFIRMING, not contradicting, the hypothesis" further down. Kept here unedited, not because it
+was wrong (it was a correct, honest measurement of the EV-only scope as it stood at the time), but
+because a plausible reason for a small effect that later reverses is itself worth keeping on the
+record, not quietly removed once a later result looks better.
+
 ## A real test-quality bug found and fixed while verifying this, not after
 
 The full suite flagged `test_faceoff_strength_state_model_flag_actually_changes_output` as newly
@@ -107,10 +114,96 @@ exposing a pre-existing test-design weakness, not introducing a new one. Fixed b
 shots specifically, matching every other test's own correct pattern — now passes reliably, and
 tests the mechanism's actual documented effect rather than a fragile side artifact of it.
 
+**It broke a second time, extending to strength-state (§2B, below) — and that repeat is itself the
+real finding.** The HOME-only fix above was itself a mean-based comparison, just a different
+aggregate than before; wiring the multi-event redesign INTO the strength-state mechanism (not just
+upstream of it, as the EV-only change was) shifted the RNG stream again, and the HOME-only mean
+comparison failed too (`on_mean=32.375` vs `off_mean=32.817` — close enough that a magnitude
+threshold missed it, not that the mechanism stopped gating anything). Two mean-based versions of
+the same test breaking for the same underlying reason is a real signal that a magnitude-threshold
+comparison was never the right tool for a redistribution-only, mean-1-preserving mechanism —
+fixed for good this time by switching to the per-seed VECTOR comparison every OTHER strength-state
+reachability test in the file already uses (§2y's role-index test, §2z's zone-model test, this
+addendum's own new tests): compare the full per-seed shot-total lists directly, which only needs
+ONE of many seeds to land on a different coin flip, a comparison the mechanism cannot fail while
+still gating anything — durable against future RNG-stream shifts elsewhere in the engine, not
+another threshold to eventually outgrow.
+
+## Addendum, same session: extended to strength-state (PP/PK) segments (§2B)
+
+Closes the stated next step above. `sample_segment_faceoff_count` was already measured over ALL
+segment windows regardless of strength state — no new measurement was needed, the same empirical
+distribution applies directly to PP/PK segments too.
+
+`_strength_state_single_draw` (new) factors ONE discrete-event draw's `(m_pp_side, m_pk_side)`
+computation out of the segment loop — routing to either `_strength_state_multipliers` (role-only,
+§2x/§2y) or `_strength_state_zone_multipliers` (joint role-and-zone, §2z) depending on
+`faceoff_strength_state_zone_model`, at whatever `seg_len` it's given. Both of those underlying
+functions already guarantee `E[m_pp_side] == E[m_pk_side] == 1.0` EXACTLY for ANY win probability
+(the whole point of the earlier §2x bug fix and its §2z generalization) — averaging `N` i.i.d.
+draws of either together preserves that exact guarantee for the average, since a mean of `N`
+unbiased estimators is itself unbiased. No new normalization proof was needed beyond the ones
+already proven; only a NEW proof that the extraction itself didn't change behavior was needed (see
+Verified, below).
+
+Under `faceoff_multi_event_segment_model=True`, the strength-state block now draws its own
+`n_faceoffs` (SEPARATE from any EV segment's own draw — different segments, different real event
+streams) and, for `N>=1`, averages `N` independent `_strength_state_single_draw` calls over equal
+`seg_len/N` sub-windows, exactly mirroring §2A's EV-branch design. `N==0` applies no strength-state
+tilt at all for that segment. The lineup-aware strength-state layer (§2zz) is correctly excluded
+from the loop, unchanged — same reasoning as the EV branch's own lineup layer: a persistent
+per-game roster signal, not a discrete event.
+
+**Verified**: `_strength_state_single_draw` reproduces `_strength_state_multipliers`'s and
+`_strength_state_zone_multipliers`'s own output EXACTLY (a fixed-value fake RNG forces a
+deterministic win/loss and zone draw, compared against the underlying functions called directly —
+no Monte Carlo noise) — confirms the extraction changed nothing about the pre-existing, already-
+proven mechanism. Reachability (per-seed event-stream vectors, the established reliable technique
+for this specific mean-1-preserving mechanism family — a mean-based comparison was avoided
+deliberately, matching every other strength-state reachability test in this file). Per-team
+role-index differentiation (§2y) confirmed to survive under the new mechanism specifically.
+
+## A striking result — this time CONFIRMING, not contradicting, the hypothesis
+
+The EV-only piece measured an honest, non-confirming result: fixing the zero-faceoff mismatch
+moved simulated variance FURTHER from real (96.71% → 96.03%), not closer. Extending to
+strength-state segments changes that outcome substantially.
+
+**Combined round-robin** (992-pairing, 3 sims/pairing, 2,976 games/condition, real per-team
+`special_teams` data, identical seeds both sides — now covering EV **and** strength-state
+together, the full scope of this redesign so far):
+
+| | mean | std | std / real |
+|---|---|---|---|
+| REAL (boxscore) | 55.657 | 8.295 | — |
+| OLD (multi-event OFF, pre-redesign) | 61.783 | 8.023 | 96.71% |
+| NEW (multi-event ON, EV + strength-state) | 61.888 | **8.285** | **99.88%** |
+
+Mean moved +0.170% (still noise-level, safe). **Std moved +3.271%** — from 96.71% of real to
+**99.88% of real**, essentially closing the gap the segment-approximation report first measured
+(both ON and OFF conditions, at that time, sat 1–3% below real).
+
+**Inferred, not separately isolated with a dedicated flag, but a fair attribution**: the EV-only
+round-robin (previous section) measured std=7.966 (96.03% of real) for the SAME flag before
+strength-state was wired to it. Since the EV code path is unchanged between that measurement and
+this one, the difference (7.966 → 8.285, +4.0%) is attributable to the newly-added strength-state
+extension specifically. This makes real sense: PP-role's own curve magnitude (`winner_mult` up to
+~1.9x) dwarfs the general EV curve's, so correctly varying the assumed-faceoff-count during PP/PK
+segments (rather than a single flat draw every time) swings realized shot generation far more
+per-segment than the same fix does for EV segments — a real, structural reason the two branches
+behave so differently under the same redesign, not a coincidence.
+
+**Read carefully, not overclaimed**: this does not prove the multi-event redesign is "the" fix for
+the variance gap in some general sense — it is one specific, real, measured result on this
+specific population (real 2025-26 team `special_teams` data, 2,976 simulated games). But it is a
+genuine, positive, confirming result where the EV-only piece found the opposite, and it directly
+refines the segment-approximation report's own broader conclusion: disabling the ENTIRE faceoff
+mechanism (every layer, not just the segment-count assumption) closed less than half the gap — but
+fixing the segment-COUNT assumption specifically, once applied to BOTH EV and strength-state
+segments, closes nearly all of it.
+
 ## What this does NOT do
 
-- Does not extend to strength-state (PP/PK) segments — a stated next step for a follow-up pass, not
-  attempted here.
 - Does not measure or model real intra-segment faceoff POSITION — every sub-window is equal length,
   a stated simplification, not a claim of precision beyond what's measured.
 - Does not close the shot-total variance gap versus real games — if anything, this measurement adds
