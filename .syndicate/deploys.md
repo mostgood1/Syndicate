@@ -18447,3 +18447,33 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   by code (checks `item.steam === true` first) and will be re-verified
   against a real steam event opportunistically rather than blocking this
   deploy on one occurring.
+
+## SHIPPED, LIVE-RETRY UNVERIFIED 2026-08-20 17:32Z -- refresh-worker deploy -- AZ team-code alias fix (nfl-team-abbr-az-alias), live df04c294
+- Lane: nfl-autorun-production-arm (deploy action) / nfl-team-abbr-az-alias
+  (the fix itself, landed `8a87e822` earlier). Preflight run scoped to the
+  target commit each time the live SHA moved (twice, both from other
+  sessions' legitimate deploys during a heavily contended evening --
+  `85296826` -> `cc39383f`); the scoped deploy commit was rebuilt each
+  time, confirmed no file overlap, before deploying.
+- Scope note: cherry-picked the 4 files from `8a87e822` (team_identity.py
+  + 3 test files) cleanly onto refresh-worker's live SHA at fire time
+  (`cc39383f`), as `df04c294`.
+- `dep-da3jglrbc2fs7397rtf0`, live 17:32:54Z, commit content-verified ==
+  `df04c294` (grepped the live commit's own team_identity.py for the `AZ`
+  alias -- present).
+- **verify: CODE confirmed live; the actual autorun RE-LAUNCH is NOT yet
+  observed.** The roster-snapshot autorun correctly `SKIPPED
+  reason=rate_limited marker_age_s=14241/interval_s=21600` on the first
+  tick after this deploy -- its own last-ATTEMPT marker (written before
+  the ORIGINAL crash at 13:40:31Z) is still within the 6h interval,
+  ~66 min of it remaining as of this entry. This is CORRECT behavior
+  (the marker-before-launch design exists precisely so a crash costs one
+  interval, not a storm) but means the fix has not yet had a live
+  production trial. **Do not treat this deploy as fully verified until
+  the next natural relaunch (approx 2026-08-20 18:41Z or later) shows
+  `NFL_ROSTER_SNAPSHOT_LAUNCHING` followed by a clean write, not another
+  traceback.** Local/unit verification (falsification test against the
+  real live nflverse feed's actual team-code set) already gives high
+  confidence the fix is correct; this entry exists so a future session
+  doesn't mistake "deployed" for "confirmed working against real data in
+  production."
