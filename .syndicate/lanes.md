@@ -1095,7 +1095,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### nfl-artifact-allowlist-add — OPEN — opened 2026-08-20 — session: nfl-artifact-allowlist-add
+### nfl-artifact-allowlist-add — CLOSED-VERIFIED 2026-08-20 — landed `2cb773e4` on `origin/main` — opened 2026-08-20 — session: nfl-artifact-allowlist-add
 - Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
   artifact_publisher.py`) has no entries for the three new NFL artifacts
   this session's autoruns produce -- `injuries_{season}.csv`,
@@ -1120,6 +1120,19 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   depth_2026_snapshot.csv`) matches at least one pattern in the updated
   allowlist; existing allowlist tests still pass (no regression on
   prior entries).
+- Verification: DONE. New test
+  (`test_accepts_nfl_injuries_roster_and_depth_chart_artifacts`) asserts
+  all 3 real produced paths match, plus 2 negative cases confirming the
+  `nfl_source/`-scoped patterns do NOT bleed into another sport's tree
+  under the same subdirectory names. Full `test_artifact_publisher.py`:
+  97 passed, 3 subtests passed, no regressions. Cross-checked the
+  injuries pattern against the REAL resolver (not just the hardcoded
+  test string) by writing a real file at `nfl_artifact_output_root()`'s
+  actual write location and confirming `nfl_injuries_path()` resolves
+  back to it, matching the pattern -- an earlier naive check against an
+  empty checkout hit `default_nfl_source_root()`'s different miss-
+  fallback root and looked like a mismatch; re-verified against a
+  populated fixture before trusting either the pattern or the test.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
