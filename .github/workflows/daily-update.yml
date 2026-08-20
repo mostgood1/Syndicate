@@ -22,6 +22,14 @@ on:
         required: false
         type: number
         default: 30
+      backup_since_hours:
+        description: 'Backup lookback window in hours (default 26). Widen for a recovery run after a gap.'
+        required: false
+        type: string
+      backup_max_file_bytes:
+        description: 'Per-file backup cap in bytes (default 1048576). Larger files are skipped by design -- see #481.'
+        required: false
+        type: string
       run_full_pipeline:
         description: 'Regenerate everything locally instead of backing up Render (manual fallback for backfills/recovery; Render workers own the daily generation now)'
         required: false
@@ -206,87 +214,139 @@ jobs:
           # Render's refresh-worker/live-odds-worker now generate this data
           # live and continuously -- this Action no longer regenerates it.
           # Since the GHA runner has no filesystem access to any Render disk,
-          # this pulls the current hot-artifact set back down over HTTP via
-          # the read-only counterpart to the worker->web publish endpoint
-          # (see syndicate/blueprints/ops.py:api_ops_artifacts_export), so
-          # the commit step below can still keep a git-committed cold-start
-          # safety net -- not the primary source of truth anymore.
+          # this pulls hot artifacts back down over HTTP via the read-only
+          # counterpart to the worker->web publish endpoint (see
+          # syndicate/blueprints/ops.py:api_ops_artifacts_export), so the commit
+          # step below can keep a git-committed cold-start safety net -- not the
+          # primary source of truth anymore.
+          #
+          # ==================== #481, REWRITTEN 2026-08-19 ====================
+          # This step used to issue ONE bulk body export with no parameters and
+          # check only $response.ok. MEASURED against production: that returned
+          # ok=True, count=8, truncated=True, bytes=20,947,993 -- against a full
+          # hot set of count=7909, bytes=8,457,851,138. It was backing up
+          # 8 of 7,909 files (0.10%), the same first-8 MLB files every run,
+          # and reporting success. `ok` is not a statement about completeness.
+          #
+          # The endpoint is CORRECT and is unchanged: it caps one response at
+          # 24MB (_artifact_export_budget_bytes) because an unbounded export
+          # OOM'd the 2GB web instance on 2026-07-25, and it reports `truncated`
+          # faithfully. The caller was the problem.
+          #
+          # A watermark ALONE does not fix it -- measured, and this was my own
+          # hypothesis being wrong: the last-26h delta is 439 files /
+          # 802,273,046 bytes, still 33x the ceiling. The churn is append-only
+          # growers -- book_quotes/*.jsonl, odds_history/*.json,
+          # book_grid/*.json -- which are 68% of it by bytes.
+          #
+          # SCOPE DECISION [2026-08-19, user]: back up the SMALL-FILE TAIL and
+          # skip the giants. With a 26h window and a 1MB-per-file cap that is
+          # 370 files / 51,538,751 bytes -- the long tail where a cold start
+          # actually needs help. The giants stay unprotected BY CHOICE; they are
+          # reconstructible tracking logs, and they are what makes the whole set
+          # unbackupable in the first place.
+          #
+          # HOW this avoids the ceiling, which is the load-bearing part: it
+          # never asks for bodies in bulk. ?names_only=1 is the ONE call that
+          # cannot truncate -- that path never reads a file, so there is no
+          # budget to exceed, and the handler's own comment says exactly that --
+          # and every body is then fetched with ?path=, one small file per
+          # request. Bounded memory on the web service AND on the runner, with
+          # no budget raise anywhere. Measured 0.11s/file, so ~370 files ~= 41s.
+          # ===================================================================
           $baseUrl = if ($env:DAILY_UPDATE_BASE_URL) { $env:DAILY_UPDATE_BASE_URL } else { 'https://syndicate-an21.onrender.com' }
           $adminToken = $env:ADMIN_TOKEN
           if ([string]::IsNullOrWhiteSpace($adminToken)) {
             Write-Error 'ADMIN_TOKEN secret not set; cannot pull artifacts from Render. Add it in repo Settings > Secrets (value must match the syndicate web service''s ADMIN_TOKEN in the Render dashboard), or re-run this workflow with run_full_pipeline=true.'
             exit 1
           }
+          $headers = @{ Authorization = "Bearer $adminToken" }
 
-          Write-Host "==> Pulling current hot artifacts from $baseUrl"
-          $response = Invoke-RestMethod -Uri "$baseUrl/api/ops/artifacts/export" -Headers @{ Authorization = "Bearer $adminToken" } -Method Get -TimeoutSec 60
+          $sinceHours = 26
+          if (-not [string]::IsNullOrWhiteSpace($env:BACKUP_SINCE_HOURS)) { $sinceHours = [int]$env:BACKUP_SINCE_HOURS }
+          $capBytes = 1048576
+          if (-not [string]::IsNullOrWhiteSpace($env:BACKUP_MAX_FILE_BYTES)) { $capBytes = [int64]$env:BACKUP_MAX_FILE_BYTES }
+          # 26h not 24h: the schedule is daily, and a window exactly equal to
+          # the cadence loses anything written in the gap between two runs.
+          # Both are workflow_dispatch inputs so a RECOVERY run can widen the
+          # window -- this backup went unexercised 2026-07-15..2026-08-19, and a
+          # stateless window cannot self-heal a gap that long on its own.
+          $sinceEpoch = [int64](([DateTimeOffset]::UtcNow).ToUnixTimeSeconds()) - ($sinceHours * 3600)
+          Write-Host "==> Inventory: changed within ${sinceHours}h, per-file cap $capBytes bytes"
 
-          if (-not $response.ok) {
-            throw "Artifact export request failed: $($response.error)"
+          $inventory = Invoke-RestMethod -Uri "$baseUrl/api/ops/artifacts/export?since=$sinceEpoch&names_only=1" -Headers $headers -Method Get -TimeoutSec 180
+          if (-not $inventory.ok) {
+            throw "Artifact inventory request failed: $($inventory.error)"
           }
 
-          # $response.ok is NOT a statement about completeness, and reading it
-          # as one made this step a no-op that reported success.
-          #
-          # MEASURED 2026-08-19 against production web, single fetch each:
-          # this exact call returned ok=True, count=8, truncated=True,
-          # bytes=20,947,993 -- while ?names_only=1 reported the full
-          # hot-artifact set as count=7909, bytes=8,457,851,138. The "cold-start
-          # safety net" was capturing 8 of 7,909 files (0.10%) and 0.25% of the
-          # bytes, the same first-8 MLB files every run, and going green.
-          #
-          # The endpoint is not at fault: it applies a 24MB ceiling
-          # (_artifact_export_budget_bytes, ops.py) because an unbounded export
-          # OOM'd the 2GB web instance on 2026-07-25, and it reports `truncated`
-          # faithfully. It is built for INCREMENTAL pulls -- it takes
-          # ?since=<epoch> and its own comment says "the watermark keeps those
-          # small". This caller passes no watermark, so it asks for all 8.46GB
-          # every run and necessarily truncates.
-          #
-          # Reported, deliberately NOT thrown: failing here would only trade a
-          # silent wrong answer for a red workflow that blocks the rest of the
-          # job, and the real fix (a watermark, and a decision about how much of
-          # an 8.46GB set belongs in git at all) is a design change, not a retry.
-          # See `#481`.
-          $exportCount = [int]$response.count
-          $exportBytes = [int64]$response.bytes
-          if ($response.truncated) {
-            Write-Warning ("ARTIFACT EXPORT TRUNCATED: got {0} file(s) / {1:N0} bytes, and the server stopped at its budget -- the REST OF THE HOT-ARTIFACT SET IS NOT IN THIS BACKUP. This run is not a complete cold-start safety net. See #481." -f $exportCount, $exportBytes)
-            if ($env:GITHUB_STEP_SUMMARY) {
-              "### :warning: Artifact backup was TRUNCATED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-              ("Pulled **{0}** file(s), **{1:N0}** bytes before the server hit its export budget. The remainder of the hot-artifact set is **not** backed up by this run. See ``#481``." -f $exportCount, $exportBytes) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-            }
-          } else {
-            Write-Host ("==> Artifact export COMPLETE (not truncated): {0} file(s), {1:N0} bytes" -f $exportCount, $exportBytes)
-          }
+          $candidates = @($inventory.artifacts.PSObject.Properties | ForEach-Object {
+            [pscustomobject]@{ Path = $_.Name; Bytes = [int64]$_.Value.bytes }
+          })
+          $keep = @($candidates | Where-Object { $_.Bytes -le $capBytes })
+          $skip = @($candidates | Where-Object { $_.Bytes -gt $capBytes })
+          $skipBytes = 0
+          if ($skip.Count -gt 0) { $skipBytes = ($skip | Measure-Object -Property Bytes -Sum).Sum }
+          Write-Host ("==> {0} changed artifact(s); {1} within cap, {2} over cap ({3:N0} bytes skipped by design)" -f $candidates.Count, $keep.Count, $skip.Count, $skipBytes)
 
-          # git-add each written file directly here rather than relying on the
-          # commit step's directory-root heuristic below to rediscover them --
-          # that heuristic predates the shallow-layout and current_week.json
-          # patterns (Phase 3) and would silently miss files that don't live
-          # under its hardcoded manifests/source_artifacts subpaths, which is
-          # exactly the drift risk of keeping two independent path lists.
+          # git-add each written file directly rather than relying on the commit
+          # step's directory-root heuristic below to rediscover them -- that
+          # heuristic predates the shallow-layout and current_week.json patterns
+          # (Phase 3) and would silently miss files that do not live under its
+          # hardcoded manifests/source_artifacts subpaths, which is exactly the
+          # drift risk of keeping two independent path lists.
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-          $count = 0
-          foreach ($relativePath in $response.artifacts.PSObject.Properties.Name) {
+          $written = 0
+          $failed = 0
+          foreach ($item in $keep) {
+            $relativePath = $item.Path
+            try {
+              $one = Invoke-RestMethod -Uri "$baseUrl/api/ops/artifacts/export?path=$([uri]::EscapeDataString($relativePath))" -Headers $headers -Method Get -TimeoutSec 60
+            } catch {
+              $failed += 1
+              Write-Warning "fetch failed: $relativePath -- $($_.Exception.Message)"
+              continue
+            }
+            if (-not $one.ok -or [int]$one.count -ne 1) {
+              $failed += 1
+              Write-Warning "fetch returned no body: $relativePath"
+              continue
+            }
             $targetPath = Join-Path 'data' $relativePath
             $targetDir = Split-Path $targetPath -Parent
             if (-not (Test-Path $targetDir)) {
               New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
             }
-            Set-Content -Path $targetPath -Value $response.artifacts.$relativePath -NoNewline -Encoding utf8
+            Set-Content -Path $targetPath -Value $one.artifacts.$relativePath -NoNewline -Encoding utf8
             git add -f -- $targetPath
-            $count += 1
+            $written += 1
           }
 
-          Write-Host "==> Wrote $count artifact file(s) under data/"
-          if ($count -eq 0) {
-            Write-Warning 'No artifacts were returned by the export endpoint -- nothing to back up this run.'
+          # A RATE, not a count. "Wrote 8 artifact file(s)" was literally true
+          # every day while 0.10% of the set was being captured, and a bare
+          # count with no denominator is what made that read as success.
+          $coverage = 0
+          if ($candidates.Count -gt 0) { $coverage = [math]::Round(100 * $written / $candidates.Count, 1) }
+          Write-Host ("==> Wrote {0} of {1} changed artifact(s) ({2}%); {3} skipped over cap, {4} failed" -f $written, $candidates.Count, $coverage, $skip.Count, $failed)
+          if ($env:GITHUB_STEP_SUMMARY) {
+            "### Artifact backup" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            ("Wrote **{0} of {1}** changed artifact(s) (**{2}%**) from the last {3}h. **{4}** skipped over the {5:N0}-byte per-file cap ({6:N0} bytes, by design -- see #481). **{7}** failed." -f $written, $candidates.Count, $coverage, $sinceHours, $skip.Count, $capBytes, $skipBytes, $failed) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          if ($candidates.Count -eq 0) {
+            Write-Warning 'No artifacts changed in the window -- nothing to back up this run.'
+          }
+          elseif ($written -eq 0 -and $keep.Count -gt 0) {
+            # Distinct from "nothing changed": candidates existed, were within
+            # cap, and every single fetch failed. That is a broken backup rather
+            # than a quiet day, and it is the one case worth going red for.
+            Write-Error "Every one of $($keep.Count) in-cap artifact fetch(es) failed; the backup captured nothing."
+            exit 1
           }
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          BACKUP_SINCE_HOURS: ${{ github.event.inputs.backup_since_hours || '' }}
+          BACKUP_MAX_FILE_BYTES: ${{ github.event.inputs.backup_max_file_bytes || '' }}
 
       - name: Commit and push pipeline outputs
         shell: pwsh

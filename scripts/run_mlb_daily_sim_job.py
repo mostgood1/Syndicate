@@ -471,6 +471,7 @@ def main() -> int:
     # when the odds or a sim are newer than the artifact. The sim clause is what
     # re-derives ladders on GAME STATE, since sims re-run every 15-20 minutes.
     if ok and str(os.environ.get("SYNDICATE_MLB_LADDERS_REFRESH") or "on").strip().lower() not in ("0", "off", "false"):
+        _status: dict = {}
         try:
             from syndicate.features.mlb import ladders_build as _lb
             _pks = _lb.discover_game_pks(str(args.date))
@@ -478,25 +479,81 @@ def main() -> int:
             if _st.get("stale"):
                 _res = _lb.write_ladders_artifact(str(args.date), _pks)
                 print(f"MLB_LADDERS_REFRESH reason={_st.get('reason')} games={len(_pks)} {_res}", flush=True)
-                _lb.write_status_artifact(str(args.date), {
+                _status = {
                     "outcome": "rebuilt", "reason": _st.get("reason"),
                     "games": len(_pks), "result": _res, "staleness": _st,
-                })
+                }
             else:
                 print(f"MLB_LADDERS_REFRESH skipped fresh games={len(_pks)}", flush=True)
-                _lb.write_status_artifact(str(args.date), {
+                _status = {
                     "outcome": "skipped_fresh", "games": len(_pks), "staleness": _st,
-                })
+                }
         except Exception as _exc:
             # Never fatal: a ladder refresh must not take down the sim job.
             print(f"MLB_LADDERS_REFRESH_FAILED {type(_exc).__name__}: {_exc}", flush=True)
-            try:
-                from syndicate.features.mlb import ladders_build as _lb2
-                _lb2.write_status_artifact(str(args.date), {
-                    "outcome": "failed", "error": f"{type(_exc).__name__}: {_exc}",
-                })
-            except Exception:
-                pass
+            _status = {"outcome": "failed", "error": f"{type(_exc).__name__}: {_exc}"}
+
+        # DIRECT PUBLISH -- the sweep below will NOT ship this file.
+        #
+        # Measured on refresh-worker, 2026-08-20T00:55:00Z:
+        #   SWEEP_SKIPPED_DETAIL too_large=[
+        #     mlb_source/.../daily_ladders_2026_08_19.json(13678982), ...]
+        # against `_PUBLISH_MAX_BYTES` = 12,582,912 -- 8.7% over.
+        #
+        # Every other link in the chain was already correct and that is what made
+        # this expensive to find: the worker DID rebuild the ladder (generatedAt
+        # 19:54:41 CT) and `is_stale()` DID correctly answer "fresh". Web simply
+        # went on serving the last copy that fit under the ceiling -- 11,716,507
+        # bytes, generated 2026-08-18T18:20:25 -- which is why every compact-card
+        # row carried a full sim side against an empty market side. The artifact
+        # crossed the ceiling between 08-18 and 08-19, so publishing went silent
+        # with no error anywhere near the ladder code.
+        #
+        # NOT fixed by raising the ceiling: it is sweep-only BY DESIGN and exists
+        # to stop 51MB odds_history shards going up on every cycle (see the note
+        # on `_PUBLISH_MAX_BYTES`). `publish_hot_artifact` streams above 4MB and
+        # never consults `_publish_skip_reason`, which is how book_grid
+        # (12,855,903 bytes) has been publishing all along. Same route, no
+        # change to the bound.
+        #
+        # Gated on mtime -- the SAME test the sweep applies, minus the size rule
+        # -- so a tick that rebuilt nothing does not re-upload 13MB. Note the
+        # gate is deliberately not `_status["outcome"] == "rebuilt"`: daily_update
+        # has its own ladder writer, and on the run that produced the measurement
+        # above THAT writer is what refreshed the file while this block correctly
+        # reported `skipped_fresh`. Keying on the file answers "does web need
+        # this", which is the actual question; keying on our own branch would
+        # have missed exactly the case being fixed.
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+            from syndicate.features.mlb.sources import daily_ladders_path
+            _lad = Path(daily_ladders_path(str(args.date)))
+            _mtime = _lad.stat().st_mtime
+            _size = _lad.stat().st_size
+            if _mtime >= started_epoch:
+                _pub_ok = publish_hot_artifact(_lad, timeout_seconds=120)
+                _status["directPublish"] = {
+                    "attempted": True, "ok": bool(_pub_ok),
+                    "bytes": _size, "mtime": _mtime,
+                }
+            else:
+                _status["directPublish"] = {
+                    "attempted": False, "reason": "unchanged_this_run",
+                    "bytes": _size, "mtime": _mtime, "startedEpoch": started_epoch,
+                }
+            print(f"MLB_LADDERS_PUBLISH {_status['directPublish']}", flush=True)
+        except Exception as _pexc:
+            _status["directPublish"] = {
+                "attempted": True, "ok": False,
+                "error": f"{type(_pexc).__name__}: {_pexc}",
+            }
+            print(f"MLB_LADDERS_PUBLISH_FAILED {type(_pexc).__name__}: {_pexc}", flush=True)
+
+        try:
+            from syndicate.features.mlb import ladders_build as _lbw
+            _lbw.write_status_artifact(str(args.date), _status)
+        except Exception:
+            pass
     else:
         print(f"MLB_LADDERS_REFRESH skipped sim_ok={ok} "
               f"gate={os.environ.get('SYNDICATE_MLB_LADDERS_REFRESH') or 'on'}", flush=True)

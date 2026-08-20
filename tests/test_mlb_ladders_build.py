@@ -223,7 +223,13 @@ def test_fresh_when_the_artifact_is_newest(wired, tmp_path):
     for f in (base / "sims").glob("*.json"):
         _touch(f, 600_000)
     _touch(dest, 2_000_000)
-    assert lb.is_stale("2026-05-28", [7]) == {"stale": False, "reason": "fresh"}
+    # Assert the VERDICT, not the whole payload. The original exact-equality
+    # assertion broke the moment `evidence` was added -- and evidence is the
+    # thing that made a wrong `fresh` diagnosable at all, so the test was
+    # over-specified against a diagnostic that was always going to grow.
+    st = lb.is_stale("2026-05-28", [7])
+    assert st["stale"] is False
+    assert st["reason"] == "fresh"
 
 
 def test_status_artifact_is_written_and_allowlisted(wired, tmp_path):
@@ -282,3 +288,29 @@ def test_unreadable_artifact_does_not_default_to_fresh(wired, tmp_path):
     st = lb.is_stale("2026-05-28", [7])
     assert isinstance(st.get("stale"), bool)
     assert st.get("reason") != "artifact_missing"
+
+
+def test_fresh_verdict_carries_the_values_it_compared(wired, tmp_path):
+    """A `fresh` verdict SUPPRESSES a rebuild, so a wrong one is silent forever.
+    On 2026-08-20 the status artifact reported fresh for a 28-hour-old artifact
+    and the verdict alone could not distinguish a genuinely-fresher worker copy
+    from a failed timestamp parse. The evidence is what separates them."""
+    base = wired({7: _sim_payload()}, {"pitcher_props": {}})
+    dest = base / "daily_ladders_2026-05-28.json"
+    dest.write_text(json.dumps({"generatedAt": "2026-08-18T18:20:25+00:00"}), encoding="utf-8")
+    st = lb.is_stale("2026-05-28", [7])
+    ev = st.get("evidence") or {}
+    assert ev.get("path"), "no path recorded"
+    assert "fileMtime" in ev, "no file mtime recorded"
+    assert ev.get("artifactGeneratedAt") == "2026-08-18T18:20:25+00:00"
+    assert "contentTs" in ev
+
+
+def test_a_parse_failure_is_NAMED_not_swallowed(wired, tmp_path):
+    """Falling back to mtime is correct; doing it silently is not -- that is the
+    exact ambiguity that cost a diagnosis cycle."""
+    base = wired({7: _sim_payload()}, {"pitcher_props": {}})
+    dest = base / "daily_ladders_2026-05-28.json"
+    dest.write_text(json.dumps({"generatedAt": "not-a-timestamp"}), encoding="utf-8")
+    ev = (lb.is_stale("2026-05-28", [7]) or {}).get("evidence") or {}
+    assert "parseError" in ev, f"a parse failure left no trace: {ev}"

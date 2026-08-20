@@ -1198,7 +1198,7 @@ unsaved anywhere.
 
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
-  (§1–§2o, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
+  (§1–§2zzz, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
   `#463`/`#470`.
 - **Special teams, per-team AND league-calibrated**: PP/PK goal conversion
   (`pk_goal_cal_mult=0.4645`, `pp_goal_cal_mult=1.0` deliberately neutral —
@@ -1250,32 +1250,44 @@ unsaved anywhere.
   still far below what MLB's own much larger sample needed to find its own
   noise floor. Puck-line odds are not exposed by the production route at
   all; `--source both` covers it from local files (n=3).
-- **Faceoff-zone track (§2m/§2n/§2o) fully closed**: `_faceoff_multipliers`
-  was gated `faceoff_ev_only=True` but fed `TeamRates.faceoff_win_pct`, an
-  ALL-SITUATIONS blend — three per-team indices now close that. `faceoff_ev_index`
-  (EV-only, fallback tier). `faceoff_oz_index` (offensive-zone-specific,
-  preferred over EV when present — a refinement of the same consumption
-  point, not a separate mechanism). `faceoff_dz_index` (defensive-zone-
-  specific, an ADDITIONAL multiplicative layer composed with the OZ/EV
-  chain, not a fourth tier — a DZ win both suppresses the opponent's shots
-  and springs the winner's own transition chance, a dual effect a single
-  fallback chain can't represent). `zoneCode` confirmed empirically
-  relative to the WINNER (two draws at identical rink coordinates showed
-  opposite zone labels depending who won, not a fixed rink frame). OZ and
-  DZ confirmed genuinely independent, not mirror images: measured
-  correlation 0.69 across all 32 teams. Every index verified not to shift
-  the league-wide average shot count (992-pairing round-robin each time,
-  all under 0.5%, one under 0.02%). 356 hockeysim/nhl tests pass (up from
-  254 at session start).
-- **Genuinely still open**: player-level usage-weight producer's small-sample
-  floor (< 5 games falls back to heuristic, by design); the vendor's
-  original block-rate EV:PK:PP-def ratio (0.45:0.55:0.35) was never itself
-  validated, only scaled; xG model's rebound/tip-in coefficient sign is an
-  open question; `#470`'s market-backtest sample (n=14-15) is nowhere near
-  powered — re-run as the season resumes and dates accumulate;
-  neutral-zone faceoff rates were computed but have no consumption point;
-  `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` remain the
-  vendor's uncalibrated defaults.
+- **Faceoff track FULLY CLOSED (§2m through §2zzz)**, not just the
+  EV/OZ/DZ zone slice: `_faceoff_multipliers` was gated
+  `faceoff_ev_only=True` but fed `TeamRates.faceoff_win_pct`, an
+  ALL-SITUATIONS blend — closed in stages, each verified not to shift the
+  league-wide average shot count (992-pairing round-robin every time, all
+  well under 1%): (1) EV/OZ/DZ/NZ per-team zone indices + discrete-event
+  decay curves (`zoneCode` confirmed empirically relative to the WINNER,
+  not a fixed rink frame; OZ/DZ confirmed genuinely independent, r=0.69
+  not ±1.0); (2) a strength-state (PP/PK) mechanism — the first faceoff
+  effect outside even strength — where a naive combination of two curves
+  inflated league shots +4.478%, found by the SAME round-robin check and
+  fixed with an exact per-segment normalization down to +0.203%; (3) a
+  per-team PP/PK-role-specific win index refining that mechanism; (4) a
+  joint role×zone investigation that correctly DECLINED a full curve
+  build — 4 of 6 population cells too data-thin (as few as 197 league-wide
+  draws); (5) a player-level lineup-aware layer (real per-player
+  `faceoffWinningPctg`-derived rates, TOI-weighted per tonight's confirmed
+  roster) for both EV-only and strength-state segments; (6)
+  `faceoff_alpha`/`faceoff_diff_clip` calibrated against 1,312 real games
+  (95% CI `[-0.005, 0.439]` comfortably contains the vendor's `0.35` —
+  decision: left unchanged, backed by measurement not left uncalibrated by
+  default) plus a leave-one-out refit confirming that judgment; (7)
+  `faceoff_mult_clip_low`/`high` closed with an algebraic proof (max
+  possible swing `0.042` is strictly inside the clip's `0.10` headroom for
+  ANY input, confirmed by an exhaustive `[0,1]×[0,1]` sweep), after an
+  earlier "closes to zero" claim was found to have overstated itself and
+  was corrected on the record rather than left standing. 638 hockeysim/nhl
+  tests pass (up from 254 at session start). **Genuinely still open, the
+  one item**: the discrete-event engine's "one faceoff assumed per real
+  segment" approximation — a structural engine-design question, never
+  revisited since the redesign shipped, not currently blocking anything.
+- **Genuinely still open (non-faceoff)**: player-level usage-weight
+  producer's small-sample floor (< 5 games falls back to heuristic, by
+  design); the vendor's original block-rate EV:PK:PP-def ratio
+  (0.45:0.55:0.35) was never itself validated, only scaled; xG model's
+  rebound/tip-in coefficient sign is an open question; `#470`'s
+  market-backtest sample (n=14-15) is nowhere near powered — re-run as the
+  season resumes and dates accumulate.
 
 
 ## [model-skill] MODEL SKILL (`#428`) — measured vs not
@@ -2015,7 +2027,20 @@ market-relative scoreboard.
   either predates them or did not include this file. Treat it as unverified for
   `test_intelligence.py` specifically; the line above is the direct measurement.
 - Full suite: **526 passed, 0 failed** after the soccer `as_of` fix `[08-15]`.
-- `tests.test_archives` (what CI runs) — 383 pass.
+- `tests.test_archives` (what CI runs) — **383 pass, 2 skipped, ~6 min**
+  `[re-measured 2026-08-19, lane ci-green]`.
+- **CI RUNS `unittest`, NOT `pytest`, AND `conftest.py` DOES NOT EXIST TO IT**
+  `[verified 2026-08-19]`. `ci.yml` runs `python -m unittest tests.test_archives`
+  and `daily-update.yml` runs 13 modules the same way, while the documented
+  local loop is `python -m pytest tests/`. `tests/conftest.py` is a pytest
+  plugin file, so **every autouse fixture in it is absent in CI**. Measured on
+  one commit, one machine, one minute: `tests/test_wnba_cards_merge_aliases` was
+  `20 passed` under pytest and `FAILED (failures=2)` under unittest. **A green
+  local pytest run is not evidence about CI.** Shared setup a CI-run module
+  needs belongs in `tests/_cache_isolation.py` (plain functions + a `TestCase`
+  mixin, which `conftest.py` now delegates to), not in `conftest.py` alone.
+- `daily-update.yml`'s 13-module contract list — **55 pass**
+  `[measured 2026-08-19]`, the same count CI reports.
 
 ---
 
@@ -2038,6 +2063,16 @@ market-relative scoreboard.
   0, pegged CPU. Cause unconfirmed.
 - **MLB sim model-side as-of-ness is UNKNOWN.** The backtest is PIT-safe by
   replay, which says nothing about the model's own inputs.
+- **`Daily Update`'s artifact-backup steps (12-13) have not executed since
+  2026-07-15** `[verified 2026-08-19, #481]`. Three blockers stood in front of
+  them and all three are now cleared: `ADMIN_TOKEN` (absent 07-16, added the
+  same day), an account **billing lock** that killed every run 07-16..08-15
+  before any step (3-second jobs, empty `steps[]`, no retrievable log — which is
+  why the per-step API reported no failing step for that whole month), and the
+  test step `#480` fixed. The step itself was also rebuilt (`#481`) and hand-run
+  green against production. **Nothing has yet been proven END TO END by the
+  workflow. The next scheduled 06:00Z run is the first; do not record the backup
+  path as working until one shows both steps green.**
 - **NBA / NHL / NCAAB feature point-in-time status UNKNOWN** — no harness reaches
   them.
 - **NHL and soccer market anchoring** make those engines' market-relative
@@ -3070,6 +3105,39 @@ backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
+
+### ROOT CAUSE FOUND AND MEASURED `[2026-08-20 ~01:00Z]` — THE SWEEP WAS REFUSING IT ON SIZE
+
+    daily_ladders_2026_08_19.json      13,678,982 bytes
+    _PUBLISH_MAX_BYTES (sweep-only)    12,582,912 bytes      -> REFUSED
+
+Measured on refresh-worker `2026-08-20T00:55:00Z` (Render logs API,
+`resource=srv-d91dpertqb8s73co8ls0&text=too_large`):
+
+    SWEEP_SKIPPED_DETAIL too_large=[
+      mlb_source/.../daily_ladders_2026_08_19.json(13678982),
+      mlb_source/tracking/book_quotes/2026-08-19.jsonl(95051585)]
+
+**Every other link was already correct, which is why this took five successive
+hypotheses.** The worker DID rebuild the ladder (`artifactGeneratedAt
+2026-08-19T19:54:41-05:00`) and `is_stale()` DID correctly answer `fresh` —
+content newer than `oddsMtime_pitcher 1787187226` and `newestSimMtime
+1787186761`. Web simply went on serving the last copy that FIT: **11,716,507
+bytes, `2026-08-18T18:20:25`**. That is the whole reason every served
+compact-card row carried a full sim side against an empty market side.
+
+The artifact **grew into** the bug — the 08-18 copy was under the bound, the
+08-19 copy over it. No deploy, no regression, no failing test on the day it broke.
+
+FIX: `be62b0dd` on `origin/main` (content-verified inside merge `3fc6ef0c`) —
+publish the ladder through `publish_hot_artifact`, which streams above 4MB and
+never consults `_publish_skip_reason`. Same route `book_grid` (12,855,903 bytes)
+has used all along. **The bound is UNTOUCHED** — it is sweep-only by design and
+exists to stop 51MB `odds_history` shards going up every cycle.
+
+**STATUS: NOT DEPLOYED.** refresh-worker claim held by a live session
+(`soccer-odds-capture-cadence-gap`), not forced.
+
 
 ### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
 

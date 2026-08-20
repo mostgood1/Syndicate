@@ -18,6 +18,7 @@ from syndicate.features.nhl.sim_engine.hockeysim import (
 )
 from syndicate.features.nhl.sim_engine.hockeysim.engine import (
     SimConfig,
+    _faceoff_multipliers,
     _resolve_strength_state_faceoff_pct,
     _strength_state_multipliers,
     _strength_state_zone_multipliers,
@@ -1323,6 +1324,40 @@ class HockeySimEngineTest(unittest.TestCase):
             f"pp_shot_multiplier=0.4 when nothing else differs -- got high={high_mean:.3f} "
             f"low={low_mean:.3f}. If this fails, pp_shot_cal_mult is present but not reachable.",
         )
+
+    def test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip(self) -> None:
+        """`docs/reports/hockeysim_faceoff_alpha_calibration_report.md`'s §2zzz addendum closed
+        `faceoff_mult_clip_low`/`faceoff_mult_clip_high` with a PROOF, not a measurement:
+        `_faceoff_multipliers` clips `fo_diff` to `[-diff_clip, diff_clip]` BEFORE multiplying by
+        `alpha`, so the largest possible swing from 1.0 either output can ever reach is exactly
+        `alpha * diff_clip` -- at the live calibration profile's own values this is `0.042`,
+        comfortably inside `mult_clip`'s own headroom (`0.10` on each side). This test asserts
+        that headroom invariant directly against the LIVE profile, so a future session that raises
+        `alpha` or `diff_clip` without re-checking this gets caught here, before the clip silently
+        starts flattening a real effect mid-segment -- and separately proves the invariant holds
+        by exhaustively sweeping the full `[0, 1] x [0, 1]` input space, not just a few points."""
+        cfg = NHL_CALIBRATION_PROFILE
+        alpha = float(cfg.faceoff_alpha)
+        diff_clip = float(cfg.faceoff_diff_clip)
+        lo, hi = float(cfg.faceoff_mult_clip_low), float(cfg.faceoff_mult_clip_high)
+        max_swing = alpha * diff_clip
+        headroom = min(1.0 - lo, hi - 1.0)
+        self.assertLess(
+            max_swing, headroom,
+            f"faceoff_alpha({alpha}) * faceoff_diff_clip({diff_clip}) = {max_swing:.4f} no longer "
+            f"has headroom under mult_clip's own bound ({headroom:.4f}) -- the clip can now bind; "
+            f"re-run scripts/calibrate_nhl_faceoff_alpha.py's mult_clip check.",
+        )
+        # Exhaustive sweep (not a sample): the clipped engine output must equal the un-clipped
+        # formula everywhere in [0, 1] x [0, 1], confirming the clip is provably a no-op, not just
+        # empirically unobserved to bind.
+        for i in range(0, 101, 5):
+            for j in range(0, 101, 5):
+                h_pct, a_pct = i / 100.0, j / 100.0
+                m_h, m_a = _faceoff_multipliers(cfg, h_pct, a_pct)
+                diff = max(-diff_clip, min(diff_clip, h_pct - a_pct))
+                self.assertAlmostEqual(m_h, 1.0 + alpha * diff, places=9)
+                self.assertAlmostEqual(m_a, 1.0 - alpha * diff, places=9)
 
     def test_profile_seam_is_non_mutating(self) -> None:
         before = NHL_CALIBRATION_PROFILE.pp_shots_mult

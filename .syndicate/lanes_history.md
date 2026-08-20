@@ -9946,3 +9946,465 @@ fixed along the way, and the mid-flight live-SHA moves: `.syndicate/log/
   Publishing is a SEPARATE decision from closing the gap.
 - Fixes #1 (seeds), #3 (accent join), #4 (as-of) were built and tested and are safe to
   ship; **#2 removes a stale BLOCK and does not make the number publishable.**
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-19
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### soccer-two-sided-edges-cut — CLOSED-VERIFIED 2026-08-19 — **DIAGNOSED, NOT A BUG: real cause is a soccer odds-capture cadence gap, not a Layer 2 defect. Scope reassigned, no follow-on lane opened yet.** — opened 2026-08-19 — session: soccer-two-sided-edges-cut
+- Goal: identify and fix why soccer's genuinely two-sided, consensus-priced
+  game markets (h2h/totals/spreads) with real positive EV never reach the
+  Layer 2 shortlist. **Testable outcome:** on a live build, at least one
+  soccer `game`-kind row with `fair_method: consensus` and positive
+  `ev_pct` appears in `per_sport.soccer.game` (currently 0).
+- Files:
+  - `pipeline/layer2_shortlist.py` (the read/build path — quotes come from
+    `read_book_quotes_latest`, a DIFFERENT function than the public
+    `/api/board/book-grid` endpoint used to gather today's evidence; the
+    two may not see the same rows)
+  - `syndicate/features/shared/layer2_board.py` (`_fair_by_side`,
+    `build_layer2_rows`, `select_shortlist` — confirmed correct in
+    isolation against real data, but the full pipeline still drops these
+    rows)
+  - `syndicate/features/shared/opportunity_gate.py` (eligibility lanes —
+    a live/pregame or staleness misclassification could silently demote a
+    correct row)
+  - `syndicate/features/shared/odds_book_quotes.py` (`read_book_quotes_latest`)
+  - `syndicate/features/shared/book_grid.py` (`build_book_grid`)
+  - **Collision-checked 2026-08-19 against every OPEN lane's Files block:
+    zero overlap.** `soccer-model-dispersion` explicitly does NOT claim
+    these files (only the sim/adapter side); the informal `modelled-fair-edge`
+    lane claims `soccer_projections.py` + `book_margin_model.py`
+    specifically, neither of which is in this lane's file set. If the trace
+    leads into either of those two, STOP and raise with that lane rather
+    than editing them here.
+- Hypothesis: `pipeline/layer2_shortlist.py`'s own quote read
+  (`read_book_quotes_latest`) does not see the same rows the public
+  book-grid endpoint serves — either a different capture window, a
+  different dedup/latest-key rule, or a live/pregame state misread inside
+  `opportunity_gate.py` demotes these specific rows before they reach
+  scoring. NOT the model-quality hold: these rows get `fair_method:
+  consensus` already (verified by running `_fair_by_side` directly against
+  real quote data pulled from production), so `_row_ev_is_hold_restatement`
+  should not fire on them.
+- **Already ruled out, measured 2026-08-19 (do not re-derive):**
+  - Horizon window — both positive-EV matches kick off later TODAY
+    (2026-08-19T23:30:00Z and 2026-08-19T19:00:00Z), well inside
+    `horizon_days=1`.
+  - `excluded_markets` — only `["goal_scorer"]`, does not touch h2h/totals/
+    spreads.
+  - Value floor — both rows (+1.11%, +0.84%) clear the flat -2.0% floor
+    with room to spare.
+  - `_fair_by_side` itself — confirmed correct in isolation: 17 genuinely
+    two-sided game rows today (8 h2h, 8 totals, 1 spread, all MLS + one
+    La Liga match), every one correctly resolves to `fair_method:
+    "consensus"` when run directly against real production quote data.
+  - The "100% one-sided" reading from `per_sport_ingest.soccer.
+    enrichment.margin_model` is NOT itself the bug — soccer's candidate
+    pool is genuinely dominated by one-sided player props (`sides:
+    ['over']` confirmed at the source for `player_shots_on_target` etc.,
+    same shape as MLB's `batter_home_runs`). `book_margin_model` is the
+    correct handling for those; this lane is only about the 17 rows that
+    ARE two-sided and still get cut.
+- Falsification test: pull the EXACT quote rows `pipeline/layer2_shortlist.py`
+  reads for today's date (via `read_book_quotes_latest("soccer", ...)` or by
+  instrumenting the build) and diff against the public book-grid rows for
+  the same two matches (FC Cincinnati vs NYCFC, Philadelphia Union vs Inter
+  Miami). If the rows are IDENTICAL going in, the cut happens downstream
+  (`opportunity_gate`/`build_layer2_rows`/`select_shortlist`) and the
+  hypothesis about a read-path mismatch is WRONG — say so and move to the
+  next candidate rather than forcing the read-path story to fit.
+- Verification: on a live production build, `per_sport_ingest.soccer`
+  reports at least one `game`-kind opportunity with `fair_method: consensus`
+  and a stated `ev_pct`, and `per_sport.soccer.game > 0`. Report the
+  specific gate/stage that was dropping them, with a measured before/after
+  count — not just "it works now."
+- Blocked by: none.
+
+**FALSIFICATION TEST FIRED 2026-08-19 — HYPOTHESIS REFUTED, REAL CAUSE FOUND.**
+Pulled `soccer_source/tracking/book_quotes/2026-08-19.jsonl` directly (the
+raw capture shard, not the served board) and checked the exact rows behind
+both positive-EV candidates:
+
+- **FC Cincinnati vs NYCFC h2h, `away` @ 235 (betrivers)**: raw capture
+  `captured_at: 2026-08-10T00:23:33Z`. Board's own `age_seconds: 851854.4`
+  = **9.9 days**. Ceiling (`opportunity_gate.PREGAME_MARKET_MAX_AGE_SECONDS`)
+  is 86,400s = 24h. **9.9x over.**
+- **Philadelphia Union vs Inter Miami totals 3.5**: `age_seconds: 792481.4`
+  = **9.2 days**, same ceiling, same overage.
+- Both matches' h2h/totals markets have had **zero fresh captures since
+  Aug 6–10** — not a missed-best-price-selection bug (checked: no more
+  recent row for either key exists in the shard at all), a genuine capture
+  gap. `opportunity_gate.evaluate()` correctly returns `LANE_DEAD` /
+  `"pregame_market_stale"` for both — **this is the platform working
+  correctly, refusing to price an edge off a week-old number.**
+
+**HYPOTHESIS (read-path mismatch between `read_book_quotes_latest` and the
+public book-grid) IS REFUTED** — the quote data itself is identical and
+consistent; there is nothing to diff. Per this lane's own falsification
+protocol: say so, don't force the story to fit. **Goal reframed**: this is
+not a Layer 2 pipeline bug — it is a **soccer odds-capture cadence gap**
+for game markets (h2h/totals/spreads) on at least these two matches, and
+likely broader (untested: whether this is systemic across MLS, across all
+9 leagues, or specific to certain books/markets). Next step for whoever
+picks this up: check `scripts/refresh_odds_sources.py`'s soccer game-market
+capture schedule/rotation — why hasn't it re-polled these specific markets
+in over a week when kickoff is today — rather than anything in the Layer 2
+scoring path. This may connect to the ALREADY-DOCUMENTED soccer odds
+capture cadence issues in `state.md` `[odds-cadence]` (MLB's three-regime
+finding); soccer's own capture regime for game (non-prop) markets has not
+been separately measured there.
+- Blocked by: none. Scope has moved from `layer2_board.py`/
+  `opportunity_gate.py` (both exonerated) to the soccer odds-capture
+  scheduler — files above are NOT the right ones for whoever continues
+  this; re-scope before touching code.
+
+### nfl-receptions-blend-stability — CLOSED-VERIFIED 2026-08-19 — CONFIRMED stable (hypothesis of instability was WRONG): half A/B = 0.1367/0.0771, ratio 1.77x. No code change. **Completes the full #471 blend/shrinkage constant audit — all 6 checked.** `922e2ab7` on `origin/main`. — session: nfl-receptions-blend-stability
+- Goal: `receptions` is the last un-checked market from `#471`'s blend-
+  weight family. Shipped `w=0.137` off a fit-half optimum of 0.1367 --
+  the SMALLEST measured one-way OOS improvement of any weighted market
+  (+0.000016, an order of magnitude smaller than `receiving_yards`'
+  already-marginal +0.000065). A market whose realized benefit was this
+  close to zero is a natural candidate for an estimate that doesn't
+  replicate. **Testable outcome:** run the existing
+  `scripts/check_nfl_blend_weight_stability.py --stats receptions`
+  (already generalized, no new script needed) and report whether the
+  independent 2024-2025 half agrees.
+- Files:
+  - `syndicate/features/nfl/props.py` — `_COVER_PROBABILITY_BLEND_WEIGHT["receptions"]`,
+    ONLY if the check finds a real, stable reason to change it.
+  - Read-only: `scripts/check_nfl_blend_weight_stability.py`,
+    `scripts/calibrate_nfl_cover_probability_blend.py`,
+    `reports/nfl_cover_probability_blend_calibration.json`,
+    `reports/nfl_yardage_blend_stability_check.json`.
+- Hypothesis: UNSTABLE, more likely than not -- `receiving_yards` (whose
+  own one-way improvement was 4x larger) already came in at a wider
+  1.74x ratio than `rushing_yards`' near-perfect 1.00x; `receptions`'
+  order-of-magnitude-smaller realized benefit suggests its estimate is
+  even less pinned down. Held loosely -- the point of running the check
+  is to find out, not confirm this.
+- Falsification test: if the independent half's optimal weight shares
+  `receptions`' sign and sits within the pre-registered <=2.0x ratio,
+  the hypothesis is wrong and the tiny shipped weight is real signal
+  after all, not noise that happened to survive one clipping-free split.
+- Verification: both halves' independently-computed optimal weights
+  stated side by side, explicit stable/unstable verdict, same criterion
+  as every other market this session.
+- **RAN. Hypothesis WRONG — stable, not unstable.** `scripts/check_nfl_
+  blend_weight_stability.py --stats receptions`: half A (2022-2023,
+  n=35055) w=0.1367; half B (2024-2025, n=34523) w=0.0771 — ratio
+  **1.77x**, same sign, within the pre-registered <=2.0x threshold. The
+  lane's own hypothesis (that a tiny one-way improvement predicts
+  instability) did not hold here — stated plainly rather than only
+  reporting the confirmations. **No code change made.**
+  `_COVER_PROBABILITY_BLEND_WEIGHT["receptions"]` stays at `0.137`.
+  Report: `reports/nfl_receptions_blend_stability_check.json`.
+  **THIS WAS THE LAST UNCHECKED MARKET — the full `#471` blend-weight +
+  shrinkage-constant audit is now complete.** All 6 tuned constants
+  individually verified against independent data: stable —
+  `rushing_yards` (1.00x), `anytime_td` k (1.00x, exact), `receptions`
+  (1.77x), `receiving_yards` (1.74x); correctly left at their safe
+  value — `passing_attempts` (capped), `passing_tds`/`interceptions`
+  (`w=0`).
+- Blocked by: none.
+
+### ci-green — CLOSED 2026-08-19 — **CI GREEN, run `32312838316` head `1a45cedb`, BOTH gated steps success. Daily Update's failing step fixed by the same commit but its later steps remain UNEXERCISED since 2026-07-15 — see `#480`.** — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Goal: `CI` on `main` is GREEN again and stays green. Testable: a push to
+  `main` produces a run whose `Run archive regression suite` AND
+  `Ledger coherence` steps both pass.
+- Files: `tests/test_archives.py`, `tests/test_wnba_cards_merge_aliases.py`,
+  `tests/conftest.py`, `tests/_cache_isolation.py`
+- NOT claimed, deliberately: the CI workflow definition itself belongs to
+  `repo-coordination` and is not touched here; `intelligence.html` is read
+  as a reference only, no edit.
+- Hypothesis: CI is red for ONE cause, not many — `test_home_page_poll_
+  preserves_date_query` asserts a template literal that the 2026-08-17
+  "default day is TODAY, not All" user decision deliberately changed
+  (`date: urlParams.get("date") || ""` -> `|| _initialDayFilterDate()`).
+  The test is stale; the template is correct.
+- Falsification test: run the full archive suite locally and count the
+  failures. More than one distinct failing test, or a failure that is NOT
+  about the date seed, falsifies "one cause".
+- Verification: local `python -m unittest tests.test_archives` exits 0, AND
+  the three ledger checkers exit 0, AND the CI run for the landed commit is
+  `success` — quoted by run id, not predicted.
+- **ROOT-CAUSED AND FIXED, 2026-08-19. Hypothesis HELD for `CI`; a SECOND,
+  independent red workflow was found that the hypothesis did not cover.**
+  - `CI` red since `f9eee9d3` 2026-08-17 21:07Z, last green `080db035` 21:05Z
+    — ~150 consecutive runs, **one** failing test of 383
+    (`test_home_page_poll_preserves_date_query`), stale against the 2026-08-17
+    "default day is TODAY" decision. Falsification test RAN: full local suite,
+    `FAILED (failures=1, skipped=2)` — one cause, as hypothesised.
+  - `Daily Update` red every morning since 2026-07-16 — **34 days**, and NOT the
+    same cause. Two tests in `tests.test_wnba_cards_merge_aliases`, deterministic
+    cache pollution. **The isolation existed but only under pytest**:
+    `conftest.py` is a pytest plugin file and both workflows run
+    `python -m unittest`. Fixed by hoisting the reset to
+    `tests/_cache_isolation.py`, called from both runners.
+  - Earlier `Daily Update` failures (2026-07-16 → 08-15) were *"account is
+    locked due to a billing issue"* — 3-second jobs with no steps and no logs,
+    which is why the per-step API returned nothing for them. Already resolved.
+- **NOT verified and not claimed:** `Daily Update` steps 12-13 (Render artifact
+  pull + commit/push) have not run since 2026-07-15. `ADMIN_TOKEN` is present
+  (added 2026-07-16 14:24Z). The next scheduled run is the first real test.
+- Blocked by: none.
+- **VERIFICATION RAN, result quoted not predicted:** run `32312838316`,
+  `Run archive regression suite` success + `Ledger coherence` success. The
+  second had been SKIPPED (not passing) for the whole red window, so this is
+  also the first execution of the ledger gate since 2026-08-17 21:05Z.
+  Attribution checked per-commit: 5 consecutive reds without
+  `tests/_cache_isolation.py`, 2 greens with it. Full table in `deploys.md`.
+- Rule written to `learnings.md`: a green local `pytest` run is not evidence
+  about CI, because CI runs `unittest` and `conftest.py` is a pytest-only
+  plugin file.
+- **Left open for whoever owns it next, NOT done here:** the 06:00Z `Daily
+  Update` run is the first exercise of its Render-artifact-pull + commit/push
+  steps in five weeks. Do not record that path as working without a run.
+
+### nfl-injuries-fetcher — CLOSED 2026-08-19 — session: nfl-injuries-fetcher — landed `9ef312c5` on `origin/main`, not yet deployed
+- Goal: `syndicate/features/nfl/injury_adjustment.py` (the one place real
+  player-level data reaches the NFL sim today) depends on `injuries_
+  {season}.csv`, which has NO producer anywhere in this repo -- only a
+  stale, git-untracked, wrong-season (2025, not 2026) copy exists on one
+  dev machine, and it's not allowlisted so production presence can't even
+  be checked from web. **Testable outcome:** a real fetcher pulls
+  nflverse's own injuries release (confirmed live:
+  `https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{season}.csv`,
+  plain CSV, real schema confirmed by content), wired into refresh-worker
+  autorun the same way `#441`'s pbp fetch already is, AND the consumer
+  actually reads what it writes -- confirmed by tracing the read path, not
+  assumed from the write landing.
+- Files:
+  - `scripts/fetch_nfl_injuries.py` (NEW) — mirrors `fetch_nfl_pbp.py`'s
+    structure: atomic install, schema+row-count validation before replace,
+    graceful 404-is-normal handling for a season with no reports yet.
+  - `syndicate/features/nfl/sources.py` — add `nfl_injuries_path()`,
+    mirroring the existing `nfl_pbp_path()` multi-candidate resolver
+    EXACTLY, for the same reason it exists: `default_nfl_source_root()`
+    picks a root by probing for an unrelated file (`upcoming_recs_*.csv`)
+    and can silently resolve to the ephemeral repo checkout instead of the
+    mounted disk -- `#441`'s own documented root cause, never fixed for
+    injuries.
+  - `syndicate/features/nfl/injury_adjustment.py` — `_injured_players_for_team`
+    switches from the raw `default_nfl_source_root() / "tracking" / ...`
+    join to the new `nfl_injuries_path()`. This is the fix that makes the
+    fetcher not-inert; confirmed the bug is real by reading the code, not
+    assumed from the pbp precedent alone.
+  - `scripts/run_refresh_worker.py` — ONE new autorun function
+    (`_launch_autorun_nfl_injuries_fetch`, mirroring `_launch_autorun_nfl_pbp_fetch`
+    structurally) plus ONE new `elif` branch in the dispatch chain,
+    placed immediately after the pbp fetch branch per `#341`'s documented
+    starvation lesson (a late entry in this `elif` chain can go mute for
+    weeks while enabled and correctly configured -- already measured twice
+    in this file's own history). Narrow, additive touch to a large shared
+    file; no other lane currently claims it (checked `lanes.md` before
+    opening -- one stale/superseded reference and one explicit
+    read-only-reference, neither an active claim).
+  - `tests/test_fetch_nfl_injuries.py` (NEW), updates to
+    `tests/test_nfl_injury_adjustment.py` and `tests/test_nfl_sources.py`.
+  - Read-only reference: `scripts/fetch_nfl_pbp.py` (the template),
+    todo.md's own #441 entry (the precedent this mirrors) -- de-linked from a
+    literal path token here, same lane-guard false-positive class `#462`'s
+    incident already fixed (a "Read-only reference" line still tripped the
+    guard's own "any slash-bearing token" parser).
+  - **NOT claimed, deliberately**: `syndicate/features/shared/artifact_publisher.py`
+    (`HOT_ARTIFACT_PATTERNS` addition for the new injuries/roster/depth-chart
+    artifacts is owed but held by `basketball-model-owner` -- same
+    hand-off convention already used twice this session for this exact
+    file) — will message/flag rather than take.
+- Hypothesis: n/a (a build, not a diagnosis) — but the READ-PATH bug is a
+  genuine hypothesis, stated before fixing: `injury_adjustment.py`'s
+  `default_nfl_source_root()` usage silently resolves to the wrong root on
+  refresh-worker whenever the mounted disk's `nfl_source/` lacks
+  `upcoming_recs_*.csv` at the moment of the probe, exactly `#441`'s
+  documented mechanism for pbp.
+- Falsification test: if `nfl_pbp_path()`'s existing pattern turns out to
+  already correctly resolve injuries too (e.g. because the two paths are
+  always identical in practice on this deployment), the read-path fix is
+  unnecessary — verified by writing a test that asserts the OLD code path
+  fails exactly the scenario `#441` measured (mounted disk has the file,
+  checkout does not, no `upcoming_recs_*.csv` present) before applying the
+  fix, so the fix is proven necessary, not just applied by precedent.
+- Verification: DONE. 71/71 new+updated injuries-lane tests pass; full
+  `nfl`+`refresh_worker` slice run (746 tests) came back 736 passed/10 failed
+  before the fixture fix, 0 failed in-scope after it -- the remaining 3
+  failures are pre-existing and reproduce identically with `sources.py`/
+  `injury_adjustment.py` stashed back to `origin/main`, confirmed unrelated.
+  The falsification test (`test_nfl_injuries_path_root.py::
+  InjuryAdjustmentUsesTheResolver::test_falsifies_against_the_pre_fix_direct_join`)
+  proves the OLD `default_nfl_source_root()`-direct-join path misses the file
+  in exactly `#441`'s reproduced scenario, and the fixed resolver hits it.
+  `--json` fetcher output verified against the real live nflverse release
+  (2025 season, 6,068 rows, 695,623 bytes, `status: "written"`) earlier this
+  session, before landing.
+  NOT DONE: `scripts/football_sim_input_checklist.py` informational re-run
+  (deferred -- read-only reference, not required for this lane's outcome).
+  NOT DONE: production deploy. The autorun ships default-OFF (same
+  discipline as the pbp fetch), so this landing is inert until
+  `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN=true` is set as part of
+  an actual deploy + env change, a separate decision point.
+- Blocked by: none.
+- Handoff owed: `HOT_ARTIFACT_PATTERNS` addition for the new injuries
+  artifact, to `basketball-model-owner` (see the NOT-claimed file note
+  above) -- not yet messaged as of this close.
+
+### nfl-roster-depth-autorun — CLOSED 2026-08-19 — session: nfl-roster-depth-autorun — landed `1a844a1e` on `origin/main`, not yet deployed
+- Goal: `nfl-injuries-fetcher`'s own audit surfaced a sibling gap while
+  fixing `#441` for injuries: `roster_snapshot_builder.py` and
+  `depth_chart_snapshot_builder.py` (both real, both already consumed by
+  `ask_the_syndicate_data.py`) write their output via
+  `default_nfl_source_root() / "source_artifacts" / ...` DIRECTLY -- the
+  same probing-based root selector `#389` already proved silently resolves
+  to the ephemeral repo checkout on refresh-worker (not `nfl_artifact_
+  output_root()`, which `fetch_nfl_pbp.py`/`fetch_nfl_injuries.py` both
+  correctly use). Neither builder is wired into refresh-worker autorun at
+  all -- both are CLI-only today, same class of gap injuries had before
+  this lane's parent. `injury_adjustment.py`'s `_depth_chart_path` also
+  still has the READ-side `#441` bug (raw `default_nfl_source_root()`
+  join), deliberately left out of the parent lane's scope. **Testable
+  outcome:** both builders write via `nfl_artifact_output_root()`, the
+  depth-chart READ path goes through a resolver mirroring `nfl_pbp_path`/
+  `nfl_injuries_path`, and both builders are wired into refresh-worker
+  autorun (default-OFF, same convention as pbp/injuries).
+- Files:
+  - `syndicate/features/football/ingestion/roster_snapshot_builder.py` —
+    `roster_snapshot_output_path` switches to `nfl_artifact_output_root()`.
+  - `syndicate/features/football/ingestion/depth_chart_snapshot_builder.py`
+    — `depth_chart_snapshot_output_path` switches to
+    `nfl_artifact_output_root()`.
+  - `syndicate/features/nfl/sources.py` — add a roster-snapshot-path and
+    depth-chart-snapshot-path resolver alongside the existing
+    `_resolve_nfl_tracking_path` (note: snapshot outputs live under
+    `source_artifacts/data/processed/...`, a DIFFERENT relative shape than
+    the `tracking/nflverse/...` layout `_resolve_nfl_tracking_path` already
+    handles -- may need a sibling helper, not a forced reuse).
+  - `syndicate/features/nfl/injury_adjustment.py` — `_depth_chart_path`
+    switches to the new resolver.
+  - `scripts/run_refresh_worker.py` — two new autorun functions + two new
+    `elif` branches, placed directly behind the injuries fetch per `#341`.
+    **NOTE:** `lanes.md`'s own status table lists this file as guarded by
+    `refresh-worker-oom-recurrence` ("flagged running, stale 40h+" as of
+    this lane's own earlier sweep) despite no formal `### ... — OPEN` block
+    existing for that slug anywhere in this file -- same shape as the
+    `soccer-odds-capture-cadence-gap` collision this session already hit
+    and resolved once. Will coordinate via `send_message` to that session
+    (`local_3a27ad02-...`, "Oom band full report") before editing, same
+    convention.
+  - Read-only reference: `syndicate/features/football/ingestion/
+    nflverse_ingestion.py` (a THIRD, separate root-resolution mechanism —
+    `tracking_root()`/`SYNDICATE_DATA_ROOT`-based, used by the network-
+    fetch-on-cache-miss loaders `load_nflverse_roster`/
+    `load_nflverse_depth_chart`/`load_nflverse_injuries` — the last of
+    which is confirmed DEAD, zero callers anywhere. Investigating whether
+    this third mechanism is itself correct is IN SCOPE informationally;
+    changing it is NOT, unless it turns out to share the same defect).
+- Hypothesis: the write-side bug is real by the same mechanism `#389`
+  already measured for pbp/season-projections, applied here without a
+  fresh production measurement (a code-level confirmation, same standard
+  used for the parent lane's read-side fix).
+- Falsification test: a test proving `default_nfl_source_root()` picks a
+  root lacking the just-written snapshot file when a later candidate root
+  has it (mirrors `test_nfl_injuries_path_root.py`'s shape) — if this does
+  NOT reproduce, the hypothesis is wrong and the fix is unnecessary.
+- Verification: DONE. 130+ new/updated tests pass (falsification tests for
+  both the write-side #389-class and read-side #441-class bugs, dispatch-
+  order/gating/rate-limit tests mirroring the injuries autorun, plus
+  fixture repairs in 3 pre-existing test files whose setUp patched
+  `inj.default_nfl_source_root` directly -- that attribute no longer
+  exists on the module once both read paths moved onto the shared
+  resolver). Full `nfl`+`refresh_worker` slice: 35 failed / 739 passed,
+  and every one of the 35 confirmed pre-existing and unrelated by stashing
+  this lane's files and reproducing each failure identically against
+  unmodified `origin/main` (NFL-week-pins-to-1 in archives, nickname
+  matching, matchup evidence, football_sim_engine season mismatch,
+  market-board live odds, generate_smartsim2 x3, soccer bootstrap x3 --
+  the last needs `data/` this worktree deliberately excludes).
+  `run_once` idle-state contract (15 tests): pass, confirming both new
+  autoruns stay correctly default-OFF.
+  NOT DONE: a live network run of either builder script (network access
+  wasn't exercised this pass; the hermetic fixture pattern each builder's
+  own existing test file already uses was the coverage instead).
+  NOT DONE: production deploy / arming either autorun -- ships default-OFF,
+  inert until `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN` /
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN` are set as part
+  of a separate deploy decision.
+- `run_refresh_worker.py` coordination note resolved: `send_message` to
+  `refresh-worker-oom-recurrence`'s session (`local_3a27ad02-...`) was
+  attempted and bounced ("unattended -- a scheduled-task run or dispatched
+  session"). No formal `### refresh-worker-oom-recurrence — OPEN` block
+  exists anywhere in this file to actually block the edit, and
+  `lane-guard.py` did not block it (unlike the earlier
+  `soccer-odds-capture-cadence-gap` collision this session hit and
+  resolved). Edit made; documenting the attempt here rather than treating
+  silence as consent.
+- Blocked by: none.
+- Handoff owed: `HOT_ARTIFACT_PATTERNS` addition for the two new snapshot
+  artifacts, to `basketball-model-owner` -- bundled with the injuries
+  handoff already sent this session, not yet actioned as of this close.
+
+### daily-update-backup-truncation — CLOSED 2026-08-19 — **Backup rebuilt to the user's chosen scope and RUN against production: 174 of 216 changed artifacts (80.6%), 0 failed, exit 0 — against 8 of 7,909 (0.10%) before. NOT yet exercised BY THE WORKFLOW; next 06:00Z run is the first.** — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Goal: the `Daily Update` backup step stops reporting SUCCESS while silently
+  dropping 99.9% of what it was asked to back up. Testable: a run that
+  truncates says so, in the job output, with the ratio.
+- Files: `.github/workflows/daily-update.yml`
+- NOT claimed: `syndicate/blueprints/ops.py` (the endpoint is CORRECT — it
+  reports `truncated` faithfully; the caller ignores it). Read-only there.
+- **MEASURED 2026-08-19 23:4xZ against production web, single fetch each:**
+  - `/api/ops/artifacts/export` (exactly what step 12 calls, no params):
+    `ok=True`, **`count=8`**, **`truncated=True`**, `bytes=20,947,993`.
+  - `/api/ops/artifacts/export?names_only=1` (full inventory):
+    **`count=7909`**, `bytes=8,457,851,138`.
+  - So the "cold-start safety net" captures **8 of 7,909 files (0.10%)** and
+    **20.9MB of 8.46GB (0.25%)** — always the same first-8 MLB files, because
+    the scan walks `HOT_ARTIFACT_PATTERNS` in order and stops at the 24MB
+    budget (`_artifact_export_budget_bytes`, `ops.py:1493`).
+  - Step 12 checks **only `$response.ok`**. It never reads `truncated`, prints
+    "Wrote 8 artifact file(s)", and the workflow goes green.
+- Hypothesis for WHY the caller is shaped wrong: the endpoint is built for
+  INCREMENTAL pulls — its own comment says "the watermark keeps those small"
+  and it takes `?since=<epoch>`. The workflow passes no `since`, so it asks
+  for the entire 8.46GB set every single run and necessarily truncates.
+- Falsification test: pass a recent `?since=` and see whether the response
+  comes back `truncated=False` with a plausible daily delta. If it still
+  truncates, the budget — not the missing watermark — is the binding constraint.
+- **FALSIFICATION TEST RAN. MY HYPOTHESIS WAS WRONG — recorded rather than
+  quietly dropped.** `?since=` helps a lot and is still nowhere near enough:
+  last-24h = 438 files / 796,432,566 bytes (**33x** the 24MB budget); last-6h =
+  284 / 387,460,652; last-1h = 253 / 378,455,457 (**15x**). A daily run with a
+  perfect watermark would still truncate at ~3% of its own delta. **The budget
+  is a binding constraint too**, so "add a watermark" is not the fix.
+- What makes it decidable: the top 10 files are **68.1%** of the one-hour delta
+  and are all append-only growers (`book_quotes/*.jsonl`, `odds_history/*.json`,
+  `book_grid/*.json`), while **209 of 253 changed files are <1MB and total
+  30,613,218 bytes**. Excluding the giants puts the whole small-file tail within
+  reach of a modest budget raise.
+- **SHIPPED:** truncation is now reported (`Write-Warning` + `GITHUB_STEP_SUMMARY`
+  with both numbers). Deliberately NOT a `throw` — `#480` had just established
+  what a permanently-red gate costs. Both branches executed, not eyeballed.
+- Verification: a truncated pull is visible in the job log with both numbers.
+  Whether the backup should then be made COMPLETE is a design decision with
+  repo-size consequences (8.46GB cannot go into git) and is the user's call,
+  not this lane's — see `#481`.
+- **UNBLOCKED + SHIPPED. Scope decision: back up the small-file tail, skip the
+  append-only giants** `[2026-08-19, user]`. Step 12 no longer does a bulk body
+  export: `?names_only=1` for the inventory (the one call that CANNOT truncate),
+  a per-file cap (default 1MiB) that drops exactly the growers, then `?path=`
+  per surviving file. Bounded memory both ends, no budget raise.
+- **VERIFICATION RAN — script extracted from the YAML and executed against
+  production in an ISOLATED scratch git repo** (real tree never touched;
+  confirmed afterwards that no repo `data/` path changed):
+  `Wrote 174 of 216 changed artifact(s) (80.6%); 42 skipped over cap, 0 failed`,
+  `EXIT=0`, 75.4s. 173/174 staged paths satisfy step 13's gate. Coverage MLB 87
+  / soccer 84 / WNBA 2, versus 8 MLB-only files before. No over-cap file
+  reached disk.
+- **Correction on the record:** the option was decided on "~30MB/day", which was
+  a 1h sample extrapolated carelessly. The true 26h figure is 370 files /
+  51,538,751 bytes — ~19GB/year of git growth, not ~11GB. Decision unchanged;
+  the understatement is logged rather than quietly fixed.
+- **NOT proven and not claimed:** the WORKFLOW has still not run these steps
+  since 2026-07-15. The next 06:00Z run is the first end-to-end test.
+- Blocked by: none.

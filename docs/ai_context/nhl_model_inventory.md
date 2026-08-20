@@ -738,3 +738,67 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   Verified: 3 new engine tests (reachability via per-seed vectors, direction, independence),
   checklist full PASS (no new consumed field). Round-robin: **-0.138%** (992 pairings, real
   per-team lineup data), noise-level.
+- **Did** close the last open faceoff-track item with a real measurement, not a redesign
+  (reference doc §2zzz, full report
+  `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`). An exhaustive re-check of every
+  faceoff addendum in this file, the reference doc, and every `#463` addendum in `todo.md` found
+  exactly one item stated as open and never closed: `faceoff_alpha`/`faceoff_diff_clip`/
+  `faceoff_mult_clip_*`, `_faceoff_multipliers`'s own sensitivity constants, still the vendor's
+  original never-validated defaults. **Now consequential**: these constants are the ONLY
+  mechanism behind the two newest lineup-aware layers, which have no discrete-event alternative.
+  `scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, each game's
+  CONFIRMED dressed roster (real TOI, from the boxscore) and regresses real shot share against
+  the lineup-pct differential -- game-level, a genuinely different question from the earlier
+  season-aggregate NZ check. Result: R²=0.0028, slope=0.1086±0.0566 (p≈0.055) -- real, weak,
+  borderline, neither a clean null nor confident. **The decisive fact**: the vendor's 0.35 sits
+  comfortably inside the measured 95% CI `[~0, 0.44]`. **Decision: left unchanged** -- real data
+  neither contradicts the current default nor precisely pins down a better number; overwriting a
+  genuine measurement with a differently-uncertain point estimate would not be an improvement,
+  same discipline as the NZ item and the block-rate ratio. `faceoff_diff_clip=0.12` separately
+  confirmed sensible against the real observed distribution. `calibration_profile.py` now carries
+  an explicit comment documenting the check so it isn't re-discovered and re-run from scratch.
+- **Did** close `faceoff_mult_clip_low`/`faceoff_mult_clip_high` -- the item the above bullet's
+  own "What this does NOT do" left open, and a correction to its own "closes to zero" line, which
+  overstated that. Closed with a proof, not a measurement: `_faceoff_multipliers` clips `fo_diff`
+  BEFORE multiplying by `alpha`, so the largest possible swing from 1.0 is exactly
+  `alpha * diff_clip = 0.042` at the live values -- comfortably inside the clip's own `0.10`
+  headroom. Confirmed for literally any input (exhaustive `[0,1]x[0,1]` sweep, zero deviation
+  everywhere between clipped and un-clipped output), not just the observed real range. Locked in
+  a regression test against the live calibration profile so a future `alpha`/`diff_clip` change
+  gets caught before the clip could silently start binding. Two smaller items were flagged,
+  disclosed rather than swept in: the alpha fit's in-sample `faceoff_weight` (season average
+  including the predicted game itself, not leave-one-out) and the discrete-event engine's
+  "one faceoff per real segment" approximation (never revisited since it was first stated).
+- **Did** run the leave-one-out refit, not just reason about it. `scripts/
+  calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own faceoff counts
+  from every dressed player's rate before predicting that game -- `O(games)`, full-season counts
+  accumulated once, each game's own contribution subtracted per player only for that game's own
+  prediction. Result: `slope=0.0960` (vs in-sample `0.1086`), `R²=0.0021`, `p≈0.095`, implied
+  `alpha=0.1919`, 95% CI `[-0.034, 0.418]` -- all 1,312 games usable, 0 skipped. **Confirms, not
+  just restates**, the original judgment: modestly weaker than the in-sample fit, exactly the
+  direction removing leakage should push it, decision unchanged -- the vendor's `0.35` still sits
+  comfortably inside the interval. The discrete-event engine's "one faceoff per segment"
+  approximation is the one item that remains genuinely open, a structural engine-design question
+  distinct from calibration, never blocking anything currently shipped.
+- **Did** measure the "one faceoff per segment" approximation's real impact, not just name it as
+  open (full report `docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`). Two
+  questions, both answered with data. **(1) How far from reality**: using the engine's own segment
+  geometry read directly from `SimConfig` (`seconds_per_period=1200`, `target_seg=45`,
+  `segments/period=27`, `seg_len≈44.44s`), counted real faceoffs landing in each of 106,272
+  real segment-windows across 1,312 games -- mean **0.684** real faceoffs per segment vs the
+  engine's constant assumption of 1.0 (~46% over-count). Only 37.09% of segments match exactly;
+  **48.64% have ZERO real faceoffs** (an assumed tilt with nothing real behind it); 14.27% have
+  2+. **A genuinely unrepresentable case, quantified for the first time**: 7.79% of ALL segments
+  contain 2+ real faceoffs won by DIFFERENT teams -- a structural ceiling no tuning removes, since
+  the model resolves exactly one winner per segment by construction. **(2) Does it inflate
+  simulated variance**: measured the OPPOSITE of the hypothesis -- a controlled A/B (all 10
+  `faceoff_*` flags ON vs OFF, identical rosters/seeds, 2,976 games/condition) found turning every
+  faceoff mechanism ON REDUCES total-shots-per-game std by 2.15% relative to OFF (a plausible,
+  not separately proven, explanation: the mechanisms are zero-sum between teams per segment,
+  injecting a small negative home/away correlation, which reduces the variance of the sum).
+  **The decisive fact**: BOTH conditions sit below the real observed std (ON 96.71% of real, OFF
+  98.84%) -- the approximation is NOT the primary driver of the engine's shot-total distribution
+  running tighter than real games; disabling it entirely closes less than half that gap. This
+  closes the faceoff track's last genuinely open item with a real measurement, and correctly
+  scopes what remains (a different, larger, still-unattributed variance source) rather than
+  declaring the whole question resolved.

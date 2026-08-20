@@ -90,6 +90,64 @@ mirror and never the source of truth. The options, with their costs:
 Until one is chosen the workflow is *honest but still incomplete* — it will now
 say so on every run rather than reporting a success it did not earn.
 
+#### RESOLVED 2026-08-19 — option 1 chosen `[user decision]`, BUILT and RUN against production
+
+**Scope decided: back up the small-file tail, skip the append-only giants.**
+
+Step 12 no longer issues a bulk body export at all. It now:
+
+1. calls `?since=<26h>&names_only=1` — **the one call that cannot truncate**,
+   because that path never reads a file so there is no budget to exceed (the
+   handler says so itself). This is what makes the whole design safe;
+2. drops every candidate over a per-file cap (default 1 MiB) — which is exactly
+   the append-only growers, and reports how many and how many bytes;
+3. fetches each surviving file individually with `?path=`, one small body per
+   request. **Bounded memory on the 2GB web service and on the runner, with no
+   budget raise anywhere.**
+
+**A CORRECTION to the figures this item was decided on.** The options above
+quoted "~30MB/day" for the small-file tail. That was the **1-hour** sample
+extrapolated carelessly. The real **26-hour** figure is **370 files /
+51,538,751 bytes**, so the git cost is nearer **19GB/year** than the 11GB
+implied. The decision still holds — it is the only option that both fits the
+budget and protects the long tail — but the cost was understated when it was
+made, and that belongs on the record rather than in a footnote.
+
+**MEASURED — the step script extracted from the YAML and executed against
+production web in an isolated scratch git repo** (so the real tree was never
+touched; verified afterwards that no `data/` path in the repo changed):
+
+    ==> Wrote 174 of 216 changed artifact(s) (80.6%); 42 skipped over cap, 0 failed
+    EXIT=0   elapsed=75.4s   (BACKUP_SINCE_HOURS=1)
+
+- **80.6% of the changed set, against 0.10% before.** The missing 19.4% is the
+  42 deliberately-skipped giants (347,026,834 bytes).
+- 173 of the 174 staged paths match step 13's `^data/[^/]+_source/` gate, so the
+  commit step passes.
+- Coverage is now **MLB 87, soccer 84, WNBA 2** — previously 8 files, MLB only.
+- Zero files over the cap reached disk. `GITHUB_STEP_SUMMARY` rendered correctly.
+
+**Reported as a RATE with its denominator, deliberately.** "Wrote 8 artifact
+file(s)" was literally true every day while 0.10% was captured; a bare count is
+what let that read as success.
+
+**Two `workflow_dispatch` inputs added** so this is tunable without editing the
+file: `backup_since_hours` (default 26 — not 24, since a window equal to the
+cadence loses whatever is written between two runs' start times) and
+`backup_max_file_bytes` (default 1048576). A recovery run after a gap can widen
+the window; a **stateless window cannot self-heal** a gap like
+2026-07-15..2026-08-19 on its own, which is why the knob exists.
+
+**One failure mode is still red on purpose:** candidates existed, were within
+cap, and every fetch failed. That is a broken backup rather than a quiet day.
+"Nothing changed in the window" stays a warning and exits 0.
+
+**STILL NOT PROVEN, and this is the honest limit of the above:** the step has
+been run by hand against production, not by the workflow. `Daily Update`'s own
+steps 12-13 have not executed since 2026-07-15. **The next scheduled 06:00Z run
+is the first end-to-end exercise; do not record the path as working until one
+shows both steps green.**
+
 ### `#480` — **CI HAD BEEN RED ON EVERY PUSH TO `main` FOR 26 HOURS, AND THE DAILY UPDATE WORKFLOW FOR 34 DAYS. BOTH ROOT-CAUSED AND FIXED; ONE CAUSE EACH, NEITHER A PRODUCT DEFECT** — FOUND+FIXED 2026-08-19, lane `ci-green`
 
 **The complaint that started it:** "anytime we deploy to git there are CI errors."
@@ -1661,6 +1719,119 @@ still fires with the other disabled). Verified: 3 new engine tests (reachability
 vectors -- same low-sensitivity trap the symmetric diff-based mechanism hit for the EV-only layer;
 direction; independence), checklist full PASS (no new consumed field). Round-robin: **-0.138%**
 (992 pairings, real per-team lineup data), noise-level.
+
+**Addendum, same day: closed the last open faceoff-track item with a real measurement, not a
+redesign** (reference doc §2zzz, full report
+`docs/reports/hockeysim_faceoff_alpha_calibration_report.md`). An exhaustive re-check of every
+faceoff addendum in this item, the reference doc, and the model inventory found exactly one item
+stated as open and never closed: `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`,
+`_faceoff_multipliers`'s own sensitivity constants, still the vendor's original never-validated
+defaults. **Now consequential**: these constants are the ONLY mechanism behind the two newest
+lineup-aware layers, which have no discrete-event alternative (a persistent per-game roster-quality
+signal has no discrete "event" to build a decay curve from).
+`scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, each game's
+CONFIRMED dressed roster (real per-game TOI, from the boxscore cache) and regresses real shot
+share against the lineup-pct differential -- game-level, a genuinely different question from the
+earlier season-aggregate NZ check (§2p), which only tested season aggregates and found a clean
+null. Result: R²=0.0028, slope=0.1086+/-0.0566 (p~=0.055) -- real, weak, borderline, neither a
+clean null nor a confident signal. **The decisive fact**: the vendor's `alpha=0.35` sits
+comfortably inside the measured 95% CI `[~0, 0.44]`. **Decision: left unchanged.** Real data
+neither contradicts the current default nor precisely pins down a better number -- overwriting a
+genuine, if imprecise, measurement with a differently-uncertain point estimate would not be an
+improvement, the same discipline the NZ item and the block-rate EV:PK:PP-def ratio already
+established. `faceoff_diff_clip=0.12` separately confirmed sensible against the real observed
+`|lineup_pct_diff|` distribution (p95=0.085, max=0.158). `calibration_profile.py` now carries an
+explicit comment documenting this check so a future session doesn't re-discover and re-run it from
+scratch. Verified: `_ols_slope_and_r2`'s own arithmetic checked against two synthetic cases (a
+perfect line, a flat line); full 1,312-game run, 0 games skipped; checklist re-confirmed full
+PASS; calibration_profile.py's values confirmed byte-identical before/after (a documentation-only
+change, no behavior change).
+
+**Correction, same day: the line above overstated "closes to zero."** This addendum's own report
+stated plainly, in its own "What this does NOT do" section, that it did NOT touch
+`faceoff_mult_clip_low`/`faceoff_mult_clip_high` -- a genuinely still-open item the "closes to
+zero" framing glossed over. Found and fixed by re-verifying that exact claim, not by a user
+report. **Now closed, with a proof rather than a measurement**: `_faceoff_multipliers` clips
+`fo_diff` to `[-diff_clip, diff_clip]` BEFORE multiplying by `alpha`, so the largest possible
+swing from 1.0 either output can reach is exactly `alpha * diff_clip = 0.35 * 0.12 = 0.042` at the
+live, unchanged values -- comfortably inside `mult_clip`'s own `0.10` headroom on each side (>2x
+margin). Confirmed for LITERALLY ANY input, not just the real observed range: an exhaustive
+`[0,1]x[0,1]` sweep (10,201 combinations) found zero deviation between the clipped engine output
+and the un-clipped formula everywhere. Confirmed no other call site anywhere in `syndicate/` or
+`scripts/` ever passes a different `faceoff_alpha`/`faceoff_diff_clip` that could make the clip
+relevant. Locked in `test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip`, asserting
+the headroom invariant against the LIVE calibration profile -- if `alpha`/`diff_clip` are ever
+raised without re-checking this, the test catches it before the clip could silently start
+flattening a real effect mid-segment. `calibration_profile.py`'s comment updated accordingly.
+
+**Two smaller items were flagged, disclosed rather than swept into "closed" at that point**:
+(1) the alpha fit's `faceoff_weight` input is each player's SEASON-long average, which includes
+the very game being predicted -- not a leave-one-out fit; judged small enough not to change the
+"leave alpha unchanged" conclusion, but never actually re-run holding it out. (2) the
+discrete-event engine's "one faceoff assumed per real segment" approximation (first stated when
+the redesign shipped) has never been revisited by any of the ~10 addenda built on top of it since
+-- a standing structural simplification underlying every discrete-event curve (EV/OZ/DZ/NZ/
+strength-state/joint/lineup-aware), not a blocking bug, but an honest gap, not a closed one.
+
+**Addendum, same day: the leave-one-out refit -- run, not just reasoned about**, closing item (1)
+above. `scripts/calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own
+faceoff win/loss counts from every dressed player's rate before predicting that specific game --
+`O(games)` by construction: the full-season win/total counts are accumulated ONCE, then each
+game's own contribution is subtracted per player for that game's prediction only, never
+re-aggregated from scratch. **Result, all 1,312 games usable, 0 skipped**: `slope=0.0960` (vs
+in-sample `0.1086`), `R²=0.0021`, `t=1.668`, `p≈0.095`, implied `alpha=0.1919`, 95% CI
+`[-0.034, 0.418]`. **Confirms the original judgment, doesn't just restate it**: modestly weaker
+and less significant than the in-sample fit -- exactly the direction removing in-sample leakage
+should push it, exactly the small magnitude the earlier report predicted -- and the decision does
+not change: the vendor's `alpha=0.35` still sits comfortably inside the leave-one-out confidence
+interval. Verified: the leave-one-out subtraction arithmetic and `parse_playbyplay_player_faceoffs`
+both checked against hand-computed synthetic cases; boxscore/playbyplay `id` fields confirmed to
+agree (a real join precondition checked, not assumed) before trusting the per-game match.
+
+**This closes the faceoff-track's own open-items list -- for real this time, with the mult_clip
+gap named and closed rather than glossed over, item (1) above run and confirmed rather than left
+as reasoning alone, and item (2) stated as the one thing still genuinely open, not silently
+absorbed into "zero."** EV, OZ, DZ, NZ, strength-state role, per-team role index, joint
+role-zone, player-level lineup-aware (both EV-only and strength-state), the legacy diff-based
+mechanism's sensitivity constants, its output clip bounds, and now the alpha fit's own leave-one-out
+confirmation -- every item this session's own addenda ever flagged as open has a closing addendum,
+whether that closure built something, measured and confirmed a default was fine, proved a bound
+can't bind, or re-ran a prior judgment call to confirm it held.
+
+**Addendum, next day: the "one faceoff per segment" approximation MEASURED, not just named as
+open** (reference doc §2zzzz, full report
+`docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`). Two real questions,
+both answered with data. **(1) How far from reality**: `scripts/
+measure_nhl_faceoff_segment_approximation.py` reads the engine's OWN segment geometry directly
+from `SimConfig` (`seconds_per_period=1200`, `target_seg=45`, `segments/period=27`,
+`seg_len≈44.44s`) and counts real faceoffs landing in each of 106,272 real segment-windows across
+1,312 games -- mean **0.684** real faceoffs per segment vs the engine's constant assumption of
+1.0, a ~46% over-count. Only 37.09% of segments match exactly; **48.64% have ZERO real faceoffs**
+(an assumed win/loss tilt with nothing real behind it, applied almost as often as not); 14.27%
+have 2+ (under-represented). **A genuinely unrepresentable case, quantified for the first time**:
+7.79% of ALL segments (8,278 of 106,272) contain 2+ real faceoffs won by DIFFERENT teams -- the
+model resolves exactly one winner per segment by construction, a structural ceiling no parameter
+tuning removes. **(2) Does it inflate simulated variance**: `scripts/
+measure_nhl_faceoff_segment_variance_impact.py` runs a controlled A/B (every one of the 10
+`faceoff_*` boolean flags ON, shipped defaults, vs every one OFF -- the complete list read
+directly from `engine.py`, not guessed -- identical rosters/rates/seeds, 992-pairing round-robin
+x 3 sims = 2,976 games/condition) and measures the OPPOSITE of the hypothesis: turning every
+faceoff mechanism ON REDUCES total-shots-per-game std by **2.15%** relative to OFF, not inflates
+it. A plausible mechanism, disclosed as not separately proven: every faceoff multiplier is
+symmetric and approximately zero-sum between the two teams on the SAME segment, injecting a small
+negative home/away shot-count correlation -- summing two anti-correlated quantities reduces the
+variance of the sum. **The decisive fact for scoping this item going forward**: BOTH conditions
+sit below the real observed std (8.295) -- ON at 96.71% of real, OFF at 98.84% -- so the
+approximation is NOT the primary driver of whatever makes the engine's shot-total distribution run
+tighter than real games; disabling it entirely closes less than half that gap. Whatever explains
+the rest lives in the engine's other stochastic sources (segment-level Poisson draws,
+line-matching noise, score-effects/period-pace multipliers) -- a separate, larger, still-open
+question this pass does not attempt to answer, correctly scoped rather than declared solved.
+**This is the first time this session's "the one genuinely open item" framing has been backed by
+a real measurement instead of left as a stated caveat** -- the faceoff track now has a real answer
+for every item it ever named as open, whether that answer was "built," "measured and confirmed the
+default was fine," "proved a bound can't bind," or, here, "measured the real magnitude and
+correctly scoped what it does and doesn't explain."
 
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting

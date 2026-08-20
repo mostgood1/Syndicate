@@ -109,6 +109,21 @@ def nfl_injuries_path(season: int) -> Path:
     return _resolve_nfl_tracking_path(Path("tracking") / "nflverse" / "injuries" / f"injuries_{season}.csv")
 
 
+def nfl_depth_chart_snapshot_path(season: int) -> Path:
+    """Where the built depth-chart snapshot for *season* actually is.
+
+    Same `#441` bug, one hop further down the pipeline than `nfl_injuries_
+    path`: `injury_adjustment._depth_chart_path` used to build this off
+    `default_nfl_source_root()` directly. Reuses `_resolve_nfl_tracking_path`
+    for the search even though the relative path here
+    (`source_artifacts/data/processed/depth/...`) isn't under `tracking/` --
+    that helper's search logic is generic (candidate-root probe + named
+    fallback), only its name is pbp-flavored; a rename was judged not worth
+    the diff against two working call sites for this pass.
+    """
+    return _resolve_nfl_tracking_path(Path("source_artifacts") / "data" / "processed" / "depth" / f"depth_{season}_snapshot.csv")
+
+
 def nfl_pbp_diagnostic(season: int) -> str:
     """Why `nfl_pbp_path` returned what it did. `#441` diagnostic, third pass.
 

@@ -1202,6 +1202,100 @@ low-sensitivity trap the symmetric diff-based mechanism hit for the EV-only laye
 independence). Checklist re-confirmed full PASS (no new consumed field). Round-robin: see the
 report's own measured delta on real per-team lineup data.
 
+**§2zzz, the last open faceoff-track item, closed by a real measurement — not a redesign**: an
+exhaustive re-check of every faceoff addendum in this document, `nhl_model_inventory.md`, and every
+`#463` addendum in `todo.md` found exactly one item stated as open and never closed:
+`faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*`, `_faceoff_multipliers`'s own sensitivity
+constants, still the vendor's original never-validated defaults. **Now consequential, not just
+historical debt**: these constants are the ONLY mechanism behind the two newest layers this session
+built (§2zz's `faceoff_lineup_model`/`faceoff_lineup_model_strength_state`) — a persistent
+per-game roster-quality signal has no discrete "event" to build a decay curve from, so there is no
+discrete-event alternative the way EV/OZ/DZ/NZ have.
+
+`scripts/calibrate_nhl_faceoff_alpha.py` reconstructs, for all 1,312 real games, what
+`compute_lineup_faceoff_pct` would compute from that game's CONFIRMED dressed roster (real players,
+real per-game TOI, from the `boxscore` cache) and regresses the game's real shot SHARE against the
+lineup-pct differential — game-level, not season-aggregate (the earlier NZ check, §2p, only tested
+season aggregates and found a clean null; this is a genuinely different question). Result: R²=0.0028,
+slope=0.1086±0.0566 (p≈0.055) — a real, weak, borderline signal, neither a clean null nor a
+confident one. **The decisive fact**: the vendor's `alpha=0.35` sits comfortably inside the
+measured 95% CI `[~0, 0.44]`. **Decision: left unchanged.** Real data does not contradict the
+current default, and does not precisely pin down a better number either — overwriting a genuine,
+if imprecise, measurement with a differently-uncertain point estimate would not be an improvement,
+the same discipline the NZ item (§2p) and the block-rate ratio (§2h) already established.
+`faceoff_diff_clip=0.12` separately confirmed sensible against the real `|lineup_pct_diff|`
+distribution (p95=0.085, max=0.158). `calibration_profile.py` now carries an explicit comment
+documenting this check so a future session doesn't re-discover and re-run it from scratch. Full
+report: `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`.
+
+**A correction to §2zzz's own "closes to zero" claim, and the mult_clip item it left open,
+actually closed.** §2zzz's own report stated plainly, in its own "What this does NOT do" section,
+that it did NOT touch `faceoff_mult_clip_low`/`faceoff_mult_clip_high` — the surrounding "closes
+the faceoff track's own open-items list to zero" line overstated that, and a later re-check
+(prompted by re-verifying this exact claim) confirmed it: the mult_clip bounds were genuinely
+still open. They are now closed, with a proof rather than a measurement — `_faceoff_multipliers`
+clips `fo_diff` to `[-diff_clip, diff_clip]` **before** multiplying by `alpha`, so the largest
+possible swing from 1.0 either output can reach is exactly `alpha * diff_clip = 0.042` at the live
+values, well inside the clip's own `0.10` headroom on each side. Confirmed for LITERALLY ANY
+input (an exhaustive `[0,1]×[0,1]` sweep, not just the observed range) and locked in
+`test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip` so a future change to `alpha`/
+`diff_clip` gets caught before the clip could silently start flattening a real effect. Two smaller
+items were flagged, disclosed rather than swept in: the alpha fit's `faceoff_weight` input is a
+season-long average that includes the very game being predicted (not leave-one-out — judged small
+enough not to change the "leave unchanged" conclusion, but never re-run holding it out); and the
+discrete-event engine's "one faceoff assumed per real segment" approximation (§2r) has never been
+revisited by any of the ~10 addenda built on top of it since.
+
+**The leave-one-out refit — run, not just reasoned about, same day.**
+`scripts/calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own faceoff
+win/loss counts from every dressed player's rate before predicting that specific game — a true
+held-out fit, `O(games)` by construction (full-season counts accumulated once, each game's own
+contribution subtracted per player for that game's prediction only, not re-aggregated from
+scratch). Result, all 1,312 games usable, 0 skipped: `slope=0.0960` (vs in-sample `0.1086`),
+`R²=0.0021`, `t=1.668`, `p≈0.095`, implied `alpha=0.1919`, 95% CI `[-0.034, 0.418]`. **Confirms the
+original judgment, doesn't just restate it**: modestly weaker and less significant than the
+in-sample fit — exactly the direction removing leakage should push it, exactly the small magnitude
+the original report predicted — and the decision is unchanged: the vendor's `0.35` still sits
+comfortably inside the leave-one-out confidence interval. The discrete-event "one faceoff per
+segment" approximation remains the one genuinely open item — a structural engine-design question,
+out of scope for a calibration report, never blocking what's currently shipped.
+
+**§2zzzz — the "one faceoff per segment" approximation MEASURED, not just named as open, same
+session.** Full report: `docs/reports/hockeysim_faceoff_segment_approximation_impact_report.md`.
+Two real questions, both answered with data rather than left as a structural caveat: (1) how far
+IS the assumption from reality, and (2) does it actually show up in simulated output.
+
+**(1) Real vs assumed, using the engine's OWN segment geometry** (read directly from
+`SimConfig`/`engine.py`, not re-typed: `seconds_per_period=1200`, `target_seg=45`,
+`segments/period=27`, `seg_len≈44.44s`). Divided every real game's periods 1-3 into the same 27
+segments and counted real faceoffs (any strength state) landing in each, 1,312 games, 106,272
+segments, 72,693 real faceoffs: **mean 0.684 real faceoffs per segment vs the engine's constant
+assumption of 1.0** — a real ~46% over-count. Only 37.09% of segments match the assumption
+exactly; **48.64% — very close to half — have ZERO real faceoffs**, meaning the model applies an
+assumed win/loss shot-share tilt with nothing real behind it almost as often as not. 14.27% have
+2+ real faceoffs (under-represented, only one assumed winner can apply). A genuinely
+unrepresentable case, quantified for the first time: **7.79% of ALL segments (8,278 of 106,272)
+contain 2+ real faceoffs won by DIFFERENT teams** — the model resolves exactly one winner per
+segment by construction, so these windows cannot be represented at all regardless of curve shape
+or calibration, a structural ceiling no parameter tuning removes.
+
+**(2) Does the over-assumption inflate simulated variance?** Every curve this session built is
+mean-1.0 preserving by construction, so the AVERAGE shot total was already known to be unaffected
+(confirmed again here: -0.086% mean delta). The open question was VARIANCE — applying a real
+shot-share tilt to roughly twice as many segments as reality has an event for should, naively,
+inject extra spread. **Measured the opposite**: a controlled A/B (every one of the 10 `faceoff_*`
+flags ON vs every one OFF, identical rosters/rates/seeds, 992-pairing round-robin x 3 sims = 2,976
+games/condition) found `std` ON=8.023 vs OFF=8.199, a **-2.154% reduction**, not an increase. A
+plausible (not separately proven) mechanism: every faceoff multiplier is symmetric and
+approximately zero-sum between the two teams on the SAME segment, injecting a small negative
+correlation between home/away shot counts — summing two anti-correlated quantities reduces the
+variance of the sum. **The decisive fact for scoping this item going forward**: BOTH conditions
+sit below the real observed std (8.295) — ON at 96.71% of real, OFF at 98.84% — so the
+approximation is NOT the primary driver of whatever is making the engine's shot-total distribution
+run tighter than real games. Disabling it entirely closes less than half that gap. Whatever
+explains the rest lives in the engine's other stochastic sources, a separate, larger, still-open
+question this measurement does not attempt to answer.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

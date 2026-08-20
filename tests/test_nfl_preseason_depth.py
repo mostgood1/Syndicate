@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from syndicate.features.nfl import injury_adjustment as inj
 from syndicate.features.nfl import preseason_depth as pd
+from syndicate.features.nfl import sources
 
 
 _DEPTH_FIELDNAMES = ["team", "player_id", "player_name", "position", "positional_group", "depth_rank", "role", "roster_status"]
@@ -25,7 +25,11 @@ class PreseasonDepthTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = Path(self._tmp.name)
-        patcher = patch.object(inj, "default_nfl_source_root", return_value=self.root)
+        # `_depth_chart_rows` (via `_depth_chart_path`) now resolves through
+        # `sources._resolve_nfl_tracking_path` -> `sources._source_roots()`,
+        # not through `inj.default_nfl_source_root` directly -- that name no
+        # longer exists on the `inj` module (`nfl-roster-depth-autorun` lane).
+        patcher = patch.object(sources, "_source_roots", return_value=[self.root])
         patcher.start()
         self.addCleanup(patcher.stop)
 

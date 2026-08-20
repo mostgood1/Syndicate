@@ -97,8 +97,40 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     usage_model="deterministic",
     usage_noisy_sigma=0.18,
     faceoff_enabled=True,
+    # CHECKED against real data (§2zzz, `scripts/calibrate_nhl_faceoff_alpha.py`,
+    # `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`), NOT left uncalibrated by
+    # default alone -- the vendor's original constants below were the ONE faceoff item every
+    # session addendum stated as open and never closed. Now consequential, not just legacy: these
+    # constants are the ONLY mechanism behind the two newest layers this session built
+    # (`faceoff_lineup_model`/`faceoff_lineup_model_strength_state`, §2zz), which have no
+    # discrete-event alternative (a persistent per-game roster-quality signal has no discrete
+    # "event" to build a decay curve from). A game-level fit across all 1,312 real games
+    # (reconstructing each game's CONFIRMED dressed roster + real per-game TOI from the boxscore,
+    # regressed against that game's real shot share) found `alpha`'s 95% confidence interval is
+    # `[~0, 0.44]` (slope=0.1086, se=0.0566, R^2=0.0028, p~=0.055 -- borderline, weak, not a clean
+    # null the way the NZ season-aggregate check found (|r|<0.02) but not a confident signal
+    # either). **DECISION: left UNCHANGED**, not recalibrated -- the vendor's 0.35 sits WELL
+    # WITHIN that confidence interval, so real data neither contradicts it nor precisely pins down
+    # a better number; overwriting a genuine (if imprecise) measurement with a differently-uncertain
+    # guess would not be an improvement. `faceoff_diff_clip=0.12` separately confirmed sensible
+    # against the real observed |lineup_pct_diff| distribution (p95=0.085, max=0.158) -- it clips
+    # only the most extreme ~5% of real cases, not an arbitrary bound.
+    # LEAVE-ONE-OUT REFIT CONFIRMS THIS, not just the in-sample fit above (`scripts/
+    # calibrate_nhl_faceoff_alpha_loo.py`, same report, second addendum): excluding each game's OWN
+    # faceoff counts from every dressed player's rate before predicting THAT game gives
+    # slope=0.0960 (vs in-sample 0.1086), alpha=0.1919, 95% CI `[-0.034, 0.418]` -- modestly weaker,
+    # exactly the direction removing in-sample leakage should push it, same decision either way.
     faceoff_alpha=0.35,
     faceoff_diff_clip=0.12,
+    # `faceoff_mult_clip_*` CLOSED WITH A PROOF, not a measurement (same-day addendum to the
+    # report above). `_faceoff_multipliers` clips `fo_diff` BEFORE multiplying by `alpha`, so the
+    # largest possible swing from 1.0 is exactly `alpha * diff_clip = 0.35 * 0.12 = 0.042` --
+    # comfortably inside this clip's own headroom (`0.10` on each side, >2x margin). Holds for
+    # LITERALLY ANY input, not just the real observed range: an exhaustive `[0,1]x[0,1]` sweep
+    # confirmed zero deviation between clipped and un-clipped output everywhere. Locked in
+    # `test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip` -- if `alpha`/`diff_clip`
+    # are ever raised without re-checking this, that test catches it before the clip silently
+    # starts flattening a real effect.
     faceoff_mult_clip_low=0.90,
     faceoff_mult_clip_high=1.10,
     faceoff_ev_only=True,
