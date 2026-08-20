@@ -2604,3 +2604,43 @@ across every value from 6 to 24.
 **The actionable number:** the gap is **23.8 points of R^2** (41.6 − 17.8). That
 is the size of what the market knows and the model does not, and it only closes
 with information the model currently lacks — not by re-weighting what it has.
+
+
+### 2026-08-20 — FORBIDDEN: never re-apply a ledger edit with `git checkout <sha> -- <ledger-file>`. It is a REVERT of everyone else's entries, wearing the clothes of an append
+
+**What happened.** Closing out `#387`, I needed to move one 43-line note onto a
+newer `origin/main`. I ran:
+
+    git checkout 0f9dc4d8 -- .syndicate/log/2026-08-20.md
+
+That commit was built on an older `origin/main`. The checkout replaced the file
+WHOLESALE with my stale copy. The diffstat:
+
+    1 file changed, 41 insertions(+), 400 deletions(-)
+
+**400 deletions — other sessions' log entries for the same day**, staged and
+committed, one `git push` from landing. Caught only because the diffstat was
+read before pushing. Reset, then re-done as a genuine append: `43 insertions(+),
+0 deletions(-)`.
+
+**Same root cause as the OTHER defect in the same ten minutes**, which is why
+this is one rule and not two: a `str.replace(anchor, …, 1)` on `lanes.md`
+anchored on `- Blocked by: none.` — a line present in several lane blocks — and
+attached MLB pickup notes to the **soccer** lane. Both are *a ledger write that
+was not scoped to what I actually changed*.
+
+**The rules:**
+1. **Ledger files are append-mostly and multi-writer. Never restore one from a
+   revision.** To move a note across a rebase, re-append the note; do not
+   re-materialise the file.
+2. **`git diff --cached --numstat` before every ledger commit.** For an append,
+   deletions MUST be `0`. Any non-zero deletion count on a shared log/ledger is
+   a stop-and-look, not a formatting artifact.
+3. **An in-place edit must be anchored on a string unique to its block, or
+   bounded to that block's span** — slice the block, assert the anchor occurs
+   exactly once inside it, then edit. Asserting uniqueness is what caught the
+   second one.
+
+**Why this rates a FORBIDDEN rather than a note:** the failure is SILENT and
+INVERTED — the intent was "add my line", the effect was "delete four hundred of
+theirs", and every command involved is one people run daily.
