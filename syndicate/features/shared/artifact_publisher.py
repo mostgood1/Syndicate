@@ -362,6 +362,28 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # lane instead -- confirmed git-tracked at
     # `data/nba_source/source_artifacts/data/processed/boxscores_history.csv`)
     # -- so no new pattern is needed for either name.
+    # `#482`. `#477` made `player_logs.csv` a REAL, separately-built artifact
+    # (derived from boxscores+schedule), and `#474` added
+    # `home_court_advantage.json`. Both are written worker-side by `#479`'s
+    # scheduled builders and READ worker-side by the sim, so neither needs to
+    # cross for the engine to work -- the allowlist is not a functional
+    # dependency here.
+    #
+    # They are listed anyway because WITHOUT them the artifacts are
+    # UNOBSERVABLE: `/api/ops/artifacts/export` serves WEB's disk, and only an
+    # allowlisted publish sweep moves a worker file there. That made `#479`
+    # unverifiable -- an absent reading meant "not built" and "built but
+    # invisible" identically, which is exactly the instrument-blindness trap
+    # where a null result gets mistaken for evidence.
+    #
+    # NOTE: this supersedes the older comment a few lines above claiming
+    # `player_logs` is "NOT a separate artifact" and is computed in-memory
+    # from `boxscores_history.csv`. That was true when written and `#477`
+    # made it false.
+    "*_source/source_artifacts/data/processed/player_logs.csv",
+    "*_source/data/processed/player_logs.csv",
+    "*_source/source_artifacts/data/processed/home_court_advantage.json",
+    "*_source/data/processed/home_court_advantage.json",
     "*_source/source_artifacts/data/processed/team_advanced_stats_*.csv",
     "*_source/data/processed/team_advanced_stats_*.csv",
     "*_source/source_artifacts/data/processed/smart_sim_total_calibration.json",
