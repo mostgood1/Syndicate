@@ -14,6 +14,7 @@ scripts/run_queued_refresh_job.py.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -192,6 +193,39 @@ def _ladders_force_requested(date_str: str, env: dict | None = None) -> bool:
     if not raw_value:
         return False
     return raw_value == str(date_str or "").strip()
+
+
+def _ladders_force_already_spent(date_str: str) -> bool:
+    """True once a FORCED rebuild has already succeeded for `date_str`.
+
+    Makes the force ONE-SHOT rather than sticky-for-a-day. Without this the knob
+    self-expires only BACKWARDS: a value naming a FUTURE date sits inert and then
+    arms itself when that day arrives, forcing a rebuild on every tick for the
+    whole slate and overwriting the richer vendor artifact each time. "Set it and
+    forget it" is the expected human behaviour, so the code has to be safe under
+    it -- the knob must not depend on somebody remembering to remove it.
+
+    Reads the builder's own status artifact, which already records `forced` and
+    `forceDate` on every path. Absent/unreadable status returns False (allow the
+    force), because the FIRST run legitimately has no prior record -- the
+    permissive default here is the one that makes the knob work at all, and its
+    blast radius is one extra rebuild, not a day of them.
+    """
+    try:
+        from syndicate.features.mlb import ladders_build as _lb_status
+        path = Path(_lb_status.status_artifact_path(str(date_str)))
+        if not path.is_file():
+            return False
+        payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return (
+        bool(payload.get("forced"))
+        and str(payload.get("forceDate") or "") == str(date_str or "").strip()
+        and str(payload.get("outcome") or "") == "rebuilt"
+    )
 
 
 def _parse_game_progress(log_text: str) -> dict[str, object] | None:
@@ -527,6 +561,11 @@ def main() -> int:
             # each time -- which is why this is not that.
             _force_date = str(os.environ.get("SYNDICATE_MLB_LADDERS_FORCE_DATE") or "").strip()
             _forced = _ladders_force_requested(str(args.date))
+            if _forced and _ladders_force_already_spent(str(args.date)):
+                # One-shot: the force already produced a rebuild for this date.
+                print(f"MLB_LADDERS_FORCE_SPENT date={args.date} "
+                      f"(already rebuilt once under force; not re-forcing)", flush=True)
+                _forced = False
             if _st.get("stale") or _forced:
                 _res = _lb.write_ladders_artifact(str(args.date), _pks)
                 _reason = _st.get("reason") if _st.get("stale") else "forced"

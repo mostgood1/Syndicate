@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from scripts.run_mlb_daily_sim_job import _hydrate_vendor_oddsapi_mirror
+from scripts.run_mlb_daily_sim_job import _ladders_force_already_spent
 from scripts.run_mlb_daily_sim_job import _ladders_force_requested
 from scripts.run_mlb_daily_sim_job import _parse_game_progress
 from scripts.run_mlb_daily_sim_job import _progress_poll_interval_seconds
@@ -291,3 +292,61 @@ class LaddersForceRequestedTests(unittest.TestCase):
             self.assertTrue(_ladders_force_requested(self.DATE))
         with patch.dict(os.environ, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": ""}, clear=False):
             self.assertFalse(_ladders_force_requested(self.DATE))
+
+
+class LaddersForceOneShotTests(unittest.TestCase):
+    """The force must be safe when LEFT SET -- nobody reliably removes an env var.
+
+    The date-scoping alone self-expires only BACKWARDS. A value naming a FUTURE
+    date sits inert and then arms itself on that day, forcing a rebuild every
+    tick for a whole slate and overwriting the richer vendor artifact each time.
+    These tests pin the one-shot guard that bounds that to a single rebuild.
+    """
+
+    DATE = "2026-08-20"
+
+    def _status(self, root: Path, payload: dict) -> None:
+        d = root / "mlb_source" / "source_artifacts" / "data" / "daily" / "ladders"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"daily_ladders_status_{self.DATE.replace('-', '_')}.json").write_text(
+            json.dumps(payload), encoding="utf-8")
+
+    def test_no_status_artifact_is_not_spent(self):
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                self.assertFalse(_ladders_force_already_spent(self.DATE))
+
+    def test_a_forced_rebuild_marks_it_spent(self):
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                self._status(Path(td), {"outcome": "rebuilt", "forced": True, "forceDate": self.DATE})
+                self.assertTrue(_ladders_force_already_spent(self.DATE))
+
+    def test_an_UNFORCED_rebuild_does_not_spend_it(self):
+        # A normal stale-triggered rebuild must not consume the force, or arming
+        # the knob right after one would silently do nothing.
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                self._status(Path(td), {"outcome": "rebuilt", "forced": False, "forceDate": None})
+                self.assertFalse(_ladders_force_already_spent(self.DATE))
+
+    def test_a_skip_does_not_spend_it(self):
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                self._status(Path(td), {"outcome": "skipped_fresh", "forced": True, "forceDate": self.DATE})
+                self.assertFalse(_ladders_force_already_spent(self.DATE))
+
+    def test_a_force_spent_on_ANOTHER_date_does_not_count(self):
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                self._status(Path(td), {"outcome": "rebuilt", "forced": True, "forceDate": "2026-08-19"})
+                self.assertFalse(_ladders_force_already_spent(self.DATE))
+
+    def test_unreadable_status_is_not_spent(self):
+        with TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": td}, clear=False):
+                d = Path(td) / "mlb_source" / "source_artifacts" / "data" / "daily" / "ladders"
+                d.mkdir(parents=True, exist_ok=True)
+                (d / f"daily_ladders_status_{self.DATE.replace('-', '_')}.json").write_text(
+                    "{not json", encoding="utf-8")
+                self.assertFalse(_ladders_force_already_spent(self.DATE))
