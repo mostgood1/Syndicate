@@ -18133,3 +18133,76 @@ a log search at all.
   rate-limited launch per cadence, not a persistent loop) and/or redeploy live-odds-worker to the
   prior commit (superseded, prefix b5cf).
 - Claim released.
+
+## 2026-08-20 13:59:33Z — DEPLOYED refresh-worker `d0ea983d` — `#387` MLB overview hydration cost — **BRANCH PROVEN TO FIRE; BENEFIT NOT YET MEASURABLE**
+
+Lane `mlb-overview-hydration-cost`. `dep-da3gdn2jnfac73cfgta0`, fired 13:53:32Z,
+live **13:59:33.990Z** (6m01s). Claim acquired 13:51:45Z, preflight **CLEAR**
+(0 jobs, infra only) 13:53:10Z — 22 seconds before the POST. Deploy events
+CLEAN, no `server_failed`, no OOM.
+
+### THE LIVE SHA MOVED WHILE THIS LANE WAITED, AND THE FIRST BRANCH BECAME A ROLLBACK
+
+`nfl-autorun-production-arm` held the deploy claim from 13:06Z and let it expire
+at 13:51:20Z **without releasing it — because they were deploying**: `3b816546`
+(nfl roster/depth-chart autorun arming) went live at **13:36:29Z**, mid-poll.
+
+The branch this lane had ready, `5ad1d96e`, was cut from `041188cb`. Checked
+rather than assumed at 13:52Z:
+
+    git merge-base --is-ancestor 3b816546 5ad1d96e  ->  NO
+
+So deploying the prepared branch would have **reverted the NFL autorun arming
+9 minutes after it went live** — the 2026-08-15 shape exactly (verified fix live
+21:36:59Z, gone 21:45:20Z). Re-cut onto `3b816546` as `d0ea983d`; diff vs that
+base is exactly the four `#387` files and the NFL commit is untouched.
+**The claim serialised the two deploys and could not compose them; being cut
+from the live SHA is what composed them.** Waiting on a lock is not the same as
+waiting for a base.
+
+### verify: THE BRANCH FIRED — `pruned == games`, twice, in production
+
+    14:00:15  [mlb_cards] FEED_LIVE_PRUNE enabled=True date=2026-08-20 games=9 pruned=9 plays_dropped=1
+    14:00:20  [mlb_cards] FEED_LIVE_PRUNE enabled=True date=2026-08-20 games=9 pruned=9 plays_dropped=1
+
+`pruned=9` against `games=9`: **every retained feed/live document went through
+the prune.** This is the reading three prior candidates for this excursion could
+never produce — deepcopy, ledger accumulation and three-loads-to-one were each
+live and exercised with no way to show the branch had run at all. That gap is
+now closed, and it is the only thing this entry claims.
+
+### AND THE BENEFIT IS **NOT** DEMONSTRATED — `plays_dropped=1`
+
+Read the last field before scoring this a win. **`plays_dropped=1` across nine
+games.** Locally, the same code on 2026-06-14 dropped **1,067**.
+
+The difference is the regime, not the code: it is **09:00 CDT and the slate is
+PREGAME** — no game has been played, so `liveData.plays.allPlays` is essentially
+empty and there is nothing to prune yet. The 66.38% figure that motivated this
+change was measured on a **completed** slate. `handoff_refresh_worker_oom.md`
+already recorded this exact trap in the other direction: a local profile taken
+against a completed slate was "the wrong shape of the same function" versus a
+mid-afternoon production run.
+
+So the honest status is: **reachable, correct, and currently doing nothing,
+because there is nothing for it to do at this hour.**
+
+Memory now is also useless as evidence — the process booted at 13:59:33Z and sits
+at `memory_current 1249MB / 30.5%`, `anon 508MB`. The floor IS the ratchet; every
+fix looks good for five minutes after a boot.
+
+### WHAT WOULD ACTUALLY SETTLE IT — owed, not taken
+
+Re-read `FEED_LIVE_PRUNE` during the **live/post-game window (~22:00Z-05:00Z)**,
+when `allPlays` has accumulated:
+- `plays_dropped` in the thousands, scaling with the slate, is the mechanism working.
+- `plays_dropped` still near zero at 02:00Z would mean the payloads reaching this
+  loader never carry play-by-play at all, and the 66.38% premise is wrong for the
+  production regime even though it is right for the artifact on disk.
+
+Only then is a memory delta worth taking, same-clock against the pre-deploy
+baseline. **NOT "no OOM kills"** — a quiet period yields that on broken code, and
+`learnings.md` forbids concluding it from a log search regardless.
+
+**rollback:** redeploy `3b816546`. Kill switch without a deploy:
+`SYNDICATE_MLB_FEED_LIVE_PRUNE=0`.
