@@ -2198,3 +2198,52 @@ the second sample is where noise separates from signal.
 
 **Cost:** ~3 hours of compute and one near-miss. Cheap, and only because the
 objective test was run before shipping rather than after.
+
+## 2026-08-20 — A STANDING INSTRUCTION BLOCK GOES STALE SILENTLY, AND STALE READS AS AUTHORITATIVE
+
+`.syndicate/state.md` carried a block headed "STANDING RIDEALONG FOR ANY
+refresh-worker DEPLOY" naming branch `deploy/worker-ladders-ridealong` /
+`5c2851a4`. That branch had SHIPPED hours earlier inside `041188cb`. Any session
+following the instruction would have re-cut a spent branch onto the live SHA and
+believed it was carrying something.
+
+The block even warned "it goes stale whenever the worker moves" — and the
+warning did not help, because nothing makes the reader check. A note that
+describes a MOVING target is a liability the moment its author stops updating it.
+
+**How to apply.** A ledger block written as an INSTRUCTION ("cut from THIS",
+"deploy X") must carry the reading that proves it is still valid, and the
+instruction must be re-derived, not trusted:
+- Before acting on a named branch/SHA in the ledger, check it is not already an
+  ancestor of the live SHA. One command, and it is the difference between
+  carrying a change and carrying nothing.
+- When you SHIP the thing a standing block points at, updating that block is
+  part of shipping. It is not documentation debt; it is a live instruction that
+  is now false.
+- Prefer blocks that say what to CARRY (file paths + a source commit) over ones
+  that say what to DEPLOY (a pre-cut branch). Files stay true across worker
+  moves; a pre-cut branch expires every time the service moves, and this one
+  expired three times in two days.
+
+## 2026-08-20 — "Everything upstream is correct" is a REASON TO LOOK FURTHER DOWN, not a reason to doubt the symptom
+
+The MLB ladder was 28 hours stale on web while, on the worker: the rebuild ran on
+schedule, `is_stale()` returned `fresh`, and that verdict was TRUE — the content
+really was newer than the odds and sims. Five successive hypotheses died against
+correct-looking components before the real one (the publish sweep refusing the
+file at `_PUBLISH_MAX_BYTES`, 13,678,982 vs 12,582,912).
+
+**The generalisable error:** I kept re-examining whether the upstream verdict was
+WRONG, when the actual question was WHICH COPY it described. `is_stale()` reads
+the worker's disk; the symptom lived on web's. A component can be perfectly
+correct and still tell you nothing about the system, because it is answering a
+question about a different machine.
+
+**How to apply.** When a verdict is right and the symptom persists, stop
+auditing the verdict. Ask: *whose state does this reading describe, and is that
+the state the symptom is in?* On this repo that question has a standard answer —
+worker disk vs web disk — and it should be the FIRST fork, not the last.
+
+Corollary that cost the most time: a size ceiling makes a failure that GROWS
+INTO EXISTENCE. Nothing was deployed on the day it broke; the file crossed a
+line. "It used to work and stopped, with no deploy" should raise SIZE early.
