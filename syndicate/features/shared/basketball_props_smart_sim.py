@@ -2991,7 +2991,24 @@ def _local_event_boxscore_team_players(*, players_df) -> list[dict[str, Any]]:
     return rows
 
 
-def _local_simulate_pbp_game_boxscore(*, rng=None, home_players=None, away_players=None, cfg=None, home_lineups=None, home_lineup_weights=None, away_lineups=None, away_lineup_weights=None, target_home_points=None, target_away_points=None, quarters=None, home_team_adj=None, away_team_adj=None, **_extra_kwargs):
+def _local_boxscore_geometry(league_code: str | None = None) -> tuple[int, int, int]:
+    """(segment_seconds, minute_buckets_per_quarter, ot_seconds) for a league.
+
+    `#478`. Derived from the league's own quarter length rather than
+    hardcoded, because the vendored engine OVERRIDES its correctly-computed
+    `seg_seconds` with whatever the box dict reports
+    (`smart_sim.py:4174-4176`). A constant here silently becomes the
+    engine's geometry.
+    """
+    league = _league_for_code_local(league_code)
+    quarter_minutes = float(getattr(league, "quarter_minutes", 12.0) or 12.0)
+    quarter_seconds = int(round(quarter_minutes * 60.0))
+    if quarter_seconds <= 0:
+        quarter_seconds = 12 * 60
+    return max(1, quarter_seconds // 4), max(1, int(quarter_minutes)), 5 * 60
+
+
+def _local_simulate_pbp_game_boxscore(*, rng=None, home_players=None, away_players=None, cfg=None, home_lineups=None, home_lineup_weights=None, away_lineups=None, away_lineup_weights=None, target_home_points=None, target_away_points=None, quarters=None, home_team_adj=None, away_team_adj=None, league_code: str | None = None, **_extra_kwargs):
     hq = [int(round(max(0.0, float(getattr(q, "home_pts_mu", 0.0) or 0.0)))) for q in (quarters or [])[:4]]
     aq = [int(round(max(0.0, float(getattr(q, "away_pts_mu", 0.0) or 0.0)))) for q in (quarters or [])[:4]]
     while len(hq) < 4:
@@ -3000,8 +3017,27 @@ def _local_simulate_pbp_game_boxscore(*, rng=None, home_players=None, away_playe
         aq.append(0)
     h_players = _local_event_boxscore_team_players(players_df=home_players)
     a_players = _local_event_boxscore_team_players(players_df=away_players)
-    h_box = {"players": h_players, "team_total_pts": int(sum(hq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * 12 for _ in range(4)], "segment_seconds": 180, "minute_seconds": 60, "ot_pts": [], "ot_seconds": 300}
-    a_box = {"players": a_players, "team_total_pts": int(sum(aq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * 12 for _ in range(4)], "segment_seconds": 180, "minute_seconds": 60, "ot_pts": [], "ot_seconds": 300}
+    # `#478`: these were hardcoded to NBA geometry (segment_seconds=180,
+    # 12 minute-buckets), and the vendored engine TRUSTS them: after computing
+    # `seg_seconds` correctly from `LEAGUE.regulation_period_seconds`
+    # (600s/4 = 150s for WNBA), `smart_sim.py:4174-4176` OVERRIDES it with
+    # whatever `segment_seconds` this box dict carries. So a WNBA sim
+    # published 4x180s = 720s of segments over a 600s quarter, leaving
+    # segment 4 covering only the final 60s while the model distributed a
+    # full 180s window of scoring into it.
+    #
+    # Measured against 89 paired production games (`#476`): predicted
+    # segment-4 share 0.183 vs an actual 0.120 -- the sim over-predicted that
+    # segment by 52% while the whole-game total stayed correct (177.0 vs
+    # 177.8). A pure shape error, in exactly the field a per-segment or
+    # quarter-derivative market prices off.
+    #
+    # Derived from the league rather than replaced with another constant, so
+    # NBA (720s/4 = 180s, 12 minute-buckets) is unchanged and neither league
+    # can drift again.
+    segment_seconds, minute_buckets, ot_seconds = _local_boxscore_geometry(league_code)
+    h_box = {"players": h_players, "team_total_pts": int(sum(hq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * minute_buckets for _ in range(4)], "segment_seconds": segment_seconds, "minute_seconds": 60, "ot_pts": [], "ot_seconds": ot_seconds}
+    a_box = {"players": a_players, "team_total_pts": int(sum(aq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * minute_buckets for _ in range(4)], "segment_seconds": segment_seconds, "minute_seconds": 60, "ot_pts": [], "ot_seconds": ot_seconds}
     return h_box, a_box, hq, aq
 
 
@@ -3095,7 +3131,11 @@ def _simulate_pbp_game_boxscore_local(*, league_code: str = "nba", **kwargs):
     result = _call_real_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", league_code=league_code, kwargs=kwargs)
     if result is not None:
         return result
-    return _call_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", kwargs=kwargs)
+    # `#478`: the fallback builds the box dict whose `segment_seconds` the
+    # vendored engine TRUSTS over its own league-derived value, so it must
+    # know which league it is standing in for. Dropping `league_code` here
+    # is what let NBA geometry reach a WNBA sim.
+    return _call_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", kwargs={**kwargs, "league_code": league_code})
 
 
 def _simulate_event_level_boxscore_local(*, league_code: str = "nba", **kwargs):

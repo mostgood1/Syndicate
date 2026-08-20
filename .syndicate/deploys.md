@@ -17611,3 +17611,8 @@ merge. An earlier attempt also had to move an untracked file aside
 (`scripts/build_basketball_home_court_advantage.py`, another lane's `#474`
 work) — backed up first, and verified byte-identical apart from CRLF after the
 merge restored it.
+
+## 2026-08-20 00:23Z — live-odds-worker deploy — soccer odds #343 fix (3e8264bd, via tip 575decf3)
+- claim: soccer-odds-capture-cadence-gap, preflight CLEAR at 00:21:02Z (target 575decf3bf174aeed053e0d9120ccbac20a27854)
+- deploy: dep-da34hotg1s2s73cq1l4g, status=build_in_progress at fire time
+- verify: pending -- confirm live commit == 575decf3 (or a descendant carrying 3e8264bd), then re-pull soccer_source/tracking/book_quotes/<date>.jsonl and confirm today's matches carry a fresh captured_at, not just deploy success

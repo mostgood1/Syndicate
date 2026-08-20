@@ -1319,7 +1319,7 @@ history directly:
   artifact, to `basketball-model-owner` (see the NOT-claimed file note
   above) -- not yet messaged as of this close.
 
-### nfl-roster-depth-autorun — OPEN — opened 2026-08-19 — session: nfl-roster-depth-autorun
+### nfl-roster-depth-autorun — CLOSED 2026-08-19 — session: nfl-roster-depth-autorun — landed `1a844a1e` on `origin/main`, not yet deployed
 - Goal: `nfl-injuries-fetcher`'s own audit surfaced a sibling gap while
   fixing `#441` for injuries: `roster_snapshot_builder.py` and
   `depth_chart_snapshot_builder.py` (both real, both already consumed by
@@ -1377,12 +1377,41 @@ history directly:
   root lacking the just-written snapshot file when a later candidate root
   has it (mirrors `test_nfl_injuries_path_root.py`'s shape) — if this does
   NOT reproduce, the hypothesis is wrong and the fix is unnecessary.
-- Verification: new tests pass; full NFL test suite still passes; both
-  builders' `--json`/stdout output verified against a real run (network
-  access permitting) or the existing hermetic fixture pattern each
-  script's own tests already use.
-- Blocked by: none, pending the `run_refresh_worker.py` coordination note
-  above.
+- Verification: DONE. 130+ new/updated tests pass (falsification tests for
+  both the write-side #389-class and read-side #441-class bugs, dispatch-
+  order/gating/rate-limit tests mirroring the injuries autorun, plus
+  fixture repairs in 3 pre-existing test files whose setUp patched
+  `inj.default_nfl_source_root` directly -- that attribute no longer
+  exists on the module once both read paths moved onto the shared
+  resolver). Full `nfl`+`refresh_worker` slice: 35 failed / 739 passed,
+  and every one of the 35 confirmed pre-existing and unrelated by stashing
+  this lane's files and reproducing each failure identically against
+  unmodified `origin/main` (NFL-week-pins-to-1 in archives, nickname
+  matching, matchup evidence, football_sim_engine season mismatch,
+  market-board live odds, generate_smartsim2 x3, soccer bootstrap x3 --
+  the last needs `data/` this worktree deliberately excludes).
+  `run_once` idle-state contract (15 tests): pass, confirming both new
+  autoruns stay correctly default-OFF.
+  NOT DONE: a live network run of either builder script (network access
+  wasn't exercised this pass; the hermetic fixture pattern each builder's
+  own existing test file already uses was the coverage instead).
+  NOT DONE: production deploy / arming either autorun -- ships default-OFF,
+  inert until `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN` /
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN` are set as part
+  of a separate deploy decision.
+- `run_refresh_worker.py` coordination note resolved: `send_message` to
+  `refresh-worker-oom-recurrence`'s session (`local_3a27ad02-...`) was
+  attempted and bounced ("unattended -- a scheduled-task run or dispatched
+  session"). No formal `### refresh-worker-oom-recurrence — OPEN` block
+  exists anywhere in this file to actually block the edit, and
+  `lane-guard.py` did not block it (unlike the earlier
+  `soccer-odds-capture-cadence-gap` collision this session hit and
+  resolved). Edit made; documenting the attempt here rather than treating
+  silence as consent.
+- Blocked by: none.
+- Handoff owed: `HOT_ARTIFACT_PATTERNS` addition for the two new snapshot
+  artifacts, to `basketball-model-owner` -- bundled with the injuries
+  handoff already sent this session, not yet actioned as of this close.
 
 ### daily-update-backup-truncation — CLOSED 2026-08-19 — **Backup rebuilt to the user's chosen scope and RUN against production: 174 of 216 changed artifacts (80.6%), 0 failed, exit 0 — against 8 of 7,909 (0.10%) before. NOT yet exercised BY THE WORKFLOW; next 06:00Z run is the first.** — opened 2026-08-19 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
 - Goal: the `Daily Update` backup step stops reporting SUCCESS while silently
