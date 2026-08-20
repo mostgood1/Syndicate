@@ -18343,3 +18343,52 @@ API cannot serve. The ladder ridealong is expected to stay 0 until books post
 harness auto-mode classifier denied `render_deploy.py`. Not worked around.
 
 **measurement:** <pending>
+
+---
+
+## 2026-08-20 15:55Z — web `ea6f431f` — serve the REPLACED lift condition
+
+    lane:      football-model-owner
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       ea6f431f  (scoped graft, parent b4f90650, ONE file,
+               branch deploy/lift-condition-20260820)
+    deploy:    dep-da3i3jijnfac73cjand0  trigger=api  fired 15:48Z, live 15:55:25Z
+    claim:     acquired 15:47:17Z, released after verify
+    rollback:  deploy b4f90650 (this graft's parent). Reverts the TEXT only —
+               suppression behaviour is identical either way.
+
+**Why:** the gate had been suppressing NCAAF picks correctly, but the served
+page still explained the **superseded** bar ("paired error at or below the
+closing line's"). That criterion was replaced after measuring that a model can
+approach the close on MAE while still losing money ATS and still being worse
+than a mindless side bet — the model trails always-bet-the-underdog by **4.4 ATS
+points in NCAAF (735 bets)** and **4.2 in NFL preseason (95 bets)**.
+
+**verify: PASSED on the SERVED payload, 8 probes.**
+
+    GET /ncaaf/api/picks?week=1   x8
+      0 cards            8 of 8
+      eyebrow            "Picks suppressed"   8 of 8
+      NEW criterion      8 of 8   (contains "naive baseline")
+
+Eight probes, not one: gunicorn workers cache independently and a previous
+deploy this session read **9 PPA / 3 SP+ across 12 probes**. A single sample
+here would have been a coin toss between the old text and the new.
+
+**Blast radius verified, not assumed:**
+
+| check | reading | verdict |
+|---|---|---|
+| NCAAF projections unchanged | 51 games, \|margin\| max 50.60, SD 12.93 | PASS — still SP+ |
+| NFL picks unaffected | 12 cards, no suppression empty_state | PASS |
+| graft scope | `diff-tree` = exactly 1 file, blob identical to `origin/main` | PASS |
+
+**BEHAVIOUR IS UNCHANGED.** Every NCAAF market stays suppressed; this deploy only
+corrects what the page TELLS a reader it would take to reopen one. Recording it
+as a deploy anyway because the served text is part of the product, and a stale
+reopening bar is exactly the kind of thing someone later acts on.
+
+**What the page now says it takes:** ATS above the better naive baseline on the
+same games, a 95% CI lower bound above the 52.4% breakeven, out-of-sample with
+subsets pre-specified, and denominators in BETS not rows. Measured by
+`scripts/grade_football_playability.py`.
