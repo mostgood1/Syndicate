@@ -993,7 +993,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### layer2-board-chip-race — OPEN, CODE LANDED, NOT YET DEPLOYED — **Reconciliation check 2026-08-20 19:58Z found this: landed on `origin/main` (`164a38bf`) but content-verified ABSENT from web's live SHA (`d9a23a38`, 19:46:49Z) -- never actually deployed, only merged. web's claim is held by `soccer-board-mlb-parity` (genuinely active). Handing off: deploy the next time web's claim frees up, scoped onto its then-current live SHA, then content-verify `gameChipsLoadedOnce` is present before closing.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### layer2-board-chip-race — CLOSED-VERIFIED 2026-08-20 20:20Z — **Reconciliation gap closed: deployed via football-modeling-session's second consolidation graft (454f3caa) after riding along rather than forcing a separate claim. Content-verified live: intelligence.html carries gameChipsLoadedOnce, board_cards.css carries .game-mini-card--skeleton. Content-verified only, not a live timed-capture of the actual render behavior -- see deploys.md for the honest gap.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: fix a confirmed render-order race on the Layer 2 board's compact
   game-card strip -- a follow-on to `layer2-board-pick-clarity` /
   `layer2-board-movement-display`, both CLOSED, same file.
