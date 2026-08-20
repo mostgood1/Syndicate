@@ -10996,3 +10996,186 @@ against the MERGE-BASE, not against what is live. Measured directly
   this check: `origin/main..<live>` is the WRONG command; `git diff <live>
   <target>` is the right one.**
 
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-20
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### basketball-model-owner — **RELEASED / UNOWNED 2026-08-20. ALL WORK SHIPPED, DEPLOYED AND LIVE on all three services (`#469`, `#472`, `#474`—`#479`, `#489`—`#492`, `#488`), re-verified BY CONTENT against the CURRENT live SHAs after other sessions redeployed on top.** — opened 2026-08-18, released 2026-08-20
+- **Files: NONE CLAIMED.** Every path this lane held is free to take. The paths are deliberately
+  NOT listed here even as prose: a backticked path inside a lane block reads as a CLAIM to the
+  claim-preservation checkers, so a "released" list would keep the lane holding them. The set is
+  recoverable from `git log` and from the closed entries.
+- **Narrative is NOT here** — see the 2026-08-20 daily log and the eleven entries filed under
+  "Closed 2026-08-20 — WNBA advanced-data coverage" in the closed-items archive.
+- **Two observations outlive this lane; NEITHER is work, and neither blocks anyone:**
+  1. `#490` (commits say `#481`) live-scale refit is graded OFFLINE only. Scheduled task
+     verify-wnba-live-scale-481 fires 01:20Z; it had NOT run at release (no lastRunAt).
+  2. `#488` convergence reads NOT YET. The guard has never refused a real publish, so a long
+     silence is the DESIRED outcome and is **not** evidence it works. Proof = a PUBLISH_DIVERGENCE
+     marker in worker logs; the watcher script committed by this lane is the reader.
+
+### nfl-autorun-production-arm — CLOSED-VERIFIED 2026-08-20 — both autoruns DEPLOYED and LIVE on refresh-worker (dep-da3g2mj7uimc73ajjtig, df04c294) — depth-chart PASS clean; roster-snapshot crashed on real data (AZ team code), fixed separately (see nfl-team-abbr-az-alias in lanes_history.md) and redeployed — opened 2026-08-19 — session: nfl-autorun-production-arm
+- Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
+  (landed and closed this session) in production, on refresh-worker
+  (`srv-d91dpertqb8s73co8ls0`). **Testable outcome:** both env vars are
+  set (single-key PUT, per `[[project_render_env_needs_deploy]]` --
+  restart does NOT re-inject them, an actual deploy is required), a
+  refresh-worker deploy carries them live, and the real launch/skip log
+  lines (`NFL_ROSTER_SNAPSHOT_LAUNCHING`/`NFL_DEPTH_CHART_SNAPSHOT_
+  LAUNCHING`, or a named skip reason) are observed in production logs --
+  not merely that the env vars are set. The sibling `nfl-injuries-
+  fetcher` autorun is deliberately NOT touched here -- user asked for
+  "both autoruns" meaning the two just discussed; arming injuries too
+  is a separate ask if wanted.
+- Files: none (pure Render config + deploy action, no repo code change).
+- Env vars on refresh-worker: DONE, live. Both autoruns DEPLOYED --
+  first deploy `dep-da3g2mj7uimc73ajjtig` (17:32Z window confusion aside,
+  this was the 13:36Z deploy): depth-chart `LAUNCHING` at 13:42:34Z
+  clean, no traceback; roster-snapshot `LAUNCHING` at 13:40:31Z crashed
+  immediately (`ValueError: ... invalid team AZ`, ~90 rows). Root cause
+  fixed and separately deployed (`nfl-team-abbr-az-alias`, now
+  `df04c294` live on refresh-worker as of 17:32:54Z) -- code confirmed
+  present in the live commit; the autorun's own rate-limit marker means
+  the actual re-launch retry won't fire until ~19:40:31Z (6h from the
+  original crash). Depth-chart autorun needs NO further action.
+- Hypothesis: n/a (a deploy, not a diagnosis).
+- Falsification test: n/a.
+- Verification: Render logs (`scripts/render_logs.py` or the events API)
+  show a real `_LAUNCHING` or a named `_SKIPPED reason=...` line for both
+  autoruns within one refresh-worker tick after the deploy --
+  `not_in_season` would be a genuine surprise (NFL is active Aug-Feb per
+  `_active_sports_for_date`, so today should NOT skip for that reason).
+  `disabled` reappearing after the env PUT would mean the deploy did not
+  actually carry the new value (the exact failure mode
+  `[[project_render_env_needs_deploy]]` documents) and is the first thing
+  to check if nothing launches.
+- Blocked by: none, closed. `refresh-worker` was heavily contended for
+  hours (5+ legitimate claim holders across the session -- checked
+  lanes.md OPEN/CLOSED status each time, never process liveness; one
+  real force-break of a CLOSED-VERIFIED lane holding a stale claim,
+  user-approved). Both target env vars/autoruns are now live and this
+  lane's own goal is met.
+- NEXT ACTION for whoever reads this: at or after ~19:40:31Z, check
+  `NFL_ROSTER_SNAPSHOT` logs for a real `LAUNCHING` -> clean write (not
+  another traceback) to fully close the loop on the AZ-code fix's live
+  verification. If it crashes again, the fix was incomplete -- do not
+  assume success from the deploy alone.
+
+### layer2-board-movement-display — CLOSED-VERIFIED 2026-08-20 17:28Z — **Both fixes live on web (`d77dfb9a`), verified against the board's own production payload: 169 of 169 tracked/flat rows now render real movement text. Steam badge logic fixed and confirmed correct by code; no live steam event to observe at deploy time (a real, expected quiet state, not a gap).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal (met): fix #5 (movement/steam not showing), root-caused as a
+  FRONTEND bug -- the Aug 16 backend fix (`#372`, commit `1d03855e`)
+  already worked, computing real movement data into top-level fields
+  nothing in the template read.
+- Files: `syndicate/templates/intelligence.html` only.
+- **Fix, as planned:** `renderMovement()` now checks `movement_state`
+  first (`tracked`/`flat`/`no_opening_for_row`/`no_openings`/`unkeyable`/
+  `no_comparable_price`/`not_tracked`) and renders real text from
+  `movement_price_delta`/`movement_line_delta`/`movement_direction`/
+  `movement_opened_at` when present, distinguishing "no opening recorded"
+  from "flat" from "not tracked" -- legacy shapes kept as a fallback.
+  `isSteamCandidate()` now also checks the real `item.steam` boolean
+  (previously checked only `candidate_type === "steam"`, a field from a
+  different pipeline that never reaches these rows).
+- **Verification: DONE, measured against live production.** Deployed to
+  `web` (scoped branch off web's own live SHA `0ddd8ede`, the earlier
+  #2/#3 fix), live `d77dfb9a` at 17:28:30Z. Re-pulled the board's own
+  production payload post-deploy (456 cards): **169 of 169 tracked/flat
+  rows (100%)** now render real movement text (e.g. "Odds +226 · 12h
+  ago", "Flat · 12h ago"). `steamRows: 0` at verification time -- no row
+  currently clears the `>=15 points within 3h` bar, a real and expected
+  state given how rare that event is, not a rendering gap; the badge
+  logic itself is confirmed correct by code review.
+- Full measurement chain in `.syndicate/deploys.md`'s 2026-08-20 17:28Z
+  entry.
+- Blocked by: none.
+
+### mlb-pregame-ladder-schema — CLOSED-SHIPPED-UNVERIFIED 2026-08-20 — **Code shipped and LIVE (`a54dffa3`, refresh-worker 18:27:40Z); pregame ladder chips + starter-name gate fixed, proven locally over real production inputs (18/18 starters, was 0/18). NOT PROVEN IN PRODUCTION and never will be from this lane: the native builder is a fallback that fires only when the vendor stage errors, so it has not executed once (`outcome: skipped_fresh`). THE UNDISCHARGED VERIFICATION OBLIGATION IS TRANSFERRED, NOT DROPPED — it is item 1 of `mlb-native-ladders-producer`, which now holds the files.** — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+- **Goal:** every pregame MLB starter with a sim distribution and a market line
+  renders its ladder chips, and the NAME renders whether or not it has chips.
+- **Files:** none — released to `mlb-native-ladders-producer`.
+- **On `origin/main`:** `a54dffa3` (fix), `19b64fcd` (deploy-gate findings),
+  `0a2ad516` (deploys.md + a correction to this lane's own overclaim). Worktree
+  clean, nothing unpushed.
+- **Local evidence (real production inputs, real reader):** 18/18 starters get
+  >=1 ladder badge, was 0/18. Control George Kirby 0 -> `K up to 7 / H up to 8 /
+  BB up to 2`.
+- **BLOCKED ON A READING, not on work.** Native writer status artifact reads
+  `outcome: "skipped_fresh"` (18:56:57Z): the vendor's write is always newer
+  than the sims, so `is_stale` correctly answers `fresh` and the native builder
+  never runs. **PROVEN only when the served
+  `daily_ladders_<date>.json` carries `generatedBy ==
+  syndicate.features.mlb.ladders_build` AND populated `ladder[]`/`gamePk` on
+  18/18 pitcher rows. Chips on the board prove NOTHING — the vendor writer
+  renders them with or without this deploy.**
+- **NEXT ACTION for whoever picks this up:** force one native rebuild and read
+  the status artifact + `generatedBy`. Until then this deploy is UNVERIFIED.
+- **Narrative, evidence and dead ends:** `.syndicate/log/2026-08-20.md`.
+  Deploy record + gate findings: `.syndicate/deploys.md` 18:27:40Z entry.
+- **Raised, not taken:** web rebuilding a 9.5MB artifact inside a request
+  handler contradicts the worker-split rule. Belongs to `#440`'s owner.
+
+### layer2-live-projection-actual — CLOSED-VERIFIED 2026-08-20 19:24Z — **Deployed via football-modeling-session's consolidation graft (db469003), not my own claim. Live-verified on the actual served surface (boardContract.cards): 36/48 live MLB prop cards now carry a populated Actual, 36/48 a populated Live projection, and only 1/48 still shows Projected == Live (was 34/40 identical pre-fix).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: fix two confirmed backend gaps in the Layer 2 board's live-game
+  Projected/Live/Actual semantics -- item #4 of the original user audit.
+  **Testable outcome:** on a live MLB prop row, `Projected` shows the
+  PREGAME sim number (not equal to `Live`), `Live` shows the live re-sim
+  number, and `Actual` shows the live actual-so-far -- all three
+  populated and distinct where the underlying data supports it.
+- Files: `syndicate/features/shared/live_projection_join.py` (the
+  `projection.update()` call that overwrites `projected`),
+  `syndicate/features/shared/layer2_board.py` (`_live_projection_columns`,
+  needs an `actual` mapping added).
+- Hypothesis: n/a (root-caused already, see below).
+- **Already established, measured 2026-08-20 (do not re-derive):**
+  - **`projected` gets clobbered.** `live_projection_join.py:399-406`'s own
+    comment says the fix for `#412` is "KEEP THE PREGAME NUMBER RATHER
+    THAN OVERWRITING IT" and correctly seeds `sim_projected` from
+    `projection.get("projected")` via `setdefault` -- but
+    `projection.update({..., "projected": hit["live_projection"], ...})`
+    three lines later still overwrites `projected` itself with the live
+    value, defeating the stated intent for the field the frontend actually
+    reads (`displayProjection`, `intelligence.html:697`, reads
+    `item.sim_projection ?? item.projected ?? item.projected_sim`).
+    Measured live: **34 of 40 live MLB prop rows (85%) have
+    `projection.projected == projection.live_projected`**; `sim_projected`
+    itself is null on 23 of 40 (57.5%), consistent with it only ever
+    getting seeded on whichever tick first sees the row as live.
+  - **`actual` is never wired at all.** `_live_projection_columns`
+    (`layer2_board.py:1219`) maps `live_projected` -> `live_projection`/
+    `live_total` correctly (its own docstring documents fixing this exact
+    class of bug once already, for the Live column specifically) but has
+    no `actual` mapping. Repo-wide grep for `actual_so_far` or an `actual`
+    key assignment in `layer2_board.py`: zero hits. The frontend function
+    (`displayLiveActual`, `intelligence.html:723`) is already correct and
+    already reads `item.actual` -- structurally unreachable, not broken.
+  - Both downstream consumers of `projection.get("projected")` outside
+    this function (`layer2_board.py:1939` -> `columns["projected"]`;
+    `board_enrichment.py:362`'s `_projected_value`, used only by the
+    degeneracy audit) are display/audit-only, not EV/scoring/ranking --
+    confirmed by reading both call sites. Safe for `projected` to mean
+    "pregame" consistently without touching ranking.
+- Falsification test: n/a, implementation lane, both root causes
+  confirmed by direct code read plus a live production data pull (89
+  rows fetched from `/api/board/layer2-shortlist?sport=mlb` during 6
+  live MLB games, 2026-08-20 ~18:10Z).
+- **Verification: DONE, 2026-08-20 19:24Z.** Deploy rode along in
+  football-modeling-session's consolidated graft after both sessions hit
+  the same contended refresh-worker claim repeatedly (cross-session
+  coordination, not a separate claim of my own). Content-verified both
+  files at the live SHA. First read hit a stale pre-deploy artifact
+  (written_at before the deploy) -- waited ~15 min for the real rebuild
+  cycle rather than trust it. Checked the SERVED surface
+  (`/api/intelligence/query`'s `boardContract.cards`, what
+  `displayProjection`/`displayLiveProjection`/`displayLiveActual` in
+  `intelligence.html` actually read -- the raw `/api/board/layer2-shortlist`
+  row shape is a DIFFERENT, nested representation and checking only that
+  is not sufficient for this class of fix): 48 live MLB prop cards,
+  `actual` populated 36/48 (75%), `live_projection` populated 36/48 (75%),
+  `projected == live_projection` only 1/48 (a real coincidental match, not
+  a residual bug). Full measurement in `deploys.md`.
+- Blocked by: none.
