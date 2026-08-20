@@ -34,7 +34,38 @@ def league_display_name(league: str) -> str:
     return LEAGUE_DISPLAY_NAMES.get(str(league or "").strip().lower(), str(league or "").upper())
 
 
+def is_known_league(league: str | None) -> bool:
+    """Whether this is a real league slug, as opposed to what to do about it.
+
+    Split out from `normalize_league` because the two questions have
+    different right answers and one function was giving the same one to
+    both. `normalize_league` maps ANYTHING unknown onto `DEFAULT_LEAGUE`,
+    which is a reasonable defensive default for an INTERNAL caller handed a
+    stray value -- and silently wrong for a URL, where it turns a typo into
+    another league's data served under the requested league's name.
+
+    Measured on production 2026-08-20: `/soccer/laliga/cards` (the canonical
+    slug is `la_liga`) returned HTTP 200 with Arsenal and Coventry fixtures
+    under a La Liga heading. `/soccer/zzz/api/cards` likewise returned 200
+    with EPL data. I hit this myself while looking for a live La Liga match
+    and briefly concluded four leagues were serving EPL data, which they
+    were not -- the request was.
+
+    Case-insensitive, so `/soccer/EPL/cards` stays valid; the canonical form
+    is what `normalize_league` returns.
+    """
+    return str(league or "").strip().lower() in LEAGUE_DISPLAY_NAMES
+
+
 def normalize_league(league: str | None) -> str:
+    """The canonical slug, defaulting to `DEFAULT_LEAGUE` for anything else.
+
+    KEEP THIS PERMISSIVE. Its callers are internal -- feature modules handed a
+    league that came from an artifact, a config row or another module -- and
+    a hard failure there would take down a page over a stray value. What must
+    NOT be permissive is the URL boundary, which is `is_known_league`'s job
+    and is enforced once for every route in `blueprints/soccer.py`.
+    """
     text = str(league or "").strip().lower()
     return text if text in LEAGUE_DISPLAY_NAMES else DEFAULT_LEAGUE
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from syndicate.blueprints.layer1_page import render_layer1_board
-from flask import Blueprint, jsonify, redirect, render_template, request
+from flask import Blueprint, abort, jsonify, redirect, render_template, request
 
 from syndicate.features.soccer.archive import build_archive_api_payload
 from syndicate.features.soccer.archive import build_archive_page_context
@@ -20,6 +20,7 @@ from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import league_display_name
+from syndicate.features.soccer.sources import is_known_league
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import schedule_payload
 from syndicate.features.soccer.sources import sparse_roster_teams
@@ -48,6 +49,45 @@ def _selected_week(league: str, season: int) -> int:
     if raw.isdigit():
         return int(raw)
     return default_week(league, season)
+
+
+@soccer_bp.url_value_preprocessor
+def _reject_unknown_league(_endpoint: str | None, values: dict | None) -> None:
+    """404 an unknown `<league>`, once, for every route on this blueprint.
+
+    Seventeen handlers each opened with `league = normalize_league(league)`,
+    and that call maps anything unrecognised onto `DEFAULT_LEAGUE`. So a bad
+    slug did not fail -- it silently served EPL. Measured on production
+    2026-08-20: `/soccer/laliga/cards` (canonical: `la_liga`) returned 200
+    with Arsenal fixtures under a La Liga heading, and `/soccer/zzz/api/cards`
+    returned 200 with EPL data.
+
+    A `url_value_preprocessor` rather than a check in each handler, for the
+    reason the seventeen duplicated lines demonstrate: a per-handler guard is
+    a rule the NEXT route has to remember. This one covers every route on the
+    blueprint including ones not written yet, and it runs before any handler
+    body, so no builder is ever invoked with a slug that was never real.
+
+    Routes with no `<league>` segment (`/soccer/hub`, `/soccer/cards`,
+    `/soccer/market-board`) pass through untouched -- Werkzeug matches those
+    static rules ahead of `/<league>`, so `values` carries no `league` key
+    for them.
+
+    `/sports/<sport_slug>` has aborted on an unknown slug all along
+    (`blueprints/sports.py:16`); soccer was the outlier, not the pattern.
+    """
+    if not values:
+        return
+    league = values.get("league")
+    if league is None or is_known_league(league):
+        return
+    abort(
+        404,
+        description=(
+            f"Unknown soccer league {str(league)!r}. "
+            f"Valid leagues: {', '.join(sorted(LEAGUE_DISPLAY_NAMES))}."
+        ),
+    )
 
 
 @soccer_bp.get("/hub")
