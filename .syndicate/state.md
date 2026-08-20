@@ -3106,6 +3106,39 @@ simulated ladder like MLB's pitcher props.
 
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
+### ROOT CAUSE FOUND AND MEASURED `[2026-08-20 ~01:00Z]` — THE SWEEP WAS REFUSING IT ON SIZE
+
+    daily_ladders_2026_08_19.json      13,678,982 bytes
+    _PUBLISH_MAX_BYTES (sweep-only)    12,582,912 bytes      -> REFUSED
+
+Measured on refresh-worker `2026-08-20T00:55:00Z` (Render logs API,
+`resource=srv-d91dpertqb8s73co8ls0&text=too_large`):
+
+    SWEEP_SKIPPED_DETAIL too_large=[
+      mlb_source/.../daily_ladders_2026_08_19.json(13678982),
+      mlb_source/tracking/book_quotes/2026-08-19.jsonl(95051585)]
+
+**Every other link was already correct, which is why this took five successive
+hypotheses.** The worker DID rebuild the ladder (`artifactGeneratedAt
+2026-08-19T19:54:41-05:00`) and `is_stale()` DID correctly answer `fresh` —
+content newer than `oddsMtime_pitcher 1787187226` and `newestSimMtime
+1787186761`. Web simply went on serving the last copy that FIT: **11,716,507
+bytes, `2026-08-18T18:20:25`**. That is the whole reason every served
+compact-card row carried a full sim side against an empty market side.
+
+The artifact **grew into** the bug — the 08-18 copy was under the bound, the
+08-19 copy over it. No deploy, no regression, no failing test on the day it broke.
+
+FIX: `be62b0dd` on `origin/main` (content-verified inside merge `3fc6ef0c`) —
+publish the ladder through `publish_hot_artifact`, which streams above 4MB and
+never consults `_publish_skip_reason`. Same route `book_grid` (12,855,903 bytes)
+has used all along. **The bound is UNTOUCHED** — it is sweep-only by design and
+exists to stop 51MB `odds_history` shards going up every cycle.
+
+**STATUS: NOT DEPLOYED.** refresh-worker claim held by a live session
+(`soccer-odds-capture-cadence-gap`), not forced.
+
+
 ### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
 
     branch  deploy/worker-ladders-ridealong

@@ -1835,3 +1835,47 @@ says) — here the discrepancy was inside one document, not between two.
 any other session or deploy relied on the overclaim. Fixed with a
 correction addendum on the record (not a silent edit) plus the actually-
 open item closed with a proof.
+
+## 2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent
+
+`daily_ladders_<date>.json` reached **13,678,982 bytes** against
+`_PUBLISH_MAX_BYTES = 12,582,912`. The sweep refused it. Web went on serving the
+last copy that fit — 11,716,507 bytes, generated `2026-08-18T18:20:25` — so every
+MLB compact-card row carried a full sim side against an EMPTY market side for 28
+hours. Measured on refresh-worker `2026-08-20T00:55:00Z`:
+
+    SWEEP_SKIPPED_DETAIL too_large=[
+      mlb_source/.../daily_ladders_2026_08_19.json(13678982),
+      mlb_source/tracking/book_quotes/2026-08-19.jsonl(95051585)]
+
+**Why it cost so much to find: every other link was CORRECT.** The worker really
+did rebuild the ladder (`generatedAt 19:54:41 CT`). `is_stale()` really did
+correctly answer `fresh` — the content genuinely was newer than the odds and the
+sims. There was no error, no failing test, and nothing wrong anywhere near the
+ladder code. I chased five successive causes, each hidden behind the last, and
+three of my intermediate diagnoses were wrong.
+
+**The general rule.** A size ceiling on a publish path is a freshness failure
+mode that GROWS INTO EXISTENCE. Nothing changed on the day it broke; the file
+crossed a line. The 08-18 copy was under the bound and the 08-19 copy was over
+it. So:
+
+- **"It used to work and stopped, with no deploy" should raise SIZE as a
+  first-class hypothesis**, not a last one. Ask what got bigger.
+- **A component being correct is not evidence the SYSTEM is.** `is_stale`
+  returning `fresh` was true and useless — it described the worker's disk while
+  the symptom lived on web's. When a verdict is right and the symptom persists,
+  the next question is *whose copy is it describing*.
+- **The fix for an over-ceiling artifact is the DIRECT streamed path, not a
+  higher ceiling.** `publish_hot_artifact` streams above 4MB and never consults
+  `_publish_skip_reason`; `book_grid` (12,855,903) has published that way all
+  along. The bound is sweep-only by design — it exists to stop 51MB
+  `odds_history` shards going up every cycle.
+
+**Instrument note, worth fixing separately:** `SWEEP_SKIPPED_DETAIL` bounds
+examples at three PER REASON but prints reasons in dict order, and
+`stale_slate`'s 60 entries pushed `too_large=[...]` past the 8000-char tail the
+sim-log endpoint serves. The discriminating class was the one that got cut. The
+answer came from the Render logs API against the worker's own refresh loop
+instead — `resource=srv-d91dpertqb8s73co8ls0&text=too_large`. **A bounded log
+line is only bounded if the bound applies to the WHOLE line.**
