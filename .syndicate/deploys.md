@@ -18860,3 +18860,39 @@ of rendering an empty column that reads as a bug.
 
 18 new tests (32 in the lane's file). `test_archives` 31 failures, IDENTICAL
 by name to the origin/main baseline.
+
+## SHIPPED-VERIFIED 2026-08-20 19:24Z -- refresh-worker deploy -- Projected stays pregame, Actual is finally wired (a9eb8a3b)
+- NOT deployed via my own claim -- rode along in football-modeling-session's
+  consolidated graft (db469003, 9 files, coordinated live via cross-session
+  messages after both of us hit the same contended refresh-worker claim
+  repeatedly tonight). See that lane's own deploys.md entry for the full
+  graft manifest. Deployed dep-da3ktjs9v7es738vurag, live 19:09:55Z, content-
+  verified: both syndicate/features/shared/layer2_board.py and
+  live_projection_join.py carry the `layer2-live-projection-actual` marker
+  comment at the live SHA.
+- verify: MEASURED live, matches expectation. First read (19:12Z) hit a
+  stale pre-deploy artifact (written_at 19:05:12Z, before the 19:09:55Z
+  deploy) -- waited for the next board rebuild cycle (~15 min through the
+  full overview -> candidate-collection -> shortlist pipeline) rather than
+  trust a stale read. Fresh artifact at 19:24:54Z:
+    - /api/board/layer2-shortlist raw projection{} sub-object (49 live MLB
+      prop rows): 28 of 29 comparable rows now show projected != live_projected
+      (was 34/40 IDENTICAL pre-fix); actual_so_far present on 37/49 (75.5%).
+    - THE SURFACE THAT MATTERS -- /api/intelligence/query's boardContract.cards
+      (what displayProjection/displayLiveProjection/displayLiveActual in
+      intelligence.html actually read), 48 live MLB prop cards: actual
+      populated 36/48 (75%), live_projection populated 36/48 (75%),
+      projected == live_projection only 1/48. Sample: Taylor Ward
+      batter_hits -- sim_projection 0.953, live_projection 0.953 (a real
+      coincidental match), actual 0.0 (correctly shown as zero, not blank).
+    - Note for future readers: the raw-row API and the served-card API
+      expose this data under different shapes (nested projection{} dict vs.
+      flattened top-level columns) -- checking only the raw-row shape after
+      this class of fix is not sufficient; verify against boardContract.cards,
+      which is the actual frontend contract.
+- Rollback: this fix is bundled inside the football-modeling consolidation
+  graft; reverting it alone means reverting to the pre-graft refresh-worker
+  commit (fb59e9ea) and losing the other 8 files in that batch too. If ever
+  needed, isolate a revert to just layer2_board.py/live_projection_join.py
+  rather than rolling back the whole graft.
+- Claim: none held by me for this deploy (rode along). No release needed.
