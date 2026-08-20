@@ -544,38 +544,48 @@ across seeds, CRN off vs on.** Each ARM's own variance is irrelevant and will no
 improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
-### nhl-model-owner — OPEN — FACEOFF TRACK FULLY CLOSED (EV/OZ/DZ/NZ + strength-state PP/PK + per-team role index + joint role-zone + player-level lineup-aware, both EV-only and strength-state + `faceoff_alpha`/`diff_clip`/`mult_clip_*` calibrated incl. leave-one-out refit) — session: nhl-model-owner
+### nhl-model-owner — OPEN — FACEOFF TRACK FULLY CLOSED incl. the multi-event engine redesign (EV/OZ/DZ/NZ + strength-state PP/PK + per-team role index + joint role-zone + player-level lineup-aware + `faceoff_alpha`/`diff_clip`/`mult_clip_*` calibrated + real-N-per-segment redesign extended to both EV and strength-state, std now 99.88% of real vs the OLD 96.71%) — session: nhl-model-owner
 - Goal MET, extended repeatedly same-session: checklist full PASS
   (`scripts/nhl_sim_input_checklist.py` exits 0), market-comparison backtest
   built (`#470`), and the faceoff mechanism taken from "one EV-only diff-based
-  multiplier" to a fully measured, multi-axis system. Full narrative for
-  every piece — what was built, what was measured, every dead end (the
-  naive strength-state combination bug, the "closes to zero" overclaim
-  later corrected) — lives in `.syndicate/log/2026-08-19.md`, NOT
-  duplicated here. Canonical status docs:
-  `docs/ai_context/hockeysim_engine_reference.md` §1–§2zzz,
-  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`.
+  multiplier" to a fully measured, multi-axis, real-event-count system. Full
+  narrative for every piece — what was built, what was measured, every dead
+  end (the naive strength-state combination bug, the "closes to zero"
+  overclaim later corrected, a reachability test breaking TWICE on
+  mean-based comparisons) — lives in `.syndicate/log/2026-08-19.md` and
+  `.syndicate/log/2026-08-20.md`, NOT duplicated here. Canonical status
+  docs: `docs/ai_context/hockeysim_engine_reference.md` §1–§2B,
+  `docs/ai_context/nhl_model_inventory.md`, `todo.md` `#463`/`#470`
+  (**§2A/§2B's own todo.md addendum NOT YET WRITTEN — see Blocked by**).
 - Files: `syndicate/features/nhl/sim_engine/hockeysim/**`, `data/nhl_source/**`,
   `scripts/nhl_*.py` / `scripts/grade_nhl_predictions_vs_market.py` /
-  `scripts/calibrate_nhl_*.py` / `scripts/build_nhl_*.py`,
+  `scripts/calibrate_nhl_*.py` / `scripts/build_nhl_*.py` /
+  `scripts/measure_nhl_faceoff_*.py`,
   `docs/ai_context/hockeysim_engine_reference.md`,
   `docs/ai_context/nhl_model_inventory.md`. Shared artifact-publisher
   allowlist module: touch-and-released repeatedly — not currently claimed.
-- **Faceoff track closed** (EV→OZ→DZ→NZ discrete-event curves, strength-state
-  PP/PK role mechanism with a real +4.478%→+0.203% bug found and fixed by the
-  round-robin check, a per-team PP/PK role-specific index, a joint role×zone
-  investigation that correctly declined a full curve build on data-thinness
-  grounds, a player-level lineup-aware layer for both EV-only and
-  strength-state segments, and `faceoff_alpha`/`faceoff_diff_clip` calibrated
-  against 1,312 real games + `faceoff_mult_clip_*` closed with an algebraic
-  proof + a leave-one-out refit confirming the in-sample fit's judgment
-  call). **One correction on the record, not silently absorbed**: an
-  earlier "closes to zero" claim overstated itself — the mult_clip gap was
-  found still open by re-verifying that exact claim, then closed properly.
-  One item remains genuinely open: the discrete-event engine's "one faceoff
-  assumed per real segment" approximation — a structural engine-design
-  question, out of scope for calibration work, never blocking anything
-  shipped.
+- **Faceoff track closed**, including the last genuinely open item: the
+  discrete-event engine's "one faceoff assumed per real segment"
+  approximation was MEASURED (106,272 real segments: mean 0.684 real
+  faceoffs vs the assumed constant 1.0) then ADDRESSED via a
+  multi-event-per-segment redesign (`faceoff_multi_event_segment_model`,
+  default ON, real N∈{0..6} per segment, not a fitted approximation) —
+  built for EV segments first (honest non-confirming result: std moved
+  FURTHER from real), then extended to strength-state (PP/PK) segments,
+  which REVERSED that finding: **combined round-robin std moved from
+  96.71% of real to 99.88%**, essentially closing the gap. Mean unaffected
+  both times (+0.17-0.28%, noise-level), exact `E[]=1.0`/`E[]=2.0` proofs
+  hold for any N. Everything before this (EV→OZ→DZ→NZ discrete-event
+  curves, strength-state PP/PK role mechanism with a real
+  +4.478%→+0.203% bug found and fixed by the round-robin check, a
+  per-team PP/PK role-specific index, a joint role×zone investigation,
+  a player-level lineup-aware layer, `faceoff_alpha`/`faceoff_diff_clip`
+  calibrated against 1,312 real games + a leave-one-out refit,
+  `faceoff_mult_clip_*` closed with an algebraic proof) is unchanged from
+  the prior checkpoint. **Two corrections on the record, not silently
+  absorbed**: an earlier "closes to zero" claim overstated itself
+  (mult_clip); a reachability test broke twice on mean-based comparisons
+  and was durably fixed with the per-seed-vector technique.
 - **Dead gate CLOSED** (earlier this lane): `HockeyTeamFeatures.blocks_per_60`/
   `penalties_per_60` proven dead and removed from every call site, not just
   documented.
@@ -585,13 +595,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `lookahead_applied`'s true meaning). n=14-15 moneyline/total — explicitly
   NOT a powered verdict.
 - Verification: checklist full PASS, re-confirmed after every faceoff
-  addendum. 638 hockeysim/nhl tests pass (up from 254 at session start).
+  addendum. 650 hockeysim/nhl tests pass (up from 254 at session start).
   Nothing deployed this session (offline producer/calibration/engine-wiring
-  only — next NHL refresh-worker/web deploy picks it up). All commits
-  pushed to `origin/main`, confirmed via `git merge-base --is-ancestor`
-  after every push — latest confirmed tip `b4603123`/`22c2ff55` (LOO refit,
-  merged as `3b79fddb`).
-- Blocked by: none
+  only). **Offered as a refresh-worker deploy ridealong** to the `Football
+  modeling and analytics` session via `send_message` — no reply yet. All
+  commits pushed to `origin/main`, confirmed via `git merge-base
+  --is-ancestor` after every push — latest confirmed tip `86a729cd`
+  (strength-state multi-event extension).
+- Blocked by: `docs/ai_context/todo.md`'s own §2A/§2B addendum is blocked
+  by `mlb-overview-hydration-cost`'s active `Files:` claim on that same
+  file (still OPEN as of this checkpoint) — a persistent Monitor
+  (`blo3omza7`, this session) polls every 30s and will fire the moment it
+  clears; not forced through.
 
 ### basketball-model-owner — OPEN — **ALL WORK DEPLOYED AND VERIFIED BY CONTENT on all three services (web `ba1d3368`, live-odds `2151f7b6`, refresh-worker `0d6868ce`). `#481` refit the live win-prob scale on 212 games/73,878 samples: Brier 0.1896->0.1644, worst calib gap -0.240->-0.054. `#469` CONFIRMED FIXED — boxscores_history reaches 2026-08-18, was frozen at 06-30. `#479` was working all along; `#482` fixed the BLIND INSTRUMENT that hid it. `#483` guards a sign-flipped home-court constant. `#488` FILED (platform: two services publish different content to one path, last-writer-wins). TWO OBSERVATIONS PENDING, no action: `#488` convergence (refresh-worker has not run a WNBA refresh since its 16:50Z restart) and `#481`'s served-payload check (scheduled 01:20Z mid IND@DAL).** — opened 2026-08-18 — session: basketball-model-owner
 - Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`/`#468`'s fixes, plus `#474`'s home-court-advantage wiring), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix, UA change, and the `_player_logs_ready` masking-bug fix pt3), `scripts/build_basketball_home_court_advantage.py` (**NEW 2026-08-19, `#474`**: builds `home_court_advantage.json` from real schedule+boxscore joins — the sim has NO home/away split at all today, `home_adj`/`away_adj` are purely team-quality multipliers)), `syndicate/features/wnba/cards.py` (`#475`'s live cover/total probability fix — time-decaying scale + pregame-anchor blend + anchored total projection), `scripts/build_basketball_sim_calibration.py` (**NEW 2026-08-19, `#476`**: builds the four unwired calibration artifacts from paired production sim-vs-actual history)), `scripts/build_basketball_player_logs.py`, `syndicate/features/shared/artifact_publisher.py` (**`#482`**: allowlist entries for `player_logs.csv` + `home_court_advantage.json` -- taken 2026-08-20 after the file went UNCLAIMED; handed to `soccer-odds-capture-cadence-gap` twice and never actioned) (**NEW 2026-08-19, `#477`**: derives `player_logs.csv` from boxscores+schedule so the three dead opponent/career/venue split mechanisms can fire).

@@ -1231,7 +1231,7 @@ unsaved anywhere.
 - **In-sim substitution: BUILT, MEASURED, OFF.** Pitch-type effectiveness: BUILT
   and UNFED. Modelling of neither is present in the served path.
 
-## [nhl-sim-engine] NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-19, lane nhl-model-owner]`
+## [nhl-sim-engine] NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner]`
 
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
@@ -1313,11 +1313,25 @@ unsaved anywhere.
   possible swing `0.042` is strictly inside the clip's `0.10` headroom for
   ANY input, confirmed by an exhaustive `[0,1]×[0,1]` sweep), after an
   earlier "closes to zero" claim was found to have overstated itself and
-  was corrected on the record rather than left standing. 638 hockeysim/nhl
-  tests pass (up from 254 at session start). **Genuinely still open, the
-  one item**: the discrete-event engine's "one faceoff assumed per real
-  segment" approximation — a structural engine-design question, never
-  revisited since the redesign shipped, not currently blocking anything.
+  was corrected on the record rather than left standing; (8) the "one
+  faceoff assumed per real segment" approximation MEASURED (106,272 real
+  segment-windows: mean 0.684 real faceoffs vs the assumed constant 1.0,
+  48.64% of segments have ZERO real faceoffs) then ADDRESSED via a
+  multi-event-per-segment redesign (`faceoff_multi_event_segment_model`,
+  default ON, draws real N∈{0..6} per segment) — built for EV segments
+  first (honest non-confirming result: std moved FURTHER from real,
+  96.71%→96.03%), then extended to strength-state (PP/PK) segments,
+  which REVERSED that finding: combined round-robin std moved to 99.88%
+  of real, essentially closing the gap the original measurement found.
+  650 hockeysim/nhl tests pass (up from 254 at session start; two
+  pre-existing tests in this exact mechanism family broke twice each on
+  mean-based reachability comparisons and were durably fixed via
+  per-seed-vector comparison, the technique every other test in the
+  family already used). `todo.md`'s own addendum for items (7)/(8) is
+  NOT YET WRITTEN as of this checkpoint — blocked by an active cross-lane
+  claim (`mlb-overview-hydration-cost`), a Monitor is watching for it to
+  clear. Every other doc (reference doc §2A/§2B, inventory doc, both
+  reports) is written and pushed.
 - **Genuinely still open (non-faceoff)**: player-level usage-weight
   producer's small-sample floor (< 5 games falls back to heuristic, by
   design); the vendor's original block-rate EV:PK:PP-def ratio
