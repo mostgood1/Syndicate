@@ -72,11 +72,33 @@ an open item exactly as legitimately as one that finds a number to change.
 distribution (p95=0.0851, max=0.1582) — it clips only the most extreme ~5% of real cases, a
 sensible bound, not an arbitrary one that happens to have never been re-examined.
 
+## Addendum, same day: `faceoff_mult_clip_low`/`faceoff_mult_clip_high` — closed with a proof, not a measurement
+
+The item this report's own "What this does NOT do" left open, below, turned out not to need real
+data at all — a re-check found the current constants make it a closed-form question.
+`_faceoff_multipliers` clips `fo_diff` to `[-diff_clip, diff_clip]` **before** multiplying by
+`alpha`, so the largest possible swing from 1.0 either output can ever reach is exactly
+`alpha * diff_clip`. At the current, unchanged values (`alpha=0.35`, `diff_clip=0.12`) that
+maximum is `0.042` — comfortably inside the `mult_clip=[0.90, 1.10]` bounds' own headroom of
+`0.10` on each side (more than 2x margin). **This holds for literally ANY input**, not just the
+real observed range: an exhaustive sweep of the full `[0, 1] × [0, 1]` `(home_pct, away_pct)`
+space (10,201 combinations) confirmed the clipped engine output matches the un-clipped formula
+exactly everywhere — zero deviation, meaning `faceoff_mult_clip_low`/`faceoff_mult_clip_high`
+**mathematically cannot bind** at the current constants, not merely "didn't bind on the games
+checked." Confirmed no other call site anywhere in the codebase ever passes a different
+`faceoff_alpha`/`faceoff_diff_clip` (grepped `syndicate/` and `scripts/` for both — zero matches
+outside `SimConfig`'s own default and `calibration_profile.py`'s explicit carry-forward, both
+0.35/0.12) that could make the clip relevant. **Locked in a regression test**
+(`test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip`) asserting the headroom
+invariant directly against the live calibration profile's own values — if a future session ever
+raises `alpha` or `diff_clip` without checking this, the test catches it before the clip silently
+starts flattening a real effect mid-segment.
+
+**This closes the mult_clip item — not with a measurement that happened to find no evidence of a
+problem, but with a proof that the current configuration cannot have one.**
+
 ## What this does NOT do
 
-- Does not touch `faceoff_mult_clip_low`/`faceoff_mult_clip_high` — no real evidence surfaced
-  suggesting the output bounds `[0.90, 1.10]` are binding or miscalibrated at the fitted (or even
-  the vendor's own) alpha value.
 - A mild in-sample note, disclosed rather than hidden: each player's `faceoff_weight` is a
   SEASON-long average that includes the very game being predicted (not a leave-one-out fit).
   Given a single game is a small fraction of a player's 20-80+ game season sample, this dilutes
@@ -95,3 +117,7 @@ sensible bound, not an arbitrary one that happens to have never been re-examined
 - `calibration_profile.py`'s `faceoff_alpha`/`faceoff_diff_clip`/`faceoff_mult_clip_*` now carry
   an explicit comment documenting this check and its conclusion, so a future session does not
   re-discover the same open item and re-run an identical check from scratch.
+- `faceoff_mult_clip_low`/`faceoff_mult_clip_high`: exhaustive `[0,1]×[0,1]` sweep (10,201
+  combinations) confirms zero deviation between the clipped engine output and the un-clipped
+  formula — the bounds mathematically cannot bind at the current constants. Locked in a
+  regression test against the live calibration profile's own values.

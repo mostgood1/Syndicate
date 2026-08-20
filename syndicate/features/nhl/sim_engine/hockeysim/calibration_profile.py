@@ -117,6 +117,15 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # only the most extreme ~5% of real cases, not an arbitrary bound.
     faceoff_alpha=0.35,
     faceoff_diff_clip=0.12,
+    # `faceoff_mult_clip_*` CLOSED WITH A PROOF, not a measurement (same-day addendum to the
+    # report above). `_faceoff_multipliers` clips `fo_diff` BEFORE multiplying by `alpha`, so the
+    # largest possible swing from 1.0 is exactly `alpha * diff_clip = 0.35 * 0.12 = 0.042` --
+    # comfortably inside this clip's own headroom (`0.10` on each side, >2x margin). Holds for
+    # LITERALLY ANY input, not just the real observed range: an exhaustive `[0,1]x[0,1]` sweep
+    # confirmed zero deviation between clipped and un-clipped output everywhere. Locked in
+    # `test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip` -- if `alpha`/`diff_clip`
+    # are ever raised without re-checking this, that test catches it before the clip silently
+    # starts flattening a real effect.
     faceoff_mult_clip_low=0.90,
     faceoff_mult_clip_high=1.10,
     faceoff_ev_only=True,

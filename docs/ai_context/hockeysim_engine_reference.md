@@ -1228,6 +1228,25 @@ distribution (p95=0.085, max=0.158). `calibration_profile.py` now carries an exp
 documenting this check so a future session doesn't re-discover and re-run it from scratch. Full
 report: `docs/reports/hockeysim_faceoff_alpha_calibration_report.md`.
 
+**A correction to §2zzz's own "closes to zero" claim, and the mult_clip item it left open,
+actually closed.** §2zzz's own report stated plainly, in its own "What this does NOT do" section,
+that it did NOT touch `faceoff_mult_clip_low`/`faceoff_mult_clip_high` — the surrounding "closes
+the faceoff track's own open-items list to zero" line overstated that, and a later re-check
+(prompted by re-verifying this exact claim) confirmed it: the mult_clip bounds were genuinely
+still open. They are now closed, with a proof rather than a measurement — `_faceoff_multipliers`
+clips `fo_diff` to `[-diff_clip, diff_clip]` **before** multiplying by `alpha`, so the largest
+possible swing from 1.0 either output can reach is exactly `alpha * diff_clip = 0.042` at the live
+values, well inside the clip's own `0.10` headroom on each side. Confirmed for LITERALLY ANY
+input (an exhaustive `[0,1]×[0,1]` sweep, not just the observed range) and locked in
+`test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip` so a future change to `alpha`/
+`diff_clip` gets caught before the clip could silently start flattening a real effect. Two smaller
+items remain genuinely open, disclosed rather than swept in: the alpha fit's `faceoff_weight`
+input is a season-long average that includes the very game being predicted (not leave-one-out —
+judged small enough not to change the "leave unchanged" conclusion, but never re-run holding it
+out); and the discrete-event engine's "one faceoff assumed per real segment" approximation (§2r)
+has never been revisited by any of the ~10 addenda built on top of it since. Neither blocks
+anything currently shipped; both are honestly still open, not silently closed by omission.
+
 ---
 
 ## 3. Input provenance — where each input is produced and applied

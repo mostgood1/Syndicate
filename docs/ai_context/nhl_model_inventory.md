@@ -757,3 +757,15 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   same discipline as the NZ item and the block-rate ratio. `faceoff_diff_clip=0.12` separately
   confirmed sensible against the real observed distribution. `calibration_profile.py` now carries
   an explicit comment documenting the check so it isn't re-discovered and re-run from scratch.
+- **Did** close `faceoff_mult_clip_low`/`faceoff_mult_clip_high` -- the item the above bullet's
+  own "What this does NOT do" left open, and a correction to its own "closes to zero" line, which
+  overstated that. Closed with a proof, not a measurement: `_faceoff_multipliers` clips `fo_diff`
+  BEFORE multiplying by `alpha`, so the largest possible swing from 1.0 is exactly
+  `alpha * diff_clip = 0.042` at the live values -- comfortably inside the clip's own `0.10`
+  headroom. Confirmed for literally any input (exhaustive `[0,1]x[0,1]` sweep, zero deviation
+  everywhere between clipped and un-clipped output), not just the observed real range. Locked in
+  a regression test against the live calibration profile so a future `alpha`/`diff_clip` change
+  gets caught before the clip could silently start binding. Two smaller items remain genuinely
+  open, disclosed rather than swept in: the alpha fit's in-sample `faceoff_weight` (season average
+  including the predicted game itself, not leave-one-out) and the discrete-event engine's
+  "one faceoff per real segment" approximation (never revisited since it was first stated).

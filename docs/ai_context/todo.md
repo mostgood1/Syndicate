@@ -1747,11 +1747,39 @@ perfect line, a flat line); full 1,312-game run, 0 games skipped; checklist re-c
 PASS; calibration_profile.py's values confirmed byte-identical before/after (a documentation-only
 change, no behavior change).
 
-**This closes the faceoff-track's own open-items list to zero.** EV, OZ, DZ, NZ, strength-state
-role, per-team role index, joint role-zone, player-level lineup-aware (both EV-only and
-strength-state), and now the legacy diff-based mechanism's own sensitivity constants -- every item
-this session's own addenda ever flagged as open has a closing addendum, whether that closure built
-something or, as here, measured and confirmed the existing default was already fine.
+**Correction, same day: the line above overstated "closes to zero."** This addendum's own report
+stated plainly, in its own "What this does NOT do" section, that it did NOT touch
+`faceoff_mult_clip_low`/`faceoff_mult_clip_high` -- a genuinely still-open item the "closes to
+zero" framing glossed over. Found and fixed by re-verifying that exact claim, not by a user
+report. **Now closed, with a proof rather than a measurement**: `_faceoff_multipliers` clips
+`fo_diff` to `[-diff_clip, diff_clip]` BEFORE multiplying by `alpha`, so the largest possible
+swing from 1.0 either output can reach is exactly `alpha * diff_clip = 0.35 * 0.12 = 0.042` at the
+live, unchanged values -- comfortably inside `mult_clip`'s own `0.10` headroom on each side (>2x
+margin). Confirmed for LITERALLY ANY input, not just the real observed range: an exhaustive
+`[0,1]x[0,1]` sweep (10,201 combinations) found zero deviation between the clipped engine output
+and the un-clipped formula everywhere. Confirmed no other call site anywhere in `syndicate/` or
+`scripts/` ever passes a different `faceoff_alpha`/`faceoff_diff_clip` that could make the clip
+relevant. Locked in `test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip`, asserting
+the headroom invariant against the LIVE calibration profile -- if `alpha`/`diff_clip` are ever
+raised without re-checking this, the test catches it before the clip could silently start
+flattening a real effect mid-segment. `calibration_profile.py`'s comment updated accordingly.
+
+**Two smaller items remain genuinely open, disclosed rather than swept into "closed" this time**:
+(1) the alpha fit's `faceoff_weight` input is each player's SEASON-long average, which includes
+the very game being predicted -- not a leave-one-out fit; judged small enough not to change the
+"leave alpha unchanged" conclusion, but never actually re-run holding it out. (2) the
+discrete-event engine's "one faceoff assumed per real segment" approximation (first stated when
+the redesign shipped) has never been revisited by any of the ~10 addenda built on top of it since
+-- a standing structural simplification underlying every discrete-event curve (EV/OZ/DZ/NZ/
+strength-state/joint/lineup-aware), not a blocking bug, but an honest gap, not a closed one.
+
+**This closes the faceoff-track's own open-items list -- for real this time, with the mult_clip
+gap named and closed rather than glossed over, and the two smaller items above stated as open, not
+silently absorbed into "zero."** EV, OZ, DZ, NZ, strength-state role, per-team role index, joint
+role-zone, player-level lineup-aware (both EV-only and strength-state), the legacy diff-based
+mechanism's sensitivity constants, and now its output clip bounds -- every item this session's own
+addenda ever flagged as open has a closing addendum, whether that closure built something,
+measured and confirmed a default was fine, or proved a bound can't bind.
 
 **A real regression found and fixed while wiring this, not after.** The
 first version made the EV-gated segment ALWAYS consume the index (defaulting
