@@ -961,13 +961,47 @@ def _wnba_live_margin_win_prob(
         return None
     if live_margin is None or elapsed_min is None:
         return pregame_p_home_win
+    # `#481`: REFIT AGAINST OUTCOMES. The old `6.0 + 0.35 * min_left` was
+    # ported from the vendored live tick and never backtested -- its own
+    # comment said so. Graded over 212 real games / 73,878 live samples by
+    # replaying cached ESPN play-by-play through THIS function, it was
+    # severely UNDERCONFIDENT: samples it priced 0.6-0.7 won 91.3% of the
+    # time, and samples it priced 0.3-0.4 won 11.6%. Aggregate means were
+    # unbiased (0.573 vs 0.571), so the failure was DISPERSION -- the scale
+    # was ~2.5x too wide, compressing every probability toward 0.5.
+    #
+    # Refitted on a GAME-LEVEL train/test split (106 train games, 36,482
+    # held-out samples), minimising Brier inside this function's real
+    # structure (blend included, not a bare logistic):
+    #     before  6.0 + 0.35*min_left   test Brier 0.1922
+    #     after   2.1 (constant)        test Brier 0.1661   (-0.0261)
+    # The fitted time coefficient is 0.00, which is not a mistake: the
+    # pregame blend below ALREADY carries the time dependence via
+    # `blend_w`, so a second time term was double-counting it.
     min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
-    scale = 6.0 + 0.35 * min_left
+    scale = _WNBA_LIVE_MARGIN_SCALE
     live_win_prob = _margin_win_prob(live_margin, scale=scale)
     if live_win_prob is None:
         return pregame_p_home_win
     blend_w = max(0.0, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
     return ((1.0 - blend_w) * pregame_p_home_win) + (blend_w * live_win_prob)
+
+
+# `#481`. Refitted 2026-08-20 against 212 games / 73,878 live samples of real
+# ESPN play-by-play, graded on actual outcomes. Replaces `6.0 + 0.35*min_left`,
+# which was ported un-backtested and was ~2.5x too wide at every clock point.
+#
+# HONEST LIMIT ON THIS FIT, because it changes how the number should be read:
+# the grade used a NEUTRAL 0.5 pregame anchor in order to isolate this live
+# transform from pregame quality. That makes the pregame blend look purely
+# harmful in the fit (blending toward 0.5 can only add noise when the anchor
+# IS 0.5) -- and a variant with the blend removed scored better still (0.1575).
+# That result is an ARTIFACT OF THE TEST SETUP and must NOT be read as evidence
+# to delete the blend: in production the anchor is the sim's real
+# `p_home_win`, which is informative early when the live margin is nearly
+# meaningless. The blend is therefore KEPT, and only the scale is refitted.
+# Re-grading with real per-game pregame anchors is the open follow-up.
+_WNBA_LIVE_MARGIN_SCALE: float = 2.1
 
 
 def _wnba_live_cover_prob(
@@ -1009,8 +1043,13 @@ def _wnba_live_cover_prob(
         return pregame_p_home_cover
     if live_margin is None or elapsed_min is None:
         return pregame_p_home_cover
+    # `#481`: same refitted scale as the moneyline path above, deliberately.
+    # Cover asks "will (margin + spread) end positive" -- the SAME question
+    # about how a margin at time T predicts the final margin's sign that the
+    # win-prob fit measured, so the fitted dispersion transfers. Kept
+    # identical so the two cannot drift, per `#475`'s one-convention rule.
     min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
-    scale = 6.0 + 0.35 * min_left
+    scale = _WNBA_LIVE_MARGIN_SCALE
     live_cover_prob = _margin_win_prob(live_margin + home_spread, scale=scale)
     if live_cover_prob is None:
         return pregame_p_home_cover

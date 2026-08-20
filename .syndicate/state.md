@@ -2477,9 +2477,31 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   Understat branch does not fold in ESPN possession/set-piece even though
   `espn_match_stats.json` already exists for all 5 of those leagues — a
   real, separate opportunity, out of scope for this fix.
-  **9-league re-run against the FIXED pipeline is IN FLIGHT as of this
-  checkpoint (PID 14132, launched ~19:33Z). Do not report a Brier/stdev
-  number against the 08-15 baseline until it lands.**
+  **UPDATE 2026-08-20 ~06:2xZ, SUPERSEDES "IN FLIGHT" above — THE 9-LEAGUE
+  RE-RUN LANDED. THE LANE'S TESTABLE OUTCOME IS NOT MET, AND THE SESSION'S
+  CORE HYPOTHESIS IS FALSIFIED BY ITS OWN PRE-REGISTERED TEST.**
+  `reports/soccer_backtest/h2h_calibration_2026-08-19_fixed_pipeline_all9_s300_limit120.json`
+  (session worktree, not committed). Weighted model Brier 0.5718 vs market
+  0.5604 (gap +0.0114, n=1049) — **worse than market in 8 of 9 leagues,
+  identically to the 08-15 baseline; belgian_pro_league is again the ONE
+  exception, unchanged by an entire session of input-quality work.** Mean
+  model stdev(P home) rose from **0.1575 to 0.1922**, PAST market's own
+  0.1859 — the model is no longer under-dispersed. **This is exactly the
+  outcome the lane's own falsification test (written before any of this
+  session's work) was designed to catch: "if the Brier gap does not close
+  while stdev rises to market's, under-dispersion is NOT the binding
+  constraint." Stdev rose past market's. The gap did not close. Recorded as
+  an OVERTURNED belief in `learnings.md`, 2026-08-20.**
+  Caveat per the lane's own standing rule ("a gap on a different match set
+  proves nothing"): the raw gap number (+0.0139 -> +0.0114) is NOT reported
+  as an improvement — n differs (1112 vs 1049; bundesliga scored only 71 of
+  an expected ~120) — the dispersion and worse-in-8/9 findings are the
+  load-bearing ones, not the raw gap. This does NOT mean the input-quality
+  work (xG dedup/possession/set-piece/availability/market_confidence/
+  pipeline fix) was wasted — each was decided on its own evidence and those
+  decisions stand — it means the SPREAD specifically is not what is holding
+  the model back, and the next hypothesis must be about systematic bias in
+  the ratings/inputs, not another dispersion knob.
   **`market_features.confidence` sourced, wired (CLI-gated, default OFF),
   and paired-tested — KEPT AS BUILT, not promoted further.** `_market_prior_
   index` has read `model_probability`/`confidence`/`edge` since the engine

@@ -2280,6 +2280,68 @@ what a PRESENT reading would look like on that instrument before treating the
 absence as an answer — three instruments in a row here reported absence that was
 about the instrument, not the world.
 
+## 2026-08-20 — OVERTURNED (pre-registered): soccer is not under-dispersed anymore, and fixing dispersion + missing inputs did not close the gap to the market
+
+`soccer-model-dispersion` opened 2026-08-18 on a measured, specific
+hypothesis: the model's Brier loss to the closing line was because it was
+UNDER-DISPERSED (mean model `stdev(P home)` 0.1575 vs market's 0.1811,
+narrower in 8 of 9 leagues) -- not because its ratings were wrong, its
+under-confidence itself. The lane wrote its own falsification test BEFORE
+any fix was attempted: *"If the Brier gap does not close while stdev rises
+to market's, under-dispersion is NOT the binding constraint and the cause is
+the ratings/inputs, not the spread. That is a real outcome and must be
+recorded, not retried with a bigger knob."*
+
+Roughly 14 hours of work followed: an xG double-count fix (the model had
+been silently weighting goals-as-xG at 0.36 instead of 0.22 in one term),
+a falsified shots-weight shrink reverted, three genuinely missing inputs
+sourced and wired end-to-end (`possession_share`, `set_piece_goal_share`,
+`starters_available_share`), a fourth (`pace_seconds_per_event`) sourced,
+tested, and correctly abandoned on its own cheap falsifier, a
+market-confidence prior wired and disclosed as methodologically weak by
+construction, and — the largest single fix — a backtest-vs-production
+pipeline mismatch that had been silently rating 5 of 9 leagues from the
+wrong data source since the backtest was written.
+
+**The 2026-08-20 re-run measured exactly the falsification condition.** Mean
+model stdev rose to 0.1922, past market's 0.1859 -- under-dispersion is
+gone. The Brier gap did not close: still worse than market in 8 of 9
+leagues, `belgian_pro_league` the same single exception as the original
+diagnosis, completely unchanged by the entire session's work.
+
+**Why this is recorded as a success for the process, not a failure of the
+session.** A hypothesis that gets tested and falsified by a test written
+before the work started is not a wasted session -- it is the single most
+trustworthy kind of negative result available, because nobody could have
+retrofit the test to fit the outcome. The alternative -- declaring the
+gap "narrower" on a different match set, or quietly moving to a sixth input
+field without ever checking the falsification condition -- was available and
+was not taken.
+
+**The general rule.** When a hypothesis names a SPECIFIC mechanism (here:
+"the spread is too narrow"), the falsification test must isolate that
+mechanism from every other plausible cause, and the fix that follows must be
+checked against the SAME test that motivated it -- not just "did some
+number get better." Fixing dispersion and separately improving input
+completeness are BOTH good engineering, and BOTH were necessary regardless
+of outcome (an under-fed engine and an under-dispersed one are real defects
+on their own terms) -- but neither is evidence for the hypothesis that
+motivated the work unless the specific falsification condition is checked,
+not just "the model changed and something moved."
+
+**What the next hypothesis has to be, precisely because this one is now
+closed off:** not "the spread is wrong" (tested, false) and not "an input is
+missing" (the checklist alarms remaining are genuine data-availability gaps,
+not misrouted producers, after this session's sweep) -- the remaining
+candidate is systematic BIAS in what the ratings compute, which requires a
+different diagnostic (reliability-curve decomposition per league/bucket, not
+a pooled regression or a stdev check) than anything this session ran.
+
+Related: [[project_e2e_assessment_aug_2026]] (the standing note that soccer's
+model accuracy was "unmeasured" before this lane existed is now further
+refined -- it IS measured, repeatedly, and the measurement has converged on
+a specific negative result rather than remaining an open question).
+
 ---
 
 ## 2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEVER diagnose a vendor from your own broken query
