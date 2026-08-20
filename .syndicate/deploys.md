@@ -19265,3 +19265,24 @@ built from MEASURED state; anything unpushed is not in it.
 
 See `layer2-board-chip-race`'s own record of this deploy — they rode along in
 this graft rather than forcing a separate slot, which is the batching working.
+
+## SHIPPED-VERIFIED 2026-08-20 20:59Z -- web deploy -- NFL injuries/roster/depth-chart artifact allowlist, live c5c1b0b5
+- Lane: nfl-artifact-allowlist-add. Preflight PASS via full checklist,
+  scoped to the target commit.
+- Scope note: cherry-picked the 2 files from `2cb773e4` (HOT_ARTIFACT_
+  PATTERNS additions + test) cleanly onto web's live SHA at fire time
+  (`454f3caa`), as `c5c1b0b5`, pushed to `deploy/nfl-artifact-allowlist-web`
+  (Render can only deploy a commit it can fetch from GitHub -- a locally
+  built commit-tree object is not enough).
+- `dep-da3miiou01pc73buovl0`, live 20:59:56.913369Z, commit content-verified
+  == `c5c1b0b5` twice independently (the deploy API response directly, and
+  a later preflight's own `deployed commit per service` report).
+- **verify:** code-level only so far -- confirms web's `/api/ops/...`
+  export/import paths now recognize the 3 new NFL artifact patterns
+  (`injuries_*.csv`, `roster_*_snapshot.csv`, `depth_*_snapshot.csv`).
+  A live `/api/ops/artifacts/export` call against real production data
+  has NOT yet been run to confirm end-to-end visibility -- refresh-worker
+  (the PUBLISH side) still needs its own matching deploy before there is
+  anything new for web to actually export; see the paired refresh-worker
+  entry once it lands.
+- Rollback: redeploy web at the prior SHA (`454f3caa`).
