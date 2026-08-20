@@ -178,6 +178,22 @@ def _progress_path(date_str: str, run_stamp: str) -> Path:
 _GAME_PROGRESS_PATTERN = re.compile(r"^\[(\d+)/(\d+)\]\s*(.*)$", re.MULTILINE)
 
 
+def _ladders_force_requested(date_str: str, env: dict | None = None) -> bool:
+    """True when `SYNDICATE_MLB_LADDERS_FORCE_DATE` names exactly `date_str`.
+
+    Date-scoped so it self-expires at the date roll: arming the force costs one
+    deploy, and disarming costs none. An unset or empty value is False, and a
+    value naming a DIFFERENT date is False -- so a knob left set from yesterday
+    cannot silently rebuild today's ladder on every tick and overwrite the
+    richer vendor artifact.
+    """
+    source = os.environ if env is None else env
+    raw_value = str(source.get("SYNDICATE_MLB_LADDERS_FORCE_DATE") or "").strip()
+    if not raw_value:
+        return False
+    return raw_value == str(date_str or "").strip()
+
+
 def _parse_game_progress(log_text: str) -> dict[str, object] | None:
     matches = list(_GAME_PROGRESS_PATTERN.finditer(log_text or ""))
     if not matches:
@@ -491,11 +507,33 @@ def main() -> int:
             from syndicate.features.mlb import ladders_build as _lb
             _pks = _lb.discover_game_pks(str(args.date))
             _st = _lb.is_stale(str(args.date), _pks)
-            if _st.get("stale"):
+            # `SYNDICATE_MLB_LADDERS_FORCE_DATE=<YYYY-MM-DD>` rebuilds even when
+            # is_stale says fresh, for that ONE date. It exists because the
+            # native builder is unreachable on demand and so cannot be verified
+            # in production: `daily_update.py:3694` writes the VENDOR ladders
+            # artifact as a normal stage of every run -- launched from this very
+            # script at the `tools/daily_update.py` call above -- so by the time
+            # this check runs the artifact is seconds old and `fresh` is the
+            # CORRECT answer. The native builder is a FALLBACK that otherwise
+            # fires only when the vendor stage errors (`daily_update.py:3684`),
+            # which is exactly the degraded path that shipped a board-breaking
+            # schema until `a54dffa3`.
+            #
+            # DATE-SCOPED, not a boolean, deliberately: it self-expires at the
+            # date roll, so proving the path costs ONE deploy rather than two
+            # (one to arm, one to disarm). Same idiom as
+            # `SYNDICATE_MLB_ROSTER_REBUILD_DATE`. A bare on/off left set would
+            # rebuild every tick forever, overwriting the richer vendor artifact
+            # each time -- which is why this is not that.
+            _force_date = str(os.environ.get("SYNDICATE_MLB_LADDERS_FORCE_DATE") or "").strip()
+            _forced = _ladders_force_requested(str(args.date))
+            if _st.get("stale") or _forced:
                 _res = _lb.write_ladders_artifact(str(args.date), _pks)
-                print(f"MLB_LADDERS_REFRESH reason={_st.get('reason')} games={len(_pks)} {_res}", flush=True)
+                _reason = _st.get("reason") if _st.get("stale") else "forced"
+                print(f"MLB_LADDERS_REFRESH reason={_reason} forced={_forced} games={len(_pks)} {_res}", flush=True)
                 _status = {
-                    "outcome": "rebuilt", "reason": _st.get("reason"),
+                    "outcome": "rebuilt", "reason": _reason,
+                    "forced": bool(_forced), "forceDate": _force_date or None,
                     "games": len(_pks), "result": _res, "staleness": _st,
                 }
             else:

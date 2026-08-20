@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from scripts.run_mlb_daily_sim_job import _hydrate_vendor_oddsapi_mirror
+from scripts.run_mlb_daily_sim_job import _ladders_force_requested
 from scripts.run_mlb_daily_sim_job import _parse_game_progress
 from scripts.run_mlb_daily_sim_job import _progress_poll_interval_seconds
 from scripts.run_mlb_daily_sim_job import _vendor_mlb_data_dir
@@ -247,3 +248,46 @@ class WriteProgressSnapshotTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaddersForceRequestedTests(unittest.TestCase):
+    """`#440` follow-up. Reachability for the ladders force knob: off != on.
+
+    The knob exists only to make the NATIVE ladders builder reachable in
+    production, because `daily_update.py:3694` writes the vendor artifact as a
+    normal stage of the same job and `is_stale` then correctly answers `fresh`
+    forever. If this predicate silently returned False the deploy would look
+    successful and prove nothing -- the exact failure this test rules out.
+    """
+
+    DATE = "2026-08-20"
+
+    def test_unset_is_off(self):
+        self.assertFalse(_ladders_force_requested(self.DATE, {}))
+
+    def test_empty_and_whitespace_are_off(self):
+        for value in ("", "   "):
+            with self.subTest(value=value):
+                self.assertFalse(
+                    _ladders_force_requested(self.DATE, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": value}))
+
+    def test_matching_date_is_on(self):
+        self.assertTrue(
+            _ladders_force_requested(self.DATE, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": self.DATE}))
+
+    def test_whitespace_padded_match_is_on(self):
+        self.assertTrue(
+            _ladders_force_requested(self.DATE, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": "  2026-08-20  "}))
+
+    def test_a_DIFFERENT_date_is_off(self):
+        # The self-expiry property. A knob left armed from yesterday must not
+        # rebuild today's ladder on every tick, overwriting the richer vendor
+        # artifact each time.
+        self.assertFalse(
+            _ladders_force_requested(self.DATE, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": "2026-08-19"}))
+
+    def test_reads_real_environ_when_no_env_passed(self):
+        with patch.dict(os.environ, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": self.DATE}, clear=False):
+            self.assertTrue(_ladders_force_requested(self.DATE))
+        with patch.dict(os.environ, {"SYNDICATE_MLB_LADDERS_FORCE_DATE": ""}, clear=False):
+            self.assertFalse(_ladders_force_requested(self.DATE))
