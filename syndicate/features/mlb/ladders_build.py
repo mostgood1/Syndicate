@@ -339,11 +339,19 @@ def is_stale(date_str: str, game_pks: list[int] | None = None) -> dict[str, Any]
     sim for the date. The sim clause is what re-derives ladders on GAME STATE,
     since sims re-run every 15-20 minutes.
     """
+    # EVERY return carries the values it compared. Measured 2026-08-20: the
+    # status artifact said `{"stale": false, "reason": "fresh"}` for an artifact
+    # whose served copy was 28 hours old, and the verdict alone could not
+    # distinguish "the worker's copy really is fresher than web's" from "the
+    # timestamp parse failed and fell back to mtime". A diagnostic that reports
+    # a verdict without its evidence is half an instrument.
+    _evidence: dict[str, Any] = {"path": str(daily_ladders_path(date_str))}
     dest = Path(daily_ladders_path(date_str))
     try:
         dest_mtime = dest.stat().st_mtime
+        _evidence["fileMtime"] = dest_mtime
     except Exception:
-        return {"stale": True, "reason": "artifact_missing"}
+        return {"stale": True, "reason": "artifact_missing", "evidence": _evidence}
 
     # *** COMPARE THE CONTENT CLOCK, NOT THE FILE CLOCK. ***
     #
@@ -373,7 +381,10 @@ def is_stale(date_str: str, game_pks: list[int] | None = None) -> dict[str, Any]
             # Take the OLDER of the two. A synced file cannot make stale content
             # look fresh, and a rewritten file cannot make fresh content look old.
             effective = min(dest_mtime, content_ts)
-    except Exception:
+            _evidence["artifactGeneratedAt"] = raw
+            _evidence["contentTs"] = content_ts
+    except Exception as _exc:
+        _evidence["parseError"] = f"{type(_exc).__name__}: {_exc}"
         # Unreadable or unparseable -> fall through on mtime. Deliberately NOT
         # "assume fresh": an unknown must not default to the permissive branch.
         effective = dest_mtime
@@ -383,8 +394,11 @@ def is_stale(date_str: str, game_pks: list[int] | None = None) -> dict[str, Any]
         odds_path = (daily_snapshot_oddsapi_hitter_props_path(date_str) if side == "hitter"
                      else daily_snapshot_oddsapi_pitcher_props_path(date_str))
         try:
-            if Path(odds_path).stat().st_mtime > dest_mtime:
-                return {"stale": True, "reason": "odds_newer", "side": side}
+            _om = Path(odds_path).stat().st_mtime
+            _evidence[f"oddsMtime_{side}"] = _om
+            if _om > dest_mtime:
+                return {"stale": True, "reason": "odds_newer", "side": side,
+                        "evidence": _evidence}
         except Exception:
             continue
 
@@ -393,11 +407,17 @@ def is_stale(date_str: str, game_pks: list[int] | None = None) -> dict[str, Any]
         if sim_path is None:
             continue
         try:
-            if Path(sim_path).stat().st_mtime > dest_mtime:
-                return {"stale": True, "reason": "sim_newer", "gamePk": int(pk)}
+            _sm = Path(sim_path).stat().st_mtime
+            _evidence["newestSimMtime"] = max(_evidence.get("newestSimMtime", 0.0), _sm)
+            if _sm > dest_mtime:
+                return {"stale": True, "reason": "sim_newer", "gamePk": int(pk),
+                        "evidence": _evidence}
         except Exception:
             continue
-    return {"stale": False, "reason": "fresh"}
+    # The fresh verdict is the one that most needs its evidence: it is the
+    # branch that suppresses a rebuild, so a wrong `fresh` is silent forever.
+    _evidence["effectiveTs"] = dest_mtime
+    return {"stale": False, "reason": "fresh", "evidence": _evidence}
 
 
 def build_ladders_artifact(date_str: str, game_pks: list[int]) -> dict[str, Any]:
