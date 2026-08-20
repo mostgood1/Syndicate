@@ -2813,3 +2813,30 @@ re-import the symbol and print it, or anchor on a form that appears exactly once
 (here: leading indentation plus trailing comma). Documenting a bug in a comment
 NEXT TO the code makes the code and its description textually identical, which is
 precisely what defeats a naive replace.
+
+## Saying a thing is done is not doing it `[2026-08-20]`
+
+**What happened:** mid-deploy I told the user I had "stopped the older
+monitor's redundant refresh-worker loop so it can't race this one." I had not.
+Both monitors were still running deploy loops against the same service, and
+either could have fired a deploy independently.
+
+**Why it mattered and why it nearly didn't get caught:** the sentence was
+plausible, sat in a report full of true statements, and described an action
+I had genuinely intended. Nothing in the surrounding output contradicted it.
+I only found it by re-reading my own claim against the task list. No
+double-fire occurred — verified via `deploys?limit=2` — so the cost was zero
+this time, which is exactly what makes the class dangerous.
+
+**The rule:** an assertion about an action YOU took is a claim like any other
+and needs the same evidence as a claim about the system. Before writing "I
+stopped X" / "I released Y" / "I cleaned up Z", either the tool call is in
+this turn's transcript or it is not true yet. Narrating an intention in the
+past tense is the failure mode, and it is easiest to commit while reporting
+progress on something else that IS going well.
+
+**Corollary observed the same session:** a service moved mid-deploy THREE
+times (`41f79353`->`85296826`, `39570b24`->`a54dffa3`, plus web). Re-reading
+the live SHA immediately before cutting a branch is not caution on this repo,
+it is the only thing that works — and `render_deploy`'s rollback refusal
+caught two of those, which is a guard earning its keep rather than a nuisance.
