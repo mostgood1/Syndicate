@@ -3255,26 +3255,46 @@ Preflight **HOLD** — an MLB sim is in flight (`run_mlb_daily_sim_job.py` pid 1
 the ~109 artifacts it publishes. Poller running until it drains.
 
 
-### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<<
+### >>> STANDING RIDEALONG FOR ANY refresh-worker DEPLOY <<< `[refreshed 2026-08-20T03:1xZ]`
 
-    branch  deploy/worker-ladders-ridealong
-    commit  5c2851a4   parent f2eb719d (live at 18:51:08Z)
-    scope   3 files, +681, ZERO deletions -- purely additive
+**The branch this block used to name is SPENT.** `deploy/worker-ladders-ridealong`
+/ `5c2851a4` shipped inside `041188cb` (live 02:03:08Z) — native builder, tests
+and sim-job trigger are all live. Do not re-cut it. What follows below, from
+**BUILT**, is the still-accurate description of that shipped module.
 
-**If you are about to deploy refresh-worker, cut from THIS instead of from the
-live SHA and both changes land together.** It is live-plus-three-files, so it
-cannot revert you; verified against the football lane's NCAAF deploy, both of
-their files byte-identical.
+    carry      syndicate/features/mlb/ladders_build.py
+               tests/test_mlb_ladders_build.py
+    source     1e15addc (on origin/main); also cut as 15547572 on branch
+               deploy/mlb-ladder-market-wiring, parent 041188cb
+    scope      2 files, +92 / -4, additive; 25 tests pass, 4 new ones mutation-checked
 
-**It goes stale whenever the worker moves** — the claim passed through three
-lanes in eight minutes on 2026-08-19 and this branch expired twice. **Re-cutting
-is one command** (`read-tree <new live>`, `update-index` the three paths,
-`commit-tree`); ask the `convergence-phase7-crps` lane or just do it.
+**If the live SHA is still `041188cb`, just deploy `15547572`.** If the worker
+has moved, re-cut onto the NEW live SHA — both files were byte-identical at
+`041188cb` and at the change's base, so it is an exact add (`read-tree <live>`,
+`update-index` the two paths with blobs from `1e15addc`, `commit-tree`).
 
-**The same deploy also injects `SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-08-19`**,
-which is SET on the service but inert until a restart and **EXPIRES AT 05:00Z**.
-So one worker deploy before then closes out the ladders fix AND the roster
-rebuild that has been pending all day.
+**WHY RIDEALONG AND NOT A DEPLOY.** Its own preflight returned FAIL
+`[2026-08-20T03:0xZ]` — not on safety, but on measurability:
+`batter_strikeouts` is present for **0 players across 08-16..08-19**, so the
+expected observation is 0 → 0, which neither confirms nor refutes the change,
+while a standalone deploy costs a restart that KILLS AN IN-FLIGHT SIM. Riding
+along makes the cost zero. Caveat that bounds the claim: those were WEB's
+partial mirrors — the same 08-19 file read 47 players and then 14 an hour later
+— so this is "not measurable tonight", NOT "the market is never captured".
+
+**What it changes:** `hitter_strikeouts` joins `batter_strikeouts`, a market
+already in `DEFAULT_HITTER_MARKETS` that we pay for on every hitter fetch and
+never read. Pitcher `pitches`/`batters_faced` documented as permanently
+marketless. doubles/triples/stolen_bases wired but UNFED — **user decision
+2026-08-20: do not fetch them** (~+9% of burn, ~3 days of a ~39-day runway).
+
+**ALSO ON THE SAME RESTART — `SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-08-19`**,
+VERIFIED still set 03:07:35Z via `/v1/services/.../env-vars`. **EXPIRES 05:00Z.**
+Whether the 02:03 deploy already spent it is **UNKNOWN — not determined.** The
+sim-log tail shows no roster line, but the flag prints at the START of a run and
+the endpoint serves only the last 8000 chars, so that absence is about the
+WINDOW, not the run. Settle it by checking whether roster artifact mtimes moved
+after 02:03Z; do not infer it from the log tail.
 
 **BUILT.** `f86b24a3` + `6a213156`.
 **Nothing imports `flask_frontend` any more.**
@@ -3315,8 +3335,11 @@ destroy working output and look like a successful refresh.
 every 15-20 min. Env kill-switch `SYNDICATE_MLB_LADDERS_REFRESH`, default on,
 never fatal, skipped when the sim failed.
 
-**NOT DEPLOYED.** Needs a refresh-worker deploy. `daily_ladders_*` is already
-allowlisted (2 patterns), so the existing sweep publishes it.
+**DEPLOYED AND VERIFIED `[2026-08-20T02:18Z]`, `041188cb`.** `daily_ladders_*`
+is allowlisted (2 patterns) — but note the sweep alone was NOT sufficient: the
+artifact exceeded `_PUBLISH_MAX_BYTES` and was refused silently, so the sim job
+now also publishes it DIRECTLY via `publish_hot_artifact`. See the root-cause
+block above before assuming the allowlist is enough for a large artifact.
 
 **Bugs caught by RUNNING the real reader, not by reading:** `away`/`home` are
 OBJECTS and were being stringified whole into `team`/`matchup`; and the push
