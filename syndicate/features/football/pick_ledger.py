@@ -425,6 +425,15 @@ def leak_status(source: Any, game_season: Any) -> str:
     """
     if is_leaked_rating_source(source):
         return "leaked"
+    # A source that NAMES its own as-of discipline is clean regardless of the
+    # years in the string. Measured 2026-08-20: NFL preseason projections carry
+    # `nflverse_pbp_epa_prior_season_shrunk[...]`, which contains NO 4-digit
+    # year at all, so the season comparison below returned "unknown" for every
+    # graded row -- an honest but useless answer for a source that is leak-free
+    # BY CONSTRUCTION and says so in its own name.
+    text = str(source or "").lower()
+    if "prior_season" in text or "asof" in text or "as_of" in text:
+        return "clean"
     try:
         target = int(game_season)
     except (TypeError, ValueError):

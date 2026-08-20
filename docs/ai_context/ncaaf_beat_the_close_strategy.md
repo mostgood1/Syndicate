@@ -386,3 +386,54 @@ the proxy does not make the proxy the target.
 them is currently of the same shape ("this metric correlates with something the
 model should know"). None has been tested against realised margins. Expect most
 to behave like this one, and require the margin test before building, not after.
+
+---
+
+## 7. NFL PRESEASON — MEASURED 2026-08-20. Nobody has an edge, including the market.
+
+The NFL preseason board serves 12 pick cards. Graded against the close on
+**96 games** (2023–24 preseason, 14 books, closing lines bought from OddsAPI's
+`americanfootball_nfl_preseason` key; projections are
+`nflverse_pbp_epa_prior_season_shrunk`, **leak-free by construction**):
+
+| predictor | MAE |
+|---|---|
+| always 0 (null model) | **9.719** |
+| always the mean margin (−0.78) | 9.751 |
+| **our model** | **10.028** |
+| **closing line** | **9.630** |
+
+    model -> market   dMAE +0.397  SE 0.454  t +0.87   NOT SIGNIFICANT
+    null  -> market   dMAE +0.089  SE 0.424  t +0.21   NOT SIGNIFICANT
+    null  -> model    dMAE -0.309  SE 0.212  t -1.46   NOT SIGNIFICANT
+
+**THE CLOSING LINE CANNOT BEAT "ALWAYS PREDICT ZERO."** Realised margin SD is
+12.94 and the best available predictor improves on a constant by 0.089 MAE at
+t=+0.21. NFL preseason margins are, on this evidence, close to unpredictable —
+starters play limited and undisclosed snaps, so there is very little to model.
+
+Consequences, and they differ from NCAAF's:
+
+1. **Our model is not measurably WORSE than the close** (t=+0.87). Unlike NCAAF
+   (+3.563, t=+17.20) this is not a demonstrated loss.
+2. **But nothing here demonstrates an EDGE either** — not ours, not the
+   market's. Under the gate's default-deny rule, "no demonstrated edge" is
+   exactly the condition for withholding a pick.
+3. **The 4.3x under-dispersion is real but is NOT the defect it looked like.**
+   The market is under-dispersed too (4.30 against a realised 12.94), because
+   there is little signal to spread on. Model SD 1.64 is still too tight, but
+   the gap to the market is far smaller than the gap from the market to reality.
+
+**Power:** with n=96 and SE 0.454, an effect below ~0.9 MAE is undetectable
+here. "Not significant" means NO DEMONSTRATED EDGE, not "proven equal". n cannot
+grow much — preseason is ~49 games a year.
+
+### A methodological trap this surfaced, worth more than the result
+
+The first pass graded **1,075 per-book rows** and reported
+**dMAE +0.527, SE 0.132, t=+4.00 — MODEL_WORSE**. That was wrong. The same game
+repeats across 14 books, so those rows are not independent; collapsing to one
+row per game gives SE 0.454 and t=+0.87. **Per-book rows overstated
+significance 3.4x** and would have produced a confident, false "the model loses"
+finding. Per-provider storage is right (price shopping is worth +2.79 ROI
+points) — but the unit of ANALYSIS is the game.
