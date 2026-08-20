@@ -2153,6 +2153,19 @@ move is a single-file `git checkout origin/main -- <path>` followed by a commit 
 `checkout <rev> -- <path>` writes the index EVERY session shares, and a stray
 staged file is what gets swept into someone else's commit.
 
+**THE `smartsim2_projections_*.csv` ALLOWLIST IS ORPHANED — THREE HANDOFFS HAVE
+NOW FAILED** `[verified on origin 2026-08-20, after the NFL allowlist landed]`.
+`basketball-model-owner` was asked twice and archived without acting;
+`soccer-odds-capture-cadence-gap` closed; and `nfl-artifact-allowlist-add`
+CLOSED-VERIFIED having added the NFL **injuries / roster / depth** patterns —
+**not this one**. Checked `origin/main:artifact_publisher.py` directly: no
+`smartsim2_projections` entry. `tests/test_football_projection_publish.py` still
+reports **1 xfailed**, which is the designed signal.
+**Consequence:** both football generators' `publish_hot_artifact` calls remain
+INERT, and NCAAF projections still reach web ONLY via git + a web deploy — a
+production deploy per model change. Whoever wants this fixed should add the one
+line themselves rather than hand it off a fourth time.
+
 **THE SOCCER SUITE IS SLOW BECAUSE OF ONE FILE. Both of my earlier diagnoses
 were measurement bugs** `[bisected 2026-08-20]`.
 

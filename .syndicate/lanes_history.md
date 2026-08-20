@@ -11255,3 +11255,110 @@ lost no protection and no open lane left the session-start digest.
   accidental claim on itself — caught by simulating the hook directly
   (`echo <payload> | python .claude/hooks/lane-guard.py`) rather than
   guessing from the error text, fixed by removing the bare re-mention.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-20
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### nhl-model-owner — CLOSED-VERIFIED 2026-08-20 — faceoff track fully closed incl. the multi-event engine redesign (real-N-per-segment, EV+strength-state, std 96.71%→99.88% of real); `#463`/`#470` addendum written; checklist full PASS, 650 tests passing — opened 2026-08-18 — session: nhl-model-owner
+- Full narrative moved to `.syndicate/lanes_history.md` (verbatim) and lives
+  in `.syndicate/log/2026-08-19.md` / `.syndicate/log/2026-08-20.md`, not
+  duplicated here. Canonical status docs: `docs/ai_context/hockeysim_engine_
+  reference.md` §1–§2B, `docs/ai_context/nhl_model_inventory.md`,
+  `todo.md` `#463`/`#470`.
+- Nothing deployed this session (offline producer/calibration/engine-wiring
+  only). All commits on `origin/main`, confirmed via `git merge-base
+  --is-ancestor` after every push, including the final todo.md addendum
+  commit (`13e82afb`) and its merge (`b1ecbdb1`).
+- Blocked by: none. Session archived 2026-08-20 ~20:3xZ.
+
+### nfl-artifact-allowlist-add — CLOSED-VERIFIED 2026-08-20 — landed `2cb773e4` on `origin/main` — opened 2026-08-20 — session: nfl-artifact-allowlist-add
+- Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
+  artifact_publisher.py`) has no entries for the three new NFL artifacts
+  this session's autoruns produce -- `injuries_{season}.csv`,
+  `roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv` --
+  meaning production presence of any of them is unauditable from
+  `/api/ops/artifacts/export`. Originally handed off to
+  `basketball-model-owner` twice via `send_message`; that session
+  archived 2026-08-20T19:53:54Z without acting, and its own lane is no
+  longer OPEN in `lanes.md` (checked before taking this). **Testable
+  outcome:** all three patterns present in `HOT_ARTIFACT_PATTERNS`,
+  each verified to actually match its real produced path.
+- Files: `syndicate/features/shared/artifact_publisher.py` (add 3 glob
+  entries to `HOT_ARTIFACT_PATTERNS` only -- no other change).
+- Hypothesis: n/a -- purely additive, no behavior change to anything
+  already allowlisted.
+- Falsification test: n/a.
+- Verification: a test asserting each of the 3 real produced paths
+  (`nfl_source/tracking/nflverse/injuries/injuries_2026.csv`,
+  `nfl_source/source_artifacts/data/processed/rosters/
+  roster_2026_snapshot.csv`,
+  `nfl_source/source_artifacts/data/processed/depth/
+  depth_2026_snapshot.csv`) matches at least one pattern in the updated
+  allowlist; existing allowlist tests still pass (no regression on
+  prior entries).
+- Verification: DONE. New test
+  (`test_accepts_nfl_injuries_roster_and_depth_chart_artifacts`) asserts
+  all 3 real produced paths match, plus 2 negative cases confirming the
+  `nfl_source/`-scoped patterns do NOT bleed into another sport's tree
+  under the same subdirectory names. Full `test_artifact_publisher.py`:
+  97 passed, 3 subtests passed, no regressions. Cross-checked the
+  injuries pattern against the REAL resolver (not just the hardcoded
+  test string) by writing a real file at `nfl_artifact_output_root()`'s
+  actual write location and confirming `nfl_injuries_path()` resolves
+  back to it, matching the pattern -- an earlier naive check against an
+  empty checkout hit `default_nfl_source_root()`'s different miss-
+  fallback root and looked like a mismatch; re-verified against a
+  populated fixture before trusting either the pattern or the test.
+- Blocked by: none.
+
+### nfl-artifact-publish-wiring — CLOSED-VERIFIED 2026-08-20 — landed `4feb5fa7`, DEPLOYED to refresh-worker (`d1a897b2`, live 21:57:44Z) -- e2e retry (real autorun re-run + export check) still pending, ~01:41Z or later — opened 2026-08-20 — session: nfl-artifact-publish-wiring
+- Goal: `nfl-artifact-allowlist-add` deployed the allowlist to both
+  services (web `c5c1b0b5`, refresh-worker `08bd601f`), then a real
+  `/api/ops/artifacts/export` call against production returned `count: 0`
+  for both patterns. Traced (not assumed): NOTHING calls
+  `publish_hot_artifact()` for any of the 3 NFL artifacts --
+  `fetch_nfl_injuries.py` has no publish call site at all;
+  `roster_snapshot_builder.py`/`depth_chart_snapshot_builder.py`'s own
+  `publish=` flag only appends `_publish` to the local filename, never
+  pushes cross-service, and the refresh-worker autorun doesn't even pass
+  it. `#208`'s lesson measured as a real, current gap: the allowlist
+  permits the transfer, nothing makes it happen. **Testable outcome:**
+  after the next real autorun run of each script, a production
+  `/api/ops/artifacts/export` call for each of the 3 patterns returns
+  `count >= 1`, not 0.
+- Files:
+  - `scripts/fetch_nfl_injuries.py` -- add a best-effort
+    `publish_hot_artifact()` call in `fetch_season()` right after a
+    successful write, mirroring `generate_smartsim2_nfl_projections.py`'s
+    exact pattern (try/except, never fails the fetch itself, records
+    `published` in the result dict).
+  - `scripts/build_nfl_roster_snapshot.py` -- same pattern after
+    `write_roster_snapshot_csv()` returns, using `result.output_path`.
+  - `scripts/build_nfl_depth_chart_snapshot.py` -- same pattern after
+    `write_depth_snapshot_csv()` returns, using `result.output_path`.
+- Hypothesis: n/a -- root cause already traced by reading the actual
+  call sites (`grep` for `publish_hot_artifact(` across the whole repo),
+  not guessed.
+- Falsification test: a test mocking `publish_hot_artifact` and asserting
+  it IS called with the real written path after a successful write, for
+  each of the 3 scripts -- if this test passes on the CURRENT (unfixed)
+  code, the diagnosis was wrong.
+- Verification: DONE at the code level. 4 new falsification tests
+  confirmed to genuinely FAIL on unpatched code (clean stash of all 6
+  changed files, re-ran, restored -- not just asserted): "Expected
+  'publish_hot_artifact' to be called once. Called 0 times." 17 tests
+  total pass post-fix. Full nfl/artifact_publisher slice: 32
+  pre-existing failures, confirmed identical whether or not this fix is
+  applied.
+  NOT DONE: a live re-run against real network data -- the next natural
+  autorun tick (roster/depth-chart rate-limited ~6h from their last real
+  run, injuries not yet armed) is the first real-world confirmation.
+  This fix is NOT DEPLOYED to either service yet -- lands on
+  `origin/main` only; deploying it is a separate decision, same
+  discipline as every other change this session.
+- Blocked by: none.

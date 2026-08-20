@@ -573,18 +573,6 @@ improve; reporting it would look like a result and mean nothing. **If the ratio
 comes back ~1.0 the flag is not worth using and this entry says so.**
 
 
-### nhl-model-owner — CLOSED-VERIFIED 2026-08-20 — faceoff track fully closed incl. the multi-event engine redesign (real-N-per-segment, EV+strength-state, std 96.71%→99.88% of real); `#463`/`#470` addendum written; checklist full PASS, 650 tests passing — opened 2026-08-18 — session: nhl-model-owner
-- Full narrative moved to `.syndicate/lanes_history.md` (verbatim) and lives
-  in `.syndicate/log/2026-08-19.md` / `.syndicate/log/2026-08-20.md`, not
-  duplicated here. Canonical status docs: `docs/ai_context/hockeysim_engine_
-  reference.md` §1–§2B, `docs/ai_context/nhl_model_inventory.md`,
-  `todo.md` `#463`/`#470`.
-- Nothing deployed this session (offline producer/calibration/engine-wiring
-  only). All commits on `origin/main`, confirmed via `git merge-base
-  --is-ancestor` after every push, including the final todo.md addendum
-  commit (`13e82afb`) and its merge (`b1ecbdb1`).
-- Blocked by: none. Session archived 2026-08-20 ~20:3xZ.
-
 ### repo-coordination — OPEN — **POSSIBLY ORPHANED, unconfirmed `[flagged 2026-08-19]`: no currently-running session found narrating its own work under `repo-coordination` — every hit is a session reading the shared `lanes.md` digest or its own guard output (one session's transcript shows `your lane: repo-coordination` printed to a session that is clearly NOT this lane — `Modeling Session (fork 2)` / `abf487e4…` — the exact bare-file misattribution bug fixed earlier 2026-08-19, not evidence of real ownership). No `.current-lane.<session_id>` marker exists for it. Not closed and not force-reassigned on this evidence alone — a live session claiming this lane should confirm by opening it fresh (which now also backfills its own per-session marker).** deployment, assignment and documentation. NOT any sport, model or engine. — opened 2026-08-18 — session: repo-coordination
 
 - **Goal (single testable outcome):** the machinery that decides WHO deploys,
@@ -647,31 +635,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **CONSOLIDATION SHIPPED: 114 files / 5+ lanes / 3 deploys, all content-verified. Found the test suite's collection hang and RETRACTED my own false failure report.** — opened 2026-08-18 — session: football-model-owner
-- Status: **everything on `origin/main`, ahead 0.** Consolidated deploys live:
-  refresh-worker `db469003`, live-odds-worker `a381d652`, web `454f3caa`.
-- **THE SOCCER SUITE IS SLOW BECAUSE OF ONE FILE.**
-  `tests/test_soccer_market_anchoring.py` alone: 13 passed in **1,064s**. The
-  other 41 soccer files total ~136s; collection of all 8,900 tests is 6.06s.
-  Eight tests run Monte Carlo (`simulations=300`) inside a solver loop.
-  **`--deselect` it and soccer finishes in ~2 min.** My earlier 'collection'
-  and 'test interaction' claims were BOTH measurement bugs — a `timeout 300`
-  killed this file and wrote `none`, which my baseline sum then dropped.
-
-- **I RETRACTED my own "~12 failures" report** — it was progress dots from a
-  run killed mid-collection. Run to completion: 765 passed, 0 failed. **A partial
-  pytest run is NO result, not a partial one.**
-- **MEASURED GREEN:** soccer only (765). nhl/mlb/ncaaf/board/ladder are
-  UNMEASURED, not passing.
-- **Consolidation tool:** `scripts/build_consolidated_graft.py` — reads the parent
-  LIVE, refuses during an in-flight deploy, asserts every blob, refuses extra
-  paths, drops no-ops. It prevented two reverts today.
-- **Football model conclusions unchanged:** dominated (R² 17.8% vs market 41.6%,
-  w=−0.028); injuries PRICED on 17 seasons; situational all priced; picks
-  suppressed live. No measured lever remains.
-- **NEXT ACTION:** bisect the collection hang — it makes the full suite unusable
-  for every lane, and tonight it produced a false failure report that nearly
-  triggered a 3-service rollback.
+### football-model-owner — OPEN — **ALL WORK CLOSED AND PUSHED. Consolidation live (114 files / 3 deploys, content-verified). Bisect closed: ONE slow test file, and four of my own diagnoses were measurement bugs.** — opened 2026-08-18 — session: football-model-owner
+- Status: **`ahead 0`, nothing uncommitted.** Consolidation live: refresh-worker
+  `db469003`, live-odds-worker `a381d652`, web `454f3caa` (114 files, content-verified).
+- **SOCCER: `--deselect tests/test_soccer_market_anchoring.py`** → 633 passed in
+  **149.6s** vs **875.8s** with it (83% of runtime; 8 Monte Carlo solver tests).
+  **Do NOT lower its `simulations=` counts to speed it up** — precision needed is
+  unanalysed, author's call. **Only soccer was bisected**; other sports UNTIMED.
+- **Football model CLOSED:** dominated (R² 17.8% vs 41.6%, w=−0.028); injuries
+  PRICED (17 seasons); situational all priced; returning production removed;
+  picks SUPPRESSED live. **No measured lever remains.**
+- **DO NOT RETRY:** injuries, situational, returning production, `SP_RATING_SCALE`,
+  blending, the 3 scalar totals fixes, "beat the OPEN first".
+- **Tools on origin:** `build_consolidated_graft.py`, `grade_football_playability.py`,
+  `grade_football_model_weight.py`, `test_ncaaf_situational_edge.py`,
+  `test_nfl_injury_market_edge.py`, `probe_ncaaf_injury_feed.py`.
+- **NEXT:** nothing owed. For football: regress the market residual on any
+  candidate input FIRST, and state the detectable-effect floor before calling a
+  null. Detail in `.syndicate/log/2026-08-20.md`.
 
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
@@ -1107,93 +1088,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   The board currently runs on the vendor artifact; removing its writer first
   converts a degraded path into an outage.
 
-
-### nfl-artifact-allowlist-add — CLOSED-VERIFIED 2026-08-20 — landed `2cb773e4` on `origin/main` — opened 2026-08-20 — session: nfl-artifact-allowlist-add
-- Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
-  artifact_publisher.py`) has no entries for the three new NFL artifacts
-  this session's autoruns produce -- `injuries_{season}.csv`,
-  `roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv` --
-  meaning production presence of any of them is unauditable from
-  `/api/ops/artifacts/export`. Originally handed off to
-  `basketball-model-owner` twice via `send_message`; that session
-  archived 2026-08-20T19:53:54Z without acting, and its own lane is no
-  longer OPEN in `lanes.md` (checked before taking this). **Testable
-  outcome:** all three patterns present in `HOT_ARTIFACT_PATTERNS`,
-  each verified to actually match its real produced path.
-- Files: `syndicate/features/shared/artifact_publisher.py` (add 3 glob
-  entries to `HOT_ARTIFACT_PATTERNS` only -- no other change).
-- Hypothesis: n/a -- purely additive, no behavior change to anything
-  already allowlisted.
-- Falsification test: n/a.
-- Verification: a test asserting each of the 3 real produced paths
-  (`nfl_source/tracking/nflverse/injuries/injuries_2026.csv`,
-  `nfl_source/source_artifacts/data/processed/rosters/
-  roster_2026_snapshot.csv`,
-  `nfl_source/source_artifacts/data/processed/depth/
-  depth_2026_snapshot.csv`) matches at least one pattern in the updated
-  allowlist; existing allowlist tests still pass (no regression on
-  prior entries).
-- Verification: DONE. New test
-  (`test_accepts_nfl_injuries_roster_and_depth_chart_artifacts`) asserts
-  all 3 real produced paths match, plus 2 negative cases confirming the
-  `nfl_source/`-scoped patterns do NOT bleed into another sport's tree
-  under the same subdirectory names. Full `test_artifact_publisher.py`:
-  97 passed, 3 subtests passed, no regressions. Cross-checked the
-  injuries pattern against the REAL resolver (not just the hardcoded
-  test string) by writing a real file at `nfl_artifact_output_root()`'s
-  actual write location and confirming `nfl_injuries_path()` resolves
-  back to it, matching the pattern -- an earlier naive check against an
-  empty checkout hit `default_nfl_source_root()`'s different miss-
-  fallback root and looked like a mismatch; re-verified against a
-  populated fixture before trusting either the pattern or the test.
-- Blocked by: none.
-
-### nfl-artifact-publish-wiring — CLOSED-VERIFIED 2026-08-20 — landed `4feb5fa7`, DEPLOYED to refresh-worker (`d1a897b2`, live 21:57:44Z) -- e2e retry (real autorun re-run + export check) still pending, ~01:41Z or later — opened 2026-08-20 — session: nfl-artifact-publish-wiring
-- Goal: `nfl-artifact-allowlist-add` deployed the allowlist to both
-  services (web `c5c1b0b5`, refresh-worker `08bd601f`), then a real
-  `/api/ops/artifacts/export` call against production returned `count: 0`
-  for both patterns. Traced (not assumed): NOTHING calls
-  `publish_hot_artifact()` for any of the 3 NFL artifacts --
-  `fetch_nfl_injuries.py` has no publish call site at all;
-  `roster_snapshot_builder.py`/`depth_chart_snapshot_builder.py`'s own
-  `publish=` flag only appends `_publish` to the local filename, never
-  pushes cross-service, and the refresh-worker autorun doesn't even pass
-  it. `#208`'s lesson measured as a real, current gap: the allowlist
-  permits the transfer, nothing makes it happen. **Testable outcome:**
-  after the next real autorun run of each script, a production
-  `/api/ops/artifacts/export` call for each of the 3 patterns returns
-  `count >= 1`, not 0.
-- Files:
-  - `scripts/fetch_nfl_injuries.py` -- add a best-effort
-    `publish_hot_artifact()` call in `fetch_season()` right after a
-    successful write, mirroring `generate_smartsim2_nfl_projections.py`'s
-    exact pattern (try/except, never fails the fetch itself, records
-    `published` in the result dict).
-  - `scripts/build_nfl_roster_snapshot.py` -- same pattern after
-    `write_roster_snapshot_csv()` returns, using `result.output_path`.
-  - `scripts/build_nfl_depth_chart_snapshot.py` -- same pattern after
-    `write_depth_snapshot_csv()` returns, using `result.output_path`.
-- Hypothesis: n/a -- root cause already traced by reading the actual
-  call sites (`grep` for `publish_hot_artifact(` across the whole repo),
-  not guessed.
-- Falsification test: a test mocking `publish_hot_artifact` and asserting
-  it IS called with the real written path after a successful write, for
-  each of the 3 scripts -- if this test passes on the CURRENT (unfixed)
-  code, the diagnosis was wrong.
-- Verification: DONE at the code level. 4 new falsification tests
-  confirmed to genuinely FAIL on unpatched code (clean stash of all 6
-  changed files, re-ran, restored -- not just asserted): "Expected
-  'publish_hot_artifact' to be called once. Called 0 times." 17 tests
-  total pass post-fix. Full nfl/artifact_publisher slice: 32
-  pre-existing failures, confirmed identical whether or not this fix is
-  applied.
-  NOT DONE: a live re-run against real network data -- the next natural
-  autorun tick (roster/depth-chart rate-limited ~6h from their last real
-  run, injuries not yet armed) is the first real-world confirmation.
-  This fix is NOT DEPLOYED to either service yet -- lands on
-  `origin/main` only; deploying it is a separate decision, same
-  discipline as every other change this session.
-- Blocked by: none.
 
 ### soccer-stale-artifact-overwrite — OPEN — **CAUSE FOUND, FIX LANDED (`32148cac`) AND LIVE ON WEB (`15a0be64`, 22:36:32Z, grafted onto the live SHA — main was 462 files away). THE HANDED-DOWN HYPOTHESIS WAS WRONG: no worker publishes anything here. Web's OWN boot sync (`bootstrap_data_root.py` via `_bootstrap_render_data`) copied the git checkout over its own disk on every boot, repo-always-wins, and its logs bracket the incident exactly (sync 21:42:31Z → 21:43:28Z; the good read at 21:42:5xZ sits INSIDE that window). Served bytes were sha256-identical to the committed mirror. `copy2` preserves the SOURCE mtime, so the clobbered file's mtime (21:36:27Z) PREDATES the last good read of the file it replaced — that inversion is the fingerprint, and a whole-second mtime shared by 7 files across 4 leagues is the other half. SCOPE: 1,114 of 8,016 hot artifacts web served were the checkout's copy; 88 live ones (incl. MLB sim input `batted_ball_2026.json`) were scheduled for destruction at the next boot — both LOWER BOUNDS, the sync walks ~33k files. WEB ONLY: neither worker imports `syndicate.app`, so `SYNDICATE_BOOTSTRAP_ON_START=1` is inert on both — which VOIDS `#357`'s standing counter-argument. POST-DEPLOY: control group 88/88 survived, 0 clobbered, 0 artifacts flipped to the mirror, and la_liga `recommendations_2026-08-20` now reads `generated_at 22:37:07Z`. **NOT DISCHARGED, and the reason is worse than "slow": THAT BOOT'S SYNC WAS KILLED 63 SECONDS IN.** `/healthz` went unanswered ~30s and Render fired `server_failed` (`unhealthy: HTTP health check`) at 22:37:52.78Z while the container served 4 concurrent multi-MB glob exports (1 mine, 3 the platform's) alongside a 31,147-file walk, workers already at 594/607 MB of 2 GB. It died inside root 1 of 16; `soccer_source` syncs LAST and was never reached — so the 67 mlb files are in-flight evidence and the 21 soccer files are an INFERENCE. Worse, the graceful shutdown never joined the daemon thread, so `_run_bootstrap`'s `finally` left `.bootstrap_sync.lock` behind and the replacement instance SKIPPED the sync entirely (<1800s lock, `app.py:109`). **No complete bootstrap has run since the fix went live.** A killed bootstrap poisoning the next boot for 30 min is a separate pre-existing defect, filed in `#494`. DISCHARGE = one `Bootstrap totals: … kept=` line + one control-group re-read; both ways to force a boot are correctly blocked (classifier on raw restart, preflight `HOLD: redundant` on same-SHA) and neither was worked around, so **the web claim was RELEASED for the next session's deploy to supply it**, with a monitor on the Render logs API.** — opened 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
 - Goal: web's runtime disk stops being overwritten with the month-old
