@@ -1065,7 +1065,140 @@ def _market_tiles(
     ]
 
 
-def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
+def _squad_box_sections(
+    *,
+    squad_props: list,
+    prop_picks: dict,
+    away_team: str,
+    home_team: str,
+    away_abbr: str,
+    home_abbr: str,
+    live_state: dict | None,
+) -> list:
+    """One stat table per side, every player the sim published.
+
+    THE DATA WAS ALREADY THERE AND ON THE WRONG SIDE OF A TRUNCATION.
+    `cards.py` read `match["top_props"]`, which the artifact builder caps at
+    EIGHT. The full roster lives at the payload's TOP level as
+    `player_props` -- 28 players for COV@ARS on 2026-08-21, each with 13
+    fields including the `_if_playing` variants and `expected_minutes_share`.
+    `/soccer/<league>/props` has been reading that key all along; the card
+    never did. Measured 2026-08-20: MLB's box tab carries 566 leaf values
+    (full batting and pitching lines, real and simulated) against soccer's
+    30.
+
+    Columns mirror what MLB's box actually shows -- identity, then a row of
+    numbers -- rather than the name/detail/value list, which could only ever
+    surface three of thirteen fields.
+
+    `Odds`/`Edge` come from the same `build_soccer_picks` join the props page
+    and the prop tiles use, so a player's edge reads identically wherever it
+    appears on the card.
+    """
+    if not squad_props:
+        return []
+    columns = ["Player", "Pos", "Min%", "xSh", "xSOT", "Scorer%", "Odds", "Edge"]
+    sections = []
+    for side, team_name, abbr in (("away", away_team, away_abbr), ("home", home_team, home_abbr)):
+        rows = [row for row in squad_props if isinstance(row, dict) and str(row.get("side") or "") == side]
+        if not rows:
+            # Stated, not hidden. Soccer's player coverage is genuinely
+            # one-sided for some fixtures -- all 28 rows for COV@ARS are
+            # Arsenal players, none Coventry. An empty column that says
+            # nothing is indistinguishable from a rendering bug.
+            sections.append(
+                {
+                    "title": f"{abbr} squad projections",
+                    "body": f"No player projections were published for {team_name} in this match.",
+                    "rows": [],
+                }
+            )
+            continue
+        rows.sort(key=lambda row: _safe_float(row.get("anytime_scorer_probability")) or 0.0, reverse=True)
+        table_rows = []
+        for row in rows:
+            pick = prop_picks.get(_normalize_player_name(row.get("player_name"))) or {}
+            edge = _safe_float(pick.get("edge"))
+            table_rows.append(
+                [
+                    str(row.get("player_name") or "Player").strip(),
+                    str(row.get("position") or "-").strip() or "-",
+                    _fmt_pct(row.get("expected_minutes_share")),
+                    _fmt_num(row.get("expected_shots"), 2),
+                    _fmt_num(row.get("expected_shots_on_target"), 2),
+                    _fmt_pct(row.get("anytime_scorer_probability")),
+                    _fmt_odds(pick.get("price")) or "-",
+                    f"{edge * 100.0:+.1f}%" if edge is not None else "-",
+                ]
+            )
+        sections.append(
+            {
+                "title": f"{abbr} squad projections",
+                "body": (
+                    f"{len(table_rows)} {team_name} players. Expected minutes share, shots, shots on "
+                    "target and anytime-scorer probability from the sim, against the captured price."
+                ),
+                "columns": columns,
+                "table_rows": table_rows,
+                "rows": [],
+            }
+        )
+    return sections
+
+
+def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abbr: str) -> dict | None:
+    """The most likely exact scorelines.
+
+    `scoreline_probabilities` is published on every simulated match (25
+    entries for COV@ARS) and was read by NOTHING on the card. For a sport
+    whose correct-score market is a headline market, that is the single
+    highest-signal artifact field going unused.
+
+    The keys are `"home-away"` -- confirmed against the payload, where the
+    3.24-total Arsenal-favourite match peaks at "3-0" 14.0% and "2-0" 12.7%,
+    which is a home-heavy distribution as it must be. Rendered
+    away-first to match the card's `AWAY @ HOME` header, so the same match
+    never reads in two orders on one card.
+    """
+    if not isinstance(scoreline_probabilities, dict) or not scoreline_probabilities:
+        return None
+    ranked = sorted(
+        ((str(k), _safe_float(v)) for k, v in scoreline_probabilities.items()),
+        key=lambda item: item[1] or 0.0,
+        reverse=True,
+    )
+    table_rows = []
+    for key, prob in ranked[:10]:
+        if prob is None or "-" not in key:
+            continue
+        home_goals, _, away_goals = key.partition("-")
+        table_rows.append(
+            [
+                f"{away_abbr} {away_goals.strip()} - {home_abbr} {home_goals.strip()}",
+                _fmt_pct(prob),
+            ]
+        )
+    if not table_rows:
+        return None
+    covered = sum(prob or 0.0 for _, prob in ranked[:10])
+    return {
+        "kicker": "Correct score",
+        "title": "Most likely scorelines",
+        "body": f"Top {len(table_rows)} exact scores from the sim, {_fmt_pct(covered)} of all simulated outcomes.",
+        "columns": ["Scoreline", "Prob"],
+        "table_rows": table_rows,
+        "rows": [],
+    }
+
+
+def _match_to_game(
+    match: dict[str, Any],
+    *,
+    league: str,
+    week: int,
+    season: int,
+    squad_props: list | None = None,
+) -> dict[str, Any]:
     matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
     home_team = str(matchup.get("home_team") or "Home").strip() or "Home"
     away_team = str(matchup.get("away_team") or "Away").strip() or "Away"
@@ -1181,7 +1314,27 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
         # whose real content sat in `name`/`detail` -- so the card rendered
         # "Coventry City @ Arsenal" three times down the value column.
         # `game_board_contract` preserves a non-empty incoming list.
-        "shared_prop_rows": _prop_rows_with_market(top_props, prop_picks),
+        "shared_headline_section": _scoreline_section(
+            match.get("scoreline_probabilities"),
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+        ),
+        "shared_box_sections": [
+            section
+            for section in (
+                _squad_box_sections(
+                    squad_props=squad_props or [],
+                    prop_picks=prop_picks,
+                    away_team=away_team,
+                    home_team=home_team,
+                    away_abbr=_abbr(away_team, league),
+                    home_abbr=_abbr(home_team, league),
+                    live_state=live_state,
+                )
+            )
+            if section
+        ],
+        "shared_prop_rows": _prop_rows_with_market(squad_props or top_props, prop_picks),
         "shared_top_play_rows": _top_play_rows(
             away_abbr=_abbr(away_team, league),
             home_abbr=_abbr(home_team, league),
@@ -1248,19 +1401,39 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
     if not fixtures:
         return []
     simulated_by_event_id: dict[str, dict[str, Any]] = {}
+    # `player_props` is a TOP-LEVEL key, not a per-match one, and it carries
+    # the full squad where `match["top_props"]` is capped at eight by the
+    # artifact builder. Indexed by match_id here so the card can show what
+    # `/soccer/<league>/props` has always shown.
+    squad_by_match: dict[str, list[dict[str, Any]]] = {}
     for date_str in week_date_list(league, season, week):
         payload = recommendations_payload(league, date_str) or {}
         for match in payload.get("matches") if isinstance(payload.get("matches"), list) else []:
             event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
             if event_id:
                 simulated_by_event_id[event_id] = match
+        for row in payload.get("player_props") if isinstance(payload.get("player_props"), list) else []:
+            if not isinstance(row, dict):
+                continue
+            match_id = str(row.get("match_id") or "").strip()
+            if match_id:
+                squad_by_match.setdefault(match_id, []).append(row)
 
     games: list[dict[str, Any]] = []
     for fixture in fixtures:
         event_id = str(fixture.get("event_id") or "").strip()
         simulated = simulated_by_event_id.get(event_id)
         if simulated is not None:
-            games.append(_match_to_game(simulated, league=league, week=week, season=season))
+            match_id = str(simulated.get("match_id") or simulated.get("event_id") or "").strip()
+            games.append(
+                _match_to_game(
+                    simulated,
+                    league=league,
+                    week=week,
+                    season=season,
+                    squad_props=squad_by_match.get(match_id) or squad_by_match.get(event_id) or [],
+                )
+            )
         else:
             games.append(_unsimulated_game(fixture, league=league, week=week, season=season))
     return games
