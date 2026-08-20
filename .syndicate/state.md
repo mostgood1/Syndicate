@@ -3544,7 +3544,7 @@ independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
-## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART INGESTION — BUILT, WIRED, DEPLOYED, LIVE-VERIFIED `[2026-08-20]`
+## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — BUILT, WIRED, DEPLOYED, ALLOWLISTED, PUBLISH-WIRED — E2E EXPORT CONFIRMATION PENDING `[2026-08-20]`
 
 `roster_snapshot_builder.py` and `depth_chart_snapshot_builder.py` are real
 (both already consumed by `ask_the_syndicate_data.py`'s team-profile
@@ -3580,12 +3580,35 @@ meant roster/depth-chart specifically); flagged as an optional low-risk
 ridealong to `football-model-owner`, not yet actioned as of this
 checkpoint.
 
-**HOT_ARTIFACT_PATTERNS allowlisting NOT done** for any of the three new
-artifact paths (`injuries_{season}.csv`,
-`roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv`) --
-production presence of these is unauditable from `/api/ops/...` until
-allowlisted. Handed off to `basketball-model-owner` (the file is under
-their lane) via `send_message`, twice, not yet actioned.
+**HOT_ARTIFACT_PATTERNS allowlisting: DONE, DEPLOYED, but a SECOND gap
+found behind it (`nfl-artifact-allowlist-add` / `nfl-artifact-publish-
+wiring`).** `basketball-model-owner` (the original handoff target)
+archived without acting; taken directly since its lane was no longer
+OPEN. Added the 3 patterns, deployed to BOTH web (`c5c1b0b5`, live
+2026-08-20T20:59:56Z) and refresh-worker (`08bd601f`, live
+2026-08-20T21:18:35Z). A real `/api/ops/artifacts/export` call against
+production then returned `count: 0` for both checked patterns --
+**allowlisting alone was not sufficient.** Traced (not assumed): NOTHING
+called `publish_hot_artifact()` for any of the 3 artifacts --
+`fetch_nfl_injuries.py` had no publish call site at all;
+`roster_snapshot_builder.py`/`depth_chart_snapshot_builder.py`'s own
+`publish=` flag only renamed the local file, never pushed cross-service.
+Exactly `#208`'s lesson ("allowlisting PERMITS a transfer, it does not
+MAKE one happen"), measured as real rather than hypothetical. Fixed --
+all 3 scripts now call `publish_hot_artifact()` best-effort after a
+successful write, mirroring `generate_smartsim2_nfl_projections.py`'s
+existing pattern -- and deployed to refresh-worker (`d1a897b2`, live
+2026-08-20T21:57:44Z).
+
+**STILL PENDING: end-to-end confirmation.** All three layers (data
+exists -> allowlist permits -> code pushes) are live together for the
+first time, but no REAL autorun run has happened with all three fixes
+in place yet. Roster/depth-chart are rate-limited to one attempt per
+21600s from their last real run (2026-08-20T19:41:42Z) -- next window
+approx 2026-08-21T01:41:42Z. Injuries fetch remains unarmed. Whoever
+next observes one of these three scripts actually launch should check
+`artifact_published=` in its output and re-run the export check before
+calling this fully closed.
 
 ## [mlb-vendor-exit-audit] MLB VENDOR EXIT — 18 OF 20 PIPELINE STAGES HAVE NO NATIVE PRODUCER `[2026-08-20, MEASURED]`
 
