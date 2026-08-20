@@ -18392,3 +18392,23 @@ reopening bar is exactly the kind of thing someone later acts on.
 same games, a 95% CI lower bound above the 52.4% breakeven, out-of-sample with
 subsets pre-specified, and denominators in BETS not rows. Measured by
 `scripts/grade_football_playability.py`.
+
+## PENDING 2026-08-20 16:43Z -- web deploy -- Layer 2 board pick-clarity fixes (#2/#3), scoped onto live SHA ea6f431f
+- Lane: layer2-board-pick-clarity. Preflight PASS via full checklist. Claim +
+  target-scoped preflight CLEAR at 16:40:49Z.
+- Scope note: web's live SHA (ea6f431f) is not an ancestor of origin/main
+  (489-file, 151K-insertion drift measured) -- web runs its own scoped
+  deploy branch, same pattern as every other web deploy this session.
+  Cherry-picked the one fix commit (0a192986 on origin/main) cleanly onto
+  ea6f431f as 0ddd8ede, no conflicts.
+- Expected effect: on the next board load, over/under picks (306 of 512
+  rows measured live pre-fix) show "Over"/"Under" in the pick detail line;
+  h2h/moneyline rows (109 of 114 measured blank pre-fix) show a
+  model-probability percentage instead of a blank Projected cell. No other
+  visible change -- pure client-side template edit, no backend/data change.
+- Rollback: redeploy web at the prior SHA (ea6f431f).
+- `dep-da3it5ibkg8c738n6ml0`, status=build_in_progress at fire time (first
+  attempt hit a transient Render API 500, retried clean).
+- Measurement: [PENDING -- confirm live commit == 0ddd8ede, then re-pull the
+  live board's own production payload (same method used to find the bugs)
+  and re-run the same over/under and blank-Projected counts against it]
