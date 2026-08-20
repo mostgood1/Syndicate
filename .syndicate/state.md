@@ -1974,6 +1974,27 @@ independent sports**. NCAAF ATS gets WORSE as the edge filter tightens
 | blending | w≈0 → optimal blend is 100% market |
 | three scalar totals fixes | measured dead |
 
+**THE SESSION DIGEST DOES NOT READ state.md, AND READS ONLY HEADINGS FROM
+learnings.md** `[measured 2026-08-20 from .claude/hooks/session-start.sh]`.
+state.md's own size costs nothing at session start — the hook's header records
+that v1 cat-ed it, spent the whole ~2KB budget, and that was the bug being
+fixed. learnings.md is grepped for FORBIDDEN/EXONERATED **headings only**, and
+`lanes.md`'s OPEN LANES section truncates on **lane COUNT** (`LANE_CAP=600` vs
+~6,489 B raw), not on file size — trimming lanes.md 134,022 → 98,118 B did NOT
+stop it truncating. **So "LEDGER OVER BUDGET" is a byte warning about the cost
+to whoever OPENS a file; it does not describe the digest.** Do not trim these
+files expecting the digest to change.
+
+**35 of 44 STANDING RULES REACHED NO SESSION until 2026-08-20.** The digest
+grepped `^###` while learnings.md entries are written at `##` — 8 matched, 35
+invisible, including "never point a worker publish URL at a public hostname".
+Fixed in `362c505d`: matches `^#{2,3}`, clips each entry to 64 chars, takes the
+TAIL so the newest rules show, and prints "showing 6 most recent of 43".
+**Relaxing the grep alone would have been worse** — 43 headings ≈ 4,800 B against
+a 450 B cap taken in append order would have shown only the OLDEST. That edit is
+a CROSS-LANE take of `.claude/hooks/` (claimed by `repo-coordination`, OPEN)
+made under explicit user instruction and messaged to them.
+
 **NFL CLOSING LINES ARE FREE AND LOCAL — do not buy them.** nflverse
 `schedules/games.csv` (2.2 MB) carries `spread_line` and `total_line` back to
 **1999** alongside final scores; fetch via

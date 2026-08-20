@@ -2657,3 +2657,38 @@ it.** "Over budget" was a byte comparison against a per-file cap; I assumed it
 described the digest's behaviour and spent effort on the wrong quantity. The
 byte caps and the digest's caps are unrelated mechanisms that happen to share
 the word "cap".
+
+---
+
+## 2026-08-20 — RELAXING A FILTER CAN MAKE THE OUTPUT WORSE. Selection matters as much as the match.
+
+Found that the session digest's STANDING RULES grep used `^###` while
+`learnings.md` entries are written at `##` — **8 of 43 rules matched, 35 were
+invisible to every session**, including "never point a worker publish URL at a
+public hostname". The obvious fix is one character: relax the pattern.
+
+**That would have made it worse.** 43 headings is ~4,800 B against a 450 B cap,
+and `head -c` takes lines in FILE order, which in an append-only file is OLDEST
+first. So the "fix" would have shown ~7 of the most stale rules and silently
+dropped every lesson learned since — trading 8 visible rules for 7 worse ones.
+
+**A filter has three parts and a bug in one is usually a bug in all three:**
+what MATCHES, what is SELECTED from the matches, and how the selection is
+FORMATTED to fit. I had been thinking only about the match.
+
+    match      ^###  ->  ^#{2,3}                      8 -> 43 candidates
+    select     head (oldest) -> tail (newest)         newest rules surface
+    format     full heading -> clipped to 64 chars    4 fit -> 6 fit
+    honesty    "showing 6" -> "showing 6 of 43"       tells you to go read it
+
+**AND I INTRODUCED TWO BUGS DOING IT, both caught by READING THE OUTPUT rather
+than the code.** `tail -n 14 | head -c 450` keeps the FIRST 7 of the last 14 —
+it showed rules 30-36, neither newest nor oldest — and the byte cap cut the
+final entry mid-word. The code read as "take the recent ones and cap them"; it
+did not do that. **Run the thing and look at what comes out.**
+
+**The wider point about caps:** "over budget" and "truncated in the digest" were
+two unrelated mechanisms sharing a word. state.md is never read by the digest at
+all; learnings.md is read for headings only; lanes.md truncates on lane COUNT.
+I trimmed 34 KB from lanes.md and the section it feeds still truncates. **Before
+optimising a number, read the code that consumes it.**

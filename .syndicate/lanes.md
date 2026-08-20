@@ -641,33 +641,36 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **ALL LEVERS RESOLVED. Model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%). Injuries settled PRICED on 17 seasons / 4,431 games. Picks suppressed live. No measured lever remains.** — opened 2026-08-18 — session: football-model-owner
-- Status: **All work on `origin/main` (`9ce663fe`), verified by content.** web
-  `ea6f431f` live; NCAAF picks suppressed; board serves SP+ week 1 (51 games,
-  max 50.60); NFL picks untouched.
-- **THE ONE FACT:** the model is dominated, not broken — real signal (R² 17.8%)
-  but its deviation from the market carries none (w=−0.028, CI [−0.130,+0.069]).
-  No threshold, weight or subset can help. STOP re-testing them.
-- **DO NOT RETRY — all measured dead:** injuries (PRICED, 17 seasons, 4,431
-  games; a 4-season run said otherwise and was a false positive); situational
-  (all 8 priced, 1,746 games); returning production (pooled t=−0.89, code
-  removed); `SP_RATING_SCALE` (every scale 6..24 loses); blending (w≈0);
-  the three scalar totals fixes; "beat the OPEN first".
-- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` has `spread_line`
-  back to 1999, free, 2.2 MB. It IS the home-margin prediction (r=+0.431; MAE
-  10.264 as-is vs 14.645 negated). OddsAPI historical NFL starts 2020.
+### football-model-owner — OPEN — **ALL FOOTBALL LEVERS RESOLVED (model is STRICTLY DOMINATED; injuries PRICED on 17 seasons). Ledger trimmed. FIXED a digest defect that hid 35 of 44 standing rules from every session.** — opened 2026-08-18 — session: football-model-owner
+- Status: **everything on `origin/main`, verified BY CONTENT.** web `ea6f431f`
+  live; NCAAF picks suppressed; board serves SP+ week 1 (51 games, max 50.60).
+- **THE ONE MODEL FACT:** dominated, not broken — real signal (R² 17.8%) but its
+  deviation from the market carries none (w=−0.028). No threshold, weight or
+  subset helps. STOP re-testing them.
+- **DO NOT RETRY — measured dead:** injuries (PRICED, 17 seasons / 4,431 games;
+  a 4-season run said otherwise and was a false positive); situational (8 factors
+  priced); returning production (t=−0.89, removed); `SP_RATING_SCALE` (6..24 all
+  lose); blending (w≈0); the three scalar totals fixes; "beat the OPEN first".
+- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` carries `spread_line`
+  back to 1999, free. It IS the home-margin prediction (MAE 10.264 as-is vs
+  14.645 negated). OddsAPI historical NFL starts 2020.
+- **DO NOT TRIM state.md/learnings.md EXPECTING THE DIGEST TO CHANGE.** It never
+  reads state.md and reads only headings from learnings.md; OPEN LANES truncates
+  on lane COUNT, not bytes.
+- **CROSS-LANE EDIT, disclosed:** `.claude/hooks/session-start.sh` (claimed by
+  `repo-coordination`, OPEN) taken under explicit user instruction, logged in
+  `362c505d`, messaged to them with an invitation to revert. **Unacknowledged.**
 - **Harnesses — run BEFORE building anything:**
   `grade_football_model_weight.py`, `grade_football_playability.py`,
   `test_ncaaf_situational_edge.py`, `test_nfl_injury_market_edge.py`,
   `probe_ncaaf_injury_feed.py`.
-- **NEXT ACTION:** no measured lever remains. Either accept NCAAF/NFL margins
-  are not a product and redirect, or find an input class that is NOT
-  performance-derived and NOT already priced. Whatever it is, regress the market
-  residual on it FIRST — and state the detectable-effect floor before calling
-  any result null.
-- **UNCOMMITTED:** `data/nfl_source/historical_odds/closing_lines_preseason_*.json`
-  — 2,728 credits, untracked by convention, and still the ONLY preseason line
-  source (`games.csv` is regular-season only).
+- **NEXT ACTION:** no measured lever remains. Either redirect, or find an input
+  that is NOT performance-derived and NOT already priced — and regress the market
+  residual on it FIRST, stating the detectable-effect floor before calling any
+  result null.
+- **TREE HAZARD:** the primary tree's `lanes.md` is STALE (127,558 B vs origin's
+  ~98,000). Today's trim was pushed from a worktree. Editing it there and pushing
+  REVERTS the trim. Pull first or use a worktree.
 
 ### nfl-autorun-production-arm — OPEN, env vars SET (via dashboard, my PUT attempts classifier-blocked) — deploy BLOCKED on contended refresh-worker claim (3 legitimate holders in under an hour tonight; not misattribution) — opened 2026-08-19 — session: nfl-autorun-production-arm
 - Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
