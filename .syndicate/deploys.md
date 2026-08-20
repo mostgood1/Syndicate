@@ -18674,3 +18674,81 @@ slate's first build is a genuine rebuild with the artifacts present. Expect
 fields (separate BVP path), and `vendor/*/data/` statcast caches remaining
 ephemeral and unpublishable — my theory that the latter caused the arsenal
 failure was WRONG, but the fragility is real and undocumented.
+
+---
+
+## 2026-08-20 18:27:40Z — refresh-worker `a54dffa3` — MLB pregame ladder chips: the artifact stopped carrying ladders
+
+**lane:** mlb-pregame-ladder-schema · **deploy:** `dep-da3kb6n10e5c73dgo5a0`,
+triggered 18:21:14Z, live 18:27:40Z · **claim:** held by this lane from 18:05:07Z
+
+**What shipped.** `#440`'s native writer (`ladders_build`) pinned its output
+schema to the TOP-PROPS reader and stopped emitting `gamePk`, `pitcherId` and
+`ladder[]` — the three fields `cards.py`'s pregame starter-chip builder joins on
+and builds from. Restored, plus a `cards_source.js` change so a starter's NAME
+is no longer gated on having chips. `cards.py` untouched (held by another lane;
+the reader was always correct — only its input regressed).
+
+**CORRECTION TO THIS LANE'S OWN EARLIER CLAIM — the outage was INTERMITTENT,
+not continuous, and the commit message `a54dffa3` overstates it.** The vendor
+writer `write_daily_ladders_artifact` was NOT retired by `#440` as its docstring
+says. `vendor/mlb_bettingv2/tools/web/flask_frontend.py:4057` still rebuilds this
+artifact ON-REQUEST when it looks stale, in the WEB request path, and it writes
+the full 26-field schema WITH ladders. So two writers with incompatible schemas
+overwrite the same file and the chips FLAPPED:
+
+    16:46:16Z  generatedBy=syndicate.features.mlb.ladders_build  ladder=0/18   chips DEAD
+    18:19:09Z  no generatedBy (vendor)                           ladder=18/18  chips WORK
+
+Both readings were correct; one sample was mistaken for the steady state. The
+fix is right either way — it is what STOPS the flapping — but "every pregame
+chip has been dead since the cutover" was an overclaim from a single sample.
+
+**VERIFY — the reading that will prove it, and why the obvious one does not.**
+Chips on the board prove NOTHING right now: the vendor writer produced the live
+artifact at 18:19 and would render chips with or without this deploy. The
+discriminator is `generatedBy`, which ONLY the native writer stamps
+(`ladders_build.py:564`; the vendor writer emits no such key). So:
+
+    PROVEN when the served daily_ladders_2026_08_20.json carries BOTH
+      generatedBy == "syndicate.features.mlb.ladders_build"
+      AND ladder[] populated on 18/18 pitcher rows, gamePk on 18/18
+
+**STATUS AT WRITE TIME: NOT YET PROVEN — deploy is live, the reading has not
+landed.** A second-order effect of the race is delaying it: `is_stale` compares
+the artifact clock against the sims, and the vendor's 18:19 write is NEWER than
+the sims, so the native writer correctly reads `fresh` and SKIPS. It will not
+rebuild until a sim lands newer than 18:19. Watcher running; this entry gets the
+result appended, pass or fail. **If it never fires, this deploy is UNVERIFIED
+and must be recorded as such — not assumed good because the board looks right.**
+
+**Pre-deploy baseline, for the record:** built the fixed writer locally over
+today's REAL production inputs (9 sim artifacts + both odds snapshots pulled
+from the live disk) and drove the REAL cards reader: 18/18 starters got >=1
+ladder badge, against 0/18 from the shipped artifact. George Kirby — a starter
+with a prop row, no pick and no chip — went 0 chips to `K up to 7 / H up to 8 /
+BB up to 2`.
+
+**Size, against `learnings.md` 2026-08-20's ceiling incident on this exact
+file:** ladder goes on the 18 pitcher rows only, never the 234 hitter rows.
+Isolated cost +84,905 bytes (+15.4%), total 635,001 vs `_PUBLISH_MAX_BYTES`
+12,582,912 — 11.9MB headroom.
+
+**Two gate findings, both recorded in `lanes.md`:**
+1. `deploy_preflight.py` reported CLEAR while a board build had been running 88
+   seconds. It enumerates OS processes; the board build runs IN-PROCESS in
+   `run_refresh_worker.py`. Eight minutes later the reverse happened —
+   `check_deploy_safety.py` said CLEAR while preflight caught a freshly spawned
+   sim SUBPROCESS. **Neither gate is sufficient alone. Run both.**
+2. Live SHA `39570b24` was not an ancestor of `origin/main` and
+   `origin/main..39570b24` showed 20 commits / 18,582 insertions — reading as a
+   massive revert. Measured directly (`git diff 39570b24 a54dffa3`) it deletes
+   **0** code files, leaves the vendor sim engine and publisher byte-identical,
+   and puts main AHEAD on `live_refresh_loop.py`. That range is against the
+   MERGE-BASE, not against what is live. Deployed with `--allow-rollback`
+   deliberately, on content evidence. **`origin/main..<live>` is the wrong
+   command; `git diff <live> <target>` is the right one.**
+
+**Known-unfixed, out of this lane's scope:** web rebuilding a heavy artifact
+inside a request handler contradicts the worker-split rule that the web service
+does no heavy computation. Pre-existing, belongs with `#440`'s owner.
