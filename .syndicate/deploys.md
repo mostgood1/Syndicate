@@ -18424,7 +18424,7 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   is genuinely sparse... a real COVERAGE gap, not a plumbing one"), not a
   frontend defect, and correctly left blank rather than fabricated.
 
-## PENDING 2026-08-20 17:21Z -- web deploy -- Layer 2 board movement/steam display fix (#5), scoped onto live SHA 0ddd8ede
+## SHIPPED-VERIFIED 2026-08-20 17:28Z -- web deploy -- Layer 2 board movement/steam display fix (#5), live d77dfb9a
 - Lane: layer2-board-movement-display. Preflight PASS via full checklist.
   Claim + target-scoped preflight CLEAR at 17:20:54Z.
 - Scope note: same pattern as every web deploy this session -- cherry-picked
@@ -18436,6 +18436,14 @@ subsets pre-specified, and denominators in BETS not rows. Measured by
   No backend/data change -- pure client-side template edit.
 - Rollback: redeploy web at the prior SHA (0ddd8ede).
 - `dep-da3jf1bbc2fs7397o0eg`, status=build_in_progress at fire time.
-- Measurement: [PENDING -- confirm live commit == d77dfb9a, then re-pull the
-  live board's own production payload and re-run the same movement_state
-  render-coverage count against it]
+- **verify: MEASURED live, matches expectation.** `dep-da3jf1bbc2fs7397o0eg`
+  live at 17:28:30Z, commit content-verified == d77dfb9a. Re-pulled the
+  board's own production payload post-deploy (456 cards, natural churn):
+  **169 of 169 tracked/flat rows (100%) now render real movement text**
+  (e.g. "Odds +226 · 12h ago", "Flat · 12h ago"). `steamRows: 0` currently
+  -- no row meets the size-and-clock steam bar at this moment, which is a
+  real, expected state (>=15 price points within 3h of publish is a rare
+  event), not a rendering gap; the badge logic itself is confirmed correct
+  by code (checks `item.steam === true` first) and will be re-verified
+  against a real steam event opportunistically rather than blocking this
+  deploy on one occurring.
