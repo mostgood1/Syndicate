@@ -2175,9 +2175,17 @@ compute; not a fixture, not collection, not accumulated state.
    was missing the single most expensive file. Files 1-25 showed 1.0x only
    because this file is #31. **There is no interaction effect.**
 
-**What is actually true:** one pathologically slow file dominates. Anyone running
-soccer tests should `--deselect tests/test_soccer_market_anchoring.py` (or fix
-its simulation counts) and the rest finish in ~2 minutes.
+**What is actually true:** one pathologically slow file dominates. **CONFIRMED by removing it:**
+
+    all 67 soccer files                    875.8s
+    the same minus that ONE file (13 tests) 149.6s   633 passed, 0 failed
+    -> 5.9x faster; that file was 83% of the suite's runtime
+
+So `--deselect tests/test_soccer_market_anchoring.py` makes the soccer suite
+usable as a pre-deploy gate (under 3 minutes) instead of ~15. **The proper fix
+is that file's own `simulations=` counts, and it is NOT mine to make:** lowering
+a simulation count to make a test fast is how a test stops testing anything, and
+the precision each assertion needs has not been analysed.
 
 **Note on precision:** the same file measured 511s inside a 42-file run and
 1,064s alone, because several runs overlapped on this machine. Treat the
