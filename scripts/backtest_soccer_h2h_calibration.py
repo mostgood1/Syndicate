@@ -26,10 +26,18 @@ an edge on a board.
 
 SCOPE, stated rather than discovered later:
 
-- Runs on the four goals-based leagues (eredivisie, primeira_liga,
-  championship, belgian_pro_league) plus the five Understat leagues, from
-  committed `history/` files. Goals stand in for xG there --
-  `team_rows_from_match_history`'s documented fallback.
+- Match fixtures/results/closing-odds always come from committed `history/`
+  files, for all nine backtestable leagues.
+- **Team RATINGS branch by league, matching `build_soccer_artifacts.
+  _load_team_ratings` exactly (fixed 2026-08-19; previously this backtest
+  used the goals-as-xG fallback for every league, which measured a DIFFERENT
+  pipeline than production runs for five of them):**
+  - eredivisie, primeira_liga, championship, belgian_pro_league: goals stand
+    in for xG, `team_rows_from_match_history`'s documented fallback,
+    `window=90`.
+  - epl, la_liga, bundesliga, serie_a, ligue_1: real Understat xG and ppda
+    from committed `team_history/*.csv`, `window=45` -- no goals conversion,
+    matching what production actually reads for these five.
 - **MLS is excluded and cannot be included.** `fetch_asa_mls_team_history`
   returns undated season aggregates; a season average already contains the
   season, so no as-of filter can repair it.
@@ -86,6 +94,34 @@ BACKTESTABLE_LEAGUES = (
 def _load_history(league: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in sorted(glob.glob(str(REPO_ROOT / "data" / "soccer_source" / league / "history" / "*.csv"))):
+        rows.extend(pd.read_csv(path).to_dict("records"))
+    return rows
+
+
+# Mirrors `build_soccer_artifacts._GOALS_BASED_RATING_LEAGUES` EXACTLY --
+# checked against it directly, not re-derived, when this branch was added.
+_GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
+
+
+def _load_team_history(league: str) -> list[dict[str, Any]]:
+    """Real Understat team-match rows (`team`, `xg_for`, `xg_against`, `ppda`,
+    ...) for the five non-goals-based leagues. `compute_team_ratings`'s own
+    docstring says these "match directly" -- no goals-as-xG conversion.
+
+    THIS BRANCH WAS MISSING HERE UNTIL NOW, and it was not a silent oversight
+    -- the module docstring above explicitly scoped "plus the five Understat
+    leagues" through `team_rows_from_match_history`'s goals-as-xG fallback,
+    stated as a deliberate choice. It just never matched what
+    `build_soccer_artifacts._load_team_ratings` actually does in PRODUCTION
+    for these same five leagues: reads `team_history/teams_*.csv` directly,
+    real xG and real ppda, `window=45` (vs `window=90` for the goals-based
+    four -- xG is smoother than raw goals, so it needs less smoothing).
+    A backtest measuring a DIFFERENT pipeline than production runs is not
+    measuring production, whatever its own internal leak-freedom. `ppda`'s
+    "CONSUMED, container has none" alarm on this path was a symptom of the
+    same gap, not a separate problem -- this fixes both at once."""
+    rows: list[dict[str, Any]] = []
+    for path in sorted(glob.glob(str(REPO_ROOT / "data" / "soccer_source" / league / "team_history" / "*.csv"))):
         rows.extend(pd.read_csv(path).to_dict("records"))
     return rows
 
@@ -173,7 +209,24 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
         return {"league": league, "error": "no committed history"}
 
     espn_stats = _load_espn_match_stats(league)
-    team_rows = team_rows_from_match_history(history, espn_stats=espn_stats)
+    # MATCHES `build_soccer_artifacts._load_team_ratings` EXACTLY, branch for
+    # branch -- this backtest previously used the goals-as-xG fallback for
+    # every league including these five, which is NOT what production does
+    # for them (production reads real Understat xG+ppda here). A backtest
+    # measuring a different pipeline than production runs is not measuring
+    # production. Deliberately reproduces production's CURRENT gap too: the
+    # Understat branch does not fold in ESPN possession/set-piece the way
+    # `team_rows_from_match_history` does for the goals-based four, even
+    # though `espn_match_stats.json` exists for all five of these leagues
+    # (confirmed 918-1145 rows each) -- that is a real, separate opportunity
+    # in PRODUCTION, not something to silently fix inside a backtest whose
+    # whole point is measuring what production actually does today.
+    if league in _GOALS_BASED_RATING_LEAGUES:
+        team_rows = team_rows_from_match_history(history, espn_stats=espn_stats)
+        rating_window = 90
+    else:
+        team_rows = _load_team_history(league)
+        rating_window = 45
     # SEPARATE from the `team_rows` join above on purpose. `possession_share`/
     # `set_piece_goal_share` are ratings-derived (rolling team averages, via
     # `compute_team_ratings`); `starters_available_share` is PER-FIXTURE (this
@@ -224,7 +277,7 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
     for day in sorted(by_day):
         if limit is not None and scored >= limit:
             break
-        ratings = compute_team_ratings(team_rows, as_of=day, window=45)
+        ratings = compute_team_ratings(team_rows, as_of=day, window=rating_window)
         fixtures = by_day[day]
         # A team the as-of ratings have never seen gets a 0.0/0.0 default from
         # `_rating_for`, which is a prior, not a projection. Requiring prior
