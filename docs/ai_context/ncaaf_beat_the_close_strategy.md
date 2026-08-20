@@ -773,7 +773,7 @@ production established costs hours to unwind.
 
 ---
 
-## 14. INJURIES ON FOUR SEASONS — §13's "dead" was an OVERCLAIM from one season
+## 14. INJURIES ON FOUR SEASONS — §13's "dead" was an OVERCLAIM. SUPERSEDED by §15.
 
 **§13 concluded on 272 games that the NFL market prices injuries and the lever
 is dead. Extending to 2022–2025 (1,083 games) shows that was too strong.**
@@ -828,3 +828,61 @@ it is 2024–25 noise.
 call it priced either. §13's headline is corrected above; its NCAAF conclusion
 is unaffected — that rests on there being **no feed at all**, which four seasons
 of NFL data does not change.
+
+---
+
+## 15. INJURIES, RESOLVED ON SEVENTEEN SEASONS — the market prices them
+
+**Measured 2026-08-20, 4,431 games, 2009–2025.** This settles a question that
+moved twice, and the movement is worth more than the answer.
+
+    272 games  (2025)        all null          -> I called it "DEAD"    OVERCLAIM
+  1,083 games  (2022-25)     two |t|>2         -> corrected "UNRESOLVED"
+  4,431 games  (2009-25)     ALL NULL AGAIN    -> RESOLVED: market prices them
+
+| burden measure | n | slope | SE | t | verdict |
+|---|---|---|---|---|---|
+| out_diff | 4431 | −0.1631 | 0.0938 | −1.74 | priced |
+| qb_out_diff | 4431 | −0.8724 | 0.5543 | −1.57 | priced |
+| weighted_diff | 4431 | −0.1456 | 0.0898 | −1.62 | priced |
+| skill_out_diff | 4431 | −0.2840 | 0.1781 | −1.59 | priced |
+
+**The four-season "significance" was a FALSE POSITIVE**, and the per-season
+table is what exposes it. Seasons swing +0.7291 (2013), +0.7061 (2016),
+−0.9451 (2017), −0.8005 (2024) — **three cross |t|=2 in BOTH directions**, which
+is what 17 independent draws on a null look like. 12 of 17 carry the intuitive
+negative sign against ~8.5 expected by chance (p≈0.14). The 2022–25 result was
+carried by 2024–25 and did not survive contact with the other thirteen seasons.
+
+**ATS fails at every threshold:**
+
+    >= 1 : 2938 bets  51.3%  CI [49.5, 53.1]
+    >= 2 : 1636 bets  51.1%  CI [48.7, 53.5]
+    >= 4 :  340 bets  52.1%  CI [46.8, 57.3]
+    >= 6 :   42 bets  59.5%  CI [44.5, 73.0]
+
+**POWER, stated rather than implied** — the thing §13 should have said instead
+of "dead": at n=4,431 this test detects a slope of **~0.18 points**. The observed
+is −0.146, i.e. below the detection floor AND far too small to bet even if real
+(the home-field bias at +0.98 points was already unplayable at 51.4% ATS).
+
+### The backfill that cost 3 credits instead of 10,000
+
+The plan was an OddsAPI historical backfill of 2018–2021, ~10k credits. Two
+probes replaced it:
+
+1. **OddsAPI historical NFL returns ZERO events for 2018 and 2019** — coverage
+   starts in 2020. Cost 0 credits (empty responses are not billed). Buying blind
+   would have spent thousands on two seasons that do not exist.
+2. **nflverse `schedules/games.csv` already carries `spread_line` and
+   `total_line` back to 1999**, in a 2.2 MB file, alongside the final scores.
+   The odds were free and local the whole time.
+
+`spread_line`'s sign was verified empirically, not assumed: r(spread_line, home
+margin) = **+0.431**, MAE **10.264** as-is against **14.645** negated. It IS the
+home-margin prediction. The harness now sources results and lines from one file,
+so there is no cross-source join to invert.
+
+**This closes the injury lever properly** — not on one season with a confident
+headline, but on seventeen with a stated power floor. NCAAF is unaffected and
+remains closed for a different reason: no feed exists at all (§12).
