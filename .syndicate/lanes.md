@@ -154,7 +154,7 @@ the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
 needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 — original re-take header follows —
-### convergence-phase7-crps — OPEN — session: model-sim-track — **FIVE FINDINGS: FOUR DEFECTS FIXED, ONE NOT A DEFECT `[2026-08-20T18:5xZ]`.** Fixed and measured: ladder over the 12MB publish ceiling (strikeouts 0/12 → 18/18 with market lines); conditional mix never CALLED from the roster build; season-artifact pull matching NOTHING (bare globs vs fnmatch on full paths) — all five inputs now on the worker, confirmed across two runs. NOT a defect: the five `vs_pitcher_*` fields are unfed by `FORWARD_BVP_MATCHUP_MODE=off`, a modelling decision; `7dc4893d` reclassifies them as `disabled` so nfail means "wrong". **VERIFY 08-21: nfail 10 → 0.** Still open: ephemeral `vendor/*/data/` statcast caches; BVP left OFF by design. **I clobbered `#482`'s allowlist entries with a stale-base push and it CASCADED into `#488`; restored twice, additively.** — opened 2026-08-17
+### convergence-phase7-crps — OPEN, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder over the 12MB publish ceiling (pitcher strikeouts 0/12 → 18/18 rows with market lines, verified on the served payload); conditional mix never CALLED from the roster build; season-artifact pull matching NOTHING (bare globs vs fnmatch on full paths) — all five inputs now present on the worker. NOT a defect: `vs_pitcher_*` is unfed by `FORWARD_BVP_MATCHUP_MODE=off`, a modelling decision; reclassified as `disabled` so nfail means "wrong". **THE ONE THING OWED: verify on 2026-08-21** — first `sim_input_report_2026-08-21.json` via `/api/ops/artifacts/export?pattern=*sim_input_report*` must show `nfail` **10 → 0**; still 10 on a fresh `generated_at` means the wiring is INERT and this reopens. Claims: NONE held. Still open, deliberately not fixed: ephemeral `vendor/*/data/` statcast caches; BVP left OFF by design. — opened 2026-08-17
 - **Goal (single testable outcome):** a proper scoring rule runs over
   CONTINUOUS projections joined to realized outcomes, with **no dependency on
   settlement, grading, or a placed bet**, and emits a non-zero per-sport sample
@@ -1094,6 +1094,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   The board currently runs on the vendor artifact; removing its writer first
   converts a degraded path into an outage.
 
+
+### nfl-artifact-allowlist-add — OPEN — opened 2026-08-20 — session: nfl-artifact-allowlist-add
+- Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
+  artifact_publisher.py`) has no entries for the three new NFL artifacts
+  this session's autoruns produce -- `injuries_{season}.csv`,
+  `roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv` --
+  meaning production presence of any of them is unauditable from
+  `/api/ops/artifacts/export`. Originally handed off to
+  `basketball-model-owner` twice via `send_message`; that session
+  archived 2026-08-20T19:53:54Z without acting, and its own lane is no
+  longer OPEN in `lanes.md` (checked before taking this). **Testable
+  outcome:** all three patterns present in `HOT_ARTIFACT_PATTERNS`,
+  each verified to actually match its real produced path.
+- Files: `syndicate/features/shared/artifact_publisher.py` (add 3 glob
+  entries to `HOT_ARTIFACT_PATTERNS` only -- no other change).
+- Hypothesis: n/a -- purely additive, no behavior change to anything
+  already allowlisted.
+- Falsification test: n/a.
+- Verification: a test asserting each of the 3 real produced paths
+  (`nfl_source/tracking/nflverse/injuries/injuries_2026.csv`,
+  `nfl_source/source_artifacts/data/processed/rosters/
+  roster_2026_snapshot.csv`,
+  `nfl_source/source_artifacts/data/processed/depth/
+  depth_2026_snapshot.csv`) matches at least one pattern in the updated
+  allowlist; existing allowlist tests still pass (no regression on
+  prior entries).
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
