@@ -1183,6 +1183,56 @@ against the MERGE-BASE, not against what is live. Measured directly
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
 
+### layer2-live-projection-actual — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: fix two confirmed backend gaps in the Layer 2 board's live-game
+  Projected/Live/Actual semantics -- item #4 of the original user audit.
+  **Testable outcome:** on a live MLB prop row, `Projected` shows the
+  PREGAME sim number (not equal to `Live`), `Live` shows the live re-sim
+  number, and `Actual` shows the live actual-so-far -- all three
+  populated and distinct where the underlying data supports it.
+- Files: `syndicate/features/shared/live_projection_join.py` (the
+  `projection.update()` call that overwrites `projected`),
+  `syndicate/features/shared/layer2_board.py` (`_live_projection_columns`,
+  needs an `actual` mapping added).
+- Hypothesis: n/a (root-caused already, see below).
+- **Already established, measured 2026-08-20 (do not re-derive):**
+  - **`projected` gets clobbered.** `live_projection_join.py:399-406`'s own
+    comment says the fix for `#412` is "KEEP THE PREGAME NUMBER RATHER
+    THAN OVERWRITING IT" and correctly seeds `sim_projected` from
+    `projection.get("projected")` via `setdefault` -- but
+    `projection.update({..., "projected": hit["live_projection"], ...})`
+    three lines later still overwrites `projected` itself with the live
+    value, defeating the stated intent for the field the frontend actually
+    reads (`displayProjection`, `intelligence.html:697`, reads
+    `item.sim_projection ?? item.projected ?? item.projected_sim`).
+    Measured live: **34 of 40 live MLB prop rows (85%) have
+    `projection.projected == projection.live_projected`**; `sim_projected`
+    itself is null on 23 of 40 (57.5%), consistent with it only ever
+    getting seeded on whichever tick first sees the row as live.
+  - **`actual` is never wired at all.** `_live_projection_columns`
+    (`layer2_board.py:1219`) maps `live_projected` -> `live_projection`/
+    `live_total` correctly (its own docstring documents fixing this exact
+    class of bug once already, for the Live column specifically) but has
+    no `actual` mapping. Repo-wide grep for `actual_so_far` or an `actual`
+    key assignment in `layer2_board.py`: zero hits. The frontend function
+    (`displayLiveActual`, `intelligence.html:723`) is already correct and
+    already reads `item.actual` -- structurally unreachable, not broken.
+  - Both downstream consumers of `projection.get("projected")` outside
+    this function (`layer2_board.py:1939` -> `columns["projected"]`;
+    `board_enrichment.py:362`'s `_projected_value`, used only by the
+    degeneracy audit) are display/audit-only, not EV/scoring/ranking --
+    confirmed by reading both call sites. Safe for `projected` to mean
+    "pregame" consistently without touching ranking.
+- Falsification test: n/a, implementation lane, both root causes
+  confirmed by direct code read plus a live production data pull (89
+  rows fetched from `/api/board/layer2-shortlist?sport=mlb` during 6
+  live MLB games, 2026-08-20 ~18:10Z).
+- Verification: re-pull live MLB prop rows post-deploy during a live
+  game; confirm `Projected` != `Live` on rows where the sim genuinely
+  differs pregame-vs-live, and `Actual` is populated (non-null) on rows
+  where `actual_so_far` exists upstream.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
