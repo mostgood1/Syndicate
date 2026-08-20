@@ -18155,7 +18155,48 @@ API cannot serve. The ladder ridealong is expected to stay 0 until books post
 **BLOCKED ON PERMISSION, not on the gates.** Both locks are satisfied; the
 harness auto-mode classifier denied `render_deploy.py`. Not worked around.
 
-**measurement:** <pending>
+**measurement: DEPLOYED 2026-08-20T15:47:49Z (`dep-da3i04jncjis73citfdg`).
+VERIFICATION DEFERRED TO 2026-08-21 -- the advance verify condition DID NOT PASS,
+recorded as a fact rather than explained away.**
+
+    report gen 2026-08-20T16:10:02Z (AFTER the deploy, host=worker)
+      conditional_arsenal 0.0   count_bucket_map 0.0   nfail=15  (unchanged)
+
+**WHY IT CANNOT BE READ AS "INERT" -- AND EQUALLY MUST NOT BE READ AS "WORKING".**
+The checklist reads roster ARTIFACTS ON DISK. Today's rosters were built once at
+~07:37Z, EIGHT HOURS BEFORE the wiring went live, and every sim since REUSES that
+artifact. The new call enriches the IN-MEMORY profiles the sim consumes, but the
+artifact write is gated on `not used_roster_artifact`, so disk was never
+rewritten. 0.0% is consistent with BOTH readings. I could not separate them and
+did not pick the flattering one.
+
+The direct signal is blind too: `CONDITIONAL_MIX applied=N/M` prints during the
+roster build at the START of a run, and the endpoint serves only the LAST 8000
+chars. Zero hits there is about the WINDOW, not the code.
+
+**CORRECTION TO AN EARLIER CLAIM IN THIS LANE.** I wrote that
+`SYNDICATE_MLB_ROSTER_REBUILD_DATE` was irrelevant because "a fresh game date
+always rebuilds". True of the STEADY STATE, wrong about the CATCH-UP: the fields
+reach the artifact only if a rebuild happens AFTER the wiring is live.
+
+**RESOLUTION, user decision 2026-08-20: leave the gate UNSET, verify tomorrow.**
+The 08-21 slate's first build runs with the wiring already live, so it populates
+the fields with no config change and no rebuild cost. Setting the gate would have
+bought same-day proof for one rebuild plus an inert config key needing cleanup --
+the same cruft that made the stale `2026-08-19` value misleading. For the record
+the gate would NOT have pinned the date: it only COMPARES against `args.date`,
+and `test_non_matching_date_is_inert` drives the real main() to prove a stale
+gate goes inert. `always` is the value that rebuilds forever; never proposed.
+
+**verify on 2026-08-21:** first `sim_input_report_2026-08-21.json` via
+`/api/ops/artifacts/export?pattern=*sim_input_report*` must show
+`conditional_arsenal` / `count_bucket_map` / `conditional_arsenal_source` GONE
+from `failures`, with `nfail` 15 -> 12 and the five `vs_pitcher_*` entries STILL
+present. 12-not-10 is what discriminates a real fix from a coincidence. Still 15
+on a fresh `generated_at` means the wiring is INERT and must be reopened.
+
+**claim released 2026-08-20T16:14Z** -- the measurement belongs to tomorrow, and
+holding a lock across a 16-hour wait would block every other lane.
 
 ---
 
