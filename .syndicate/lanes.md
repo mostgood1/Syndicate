@@ -1,4 +1,4 @@
-﻿# Syndicate — Work Lanes
+# Syndicate — Work Lanes
 
 > Lanes are exclusive by file path. Two lanes may not claim the same file.
 > Max concurrent OPEN lanes: 3 (see `state.md`).
@@ -446,81 +446,59 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~20:3xZ — 9-LEAGUE RE-RUN STILL IN FLIGHT AGAINST THE FIXED BACKTEST PIPELINE, ALL INPUT-QUALITY WORK NOW LANDED
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-20 ~06:2xZ — TESTABLE OUTCOME NOT MET; CORE HYPOTHESIS FALSIFIED BY ITS OWN PRE-REGISTERED TEST; INPUT-QUALITY AVENUE EXHAUSTED, NEXT SESSION NEEDS A NEW HYPOTHESIS
 
-- Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
-  the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
-  least one non-`belgian_pro_league` league, stdev(P home) rising from
-  **0.1575** toward market's **0.1811**. Baseline:
-  `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
-- **FOUND AND FIXED 2026-08-19 ~19:2xZ, before trusting any re-run number:**
-  the backtest rated ALL 9 leagues via the goals-as-xG fallback
-  (`team_rows_from_match_history`), but `build_soccer_artifacts.py`
-  (production) reads REAL Understat xG+ppda from `team_history/*.csv` for 5
-  of them (epl/la_liga/bundesliga/serie_a/ligue_1) — the backtest was
-  measuring a different pipeline than production runs for over half the
-  leagues. Fixed by mirroring production's branch exactly
-  (`_GOALS_BASED_RATING_LEAGUES`, asserted equal by a new test,
-  `73b76b66`/landed `3ad5c8a4`). Also resolves the `ppda` CONSUMED+
-  UNPOPULATED checklist alarm for free — the data was already on disk,
-  already used live, just not in this backtest. Killed a ~1.5h-in run on the
-  OLD pipeline rather than trust its number for those 5 leagues; the 9-league
-  re-run below is against the FIXED pipeline. Full detail in the log.
-  **NOT FIXED, flagged not fixed:** production's own Understat branch does
-  NOT fold in ESPN possession/set-piece even though `espn_match_stats.json`
-  exists for all 5 of those leagues — a real, separate opportunity, out of
-  scope for this fix (which only had to match what production already does).
-- **9-LEAGUE RE-RUN IN FLIGHT** against the fixed pipeline (launched
-  ~19:3xZ). **Do not report a Brier/stdev number against the 08-15 baseline
-  until this lands — the run before this one was killed specifically because
-  its number would not have been trustworthy.**
-- Status of this session's input-quality work (full narrative in
-  `.syndicate/log/2026-08-19.md`, dated entries — do not duplicate here):
-  xG double-count fixed+validated+kept; shots-weight shrink reverted (was
-  falsified, recorded); dispersion-overshoot mechanism fully decomposed via
-  isolated 2x2 probe, treated as a closed stopping point per explicit
-  instruction; `clean_sheet_rate` fitted (pooled, significant) but its paired
-  backtest trended unfavorably — **discarded**; `possession_share`/
-  `set_piece_goal_share` sourced, wired, pooled-regression-tested (not
-  significant, favorable trend) — **kept**; `starters_available_share`
-  sourced (walk-forward core-XI overlap from ESPN boxscores), pooled-fit
-  significant (t=+2.06), fully wired end to end
-  (commit `d1136447`, BACKTEST-HONEST ONLY — not live-wired, see log), paired
-  test now complete: mean delta -0.0049 vs the possession baseline, t=-1.31,
-  **not significant, favorable direction** — **kept**, same disposition as
-  possession/set-piece and the opposite of `clean_sheet_rate`.
-  **`market_features.confidence`** (de-vigged closing-odds implied
-  probability, `_market_prior_index`) sourced, wired CLI-gated
-  (`--wire-market-confidence`, default OFF — not unconditional like the
-  other three), paired test complete: mean delta -0.0040, t=-0.96, **not
-  significant, weaker than every other field tested this session** —
-  **kept as built, not promoted further**: this one reuses the SAME closing
-  odds the lane benchmarks against, so any improvement is shrinkage-toward-
-  market, not independent skill (`089c42bd`).
+- Goal (unchanged, still NOT met): `backtest_soccer_h2h_calibration.py`
+  reports model Brier **<= market** on at least one non-`belgian_pro_league`
+  league. Baseline: `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json`.
+- **RESULT, 2026-08-20 ~06:00Z, against the FIXED pipeline (`3ad5c8a4`) and
+  every input-quality change this session made:**
+  `reports/soccer_backtest/h2h_calibration_2026-08-19_fixed_pipeline_all9_s300_limit120.json`
+  (session worktree, not committed) — **worse than market in 8 of 9
+  leagues, `belgian_pro_league` the same single exception as 08-15,
+  unchanged.** Mean model stdev(P home) rose **0.1575 -> 0.1922**, PAST
+  market's own 0.1859 (model no longer under-dispersed). **This is the
+  lane's own pre-registered falsification outcome** ("if the Brier gap does
+  not close while stdev rises to market's, under-dispersion is NOT the
+  binding constraint") — recorded as an OVERTURNED belief in
+  `learnings.md`, 2026-08-20. Full numbers + reasoning in the log
+  (2026-08-20 entry) and `state.md`.
+- **The input-quality avenue is exhausted, not abandoned.** Every field this
+  session set out to check — xG double-count, shots-weight shrink,
+  clean_sheet_rate, possession_share, set_piece_goal_share,
+  starters_available_share, pace_seconds_per_event, ppda, the backtest/
+  production pipeline mismatch, market_features.confidence — is sourced (or
+  correctly ruled out), tested, and disposed with a stated reason. None of
+  it was wasted (the engine is measurably more complete and honest about
+  what it doesn't know than at session start), but none of it closed the
+  Brier gap either. **Do not re-open this list without new evidence that a
+  specific field is systematically BIASED, not just present or absent** —
+  that is the falsification test's actual implication: the spread was fixed
+  and it didn't help, so the next hypothesis has to be about what the
+  ratings get systematically WRONG, not another input or another knob on
+  dispersion.
 - Files: `scripts/backtest_soccer_h2h_calibration.py`,
   `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
   `scripts/soccer_sim_input_checklist.py`, `syndicate/features/soccer/` (sim
   engine, adapters, ratings, `ingestion/espn_match_stats.py`),
   `tests/test_soccer_feature_loaders.py`, `tests/test_soccer_projections.py`,
   `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_adapter.py`,
-  `tests/test_soccer_advanced_input_reachability.py`, `reports/soccer_backtest/`.
+  `tests/test_soccer_advanced_input_reachability.py`,
+  `tests/test_backtest_matches_production_rating_source.py`,
+  `reports/soccer_backtest/`.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: **the ONLY open thread now is the 9-league re-run above.**
-  Every input-quality field this session set out to check
-  (xG/shots/clean_sheet/possession/set-piece/availability/pace/ppda/
-  market_confidence) is landed, tested, and disposed (kept or discarded,
-  each with a stated reason). Check the re-run, compare against the 08-15
-  baseline per the original testable outcome, and that is this lane's
-  original goal either met or not — no more input work is queued behind it.
-- Blocked by: none. **UNOWNED — anyone may pick this up.**
-- **DO NOT DEPLOY `origin/deploy/mlb-overview-hydration-cost` (`5ad1d96e`).** It was cut from
-  `041188cb` and is now a ROLLBACK of the NFL roster/depth-chart autorun arming (`3b816546`,
-  live 13:36:29Z). The branch that is actually live is `origin/deploy/387-on-3b816546` = `d0ea983d`.
-- **The one open question is the magnitude, not the mechanism.** Mechanism is proven
-  (`pruned == games` 3/3; 1,125 play records dropped on a completed slate). Whether it moves the
-  ~2GB excursion is unproven and must not be asserted without a same-clock, boot-matched reading.
+- Next action: **a new hypothesis, not another input pass.** Candidates not
+  yet tried: per-league systematic bias decomposition (is the model wrong
+  the same direction every time, or randomly — the reliability tables in the
+  08-20 result suggest calibration issues at specific probability buckets,
+  not a uniform shift); whether `belgian_pro_league` being the one exception
+  says something about what's different there (league-specific effect worth
+  isolating before assuming it's noise); or stepping back to question
+  whether Brier-vs-closing-line is achievable at all for a model built on
+  this data at this sample size, separate from whether the model is "good."
+- Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
 archived 2026-08-19 — read there for the falsification-test design and the
@@ -615,11 +593,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   merged as `3b79fddb`).
 - Blocked by: none
 
-### basketball-model-owner — OPEN — **SIX ITEMS BUILT AND ON `origin/main` (`#474` home-court, `#475` live cover/total, `#476` interval calibration, `#477` player-logs, `#478` segment-geometry bug, `#479` builder scheduling). DEPLOY STATE IS THE OPEN RISK: only `#475` is LIVE (web `75c526f5`, verified by content). `#474`/`#476`/`#477`/`#478`/`#479` are committed and INERT — live-odds-worker claim held by me with an armed auto-deploy monitor for `d520d93d`, blocked ~40min by continuous soccer jobs; refresh-worker held by `convergence-phase7-crps`. `#476`'s time profile MUST be rebuilt after `#478` deploys or it double-corrects.** — opened 2026-08-18 — session: basketball-model-owner
-- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`/`#468`'s fixes, plus `#474`'s home-court-advantage wiring), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix, UA change, and the `_player_logs_ready` masking-bug fix pt3), `scripts/build_basketball_home_court_advantage.py` (**NEW 2026-08-19, `#474`**: builds `home_court_advantage.json` from real schedule+boxscore joins — the sim has NO home/away split at all today, `home_adj`/`away_adj` are purely team-quality multipliers)), `syndicate/features/wnba/cards.py` (`#475`'s live cover/total probability fix — time-decaying scale + pregame-anchor blend + anchored total projection), `scripts/build_basketball_sim_calibration.py` (**NEW 2026-08-19, `#476`**: builds the four unwired calibration artifacts from paired production sim-vs-actual history)), `scripts/build_basketball_player_logs.py` (**NEW 2026-08-19, `#477`**: derives `player_logs.csv` from boxscores+schedule so the three dead opponent/career/venue split mechanisms can fire).
-- Goal: NBA/WNBA smart-sim to `model_engine_standard.md`. Current goal: land the five inert commits on both workers, then rebuild `#476`'s profile against post-`#478` production artifacts.
-- Verification: `#477` splits call-counted 0→21/21/47 with `#467` control held at 54. `#478` engine-vs-boxdict geometry now agree at 150s. `#479` measured 1.27s / 4.6MB (0.33% headroom). Narrative: `.syndicate/log/2026-08-20.md`.
-- Blocked by: deploy claims on live-odds-worker (soccer jobs) and refresh-worker (`convergence-phase7-crps`).
+### basketball-model-owner — OPEN — **ALL WORK DEPLOYED AND VERIFIED BY CONTENT on all three services (web `ba1d3368`, live-odds `2151f7b6`, refresh-worker `0d6868ce`). `#481` refit the live win-prob scale on 212 games/73,878 samples: Brier 0.1896->0.1644, worst calib gap -0.240->-0.054. `#469` CONFIRMED FIXED — boxscores_history reaches 2026-08-18, was frozen at 06-30. `#479` was working all along; `#482` fixed the BLIND INSTRUMENT that hid it. `#483` guards a sign-flipped home-court constant. `#488` FILED (platform: two services publish different content to one path, last-writer-wins). TWO OBSERVATIONS PENDING, no action: `#488` convergence (refresh-worker has not run a WNBA refresh since its 16:50Z restart) and `#481`'s served-payload check (scheduled 01:20Z mid IND@DAL).** — opened 2026-08-18 — session: basketball-model-owner
+- Files: scripts/basketball_sim_input_checklist.py (new), docs/ai_context/basketball_sim_engine_reference.md (new), docs/ai_context/basketball_model_inventory.md (new). **Write access:** `syndicate/features/shared/basketball_props_smart_sim.py` (`#467`/`#468`'s fixes, plus `#474`'s home-court-advantage wiring), `vendor/{wnba,nba}_betting_repo/src/*/cli.py` (`#461`), `scripts/refresh_wnba_oddsapi_props.py` + `syndicate/features/shared/basketball_boxscores_history.py` (`#469`'s silent-success fix, UA change, and the `_player_logs_ready` masking-bug fix pt3), `scripts/build_basketball_home_court_advantage.py` (**NEW 2026-08-19, `#474`**: builds `home_court_advantage.json` from real schedule+boxscore joins — the sim has NO home/away split at all today, `home_adj`/`away_adj` are purely team-quality multipliers)), `syndicate/features/wnba/cards.py` (`#475`'s live cover/total probability fix — time-decaying scale + pregame-anchor blend + anchored total projection), `scripts/build_basketball_sim_calibration.py` (**NEW 2026-08-19, `#476`**: builds the four unwired calibration artifacts from paired production sim-vs-actual history)), `scripts/build_basketball_player_logs.py`, `syndicate/features/shared/artifact_publisher.py` (**`#482`**: allowlist entries for `player_logs.csv` + `home_court_advantage.json` -- taken 2026-08-20 after the file went UNCLAIMED; handed to `soccer-odds-capture-cadence-gap` twice and never actioned) (**NEW 2026-08-19, `#477`**: derives `player_logs.csv` from boxscores+schedule so the three dead opponent/career/venue split mechanisms can fire).
+- Goal: NBA/WNBA smart-sim to `model_engine_standard.md`. Current goal: read the two pending observations, then `#488` itself — it is filed but UNFIXED, and the convergence deploy only makes one artifact agree.
+- Verification: watchers committed — `scripts/watch_488_convergence.py` (attribution-aware: pairs the export with per-service PUBLISH_OK, because the export alone cannot say WHICH worker's copy it read), `scripts/watch_479_artifacts.py` (tests CONTENT not presence), `scripts/verify_wnba_live_scale.py`. Narrative: `.syndicate/log/2026-08-20.md`.
+- Blocked by: nothing.
 ### repo-coordination — OPEN — **POSSIBLY ORPHANED, unconfirmed `[flagged 2026-08-19]`: no currently-running session found narrating its own work under `repo-coordination` — every hit is a session reading the shared `lanes.md` digest or its own guard output (one session's transcript shows `your lane: repo-coordination` printed to a session that is clearly NOT this lane — `Modeling Session (fork 2)` / `abf487e4…` — the exact bare-file misattribution bug fixed earlier 2026-08-19, not evidence of real ownership). No `.current-lane.<session_id>` marker exists for it. Not closed and not force-reassigned on this evidence alone — a live session claiming this lane should confirm by opening it fresh (which now also backfills its own per-session marker).** deployment, assignment and documentation. NOT any sport, model or engine. — opened 2026-08-18 — session: repo-coordination
 
 - **Goal (single testable outcome):** the machinery that decides WHO deploys,
@@ -663,324 +641,36 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **ALL LEVERS RESOLVED. Model is STRICTLY DOMINATED (R² 17.8% vs market 41.6%). Injuries settled PRICED on 17 seasons / 4,431 games. Picks suppressed live. No measured lever remains.** — opened 2026-08-18 — session: football-model-owner
-- Status: **All work on `origin/main` (`9ce663fe`), verified by content.** web
-  `ea6f431f` live; NCAAF picks suppressed; board serves SP+ week 1 (51 games,
-  max 50.60); NFL picks untouched.
-- **THE ONE FACT:** the model is dominated, not broken — real signal (R² 17.8%)
-  but its deviation from the market carries none (w=−0.028, CI [−0.130,+0.069]).
-  No threshold, weight or subset can help. STOP re-testing them.
-- **DO NOT RETRY — all measured dead:** injuries (PRICED, 17 seasons, 4,431
-  games; a 4-season run said otherwise and was a false positive); situational
-  (all 8 priced, 1,746 games); returning production (pooled t=−0.89, code
-  removed); `SP_RATING_SCALE` (every scale 6..24 loses); blending (w≈0);
-  the three scalar totals fixes; "beat the OPEN first".
-- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` has `spread_line`
-  back to 1999, free, 2.2 MB. It IS the home-margin prediction (r=+0.431; MAE
-  10.264 as-is vs 14.645 negated). OddsAPI historical NFL starts 2020.
+### football-model-owner — OPEN — **ALL FOOTBALL LEVERS RESOLVED (model is STRICTLY DOMINATED; injuries PRICED on 17 seasons). Ledger trimmed. FIXED a digest defect that hid 35 of 44 standing rules from every session.** — opened 2026-08-18 — session: football-model-owner
+- Status: **everything on `origin/main`, verified BY CONTENT.** web `ea6f431f`
+  live; NCAAF picks suppressed; board serves SP+ week 1 (51 games, max 50.60).
+- **THE ONE MODEL FACT:** dominated, not broken — real signal (R² 17.8%) but its
+  deviation from the market carries none (w=−0.028). No threshold, weight or
+  subset helps. STOP re-testing them.
+- **DO NOT RETRY — measured dead:** injuries (PRICED, 17 seasons / 4,431 games;
+  a 4-season run said otherwise and was a false positive); situational (8 factors
+  priced); returning production (t=−0.89, removed); `SP_RATING_SCALE` (6..24 all
+  lose); blending (w≈0); the three scalar totals fixes; "beat the OPEN first".
+- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` carries `spread_line`
+  back to 1999, free. It IS the home-margin prediction (MAE 10.264 as-is vs
+  14.645 negated). OddsAPI historical NFL starts 2020.
+- **DO NOT TRIM state.md/learnings.md EXPECTING THE DIGEST TO CHANGE.** It never
+  reads state.md and reads only headings from learnings.md; OPEN LANES truncates
+  on lane COUNT, not bytes.
+- **CROSS-LANE EDIT, disclosed:** `.claude/hooks/session-start.sh` (claimed by
+  `repo-coordination`, OPEN) taken under explicit user instruction, logged in
+  `362c505d`, messaged to them with an invitation to revert. **Unacknowledged.**
 - **Harnesses — run BEFORE building anything:**
   `grade_football_model_weight.py`, `grade_football_playability.py`,
   `test_ncaaf_situational_edge.py`, `test_nfl_injury_market_edge.py`,
   `probe_ncaaf_injury_feed.py`.
-- **NEXT ACTION:** no measured lever remains. Either accept NCAAF/NFL margins
-  are not a product and redirect, or find an input class that is NOT
-  performance-derived and NOT already priced. Whatever it is, regress the market
-  residual on it FIRST — and state the detectable-effect floor before calling
-  any result null.
-- **UNCOMMITTED:** `data/nfl_source/historical_odds/closing_lines_preseason_*.json`
-  — 2,728 credits, untracked by convention, and still the ONLY preseason line
-  source (`games.csv` is regular-season only).
-
-### soccer-odds-capture-cadence-gap — CLOSED-VERIFIED 2026-08-20 01:25Z — **`#343` (`77c0ee49`, 2026-08-10 21:17:39) broke soccer's bulk game-odds request for every league, 9 days straight; fixed (`3e8264bd`), deployed to both live-odds-worker (`575decf3`) and refresh-worker (`b2f4b197`, cherry-picked onto their scoped live SHA), and VERIFIED with real production data: a manual pregame trigger post-deploy produced genuine fresh captures across the full soccer book_quotes shard, and 6 of the originally-8 stale MLS/La Liga matches now show `captured_at` 3 minutes old. Full evidence chain in `.syndicate/deploys.md`'s 2026-08-20 01:25Z entry.** — opened 2026-08-19 — session: soccer-odds-capture-cadence-gap
-- Goal: soccer's h2h/totals/spreads game-market odds capture actually
-  refreshes within a bounded window (target: <24h old for a match kicking
-  off within the next day) instead of sitting 8-10 days stale.
-  **Testable outcome:** re-pull `soccer_source/tracking/book_quotes/
-  <today>.jsonl` for a slate with same-day kickoffs; every distinct
-  match's h2h/totals/spreads `captured_at` is <24h old, not just some.
-- Files:
-  - `scripts/fetch_soccer_oddsapi_odds_local.py` — **claimed 2026-08-19,
-    THE ACTUAL FIX: `_game_markets()` no longer merges `_segment_market_map()`
-    into the bulk-endpoint request (root cause, see below). Landed on
-    `origin/main` as `3e8264bd`; not yet deployed to any service.**
-  - `tests/test_fetch_soccer_oddsapi_odds_local.py` — **new file, claimed
-    2026-08-19, regression tests for the fix above (4 tests, passing, landed
-    with the fix).**
-  - `syndicate/features/shared/artifact_publisher.py` — **claimed 2026-08-19,
-    narrow: ONE new `HOT_ARTIFACT_PATTERNS` line
-    (`reports/refresh_status/latest/soccer_pregame_autorun_status.json`)
-    only. Was `basketball-model-owner`'s; released by them (their own
-    header: "no further action identified as ready", `#462`/`#471` both
-    shipped) rather than left claimed-but-idle. Done under explicit user
-    authorization — see that lane's own block for the release note.**
-  - **Not claimed here, read-only reference:** `scripts/run_live_odds_refresh_worker.py`
-    (defines `_launch_autorun_soccer_pregame_refresh`, the SOLE producer,
-    4h cadence; held by `basketball-model-owner`, `#472`). Traced only,
-    never edited — `#472`'s own fix (preserve epoch on contention) is
-    already live in this file; this lane's `steps=0` question needs a
-    DIFFERENT change (still unscoped to a location). If an edit here does
-    become necessary, re-claim it explicitly rather than relying on this
-    reference. Also note: this file has real uncommitted changes sitting
-    in the PRIMARY shared tree right now, not mine, likely from the
-    informally-referenced "OOM band" session (flagged stale 40h in the
-    roster, no formal lane header found).
-    Any future edit here goes through a dedicated worktree
-    (`scripts/session_worktree.py open --lane soccer-odds-capture-cadence-gap`),
-    never the primary tree, so that uncommitted diff is never touched.
-  - **Not claimed, read-only reference:** `scripts/run_refresh_worker.py`
-    (referenced alongside the above in prior sessions' notes; `phase=live`
-    there has 0 odds steps by design per `#148`, so it may not be where the
-    fix belongs at all). **Narrowed 2026-08-19 by `nfl-injuries-fetcher`**
-    after `lane-guard.py` correctly read the previous ambiguous phrasing as
-    a real claim and blocked an unrelated, purely additive edit (one new
-    autorun function + one new `elif` branch, nothing touching odds-step
-    handling). Coordinated via `send_message` first; no objection at time
-    of edit. If this file turns out to matter to the soccer investigation
-    after all, re-claim it explicitly rather than relying on this note.
-  - `scripts/refresh_odds_sources.py` (`_build_soccer_steps`, confirmed:
-    the actual h2h/totals/spreads fetch step is `phases=("pregame",)`
-    only — this file is EXONERATED as the bug's location, kept in the
-    list as read-only reference only)
-  - `syndicate/features/shared/ops_refresh.py` (`launch_refresh_run`,
-    `_assert_no_active_refresh_run`, `_resolve_launch_mode` — THIS is now
-    the most likely location of the actual fix, per the mechanism traced
-    below, not the files originally guessed at lane-open)
-  - Read-only reference: `.syndicate/state.md` `[soccer]` section — the
-    prior investigation's full history, DEAD hypotheses, and the now-
-    contradicted "SUPERSEDED 2026-08-17" note.
-- Hypothesis: `_launch_autorun_soccer_pregame_refresh` has stopped firing
-  successfully again (or was never actually fixed on 08-17 — that read
-  used aggregate `quote_rows`/`dates_with_rows` counts, which can stay
-  healthy-looking while specific matches never get a fresh capture, the
-  exact "healthy sibling masks an outage" shape `learnings.md` already
-  names). NOT league-specific (this session's own measurement: 8 of 8
-  affected matches span MLS AND La Liga) — that hypothesis is DEAD twice
-  over now.
-- **Already established, measured 2026-08-19 (do not re-derive):**
-  - **8 of 8** distinct matches with TODAY's kickoffs, checked across
-    every league present in the shard, have their freshest h2h/totals/
-    spreads `captured_at` at **211-236 hours old (8.8-9.8 days)**.
-    Freshest capture found anywhere in the file: 2026-08-11.
-  - This directly contradicts `state.md`'s `[soccer]` note "SUPERSEDED
-    2026-08-17 21:3xZ — capture is WORKING" — that note's own evidence
-    (`quote_rows 16,044`, `dates_with_rows` spanning many dates) never
-    checked PER-MATCH freshness, only that SOME rows existed somewhere.
-  - **Already DEAD, from the prior session (state.md `[soccer]`), do not
-    retry:** step truncation at #27 of 50 (falsified by a scoped ~6-step
-    run that captured nothing); three-specific-leagues (all ten were
-    affected then; this session's finding — MLS + La Liga both affected
-    now — is independent confirmation).
-  - **Known blocker from the prior session:** the run's own logs are
-    UNREADABLE FROM WEB — `launch_refresh_run` spawns the child with
-    `stdout=DEVNULL, stderr=DEVNULL` onto the WORKER's own disk, and
-    Render's log collector only captures a service's own top-level
-    stdout. A log-based diagnosis failed for 4 days before on this exact
-    account; do not restart from "read the logs."
-- Falsification test: confirm `_launch_autorun_soccer_pregame_refresh` is
-  still being INVOKED at all (a scheduler-liveness question, separate
-  from whether its fetch succeeds) — e.g. a process-list check on
-  live-odds-worker at a moment straddling its 4h cadence boundary, or any
-  observable side effect it writes regardless of fetch outcome. If it is
-  firing but the FETCH itself fails, the bug is downstream (HTTP/auth/
-  odds-source), not the scheduler — say so and retarget rather than
-  assuming the scheduler is the fault by default.
-**MECHANISM TRACED 2026-08-19, from code (not yet directly observed firing
-live — see "still needs verification" below).**
-
-1. **Confirmed by reading `_build_soccer_steps` directly**
-   (`scripts/refresh_odds_sources.py:1168`): `soccer_{league}_odds`,
-   `_props`, `_picks` are ALL `phases=("pregame",)` ONLY — never `"live"`.
-   Only `soccer_{league}_artifacts` (the sim) runs in both. **`state.md`'s
-   "phase=live builds 0 odds steps" claim is CORRECT, not stale** — this
-   session's own earlier suspicion that it might be outdated is now
-   resolved in the ORIGINAL note's favor.
-2. Pulled `/api/ops/odds-refresh/status` live: `phase=live` soccer runs
-   ARE firing constantly — every ~5 minutes, alternating between
-   `refresh-worker` and `live-odds-worker`, both "finished" successfully.
-   **This is a red herring by design (1) already explains** — these runs
-   were never going to capture odds regardless of how healthy they look,
-   which is exactly the "healthy-looking activity masks the real gap"
-   shape.
-3. **REFUTED SUB-HYPOTHESIS, recorded so it is not retried:** suspected
-   `_launch_autorun_soccer_pregame_refresh`'s `launch_mode="web_process"`
-   routed its concurrency check through refresh-worker's OWN lane (which
-   is almost always saturated with MLB/NFL sims) via the
-   `external_runner`/queue path. **Checked `_resolve_launch_mode` directly
-   (`ops_refresh.py:161`): `"web_process"` is not a recognized value and
-   silently falls back to `"detached_subprocess"`**, which is NOT
-   `external_runner_mode` — so it runs directly on the CALLING service
-   (live-odds-worker) under live-odds-worker's OWN lane, not refresh-
-   worker's. The refresh-worker-starvation theory is dead.
-4. **CURRENT LEADING HYPOTHESIS, not yet directly confirmed:**
-   self-contention on live-odds-worker's OWN lane. The very frequent
-   `phase=live` cycle (every ~5 min) and the rare `phase=pregame` soccer
-   cycle (every 4h) BOTH launch via `launch_refresh_run(...,
-   launch_mode="web_process", ...)` on the SAME service, both resolving to
-   the SAME `detached_subprocess` lane. `_assert_no_active_refresh_run`
-   (`ops_refresh.py:636`) is a genuine hard per-lane block — confirmed by
-   reading it, not inferred. If the frequent cycle's lane is occupied
-   (or was, moments earlier) essentially every time the 4-hour pregame
-   timer comes due, the pregame odds-capture steps may simply never win
-   the race. The contention-handling code
-   (`_is_refresh_run_contention_error`) preserves the original epoch on
-   failure rather than resetting it, so a starved autorun retries on
-   EVERY subsequent tick rather than backing off — consistent with a
-   sustained, indefinite gap rather than a one-off miss.
-- **RESOLVED 2026-08-19 ~23:16Z — `steps=0` is a genuinely empty capture,
-  not a reporting-schema mismatch. Reproduces on refresh-worker under a
-  manual, targeted trigger too — NOT specific to live-odds-worker's
-  scheduler/cadence.** Manually fired `POST /api/ops/odds-refresh/run`
-  (`phase=pregame, sports=soccer`, `run_stamp=20260819_225403`), landed on
-  `refresh-worker`'s lane (confirmed via `/api/ops/odds-refresh/status`
-  `history[]`). Read `refresh-worker`'s OWN `[artifact_publisher]` log
-  lines for the full run window (22:54Z-23:16Z), content not just status:
-  MLB's local `book_quotes/2026-08-19.jsonl` genuinely grew during this
-  run (`STREAM_TAIL_OK appended_bytes=2027948` @23:00, `appended_bytes=
-  1530276` @23:12, `PUBLISH_OK bytes=3856426` @23:11) — proving the run
-  really executed and really captured for at least one sport. Soccer's
-  local copy, same run, same window: only `STREAM_PULL_OK` (pulling an
-  existing remote copy in) and `PUBLISH_SKIPPED_UNCHANGED path=
-  soccer_source/tracking/book_quotes/2026-08-19.state.json checksum=
-  205c14a0f21d` @23:01:35 — checksum never moved again for the rest of
-  the window. Zero `STREAM_TAIL_OK`/`PUBLISH_OK` for soccer despite
-  `--sports soccer` being the explicit, sole target of this job. This is
-  content evidence from the writing service's own disk, not an inference
-  from a status endpoint (which independently misreported this same run
-  as `state=failed` at ~43s in — same premature-read pattern caught
-  earlier this session; ignored, per the log evidence above the job kept
-  running/writing for MLB well past that).
-  **Consequence for hypothesis (4) (self-contention on live-odds-worker's
-  lane):** weakened, not confirmed — this run wasn't on live-odds-worker
-  at all, so lane-contention with the frequent `phase=live` cycle cannot
-  explain THIS run's zero soccer output. The fetch failure is upstream of
-  which service calls it: in `refresh_odds_sources.py`'s soccer branch
-  itself (already on file as read-only reference, previously exonerated
-  only for the STEP-LIST-BUILDING logic `_build_soccer_steps`, not for
-  the actual fetch call each step makes — that fetch call is now the
-  prime suspect and has NOT yet been read/traced).
-- **ROOT CAUSE CONFIRMED 2026-08-19 ~23:25Z, tested directly against the
-  live OddsAPI (not inferred, not from logs).** Pulled `ODDS_API_KEY` from
-  `live-odds-worker`'s own Render env vars and replicated `fetch_game_odds`
-  exactly (same URL, same params, same live market list pulled from
-  `market_segments.py`) for `mls` and `la_liga` — both returned **HTTP 422**:
-  ```
-  {"error_code": "INVALID_MARKET", "message": "Markets not supported by this
-  endpoint: alternate_spreads, alternate_spreads_h1, alternate_spreads_h2,
-  alternate_totals, alternate_totals_h1, alternate_totals_h2, h2h_3_way,
-  h2h_3_way_h1, h2h_3_way_h2, h2h_h1, h2h_h2, spreads_h1, spreads_h2,
-  totals_h1, totals_h2"}
-  ```
-  Retried with ONLY `h2h,totals,spreads` (`DEFAULT_GAME_MARKETS`): **HTTP
-  200**, real events — **31 for MLS, 14 for La Liga**, live right now, each
-  with 8-11 bookmakers. The odds exist and are fetchable; the code was
-  asking for markets this endpoint rejects.
-  - **Mechanism:** `_game_markets()` in `fetch_soccer_oddsapi_odds_local.py`
-    merges `_segment_market_map()` (h1/h2 + alternate-line keys, from the
-    shared `market_segments.py` vocabulary) into the REQUESTED market list
-    for the BULK `/sports/{sport}/odds` endpoint. `market_segments.py`'s own
-    docstring says that vocabulary is for **per-event** requests ("Each
-    segment market is a distinct OddsAPI market key on a per-event
-    request"). MLB's fetcher has a separate per-event path
-    (`_event_wants_full_game_markets` in `fetch_mlb_oddsapi_local.py`) gated
-    specifically for segment markets and wrapped in its own
-    `except requests.HTTPError` — which is why MLB's capture kept working
-    (confirmed: it grew live during this session's own triggered run,
-    `STREAM_TAIL_OK`/`PUBLISH_OK`, see above). Soccer's fetcher never grew
-    that second path; it just bulk-requested everything in one comma-joined
-    `markets=` param, and one unsupported key 422s the WHOLE request —
-    every league, every time, no partial credit.
-  - **Regression pinned to the exact commit and date:** `77c0ee49` (`#343:
-    wire every sport's interval capture to the one shared vocabulary`),
-    **2026-08-10 21:17:39 -0500**. This lines up EXACTLY with the earlier,
-    independently-measured fact "freshest capture found anywhere in the
-    file: 2026-08-11" — the regression date and the last-good-capture date
-    are the same event, not a coincidence. Soccer game-odds capture has
-    been broken for every league, every cycle, for 9 days straight.
-  - **Same failure class the code already fixed once**, on a bigger scale:
-    the file's own comment already documents removing `btts`/
-    `draw_no_bet`/`double_chance` for this exact reason (HTTP 422,
-    2026-07-21) — `#343` reintroduced the same class of bug with 15 new
-    keys nobody checked against this specific endpoint.
-- **FIX LANDED on `origin/main` 2026-08-19 ~23:40Z as `3e8264bd` (content-
-  verified: `git show origin/main:scripts/fetch_soccer_oddsapi_odds_local.py`
-  carries the fix). Written and committed in this lane's own worktree
-  (`C:\tmp\syndicate-sessions\soccer-odds-capture-cadence-gap`), never the
-  primary tree. NOT YET DEPLOYED — no service is running this commit yet.**
-  `_game_markets()` reverted to return `DEFAULT_GAME_MARKETS` only (still
-  honors the `ODDS_API_SOCCER_GAME_MARKETS` env override outright).
-  `_segment_market_map()` itself is UNCHANGED and correctly kept for
-  TAGGING (`_append_soccer_book_quotes`'s `market_map=` argument) — only
-  the REQUEST list was narrowed, so this does not touch how returned
-  quotes get labeled. 4 new regression tests in
-  `tests/test_fetch_soccer_oddsapi_odds_local.py`, passing; existing
-  `test_all_sports_segment_wiring.py` (14 tests) and
-  `test_soccer_odds_coverage.py` (9 tests) still pass unmodified.
-- **Next concrete step for whoever continues:** land the fix
-  (`session_worktree.py land`), then deploy to whichever service(s) run
-  soccer's pregame odds capture (`live-odds-worker` is the confirmed
-  producer; `refresh-worker` also executes this same script under the
-  manual-trigger path used to diagnose this) behind the standard
-  claim+preflight protocol. Verify post-deploy the same way this was
-  diagnosed: re-pull `soccer_source/tracking/book_quotes/<date>.jsonl` and
-  confirm today's matches carry a fresh `captured_at`, not just that the
-  job completed without error.
-  Deferred, not abandoned — the original `steps=0` reporting-schema
-  question (does `_report_previous_soccer_pregame_run` correctly surface a
-  per-league 422 as `failed=N`, or does it swallow it into `steps=0`?) is
-  now secondary: whether or not that reporting gap also exists, THIS fix
-  removes the actual cause of the empty captures. Worth a look after
-  deploy/verify, not before.
-
-**FALSIFICATION RESOLVED 2026-08-19 21:5xZ — CONFIRMED FROM LOGS, not
-inference.** Did not wait on the `HOT_ARTIFACT_PATTERNS` addition (asked
-`basketball-model-owner`, no reply yet) — found a path that did not need
-it: `render_logs.py` reads live-odds-worker's OWN stdout (the print
-statements `_report_previous_soccer_pregame_run`/
-`_launch_autorun_soccer_pregame_refresh` themselves emit, NOT the
-redirected child's `DEVNULL` stdout `#433` already worked around this
-for). `py -3 scripts/render_logs.py --service live-odds-worker --text
-SOCCER_PREGAME --start 2026-08-19T00:00:00Z` returned the full day's
-history directly:
-
-```
-03:20Z LAUNCHED date=2026-08-18 -> 03:21Z NO_ARTIFACT (child wrote nothing)
-07:26Z LAUNCHED date=2026-08-19 -> 07:42Z SUMMARY steps=0 ok=0 failed=0
-11:32Z LAUNCHED date=2026-08-19 -> 11:48Z SUMMARY steps=0 ok=0 failed=0
-15:38Z LAUNCHED date=2026-08-19 -> 15:53Z SUMMARY steps=0 ok=0 failed=0
-19:39Z-19:47Z  AUTORUN_FAILED ValueError: A refresh run is already active
-               (pid=64). Cancel it before starting a new run.  [x8, ~1/min]
-19:48Z LAUNCHED pid=492 -> 19:49Z NO_ARTIFACT (child wrote nothing)
-```
-
-**TWO CONFIRMED, DISTINCT FAILURE MODES, not one:**
-
-1. **`steps=0` on every one of TODAY's clean cycles (07:26/11:32/15:38) —
-   the DOMINANT cause of the multi-day staleness.** The run launches,
-   completes without error, but the reporting artifact's
-   `results[].generation.steps[]` is empty. Traced the parser itself
-   (`_report_previous_soccer_pregame_run`, `run_live_odds_refresh_worker.py:150`)
-   — **NOT YET DISTINGUISHED: is this a genuinely empty run (something
-   upstream of `_build_soccer_steps` produces zero league_slugs for real),
-   or a schema mismatch between what the reporting code expects
-   (`payload["results"][i]["generation"]["steps"]`) and what a
-   `phase="pregame"` child actually writes?** Checked `_build_soccer_steps`
-   directly and RULED OUT the obvious season-window explanation:
-   `_MLS_OFF_SEASON_MONTHS = (1,)`, `_EUROPEAN_OFF_SEASON_MONTHS = (6, 7)`
-   — August is in-season for every league, so `active_leagues_for_date`
-   should not be empty. The `steps=0` cause is still open; next step is
-   reading one actual `odds_refresh.json` result artifact (needs the
-   `HOT_ARTIFACT_PATTERNS` addition, or `basketball-model-owner` reading it
-   directly off their own disk access) rather than guessing further.
-2. **Mutex contention IS real and directly confirmed** (not just
-   hypothesized) — the exact `#472`-shaped error, firing repeatedly late
-   in the sampled window. Independent of failure mode 1 — even a
-   contention-free pregame run this same day still produced `steps=0`
-   three times before contention ever appeared.
-- Verification: re-pull the book_quotes shard for a live same-day slate
-  after any fix and confirm ALL distinct matches (not a sample) show
-  `captured_at` inside the target window. Report the per-match count,
-  not just "capture resumed."
-- Blocked by: none.
+- **NEXT ACTION:** no measured lever remains. Either redirect, or find an input
+  that is NOT performance-derived and NOT already priced — and regress the market
+  residual on it FIRST, stating the detectable-effect floor before calling any
+  result null.
+- **TREE HAZARD:** the primary tree's `lanes.md` is STALE (127,558 B vs origin's
+  ~98,000). Today's trim was pushed from a worktree. Editing it there and pushing
+  REVERTS the trim. Pull first or use a worktree.
 
 ### nfl-autorun-production-arm — OPEN, env vars SET (via dashboard, my PUT attempts classifier-blocked) — deploy BLOCKED on contended refresh-worker claim (3 legitimate holders in under an hour tonight; not misattribution) — opened 2026-08-19 — session: nfl-autorun-production-arm
 - Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
@@ -1033,7 +723,13 @@ history directly:
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
-- Blocked by: none.
+- Blocked by: none. **UNOWNED — anyone may pick this up.**
+- **DO NOT DEPLOY `origin/deploy/mlb-overview-hydration-cost` (`5ad1d96e`).** It was cut from
+  `041188cb` and is now a ROLLBACK of the NFL roster/depth-chart autorun arming (`3b816546`,
+  live 13:36:29Z). The branch that is actually live is `origin/deploy/387-on-3b816546` = `d0ea983d`.
+- **The one open question is the magnitude, not the mechanism.** Mechanism is proven
+  (`pruned == games` 3/3; 1,125 play records dropped on a completed slate). Whether it moves the
+  ~2GB excursion is unproven and must not be asserted without a same-clock, boot-matched reading.
 - **2026-08-20 STATUS.** Shipped on `origin/main` (`ab99d236`, `9b66e841`, `6980f910`) and deployed to
   refresh-worker as `d0ea983d`, re-cut onto `3b816546` (the live SHA at deploy time) after
   `nfl-autorun-production-arm` deployed mid-poll and turned the prepared branch into a rollback of
@@ -1096,186 +792,189 @@ history directly:
   nothing measurable. Ship, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`
   as a RATE against a same-clock-window baseline — never a post-deploy hour,
   because only a cold process clears that bar.
-- Landed `ab99d236` on `origin/main`. **No deploy made, no claim taken.**
+- Landed `ab99d236` on `origin/main`, then DEPLOYED as `d0ea983d` (refresh-worker, 2026-08-20T13:59:33Z). Claim acquired 13:51:45Z, preflight CLEAR, claim RELEASED. Superseded the same day: this line previously read "No deploy made, no claim taken."
   Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
 
 
-### ci-utc-midnight-window — CLOSED 2026-08-20 — **`#482` CONFIRMED FIXED INSIDE the 00:00-05:00Z window: run `32323646103` (`df8aec91`, 02:09Z) green on both gated steps, against 11 consecutive failures 01:24-01:53Z in the same band without it. CI is no longer red on the clock.** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
-- Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
-  independent cause. `#480` and `#481` are done and are not reopened by this.
-- Goal: `CI` is green INSIDE 00:00-05:00Z, not just outside it. Testable: a run
-  whose archive suite executes within that UTC window passes.
-- Files: `tests/test_archives.py`
-- **The defect (`#482`), measured:** 7 tests computed "today" with
-  `date.today()` — the runner's date, UTC on GHA — while every route under test
-  uses `central_today_iso()`. CDT is UTC-5, so 00:00-05:00Z the two disagree and
-  CI is **structurally red ~5 hours a day regardless of what anyone pushes**.
-  Evidence is a clock, not a diff: 16 consecutive greens 2026-08-19
-  23:25-23:53Z, then 29 consecutive reds from 23:57Z (that run asserts just past
-  midnight). Over 45 completed runs: 28 failures inside the window, 11 successes
-  outside, 1 failure outside (pre-`#480`).
-- Fix applied: assert against `central_today_iso()`, the same source the app
-  uses. Precedent already existed in this very file —
-  `test_wnba_cards_api_without_date_uses_today` was fixed this way and its
-  comment names the cause exactly; the other 7 were left. Swept the 13 other
-  `unittest`-run modules: none share it.
-- Falsification test: if the window is NOT the cause, a run inside 00:00-05:00Z
-  still fails after the fix, or a run outside it fails before.
-- **Verification, and why the local pass does not count:** this dev box is
-  Central, so `date.today() == central_today_iso()` on it and the 7 tests pass
-  with or without the fix. Window confirmed live at fix time (UTC 2026-08-20 vs
-  Central 2026-08-19). **Only a CI run inside 00:00-05:00Z proves it**, and one
-  is available immediately — quote the run id, do not predict it.
-- **VERIFICATION RAN, inside the failing condition, with a control.** Run
-  `32323646103`, head `df8aec91`, 02:09Z: `Run archive regression suite` success
-  + `Ledger coherence` success. Immediately prior, same UTC band, without the
-  fix: 11 consecutive failures (`63a2341d` 01:24Z through `f968d242` 01:53Z).
-  Falsification test did NOT fire. Full table in `deploys.md`.
-- Local evidence, stated for what it is worth: `tests.test_archives` 383 OK
-  (skipped=2) and the 7 touched tests OK — but this box is Central, so that
-  shows no regression and proves nothing about the window. The CI run is the
-  proof.
-- Blocked by: none.
-
-### home-stack-test-data-dependence — CLOSED 2026-08-20 — **Hypothesis HELD. Overview pinned to a fixture; test passes at any hour, full suite 383 OK. Reachability proved off != on (flipping `active_today` fails it).** — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
-- Goal: `test_archive_launch_links_and_tracker_copy` stops depending on whether
-  the ambient mirror happens to have active sports for the resolved date.
-  Testable: it passes at any hour, including 23:2x CT where it failed.
-- Files: `tests/test_archives.py`
-- **The defect, measured.** Run `32331841627` (23:28 CT 2026-08-19) failed
-  `assertIn("Live slate", home)` at line 6400. `Live slate`, `Compact rail`,
-  `Pregame only`, `Open Live Lens` and `Live only` are all rendered PER SPORT by
-  `shared/_home_sport_stack.html`; the failing page had
-  `<section class="sport-stack">` completely EMPTY and `0 sports tracked`, so
-  none were emitted. Not a date-arithmetic bug — a data-availability one.
-- **NOT a `#482` regression — `#482` UNMASKED it.** Pre-fix (01:39Z) this same
-  test died at line **6357** on the UTC-date assertion; post-fix it gets past
-  that and reaches **6400**. The first failure had been hiding the second, which
-  is the "a failing test hides everything after it" pattern already in
-  `learnings.md`.
-- Hypothesis: `build_home_overview` filters on `show_on_home` +
-  `_active_sport_slugs()`, and `_home_selected_date(None)` is Central-today, so
-  the set of sports rendered depends on what the checkout's mirror holds for
-  THAT date. 23:28 CT resolved to 2026-08-19 (empty); 06:25 CT and 08:08 CT
-  resolved to 2026-08-20 (non-empty) and passed.
-- Falsification test: if the hypothesis is right, patching the overview seam
-  with a fixed sport makes the assertions pass regardless of clock or mirror.
-  If it still fails, the emptiness comes from somewhere below that seam.
-- Verification: the test passes with the overview seam pinned, AND the full
-  `tests.test_archives` suite stays green.
-- **FALSIFICATION TEST RAN, hypothesis HELD:** pinning the overview seam makes
-  the assertions pass regardless of clock or mirror, so the emptiness did come
-  from that seam and not below it.
-- **REACHABILITY (off != on), run before trusting the pass:** flipping the
-  fixture's `active_today` to `False` fails the test with
-  `AssertionError: 'Live slate' not found`, exit 1. The pin is consulted and the
-  assertion still bites. Restored and verified against the pre-probe file.
-- Verified: target test exit 0; full `tests.test_archives` **383 OK (skipped=2)**.
-- Incidental finding recorded in `#487`: the template's `rail['items']` RAISES
-  rather than renders empty when a rail dict lacks an `items` key, because Jinja
-  falls back to the `dict.items` method.
-- Blocked by: none.
-
-### soccer-board-mlb-parity — OPEN — **BUILT AND COMMITTED (`7be68675`, branch `session/soccer-board-mlb-parity`). NOT PUSHED, NOT DEPLOYED, AND THE PRODUCTION READING IS OWED — every local tile reads "Model only" because the mirror has no picks/props CSV for these dates, so the market path is proven by CODE (run over the production payload) and NOT by the board.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
-- Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
-  carry the same information classes MLB's do. **Single testable outcome:** on a
-  fixed slate date, soccer's card renders (a) market tiles carrying selection +
-  price + model + edge rather than bare probabilities, (b) a box-score panel
-  built from real match state on a completed/live match instead of
-  "Box score unavailable", and (c) information density within 2x of MLB's
-  measured 544 leaf-text-items/Mpx — against soccer's measured 139 today.
+### wnba-live-odds-capture-gap — OPEN, VERIFICATION PENDING — **FIX SHIPPED AND DEPLOYED (commit `170505ec`, deploy `b5cf8ac2` live 13:15:46Z; flag flip `cb322dd1` live 13:31:11Z). Isolated WNBA-only live-phase autorun, own lane+cadence, mode=fast. No WNBA game has been live since the flag flipped, so real end-to-end behavior is UNOBSERVED — that is the one thing left.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
+  game goes live, instead of freezing at its last pregame quote.
+  **Testable outcome:** for a WNBA game currently in live state, re-pull
+  `wnba_source/tracking/book_quotes/<date>.jsonl` and confirm at least one
+  market's `captured_at` is newer than the game's own kickoff time.
 - Files:
-  - `syndicate/features/shared/game_board_contract.py` — the shared normalizer.
-    `_build_box_sections` clobbers a sport's own sections (:775, unconditional
-    assignment); `market_tiles` setdefault (:764) derives from `metrics[:4]`;
-    `_build_prop_status_rows` (:706) drops every synthesized row; the live
-    market-tile branch (:791) is unreachable when `metrics` is non-empty.
-  - `syndicate/features/soccer/cards.py` — **DECLARED OVERLAP, see Blocked by.**
-  - `syndicate/blueprints/soccer.py` — `/soccer` redirect (:87) and a new
-    date-scoped cross-league cards route.
-  - `syndicate/features/soccer/sources.py` — week->date resolution.
-  - `syndicate/templates/soccer/`, `syndicate/static/soccer/` (new files).
-  - `tests/test_soccer_*` (new), `.syndicate/*`.
-- The cross-session TODO list is deliberately NOT claimed here:
-  `mlb-overview-hydration-cost` already holds it and a second claim reads as
-  contested. I still reconcile my items into it at checkpoint, per CLAUDE.md.
-- **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, `adapters.py`,
-  ratings, `ingestion/*` — all held by `soccer-model-dispersion`. I do not
-  change what the model produces, only what the board does with it.
-- Hypothesis (diagnostic half, already tested): soccer's thin card is NOT a
-  missing-data problem — the data is in the payload and the shared normalizer
-  discards it. **CONFIRMED 2026-08-20 against production**, before any edit:
-  `/soccer/epl/api/cards` carries `betting.home_ml -590`, `away_ml +1400`,
-  `spread -1.5`, `total 2.5` and six per-market EV fields, while all four
-  rendered tiles read a bare probability with the matchup string repeated as
-  every sub-label. A completed MLS match (HOU 1-0 LA) carries `home.score`/
-  `away.score` in the same payload and renders "Box score unavailable".
-- Falsification test: if the same payloads had shown null prices / null EV /
-  no scores, the finding would be a data gap and this lane would be wrong to
-  open as UI work. They did not. Re-run `curl /soccer/<league>/api/cards` and
-  read `betting` + `home.score` before trusting any later claim here.
-- Verification: `scripts/ui_layout_probe.py` before/after on the soccer board
-  (the durable instrument named in `state.md [ui-board-cards]`), plus the
-  leaf-text-density measurement above re-taken against the SAME production
-  service, plus `python -m unittest tests.test_archives` green. A density
-  number taken against a dev box is not the reading.
-- **What shipped into the commit** (audit findings A-H, all measured on
-  production 2026-08-20 before any edit):
-  - **A. Landing.** `/soccer` -> `/soccer/cards?date=` across all ten
-    leagues. The old redirect landed on EPL matchweek 1 = ONE fixture,
-    kicking off the next day, out of 92 across the ten leagues. Soccer's
-    board was the only one keyed by (league, matchweek) rather than date and
-    each league runs its own calendar (MLS wk21 Aug 16-22 = 31 fixtures,
-    Bundesliga wk1 = Aug 28 = 1). The per-league board is untouched.
-  - **B. Market tiles.** Soccer now builds its own, mirroring
-    `mlb/cards.py::_market_tiles`. The generic `metrics[:4]` fallback showed
-    a bare probability with "COV @ ARS" as all four sub-labels while
-    `home_ml -590` / `away_ml +1400` / `total 2.5` / `spread -1.5` sat
-    unused on the same payload, and dropped BTTS + Over 2.5 to the cap.
-  - **C. Box score.** THREE instances of one clobber in `_normalize_game`
-    (`shared_box_sections`, `shared_prop_rows`, and the live tile branch)
-    each overwrote what the sport supplied. The July fix for
-    `shared_top_play_rows` had already named this shape and was never
-    applied to its neighbours. Also added a REAL score section: a completed
-    MLS match carried `home.score`/`away.score` and rendered "Box score
-    unavailable" because the builder read only the sim.
-  - **D. Props.** Joined to `build_soccer_picks`' captured price/edge via
-    props.py's OWN normaliser (not a second one). Rows are no longer
-    `is_synthesized`, so the status table stops rendering empty (0 -> 8).
-  - **E/F/G/H.** Top-play field mapping (value column held the MATCHUP
-    string); empty lens stat cells no longer rendered; the live tile branch
-    made reachable (it was guarded on a key the setdefault above it had
-    already filled — unreachable for any sport publishing `metrics`);
-    finished matches show a result instead of "not yet simulated".
-- **Edge is model-minus-market, deliberately NOT `betting.*_ev`.**
-  `build_soccer_picks.py:131` computes EV against ITS model prob, a
-  different vintage: `away_ml_ev 0.575` at +1400 implies ~10.5% where the
-  card renders 7.0%. Both fields stay on `betting` for other readers.
-- **Verification so far:** 19 new tests anchored to the production payloads
-  (4 assert reachability, off != on); 88 targeted soccer/board tests green;
-  `tests.test_archives` 31 failures before AND after, **the same 31 by
-  name** (diff clean) — all `data/`-dependent NFL/NBA/NCAAB tests that
-  cannot pass where `data/` is excluded by design. Rendered locally against
-  real artifacts: card height 1074 -> 829px, em-dash cells 6 -> 0, repeated
-  matchup sub-labels 4 -> 0, box sections 1 -> 2, prop status rows 0 -> 8.
-- **THE OPEN THREAD, and it is the one that matters:** the density number
-  that opened this lane (MLB 544 vs soccer 139 items/Mpx) has NOT been
-  re-taken against production. A local reading cannot take it — the mirror
-  has no picks/props for these dates, so the tiles that carry the new
-  content are empty locally. `_market_tiles` run over the real production
-  payload returns "COV ML +1400 | Model 7.0% | Market 6.3% | Edge +0.7 pts",
-  which proves the CODE and not the BOARD. Deploy web, then re-measure with
-  `scripts/ui_layout_probe.py` plus the leaf-density count, same service,
-  same instant. **A local reading must not be written up as the result.**
-- Blocked by: none, but **DECLARED OVERLAP**: `soccer-model-dispersion` (OPEN,
-  session `Soccer Session (fork)`, not running as of 2026-08-20 16:4xZ) claims
-  `syndicate/features/soccer/` with the parenthetical scope "(sim engine,
-  adapters, ratings, `ingestion/espn_match_stats.py`)". `cards.py` sits in that
-  directory and outside that parenthetical. I read it as not claimed, notified
-  that session with the exact file list before editing, and am proceeding on
-  that reading with the user's decision. **If that lane says otherwise, stop.**
-  Recording it here rather than omitting it, because a silent overlap is the
-  failure mode the lane protocol exists to prevent.
+  - `scripts/refresh_odds_sources.py` (`_build_wnba_steps`) — read-only
+    reference until the actual defect location is confirmed; do not edit
+    without re-claiming narrowly, same convention the soccer lane used for
+    this same file.
+  - Not claimed, read-only reference: `scripts/run_live_odds_refresh_worker.py`
+    — likely relevant (soccer's autorun equivalent lived here), not yet
+    confirmed WNBA has an analogous live-phase launcher at all.
+- Hypothesis: WNBA's live-phase odds fetch either (a) does not exist as a
+  distinct step from the soccer-style `phase=live` odds capture, or (b)
+  exists but is failing/never firing, structurally similar to `#343`
+  (soccer's bulk-endpoint 422) but a different mechanism, since WNBA's
+  fetch script and market list have never been touched by that fix.
+- **Already established, measured 2026-08-20 ~02:18Z (do not re-derive):**
+  Minnesota Lynx @ Golden State Valkyries (kickoff 2026-08-20T02:10:00Z):
+  every h2h/spreads/totals/prop market for this matchup shares ONE
+  `captured_at` (`2026-08-20T00:31:28Z`) — 99 minutes BEFORE kickoff, zero
+  refreshes since, 107+ min stale at check time. Distinct from the sim-side
+  gap already documented in `per_sport_ingest.wnba.enrichment.
+  live_projections` (`reason: "no live re-sim wired for wnba"`) — that is
+  about projections, this is about the underlying MARKET QUOTE, which a
+  pure book-price EV play does not need a sim for at all.
+- Falsification test: find a WNBA-specific `phase=live` odds-fetch step
+  that DID run recently for this game (any log evidence of an attempt,
+  success or failure) — if one exists and simply failed silently, the
+  hypothesis narrows to (b); if none exists at all in the step-builder,
+  hypothesis (a) is confirmed and this is a missing feature, not a bug.
+  **RESOLVED: hypothesis (b), but not `#343`-shaped — see below.**
+- **ROOT CAUSE CONFIRMED 2026-08-20 02:37Z, tested directly, not inferred.**
+  1. `_build_wnba_steps` (`scripts/refresh_odds_sources.py:828`) DOES fire
+     for `phases=("pregame","live")` — hypothesis (a) is dead.
+  2. Replicated the exact discovery + per-event `/odds` call this fetcher
+     makes (`fetch_basketball_oddsapi_props_local.py`, event_id
+     `09563bab4edf9cf2073ee946ad95d61b`, Lynx@Valkyries) directly against
+     production OddsAPI: **HTTP 200, 8 bookmakers, every market present.**
+     This is NOT `#343` — the market list is fine (this fetcher already
+     uses the safe discover-then-intersect pattern, unlike soccer's old
+     naive bulk request; its own code comment even cites `#343` by name as
+     the reason it was built this way).
+  3. Confirmed genuinely stale via the unambiguous `event_id` join (not a
+     team-name mismatch in the diagnostic): 6,981 rows for this event, all
+     frozen at `captured_at=2026-08-20T00:31:28Z`, 2+ hours stale.
+  4. **The autonomous sweep's own outcome log admits the failure directly:**
+     `[live_refresh_loop] ODDS_SWEEP_OUTCOME sport=wnba wrote=False
+     exists=True since_launch_s=193 sidecar_age_s=7449` (02:35:49Z) — no
+     inference needed, the sweep says it did not write.
+  5. **Fired a manually SCOPED trigger** (`POST /api/ops/odds-refresh/run`,
+     `phase=live, sports=wnba` ONLY — no mlb, no soccer) and it succeeded
+     immediately: `PUBLISH_OK path=wnba_source/tracking/book_quotes/
+     2026-08-19.jsonl bytes=6983198` at 02:37:07Z. Re-pulled the shard:
+     7,851 rows (up from 6,981), latest `captured_at` **1.7 minutes old**.
+     Verification step (below) is DONE for this specific game.
+  - **Mechanism:** `live_refresh_loop.py`'s sweep calls
+    `launch_refresh_run(sports=launch_sports, ...)` ONCE per tick with ALL
+    active sports combined (`sports=mlb,wnba,soccer`) — one subprocess, one
+    `refresh_odds_sources.py --sports mlb,wnba,soccer` invocation. Step
+    order follows `REGISTRY`'s insertion order: `mlb` (heaviest, most
+    complex live-phase work) runs BEFORE `wnba`. Under load, MLB's own
+    live-phase cost appears to consume the sweep's effective time/resource
+    budget before WNBA's step gets a turn — same general SHAPE as soccer's
+    pre-`#433` problem (a heavy sport starving a lighter one sharing one
+    combined run), but the mechanism is scheduling/ordering within ONE
+    process, not a market-list API error. NOT yet proven which specific
+    resource is exhausted (wall-clock step budget vs memory vs something
+    else) — that is the next open question, not this session's finding.
+- **FIX IMPLEMENTED 2026-08-20 ~03:0xZ, deployed and flag-flipped 13:07-13:31Z.**
+  `_launch_autorun_wnba_live_refresh()` (`scripts/run_live_odds_refresh_worker.py`) mirrors the
+  existing pregame autorun's shape: its own 240s cadence, its own EXPLICIT refresh lane
+  (`live-odds-worker-wnba-live`, so it can never contend with the combined sweep's lane), `mode=
+  "fast"` (skips the SmartSim prediction/edges/export pipeline that `test_wnba_pregame_autorun.py`'s
+  own comment warns would OOM this 2GB service if run every few minutes), gated on
+  `_wnba_has_live_game` specifically — not merely "WNBA active today". Default OFF, same
+  convention as every other autorun in this file. 22 new tests
+  (`tests/test_wnba_live_refresh_autorun.py`), 73/73 passing across every file touching the module.
+- **Deploy history, both scoped off the LIVE SHA (origin/main had drifted 47+ commits ahead by
+  deploy time — see `deploys.md` for the full "exactly one substantive change" reasoning):**
+  1. `170505ec` landed on `main`; `b5cf8ac2` (scoped, parent `d520d93d`) deployed 13:15:46Z, code
+     default-OFF, verified genuinely inert (zero `WNBA_LIVE_AUTORUN` log lines post-deploy).
+  2. `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1` set on the service; `cb322dd1` (comment-only,
+     produced specifically because `deploy_preflight.py` has no override for an intentional
+     same-commit redeploy — a real tooling gap worth fixing separately) deployed 13:31:11Z. Content
+     landed on `main` too (`2908373d`), not orphaned on the deploy branch.
+- **verify: PARTIAL.** Confirmed: env var reads `"1"` live, zero `WNBA_LIVE_AUTORUN_ERROR`, tick loop
+  healthy. NOT confirmed: no WNBA game was live at deploy time (all three of today's games still
+  pregame, kickoffs 00:00Z/02:00Z the next day) — `WNBA_LIVE_AUTORUN_LAUNCHED` has never fired for
+  real. **This is the one thing left, and it is the lane's actual falsification test.**
+- Next concrete step for whoever continues: once a WNBA game goes live, `render_logs.py --service
+  live-odds-worker --text WNBA_LIVE_AUTORUN_LAUNCHED` should show it firing within one 240s cycle of
+  kickoff; re-pull that game's `book_quotes` shard and confirm a `captured_at` newer than kickoff.
+  If it does NOT fire, re-check `_wnba_has_live_game`'s two sub-checkers
+  (`_wnba_has_live_game_via_artifact`, `_espn_has_live_game`) directly — not yet independently
+  verified against a real live game, only unit-tested with a monkeypatched return value.
+- Blocked by: none.
+
+### layer2-board-movement-display — CLOSED-VERIFIED 2026-08-20 17:28Z — **Both fixes live on web (`d77dfb9a`), verified against the board's own production payload: 169 of 169 tracked/flat rows now render real movement text. Steam badge logic fixed and confirmed correct by code; no live steam event to observe at deploy time (a real, expected quiet state, not a gap).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal (met): fix #5 (movement/steam not showing), root-caused as a
+  FRONTEND bug -- the Aug 16 backend fix (`#372`, commit `1d03855e`)
+  already worked, computing real movement data into top-level fields
+  nothing in the template read.
+- Files: `syndicate/templates/intelligence.html` only.
+- **Fix, as planned:** `renderMovement()` now checks `movement_state`
+  first (`tracked`/`flat`/`no_opening_for_row`/`no_openings`/`unkeyable`/
+  `no_comparable_price`/`not_tracked`) and renders real text from
+  `movement_price_delta`/`movement_line_delta`/`movement_direction`/
+  `movement_opened_at` when present, distinguishing "no opening recorded"
+  from "flat" from "not tracked" -- legacy shapes kept as a fallback.
+  `isSteamCandidate()` now also checks the real `item.steam` boolean
+  (previously checked only `candidate_type === "steam"`, a field from a
+  different pipeline that never reaches these rows).
+- **Verification: DONE, measured against live production.** Deployed to
+  `web` (scoped branch off web's own live SHA `0ddd8ede`, the earlier
+  #2/#3 fix), live `d77dfb9a` at 17:28:30Z. Re-pulled the board's own
+  production payload post-deploy (456 cards): **169 of 169 tracked/flat
+  rows (100%)** now render real movement text (e.g. "Odds +226 · 12h
+  ago", "Flat · 12h ago"). `steamRows: 0` at verification time -- no row
+  currently clears the `>=15 points within 3h` bar, a real and expected
+  state given how rare that event is, not a rendering gap; the badge
+  logic itself is confirmed correct by code review.
+- Full measurement chain in `.syndicate/deploys.md`'s 2026-08-20 17:28Z
+  entry.
+- Blocked by: none.
+
+
+### layer2-board-chip-race — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal: fix a confirmed render-order race on the Layer 2 board's compact
+  game-card strip -- a follow-on to `layer2-board-pick-clarity` /
+  `layer2-board-movement-display`, both CLOSED, same file.
+  **Testable outcome:** on a fresh page load, today's real games' mini
+  cards render directly in the chip-based (scores/live-status) style,
+  with no visible flash-then-relayout from the plain fallback style.
+- Files: `syndicate/templates/intelligence.html` (`loadGameChips()`,
+  the initial synchronous render call site at the bottom of the IIFE,
+  `renderGameCards`/`deriveGameCards` if the fix ends up needing to gate
+  the strip's own first paint rather than just reordering two calls).
+- Hypothesis: n/a (root-caused already, see below).
+- **Already established, measured 2026-08-20 (do not re-derive):**
+  - The board's mini game-card strip has two render styles: a chip-based
+    one (team abbrs, live score, status token) when `chipForGame(group)`
+    finds a match in `gameChipsById`/`gameChipsByMatchup`, and a plain
+    fallback (matchup text only) when it doesn't.
+  - **This is NOT a chip-matching bug.** Measured live against the
+    production board (`/api/board/game-chips`, `/api/intelligence/query`):
+    of 89 total game groups, 56 failed to match a chip -- but re-scoped to
+    ONLY today's (`game_date` 2026-08-20) real games, **15 of 15 (100%)
+    matched.** Every one of the 56 apparent mismatches was a future-dated
+    game (1-3 days out, `source_board_date` 2026-08-20 spanning a
+    multi-day `combined_board_window`), where a scoreboard chip correctly
+    does not exist yet. The simpler card for those is correct, expected
+    behaviour, not a defect.
+  - **The real, reproducible cause is a load-order race.** On page load,
+    if `initialIntelligenceResponse` is present (server-rendered, the
+    normal case), `renderIntelligence(merged)` runs SYNCHRONOUSLY
+    (`intelligence.html:2547-2552`) -- including the first paint of the
+    mini game-card strip -- while `gameChipsById`/`gameChipsByMatchup`
+    are still their initial empty `Map()`s, because `loadGameChips()`
+    is not called until the NEXT line, 2557. So the strip's first paint
+    is always the plain fallback style for every game, including today's
+    real ones, and then re-renders into the richer chip style a moment
+    later once `loadGameChips()`'s fetch resolves (it calls
+    `renderBoardBody()` itself, `intelligence.html:1322`). Confirmed by
+    code read (call-site line numbers), not yet reproduced with a timed
+    screenshot/network-waterfall capture -- that is the next concrete
+    step, not a re-derivation of the mechanism.
+- Falsification test: n/a, implementation lane, mechanism confirmed by
+  code read. If a timed capture shows the strip using the chip style on
+  its FIRST paint even before `loadGameChips()`'s network request
+  resolves, the mechanism above is wrong and needs re-diagnosis.
+- Verification: reload the live board with network throttling (or just a
+  slow enough connection to observe the transition) and confirm no
+  visible flash-then-relayout for today's games; re-run this session's
+  same "100% chip-match for today" measurement post-deploy as a
+  regression check that the reorder did not break matching itself.
+- Blocked by: none.
 
 ### mlb-pregame-ladder-schema — OPEN — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
 - **Goal (single testable outcome):** every pregame MLB starter with a sim
@@ -1343,7 +1042,6 @@ history directly:
 - **Blocked by:** none. Deploy target is refresh-worker (the writer) — claim
   required, and web is currently 502ing on `/api/ops/version`, which is
   somebody else's deploy and must be clear before I measure anything.
-
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
