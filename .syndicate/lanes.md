@@ -641,7 +641,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **ALL FOOTBALL LEVERS RESOLVED (model is STRICTLY DOMINATED; injuries PRICED on 17 seasons). Ledger trimmed. FIXED a digest defect that hid 35 of 44 standing rules from every session.** — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — OPEN — **ALL FOOTBALL LEVERS RESOLVED (dominated model; injuries PRICED on 17 seasons). Digest defect fixed (35 of 44 rules were invisible). Primary-tree lanes.md desync repaired.** — opened 2026-08-18 — session: football-model-owner
 - Status: **everything on `origin/main`, verified BY CONTENT.** web `ea6f431f`
   live; NCAAF picks suppressed; board serves SP+ week 1 (51 games, max 50.60).
 - **THE ONE MODEL FACT:** dominated, not broken — real signal (R² 17.8%) but its
@@ -668,9 +668,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   that is NOT performance-derived and NOT already priced — and regress the market
   residual on it FIRST, stating the detectable-effect floor before calling any
   result null.
-- **TREE HAZARD:** the primary tree's `lanes.md` is STALE (127,558 B vs origin's
-  ~98,000). Today's trim was pushed from a worktree. Editing it there and pushing
-  REVERTS the trim. Pull first or use a worktree.
+- **TREE HAZARD — REPAIRED 2026-08-20.** The primary tree's `lanes.md` was 21 KB
+  stale (127,558 B vs origin 106,084) because the trims were committed from
+  WORKTREES. Synced and verified byte-identical. **After any worktree commit,
+  sync the shared tree back and verify by HASH.** `reset --keep` aborts while
+  another session holds a dirty file, so use a single-file checkout + commit.
 
 ### nfl-autorun-production-arm — OPEN, env vars SET (via dashboard, my PUT attempts classifier-blocked) — deploy BLOCKED on contended refresh-worker claim (3 legitimate holders in under an hour tonight; not misattribution) — opened 2026-08-19 — session: nfl-autorun-production-arm
 - Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
