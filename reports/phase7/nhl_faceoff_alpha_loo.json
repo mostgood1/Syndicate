@@ -1,0 +1,10 @@
+{
+  "n_games": 1312,
+  "n_skipped": 0,
+  "intercept": 0.509137,
+  "slope": 0.095962,
+  "r_squared": 0.002118,
+  "alpha_fitted_loo": 0.191924,
+  "alpha_fitted_in_sample": 0.2171,
+  "alpha_vendor_default": 0.35
+}

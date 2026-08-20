@@ -97,16 +97,42 @@ starts flattening a real effect mid-segment.
 **This closes the mult_clip item — not with a measurement that happened to find no evidence of a
 problem, but with a proof that the current configuration cannot have one.**
 
+## Second addendum, same day: the leave-one-out refit — run, not just reasoned about
+
+The remaining disclosed gap (below) said the in-sample leakage was "judged small enough not to
+change the conclusion" but never actually re-ran the fit to confirm that judgment.
+`scripts/calibrate_nhl_faceoff_alpha_loo.py` does: for EVERY one of the same 1,312 real games, it
+excludes that specific game's own faceoff win/loss counts from every dressed player's rate before
+computing that game's lineup percentage — a true held-out fit, not an approximation. Efficient by
+construction (not `O(games^2)`): the full-season win/total counts are accumulated once, then each
+game's own contribution is subtracted per player for that game's prediction only.
+
+**Result, all 1,312 games usable, 0 skipped:**
+
+```
+LOO:        shot_share = 0.5091 + 0.0960 * lineup_pct_diff   R^2=0.0021   slope se=0.0575
+            t=1.668   p≈0.095   implied alpha=0.1919   95% CI for alpha: [-0.034, 0.418]
+
+in-sample:  slope=0.1086   R^2=0.0028   t=1.917   p≈0.055   implied alpha=0.2171
+```
+
+**Confirms the original judgment was correct, not just plausible.** The leave-one-out slope is
+modestly weaker (0.096 vs 0.109, ~12% lower) and the significance drops slightly further from the
+conventional threshold (p≈0.095 vs p≈0.055) — exactly the direction removing in-sample leakage
+should push it, and exactly the small magnitude the original report predicted. **The decision does
+not change**: the vendor's `alpha=0.35` still sits comfortably inside the leave-one-out 95%
+confidence interval `[-0.034, 0.418]`, same as the in-sample interval. This closes the disclosed
+gap with a real re-run, not by leaving the earlier reasoning unverified.
+
 ## What this does NOT do
 
-- A mild in-sample note, disclosed rather than hidden: each player's `faceoff_weight` is a
-  SEASON-long average that includes the very game being predicted (not a leave-one-out fit).
-  Given a single game is a small fraction of a player's 20-80+ game season sample, this dilutes
-  rather than dominates the fit — a real, small limitation, not a confound large enough to explain
-  away the already-weak result.
-- Does not attempt a leave-one-out or held-out-season refit -- the result is weak enough that this
-  additional rigor would not change the "leave as-is" conclusion, and the added complexity was not
-  judged worth it for a decision that already has a clear answer.
+- `faceoff_mult_clip_low`/`faceoff_mult_clip_high` — closed above, in this same document.
+- The leave-one-out refit above closes the in-sample-leakage gap. What remains genuinely open, not
+  attempted by this document at any point: the discrete-event engine's own "one faceoff assumed
+  per real segment" approximation (first stated when the discrete-event redesign shipped) — a
+  structural simplification underlying every discrete-event curve built since, never revisited by
+  anything downstream. Out of scope for a calibration report; a distinct, larger engine-design
+  question.
 
 ## Verified
 
@@ -121,3 +147,7 @@ problem, but with a proof that the current configuration cannot have one.**
   combinations) confirms zero deviation between the clipped engine output and the un-clipped
   formula — the bounds mathematically cannot bind at the current constants. Locked in a
   regression test against the live calibration profile's own values.
+- Leave-one-out refit: all 1,312 real games usable (0 skipped), a genuinely held-out per-game
+  rate for every dressed player, matched to real boxscore SOG outcomes by real game id (confirmed
+  boxscore/playbyplay `id` fields agree on a direct spot-check before trusting the join). Result
+  confirms, does not merely restate, the in-sample report's own prediction.

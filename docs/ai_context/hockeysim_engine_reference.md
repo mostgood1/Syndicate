@@ -1240,12 +1240,25 @@ values, well inside the clip's own `0.10` headroom on each side. Confirmed for L
 input (an exhaustive `[0,1]×[0,1]` sweep, not just the observed range) and locked in
 `test_faceoff_mult_clip_has_headroom_over_alpha_times_diff_clip` so a future change to `alpha`/
 `diff_clip` gets caught before the clip could silently start flattening a real effect. Two smaller
-items remain genuinely open, disclosed rather than swept in: the alpha fit's `faceoff_weight`
-input is a season-long average that includes the very game being predicted (not leave-one-out —
-judged small enough not to change the "leave unchanged" conclusion, but never re-run holding it
-out); and the discrete-event engine's "one faceoff assumed per real segment" approximation (§2r)
-has never been revisited by any of the ~10 addenda built on top of it since. Neither blocks
-anything currently shipped; both are honestly still open, not silently closed by omission.
+items were flagged, disclosed rather than swept in: the alpha fit's `faceoff_weight` input is a
+season-long average that includes the very game being predicted (not leave-one-out — judged small
+enough not to change the "leave unchanged" conclusion, but never re-run holding it out); and the
+discrete-event engine's "one faceoff assumed per real segment" approximation (§2r) has never been
+revisited by any of the ~10 addenda built on top of it since.
+
+**The leave-one-out refit — run, not just reasoned about, same day.**
+`scripts/calibrate_nhl_faceoff_alpha_loo.py` excludes each of the 1,312 real games' own faceoff
+win/loss counts from every dressed player's rate before predicting that specific game — a true
+held-out fit, `O(games)` by construction (full-season counts accumulated once, each game's own
+contribution subtracted per player for that game's prediction only, not re-aggregated from
+scratch). Result, all 1,312 games usable, 0 skipped: `slope=0.0960` (vs in-sample `0.1086`),
+`R²=0.0021`, `t=1.668`, `p≈0.095`, implied `alpha=0.1919`, 95% CI `[-0.034, 0.418]`. **Confirms the
+original judgment, doesn't just restate it**: modestly weaker and less significant than the
+in-sample fit — exactly the direction removing leakage should push it, exactly the small magnitude
+the original report predicted — and the decision is unchanged: the vendor's `0.35` still sits
+comfortably inside the leave-one-out confidence interval. The discrete-event "one faceoff per
+segment" approximation remains the one genuinely open item — a structural engine-design question,
+out of scope for a calibration report, never blocking what's currently shipped.
 
 ---
 
