@@ -1900,3 +1900,42 @@ missing, stale, or expired, convert: `slate_date = (utc - 5h).date()`. A watcher
 keyed on the wrong date does not return "nothing happened", it returns a
 CONFIDENT WRONG ANSWER, because the document it is polling really does exist and
 really is old.
+
+---
+
+## 2026-08-19 — a single read of a MULTI-WORKER service is not a measurement
+
+Distinct from the "read it 60 seconds after deploy" entry above, and it bit in
+the same hour. That one was about TIMING — an async sync had not landed yet.
+This one is about SAMPLING: the service genuinely returns different answers to
+identical requests, and one read gives you whichever worker answered.
+
+**Measured.** After deploying the NCAAF SP+ artifact I probed
+`/ncaaf/api/cards?week=1` once, saw the SP+ signature, and reported PASS. Probing
+**12 times** returned **9 PPA / 3 SP+** — the board was serving two different
+models depending on which gunicorn worker handled the request. Cause:
+`WEB_CONCURRENCY > 1` means several worker PROCESSES each build the app
+independently and each holds its own `lru_cache` of the projection index. Workers
+that read the mounted disk before `bootstrap_data_root` synced cached the OLD
+artifact; workers that read after cached the new one. Both answers persist until
+the workers restart.
+
+**Why one sample is worse than useless here:** it is not noisy-but-centred, it is
+BIMODAL. A single read does not give you an estimate with error bars, it gives
+you one of two categorical answers, and which one is pure luck. I got the
+flattering one and banked it.
+
+**The rule going forward.** Verifying anything on a multi-worker service —
+post-deploy or not — means PROBING REPEATEDLY and reporting the distribution,
+not a value. If the probes disagree, that disagreement IS the finding: it means
+the workers hold different state, and a deploy (which restarts them) is what
+resolves it. Report "10/10" or "9 of 12", never a bare reading.
+
+**Corollary that generalises past web:** any cache keyed per-process, per-worker
+or per-container makes "what does the service return" a distribution question.
+The same applies to the refresh-worker's own caches and to anything read through
+a load balancer.
+
+**Cost:** one wrong PASS reported to the user, inside the same hour as a wrong
+FAIL from the timing version. Two opposite errors, one root habit — reading once
+and treating the answer as the truth.

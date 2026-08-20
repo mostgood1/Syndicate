@@ -674,7 +674,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **NCAAF PICKS SUPPRESSED LIVE (web `8833cfd6`). Model loses to the CLOSE (+3.419, t=16.3) AND the OPEN (+3.358) — no softer target. Stage 0 ledger built and backfilled.** — opened 2026-08-18 — session: football-model-owner
+### football-model-owner — OPEN — **SP+ IS LIVE ON THE BOARD (web `6b23d6fa`, verified 10/10 probes/week); picks still SUPPRESSED (+3.563 vs close, clean out-of-sample). Returning production measured t=-1.58, NOT shipped. 2nd-season backtest IN FLIGHT.** — opened 2026-08-18 — session: football-model-owner
 - Goal: NFL + NCAAF get the input-inventory, pipeline-trace and advanced-analytics
   treatment MLB and soccer have. **Testable:** gating checklist runs; inputs
   leak-free and reachable; defects measured on the SERVED payload.
@@ -686,24 +686,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_{ncaaf_board_slate_coverage,published_projection_means,asof_team_form,football_pick_gate}.py`
 - **NOT claimed:** `shared/artifact_publisher.py` (basketball-model-owner),
   `scripts/deploy_preflight.py` (repo-coordination). Both handed over.
-- Status: **2 deploys live+VERIFIED; 9 commits all on `origin/main`; nothing of
-  mine uncommitted.** web `8833cfd6` 19:18:07Z — picks 0 cards (was 12) +
-  suppression empty_state; projections still 51, NFL still 12. refresh-worker
-  `f2eb719d` 18:51:08Z — SP+ ratings + as-of PPA leak fix.
-- **OWED:** `f2eb719d` STAGE 2 — ~51/51 non-null `predictions.home_mean` on
-  `/ncaaf/api/cards?week=1`, 86400s autorun, <=24h. **Shipped, not proven.**
-- **IN FLIGHT:** clean 2024 backtest (2023 SP+ on 2024 games, leak-free,
-  `--ratings-season`). Generation `binv22kma` wk7/15 at 21:07Z; grading chained
-  `bb7bmickj`. **NO RESULT YET — do not quote one.** First grade of the
-  production code path on out-of-sample data.
-- Next: the gate is a PAUSE, not a fix. Plan + per-market exit criterion in
-  `docs/ai_context/ncaaf_beat_the_close_strategy.md`.
-- **Do not** retune `SP_RATING_SCALE` (all scales 6..24 lose; 10 vs 13 = 0.7σ),
-  retry the three dead scalar fixes, or reopen "beat the OPEN first" — measured
-  dead, the open is 0.06 MAE softer than the close.
-- **Handed off:** `*_source/data/pick_ledger/pick_ledger_*.csv` allowlist ->
-  `basketball-model-owner` (their `artifact_publisher.py`). Until then the
-  evidence that would lift the gate is not readable from web.
+- Status: **4 deploys live+VERIFIED; everything on `origin/main` (ahead 0).**
+  web `6b23d6fa` — SP+ board, pregame window, wk2-15 deleted, 10/10 probes/week.
+  web `8833cfd6` — picks suppressed. refresh-worker `f2eb719d` — SP+ ratings.
+- **IN FLIGHT:** 2025 arms for the returning-production verdict (`bufuamhht`,
+  ~3 of 15 week-pairs; pooled comparison chained `bt1ww1ijh`). **NO POOLED
+  RESULT — do not quote one.** Ship only on pooled |t| >= 2.
+- **UNCOMMITTED, deliberately:** 15 untracked `smartsim2_projections_2024_wk*.csv`
+  in `data/ncaaf_source/data/` are BACKTEST artifacts (the RP ON arm), read by
+  the pooled job. **Do not `git add` them.**
+- **DEAD, do not retry:** `f2eb719d`'s stage-2 criterion (`predictions.home_mean`
+  is null on this path STRUCTURALLY — unfalsifiable, use margin dispersion from
+  `metrics`); triggering the season-projection autorun (no worker run reaches
+  the board); `SP_RATING_SCALE` retuning; the three scalar totals fixes; "beat
+  the OPEN first" (0.06 MAE softer, measured).
+- **Handed off:** `pick_ledger_*.csv` allowlist -> `basketball-model-owner`;
+  `smartsim2_projections_*.csv` allowlist -> `soccer-odds-capture-cadence-gap`.
+  Both hold `artifact_publisher.py`. The publish wiring is INERT until the
+  second lands.
 - **BLOCKED ON NOTHING.** Two handoffs outstanding with other lanes (above).
 - **Phase 3 DONE, n=269: NULL** (`dCRPS +0.0226`, 0.97 SE). Payload does not
   ship; Phase 4 moot. The ratings path carries 4.2x the leverage and production
