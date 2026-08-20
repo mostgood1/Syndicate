@@ -17840,6 +17840,26 @@ refuted. Only a snapshot WITH that key and a ladder WITHOUT lines is a failure.
 
 **measurement:** <pending>
 
+**PREFLIGHT VERDICT 2026-08-20T03:0xZ: FAIL as a STANDALONE deploy. Ride along
+instead.** Not a safety objection -- scope is one file, rollback is a redeploy
+of `041188cb`, no lane collision, no learnings rule. It fails question 2: the
+expected effect cannot be stated as a number that will be observed. Checked
+`oddsapi_hitter_props_*` for 08-16..08-19 and `batter_strikeouts` is present for
+**0 players on every date**, so the likely observation is 0 -> 0, which neither
+confirms nor refutes the wiring. Against that, a deploy costs a worker restart
+that KILLS AN IN-FLIGHT SIM.
+
+CAVEAT ON THAT EVIDENCE, stated because it limits the conclusion: those are
+WEB's copies, and they are partial mirrors -- the same 08-19 file read 47
+players earlier in the session and 14 players an hour later. Absence here is NOT
+proof the worker never captured the market. It is only enough to say the effect
+is not reliably measurable tonight.
+
+Path to PASS: (a) land it on the next refresh-worker deploy that carries its own
+justification -- cost drops to zero and it is live whenever books post the
+market; or (b) confirm the WORKER's snapshot carries `batter_strikeouts`, which
+turns question 2 into a real number.
+
 **DECISION LOGGED `[2026-08-20, user]`: do NOT fetch batter_doubles /
 batter_triples / batter_stolen_bases.** Measured cost ~+7,700 credits/day
 (~+9% of burn), cutting runway ~39 -> ~36 days against the 5M cap, with ~39
