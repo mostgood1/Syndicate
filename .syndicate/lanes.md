@@ -1063,6 +1063,42 @@ history directly:
   log lines (or a named skip reason) in production logs -- not the env
   var alone.
 
+### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be
+- Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
+- Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
+- Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
+- Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
+- Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
+- Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
+
+### ci-utc-midnight-window — OPEN — opened 2026-08-20 — session 13ad06bb-42fc-444c-ae01-c7f67f6acad1
+- Successor to `ci-green` (CLOSED, body in `lanes_history.md`) for a THIRD and
+  independent cause. `#480` and `#481` are done and are not reopened by this.
+- Goal: `CI` is green INSIDE 00:00-05:00Z, not just outside it. Testable: a run
+  whose archive suite executes within that UTC window passes.
+- Files: `tests/test_archives.py`
+- **The defect (`#482`), measured:** 7 tests computed "today" with
+  `date.today()` — the runner's date, UTC on GHA — while every route under test
+  uses `central_today_iso()`. CDT is UTC-5, so 00:00-05:00Z the two disagree and
+  CI is **structurally red ~5 hours a day regardless of what anyone pushes**.
+  Evidence is a clock, not a diff: 16 consecutive greens 2026-08-19
+  23:25-23:53Z, then 29 consecutive reds from 23:57Z (that run asserts just past
+  midnight). Over 45 completed runs: 28 failures inside the window, 11 successes
+  outside, 1 failure outside (pre-`#480`).
+- Fix applied: assert against `central_today_iso()`, the same source the app
+  uses. Precedent already existed in this very file —
+  `test_wnba_cards_api_without_date_uses_today` was fixed this way and its
+  comment names the cause exactly; the other 7 were left. Swept the 13 other
+  `unittest`-run modules: none share it.
+- Falsification test: if the window is NOT the cause, a run inside 00:00-05:00Z
+  still fails after the fix, or a run outside it fails before.
+- **Verification, and why the local pass does not count:** this dev box is
+  Central, so `date.today() == central_today_iso()` on it and the 7 tests pass
+  with or without the fix. Window confirmed live at fix time (UTC 2026-08-20 vs
+  Central 2026-08-19). **Only a CI run inside 00:00-05:00Z proves it**, and one
+  is available immediately — quote the run id, do not predict it.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
