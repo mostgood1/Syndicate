@@ -647,38 +647,26 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **ALL FOOTBALL LEVERS RESOLVED (dominated model; injuries PRICED on 17 seasons). Digest defect fixed (35 of 44 rules were invisible). Primary-tree lanes.md desync repaired.** — opened 2026-08-18 — session: football-model-owner
-- Status: **everything on `origin/main`, verified BY CONTENT.** web `ea6f431f`
-  live; NCAAF picks suppressed; board serves SP+ week 1 (51 games, max 50.60).
-- **THE ONE MODEL FACT:** dominated, not broken — real signal (R² 17.8%) but its
-  deviation from the market carries none (w=−0.028). No threshold, weight or
-  subset helps. STOP re-testing them.
-- **DO NOT RETRY — measured dead:** injuries (PRICED, 17 seasons / 4,431 games;
-  a 4-season run said otherwise and was a false positive); situational (8 factors
-  priced); returning production (t=−0.89, removed); `SP_RATING_SCALE` (6..24 all
-  lose); blending (w≈0); the three scalar totals fixes; "beat the OPEN first".
-- **DO NOT BUY NFL ODDS.** nflverse `schedules/games.csv` carries `spread_line`
-  back to 1999, free. It IS the home-margin prediction (MAE 10.264 as-is vs
-  14.645 negated). OddsAPI historical NFL starts 2020.
-- **DO NOT TRIM state.md/learnings.md EXPECTING THE DIGEST TO CHANGE.** It never
-  reads state.md and reads only headings from learnings.md; OPEN LANES truncates
-  on lane COUNT, not bytes.
-- **CROSS-LANE EDIT, disclosed:** `.claude/hooks/session-start.sh` (claimed by
-  `repo-coordination`, OPEN) taken under explicit user instruction, logged in
-  `362c505d`, messaged to them with an invitation to revert. **Unacknowledged.**
-- **Harnesses — run BEFORE building anything:**
-  `grade_football_model_weight.py`, `grade_football_playability.py`,
-  `test_ncaaf_situational_edge.py`, `test_nfl_injury_market_edge.py`,
-  `probe_ncaaf_injury_feed.py`.
-- **NEXT ACTION:** no measured lever remains. Either redirect, or find an input
-  that is NOT performance-derived and NOT already priced — and regress the market
-  residual on it FIRST, stating the detectable-effect floor before calling any
-  result null.
-- **TREE HAZARD — REPAIRED 2026-08-20.** The primary tree's `lanes.md` was 21 KB
-  stale (127,558 B vs origin 106,084) because the trims were committed from
-  WORKTREES. Synced and verified byte-identical. **After any worktree commit,
-  sync the shared tree back and verify by HASH.** `reset --keep` aborts while
-  another session holds a dirty file, so use a single-file checkout + commit.
+### football-model-owner — OPEN — **CONSOLIDATION SHIPPED: 114 files / 5+ lanes / 3 deploys, all content-verified. Found the test suite's collection hang and RETRACTED my own false failure report.** — opened 2026-08-18 — session: football-model-owner
+- Status: **everything on `origin/main`, ahead 0.** Consolidated deploys live:
+  refresh-worker `db469003`, live-odds-worker `a381d652`, web `454f3caa`.
+- **USE EXPLICIT TEST FILE LISTS, NOT `-k`.** `-k` over `tests/` costs ~14 min in
+  COLLECTION regardless of selection (8,135 deselected but still imported). Five
+  `-k` runs tonight never reached execution. Explicit files: 81 passed in 5.12s.
+- **I RETRACTED my own "~12 failures" report** — it was progress dots from a
+  run killed mid-collection. Run to completion: 765 passed, 0 failed. **A partial
+  pytest run is NO result, not a partial one.**
+- **MEASURED GREEN:** soccer only (765). nhl/mlb/ncaaf/board/ladder are
+  UNMEASURED, not passing.
+- **Consolidation tool:** `scripts/build_consolidated_graft.py` — reads the parent
+  LIVE, refuses during an in-flight deploy, asserts every blob, refuses extra
+  paths, drops no-ops. It prevented two reverts today.
+- **Football model conclusions unchanged:** dominated (R² 17.8% vs market 41.6%,
+  w=−0.028); injuries PRICED on 17 seasons; situational all priced; picks
+  suppressed live. No measured lever remains.
+- **NEXT ACTION:** bisect the collection hang — it makes the full suite unusable
+  for every lane, and tonight it produced a false failure report that nearly
+  triggered a 3-service rollback.
 
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.

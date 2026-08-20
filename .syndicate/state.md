@@ -2136,6 +2136,31 @@ move is a single-file `git checkout origin/main -- <path>` followed by a commit 
 `checkout <rev> -- <path>` writes the index EVERY session shares, and a stray
 staged file is what gets swept into someone else's commit.
 
+**THE TEST SUITE'S COST IS COLLECTION, NOT EXECUTION — and it invalidated a
+finding of mine** `[measured 2026-08-20]`. Two explicit test FILES: **81 passed
+in 5.12s**. The same tests via `-k soccer` over `tests/`: **822s (13m42s)** for
+`765 passed, 8135 DESELECTED` — pytest imports all ~8,900 tests before filtering,
+so a `-k` run spends ~14 minutes on collection whatever it selects.
+**USE EXPLICIT FILE LISTS, NOT `-k`.** Five `-k` attempts tonight never reached
+execution at all; one produced a 606KB output file that was a worker's memory
+telemetry, not test results.
+**AND A RUN KILLED MID-COLLECTION LOOKS LIKE FAILING TESTS.** I read progress
+dots from a truncated run as "~12 failures in the deployed areas", reported it
+twice, and proposed rolling back three verified deploys on it. Run to
+completion: **765 passed, 0 failed.** A partial pytest run is not a partial
+result — it is NO result.
+
+**CONSOLIDATED DEPLOYS ARE THE WORKING PATTERN FOR A BUSY DAY** `[2026-08-20]`.
+114 files / 5+ lanes / **3 deploys**: refresh-worker `db469003` (9 files,
+19:09:55Z), live-odds-worker `a381d652` (38, 20:04:14Z), web `454f3caa` (67,
+20:20:34Z). Each verified BY CONTENT per file; web also on the served payload.
+Tool: `scripts/build_consolidated_graft.py`. **It prevented two reverts,
+measured**: web's parent moved TWICE mid-build so the file list was RECOMPUTED
+(67→68→67, dropping `soccer/cards.py` once another deploy carried it), and the
+builder REFUSED a graft when web read `d9a23a38` as live while `00541a8d` was
+`update_in_progress`. **Reading the parent live is NOT enough — an in-flight
+deploy leaves the OLD sha reading live.**
+
 **THE SESSION DIGEST DOES NOT READ state.md, AND READS ONLY HEADINGS FROM
 learnings.md** `[measured 2026-08-20 from .claude/hooks/session-start.sh]`.
 state.md's own size costs nothing at session start — the hook's header records
