@@ -2840,3 +2840,27 @@ times (`41f79353`->`85296826`, `39570b24`->`a54dffa3`, plus web). Re-reading
 the live SHA immediately before cutting a branch is not caution on this repo,
 it is the only thing that works — and `render_deploy`'s rollback refusal
 caught two of those, which is a guard earning its keep rather than a nuisance.
+
+## 2026-08-20 — AN EDIT THAT REPORTS SUCCESS IS NOT EVIDENCE THE EDIT LANDED
+
+Two instances an hour apart, same shape, both nearly banked as results.
+
+**One.** To prove new tests were load-bearing I mutated the source and ran them.
+16 passed. The honest reading is "these tests are worthless". The true reading
+was that `str.replace(..., 1)` had hit the FIRST occurrence — inside the comment
+I had just written documenting the bug — so the code was never touched. A green
+mutation run is evidence about the MUTATION as much as the test, and the two
+readings demand opposite responses.
+
+**Two.** A one-line repair to a broken `print(` failed six times while each
+attempt reported success and the file md5 changed. The heredoc was collapsing a
+literal backslash-n into a REAL newline, so every "fix" rewrote the identical
+broken line. Building the backslash with `chr(92)` fixed it immediately.
+
+**How to apply.** After any programmatic edit, assert the POST-STATE, not the
+operation: re-read the file and check the property you intended, re-import the
+symbol and print it, or run the parser. "md5 changed" and "no exception" both
+hold when you have written the wrong thing successfully. And when documenting a
+bug in a comment beside the code, the comment and the code become textually
+identical — which is exactly what defeats a naive anchored replace, so anchor on
+something unique to the code (leading indentation, trailing comma).

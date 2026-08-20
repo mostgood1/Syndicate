@@ -3405,7 +3405,9 @@ SEPARATE milestones: the pull runs at sim start, that run REUSED rosters built
 ~07:37Z, and the appliers only write during a BUILD. Predicted before the reading.
 
 **verify 2026-08-21:** first `sim_input_report_2026-08-21.json` — expect `nfail`
-**15 -> 6**, with the five `vs_pitcher_*` entries STILL present (BVP path,
+**10 -> 0** `[revised 18:5xZ; was 15 -> 6]` -- `7dc4893d` moved the five `vs_pitcher_*` fields OUT of the failure count into a `disabled` category, because they are unfed by DELIBERATE CONFIG (`FORWARD_BVP_MATCHUP_MODE = "off"`, re-entry condition stated in its own comment), not by defect. Any residual failure tomorrow is unambiguously real.
+
+Superseded detail:**, with the five `vs_pitcher_*` entries STILL present (BVP path,
 untouched). Still 15 on a fresh `generated_at` = a SIXTH cause, reopen.
 
 **This is why `85296826`'s conditional-mix wiring looked inert** — the wiring is
