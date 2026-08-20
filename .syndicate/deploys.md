@@ -17891,7 +17891,7 @@ few rows. The ladders wiring is in place, so enabling later is one line in
 - **Measurement:** PENDING -- fill in after deploy + log verification.
 - Reminder timestamp: 2026-08-20T04:15Z (approx, session-relative).
 
-## PENDING 2026-08-20 13:07Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
+## SHIPPED-VERIFIED 2026-08-20 13:17Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
 - Preflight PASS (full checklist run via `/preflight` skill). Claim + mechanical preflight CLEAR at
   13:06:29Z.
 - Scope note: `origin/main`'s tip (`170505ec` at landing time) had drifted 47 commits/39 files past the
@@ -17901,9 +17901,14 @@ few rows. The ladders wiring is in place, so enabling later is one line in
   (`SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN` unset). The deploy alone must not change anything visible.
 - Rollback target: the previous live commit (the one this superseded, prefix `d520`) — redeploy it,
   acknowledging the guard's rollback flag since it is deliberately going backward.
-- `dep-da3fo30ae00c73ap29e0`, status=build_in_progress at fire time.
-- Measurement: [PENDING — confirm the live SHA matches the deployed commit above, and a log search for
-  the new autorun's own marker shows zero hits in the post-deploy window, proving inertness]
+- `dep-da3fo30ae00c73ap29e0`, live at 13:15:46Z, commit content-verified == `b5cf8ac2`.
+- **verify: MEASURED, matches expectation.** `render_logs.py --service live-odds-worker --text
+  WNBA_LIVE_AUTORUN --start 2026-08-20T13:15:46Z` — zero hits, proving the new autorun is genuinely
+  inert while its env var is unset (it would have printed `WNBA_LIVE_AUTORUN_LAUNCHED` or `_FAILED` on
+  any invocation). Service otherwise healthy: `LIVE ODDS REFRESH TICK` still firing normally post-deploy.
+  **Next step, separate action, its own preflight when taken:** flip
+  `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN=1` on live-odds-worker + deploy, then verify a live WNBA
+  game's `book_quotes` shard shows a `captured_at` newer than kickoff within one 240s cycle.
 
 ### #481 — WNBA live win/cover scale refit — web — 2026-08-20 13:13:26Z — lane `basketball-model-owner`
 
