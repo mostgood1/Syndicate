@@ -635,24 +635,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — OPEN — **ALL WORK CLOSED AND PUSHED. Consolidation live (114 files / 3 deploys, content-verified). Bisect closed: ONE slow test file, and four of my own diagnoses were measurement bugs.** — opened 2026-08-18 — session: football-model-owner
-- Status: **`ahead 0`, nothing uncommitted.** Consolidation live: refresh-worker
-  `db469003`, live-odds-worker `a381d652`, web `454f3caa` (114 files, content-verified).
-- **SOCCER: `--deselect tests/test_soccer_market_anchoring.py`** → 633 passed in
-  **149.6s** vs **875.8s** with it (83% of runtime; 8 Monte Carlo solver tests).
-  **Do NOT lower its `simulations=` counts to speed it up** — precision needed is
-  unanalysed, author's call. **Only soccer was bisected**; other sports UNTIMED.
-- **Football model CLOSED:** dominated (R² 17.8% vs 41.6%, w=−0.028); injuries
-  PRICED (17 seasons); situational all priced; returning production removed;
-  picks SUPPRESSED live. **No measured lever remains.**
-- **DO NOT RETRY:** injuries, situational, returning production, `SP_RATING_SCALE`,
-  blending, the 3 scalar totals fixes, "beat the OPEN first".
-- **Tools on origin:** `build_consolidated_graft.py`, `grade_football_playability.py`,
-  `grade_football_model_weight.py`, `test_ncaaf_situational_edge.py`,
-  `test_nfl_injury_market_edge.py`, `probe_ncaaf_injury_feed.py`.
-- **NEXT:** nothing owed. For football: regress the market residual on any
-  candidate input FIRST, and state the detectable-effect floor before calling a
-  null. Detail in `.syndicate/log/2026-08-20.md`.
+### football-model-owner — CLOSED-VERIFIED 2026-08-20 — **NCAAF+NFL model track closed on measurement (dominated; every lever priced or null; picks SUPPRESSED live and verified). Consolidation shipped: 114 files / 3 deploys, content-verified.** — opened 2026-08-18 — session: football-model-owner
+- **Nothing held:** no deploy claim, no file claims (this block never had a
+  `Files:` section), no grants. `ahead 0` — all work on `origin/main`.
+- **Live and verified:** picks SUPPRESSED (`/ncaaf/api/picks` 0 cards + reason);
+  board serves SP+ wk1; consolidation grafts `db469003` / `a381d652` / `454f3caa`.
+- **CLOSED ON MEASUREMENT — do not reopen without new data:** model is dominated
+  (R² 17.8% vs market 41.6%, w=−0.028); injuries PRICED (17 seasons, 4,431
+  games); situational all 8 priced (1,746 games); returning production null
+  (pooled t=−0.89, code removed); every `SP_RATING_SCALE` 6..24 loses; blending
+  w≈0. ATS: the model trails always-bet-the-underdog by ~4.3 pts in BOTH sports.
+- **OWED BY OTHERS, not this lane:** `smartsim2_projections_*.csv` allowlist —
+  orphaned after THREE failed handoffs; both football generators' publish calls
+  stay INERT until someone adds the line. `tests/test_football_projection_publish.py`
+  flips from xfail to unexpected-success when it lands.
+- **Soccer suite:** `--deselect tests/test_soccer_market_anchoring.py` → 633 pass
+  in 149.6s vs 875.8s. Do NOT lower its `simulations=` counts to speed it up.
+- Full narrative: `.syndicate/log/2026-08-{19,20}.md`. Exit criterion and the
+  dead levers: `docs/ai_context/ncaaf_beat_the_close_strategy.md`.
 
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
