@@ -191,6 +191,21 @@ body.syndicate-body .cards-shell {
   opacity: 1;
 }
 
+/* `layer2-board-chip-race`. Shown for the strip's first paint while the
+   scoreboard chip fetch is still in flight, sized to the real card so
+   nothing jumps when it is replaced. Reuses .board-pulse (defined above)
+   rather than a second animation, so the strip and the main board's own
+   loading skeleton read as one system. */
+.game-mini-card--skeleton {
+  min-width: 150px;
+  height: 78px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  border: 1px solid var(--cards-line);
+  background: rgba(255, 255, 255, 0.05);
+  animation: board-pulse 1.4s ease-in-out infinite;
+}
+
 /* The ranking disclosure. Quiet by design -- it is a standing statement
    about how the score is built, not an alert, and an alarm-coloured
    banner on every page load is one people stop reading. */

@@ -1401,6 +1401,18 @@
   // always share ids).
   let gameChipsById = new Map();
   let gameChipsByMatchup = new Map();
+  // `layer2-board-chip-race`. The FIRST call to `renderGameCards` almost
+  // always lands before this fetch resolves -- `initialIntelligenceResponse`
+  // (server-rendered) triggers a synchronous `renderIntelligence` on page
+  // load, while `loadGameChips()` is a network round trip that has not even
+  // started yet at that point. Without this flag, that first paint used the
+  // chip-less fallback style for EVERY game, including today's real ones,
+  // which then visibly popped into the richer chip style a moment later --
+  // read as "the compact game cards aren't uniform" because, for that one
+  // frame, they weren't. `renderGameCards` checks this and shows a stable
+  // loading placeholder instead of the wrong card shape until it flips true
+  // (success, empty response, or failure -- any settled fetch unblocks it).
+  let gameChipsLoadedOnce = false;
 
   // #165: two candidates for the SAME real game can carry two different
   // ids -- confirmed live: 89 "WSH @ ATL" MLB candidates on 824894, one
@@ -1419,7 +1431,13 @@
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
       const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`, { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        // A settled failure still unblocks the strip -- it must not hang on
+        // "Loading…" forever just because this one fetch came back non-2xx.
+        gameChipsLoadedOnce = true;
+        renderBoardBody();
+        return;
+      }
       const json = await res.json();
       const chips = Array.isArray(json.chips) ? json.chips : [];
       const byId = new Map();
@@ -1448,8 +1466,15 @@
       }
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
+      gameChipsLoadedOnce = true;
       renderBoardBody();
-    } catch (err) { /* scoreboard hydration is best-effort */ }
+    } catch (err) {
+      // Same reasoning as the !res.ok branch above -- a thrown fetch (offline,
+      // aborted, bad JSON) must still unblock the strip rather than leaving it
+      // on the loading placeholder indefinitely.
+      gameChipsLoadedOnce = true;
+      renderBoardBody();
+    }
   }
 
   function chipForGame(group) {
@@ -1823,6 +1848,25 @@
     const games = deriveGameCards(items);
     if (!games.length) {
       container.innerHTML = "";
+      return;
+    }
+    // `layer2-board-chip-race`. `deriveGameCards` needs no chip data, so
+    // the game count/matchups are already known here even before
+    // `loadGameChips()` resolves -- but EVERY card's visual shape (scores,
+    // live status vs. plain matchup text) depends on chip data, and today's
+    // real games render differently once it arrives. Rendering the real
+    // cards now, chip-less, would show that shape change live on today's
+    // slate a moment later while future-dated games stayed as they were --
+    // the exact "not uniform" symptom this fix exists for. A same-sized
+    // skeleton strip means every card goes loading -> final shape once,
+    // never wrong-shape -> final shape.
+    if (!gameChipsLoadedOnce) {
+      container.innerHTML = `
+        <h2 class="board-section-title">Games</h2>
+        <div class="game-card-strip">
+          ${games.map(() => '<div class="game-mini-card--skeleton"></div>').join("")}
+        </div>
+      `;
       return;
     }
     container.innerHTML = `
@@ -2659,6 +2703,15 @@
     });
   }
 
+  // `layer2-board-chip-race`. Fired before anything else in this block,
+  // specifically before the synchronous `renderIntelligence(merged)` a few
+  // lines down -- that call renders the game-card strip's first paint, and
+  // this fetch is what `gameChipsLoadedOnce` is waiting on. Starting it
+  // first gives it the largest possible head start; it was previously the
+  // LAST line here, meaning the strip's first paint never had a chance to
+  // see chip data at all.
+  void loadGameChips();
+
   renderFilterTabs();
   renderBetSlip();
   window.SyndicateWatchlist.init();
@@ -2675,7 +2728,6 @@
   } else {
     void loadIntelligence({});
   }
-  void loadGameChips();
 
   window.SyndicatePolling.startFromPolicy(
     {},
