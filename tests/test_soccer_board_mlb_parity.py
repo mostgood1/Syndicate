@@ -15,6 +15,7 @@ in one session.
 
 from __future__ import annotations
 
+import io
 import unittest
 
 from syndicate.features.shared import game_board_contract as contract
@@ -369,6 +370,65 @@ class BoxSectionSurvivalTests(unittest.TestCase):
             "shared_box_sections": own,
         }
         self.assertEqual(contract._normalize_game(game)["shared_box_sections"], own)
+
+
+class PrimaryLensRowTests(unittest.TestCase):
+    """The ribbon captions the matchup with ONE line and took `lens_rows[0]`.
+
+    On the board only the full-game row survives the gate, so it read right.
+    On the GAME DETAIL page all three soccer rows render and row 0 is the
+    FIRST HALF -- production `/soccer/epl/game/401879301` showed "Projected
+    total 1.6" directly under a summary saying "(total 3.5)".
+    """
+
+    ROWS = [
+        {"label": "1st Half", "subtitle": "Projected total 1.6", "home_pct": None},
+        {"label": "2nd Half", "subtitle": "Projected total 1.8", "home_pct": None},
+        {"label": "Full Game", "subtitle": "Projected total 3.5", "home_pct": 80.69},
+    ]
+
+    def test_picks_the_game_row_not_the_first_row(self) -> None:
+        self.assertEqual(contract._primary_lens_row(self.ROWS)["subtitle"], "Projected total 3.5")
+
+    def test_falls_back_to_the_label_when_no_row_carries_a_win_probability(self) -> None:
+        rows = [{"label": "1st Half", "subtitle": "a"}, {"label": "Full Game", "subtitle": "b"}]
+        self.assertEqual(contract._primary_lens_row(rows)["subtitle"], "b")
+
+    def test_falls_back_to_the_last_row_for_unknown_labels(self) -> None:
+        """Period rows are built chronologically with the whole-game row last."""
+        rows = [{"label": "Q1", "subtitle": "x"}, {"label": "Q2", "subtitle": "y"}]
+        self.assertEqual(contract._primary_lens_row(rows)["subtitle"], "y")
+
+    def test_no_rows_yields_none_rather_than_raising(self) -> None:
+        self.assertIsNone(contract._primary_lens_row([]))
+
+    def test_a_single_row_board_card_is_unchanged(self) -> None:
+        """REGRESSION GUARD: the board renders one lens row and read correctly
+        before this fix. It must still resolve to that same row."""
+        only = [{"label": "Full Game", "subtitle": "Projected total 3.5", "home_pct": 80.69}]
+        self.assertEqual(contract._primary_lens_row(only), only[0])
+
+
+class LiveScoreTests(unittest.TestCase):
+    """Measured on live La Liga match 401882908 (ALA @ RAY), 2026-08-20: the
+    card read status "Live" and slate context "0-0" with no score in the head.
+    `away.score`/`home.score` were populated ("0"/"0") the entire time."""
+
+    def test_detail_carries_the_league_not_the_score(self) -> None:
+        """`detail` is the "Slate context" slot. Overwriting it with the score
+        lost the competition label AND captioned a score as slate context."""
+        src = io.open("syndicate/features/soccer/cards.py", encoding="utf-8").read()
+        self.assertIn('"detail": league_display_name(league),', src)
+        self.assertNotIn('"detail": score_text if score_text != "-"', src)
+
+    def test_head_renders_a_score_element_when_live(self) -> None:
+        tpl = io.open(
+            "syndicate/templates/shared/_game_card_generic.html", encoding="utf-8"
+        ).read()
+        self.assertIn("cards-head-score", tpl)
+        # 0 is a real score: the guard must test for None, not falsiness.
+        self.assertIn("game.away.score is not none", tpl)
+        self.assertIn("game.home.score is not none", tpl)
 
 
 class DateBoardTests(unittest.TestCase):

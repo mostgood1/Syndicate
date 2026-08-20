@@ -1262,7 +1262,13 @@ def _match_to_game(
         # `_live_state_block`: `status` is prose and every downstream reader
         # wants a dict, which is why soccer sat at 100% `pregame`.
         "live_state": _live_state_block(effective_state, match.get("kickoff")),
-        "detail": score_text if score_text != "-" else league_display_name(league),
+        # `detail` is the card's "Slate context" slot and every non-live
+        # state puts the competition name in it. It used to be overwritten
+        # with the score for live/final matches, which both lost the league
+        # label and captioned the score with "Slate context". The head now
+        # renders `away.score`/`home.score` directly, so this stays constant
+        # across states -- one field, one meaning.
+        "detail": league_display_name(league),
         # Raw ISO kickoff, distinct from "detail" above (which carries a
         # score/league string, not a timestamp) -- the shared game-chip and
         # home-rail scheduled-status helpers read this key to render a

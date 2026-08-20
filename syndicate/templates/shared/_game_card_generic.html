@@ -33,7 +33,22 @@
           <div class="cards-mini-copy">{{ game.away.abbr }}</div>
         </div>
       </div>
-      <span class="cards-score-divider">@</span>
+      {#- The score, when there is one. The head rendered crests and a bare
+          "@" in every state, so a LIVE match showed no score at all and
+          soccer smuggled it into `detail` -- which renders as "Slate
+          context", the slot that otherwise holds the competition name. Both
+          scores must be present: a half-populated score line is worse than
+          none, and `0` is a real score, so this tests for None, not falsiness. -#}
+      {% set has_score = (live_state or game.shared_is_live) and game.away.score is not none and game.home.score is not none %}
+      {% if has_score %}
+        <span class="cards-head-score" aria-label="Current score">
+          <span class="cards-head-score-num">{{ game.away.score }}</span>
+          <span class="cards-head-score-sep">-</span>
+          <span class="cards-head-score-num">{{ game.home.score }}</span>
+        </span>
+      {% else %}
+        <span class="cards-score-divider">@</span>
+      {% endif %}
       <div class="cards-head-team"{% if game.home.primary_color %} style="--cards-team-accent: {{ game.home.primary_color }};"{% endif %}>
         {% if game.home.logo_url %}
           <img class="cards-strip-logo cards-strip-crest" src="{{ game.home.logo_url }}" alt="{{ game.home.name }} crest" loading="lazy" />
@@ -70,8 +85,15 @@
           stand-in row's `subtitle` is `game.detail`, already shown as Slate
           context in the head -- and the mini copy echoed the title of a panel
           two rows down. Tie them to the lens, which is the thing they caption. -#}
+      {#- `lens_rows[0]` is the FIRST period, not the game. On the board only
+          the full-game row survives the gate, so it read correctly there; on
+          the game detail page, where all three soccer rows render, the ribbon
+          captioned the matchup with the FIRST HALF -- "Projected total 1.6"
+          under a summary saying "(total 3.5)". The contract now names the
+          game-level row by content. -#}
+      {% set lens_primary = game.shared_lens_primary if game.shared_lens_primary is defined and game.shared_lens_primary else lens_rows[0] %}
       {% if lens_rows %}
-        <div class="cards-sim-line">{{ lens_rows[0].subtitle }}</div>
+        <div class="cards-sim-line">{{ lens_primary.subtitle }}</div>
         {% if game.shared_tab_game_title is defined %}
           <div class="cards-mini-copy">{{ game.shared_tab_game_title }}</div>
         {% endif %}
