@@ -3223,7 +3223,36 @@ Preflight **HOLD** — an MLB sim is in flight (`run_mlb_daily_sim_job.py` pid 1
 the ~109 artifacts it publishes. Poller running until it drains.
 
 
-### >>> DEPLOY CANDIDATE, refresh-worker: `1ef337c0` `[2026-08-20T13:3xZ]` <<<
+### >>> MLB SIM INPUTS: THE PULL WAS BROKEN BY ONE `*` — FIXED `[2026-08-20T18:03Z]` <<<
+
+**`39570b24` live 17:54:04Z.** `_SEASON_ARTIFACT_PATTERNS` held BARE filename
+globs (`arsenal_*.json`). The export endpoint matches
+`fnmatch(relative_path, pattern)` (`ops.py:1349`) against the FULL path and
+fnmatch anchors both ends, so **all five patterns matched NOTHING** — five
+requests, zero files, every season-scoped sim input absent from the worker.
+
+**MEASURED** (`sim_input_report.season_artifacts`, host=worker):
+
+    BEFORE gen 17:22:58Z   all five exists=False
+    AFTER  gen 18:03:12Z   arsenal 466 / conditional_mix 728 / batted_ball 509
+                           quality 509 / pitch_splits 305, all loadable=True
+                           byte counts match web's copies -> transport intact
+
+**THE FIELDS ARE STILL 0.0% AND THAT IS EXPECTED.** Presence and population are
+SEPARATE milestones: the pull runs at sim start, that run REUSED rosters built
+~07:37Z, and the appliers only write during a BUILD. Predicted before the reading.
+
+**verify 2026-08-21:** first `sim_input_report_2026-08-21.json` — expect `nfail`
+**15 -> 6**, with the five `vs_pitcher_*` entries STILL present (BVP path,
+untouched). Still 15 on a fresh `generated_at` = a SIXTH cause, reopen.
+
+**This is why `85296826`'s conditional-mix wiring looked inert** — the wiring is
+correct and called; `conditional_mix_2026.json` was simply never on the worker.
+
+**Superseded:** the `1ef337c0` deploy-candidate block. `85296826` shipped it and
+is an ancestor of live.
+
+### >>> (superseded) DEPLOY CANDIDATE `1ef337c0` <<<
 
 **`deploy/mlb-mix-and-markets` = `1ef337c0`, parent `041188cb` (the LIVE SHA).**
 4 files, +323/-4, additive. All four verified BYTE-IDENTICAL at `041188cb` and

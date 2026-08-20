@@ -18246,3 +18246,147 @@ reopening bar is exactly the kind of thing someone later acts on.
 same games, a 95% CI lower bound above the 52.4% breakeven, out-of-sample with
 subsets pre-specified, and denominators in BETS not rows. Measured by
 `scripts/grade_football_playability.py`.
+
+---
+
+## 2026-08-20 17:49Z — web `528272e1` — the soccer card stops discarding its own market data
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       528272e1  (scoped graft, parent d77dfb9a = the LIVE SHA,
+               branch deploy/soccer-board-parity-20260820, 6 files)
+    on main:   NO -- and deliberately. See "why off-main" below.
+    deploy:    dep-da3jodpt0dsc73frkkfg  trigger=api  fired 17:41:11Z, live 17:49:25Z
+    claim:     acquired 17:35:00Z, released after verify
+    preflight: CLEAR (only infrastructure processes), target 528272e1, sample age 0s
+    rollback:  deploy d77dfb9a (this graft's parent). Reverts the soccer board
+               only; every other lineage commit is in the parent.
+
+**WHY OFF-MAIN, when the standing rule is "deploy a commit that is on
+`origin/main`".** The rule exists to stop deploy N silently reverting deploy
+N-1. Here it would have CAUSED that. The change landed on main as `51b7e765`
+(main's tip). Web's live SHA `d77dfb9a` is **not on main**, and `origin/main..
+d77dfb9a` is **ten commits** that exist nowhere else:
+
+    d77dfb9a layer2 renderMovement/isSteamCandidate   0ddd8ede layer2 Over/Under + blank Projected
+    ea6f431f REPLACED lift condition                  b4f90650 #482 allowlist
+    ba1d3368 #481 live-scale refit                    75c526f5 #475 live cover/total
+    6b23d6fa NCAAF pregame window                     17986fb5 soccer autorun allowlist
+    ebf301ae NCAAF wk1 SP+                            f149f5e2 NFL prop calibration
+
+Deploying main's tip would have reverted all ten -- the 2026-08-15 shape at
+ten times the scope. Grafted onto the live SHA instead, which is what every
+commit in that lineage already did. **Verified BEFORE deploying, not assumed:**
+`diff-tree 528272e1` = exactly the 6 intended files, and all ten commits above
+are ancestors of the graft.
+
+**verify: PASSED. The measurement this lane was opened to take, re-taken on the
+SERVED page after deploy -- same match, same service, same 1280px viewport.**
+
+`/soccer/epl/cards`, COV @ ARS, the identical card benchmarked before any edit:
+
+| reading | before (pre-deploy, same URL) | after | MLB, same instant |
+|---|---|---|---|
+| card height | 1074 px | **878 px** | 1268 px |
+| leaf text items | 188 | **195** | 917 |
+| density (items/Mpx) | **139** | **176** (+27%) | **569** |
+| em-dash placeholder cells | 6 | **0** | 6 |
+| matchup string repeated as tile sub-label | 4 | **0** | 0 |
+| box sections | 1 (generic) | **2** (player stat lines restored) | n/a |
+| prop status rows | 0 | **8** | n/a |
+
+Served tiles now carry a price, both probabilities and the edge:
+
+    BEST 1X2 EDGE   COV ML +1400   Model 8.7% | Market 6.3% | Edge +2.4 pts
+    TOTAL GOALS     OVER 2.5 -178  Model 3.24 | Line 2.5 | Market 64.0%
+    HANDICAP        ARS -1.5       Proj margin 1.68 | vs line 0.18
+    BEST PROP EDGE  Kai Havertz anytime +150   Model 25.8% | Edge -14.6%
+
+Landing page: `GET /soccer` -> 302 -> `/soccer/cards?date=2026-08-20` (was
+`/soccer/epl/cards`). The date board served **9 matches across 2 leagues** for
+2026-08-20 and 8 of 9 correctly marked Final; `/soccer/api/cards?date=` 200,
+114,132 bytes. Prop prices are real and served: 3 of 9 cards carry a market
+price, and priced prop rows read `Odds +380 | Edge -10.3%`.
+
+**THE TARGET WAS MISSED AND I AM NOT ROUNDING IT UP.** The lane's stated
+testable outcome was density "within 2x of MLB" -- MLB 569 means 285, and
+soccer reached **176**. That is +27% on the pre-deploy number and still a
+**3.2x gap**. Part is intrinsic (MLB has nine innings of lens rows and two
+full prop tables; soccer has two halves), but not all of it, and the lane
+stays OPEN on that basis rather than being declared done on the improvement.
+
+**Blast radius verified, not assumed:**
+
+| check | reading | verdict |
+|---|---|---|
+| graft scope | `diff-tree` = exactly 6 files | PASS |
+| ten lineage commits retained | all 10 are ancestors of 528272e1 | PASS |
+| MLB card unaffected | 917 items / 569 density, card renders | PASS |
+| tests on the GRAFT base, not just main | `test_archives` 32 fail on `d77dfb9a` alone and 32 on the graft, same names -- my commit adds **zero** | PASS |
+| targeted suites | 88 soccer/board-contract tests green | PASS |
+
+**A note on the 31-vs-32 discrepancy, since it looks like a regression and is
+not.** Against `origin/main` the archive baseline is 31 failures; against
+`d77dfb9a` it is 32. The extra one is
+`HomeBoardTests.test_home_page_poll_preserves_date_query`, and it fails on
+`d77dfb9a` **without** my commit -- pre-existing in that lineage, surfaced by
+grafting onto it, not introduced here. Flagged for whoever owns that lineage.
+All of these failures are `data/`-dependent and cannot pass in a worktree
+where `data/` is excluded by design.
+
+
+
+---
+
+## refresh-worker `39570b24` — SEASON-ARTIFACT PULL FIXED AND MEASURED — `#440`
+
+    deploy    dep-da3jr83bc2fs7398joqg, live 2026-08-20T17:54:04Z
+    parent    df04c294 (the LIVE SHA). Base re-verified AT CUT TIME: live->main
+              diff was exactly +28/-5 with the five deletions being precisely the
+              bare patterns replaced, and the #482/#477/#474 allowlist entries
+              already present at df04c294 and untouched.
+
+**ROOT CAUSE: one missing `*`.** `_SEASON_ARTIFACT_PATTERNS` held bare filename
+globs. The export endpoint matches `fnmatch(relative_path, pattern)`
+(`ops.py:1349`) against the FULL path, and fnmatch anchors both ends:
+
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "arsenal_*.json")  -> False
+    fnmatch("mlb_source/.../arsenal/arsenal_2026.json", "*arsenal_*.json") -> True
+
+Five requests, zero files, every season-scoped sim input absent from the worker.
+
+**MEASURED, the reading that proves it (sim_input_report, host=worker):**
+
+    BEFORE  gen 17:22:58Z   all five exists=False
+    AFTER   gen 18:03:12Z   arsenal          exists=True n_pitchers=466 bytes=546,739
+                            conditional_mix  exists=True n_pitchers=728 bytes=476,461
+                            batted_ball      exists=True n_pitchers=509 bytes=219,440
+                            quality          exists=True n_pitchers=509 bytes=79,053
+                            pitch_splits     exists=True n_pitchers=305 bytes=225,010
+
+Byte counts match web's copies exactly, so the transport is intact, not truncated.
+
+**THE FIELDS ARE STILL 0.0% AND THAT IS EXPECTED — STATED BEFORE THE READING,
+NOT AFTER.** Presence and population are SEPARATE milestones. The pull runs at
+sim start; this run then REUSED today's rosters (built ~07:37Z, eight hours
+before the artifacts arrived), and the appliers only write these fields during a
+roster BUILD. `nfail` stays 15 until a rebuild happens with the artifacts
+present.
+
+**WHAT THIS UNBLOCKS.** This morning's conditional-mix wiring (`85296826`) was
+INERT for this reason, not for a fault in the wiring: `conditional_mix_2026.json`
+had never been on the worker. Tomorrow's deferred verification would have failed
+regardless of any roster rebuild. It can now actually succeed.
+
+**verify on 2026-08-21:** first `sim_input_report_2026-08-21.json` — the 08-21
+slate's first build is a genuine rebuild with the artifacts present. Expect
+`nfail` 15 -> 6: `conditional_arsenal`, `count_bucket_map`,
+`conditional_arsenal_source`, `pitch_type_whiff_mult`, `pitch_type_inplay_mult`,
+`pitch_type_hr_mult` and the four `statcast_splits_*` clearing, with the five
+`vs_pitcher_*` entries STILL present (BVP path, untouched by this work). Still
+15 on a fresh generated_at means a SIXTH cause and must be reopened.
+
+**STILL OPEN, explicitly not fixed by this:** the five `vs_pitcher_*` batter
+fields (separate BVP path), and `vendor/*/data/` statcast caches remaining
+ephemeral and unpublishable — my theory that the latter caused the arsenal
+failure was WRONG, but the fragility is real and undocumented.
