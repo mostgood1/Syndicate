@@ -19836,3 +19836,67 @@ untrustworthy in a specific direction.** The join finding did not fail loudly;
 it succeeded more easily than it should have, and succeeded is what I wrote
 down. When re-auditing against staleness, sort findings by which way the
 staleness pushes them, not by whether they look wrong.
+
+---
+
+## 2026-08-20 ~22:2xZ — AMENDMENT to the CORRECTION SWEEP above — the live-score diagnosis was WRONG, not merely overstated
+
+**The sweep I landed twenty minutes ago (`88c7f22c`) contains an error of its
+own, and this is the third layer of the same mistake.**
+
+The sweep said `00541a8d`'s "placeholder" claim was *overstated* but that the
+fix "stands for a different reason: those fields come from `_fetch_fixtures`'
+ESPN payload and are not a live feed." **That last clause is false.**
+
+The `soccer-live-score-clock-box` session traced it to source and I verified
+both halves independently before accepting them:
+
+- `espn_lineups.py:143` sets `"home_score": home.get("score")` — ESPN's own
+  `competitors[].score` off the scoreboard endpoint, which
+  `build_soccer_artifacts.py` writes through to `live_home_score`. **That is a
+  real reading at every point in a match's life**, including a final score. It
+  reads `"0"` before kickoff because `"0"` is what the scoreboard says before
+  kickoff.
+- Their census: every git-tracked recommendations artifact, **57 matches
+  across 10 leagues, `status_state == "pre"` on all 57**. Re-run by me from
+  the same tree: `{'pre': 57}`. Confirmed.
+
+**So the fields are a real score source, and `00541a8d` — which made soccer
+publish NO score rather than render them — removed a working final score
+rather than a fabrication.** They have since fixed it properly with
+`_artifact_score`, gated on the match actually having started.
+
+### The specific reasoning error, because it is the sharpest one of the session
+
+My evidence was "the string `0` on 12 of 12 sampled matches, **INCLUDING**
+`status_state == "pre"`". I wrote that `INCLUDING` as if pre-kickoff matches
+STRENGTHENED the case — a placeholder showing up even before kickoff. It is
+the exact opposite. **Every match in the sample was pre-kickoff**, so a real
+scoreboard reading and a hardcoded placeholder are indistinguishable in all 12
+observations. The sample could not discriminate between the two hypotheses,
+and I read a uniform result as confirmation of the one I had in mind.
+
+That is the same shape as the two other errors recorded above — the
+`/soccer/laliga` slug and the `picks` directory 403 — but worse, because in
+those the system returned a correct answer to a malformed question. Here the
+observation was accurate and the inference was unsound, and **I then wrote the
+unsound inference into a code comment as an established fact**, where the next
+reader would have inherited it.
+
+### What this does to the sweep above
+
+- The row "live-score characterization: directionally sound, characterization
+  unproven" is **WITHDRAWN. It was wrong.** The fix it described was a
+  regression, now repaired by another lane.
+- Nothing else in the sweep changes. The stale-artifact extent, the weakened
+  join finding, the local-only squad magnitudes and the intact routing/layout
+  findings were all derived independently of this.
+
+### The rule
+
+**A sample that cannot distinguish your hypothesis from its alternative is not
+weak evidence — it is NO evidence, and a uniform result from it is the most
+seductive form of nothing.** Before citing "N of N", state what a
+counterexample would have looked like and confirm the sample could have
+contained one. Twelve pre-kickoff matches cannot tell you what a live match
+does.
