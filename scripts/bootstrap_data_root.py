@@ -61,19 +61,86 @@ BOOTSTRAP_FILES = (
 )
 
 
-def _copy_file_if_needed(src: Path, dst: Path) -> None:
+# The git-tracked `data/**` trees are a COLD-START SAFETY NET, not a snapshot
+# of what production computed (CLAUDE.md says so in those words). Everything
+# under them is produced by the pipeline on a worker and lands on a service's
+# mounted disk; the committed copy is a periodically-refreshed mirror of that,
+# and it is routinely weeks old.
+#
+# So for those roots the DISK WINS. A destination file that already exists was
+# put there by the pipeline (or by an earlier cold-start seed of this same
+# mirror), and a boot-time copy from the checkout can only ever make it older.
+#
+# THE INCIDENT THIS COMES FROM, 2026-08-20 (soccer, La Liga). Web's boot-time
+# bootstrap ran 21:42:31Z -> 21:43:28Z, reaching `data/soccer_source` at
+# 21:43:28.245Z, and overwrote
+#   soccer_source/la_liga/api/recommendations/recommendations_2026-08-20.json
+# with the committed mirror: `generated_at 2026-07-20T21:33:36`, a MONTH stale,
+# `status_state "pre"`, both scores "0". The match (Alaves v Rayo Vallecano) had
+# finished 1-1 hours earlier. The same endpoint had served that match correctly
+# at 21:42:5xZ -- inside this sync's own window -- and served the month-old copy
+# from 21:45Z onward across six consecutive reads. Byte-identical to the
+# checkout (sha256 70dbdc0c35585db..., 36,898 bytes), so the provenance is not
+# in question. Measured the same evening: 1,114 of the 8,016 hot artifacts web
+# was serving were the checkout's copy, across mlb/wnba/nba/nhl/nfl/soccer.
+#
+# `copy2` PRESERVES THE SOURCE MTIME, which is what made this so hard to see:
+# the clobbered file's mtime reads 21:36:27Z -- the checkout's own mtime, six
+# minutes BEFORE the last good read of the file it replaced. An mtime that
+# predates the write is the fingerprint; a whole-second mtime (Render's checkout
+# has 1s granularity, a runtime write has nanoseconds) is the other half of it.
+#
+# VENDORED CODE IS THE EXCEPTION and keeps the old overwrite behaviour: git owns
+# it, no pipeline writes it, and pinning a stale copy on the disk would be the
+# bug in the other direction.
+SEED_ONLY = "seed_only"        # disk wins: never overwrite an existing file
+OVERWRITE = "overwrite"        # git wins: refresh the destination in place
+
+
+def _force_overwrite_enabled() -> bool:
+    """One-shot escape hatch to restore the pre-2026-08-20 behaviour.
+
+    For a DELIBERATE reseed of a disk believed to be corrupt -- not for routine
+    operation. It re-arms the overwrite on every root, including the artifact
+    trees, so a boot with this set will happily replace live pipeline output
+    with the committed mirror.
+    """
+    return _env_bool("SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE")
+
+
+def _copy_file_if_needed(src: Path, dst: Path, *, overwrite_existing: bool) -> str:
+    """Returns the outcome: "copied", "unchanged", or "kept".
+
+    "kept" means the destination existed, differed from the checkout, and was
+    LEFT ALONE because this root is seed-only. That is the whole point of the
+    return value -- see `_sync_bootstrap_roots`, which reports it. The counter
+    this replaced incremented once per file VISITED and was logged as "files
+    copied", so a run that overwrote one file and a run that overwrote thirty
+    thousand printed the same number. Nothing anywhere distinguished them.
+    """
     if dst.exists() and dst.is_file():
         try:
             if filecmp.cmp(src, dst, shallow=False):
                 logger.debug("skipped unchanged file %s", src)
-                return
+                return "unchanged"
         except Exception:
             pass
+        if not overwrite_existing:
+            logger.debug("kept existing %s (seed-only root)", dst)
+            return "kept"
     shutil.copy2(src, dst)
     logger.debug("copied %s -> %s", src, dst)
+    return "copied"
 
 
-def _sync_tree(src: Path, dst: Path, counters: Dict[str, int], key: str) -> None:
+def _sync_tree(
+    src: Path,
+    dst: Path,
+    counters: Dict[str, Dict[str, int]],
+    key: str,
+    *,
+    overwrite_existing: bool,
+) -> None:
     if not src.exists() or not src.is_dir():
         logger.debug("source root missing or not a dir: %s", src)
         return
@@ -81,14 +148,21 @@ def _sync_tree(src: Path, dst: Path, counters: Dict[str, int], key: str) -> None
     for item in src.iterdir():
         target = dst / item.name
         if item.is_dir():
-            _sync_tree(item, target, counters, key)
+            _sync_tree(item, target, counters, key, overwrite_existing=overwrite_existing)
         else:
-            _copy_file_if_needed(item, target)
-            counters[key] = counters.get(key, 0) + 1
+            outcome = _copy_file_if_needed(item, target, overwrite_existing=overwrite_existing)
+            counters.setdefault(key, {})[outcome] = counters.setdefault(key, {}).get(outcome, 0) + 1
 
 
-def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, Path]]:
-    pairs: list[tuple[Path, Path]] = []
+def _bootstrap_root_pairs(
+    repo_root: Path, data_root: Path
+) -> list[tuple[Path, Path, str, str]]:
+    """(source, destination, key, policy) per root.
+
+    The return annotation used to say `list[tuple[Path, Path]]` while the body
+    appended 3-tuples, so it never described what a caller got.
+    """
+    pairs: list[tuple[Path, Path, str, str]] = []
     for relative_root in BOOTSTRAP_ROOTS:
         src = repo_root / relative_root
         # If the relative root begins with a leading 'data' segment, strip it when
@@ -101,15 +175,15 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
         else:
             dest_relative = relative_root
         dst = data_root / dest_relative
-        pairs.append((src, dst, str(relative_root)))
+        pairs.append((src, dst, str(relative_root), SEED_ONLY))
     for relative_root, data_relative_root in BOOTSTRAP_VENDOR_ROOTS:
         src = repo_root / relative_root
         dst = data_root / data_relative_root
-        pairs.append((src, dst, str(relative_root)))
+        pairs.append((src, dst, str(relative_root), OVERWRITE))
     for relative_file in BOOTSTRAP_FILES:
         src = repo_root / relative_file
         dst = data_root / relative_file
-        pairs.append((src, dst, str(relative_file)))
+        pairs.append((src, dst, str(relative_file), SEED_ONLY))
     intelligence_root = repo_root / "reports" / "intelligence"
     if intelligence_root.exists() and intelligence_root.is_dir():
         for pattern in (
@@ -125,11 +199,11 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
                 if not src.is_file():
                     continue
                 dst = data_root / "reports" / "intelligence" / src.name
-                pairs.append((src, dst, f"reports/intelligence/{src.name}"))
+                pairs.append((src, dst, f"reports/intelligence/{src.name}", SEED_ONLY))
     return pairs
 
 
-def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
+def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, Dict[str, int]]:
     # Each root synced independently, on purpose: app.py's caller wraps the
     # whole of main() in a bare `except Exception: pass`, so one unhandled
     # exception here used to silently abort every root after it in
@@ -143,11 +217,35 @@ def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
     # of soccer was ever proven to be the actual failure; isolating each
     # root removes the whole class of "root N's failure hides root N+1..end"
     # bug regardless of which root eventually throws.
-    counters: Dict[str, int] = {}
-    for source_root, destination_root, key in _bootstrap_root_pairs(repo_root, data_root):
-        logger.info("Syncing %s -> %s", source_root, destination_root)
+    counters: Dict[str, Dict[str, int]] = {}
+    forced = _force_overwrite_enabled()
+    if forced:
+        logger.warning(
+            "SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE is set: EVERY root will overwrite existing "
+            "destination files, including live pipeline output, with the committed mirror."
+        )
+    for source_root, destination_root, key, policy in _bootstrap_root_pairs(repo_root, data_root):
+        overwrite_existing = forced or policy == OVERWRITE
+        logger.info(
+            "Syncing %s -> %s (policy=%s)",
+            source_root,
+            destination_root,
+            OVERWRITE if overwrite_existing else SEED_ONLY,
+        )
+        if source_root.exists() and not source_root.is_dir():
+            # `_sync_tree` returns immediately for a non-directory, so the
+            # single-file entries in BOOTSTRAP_FILES and the per-date
+            # intelligence globs have NEVER been copied by this script -- they
+            # are logged as "Syncing ..." above and then silently do nothing.
+            # Recorded here rather than fixed: making them live would start
+            # writing the committed mirror of board_snapshot.json /
+            # intelligence_state.json onto a running service's disk, which is
+            # exactly the class of change this file is being edited to stop.
+            # It needs its own decision, not a side effect of this one.
+            counters.setdefault(key, {})["inert_file_entry"] = 1
+            continue
         try:
-            _sync_tree(source_root, destination_root, counters, key)
+            _sync_tree(source_root, destination_root, counters, key, overwrite_existing=overwrite_existing)
         except Exception as exc:
             logger.warning("Bootstrap sync failed for root %s (%s -> %s): %s", key, source_root, destination_root, exc)
     return counters
@@ -264,14 +362,40 @@ def main() -> int:
     if _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
         _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
-    # Log summary counts
+    # Log summary counts.
+    #
+    # The line this replaces read "  %s: %d files copied" against a counter
+    # incremented once per file VISITED, so it reported 33,379 "copied" on a run
+    # that copied a handful. That number is in the production logs for every
+    # deploy this year and it never meant what it said -- which is why a boot
+    # that replaced a live artifact with a month-old mirror looked exactly like
+    # a boot that did nothing.
     if counters:
-        logger.info("Bootstrap copy summary:")
-        total = 0
-        for key, count in counters.items():
-            logger.info("  %s: %d files copied", key, count)
-            total += count
-        logger.info("Total files copied: %d", total)
+        logger.info("Bootstrap copy summary (copied = written, kept = existing file left alone):")
+        totals: Dict[str, int] = {}
+        for key, outcomes in counters.items():
+            logger.info(
+                "  %s: copied=%d unchanged=%d kept=%d%s",
+                key,
+                outcomes.get("copied", 0),
+                outcomes.get("unchanged", 0),
+                outcomes.get("kept", 0),
+                "  [INERT: file entry, never synced]" if outcomes.get("inert_file_entry") else "",
+            )
+            for outcome, count in outcomes.items():
+                totals[outcome] = totals.get(outcome, 0) + count
+        logger.info(
+            "Bootstrap totals: copied=%d unchanged=%d kept=%d",
+            totals.get("copied", 0),
+            totals.get("unchanged", 0),
+            totals.get("kept", 0),
+        )
+        if totals.get("kept", 0):
+            logger.info(
+                "%d destination file(s) were NEWER-OR-DIFFERENT pipeline output and were not "
+                "overwritten by the committed mirror.",
+                totals["kept"],
+            )
     else:
         logger.info("No files copied by bootstrap (no source roots present or empty)")
 

@@ -1050,6 +1050,15 @@ def api_ops_bootstrap_run() -> Any:
     # which made "did ncaaf_source's real files actually land on disk"
     # unanswerable from this endpoint's response alone. Verify by real
     # returned state, not by re-inferring from an unrelated page render.
+    #
+    # `counters` is now {root: {copied, unchanged, kept}} rather than
+    # {root: int}. The int was incremented once per file VISITED while being
+    # reported as a copy count, so it answered "did the sync reach this root"
+    # and nothing more -- 33,379 on a run that wrote a handful. A run that
+    # replaced live artifacts and a run that wrote nothing printed the same
+    # number, which is why 2026-08-20's clobbered soccer artifact left no trace
+    # anywhere. `kept` is the count this endpoint exists to show: destination
+    # files that differ from the committed mirror and were left alone.
     try:
         try:
             from pathlib import Path as _Path

@@ -51,7 +51,18 @@ def _bootstrap_soccer_seed_files(*, relative_subdir: str, glob_pattern: str) -> 
     # into a subdirectory that has NONE matching yet, so it can never touch
     # or replace anything the real pipeline has already written. See
     # _bootstrap_soccer_player_seed_files's own comment for why this doesn't
-    # reuse bootstrap_data_root.py's broad copy-if-content-differs sync.
+    # reuse bootstrap_data_root.py's sync.
+    #
+    # That sync was "copy whenever the content differs", and the reason given
+    # here for not reusing it -- it must never replace what the pipeline has
+    # already written -- turned out to be the real defect in it, not just a
+    # reason to keep this one narrow. Measured 2026-08-20: the boot sync
+    # replaced a current La Liga recommendations artifact on web's disk with the
+    # month-old committed mirror, and the card served a finished 1-1 match as a
+    # 0-0 that had not kicked off. `bootstrap_data_root` is now seed-only for
+    # every artifact root, so the two agree; this seeder stays as it is because
+    # "a subdirectory with none matching yet" is a narrower and cheaper test than
+    # the per-file one, not because the shared path is still unsafe.
     try:
         data_root = _refresh_state_store()["data_root"]()
     except Exception as exc:

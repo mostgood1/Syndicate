@@ -30,30 +30,71 @@ class BootstrapDataRootTests(unittest.TestCase):
             expected_path = src_root / "nba_source" / "data" / "processed" / "game_cards_2026-05-28.csv"
             expected_path.write_text("header\nvalue\n", encoding="utf-8")
 
-            module._sync_tree(src_root, dst_root, {}, "nba_source")
+            module._sync_tree(src_root, dst_root, {}, "nba_source", overwrite_existing=False)
 
             copied_path = dst_root / "nba_source" / "data" / "processed" / "game_cards_2026-05-28.csv"
             self.assertTrue(copied_path.exists())
             self.assertEqual(copied_path.read_text(encoding="utf-8"), "header\nvalue\n")
 
-    def test_sync_tree_updates_stale_files(self) -> None:
+    # THE TWO TESTS BELOW REPLACE `test_sync_tree_updates_stale_files` and
+    # `test_sync_tree_overwrites_same_size_stale_files`, which asserted the
+    # opposite. Their history was checked before reversing them: both arrived in
+    # `627d111e` (2026-06-02, "Force bootstrap to refresh artifacts"), the commit
+    # that DELETED the size+mtime skip this script originally shipped with.
+    # Commit message, in full, one line. No docstring, no stated requirement --
+    # characterization of a behaviour change, not a specification of one.
+    #
+    # That behaviour is the measured cause of a live-surface regression on
+    # 2026-08-20: web's boot sync replaced a correct, current La Liga artifact
+    # with the month-old committed mirror, and the card served a finished 1-1
+    # match as a 0-0 that had not kicked off. See the comment block above
+    # `_copy_file_if_needed` for the full measurement.
+    #
+    # (For the record, the check `627d111e` removed would not have prevented it
+    # either: `copy2` preserves the source mtime, so a bootstrap-written file
+    # compares equal and is skipped, while a file the PIPELINE has since
+    # rewritten has a new size and mtime, compares unequal, and gets clobbered --
+    # precisely the file that must not be.)
+
+    def test_seed_only_root_does_not_overwrite_live_pipeline_output(self) -> None:
+        # The real path and the real shape of the 2026-08-20 incident.
         module = _load_module()
         with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
             src_root = Path(src_dir)
             dst_root = Path(dst_dir)
-            relative_path = Path("mlb_source") / "data" / "daily" / "daily_summary_2026_05_28.json"
+            relative_path = (
+                Path("soccer_source") / "la_liga" / "api" / "recommendations"
+                / "recommendations_2026-08-20.json"
+            )
             source_file = src_root / relative_path
             dest_file = dst_root / relative_path
             source_file.parent.mkdir(parents=True, exist_ok=True)
             dest_file.parent.mkdir(parents=True, exist_ok=True)
-            source_file.write_text('{"games": 12}\n', encoding="utf-8")
-            dest_file.write_text('{"games": 0}\n', encoding="utf-8")
+            # The committed mirror: a month old, match not yet kicked off.
+            source_file.write_text(
+                '{"generated_at": "2026-07-20T21:33:36", "status_state": "pre",'
+                ' "live_home_score": "0", "live_away_score": "0"}\n',
+                encoding="utf-8",
+            )
+            # What the pipeline actually put on the disk: the finished match.
+            live = (
+                '{"generated_at": "2026-08-20T21:40:02", "status_state": "post",'
+                ' "live_home_score": "1", "live_away_score": "1"}\n'
+            )
+            dest_file.write_text(live, encoding="utf-8")
 
-            module._sync_tree(src_root, dst_root, {}, "mlb_source")
+            counters: dict = {}
+            module._sync_tree(src_root, dst_root, counters, "soccer_source", overwrite_existing=False)
 
-            self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"games": 12}\n')
+            self.assertEqual(dest_file.read_text(encoding="utf-8"), live)
+            self.assertEqual(counters["soccer_source"].get("kept"), 1)
+            self.assertEqual(counters["soccer_source"].get("copied", 0), 0)
 
-    def test_sync_tree_overwrites_same_size_stale_files(self) -> None:
+    def test_seed_only_root_keeps_an_existing_file_of_the_same_size(self) -> None:
+        # Same-size-different-content was the case the replaced test existed to
+        # exercise, and it is worth keeping: `filecmp.cmp(shallow=False)` sees
+        # the difference, so this reaches the seed-only branch rather than the
+        # cheap "identical, skip" one. Kept, not copied.
         module = _load_module()
         with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
             src_root = Path(src_dir)
@@ -69,9 +110,32 @@ class BootstrapDataRootTests(unittest.TestCase):
             os.utime(source_file, (stamp, stamp))
             os.utime(dest_file, (stamp, stamp))
 
-            module._sync_tree(src_root, dst_root, {}, "nhl_source")
+            module._sync_tree(src_root, dst_root, {}, "nhl_source", overwrite_existing=False)
 
-            self.assertEqual(dest_file.read_text(encoding="utf-8"), "aaaa\n")
+            self.assertEqual(dest_file.read_text(encoding="utf-8"), "bbbb\n")
+
+    def test_overwrite_root_still_refreshes_a_stale_destination(self) -> None:
+        # `off != on`. Without this, every assertion above would still pass if
+        # the overwrite branch had been deleted rather than made conditional,
+        # and the vendored-code root would be silently pinned to whatever landed
+        # on the disk first.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root = Path(src_dir)
+            dst_root = Path(dst_dir)
+            relative_path = Path("wnba_source") / "src" / "wnba_betting" / "config.py"
+            source_file = src_root / relative_path
+            dest_file = dst_root / relative_path
+            source_file.parent.mkdir(parents=True, exist_ok=True)
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            source_file.write_text("VERSION = 2\n", encoding="utf-8")
+            dest_file.write_text("VERSION = 1\n", encoding="utf-8")
+
+            counters: dict = {}
+            module._sync_tree(src_root, dst_root, counters, "vendor", overwrite_existing=True)
+
+            self.assertEqual(dest_file.read_text(encoding="utf-8"), "VERSION = 2\n")
+            self.assertEqual(counters["vendor"].get("copied"), 1)
 
     def test_sync_tree_skips_unchanged_files(self) -> None:
         module = _load_module()
@@ -88,7 +152,7 @@ class BootstrapDataRootTests(unittest.TestCase):
 
             with patch.object(module.filecmp, "cmp", return_value=True):
                 with patch.object(module.shutil, "copy2") as copy_mock:
-                    module._sync_tree(src_root, dst_root, {}, "wnba_source")
+                    module._sync_tree(src_root, dst_root, {}, "wnba_source", overwrite_existing=False)
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"ok": true}\n')
             copy_mock.assert_not_called()
@@ -112,17 +176,17 @@ class BootstrapDataRootTests(unittest.TestCase):
 
             real_sync_tree = module._sync_tree
 
-            def _flaky_sync_tree(source, destination, counters, key):
+            def _flaky_sync_tree(source, destination, counters, key, *, overwrite_existing):
                 if key == "mlb_source":
                     raise OSError("simulated disk failure syncing mlb_source")
-                return real_sync_tree(source, destination, counters, key)
+                return real_sync_tree(source, destination, counters, key, overwrite_existing=overwrite_existing)
 
             with patch.object(
                 module,
                 "_bootstrap_root_pairs",
                 return_value=[
-                    (src_root / "mlb_source", dst_root / "mlb_source", "mlb_source"),
-                    (src_root / "soccer_source", dst_root / "soccer_source", "soccer_source"),
+                    (src_root / "mlb_source", dst_root / "mlb_source", "mlb_source", module.SEED_ONLY),
+                    (src_root / "soccer_source", dst_root / "soccer_source", "soccer_source", module.SEED_ONLY),
                 ],
             ), patch.object(module, "_sync_tree", side_effect=_flaky_sync_tree):
                 counters = module._sync_bootstrap_roots(src_root, dst_root)
@@ -131,7 +195,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertTrue(copied_players_file.exists(), "soccer_source must still sync after mlb_source fails")
             self.assertEqual(copied_players_file.read_text(encoding="utf-8"), "player_id,name\n1,Real Player\n")
             self.assertNotIn("mlb_source", counters)
-            self.assertEqual(counters.get("soccer_source"), 1)
+            self.assertEqual(counters.get("soccer_source"), {"copied": 1})
 
     def test_bootstrap_roots_include_render_critical_paths(self) -> None:
         module = _load_module()
@@ -140,7 +204,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             data_root = Path(temp_dir) / "data-root"
 
             pairs = module._bootstrap_root_pairs(repo_root, data_root)
-            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _ in pairs]
+            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _, _ in pairs]
 
             self.assertEqual(
                 relative_sources,
@@ -183,7 +247,7 @@ class BootstrapDataRootTests(unittest.TestCase):
             daily_snapshot.write_text("{}\n", encoding="utf-8")
 
             pairs = module._bootstrap_root_pairs(repo_root, data_root)
-            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _ in pairs]
+            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _, _ in pairs]
 
             self.assertIn("reports/intelligence/board_snapshot_2026_06_18.json", relative_sources)
 
@@ -270,6 +334,90 @@ class BootstrapDataRootTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         sync_mock.assert_called_once()
         wnba_mock.assert_not_called()
+
+
+    def test_every_artifact_root_is_seed_only_and_only_vendor_code_overwrites(self) -> None:
+        # The policy assignment itself, asserted as a whole rather than sampled.
+        # An artifact root that reverts to OVERWRITE is the 2026-08-20 regression
+        # coming back, and it would be invisible at every other level: the copy
+        # succeeds, the file is valid JSON, the page renders, the tests pass.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            data_root = Path(temp_dir) / "data-root"
+            pairs = module._bootstrap_root_pairs(repo_root, data_root)
+
+        overwriting = sorted(
+            source.relative_to(repo_root).as_posix()
+            for source, _, _, policy in pairs
+            if policy == module.OVERWRITE
+        )
+        self.assertEqual(overwriting, ["vendor/wnba_betting_repo/src"])
+        self.assertTrue(
+            all(policy in (module.SEED_ONLY, module.OVERWRITE) for _, _, _, policy in pairs)
+        )
+
+    def test_force_overwrite_env_re_arms_the_old_behaviour(self) -> None:
+        # `off != on` for the escape hatch, and proof that the seed-only branch
+        # is what actually runs without it. Same inputs, same call, both ways.
+        module = _load_module()
+        for force, expected in (("0", "old\n"), ("1", "new\n")):
+            with self.subTest(force=force):
+                with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+                    src_root = Path(src_dir)
+                    dst_root = Path(dst_dir)
+                    relative_path = Path("soccer_source") / "epl" / "api" / "x.json"
+                    (src_root / relative_path).parent.mkdir(parents=True, exist_ok=True)
+                    (dst_root / relative_path).parent.mkdir(parents=True, exist_ok=True)
+                    (src_root / relative_path).write_text("new\n", encoding="utf-8")
+                    (dst_root / relative_path).write_text("old\n", encoding="utf-8")
+
+                    with patch.object(
+                        module,
+                        "_bootstrap_root_pairs",
+                        return_value=[
+                            (
+                                src_root / "soccer_source",
+                                dst_root / "soccer_source",
+                                "soccer_source",
+                                module.SEED_ONLY,
+                            )
+                        ],
+                    ), patch.dict(os.environ, {"SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE": force}, clear=False):
+                        module._sync_bootstrap_roots(src_root, dst_root)
+
+                    self.assertEqual((dst_root / relative_path).read_text(encoding="utf-8"), expected)
+
+    def test_single_file_pair_is_reported_as_inert_rather_than_logged_as_synced(self) -> None:
+        # `_sync_tree` returns immediately for a non-directory, so every entry in
+        # BOOTSTRAP_FILES and every per-date intelligence glob has always been a
+        # no-op -- while the loop logged "Syncing <file> -> <file>" for each one.
+        # Not activated here (that would start writing the committed mirror of
+        # intelligence_state.json onto a running service's disk, which needs its
+        # own decision); recorded so the log stops implying work that never
+        # happens.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            src_root = Path(temp_dir) / "repo"
+            dst_root = Path(temp_dir) / "data-root"
+            src_file = src_root / "reports" / "intelligence" / "board_snapshot.json"
+            src_file.parent.mkdir(parents=True, exist_ok=True)
+            src_file.write_text("{}\n", encoding="utf-8")
+            dst_file = dst_root / "reports" / "intelligence" / "board_snapshot.json"
+
+            with patch.object(
+                module,
+                "_bootstrap_root_pairs",
+                return_value=[
+                    (src_file, dst_file, "reports/intelligence/board_snapshot.json", module.SEED_ONLY)
+                ],
+            ):
+                counters = module._sync_bootstrap_roots(src_root, dst_root)
+
+            self.assertFalse(dst_file.exists())
+            self.assertEqual(
+                counters["reports/intelligence/board_snapshot.json"], {"inert_file_entry": 1}
+            )
 
 
 if __name__ == "__main__":
