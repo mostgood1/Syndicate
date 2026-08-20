@@ -203,7 +203,10 @@ def _reliability(pairs: list[tuple[float, bool]], bins: int = 5) -> list[dict[st
     return out
 
 
-def backtest_league(league: str, *, simulations: int, min_prior_matches: int, limit: int | None) -> dict[str, Any]:
+def backtest_league(
+    league: str, *, simulations: int, min_prior_matches: int, limit: int | None,
+    wire_market_confidence: bool = False,
+) -> dict[str, Any]:
     history = _load_history(league)
     if not history:
         return {"league": league, "error": "no committed history"}
@@ -305,6 +308,17 @@ def backtest_league(league: str, *, simulations: int, min_prior_matches: int, li
                     fx["home_starters_available_share"] = espn_row["home_starters_available_share"]
                 if espn_row.get("away_starters_available_share") is not None:
                     fx["away_starters_available_share"] = espn_row["away_starters_available_share"]
+            # `market_features.confidence` is match-level, not per-side (see
+            # `_market_prior_index` -- no `side=` on its `_first_float` call),
+            # so ONE value applies to both teams' priors, same as tempo. Reuses
+            # `_market_probabilities`, the SAME devig this script already uses
+            # for the market benchmark -- CLI-gated (`--wire-market-confidence`,
+            # default off) specifically so a plain re-run of this script never
+            # silently starts leaking the benchmark into the model.
+            if wire_market_confidence:
+                market = _market_probabilities(row)
+                if market is not None:
+                    fx["market_features"] = {"confidence": max(market.values())}
             return fx
 
         simulation_input = build_soccer_simulation_input(
@@ -390,6 +404,16 @@ def main() -> int:
     parser.add_argument("--simulations", type=int, default=300, help="matches production's _DEFAULT_SIMULATIONS")
     parser.add_argument("--min-prior-matches", type=int, default=20)
     parser.add_argument("--limit", type=int, default=None, help="cap matches scored per league")
+    parser.add_argument(
+        "--wire-market-confidence",
+        action="store_true",
+        help="feed market_features.confidence (max de-vigged closing-odds probability) into the "
+        "sim's market_prior_index. OFF by default. NOTE: this reuses the SAME closing odds this "
+        "script benchmarks the model against, so a Brier improvement with this flag on reflects "
+        "shrinkage toward the market, not independent model skill -- see possession_priors.py's "
+        "_market_prior_index docstring and the soccer-model-dispersion lane's log for why that "
+        "distinction matters here specifically.",
+    )
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument(
         "--dump-matches",
@@ -410,6 +434,7 @@ def main() -> int:
             simulations=args.simulations,
             min_prior_matches=args.min_prior_matches,
             limit=args.limit,
+            wire_market_confidence=args.wire_market_confidence,
         )
         for league in leagues
     ]

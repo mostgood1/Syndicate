@@ -2419,6 +2419,49 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   revisits this, a DIFFERENT hypothesis for what pace should predict (not
   total goals) or a fundamentally different "event" unit is needed, not a
   rerun of the same test.
+  **UPDATE 2026-08-19 ~19:2xZ — THE BACKTEST WAS RATING 5 OF 9 LEAGUES FROM
+  A DIFFERENT PIPELINE THAN PRODUCTION RUNS. FIXED (`3ad5c8a4`).** Found
+  while checking whether `ppda` was a misrouted producer (data existing
+  somewhere unused) rather than genuinely missing: it was both.
+  `data/soccer_source/{epl,la_liga,bundesliga,serie_a,ligue_1}/team_history/
+  teams_*.csv` already carry real Understat xG AND real ppda (confirmed:
+  `ppda=11.3043` on a live EPL row), and `build_soccer_artifacts.py`
+  (production) already reads this directly for exactly these 5 leagues via
+  `_GOALS_BASED_RATING_LEAGUES` branch logic (`window=45`) — but
+  `backtest_soccer_h2h_calibration.py` had no such branch and rated ALL 9
+  leagues via the goals-as-xG fallback (`window=45` uniform, vs production's
+  `window=90` for the 4 leagues that fallback is actually meant for). **A
+  backtest measuring a different pipeline than production runs is not
+  measuring production, however leak-free its methodology.** Killed a
+  ~1.5h-in 9-league run on the OLD pipeline rather than trust its number for
+  those 5 leagues (user's explicit call). Fixed by mirroring production's
+  branch exactly, with a new test asserting the two modules'
+  `_GOALS_BASED_RATING_LEAGUES` sets stay equal so this cannot silently
+  drift apart again. **Resolves the `ppda` checklist alarm for free** — no
+  new external sourcing needed. **Flagged, not fixed:** production's own
+  Understat branch does not fold in ESPN possession/set-piece even though
+  `espn_match_stats.json` already exists for all 5 of those leagues — a
+  real, separate opportunity, out of scope for this fix.
+  **9-league re-run against the FIXED pipeline is IN FLIGHT as of this
+  checkpoint (PID 14132, launched ~19:33Z). Do not report a Brier/stdev
+  number against the 08-15 baseline until it lands.**
+  **`market_features.confidence` sourced, wired (CLI-gated, default OFF),
+  and paired-tested — KEPT AS BUILT, not promoted further.** `_market_prior_
+  index` has read `model_probability`/`confidence`/`edge` since the engine
+  was written; confirmed football's identical engine also never populates
+  it (checked directly, not assumed) — a cross-sport gap, not soccer-
+  specific. Reuses `_market_probabilities` (the SAME de-vigged closing-odds
+  computation this script already uses for the market BENCHMARK) as
+  `confidence = max(implied probs)`. Paired test, eredivisie n=126, vs the
+  possession/set-piece baseline: mean delta -0.0040 (favorable), t=-0.96 —
+  **not significant, and weaker than every other field tested this
+  session** (all others had |t| > 1.3). Deliberately left CLI-gated rather
+  than unconditionally wired like the other three fields: this is the ONLY
+  new input this session where the source data is IDENTICAL to the
+  benchmark the lane exists to beat, so any improvement is shrinkage-
+  toward-market, not independent skill — a weaker and methodologically
+  different case than possession/set-piece/availability's "keep despite
+  non-significance" calls.
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 

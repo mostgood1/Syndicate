@@ -1880,6 +1880,54 @@ answer came from the Render logs API against the worker's own refresh loop
 instead — `resource=srv-d91dpertqb8s73co8ls0&text=too_large`. **A bounded log
 line is only bounded if the bound applies to the WHOLE line.**
 
+## 2026-08-19 — OVERTURNED: "leak-free" is not "representative" -- a backtest can be methodologically clean and still measure the wrong pipeline
+
+`backtest_soccer_h2h_calibration.py` was built and trusted on the strength of
+its leak-freedom: ratings recomputed per match day with a correct `as_of`
+cutoff, closing odds as an honest benchmark, per-family date coverage stated
+rather than assumed. All of that was, and is, true. It was also rating 5 of
+9 leagues (epl/la_liga/bundesliga/serie_a/ligue_1) via the goals-as-xG
+fallback, while `build_soccer_artifacts.py` -- PRODUCTION -- reads real
+Understat xG and real ppda directly from `team_history/*.csv` for exactly
+those five leagues. Two entirely different code paths, both leak-free in
+their own right, computing different numbers for what "this team's attack
+rating" means. **The backtest's own internal correctness said nothing about
+whether it was testing the thing production actually runs.**
+
+Found while checking whether `ppda` (a CONSUMED+UNPOPULATED checklist alarm)
+was a misrouted producer rather than genuinely missing data -- the
+"data already exists somewhere, check before sourcing new" discipline this
+session had already applied twice. It was both: the data existed, AND the
+backtest script simply never read the file it lived in.
+
+**The general rule.** A backtest's job is to measure what production does.
+"Leak-free" answers "is this number honestly measured from the data it
+uses" -- a completely separate question from "is this the SAME data
+production uses." Passing the first says nothing about the second, and
+nothing about the second's absence produces an error, a test failure, or
+any signal at all -- both pipelines run, both produce plausible numbers,
+both pass every existing test. The two pipelines have to be checked against
+each other DIRECTLY (does the backtest's league-branching logic match
+production's, field for field), not inferred from either one looking
+correct in isolation.
+
+**How to apply, going forward:** whenever a backtest and its production
+counterpart both compute "the same" derived quantity (ratings, features,
+whatever a sim consumes) from source data, that computation's BRANCHING
+LOGIC -- which leagues/sports/entities take which code path -- must be
+checked for equality between the two call sites, not just each site's
+internal correctness. A named constant (`_GOALS_BASED_RATING_LEAGUES`) that
+exists in two places and is never asserted equal is exactly the kind of
+drift this misses. `test_backtest_matches_production_rating_source.py`'s
+first test is that assertion, added specifically so this class of bug
+cannot silently return.
+
+Related: [[project_syndicate_e2e_assessment]] (the general "Render is source
+of truth, git is a lossy mirror" caution is a sibling of this -- both are
+"the thing that LOOKS like ground truth is not automatically the thing that
+matters" traps), and this session's own earlier xG-double-count fix (a
+different flavor of the same family: code that is locally correct and
+globally wrong).
 ## 2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.
 
 I told the user a roster-rebuild gate set for `2026-08-19` had **expired
@@ -1939,3 +1987,36 @@ a load balancer.
 **Cost:** one wrong PASS reported to the user, inside the same hour as a wrong
 FAIL from the timing version. Two opposite errors, one root habit — reading once
 and treating the answer as the truth.
+## Ancestry is the wrong test for a cherry-picked deploy `[2026-08-20]`
+
+**Believed:** `git merge-base --is-ancestor <fix> <live_sha>` tells you whether
+a fix is live.
+
+**Actually:** a cherry-pick creates a NEW commit with a new SHA, so the
+ORIGINAL commit is never an ancestor of it. Checking `#475` on web that way
+returned NO for a deploy that was completely correct — the test was wrong, not
+the deploy. Nearly reported a successful deploy as failed.
+
+**Rule:** for any cherry-picked/scoped deploy — which on this repo is MOST of
+them, because service live-SHAs are usually off-main — verify by CONTENT
+(`git show <live_sha>:<path> | grep <the new symbol>`), never by ancestry.
+Ancestry is only valid when deploying a commit that literally descends from
+what is live.
+
+## `HOT_ARTIFACT_PATTERNS` is about worker→web, not "can the sim see it" `[2026-08-20]`
+
+**Believed:** `#474`'s and `#477`'s new artifacts were blocked from production
+by the missing allowlist entries, so the work was inert until another lane
+added them.
+
+**Actually:** every consumer of those artifacts is the SIM, which runs
+worker-side and reads them from its own `processed_root`.
+`HOT_ARTIFACT_PATTERNS` governs PUBLISHING worker→WEB. A builder running
+inside the worker refresh writes to the same disk its reader uses, so no
+allowlist is involved in making it work. The allowlist buys external
+auditability via `/api/ops/artifacts/export` — worth having, not blocking.
+
+**Rule:** before treating an allowlist entry as a blocker, name the READER and
+the disk it reads from. "Producer and consumer are both worker-side" and
+"needs to cross to web" are different problems with different fixes, and
+conflating them makes a lane wait on another lane for no reason.
