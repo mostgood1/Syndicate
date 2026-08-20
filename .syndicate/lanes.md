@@ -1110,7 +1110,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   populated fixture before trusting either the pattern or the test.
 - Blocked by: none.
 
-### nfl-artifact-publish-wiring — CLOSED-VERIFIED 2026-08-20 — landed `4feb5fa7` on `origin/main`, NOT yet deployed — opened 2026-08-20 — session: nfl-artifact-publish-wiring
+### nfl-artifact-publish-wiring — CLOSED-VERIFIED 2026-08-20 — landed `4feb5fa7`, DEPLOYED to refresh-worker (`d1a897b2`, live 21:57:44Z) -- e2e retry (real autorun re-run + export check) still pending, ~01:41Z or later — opened 2026-08-20 — session: nfl-artifact-publish-wiring
 - Goal: `nfl-artifact-allowlist-add` deployed the allowlist to both
   services (web `c5c1b0b5`, refresh-worker `08bd601f`), then a real
   `/api/ops/artifacts/export` call against production returned `count: 0`
