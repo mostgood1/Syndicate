@@ -1,5 +1,145 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** STAYS OPEN: the boot that would have proven it was KILLED 63 SECONDS IN by a `/healthz` timeout, and the lock it left behind made the NEXT boot skip the sync entirely — so no complete bootstrap has run since the fix. Readings are clean but bounded to the first root. **Discharging reading is one log line, and the released web claim means the next session's web deploy supplies it** — lane `soccer-stale-artifact-overwrite`
+
+**THE SYMPTOM.** `/soccer/api/cards` served the finished La Liga match
+Alaves 1-1 Rayo Vallecano as a 0-0 that had not kicked off. The artifact behind
+it, `soccer_source/la_liga/api/recommendations/recommendations_2026-08-20.json`,
+read `generated_at 2026-07-20T21:33:36` — a month stale — and was
+**byte-identical to the committed mirror** (sha256 `70dbdc0c35585dbf…`,
+36,898 bytes = the checkout's 38,019 CRLF bytes with line endings normalised).
+
+**IT WAS BRIEFLY CORRECT, AND THAT IS THE WHOLE CLUE.** The same endpoint served
+the match correctly at 21:42:5xZ and the month-old copy from 21:45Z across six
+consecutive reads. So something REPLACED a good file rather than never writing
+one.
+
+**THE CAUSE — not a publisher, and nothing to do with the allowlist.**
+`scripts/bootstrap_data_root.py`, run from `syndicate/app.py`'s
+`_bootstrap_render_data` at every web boot. `_copy_file_if_needed` copied the
+checkout over the destination whenever the two differed: **repo always wins, no
+freshness test of any kind.** Web's own logs bracket the incident exactly:
+
+| time | event |
+|---|---|
+| 21:42:15Z | web deploy `075226dd` goes live |
+| **21:42:31Z** | `Bootstrapping data root: repo=/opt/render/project/src` |
+| 21:42:5xZ | the good read — **inside the sync's own window** |
+| **21:43:28.245Z** | `Syncing …/data/soccer_source -> /opt/render/project/data/soccer_source` |
+| 21:45Z → | the month-old copy, six consecutive reads |
+
+**WHY IT SURVIVED MONTHS OF DEPLOYS UNSEEN — two independent blindfolds.**
+
+1. **`copy2` preserves the SOURCE mtime.** The clobbered file's mtime reads
+   `21:36:27Z`: the checkout's own timestamp, *six minutes before the last good
+   read of the file it replaced*. An mtime that predates the write it describes
+   is the fingerprint. The other half is that it is a WHOLE SECOND — Render's
+   checkout has 1s granularity where a runtime write has nanoseconds — and seven
+   files across four leagues share that one timestamp, which is a batch copy and
+   cannot be a publish.
+2. **The log counter was a lie of omission.** It incremented once per file
+   VISITED and printed as `"%d files copied"` — `33,379` on a run that wrote a
+   handful. A boot that destroyed a live artifact and a boot that did nothing
+   printed the same number.
+
+**THE SCOPE, measured against `/api/ops/artifacts/export` the same evening.**
+Not soccer-specific; the sync walks whole trees and the allowlist is irrelevant
+to it:
+
+| | |
+|---|---|
+| hot artifacts web was serving that were byte-for-byte the checkout's copy | **1,114 of 8,016** (mlb, wnba, nba, nhl, nfl, soccer) |
+| live artifacts scheduled to be destroyed by the *next* boot | **88**, incl. the MLB sim input `batted_ball_2026.json` |
+
+Both counts cover the ALLOWLIST ONLY. The sync itself walks ~33k files, so these
+are lower bounds on a set that cannot be enumerated from outside.
+
+**WEB ONLY, and this corrects `#357`.** `_bootstrap_render_data` is called from
+`create_app()` and nowhere else; neither worker entrypoint imports
+`syndicate.app` (they import `syndicate.features.*` only), and both are
+`type: worker` with a plain `python scripts/run_*.py` startCommand.
+`SYNDICATE_BOOTSTRAP_ON_START=1` is set on all three services and is read by
+nothing on the two workers. **`#357`'s standing counter-argument — *"`_sync_tree`
+copies `data/soccer_source` recursively, it is in `BOOTSTRAP_ROOTS`,
+`SYNDICATE_BOOTSTRAP_ON_START=1` on refresh-worker … `team_history` should be on
+the disk"* — is therefore void**, and so is its residual *"why does the bootstrap
+sync drop `soccer_source`"*: on refresh-worker it never ran at all.
+`run_refresh_worker.py:119` has said so in a comment since `#145`.
+
+**THE FIX** (`32148cac` on `origin/main`; grafted to `15a0be64` for web, because
+web's live SHA was 462 files off main and deploying main's tip would have been a
+far larger change than this one). Artifact roots are **seed-only**: copy when the
+destination is ABSENT, never replace what the pipeline wrote. Vendored code keeps
+overwrite — git owns it, no pipeline writes it, and pinning a stale copy there
+would be the bug in the other direction.
+`SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE=1` re-arms the old behaviour for a
+deliberate reseed. Counters are now `copied`/`unchanged`/`kept` per root.
+
+**MEASURED AFTER THE DEPLOY** (live 22:36:32Z, sync began 22:36:47Z):
+
+    control group (live content the mirror would have overwritten)   88
+      survived                                                       88
+      clobbered                                                       0
+    artifacts anywhere that flipped runtime-written -> checkout copy   0
+    la_liga recommendations_2026-08-20  generated_at 22:37:07Z   <- FRESH
+    la_liga recommendations_2026-08-21  generated_at 22:37:33Z   <- FRESH
+
+The artifact that started this now carries a current stamp: the pipeline
+republished it minutes after the boot and, for the first time, the republished
+copy was still there afterwards.
+
+**WHAT IS NOT YET PROVEN, and why this stays open.** The completion summary
+(`Bootstrap totals: copied= unchanged= kept=`) never appeared, and the reason is
+not the log collector:
+
+| time | event |
+|---|---|
+| 22:36:47.659Z | `Syncing …/mlb_source/source_artifacts … (policy=seed_only)` — root 1 of 16 |
+| 22:37:41.695Z | last `/healthz` 200, then a ~30s gap |
+| 22:37:42 / 22:37:50 | gunicorn workers 79, 78 exit; `Shutting down: Master` |
+| **22:37:52.78Z** | `server_failed` — `unhealthy: HTTP health check` |
+| 22:38:05 / 22:38:11Z | replacement workers boot; `server_available` |
+
+**The instance was killed 63 seconds into the sync, inside the first root.** In
+that window the 2-worker container was serving at least FOUR concurrent multi-MB
+glob exports — one mine (`names_only=1`, 950,632 B) and three from the platform's
+own callers on other source IPs (`pattern=*2026-08-20*`, 3,058,992 B, twice;
+`*2026_08_20*`, 1,219,500 B) — while the sync walked 31,147 files, with workers
+already at 594/607 MB RSS against a 2 GB ceiling.
+
+`soccer_source` syncs LAST and was never reached. **So the 67 mlb files in the
+control group are in-flight evidence and the 21 soccer files are an inference.**
+
+**AND THE NEXT BOOT SKIPPED THE SYNC.** gunicorn shut down gracefully, so the
+daemon bootstrap thread was never joined and `_run_bootstrap`'s
+`finally: os.remove(lock_path)` never ran. The replacement instance found
+`.bootstrap_sync.lock` fresh (`<1800s`, `syndicate/app.py:109`) and returned
+without syncing. **No complete bootstrap has run since this fix went live.**
+
+**A NEW DEFECT FALLS OUT OF THAT, pre-existing and not fixed here: a killed
+bootstrap poisons the next boot for 30 minutes.** Web took 8 deploys today, so
+the sync may frequently never complete — which plausibly explains why 1,114 hot
+artifacts were mirror copies rather than all ~33k. Worth its own item, together
+with the question of whether a 33k-file walk belongs in a background thread on a
+2-worker 2 GB container at all.
+
+**HOW IT GETS DISCHARGED.** One log line — `Bootstrap totals:` with a non-zero
+`kept` — plus one control-group re-read. It needs a boot whose sync completes.
+Both ways to force one are correctly closed and neither was worked around: a raw
+`POST /v1/services/…/restart` is classifier-blocked, and a same-SHA redeploy
+returns `HOLD: … already contained in live … the deploy is redundant`. **The web
+deploy claim was RELEASED so the next session's web deploy supplies the boot**,
+with a monitor watching the Render logs API (not the web service) for that line.
+
+**RELATED, NOT FIXED HERE.** The single-file entries in `BOOTSTRAP_FILES` and
+the per-date `reports/intelligence/*` globs have NEVER synced — `_sync_tree`
+returns immediately for a non-directory — while the loop logged `Syncing <file>`
+for each one. They are now reported as `inert_file_entry` rather than activated:
+making them live would start writing the committed mirror of
+`intelligence_state.json` and `board_snapshot.json` onto a running service's
+disk, which is the same class of change this item exists to stop and needs its
+own decision.
+
 ### `#493` — **MLB VENDOR EXIT: make `ladders_build` the PRODUCER and delete the vendor ladders stage. Stage 1 of 20.** Fix SHIPPED and LIVE; production verification UNDISCHARGED — lane `mlb-native-ladders-producer`
 
 **What was wrong.** MLB pregame starter ladder chips rendered nothing, and on 12

@@ -1193,6 +1193,41 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   discipline as every other change this session.
 - Blocked by: none.
 
+### soccer-stale-artifact-overwrite — OPEN — **CAUSE FOUND, FIX LANDED (`32148cac`) AND LIVE ON WEB (`15a0be64`, 22:36:32Z, grafted onto the live SHA — main was 462 files away). THE HANDED-DOWN HYPOTHESIS WAS WRONG: no worker publishes anything here. Web's OWN boot sync (`bootstrap_data_root.py` via `_bootstrap_render_data`) copied the git checkout over its own disk on every boot, repo-always-wins, and its logs bracket the incident exactly (sync 21:42:31Z → 21:43:28Z; the good read at 21:42:5xZ sits INSIDE that window). Served bytes were sha256-identical to the committed mirror. `copy2` preserves the SOURCE mtime, so the clobbered file's mtime (21:36:27Z) PREDATES the last good read of the file it replaced — that inversion is the fingerprint, and a whole-second mtime shared by 7 files across 4 leagues is the other half. SCOPE: 1,114 of 8,016 hot artifacts web served were the checkout's copy; 88 live ones (incl. MLB sim input `batted_ball_2026.json`) were scheduled for destruction at the next boot — both LOWER BOUNDS, the sync walks ~33k files. WEB ONLY: neither worker imports `syndicate.app`, so `SYNDICATE_BOOTSTRAP_ON_START=1` is inert on both — which VOIDS `#357`'s standing counter-argument. POST-DEPLOY: control group 88/88 survived, 0 clobbered, 0 artifacts flipped to the mirror, and la_liga `recommendations_2026-08-20` now reads `generated_at 22:37:07Z`. **NOT DISCHARGED, and the reason is worse than "slow": THAT BOOT'S SYNC WAS KILLED 63 SECONDS IN.** `/healthz` went unanswered ~30s and Render fired `server_failed` (`unhealthy: HTTP health check`) at 22:37:52.78Z while the container served 4 concurrent multi-MB glob exports (1 mine, 3 the platform's) alongside a 31,147-file walk, workers already at 594/607 MB of 2 GB. It died inside root 1 of 16; `soccer_source` syncs LAST and was never reached — so the 67 mlb files are in-flight evidence and the 21 soccer files are an INFERENCE. Worse, the graceful shutdown never joined the daemon thread, so `_run_bootstrap`'s `finally` left `.bootstrap_sync.lock` behind and the replacement instance SKIPPED the sync entirely (<1800s lock, `app.py:109`). **No complete bootstrap has run since the fix went live.** A killed bootstrap poisoning the next boot for 30 min is a separate pre-existing defect, filed in `#494`. DISCHARGE = one `Bootstrap totals: … kept=` line + one control-group re-read; both ways to force a boot are correctly blocked (classifier on raw restart, preflight `HOLD: redundant` on same-SHA) and neither was worked around, so **the web claim was RELEASED for the next session's deploy to supply it**, with a monitor on the Render logs API.** — opened 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
+- Goal: web's runtime disk stops being overwritten with the month-old
+  git-mirror copy of `soccer_source/*/api/recommendations/recommendations_*.json`.
+  **Testable outcome:** `/api/ops/artifacts/export?path=soccer_source/la_liga/
+  api/recommendations/recommendations_<today>.json` returns a `generated_at`
+  from TODAY, and still does on a re-read >=30 min later (the 22:00Z lesson:
+  one green read is timing, not a property).
+- Files: `syndicate/features/shared/artifact_publisher.py`,
+  `scripts/run_refresh_worker.py`, `syndicate/app.py` (`_bootstrap_render_data`
+  only), `tests/test_artifact_publisher.py`, `.syndicate/*`.
+- **NOT IN THIS LANE (declared overlaps, will not edit):**
+  `scripts/build_soccer_artifacts.py` and `syndicate/features/soccer/` sim dirs
+  (`soccer-model-dispersion`); `syndicate/features/soccer/cards.py`,
+  `sources.py`, `syndicate/blueprints/soccer.py` (`soccer-board-mlb-parity`).
+- Hypothesis (from `deploys.md` 22:00Z): a service whose own runtime disk holds
+  the git-shipped mirror copy publishes it through `HOT_ARTIFACT_PATTERNS` and
+  overwrites web's fresher file. **FALSIFIED 2026-08-20 22:1xZ.** No publisher is
+  involved and the allowlist is irrelevant: `_write_published_artifact` writes
+  with sub-second mtimes, and the clobbered file carried a whole-second mtime
+  copied from the checkout. The `_bootstrap_render_data` half of that hypothesis
+  was right, but as web's OWN boot sync overwriting web's OWN disk — not as a
+  cross-service publish.
+- Falsification test: if the file's `mtime` on web has NOT moved since before
+  21:42Z, nothing overwrote anything and the fresh reading came from somewhere
+  other than this file — the hypothesis is dead and the question becomes which
+  root served the 21:42Z read. Equally: if no other service's disk holds a
+  `generated_at 2026-07-20` copy, there is nothing to have pushed.
+- Verification: the goal reading above, taken TWICE separated by >=30 min, with
+  the INPUT stated both times. **First reading TAKEN 22:37-22:39Z and clean, but
+  it lands inside the boot sync it is meant to outlast — the same defect the
+  22:00Z entry named, repeated on the lane opened to fix it. The second reading
+  is the one that counts, and it must be taken after that boot's sync is
+  confirmed COMPLETE, not merely after N minutes.**
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

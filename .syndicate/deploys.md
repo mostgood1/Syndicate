@@ -19900,3 +19900,190 @@ seductive form of nothing.** Before citing "N of N", state what a
 counterexample would have looked like and confirm the sample could have
 contained one. Twelve pre-kickoff matches cannot tell you what a live match
 does.
+
+---
+
+## SHIPPED 2026-08-20 22:36:32Z — web `15a0be64` — THE PRODUCER WAS WEB ITSELF. Its boot sync overwrote live artifacts with the committed mirror
+
+    lane:      soccer-stale-artifact-overwrite   (session eb7a0536)
+    source:    origin/main 32148cac
+    web:       15a0be64  graft, parent 79cb457e (web's live SHA)
+               dep-da3nvkgn74is73f9ei8g  trigger=api  live 22:36:32.148Z  4 files
+    preflight: CLEAR, target-commit pinned, --allow-off-main (see below)
+    rollback:  deploy 79cb457e
+
+**Follows the 22:00Z entry's "STILL BROKEN, NOT THIS LANE'S".** That entry
+asked whose lane it was. It is `bootstrap_data_root.py`'s.
+
+### The hypothesis handed to this lane was WRONG, and the right answer was in web's own logs
+
+The lead was *"a worker publishes ITS OWN checkout's stale git mirror and
+overwrites web's fresh copy — leading hypothesis, NOT yet confirmed."* It is
+falsified. **No publisher is involved and the allowlist is irrelevant.**
+`scripts/bootstrap_data_root.py`, called from `syndicate/app.py`'s
+`_bootstrap_render_data` at every web boot, copies the git checkout onto web's
+own mounted disk. `_copy_file_if_needed` overwrote the destination whenever the
+two differed: **repo always wins, no freshness test of any kind.**
+
+| time | event |
+|---|---|
+| 21:42:15Z | web deploy `075226dd` goes live |
+| **21:42:31.379Z** | `Bootstrapping data root: repo=/opt/render/project/src` |
+| 21:42:5xZ | the 22:00Z entry's good read — **inside this sync's own window** |
+| **21:43:28.245Z** | `Syncing …/data/soccer_source -> /opt/render/project/data/soccer_source` |
+| 21:45Z → | the month-old copy, six consecutive reads |
+
+Corroborated three ways, none of them the log alone: web's served bytes are
+**sha256-identical** to the committed mirror (`70dbdc0c35585dbf…`, 36,898 B =
+the checkout's 38,019 CRLF bytes LF-normalised); `SYNDICATE_BOOTSTRAP_ON_START=1`
+on web; and the export endpoint reads `SYNDICATE_DATA_ROOT`, with
+`SYNDICATE_SOCCER_SOURCE_ROOT` unset — so **the RUNTIME DISK served that read,
+not `preferred_source_roots`' repo fallback.** That answers the `_api_read_path`
+question the lead raised: the fallback was never in the path.
+
+### The two things that hid it for months
+
+**1. `copy2` preserves the SOURCE mtime.** The clobbered file's mtime reads
+`21:36:27Z` — the checkout's own timestamp, *six minutes before the last good
+read of the file it replaced*. **An mtime that predates the write it describes
+is the fingerprint**, and it inverts the usual reasoning: the file looks OLDER
+than the event that created it. The other half is that it is a WHOLE SECOND
+(Render's checkout has 1s granularity; a runtime write has nanoseconds), and
+seven files across four leagues carry that identical timestamp — a batch copy,
+which no per-league publish can produce.
+
+**2. The counter was a lie of omission.** It incremented once per file VISITED
+and printed as `"%d files copied"` — **33,379 on a run that wrote a handful.** A
+boot that destroyed a live artifact and a boot that did nothing printed the same
+number. Now `copied`/`unchanged`/`kept`, per root and in total.
+
+### Scope: not soccer, and bigger than the allowlist can see
+
+Measured against `/api/ops/artifacts/export` before the fix:
+
+| | |
+|---|---|
+| hot artifacts web was serving that were byte-for-byte the checkout's copy | **1,114 of 8,016** (mlb, wnba, nba, nhl, nfl, soccer) |
+| live artifacts scheduled to be destroyed by the NEXT boot | **88**, incl. the MLB sim input `batted_ball_2026.json` |
+
+**Both are lower bounds.** They cover the allowlist only; the sync walks ~33k
+files, and the rest cannot be enumerated from outside the disk.
+
+**WEB ONLY — and this retires a standing counter-argument in `#357`.**
+`_bootstrap_render_data` is called from `create_app()` and nowhere else. Neither
+worker entrypoint imports `syndicate.app` (only `syndicate.features.*`), and both
+are `type: worker` running a plain script. `SYNDICATE_BOOTSTRAP_ON_START=1` is
+set on all three services and **read by nothing on the two workers** — the env
+var was the trap, the code is the answer. So `#357`'s objection *"…
+`SYNDICATE_BOOTSTRAP_ON_START=1` on refresh-worker … `team_history` should be on
+the disk"* is void, as is its residual *"why does the bootstrap sync drop
+soccer_source"*: on refresh-worker it never ran. `run_refresh_worker.py:119` has
+said so in a comment since `#145`, and that comment is what settled it.
+
+### The fix
+
+Artifact roots are **seed-only** — copy when the destination is ABSENT, never
+replace what the pipeline wrote. Vendored code keeps overwrite (git owns it, no
+pipeline writes it; pinning a stale copy there is the bug in the other
+direction). `SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE=1` re-arms the old behaviour for
+a deliberate reseed.
+
+Rehearsed against the REAL checkout tree before deploying: cold disk seeds 162
+soccer files; second boot reports `{'unchanged': 161, 'kept': 1}` and the live
+artifact survives; the same fixture under the old policy reports
+`{'unchanged': 161, 'copied': 1}` and reverts it to `generated_at 2026-07-20`.
+
+**Why `--allow-off-main`.** Web's live SHA `79cb457e` was **462 files** apart
+from main's tip. Deploying main would have been a far larger change than this
+one, on a service other lanes are mid-verification on. Grafted onto the live SHA
+instead — the same pattern the 17:49Z / 18:07Z / 22:00Z entries used, and for the
+same reason. The change itself IS on `origin/main` as `32148cac`.
+
+### verify: PARTIAL, AND SAYING SO — the boot sync was KILLED 63 SECONDS IN
+
+**Readings taken 22:37-22:39Z, all clean:**
+
+    control group (live artifacts the mirror would have overwritten)   88
+      survived                                                         88
+      clobbered                                                         0
+    artifacts anywhere that flipped runtime-written -> checkout copy     0
+    la_liga recommendations_2026-08-20   generated_at 22:37:07Z    <- FRESH
+    la_liga recommendations_2026-08-21   generated_at 22:37:33Z    <- FRESH
+    `policy=seed_only` in web's own log 22:36:47Z  <- the new branch, not the outcome
+
+**And they cover less than they appear to.** The sync never finished:
+
+| time | event |
+|---|---|
+| 22:36:47.659Z | `Syncing …/mlb_source/source_artifacts … (policy=seed_only)` — root 1 of 16 |
+| 22:37:41.695Z | last `/healthz` 200 |
+| 22:37:42 / 22:37:50 | gunicorn workers 79, 78 exit; `Shutting down: Master` |
+| **22:37:52.78Z** | `server_failed` — `unhealthy: HTTP health check` |
+| 22:38:05Z | replacement workers 75, 76 boot |
+| 22:38:11.77Z | `server_available` |
+
+`/healthz` went unanswered for ~30s and Render killed the instance **63 seconds
+into the sync, inside the first root.** In that window the 2-worker container was
+serving **at least four concurrent multi-MB glob exports** — one mine
+(`names_only=1`, 950,632 B) and three from the platform's own callers on
+different source IPs (`pattern=*2026-08-20*`, 3,058,992 B, twice; `*2026_08_20*`,
+1,219,500 B) — while the sync walked 31,147 files. Preflight read the workers at
+**594 and 607 MB RSS** against a 2 GB ceiling before any of this.
+
+**`soccer_source` syncs LAST.** It was never reached. So the 67 mlb files in the
+control group are in-flight evidence and the 21 soccer files are an INFERENCE,
+which is exactly the distinction this ledger's 22:00Z entry exists to enforce.
+
+**AND THE NEXT BOOT SKIPPED THE SYNC ENTIRELY.** Gunicorn shut down gracefully,
+so the daemon bootstrap thread was never joined — `_run_bootstrap`'s
+`finally: os.remove(lock_path)` did not run and `.bootstrap_sync.lock` survived.
+The replacement instance at 22:38:05Z found that lock fresh (`<1800s`,
+`syndicate/app.py:109`) and returned without syncing. **No complete bootstrap has
+run since this fix went live.**
+
+**A killed bootstrap therefore poisons the NEXT boot for 30 minutes**, and web
+took 8 deploys today. That is a separate defect from the one this deploy fixes,
+it is pre-existing, and it plausibly explains why 1,114 hot artifacts were mirror
+copies rather than all ~33k: the sync may often never finish. Filed, not fixed
+here.
+
+**HOW THIS GETS DISCHARGED, and why I am not forcing it.** The reading needed is
+one line — `Bootstrap totals: copied= unchanged= kept=` with a non-zero `kept` —
+plus one control-group re-read. It requires a boot whose sync completes. Both
+ways to force one are correctly closed: a raw `POST /v1/services/…/restart` is
+classifier-blocked (the repo's own reason for `render_deploy.py` existing), and a
+same-SHA redeploy returns `HOLD: 15a0be64 is already contained in live 15a0be64
+-- the deploy is redundant`. Neither guard was worked around. **The web claim is
+RELEASED so the next session's web deploy supplies the boot**, and a monitor is
+watching the Render logs API — not the web service — for that summary line.
+
+### Three process notes, one of them a correction to myself
+
+**1. The first post-deploy readings were taken INSIDE the boot sync they were
+meant to outlast** — exactly the failure the 22:00Z entry above names, repeated
+on the lane opened to fix it. `mlb_source/source_artifacts` is root 1 and
+`soccer_source` is the last, so a reading taken 40s in covers the first and
+merely predicts the second. **A deploy's verification window and its boot sync
+overlap, and the sync is invisible unless you go looking for it.** Looking for it
+is what turned "the sync is slow" into "the sync was killed".
+
+**2. I diagnosed the silence wrong first, and the wrong diagnosis was
+self-flattering in a specific way.** When the completion summary did not appear I
+concluded the sync was running slowly and that my own `names_only=1` exports were
+starving it — plausible, self-critical, and WRONG. The access log says my export
+was ONE of at least four concurrent multi-MB exports in that window and the other
+three were the platform's own pulls; the service events say the instance was
+killed outright. **Taking the blame is not the same as finding the cause**, and
+it stopped the search one step early. The discriminating evidence — a 30-second
+`/healthz` gap and a `server_failed` event — was in an API I had not queried yet.
+
+**3. A 502 is a reading, not noise.** Mid-verification a `?path=` read returned
+`HTTP 502` and I wrote it off as post-deploy settling. It was the instance dying,
+timestamped inside the failure window. It was the first evidence of the real
+story and I discarded it as background.
+
+**Standing advice from all three:** `/api/ops/artifacts/export?names_only=1`
+globs `HOT_ARTIFACT_PATTERNS` across the whole data root — a full filesystem walk
+on the same disk a boot sync walks, on a container whose workers were already at
+~600 MB of 2 GB. Prefer `?path=` for a single artifact, and never issue an
+inventory export during a boot window.
