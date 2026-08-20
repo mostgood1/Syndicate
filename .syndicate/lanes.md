@@ -1213,7 +1213,7 @@ against the MERGE-BASE, not against what is live. Measured directly
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
 
-### layer2-live-projection-actual — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### layer2-live-projection-actual — CLOSED-VERIFIED 2026-08-20 19:24Z — **Deployed via football-modeling-session's consolidation graft (db469003), not my own claim. Live-verified on the actual served surface (boardContract.cards): 36/48 live MLB prop cards now carry a populated Actual, 36/48 a populated Live projection, and only 1/48 still shows Projected == Live (was 34/40 identical pre-fix).** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: fix two confirmed backend gaps in the Layer 2 board's live-game
   Projected/Live/Actual semantics -- item #4 of the original user audit.
   **Testable outcome:** on a live MLB prop row, `Projected` shows the
@@ -1257,10 +1257,21 @@ against the MERGE-BASE, not against what is live. Measured directly
   confirmed by direct code read plus a live production data pull (89
   rows fetched from `/api/board/layer2-shortlist?sport=mlb` during 6
   live MLB games, 2026-08-20 ~18:10Z).
-- Verification: re-pull live MLB prop rows post-deploy during a live
-  game; confirm `Projected` != `Live` on rows where the sim genuinely
-  differs pregame-vs-live, and `Actual` is populated (non-null) on rows
-  where `actual_so_far` exists upstream.
+- **Verification: DONE, 2026-08-20 19:24Z.** Deploy rode along in
+  football-modeling-session's consolidated graft after both sessions hit
+  the same contended refresh-worker claim repeatedly (cross-session
+  coordination, not a separate claim of my own). Content-verified both
+  files at the live SHA. First read hit a stale pre-deploy artifact
+  (written_at before the deploy) -- waited ~15 min for the real rebuild
+  cycle rather than trust it. Checked the SERVED surface
+  (`/api/intelligence/query`'s `boardContract.cards`, what
+  `displayProjection`/`displayLiveProjection`/`displayLiveActual` in
+  `intelligence.html` actually read -- the raw `/api/board/layer2-shortlist`
+  row shape is a DIFFERENT, nested representation and checking only that
+  is not sufficient for this class of fix): 48 live MLB prop cards,
+  `actual` populated 36/48 (75%), `live_projection` populated 36/48 (75%),
+  `projected == live_projection` only 1/48 (a real coincidental match, not
+  a residual bug). Full measurement in `deploys.md`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
