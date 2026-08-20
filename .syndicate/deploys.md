@@ -17890,3 +17890,17 @@ few rows. The ladders wiring is in place, so enabling later is one line in
   persistent loop).
 - **Measurement:** PENDING -- fill in after deploy + log verification.
 - Reminder timestamp: 2026-08-20T04:15Z (approx, session-relative).
+
+## PENDING 2026-08-20 13:07Z — live-odds-worker deploy — WNBA live-phase odds autorun (`b5cf8ac2`, scoped onto live SHA `d520d93d`)
+- Preflight PASS (full checklist run via `/preflight` skill). Claim + mechanical preflight CLEAR at
+  13:06:29Z.
+- Scope note: `origin/main`'s tip (`170505ec` at landing time) had drifted 47 commits/39 files past the
+  live SHA by deploy time (other sessions' work) — built a scoped branch off the live SHA instead of
+  deploying the tip, per the "exactly one substantive change" gate.
+- Expected effect: ZERO observable behavior change — new autorun is default-OFF
+  (`SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN` unset). The deploy alone must not change anything visible.
+- Rollback target: the previous live commit (the one this superseded, prefix `d520`) — redeploy it,
+  acknowledging the guard's rollback flag since it is deliberately going backward.
+- `dep-da3fo30ae00c73ap29e0`, status=build_in_progress at fire time.
+- Measurement: [PENDING — confirm the live SHA matches the deployed commit above, and a log search for
+  the new autorun's own marker shows zero hits in the post-deploy window, proving inertness]
