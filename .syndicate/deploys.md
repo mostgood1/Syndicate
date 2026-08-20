@@ -19054,3 +19054,115 @@ drops no-op files).
   needed, isolate a revert to just layer2_board.py/live_projection_join.py
   rather than rolling back the whole graft.
 - Claim: none held by me for this deploy (rode along). No release needed.
+
+---
+
+## 2026-08-20 19:46Z + 20:08Z — web `d9a23a38`, `00541a8d` — game detail, and a fabrication I shipped and reverted
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       d9a23a38 (graft onto live 0514f2d7) -> 00541a8d (graft onto d9a23a38)
+    on main:   43c82b3c
+    deploys:   dep-da3lg38jo6nc73e7a35g live 19:46:49Z
+               dep-da3lpbf40ujc73fv5nvg live 20:08:15Z
+    claim:     held 19:38:41Z, released after the closing read
+    rollback:  deploy 0514f2d7
+
+**The game detail page did not need a density pass.** Measuring both pregame,
+like-for-like, before changing anything:
+
+| pregame detail | soccer | MLB |
+|---|---|---|
+| leaf items | 461 | 456 |
+| page height | 970 px | 624 px |
+| density | 377/Mpx | 578/Mpx |
+| **visible panel** | **122/Mpx** | 78/Mpx |
+| em-dash cells | 22 | 4 |
+
+It already carries as much content as MLB's and its VISIBLE panel is denser,
+because it renders the same generic card the board work had already fixed.
+Comparing against MLB's LIVE detail page instead would have shown 377 vs 1006
+and invented a content gap that does not exist — the box tab difference was
+game state, not capability.
+
+### 1. The ribbon captioned the match with the FIRST HALF — my own regression
+
+`3912f8f2` (this lane) replaced an unconditional restatement with
+`lens_rows[0].subtitle`. On the BOARD only the full-game row survives
+`_build_lens_rows`' gate, so row 0 IS the game. On the DETAIL page soccer
+publishes `sim.periods` (h1, h2), all three rows survive, and row 0 is the
+first half. Production `/soccer/epl/game/401879301` read **"Projected total
+1.6" directly beneath a summary saying "(total 3.5)"**. The panels below were
+correct — 1.6 / 1.8 / 3.5 — so a HALF's total was stated as the GAME's in the
+one place a reader looks first.
+
+`_primary_lens_row` picks by CONTENT (a row carrying game-level `home_pct`)
+then LABEL, never by position. **verify: PASSED** — `shared_lens_primary`
+now reads `Projected total 3.5` against a summary total of 3.5, same match.
+
+### 2. A live match showed no score — and the fix shipped a FABRICATED one
+
+The live La Liga fixture (401882908, Alavés @ Rayo Vallecano) read status
+"Live", slate context "0-0", and had no score in the head. Two faults: the
+generic head only ever drew crests and an "@" in ANY state, and soccer worked
+around that by overwriting `detail` — the "Slate context" slot — with the
+score.
+
+`d9a23a38` rendered `away.score`/`home.score` in the head. **That was wrong,
+and it was live for about 22 minutes.**
+
+**`live_home_score` / `live_away_score` ARE NOT A SCORE.** Both fields are the
+string `"0"` on 12 of 12 sampled recommendations artifacts, INCLUDING
+`status_state == "pre"` — fixtures that had not kicked off. The board
+confirmed it: all nine La Liga matches read 0-0, five completed days earlier.
+Nine consecutive nil-nils across a league slate is not a plausible set of
+soccer results. It is a placeholder the builder writes.
+
+So the head rendered a fabricated 0-0 on every live match — **the exact
+failure Lane F removed from seven sites in `game_board_contract.py`,
+reintroduced through a different door.**
+
+**What caught it was not a test.** It was the cross-sport regression sweep
+reporting `headScore=0` on `/soccer/la_liga/cards` when that board HAD a live
+match, and asking why board and detail disagreed. They did not — both were
+reading a constant. **A sweep run to check OTHER sports for damage is what
+found the damage in the sport being changed.**
+
+`_real_live_score` now consults ONLY the live poller's `live_state` and never
+the artifact placeholder. Absence returns None; a genuine 0 from the poller
+survives, because the guard rejects ABSENCE rather than falsiness and 0-0 is a
+real and common soccer scoreline.
+
+**verify: PASSED.** Same board, after `00541a8d`: **9 of 9 matches
+`away=None home=None`, `detail='La Liga'`, and `cards-head-score` rendered 0
+times** in the served HTML. Soccer now shows NO score, which is correct — it
+has no trustworthy per-match live score in the card payload. The absence is
+visible as an empty state instead of asserted as nil-nil. Note the old
+`detail` hijack had been publishing this same fabricated 0-0 into Slate
+context all along, so this removed a fabrication predating today.
+
+Cross-sport, served pages, after both deploys: nfl 16 cards, ncaaf 51, mlb 9,
+soccer la_liga 9 / epl 1 / mls 31 — all HTTP 200, `cards-head-score` 0
+everywhere (no sport has a live game with a trustworthy score right now).
+
+### Found, NOT fixed — stated so they are not mistaken for done
+
+- **No clock, minute or period on a live soccer card.** `shared_game_state`
+  carries `clock: ""` and `period: null` for a match genuinely in progress.
+- **No live/final box score in soccer at all.** MLB's box tab shows "Live /
+  final box" AND "Sim box"; soccer shows only sim squad projections, because
+  its ESPN per-match stats feed model-feature CSVs and no card-readable
+  per-match artifact. This is the user's "sim box and real box are not both
+  displayed", and it is an artifact-publishing gap, not a template one.
+- **An unknown league slug silently serves EPL.** `normalize_league` maps
+  anything not in `LEAGUE_DISPLAY_NAMES` to `DEFAULT_LEAGUE`, so
+  `/soccer/laliga/cards` (no underscore) renders Arsenal fixtures under a La
+  Liga heading rather than 404ing. Canonical slugs are `la_liga`, `serie_a`,
+  `ligue_1`. I hit this myself and briefly mis-reported four leagues as
+  serving EPL data.
+- **17 of 28 squad rows carry a price; the 11 without are NOT explained by a
+  bookmaker top-N cap** — Mosquera at 0.3% scorer probability has a price and
+  Trossard at 15.9% does not. Either a name-join failure or a stale squad
+  list. `picks_{date}.csv` is not in `HOT_ARTIFACT_PATTERNS` (403 on
+  `/api/ops/artifacts/export`), so this could not be settled from here. **A
+  LEAD, not a finding.**
