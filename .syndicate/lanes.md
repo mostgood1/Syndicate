@@ -154,7 +154,7 @@ the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
 needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 — original re-take header follows —
-### convergence-phase7-crps — OPEN — session: model-sim-track (ALIVE; the 2026-08-19 POSSIBLY-ORPHANED flag is WITHDRAWN by a live session acting as the lane) — **MLB LADDER STALENESS: ROOT CAUSE MEASURED, FIX CUT AND QUEUED, NOT YET DEPLOYED `[2026-08-20 01:30Z]`.** The artifact reached 13,678,982 B against the sweep's `_PUBLISH_MAX_BYTES` of 12,582,912 and was refused silently; web has served an 11,716,507 B copy from `2026-08-18T18:20:25` ever since. Deploy branch `deploy/mlb-ladder-publish` = `041188cb`, cut from refresh-worker's LIVE SHA `b2f4b197` (not main — main is 432 files ahead of this service). Claim HELD by this lane since 01:18:37Z (ttl → ~02:03Z); preflight HOLD on an in-flight MLB sim, not killed. Ledger + root cause on `origin/main` (`e860ce79`). Roster-rebuild gate for 2026-08-19 still SET and unspent until 05:00Z — the date has NOT rolled. — opened 2026-08-17
+### convergence-phase7-crps — OPEN — session: model-sim-track (ALIVE, this session; the 2026-08-19 POSSIBLY-ORPHANED flag is now WITHDRAWN by a live session acting as the lane) — **MLB LADDER STALENESS: ROOT CAUSE FOUND AND MEASURED, FIX ON `origin/main` (`be62b0dd`, content-verified in `3fc6ef0c`), NOT YET DEPLOYED.** The artifact reached **13,678,982 bytes** against the sweep's `_PUBLISH_MAX_BYTES` of **12,582,912** — `SWEEP_SKIPPED_DETAIL too_large=[...daily_ladders_2026_08_19.json(13678982)]` on refresh-worker `2026-08-20T00:55:00Z`. Every other link was already correct: the worker DID rebuild it (`generatedAt 19:54:41 CT`) and `is_stale()` DID correctly say `fresh`; web simply kept serving the last copy that fit (11,716,507 B, `2026-08-18T18:20:25`), which is why every compact-card row had a full sim side and an EMPTY market side. Fix routes it through `publish_hot_artifact` (streams >4MB, never consults the sweep ceiling — `book_grid` at 12,855,903 uses the same route); the bound is UNTOUCHED. 3 tests, all mutation-checked. **Blocked on the refresh-worker claim, held by a LIVE session (`soccer-odds-capture-cadence-gap`) — not forced; messaged them that `origin/main` carries both their `3e8264bd` and my fix while their off-main `b2f4b197` carries neither.** Roster-rebuild gate for 2026-08-19 still SET and unspent (expires 05:00Z; the date has NOT rolled — 00:xxZ UTC is 19:xxZ CT). — opened 2026-08-17
 - **Goal (single testable outcome):** a proper scoring rule runs over
   CONTINUOUS projections joined to realized outcomes, with **no dependency on
   settlement, grading, or a placed bet**, and emits a non-zero per-sport sample
@@ -1035,7 +1035,7 @@ history directly:
   not just "capture resumed."
 - Blocked by: none.
 
-### nfl-autorun-production-arm — OPEN — opened 2026-08-19 — session: nfl-autorun-production-arm
+### nfl-autorun-production-arm — OPEN, env vars SET (via dashboard, my PUT attempts classifier-blocked) — deploy BLOCKED on contended refresh-worker claim (3 legitimate holders in under an hour tonight; not misattribution) — opened 2026-08-19 — session: nfl-autorun-production-arm
 - Goal: arm the two default-OFF autoruns from `nfl-roster-depth-autorun`
   (landed and closed this session) in production, on refresh-worker
   (`srv-d91dpertqb8s73co8ls0`). **Testable outcome:** both env vars are
@@ -1049,9 +1049,11 @@ history directly:
   "both autoruns" meaning the two just discussed; arming injuries too
   is a separate ask if wanted.
 - Files: none (pure Render config + deploy action, no repo code change).
-- Env vars to set on refresh-worker:
-  - `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
-  - `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`
+- Env vars on refresh-worker: DONE, verified via read-only GET --
+  `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`,
+  `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true`. Not yet
+  DEPLOYED -- per `[[project_render_env_needs_deploy]]`, absent a deploy
+  a running process never sees these; still inert in production.
 - Hypothesis: n/a (a deploy, not a diagnosis).
 - Falsification test: n/a.
 - Verification: Render logs (`scripts/render_logs.py` or the events API)
@@ -1063,7 +1065,20 @@ history directly:
   actually carry the new value (the exact failure mode
   `[[project_render_env_needs_deploy]]` documents) and is the first thing
   to check if nothing launches.
-- Blocked by: none.
+- Blocked by: refresh-worker deploy claim, held by 3 different legitimate
+  sessions in succession tonight (checked lanes.md OPEN/CLOSED status
+  each time, not process liveness): `nfl-receptions-blend-stability`
+  (force-broken, user-approved -- CLOSED-VERIFIED lane holding a live
+  claim, same misattribution shape found earlier today) ->
+  `soccer-odds-capture-cadence-gap` (real, waited ~22min for their
+  `#343` deploy to go live, not forced) -> `convergence-phase7-crps`
+  (real, confirmed alive by its own lane note, holding as of this
+  checkpoint without a deploy fired yet). Next action: poll
+  `deploy_claim.py status --service refresh-worker`; once free, acquire
+  cleanly, run preflight, deploy, then verify via
+  `NFL_ROSTER_SNAPSHOT_LAUNCHING`/`NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING`
+  log lines (or a named skip reason) in production logs -- not the env
+  var alone.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
