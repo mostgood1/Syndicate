@@ -19286,3 +19286,83 @@ this graft rather than forcing a separate slot, which is the batching working.
   anything new for web to actually export; see the paired refresh-worker
   entry once it lands.
 - Rollback: redeploy web at the prior SHA (`454f3caa`).
+
+---
+
+## 2026-08-20 21:14Z — web `93b6d5a4` — an unknown league slug served EPL instead of 404ing
+
+    lane:      soccer-board-mlb-parity
+    service:   web (srv-d88ahvrbc2fs73eodu30)
+    sha:       93b6d5a4 (graft onto live c5c1b0b5)
+    on main:   82621374
+    deploy:    dep-da3mp649v7es739491t0 live 21:14:02Z
+    claim:     acquired 21:05:15Z AFTER waiting ~12 min for a live holder
+    preflight: CLEAR, target-commit pinned
+    rollback:  deploy c5c1b0b5
+
+**The defect.** All seventeen `<league>` handlers open with
+`league = normalize_league(league)`, which maps anything unrecognised onto
+`DEFAULT_LEAGUE`. A typo therefore did not fail — it silently answered a
+different question. Measured on production: `/soccer/laliga/cards` (canonical
+slug `la_liga`, one underscore away) returned **HTTP 200 with Arsenal and
+Coventry fixtures under a La Liga heading**, and `/soccer/zzz/api/cards`
+returned 200 with EPL data.
+
+**I hit this myself and it cost a wrong conclusion first.** Looking for a live
+La Liga match, I reported that four leagues were serving EPL data. They were
+not. My requests were malformed and nothing said so — the permissive default
+turned my error into a confident wrong finding about the system.
+
+**The fix is at the choke point, not seventeen times.** `is_known_league`
+answers "is this a real slug" separately from `normalize_league`'s "what
+should I do about it", because the two questions have different right answers
+and one function was giving the same one to both. A `url_value_preprocessor`
+on the blueprint 404s an unknown `<league>` once, before any handler body —
+so it covers routes not written yet, which a per-handler check would not.
+
+`normalize_league` **stays permissive on purpose**: its remaining callers are
+internal, handed leagues that came from artifacts and config rows, where a
+hard failure would take down a page over a stray value. Strictness belongs at
+the URL boundary and now lives there only.
+
+**Not only where I found it.** `/sports/<sport_slug>` has aborted on unknown
+slugs all along (`blueprints/sports.py:16`), and no other blueprint has a
+sub-slug with a silent default. Soccer was the outlier, not the pattern.
+
+**A pre-existing test asserted the opposite**, and its history was checked
+before reversing it rather than overwritten. It arrived in `570ba09f` (a
+rosters/schedules/week-nav feature landing) with no docstring and no
+rationale — characterization of what `normalize_league` happened to do, not a
+requirement. Its replacement also asserts `build_cards_page_context` is NOT
+CALLED: a 404 rendered after the page was built would still have burned the
+work and still read the wrong artifacts.
+
+**verify: PASSED — all three classes measured on the SERVED site after the
+deploy, not asserted:**
+
+| probe | result |
+|---|---|
+| 7 bad slugs (`laliga`, `seriea`, `ligue1`, `zzz`, `nope`; page, api, `/game/`, `/team/` shapes) | **404, 7 of 7** |
+| all **10** canonical leagues, `/api/cards` | **200, 10 of 10** |
+| `/soccer/EPL`, `/soccer/La_Liga` (case variants) | **200** — the old behaviour lower-cased and losing that would be a regression |
+| `/soccer/hub`, `/cards`, `/api/cards`, `/market-board` | **200** — Werkzeug matches these static rules ahead of `/<league>` |
+
+Left as an HTML 404 rather than inventing JSON negotiation for one blueprint:
+the app registers no 404 handler at all, so `/nfl/api/nope` and
+`/api/ops/nope` are HTML too. Consistency beat a local improvement.
+
+### Two process notes worth keeping
+
+- **The web claim was held by a live session (`nfl-artifact-allowlist-add`)
+  for ~12 minutes with `target_commit: null`.** I waited rather than
+  `--force`, messaged the holder's likely session, and deployed at 21:05Z once
+  it released. Breaking an unexpired claim held by a RUNNING session is what
+  the lock exists to prevent; a null target is not evidence of abandonment.
+- **I landed through a THROWAWAY WORKTREE.** ~463 lines of uncommitted work
+  belonging to another session (the live-score/box-score task) were sitting in
+  `C:\tmp\syndicate-sessions\soccer-board-mlb-parity` — five modified files
+  plus an untracked `espn_match_box.py`. `session_worktree.py land` refuses a
+  dirty tree, and the tempting fixes (`git stash`, `git checkout --`) would
+  each have put a peer's in-flight work at risk. `git worktree add` +
+  cherry-pick + push touched none of it, and the files were confirmed still
+  present and still growing afterwards.
