@@ -84,12 +84,43 @@ if [ -f .syndicate/lanes.md ]; then
 fi
 
 # --- Standing rules: headings only, never bodies ---
+#
+# MEASURED 2026-08-20: the pattern here was `^###`, but learnings.md entries are
+# written at `##`. That matched 9 headings against 35 FORBIDDEN/EXONERATED rules
+# at `##` -- so **35 of 44 standing rules reached no session at all**, including
+# ones as load-bearing as "never point a worker publish URL at a public
+# hostname". A rule nobody is shown is not a rule.
+#
+# Relaxing the pattern ALONE would have made it worse. 44 headings is ~4,800B
+# against a 450B cap, and `head -c` takes them in FILE order, which is
+# append-order, which is OLDEST-first -- so the digest would have shown ~7 of
+# the most stale rules and silently dropped every lesson learned since. The
+# selection matters as much as the match, so this takes the TAIL: the most
+# recently written rules, which are the ones a session is most likely to be
+# about to repeat.
+#
+# The count is printed because "showing 6" and "showing 6 of 44" are different
+# claims, and only the second tells a session that reading learnings.md is
+# still worth doing.
 RULES=""
 if [ -f .syndicate/learnings.md ]; then
-  RULES_RAW=$(grep -E '^###.*(FORBIDDEN|EXONERATED)' .syndicate/learnings.md 2>/dev/null \
-    | sed 's/^### //')
-  NOTES="${NOTES}$(over_note "STANDING RULES" "$RULE_CAP" "$RULES_RAW")"
-  RULES=$(printf '%s' "$RULES_RAW" | head -c "$RULE_CAP")
+  # Compacted, because 43 rules do not fit in 450B at full heading length and
+  # `head -c` alone cuts the last one mid-word. Drop the `2026-` century prefix
+  # and clip each to one line: measured, full headings fit 4 rules and clipped
+  # ones fit ~7, all of them readable to the end.
+  RULES_RAW=$(grep -E '^#{2,3}[[:space:]].*(FORBIDDEN|EXONERATED)' .syndicate/learnings.md 2>/dev/null \
+    | sed -E 's/^#{2,3} //; s/^2026-//; s/[[:space:]]+—[[:space:]]+/ /' \
+    | cut -c1-64)
+  RULES_N=$(printf '%s\n' "$RULES_RAW" | grep -c . || true)
+  # `tail -n 14 | head -c CAP` looked right and was WRONG: it keeps the FIRST 7
+  # of the last 14, so it showed rules 30-36 of 43 -- neither the newest nor the
+  # oldest, and the tail cut mid-word. Take exactly as many whole lines as the
+  # cap holds: entries are clipped to 64 chars, so 6 lines is <=390B, under the
+  # 450B cap with every line complete.
+  RULES=$(printf '%s' "$RULES_RAW" | tail -n 6 | head -c "$RULE_CAP")
+  RULES_SHOWN=$(printf '%s\n' "$RULES" | grep -c . || true)
+  [ "${RULES_N:-0}" -gt "${RULES_SHOWN:-0}" ] && \
+    NOTES="${NOTES}[STANDING RULES: showing ${RULES_SHOWN} most recent of ${RULES_N} — full list in learnings.md] "
 fi
 
 BODY=""
