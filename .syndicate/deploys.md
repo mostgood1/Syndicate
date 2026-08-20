@@ -17800,3 +17800,51 @@ across the change.
 since 2026-07-15. That job fires at 06:00Z, **outside** this window, so `#482`
 never affected it and this result says nothing about it. The next scheduled run
 is still the first end-to-end test of `#481`.
+
+---
+
+## PENDING — refresh-worker `15547572` (`deploy/mlb-ladder-market-wiring`) — `#440` prop market keys
+
+    cut from  041188cb (refresh-worker's LIVE SHA) -- both touched files are
+              byte-identical there and at the change's base, so it is an exact add.
+    status    QUEUED. Claim held by a LIVE session (nfl-autorun-production-arm,
+              36 min at 02:5xZ) and an MLB sim was in flight besides. NOT forced.
+    urgency   LOW. The freshness fix that was actually breaking the board is
+              already live and verified (041188cb, 02:03:08Z). This one adds one
+              market join.
+
+**change:** `hitter_strikeouts` joins `batter_strikeouts` instead of `None`.
+That market is in `DEFAULT_HITTER_MARKETS` and has a line preference, i.e. we
+have been fetching and paying for it on every hitter refresh and never reading
+it. Also documents pitcher `pitches`/`batters_faced` as permanently marketless,
+and wires doubles/triples/stolen_bases to their real keys while leaving them
+UNFED on purpose.
+
+**expected effect:** on the first sim after deploy, the `hitter_strikeouts`
+ladder goes from 0 of 390 rows with a `marketLine` to a NON-ZERO count.
+
+**HOW THIS COULD READ AS SUCCESS WHILE BEING WRONG:** a still-zero count does
+NOT falsify the wiring -- it may simply mean no book posted a strikeouts line
+for that slate. Today's snapshot showed `batter_strikeouts` absent entirely
+while `batter_home_runs` covered 46 players, so thin coverage is the expected
+case. To distinguish, read the SNAPSHOT first: if
+`oddsapi_hitter_props_<date>.json` contains no `batter_strikeouts` key for any
+player, the join has nothing to find and the deploy is neither confirmed nor
+refuted. Only a snapshot WITH that key and a ladder WITHOUT lines is a failure.
+
+**verify:** `*oddsapi_hitter_props_<date>*` for a `batter_strikeouts` key, THEN
+`*daily_ladders_<date>*` for `groups.hitter.hitter_strikeouts` rows carrying
+`marketLine`. Both readings, in that order.
+
+**rollback:** redeploy `041188cb`.
+
+**measurement:** <pending>
+
+**DECISION LOGGED `[2026-08-20, user]`: do NOT fetch batter_doubles /
+batter_triples / batter_stolen_bases.** Measured cost ~+7,700 credits/day
+(~+9% of burn), cutting runway ~39 -> ~36 days against the 5M cap, with ~39
+days already being about the rest of the regular season. These are thin
+markets -- in the same snapshot `batter_home_runs` covered 46 players while
+`batter_hits` covered 3 and `batter_runs_scored` 2 -- so the spend buys very
+few rows. The ladders wiring is in place, so enabling later is one line in
+`DEFAULT_HITTER_MARKETS`.
