@@ -3356,3 +3356,64 @@ ones. A timeout is a sampling filter biased against your own hypothesis.
 **Cost:** roughly three hours, four ledger corrections, and a proposed rollback
 of 114 verified files. The deploys were never at risk — every one was verified
 by content and served payload, independent of any test.
+
+### 2026-08-20 — an mtime that PREDATES the write it describes is `copy2` from the checkout, not a publish. It is the only signal that a boot-time sync clobbered a live artifact
+
+- **What we believed.** Web was serving a month-old soccer artifact because some
+  producer had published a stale copy over the fresh one — a cross-service
+  publish through `HOT_ARTIFACT_PATTERNS`. The file's mtime read `21:36:27Z`,
+  which looked like a recent write and so like a recent publish.
+- **What was actually true.** No publisher was involved and the allowlist was
+  irrelevant. `bootstrap_data_root.py`, run from `create_app`'s
+  `_bootstrap_render_data` at every WEB boot, copied the git checkout over web's
+  own disk whenever content differed — repo always wins, no freshness test.
+  `shutil.copy2` PRESERVES THE SOURCE MTIME, so `21:36:27Z` was the checkout's
+  timestamp, **six minutes BEFORE the last known-good read of the file it
+  replaced.** 1,114 of 8,016 hot artifacts web served were the checkout's copy.
+- **How we found out.** Two fingerprints, both in data already fetched. (1) The
+  mtime inversion above — a file cannot be written before the thing it
+  overwrote was last read. (2) A WHOLE-SECOND mtime: Render's checkout has 1s
+  granularity where a runtime write has nanoseconds, and seven files across four
+  leagues shared one identical timestamp, which is a batch copy and cannot be a
+  per-league publish. Confirmed by web's own log: sync `21:42:31Z → 21:43:28Z`,
+  soccer reached at `21:43:28.245Z`, with the "verified good" read at
+  `21:42:5xZ` sitting INSIDE that window.
+- **The rule going forward.** Before attributing a stale artifact to a producer,
+  read its MTIME and compare it to when the file was last known good. **An mtime
+  earlier than that, or landing exactly on a whole second, means a `copy2` from
+  the checkout — look at boot-time sync, not at publishers.** And check WHICH
+  SERVICE runs the sync from the CODE, never from the env var:
+  `SYNDICATE_BOOTSTRAP_ON_START=1` is set on all three services and read by
+  nothing on the two workers, because neither imports `syndicate.app`.
+- **Cost.** ~1h of a lane pointed at the wrong subsystem by a plausible
+  hypothesis. Full measurement trail: `deploys.md` 2026-08-20 22:36Z; `#494`.
+
+### 2026-08-20 — taking the blame is not the same as finding the cause, and a self-critical wrong answer stops the search just as dead as a self-serving one
+
+- **What we believed.** A post-deploy boot sync produced two log lines and then
+  went silent for minutes against a 57-second baseline. I concluded it was
+  running slowly and that my own `names_only=1` inventory exports — heavy
+  filesystem walks on the same disk — were starving it. Plausible, self-blaming,
+  and reported as such.
+- **What was actually true.** The instance had been KILLED. `/healthz` went
+  unanswered ~30s and Render fired `server_failed` (`unhealthy: HTTP health
+  check`) 63 seconds into the sync. The access log shows my export was ONE of at
+  least four concurrent multi-MB exports in that window; the other three were
+  the platform's own pulls. Worse, the graceful shutdown never joined the daemon
+  bootstrap thread, so `_run_bootstrap`'s `finally` left `.bootstrap_sync.lock`
+  behind and the REPLACEMENT instance skipped its sync entirely (<1800s lock).
+- **How we found out.** `/v1/services/<id>/events` and the gunicorn
+  `Booting worker` / `Worker exiting` lines — an API not yet queried when the
+  first diagnosis was written. A `HTTP 502` returned mid-verification, dismissed
+  at the time as "post-deploy settling", was the instance dying and was the
+  first evidence of it.
+- **The rule going forward.** Accepting fault feels like rigour and is not
+  evidence. **Before writing down a cause — especially one that blames your own
+  actions — name the reading that would DISTINGUISH it from the alternatives,
+  and take it.** For a service that went quiet, that reading is the events API
+  and the process lifecycle lines, not the application log. And treat a 502 as a
+  measurement with a timestamp, never as noise.
+- **Cost.** One wrong cause published to the user before correction; the real
+  defect (a killed bootstrap poisons the next boot for 30 minutes) would have
+  been missed entirely. Trail: `deploys.md` 2026-08-20 22:36Z, process notes.
+
