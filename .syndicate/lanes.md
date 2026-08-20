@@ -1063,13 +1063,27 @@ history directly:
   log lines (or a named skip reason) in production logs -- not the env
   var alone.
 
-### mlb-overview-hydration-cost — OPEN — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
+### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND ITS BENEFIT IS PROVEN NOTHING SO FAR (`plays_dropped=1` against 1,067 locally) — because the slate was PREGAME and `allPlays` was empty. Reachable, correct, and currently doing nothing. The live-slate window (~22:00Z-05:00Z) is the only reading that can settle the magnitude, and it has NOT been taken.** — opened 2026-08-19 — session 80b3e432-6759-462f-9af5-b6677c49a3be — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
 - Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `docs/ai_context/todo.md`, `.syndicate/*`.
 - Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
 - Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
 - Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
-- Blocked by: none. Deploy is a SEPARATE decision and is not part of closing this lane.
+- Blocked by: none.
+- **2026-08-20 STATUS.** Shipped on `origin/main` (`ab99d236`, `9b66e841`, `6980f910`) and deployed to
+  refresh-worker as `d0ea983d`, re-cut onto `3b816546` (the live SHA at deploy time) after
+  `nfl-autorun-production-arm` deployed mid-poll and turned the prepared branch into a rollback of
+  their work. Claim acquired 13:51:45Z after theirs expired, preflight CLEAR, released 14:0xZ.
+- **WHAT `/preflight` CAUGHT, and it was worth running.** The candidate had (a) no production-observable
+  signal that the prune fired — the exact way three prior `#387` candidates became unfalsifiable;
+  (b) a parity harness comparing stdout, so it broke the moment the new log line existed; (c) two
+  load-bearing comments naming a test file AND a test name that do not exist.
+- **STILL OWED, and it is the whole question:** re-read `FEED_LIVE_PRUNE` during the live/post-game
+  window. `plays_dropped` in the thousands = the mechanism works. Still ~0 at 02:00Z = the payloads
+  reaching this loader never carry play-by-play in production, and the 66.38% premise — true of the
+  artifact on disk — is wrong for the production regime. That would not be a small correction; it
+  would retire the main reason this change exists.
+- This lane does NOT close until that reading is taken.
 - **RESULT `[2026-08-19]` — the hypothesis was HALF RIGHT, and the half that was
   wrong is the more useful finding.** The projection idea ("the worker keeps only
   `games`, so skip the page furniture") was not needed: the two real costs were
