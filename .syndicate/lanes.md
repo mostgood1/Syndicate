@@ -1086,6 +1086,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
+### nfl-artifact-allowlist-add — OPEN — opened 2026-08-20 — session: nfl-artifact-allowlist-add
+- Goal: `HOT_ARTIFACT_PATTERNS` (`syndicate/features/shared/
+  artifact_publisher.py`) has no entries for the three new NFL artifacts
+  this session's autoruns produce -- `injuries_{season}.csv`,
+  `roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv` --
+  meaning production presence of any of them is unauditable from
+  `/api/ops/artifacts/export`. Originally handed off to
+  `basketball-model-owner` twice via `send_message`; that session
+  archived 2026-08-20T19:53:54Z without acting, and its own lane is no
+  longer OPEN in `lanes.md` (checked before taking this). **Testable
+  outcome:** all three patterns present in `HOT_ARTIFACT_PATTERNS`,
+  each verified to actually match its real produced path.
+- Files: `syndicate/features/shared/artifact_publisher.py` (add 3 glob
+  entries to `HOT_ARTIFACT_PATTERNS` only -- no other change).
+- Hypothesis: n/a -- purely additive, no behavior change to anything
+  already allowlisted.
+- Falsification test: n/a.
+- Verification: a test asserting each of the 3 real produced paths
+  (`nfl_source/tracking/nflverse/injuries/injuries_2026.csv`,
+  `nfl_source/source_artifacts/data/processed/rosters/
+  roster_2026_snapshot.csv`,
+  `nfl_source/source_artifacts/data/processed/depth/
+  depth_2026_snapshot.csv`) matches at least one pattern in the updated
+  allowlist; existing allowlist tests still pass (no regression on
+  prior entries).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
