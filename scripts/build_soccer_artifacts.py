@@ -36,6 +36,7 @@ from syndicate.features.soccer.adapters import build_soccer_simulation_adapter
 from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
+from syndicate.features.soccer.features.lineups import _norm_player_name
 from syndicate.features.soccer.features.loaders import team_rows_from_match_history
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
@@ -95,6 +96,110 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
     return compute_team_ratings(rows, as_of=as_of, window=45)
 
 
+def _current_roster_names(league: str, source_root: Path) -> set[str]:
+    """Normalized names on the club's CURRENT ESPN roster, best effort.
+
+    Used ONLY to RESCUE a player from the season filter below, never to drop
+    one. That direction is the whole design and it is not a style choice --
+    measured across the ten leagues 2026-08-20, using the roster as a FILTER
+    would have wrongly deleted 1,970 current-season players, because:
+
+      - several roster files are badly incomplete (bundesliga 142 rows against
+        567 players with stats; ligue_1 223; la_liga 353). `sources.py`'s own
+        `SPARSE_ROSTER_THRESHOLD` comment already documents ESPN populating
+        2026-27 squads late for exactly these leagues; and
+      - the name join is lossy in both directions -- the roster spells them
+        "Viktor Gyokeres", "Gabriel Magalhaes" and "Martin Odegaard" where the
+        stats feed has "Viktor Gyokeres", "Gabriel" and "Martin Odegaard".
+
+    Used as a rescue list, a missing roster file or a failed name match costs
+    exactly nothing: the player falls back to the season rule. An absent
+    roster is therefore NOT a reason to skip filtering -- it just means no
+    rescues, which is the pre-existing behaviour.
+
+    Shares `_norm_player_name` with `features/lineups.py` on purpose, so the
+    identity used to keep a player here is the same identity
+    `attach_confirmed_starters` uses to match them to a confirmed XI. Two
+    different normalizers would let a player be kept by one and unresolvable
+    by the other.
+    """
+    roster_dir = source_root / league / "api" / "rosters"
+    paths = sorted(roster_dir.glob("rosters_*.csv"))
+    if not paths:
+        return set()
+    try:
+        frame = pd.read_csv(paths[-1])
+    except Exception as error:
+        print(
+            f"[build_soccer_artifacts] SOCCER_ROSTER_READ_FAILED league={league} "
+            f"path={paths[-1]} error={error} (no roster rescues this build; "
+            "players fall back to the season rule)",
+            flush=True,
+        )
+        return set()
+    if "player_name" not in frame.columns:
+        return set()
+    return {_norm_player_name(name) for name in frame["player_name"] if str(name).strip()}
+
+
+def _drop_departed_players(
+    league: str,
+    deduped: "pd.DataFrame",
+    latest_frame: "pd.DataFrame",
+    roster_names: set[str],
+) -> "pd.DataFrame":
+    """Remove players who are in no current squad but still carry old stats.
+
+    THE BUG THIS FIXES. `_load_player_rows` concatenates every season's
+    `players_*.csv` and dedupes by `player_id` keeping the most recent row.
+    That asks "what is this player's newest row" and never "is this player
+    still here", so anyone who ever played in the league survives forever
+    under their last-known club.
+
+    Measured on production 2026-08-20, Arsenal v Coventry: the sim published
+    a 28-man Arsenal squad containing Thomas Partey, Kieran Tierney,
+    Jorginho, Raheem Sterling and Jakub Kiwior -- all departed, none in
+    `players_2025.csv`, all still carried by their 2024 row. Exposure was not
+    local to Arsenal: the five two-season leagues carried 160-215 stale-only
+    players each. They are not harmless passengers, either -- by this
+    function's own existing reasoning about duplicate rows, every extra squad
+    member dilutes each real teammate's allocated shot and prop share.
+
+    A player is kept when EITHER
+      - they appear in the latest season's stats file, or
+      - they are on the current ESPN roster (see `_current_roster_names`).
+    Dropped only when both say absent.
+
+    The roster half is load-bearing and was added after measuring: filtering
+    on the latest season ALONE would have dropped Ethan Nwaneri and Reiss
+    Nelson, both genuinely at the club and both carrying a real bookmaker
+    price, because neither has a 2025 stats row. Across the ten leagues the
+    roster rescues 121 such players.
+    """
+    if latest_frame.empty:
+        return deduped
+    latest_ids = {str(value) for value in latest_frame["player_id"].astype(str)}
+    keep_mask = deduped["player_id"].astype(str).isin(latest_ids)
+    if roster_names:
+        on_roster = deduped["player_name"].map(lambda name: _norm_player_name(name) in roster_names)
+        keep_mask = keep_mask | on_roster
+    kept = deduped[keep_mask]
+    dropped = deduped[~keep_mask]
+    if dropped.empty:
+        return deduped
+    sample = ", ".join(
+        f"{row.player_name} ({row.team})" for row in dropped.head(5).itertuples()
+    )
+    print(
+        f"[build_soccer_artifacts] SOCCER_DEPARTED_PLAYERS_DROPPED league={league} "
+        f"dropped={len(dropped)} kept={len(kept)} rescued_by_roster="
+        f"{int((~deduped['player_id'].astype(str).isin(latest_ids) & keep_mask).sum())} "
+        f"e.g. {sample}",
+        flush=True,
+    )
+    return kept
+
+
 def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     players_dir = source_root / league / "players"
     player_csv_paths = sorted(players_dir.glob("players_*.csv"))
@@ -140,6 +245,35 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     deduped = pd.concat(
         [combined[has_id].drop_duplicates(subset="player_id", keep="last"), combined[~has_id]],
         ignore_index=True,
+    )
+    if len(frames) < 2:
+        # One season on disk means no stale population is possible, and
+        # nothing to compare a thin file against. Leagues in this state
+        # (belgian_pro_league, championship, eredivisie, mls, primeira_liga
+        # as of 2026-08-20) are unaffected by any of the below.
+        return deduped.to_dict("records")
+    latest_frame, previous_frame = frames[-1], frames[-2]
+    # A NEW SEASON'S FILE STARTS EMPTY AND FILLS UP. Filtering against a file
+    # that is still being populated would delete most of the league on the
+    # first build of a season -- the failure would look exactly like this fix
+    # working. Require the newest file to be at least half the previous one
+    # before trusting it to define "current", and say so when it is not
+    # rather than silently skipping.
+    if len(latest_frame) < 0.5 * max(len(previous_frame), 1):
+        print(
+            f"[build_soccer_artifacts] SOCCER_LATEST_SEASON_FILE_THIN league={league} "
+            f"latest={len(latest_frame)} previous={len(previous_frame)} "
+            "(under half the previous season; NOT filtering departed players "
+            "this build, because a partially-populated file cannot define the "
+            "current squad)",
+            flush=True,
+        )
+        return deduped.to_dict("records")
+    deduped = _drop_departed_players(
+        league,
+        deduped,
+        latest_frame,
+        _current_roster_names(league, source_root),
     )
     return deduped.to_dict("records")
 

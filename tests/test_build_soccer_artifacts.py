@@ -80,5 +80,159 @@ class LoadPlayerRowsTests(unittest.TestCase):
         self.assertIn("Toronto FC", teams)
 
 
+_PLAYER_HEADER = (
+    "league,season,player_id,player_name,team,position,minutes,games,"
+    "shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,"
+    "key_passes_per90,expected_minutes_share,is_goalkeeper,source\n"
+)
+
+
+def _player_row(season: int, pid: str, name: str, team: str = "Arsenal") -> str:
+    return (
+        f"epl,{season},{pid},{name},{team},F,900,10,"
+        "2.0,0.4,0.2,0.3,0.1,1.0,0.8,False,understat\n"
+    )
+
+
+def _write_players(source_root, season: int, rows: str) -> None:
+    players_dir = source_root / "epl" / "players"
+    players_dir.mkdir(parents=True, exist_ok=True)
+    (players_dir / f"players_{season}.csv").write_text(_PLAYER_HEADER + rows, encoding="utf-8")
+
+
+def _write_roster(source_root, names: list[str]) -> None:
+    roster_dir = source_root / "epl" / "api" / "rosters"
+    roster_dir.mkdir(parents=True, exist_ok=True)
+    body = "team_id,team,player_id,player_name,jersey,position\n" + "".join(
+        f"1,Arsenal,{900 + i},{name},{i},F\n" for i, name in enumerate(names)
+    )
+    (roster_dir / "rosters_2026.csv").write_text(body, encoding="utf-8")
+
+
+class DepartedPlayerTests(unittest.TestCase):
+    """`_load_player_rows` concatenated every season's file and deduped by
+    `player_id` keeping the newest row. That asks "what is this player's
+    latest row" and never "is this player still here", so anyone who ever
+    played in the league survived forever under their last-known club.
+
+    Measured on production 2026-08-20 (Arsenal v Coventry): the sim published
+    a 28-man Arsenal squad including Thomas Partey, Kieran Tierney, Jorginho,
+    Raheem Sterling and Jakub Kiwior -- all departed, none in
+    `players_2025.csv`, all carried by a 2024 row. The five two-season
+    leagues held 160-215 stale-only players each, and by this function's own
+    reasoning about duplicates, every extra squad member dilutes each real
+    teammate's shot and prop share.
+    """
+
+    def _module(self):
+        return _load_module(Path(__file__).resolve().parents[1])
+
+    def test_a_player_absent_from_the_latest_season_is_dropped(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
+            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                rows = self._module()._load_player_rows("epl", source_root)
+        names = {r["player_name"] for r in rows}
+        self.assertIn("Stays", names)
+        self.assertNotIn("Departed", names)
+        self.assertIn("SOCCER_DEPARTED_PLAYERS_DROPPED", out.getvalue())
+
+    def test_the_roster_RESCUES_a_current_player_with_no_latest_season_row(self) -> None:
+        """The load-bearing half, and the reason this is a union and not a
+        latest-season filter. Filtering on the season alone would have
+        dropped Ethan Nwaneri and Reiss Nelson -- both genuinely at Arsenal,
+        both carrying a real bookmaker price, neither with a 2025 stats row.
+        Across the ten leagues the roster rescues 121 such players."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Nwaneri"))
+            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            _write_roster(source_root, ["Stays", "Nwaneri"])
+            rows = self._module()._load_player_rows("epl", source_root)
+        self.assertEqual({r["player_name"] for r in rows}, {"Stays", "Nwaneri"})
+
+    def test_the_roster_never_deletes_a_player_it_omits(self) -> None:
+        """DIRECTION IS THE DESIGN. Measured 2026-08-20: used as a FILTER the
+        roster would have wrongly dropped 1,970 current-season players --
+        several roster files are badly incomplete (bundesliga 142 rows vs 567
+        players with stats) and the name join is lossy. A player in the
+        latest season must survive a roster that has never heard of them."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2024, _player_row(2024, "u1", "Current"))
+            _write_players(source_root, 2025, _player_row(2025, "u1", "Current"))
+            _write_roster(source_root, ["SomebodyElse"])
+            rows = self._module()._load_player_rows("epl", source_root)
+        self.assertEqual({r["player_name"] for r in rows}, {"Current"})
+
+    def test_roster_match_ignores_diacritics(self) -> None:
+        """The roster spells them "Viktor Gyokeres" and "Gabriel Magalhaes"
+        where the stats feed does not. Shares `_norm_player_name` with
+        `features/lineups.py` so the identity that keeps a player here is the
+        one `attach_confirmed_starters` uses to match a confirmed XI."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2024, _player_row(2024, "u1", "A") + _player_row(2024, "u2", "Viktor Gyokeres"))
+            _write_players(source_root, 2025, _player_row(2025, "u1", "A"))
+            _write_roster(source_root, ["Viktor Gy\u00f6keres"])
+            rows = self._module()._load_player_rows("epl", source_root)
+        self.assertIn("Viktor Gyokeres", {r["player_name"] for r in rows})
+
+    def test_a_single_season_league_is_untouched(self) -> None:
+        """No earlier file means no stale population is possible. Five of the
+        ten leagues are in this state and must be unaffected."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2026, _player_row(2026, "u1", "A") + _player_row(2026, "u2", "B"))
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                rows = self._module()._load_player_rows("epl", source_root)
+        self.assertEqual(len(rows), 2)
+        self.assertNotIn("SOCCER_DEPARTED_PLAYERS_DROPPED", out.getvalue())
+
+    def test_a_thin_new_season_file_disables_filtering_and_says_so(self) -> None:
+        """A new season's file starts empty and fills up. Filtering against a
+        half-written file would delete most of the league on the first build
+        of a season -- and the failure would look exactly like this fix
+        working, which is why it degrades loudly instead of silently."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(
+                source_root, 2025,
+                "".join(_player_row(2025, f"u{i}", f"P{i}") for i in range(10)),
+            )
+            _write_players(source_root, 2026, _player_row(2026, "u0", "P0"))
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                rows = self._module()._load_player_rows("epl", source_root)
+        self.assertEqual(len(rows), 10)
+        self.assertIn("SOCCER_LATEST_SEASON_FILE_THIN", out.getvalue())
+
+    def test_an_absent_roster_still_filters_rather_than_skipping(self) -> None:
+        """An absent roster means no rescues, not no filtering. Treating it
+        as a reason to skip would make the fix silently inert on exactly the
+        leagues whose roster feed is weakest."""
+        with TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
+            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            rows = self._module()._load_player_rows("epl", source_root)
+        self.assertEqual({r["player_name"] for r in rows}, {"Stays"})
+
+    def test_against_the_real_mirror_the_known_departures_go_and_the_known_squad_stays(self) -> None:
+        """The production case that started this, end to end on real data."""
+        module = self._module()
+        source_root = Path(__file__).resolve().parents[1] / "data" / "soccer_source"
+        if not (source_root / "epl" / "players").exists():
+            self.skipTest("epl mirror not present in this checkout")
+        rows = module._load_player_rows("epl", source_root)
+        arsenal = {str(r.get("player_name")) for r in rows if "Arsenal" in str(r.get("team"))}
+        for departed in ("Thomas Partey", "Jorginho", "Kieran Tierney", "Raheem Sterling", "Jakub Kiwior"):
+            self.assertNotIn(departed, arsenal)
+        # Rescued by the roster: no 2025 stats row, but really at the club and
+        # really priced by the book.
+        for current in ("Ethan Nwaneri", "Reiss Nelson"):
+            self.assertIn(current, arsenal)
+
 if __name__ == "__main__":
     unittest.main()
