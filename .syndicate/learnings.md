@@ -2729,3 +2729,42 @@ comparison.
 cherry-EQUIVALENT to upstream (or you are discarding real work). Both were
 verified here — 19 of 19 equivalent — which is what made the repair safe rather
 than lucky.
+
+## 2026-08-20 — OVERTURNED: a genuinely BRACKETED grid-search optimum (not an edge artifact) still failed held-out validation
+
+Soccer's `home_advantage_attack_boost` re-fit produced five results from a
+small-sample grid search. Four were visibly untrustworthy on their face:
+one ran away to an implausible value with no reversal (overfitting), one
+was non-monotonic/noisy, one never stopped improving at the edge of the
+tested range. The fifth -- championship -- did none of those things: it
+improved through two interior points and then REVERSED at the third,
+exactly what a real local optimum looks like. That was believed to be the
+one trustworthy result of the five, on the strength of its shape alone.
+
+**It failed held-out validation anyway.** Applied to a worktree, run on a
+larger match set at both the old and new value, scored ONLY on the matches
+not used to find the value: mean Brier delta +0.0121, the WRONG direction.
+
+**The general rule, now demonstrated rather than only asserted.** A
+bracketed interior optimum is evidence the search wasn't hitting a
+boundary artifact -- it is NOT evidence the optimum will generalize. Both
+failure modes (edge-of-grid runaway, and a plausible-shaped optimum that's
+still sample-specific) are indistinguishable from a REAL fit without a
+held-out check on data the fit never saw. This repo already had a tool
+built around exactly this discipline (`fit_soccer_probability_calibration.
+py`'s chronological train/test split) for a different fit; this session
+independently re-derived the same requirement for a different constant and
+it caught a real near-miss -- if the championship change had shipped on
+the strength of its bracketed shape alone, it would have shipped a
+measured regression.
+
+**How to apply:** "the search shape looks like a real optimum, not an
+artifact" is a necessary filter for which fits are worth held-out testing
+at all (correctly screened OUT epl, belgian_pro_league, and left
+primeira_liga unresolved here) -- it is never a substitute for the test
+itself, however clean the shape.
+
+Related: [[project_home_advantage_refit_failed]] (if a future session
+revisits primeira_liga or the other untested leagues' directional
+findings, this is the reason NONE of them are safe to apply without their
+own held-out check, regardless of how the grid search shape looks).

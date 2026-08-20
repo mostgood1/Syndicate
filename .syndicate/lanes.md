@@ -446,7 +446,7 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-20 ~06:2xZ — TESTABLE OUTCOME NOT MET; CORE HYPOTHESIS FALSIFIED BY ITS OWN PRE-REGISTERED TEST; INPUT-QUALITY AVENUE EXHAUSTED, NEXT SESSION NEEDS A NEW HYPOTHESIS
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-20 ~13:2xZ — TESTABLE OUTCOME NOT MET; DISPERSION FALSIFIED; DISCRIMINATION CONFIRMED AS THE REMAINING DEFECT; HOME-ADVANTAGE RE-FIT TRIED AND FAILED HELD-OUT VALIDATION
 
 - Goal (unchanged, still NOT met): `backtest_soccer_h2h_calibration.py`
   reports model Brier **<= market** on at least one non-`belgian_pro_league`
@@ -489,15 +489,43 @@ to betting-accuracy improvements.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: **a new hypothesis, not another input pass.** Candidates not
-  yet tried: per-league systematic bias decomposition (is the model wrong
-  the same direction every time, or randomly — the reliability tables in the
-  08-20 result suggest calibration issues at specific probability buckets,
-  not a uniform shift); whether `belgian_pro_league` being the one exception
-  says something about what's different there (league-specific effect worth
-  isolating before assuming it's noise); or stepping back to question
-  whether Brier-vs-closing-line is achievable at all for a model built on
-  this data at this sample size, separate from whether the model is "good."
+- **BIAS DECOMPOSITION DONE, 2026-08-20 ~06:3x-13:2xZ (full detail in the
+  log's two 08-20 entries):** `fit_soccer_probability_calibration.py
+  --per-league` confirms DISCRIMINATION, not dispersion, is the remaining
+  defect (global held-out calibration made Brier worse, fitted temperature
+  ~1.0). **Per-league AUC gap is the map of where to look next:** eredivisie/
+  championship/primeira_liga/belgian_pro_league/epl all rank AS WELL OR
+  BETTER than market (AUC gap +0.004 to +0.044) — NOT ranking problems.
+  ligue_1/la_liga are near-parity (-0.002/-0.003). **serie_a (-0.055) and
+  especially bundesliga (-0.111) have real, unaddressed ranking
+  deficiencies** — the most promising untried thread.
+  Traced and tried `home_advantage_attack_boost` (a real calibrated
+  constant, stale relative to this session's mechanism changes) for the 5
+  shift-candidate leagues: bounded grid search then widened. Four
+  directional findings (eredivisie: no change needed; epl: discarded,
+  ran away to an implausible negative value; belgian_pro_league:
+  noisy/inconclusive; primeira_liga: direction plausible, magnitude
+  unresolved) plus ONE genuine bracketed optimum (championship,
+  0.055 -> 0.115). **Applied championship's change to a worktree and
+  HELD-OUT VALIDATED it (old vs new boost, same 151-match set, scored on
+  the 125 matches NOT used to find the value) — FAILED: mean Brier delta
+  +0.0121 worse, t=+1.19. REVERTED, NOT COMMITTED.** Same pattern as
+  `clean_sheet_rate`: the most trustworthy-looking in-sample result still
+  failed held-out. **No home-advantage adjustment shipped for any league —
+  none of the other 4 should be trusted either, having looked LESS solid
+  than the one that failed.**
+- Next action: **bundesliga and serie_a's AUC deficiencies, not another
+  home-advantage attempt.** Those two leagues' ranking gap vs market
+  (-0.111 and -0.055) is real, measured, and untouched by anything this
+  session tried — everything tried so far (dispersion, home-advantage
+  shift) targeted the 5 leagues where ranking was already fine. Whatever
+  makes bundesliga/serie_a rank worse than market is a different, unexamined
+  question — likely something about how team strength is differentiated
+  for those two specifically, not a global mechanism. Separately: whether
+  `belgian_pro_league` being the one Brier-beating league says something
+  transferable is still untried. **Any future single-parameter fit MUST
+  clear a held-out validation (different matches than the fit) before
+  being applied — this session demonstrated why, not just asserted it.**
 - Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,

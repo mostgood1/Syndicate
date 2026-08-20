@@ -2551,6 +2551,42 @@ retains Phase 1c and the reconciliation guard. The convergence held.
   toward-market, not independent skill — a weaker and methodologically
   different case than possession/set-piece/availability's "keep despite
   non-significance" calls.
+  **UPDATE 2026-08-20 ~06:3x-13:2xZ — BIAS DECOMPOSITION RUN, HOME-ADVANTAGE
+  RE-FIT ATTEMPTED AND DISCARDED AFTER FAILING HELD-OUT VALIDATION.**
+  `fit_soccer_probability_calibration.py --per-league` against the fixed-
+  pipeline result: global held-out calibration made Brier WORSE (0.5467 ->
+  0.5503, fitted temperature 1.1 near-identity) — **confirms discrimination,
+  not dispersion, is the remaining defect**, exactly the negative result
+  that script's own docstring predicts follows a falsified dispersion
+  hypothesis. Per-league AUC gap (model minus market) is genuinely mixed:
+  eredivisie +0.044, championship +0.043, primeira_liga +0.012,
+  belgian_pro_league +0.010, epl +0.004 (model ranks as well or better) vs
+  ligue_1 -0.002, la_liga -0.003, serie_a -0.055, **bundesliga -0.111**
+  (model ranks meaningfully worse) — bundesliga and serie_a are where a
+  real ranking deficiency lives, not the other 5.
+  Traced `home_advantage_attack_boost` (per-league constant,
+  `league_profiles.py`) as the mechanism for the 5 shift-candidate leagues
+  — a REAL calibrated constant (Phase 10/12/16/17), but calibrated before
+  this session's mechanism changes. Bounded grid search (n=25-28, 150
+  sims, single-parameter) then widened: eredivisie needs no change (clean
+  interior optimum already); epl's "improvement" ran away to an implausible
+  NEGATIVE boost with no reversal — discarded as overfitting;
+  belgian_pro_league was non-monotonic/noisy — inconclusive;
+  primeira_liga was still improving at the edge — direction plausible,
+  magnitude unresolved; **championship was the one genuine bracketed
+  optimum** (0.055 -> 0.115, peaked at +0.06 then reversed at +0.09).
+  **Applied to a worktree and HELD-OUT VALIDATED (old vs new boost, same
+  151-match set, scored only on the 125 matches NOT used in the grid
+  search) — FAILED: mean Brier delta +0.0121 (worse), t=+1.19.
+  REVERTED, NOT COMMITTED.** `league_profiles.py` is unchanged
+  (`home_advantage_attack_boost=0.055` for championship, as before).
+  **Same pattern as `clean_sheet_rate`: the MOST trustworthy-looking
+  in-sample result (a genuine bracket, not an edge artifact) still failed
+  held-out.** None of the other 4 leagues' findings should be trusted or
+  applied without the same validation — if the best one failed, the
+  others (already flagged as artifact/noisy/unbracketed) are less
+  trustworthy, not more. **No home-advantage adjustment shipped from this
+  session for any league.**
 
 ## [live-sha-authority] LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]`
 
