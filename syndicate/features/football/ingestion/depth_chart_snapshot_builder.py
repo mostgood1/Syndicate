@@ -9,6 +9,7 @@ from typing import Any
 
 from syndicate.features.football.features.team_identity import canonical_team_abbr
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_artifact_output_root
 
 
 DEPTH_SNAPSHOT_COLUMNS = (
@@ -44,7 +45,14 @@ class DepthChartSnapshotBuildResult:
 
 
 def depth_chart_snapshot_output_path(*, season: int, snapshot_date: str | None = None, publish: bool = False) -> Path:
-    root = default_nfl_source_root() / "source_artifacts" / "data" / "processed" / "depth"
+    # `nfl_artifact_output_root()`, not `default_nfl_source_root()` -- same
+    # `#389` write-side bug as `roster_snapshot_output_path` above (its own
+    # comment has the full explanation). This snapshot is what `injury_
+    # adjustment._depth_chart_path` reads via `nfl_depth_chart_snapshot_path`
+    # -- a write here that lands on the wrong root makes that read-side fix
+    # inert, the same "producer must not undo the consumer's fix" shape
+    # `#441`'s injuries fetcher was built around.
+    root = nfl_artifact_output_root() / "source_artifacts" / "data" / "processed" / "depth"
     if snapshot_date and publish:
         suffix = "_publish" if publish else ""
         return root / f"depth_{season}_snapshot_{snapshot_date.replace('-', '_')}{suffix}.csv"

@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.nfl.player_stats import load_player_plays
-from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_depth_chart_snapshot_path
 from syndicate.features.nfl.sources import nfl_injuries_path
 
 MIN_EXCLUSION_SAMPLE = 20
@@ -193,7 +193,14 @@ def player_defense_value_rate(season: int, week: int, player_id: str) -> tuple[f
 
 
 def _depth_chart_path(season: int) -> Path:
-    return default_nfl_source_root() / "source_artifacts" / "data" / "processed" / "depth" / f"depth_{season}_snapshot.csv"
+    # `nfl_depth_chart_snapshot_path`, not `default_nfl_source_root() /
+    # "source_artifacts" / ...` directly -- the same `#441`-class
+    # root-resolution bug already fixed for pbp and injuries, one more hop
+    # down this same real-substitution pipeline: a root chosen by probing
+    # for an unrelated file (`upcoming_recs_*.csv`) can silently pick the
+    # ephemeral repo checkout over the mounted disk where the snapshot was
+    # actually written.
+    return nfl_depth_chart_snapshot_path(season)
 
 
 def _depth_chart_rows(season: int, team: str) -> list[dict[str, Any]]:

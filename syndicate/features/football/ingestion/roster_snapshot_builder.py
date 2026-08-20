@@ -11,6 +11,7 @@ from syndicate.features.football.features.team_identity import canonical_team_ab
 from syndicate.features.football.features.team_identity import canonical_team_metadata
 from syndicate.features.football.ingestion.nflverse_ingestion import load_nflverse_roster
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_artifact_output_root
 
 
 ROSTER_SNAPSHOT_COLUMNS = (
@@ -42,7 +43,15 @@ class RosterSnapshotBuildResult:
 
 
 def roster_snapshot_output_path(*, season: int, snapshot_date: str | None = None, publish: bool = False) -> Path:
-    root = default_nfl_source_root() / "source_artifacts" / "data" / "processed" / "rosters"
+    # `nfl_artifact_output_root()`, not `default_nfl_source_root()` -- the
+    # same `#389` write-side bug already fixed for SmartSim2 projections:
+    # `default_nfl_source_root()` probes for an UNRELATED file
+    # (`upcoming_recs_*.csv`) and can silently pick the ephemeral repo
+    # checkout over the mounted disk, so a snapshot written on refresh-worker
+    # would be discarded on every deploy with nothing reading it. Deliberately
+    # no filesystem probing on the write side -- env var, else the shared
+    # data root, same as every other NFL artifact writer.
+    root = nfl_artifact_output_root() / "source_artifacts" / "data" / "processed" / "rosters"
     if snapshot_date and publish:
         suffix = "_publish" if publish else ""
         return root / f"roster_{season}_snapshot_{snapshot_date.replace('-', '_')}{suffix}.csv"

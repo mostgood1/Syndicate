@@ -15,7 +15,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.nfl import cards as nfl_cards
-from syndicate.features.nfl import injury_adjustment as inj
 from syndicate.features.nfl import preseason_cards as pc
 from syndicate.features.nfl import preseason_projection as pp
 from syndicate.features.nfl import sources as nfl_sources
@@ -26,16 +25,22 @@ class PreseasonCardsTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = Path(self._tmp.name)
-        # inj (injury_adjustment.py) is patched too -- preseason_depth.py's
-        # likely_snap_leaders()/likely_starters_sitting() read the real
-        # depth chart via injury_adjustment._depth_chart_rows(), which
-        # resolves its own default_nfl_source_root() independently; without
-        # this, these tests would silently read real production depth data
-        # instead of this fixture's controlled (empty) tempdir.
-        for target in (pc, nfl_sources, inj):
+        # `injury_adjustment.py`'s `_depth_chart_rows` (read by preseason_
+        # depth.py's likely_snap_leaders()/likely_starters_sitting(), which
+        # this fixture's projection rendering can reach) now resolves through
+        # `nfl_sources._resolve_nfl_tracking_path` -> `nfl_sources._source_
+        # roots()`, not through its own `default_nfl_source_root()` call --
+        # `inj` no longer even imports that name (`nfl-roster-depth-autorun`
+        # lane). Patching `_source_roots` on `nfl_sources` covers the search
+        # loop itself, not just its fallback, so this stays contained to the
+        # tempdir rather than silently reading real production depth data.
+        for target in (pc, nfl_sources):
             patcher = patch.object(target, "default_nfl_source_root", return_value=self.root)
             patcher.start()
             self.addCleanup(patcher.stop)
+        source_roots_patcher = patch.object(nfl_sources, "_source_roots", return_value=[self.root])
+        source_roots_patcher.start()
+        self.addCleanup(source_roots_patcher.stop)
         nfl_cards._team_branding_index.cache_clear()
         self.addCleanup(nfl_cards._team_branding_index.cache_clear)
 

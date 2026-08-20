@@ -2701,6 +2701,275 @@ def _launch_autorun_nfl_injuries_fetch(
     return True
 
 
+# ---------------------------------------------------------------------------
+# NFL roster and depth-chart snapshot ingestion (`nfl-roster-depth-autorun`
+# lane, sibling to `nfl-injuries-fetcher`'s injuries fetch above).
+#
+# WHY THIS AUTORUN EXISTS. `roster_snapshot_builder.py` and `depth_chart_
+# snapshot_builder.py` are real, already CONSUMED (by `ask_the_syndicate_
+# data.py`'s team-profile evidence), but neither was wired into any
+# scheduled/automatic run anywhere in this repo -- both were CLI-only. Worse:
+# both builders' OUTPUT path used to be built off `default_nfl_source_root()`
+# directly, which is the exact `#389` write-side bug already measured for
+# SmartSim2 projections (a root chosen by probing for an UNRELATED file,
+# `upcoming_recs_*.csv`, can silently pick the ephemeral repo checkout over
+# the mounted disk) -- fixed in this same lane before this autorun was added,
+# so a snapshot this autorun launches actually lands somewhere the next
+# refresh-worker tick (and `injury_adjustment._depth_chart_path`, via its own
+# `#441`-class read-side fix in this same lane) can find it.
+#
+# DEFAULT OFF, like every sibling autorun -- see the pbp block far above for
+# the full reasoning (three existing tests caught a default-on version of
+# that one; the same contract applies here).
+# `NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true` and
+# `NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN=true` arm them
+# independently -- a roster snapshot is useful on its own (team-size/coverage
+# evidence) even before a depth chart exists, so there is no reason to force
+# them on together.
+#
+# INTERVAL DEFAULTS ARE CONSIDERED GUESSES, NOT MEASURED ONES -- same caveat
+# the injuries autorun's own comment states. 21600s (4x/day) for both: rosters
+# and depth charts change on a practice/transaction cadence, not a play-by-
+# play one, so daily-ish is a reasonable starting point pending a real
+# staleness complaint.
+#
+# NO PRODUCER/CONSUMER ORDERING NEEDED BETWEEN THESE TWO. Unlike pbp before
+# season_projections, `build_nfl_depth_chart_snapshot.py` loads its own roster
+# rows directly from `load_nflverse_roster` (the raw nflverse feed), not from
+# the roster SNAPSHOT this sibling autorun writes -- so either can run first,
+# or only one can be armed, without the other silently degrading.
+#
+# PLACED IMMEDIATELY AFTER THE INJURIES FETCH IN THE DISPATCH CHAIN,
+# deliberately -- `#341`: the same starvation mechanism the pbp and injuries
+# autoruns' own comments document. All three NFL ingestion autoruns are
+# equally time-sensitive for the same sport, so they stay grouped at the
+# front of the chain rather than one drifting toward the end where it could
+# go mute for weeks while still enabled and correctly configured.
+#
+# NO PERSISTED PID GUARD, deliberately -- same `#443` rationale as pbp and
+# injuries: a last-ATTEMPT marker recorded BEFORE the launch, so a crash
+# costs one interval, never a storm, and there is no pid whose liveness can
+# be misread. Both builders raise on validation failure (non-atomic write is
+# acceptable here: unlike the fetchers, output is entirely regenerated from
+# freshly-loaded source rows each run, so a failed run simply leaves the
+# previous snapshot in place -- there is no partial-file risk to guard
+# against with a temp-file swap).
+# ---------------------------------------------------------------------------
+
+_NFL_ROSTER_SNAPSHOT_SKIP_LOG_AT: dict[str, float] = {}
+_NFL_ROSTER_SNAPSHOT_SKIP_LOG_INTERVAL_SECONDS = 60.0
+_NFL_DEPTH_CHART_SNAPSHOT_SKIP_LOG_AT: dict[str, float] = {}
+_NFL_DEPTH_CHART_SNAPSHOT_SKIP_LOG_INTERVAL_SECONDS = 60.0
+
+
+def _nfl_roster_snapshot_enabled() -> bool:
+    raw = str(os.environ.get("NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_roster_snapshot_interval_seconds() -> int:
+    raw = str(os.environ.get("NFL_ROSTER_SNAPSHOT_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 21600)
+    except Exception:
+        value = 21600
+    return max(3600, value)
+
+
+def _nfl_roster_snapshot_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_roster_snapshot.json"
+
+
+def _nfl_roster_snapshot_script_args(season: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "build_nfl_roster_snapshot.py"
+    return [sys.executable, str(script_path), "--season", str(season)]
+
+
+def _launch_autorun_nfl_roster_snapshot(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Build the real NFL roster snapshot when the marker is missing or stale.
+
+    Runs immediately after `_launch_autorun_nfl_injuries_fetch` -- see the
+    module comment above for why (`#341` starvation).
+    """
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_ROSTER_SNAPSHOT_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NFL_ROSTER_SNAPSHOT_SKIP_LOG_INTERVAL_SECONDS:
+            _NFL_ROSTER_SNAPSHOT_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_ROSTER_SNAPSHOT_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_roster_snapshot_enabled():
+        return _skip("disabled", "NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return _skip("not_in_season", f"date={selected_date} active={','.join(sorted(active))}")
+
+    interval = _nfl_roster_snapshot_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_roster_snapshot_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    season = date.today().year
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_roster_snapshot_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "season": season,
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_ROSTER_SNAPSHOT_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    print(
+        f"[refresh_worker] NFL_ROSTER_SNAPSHOT_LAUNCHING season={season} "
+        f"last_attempt_age_s={int(age) if last_attempt else 'never'} "
+        f"interval_s={interval}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_nfl_roster_snapshot_script_args(season))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_ROSTER_SNAPSHOT_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NFL roster snapshot build (season={season}) because the marker was missing or older than {interval}s.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
+def _nfl_depth_chart_snapshot_enabled() -> bool:
+    raw = str(os.environ.get("NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_depth_chart_snapshot_interval_seconds() -> int:
+    raw = str(os.environ.get("NFL_DEPTH_CHART_SNAPSHOT_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 21600)
+    except Exception:
+        value = 21600
+    return max(3600, value)
+
+
+def _nfl_depth_chart_snapshot_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_depth_chart_snapshot.json"
+
+
+def _nfl_depth_chart_snapshot_script_args(season: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "build_nfl_depth_chart_snapshot.py"
+    return [sys.executable, str(script_path), "--season", str(season)]
+
+
+def _launch_autorun_nfl_depth_chart_snapshot(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Build the real NFL depth-chart snapshot when the marker is missing or
+    stale. Runs immediately after the roster snapshot autorun -- see the
+    module comment above (no producer/consumer ordering is actually required
+    between the two, but grouping them keeps `#341` placement simple).
+    """
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_DEPTH_CHART_SNAPSHOT_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NFL_DEPTH_CHART_SNAPSHOT_SKIP_LOG_INTERVAL_SECONDS:
+            _NFL_DEPTH_CHART_SNAPSHOT_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_DEPTH_CHART_SNAPSHOT_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_depth_chart_snapshot_enabled():
+        return _skip("disabled", "NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return _skip("not_in_season", f"date={selected_date} active={','.join(sorted(active))}")
+
+    interval = _nfl_depth_chart_snapshot_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_depth_chart_snapshot_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    season = date.today().year
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_depth_chart_snapshot_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "season": season,
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_DEPTH_CHART_SNAPSHOT_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    print(
+        f"[refresh_worker] NFL_DEPTH_CHART_SNAPSHOT_LAUNCHING season={season} "
+        f"last_attempt_age_s={int(age) if last_attempt else 'never'} "
+        f"interval_s={interval}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_nfl_depth_chart_snapshot_script_args(season))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_DEPTH_CHART_SNAPSHOT_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NFL depth-chart snapshot build (season={season}) because the marker was missing or older than {interval}s.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 def _season_projection_process_still_running(sport: str) -> bool:
     # Confirmed live 2026-08-02: this autorun had no "already running" guard
     # at all -- unlike every sibling autorun here (MLB's daily sim, the
@@ -3937,6 +4206,27 @@ def main() -> int:
             # it can go mute for weeks while still enabled and correctly
             # configured. Also DAILY-ish gated (default 21600s interval, not
             # literally daily), so it wins at most a handful of ticks per day.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_roster_snapshot(
+            # FOURTH, DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
+            # starvation reasoning as the branches above: equally
+            # time-sensitive for the same sport, same priority tier.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_depth_chart_snapshot(
+            # FIFTH, DIRECTLY BEHIND THE ROSTER SNAPSHOT -- same reasoning.
+            # No producer/consumer ordering is actually required between
+            # these two (see the module comment above), but keeping them
+            # adjacent keeps this chain's NFL block easy to reason about.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
