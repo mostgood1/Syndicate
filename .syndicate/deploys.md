@@ -17677,7 +17677,36 @@ A `directPublish.ok=false` with an `error` is a DIFFERENT outcome from
 **rollback:** redeploy `b2f4b197` (the current live SHA) on refresh-worker.
 Additive, 2 files, no schema or contract change, so rollback is a plain redeploy.
 
-**measurement:** <pending>
+**measurement: CONFIRMED FIXED 2026-08-20T02:18Z.** Deploy
+`dep-da35tbrbc2fs738atmjg`, live 02:03:08Z. First sim on the new code wrote its
+status at 02:18:21Z carrying:
+
+    directPublish {"attempted": true, "ok": true, "bytes": 12627555, ...}
+
+and WEB's served ladder moved:
+
+                      BEFORE                      AFTER
+    generatedAt       2026-08-18T18:20:25-05:00   2026-08-19T21:17:32-05:00
+    bytes             11,716,507                  12,627,555
+
+**The fix is load-bearing, not incidental:** 12,627,555 is still 44,643 bytes
+OVER the 12,582,912 sweep ceiling, so the sweep would have refused this copy
+too. The direct streamed path is what carried it.
+
+**User-visible symptom, the thing actually reported — pitcher prop ladders now
+carry market lines:**
+
+    strikeouts     20 of 30 rows   (was 0 of 12 on the stale copy)
+    outs           25 of 30
+    earned_runs    21 of 30
+    hits_allowed   18 of 30
+    walks_allowed  14 of 30
+
+STILL ZERO and NOT explained by this fix, flagged as separate work: pitcher
+`pitches` and `batters_faced` (0/30), and hitter `hitter_strikeouts`,
+`doubles`, `triples`, `stolen_bases` (0/390). These read like markets that are
+not being captured at all rather than a staleness symptom — the other hitter
+props do carry lines (37-78 of 390) off the same document. Not investigated.
 
 ## 2026-08-20 01:25Z — VERIFIED — soccer odds #343 fix confirmed live, real fresh captures
 - Both deploys live: live-odds-worker (575decf3, finished 00:29:51Z),

@@ -98,6 +98,27 @@ That story ended; do not re-open it from the archive.**
   is not the cause". It was wrong, and instructively so — peak is PER-PASS, not
   cumulative, so halving 2 scans to 1 cut DURATION and could never move the peak.
   "Kills continued" was evidence of the wrong lever, not the wrong suspect.
+- **MLB's hydration cost has two named, measured components, and both are CUT ON
+  `main` (`ab99d236`) AND NOT DEPLOYED `[measured 2026-08-19, lane
+  mlb-overview-hydration-cost]`.** (a) `liveData.plays.allPlays` is **66.38%** of
+  a StatsAPI feed/live document and `playsByInning` **3.05%** — measured over 15
+  documents, 12,605,243 JSON bytes — and **nothing in `syndicate/` reads either**;
+  `_daily_actual_by_game` held one full document per game for the whole build.
+  Pruned: peak RSS **142.9 → 114.5 MB** on a 15-game slate (worker path, 5
+  repeats/arm, non-overlapping spreads), with the serialised games list
+  **byte-identical at 343,503 B**. (b) `_enrich_games_with_tracked_market_lines`
+  loaded the whole odds_history shard to consult `doc["games"]` — **that key does
+  not exist and never has** (one writer, one literal schema, `markets`-keyed;
+  three real shard copies on disk confirm), so the branch could never fire.
+  Removed. **NEITHER IS EVIDENCE ABOUT THE ~2GB EXCURSION** — the shard's ~125MB
+  is a production-only derivation (19,798,176 B x `#435`'s ~6.3x) and is NOT in
+  the RSS numbers, which are the prune alone.
+- **`#387`'s "one thing to fix" — turn overview peak from SUM into MAX — ALREADY
+  SHIPPED.** `build_intelligence_overview` takes a `consumer=` and releases each
+  sport before the next hydrates, and a second floor
+  (`_OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES = 1500MB`) admits the seven cheap
+  sports. `handoff_overview_hydration.md` now says so at the top. The live
+  question is MLB alone.
 - **`memory.current` counts PAGE CACHE.** Split anon from `inactive_file` before
   calling anything a leak: on live-odds-worker 2026-08-18 the aggregate read
   96.8% while anon was 41%, and a rollback was fired on that misreading.
@@ -3216,7 +3237,7 @@ never consults `_publish_skip_reason`. Same route `book_grid` (12,855,903 bytes)
 has used all along. **The bound is UNTOUCHED** — it is sweep-only by design and
 exists to stop 51MB `odds_history` shards going up every cycle.
 
-**STATUS as of 2026-08-20T01:30Z: CUT AND QUEUED, NOT DEPLOYED.** Deploy branch
+**STATUS: DEPLOYED AND CONFIRMED FIXED `[2026-08-20T02:18Z]`** — `dep-da35tbrbc2fs738atmjg`, live 02:03:08Z. Web's ladder moved `2026-08-18T18:20:25` → `2026-08-19T21:17:32` and 11,716,507 B → 12,627,555 B; `directPublish {attempted:true, ok:true, bytes:12627555}`. Pitcher strikeouts now carry market lines on **20 of 30** rows (was 0 of 12). The new size is STILL 44,643 B over the sweep ceiling, so the direct path is what carried it. Claim released. Detail: Deploy branch
 `deploy/mlb-ladder-publish` = **`041188cb`**, cut from refresh-worker's LIVE SHA
 `b2f4b197` (live 01:13:09Z), NOT from main — main is 432 files / 126,420 lines
 ahead of this service and a ~420-commit jump on a live 4GB sim service is not a
