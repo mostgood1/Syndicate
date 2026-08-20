@@ -59,3 +59,36 @@ jobs:
           python scripts/lane_identity_check.py
           python scripts/todo_id_reconcile.py --no-history
           python scripts/state_key_check.py
+
+      # The hooks that enforce all of the above. ENFORCED from the first run:
+      # all four suites are green (59 cases) and none is vacuous -- each was
+      # mutation-tested by disabling the predicate under test, and each went red.
+      # A suite that stays green with its subject disabled is measuring nothing,
+      # which is the same "looks like coverage" failure the split above exists
+      # to avoid.
+      #
+      # WHY THESE EXIST. Four guards resolved paths against CLAUDE_PROJECT_DIR
+      # -- the PRIMARY checkout -- while every session works in its own linked
+      # worktree (scripts/session_worktree.py). Measured 2026-08-20:
+      #   ledger-commit-guard   blocked a CLEAN worktree over the primary tree's
+      #                         duplicate lane blocks, and printed a cleanup that
+      #                         would have rewritten two OTHER lanes' blocks.
+      #   ledger-append-guard   fully INERT in every worktree. Identical
+      #                         violating edit: primary exit=2, worktree exit=0.
+      #   ledger-postwrite      blind to worktree Bash writes -- the one thing it
+      #                         exists to catch -- and blamed unrelated sessions
+      #                         for changes it merely observed.
+      # An inert guard and a satisfied guard are indistinguishable from outside,
+      # so these need a suite, not an eyeball. lane-guard is EXONERATED and its
+      # pre-existing suite is included to keep it that way.
+      #
+      # The suites build throwaway git repos under the OS temp dir. They never
+      # read the live ledger: the first version of the commit-guard suite did,
+      # and a parallel session trimming real duplicates mid-run flipped three
+      # cases from pass to fail.
+      - name: Hook guards (enforced -- worktree resolution, overrides, fail-open)
+        run: |
+          python .claude/hooks/test_ledger_commit_guard.py
+          python .claude/hooks/test_ledger_append_guard.py
+          python .claude/hooks/test_ledger_postwrite_check.py
+          python .claude/hooks/test_lane_guard_hyphen.py
