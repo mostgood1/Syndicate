@@ -76,6 +76,7 @@ def compute_home_court_advantage(
     season: int,
     include_preseason: bool = False,
     min_games: int = 40,
+    min_t_stat: float = 1.0,
 ) -> dict:
     """Return the measured HCA payload, or a payload with `ok: False` and a
     reason when the sample cannot support one."""
@@ -92,6 +93,7 @@ def compute_home_court_advantage(
         "schedule": str(schedule_path),
         "include_preseason": bool(include_preseason),
         "min_games": int(min_games),
+        "min_t_stat": float(min_t_stat),
     }
 
     if not history_path.is_file():
@@ -162,6 +164,38 @@ def compute_home_court_advantage(
     if mean_team_points <= 0:
         return {"ok": False, "reason": "degenerate_mean_points", **diag}
 
+    diag["mean_margin"] = mean_margin
+    diag["t_stat"] = t_stat
+    diag["home_win_rate"] = home_win_rate
+
+    # `#483`. THE INCIDENT: a production run on 2026-08-20T14:33Z emitted
+    # `eff_mult_delta = -0.0116` from 46 games -- a NEGATIVE home-court
+    # advantage, published for the sim to consume. Two hours earlier the same
+    # service on the same disk produced +0.0151 from 138 games. The existing
+    # `min_games=40` floor passed it, because a game COUNT says nothing about
+    # whether the estimate is distinguishable from noise.
+    #
+    # Home-court advantage is one of the most robust priors in team sports.
+    # A negative point estimate is not a discovery, it is a thin sample, and
+    # shipping it actively inverts a real effect the sim would otherwise get
+    # roughly right by doing nothing. Two gates, both cheap:
+    #
+    #   SIGN  -- refuse a negative advantage outright. This is a genuine
+    #            prior, not curve-fitting: the measured full-season value is
+    #            +2.31 pts (t=+2.01), regular-season-only +2.07 (t=+1.75).
+    #   POWER -- refuse when the estimate is not distinguishable from zero.
+    #            t=1.0 is deliberately permissive (roughly the 84th
+    #            percentile one-sided); the aim is to exclude noise, not to
+    #            demand significance a 40-game WNBA sample cannot supply.
+    #
+    # Refusal is FAIL-SAFE: no file is written, `_load_home_court_advantage_local`
+    # finds nothing, and the sim runs with no home-court term -- exactly the
+    # behaviour that predates `#474`, and strictly better than a sign-flipped one.
+    if mean_margin <= 0.0:
+        return {"ok": False, "reason": "non_positive_home_advantage", **diag}
+    if not (math.isfinite(t_stat) and t_stat >= float(min_t_stat)):
+        return {"ok": False, "reason": "estimate_indistinguishable_from_zero", "min_t_stat": float(min_t_stat), **diag}
+
     # Symmetric split: half the margin to each side, so TOTAL is unchanged.
     eff_mult_delta = (mean_margin / 2.0) / mean_team_points
 
@@ -199,6 +233,7 @@ def main() -> int:
     parser.add_argument("--season", type=int, default=2026)
     parser.add_argument("--include-preseason", action="store_true", help="include preseason games (default: regular season only)")
     parser.add_argument("--min-games", type=int, default=40, help="refuse to write below this many joined games")
+    parser.add_argument("--min-t-stat", type=float, default=1.0, help="refuse when the home-advantage estimate is not distinguishable from zero")
     parser.add_argument("--dry-run", action="store_true", help="compute and print, write nothing")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -208,6 +243,7 @@ def main() -> int:
         season=args.season,
         include_preseason=bool(args.include_preseason),
         min_games=int(args.min_games),
+        min_t_stat=float(args.min_t_stat),
     )
 
     if args.json:
