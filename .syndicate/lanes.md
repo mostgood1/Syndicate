@@ -650,9 +650,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 ### football-model-owner — OPEN — **CONSOLIDATION SHIPPED: 114 files / 5+ lanes / 3 deploys, all content-verified. Found the test suite's collection hang and RETRACTED my own false failure report.** — opened 2026-08-18 — session: football-model-owner
 - Status: **everything on `origin/main`, ahead 0.** Consolidated deploys live:
   refresh-worker `db469003`, live-odds-worker `a381d652`, web `454f3caa`.
-- **USE EXPLICIT TEST FILE LISTS, NOT `-k`.** `-k` over `tests/` costs ~14 min in
-  COLLECTION regardless of selection (8,135 deselected but still imported). Five
-  `-k` runs tonight never reached execution. Explicit files: 81 passed in 5.12s.
+- **THE SUITE IS SLOW FROM TEST INTERACTION, NOT COLLECTION.** Collection of
+  all 8,900 tests is 6.06s. 66 soccer files run singly total 249.9s; the same
+  67 in ONE process take 875.8s (3.50x). Files are fast alone, slow together —
+  cost is superlinear in FILE COUNT PER PROCESS. Keep runs to a few files;
+  a bigger `-k` will not help and explicit lists are not faster (875.8 vs 822.4).
+
 - **I RETRACTED my own "~12 failures" report** — it was progress dots from a
   run killed mid-collection. Run to completion: 765 passed, 0 failed. **A partial
   pytest run is NO result, not a partial one.**

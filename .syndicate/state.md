@@ -2153,19 +2153,29 @@ move is a single-file `git checkout origin/main -- <path>` followed by a commit 
 `checkout <rev> -- <path>` writes the index EVERY session shares, and a stray
 staged file is what gets swept into someone else's commit.
 
-**THE TEST SUITE'S COST IS COLLECTION, NOT EXECUTION — and it invalidated a
-finding of mine** `[measured 2026-08-20]`. Two explicit test FILES: **81 passed
-in 5.12s**. The same tests via `-k soccer` over `tests/`: **822s (13m42s)** for
-`765 passed, 8135 DESELECTED` — pytest imports all ~8,900 tests before filtering,
-so a `-k` run spends ~14 minutes on collection whatever it selects.
-**USE EXPLICIT FILE LISTS, NOT `-k`.** Five `-k` attempts tonight never reached
-execution at all; one produced a 606KB output file that was a worker's memory
-telemetry, not test results.
-**AND A RUN KILLED MID-COLLECTION LOOKS LIKE FAILING TESTS.** I read progress
-dots from a truncated run as "~12 failures in the deployed areas", reported it
-twice, and proposed rolling back three verified deploys on it. Run to
-completion: **765 passed, 0 failed.** A partial pytest run is not a partial
-result — it is NO result.
+**THE TEST SUITE IS SLOW FROM TEST INTERACTION, NOT COLLECTION — and my first
+diagnosis was WRONG** `[measured 2026-08-20, corrected same session]`.
+
+    collect-only, all 8,900 tests        6.06s   <- collection is NOT the cost
+    66 soccer files run ONE AT A TIME  249.9s   (183.9s net of ~1s startup each)
+    the SAME 67 files in ONE process   875.8s
+    -> 3.50x the sum, 4.76x net.  Median file: 2.29s.  Slowest: 38.30s.
+
+**Files are FAST alone and SLOW together**, so the cost is accumulated in-process
+state — a fixture or cache that grows across modules — NOT collection, NOT a few
+slow tests. Slowest four are `test_soccersim_distribution` (38.3s),
+`test_soccer_team_ratings_as_of` (23.0), `test_soccer_live_lens` (21.7),
+`test_soccer_adapter` (20.7); everything else is ~2s.
+
+**RETRACTED, both halves:** I recorded "the cost is COLLECTION" and "use explicit
+file lists, not `-k`". Both false. Collection is 6s, and explicit files were
+SLOWER (875.8s vs `-k`'s 822.4s). The 5-second run that produced that theory was
+fast because it was TWO FILES, not because it avoided `-k`.
+
+**Practical rule that survives:** keep a run to a handful of files. 3 files = 74
+tests in 2.97s; 67 files = 646 tests in 875.8s. The penalty is superlinear in
+FILE COUNT PER PROCESS, so `-p xdist` or batching would help and a bigger `-k`
+will not.
 
 **CONSOLIDATED DEPLOYS ARE THE WORKING PATTERN FOR A BUSY DAY** `[2026-08-20]`.
 114 files / 5+ lanes / **3 deploys**: refresh-worker `db469003` (9 files,

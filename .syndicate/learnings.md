@@ -3189,7 +3189,7 @@ It came from a run I killed with `timeout 540` at 25% progress. I looked at
 `F.....................FFFFFFFFF.F..F` and read a failure cluster. Run to
 completion, the same selection is **765 passed, 0 failed.**
 
-**THE ROOT CAUSE IS COLLECTION, AND IT EXPLAINS FIVE FAILED ATTEMPTS.** Measured:
+**I BLAMED COLLECTION. THAT WAS WRONG — see the correction at the end.** Measured:
 
     two explicit test FILES        81 passed in    5.12s
     same tests via -k soccer      765 passed in  822.43s   (8,135 DESELECTED)
@@ -3277,3 +3277,32 @@ when it overrides, so the staleness surfaces instead of being absorbed.
 Related: [[feedback_unknown_must_not_default_permissive]] (its converse:
 unknown must not default permissive, but KNOWN-FRESH must not lose to
 known-stale), [[project_render_source_of_truth]].
+
+### CORRECTION, same session — collection was NOT the cause, and the fix I gave was backwards
+
+I wrote "the root cause is collection" and "use explicit file lists, never `-k`".
+**Both are false**, and I recorded them as measured facts:
+
+    collect-only, all 8,900 tests        6.06s    <- collection is trivial
+    66 soccer files ONE AT A TIME      249.9s     (183.9s net of startup)
+    the SAME 67 files in ONE process   875.8s     -> 3.50x sum, 4.76x net
+    -k soccer over tests/              822.4s     <- FASTER than explicit files
+
+Explicit file lists were **slower**. The 5-second run that produced the theory
+was fast because it was **two files** — I generalised from a sample that varied
+the wrong variable.
+
+**The real cause is TEST INTERACTION.** Files are fast alone (median 2.29s,
+slowest 38.3s) and slow together. Something accumulates in-process across
+modules — a fixture or cache that grows — so cost is superlinear in FILE COUNT
+PER PROCESS.
+
+**THREE FALSE DIAGNOSES IN ONE SESSION, ALL THE SAME SHAPE:** phantom test
+failures (progress dots read as results), "collection is the cost" (two data
+points, wrong variable), and a 6.9x ratio computed from a `head -14` truncation
+against a 67-file run. Each was written down as measured before it was measured.
+
+**The rule: a comparison is only evidence if you changed exactly ONE thing.**
+Two files vs sixty-seven differs in count AND in selection mechanism; attributing
+the gap to the mechanism was unfounded. And a ratio needs both terms measured
+over the SAME population — check the denominator's `n` before dividing.
