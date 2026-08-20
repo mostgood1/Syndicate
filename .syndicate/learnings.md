@@ -2145,3 +2145,56 @@ context for *how* to fix the backup rather than as evidence about *whether* to.
 - When repairing an unblocked path, **enumerate what the repair lets happen
   next.** The dangerous moment is not the broken state, it is the first
   successful run after the fix.
+
+---
+
+## 2026-08-19 — a 5.8σ result against a PROXY did not transfer to the objective
+
+**The strongest-evidenced model input I tested all session failed, and the prior
+that recommended it was not weak — it was rigorous and it was measured against
+the wrong thing.**
+
+Returning production for NCAAF. Two independent checks passed before anything
+was built: it is NOT already inside preseason SP+ (r=+0.035, incremental R²
++0.000, with recruiting at +0.482 through the identical residual as a POSITIVE
+CONTROL proving the probe could detect an ingredient), and it DOES predict
+year-over-year SP+ movement — pooled **r=+0.207, n=786, ~5.8σ, positive in all
+six seasons independently.**
+
+Wired through the strong lever (ratings, 17.2% of margin SD, not the 4.1%
+payload). Reachability passed: 50 of 51 margins moved.
+
+Then the objective test, paired, leak-free, identical games and seeds:
+
+    2024   n=749   dMAE -0.149  t=-1.58
+    2025   n=758   dMAE +0.023  t=+0.22   <- OPPOSITE SIGN
+    pooled n=1507  dMAE -0.062  t=-0.89   NOT SIGNIFICANT
+
+**The chain had two links and only the first held:**
+
+    returning production -> SP+ MOVEMENT      HELD, 5.8 sigma
+    SP+ movement -> MARGIN ACCURACY           FAILED
+
+**What makes this worth its own entry.** The session already records "calibrated
+is not competitive" — matching market dispersion said nothing about accuracy.
+This is the same failure with a much better disguise: the proxy relationship was
+not a hand-wave, it was multi-season, positive-controlled and 5.8 sigma.
+**Rigour in validating a proxy does not convert it into the target.** A proxy
+measured to ten decimal places is still a proxy.
+
+**And the 2024 arm nearly sold it.** At t=-1.58 with the right sign and a strong
+prior, the temptation to ship was real and I nearly framed it as
+"under-powered, needs more data" indefinitely. One more independent season cost
+~100 minutes and flipped the sign. **A single-season backtest with a favourable
+prior is the most dangerous kind of result**, because prior plus direction feels
+like corroboration when it is one sample.
+
+**The rule going forward.** Before building an input on the strength of a
+correlation, ask what that correlation was measured AGAINST. If it is anything
+other than the quantity the model is judged on, the measurement is a reason to
+RUN the objective test, never a substitute for it. And require a second
+independent sample before shipping anything whose first sample is under |t|=2 —
+the second sample is where noise separates from signal.
+
+**Cost:** ~3 hours of compute and one near-miss. Cheap, and only because the
+objective test was run before shipping rather than after.
