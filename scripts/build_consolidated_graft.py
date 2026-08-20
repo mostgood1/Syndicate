@@ -53,11 +53,14 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
-SERVICE_IDS = {
-    "web": "srv-d88ahvrbc2fs73eodu30",
-    "refresh-worker": "srv-d91dpertqb8s73co8ls0",
-    "live-odds-worker": "srv-d2ed2rmmcj7s73f7uleg",
-}
+# IMPORTED, never re-typed. My hand-copied map had live-odds-worker as
+# srv-d2ed2rmmcj7s73f7uleg -- entirely wrong, caught only by a 404. The real IDs
+# for refresh-worker and live-odds-worker differ by ONE CHARACTER
+# (...73co8ls0 vs ...73co8lt0), so a typo is both easy and catastrophic: it
+# deploys one service's graft onto another. render_deploy.py is the single
+# source of truth; a second copy is a second thing to get wrong.
+sys.path.insert(0, str(REPO / "scripts"))
+from render_deploy import SERVICE_IDS  # noqa: E402
 
 
 def git(*args: str, check: bool = True) -> str:

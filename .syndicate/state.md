@@ -3445,6 +3445,49 @@ independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
+## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART INGESTION — BUILT, WIRED, DEPLOYED, LIVE-VERIFIED `[2026-08-20]`
+
+`roster_snapshot_builder.py` and `depth_chart_snapshot_builder.py` are real
+(both already consumed by `ask_the_syndicate_data.py`'s team-profile
+evidence) but had NO automated production trigger before this session
+(CLI-only) and both wrote via the probing-based `default_nfl_source_root()`
+instead of `nfl_artifact_output_root()` -- the same `#389`-class write-side
+bug already measured for SmartSim2 projections. Fixed (both switched to the
+non-probing resolver; `injury_adjustment.py`'s depth-chart READ path also
+had the sibling `#441`-class bug, fixed via a shared resolver mirroring
+`nfl_pbp_path`/`nfl_injuries_path`), and wired into refresh-worker as two
+new default-OFF autoruns
+(`NFL_ROSTER_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`,
+`NFL_DEPTH_CHART_SNAPSHOT_ENABLE_REFRESH_WORKER_AUTORUN`).
+
+**Armed and deployed in production** (refresh-worker, `df04c294` live
+2026-08-20T17:32:54Z). Depth-chart: `LAUNCHING` clean on its first real
+run, no crash. Roster-snapshot: crashed on its FIRST real run --
+`ValueError: Roster snapshot validation failed: row 91 has invalid team
+AZ; ...` (~90 rows, every Arizona Cardinals player) -- nflverse's own
+team code for Arizona is `AZ`, not `ARI`, and `canonical_team_abbr` (the
+shared `team_identity.py`) had no alias entry for it. **Fixed and
+CONFIRMED WORKING against real production data**: the autorun's real
+retry fired 2026-08-20T19:41:42Z, zero traceback in the full launch
+window, `rows_written=2930` (the real 2026 nflverse roster, Arizona
+included).
+
+**NOT armed, deliberately out of scope this session:**
+`NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` -- the fetch script
+(`scripts/fetch_nfl_injuries.py`) and the matching `#441`-class read-path
+fix in `injury_adjustment.py` landed earlier (`nfl-injuries-fetcher`
+lane, closed), but arming it was explicitly scoped OUT ("both autoruns"
+meant roster/depth-chart specifically); flagged as an optional low-risk
+ridealong to `football-model-owner`, not yet actioned as of this
+checkpoint.
+
+**HOT_ARTIFACT_PATTERNS allowlisting NOT done** for any of the three new
+artifact paths (`injuries_{season}.csv`,
+`roster_{season}_snapshot.csv`, `depth_{season}_snapshot.csv`) --
+production presence of these is unauditable from `/api/ops/...` until
+allowlisted. Handed off to `basketball-model-owner` (the file is under
+their lane) via `send_message`, twice, not yet actioned.
+
 ## [mlb-vendor-exit-audit] MLB VENDOR EXIT — 18 OF 20 PIPELINE STAGES HAVE NO NATIVE PRODUCER `[2026-08-20, MEASURED]`
 
 **Syndicate's MLB module is a READ LAYER over vendor-produced artifacts.** Of the

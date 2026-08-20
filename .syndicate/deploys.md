@@ -19187,3 +19187,46 @@ everywhere (no sport has a live game with a trustworthy score right now).
   browser). Whoever next touches the game-card strip should close that gap if
   it becomes relevant.
 - Claim: none held by me (rode along). No release needed.
+
+---
+
+## 2026-08-20 20:04:14Z — live-odds-worker `a381d652` — CONSOLIDATED, 38 files
+
+    lane:      football-model-owner (consolidation point)
+    sha:       a381d652  (graft, parent 24871571, branch deploy/consolidated-live-odds-worker-20260820)
+    deploy:    dep-da3lnvjbc2fs73aamdag  trigger=api  fired 19:56:5xZ, live 20:04:14Z
+    rollback:  deploy 24871571
+
+**verify: PASSED, by CONTENT.** live commit reads `a381d652`; the deploy changed
+the tree by **+4,984 / −320 across 38 files** (live ≠ parent, so it did
+something); **37 of 38 still byte-identical to origin/main**.
+
+`syndicate/features/soccer/cards.py` was SUPERSEDED UPSTREAM during the 7-minute
+build — the same pattern as `dense_cards.css` on refresh-worker. Not a failure:
+the builder asserts blob equality against the source AT BUILD TIME, and that is
+the correct check. On an active repo "live == origin NOW" will always risk a
+false alarm after a multi-minute build. It is a NEW pending item for the next
+batch.
+
+**Preflight HELD first** — 3 jobs in flight (`refresh_odds_sources.py`,
+`build_soccer_artifacts.py --league la_liga`, `run_refresh_odds_job.py`). On the
+odds SOURCE OF TRUTH a deploy mid-refresh truncates the capture, so it waited
+19:5xZ → 19:56:11Z for them to drain.
+
+### Stated rather than implied: the combined-state test gate did NOT report
+
+A full-suite run against `origin/main` was started to check the COMBINED state —
+five lanes' work has only ever been tested in isolation. It was still executing
+when this shipped (verified ACTIVELY COMPUTING, not hung: CPU advanced 6.9s over
+an 8s sample, 1,819s total, 1,080 MB RSS). **Deployed on user instruction with
+the content reviewed on origin/main, which is a weaker basis than a green
+suite.** Rollback is one command.
+
+### NEAR-MISS: a one-character service ID
+
+The graft builder's hand-copied ID for this service was
+`srv-d2ed2rmmcj7s73f7uleg` — entirely wrong, caught only by a 404. The real IDs
+for refresh-worker and live-odds-worker differ by ONE CHARACTER
+(`...73co8ls0` vs `...73co8lt0`), so a *plausible* typo grafts one service's work
+onto another and looks completely normal. `SERVICE_IDS` is now IMPORTED from
+`render_deploy.py` rather than duplicated.
