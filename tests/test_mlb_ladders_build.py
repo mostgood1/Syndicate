@@ -379,3 +379,127 @@ def test_wired_pitcher_markets_match_the_fetchers_mapping():
         assert key in produced, (
             f"{prop}: {key!r} is not produced by PITCHER_MARKET_KEY_MAP {sorted(produced)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# THE SECOND CONSUMER.
+#
+# `test_the_real_native_reader_consumes_the_output` above drives the TOP-PROPS
+# reader and passed continuously while the compact board's pregame starter chips
+# were entirely dead -- because this module served that reader's fields and not
+# this one's. Measured on production 2026-08-20: 3,978 rows with `ladder=0` and
+# `gamePk=0`, 0 of 18 starters carrying a ladder-derived chip, and (since the
+# card hides the name with the chips) 12 of 18 pregame sides rendering no
+# starter at all. Perfect join, fresh artifact, green suite, no log line.
+#
+# These tests drive `cards.py`'s REAL pregame badge builder over this module's
+# REAL output. A schema assertion here would be worth much less: the fields were
+# never misspelled, they were absent, and the reader's failure on absence is
+# silent (`return None` / `continue`).
+# ---------------------------------------------------------------------------
+
+from syndicate.features.mlb.cards import (  # noqa: E402
+    _pregame_starter_ladder_badges_for_pitcher,
+)
+
+
+def _ladder_badges_for(grp, *, game_pk=7, pitcher_id=111, name="Colin Rea"):
+    return _pregame_starter_ladder_badges_for_pitcher(
+        {"strikeouts": grp},
+        game_pk=game_pk,
+        pitcher_id=pitcher_id,
+        pitcher_name=name,
+    )
+
+
+def test_the_CARDS_reader_consumes_the_output(wired):
+    """Drive the ACTUAL pregame-chip builder, not a schema assertion."""
+    wired({7: _sim_payload()}, {"pitcher_props": {"colin rea": {"strikeouts": {"line": 4.5}}}})
+    grp = lb.build_pitcher_strikeout_rows("2026-05-28", [7])
+
+    badges = _ladder_badges_for(grp)
+
+    assert badges, "the cards reader got no ladder badge out of a complete row"
+    assert badges[0]["stat"] == "strikeouts"
+    # dist is 4:200 5:500 6:300 over a 4.5 line -> rungs 5 (P=.8) and 6 (P=.3),
+    # both clearing the reader's 0.2 floor. Label takes the last one.
+    assert badges[0]["targets"] == [5, 6]
+    assert badges[0]["label"] == "K up to 6"
+
+
+def test_the_cards_reader_is_REACHABLE_off_vs_on(wired):
+    """off != on. The regression was a field going missing, so the test that
+    matters is that REMOVING it kills the badge -- otherwise this file would
+    have kept passing on a row the card cannot use."""
+    wired({7: _sim_payload()}, {"pitcher_props": {"colin rea": {"strikeouts": {"line": 4.5}}}})
+    grp = lb.build_pitcher_strikeout_rows("2026-05-28", [7])
+    assert _ladder_badges_for(grp), "control failed: no badge even with a good row"
+
+    without_ladder = json.loads(json.dumps(grp))
+    for row in without_ladder["rows"]:
+        row.pop("ladder", None)
+    assert _ladder_badges_for(without_ladder) == [], "absent ladder[] must kill the badge"
+
+    without_game_pk = json.loads(json.dumps(grp))
+    for row in without_game_pk["rows"]:
+        row.pop("gamePk", None)
+    assert _ladder_badges_for(without_game_pk) == [], "absent gamePk must kill the badge"
+
+
+def test_gamePk_is_carried_and_is_the_right_game(wired):
+    """The join field, on the row, matching the sim it came from -- not merely
+    present. Two games so a constant would fail."""
+    wired(
+        {7: _sim_payload(), 9: _sim_payload(pid="333", name="Other Starter")},
+        {"pitcher_props": {"colin rea": {"strikeouts": {"line": 4.5}},
+                           "other starter": {"strikeouts": {"line": 4.5}}}},
+    )
+    grp = lb.build_pitcher_strikeout_rows("2026-05-28", [7, 9])
+    by_name = {r["pitcherName"]: r for r in grp["rows"]}
+    assert by_name["Colin Rea"]["gamePk"] == 7
+    assert by_name["Other Starter"]["gamePk"] == 9
+    # int, because cards.py compares it with int(game_pk)
+    assert isinstance(by_name["Colin Rea"]["pitcherId"], int)
+    assert by_name["Colin Rea"]["pitcherId"] == 111
+
+
+def test_ladder_is_cumulative_P_at_or_above_and_descends(wired):
+    """`hitProb` direction is not type-checkable and would not throw if
+    inverted -- it would render confidently wrong chips."""
+    wired({7: _sim_payload(dist={"0": 100, "1": 300, "2": 600})},
+          {"pitcher_props": {"colin rea": {"strikeouts": {"line": 0.5}}}})
+    grp = lb.build_pitcher_strikeout_rows("2026-05-28", [7])
+    ladder = [r for r in grp["rows"] if r["pitcherName"] == "Colin Rea"][0]["ladder"]
+
+    assert [e["total"] for e in ladder] == [0, 1, 2], "must be ascending by total"
+    assert [e["hitProb"] for e in ladder] == [1.0, 0.9, 0.6]
+    probs = [e["hitProb"] for e in ladder]
+    assert probs == sorted(probs, reverse=True), "P(X>=t) must be non-increasing"
+
+
+def test_hitter_rows_carry_NO_ladder_because_nothing_reads_one(wired, tmp_path):
+    """The size control, asserted. `learnings.md` 2026-08-20: this artifact hit
+    the publish ceiling at 13,678,982 bytes and was refused SILENTLY for 28
+    hours. Hitter groups are 234 rows to the pitchers' 18 and have no consumer
+    for a ladder, so putting one there is pure size against no reader."""
+    wired({7: _sim_payload()}, {"pitcher_props": {"colin rea": {"strikeouts": {"line": 4.5}}}})
+    artifact = lb.build_ladders_artifact("2026-05-28", [7])
+
+    for key, grp in artifact["groups"]["pitcher"].items():
+        for row in grp["rows"]:
+            assert "ladder" in row, f"pitcher/{key} lost its ladder"
+    for key, grp in artifact["groups"]["hitter"].items():
+        for row in grp["rows"]:
+            assert "ladder" not in row, f"hitter/{key} grew a ladder nothing reads"
+
+
+def test_top_props_reader_still_works_with_the_restored_fields(wired):
+    """Consumer 1 must not regress while fixing consumer 2 -- the inverse of the
+    mistake being fixed here."""
+    wired({7: _sim_payload()}, {"pitcher_props": {"colin rea": {"strikeouts": {"line": 4.5}}}})
+    grp = lb.build_pitcher_strikeout_rows("2026-05-28", [7])
+    cards, label = pitcher_rows_from_summary({"groups": {"pitcher": {"strikeouts": grp}}})
+    assert label == "Strikeouts"
+    card = [c for c in cards if c["title"] == "Colin Rea"][0]
+    assert card["meta"] == "CHC @ PIT"
+    assert "4.5" in card["badge"]

@@ -1176,7 +1176,7 @@ history directly:
   falls back to the `dict.items` method.
 - Blocked by: none.
 
-### soccer-board-mlb-parity — OPEN — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
+### soccer-board-mlb-parity — OPEN — **BUILT AND COMMITTED (`7be68675`, branch `session/soccer-board-mlb-parity`). NOT PUSHED, NOT DEPLOYED, AND THE PRODUCTION READING IS OWED — every local tile reads "Model only" because the mirror has no picks/props CSV for these dates, so the market path is proven by CODE (run over the production payload) and NOT by the board.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
 - Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
   carry the same information classes MLB's do. **Single testable outcome:** on a
   fixed slate date, soccer's card renders (a) market tiles carrying selection +
@@ -1219,6 +1219,54 @@ history directly:
   leaf-text-density measurement above re-taken against the SAME production
   service, plus `python -m unittest tests.test_archives` green. A density
   number taken against a dev box is not the reading.
+- **What shipped into the commit** (audit findings A-H, all measured on
+  production 2026-08-20 before any edit):
+  - **A. Landing.** `/soccer` -> `/soccer/cards?date=` across all ten
+    leagues. The old redirect landed on EPL matchweek 1 = ONE fixture,
+    kicking off the next day, out of 92 across the ten leagues. Soccer's
+    board was the only one keyed by (league, matchweek) rather than date and
+    each league runs its own calendar (MLS wk21 Aug 16-22 = 31 fixtures,
+    Bundesliga wk1 = Aug 28 = 1). The per-league board is untouched.
+  - **B. Market tiles.** Soccer now builds its own, mirroring
+    `mlb/cards.py::_market_tiles`. The generic `metrics[:4]` fallback showed
+    a bare probability with "COV @ ARS" as all four sub-labels while
+    `home_ml -590` / `away_ml +1400` / `total 2.5` / `spread -1.5` sat
+    unused on the same payload, and dropped BTTS + Over 2.5 to the cap.
+  - **C. Box score.** THREE instances of one clobber in `_normalize_game`
+    (`shared_box_sections`, `shared_prop_rows`, and the live tile branch)
+    each overwrote what the sport supplied. The July fix for
+    `shared_top_play_rows` had already named this shape and was never
+    applied to its neighbours. Also added a REAL score section: a completed
+    MLS match carried `home.score`/`away.score` and rendered "Box score
+    unavailable" because the builder read only the sim.
+  - **D. Props.** Joined to `build_soccer_picks`' captured price/edge via
+    props.py's OWN normaliser (not a second one). Rows are no longer
+    `is_synthesized`, so the status table stops rendering empty (0 -> 8).
+  - **E/F/G/H.** Top-play field mapping (value column held the MATCHUP
+    string); empty lens stat cells no longer rendered; the live tile branch
+    made reachable (it was guarded on a key the setdefault above it had
+    already filled — unreachable for any sport publishing `metrics`);
+    finished matches show a result instead of "not yet simulated".
+- **Edge is model-minus-market, deliberately NOT `betting.*_ev`.**
+  `build_soccer_picks.py:131` computes EV against ITS model prob, a
+  different vintage: `away_ml_ev 0.575` at +1400 implies ~10.5% where the
+  card renders 7.0%. Both fields stay on `betting` for other readers.
+- **Verification so far:** 19 new tests anchored to the production payloads
+  (4 assert reachability, off != on); 88 targeted soccer/board tests green;
+  `tests.test_archives` 31 failures before AND after, **the same 31 by
+  name** (diff clean) — all `data/`-dependent NFL/NBA/NCAAB tests that
+  cannot pass where `data/` is excluded by design. Rendered locally against
+  real artifacts: card height 1074 -> 829px, em-dash cells 6 -> 0, repeated
+  matchup sub-labels 4 -> 0, box sections 1 -> 2, prop status rows 0 -> 8.
+- **THE OPEN THREAD, and it is the one that matters:** the density number
+  that opened this lane (MLB 544 vs soccer 139 items/Mpx) has NOT been
+  re-taken against production. A local reading cannot take it — the mirror
+  has no picks/props for these dates, so the tiles that carry the new
+  content are empty locally. `_market_tiles` run over the real production
+  payload returns "COV ML +1400 | Model 7.0% | Market 6.3% | Edge +0.7 pts",
+  which proves the CODE and not the BOARD. Deploy web, then re-measure with
+  `scripts/ui_layout_probe.py` plus the leaf-density count, same service,
+  same instant. **A local reading must not be written up as the result.**
 - Blocked by: none, but **DECLARED OVERLAP**: `soccer-model-dispersion` (OPEN,
   session `Soccer Session (fork)`, not running as of 2026-08-20 16:4xZ) claims
   `syndicate/features/soccer/` with the parenthetical scope "(sim engine,
@@ -1228,6 +1276,74 @@ history directly:
   that reading with the user's decision. **If that lane says otherwise, stop.**
   Recording it here rather than omitting it, because a silent overlap is the
   failure mode the lane protocol exists to prevent.
+
+### mlb-pregame-ladder-schema — OPEN — opened 2026-08-20 — session 822e1e5a-de81-49bf-ade0-9dbe4de00ea9
+- **Goal (single testable outcome):** every pregame MLB starter with a sim
+  distribution and a market line renders its ladder chips on the compact card —
+  and the starter's NAME renders whether or not it has chips. Today: 0 of 18
+  sides get a ladder-derived chip, and 12 of 18 render no name at all.
+- **Files:**
+  - `syndicate/features/mlb/ladders_build.py`
+  - `tests/test_mlb_ladders_build.py`
+  - `syndicate/static/mlb/cards_source.js`
+  - `.syndicate/*`
+
+  Respectively: the writer that must restore the fields the cards reader joins
+  on, the cards-reader consumption test, and the starter-name/badge decoupling.
+- **`docs/ai_context/todo.md` DELIBERATELY NOT CLAIMED.**
+  `check_lane_invariants.py` flagged it contested against
+  `mlb-overview-hydration-cost` the moment I claimed it, so I dropped it rather
+  than run a second holder on the file the `#71` check reads. The todo entry
+  for this work gets reconciled at close, against whoever holds it then. Noting
+  it here because an unrecorded skip of the `#71` check looks identical to
+  forgetting it.
+- **NOT claimed, deliberately:** `syndicate/features/mlb/cards.py` is held by
+  the OPEN `mlb-overview-hydration-cost` lane. **The fix does not need it** —
+  the reader is correct as written; only its input regressed. Scoping the fix
+  to the writer is what makes this collision-free, not a compromise on it.
+- **Hypothesis (stated before fixing, MEASURED not believed):** the pregame
+  ladder chips are dead because `#440`'s native writer pinned its output schema
+  to the TOP-PROPS reader (`ladders_common.pitcher_rows_from_summary`) and
+  dropped the three fields the CARDS reader needs. Confirmed against
+  production's own copy, `generatedBy syndicate.features.mlb.ladders_build`,
+  generated 2026-08-20T16:46:16Z:
+
+      pitcher/strikeouts: n=18  ladder=0  gamePk=0  marketLine=18
+      ... all 7 pitcher stats + all 10 hitter stats, 3,978 rows: ladder=0 gamePk=0
+
+  Row schema today is 10 fields. The git-tracked May mirror (vendor writer) has
+  26, including `gamePk`, `pitcherId`, `ladder[{total,hitProb}]`. Reader dies at
+  `cards.py:1166` (`gamePk is None -> continue`, which also makes the
+  `pitcherName` fallback two lines down unreachable) and again at
+  `cards.py:1102` (`not ladder_rows -> return None`).
+- **Falsification test:** if the join or the inputs were the problem rather
+  than the schema, the artifact would show unmatched players or absent market
+  lines. It shows neither — `matchedPlayers 18, oddsPlayers 18, unmatchedOdds 0,
+  unmatchedSimNames 0`, and 18/18 rows carry BOTH `simCount>0` and a
+  `marketLine` on all four badge stats. Inputs are complete; only the emitted
+  shape is short. If a schema fix does NOT produce chips, the hypothesis is
+  wrong and the next suspect is `_filter_badges_to_current_market`.
+- **DESIGN CONSTRAINT, from `learnings.md` 2026-08-20 ("An artifact can OUTGROW
+  the publish ceiling, and the failure is silent"):** this same artifact hit
+  `_PUBLISH_MAX_BYTES` at 13,678,982 bytes and was refused SILENTLY for 28
+  hours. Adding arrays back to it is the exact move that re-arms that failure.
+  So: `ladder[]` goes on PITCHER rows only (18 rows, the sole consumer is
+  `cards.py:1102`), never on the 234-row hitter groups, and **the resulting
+  artifact size gets MEASURED against 12,582,912 and written down** — not
+  assumed small. Today's copy is 684,325 bytes, so there is headroom; the
+  number is the evidence, not the headroom.
+- **Verification:** (1) a test that runs the REAL cards reader
+  (`_pregame_starter_ladder_badges_for_pitcher`) over this writer's REAL output
+  and asserts a non-empty badge list — the reachability test whose absence let
+  this ship silently, since every existing test passed throughout; (2) the
+  measured artifact size vs the publish ceiling; (3) after deploy, the served
+  `/mlb/api/cards` payload showing ladder-derived chips on pregame sides that
+  have no pitcher recommendation (George Kirby is the control — he has a prop
+  row, no pick, and no chip today). Reading written to `deploys.md`.
+- **Blocked by:** none. Deploy target is refresh-worker (the writer) — claim
+  required, and web is currently 502ing on `/api/ops/version`, which is
+  somebody else's deploy and must be clear before I measure anything.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

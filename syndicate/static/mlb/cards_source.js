@@ -666,14 +666,24 @@
   }
 
   function starterLadderStripMarkup(card) {
+    // The NAME is gated on having a name, and the CHIPS are gated on having
+    // chips. These used to be one gate -- `if (!badges.length) return ""` above
+    // the whole row -- so a starter with no ladder badge rendered no starter at
+    // all. Reported from the board 2026-08-20 as "pregame is missing not only
+    // the chips but in some cases the actual starter": 12 of 18 pregame sides
+    // had a correct `fullName` in the payload and showed nothing, because the
+    // upstream ladder artifact had stopped carrying ladders. Two independent
+    // facts should fail independently -- coupling them turned a chip outage
+    // into a name outage and made the real cause harder to see.
     const renderRow = (prefix, probable) => {
       const badgeKey = starterMetricBadgeKey(card);
-      const badges = starterBadgeList(probable, badgeKey);
-      if (!badges.length) return "";
+      const name = String(probable?.fullName || "").trim();
+      const badgesMarkup = starterLadderBadgesMarkup(probable, badgeKey);
+      if (!name && !badgesMarkup) return "";
       return `
         <div class="cards-strip-starter-line">
-          <span class="cards-strip-starter-name">${escapeHtml(prefix)} ${escapeHtml(probable?.fullName || "Starter")}</span>
-          ${starterLadderBadgesMarkup(probable, badgeKey)}
+          <span class="cards-strip-starter-name">${escapeHtml(prefix)} ${escapeHtml(name || "Starter")}</span>
+          ${badgesMarkup}
         </div>`;
     };
 
