@@ -446,7 +446,7 @@ rate and not only on bias — that harness's own lesson, recorded in the
 overrides file, is that statistical-bias improvements do not reliably translate
 to betting-accuracy improvements.
 
-### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~19:3xZ — 9-LEAGUE RE-RUN IN FLIGHT AGAINST A NOW-FIXED BACKTEST PIPELINE
+### soccer-model-dispersion — OPEN — session: soccer-sport-owner — updated 2026-08-19 ~20:3xZ — 9-LEAGUE RE-RUN STILL IN FLIGHT AGAINST THE FIXED BACKTEST PIPELINE, ALL INPUT-QUALITY WORK NOW LANDED
 
 - Goal (unchanged, still open): `backtest_soccer_h2h_calibration.py` re-run over
   the same 1,112 matches / 9 leagues reports model Brier **<= market** on at
@@ -489,6 +489,14 @@ to betting-accuracy improvements.
   test now complete: mean delta -0.0049 vs the possession baseline, t=-1.31,
   **not significant, favorable direction** — **kept**, same disposition as
   possession/set-piece and the opposite of `clean_sheet_rate`.
+  **`market_features.confidence`** (de-vigged closing-odds implied
+  probability, `_market_prior_index`) sourced, wired CLI-gated
+  (`--wire-market-confidence`, default OFF — not unconditional like the
+  other three), paired test complete: mean delta -0.0040, t=-0.96, **not
+  significant, weaker than every other field tested this session** —
+  **kept as built, not promoted further**: this one reuses the SAME closing
+  odds the lane benchmarks against, so any improvement is shrinkage-toward-
+  market, not independent skill (`089c42bd`).
 - Files: `scripts/backtest_soccer_h2h_calibration.py`,
   `scripts/build_soccer_artifacts.py`, `scripts/validate_soccer_vs_market.py`,
   `scripts/soccer_sim_input_checklist.py`, `syndicate/features/soccer/` (sim
@@ -499,12 +507,13 @@ to betting-accuracy improvements.
 - **NOT IN THIS LANE:** `syndicate/features/shared/soccer_projections.py`,
   `syndicate/features/shared/book_margin_model.py` — board-side adapter,
   owned by lane `modelled-fair-edge`. Re-check before assuming still true.
-- Next action: check on the in-flight 9-league re-run above, and compare its
-  Brier/stdev against the 08-15 baseline per the original testable outcome.
-  Also separately in flight: a market_features.confidence (de-vigged
-  closing-odds implied probability, small weight 0.02-0.03) paired backtest
-  on eredivisie — see log, includes a methodological caveat that any
-  improvement there is shrinkage-toward-market, not independent skill.
+- Next action: **the ONLY open thread now is the 9-league re-run above.**
+  Every input-quality field this session set out to check
+  (xG/shots/clean_sheet/possession/set-piece/availability/pace/ppda/
+  market_confidence) is landed, tested, and disposed (kept or discarded,
+  each with a stated reason). Check the re-run, compare against the 08-15
+  baseline per the original testable outcome, and that is this lane's
+  original goal either met or not — no more input work is queued behind it.
 - Blocked by: none.
 
 **INHERITED, DO NOT RE-DERIVE** (full detail moved to `.syndicate/lanes_history.md`,
