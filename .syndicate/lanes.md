@@ -1326,52 +1326,43 @@ history directly:
   until fixed) and the deploy decision is being handed back rather than
   fired autonomously.
 
-### layer2-board-pick-clarity — OPEN — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
-- Goal: fix two confirmed Layer 2 board display bugs from this session's
-  user-directed audit. (1) Under/Over game picks show no matchup context
-  on the compact card. (2) `Projected` is blank for the large majority of
-  h2h/moneyline game rows.
-  **Testable outcome:** a totals/spreads Under/Over card shows its
-  matchup somewhere on the compact card; an h2h/moneyline card shows a
-  non-blank `Projected` value (team name or probability-derived text).
-- Files: `syndicate/templates/intelligence.html` (client-side render
-  logic only for both fixes -- `propLine()`, `displayTeam()`,
-  `displayProjection()`, `renderCard()`; root causes already isolated,
-  not diagnostic from here).
-- Hypothesis: n/a (root-caused already, see below).
-- **Already established, measured 2026-08-20 (do not re-derive):**
-  - **#2, pick clarity.** `propLine()` (`intelligence.html:615-625`) skips
-    `selection` from the detail line whenever it equals `title`
-    (`if (selection && selection !== title)`) -- for a totals pick BOTH
-    are the same fallback value (`"Under"`/`"Over"`), so the word is
-    dropped from the line entirely. Separately, `displayTeam()`
-    (`intelligence.html:627-634`) only checks `team`/`team_name`/
-    `player_team`; for a totals row the backend correctly sends `"—"`
-    for all three (no team applies to a total), so `displayTeam` returns
-    `null` and the subtitle (`renderCard`, `intelligence.html:1239`) shows
-    sport-only, never falling back to `displayMatchup()` (which exists,
-    used elsewhere, and holds the real matchup text). Net: a live card
-    reads title="Under", subtitle="WNBA", detail="162.5 · totals_alt" --
-    no game reference anywhere on the card.
-  - **#3, blank Projected.** `displayProjection()`
-    (`intelligence.html:697-702`) reads only `sim_projection ?? projected
-    ?? projected_sim` -- all three numeric. Measured live on today's board:
-    **109 of 114 h2h rows blank (95.6%)**, vs `totals` 85/94 present and
-    `spreads` 8/13 present. A moneyline pick has no natural projected
-    NUMBER; needs a team-name/probability-based value instead. Row data
-    does carry `model_probability`/`fair_probability` and
-    `home_team`/`away_team` on h2h candidates (confirmed via a live
-    network capture) -- the fix is a frontend fallback deriving "projected
-    winner" text from those, not a new backend field, unless that data
-    turns out to be missing on rows beyond the one sampled.
-- Falsification test: n/a, this is an implementation lane not a diagnostic
-  one -- both root causes were confirmed against live production data
-  before this lane opened.
-- Verification: re-load the live board post-deploy; spot-check at least
-  one totals/spreads Under/Over card for a visible matchup, and at least
-  3 h2h rows (different sports if possible) for a non-blank Projected
-  value that is not a fabricated number.
+### layer2-board-pick-clarity — CLOSED-VERIFIED 2026-08-20 16:52Z — **Real root cause of #2 was DIFFERENT and more severe than the lane's own opening note: `side` ("over"/"under") was never read by any display function -- 306/306 over/under rows (100%) showed neither word anywhere on the card, not just totals rows missing a matchup. Both fixes live on web (`0ddd8ede`), verified against the board's own production payload.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+- Goal (met): fix two confirmed Layer 2 board display bugs. (1) Over/Under
+  picks unclear. (2) `Projected` blank for the large majority of h2h/
+  moneyline game rows.
+- Files: `syndicate/templates/intelligence.html` only.
+- **CORRECTED MID-LANE, before shipping:** the opening note's theory for
+  #2 (totals rows missing matchup context because `displayTeam()` never
+  falls back to `displayMatchup()`) was real but SECONDARY. Re-sampling a
+  prop row (`Andres Gimenez`, `side="over"`) while implementing found the
+  actual dominant cause: `selection` holds the PLAYER's name for props
+  (redundant with the title), and NO display function anywhere read
+  `item.side` -- the one field that actually carries "over"/"under".
+  Measured against the live board's own 512-card payload before fixing:
+  **306 of 306 over/under rows (100%) showed neither word on the card at
+  all**, not a subset. Shipped both: a new `displaySide()` wired into
+  `propLine()` unconditionally (fixes the dominant cause), plus the
+  originally-planned matchup fallback in the card subtitle (real,
+  complementary, lower-severity than first estimated since `cardFacts()`
+  already showed matchup separately as a labeled fact row).
+- **#3 fix, as planned:** `displayProjection()` gained a moneyline-only
+  fallback to `model_probability` (already backend-attached by
+  `layer2_board.py`, not fabricated), formatted as a percentage.
+- **Verification: DONE, measured against live production, not assumed.**
+  Deployed to `web` (scoped branch off web's own live SHA `ea6f431f`,
+  since `origin/main` had drifted 489 files/151K insertions ahead by
+  deploy time), live `0ddd8ede` at 16:52:40Z. Re-pulled the board's own
+  production payload post-deploy (461 cards, natural churn from the
+  512-card pre-fix sample): **273 of 273 over/under rows (100%)** now
+  show the direction; **84 of 94** previously-blank h2h rows now show a
+  real value. The remaining 10 stay correctly blank -- `model_probability`
+  itself is not populated on those specific rows, a genuine backend
+  coverage gap already documented in `layer2_board.py`'s own comment, not
+  a frontend defect this lane could or should paper over.
+- Full measurement chain in `.syndicate/deploys.md`'s 2026-08-20 16:52Z
+  entry.
 - Blocked by: none.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
