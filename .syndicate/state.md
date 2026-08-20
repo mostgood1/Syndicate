@@ -69,6 +69,34 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [soccer-live-match-state] Soccer cards can show live match state (VERIFIED 2026-08-20, NOT DEPLOYED)
+
+`origin/main` `ca75e0a1`. Soccer's card serves a real score in BOTH live and
+final states, a live clock, and a real box score. Verified end to end against
+La Liga fixture 401882908 in both states: at 83' the card read 1-0 with
+`live_state.clock "83'"`; after full time it read Final 1-1 with a "Final
+score" section, both goals (48' Camello, 84' Mariano) and team stats
+(possession 51.8/48.2, shots 15/8). **NOT ON ANY SERVICE YET** -- web needs a
+deploy for the card, live-odds-worker for `poll_soccer_live_state` to write
+`match_box`.
+
+Three facts worth not rediscovering:
+
+- **`live_home_score`/`live_away_score` in `recommendations_*.json` are REAL.**
+  They are ESPN's `competitors[].score` via `fetch_events`
+  (`build_soccer_artifacts.py:289`) -- "0" before kickoff because that is what
+  a scoreboard says before kickoff, `'2'`/`'0'` on a completed match. A prior
+  session recorded them as a fabricated placeholder; that rested on a sample in
+  which **all 57 git-tracked matches were `status_state == "pre"`**. They must
+  be GATED on state, not removed: the live poller fetches `statuses={"in"}`, so
+  this is the ONLY score path a FINAL match has.
+- **Soccer's `picks_*.csv` and `recommendations_*.json` ARE allowlisted** --
+  `artifact_publisher.py:460` and `:474` -- and both return **200 with real
+  content** from `/api/ops/artifacts/export`. A prior note said 403/count=0.
+- **`poll_soccer_live_state` now writes a `match_box` key** inside
+  `live_state_{date}.json` (already allowlisted), covering `in` AND `post`,
+  separate from `games` so a finished match never reads as live.
+
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.
