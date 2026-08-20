@@ -67,7 +67,7 @@ kwarg set, not a subset.
    `#385`'s gate owns this question too; it is a live behaviour delta the
    moment that gate opens.
 
-### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** STAYS OPEN: the boot that would have proven it was KILLED 63 SECONDS IN by a `/healthz` timeout, and the lock it left behind made the NEXT boot skip the sync entirely — so no complete bootstrap has run since the fix. Readings are clean but bounded to the first root. **Discharging reading is one log line, and the released web claim means the next session's web deploy supplies it** — lane `soccer-stale-artifact-overwrite`
+### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** **VERIFIED ON READ 1 (23:35:55Z): `Bootstrap totals: copied=0 unchanged=33354 kept=25`, `soccer_source kept=24` on a sync that RAN TO COMPLETION.** The first attempt was killed 63s in by a `/healthz` timeout and the lock it orphaned made the next boot skip the sync entirely; that second defect is fixed separately in `35daa092` (lock now container-local, holder liveness checked) and its deploy is what supplied the clean boot. STAYS OPEN only for read 2 (>=30 min, due ~00:10Z) — lane `soccer-stale-artifact-overwrite`
 
 **THE SYMPTOM.** `/soccer/api/cards` served the finished La Liga match
 Alaves 1-1 Rayo Vallecano as a 0-0 that had not kicked off. The artifact behind
@@ -155,48 +155,27 @@ The artifact that started this now carries a current stamp: the pipeline
 republished it minutes after the boot and, for the first time, the republished
 copy was still there afterwards.
 
-**WHAT IS NOT YET PROVEN, and why this stays open.** The completion summary
-(`Bootstrap totals: copied= unchanged= kept=`) never appeared, and the reason is
-not the log collector:
+**VERIFIED, on a sync confirmed complete.** The first attempt (22:36:47Z) was
+killed 63 seconds in — `/healthz` unanswered ~30s, `server_failed` at
+22:37:52.78Z — inside root 1 of 16, and the lock it orphaned on the persistent
+disk made the replacement instance skip its sync entirely. Both were fixed
+(`35daa092`) and that deploy supplied a clean boot:
 
-| time | event |
-|---|---|
-| 22:36:47.659Z | `Syncing …/mlb_source/source_artifacts … (policy=seed_only)` — root 1 of 16 |
-| 22:37:41.695Z | last `/healthz` 200, then a ~30s gap |
-| 22:37:42 / 22:37:50 | gunicorn workers 79, 78 exit; `Shutting down: Master` |
-| **22:37:52.78Z** | `server_failed` — `unhealthy: HTTP health check` |
-| 22:38:05 / 22:38:11Z | replacement workers boot; `server_available` |
+    23:34:45.957  [bootstrap] LOCK pid=60 path=/tmp/syndicate_bootstrap_sync.lock
+    23:35:55.858  Bootstrap totals: copied=0 unchanged=33354 kept=25
+    23:35:55.857    data/soccer_source:               copied=0 unchanged=116   kept=24
+    23:35:55.857    data/mlb_source/source_artifacts: copied=0 unchanged=31146 kept=1
 
-**The instance was killed 63 seconds into the sync, inside the first root.** In
-that window the 2-worker container was serving at least FOUR concurrent multi-MB
-glob exports — one mine (`names_only=1`, 950,632 B) and three from the platform's
-own callers on other source IPs (`pattern=*2026-08-20*`, 3,058,992 B, twice;
-`*2026_08_20*`, 1,219,500 B) — while the sync walked 31,147 files, with workers
-already at 594/607 MB RSS against a 2 GB ceiling.
+`soccer_source` syncs LAST, so a completed totals line proves the walk reached
+it — the inference the earlier reading rested on is now a measurement. On the
+served surface: control group **88/88 survived, 0 clobbered**, **0** artifacts
+anywhere flipped runtime-written -> checkout copy, and la_liga
+`recommendations_2026-08-20` reads `generated_at 23:32:11Z` **and survived a full
+boot sync**. That is the artifact that started this.
 
-`soccer_source` syncs LAST and was never reached. **So the 67 mlb files in the
-control group are in-flight evidence and the 21 soccer files are an inference.**
-
-**AND THE NEXT BOOT SKIPPED THE SYNC.** gunicorn shut down gracefully, so the
-daemon bootstrap thread was never joined and `_run_bootstrap`'s
-`finally: os.remove(lock_path)` never ran. The replacement instance found
-`.bootstrap_sync.lock` fresh (`<1800s`, `syndicate/app.py:109`) and returned
-without syncing. **No complete bootstrap has run since this fix went live.**
-
-**A NEW DEFECT FALLS OUT OF THAT, pre-existing and not fixed here: a killed
-bootstrap poisons the next boot for 30 minutes.** Web took 8 deploys today, so
-the sync may frequently never complete — which plausibly explains why 1,114 hot
-artifacts were mirror copies rather than all ~33k. Worth its own item, together
-with the question of whether a 33k-file walk belongs in a background thread on a
-2-worker 2 GB container at all.
-
-**HOW IT GETS DISCHARGED.** One log line — `Bootstrap totals:` with a non-zero
-`kept` — plus one control-group re-read. It needs a boot whose sync completes.
-Both ways to force one are correctly closed and neither was worked around: a raw
-`POST /v1/services/…/restart` is classifier-blocked, and a same-SHA redeploy
-returns `HOLD: … already contained in live … the deploy is redundant`. **The web
-deploy claim was RELEASED so the next session's web deploy supplies the boot**,
-with a monitor watching the Render logs API (not the web service) for that line.
+**Still open only for read 2** — the same three measurements >=30 min later with
+the input named both times, per this lane's own verification clause. A single
+green read is what this ledger has twice been burned by.
 
 **RELATED, NOT FIXED HERE.** The single-file entries in `BOOTSTRAP_FILES` and
 the per-date `reports/intelligence/*` globs have NEVER synced — `_sync_tree`

@@ -3417,3 +3417,35 @@ by content and served payload, independent of any test.
   defect (a killed bootstrap poisons the next boot for 30 minutes) would have
   been missed entirely. Trail: `deploys.md` 2026-08-20 22:36Z, process notes.
 
+### 2026-08-20 — a lock's STORAGE must not outlive its SCOPE. An age-based "stale lock" check does not make one self-healing
+
+- **What we believed.** `_run_bootstrap`'s lock was safe against a crashed run.
+  The code said so in its own comment — `os.remove(lock_path)  # stale lock from
+  a crashed run -- retry once` — behind a 1800-second age test.
+- **What was actually true.** The age test cannot fire in the case that
+  matters. A container dies and its replacement boots in SECONDS, so the
+  orphaned lock is always far INSIDE the 30-minute window and always reads as
+  "a live sibling holds it". Measured 2026-08-20: web's boot sync was killed 63s
+  in by a `/healthz` timeout; gunicorn shut down gracefully so the daemon thread
+  was never joined and the `finally` never ran; the replacement instance found
+  the lock 78 seconds old and **skipped its sync entirely**. The lock lived on
+  the Render PERSISTENT DISK while what it guards — "one gunicorn worker per
+  BOOT runs the sync" — is scoped to one container.
+- **How we found out.** The completion summary never appeared. `/v1/services/
+  <id>/events` showed `server_failed`, and the gunicorn `Worker exiting` /
+  `Booting worker` lines dated the replacement. Neither is in the application
+  log, which is where the search started and stalled.
+- **The rule going forward.** **A lock stored somewhere that outlives its own
+  scope can poison a run it was never meant to see — fix the STORAGE, not the
+  timeout.** Put a per-boot lock somewhere the boot owns (a temp dir dies with
+  the container); an age check is a backstop, never the mechanism. The payoff is
+  that a PID recorded inside a container-local lock becomes a VALID liveness
+  signal, where the same PID in a disk-backed lock is meaningless — PID
+  namespaces restart with the container. (`fcntl.flock` is stronger still: the
+  kernel drops it when the holder dies. Rejected here only because POSIX-only
+  would leave production on a branch the Windows test suite cannot execute.)
+- **Cost.** Every killed boot suppressed the NEXT boot's sync for 30 minutes,
+  on a service that deployed 8 times that day — the likeliest reason 1,114 of
+  8,016 hot artifacts were stale mirror copies rather than all ~33k. Fixed in
+  `35daa092`. Trail: `deploys.md` 2026-08-20 22:36Z, `#494`.
+

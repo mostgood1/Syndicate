@@ -519,6 +519,35 @@ unsaved anywhere.
 - `refresh-worker` `srv-d91dpertqb8s73co8ls0` (4 GB) — sim/board.
   `live-odds-worker` `srv-d91dpertqb8s73co8lt0` (1 CPU / 2 GB / 50 GB disk) —
   odds. Web (2 GB) — display only.
+- **The boot-time git->disk sync (`bootstrap_data_root`) runs on WEB ONLY.**
+  `_bootstrap_render_data` is called from `create_app()` and nowhere else
+  (repo-wide grep 2026-08-20); neither worker entrypoint imports
+  `syndicate.app`, and both are `type: worker` running a plain script.
+  `SYNDICATE_BOOTSTRAP_ON_START=1` is set on ALL THREE services and read by
+  nothing on the two workers — **the env var is the trap, the code is the
+  answer.** This voids `#357`'s counter-argument that `team_history` "should be
+  on the disk" via bootstrap on refresh-worker.
+- **That sync is SEED-ONLY as of `32148cac`** (web `15a0be64`, live 22:36:32Z):
+  artifact roots copy only when the destination is ABSENT, so the committed
+  mirror can no longer overwrite live pipeline output. Vendored code
+  (`vendor/wnba_betting_repo/src`) keeps overwrite; `SYNDICATE_BOOTSTRAP_FORCE_
+  OVERWRITE=1` re-arms the old behaviour. Measured on the real disk 23:35:55Z:
+  `Bootstrap totals: copied=0 unchanged=33354 kept=25`, of which
+  `soccer_source kept=24`. Before the fix, **1,114 of 8,016 hot artifacts web
+  served were byte-for-byte the git checkout's copy** (allowlist only; the sync
+  walks ~33k files). `#494`.
+- **The bootstrap lock is CONTAINER-LOCAL** (`/tmp/syndicate_bootstrap_sync.lock`)
+  as of `35daa092` (web `f3a9bb0b`, live 23:34:33Z). It used to live on the
+  persistent disk, so a killed sync left a lock that made the NEXT container skip
+  its sync for 30 minutes — measured 2026-08-20 22:37:52Z. The holder's liveness
+  is now checked, which is sound only because the lock is container-local (PID
+  namespaces restart with the container).
+- **The single-file entries in `BOOTSTRAP_FILES` and the per-date
+  `reports/intelligence/*` globs have NEVER synced** — `_sync_tree` returns
+  immediately for a non-directory — while the loop logged `Syncing <file>` for
+  each. Confirmed in production 23:35:55Z, now logged as `[INERT: file entry,
+  never synced]`. Left inert deliberately: activating them would start writing
+  the committed mirror of `intelligence_state.json` onto a running service.
 - **`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` on
   refresh-worker ONLY** (`false` on web and live-odds-worker);
   `SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = 60` on all three.
@@ -2285,7 +2314,15 @@ Re-check in-season with `scripts/probe_ncaaf_injury_feed.py`.
   `HOT_ARTIFACT_PATTERNS`; web reads `SYNDICATE_NCAAF_SOURCE_ROOT`;
   `bootstrap_data_root` copies and **never prunes**. So the refresh-worker
   season-projection autorun regenerates a file **nothing reads**, and deleting a
-  stale artifact from git does NOT remove it from the served disk. Both
+  stale artifact from git does NOT remove it from the served disk.
+  **CHANGED 2026-08-20 (`32148cac`, live on web `15a0be64`) — this path is now
+  SEED-ONLY.** The boot sync copies an artifact root file only when the
+  destination is ABSENT. A NEW week's `smartsim2_projections_*.csv` is a new
+  path and still arrives; a REGENERATED file for a week already on the disk no
+  longer overwrites it. Pruning is unchanged (still none). This makes the
+  allowlist + `publish_hot_artifact` path the only way to UPDATE an NCAAF
+  artifact already on web, so the owed allowlist entry is now load-bearing
+  rather than tidy. Both
   generators now call `publish_hot_artifact`, INERT until
   `*_source/data/smartsim2_projections_*.csv` is allowlisted (handed to
   `soccer-odds-capture-cadence-gap`; asserted as `expectedFailure`).
