@@ -122,7 +122,7 @@
         <div class="cards-market-tile">
           <div class="cards-market-label">{{ metric.label }}</div>
           <div class="cards-market-main">{{ metric.value }}</div>
-          <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
+          <div class="cards-market-sub">{{ metric.sub | default('', true) }}</div>
         </div>
       {% endfor %}
     {% endfor %}
@@ -179,11 +179,16 @@
                 <span class="cards-chip">{{ 'Live lens' if live_state else 'Period odds' }}</span>
               </div>
               <div class="cards-subcopy">{{ row.subtitle }}</div>
+              {% set has_home_win = row.home_win and row.home_win != '—' and row.home_win != '-' %}
+              {% set has_market = row.market and row.market != '—' and row.market != '-' %}
+              {% set has_edge = row.best_edge and row.best_edge != '—' and row.best_edge != '-' %}
+              {% if has_home_win or has_market or has_edge %}
               <div class="cards-summary-grid">
-                <div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win | default('—', true) }}</strong></div>
-                <div class="cards-data-pair"><span>Market</span><strong>{{ row.market | default('—', true) }}</strong></div>
-                <div class="cards-data-pair"><span>Best edge</span><strong>{{ row.best_edge | default('—', true) }}</strong></div>
+                {% if has_home_win %}<div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win }}</strong></div>{% endif %}
+                {% if has_market %}<div class="cards-data-pair"><span>Market</span><strong>{{ row.market }}</strong></div>{% endif %}
+                {% if has_edge %}<div class="cards-data-pair"><span>Best edge</span><strong>{{ row.best_edge }}</strong></div>{% endif %}
               </div>
+              {% endif %}
             </div>
           {% endfor %}
         </div>

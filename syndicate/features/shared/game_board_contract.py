@@ -706,8 +706,82 @@ def _build_prop_status_rows(prop_rows: list[dict[str, Any]]) -> list[dict[str, A
     return [row for row in prop_rows if isinstance(row, dict) and not row.get("is_synthesized")]
 
 
+def _format_score(value: float | None) -> str:
+    """A scored total, as a count.
+
+    Separate from `_format_num`, which is a 1-decimal PROJECTION formatter.
+    Rendering a real 1-0 as "1.0 - 0.0" puts a decimal point on a number that
+    cannot have one, and on a card that shows projections a few rows away that
+    is precisely the wrong signal.
+    """
+    if value is None:
+        return NULL_PLACEHOLDER
+    return f"{value:.0f}"
+
+
+def _actual_score_section(game: dict[str, Any]) -> dict[str, Any] | None:
+    """The REAL score, when the game has one.
+
+    Added 2026-08-20 (`soccer-board-mlb-parity`). This function exists because
+    the fallback below claimed a sport "has not shipped a live box-score lane"
+    on matches whose final score was sitting in the SAME payload. Measured on
+    production soccer: an MLS match that had finished 1-0 carried
+    `home.score = "1"` / `away.score = "0"` and rendered
+    "Box score unavailable", because the only thing `_build_box_sections`
+    looked at was the SIM projection -- and a completed game has no sim.
+
+    The rule this encodes: a box score is about what HAPPENED. Reading only
+    the projection means the panel is emptiest at exactly the moment the real
+    numbers exist. Any sport that fills `home.score`/`away.score` gets this,
+    not just soccer.
+    """
+    away = _team_side(game, "away")
+    home = _team_side(game, "home")
+    away_score = _safe_float(away.get("score"))
+    home_score = _safe_float(home.get("score"))
+    if away_score is None and home_score is None:
+        return None
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    final = bool(live_state.get("final"))
+    in_progress = bool(live_state.get("in_progress"))
+    if not final and not in_progress and not _infer_live_state(game):
+        # A scheduled game can legitimately carry score 0-0 as a placeholder.
+        # Showing that as "the score" would be a fabrication of the same kind
+        # Lane F removed from this module -- an absent result rendered as a
+        # real one. Only report a score the game state says is real.
+        return None
+    state = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
+    clock = str(state.get("clock") or "").strip()
+    period = str(state.get("period") or "").strip()
+    when = " ".join(part for part in (period, clock) if part).strip()
+    if final:
+        title, body = "Final score", "The result as played."
+    else:
+        title = f"Live score{f' -- {when}' if when else ''}"
+        body = "The score as it stands, from the live feed."
+    return {
+        "title": title,
+        "body": body,
+        "rows": [
+            {
+                "name": _safe_text(away.get("abbr"), "AWY"),
+                "detail": _safe_text(away.get("name"), ""),
+                "value": _format_score(away_score),
+            },
+            {
+                "name": _safe_text(home.get("abbr"), "HME"),
+                "detail": _safe_text(home.get("name"), ""),
+                "value": _format_score(home_score),
+            },
+        ],
+    }
+
+
 def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
     sections: list[dict[str, Any]] = []
+    actual = _actual_score_section(game)
+    if actual is not None:
+        sections.append(actual)
     sim = _sim_payload(game)
     score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
     away_abbr = _safe_text(_team_side(game, "away").get("abbr"), "AWY")
@@ -740,7 +814,7 @@ def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
                     "rows": rows,
                 }
             )
-        if len(sections) >= 2:
+        if len(sections) >= (3 if actual is not None else 2):
             break
     if not sections:
         sections.append(
@@ -761,6 +835,12 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(game)
     metrics = normalized.get("metrics") if isinstance(normalized.get("metrics"), list) else []
     period_rows = _build_period_rows(normalized)
+    # Recorded BEFORE the setdefault, which is the only moment the difference
+    # is still observable: afterwards a sport-supplied list and a generically
+    # derived one are both just a non-empty list on the same key.
+    normalized["has_own_market_tiles"] = bool(
+        isinstance(normalized.get("market_tiles"), list) and normalized.get("market_tiles")
+    )
     normalized.setdefault("market_tiles", [{"label": metric.get("label"), "title": metric.get("value"), "sub": f"{_safe_text(_team_side(normalized, 'away').get('abbr'), 'AWY')} @ {_safe_text(_team_side(normalized, 'home').get('abbr'), 'HME')}"} for metric in metrics[:4]])
     normalized["shared_is_live"] = _infer_live_state(normalized)
     normalized["shared_period_rows"] = period_rows
@@ -772,8 +852,27 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized["shared_lens_rows"] = _build_lens_rows(normalized, period_rows)
     normalized["shared_probability_rows"] = _build_probability_rows(normalized, period_rows)
     normalized["shared_total_rows"] = _build_total_rows(period_rows)
-    normalized["shared_box_sections"] = _build_box_sections(normalized)
-    normalized["shared_prop_rows"] = _build_prop_rows(normalized)
+    # Was an UNCONDITIONAL assignment until 2026-08-20, which is the same bug
+    # the `shared_top_play_rows` comment below describes -- and it was fixed
+    # there in July and never here. `soccer/cards.py` builds real box panels
+    # (`_player_box_score_panel`: live shots-so-far and projected final shots
+    # per player, straight off ESPN's live feed) and every one was overwritten
+    # on every request by the generic derivation. Preserve a non-empty
+    # incoming list, exactly like `market_tiles` and `shared_top_play_rows`.
+    existing_box_sections = normalized.get("shared_box_sections")
+    if not (isinstance(existing_box_sections, list) and existing_box_sections):
+        normalized["shared_box_sections"] = _build_box_sections(normalized)
+    # Third instance of the same clobber, and the one that made the props
+    # STATUS table render empty on every soccer card. `soccer/cards.py` now
+    # supplies prop rows joined to a captured price and edge
+    # (`_prop_rows_with_market`); the generic panel-scrape replaced them with
+    # rows whose `value` was the panel EYEBROW ("Top prop signals") repeated
+    # once per player -- which is also why every one carried `is_synthesized`,
+    # and `_build_prop_status_rows` drops exactly those. Preserve a non-empty
+    # incoming list, like the three keys around it.
+    existing_prop_rows = normalized.get("shared_prop_rows")
+    if not (isinstance(existing_prop_rows, list) and existing_prop_rows):
+        normalized["shared_prop_rows"] = _build_prop_rows(normalized)
     normalized["shared_prop_status_rows"] = _build_prop_status_rows(normalized["shared_prop_rows"])
     # Real bug found 2026-07-23: this used to unconditionally overwrite
     # shared_top_play_rows with the generic panels-derived version, even
@@ -788,7 +887,16 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     existing_top_play_rows = normalized.get("shared_top_play_rows")
     if not (isinstance(existing_top_play_rows, list) and existing_top_play_rows):
         normalized["shared_top_play_rows"] = _build_top_play_rows(normalized)
-    if normalized["shared_is_live"] and not normalized.get("market_tiles") and period_rows:
+    # `not normalized.get("market_tiles")` made this branch UNREACHABLE for any
+    # sport that publishes `metrics`, because the setdefault above had already
+    # filled the key from `metrics[:4]`. Measured 2026-08-20: soccer always
+    # publishes six metrics, so a live soccer match could never reach the live
+    # tile path -- it showed the same pregame probabilities it showed an hour
+    # before kickoff. The guard now asks the question it meant to ask: are the
+    # tiles we have actually the generic pregame fallback, i.e. did this sport
+    # supply its own? A sport with real tiles keeps them live.
+    tiles_are_generic_fallback = not bool(normalized.get("has_own_market_tiles"))
+    if normalized["shared_is_live"] and tiles_are_generic_fallback and period_rows:
         normalized["market_tiles"] = [
             {
                 "label": str(row.get("label") or "Live"),

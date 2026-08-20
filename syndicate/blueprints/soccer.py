@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request
 from syndicate.features.soccer.archive import build_archive_api_payload
 from syndicate.features.soccer.archive import build_archive_page_context
 from syndicate.features.soccer.cards import build_cards_page_context
+from syndicate.features.soccer.cards import build_date_cards_page_context
 from syndicate.features.soccer.game_detail import build_game_detail_page_context
 from syndicate.features.soccer.live_lens import build_live_lens_api_payload
 from syndicate.features.soccer.live_lens import build_live_lens_page_context
@@ -83,9 +84,43 @@ def hub():
     )
 
 
+def _selected_date() -> str:
+    raw = (request.args.get("date") or "").strip()
+    if raw:
+        try:
+            datetime.strptime(raw[:10], "%Y-%m-%d")
+            return raw[:10]
+        except ValueError:
+            pass
+    return central_today_iso()
+
+
 @soccer_bp.get("")
 def root():
-    return redirect(f"/soccer/{DEFAULT_LEAGUE}/cards")
+    """Land on TODAY across every league, not on one league's matchweek.
+
+    Was `redirect(f"/soccer/{DEFAULT_LEAGUE}/cards")`. Measured 2026-08-20:
+    that put the landing page on EPL's matchweek 1, which contained exactly
+    one fixture, kicking off the NEXT day, while 92 fixtures existed across
+    the ten tracked leagues and 31 MLS matches sat on the current window. The
+    per-league week board is still there and still linked; it is simply not
+    the right thing to open cold.
+    """
+    return redirect(f"/soccer/cards?date={central_today_iso()}")
+
+
+@soccer_bp.get("/cards")
+def all_league_cards():
+    return render_template(
+        "shared/game_cards_board.html",
+        **build_date_cards_page_context(_selected_date()),
+    )
+
+
+@soccer_bp.get("/api/cards")
+def api_all_league_cards():
+    context = build_date_cards_page_context(_selected_date())
+    return jsonify(build_game_board_api_payload(context))
 
 
 @soccer_bp.get("/<league>")
