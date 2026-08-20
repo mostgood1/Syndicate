@@ -1231,6 +1231,48 @@ history directly:
   falls back to the `dict.items` method.
 - Blocked by: none.
 
+### nfl-team-abbr-az-alias — OPEN — opened 2026-08-20 — session: nfl-team-abbr-az-alias
+- Goal: production roster-snapshot autorun (armed this session, deploy
+  `dep-da3g2mj7uimc73ajjtig`) crashed on its FIRST real run against real
+  nflverse data -- `ValueError: Roster snapshot validation failed: row 91
+  has invalid team AZ; row 92 has invalid team AZ; ...` (~90 rows, every
+  Arizona Cardinals player). Root cause traced to
+  `syndicate/features/football/features/team_identity.py`:
+  `canonical_team_abbr("AZ")` falls through both `_TEAM_IDENTITY_BY_ABBR`
+  (keyed `ARI`) and `_TEAM_IDENTITY_BY_ALIAS` (Arizona's alias tuple has
+  `ARI`/`ARIZONA CARDINALS`/`ARIZONA`/`CARDINALS`, no `AZ`) and returns
+  the input unchanged (`len("AZ") <= 3` fallback branch) -- exactly what
+  then fails `valid_teams` in both `roster_snapshot_builder.py` and
+  `depth_chart_snapshot_builder.py` (same hardcoded `{"ARI", ...}` set,
+  duplicated in both). Confirmed real by content, not a fixture guess --
+  the exact production log line is quoted above. **Testable outcome:** a
+  test reproduces `canonical_team_abbr("AZ") == "ARI"` failing pre-fix,
+  passing post-fix; the roster snapshot autorun succeeds against a fixture
+  containing `team=AZ` rows.
+- Files:
+  - `syndicate/features/football/features/team_identity.py` -- add `"AZ"`
+    to Arizona's `TeamIdentity` alias tuple (the shared fix: every
+    consumer of `canonical_team_abbr`/`canonical_team_name`/
+    `canonical_team_metadata` benefits, not just roster snapshots).
+  - Tests: falsification test for `canonical_team_abbr("AZ")`, plus a
+    fixture-level regression test on `build_roster_snapshot_rows`/
+    `validate_roster_snapshot_rows` with a real `team=AZ` row.
+- Hypothesis: n/a -- root cause already traced to the exact line via
+  production logs, not a guess.
+- Falsification test: `canonical_team_abbr("AZ")` returns `"AZ"` (not
+  `"ARI"`) on the current, unpatched code -- confirms the bug is real
+  before claiming the fix.
+- Verification: falsification test passes pre-fix-revert / fails on
+  fixed code correctly; full football/NFL test slice has no regressions;
+  ideally a manual re-run of `build_nfl_roster_snapshot.py --season 2026`
+  against real network data succeeds with Arizona rows included (network
+  permitting from this environment).
+- Blocked by: none. NOT deploying this fix yet -- will hand the deploy
+  decision back after landing on `origin/main` (the crash is contained:
+  the autorun rate-limits to one attempt per 21600s interval, so it is
+  not hammering anything, just silently failing once every 6 hours until
+  fixed).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
