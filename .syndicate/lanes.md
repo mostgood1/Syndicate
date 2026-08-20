@@ -904,7 +904,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   regression check that the reorder did not break matching itself.
 - Blocked by: none.
 
-### soccer-board-mlb-parity — OPEN — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. **DENSITY TARGET NOW MET (`bfdd0179` + `0514f2d7`, live 18:59:52Z): 363/Mpx against a 2x bar of 331 (MLB re-read at 663 this session), card 1074 → 970px, box tab 30 → 238 items, visible panel 51 → 97/Mpx. The FIRST of those two deploys DID NOT WORK — production read 255 where local read 427, because the local mirror has no odds and the overview grid collapses to a shape production never renders; the fix was probed against the LIVE page. Blast radius verified on NFL, NCAAF and mobile: 0 clipped elements, 0 body overflow. MLB does not load this stylesheet.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
+### soccer-board-mlb-parity — OPEN, UNOWNED (session `aeb71be7` closed 2026-08-20 22:1xZ; DEPLOYED, only the live-clock reading outstanding) — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. **DENSITY TARGET NOW MET (`bfdd0179` + `0514f2d7`, live 18:59:52Z): 363/Mpx against a 2x bar of 331 (MLB re-read at 663 this session), card 1074 → 970px, box tab 30 → 238 items, visible panel 51 → 97/Mpx. The FIRST of those two deploys DID NOT WORK — production read 255 where local read 427, because the local mirror has no odds and the overview grid collapses to a shape production never renders; the fix was probed against the LIVE page. Blast radius verified on NFL, NCAAF and mobile: 0 clipped elements, 0 body overflow. MLB does not load this stylesheet.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
 - Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
   carry the same information classes MLB's do. **Single testable outcome:** on a
   fixed slate date, soccer's card renders (a) market tiles carrying selection +
@@ -1060,6 +1060,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   session**: `5848f64d` "the squad was every player who had EVER played in the
   league", recorded INERT by its own lane (worker code, no worker carries it).
   Cause (1), the feed->sim NAME JOIN on word order, is still open.
+- **SESSION CLOSED 2026-08-20 22:1xZ (`aeb71be7`). LANE STAYS OPEN AND IS NOW
+  UNOWNED.** Everything shipped and deployed; ONE verification is outstanding
+  and it is not blocked by anything except the absence of a match.
+- **THE ONLY OPEN ITEM: witness the LIVE CLOCK in production.** Measured at
+  22:14:49Z, all ten leagues: **live=0**, so it could not be taken. (The earlier
+  "next MLS kickoffs ~23:30Z" note was WRONG -- MLS has no fixture in that
+  window.) Real next chances: **2026-08-21 18:45Z** (ligue_1 Strasbourg @
+  Marseille, belgian RAAL @ Standard Liege) and **19:00Z** (epl Coventry @
+  Arsenal, la_liga Real Sociedad @ Real Betis). Take the reading ~20 min after
+  kickoff. Assertions to make are written out in `log/2026-08-20.md` under
+  "session close" -- do not re-derive them.
+- Claims: none held. Deploys: none pending.
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
