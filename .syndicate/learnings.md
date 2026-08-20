@@ -1939,3 +1939,36 @@ a load balancer.
 **Cost:** one wrong PASS reported to the user, inside the same hour as a wrong
 FAIL from the timing version. Two opposite errors, one root habit — reading once
 and treating the answer as the truth.
+## Ancestry is the wrong test for a cherry-picked deploy `[2026-08-20]`
+
+**Believed:** `git merge-base --is-ancestor <fix> <live_sha>` tells you whether
+a fix is live.
+
+**Actually:** a cherry-pick creates a NEW commit with a new SHA, so the
+ORIGINAL commit is never an ancestor of it. Checking `#475` on web that way
+returned NO for a deploy that was completely correct — the test was wrong, not
+the deploy. Nearly reported a successful deploy as failed.
+
+**Rule:** for any cherry-picked/scoped deploy — which on this repo is MOST of
+them, because service live-SHAs are usually off-main — verify by CONTENT
+(`git show <live_sha>:<path> | grep <the new symbol>`), never by ancestry.
+Ancestry is only valid when deploying a commit that literally descends from
+what is live.
+
+## `HOT_ARTIFACT_PATTERNS` is about worker→web, not "can the sim see it" `[2026-08-20]`
+
+**Believed:** `#474`'s and `#477`'s new artifacts were blocked from production
+by the missing allowlist entries, so the work was inert until another lane
+added them.
+
+**Actually:** every consumer of those artifacts is the SIM, which runs
+worker-side and reads them from its own `processed_root`.
+`HOT_ARTIFACT_PATTERNS` governs PUBLISHING worker→WEB. A builder running
+inside the worker refresh writes to the same disk its reader uses, so no
+allowlist is involved in making it work. The allowlist buys external
+auditability via `/api/ops/artifacts/export` — worth having, not blocking.
+
+**Rule:** before treating an allowlist entry as a blocker, name the READER and
+the disk it reads from. "Producer and consumer are both worker-side" and
+"needs to cross to web" are different problems with different fixes, and
+conflating them makes a lane wait on another lane for no reason.
