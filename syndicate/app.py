@@ -13,6 +13,7 @@ Constraints:
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
 from typing import Callable
 
@@ -62,6 +63,72 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+# Last-resort backstop only. With the lock container-local AND pid-checked, this
+# fires just for PID reuse inside one long-lived container -- not for the
+# cross-boot case, which cannot happen any more.
+_BOOTSTRAP_LOCK_MAX_AGE_SECONDS = 1800
+
+
+def _pid_is_running(pid: int) -> bool:
+    """Whether `pid` is a live process IN THIS CONTAINER.
+
+    This is only a valid signal because the lock it backs is container-local
+    (see `_bootstrap_lock_path`). `deploys.md` 2026-08-19 records a PID being
+    used as a CROSS-SESSION liveness check and being wrong for exactly the
+    reason that does not apply here: PID namespaces restart with the container,
+    so a PID recorded by another container names a different process or none at
+    all. Same call, sound here, unsound there -- the difference is entirely
+    where the lock lives.
+    """
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by another user
+    except OSError:
+        # Unknown. Treat as ALIVE: refusing to take a lock costs one skipped
+        # sync, while stealing a live one runs two syncs at once. The age
+        # backstop still breaks a lock that reads "alive" forever.
+        return True
+    return True
+
+
+def _bootstrap_lock_path() -> str:
+    """CONTAINER-LOCAL on purpose. This is the whole 2026-08-20 fix.
+
+    The lock lived at `<SYNDICATE_DATA_ROOT>/.bootstrap_sync.lock` -- on the
+    Render PERSISTENT DISK -- while what it guards ("only one gunicorn worker
+    per BOOT runs the sync") is scoped to a single container. **A lock stored
+    somewhere that outlives its own scope can poison a boot it was never meant
+    to see**, and that is not a hypothetical:
+
+    Measured 2026-08-20. Web's boot sync started 22:36:47Z and was killed 63s
+    in when a `/healthz` timeout took the instance (`server_failed`, 22:37:52.78Z).
+    gunicorn shut down GRACEFULLY, so the daemon thread was never joined and the
+    `finally` that removes the lock never ran. The replacement instance booted
+    at 22:38:05Z, found that lock 78 seconds old, and **skipped its sync
+    entirely** -- for 30 minutes, on the age check alone. Web took 8 deploys
+    that day, so the sync may routinely never complete. That is the likeliest
+    reason 1,114 of 8,016 hot artifacts were stale mirror copies rather than
+    all ~33k (`#494`).
+
+    In a temp dir the file dies with the container, so a new boot always starts
+    clean -- and the PID written inside it now refers to THIS container's PID
+    namespace, which is what turns `_pid_is_running` into a real check instead
+    of a guess.
+
+    (`fcntl.flock` would be stronger still -- the kernel drops it when the
+    holder dies, with no pid and no clock. Not used because it is POSIX-only,
+    which would leave production running a branch the Windows test suite can
+    never execute. The failure mode here was a lock outliving its holder; the
+    fix removes the place it could outlive them.)
+    """
+    return os.path.join(tempfile.gettempdir(), "syndicate_bootstrap_sync.lock")
+
+
 def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> None:
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START", default=False):
         return
@@ -98,28 +165,73 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
             time.sleep(20)
 
             data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data"
-            lock_path = os.path.join(data_root, ".bootstrap_sync.lock")
-            try:
-                os.makedirs(data_root, exist_ok=True)
-                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, str(os.getpid()).encode("utf-8"))
-                os.close(fd)
-            except FileExistsError:
+            lock_path = _bootstrap_lock_path()
+
+            def _take_lock() -> bool:
                 try:
-                    if (time.time() - os.path.getmtime(lock_path)) < 1800:
-                        return  # another worker holds a fresh lock
-                    os.remove(lock_path)  # stale lock from a crashed run -- retry once
                     fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                except FileExistsError:
+                    return False
+                except OSError as exc:
+                    print(
+                        f"[bootstrap] LOCK_UNAVAILABLE path={lock_path} "
+                        f"{type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    return False
+                try:
                     os.write(fd, str(os.getpid()).encode("utf-8"))
+                finally:
                     os.close(fd)
+                return True
+
+            def _lock_holder() -> tuple[int, float]:
+                try:
+                    with open(lock_path, encoding="utf-8") as handle:
+                        holder = int((handle.read() or "").strip() or 0)
+                except (OSError, ValueError):
+                    holder = 0
+                try:
+                    age = max(0.0, time.time() - os.path.getmtime(lock_path))
                 except OSError:
+                    age = 0.0
+                return holder, age
+
+            # Every branch below PRINTS. `logger.info` does not reach Render's
+            # log collector, and a silent skip is what made the 2026-08-20
+            # incident invisible: the boot that dropped its sync looked exactly
+            # like a boot that had nothing to do.
+            if not _take_lock():
+                holder, age = _lock_holder()
+                alive = _pid_is_running(holder)
+                if alive and age < _BOOTSTRAP_LOCK_MAX_AGE_SECONDS:
+                    print(
+                        f"[bootstrap] SKIP a live sibling holds the lock "
+                        f"pid={holder} age={age:.0f}s",
+                        flush=True,
+                    )
                     return
-            except OSError:
-                return
+                print(
+                    f"[bootstrap] RECLAIM stale lock pid={holder} alive={alive} "
+                    f"age={age:.0f}s -- its holder is gone, so this boot syncs",
+                    flush=True,
+                )
+                try:
+                    os.remove(lock_path)
+                except OSError:
+                    pass
+                if not _take_lock():
+                    print("[bootstrap] SKIP another worker won the reclaim race", flush=True)
+                    return
+
+            print(f"[bootstrap] LOCK pid={os.getpid()} path={lock_path}", flush=True)
             try:
+                # Unrelated to the lock, kept from the original: a cold dyno may
+                # not have the mounted root yet.
+                os.makedirs(data_root, exist_ok=True)
                 bootstrap_main()
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[bootstrap] FAILED {type(exc).__name__}: {exc}", flush=True)
             finally:
                 try:
                     os.remove(lock_path)
