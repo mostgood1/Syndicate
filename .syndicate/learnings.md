@@ -4187,3 +4187,49 @@ ranking within team-season read **14.28**, which is the real answer. All three
 returned a plausible number. The first two would have projected every starting
 quarterback in the league for ten or eleven games, and no test can see it.
 
+
+## 2026-08-21 THE PRIMARY SHARED TREE IS NOT A NARRATOR OF `main`, AND `reset --hard` ON IT DESTROYS OTHER SESSIONS' WORK
+
+Measured this date: the primary tree sat **2 ahead / 58 BEHIND** `origin/main`,
+based at `31184d54`. It cost two different sessions their work in one day, in
+two different ways, and neither failure announced itself.
+
+**1. A grep in that tree is not evidence about the codebase.** Checking field
+names before writing them into a scheduled task, `grep -r WNBA_LIVE_BOX_`
+returned NOTHING — while that exact string was in production logs 40 minutes
+earlier. The grep was correct; the assumption about which tree it ran in was
+not. **When a tool disagrees with production about whether code EXISTS, suspect
+the tree before the production reading.** `git rev-list --left-right --count
+HEAD...origin/main` is one line and settles it. Read source from the remote
+(`git show origin/main:<path>`) rather than from the checkout.
+
+Two probes of the same paths disagreed, which is the second tell: `git cat-file
+-e <rev>:<path>` under Git Bash gives false ABSENT on Windows (already recorded).
+`git ls-tree -r --name-only <rev>` via PowerShell is the authority.
+
+**2. Commits made on a stale primary tree are STRANDED, not lost — and the
+distinction is why nobody notices.** A push is rejected non-fast-forward, so
+nothing is reverted and no alarm fires; the work simply never arrives. A deploy
+RECORD and a verifier script sat on a dead branch here, and the stale
+`deploys.md` was 20,519 lines against `origin/main`'s 20,994 — "resolving" that
+by force-pushing the local copy would have deleted **475 lines of other
+sessions' deploy records**. Land stranded work by cherry-picking into a worktree
+at `origin/main`, never by forcing the branch.
+
+**3. `reset --hard` on the SHARED tree is a destructive act against sessions
+that are not yours.** The tree held 14 modified files and 611 untracked. Among
+them was a complete, substantive `learnings.md` block written that same day by
+another session (the `max(timestamp)` hindsight leak) that had never been
+pushed — it would have been destroyed silently. **Look at every modified file
+before syncing, and stash rather than discard.** Backup first; the stash list
+already held two older entries from concurrent sessions, so a stash is itself
+easy to forget.
+
+**4. When recovering, ledger files split by KIND and must not be treated
+uniformly.**
+- `learnings.md` **ACCUMULATES** — a block missing from the newer version is
+  lost knowledge. Restore it.
+- `lanes.md` / `state.md` are **REWRITTEN STATUS** — local-only lines there were
+  authored against the stale base and are SUPERSEDED, not lost. Restoring them
+  resurrects dead status as if it were current, which is worse than dropping it.
+Here that was 28 lines to restore and 241 to correctly leave behind.
