@@ -52,6 +52,46 @@ _PLAYER_FIELDS: dict[str, tuple[str, str]] = {
     "player_shots_on_target": ("expected_shots_on_target", "mean"),
 }
 
+# PER-LINE PROBABILITY DICTS, PREFERRED OVER THE MEAN ABOVE WHERE PRESENT.
+#
+# The sim publishes `{line: P(over line)}` for shots, shots on target and
+# assists -- real probabilities from the same allocation the means come from,
+# not an inference off them. Priced from the mean, these markets could only
+# ever carry `edge_vs_line` in SHOT units, which `_model_edge_for` correctly
+# refuses to add to an EV percentage; so they ranked on EV alone and the sim
+# had no say. `player_assists` had no projection at all.
+#
+# Falls back to `_PLAYER_FIELDS` when the dict is absent -- an artifact built
+# before these were allowlisted degrades to exactly the previous behaviour
+# rather than to a wrong number, and `#170`-style rebuild lag is the norm here.
+_PLAYER_PROB_BY_LINE: dict[str, str] = {
+    "player_shots": "shots_over_probabilities",
+    "player_shots_on_target": "shots_on_target_over_probabilities",
+    "player_assists": "assists_over_probabilities",
+}
+
+
+def _prob_at_line(entry: Mapping[str, Any], field: str, line: Any) -> float | None:
+    """P(over `line`) from a `{line: prob}` dict, EXACT MATCH ONLY.
+
+    Deliberately no nearest-line fallback: 0.5 and 1.5 assists are different
+    questions, and answering one with the other's number is the substitution
+    this module exists to refuse. A line the sim did not price returns None and
+    the caller falls back to the mean.
+    """
+    table = entry.get(field)
+    if not isinstance(table, Mapping) or not table:
+        return None
+    target = _as_float(line)
+    if target is None:
+        return None
+    for key, value in table.items():
+        if _as_float(key) == target:
+            prob = _as_float(value)
+            if prob is not None and 0.0 <= prob <= 1.0:
+                return prob
+    return None
+
 # `player_first_goal_scorer` / `player_last_goal_scorer` are NOT in the table
 # above because they are not a field lookup -- they are DERIVED, per match, by
 # `soccer_scorer_markets.scorer_race` (`#368`). The note that stood here said
@@ -776,20 +816,36 @@ def attach_soccer_projections(
                 projection["low_coverage"] = True
             if market == "player_last_goal_scorer":
                 projection["assumption"] = "last scorer equals first scorer under time-reversal symmetry"
-        elif market in _PLAYER_FIELDS:
-            field_name, kind = _PLAYER_FIELDS[market]
+        elif market in _PLAYER_FIELDS or market in _PLAYER_PROB_BY_LINE:
             players = index.players_by_match.get(str(match.get("match_id") or "").strip()) or {}
             entry = players.get(_norm_name(row.get("player_name")))
             if entry is None:
                 unmatched_player += 1
                 continue
-            value = _as_float(entry.get(field_name))
-            if value is not None:
-                projection = (
-                    _probability_projection(value, basis=field_name)
-                    if kind == "probability"
-                    else _mean_projection(value, row.get("line"), basis=field_name)
-                )
+            # PER-LINE PROBABILITY FIRST, mean only as a fallback. Falls
+            # through to the shared tail below rather than pricing here, so
+            # `_price_against_market`, the `#350` age stamp and the coverage
+            # counters cannot drift between the two paths -- a second copy of
+            # that tail is exactly how this file's rules have rotted before.
+            prob_field = _PLAYER_PROB_BY_LINE.get(market)
+            exact = _prob_at_line(entry, prob_field, row.get("line")) if prob_field else None
+            if exact is not None:
+                projection = _probability_projection(exact, basis=prob_field)
+            elif market not in _PLAYER_FIELDS:
+                # An assists row whose exact line the sim did not price. Named
+                # rather than counted as a player miss: the player matched, the
+                # LINE did not.
+                unsupported_market += 1
+                continue
+            else:
+                field_name, kind = _PLAYER_FIELDS[market]
+                value = _as_float(entry.get(field_name))
+                if value is not None:
+                    projection = (
+                        _probability_projection(value, basis=field_name)
+                        if kind == "probability"
+                        else _mean_projection(value, row.get("line"), basis=field_name)
+                    )
         else:
             unsupported_market += 1
             continue

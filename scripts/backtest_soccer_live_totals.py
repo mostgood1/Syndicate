@@ -188,10 +188,124 @@ def replay(
     }
 
 
+def batch(
+    leagues: list[str],
+    window: str,
+    *,
+    cutoffs: list[int],
+    simulations: int,
+    ratings_file: Path | None,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    """Every COMPLETED match in `window`, across `leagues`, replayed and pooled.
+
+    n=1 cannot support an accuracy claim, which is what the single-match mode
+    was explicitly labelled as. Pooling is what turns this into a reading.
+
+    POOLED BY CUTOFF, not just overall. A live projection that is good at 75'
+    and bad at 15' is a different system from one that is uniformly mediocre,
+    and a single MAE hides which one we have -- the shape is the finding.
+
+    A match that fails to fetch or replay is COUNTED AND NAMED, never dropped
+    silently: a pool that quietly shrinks to the matches that happened to work
+    reports the accuracy of the easy cases.
+    """
+    from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
+
+    results: list[dict[str, Any]] = []
+    failures: list[dict[str, str]] = []
+
+    # DISCOVER ALL LEAGUES FIRST, THEN INTERLEAVE. A flat "stop at `limit`"
+    # over leagues in order starves every league after the first few -- the
+    # pool would be one country's football wearing a multi-league label, which
+    # is exactly the generality this harness is supposed to test. Round-robin
+    # so a cap trims each league evenly instead of truncating the tail.
+    discovered: dict[str, list[str]] = {}
+    for league in leagues:
+        try:
+            events = fetch_events(league, date_windows=[window], statuses={"post"})
+        except Exception as exc:
+            failures.append({"league": league, "event_id": "-", "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        discovered[league] = [str(e.get("event_id") or "") for e in events if e.get("event_id")]
+
+    ordered: list[tuple[str, str]] = []
+    for i in range(max((len(v) for v in discovered.values()), default=0)):
+        for league, ids in discovered.items():
+            if i < len(ids):
+                ordered.append((league, ids[i]))
+
+    for league, event_id in ordered:
+        if True:
+            if limit is not None and len(results) >= limit:
+                break
+            if not event_id:
+                continue
+            try:
+                results.append(
+                    replay(league, event_id, cutoffs=cutoffs, simulations=simulations,
+                           ratings_file=ratings_file)
+                )
+            except Exception as exc:
+                failures.append({"league": league, "event_id": event_id,
+                                 "error": f"{type(exc).__name__}: {exc}"})
+
+    def _mean(vals):
+        vals = [v for v in vals if v is not None]
+        return round(sum(vals) / len(vals), 4) if vals else None
+
+    by_cutoff: dict[str, Any] = {}
+    for minute in cutoffs:
+        rows = [r for res in results for r in res["cutoffs"] if r["minute"] == minute]
+        briers = [r["brier"].get("2.5") for r in rows]
+        by_cutoff[str(minute)] = {
+            "n": len(rows),
+            "mae_projection": _mean([r["abs_error_projection"] for r in rows]),
+            "mae_frozen": _mean([r["abs_error_frozen"] for r in rows]),
+            "brier_2_5": _mean([b["brier"] for b in briers if isinstance(b, dict)]),
+        }
+
+    all_rows = [r for res in results for r in res["cutoffs"]]
+    pooled = {
+        "matches": len(results),
+        "cutoff_rows": len(all_rows),
+        "mae_projection": _mean([r["abs_error_projection"] for r in all_rows]),
+        "mae_frozen": _mean([r["abs_error_frozen"] for r in all_rows]),
+    }
+    for line in DEFAULT_LINES:
+        b = [r["brier"].get(str(line)) for r in all_rows]
+        pooled[f"brier_{str(line).replace('.', '_')}"] = _mean(
+            [x["brier"] for x in b if isinstance(x, dict)]
+        )
+    if pooled["mae_projection"] is not None and pooled["mae_frozen"] is not None:
+        pooled["mae_improvement_vs_frozen"] = round(
+            pooled["mae_frozen"] - pooled["mae_projection"], 4)
+        pooled["beats_frozen_baseline"] = pooled["mae_improvement_vs_frozen"] > 0
+
+    return {
+        "window": window,
+        "leagues": leagues,
+        "simulations": simulations,
+        "ratings_source": results[0]["ratings_source"] if results else "n/a",
+        "pooled": pooled,
+        "by_cutoff": by_cutoff,
+        "failures": failures,
+        "matches": [
+            {"league": r["league"], "event_id": r["event_id"], "matchup": r["matchup"],
+             "actual_total": r["actual_total"], "mae": r["summary"]["mae_projection"]}
+            for r in results
+        ],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--league", required=True)
-    parser.add_argument("--event-id", required=True)
+    parser.add_argument("--league", default=None)
+    parser.add_argument("--event-id", default=None)
+    parser.add_argument("--batch-leagues", default=None,
+                        help="comma-separated leagues to pool across")
+    parser.add_argument("--window", default=None, help="YYYYMMDD-YYYYMMDD")
+    parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--cutoffs", default="15,30,45,60,75")
     parser.add_argument("--simulations", type=int, default=300)
     parser.add_argument("--ratings-file", default=None,
@@ -202,6 +316,46 @@ def main() -> int:
     args = parser.parse_args()
 
     cutoffs = [int(x) for x in str(args.cutoffs).split(",") if str(x).strip()]
+
+    if args.batch_leagues:
+        if not args.window:
+            parser.error("--batch-leagues requires --window")
+        pooled = batch(
+            [x.strip() for x in args.batch_leagues.split(",") if x.strip()],
+            args.window,
+            cutoffs=cutoffs,
+            simulations=args.simulations,
+            ratings_file=Path(args.ratings_file) if args.ratings_file else None,
+            limit=args.limit,
+        )
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(json.dumps(pooled, indent=2), encoding="utf-8")
+        if args.json:
+            print(json.dumps(pooled, indent=2))
+        else:
+            pl = pooled["pooled"]
+            print(f"window {pooled['window']}  leagues {','.join(pooled['leagues'])}  "
+                  f"sims={pooled['simulations']}  ratings: {pooled['ratings_source']}")
+            print(f"matches {pl['matches']}  cutoff-rows {pl['cutoff_rows']}  "
+                  f"failures {len(pooled['failures'])}")
+            print()
+            print(f"{'cutoff':>7} {'n':>4} {'MAE proj':>9} {'MAE froz':>9} {'brier@2.5':>10}")
+            for minute, row in pooled["by_cutoff"].items():
+                print(f"{minute:>7} {row['n']:>4} {str(row['mae_projection']):>9} "
+                      f"{str(row['mae_frozen']):>9} {str(row['brier_2_5']):>10}")
+            print()
+            print(f"POOLED MAE projection {pl['mae_projection']}  frozen {pl['mae_frozen']}")
+            if "beats_frozen_baseline" in pl:
+                v = "BEATS" if pl["beats_frozen_baseline"] else "DOES NOT BEAT"
+                print(f"VERDICT: projection {v} frozen by {pl['mae_improvement_vs_frozen']}")
+            print(f"Brier 1.5/2.5/3.5: {pl.get('brier_1_5')} / {pl.get('brier_2_5')} / {pl.get('brier_3_5')}")
+            for f in pooled["failures"][:8]:
+                print(f"  FAILED {f['league']} {f['event_id']}: {f['error'][:80]}")
+        return 0
+
+    if not args.league or not args.event_id:
+        parser.error("single-match mode needs --league and --event-id")
     result = replay(
         args.league,
         args.event_id,

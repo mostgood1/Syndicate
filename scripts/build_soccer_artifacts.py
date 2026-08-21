@@ -494,6 +494,31 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
                 "expected_shots_on_target": row.get("expected_shots_on_target"),
                 "expected_shots_on_target_if_playing": row.get("expected_shots_on_target_if_playing"),
                 "expected_minutes_share": row.get("expected_minutes_share"),
+                # THE PER-LINE PROBABILITIES THE SIM ALREADY COMPUTES.
+                #
+                # This allowlist is hand-written, and everything absent from it
+                # was silently discarded -- including three probability dicts
+                # the player-prop model produces on every build. The board was
+                # therefore pricing `player_shots` and `player_shots_on_target`
+                # from a MEAN (`expected_shots`), which cannot answer "over
+                # 2.5?" and so can only ever carry `edge_vs_line` in shot units,
+                # never a probability edge. Meanwhile `shots_over_probabilities`
+                # sat in the same object, dropped one line later.
+                #
+                # `player_assists` is worse: it is a LIVE market on the board
+                # (74 rows measured 2026-08-21) with no projection at all,
+                # because `expected_assists` never reached the artifact either.
+                "shots_over_probabilities": row.get("shots_over_probabilities") or {},
+                "shots_on_target_over_probabilities": row.get("shots_on_target_over_probabilities") or {},
+                "assists_over_probabilities": row.get("assists_over_probabilities") or {},
+                "expected_assists": row.get("expected_assists"),
+                "expected_assists_if_playing": row.get("expected_assists_if_playing"),
+                "expected_goals": row.get("expected_goals"),
+                # Modelled and captured by no market YET -- carried so the
+                # market can be priced the day it is captured, rather than
+                # needing a rebuild first.
+                "goal_or_assist_probability": row.get("goal_or_assist_probability"),
+                "two_or_more_scorer_probability": row.get("two_or_more_scorer_probability"),
             }
             for row in player_outputs
         ],
