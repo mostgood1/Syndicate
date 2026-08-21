@@ -339,6 +339,49 @@ Verify: `scripts/check_passing_attempts_skew_stability.py`,
 
 ---
 
+## 2026-08-21 — REFRESH-WORKER: NFL PROP ODDS CAPTURE FIXED (per-event endpoint) — lane `nfl-props-odds-allowlist`
+
+**Deployed**: 2026-08-21 02:37:40Z. refresh-worker `916593f6` -> `59afbbb6`
+(`dep-da3rglvqj5pc73am8t20`, `status=live`). Claim held by this lane; preflight
+CLEAR at 02:30:12Z for this exact SHA (MLB sim had finished; only infra
+processes running). Plain `origin/main` deploy, NOT scoped: main contained the
+live SHA at deploy time (0 commits live-but-not-in-main), so it was cumulative.
+
+**Change**: NFL/NCAAF player-prop capture had returned ZERO rows for as long as
+it existed. Two silent defects — the fetcher called the bulk
+`/sports/{key}/odds` endpoint, which does not serve player props at all
+(`422 INVALID_MARKET`, verified live), and two market keys did not exist
+(`player_rec_yds`, `player_interceptions`). Every 422 was swallowed as a
+WARNING, so the run wrote a header-only CSV and reported success.
+
+**Measured BEFORE (production, 2026-08-20)**: 13 of 14 weekly NFL prop CSVs
+were 5-byte stubs — and all 13 shared ONE identical whole-second mtime, the
+`copy2` batch-copy fingerprint of `bootstrap_data_root.py`, i.e. they were the
+git checkout, not worker output. 101MB of NFL `book_quotes` across 14 days held
+**zero** player rows.
+
+**Measured AFTER (local, against the live API)**: 0 rows -> **80 CSV rows, 122
+`kind=prop` quotes, 81 distinct players**, 4 of 17 week-1 events (only Anytime
+TD is posted three weeks out).
+
+verify: the reading that will prove this IN PRODUCTION is a POPULATED
+`nfl_source/oddsapi_player_props_2026_wk1.csv` on
+`/api/ops/artifacts/export?names_only=1` replacing the 5-byte stub. **NOT YET
+OBSERVED** — the NFL autorun is 6-hourly
+(`WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS=21600`). Deploy verified by CONTENT on
+the live SHA (per-event endpoint present, both corrected market keys present).
+
+**OWNERSHIP CAVEAT, measured from live env-vars and load-bearing for the next
+deploy:** once NFL has games inside the horizon, `_weekly_sport_claimed_by_fast_tick`
+hands NFL to the FAST TICK, which runs on **live-odds-worker**
+(`SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=true` there, `false` on
+refresh-worker). refresh-worker's weekly autorun drops exactly those sports
+using the same predicate, so the partition is complete and nothing falls
+through — but it means **this fix is on the wrong service for in-season
+capture**. live-odds-worker needs the same SHA before 2026-09-10.
+
+---
+
 ## 2026-08-19 — WEB: NFL ODDS ARTIFACT-ALLOWLIST FIX DEPLOYED, SCOPED OFF-MAIN — lane `nfl-odds-allowlist-deploy`
 
 **Deployed**: 2026-08-19 19:03:22Z. `web` `b775255a` → `b233c55d`
