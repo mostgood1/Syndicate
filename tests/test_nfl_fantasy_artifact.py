@@ -450,3 +450,32 @@ def test_guard_band_is_tight_enough_to_have_caught_it():
 def test_guard_catches_an_empty_projection():
     build = _load_build_script()
     assert build.degenerate_reasons([], {}, []) == ["no season projections produced"]
+
+
+@requires_artifact
+def test_basis_describes_what_BUILT_the_numbers_not_what_serves_them():
+    """A payload that probes its own substrate for provenance lies on the web.
+
+    Measured on production: the served basis reported `depth_chart_as_of: null`,
+    `games_with_line: 0 of 0` and `history_seasons: []` for an artifact actually
+    built from a 2026-08-21 depth chart, 112 of 272 lined games, and three
+    seasons of play-by-play. The web dyno holds none of those inputs by design,
+    so every zero was a fact about the reader rather than about the projection.
+    """
+    payload = build_fantasy_payload(SEASON, scoring_key="ppr", limit=3)
+    basis = payload["basis"]
+    assert basis["roster"]["depth_chart_as_of"], "build-time depth chart must survive to the payload"
+    assert basis["market"]["games_with_line"] > 0
+    assert basis["history_seasons"], "build-time usage seasons must survive"
+    # And the serving process's own view is kept, clearly labelled as such.
+    assert basis["served_by"]["mode"] == "artifact"
+    assert "reads the published artifact" in basis["served_by"]["note"]
+
+
+@requires_artifact
+def test_news_reports_itself_as_off_and_unfitted():
+    """The one claim the news block must never overstate."""
+    payload = build_fantasy_payload(SEASON, scoring_key="ppr", limit=1)
+    news = payload["basis"]["news"]
+    assert news["applied"] is False
+    assert news["fitted"] is False

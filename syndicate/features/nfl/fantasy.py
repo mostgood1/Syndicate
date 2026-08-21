@@ -155,6 +155,10 @@ def _resolve_projections(
             "generated_at": artifact.generated_at,
             "path": artifact.path,
             "note": "precomputed on the worker; scoring applied per request",
+            # The artifact's OWN basis, captured where it was built. Carried
+            # here because the alternative is worse than useless: see
+            # `build_fantasy_payload`.
+            "build_basis": artifact.basis,
         }
 
     if _serving_mode() == "compute":
@@ -333,6 +337,40 @@ def build_basis(season: int, config: EngineConfig, news: Any, applied_news: bool
     }
 
 
+def _serving_basis(
+    season: int,
+    config: EngineConfig,
+    news: Any,
+    use_news: bool,
+    source: dict[str, Any],
+) -> dict[str, Any]:
+    """What BUILT these numbers, plus what is serving them.
+
+    When the rows came from a published artifact, its own build-time basis is
+    authoritative -- it was captured on the machine that had the inputs. The
+    serving process's view of those same inputs is recorded separately under
+    `served_by`, where it is honest ("this dyno has none of them") instead of
+    masquerading as the projection's provenance.
+    """
+    local = build_basis(season, config, news, applied_news=use_news)
+    build = source.get("build_basis")
+    if not build:
+        return local
+    merged = dict(build)
+    merged["served_by"] = {
+        "mode": source.get("mode"),
+        "generated_at": source.get("generated_at"),
+        "artifact": local.get("artifact"),
+        "note": (
+            "The blocks above describe where the projection was BUILT. This "
+            "service only reads the published artifact and applies scoring, so "
+            "it holds none of the raw inputs itself."
+        ),
+    }
+    merged["news"] = local.get("news", merged.get("news"))
+    return merged
+
+
 def build_fantasy_payload(
     season: int = DEFAULT_FANTASY_SEASON,
     scoring_key: str | None = None,
@@ -394,7 +432,20 @@ def build_fantasy_payload(
         "board_summary": board_summary(board, settings) if board else None,
         "source": source,
         "available": bool(rows),
-        "basis": build_basis(season, config, news, applied_news=use_news),
+        # THE BASIS MUST DESCRIBE WHAT BUILT THE NUMBERS, NOT WHAT IS SERVING
+        # THEM. Rebuilding it here probes the LOCAL substrate -- and on the web
+        # dyno that substrate is empty by design, so the served payload
+        # reported `depth_chart_as_of: null`, `games_with_line: 0 of 0` and
+        # `history_seasons: []` for an artifact actually built from a
+        # 2026-08-21 depth chart, 112 of 272 lined games and three seasons of
+        # play-by-play. Every one of those zeros was a fact about the reader.
+        #
+        # `model_engine_standard.md` s3b says a claim that does not name its
+        # substrate is not yet a claim; this was worse, because it named the
+        # wrong one confidently. The artifact carries the basis from where it
+        # was built, so that is what gets served, with the web's own view kept
+        # alongside under `served_by`.
+        "basis": _serving_basis(season, config, news, use_news, source),
     }
 
 
@@ -427,7 +478,7 @@ def build_draft_board_payload(
         "board_summary": board_summary(board, settings),
         "source": source,
         "available": bool(board),
-        "basis": build_basis(season, config, news, applied_news=use_news),
+        "basis": _serving_basis(season, config, news, use_news, source),
     }
 
 
