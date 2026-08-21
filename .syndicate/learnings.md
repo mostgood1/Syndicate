@@ -3603,3 +3603,37 @@ which is the dangerous part — it looks like evidence of absence.
   ABSENT for a file that exists) and `feedback_read_the_field_you_already_have`.
   The failure is not in the repo; it is in the instrument, and the instrument's
   wrong answer was the comfortable one both times.
+---
+
+## 2026-08-20 — A PLATEAU IS NOT A FREEZE. A monotonic counter read ONCE cannot tell "stopped" from "between events".
+
+**The near-miss.** `#387`'s closing reading turned on one field: does
+`FEED_LIVE_PRUNE plays_dropped` grow during the live slate? Growth = the
+mechanism works. Stuck near zero = **PREMISE RETIRED**, the verdict that would
+have withdrawn the whole reason the change exists.
+
+It read **flat at 464 from 23:05Z to 00:11Z — 66 minutes**. That is a long time
+to hold still, and it is exactly the shape of the retiring verdict. A second read
+17 minutes later showed **474 → 476 → 477 → 478**. It had never stopped; MLB
+half-innings simply do not produce plays at the sampling rate of a board build.
+
+**The rule.** For any counter you are about to score as *not advancing*, take a
+**second read separated by more than one period of the underlying process** —
+and if you do not know that period, say so instead of scoring it. The duration
+of a plateau is not evidence: 66 minutes of flat looked far more conclusive than
+5 minutes would have, and was equally wrong.
+
+**Why this is its own rule and not a restatement of `watcher over spot check`.**
+That rule is about async effects that have not landed YET — poll until they do.
+This is the opposite failure: the effect had already landed many times over, and
+the instrument was sampling a *bursty* process during a gap. Polling longer was
+not the fix; **knowing the emitter's cadence** was. Related:
+`absence in a window isn't absence` — same family, different instrument.
+
+**Second, smaller, same session.** `render_logs.py --json` embeds the payload in
+`lines[].message` with the inner quotes **backslash-escaped**. A regex written
+for unescaped JSON returned **n=0 samples** — not an error, a silent empty
+result that would have read as "the field is not emitted". Parse it
+(`json.loads` from the first `{`); do not pattern-match escaped text. And treat
+`n=0` from any extractor as *suspect the extractor first*, per
+`absent signal is about the emitter`.

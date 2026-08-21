@@ -20300,3 +20300,119 @@ present **6 times** on `f3a9bb0b`. The 19:58Z reconciliation read `d9a23a38`,
 which WAS web's live SHA then; web deployed several times after. Lane closed
 verified. Same lesson as above: a deployed-SHA reading describes the SHA you
 read, not a standing property.
+
+---
+
+## 2026-08-21 00:00–00:28Z — READING refresh-worker `7eb99f14` — `#387` live-slate close-out — **VERDICT: MECHANISM ONLY**
+
+Lane `mlb-overview-hydration-cost`, scheduled task `mlb-387-live-slate-read`,
+read 2026-08-21 00:13–00:35Z (2026-08-20 19:13–19:35 CDT). **Read-only. No
+deploy, no claim taken.** This discharges the reading `deploys.md` recorded as
+owed at 13:59:33Z ("re-read `FEED_LIVE_PRUNE` during the live/post-game window").
+
+### FIRST: THE CODE IS LIVE, BUT NOT UNDER THE SHA THE TASK EXPECTED
+
+`live_commit` is **`7eb99f14`**, not `d0ea983d`. refresh-worker took **14 more
+deploys** after `d0ea983d`; current boot `2026-08-20T23:32:15.024587Z`.
+
+`d0ea983d` is **NOT an ancestor** of `7eb99f14` — the service runs the off-main
+deploy-branch chain, so ancestry is the wrong test. **Tested by CONTENT instead**
+(PowerShell, not Git Bash — the `rev:path` rule):
+
+    git show "7eb99f14:syndicate/features/mlb/cards.py"   -> 6969 lines, 5 FEED_LIVE_PRUNE hits
+    Compare-Object vs d0ea983d:same path                  -> IDENTICAL
+
+The prune survived all 14 re-parentings byte-for-byte. The reading is valid.
+
+### STEP 2 — THE PRUNE IN THE LIVE REGIME: **THE PREMISE HOLDS. NOT RETIRED.**
+
+72 matches, covered 2026-08-20T22:07:58Z .. 2026-08-21T00:27:56Z, plus a
+back-read to 14:00Z. `plays_dropped` for the live date climbs **monotonically all
+day**, which is exactly the signature a stale-payload regime could not produce:
+
+    17:39Z   62      18:30Z  160      19:50Z  374      23:05Z  464
+    18:11Z  108      19:04Z  255      22:48Z  462      00:28Z  478
+
+    date        games   plays_dropped   per game
+    2026-08-20      9        478         53.1   (live, still climbing at read)
+    2026-08-19     15       1125         75.0   (completed look-back, constant)
+    2026-08-14     15       1067         71.1   (local, completed — prior reading)
+
+`pruned == games` on every line. **Hundreds-to-thousands, scaling with the slate
+and with game progress — NOT ~0.** The 66.38% artifact-share premise is right for
+the production regime as well as for the artifact on disk.
+
+**One correction to my own reading mid-run:** the counter sat flat at 464 from
+23:05Z to 00:11Z and I nearly filed that as "the payloads stop refreshing". It
+resumed (474 → 476 → 477 → 478) by 00:28Z. An hour-long plateau between innings
+is not a freeze; a second read is what distinguished them.
+
+### STEP 3 — MEMORY: **SAME-CLOCK, BOOT-MATCHED, AND IT SETTLES NOTHING**
+
+The right baseline is **last night's same window**, which ran the PRE-`d0ea983d`
+code (`d0ea983d` went live 13:59:33Z on 08-20, i.e. after it). Boot ages are
+closely matched — prior process booted 2026-08-19T23:38:20.8Z, current one
+2026-08-20T23:32:15.0Z, so both are **22–48 min old** across their windows.
+
+    metric (00:00–00:20Z)      08-20 OLD code      08-21 NEW (7eb99f14)    defect-night baseline
+    samples                        2,568                1,607                    —
+    peak anon                    1,863.1 MB           1,663.9 MB            3,426–3,907 MB
+    trough anon                  1,329.7 MB           1,035.8 MB              971–1,900 MB
+    amplitude (max−min)            533.4 MB             628.1 MB            1,950–2,235 MB
+    min inactive_file            1,182.0 MB           1,367.7 MB       26.3/42.2 (kills), 164–240 (survived)
+
+**Peak anon is 199.2 MB lower and amplitude is 94.7 MB HIGHER — opposite signs,
+both small. Neither is a result.** And the decisive line is the last one: on both
+nights the kernel was left **1.2–1.4 GB of evictable page cache**, against
+26–240 MB on the nights that killed the worker. `memory_current` reads ~3.0–3.2 GB
+(76.9% of 4,096) but **1.37–1.90 GB of that is `inactive_file`** — page cache, not
+the process.
+
+**The ~2 GB sawtooth was not running in EITHER window.** There is no excursion in
+the baseline for this change to have moved.
+
+### CONFOUNDS — every one of them cuts against attributing the −199 MB to the prune
+
+1. **The slates are not the same size.** At 08-20 00:00Z the live date was
+   2026-08-19, `games=15`. At 08-21 00:00Z it is 2026-08-20, `games=9`. **The OLD
+   window processed a 40% BIGGER slate.** A lower peak on a smaller slate is what
+   you would see with no code change at all.
+2. **Sample density 2,568 → 1,607 (63%).** Fewer samples is less chance of
+   catching a peak, so the lower peak is partly a weaker instrument.
+3. **34 deploys on refresh-worker since 2026-08-19T00:00Z**, 14 of them since
+   14:00Z today. No deploy-free window today is long enough for the ratchet to
+   develop. The floor IS the ratchet.
+4. **20 minutes of a ~7-hour live window (22:00–05:00Z).** State the window with
+   the null: this is a 20-minute null, not a night.
+
+### OOM KILLS — read from the EVENTS API, not a log search
+
+**Zero `server_failed` on refresh-worker across the whole window read,
+2026-08-19T00:00:00Z .. 2026-08-21T00:16Z** (`render_events.py`, 132 events,
+fully paged, 2 pages). Per the standing rule this is **not** evidence the defect
+is fixed — with 34 deploys in that span the process rarely lived long enough to
+reach a kill, and the defect's own best pre-fix run was 17h 51m clean.
+
+### verify: **MECHANISM ONLY**
+
+- **Mechanism CONFIRMED in the live regime.** `plays_dropped` 478 across 9 live
+  games at 53.1/game and still climbing, 1,125 across 15 on the completed
+  look-back date, `pruned == games` on 72 of 72 lines.
+- **The transient did NOT move measurably.** Peak anon −199.2 MB, amplitude
+  +94.7 MB, on a 40%-smaller slate with 63% of the sampling density. Not a win,
+  not a regression — not a measurement of the thing.
+- **`#387`'s ~2 GB excursion is STILL UNEXPLAINED, and this change is not its
+  fix.** That now makes **four** `#387` candidates live and exercised with the
+  excursion unmoved: deepcopy (EXONERATED, 0.54 MB), odds-shard duplicate
+  (~125 MB), ledger accumulation (833 MB), and the feed/live prune. The named
+  candidates still do not sum to 2 GB.
+- **The lane does NOT close on this verdict.** It narrows to: *find a
+  deploy-free live-slate window on a 15-game slate where the excursion actually
+  runs, and only then judge amplitude.* Until such a window exists, no `#387`
+  candidate can be judged either way — which is the real finding here, and it is
+  about the measurement, not the code.
+
+**No rollback needed — nothing was deployed.** Kill switch remains
+`SYNDICATE_MLB_FEED_LIVE_PRUNE=0`. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` untouched
+at 3000 MB (headroom read 917–1,083 MB tonight, so the overview guard is still
+refusing — unchanged and expected).

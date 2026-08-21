@@ -144,9 +144,12 @@ That story ended; do not re-open it from the archive.**
   cumulative, so halving 2 scans to 1 cut DURATION and could never move the peak.
   "Kills continued" was evidence of the wrong lever, not the wrong suspect.
 - **MLB's hydration cost has two named, measured components. Both are on `main`
-  and both are LIVE on refresh-worker as `d0ea983d` since 2026-08-20T13:59:33Z,
-  with the prune PROVEN TO FIRE IN PRODUCTION `[verified 2026-08-20 14:00Z, lane
-  mlb-overview-hydration-cost]`.** Production evidence, 3 of 3 builds
+  and both are LIVE on refresh-worker — now under `7eb99f14`, NOT `d0ea983d`:
+  14 later deploys re-parented the off-main chain, and the prune survived them
+  BYTE-IDENTICAL (verified by CONTENT — `merge-base --is-ancestor d0ea983d
+  7eb99f14` is NO, so ancestry is the wrong test here). The prune is PROVEN TO
+  FIRE IN PRODUCTION `[verified 2026-08-20 14:00Z; re-verified in the LIVE
+  regime 2026-08-21 00:00-00:28Z, lane mlb-overview-hydration-cost]`.** Production evidence, 3 of 3 builds
   `pruned == games`, two different slate dates:
   `FEED_LIVE_PRUNE enabled=True date=2026-08-19 games=15 pruned=15 plays_dropped=1125`
   on a COMPLETED slate (vs 1,067 measured locally on a 15-game completed slate),
@@ -170,9 +173,27 @@ That story ended; do not re-open it from the archive.**
   (19,798,176 B x `#435`'s ~6.3x) and is NOT in the RSS numbers, which are the
   prune alone. Dropping 1,125 play records off the retained set is a different
   claim from moving the transient, and the post-deploy memory reading is
-  boot-confounded (process up ~1 min, container 1249MB / 30.5%). **The
-  live-slate window (~22:00Z-05:00Z) against a comparably-aged process is the
-  only reading that can settle it and it HAS NOT BEEN TAKEN.** Kill switch
+  boot-confounded. **THE LIVE-SLATE READING HAS NOW BEEN TAKEN
+  `[2026-08-21 00:00-00:28Z]` AND THE VERDICT IS *MECHANISM ONLY*.** The prune
+  works in the live regime — `plays_dropped` climbs monotonically 62 (17:39Z) ->
+  478 (00:28Z) on the live date, 9 games, 53.1/game and still rising, plus
+  1,125/15 = 75.0/game on the completed look-back date, `pruned == games` on 72
+  of 72 lines — **so the 66.38% premise holds in production and is NOT
+  retired.** But the transient did NOT move: same-clock, boot-matched
+  00:00-00:20Z (both processes 22-48 min old), peak anon 1,863.1 -> 1,663.9 MB
+  while amplitude went 533.4 -> 628.1 MB — opposite signs, both small, and the
+  OLD window ran a 15-game slate against tonight's 9 at 1.6x the sampling
+  density, so the -199 MB is not attributable to the code. **DECISIVE: the ~2GB
+  sawtooth was not running in EITHER window** — min inactive_file 1,182 / 1,368
+  MB against 26.3/42.2 MB at the defect nights' kills. There was no excursion in
+  the baseline to move. **`#387`'s ~2GB excursion is STILL UNEXPLAINED and this
+  is the FOURTH candidate live-and-exercised with it unmoved** (deepcopy,
+  odds-shard, ledger accumulation, prune). **WHAT IS OWED IS NOW A MEASUREMENT
+  WINDOW, NOT ANOTHER CANDIDATE:** no deploy-free live-slate window on a full
+  ~15-game slate has existed to judge any of them against — 34 refresh-worker
+  deploys since 2026-08-19T00:00Z. Zero `server_failed` in that whole span
+  (EVENTS API, fully paged), which is NOT evidence of a fix: the defect's own
+  best pre-fix run was 17h 51m clean. Kill switch
   without a deploy: `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`.
 - **`#387`'s "one thing to fix" — turn overview peak from SUM into MAX — ALREADY
   SHIPPED.** `build_intelligence_overview` takes a `consumer=` and releases each
