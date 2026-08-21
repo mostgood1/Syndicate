@@ -2463,6 +2463,157 @@ def _nfl_pbp_fetch_script_args(season: int) -> list[str]:
     return [sys.executable, str(script_path), "--season", str(season), "--json"]
 
 
+_NFL_FANTASY_SKIP_LOG_AT: dict[str, float] = {}
+_NFL_FANTASY_SKIP_LOG_INTERVAL_SECONDS = 60.0
+
+
+def _nfl_fantasy_artifact_enabled() -> bool:
+    # Absent means OFF, like every other autorun gate here. The flag is set on
+    # the SERVICE, not in `render.yaml` -- a `render.yaml` push fires
+    # `blueprint_sync`, which rewrites the whole env block of all three
+    # services.
+    raw = str(os.environ.get("NFL_FANTASY_ARTIFACT_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_fantasy_artifact_interval_seconds() -> int:
+    # DAILY. The projection's fastest-moving input is the depth chart, which
+    # nflverse republishes about once a day; play-by-play arrives weekly. A
+    # shorter interval re-runs a ~725MB build for inputs that have not changed,
+    # on a worker that also runs MLB sims.
+    raw = str(os.environ.get("NFL_FANTASY_ARTIFACT_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 86400)
+    except Exception:
+        value = 86400
+    return max(3600, value)
+
+
+def _nfl_fantasy_artifact_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_fantasy_artifact.json"
+
+
+def _nfl_fantasy_artifact_season() -> int:
+    """The season the fantasy surface projects.
+
+    NOT `date.today().year` alone. An NFL season is named for the year it
+    STARTS, so from January to summer the calendar year names the season just
+    FINISHED, and projecting it would rebuild a settled past. The surface's own
+    default is the authority, imported rather than duplicated so the two cannot
+    drift.
+    """
+    try:
+        from syndicate.features.nfl.fantasy import DEFAULT_FANTASY_SEASON
+
+        return int(DEFAULT_FANTASY_SEASON)
+    except Exception:  # noqa: BLE001
+        return date.today().year
+
+
+def _nfl_fantasy_artifact_script_args(season: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "build_nfl_fantasy_projection_artifact.py"
+    return [
+        sys.executable,
+        str(script_path),
+        "--season",
+        str(season),
+        "--weeks",
+        "1-18",
+        "--prepare",
+        "--publish",
+    ]
+
+
+def _launch_autorun_nfl_fantasy_artifact(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Rebuild and publish the NFL fantasy projection artifact, daily.
+
+    WHY THE WORKER AND NOT THE WEB. `/nfl/fantasy` serves a precomputed
+    document; the web dyno has none of the engine's ~61MB of raw nflverse
+    input, because Render disks are per-service. Without this job the surface
+    shows its degraded state forever -- which is what production did until the
+    artifact was pushed by hand on 2026-08-21.
+
+    LAUNCHED AS A DETACHED SUBPROCESS, and that is not incidental. MEASURED
+    2026-08-21: the projection build peaks at **725MB** over a 31MB baseline
+    and runs ~47s, before the preparation steps. Inline, that lands in the poll
+    loop's own RSS on a 4GB service that also runs MLB sims -- which is `#241`,
+    a production restart loop caused by exactly this shape of "small" periodic
+    addition. In a child, the memory returns to the OS on exit.
+
+    EVERY DECLINE SAYS WHY (`#443`), throttled per reason so a 30s poll cannot
+    turn this into the log storm `#378` records.
+    """
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_FANTASY_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NFL_FANTASY_SKIP_LOG_INTERVAL_SECONDS:
+            _NFL_FANTASY_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_FANTASY_ARTIFACT_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_fantasy_artifact_enabled():
+        return _skip("disabled", "NFL_FANTASY_ARTIFACT_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+
+    # NO in-season gate, deliberately, and it is the one place this differs from
+    # `_launch_autorun_nfl_pbp_fetch`. A DRAFT happens in August, before
+    # `_active_sports_for_date` lists nfl, and the draft board is what this
+    # surface is most used for. Gating on the season being live would leave it
+    # stale for exactly the weeks it matters most.
+    interval = _nfl_fantasy_artifact_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_fantasy_artifact_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    season = _nfl_fantasy_artifact_season()
+
+    # Marker BEFORE the launch: a run that dies costs one interval instead of
+    # relaunching on every tick.
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_fantasy_artifact_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "season": season,
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[refresh_worker] NFL_FANTASY_ARTIFACT_MARKER_FAILED error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+    print(
+        f"[refresh_worker] NFL_FANTASY_ARTIFACT_LAUNCHING season={season} "
+        f"last_attempt_age_s={int(age) if last_attempt else 'never'} interval_s={interval}",
+        flush=True,
+    )
+    try:
+        subprocess.Popen(_nfl_fantasy_artifact_script_args(season))
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[refresh_worker] NFL_FANTASY_ARTIFACT_LAUNCH_FAILED error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+    return True
+
+
 def _launch_autorun_nfl_pbp_fetch(
     *,
     latest_manifest_path: Path,
@@ -4266,6 +4417,25 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_evaluation_settlement(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_fantasy_artifact(
+            # THIRD, directly behind the pbp fetch, and `#341` is why it is not
+            # lower. Every branch in this chain is `elif`, so a late entry only
+            # runs on a tick where every earlier one declines -- reconciliation
+            # was mute FOR WEEKS that way, and `season_projections` went from 16
+            # turns/hour to zero over the same window. Both were starvation, not
+            # bugs.
+            #
+            # Safe this high for the same reasons the pbp fetch is: DAILY gated,
+            # so it wins at most one tick per 24h, and it launches a subprocess
+            # rather than running inline, so the poll loop is free again
+            # immediately. It sits behind the pbp fetch specifically because it
+            # CONSUMES what that job produces.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

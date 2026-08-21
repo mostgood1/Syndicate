@@ -45,11 +45,102 @@ from syndicate.features.nfl.fantasy_usage import usage_substrate  # noqa: E402
 PUBLISH_MAX_BYTES = 12 * 1024 * 1024
 
 
+
+def _clear_input_caches() -> None:
+    """Drop the memoised views of inputs that `--prepare` may have just changed."""
+    from syndicate.features.nfl import fantasy_players, fantasy_schedule, fantasy_usage
+
+    for target in (
+        fantasy_usage.load_season_usage,
+        fantasy_usage.load_season_game_lines,
+        fantasy_usage._load_usage_payload,
+        fantasy_players.load_fantasy_players,
+        fantasy_players.latest_depth_chart,
+        fantasy_schedule.load_schedule_rows,
+        fantasy_schedule.market_team_ratings,
+    ):
+        try:
+            target.cache_clear()
+        except AttributeError:
+            pass
+
+
+def _run(label: str, args: list[str]) -> bool:
+    """Run one preparation step as a SUBPROCESS, and say what happened.
+
+    Subprocess rather than an import, so each step's memory returns to the OS
+    when it exits. The projection build alone peaks at ~725 MB (measured
+    2026-08-21); stacking the usage builds into the same process on a shared
+    4 GB worker is how `#241` happened.
+    """
+    import subprocess
+
+    print(f"[fantasy_artifact] PREPARE_STEP {label} launching", flush=True)
+    try:
+        completed = subprocess.run(args, check=False)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[fantasy_artifact] PREPARE_STEP {label} FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+    print(f"[fantasy_artifact] PREPARE_STEP {label} rc={completed.returncode}", flush=True)
+    return completed.returncode == 0
+
+
+def _prepare_inputs(season: int, history: tuple) -> None:
+    """Fetch the raw roster/depth chart, and build any usage artifact missing.
+
+    NOTHING ELSE ON THE WORKER PRODUCES THESE, and one near-miss is worth
+    naming so this is not "de-duplicated" later. `fetch_nfl_pbp.py` brings down
+    the play-by-play. `_launch_autorun_nfl_roster_snapshot` sounds like it
+    covers the roster and does NOT: it writes a PROCESSED
+    `source_artifacts/data/processed/rosters/roster_{season}_snapshot.csv`,
+    while this engine reads the RAW nflverse releases under
+    `tracking/nflverse/roster/` and `tracking/nflverse/depth_charts/`.
+    Different files, different shape, and only one of them has `pos_rank`.
+
+    The roster and depth chart are re-fetched every run because they change
+    daily in camp and in-season; usage is built only when its artifact is
+    absent, because it derives from play-by-play that changes weekly.
+    """
+    from syndicate.features.nfl.fantasy_usage import usage_artifact_path
+
+    scripts = Path(__file__).resolve().parent
+
+    _run(
+        "roster_depth_charts",
+        [
+            sys.executable,
+            str(scripts / "fetch_nfl_rosters_depth_charts.py"),
+            "--seasons",
+            str(season),
+            "--force",
+        ],
+    )
+
+    missing = [value for value in history if not usage_artifact_path(value).is_file()]
+    if missing:
+        _run(
+            "usage",
+            [
+                sys.executable,
+                str(scripts / "build_nfl_fantasy_usage.py"),
+                "--seasons",
+                ",".join(str(value) for value in missing),
+            ],
+        )
+    else:
+        print("[fantasy_artifact] PREPARE_STEP usage skipped -- all artifacts present", flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, default=2026)
     parser.add_argument("--weeks", default="1-18", help="e.g. 1-18, or 1,2,3, or none")
     parser.add_argument("--publish", action="store_true", help="push to the web service")
+    parser.add_argument(
+        "--prepare",
+        action="store_true",
+        help="fetch the roster/depth chart and build any missing usage artifact first",
+    )
     # `publish_hot_artifact` defaults to 10s, which is tuned for the small
     # per-date JSON most callers push. This artifact is ~2.8 MB and a 10s
     # ceiling drops the TLS connection mid-upload ("EOF occurred in violation
@@ -60,6 +151,14 @@ def main() -> int:
 
     season = args.season
     history = _history_seasons(season, len(DEFAULT_CONFIG.season_recency_weights))
+
+    if args.prepare:
+        _prepare_inputs(season, history)
+        # The loaders memoise per season, and `--prepare` has just changed what
+        # is on disk underneath them. Without this the run would build from the
+        # state observed BEFORE preparing -- which on a first run is nothing.
+        _clear_input_caches()
+        history = _history_seasons(season, len(DEFAULT_CONFIG.season_recency_weights))
 
     # ---- inputs must be present, and say WHICH one is not
     missing: list[str] = []
