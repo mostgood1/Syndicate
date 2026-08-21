@@ -21321,3 +21321,67 @@ The autorun is rate-limited until ~19:50Z tomorrow. **Its next run is the real
 verification of the guard** — it should either publish a healthy artifact (now
 that `--prepare` fetches the schedule) or refuse and say why. Neither has been
 observed yet on the worker.
+
+## 2026-08-21 15:00-21:15Z — RE-VERIFY of sweep-ownership gate `20025cc4` — **ALREADY CLOSED 08-18; RE-CONFIRMED TODAY ON A FRESH WINDOW**
+
+Unattended scheduled task `sweep-gate-verification-check` fired today asking for
+the "second half" of the `20025cc4` measurement. **That row closed on 2026-08-18
+~01:2xZ** (RESOLVED block above). No lane opened, nothing deployed. Recording
+the re-verification because it was run, and because it independently reproduces
+the structural finding on a window four days later.
+
+**THE TASK'S TWO PRIMARY CRITERIA ARE BOTH UNSATISFIABLE, AND THAT IS THE OLD
+FINDING, RE-MEASURED.** It asked for `ODDS_SWEEP_OUTCOME` on live-odds-worker
+("THE PROOF") and `SWEEP_OWNERSHIP_EXCLUDED` on refresh-worker. **Neither
+service emits the line asked of it.** 24h window 08-20 21:00Z -> 08-21 21:15Z,
+each null paired with a same-window no-filter control:
+
+    live-odds-worker  ODDS_SWEEP_OUTCOME         ->  0     control: emitting (hasMore)
+    refresh-worker    SWEEP_OWNERSHIP_EXCLUDED   ->  0     control: emitting (hasMore)
+    refresh-worker    ODDS_SWEEP_LAUNCHED        ->  0     control: emitting (hasMore)
+
+Code check, not inference: `_run_live_refresh_tick` is imported by
+`scripts/run_live_odds_refresh_worker.py:26` and **by nothing else**. The gate
+and `ODDS_SWEEP_LAUNCHED` live on that path; the grading pass that prints
+`ODDS_SWEEP_OUTCOME` reads the SHARED keyvalue store and runs on refresh-worker.
+**Launcher and grader are different services** — the criterion was never
+satisfiable, exactly as recorded on 08-18.
+
+**THE GATE IS LIVE AND PARTITIONING CORRECTLY RIGHT NOW** (08-21 10:00-16:15
+CDT / 15:00-21:15Z):
+
+    live-odds-worker  SWEEP_OWNERSHIP_EXCLUDED date=2026-08-21
+                      kept=mlb,wnba,soccer
+                      dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+                              ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+                      emitting continuously, ~every 60-70s
+
+    live-odds-worker  ODDS_SWEEP_LAUNCHED  >=1200 lines (12-page cap, a FLOOR)
+                      soccer 1020 | mlb 864 | wnba 12 | nfl 0 | ncaaf 0
+                      19:01:48Z .. 21:14:36Z
+
+**The launched set is exactly the kept set.** This is the half-two signal the
+task was reaching for, read off the line the launcher actually emits. The 08-17
+"HARD ZERO over 30h" baseline is gone.
+
+**refresh-worker did NOT stop, and did NOT start sweeping — it grades.** 62
+`ODDS_SWEEP_OUTCOME` lines in the 6h window: soccer 22, wnba 16, mlb 14, nfl 10.
+Split by `since_launch_s`, which is the whole point:
+
+    FRESH grading (<=900s)   soccer 21 | mlb  8 | wnba  6 | nfl 0
+    STALE grading ( >900s)   soccer  1 | mlb  6 | wnba 10 | nfl 10
+    since_launch_s   mlb 121..4056   soccer 120..903   wnba 121..6885
+                     nfl 476816..494877   <-- 5.5 to 5.7 DAYS
+
+**Every one of refresh-worker's 10 nfl lines grades a launch from ~08-16.** Not
+one nfl sweep has been launched in 5.5 days, by either service. Counting those
+10 as nfl sweeps is precisely the grading-is-not-an-event error the task warned
+about; the `since_launch_s` split is what separates them.
+
+**VERDICT: `20025cc4` CONFIRMED — both halves, re-measured on a fresh window.**
+The row stays closed. Nothing owed.
+
+**The scheduled task itself is now stale and should be retired** — it encodes
+the pre-08-18 model in which live-odds-worker emits `ODDS_SWEEP_OUTCOME`, so
+every future run will report a null against a service that cannot produce that
+line. Left in place; not modified by this unattended run.
