@@ -173,3 +173,42 @@ def test_all_markets_invalid_raises_instead_of_returning_empty(module, monkeypat
 
     with pytest.raises(module.InvalidMarketError):
         module.fetch_player_props("key")
+
+
+# ---------------------------------------------------------------------------
+# Name resolution. Split out because the failure mode is not "no match" -- it
+# is a CONFIDENT WRONG match, which is strictly worse for a betting join.
+# ---------------------------------------------------------------------------
+
+def test_ambiguous_short_name_resolves_to_none_not_to_a_guess(monkeypatch):
+    """`short_name_from_full` maps "Troy Hill" and "Tyreek Hill" to the same
+    "T.Hill". The index must refuse it.
+
+    The old `setdefault` behaviour handed the longshot's price Tyreek Hill's
+    game log and produced a +125% anytime_td ROI that was pure join artifact.
+    """
+    from syndicate.features.nfl import player_stats
+
+    plays = (
+        {"receiver_player_id": "TYREEK", "receiver_player_name": "T.Hill",
+         "passer_player_id": "", "passer_player_name": "",
+         "rusher_player_id": "", "rusher_player_name": "", "week": 1},
+        {"receiver_player_id": "TROY", "receiver_player_name": "T.Hill",
+         "passer_player_id": "", "passer_player_name": "",
+         "rusher_player_id": "", "rusher_player_name": "", "week": 1},
+        {"receiver_player_id": "SOLO", "receiver_player_name": "D.Maye",
+         "passer_player_id": "", "passer_player_name": "",
+         "rusher_player_id": "", "rusher_player_name": "", "week": 1},
+    )
+    monkeypatch.setattr(player_stats, "load_player_plays", lambda season: plays)
+    player_stats.player_name_index.cache_clear()
+
+    assert player_stats.resolve_player_id(2025, "Tyreek Hill") is None
+    assert player_stats.resolve_player_id(2025, "Troy Hill") is None
+    # An unambiguous name still resolves -- the fix must not blind the join.
+    assert player_stats.resolve_player_id(2025, "Drake Maye") == "SOLO"
+
+    collisions = player_stats.player_name_collisions(2025)
+    assert set(collisions) == {"t.hill"}
+    assert collisions["t.hill"] == frozenset({"TYREEK", "TROY"})
+    player_stats.player_name_index.cache_clear()

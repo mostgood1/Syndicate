@@ -1,0 +1,222 @@
+{
+  "seasons": [
+    2023,
+    2024,
+    2025
+  ],
+  "graded": 64007,
+  "dispersion": {
+    "n": 12986,
+    "spread_median": 0.0316,
+    "spread_p90": 0.057,
+    "bases": {
+      "worst": {
+        "n": 12986,
+        "hit_rate": 0.5081,
+        "profit_units": -1327.9,
+        "roi_pct": -10.23
+      },
+      "median": {
+        "n": 12986,
+        "hit_rate": 0.5081,
+        "profit_units": -930.3,
+        "roi_pct": -7.16
+      },
+      "best": {
+        "n": 12986,
+        "hit_rate": 0.5081,
+        "profit_units": -547.3,
+        "roi_pct": -4.21
+      }
+    },
+    "shopping_gain_pts": 2.95
+  },
+  "per_book": {
+    "barstool": {
+      "n": 1452,
+      "hit_rate": 0.6164,
+      "profit_units": -70.5,
+      "roi_pct": -4.85
+    },
+    "draftkings": {
+      "n": 16149,
+      "hit_rate": 0.507,
+      "profit_units": -1113.9,
+      "roi_pct": -6.9
+    },
+    "williamhill_us": {
+      "n": 14872,
+      "hit_rate": 0.5039,
+      "profit_units": -1220.1,
+      "roi_pct": -8.2
+    },
+    "betmgm": {
+      "n": 15606,
+      "hit_rate": 0.5101,
+      "profit_units": -1088.3,
+      "roi_pct": -6.97
+    },
+    "fanduel": {
+      "n": 15280,
+      "hit_rate": 0.5044,
+      "profit_units": -1000.3,
+      "roi_pct": -6.55
+    },
+    "betrivers": {
+      "n": 40177,
+      "hit_rate": 0.575,
+      "profit_units": -3376.9,
+      "roi_pct": -8.41
+    },
+    "unibet_us": {
+      "n": 10782,
+      "hit_rate": 0.6131,
+      "profit_units": -682.3,
+      "roi_pct": -6.33
+    },
+    "betonlineag": {
+      "n": 15700,
+      "hit_rate": 0.5042,
+      "profit_units": -1164.3,
+      "roi_pct": -7.42
+    },
+    "pointsbetus": {
+      "n": 1643,
+      "hit_rate": 0.5033,
+      "profit_units": -103.9,
+      "roi_pct": -6.33
+    },
+    "bovada": {
+      "n": 12717,
+      "hit_rate": 0.5068,
+      "profit_units": -953.0,
+      "roi_pct": -7.49
+    },
+    "fanatics": {
+      "n": 4829,
+      "hit_rate": 0.4953,
+      "profit_units": -506.6,
+      "roi_pct": -10.49
+    }
+  },
+  "calibration": {
+    "train_n": 47383,
+    "test_n": 16624,
+    "fit": [
+      {
+        "lo": 0.5000051734292102,
+        "hi": 0.5304633947637329,
+        "realized": 0.5004221190375686
+      },
+      {
+        "lo": 0.5304661958075776,
+        "hi": 0.5620023734375642,
+        "realized": 0.5179400590966653
+      },
+      {
+        "lo": 0.5620095693779904,
+        "hi": 0.593670211431308,
+        "realized": 0.5206838328408612
+      },
+      {
+        "lo": 0.5936746919595144,
+        "hi": 0.6284280140578468,
+        "realized": 0.5377796538623892
+      },
+      {
+        "lo": 0.6284280140578468,
+        "hi": 0.6659593845347851,
+        "realized": 0.5527648796960742
+      },
+      {
+        "lo": 0.6659672104185681,
+        "hi": 0.7084041500891671,
+        "realized": 0.573870831574504
+      },
+      {
+        "lo": 0.7084359543099312,
+        "hi": 0.7542983584830922,
+        "realized": 0.5922330097087378
+      },
+      {
+        "lo": 0.754314202563362,
+        "hi": 0.8150569827007109,
+        "realized": 0.6188265090755594
+      },
+      {
+        "lo": 0.815077784532735,
+        "hi": 0.903474455722873,
+        "realized": 0.6390882228788518
+      },
+      {
+        "lo": 0.9034886393404772,
+        "hi": 1.0,
+        "realized": 0.6169269734065006
+      }
+    ],
+    "raw": {
+      "0.0": {
+        "n": 14293,
+        "hit_rate": 0.4911,
+        "profit_units": -1073.4,
+        "roi_pct": -7.51
+      },
+      "0.02": {
+        "n": 13111,
+        "hit_rate": 0.4907,
+        "profit_units": -981.4,
+        "roi_pct": -7.49
+      },
+      "0.05": {
+        "n": 11399,
+        "hit_rate": 0.4897,
+        "profit_units": -851.8,
+        "roi_pct": -7.47
+      },
+      "0.1": {
+        "n": 8701,
+        "hit_rate": 0.4872,
+        "profit_units": -673.6,
+        "roi_pct": -7.74
+      },
+      "0.15": {
+        "n": 6501,
+        "hit_rate": 0.4858,
+        "profit_units": -519.7,
+        "roi_pct": -7.99
+      }
+    },
+    "calibrated": {
+      "0.0": {
+        "n": 10306,
+        "hit_rate": 0.4779,
+        "profit_units": -825.6,
+        "roi_pct": -8.01
+      },
+      "0.02": {
+        "n": 8169,
+        "hit_rate": 0.4723,
+        "profit_units": -685.2,
+        "roi_pct": -8.39
+      },
+      "0.05": {
+        "n": 5692,
+        "hit_rate": 0.4705,
+        "profit_units": -452.4,
+        "roi_pct": -7.95
+      },
+      "0.1": {
+        "n": 1737,
+        "hit_rate": 0.4542,
+        "profit_units": -116.5,
+        "roi_pct": -6.71
+      },
+      "0.15": {
+        "n": 313,
+        "hit_rate": 0.4058,
+        "profit_units": -15.9,
+        "roi_pct": -5.08
+      }
+    }
+  }
+}

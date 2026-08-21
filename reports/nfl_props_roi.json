@@ -1,0 +1,191 @@
+{
+  "seasons": [
+    2023,
+    2024,
+    2025
+  ],
+  "graded": 64007,
+  "bases": {
+    "best_price": {
+      "by_edge": {
+        "0.0": {
+          "n": 48024,
+          "hit_rate": 0.5202,
+          "profit_units": -3531.69,
+          "roi_pct": -7.35
+        },
+        "0.02": {
+          "n": 43658,
+          "hit_rate": 0.5174,
+          "profit_units": -3184.64,
+          "roi_pct": -7.29
+        },
+        "0.05": {
+          "n": 37202,
+          "hit_rate": 0.5124,
+          "profit_units": -2718.38,
+          "roi_pct": -7.31
+        },
+        "0.1": {
+          "n": 27236,
+          "hit_rate": 0.5006,
+          "profit_units": -2130.82,
+          "roi_pct": -7.82
+        }
+      },
+      "by_market": {
+        "anytime_td": {
+          "n": 256,
+          "hit_rate": 0.5508,
+          "profit_units": 47.11,
+          "roi_pct": 18.4
+        },
+        "interceptions": {
+          "n": 796,
+          "hit_rate": 0.5477,
+          "profit_units": -33.66,
+          "roi_pct": -4.23
+        },
+        "passing_attempts": {
+          "n": 1576,
+          "hit_rate": 0.5089,
+          "profit_units": -41.09,
+          "roi_pct": -2.61
+        },
+        "passing_tds": {
+          "n": 973,
+          "hit_rate": 0.5838,
+          "profit_units": -80.14,
+          "roi_pct": -8.24
+        },
+        "passing_yards": {
+          "n": 5838,
+          "hit_rate": 0.4734,
+          "profit_units": -862.69,
+          "roi_pct": -14.78
+        },
+        "receiving_yards": {
+          "n": 20416,
+          "hit_rate": 0.5196,
+          "profit_units": -1580.66,
+          "roi_pct": -7.74
+        },
+        "receptions": {
+          "n": 6605,
+          "hit_rate": 0.5618,
+          "profit_units": -235.75,
+          "roi_pct": -3.57
+        },
+        "rushing_attempts": {
+          "n": 2347,
+          "hit_rate": 0.5168,
+          "profit_units": -56.38,
+          "roi_pct": -2.4
+        },
+        "rushing_yards": {
+          "n": 9217,
+          "hit_rate": 0.5142,
+          "profit_units": -688.43,
+          "roi_pct": -7.47
+        }
+      }
+    },
+    "draftkings": {
+      "by_edge": {
+        "0.0": {
+          "n": 13368,
+          "hit_rate": 0.4992,
+          "profit_units": -966.29,
+          "roi_pct": -7.23
+        },
+        "0.02": {
+          "n": 12194,
+          "hit_rate": 0.4984,
+          "profit_units": -873.97,
+          "roi_pct": -7.17
+        },
+        "0.05": {
+          "n": 10335,
+          "hit_rate": 0.494,
+          "profit_units": -804.41,
+          "roi_pct": -7.78
+        },
+        "0.1": {
+          "n": 7563,
+          "hit_rate": 0.4884,
+          "profit_units": -653.03,
+          "roi_pct": -8.63
+        }
+      },
+      "by_market": {
+        "anytime_td": {
+          "n": 154,
+          "hit_rate": 0.5195,
+          "profit_units": 0.29,
+          "roi_pct": 0.19
+        },
+        "interceptions": {
+          "n": 686,
+          "hit_rate": 0.5117,
+          "profit_units": -43.17,
+          "roi_pct": -6.29
+        },
+        "passing_attempts": {
+          "n": 730,
+          "hit_rate": 0.4959,
+          "profit_units": -47.4,
+          "roi_pct": -6.49
+        },
+        "passing_tds": {
+          "n": 568,
+          "hit_rate": 0.5088,
+          "profit_units": -55.2,
+          "roi_pct": -9.72
+        },
+        "passing_yards": {
+          "n": 786,
+          "hit_rate": 0.4478,
+          "profit_units": -122.7,
+          "roi_pct": -15.61
+        },
+        "receiving_yards": {
+          "n": 3993,
+          "hit_rate": 0.4904,
+          "profit_units": -318.05,
+          "roi_pct": -7.97
+        },
+        "receptions": {
+          "n": 3394,
+          "hit_rate": 0.513,
+          "profit_units": -211.49,
+          "roi_pct": -6.23
+        },
+        "rushing_attempts": {
+          "n": 1154,
+          "hit_rate": 0.5225,
+          "profit_units": -27.71,
+          "roi_pct": -2.4
+        },
+        "rushing_yards": {
+          "n": 1903,
+          "hit_rate": 0.4924,
+          "profit_units": -140.85,
+          "roi_pct": -7.4
+        }
+      }
+    }
+  },
+  "book_coverage": {
+    "barstool": 1452,
+    "draftkings": 16149,
+    "williamhill_us": 14872,
+    "betmgm": 15606,
+    "fanduel": 15280,
+    "betrivers": 40177,
+    "unibet_us": 10782,
+    "betonlineag": 15700,
+    "pointsbetus": 1643,
+    "bovada": 12717,
+    "fanatics": 4829
+  }
+}

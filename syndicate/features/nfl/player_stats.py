@@ -87,12 +87,21 @@ def load_player_plays(season: int) -> tuple[dict[str, Any], ...]:
     return tuple(plays)
 
 
-@lru_cache(maxsize=8)
-def player_name_index(season: int) -> dict[str, str]:
-    """Real nflverse display name (e.g. "K.Murray") -> player id, built
-    directly off whichever passer/rusher/receiver columns carried that id.
-    Case/whitespace-normalized key."""
-    index: dict[str, str] = {}
+def _player_name_candidates(season: int) -> dict[str, frozenset[str]]:
+    """nflverse display name -> EVERY player id that name refers to.
+
+    The set, not one winner. `player_name_index` collapses this to the
+    unambiguous entries and `player_name_collisions` reports the rest.
+
+    DELIBERATELY NOT `lru_cache`d, even though it does a full play scan.
+    `player_name_index` is the cached entry point and several test files
+    reset it with `player_name_index.cache_clear()`. Caching here too adds a
+    second layer that call does not reach, so a stale index survives the
+    reset and leaks across tests -- which is exactly what happened when this
+    was first written cached (tests/test_nfl_props.py went red on a fixture
+    it had nothing to do with).
+    """
+    candidates: dict[str, set[str]] = {}
     for play in load_player_plays(season):
         for id_key, name_key in (
             ("passer_player_id", "passer_player_name"),
@@ -102,17 +111,68 @@ def player_name_index(season: int) -> dict[str, str]:
             player_id = play.get(id_key)
             name = play.get(name_key)
             if player_id and name:
-                index.setdefault(name.strip().lower(), player_id)
-    return index
+                candidates.setdefault(name.strip().lower(), set()).add(player_id)
+    return {name: frozenset(ids) for name, ids in candidates.items()}
+
+
+@lru_cache(maxsize=8)
+def player_name_index(season: int) -> dict[str, str]:
+    """Real nflverse display name (e.g. "K.Murray") -> player id, for names
+    that identify EXACTLY ONE player. Case/whitespace-normalized key.
+
+    AMBIGUOUS NAMES ARE OMITTED, not resolved to a guess. This used to be
+    `index.setdefault(name, player_id)`, so the first id encountered won and
+    every other player sharing that short name silently resolved to them --
+    the docstring on `short_name_from_full` called the collision "acceptable
+    for a v1" because nothing had ever measured its consequence. Measured
+    2026-08-20, the first time real quoted prop lines existed to join against:
+
+      season 2023: 14 of 573 short names collide (2.4%), hiding 16 players.
+      `j.williams` alone maps to FOUR distinct player ids.
+
+    2.4% sounds survivable and is not, because the errors are not random. A
+    collision takes the PRICE of a longshot and the MODEL RATE and OUTCOME of
+    whichever star shares their initial+surname, which is exactly the shape of
+    a fake edge. In the first NFL prop ROI run it produced `Troy Hill` (a
+    cornerback) priced +4000 carrying Tyreek Hill's game log, `D.J. Montgomery`
+    at +3000 carrying David Montgomery's, and a headline anytime_td ROI of
+    +125% that was entirely an artifact of the join.
+
+    An unresolvable name costs us one bet. A wrongly resolved name prices a
+    projection against a different human being, which is worse than no bet at
+    any stake -- so `unknown` maps to None here, never to a permissive guess.
+
+    RECOVERABLE, and deliberately not attempted in this pass: the odds row
+    carries home/away team, so a player_id -> team map would disambiguate most
+    of these. That needs `posteam` added to `_PLAY_COLUMNS`, which widens every
+    play dict in memory, and is its own change with its own measurement.
+    """
+    return {
+        name: next(iter(ids))
+        for name, ids in _player_name_candidates(season).items()
+        if len(ids) == 1
+    }
+
+
+def player_name_collisions(season: int) -> dict[str, frozenset[str]]:
+    """Names that refer to more than one player, so a caller can REPORT the
+    coverage it is losing rather than silently missing those rows."""
+    return {
+        name: ids
+        for name, ids in _player_name_candidates(season).items()
+        if len(ids) > 1
+    }
 
 
 def short_name_from_full(full_name: str) -> str:
     """"Drake Maye" -> "D.Maye" -- real player-prop odds carry full names
     while nflverse pbp uses first-initial.last-name; this bridges the two
-    real data sources. Known limitation: two players sharing a first
-    initial + last name on the same roster would collide -- acceptable for
-    a v1, same class of simplification as this session's other rate-based
-    approximations."""
+    real data sources. Two players sharing a first initial + last
+    name collide here. That is unavoidable in this direction (the short
+    name genuinely carries less information), which is why the COLLISION
+    IS HANDLED IN `player_name_index` -- it omits ambiguous names so this
+    function can stay a pure format bridge. See that docstring for the
+    measurement."""
     parts = [part for part in str(full_name or "").strip().split() if part]
     if len(parts) < 2:
         return str(full_name or "").strip()
