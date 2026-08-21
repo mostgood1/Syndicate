@@ -473,9 +473,18 @@ def build_fantasy_page_context(
         use_news=use_news,
         league=settings,
     )
-    selected = (position or "ALL").strip().upper()
-    if selected not in POSITION_ORDER:
-        selected = "ALL"
+    # MULTISELECT. `position` is a comma-separated set, so "RB,WR" is one
+    # question ("what is left in my flex") rather than two page loads. An empty
+    # or unrecognised set means every position -- an unknown value must widen
+    # the board, never empty it.
+    requested = {
+        value.strip().upper()
+        for value in (position or "").replace("+", ",").split(",")
+        if value.strip()
+    }
+    selected_positions = [name for name in POSITION_ORDER if name in requested]
+    showing_all = not selected_positions
+    selected = "ALL" if showing_all else ",".join(selected_positions)
 
     by_position: dict[str, list[dict[str, Any]]] = {name: [] for name in POSITION_ORDER}
     for row in payload["rows"]:
@@ -485,19 +494,29 @@ def build_fantasy_page_context(
 
     board = [row for row in payload["rows"] if row.get("draft")]
     board.sort(key=lambda row: row["draft"]["rank"])
-    if selected != "ALL":
-        board = [row for row in board if row["position"] == selected]
+    if not showing_all:
+        board = [row for row in board if row["position"] in selected_positions]
 
     full_stats = (stat_view or "").strip().lower() in {"full", "all", "1", "true"}
     counts = {name: len(rows) for name, rows in by_position.items()}
-    if selected == "ALL":
+    if showing_all:
         shown = {name: rows[:60] for name, rows in by_position.items()}
     else:
-        shown = {selected: by_position.get(selected, [])[:POSITION_VIEW_LIMIT]}
+        shown = {
+            name: by_position.get(name, [])[:POSITION_VIEW_LIMIT]
+            for name in selected_positions
+        }
 
-    stat_columns = {
-        name: populated_stat_columns(rows) for name, rows in shown.items()
-    } if full_stats else {}
+    stat_columns = (
+        {name: populated_stat_columns(rows) for name, rows in shown.items()}
+        if full_stats
+        else {}
+    )
+    # THE DRAFT BOARD GETS THE STAT COLUMNS TOO. It is the all-up list, and
+    # "all projected stats" that widened only the per-position tables read as a
+    # filter that does nothing -- the board is the first table on the page and
+    # it stayed at 12 columns.
+    board_stat_columns = populated_stat_columns(board) if full_stats else []
 
     return {
         "title": "Fantasy Football",
@@ -512,6 +531,9 @@ def build_fantasy_page_context(
         "use_news": use_news,
         "positions": POSITION_ORDER,
         "selected_position": selected,
+        "selected_positions": selected_positions,
+        "showing_all_positions": showing_all,
+        "board_stat_columns": board_stat_columns,
         "position_counts": counts,
         "by_position": shown,
         "board": board[:BOARD_VIEW_LIMIT],

@@ -215,8 +215,8 @@ def test_position_view_filters_server_side_and_keeps_league_wide_replacement():
     everything = build_fantasy_page_context(SEASON, scoring_key="ppr")
     running_backs = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB")
 
-    assert everything["selected_position"] == "ALL"
-    assert running_backs["selected_position"] == "RB"
+    assert everything["showing_all_positions"] is True
+    assert running_backs["selected_positions"] == ["RB"]
 
     # Only the selected group is rendered.
     assert set(running_backs["by_position"]) == {"RB"}
@@ -251,7 +251,7 @@ def test_position_counts_report_the_full_pool_not_the_rendered_slice():
 @requires_artifact
 def test_unknown_position_falls_back_to_all_rather_than_emptying_the_page():
     context = build_fantasy_page_context(SEASON, scoring_key="ppr", position="quarterbackish")
-    assert context["selected_position"] == "ALL"
+    assert context["showing_all_positions"] is True
     assert context["board"]
 
 
@@ -347,3 +347,48 @@ def test_weekly_stats_differ_by_opponent():
         top = context["by_position"]["RB"][0]
         lines.append((top["opponent"], round(top["fantasy_points"], 2)))
     assert len({value for _, value in lines}) > 1, f"weekly projections are identical: {lines}"
+
+
+@requires_artifact
+def test_positions_are_multiselect():
+    """"RB,WR" is one question -- what is left in my flex -- not two pages."""
+    both = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB,WR")
+    assert both["selected_positions"] == ["RB", "WR"]
+    assert set(both["by_position"]) == {"RB", "WR"}
+    assert {row["position"] for row in both["board"]} == {"RB", "WR"}
+    # Order in the query must not change the answer.
+    reversed_order = build_fantasy_page_context(SEASON, scoring_key="ppr", position="WR,RB")
+    assert reversed_order["selected_positions"] == ["RB", "WR"]
+
+
+@requires_artifact
+def test_a_partly_unknown_selection_keeps_the_positions_it_recognises():
+    """An unknown token must widen or be ignored -- never empty the board."""
+    context = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB,notaposition")
+    assert context["selected_positions"] == ["RB"]
+    assert context["board"]
+
+
+@requires_artifact
+def test_the_all_up_draft_board_gains_stat_columns_in_the_full_view():
+    """THE BUG THIS PINS: "all projected stats" widened only the per-position
+    tables, so clicking it on the default view -- where the draft board is the
+    first and largest table -- appeared to do nothing at all."""
+    key_view = build_fantasy_page_context(SEASON, scoring_key="ppr")
+    full_view = build_fantasy_page_context(SEASON, scoring_key="ppr", stat_view="full")
+    assert key_view["board_stat_columns"] == []
+    assert len(full_view["board_stat_columns"]) >= 20, "the board must widen too"
+    keys = [key for key, _ in full_view["board_stat_columns"]]
+    assert "rushing_yards" in keys and "receiving_yards" in keys and "passing_yards" in keys
+
+
+@requires_artifact
+def test_board_stat_columns_narrow_with_the_position_selection():
+    """Columns come from the rows on screen, so a defence-only board should not
+    carry rushing columns."""
+    defense = build_fantasy_page_context(
+        SEASON, scoring_key="ppr", position="DST", stat_view="full"
+    )
+    keys = [key for key, _ in defense["board_stat_columns"]]
+    assert "dst_sacks" in keys
+    assert "carries" not in keys

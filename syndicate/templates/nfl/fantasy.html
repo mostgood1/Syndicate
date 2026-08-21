@@ -4,11 +4,19 @@
 {% block page_title %}Fantasy Football{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/board_cards.css') }}" />
 <style>
-  .ff-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: .75rem 0 1.25rem; }
-  .ff-controls a { padding: .3rem .7rem; border: 1px solid var(--border, #444); border-radius: 999px;
-                   text-decoration: none; font-size: .85rem; }
-  .ff-controls a.on { background: var(--accent, #2f6feb); color: #fff; border-color: transparent; }
+  /* The filter rails reuse Layer 2's `cards-tab` / `cards-tabs` classes from
+     shared/dense_cards.css so the two boards look and behave the same. Only
+     the anchor reset below is local: Layer 2's rails are <button>s driven by
+     JS, and these are links, because every filter here is server-side and must
+     survive a reload and a shared URL. */
+  .ff-rail a.cards-tab { text-decoration: none; display: inline-flex; align-items: center; gap: .35rem; }
+  .ff-rail { flex-wrap: wrap; }
+  .ff-rail-label { font-size: 10px; font-weight: 800; letter-spacing: .12em;
+                   text-transform: uppercase; opacity: .55; align-self: center; margin-right: .25rem; }
+  .ff-count { opacity: .55; font-weight: 600; letter-spacing: 0; }
   .ff-note { font-size: .85rem; opacity: .8; margin: .5rem 0 1rem; line-height: 1.5; }
   .ff-scroll { overflow-x: auto; }
   table.ff { border-collapse: collapse; width: 100%; font-size: .88rem; }
@@ -49,31 +57,74 @@
     roles from the {{ season }} depth chart taken {{ basis.roster.depth_chart_as_of }}.
   </p>
 
-  <div class="ff-controls">
-    <span style="opacity:.7">Scoring:</span>
-    {% for key in available_scoring %}
-      <a class="{{ 'on' if key == scoring else '' }}"
-         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ key }}{{ '&week=' ~ week if week else '' }}{{ '&news=1' if use_news else '' }}">{{ key }}</a>
-    {% endfor %}
-    <span style="opacity:.7; margin-left:1rem">Position:</span>
-    <a class="{{ 'on' if selected_position == 'ALL' else '' }}"
-       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}">All</a>
-    {% for pos in positions %}
-      <a class="{{ 'on' if selected_position == pos else '' }}"
-         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}&amp;position={{ pos }}">{{ pos }}<span style="opacity:.55"> {{ position_counts.get(pos, 0) }}</span></a>
-    {% endfor %}
-    <span style="opacity:.7; margin-left:1rem">Stats:</span>
-    <a class="{{ '' if full_stats else 'on' }}"
-       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}{{ '&position=' ~ selected_position if selected_position != 'ALL' else '' }}">Key</a>
-    <a class="{{ 'on' if full_stats else '' }}"
-       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}{{ '&position=' ~ selected_position if selected_position != 'ALL' else '' }}&amp;stats=full">All projected stats</a>
-    <span style="opacity:.7; margin-left:1rem">View:</span>
-    <a class="{{ '' if week else 'on' }}" href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}">Season / draft</a>
-    {% for w in range(1, 19) %}
-      <a class="{{ 'on' if week == w else '' }}"
-         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}&amp;week={{ w }}">{{ w }}</a>
-    {% endfor %}
-  </div>
+  {#- Filter rails, shaped like the Layer 2 board's toolbar: one rail per
+      question, `cards-tab` pills, active state via `is-active`. Positions are
+      MULTISELECT -- each pill toggles itself in or out of the `position` set,
+      so "RB,WR" is one URL and one page. Every filter is server-side, which is
+      why these are links rather than Layer 2's JS buttons: the state has to
+      survive a reload and be shareable. -#}
+  {%- set week_query = ('&week=' ~ week) if week else '' -%}
+  {%- set stats_query = '&stats=full' if full_stats else '' -%}
+  {%- set pos_query = ('&position=' ~ (selected_positions | join(','))) if selected_positions else '' -%}
+
+  <form class="cards-control-card board-toolbar" onsubmit="return false">
+    <div class="board-toolbar-row">
+      <span class="ff-rail-label">Scoring</span>
+      <div class="board-tabs cards-tabs ff-rail" role="tablist" aria-label="Scoring format">
+        {% for key in available_scoring %}
+          <a class="cards-tab {{ 'is-active' if key == scoring else '' }}"
+             href="/nfl/fantasy?season={{ season }}&amp;scoring={{ key }}{{ week_query }}{{ pos_query }}{{ stats_query }}">{{ key.replace('_',' ') }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="board-toolbar-row">
+      <span class="ff-rail-label">Positions</span>
+      <div class="board-tabs cards-tabs ff-rail" role="tablist" aria-label="Position filter">
+        <a class="cards-tab {{ 'is-active' if showing_all_positions else '' }}"
+           href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ week_query }}{{ stats_query }}">All</a>
+        {% for pos in positions %}
+          {%- set next_set = (selected_positions | reject('equalto', pos) | list) if pos in selected_positions else (selected_positions + [pos]) -%}
+          {%- set next_query = ('&position=' ~ (next_set | join(','))) if next_set else '' -%}
+          <a class="cards-tab {{ 'is-active' if pos in selected_positions else '' }}"
+             href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ week_query }}{{ next_query }}{{ stats_query }}">{{ pos }}<span class="ff-count">{{ position_counts.get(pos, 0) }}</span></a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="board-toolbar-row">
+      <span class="ff-rail-label">Stats</span>
+      <div class="board-tabs cards-tabs ff-rail" role="tablist" aria-label="Stat detail">
+        <a class="cards-tab {{ '' if full_stats else 'is-active' }}"
+           href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ week_query }}{{ pos_query }}">Key stats</a>
+        <a class="cards-tab {{ 'is-active' if full_stats else '' }}"
+           href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ week_query }}{{ pos_query }}&amp;stats=full">All projected stats</a>
+      </div>
+    </div>
+
+    <div class="board-toolbar-row">
+      <details class="board-more-filters" {{ 'open' if week else '' }}>
+        <summary class="board-more-filters__summary">
+          <span>Week</span>
+          <span class="board-filter-count">{{ ('week ' ~ week) if week else 'season' }}</span>
+        </summary>
+        <div class="board-more-filters__body">
+          <div class="board-tabs cards-tabs ff-rail" role="tablist" aria-label="Week">
+            <a class="cards-tab {{ '' if week else 'is-active' }}"
+               href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ pos_query }}{{ stats_query }}">Season / draft</a>
+            {% for w in range(1, 19) %}
+              <a class="cards-tab {{ 'is-active' if week == w else '' }}"
+                 href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}&amp;week={{ w }}{{ pos_query }}{{ stats_query }}">{{ w }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+      {% if selected_positions or full_stats or week %}
+        <a class="cards-nav-pill board-clear-filters"
+           href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}">Clear filters</a>
+      {% endif %}
+    </div>
+  </form>
 
   {% if not available %}
     <div class="ff-note" style="padding:1rem;border:1px solid var(--border,#444);border-radius:8px">
@@ -86,14 +137,12 @@
   {% endif %}
 
   {% if board %}
-    <h2>{% if selected_position == 'ALL' %}Draft board &mdash; by value over replacement{% else %}{{ selected_position }} draft board &mdash; by value over replacement{% endif %}</h2>
+    <h2>{% if showing_all_positions %}Draft board{% else %}{{ selected_positions | join(' / ') }} draft board{% endif %} &mdash; by value over replacement</h2>
     <p class="ff-note">
       Ordered by points above what is freely available at the same position after every
       starting slot in a {{ league_label }} league is filled. Replacement level is computed
-      over the FULL player pool whichever position is shown, so these numbers stay
-      comparable across views &mdash; which is why an elite
-      tight end outranks a quarterback who outscores him. Replacement levels:
-      {% for pos, info in board_summary.by_position.items() %}{{ pos }} {{ info.replacement_points }}{% if not loop.last %} &middot; {% endif %}{% endfor %}.
+      over the FULL player pool whichever positions are shown, so these numbers stay
+      comparable across views.
     </p>
     <div class="ff-scroll">
       <table class="ff">
@@ -101,6 +150,7 @@
           <tr>
             <th>#</th><th>Rd</th><th>Pos</th><th>Player</th><th>Tm</th>
             <th>VOR</th><th>Proj</th><th>G</th><th>PPG</th><th>Floor</th><th>Ceiling</th><th>Tier</th>
+            {% for key, label in board_stat_columns %}<th>{{ label }}</th>{% endfor %}
           </tr>
         </thead>
         <tbody>
@@ -118,6 +168,7 @@
             <td>{{ row.floor }}</td>
             <td>{{ row.ceiling }}</td>
             <td class="tier">T{{ row.draft.tier }}</td>
+            {% for key, label in board_stat_columns %}<td>{{ row.stat_line.get(key, 0) }}</td>{% endfor %}
           </tr>
           {% endfor %}
         </tbody>
