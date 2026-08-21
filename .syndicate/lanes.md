@@ -1236,6 +1236,42 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
+### wnba-live-props-data — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+- Goal: live WNBA props. **Phase 1 (THIS LANE): persist the live per-player stat
+  lines so a worker can read them.** The data was never missing --
+  `/wnba/api/live_player_boxscore` serves minutes/pts/reb/ast/threes and has all
+  along; it is fetched in the REQUEST PATH on web while the prop join runs in the
+  board build on a WORKER, so there is no artifact to read.
+  **Testable outcome:** `scripts/capture_wnba_live_player_box.py --date <d>`
+  writes an allowlisted artifact on a live slate. VERIFIED against production
+  2026-08-21 03:37Z: `games=2 players_with_stats=39` (19 + 20).
+- Files:
+  - `scripts/capture_wnba_live_player_box.py` — the capture (new).
+  - **BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
+    `wnba_source/data/live/live_player_box_*.json` lives in a file held by the
+    OPEN lane `nfl-props-odds-allowlist` (actively editing that same list). Not
+    edited across lanes. **Until it lands the capture writes an artifact the
+    board build cannot see** — written, not yet reachable, which is exactly the
+    half of `#488` that reads as working. Owed with it: the
+    `is_hot_artifact_relative_path` test.
+- Hypothesis: n/a — measured. See `log/2026-08-20.md` and the `state.md`
+  correction stamped on the "nothing for props" sentence.
+- Falsification test: if the artifact is written but the board build cannot read
+  it, the allowlist entry is wrong or nothing publishes it — the two halves
+  `#488` records as separately broken. `is_hot_artifact_relative_path` is
+  asserted in the tests for exactly that.
+- Verification: the capture REFUSES to store an empty/hollow payload (tested),
+  because a persisted empty is served in preference to real data thereafter —
+  `capture_wnba_pbp.py`'s recorded failure mode.
+- **REMAINING PHASES, none started:** (2) project each player's final line from
+  current stat + remainder off minutes/pace; (3) carry `liveModelProbOver` per
+  `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
+  gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
+  interval before any edge is priced** — same discipline as totals; an
+  unbacktested live prop projection may be PUBLISHED but not PRICED.
+- Blocked by: none. NOT deployed — the capture still needs a worker tick to call
+  it (live-odds-worker's WNBA lane is the natural home, 240s cadence).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
