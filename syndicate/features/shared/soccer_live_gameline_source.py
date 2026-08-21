@@ -159,3 +159,109 @@ def soccer_live_gameline_index(
                 },
             }
     return index
+
+
+# Market key the grid uses for soccer shot props. `shots_over_probabilities` is
+# a shots distribution and prices this market and no other -- deliberately NOT
+# mapped onto `player_shots_on_target`, which is a different statistic with its
+# own pregame field.
+SOCCER_LIVE_PROP_MARKET = "player_shots"
+
+
+def soccer_live_prop_index(
+    selected_date: str, *, data_root: Any = None
+) -> dict[str, Any]:
+    """(player, market, line) -> live prop projection, in gate 2's contract.
+
+    Soccer's live re-sim publishes `shots_over_probabilities` -- a real P(over)
+    per line from the RESUMED Monte Carlo, keyed by the lines in
+    `live_lens._SHOT_LINES` (0.5..4.5). That is the same thing MLB's
+    `liveModelProbOver` is, under a different name, so it maps onto the gate-2
+    contract without inventing anything.
+
+    THE PRODUCER CAPS AT 12 PLAYERS PER MATCH
+    (`poll_soccer_live_state.py`: `sorted(...)[:12]`). Downstream, a capped-out
+    player is indistinguishable from one the re-sim never projected -- it just
+    has no live row. So the cap is REPORTED here rather than inherited silently;
+    a coverage number that cannot be read against its own bound is the
+    `no silent caps` failure this repo has a standing rule about.
+    """
+    from syndicate.features.shared.live_projection_join import _norm_name
+    from syndicate.features.shared.refresh_state_store import (
+        data_root as default_root,
+        read_json_file,
+    )
+
+    root = (data_root or default_root()) / "soccer_source"
+    index: dict[tuple[str, str, float], dict[str, Any]] = {}
+    report: dict[str, Any] = {
+        "index": index,
+        "games_seen": 0,
+        "live_games": 0,
+        "rows_seen": 0,
+        "rows_indexed": 0,
+        "skipped_no_live_projection": 0,
+        "skipped_no_key": 0,
+        "players_at_producer_cap": 0,
+        "producer_player_cap": 12,
+    }
+    if not root.exists():
+        return report
+
+    for league_dir in sorted(root.iterdir()):
+        if not league_dir.is_dir():
+            continue
+        payload = read_json_file(
+            league_dir / "api" / "live_state" / f"live_state_{selected_date}.json"
+        )
+        if not isinstance(payload, Mapping):
+            continue
+        games = payload.get("games")
+        if not isinstance(games, Mapping):
+            continue
+        for game in games.values():
+            if not isinstance(game, Mapping):
+                continue
+            report["games_seen"] += 1
+            # Everything in `games` is in play by the producer's contract.
+            report["live_games"] += 1
+            props = game.get("live_player_props")
+            if not isinstance(props, list):
+                continue
+            if len(props) >= report["producer_player_cap"]:
+                report["players_at_producer_cap"] += 1
+            for prop in props:
+                if not isinstance(prop, Mapping):
+                    continue
+                player = _norm_name(prop.get("player_name"))
+                over = prop.get("shots_over_probabilities")
+                projected = _f(prop.get("projected_final_shots"))
+                if not player or not isinstance(over, Mapping) or not over:
+                    report["skipped_no_key"] += 1
+                    continue
+                if projected is None:
+                    # The live projection IS the live-awareness evidence, the
+                    # same rule gate 2 applies to MLB. Without it a row would be
+                    # marked live_aware on a probability alone.
+                    report["skipped_no_live_projection"] += 1
+                    continue
+                for raw_line, raw_prob in over.items():
+                    line = _f(raw_line)
+                    prob = _f(raw_prob)
+                    report["rows_seen"] += 1
+                    if line is None or prob is None:
+                        report["skipped_no_key"] += 1
+                        continue
+                    index[(player, SOCCER_LIVE_PROP_MARKET, line)] = {
+                        "live_projection": projected,
+                        # Soccer publishes no PREGAME probability on this row,
+                        # and `model_prob_over` is the pregame slot. Leaving it
+                        # None keeps the live number from being read as one.
+                        "model_prob_over": None,
+                        "live_prob_over": prob,
+                        "actual_so_far": prop.get("shots_so_far"),
+                        "live_edge_hint": None,
+                        "side": "over",
+                    }
+                    report["rows_indexed"] += 1
+    return report

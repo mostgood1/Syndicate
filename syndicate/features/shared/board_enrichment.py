@@ -956,6 +956,36 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
         )
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
 
+        if sport == "soccer":
+            # Same path split as the gameline gate: soccer's live props are in
+            # the per-league live-state artifact, not on the lens.
+            from syndicate.features.shared.soccer_live_gameline_source import (
+                soccer_live_prop_index,
+            )
+
+            indexed = soccer_live_prop_index(selected_date)
+            if not indexed.get("index"):
+                # NAMED, and the counters come with it so a zero is readable:
+                # `live_games 0` is "no match in play", while `live_games > 0`
+                # with `rows_indexed 0` is the producer or this join failing.
+                return {
+                    "supported": True,
+                    "reason": "no soccer live player props in any league's live-state artifact",
+                    "rows_live_projected": 0,
+                    "live_games": indexed.get("live_games", 0),
+                    "rows_seen": indexed.get("rows_seen", 0),
+                    "skipped_no_key": indexed.get("skipped_no_key", 0),
+                    "skipped_no_live_projection": indexed.get("skipped_no_live_projection", 0),
+                }
+            coverage = attach_live_projections(grid, indexed)
+            coverage["supported"] = True
+            # THE PRODUCER'S 12-PLAYER CAP, carried to the reader. A capped-out
+            # player has no live row and is indistinguishable from one the
+            # re-sim never projected unless the bound travels with the count.
+            coverage["players_at_producer_cap"] = indexed.get("players_at_producer_cap", 0)
+            coverage["producer_player_cap"] = indexed.get("producer_player_cap")
+            return coverage
+
         snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
         if not isinstance(snapshot, dict):
             # An absent snapshot is the normal state outside a live slate. Say
@@ -1020,9 +1050,9 @@ def attach_margin_model(grid: list) -> dict:
 # Sports whose published live lens carries a PROP-tier projection this join can
 # read. Named for the same reason as `_LIVE_GAMELINE_SPORTS` below: an unlisted
 # sport must fail closed and say so.
-_LIVE_PROP_SPORTS = frozenset({"mlb", "wnba"})
+_LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba"})
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 
 
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
@@ -1069,24 +1099,47 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
         )
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
 
-        snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
-        if not isinstance(snapshot, dict):
-            return {
-                "supported": True,
-                "reason": "no published live-lens snapshot",
-                "rows_live_gameline_edged": 0,
-            }
-        coverage = attach_live_gamelines(
-            grid,
-            build_live_gameline_index(
-                snapshot,
-                sources=lens_sources_for_sport(sport),
-                # None for MLB, so its sims-derived interval stays in charge and
-                # its behaviour is unchanged. Set only for a sport whose live
-                # probability is ANALYTIC and whose error bar has been measured.
-                analytic_std_err=analytic_std_err_for_sport(sport),
-            ),
-        )
+        if sport == "soccer":
+            # SOCCER'S LIVE RE-SIM IS NOT ON THE LENS PATH. `poll_soccer_live_state.py`
+            # writes it per league to `soccer_source/<league>/api/live_state/`;
+            # `live/soccer_live_lens.json` is `live_lens_loop.py`'s tick-status
+            # snapshot and carries no `gameLens`. Reading it here would parse a
+            # real file, index zero matches, and report a clean empty -- the
+            # exact failure gate 1 had to avoid on the same path.
+            from syndicate.features.shared.soccer_live_gameline_source import (
+                soccer_live_gameline_index,
+            )
+
+            index = soccer_live_gameline_index(selected_date)
+            if not index:
+                # NAMED, not a silent zero. Outside a live window this is the
+                # normal state, and it must stay distinguishable from "the join
+                # ran over live matches and priced none of them".
+                return {
+                    "supported": True,
+                    "reason": "no soccer match in play in any league's live-state artifact",
+                    "rows_live_gameline_edged": 0,
+                }
+            coverage = attach_live_gamelines(grid, index)
+        else:
+            snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+            if not isinstance(snapshot, dict):
+                return {
+                    "supported": True,
+                    "reason": "no published live-lens snapshot",
+                    "rows_live_gameline_edged": 0,
+                }
+            coverage = attach_live_gamelines(
+                grid,
+                build_live_gameline_index(
+                    snapshot,
+                    sources=lens_sources_for_sport(sport),
+                    # None for MLB, so its sims-derived interval stays in charge and
+                    # its behaviour is unchanged. Set only for a sport whose live
+                    # probability is ANALYTIC and whose error bar has been measured.
+                    analytic_std_err=analytic_std_err_for_sport(sport),
+                ),
+            )
         coverage["supported"] = True
         return coverage
     except Exception:
