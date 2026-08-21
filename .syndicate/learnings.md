@@ -3637,3 +3637,44 @@ result that would have read as "the field is not emitted". Parse it
 (`json.loads` from the first `{`); do not pattern-match escaped text. And treat
 `n=0` from any extractor as *suspect the extractor first*, per
 `absent signal is about the emitter`.
+
+---
+
+## 2026-08-20 — A ONE-REVISION PRESENCE CHECK CANNOT TELL "ALREADY UPSTREAM" FROM "ONLY IN MY OWN ABANDONED COMMIT"
+
+**Belief overturned, and I stated it to the user as fact:** that my session's
+`log/<today>.md` entry was already on `origin/main`, having been swept there by
+another session's commit. It was not. It was **nowhere in main's history** — it
+existed only in the commit I had just abandoned.
+
+**How the wrong answer was produced.** Rebuilding an abandoned commit, I asked
+"is this content already upstream?" and answered it with ONE read:
+
+    git show "origin/main:<file>"  | Select-String 'THE CLOSING READING'   -> present
+
+That read was taken while `origin/main` pointed at a commit fetched minutes
+earlier, and the string genuinely appeared — in the tree I was standing in. On
+the basis of it I skipped restoring the file, and reported the push complete.
+
+**The check that actually settles it** is the same string tested at EVERY
+revision, not one:
+
+    git log --format=%h -25 <tip> | walk: git show <sha>:<file> | count needle
+    -> closing_reading=0 at all 25 commits
+
+**The rule.** "Is my content upstream?" is a question about a RANGE, not a
+point. Answer it by walking the history — or at minimum by diffing your commit
+against its own parent (`git show <c>:<f>` vs `git show <c>^:<f>`) so the answer
+comes from the commit rather than from the working tree you are sitting in. Any
+presence check run inside a tree that ALREADY contains the content is
+self-confirming and cannot fail.
+
+**Why it survived to the user.** Nothing about the reading looked wrong: it was
+the answer that let the work finish, and it agreed with a plausible story
+(another session had in fact swept me symmetrically on OTHER files, so the
+mechanism was real — just not for this file). Same family as
+`feedback_isolate_the_source_you_changed` (a value with more than one possible
+source verifies nothing until you know which one filled it) and
+`feedback_instrument_blindness`. **It was caught only because the user asked for
+the push to be verified.** A self-confirming check is not evidence, and
+"I already verified it" is not a reason to skip re-deriving when asked.
