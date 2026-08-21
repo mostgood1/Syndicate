@@ -391,6 +391,38 @@ def attach_wnba_game_projections(
                         "this projection's producer does not compute a "
                         "probability-space edge, so none was priced"
                     ),
+                    # THE MARKET'S OWN PRICE, STAMPED; THE EDGE, STILL WITHHELD.
+                    #
+                    # `[2026-08-21, user decision]` -- the separate call the
+                    # block above says this needs. Read that block first: it
+                    # refuses to PRICE an edge here because the pregame sim is
+                    # unvalidated (`model_skill.sample_games: 0`), and that
+                    # refusal is UNCHANGED -- `edge_vs_market_pct` stays None
+                    # and its reason stays exactly as written.
+                    #
+                    # What is added is the de-vigged MARKET probability, which
+                    # is not a model claim at all. Withholding it did not
+                    # protect anyone from the unvalidated sim; it starved a
+                    # DIFFERENT consumer whose validation story is the one that
+                    # block asks for. `live_gameline_join` prices the LIVE
+                    # transform, and `#481` graded that transform against
+                    # outcomes over 36,482 held-out samples on a game-level
+                    # split for a worst calibration gap of 0.054 -- so the live
+                    # path carries precisely the backtest whose absence is the
+                    # stated reason for the pregame refusal.
+                    #
+                    # MEASURED, and why this was not obvious: the field was
+                    # ABSENT rather than None on every served live WNBA h2h row,
+                    # because this branch writes `row["projection"]` directly and
+                    # never passes through `_attach_sim_probability_edge` (the
+                    # "fourth producer" this file's own comments flag). Two
+                    # games live 2026-08-21 at ordinary states carried a live
+                    # model probability and a valid interval (se=0.054,
+                    # basis=analytic_calibration) and were still withheld
+                    # `no_two_sided_market_price` -- while the same rows carried
+                    # a two-sided consensus that de-vigs cleanly (away -7544 /
+                    # home +1581 -> 0.0569, verified directly).
+                    "market_fair_prob_over": _no_vig_over_probability(row),
                 }
         elif market == "spreads":
             margin = entry.get("pred_margin")

@@ -471,3 +471,50 @@ def test_live_row_still_carries_the_MARKET_fair_price_while_its_edge_is_suppress
     fair = projection.get("market_fair_prob_over")
     assert fair is not None, "the live game-line join needs the de-vigged market price"
     assert 0.0 < float(fair) < 1.0
+
+
+def test_h2h_stamps_the_MARKET_fair_price_while_the_edge_stays_refused():
+    """`[2026-08-21, user decision]` -- the separate call the h2h branch asks for.
+
+    THE REFUSAL IS UNCHANGED. The pregame sim is still unvalidated
+    (`model_skill.sample_games: 0`), so `edge_vs_market_pct` stays None with its
+    reason intact -- this test asserts that half FIRST, because the risk of this
+    change is someone later reading it as permission to publish the pregame
+    moneyline edge the branch deliberately refuses.
+
+    WHAT IS ADDED is the de-vigged MARKET probability, which is not a model
+    claim. Withholding it protected nobody from the unvalidated sim; it starved
+    `live_gameline_join`, whose live transform `#481` DID backtest (36,482
+    held-out samples, worst calibration gap 0.054) -- the very validation the
+    refusal cites as missing.
+
+    Measured: the field was ABSENT, not None, on every served live WNBA h2h row,
+    because this branch writes `row["projection"]` directly and never passes
+    through `_attach_sim_probability_edge`.
+    """
+    row = _row("h2h", consensus={"away": -150, "home": 130}, sides=["away", "home"])
+    attach_wnba_game_projections([row], _index(margin=7.5))
+    projection = row["projection"]
+
+    # The refusal, unchanged.
+    assert projection.get("edge_vs_market_pct") is None
+    assert "producer does not compute" in projection.get("edge_unavailable_reason", "")
+
+    # The market's own price, now present for the live join.
+    fair = projection.get("market_fair_prob_over")
+    assert fair is not None, "the live game-line join needs the de-vigged market price"
+    assert 0.0 < float(fair) < 1.0
+
+
+def test_h2h_fair_is_None_not_absent_on_a_one_sided_market():
+    """A one-sided market has no de-vig, and the KEY must still exist.
+
+    Absent and None are different to the join: absent reads as 'this producer
+    does not do market prices', None reads as 'it does, and this row has none'.
+    """
+    row = _row("h2h", consensus={"home": 130}, sides=["home"])
+    attach_wnba_game_projections([row], _index(margin=7.5))
+    projection = row["projection"]
+
+    assert "market_fair_prob_over" in projection
+    assert projection["market_fair_prob_over"] is None
