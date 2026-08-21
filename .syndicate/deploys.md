@@ -21859,3 +21859,37 @@ caveat is discharged.
 Not a clean measurement of the phone preset: the pane reports 521x1129 for a
 375x812 preset (device scale factor). It is a genuine narrow-width test, not a
 375px one.
+
+## 2026-08-21 23:29Z — RETRACTION: the card fixes solved a problem that did not exist
+
+Web is live on `b23bc087` (carries `94a53639`). Cards verified with the RIGHT
+key this time:
+
+    Goals        3 table_rows   15' Havertz, 23' Saka, 49' Odegaard
+    Match stats 12 table_rows   Possession 35.5%/64.5%, Shots 4/20, On target 1/6
+    ARS squad   23 table_rows   with prices and edges
+
+**They were rendering correctly the whole time.** Table sections carry
+`table_rows` and set `"rows": []` BY DESIGN. I counted `rows`, got 0, and filed
+it as a defect in a UI audit this morning.
+
+**RETRACTED:** the audit finding "box sections render 0 rows on all 4 games",
+and the premise of BOTH `0aaf71f0` (reader swap) and `94a53639` (data_root
+path). Neither was needed. Both are defensible in isolation -- reading
+cross-service IS more correct, and the `data_root()` path DOES match what the
+worker writes -- so neither is being reverted, but their commit messages claim
+to fix a symptom that was a measurement artifact.
+
+**ALSO RETRACTED:** every "still 0 rows" reading tonight, each of which looked
+like evidence a fix had failed and generated the next hypothesis.
+
+**What this thread actually cost:** two commits, one web deploy, one rollback,
+a 502 misattributed to my own change, and a second wrong attribution after
+that. All downstream of one wrong dict key.
+
+**STILL TRUE AND UNAFFECTED:** `COV squad projections` has 0 table_rows -- we
+hold no Coventry player rows. That gap is real, was found independently this
+afternoon, and is unrelated to any of the above.
+
+verify: PASSED, for the thing that was actually asked -- today's cards DO carry
+live-lens box data. It simply never needed fixing.
