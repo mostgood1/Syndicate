@@ -98,6 +98,44 @@ def _ratings_from_artifact(path: Path, home_team: str) -> tuple[dict, dict, str]
     return dict(_NEUTRAL), dict(_NEUTRAL), f"neutral (no matching fixture in {path.name})"
 
 
+_RATINGS_CACHE: dict[tuple[str, str], tuple[dict, dict]] = {}
+
+
+def _production_ratings(league: str, source_root: Path, as_of: str, home: str, away: str):
+    """The ratings PRODUCTION would have had ON THAT DATE.
+
+    NOT the whole history. `compute_team_ratings(rows, as_of=...)` filters to
+    rows predating `as_of`, and `build_soccer_artifacts._load_team_ratings`'s
+    docstring says why that requirement exists: "so the two EVALUATION callers
+    cannot silently keep using future results". A backtest is exactly such a
+    caller. Rating a 2025-09 match off the full season would let the model know
+    results it could not have had, and every accuracy number downstream would
+    be measuring hindsight.
+
+    Cached per (league, date): recomputing per match is the expensive part and
+    two matches on one date share a rating set by construction.
+    """
+    key = (league, as_of)
+    if key not in _RATINGS_CACHE:
+        from scripts.build_soccer_artifacts import _load_team_ratings
+        try:
+            table = _load_team_ratings(league, source_root, as_of)
+        except Exception:
+            table = {}
+        _RATINGS_CACHE[key] = (table, {})
+    table, _ = _RATINGS_CACHE[key]
+    if not table:
+        return None
+    from syndicate.features.soccer.features.team_names import match_team_name
+
+    names = list(table)
+    hk = match_team_name(home, names)
+    ak = match_team_name(away, names)
+    if hk is None or ak is None:
+        return None
+    return dict(table[hk]), dict(table[ak])
+
+
 def replay(
     league: str,
     event_id: str,
@@ -106,6 +144,8 @@ def replay(
     simulations: int,
     ratings_file: Path | None,
     lines: tuple[float, ...] = DEFAULT_LINES,
+    source_root: Path | None = None,
+    as_of: str | None = None,
 ) -> dict[str, Any]:
     summary = fetch_match_summary(league, event_id)
 
@@ -117,10 +157,19 @@ def replay(
 
     home_team = final_state["home_team"]
     away_team = final_state["away_team"]
-    if ratings_file is not None:
+    home_rating = away_rating = None
+    ratings_source = "neutral (none supplied)"
+    if source_root is not None and as_of:
+        pair = _production_ratings(league, source_root, as_of, home_team, away_team)
+        if pair is not None:
+            home_rating, away_rating = pair
+            ratings_source = f"computed as_of {as_of} (no hindsight)"
+        else:
+            ratings_source = f"neutral (no rating match for {home_team}/{away_team} as_of {as_of})"
+    elif ratings_file is not None:
         home_rating, away_rating, ratings_source = _ratings_from_artifact(ratings_file, home_team)
-    else:
-        home_rating, away_rating, ratings_source = dict(_NEUTRAL), dict(_NEUTRAL), "neutral (none supplied)"
+    if home_rating is None:
+        home_rating, away_rating = dict(_NEUTRAL), dict(_NEUTRAL)
 
     rows: list[dict[str, Any]] = []
     for minute in cutoffs:
@@ -137,6 +186,10 @@ def replay(
             "projected_total": projection.projected_final_total,
             # THE HOSTILE BASELINE: assume nothing else happens.
             "frozen_total": goals_so_far,
+            # SIGNED, alongside the absolute. MAE says how wrong, never which
+            # way, and a bias correction applied in the wrong direction makes
+            # the model worse while looking like work.
+            "signed_error_projection": round(projection.projected_final_total - actual_total, 4),
             "abs_error_projection": round(abs(projection.projected_final_total - actual_total), 4),
             "abs_error_frozen": abs(goals_so_far - actual_total),
             "scoreline_support": len(scorelines),
@@ -196,6 +249,7 @@ def batch(
     simulations: int,
     ratings_file: Path | None,
     limit: int | None = None,
+    source_root: Path | None = None,
 ) -> dict[str, Any]:
     """Every COMPLETED match in `window`, across `leagues`, replayed and pooled.
 
@@ -220,22 +274,40 @@ def batch(
     # pool would be one country's football wearing a multi-league label, which
     # is exactly the generality this harness is supposed to test. Round-robin
     # so a cap trims each league evenly instead of truncating the tail.
+    # MULTIPLE WINDOWS. ESPN's scoreboard silently truncates around ~100 events
+    # per call -- `fetch_events`' own docstring says to keep each window to a
+    # few weeks -- so a full season asked for in one range would come back
+    # quietly short, and a sample that is short WITHOUT SAYING SO is worse than
+    # a small one. `window` accepts a semicolon-separated list.
+    windows = [w.strip() for w in str(window).split(";") if w.strip()]
     discovered: dict[str, list[str]] = {}
     for league in leagues:
-        try:
-            events = fetch_events(league, date_windows=[window], statuses={"post"})
-        except Exception as exc:
-            failures.append({"league": league, "event_id": "-", "error": f"{type(exc).__name__}: {exc}"})
-            continue
-        discovered[league] = [str(e.get("event_id") or "") for e in events if e.get("event_id")]
+        ids: list[str] = []
+        for w in windows:
+            try:
+                events = fetch_events(league, date_windows=[w], statuses={"post"})
+            except Exception as exc:
+                failures.append({"league": league, "event_id": f"window {w}",
+                                 "error": f"{type(exc).__name__}: {exc}"})
+                continue
+            ids.extend((str(e.get("event_id")), str(e.get("date") or "")[:10])
+                       for e in events if e.get("event_id"))
+            if len(events) >= 95:
+                # Near the truncation ceiling: the window is too wide and this
+                # league's sample is probably incomplete. Recorded, not guessed.
+                failures.append({"league": league, "event_id": f"window {w}",
+                                 "error": f"TRUNCATION RISK: {len(events)} events returned"})
+        # De-duplicate: adjacent windows can overlap on boundary dates.
+        seen: set[str] = set()
+        discovered[league] = [i for i in ids if i[0] and not (i[0] in seen or seen.add(i[0]))]
 
-    ordered: list[tuple[str, str]] = []
+    ordered: list[tuple[str, tuple[str, str]]] = []
     for i in range(max((len(v) for v in discovered.values()), default=0)):
         for league, ids in discovered.items():
             if i < len(ids):
                 ordered.append((league, ids[i]))
 
-    for league, event_id in ordered:
+    for league, (event_id, event_date) in ordered:
         if True:
             if limit is not None and len(results) >= limit:
                 break
@@ -244,7 +316,8 @@ def batch(
             try:
                 results.append(
                     replay(league, event_id, cutoffs=cutoffs, simulations=simulations,
-                           ratings_file=ratings_file)
+                           ratings_file=ratings_file, source_root=source_root,
+                           as_of=event_date)
                 )
             except Exception as exc:
                 failures.append({"league": league, "event_id": event_id,
@@ -262,6 +335,8 @@ def batch(
             "n": len(rows),
             "mae_projection": _mean([r["abs_error_projection"] for r in rows]),
             "mae_frozen": _mean([r["abs_error_frozen"] for r in rows]),
+            "bias_projection": _mean([r["signed_error_projection"] for r in rows]),
+            "mean_projected_total": _mean([r["projected_total"] for r in rows]),
             "brier_2_5": _mean([b["brier"] for b in briers if isinstance(b, dict)]),
         }
 
@@ -284,6 +359,7 @@ def batch(
 
     return {
         "window": window,
+        "windows_expanded": windows,
         "leagues": leagues,
         "simulations": simulations,
         "ratings_source": results[0]["ratings_source"] if results else "n/a",
@@ -294,6 +370,14 @@ def batch(
             {"league": r["league"], "event_id": r["event_id"], "matchup": r["matchup"],
              "actual_total": r["actual_total"], "mae": r["summary"]["mae_projection"]}
             for r in results
+        ],
+        # THE ROWS THEMSELVES. The first version kept per-match summaries only,
+        # so asking "is the late error biased high or low" required re-running
+        # the whole batch -- computing something and throwing it away, which is
+        # precisely the defect class this harness exists to expose.
+        "rows": [
+            {"league": r["league"], "matchup": r["matchup"], "actual_total": r["actual_total"], **row}
+            for r in results for row in r["cutoffs"]
         ],
     }
 
@@ -306,6 +390,12 @@ def main() -> int:
                         help="comma-separated leagues to pool across")
     parser.add_argument("--window", default=None, help="YYYYMMDD-YYYYMMDD")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--as-of", default=None,
+                        help="single-match mode: the match date, so ratings are computed "
+                             "without hindsight. Batch mode takes it from the event.")
+    parser.add_argument("--source-root", default=None,
+                        help="data/soccer_source root; ratings are computed AS OF each "
+                             "match's own date so the backtest cannot use future results")
     parser.add_argument("--cutoffs", default="15,30,45,60,75")
     parser.add_argument("--simulations", type=int, default=300)
     parser.add_argument("--ratings-file", default=None,
@@ -327,6 +417,7 @@ def main() -> int:
             simulations=args.simulations,
             ratings_file=Path(args.ratings_file) if args.ratings_file else None,
             limit=args.limit,
+            source_root=Path(args.source_root) if args.source_root else None,
         )
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -362,6 +453,8 @@ def main() -> int:
         cutoffs=cutoffs,
         simulations=args.simulations,
         ratings_file=Path(args.ratings_file) if args.ratings_file else None,
+        source_root=Path(args.source_root) if args.source_root else None,
+        as_of=args.as_of,
     )
 
     if args.json:
