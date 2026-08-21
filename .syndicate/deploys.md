@@ -20827,3 +20827,52 @@ canonicalizer that turned `é` into a space. Tightening it would have broken
   deploy -- one-shot rate-limited subprocess, not a persistent loop);
   redeploying refresh-worker at a prior SHA is a separate, larger
   decision given the 94-commit jump already landed.
+
+## 2026-08-21 15:29-15:34Z — web `4d8e3ac2` — soccer gameday readiness (1 of 2)
+
+lane: `soccer-board-mlb-parity`
+service: web (`srv-d88ahvrbc2fs73eodu30`), deploy `dep-da46tqrbc2fs73c5lrvg`
+parent: `ee0bc9ab` (14:41:07Z). Commit is ON `origin/main`. Claim held and
+released; preflight CLEAR (only gunicorn infra, no in-flight jobs).
+
+**What this deploy carries that runs on WEB:** `publication_adapter`'s
+`_shared_predictions`. Soccer cards are built at REQUEST time from
+`soccer_source/*/api/{schedule,recommendations}` — `source_kind:
+artifact_backed` names the inputs, not a prebuilt card artifact — so this
+half runs in the web process. The other three fixes in the same commit range
+build board artifacts on refresh-worker and are NOT live from this deploy.
+Deploying only web and calling the set done would have been the inert-fix
+error.
+
+**verify: `/soccer/api/cards?date=2026-08-21` — `predictions.probabilities`
+went 0/4 games filled to 4/4, and 0/4 to 4/4 carrying `draw`.**
+
+    before (14:3xZ, live ee0bc9ab):
+      probabilities {away_cover,away_win,home_cover,home_win,
+                     total_over,total_under} = null on ALL FOUR fixtures
+      no `draw` key in the contract at all
+    after  (15:34:5xZ, live 4d8e3ac2):
+      home_win/away_win/draw populated on 4/4
+      COV@ARS: home_win 0.79, draw 0.14, away_win 0.07
+
+**The discriminating check, and the reason it is in the script:** the values
+must be the SIM's, not `betting.p_home_win`'s de-vigged market view (0.7955 /
+0.0682 on that same fixture). The verifier compares the two and reports
+"MARKET VALUE LEAKED INTO PREDICTIONS" naming the league if they ever match to
+1e-9. Reading: **no market value borrowed**, 0 of 4.
+
+`home_cover`/`away_cover`/`total_over`/`total_under` are STILL null and that is
+the intended outcome, not a partial fix: soccer publishes no MODEL number for
+those on this payload, and filling them from `betting.*` would put the market
+under a label that says model and make every edge computed against it read
+zero.
+
+**Instrument was baselined before it was trusted.** Run mid-restart it returned
+`PENDING ... 502`, not PASS — so a green reading is known to be distinguishable
+from an unreadable one.
+
+Not verified by this deploy, still owed on refresh-worker: soccer live game
+state, Marseille's totals at 3.0/3.5, Layer 2's imminence floor. The verifier
+reports those as FAIL/PENDING right now and that is correct — refresh-worker is
+on `67a71eda`, deployed 15:26:27Z by lane `nfl-props-odds-allowlist`, which held
+the claim through this window.
