@@ -136,21 +136,35 @@ class FantasyArtifactAutorunTests(unittest.TestCase):
         self.assertIn("1-18", args)
         self.assertIn("2026", args)
 
-    def test_dispatched_before_season_projections_and_after_the_pbp_fetch(self):
-        """`#341`: in an `elif` chain, ORDER IS BEHAVIOUR.
+    def test_dispatched_IMMEDIATELY_after_the_pbp_fetch(self):
+        """`#341`: in an `elif` chain, ORDER IS BEHAVIOUR -- and a relative
+        assertion is not enough to pin it.
 
-        This job consumes what the pbp fetch produces, so it must come after
-        it; and it must stay ahead of `season_projections`, which is 7th and
-        was starved to zero turns/hour by exactly this mechanism.
+        The first version of this test only checked
+        `pbp < fantasy < season_projections`. That PASSED while the branch was
+        actually TENTH, below evaluation_settlement, because the patch that
+        added it anchored on `season_projections` and inserted above that. The
+        code comment said "THIRD" the whole time. Twelve minutes after the
+        deploy it had logged nothing at all -- not even a SKIPPED line.
+
+        So this asserts the ADJACENCY, not the ordering: nothing may sit
+        between the pbp fetch and this job.
         """
         import inspect
+        import re
 
         source = inspect.getsource(worker)
-        pbp = source.index("elif _launch_autorun_nfl_pbp_fetch(")
-        fantasy = source.index("elif _launch_autorun_nfl_fantasy_artifact(")
-        projections = source.index("elif _launch_autorun_season_projections(")
-        self.assertLess(pbp, fantasy, "must run after the pbp fetch it consumes")
-        self.assertLess(fantasy, projections, "must not be starved behind season projections")
+        branches = re.findall(r"^\s+(?:if|elif) (_launch_autorun_\w+)\(", source, re.M)
+        self.assertIn("_launch_autorun_nfl_fantasy_artifact", branches)
+        position = branches.index("_launch_autorun_nfl_fantasy_artifact")
+        self.assertEqual(
+            branches[position - 1],
+            "_launch_autorun_nfl_pbp_fetch",
+            f"must sit directly behind the pbp fetch it consumes; chain is {branches[:6]}",
+        )
+        self.assertLessEqual(
+            position, 3, f"too deep in the elif chain to be reached reliably: {branches[:6]}"
+        )
 
 
 if __name__ == "__main__":

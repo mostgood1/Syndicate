@@ -4360,6 +4360,30 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
+        elif _launch_autorun_nfl_fantasy_artifact(
+            # THIRD, directly behind the pbp fetch, and `#341` is why it is not
+            # lower. IT WAS TENTH ON ITS FIRST DEPLOY: the patch that added it
+            # anchored on `season_projections` and inserted above THAT, which
+            # put it below evaluation_settlement while the comment here still
+            # said third. Twelve minutes after the deploy it had logged
+            # nothing at all -- not even a SKIPPED line -- which is the exact
+            # silence `#341` describes. Every branch in this chain is `elif`, so a late entry only
+            # runs on a tick where every earlier one declines -- reconciliation
+            # was mute FOR WEEKS that way, and `season_projections` went from 16
+            # turns/hour to zero over the same window. Both were starvation, not
+            # bugs.
+            #
+            # Safe this high for the same reasons the pbp fetch is: DAILY gated,
+            # so it wins at most one tick per 24h, and it launches a subprocess
+            # rather than running inline, so the poll loop is free again
+            # immediately. It sits behind the pbp fetch specifically because it
+            # CONSUMES what that job produces.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_nfl_injuries_fetch(
             # THIRD, DIRECTLY BEHIND THE PBP FETCH -- same `#341` starvation
             # reasoning as that branch's comment above: injuries data is
@@ -4417,25 +4441,6 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_evaluation_settlement(
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_fantasy_artifact(
-            # THIRD, directly behind the pbp fetch, and `#341` is why it is not
-            # lower. Every branch in this chain is `elif`, so a late entry only
-            # runs on a tick where every earlier one declines -- reconciliation
-            # was mute FOR WEEKS that way, and `season_projections` went from 16
-            # turns/hour to zero over the same window. Both were starvation, not
-            # bugs.
-            #
-            # Safe this high for the same reasons the pbp fetch is: DAILY gated,
-            # so it wins at most one tick per 24h, and it launches a subprocess
-            # rather than running inline, so the poll loop is free again
-            # immediately. It sits behind the pbp fetch specifically because it
-            # CONSUMES what that job produces.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
