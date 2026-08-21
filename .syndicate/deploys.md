@@ -20416,3 +20416,104 @@ reach a kill, and the defect's own best pre-fix run was 17h 51m clean.
 `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` untouched
 at 3000 MB (headroom read 917–1,083 MB tonight, so the overview guard is still
 refusing — unchanged and expected).
+
+---
+
+## 2026-08-21 00:51Z / 00:58Z — workers `68acf3ca` / `a05412f9` — a club was absorbing another club's entire squad. VERIFIED FIXED.
+
+    lane:      soccer-board-mlb-parity
+    on main:   4aeea256
+    deploys:   refresh-worker   68acf3ca (onto 7eb99f14) live 00:51:03Z
+               live-odds-worker a05412f9 (onto 2db7e821) live 00:58:06Z
+    claims:    taken, both released after the reading
+    rollback:  deploy 7eb99f14 / 2db7e821
+
+**Found by pulling one loose thread.** The departed-player fix verified clean
+on EPL, but la_liga's Real Sociedad showed **50** players where local math
+said 24. That number was the whole finding.
+
+### Two layered defects, and the second is why the first survived
+
+**1. `canonical_team_name` did not strip accents, it DESTROYED them.** The
+ASCII scrub `[^a-z0-9' .]+ -> " "` turns every non-ASCII character into a
+SPACE, splitting the word:
+
+    Alaves -> "alaves"   but  Alavés -> "alav s"
+                              Atlético Madrid -> "atl tico madrid"
+                              Mönchengladbach -> "m nchengladbach"
+
+An accented club name therefore NEVER canonicalized to its unaccented twin,
+in any of the five leagues that have them.
+
+**2. `build_soccer_player_features` compensated with fuzzy matching — and
+that is why its threshold had to be 0.72.** Low enough to survive a split
+word is also low enough to match Real Oviedo to Real Sociedad at **0.750**.
+The function asks *"which of TODAY'S fixture teams is this player's club?"*
+of every row in the league and REWRITES the row's team to the answer. For a
+club not playing today the correct answer is "none" — which a fuzzy matcher
+never returns while anything sits within threshold.
+
+**Never one club pair.** Scored against the real club strings in each
+league's own data, **six pairs collide across five leagues**:
+
+| league | pair | score |
+|---|---|---|
+| **epl** | **Manchester City ↔ Manchester United** | **0.812** |
+| ligue_1 | Paris FC ↔ Paris Saint-Germain | containment |
+| belgian | Cercle Brugge KSV ↔ Club Brugge | containment |
+| la_liga | Real Oviedo ↔ Real Sociedad | 0.750 |
+| mls | LA Galaxy ↔ Los Angeles FC | 0.750 |
+| mls | Atlanta United ↔ Minnesota United | 0.722 |
+
+It fires only when one of a pair plays and the other does not — when both are
+on the slate each matches itself exactly and wins outright. **That is why EPL
+verified clean earlier today: Arsenal collides with nothing.** Had the
+verification fixture been a Manchester City one, this would have been visible
+hours earlier.
+
+### Why the obvious fixes were rejected — each measured, not argued
+
+| option | measured result |
+|---|---|
+| raise the 0.72 threshold | same-club 0.833–0.933 vs different-club 0.722–0.812 — the ranges OVERLAP; a threshold tuned to six observed cases is a coincidence |
+| exact-only, canonicalizer untouched | deletes **11 clubs'** entire squads |
+| two-stage identity → participation | fixes 4 of 5; fails where the schedule omits a club |
+| add CSV spellings to the identity list | makes `Atletico` and `Atlético` two different clubs |
+
+### verify: PASSED — served artifact, rebuilt by the deployed code
+
+    generated_at         2026-08-21T01:01:32   (after the 00:58:06Z deploy)
+    Real Sociedad        50 -> 24              (21 genuine + 3 transfer rows)
+    Real Betis           28 (unchanged)
+    known Oviedo players NONE
+
+Gated on `generated_at`, not elapsed time: a fresh stamp still reading 50
+would have meant inert code.
+
+**Regression guard re-run, same script both sides of the change:**
+
+    eredivisie  918/918 -> 918/918     exact pairs  352 -> 352
+    epl        1140/1140 -> 1140/1140  exact pairs 1140 -> 1140
+    la_liga     918/1140 -> 918/1140   exact pairs  310 -> 446
+    bundesliga  752/918  -> 752/918    exact pairs  128 -> 236
+
+Match rates IDENTICAL — no regression — while exact resolution rises sharply
+where accents live. Same coverage, far less of it resting on fuzzy. (The
+`_EspnStatsIndex` docstring's "916 of 918" does not reproduce today at
+918/918 on EITHER side; the data has moved since. Stated, not quietly
+restated.)
+
+### The #148 signal was rebuilt, because exact binding broke it
+
+Its print listed every unbound source team. Under exact binding that is every
+club not playing today — the first real run printed all nineteen other
+la_liga clubs. A signal that fires on normal operation buries the condition it
+exists for. It now alarms on a fixture side that resolved to **zero** players
+and names the nearest unbound source team, pointing at the alias worth adding.
+
+### The rule
+
+**A loose threshold is a symptom. Ask what it is compensating for before
+tuning it.** 0.72 looked like a tolerance choice; it was scar tissue over a
+canonicalizer that turned `é` into a space. Tightening it would have broken
+11 clubs; fixing the thing underneath let the tolerance be removed entirely.
