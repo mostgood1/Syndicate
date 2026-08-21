@@ -21627,3 +21627,60 @@ is ~03:20Z. The reading that settles it:
 `status=ok` there, or a live (non-quiet) Buzz badge on `/nfl/fantasy`, is the
 proof. Until then the worker's outbound path to THIS endpoint is unmeasured —
 the fix is verified only from a developer machine.
+
+## 2026-08-21 22:1x-22:2xZ — **WEB OUTAGE, ONGOING AT HANDOVER** — and TWO WRONG ATTRIBUTIONS BY ME
+
+**STATE AT HANDOVER 22:28Z: web is in a RESTART LOOP and serving 502.**
+Live SHA is `6855fe96` (rollback completed 22:23:53). refresh-worker and
+live-odds-worker are healthy on `6855fe96`.
+
+**THE LOOP.** Render's health check times out at **5 seconds**. Home does
+per-game compute in the request path for all 15 MLB games and takes 20-25s cold
+(`WARNING: compute in request path` is in the logs, and the route emits 15
+`MLB_GAME_MARKET_ROWS_DIAG` lines per request). So: instance starts cold ->
+home exceeds 5s -> `server_failed (unhealthy: HTTP health check failed)` ->
+cycle -> cold again. Observed flapping: available 22:15:21 / 22:17:11 /
+22:18:41 / 22:25:42 / 22:27:03, each followed by another failure. `evicted:
+false` throughout -- NOT an OOM.
+
+**LIKELY TRIGGER, not proven:** the 21:52Z three-service deploy. Both workers
+restarted and re-published their artifact sets; the flood peaked at **16
+`POST /api/ops/artifacts/publish` per second** at 22:25:49 (2/s by 22:26:12, so
+it has tapered) and lands on WEB, which was itself cold. The underlying
+fragility is PRE-EXISTING: a 5s health check against a 20s route was always
+going to spiral under any load.
+
+**I ATTRIBUTED THIS WRONGLY TWICE, and that is the part worth keeping.**
+
+1. **Blamed my own `live_state_payload` change** (`0aaf71f0`, cross-service card
+   read). The mechanism was plausible -- per-card keyvalue reads on a fan-out
+   route -- and I had just written it. **The contradicting evidence was in the
+   same output I was reading:** HOME was also 502ing, and home never calls
+   `live_state_payload`. I rolled back on that belief.
+2. **The rollback DISPROVED it** -- `6855fe96` reproduced the outage exactly.
+   Rolling back under uncertainty was still right (restore service first), but
+   "my change caused it" was a claim I had not earned.
+
+Also unearned: that commit asserted **"no regression"** on the strength of unit
+tests that MOCK `read_json_file`. A mocked correctness test cannot see a
+LATENCY cost. Whatever the timing truth turns out to be, the claim was
+unsupported when written.
+
+**The card fix `0aaf71f0` is therefore NOT disproven and NOT validated** -- it
+is deployed-then-rolled-back with its effect unmeasured. The A/B timing
+comparison that would settle it never completed.
+
+**DO NOT, without full context:** push `render.yaml` to point the health check
+at a cheap endpoint. That fires `blueprint_sync`, rewrites env on ALL THREE
+services and 502s every route for ~2 minutes -- adding an outage to an outage.
+
+**Options for whoever picks this up, in order of blast radius:**
+1. Let the publish flood finish draining and see if the loop breaks on its own.
+2. Restart WEB ALONE and let one cold start complete undisturbed.
+3. Reduce home's request-path compute (the real fix, and the architectural rule
+   this repo already states).
+4. Health-check path change -- last, and only with the three-service blast
+   radius accounted for.
+
+**verify: NOTHING IS VERIFIED HERE.** Web is down at handover. That is the
+reading.
