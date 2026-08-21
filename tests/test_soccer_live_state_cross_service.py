@@ -69,3 +69,36 @@ def test_an_empty_store_payload_is_not_treated_as_an_answer(monkeypatch, tmp_pat
     )
     out = sources.live_state_payload("epl", "2026-08-21")
     assert out is not None and out["match_box"] == {"z": {}}
+
+
+def test_the_path_handed_to_the_store_is_the_one_the_WORKER_WROTE(monkeypatch):
+    """THE ACTUAL BUG, pinned.
+
+    `read_json_file` derives its keyvalue key FROM THE PATH. `_api_read_path`
+    returns "the first root that actually HAS it" -- and on web the file exists
+    on NEITHER root, because the poller wrote it to live-odds-worker's disk. So
+    web resolved a different absolute path and queried a key the worker never
+    wrote. Swapping only the reader (`0aaf71f0`) fixed nothing for exactly this
+    reason; the path has to come from `data_root()`, which is the root the
+    worker writes under.
+    """
+    seen = {}
+
+    def _capture(path):
+        seen["path"] = str(path).replace("\\", "/")
+        return {"league": "epl", "match_box": {"401879301": {}}}
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file", _capture
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.data_root", lambda: __import__("pathlib").Path("/opt/render/project/data")
+    )
+    out = sources.live_state_payload("epl", "2026-08-21")
+    assert out is not None
+    assert seen["path"].endswith(
+        "/soccer_source/epl/api/live_state/live_state_2026-08-21.json"
+    ), seen["path"]
+    # And it must be under the DATA ROOT, not the repo checkout -- the repo
+    # path is what `_api_read_path` would have produced.
+    assert seen["path"].startswith("/opt/render/project/data/"), seen["path"]

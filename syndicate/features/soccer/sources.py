@@ -198,40 +198,44 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
     Not cached: overwritten by the poller every cycle, unlike the once-per-date
     recommendations artifact above.
 
-    READS THROUGH `refresh_state_store` FIRST, and that is the whole point.
-    This file is written by **live-odds-worker to its own disk**, and web has a
-    different disk -- a hard Render constraint. A bare `load_json` therefore
-    returned None on web for every match ever played, so the card rendered
-    "Goals" and "Match stats" as EMPTY HEADERS while
-    `/api/ops/artifacts/export` (which reads the keyvalue-backed store) showed
-    a fully populated `match_box` for the same fixture.
+    THE PATH IS BUILT FROM `data_root()`, NOT `_api_read_path`, AND THAT IS THE
+    WHOLE FIX. `read_json_file` derives its keyvalue key FROM THE PATH, and
+    `_api_read_path` returns "the first root that actually HAS it" -- on web the
+    file exists on NEITHER root, because the poller wrote it to
+    live-odds-worker's disk. So web resolved a DIFFERENT absolute path and
+    queried a key the worker never wrote.
 
-    MEASURED 2026-08-21 on the four finished European matches: artifact carried
-    score 3-0 with 3 goals and both teams' stats; the card showed the right
-    score (that comes from the readable recommendations artifact) and 0 rows in
-    every box section. Same cross-service split fixed earlier that day for the
-    BOARD gates in `soccer_live_gameline_source.soccer_live_games` -- this is
-    the second reader, which that fix did not touch.
+    Measured 2026-08-21: swapping only the READER to `read_json_file` (commit
+    `0aaf71f0`) changed nothing, because it kept the wrong path -- the card
+    still showed "Goals" and "Match stats" as empty headers on four finished
+    matches whose artifacts carried score 3-0, three goals and both teams'
+    stats. `soccer_live_gameline_source.soccer_live_games` reads the same files
+    correctly precisely because it builds them under `data_root()`, which is
+    the root the worker writes to.
 
-    FALLS BACK TO DISK. `read_json_file` routes to the keyvalue store only when
-    the backend IS keyvalue (`_keyvalue_backed`); locally it reads the
-    filesystem anyway. The explicit fallback covers the remaining case -- a
-    keyvalue backend configured while the file exists only on THIS box, which
-    is the normal state of a dev checkout that has run the poller itself.
-    Without it, this fix would break local development to fix production.
+    FALLS BACK to the old `_api_read_path` read, so a local checkout -- where
+    the repo/runtime roots are the real location and there is no store --
+    behaves exactly as before rather than being broken to fix production.
     """
-    path = live_state_path(league, selected_date)
     try:
+        from syndicate.features.shared.refresh_state_store import data_root
         from syndicate.features.shared.refresh_state_store import read_json_file
 
-        payload = read_json_file(path)
+        payload = read_json_file(
+            data_root()
+            / "soccer_source"
+            / league
+            / "api"
+            / "live_state"
+            / f"live_state_{selected_date}.json"
+        )
         if isinstance(payload, dict) and payload:
             return payload
     except Exception:
         # Never fatal: a store hiccup degrades to the disk read below, which is
-        # exactly the previous behaviour rather than a blank card.
+        # the previous behaviour rather than a blank card.
         pass
-    return load_json(path)
+    return load_json(live_state_path(league, selected_date))
 
 
 def picks_path(league: str, selected_date: str) -> Path:
