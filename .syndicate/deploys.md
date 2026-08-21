@@ -339,6 +339,45 @@ Verify: `scripts/check_passing_attempts_skew_stability.py`,
 
 ---
 
+## 2026-08-21 — **NFL PROP CAPTURE VERIFIED IN PRODUCTION** (the obligation owed since 02:37Z) — lane `nfl-props-odds-allowlist`
+
+**verify: DISCHARGED.** `nfl_source/oddsapi_player_props_2026_wk1.csv` on web,
+read through `/api/ops/artifacts/export`:
+
+    before   5 bytes      header-only stub, mtime 2026-08-20T22:24:11 (pre-fix)
+    after   12,142 bytes  mtime 2026-08-21T14:08:06.416020
+
+The mtime is FRACTIONAL, so it is a runtime write and not another `copy2` boot
+copy — the same fingerprint that exposed the 13 stub files as checkout copies
+earlier in this lane. Content pulled and checked, not inferred: **84 rows, 84
+distinct players, real DraftKings Anytime TD prices** for Week 1 fixtures
+(A.J. Brown +160, AJ Barner +270, Bo Nix +400, ...).
+
+Anytime TD only, which is CORRECT rather than a shortfall: three weeks out it is
+the only market books have posted, and it matches the local reachability run
+(80 rows, same single market) exactly.
+
+This is the first real NFL player-prop capture the platform has ever made. It
+ran on **refresh-worker** (`453c16ee`), unattended, on its own schedule — no
+manual trigger involved.
+
+**STILL NOT WORKING, now cleanly isolated:** `schedule_2026.csv` on web remains
+the boot copy (`2026-08-02T03:29:35`, frac `0.0`). Same worker, same run: the
+props step works and the schedule step does not. That isolation is what makes it
+diagnosable at all.
+
+**AND THE DIAGNOSTIC ITSELF HIT `#208`.** `reports/migration_runs/*/odds_refresh_*/`
+was allowlisted and web deployed with it (`ee0bc9ab`) — `count: 0`. Verified
+that this is FILE-ABSENT and not pattern-absent: the pattern is present 4x in
+the deployed web commit and 0x on refresh-worker's. The run summary is written
+on the WORKER's disk, and `/api/ops/artifacts/export` globs WEB's. Allowlisting
+permits the read; `sweep_changed_hot_artifacts` on the WRITING service is what
+pushes, and it only sweeps patterns present in ITS OWN deployed code.
+So refresh-worker needs the allowlist too — not web alone. Pending: preflight
+HOLD, 10 jobs in flight incl. an MLB sim.
+
+---
+
 ## 2026-08-21 — WEB + LIVE-ODDS-WORKER: NFL GAME CONTEXT MADE REACHABLE — lane `nfl-props-odds-allowlist`
 
 **Deployed**, all claims taken and released by this lane:

@@ -4281,8 +4281,12 @@ against current lines AND current game state. **Retires the vendor import.**
   `/sports/{key}/odds` does not serve player props (`422 INVALID_MARKET`,
   verified live); they are per-event only. Two market keys were also invalid.
   Fixed; refresh-worker live on `59afbbb6`. 0 -> 80 rows on a live run.
-- **PRODUCTION BEHAVIOUR NOT YET OBSERVED.** Owed reading: a populated
-  `nfl_source/oddsapi_player_props_2026_wk1.csv` on `/api/ops/artifacts/export`.
+- **PRODUCTION BEHAVIOUR VERIFIED 2026-08-21T14:08:06Z.**
+  `oddsapi_player_props_2026_wk1.csv` went **5 bytes -> 12,142 bytes** with a
+  FRACTIONAL mtime (runtime write, not a boot copy). Content read, not inferred:
+  **84 rows, 84 distinct players, real DraftKings Anytime TD prices**. Ran
+  unattended on refresh-worker. First real NFL player-prop capture this platform
+  has ever made.
 - **NFL runs on `refresh-worker`, and ONLY there. CORRECTED 2026-08-21** —
   an earlier line here said live-odds-worker owned NFL in season. That was
   wrong. It was reasoned from `_weekly_sport_claimed_by_fast_tick` in the CODE
