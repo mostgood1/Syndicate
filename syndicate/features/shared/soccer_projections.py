@@ -15,7 +15,10 @@ WHAT THE SOURCE ACTUALLY CARRIES, checked field by field rather than assumed --
 The two `*_distribution` keys are **summary statistics, not distributions**, and
 the naming invites exactly the wrong assumption. `total_distribution` can answer
 P(over) at **2.5 and nowhere else**; at any other line it has a mean and nothing
-more. `spread_distribution` is a single margin number.
+more -- but `scoreline_probabilities` is published beside it and IS a real
+distribution, so totals at any line are summed from that rather than inferred
+from a mean (see `_total_prob_from_scorelines`). `spread_distribution` is a
+single margin number and still has no such companion.
 
 So this emits a probability ONLY where one genuinely exists, and a mean
 otherwise -- never a probability derived from a mean. Where a real probability
@@ -421,6 +424,61 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _total_prob_from_scorelines(scorelines: Any, line: float) -> tuple[float, float] | None:
+    """(P(over), P(push)) for ANY total line, from the scoreline distribution.
+
+    `total_distribution` can answer 2.5 and nothing else, which cost real
+    coverage: measured 2026-08-21, Marseille v Strasbourg was priced by the
+    books at 3.0 and 3.5 ONLY, so its card and both boards carried no market
+    total at all while the sim had the full distribution in hand the whole time.
+
+    THIS IS A TRANSFORMATION, NOT AN INFERENCE. `scoreline_probabilities` is a
+    real distribution over final scores published alongside `total_distribution`
+    by `adapters.py`, so summing the arm above the line is exact, not a
+    probability reverse-engineered from a mean -- the thing this module's
+    docstring refuses to do and still refuses to do. Verified against the real
+    2026-08-21 ligue_1 artifact: summing above 2.5 reproduces the published
+    `over_2_5_probability` of 0.5775 EXACTLY.
+
+    INTEGER LINES PUSH. At 3.0 a match landing on exactly 3 goals is void, not a
+    loss, so P(over) and P(under) do not sum to 1 and the caller must
+    renormalise. Returning the push mass rather than swallowing it keeps that
+    the caller's decision.
+    """
+    if not isinstance(scorelines, dict) or not scorelines:
+        return None
+    over = 0.0
+    push = 0.0
+    total_mass = 0.0
+    max_total = 0
+    for key, raw in scorelines.items():
+        prob = _as_float(raw)
+        if prob is None:
+            continue
+        parts = str(key).replace(":", "-").split("-")
+        if len(parts) != 2:
+            continue
+        try:
+            goals = int(parts[0]) + int(parts[1])
+        except (TypeError, ValueError):
+            continue
+        total_mass += prob
+        max_total = max(max_total, goals)
+        if goals > line:
+            over += prob
+        elif abs(goals - line) < 1e-9:
+            push += prob
+    # A distribution that does not sum to ~1 is not one this can price against.
+    if total_mass < 0.99 or total_mass > 1.01:
+        return None
+    # Beyond the simulated support the answer would be a hard 0.0, which reads
+    # as certainty the sim never expressed -- it is the granularity of a finite
+    # sim, not knowledge. Refuse and let the caller fall back to the mean.
+    if line > max_total:
+        return None
+    return over, push
+
+
 def _probability_projection(prob: float, *, basis: str, side: str = "over") -> dict[str, Any]:
     return {
         "model_prob_over": round(prob, 4),
@@ -657,9 +715,34 @@ def attach_soccer_projections(
             totals = match.get("total_distribution") or {}
             line_value = _as_float(row.get("line"))
             over_25 = _as_float(totals.get("over_2_5_probability"))
+            derived = (
+                _total_prob_from_scorelines(match.get("scoreline_probabilities"), line_value)
+                if line_value is not None
+                else None
+            )
             if line_value is not None and over_25 is not None and abs(line_value - _TOTALS_EXACT_PROB_LINE) < 1e-9:
-                # The ONE line this source can answer as a probability.
+                # The ONE line the SUMMARY can answer directly. Kept ahead of the
+                # derivation so 2.5 kicks out the byte-identical number it always
+                # has -- a fix that silently restates every existing row is a
+                # fix whose blast radius nobody can bound.
                 projection = _probability_projection(over_25, basis="over_2_5_probability")
+            elif derived is not None:
+                p_over, p_push = derived
+                live_mass = 1.0 - p_push
+                # An all-push line prices nothing. Refuse rather than divide by
+                # ~0 and publish a probability built from rounding error.
+                if live_mass > 1e-6:
+                    projection = _probability_projection(
+                        p_over / live_mass, basis="scoreline_distribution"
+                    )
+                    if p_push > 0:
+                        # Named, because a 0.62 that excludes a 12% push is a
+                        # different claim from a 0.62 that has no push at all.
+                        projection["push_probability"] = round(p_push, 4)
+                else:
+                    projection = _mean_projection(
+                        _as_float(totals.get("mean")) or 0.0, row.get("line"), basis="total_mean"
+                    )
             else:
                 mean = _as_float(totals.get("mean")) or _as_float(
                     (match.get("team_projection") or {}).get("total_mean")
@@ -751,7 +834,7 @@ def attach_soccer_projections(
         "unmatched_player_rows": unmatched_player,
         "unsupported_market_rows": unsupported_market,
         "pct_projected": round(100.0 * projected / considered, 1) if considered else 0.0,
-        "note": "probability only where the source has one; totals answer P(over) at 2.5 only",
+        "note": "probability only where the source has one; totals price any line from the scoreline distribution (2.5 still from the published summary)",
         "source_artifacts": index.source_paths,
         # The coverage report is what an operator reads first, so the staleness
         # belongs here too -- not only on individual rows.
