@@ -99,9 +99,6 @@ BOOTSTRAP_VENDOR_ROOTS = (
 # `test_no_bootstrap_pair_points_into_reports_intelligence` is therefore
 # STRICTLY SAFER than what it replaces: it forbids the directory root whose
 # return would resurrect the 3.2 GB OOM, not just the file pairs.
-#
-# `test_no_bootstrap_pair_points_into_reports_intelligence` fails if any of it
-# comes back.
 
 
 # The git-tracked `data/**` trees are a COLD-START SAFETY NET, not a snapshot

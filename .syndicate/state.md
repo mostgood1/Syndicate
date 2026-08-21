@@ -552,12 +552,21 @@ unsaved anywhere.
   its sync for 30 minutes — measured 2026-08-20 22:37:52Z. The holder's liveness
   is now checked, which is sound only because the lock is container-local (PID
   namespaces restart with the container).
-- **The single-file entries in `BOOTSTRAP_FILES` and the per-date
-  `reports/intelligence/*` globs have NEVER synced** — `_sync_tree` returns
-  immediately for a non-directory — while the loop logged `Syncing <file>` for
-  each. Confirmed in production 23:35:55Z, now logged as `[INERT: file entry,
-  never synced]`. Left inert deliberately: activating them would start writing
-  the committed mirror of `intelligence_state.json` onto a running service.
+- **NOTHING under `reports/intelligence/` is bootstrapped, and it must stay that
+  way** (`#496`, `0dd9c6cd`). `BOOTSTRAP_FILES` and the per-date globs had never
+  copied a byte — `_sync_tree` returns immediately for a non-directory — while
+  the loop logged `Syncing <file>` for each; confirmed in production 23:35:55Z.
+  **Deleted, not repaired.** On the keyvalue backend every
+  `reports/intelligence/**` path reads from Redis with no filesystem fallback
+  (`_KEYVALUE_EXCLUDED_PATH_MARKERS` is `("migration_runs/",)`), so a seeded file
+  has no readable CONTENT — but its FILENAME and MTIME are what
+  `_intelligence_state_read_path` and `blueprints/intelligence.py` use to decide
+  which date is latest, so seeding months-old copies would inject dates with
+  nothing behind them. Zero intelligence files have been bootstrapped since
+  2026-07-03 (`2fc3673e`, itself a fix for deploys OOM-ing on a 3.2 GB
+  `evaluation_ledger.jsonl` pulled in by the old whole-directory sync) with no
+  incident attributed to a missing seed. `test_no_bootstrap_pair_points_into_
+  reports_intelligence` now also blocks the directory root that caused that OOM.
 - **`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` on
   refresh-worker ONLY** (`false` on web and live-odds-worker);
   `SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = 60` on all three.
