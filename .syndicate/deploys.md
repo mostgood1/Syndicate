@@ -1115,6 +1115,60 @@ deploys off `origin/main`.
   (command described, not pasted -- the guard matches it inside this file).
 - Claim released: `deploy_claim.py release --service refresh-worker`
 
+### `#498` — WNBA live props, phases 1-4 wired — live-odds-worker + refresh-worker — 2026-08-21 — lane `wnba-live-props-data`
+
+`a41f88f8` deployed to BOTH: live-odds-worker 16:04:02Z (the capture tick) and
+refresh-worker 15:53:57Z (the board build + prop gate). Both clean descendant
+deploys off `origin/main`, no `--allow-rollback`, nothing killed.
+
+- **verify: THE WIRING IS REACHABLE, AND THE REFUSAL FIRED ON REAL DATA.**
+  First WNBA lens tick after landing, 45 seconds later:
+
+      2026-08-21T16:04:47Z [live_lens_loop] WNBA_LIVE_BOX_EMPTY
+        date=2026-08-21 games=3 players=0 -- nothing written
+
+  Three games, zero players (the slate had rolled), and NO artifact written.
+  That is the hollow-payload refusal working against the real degraded shape --
+  a stored empty is served in preference to real data thereafter
+  (`capture_wnba_pbp.py`'s recorded failure).
+
+- **NOT VERIFIED, AND THIS IS THE HONEST STATUS: `players=0` MEANS PROPS HAVE
+  NEVER SEEN A REAL PLAYER.** The projection, the probability and the prop join
+  have not run on live data. `livePropsCoverage` has never been populated and
+  `rows_live_projected` has never been non-zero. **Do not report live WNBA props
+  as working.** Next reading: on a live slate, `WNBA_LIVE_BOX_CAPTURED
+  games=N players=M`, then `livePropsCoverage` on the lens and the join's
+  `rows_live_projected`.
+
+- **I DEPLOYED TO THE WRONG SERVICE FIRST, and it is the THIRD instance tonight
+  of the same class.** `a41f88f8` went to refresh-worker at 15:53:57Z, where
+  `TICK_COMPLETE results={'nfl': False} skipped=['mlb','nba','wnba','soccer']`
+  -- the WNBA branch is never reached there, so the capture could not emit a
+  line however long I waited. live-odds-worker runs it:
+  `results={'mlb': True, 'wnba': True, 'soccer': True}`.
+
+  What misled me: `wnba/live_lens.py`'s own docstring says "this tick runs on
+  refresh-worker", and I took a CODE COMMENT as authoritative about a RUNTIME
+  fact. Sport ownership is env-driven and moves; `TICK_COMPLETE`'s `skipped=`
+  list states it in one call, before deploying rather than after. The earlier
+  two tonight: nearly deploying the analytic interval to web when the artifact
+  builder runs on a worker, and deploying the board fix to live-odds-worker when
+  refresh-worker builds the WNBA book_grid.
+
+  The refresh-worker deploy is NOT wasted -- the board build and the prop gate
+  do run there, so that placement is correct; only the capture branch is inert
+  on it.
+
+- **What DID work:** I refused to read the missing log line as a result. The
+  absence sent me to check the emitter, which is the rule I broke earlier in
+  this same session and followed here.
+
+- Rollback: redeploy either service at its prior SHA (live-odds-worker
+  `453c16ee`, refresh-worker `67a71eda`) via the sanctioned entrypoint (command
+  described, not pasted -- the guard matches it inside this file).
+- Claims released: `deploy_claim.py release --service live-odds-worker` and
+  `--service refresh-worker`.
+
 ## PENDING
 
 - [ ] **RIDEALONG, NOT A DEPLOY OF ITS OWN — `734c163e` on `origin/main`: the

@@ -4113,3 +4113,42 @@ Bash hook, and nothing would report it.
 - The fix is to resolve `CLAIM_DIR` from the git COMMON dir rather than
   `REPO_ROOT` — deliberately NOT done on 2026-08-21 while three sessions were
   actively deploying against the current behaviour. Tracked in `todo.md`.
+
+## 2026-08-21 — FORBIDDEN: taking a CODE COMMENT as authority for WHICH SERVICE runs something
+
+**Three instances in one session**, the third of which shipped:
+
+1. Nearly deployed the analytic-interval fix to **web** because
+   `/api/board/book-grid` is served there — the artifact it enriches is built on
+   a worker. Caught before deploying.
+2. Deployed the board market-price fix to **live-odds-worker** after checking a
+   log window where that service published `wnba_source/data/book_grid/`.
+   refresh-worker publishes it too; ownership alternates. Cost one deploy.
+3. Deployed the props capture to **refresh-worker** because
+   `wnba/live_lens.py`'s own docstring says *"this tick runs on
+   refresh-worker"*. It does not:
+   `TICK_COMPLETE results={'nfl': False} skipped=['mlb','nba','wnba','soccer']`
+   there, against `results={'mlb': True, 'wnba': True, 'soccer': True}` on
+   live-odds-worker. The code was live and completely inert.
+
+**The common error.** Each time I answered "which service runs this?" from
+something that DESCRIBES the system — a route's URL, one log window, a
+docstring — rather than from the system SAYING SO at that moment. Sport and lane
+ownership here is env-driven (`SYNDICATE_ACTIVE_SPORTS`, per-service loop flags)
+and moves without a diff, so a comment written when it was true stays in the file
+after it stops being true.
+
+**The rule going forward.** Before ANY deploy, get the running system to name the
+executor of the exact branch you changed, in one call:
+
+    py -3 scripts/render_logs.py --service <svc> --text TICK_COMPLETE --start ...
+
+`skipped=[...]` is definitive and costs one call. For artifact producers, the
+equivalent is which service last logged `PUBLISH_OK` for THAT path — checked
+across all candidates, not the first one that matches, because ownership
+alternates.
+
+**The corollary that saved the third one.** A missing log line is not a result.
+When the capture emitted nothing on refresh-worker I went looking for the
+EMITTER instead of waiting, and `skipped=` gave the answer immediately. The same
+instinct, applied one step earlier, would have prevented the deploy.
