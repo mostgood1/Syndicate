@@ -21789,3 +21789,37 @@ cold, then healthy.
 verify (mine): `/nfl/fantasy` serves "Showing headlines published across 2
 day(s)"; the old "2-day archive" wording is gone; 101 live Buzz badges, 58
 players with coverage.
+
+### ADDENDUM — what the deploy-restart cost `/`, measured across the cutover
+
+A watcher was sampling home every ~110s through the whole window, so this is a
+series rather than the single readings I had been reasoning from:
+
+    22:37:26Z  10.2s   <- on 6855fe96, pre-deploy
+    22:39:16Z  10.4s
+    22:41:07Z  19.5s
+    22:43:08Z  12.4s   <- deploy in flight
+    22:45:01Z  HTTPError
+    22:46:42Z  TimeoutError   <- 8a7b2407 goes live 22:46
+    22:49:08Z  HTTPError
+    22:50:49Z  12.8s   <- warmed
+    22:52:42Z  11.4s
+    22:54:34Z  17.8s
+
+**Cost of the restart: about 5 minutes of errors on `/`, then recovery to the
+SAME degraded band it was already in (10-18s).** No lasting harm, and no
+`server_failed` throughout, so it warmed rather than re-entering the loop. The
+band itself is the unfixed architectural problem the peer lane documented --
+per-game request-path compute against a 5s health check -- and this deploy
+neither caused nor cured it.
+
+**It also corrects something I said twice.** I called web "sliding" off a single
+19.7s sample. The series shows 10.2 / 10.4 / 19.5 BEFORE I touched anything:
+that spread is the normal degraded behaviour, and 19.7 was an ordinary member of
+it, not a trend. One sample cannot see a trend; I asserted one anyway.
+
+**And the force bought about 12 minutes.** The claim I broke at 32.1 min would
+have expired on its own at ~22:54:34Z. I deployed at 22:42. That is the actual
+price paid for taking an active lane's lock mid-incident -- worth knowing next
+time the question comes up, because "wait for the TTL" was a cheaper option than
+it looked.
