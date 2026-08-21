@@ -21669,3 +21669,55 @@ band. That band is a pre-existing architectural problem this deploy neither
 causes nor cures. It also interrupts the stage-timing collection that peer lane
 started at 22:46Z on `8a7b2407`; their instrumentation is contained in this SHA
 and resumes after restart, so what is lost is sample continuity, not capability.
+
+### UPDATE 23:15Z — web LIVE; worker deployed, and it did NOT carry the SHA I preflighted
+
+**WEB `dep-da4dld6417fc738i1k20` -> `status=live` `6c5abb51`, finished
+23:13:44Z.** Cutover ~23:12-23:13.
+
+**REFRESH-WORKER `dep-da4dnrv40ujc73b4o4q0` fired 23:14:55Z — on `003a5866`,
+NOT on `6c5abb51`.** `mcp__Render__trigger_deploy` takes **the tip of the
+service's branch**, not a SHA the caller names. A peer session pushed
+`003a5866` ("nfl fantasy: the Buzz badge is a button now") to `main` at
+23:12:33Z, two minutes before I fired.
+
+**Checked rather than assumed, and it is safe:**
+
+    003a5866 contains 6c5abb51        -> my fixes ARE in this deploy
+    003a5866 is on origin/main        -> not an off-main graft
+    diff 6c5abb51..003a5866 touches   syndicate/features/nfl/fantasy.py
+                                      syndicate/features/nfl/fantasy_news.py
+                                      syndicate/templates/nfl/fantasy.html
+                                      -> no overlap with any file in this lane
+
+So the deploy is additive and carries one unrelated peer commit. **Recorded
+because I did not intend to ship another lane's work and did not know I had
+until I read the response.** Anyone using this tool should know it deploys
+BRANCH TIP: the SHA you preflight and the SHA you ship are the same only if
+nobody pushes in between. Web and worker are consequently on DIFFERENT SHAs
+(web `6c5abb51`, worker `003a5866`); the difference is a web-rendered NFL
+template that will not take effect until web deploys again.
+
+**The soccer job did not have to be killed after all.** User authorised killing
+it; the 23:13:53Z sample then showed `process_count 3` — worker, bash wrapper,
+and pid 1736 already exiting (null rss, empty cmdline). It finished on its own,
+so the deploy fired into a genuinely idle worker. No MLB sim, no soccer build.
+
+### A PRODUCTION VERIFICATION IS AVAILABLE AFTER ALL — via this lane's own new log line
+
+The 403 blocks the served board, but it does not block the worker's logs, and
+this change added a token that **cannot exist on the old code**:
+
+    git grep -c LIVE_PROJECTION_JOIN 70ba0aad -- pipeline/layer2_shortlist.py  -> 0
+    git grep -c LIVE_PROJECTION_JOIN 003a5866 -- pipeline/layer2_shortlist.py  -> 1
+
+So `[layer2_shortlist] LIVE_PROJECTION_JOIN sport=... projected=... lens_indexed=...`
+appearing in refresh-worker's logs is a DEPLOY FINGERPRINT: it proves the new
+code is the code running. It also answers the user's original question directly
+— `projected` vs `lens_indexed` separates "the live lens produced nothing" from
+"the lens had rows and the join missed", which had one symptom before today.
+
+**This does NOT discharge `verify:`.** It proves the code is live and the live
+join's coverage; it does not prove `Win%`, `model_probability` or the
+`live_disagrees` badge render correctly on the served surface. That still needs
+`boardContract.cards`, and still needs someone who is not behind this proxy.
