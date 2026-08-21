@@ -3483,6 +3483,36 @@ minutes/pace) -> carry `liveModelProbOver` per `(player, market, line)` on the
 lens -> open the `sport != "mlb"` gate in `attach_live_projections_for_sport`.
 Pricing an edge off it still needs a MEASURED interval, which does not exist yet.
 
+**PHASES 1-3(a) ARE BUILT AND ON `main`, NONE WIRED, NONE DEPLOYED
+`[2026-08-21]`.** `capture_wnba_live_player_box.py` (persist),
+`wnba_live_prop_projection.py` (project), `wnba_live_prop_rows.py` (join to
+anchor). 33 tests + 20 subtests. **The chain has NEVER run end to end in
+production** — nothing calls the capture on a tick, so the artifact has never
+existed on a worker.
+
+**THE PREGAME ANCHOR IS `cards_sim_detail_<date>.json`, and it carries more than
+a mean.** `games[].sim.players.{home,away}[]` →  `min_mean` (expected minutes),
+`{pts,reb,ast,threes,pra}_mean/_sd/_q`, and `prop_ladders[stat]` with
+`simCount: 100`, a full distribution histogram and a `{total, hitProb}` ladder.
+Measured: Paige Bueckers `min_mean 38.37, pts_mean 23.39, pts_sd 7.33`.
+**`props_predictions_*.csv` and `props_edges_*.csv` return 403 from WEB — that is
+a ROUTE restriction, not absence.** The lens builder runs on a worker and reads
+them directly; do not conclude a file is unreachable from an export 403.
+
+**THE LIVE PROP PROBABILITY IS THE ONE THING STILL MISSING, deliberately.**
+`build_live_prop_index` keys on `liveModelProbOver`; nothing built so far emits
+one, so the `sport != "mlb"` gate stays shut BY DESIGN. The ladder above is the
+PREGAME distribution (`P(final >= line)` from tip-off); a live prop needs
+`P(final >= line | current, minutes played)` — the REMAINDER's distribution over
+the minutes left. Scaling the full-game shape (mean by `m/min_mean`, sd by
+`sqrt(m/min_mean)`) is standard and UNMEASURED HERE. Grade it and
+`prob_std_err(p, simCount)` applies honestly at n=100.
+
+**NO GAME-LEVEL TOTAL DISTRIBUTION EXISTS in the sim `[2026-08-21, checked]`** —
+`sim.quarters` is `[]`, `sim.players_summary` is bare counts. So the per-player
+ladders do NOT unblock live totals; that still needs the OddsAPI historical
+backfill and a grade.
+
 **WNBA LIVE GAME-LINE PRICING, state as of `[2026-08-21 03:2xZ]`.** Every gate
 is individually cleared and the end-to-end reading is STILL OWED:
 - capture cadence 3,676s -> **261s** (live-tick reuse bound, `d68f343a`)

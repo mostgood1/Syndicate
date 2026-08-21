@@ -3991,3 +3991,47 @@ worker": I read three env keys and stopped before the one that decides.
 "not yet" and were actually "never" — the window was never going to produce it.
 When a watch comes back empty, ask whether the producer ran, before waiting
 longer.
+
+## 2026-08-21 — A 403 FROM WEB IS A ROUTE RESTRICTION, NOT AN ABSENT FILE
+
+**The belief nearly published.** `props_predictions_*.csv` and
+`props_edges_*.csv` return `HTTP 403` from `/api/ops/artifacts/export`, and for
+a moment that read as "the pregame prop anchor is unreachable, phase 3 is
+blocked". It is not. The export route refuses those paths; the file is on the
+worker's disk, and the lens builder — which runs on a worker — opens it
+directly. The anchor turned out to be richer than needed
+(`cards_sim_detail_<date>.json`: `min_mean`, `{stat}_mean/_sd/_q`, and
+`prop_ladders` with `simCount: 100` and a full histogram).
+
+**Why this keeps happening in this repo specifically.** Three separate
+readers exist and they answer different questions:
+`/api/ops/artifacts/export` reads WEB's disk; `read_json_file` is
+keyvalue-aware and crosses services; a worker opens its own disk directly. A
+"no" from one of them says nothing about the other two — the same structure that
+made `PULL_LIVE_LENS_SNAPSHOT ok=True written=0` look like a defect the day
+before, and that made the live player box look absent when it was serving.
+
+**The rule going forward.** Before recording a file as unreachable, say WHICH
+reader refused and WHICH consumer actually needs it. If the consumer runs on a
+worker and the refusal came from a web route, the answer is not "blocked" —
+nothing has been established. Cheapest discriminator: name the consumer's
+process first, then test the reader THAT process would use.
+
+---
+
+## 2026-08-21 — AN APOSTROPHE IS INTRA-WORD; A HYPHEN SEPARATES WORDS
+
+Name normalisation for the live-prop join folded both to a space, so
+`A'ja Wilson` became `a ja wilson` and matched nothing. The player would have
+been silently absent from the board — not wrong, ABSENT, which is the failure
+mode this family has already paid for once (`miss_no_market_alias`, 903 of 989).
+
+**The rule going forward.** In a name normaliser, DELETE intra-word punctuation
+(apostrophes, straight and typographic) and SUBSTITUTE separators (hyphens,
+slashes) with a space. One regex for both is wrong for one of them, always. And
+a name join must COUNT AND NAME its misses: `players_unmatched` exists so a zero
+is attributable, because a silent zero and a named zero need different fixes.
+
+Caught by the module's own test, before it ever ran against production — which
+is the argument for writing the accent/punctuation cases out explicitly rather
+than trusting a normaliser to be obviously right.

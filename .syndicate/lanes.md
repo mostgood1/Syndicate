@@ -635,91 +635,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### mlb-overview-hydration-cost — CLOSED 2026-08-20 — **VERDICT: MECHANISM ONLY. Closed on an EXPLICIT USER OVERRIDE, logged: the scheduled reading's own rule says MECHANISM ONLY does NOT close this lane. It is closed anyway because THIS LANE'S Verification criterion did run and pass** — peak RSS 142.9 → 114.5 MB on a 15-game slate, byte-identical candidate output in three scopes, reachability `off != on`, and the prune PROVEN TO FIRE in production (`pruned == games` on 72 of 72 lines; `plays_dropped` climbs 62 → 478 across the live slate, 1,125/15 games on the completed look-back date, so the 66.38% premise HOLDS and is not retired). **THE UNRESOLVED QUESTION WAS NEVER THIS LANE'S VERIFICATION FIELD AND DOES NOT DIE WITH IT: `#387`'s ~2 GB excursion is STILL UNEXPLAINED and STAYS OPEN AS TICKET `#387`.** The transient did not move (peak anon 1,863.1 → 1,663.9 MB but amplitude 533.4 → 628.1 MB, on a 40%-smaller slate), and the ~2 GB sawtooth was not running in EITHER comparison window (min inactive_file 1,182 / 1,368 MB vs 26.3–42.2 MB at the defect nights' kills) — so what is owed is a deploy-free live-slate window on a full ~15-game slate, tracked on `#387`, not another candidate fix. The 3000MB floor is untouched. Full reading: `deploys.md` 2026-08-21 00:00–00:28Z; narrative: `log/2026-08-20.md`.
-- Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
-- Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `.syndicate/*`.
-  **Released 2026-08-20 ~20:1xZ, user-authorized: the todo document.** Owning session `80b3e432`
-  confirmed gone (not found in the session roster, archived or not); `nhl-model-owner` (session
-  `46352c78`) took it to add its own, unrelated §2A/§2B addendum under `#470`, additive only, no
-  touch to any `#387`-related content. The rest of this claim (the code/test files) stands, and
-  covers any future `#387` writeup there too, until the scheduled closing reading
-  (`mlb-387-live-slate-read`, 22:15 CDT) resolves the lane.
-- Hypothesis: the worker keeps only `payload["games"]` (and only a subset of each game's fields) yet pays for the whole page context — feed/live `actual_games`, HR/K shelves, ladder badges, scoreboard/module furniture. A worker-scoped projection that skips what no consumer reads cuts the transient without touching the guard.
-- Falsification test: (a) trace shows a candidate-path consumer DOES read a field the projection drops → the projection is wrong as scoped; (b) measured peak RSS with the projection ON is not lower than OFF on the same slate → the skipped work was not the cost.
-- Verification: `scripts/measure_cards_context_rss.py` reports peak **RSS** (not tracemalloc — `handoff_refresh_worker_oom.md` records tracemalloc as structurally blind here) for OFF vs ON on 2026-06-14 (15 games, full local artifact set), plus a parity test asserting the candidate-relevant projection is unchanged, plus a reachability test (`off != on`) per `model_engine_standard.md`.
-- Blocked by: none. **UNOWNED — anyone may pick this up.**
-- **DO NOT DEPLOY `origin/deploy/mlb-overview-hydration-cost` (`5ad1d96e`).** It was cut from
-  `041188cb` and is now a ROLLBACK of the NFL roster/depth-chart autorun arming (`3b816546`,
-  live 13:36:29Z). The branch that is actually live is `origin/deploy/387-on-3b816546` = `d0ea983d`.
-- **The one open question is the magnitude, not the mechanism.** Mechanism is proven
-  (`pruned == games` 3/3; 1,125 play records dropped on a completed slate). Whether it moves the
-  ~2GB excursion is unproven and must not be asserted without a same-clock, boot-matched reading.
-- **2026-08-20 STATUS.** Shipped on `origin/main` (`ab99d236`, `9b66e841`, `6980f910`) and deployed to
-  refresh-worker as `d0ea983d`, re-cut onto `3b816546` (the live SHA at deploy time) after
-  `nfl-autorun-production-arm` deployed mid-poll and turned the prepared branch into a rollback of
-  their work. Claim acquired 13:51:45Z after theirs expired, preflight CLEAR, released 14:0xZ.
-- **WHAT `/preflight` CAUGHT, and it was worth running.** The candidate had (a) no production-observable
-  signal that the prune fired — the exact way three prior `#387` candidates became unfalsifiable;
-  (b) a parity harness comparing stdout, so it broke the moment the new log line existed; (c) two
-  load-bearing comments naming a test file AND a test name that do not exist.
-- **STILL OWED, and it is the whole question:** re-read `FEED_LIVE_PRUNE` during the live/post-game
-  window. `plays_dropped` in the thousands = the mechanism works. Still ~0 at 02:00Z = the payloads
-  reaching this loader never carry play-by-play in production, and the 66.38% premise — true of the
-  artifact on disk — is wrong for the production regime. That would not be a small correction; it
-  would retire the main reason this change exists.
-- This lane does NOT close until that reading is taken.
-- **RESULT `[2026-08-19]` — the hypothesis was HALF RIGHT, and the half that was
-  wrong is the more useful finding.** The projection idea ("the worker keeps only
-  `games`, so skip the page furniture") was not needed: the two real costs were
-  *inside* what the worker does read.
-  - **Feed/live prune.** `liveData.plays.allPlays` is **66.38%** of a StatsAPI
-    feed/live document and `playsByInning` a further **3.05%** (measured over the
-    15 documents of 2026-06-14, 12,605,243 JSON bytes), and **nothing in
-    `syndicate/` reads either** — every `allPlays` reader is an offline script or
-    `vendor/`, each opening the artifact off disk itself. `_daily_actual_by_game`
-    holds one such document per game live for the whole build. Denylist, not
-    allowlist, so every other consumer is untouched.
-  - **A dead shard load.** `_enrich_games_with_tracked_market_lines` read the
-    whole odds_history shard to consult `doc["games"]`. **The shard has no
-    `games` key and never has had one** — one writer, one literal schema, `git
-    log -S` finds no revision that emitted it, and all three real shard copies on
-    disk confirm `has_games=False`. Worker-only, today-only (= every board
-    build), uncached. `.syndicate/deploys.md` 2026-08-16 called this "the best
-    candidate on the table" and asked for an in-pass measurement to settle it;
-    **the WRITER's schema settles it, and was readable the whole time.**
-- **VERIFICATION RAN.** `scripts/measure_cards_context_rss.py`, worker path
-  (`SYNDICATE_WEB_DYNO=0`), 15-game slate, 5 repeats per arm, prune the only
-  variable:
-
-      peak RSS       142.9 MB -> 114.5 MB   (-28.4 MB, -19.9%)
-        spread    142.7-143.1   114.1-114.9
-      transient       +55.7 MB ->  +35.0 MB
-      retained        +11.8 MB ->   +2.8 MB
-      _daily_actual_by_game retention  +13.6 MB -> +1.9 MB
-      serialised games list   343,503 B both arms -- IDENTICAL
-
-  RSS on a sampling thread, **not `tracemalloc`** — `handoff_refresh_worker_oom.md`
-  records tracemalloc as structurally blind to this exact failure mode.
-  10 tests in `tests/test_mlb_cards_worker_hydration_cost.py`, incl. the
-  reachability pair (`off != on`) and a schema-coupling test that fails if the
-  shard ever grows a `games` key. 103 MLB cards tests green. The 6 red
-  `test_archives` cases are PRE-EXISTING in a `data/`-less worktree — verified by
-  re-running them on a stashed tree, same 6.
-- **FALSIFICATION NOT TRIGGERED, and the limits are stated rather than implied.**
-  (a) No candidate-path consumer reads the dropped sections. (b) `off != on`, so
-  the mechanism fires. **BUT:** the ~125MB shard figure is NOT in the table — the
-  local mirror has no dated shard and the harness runs a PAST date, so that path
-  is never exercised locally. It is a production-only claim derived from a
-  measured file size (19,798,176 B) and `#435`'s ~6.3x resident ratio.
-- **NOT CLAIMED: that the ~2GB production excursion is fixed.** Three named
-  candidates before this one were live, exercised, and moved the transient by
-  nothing measurable. Ship, then read `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`
-  as a RATE against a same-clock-window baseline — never a post-deploy hour,
-  because only a cold process clears that bar.
-- Landed `ab99d236` on `origin/main`, then DEPLOYED as `d0ea983d` (refresh-worker, 2026-08-20T13:59:33Z). Claim acquired 13:51:45Z, preflight CLEAR, claim RELEASED. Superseded the same day: this line previously read "No deploy made, no claim taken."
-  Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
-
-
 ### wnba-live-odds-capture-gap — OPEN, NARROWED — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** **ROOT CAUSE FOUND `[00:45Z]`: the autorun is fine; `refresh_wnba_oddsapi_props.py`'s REUSE GUARD sits upstream of it and returns `reused_artifact_bundle` every tick, so the child that appends `book_quotes` never spawns. The guard's staleness bound is the PREGAME sweep interval (2h) and its reuse key carries no phase term, so a 240s live autorun cannot outrun it. THE FIX BELONGS IN THE GUARD, NOT THE AUTORUN.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
   game goes live, instead of freezing at its last pregame quote.
@@ -1100,32 +1015,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
-### wnba-live-reuse-bound — **CLOSED-VERIFIED 2026-08-21** — MEASURED ON A LIVE GAME: `book_quotes` capture cadence **3,676s -> 261s** (~14x). Before `00:07:49Z -> 01:09:05Z`; after `01:21:27Z -> 01:25:48Z`, the second capture steady-state rather than the deploy restart (one capture was deliberately NOT accepted as proof). `/api/ops/wnba/refresh-decision` carries `phase="live"` + `reuse_max_age_s=240.0` where both read null pre-deploy. Live `d68f343a` (live-odds-worker). Claim released. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
-- Goal: a WNBA live-phase tick actually re-fetches odds instead of being declined
-  by the PREGAME staleness bound, so `book_quotes` advances at the live cadence.
-  **Testable outcome:** with a game live, `/api/ops/wnba/refresh-decision` reads
-  `will_fetch` (not `reused_artifact_bundle`) on a live tick, and the
-  `book_quotes` state file's last-seen slot advances within one live interval.
-- Files:
-  - `scripts/refresh_wnba_oddsapi_props.py` — the reuse guard and its bound.
-  - `scripts/refresh_odds_sources.py` — NARROW RE-CLAIM, `_build_wnba_steps` only
-    (one line passing the phase to the child). Adopted from
-    `wnba-live-odds-capture-gap`, whose Files note prescribes exactly this
-    ("do not edit without re-claiming narrowly"); that lane is UNOWNED — its
-    session `2bffd747` is absent from the roster including archived. Released
-    back on close.
-- Hypothesis: n/a — root-caused already by session `1f76348c`, see
-  `wnba-live-odds-capture-gap` and `log/2026-08-20.md` Addendum 2.
-- Falsification test: if a live tick still reads `reused_artifact_bundle` after
-  the change, the bound is not the only gate and the source-root branch's
-  `should_recompute` (or something upstream) is also declining the fetch.
-- Verification: reachability FIRST (bound off != on — a pregame-phase call must
-  keep the old bound, a live-phase call must decline reuse at the live bound),
-  then the production reading above. `#383`'s credit-protection reasoning is the
-  constraint: the live bound must be ~one live interval, never unbounded.
-- Blocked by: none.
-
-
 ### wnba-halftime-elapsed — **OPEN, ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
@@ -1147,68 +1036,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   confirm against a real captured halftime payload before generalising.
 - Verification: reachability FIRST (a halftime case that FAILS on purpose
   pre-fix), then a real between-periods payload from a live game.
-- Blocked by: none.
-
-### wnba-live-analytic-pricing — **CLOSED-VERIFIED 2026-08-21 — THE CHAIN IS COMPLETE, MEASURED END TO END ON TWO LIVE GAMES.** Board 03:24:23Z: ATL@LAS `fair 0.0394 -> market 0.0394, model 0.1058, edge +6.64pp`; CON@LVA `fair 0.9246 -> market 0.9246, model 0.9721, edge +4.75pp`; both `se 0.054 basis analytic_calibration`, 2-sigma bar **10.80pp**, both withheld `prob_interval_swamps_edge`. `no_two_sided_market_price` is GONE. **`priceable: 0` is now a CORRECT OUTCOME** -- neither game clears 2 sigma -- not a broken pipeline. Claim released. Superseded header follows — `sim_count_unusable` is gone board-wide and rows carry `prob_std_err 0.054` / `std_err_basis analytic_calibration`; spreads price at their own line; totals refuse as `analytic_estimator_never_backtested_for_this_market`; h2h now stamps `market_fair_prob_over` (`a5e0b462`, user decision — the pregame EDGE stays refused). Live on refresh-worker. **DO NOT REPORT THIS CHAIN AS WORKING** until `rows_live_gameline_priceable > 0` is read on a live game. Deploy claim on refresh-worker STILL HELD pending that. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
-- Goal: the live-gameline join prices WNBA moneylines from the ANALYTIC live
-  probability, so the board serves live opportunities for WNBA the way it
-  already does for MLB. **Testable outcome:** on a live WNBA game,
-  `/api/board/book-grid?sport=wnba` reports `rows_live_gameline_priceable > 0`
-  (measured 0 of 194 considered, 2026-08-21 01:3xZ, all withheld).
-- Files:
-  - `syndicate/features/shared/live_gameline_join.py` — the sims-derived
-    standard error and the moneyline pricing gate.
-- Hypothesis: n/a — measured. `price_moneyline` refuses when `sims <
-  _min_sims()`, and WNBA's live probability is an ANALYTIC transform of a
-  pregame sim (`#481`), so it carries no sim count. `state.md` records that
-  WNBA deliberately does not re-sim live, so the sim count will never arrive.
-- Falsification test: if `rows_live_gameline_priceable` stays 0 after the
-  change, the sims gate was not the only blocker — check
-  `live_resim_published_no_distribution_for_this_market` (101 rows, the
-  spread/total path, which genuinely does need a distribution and is NOT in
-  scope here) and `segment_is_not_full_game` (92, correctly refused).
-- Verification: reachability FIRST (an analytic row prices with a std err and
-  MLB's sims path is byte-identical), then the production counter above.
-  **The refusal must survive**: an analytic estimator without a defensible
-  error bar must still be withheld, never priced at se=0.
-- Blocked by: none.
-
-### nfl-injuries-autorun-arm — CLOSED-VERIFIED 2026-08-21 — armed, deployed (`916593f6` live via user-triggered manual redeploy), CONFIRMED FIRING (LAUNCHING -> unavailable/404, the normal case) — opened 2026-08-21 — session: nfl-injuries-autorun-arm
-- Goal: arm `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` in
-  production (refresh-worker) -- the code (`_launch_autorun_nfl_
-  injuries_fetch`, `scripts/fetch_nfl_injuries.py`, the `#441`-class
-  read-path fix in `injury_adjustment.py`, and the `publish_hot_
-  artifact()` wiring) is all already on refresh-worker's live SHA
-  (confirmed by content: 5 matches for the autorun function/env var name
-  in the live commit). This is a pure config+deploy action, no code
-  change -- same pattern as arming the roster/depth-chart autoruns
-  earlier this session. Offered as an optional ridealong to
-  `football-model-owner` first; that session ended without acting
-  (confirmed: env var absent across all 112 vars, no lane update
-  mentioning it), so taking it directly now on explicit user
-  instruction.
-- Files: none (pure Render config + deploy action).
-- Env var to set on refresh-worker:
-  `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN=true`.
-- Hypothesis: n/a (a deploy, not a diagnosis).
-- Falsification test: n/a.
-- Verification: DONE. `deploy_preflight.py` refused a same-SHA
-  redeploy as "ALREADY LIVE -- redundant" (no override flag exists for
-  the env-var-refresh case, and the deploy-guard's off-switch isn't
-  settable from this session's own tool access) -- user triggered a
-  manual redeploy via the Render dashboard instead. That redeploy picked
-  up `origin/main`'s tip (`916593f6`, 94 commits/48 files past
-  refresh-worker's prior live SHA `68acf3ca`) rather than a scoped
-  same-SHA redeploy -- flagged clearly as a larger-than-intended blast
-  radius at the time, then confirmed CLEAN (no traceback near boot,
-  memory climbed then stabilized ~50% of container, no runaway growth).
-  `NFL_INJURIES_FETCH_LAUNCHING` fired at 02:10:40Z (dispatch loop took
-  ~7min post-boot to reach it -- worker was busy with loop starts + an
-  MLB tick first, not a defect). Result: `"status": "unavailable"`
-  (HTTP 404 from nflverse) -- the fetcher's own documented NORMAL case
-  for a season with no injury reports published yet, not a crash
-  (confirmed no traceback). Autorun is confirmed correctly wired and
-  firing; today's run simply had nothing real to fetch.
 - Blocked by: none.
 
 ### nfl-props-odds-allowlist — OPEN, NARROWED — **THE ASK'S PREMISE WAS FALSE AND THE REAL DEFECT WAS BIGGER.** The allowlist was already fixed (re-verified `count: 14`); 13 of 14 files were stubs sharing one `copy2` mtime, so the prior lane's "production == mirror" finding was circular. Real cause: NFL/NCAAF prop capture called the BULK odds endpoint (422, player props are per-event) with two invalid market keys, every 422 swallowed — **zero rows ever captured**. Fixed and live on refresh-worker `59afbbb6` (0 -> 80 rows). Backfilled 2023-2025 (109,750 rows / 513,235 quotes / 579 of 816 games) and **PRICED THE MODEL FOR THE FIRST TIME: -7.35% best price over 64,007 bets — it does not beat the market**, though fading it loses 16.93% so the picks are correctly signed. Price shopping worth **+2.95 ROI pts** (controlled). Game context built, fitted, **+1.18 pts paired on 16,906 held-out bets** — but **DEPLOYED INERT on web** (read a gitignored file with no writer); fix landed `8fe78662`, undeployed. Narrative: `log/2026-08-21.md`. Measurements: `deploys.md` 02:37Z. — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
@@ -1257,7 +1084,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### wnba-live-props-data — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-live-props-data — **OPEN — PHASES 1-3(a) BUILT AND ON `main`, NONE WIRED, NONE DEPLOYED.** capture / project / join-to-anchor, 33 tests + 20 subtests. **THE CHAIN HAS NEVER RUN END TO END IN PRODUCTION** — nothing calls the capture on a tick, so the artifact has never existed on a worker. Verified separately: live per-player data serves (`games=2 players_with_stats=39`), the anchor exists (`cards_sim_detail` → `min_mean` + `{stat}_mean` + `prop_ladders simCount 100`), and the empty-capture refusal fires on the real rolled slate. NEXT: 3(b) needs `liveModelProbOver`, which needs the remainder-scaling assumption GRADED — do not emit one until then. Narrative in `log/2026-08-21.md`. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: live WNBA props. **Phase 1 (THIS LANE): persist the live per-player stat
   lines so a worker can read them.** The data was never missing --
   `/wnba/api/live_player_boxscore` serves minutes/pts/reb/ast/threes and has all
