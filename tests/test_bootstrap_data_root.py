@@ -226,30 +226,72 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",
                     "vendor/wnba_betting_repo/src",
-                    "reports/intelligence/board_snapshot.json",
-                    "reports/intelligence/intelligence_state.json",
-                    "reports/intelligence/intelligence_state_history.jsonl",
-                    "reports/intelligence/status_response_cache.json",
-                    "reports/intelligence/query_state_cache.json",
-                    "reports/intelligence/query_response_cache.json",
-                    "reports/intelligence/query_response_version.json",
-                    "reports/intelligence/performance_summary.json",
                 ],
             )
 
-    def test_bootstrap_roots_include_daily_intelligence_artifacts(self) -> None:
+    # REPLACES `test_bootstrap_roots_include_daily_intelligence_artifacts`,
+    # which asserted the opposite. That test could only ever have passed
+    # VACUOUSLY: the pair it checked for produced a FILE, and `_sync_tree`
+    # returns immediately for a non-directory, so the artifact it asserted was
+    # "included" was never copied by this script -- not once, in the months the
+    # test was green. It described the pair list, and nothing checked that the
+    # pair list did anything.
+    #
+    # Deleted rather than repaired. See the comment block at the top of
+    # `bootstrap_data_root.py`: on the keyvalue backend every
+    # `reports/intelligence/**` path reads from Redis with no filesystem
+    # fallback, so a seeded file has no readable content -- but its FILENAME and
+    # MTIME are what `pipeline/intelligence_state.py` and
+    # `syndicate/blueprints/intelligence.py` use to decide which date is latest.
+    # Seeding months-old copies would hand them dates with nothing behind them.
+
+    def test_no_bootstrap_pair_points_into_reports_intelligence(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"
             data_root = Path(temp_dir) / "data-root"
-            daily_snapshot = repo_root / "reports" / "intelligence" / "board_snapshot_2026_06_18.json"
-            daily_snapshot.parent.mkdir(parents=True, exist_ok=True)
-            daily_snapshot.write_text("{}\n", encoding="utf-8")
+            # Populate the tree the deleted glob used to walk, so this test
+            # fails if the block is restored -- an empty directory would let it
+            # pass for the wrong reason.
+            intelligence = repo_root / "reports" / "intelligence"
+            intelligence.mkdir(parents=True, exist_ok=True)
+            for name in (
+                "board_snapshot.json",
+                "intelligence_state.json",
+                "intelligence_state_history.jsonl",
+                "query_state_cache.json",
+                "performance_summary.json",
+                "board_snapshot_2026_06_18.json",
+                "intelligence_state_2026_06_18.json",
+                "intelligence_state_history_2026_06_18.jsonl",
+                "board_state_2026_06_18.json",
+            ):
+                (intelligence / name).write_text("{}\n", encoding="utf-8")
 
             pairs = module._bootstrap_root_pairs(repo_root, data_root)
-            relative_sources = [source.relative_to(repo_root).as_posix() for source, _, _, _ in pairs]
 
-            self.assertIn("reports/intelligence/board_snapshot_2026_06_18.json", relative_sources)
+        offenders = sorted(
+            source.relative_to(repo_root).as_posix()
+            for source, _, _, _ in pairs
+            if "reports/intelligence" in source.relative_to(repo_root).as_posix()
+        )
+        self.assertEqual(offenders, [], "nothing under reports/intelligence may be bootstrapped")
+
+    def test_no_bootstrap_pair_is_a_file(self) -> None:
+        # The general form of the same defect: `_sync_tree` silently does
+        # nothing for a non-directory, so ANY file pair is a no-op that still
+        # logs "Syncing ...". Every pair must be a directory root.
+        module = _load_module()
+        repo_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pairs = module._bootstrap_root_pairs(repo_root, Path(temp_dir))
+
+        existing_files = sorted(
+            source.relative_to(repo_root).as_posix()
+            for source, _, _, _ in pairs
+            if source.exists() and not source.is_dir()
+        )
+        self.assertEqual(existing_files, [], "a file pair copies nothing -- use a directory root")
 
     def test_bootstrap_wnba_today_artifacts_runs_when_missing(self) -> None:
         module = _load_module()
@@ -389,13 +431,10 @@ class BootstrapDataRootTests(unittest.TestCase):
                     self.assertEqual((dst_root / relative_path).read_text(encoding="utf-8"), expected)
 
     def test_single_file_pair_is_reported_as_inert_rather_than_logged_as_synced(self) -> None:
-        # `_sync_tree` returns immediately for a non-directory, so every entry in
-        # BOOTSTRAP_FILES and every per-date intelligence glob has always been a
-        # no-op -- while the loop logged "Syncing <file> -> <file>" for each one.
-        # Not activated here (that would start writing the committed mirror of
-        # intelligence_state.json onto a running service's disk, which needs its
-        # own decision); recorded so the log stops implying work that never
-        # happens.
+        # The tripwire, exercised directly: no real pair is a file any more
+        # (the intelligence entries that were are deleted), so this drives
+        # `_sync_bootstrap_roots` with a synthetic file pair to prove that if
+        # one is ever re-added it is REPORTED rather than silently skipped.
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             src_root = Path(temp_dir) / "repo"

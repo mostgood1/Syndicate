@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#496` — **DELETED, not repaired: the `reports/intelligence` bootstrap entries had never copied a byte, and making them work would have degraded the board** — lane `bootstrap-intelligence-entries-dead`, 2026-08-20
+
+**What was there.** A `BOOTSTRAP_FILES` tuple of 8 named intelligence artifacts
+plus a block globbing `board_snapshot_*.json`, `intelligence_state_*.json`,
+`intelligence_state_history_*.jsonl` and `board_state_*.json` into per-date
+pairs. **Both produced FILE pairs, and `_sync_tree` returns immediately for a
+non-directory** — so neither ever copied anything, while the loop logged
+`Syncing <file> -> <file>` for each on every boot.
+
+**Why deletion and not activation.** On the keyvalue backend
+(`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on web AND refresh-worker, read live)
+every `reports/intelligence/**` path is keyvalue-backed —
+`_KEYVALUE_EXCLUDED_PATH_MARKERS` is `("migration_runs/",)` and nothing else — so
+`read_json_file` returns from Redis with **no filesystem fallback**. A seeded
+file carries no readable CONTENT. It does carry a FILENAME and an MTIME, and two
+readers derive dates from exactly those:
+`pipeline/intelligence_state.py::_intelligence_state_read_path` selects a read
+path by filesystem existence, and `syndicate/blueprints/intelligence.py` falls
+back to `path.stem`/`st_mtime` when the keyvalue read misses. **Seeding the
+committed mirror's months-old copies would hand both readers dates with nothing
+behind them — worst on exactly the cold disk the seeding exists to help**, since
+the date-scoped keyvalue TTL guarantees the matching keys are long expired.
+
+**The history makes it safe.** `2fc3673e` (2026-07-03) was a real incident fix:
+`docs/fix_notes_log.md` records Render deploys OOM-ing because this script synced
+the whole `reports/intelligence` tree including a **3.2 GB
+`evaluation_ledger.jsonl`**. It swapped the directory root for the allowlist —
+which then copied nothing. So **zero intelligence files have been bootstrapped
+since 2026-07-03, and no incident has been attributed to a missing intelligence
+seed in the seven weeks since.** The cold-start story is falsified by production,
+independently of the keyvalue argument.
+
+**Verification.** `_bootstrap_root_pairs()` yields no `reports/intelligence`
+pair; `test_no_bootstrap_pair_points_into_reports_intelligence` and
+`test_no_bootstrap_pair_is_a_file` both FAIL against the pre-deletion code (12
+offenders) and pass after — proven load-bearing, not assumed. 29 tests green
+across `test_bootstrap_data_root.py` + `test_app_bootstrap.py`. **No production
+reading is required or possible: the deleted code never executed, so this is a
+provable no-op on behaviour.** The new guard is strictly safer than what it
+replaces — it forbids the directory root whose return would resurrect the 3.2 GB
+OOM, not merely the file pairs.
+
+**Not deployed on its own** — a no-op needs no deploy; it ships with whatever web
+deploy comes next.
+
 ### `#495` — **A pre-existing red in `test_intelligence_state.py` was the TEST, not the product: it asserted a `force_refresh` kwarg that `#387` deliberately removed. FIXED AND PROVED STILL-DISCRIMINATING.** — FOUND+FIXED+VERIFIED 2026-08-20, lane `intel-empty-pool-fallback-test`
 
 `tests/test_intelligence_state.py::IntelligenceStateTests::test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool`
@@ -204,14 +249,9 @@ existed because the MECHANISM was unproven and only outcome-shaped evidence was
 available, and `Bootstrap totals: kept=25` is a direct observation of the
 seed-only branch refusing real overwrites on the real disk.
 
-**RELATED, NOT FIXED HERE.** The single-file entries in `BOOTSTRAP_FILES` and
-the per-date `reports/intelligence/*` globs have NEVER synced — `_sync_tree`
-returns immediately for a non-directory — while the loop logged `Syncing <file>`
-for each one. They are now reported as `inert_file_entry` rather than activated:
-making them live would start writing the committed mirror of
-`intelligence_state.json` and `board_snapshot.json` onto a running service's
-disk, which is the same class of change this item exists to stop and needs its
-own decision.
+**RELATED, NOW FIXED — see `#496`.** The single-file entries in
+`BOOTSTRAP_FILES` and the per-date `reports/intelligence/*` globs had never
+synced. They were DELETED rather than repaired.
 
 ### `#493` — **MLB VENDOR EXIT: make `ladders_build` the PRODUCER and delete the vendor ladders stage. Stage 1 of 20.** Fix SHIPPED and LIVE; production verification UNDISCHARGED — lane `mlb-native-ladders-producer`
 

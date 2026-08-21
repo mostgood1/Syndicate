@@ -1118,6 +1118,42 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **NOT FIXED, DELIBERATELY, AND HANDED TO `#385`:** `#387`'s "`force_refresh` was already inert here" is true of the call site it was written about and NOT universally. The streamed board caller (`pipeline/intelligence_state.py:4636-4653`) passes `overview=None` on purpose, so there the kwarg DOES reach `build_intelligence_overview` — its removal turned a forced re-hydration into a cached one. Restoring it would reinstate exactly the re-hydration `#387` removed for memory reasons, and the branch is unreachable in production today because the same caller sets `apply_empty_pool_fallback=not board_l2a_fallback_enabled()`. It becomes a live behaviour delta the moment `#385`'s gate opens.
 - Blocked by: none.
 
+### bootstrap-intelligence-entries-dead — OPEN — opened 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
+- Goal: `BOOTSTRAP_FILES` and the per-date `reports/intelligence/*` glob block
+  are GONE from `scripts/bootstrap_data_root.py`, with a test that fails if any
+  bootstrap pair ever points into `reports/intelligence` again, and the reason
+  ACTIVATION is forbidden recorded next to the deletion. **Testable outcome:**
+  `_bootstrap_root_pairs()` yields no pair whose source is under
+  `reports/intelligence`, and `test_bootstrap_data_root.py` is green.
+- Files: `scripts/bootstrap_data_root.py`, `tests/test_bootstrap_data_root.py`,
+  `docs/ai_context/todo.md`, `.syndicate/*`.
+- Hypothesis (the reason this is a DELETION and not the activation that was
+  asked for): these entries have never executed (`_sync_tree` returns
+  immediately for a non-directory), and if they did execute they would make
+  production WORSE, not better. On the keyvalue backend — `SYNDICATE_REFRESH_
+  STATE_BACKEND=keyvalue` on web AND refresh-worker, read live — every
+  `reports/intelligence/**` path is keyvalue-backed (`_KEYVALUE_EXCLUDED_PATH_
+  MARKERS` is `("migration_runs/",)` and nothing else), so `read_json_file`
+  returns from Redis with NO filesystem fallback. A seeded file therefore
+  carries no readable CONTENT — but it does carry a FILENAME and an MTIME, and
+  two separate readers derive dates from exactly those:
+  `pipeline/intelligence_state.py:1514` picks a read path by filesystem
+  existence, and `syndicate/blueprints/intelligence.py:142` falls back to
+  `path.stem` / `st_mtime` when the keyvalue read misses. Seeding months-old
+  files would inject dates with no data behind them, worst on the cold disk the
+  seeding exists to help.
+- Falsification test: if any `reports/intelligence` path were NOT keyvalue-backed
+  in production, or if some reader consumed the file's bytes directly rather
+  than via `read_json_file`, the seed would be real data and deletion would be
+  wrong. Checked: the exclusion list has one entry and it is `migration_runs/`;
+  both raw globs found call `read_json_file` for content.
+- Verification: `_bootstrap_root_pairs()` yields zero `reports/intelligence`
+  pairs; the new guard test fails when one is re-added; full
+  `test_bootstrap_data_root.py` green. **No production reading is required or
+  possible — the deleted code has never executed, so this is a provable no-op
+  on behaviour.**
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

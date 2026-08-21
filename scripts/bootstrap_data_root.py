@@ -49,16 +49,59 @@ BOOTSTRAP_VENDOR_ROOTS = (
     (Path("vendor/wnba_betting_repo/src"), Path("wnba_source/src")),
 )
 
-BOOTSTRAP_FILES = (
-    Path("reports/intelligence/board_snapshot.json"),
-    Path("reports/intelligence/intelligence_state.json"),
-    Path("reports/intelligence/intelligence_state_history.jsonl"),
-    Path("reports/intelligence/status_response_cache.json"),
-    Path("reports/intelligence/query_state_cache.json"),
-    Path("reports/intelligence/query_response_cache.json"),
-    Path("reports/intelligence/query_response_version.json"),
-    Path("reports/intelligence/performance_summary.json"),
-)
+# NOTHING FROM `reports/intelligence/` IS BOOTSTRAPPED, AND IT MUST STAY THAT WAY.
+#
+# There used to be a `BOOTSTRAP_FILES` tuple of 8 named intelligence files here,
+# plus a block below that globbed `board_snapshot_*.json`,
+# `intelligence_state_*.json`, `intelligence_state_history_*.jsonl` and
+# `board_state_*.json` into per-date pairs. **Neither ever copied a single
+# byte**: both produced FILE pairs, and `_sync_tree` returns immediately for a
+# non-directory. They were logged as `Syncing <file> -> <file>` on every boot
+# for months with nothing behind it.
+#
+# They were deleted rather than repaired, because repairing them would have made
+# production worse. On the keyvalue backend -- `SYNDICATE_REFRESH_STATE_BACKEND=
+# keyvalue` on web AND refresh-worker, read live 2026-08-20 -- every
+# `reports/intelligence/**` path is keyvalue-backed: `refresh_state_store.
+# _KEYVALUE_EXCLUDED_PATH_MARKERS` is `("migration_runs/",)` and nothing else.
+# `read_json_file` on such a path returns from Redis with NO filesystem
+# fallback. So a seeded file carries no readable CONTENT.
+#
+# What it does carry is a FILENAME and an MTIME, and two readers derive dates
+# from exactly those:
+#   - `pipeline/intelligence_state.py::_intelligence_state_daily_candidates`
+#     globs this directory and `_intelligence_state_read_path` returns the first
+#     path that EXISTS -- selecting a key by filesystem presence, then reading
+#     its value from Redis.
+#   - `syndicate/blueprints/intelligence.py` globs it too and, when the keyvalue
+#     read misses, falls back to `path.stem` and `st_mtime` to decide what the
+#     LATEST date is.
+# Seeding the committed mirror's months-old copies would hand both readers dates
+# with nothing behind them -- worst on exactly the cold disk the seeding exists
+# to help. The date-scoped keyvalue TTL guarantees the matching keys are long
+# gone.
+#
+# THE HISTORY, because it explains why this is safe to delete and why the guard
+# test is worth more than the code was. `2fc3673e` (2026-07-03, "Avoid
+# bootstrapping the intelligence ledger") was a real incident fix:
+# `docs/fix_notes_log.md` records Render instances failing deploy/startup with
+# OOM because this script synced the WHOLE `reports/intelligence` tree,
+# including a **3.2 GB `evaluation_ledger.jsonl`** the web dyno never needs at
+# boot. The fix replaced the directory root with "a small file allowlist for the
+# artifacts the app actually reads at runtime".
+#
+# The allowlist never copied anything. So since 2026-07-03, across every deploy,
+# **zero intelligence files have been bootstrapped** -- and no incident has been
+# attributed to a missing intelligence seed in the seven weeks since. The
+# cold-start story these entries told about themselves is falsified by that
+# alone, independently of the keyvalue argument above.
+#
+# `test_no_bootstrap_pair_points_into_reports_intelligence` is therefore
+# STRICTLY SAFER than what it replaces: it forbids the directory root whose
+# return would resurrect the 3.2 GB OOM, not just the file pairs.
+#
+# `test_no_bootstrap_pair_points_into_reports_intelligence` fails if any of it
+# comes back.
 
 
 # The git-tracked `data/**` trees are a COLD-START SAFETY NET, not a snapshot
@@ -180,26 +223,6 @@ def _bootstrap_root_pairs(
         src = repo_root / relative_root
         dst = data_root / data_relative_root
         pairs.append((src, dst, str(relative_root), OVERWRITE))
-    for relative_file in BOOTSTRAP_FILES:
-        src = repo_root / relative_file
-        dst = data_root / relative_file
-        pairs.append((src, dst, str(relative_file), SEED_ONLY))
-    intelligence_root = repo_root / "reports" / "intelligence"
-    if intelligence_root.exists() and intelligence_root.is_dir():
-        for pattern in (
-            "board_snapshot_*.json",
-            "intelligence_state_*.json",
-            "intelligence_state_history_*.jsonl",
-            # Canonical per-date board state (intelligence-state rebuild
-            # plan, migration step 2/4) -- covers both
-            # board_state_{date}.json and board_state_latest_pointer.json.
-            "board_state_*.json",
-        ):
-            for src in sorted(intelligence_root.glob(pattern)):
-                if not src.is_file():
-                    continue
-                dst = data_root / "reports" / "intelligence" / src.name
-                pairs.append((src, dst, f"reports/intelligence/{src.name}", SEED_ONLY))
     return pairs
 
 
@@ -233,15 +256,12 @@ def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, Dict[st
             OVERWRITE if overwrite_existing else SEED_ONLY,
         )
         if source_root.exists() and not source_root.is_dir():
-            # `_sync_tree` returns immediately for a non-directory, so the
-            # single-file entries in BOOTSTRAP_FILES and the per-date
-            # intelligence globs have NEVER been copied by this script -- they
-            # are logged as "Syncing ..." above and then silently do nothing.
-            # Recorded here rather than fixed: making them live would start
-            # writing the committed mirror of board_snapshot.json /
-            # intelligence_state.json onto a running service's disk, which is
-            # exactly the class of change this file is being edited to stop.
-            # It needs its own decision, not a side effect of this one.
+            # A TRIPWIRE, not a feature. `_sync_tree` returns immediately for
+            # a non-directory, so any FILE pair added to this list silently
+            # copies nothing while still logging "Syncing ..." above -- which is
+            # how the intelligence entries deleted at the top of this file sat
+            # inert for months looking busy. No pair produces a file today; if
+            # one ever does, it says so instead of vanishing.
             counters.setdefault(key, {})["inert_file_entry"] = 1
             continue
         try:
