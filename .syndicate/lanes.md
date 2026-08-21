@@ -739,7 +739,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
 
 
-### wnba-live-odds-capture-gap — OPEN, VERIFICATION PENDING — **FIX SHIPPED AND DEPLOYED (commit `170505ec`, deploy `b5cf8ac2` live 13:15:46Z; flag flip `cb322dd1` live 13:31:11Z). Isolated WNBA-only live-phase autorun, own lane+cadence, mode=fast. No WNBA game has been live since the flag flipped, so real end-to-end behavior is UNOBSERVED — that is the one thing left.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### wnba-live-odds-capture-gap — OPEN, NARROWED — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
   game goes live, instead of freezing at its last pregame quote.
   **Testable outcome:** for a WNBA game currently in live state, re-pull
@@ -827,16 +827,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      produced specifically because `deploy_preflight.py` has no override for an intentional
      same-commit redeploy — a real tooling gap worth fixing separately) deployed 13:31:11Z. Content
      landed on `main` too (`2908373d`), not orphaned on the deploy branch.
-- **verify: PARTIAL.** Confirmed: env var reads `"1"` live, zero `WNBA_LIVE_AUTORUN_ERROR`, tick loop
-  healthy. NOT confirmed: no WNBA game was live at deploy time (all three of today's games still
-  pregame, kickoffs 00:00Z/02:00Z the next day) — `WNBA_LIVE_AUTORUN_LAUNCHED` has never fired for
-  real. **This is the one thing left, and it is the lane's actual falsification test.**
-- Next concrete step for whoever continues: once a WNBA game goes live, `render_logs.py --service
-  live-odds-worker --text WNBA_LIVE_AUTORUN_LAUNCHED` should show it firing within one 240s cycle of
-  kickoff; re-pull that game's `book_quotes` shard and confirm a `captured_at` newer than kickoff.
-  If it does NOT fire, re-check `_wnba_has_live_game`'s two sub-checkers
-  (`_wnba_has_live_game_via_artifact`, `_espn_has_live_game`) directly — not yet independently
-  verified against a real live game, only unit-tested with a monkeypatched return value.
+- **verify: FIRING CONFIRMED, WRITE-THROUGH NOT.** Measured 2026-08-21 00:07–00:34Z by session
+  `1f76348c` (not this lane — findings handed over, lane NOT otherwise touched):
+  - `WNBA_LIVE_AUTORUN_LAUNCHED` first at **00:07:24.782Z**, ~7.4 min after IND@DAL's 00:00Z tip,
+    then 00:12:15 / 00:16:48 / 00:21:13 / 00:25:35 / 00:30:06 — a clean ~4.3 min cadence matching
+    the 240s design. Zero `WNBA_LIVE_AUTORUN_ERROR`, zero `_SKIPPED`. `_wnba_has_live_game` is
+    therefore confirmed against a REAL live game, not just a monkeypatched return.
+  - **Testable outcome PASSES but does not prove the mechanism.**
+    `wnba_source/tracking/book_quotes/2026-08-20.jsonl`: 28,743 rows, latest `captured_at`
+    **00:07:49.815Z** (2,437-row batch, all three events) — newer than kickoff, as required.
+    BUT prior batches ran 14:33 / 15:57 / 17:58 / 20:40 / 22:40 / 00:07, i.e. 84–162 min apart, so
+    a ~1.5–2.5h cadence produces a 00:07-ish batch with no autorun at all. The 25s gap between the
+    00:07:24 launch and the 00:07:49 capture is suggestive, NOT probative. **Do not close on this.**
+  - **The shard then stopped advancing.** Re-pulled 00:33:46Z: byte-identical, still 28,743 rows,
+    still latest 00:07:49Z — 26 min stale across five further launches. Not a publish lag: every
+    tick logs `WNBA_LIVE_AUTORUN_PREV … launched=ok runStamp=None artifactsDir=None`, and the state
+    sidecar reports `PUBLISH_SKIPPED_UNCHANGED checksum=951d27e5fb28`, so the worker's own state did
+    not change either.
+  - **What the autorun demonstrably DOES refresh: the live-lens path.**
+    `PERIOD_MARKET_DISCOVERY_DIAG matchup=DAL@IND discover_status=200` with live_lens
+    projections/signals republishing every cycle. So the fetch works and the credentials/market list
+    are fine — it simply is not landing in `book_quotes`.
+- **Next concrete step: find who OWNS the `book_quotes` append.** The autorun refreshes live-lens but
+  not the quote shard, and `ODDS_SWEEP_LAUNCHED sports=mlb,wnba` still runs the COMBINED sweep — the
+  original MLB-starves-WNBA path this lane root-caused. Prime suspect: the append is owned by the
+  combined sweep, so the new autorun never had the ability to advance it and `mode="fast"` may skip
+  the step that writes it. Verify by identifying the writer before changing anything.
+  `runStamp=None artifactsDir=None` on every `_PREV` line is the cheapest thread to pull.
+- **Adjacent risk, NOT this lane's, surfaced because it was measured in the same window:**
+  live-odds-worker hit **97.2% of its 2GB cap — 43.6MB headroom** at 00:17:03Z
+  (`memory_anon_mb 992`, `container_memory_mb 2004`) with three live games, during
+  `WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups=GSV-MIN`. Unowned as far as this lane knows.
 - Blocked by: none.
 
 ### layer2-board-chip-race — **CLOSED-VERIFIED 2026-08-20 19:1x CT — IT IS LIVE ON WEB. THE "NEVER DEPLOYED" HEADER BELOW WAS WRONG.** Content-verified by `layer2-rail-duplicate-nfl-cards` against web's ACTUAL live SHA `f3a9bb0b`: `gameChipsLoadedOnce` present, **6 occurrences**. The 19:58Z reconciliation checked `d9a23a38`, which WAS web's live SHA at that moment; web deployed several times after, and one of those carried this. **A deployed-SHA reading describes the SHA YOU READ, not a standing property** — re-read before acting on a handed-down deploy verdict. File claim released to the adopting lane; nothing owed. — superseded header follows — **Reconciliation check 2026-08-20 19:58Z found this: landed on `origin/main` (`164a38bf`) but content-verified ABSENT from web's live SHA (`d9a23a38`, 19:46:49Z) -- never actually deployed, only merged. web's claim is held by `soccer-board-mlb-parity` (genuinely active). Handing off: deploy the next time web's claim frees up, scoped onto its then-current live SHA, then content-verify `gameChipsLoadedOnce` is present before closing.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
