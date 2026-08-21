@@ -339,6 +339,55 @@ Verify: `scripts/check_passing_attempts_skew_stability.py`,
 
 ---
 
+## 2026-08-21 — WEB + LIVE-ODDS-WORKER: NFL GAME CONTEXT MADE REACHABLE — lane `nfl-props-odds-allowlist`
+
+**Deployed**, all claims taken and released by this lane:
+- web `7c2e92c0` -> `9b8c49c6` (`dep-da3s2v3ncjis73adui9g`, live 03:15:xxZ).
+  SCOPED, `--allow-off-main`: web's lineage carried **97 commits not in main**,
+  so a main deploy would have reverted them. Cherry-picked `8fe78662` onto
+  `7c2e92c0`; verified every deletion vs the live tree was one of MY intended
+  replacements, so zero web-lineage work was lost.
+- live-odds-worker `5b67afd3` -> `a5e0b462` (live 03:12:18Z) -> `453c16ee`
+  (`dep-da3s70bbc2fs73bdc9kg`, live 03:19:xxZ). Plain main both times (it WAS
+  an ancestor of main).
+- refresh-worker reached `a5e0b462` at 03:11:59Z via ANOTHER lane's deploy, so
+  it picked up the path fix for free. **It still lacks `453c16ee`.**
+
+**What was actually broken.** The game-context mechanism (+1.18 ROI points,
+paired on 16,906 held-out bets) shipped to web at 02:53Z **INERT**. A model
+input needs THREE independent things and all three were missing:
+  1. an allowlist entry,
+  2. a publish call site (`fetch_nfl_schedule.py` had none),
+  3. **something that RUNS the fetcher** -- it had NO automated caller anywhere
+     in the repo, only its own docstring, a sibling's comment, and a test.
+Any one missing makes the feature silently do nothing.
+
+**Measured, and this is the part worth keeping.** After the web deploy,
+`?pattern=nfl_source/schedule_*.csv` returned **count 5** including
+`schedule_2026.csv` (21,583 bytes, 272 rows, 67 lined). That is NOT evidence my
+publish worked, and was not read as such: mtime `2026-08-02T03:29:35` with a
+fractional part of **exactly 0.0** is the whole-second `copy2` boot-copy
+fingerprint, and no worker had the schedule step until 03:19Z. **The allowlist
+made an already-present file VISIBLE; it did not move it.**
+
+So the real defect was the READ PATH (`game_context` pointed at a gitignored
+nflverse dump with no writer), fixed by `8fe78662`, and the mechanism is now
+reachable on web -- **running off a 19-day-old schedule** until a refresh cycle
+republishes it. A stale line is a WRONG implied total, not a missing one: it
+resolves silently where an absent one would return None and no-op.
+
+verify: **NOT YET DISCHARGED.** The reading owed is `schedule_2026.csv`'s mtime
+on web moving off `2026-08-02T03:29:35` to something recent **WITH a fractional
+component** (nanosecond = runtime write; whole-second = another copy). NFL is
+currently owned by live-odds-worker (`_weekly_sport_claimed_by_fast_tick` true,
+horizon 1 day, preseason games 08-21), which now has the step -- so it should
+fire on a normal tick.
+
+**Also still owed:** `oddsapi_player_props_2026_wk1.csv` is STILL a 5-byte stub
+— the capture fix has not been observed working in production on any service.
+
+---
+
 ## 2026-08-21 — REFRESH-WORKER: NFL PROP ODDS CAPTURE FIXED (per-event endpoint) — lane `nfl-props-odds-allowlist`
 
 **Deployed**: 2026-08-21 02:37:40Z. refresh-worker `916593f6` -> `59afbbb6`
