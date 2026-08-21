@@ -55,6 +55,7 @@ from typing import Iterable
 from typing import Mapping
 
 from syndicate.features.nfl.fantasy_players import FantasyPlayer
+from syndicate.features.nfl.fantasy_players import latest_depth_chart
 from syndicate.features.nfl.fantasy_players import load_fantasy_players
 from syndicate.features.nfl.fantasy_schedule import GameEnvironment
 from syndicate.features.nfl.fantasy_schedule import market_team_ratings
@@ -844,32 +845,27 @@ def player_history(season: int, config: EngineConfig = DEFAULT_CONFIG) -> dict[s
 
 @dataclass(frozen=True)
 class RolePriors:
-    """Expected opportunity share by position and depth-chart rank.
+    """Expected opportunity share by position, depth-chart rank and experience.
 
-    THE THIN PART OF THIS ENGINE, stated plainly rather than buried. Nflverse
-    publishes depth charts for the CURRENT season only -- locally there is one
-    file, ``depth_charts_2026.csv``. So this table is fitted on a single join:
-    the 2026 depth-chart rank against the 2025 usage share of the players who
-    appear in both. That is one season of evidence, and ``sample_size`` carries
-    the n so nothing downstream can quote it as though it were four.
+    Keyed ``(position, rank_bucket, experience_bucket)``. Fitted over every
+    season before the target that has BOTH a preseason depth chart and usage --
+    locally 2022-2025 for a 2026 projection. See ``role_priors`` for the two
+    earlier versions of this table that were wrong, and for the real players
+    that made each one obvious.
 
-    It matters much less than that sounds, because it is a PRIOR: any player
-    with real NFL history has it blended away by ``share_history_half_games``.
-    It is load-bearing only for rookies and for players who have never held a
-    role -- exactly the population where no amount of history would have helped
-    either.
+    Only load-bearing for rookies and players who have never held a role;
+    anyone with real history has it blended away by
+    ``share_history_half_games``.
     """
 
     season: int
     fitted_from_season: int | None
-    target_share: dict[tuple[str, int], float]
-    carry_share: dict[tuple[str, int], float]
-    pass_share: dict[tuple[str, int], float]
-    sample_size: dict[tuple[str, int], int]
-    #: absolute share by (position, draft bucket, pool), fitted on the
-    #: previous season's whole rookie class -- needs no depth chart
-    rookie_share: dict[tuple[str, str, str], float]
-    rookie_sample_size: dict[tuple[str, str, str], int]
+    fitted_seasons: tuple[int, ...]
+    target_share: dict[tuple[str, int, str], float]
+    carry_share: dict[tuple[str, int, str], float]
+    pass_share: dict[tuple[str, int, str], float]
+    kick_share: dict[tuple[str, int, str], float]
+    sample_size: dict[tuple[str, str, int, str], int]
 
 
 #: Depth ranks past this are pooled into one bucket -- below the third or
@@ -902,154 +898,185 @@ def _rank_bucket(rank: int | None) -> int:
     return min(max(rank, 1), _MAX_MODELLED_RANK)
 
 
+#: How a player's PRIOR-SEASON standing is bucketed when fitting the role
+#: prior. The three groups behave completely differently at the same depth-chart
+#: slot, and pooling them is what made a quarterback who has never taken an NFL
+#: snap look like a 45% share.
+_EXPERIENCE_BUCKETS: tuple[str, ...] = ("rookie", "no_prior_role", "prior_role")
+
+#: Opportunities in a pool last season above which a player counts as having
+#: held a role in it. Deliberately low -- this separates "was on the field" from
+#: "was not", not starters from backups.
+_PRIOR_ROLE_FLOOR: dict[str, float] = {"target": 20.0, "carry": 20.0, "pass": 50.0, "kick": 5.0}
+
+
+def _experience_bucket(
+    player: FantasyPlayer,
+    pool: str,
+    prior_usage: PlayerSeasonUsage | None,
+) -> str:
+    if player.is_rookie:
+        return "rookie"
+    if prior_usage is None:
+        return "no_prior_role"
+    field = {"target": "targets", "carry": "carries", "pass": "pass_attempts", "kick": "fg_att"}[pool]
+    return (
+        "prior_role"
+        if getattr(prior_usage, field, 0.0) >= _PRIOR_ROLE_FLOOR[pool]
+        else "no_prior_role"
+    )
+
+
 @lru_cache(maxsize=4)
 def role_priors(season: int) -> RolePriors:
-    """Fit the depth-rank and rookie draft-capital priors from real usage.
+    """Fit the role prior CONTEMPORANEOUSLY, and conditioned on experience.
 
-    TWO MEASURED DEFECTS SHAPED THIS FUNCTION. Both produced projections that
-    looked plausible row by row and were badly wrong, and neither would have
-    raised an error or failed a test:
+    THE QUESTION THIS HAS TO ANSWER is "a player is listed second on the depth
+    chart and I know nothing else about him -- what share does he get?". Two
+    earlier versions got it wrong in ways that were invisible until a real
+    player made them obvious:
 
-    1. **The rank table was fitted only over players who PLAYED.** Skipping
-       rostered players with no prior-season usage turns "what does a rank-2
-       quarterback get" into "what does a rank-2 quarterback who got on the
-       field get" -- measured at a 0.466 pass share, i.e. a backup projected
-       for 47% of his team's attempts. Because shares are normalised within a
-       team, that did not inflate the backup so much as CRUSH the starter:
-       Josh Allen came out at 12.09 PPR points per game against a real figure
-       near 24. A zero-usage rostered player is evidence, and the fix is to
-       count him as the zero he was.
+    1. **Fitted only over players who PLAYED.** Skipping zero-usage rostered
+       players priced a rank-2 quarterback at a 0.466 pass share. Because shares
+       normalise within a team that crushed the STARTER -- Josh Allen at 12.09
+       PPR points per game against a real figure near 24.
 
-    2. **The rookie prior was fitted against a reference cell that does not
-       exist.** It expressed a rookie's share as a RATIO to his own
-       position/rank cell -- but nflverse publishes depth charts for the
-       CURRENT season only, so every player in a past season resolves to rank
-       ``None`` and lands in the catch-all bucket, whose mean share is tiny.
-       Dividing by it produced a round-one multiplier of 3.24x and put four
-       rookies at the top of the overall board. The ratio is not identifiable
-       from local data, so it is gone: rookies now get an ABSOLUTE share
-       fitted directly on the previous season's rookie cohort, which needs no
-       depth chart at all.
+    2. **Fitted on the CURRENT chart against the PREVIOUS season's usage.** That
+       pairing is not the question being asked: many of a season's backups were
+       last season's starters, so "rank-2 quarterback" was priced off a
+       population of displaced starters. Measured 2026-08-21 on a real board:
+       **Stetson Bennett, who has never taken an NFL snap, drew a 0.374 pass
+       share** on the strength of a QB2 listing and pulled Matthew Stafford from
+       ~0.90 down to 0.815. Brady Russell, a fullback, drew a 0.282 carry share
+       the same way.
 
-    The two priors are combined with ``min`` in ``_role_prior_share``. Each is
-    an upper bound from a different direction -- draft capital says what
-    rookies with this pedigree average, depth rank says what players in this
-    slot average -- and a rookie should not be projected above either.
+    Both are fixed by the same two changes, and both were only possible once
+    ``scripts/fetch_nfl_rosters_depth_charts.py`` brought the historical charts
+    local -- before that there was exactly one depth chart on disk and no
+    contemporaneous fit was available at all:
+
+    * **CONTEMPORANEOUS**: season S's preseason chart against season S's own
+      usage, pooled over every season strictly BEFORE the target (so a backtest
+      of 2025 fits on 2022-2024 and cannot see itself).
+    * **CONDITIONED ON EXPERIENCE**: a rookie, a player with no prior role, and
+      a returning role-holder get different tables at the same slot, because
+      they are different populations wearing the same number.
+
+    Zero-usage rostered players are counted as the zeros they were, which is
+    what makes the prior an expectation rather than a survivor's average.
     """
-    history = _history_seasons(season, 1)
-    fitted_from = history[0] if history else None
-    if fitted_from is None:
-        return RolePriors(
-            season=season,
-            fitted_from_season=None,
-            target_share={},
-            carry_share={},
-            pass_share={},
-            sample_size={},
-            rookie_share={},
-            rookie_sample_size={},
-        )
+    charted: list[int] = []
+    candidate = season - 1
+    while candidate > season - 6:
+        if latest_depth_chart(candidate)[0]:
+            charted.append(candidate)
+        candidate -= 1
 
-    players, teams = load_season_usage(fitted_from)
-    league_team_rates: dict[str, float] = {}
-    for team_field in ("targets", "carries", "pass_attempts"):
-        total = sum(getattr(entry, team_field) for entry in teams.values())
-        games = sum(entry.games for entry in teams.values())
-        league_team_rates[team_field] = _safe_divide(total, games)
-
-    def observed_share(usage: PlayerSeasonUsage, player_field: str, team_field: str) -> float | None:
-        team = teams.get(usage.team)
-        team_rate = (
-            getattr(team, team_field) / team.games
-            if team is not None and team.games
-            else league_team_rates[team_field]
-        )
-        if team_rate <= 0:
-            return None
-        return (getattr(usage, player_field) / usage.games) / team_rate
+    empty = RolePriors(
+        season=season,
+        fitted_from_season=None,
+        fitted_seasons=(),
+        target_share={},
+        carry_share={},
+        pass_share={},
+        kick_share={},
+        sample_size={},
+    )
+    if not charted:
+        return empty
 
     pools = (
         ("target", "targets", "targets"),
         ("carry", "carries", "carries"),
         ("pass", "pass_attempts", "pass_attempts"),
+        ("kick", "fg_att", "fg_att"),
     )
+    buckets: dict[tuple[str, str, int, str], list[float]] = {}
 
-    # ---- depth-rank table, over NON-ROOKIES, counting zero-usage players as 0
-    buckets: dict[tuple[str, int], dict[str, list[float]]] = {}
-    for entry in load_fantasy_players(season):
-        if not entry.player_id or entry.is_rookie:
+    for fit_season in charted:
+        players, teams = load_season_usage(fit_season)
+        if not players:
             continue
-        usage = players.get(entry.player_id)
-        key = (entry.position, _rank_bucket(entry.depth_rank))
-        slot = buckets.setdefault(key, {"target": [], "carry": [], "pass": []})
-        for label, player_field, team_field in pools:
-            if usage is None or not usage.games:
-                slot[label].append(0.0)
+        prior_players, _ = load_season_usage(fit_season - 1)
+        league_rate = {
+            team_field: _safe_divide(
+                sum(getattr(entry, team_field) for entry in teams.values()),
+                sum(entry.games for entry in teams.values()),
+            )
+            for _, _, team_field in pools
+        }
+        for entry in load_fantasy_players(fit_season):
+            if not entry.player_id:
                 continue
-            share = observed_share(usage, player_field, team_field)
-            if share is not None:
-                slot[label].append(share)
+            usage = players.get(entry.player_id)
+            prior_usage = prior_players.get(entry.player_id)
+            for pool, player_field, team_field in pools:
+                key = (
+                    pool,
+                    entry.position,
+                    _rank_bucket(entry.depth_rank),
+                    _experience_bucket(entry, pool, prior_usage),
+                )
+                if usage is None or not usage.games:
+                    buckets.setdefault(key, []).append(0.0)
+                    continue
+                team = teams.get(usage.team)
+                team_rate = (
+                    getattr(team, team_field) / team.games
+                    if team is not None and team.games
+                    else league_rate[team_field]
+                )
+                if team_rate <= 0:
+                    continue
+                buckets.setdefault(key, []).append(
+                    (getattr(usage, player_field) / usage.games) / team_rate
+                )
 
-    target_share: dict[tuple[str, int], float] = {}
-    carry_share: dict[tuple[str, int], float] = {}
-    pass_share: dict[tuple[str, int], float] = {}
-    sample_size: dict[tuple[str, int], int] = {}
-    for key, slot in buckets.items():
-        target_share[key] = _mean(slot["target"])
-        carry_share[key] = _mean(slot["carry"])
-        pass_share[key] = _mean(slot["pass"])
-        sample_size[key] = max(len(slot["target"]), len(slot["carry"]), len(slot["pass"]))
-
-    # ---- rookie table: ABSOLUTE share by position and draft bucket, over the
-    # previous season's whole rookie class including the ones who never played.
-    rookie_pools: dict[tuple[str, str, str], list[float]] = {}
-    for entry in load_fantasy_players(fitted_from):
-        if entry.rookie_year != fitted_from or not entry.player_id:
+    tables: dict[str, dict[tuple[str, int, str], float]] = {pool: {} for pool, _, _ in pools}
+    sample_size: dict[tuple[str, str, int, str], int] = {}
+    for (pool, position, rank, experience), values in buckets.items():
+        if not values:
             continue
-        usage = players.get(entry.player_id)
-        bucket = _draft_bucket(entry.draft_number)
-        for label, player_field, team_field in pools:
-            key = (entry.position, bucket, label)
-            if usage is None or not usage.games:
-                rookie_pools.setdefault(key, []).append(0.0)
-                continue
-            share = observed_share(usage, player_field, team_field)
-            if share is not None:
-                rookie_pools.setdefault(key, []).append(share)
+        tables[pool][(position, rank, experience)] = _mean(values)
+        sample_size[(pool, position, rank, experience)] = len(values)
 
     return RolePriors(
         season=season,
-        fitted_from_season=fitted_from,
-        target_share=target_share,
-        carry_share=carry_share,
-        pass_share=pass_share,
+        fitted_from_season=charted[0],
+        fitted_seasons=tuple(sorted(charted)),
+        target_share=tables["target"],
+        carry_share=tables["carry"],
+        pass_share=tables["pass"],
+        kick_share=tables["kick"],
         sample_size=sample_size,
-        rookie_share={key: _mean(values) for key, values in rookie_pools.items() if values},
-        rookie_sample_size={key: len(values) for key, values in rookie_pools.items()},
     )
 
 
-def _role_prior_share(player: FantasyPlayer, priors: RolePriors, kind: str) -> float:
+def _role_prior_share(
+    player: FantasyPlayer,
+    priors: RolePriors,
+    kind: str,
+    prior_usage: PlayerSeasonUsage | None = None,
+) -> float:
     """The prior share for one player in one opportunity pool.
 
-    For a rookie this is the MINIMUM of the draft-capital prior and the
-    depth-rank prior -- see ``role_priors`` for why combining them any other
-    way is not supportable on local data.
+    Falls back along the experience axis before the rank axis: an unseen
+    (position, rank, experience) cell is better answered by the same slot's
+    ``no_prior_role`` group than by a different slot's exact experience match.
     """
     table = {
         "target": priors.target_share,
         "carry": priors.carry_share,
         "pass": priors.pass_share,
+        "kick": priors.kick_share,
     }[kind]
-    rank_prior = max(table.get((player.position, _rank_bucket(player.depth_rank)), 0.0), 0.0)
-    if not player.is_rookie:
-        return rank_prior
-    draft_prior = priors.rookie_share.get(
-        (player.position, _draft_bucket(player.draft_number), kind)
-    )
-    if draft_prior is None:
-        return rank_prior
-    return max(min(rank_prior, draft_prior), 0.0)
+    rank = _rank_bucket(player.depth_rank)
+    experience = _experience_bucket(player, kind, prior_usage)
+    for candidate in (experience, "no_prior_role", "prior_role", "rookie"):
+        value = table.get((player.position, rank, candidate))
+        if value is not None:
+            return max(value, 0.0)
+    return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -1420,10 +1447,11 @@ def _projection_inputs(
     league: LeagueRates,
     config: EngineConfig,
     week: int | None,
+    depth_chart_as_of: str | None = None,
 ) -> tuple[list[FantasyPlayer], dict[str, PlayerHistory], RolePriors, TeamVolume]:
     roster = [
         player
-        for player in load_fantasy_players(season)
+        for player in load_fantasy_players(season, depth_chart_as_of=depth_chart_as_of)
         if player.team == team and player.is_active
     ]
     return roster, player_history(season, config), role_priors(season), team_volume(
@@ -1439,6 +1467,7 @@ def project_team(
     config: EngineConfig = DEFAULT_CONFIG,
     news: Any | None = None,
     week: int | None = None,
+    depth_chart_as_of: str | None = None,
 ) -> list[PlayerProjection]:
     """Project every fantasy-relevant player on one team, plus its D/ST.
 
@@ -1449,7 +1478,13 @@ def project_team(
     """
     if league is None:
         league = league_rates(_history_seasons(season, len(config.season_recency_weights)))
-    roster, histories, priors, volume = _projection_inputs(season, team, league, config, week)
+    roster, histories, priors, volume = _projection_inputs(
+        season, team, league, config, week, depth_chart_as_of
+    )
+    # Prior-season usage decides which experience group a player's role prior
+    # is drawn from -- see `_experience_bucket`.
+    history_seasons = _history_seasons(season, 1)
+    prior_players = load_season_usage(history_seasons[0])[0] if history_seasons else {}
     if not roster:
         return []
     if week is not None and volume.games == 0:
@@ -1490,19 +1525,19 @@ def project_team(
 
         raw_target[key] = _blend(
             history.target_share if history else 0.0,
-            _role_prior_share(player, priors, "target"),
+            _role_prior_share(player, priors, "target", prior_players.get(player.player_id)),
             sample,
             half,
         )
         raw_carry[key] = _blend(
             history.carry_share if history else 0.0,
-            _role_prior_share(player, priors, "carry"),
+            _role_prior_share(player, priors, "carry", prior_players.get(player.player_id)),
             sample,
             half,
         )
         raw_pass[key] = _blend(
             history.pass_share if history else 0.0,
-            _role_prior_share(player, priors, "pass"),
+            _role_prior_share(player, priors, "pass", prior_players.get(player.player_id)),
             sample,
             half,
         )
@@ -1513,7 +1548,12 @@ def project_team(
         # carry one, and the depth chart's own K rows are sparse. History plus
         # the ordinal curve settles it.
         raw_kick[key] = (
-            _blend(history.fg_share if history else 0.0, 0.0, sample, half)
+            _blend(
+                history.fg_share if history else 0.0,
+                _role_prior_share(player, priors, "kick", prior_players.get(player.player_id)),
+                sample,
+                half,
+            )
             if player.position == "K"
             else 0.0
         )

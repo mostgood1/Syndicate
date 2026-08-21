@@ -312,6 +312,32 @@ def test_bye_week_produces_no_rows_rather_than_zeroes():
     assert engine.project_team(SEASON, team, ESPN_PPR, week=bye + 1)
 
 
+@requires_usage
+def test_every_roster_team_joins_to_the_schedule_and_to_usage():
+    """A team code that does not join is a SILENT whole-team defect.
+
+    Measured 2026-08-21: refetching the roster changed Arizona from `ARI` to
+    `AZ` while the schedule and play-by-play kept `ARI`. Nothing raised, every
+    Arizona player fell through to the no-market fallback, and the board still
+    looked reasonable -- their projections just quietly stopped being about
+    Arizona. This test is the only thing that can see that.
+    """
+    from syndicate.features.nfl.fantasy_players import load_fantasy_players
+    from syndicate.features.nfl.fantasy_schedule import team_environments
+
+    roster_teams = {player.team for player in load_fantasy_players(SEASON) if player.team}
+    schedule_teams = set(team_environments(SEASON))
+    _, usage_teams = load_season_usage(HISTORY_SEASON)
+
+    assert len(roster_teams) == 32, sorted(roster_teams)
+    assert not roster_teams - schedule_teams, (
+        f"roster teams missing from the schedule: {sorted(roster_teams - schedule_teams)}"
+    )
+    assert not roster_teams - set(usage_teams), (
+        f"roster teams missing from usage: {sorted(roster_teams - set(usage_teams))}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Draft board
 # ---------------------------------------------------------------------------

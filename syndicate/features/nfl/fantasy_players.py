@@ -64,6 +64,41 @@ _DEPTH_POSITION_MAP: dict[str, str] = {
     "KICKER": "K",
 }
 
+#: Team-code aliases seen across nflverse feeds, mapped to the code the
+#: play-by-play and the schedule use. THIS IS NOT COSMETIC.
+#:
+#: Measured 2026-08-21: refetching `roster_2026.csv` changed Arizona's code
+#: from `ARI` to `AZ` while `schedules_games.csv` and the play-by-play kept
+#: `ARI`. Nothing raised. Every Arizona player simply stopped joining to a team
+#: volume or a schedule and fell through to the no-market fallback branch --
+#: and still produced a plausible number, which is why it survived a read of
+#: the board (Trey McBride still held TE1 and his projection went UP).
+#:
+#: The relocations are included because the same feeds still emit the old codes
+#: for historical seasons, and a season that silently loses a team is the same
+#: failure with a different year on it.
+_TEAM_CODE_ALIASES: dict[str, str] = {
+    "AZ": "ARI",
+    "ARZ": "ARI",
+    "BLT": "BAL",
+    "CLV": "CLE",
+    "HST": "HOU",
+    "JAC": "JAX",
+    "LAR": "LA",
+    "STL": "LA",
+    "SL": "LA",
+    "SD": "LAC",
+    "OAK": "LV",
+    "WSH": "WAS",
+}
+
+
+def canonical_team(code: str | None) -> str:
+    """The team code the play-by-play and schedule use."""
+    text = (code or "").strip().upper()
+    return _TEAM_CODE_ALIASES.get(text, text)
+
+
 #: Roster statuses that mean a player will not accrue usage. ``RES`` is
 #: injured reserve, ``CUT`` is released, ``RET`` retired, ``E14`` an exempt
 #: list. Kept as an explicit set rather than an ``== "ACT"`` test so a new
@@ -135,8 +170,10 @@ def _age_on(birth_date: str, reference: date) -> float | None:
     return (reference - born).days / 365.25
 
 
-@lru_cache(maxsize=8)
-def latest_depth_chart(season: int) -> tuple[dict[str, int], str | None]:
+@lru_cache(maxsize=16)
+def latest_depth_chart(
+    season: int, as_of: str | None = None
+) -> tuple[dict[str, int], str | None]:
     """``gsis_id -> depth rank`` for *season*, and a label for when it is from.
 
     NFLVERSE PUBLISHES TWO DIFFERENT SCHEMAS and both are in play here:
@@ -171,6 +208,11 @@ def latest_depth_chart(season: int) -> tuple[dict[str, int], str | None]:
     season), and fall back to the earliest available snapshot when a season
     has none. The week-indexed schema takes week 1 for the same reason.
 
+    ``as_of`` overrides the cutoff with an explicit ISO date, so a caller can
+    ask what the depth chart looked like on a given day. That is what makes
+    "how much did training camp move the board" answerable rather than a
+    feeling -- see ``scripts/compare_nfl_fantasy_depth_charts.py``.
+
     Taking the minimum rank across a player's rows handles someone listed at
     more than one alignment (a slot receiver at both ``WR`` and ``SWR``): his
     role is the best one he holds, not the average.
@@ -192,7 +234,7 @@ def latest_depth_chart(season: int) -> tuple[dict[str, int], str | None]:
         stamps = sorted({(row.get("dt") or "").strip() for row in rows} - {""})
         if not stamps:
             return {}, None
-        cutoff = PRESEASON_CUTOFF.format(season=season)
+        cutoff = as_of or PRESEASON_CUTOFF.format(season=season)
         preseason = [stamp for stamp in stamps if stamp < cutoff]
         selected = preseason[-1] if preseason else stamps[0]
         label = selected
@@ -228,8 +270,13 @@ def latest_depth_chart(season: int) -> tuple[dict[str, int], str | None]:
     return ranks, label
 
 
-@lru_cache(maxsize=4)
-def load_fantasy_players(season: int, *, as_of: str | None = None) -> tuple[FantasyPlayer, ...]:
+@lru_cache(maxsize=16)
+def load_fantasy_players(
+    season: int,
+    *,
+    as_of: str | None = None,
+    depth_chart_as_of: str | None = None,
+) -> tuple[FantasyPlayer, ...]:
     """Every fantasy-relevant player on a *season* roster.
 
     ``as_of`` is an ISO date used only for age; it defaults to 1 September of
@@ -242,7 +289,7 @@ def load_fantasy_players(season: int, *, as_of: str | None = None) -> tuple[Fant
     if not path.is_file():
         return ()
     reference = date.fromisoformat(as_of) if as_of else date(season, 9, 1)
-    depth_ranks, depth_as_of = latest_depth_chart(season)
+    depth_ranks, depth_as_of = latest_depth_chart(season, depth_chart_as_of)
 
     players: list[FantasyPlayer] = []
     seen: set[str] = set()
@@ -260,7 +307,7 @@ def load_fantasy_players(season: int, *, as_of: str | None = None) -> tuple[Fant
                 FantasyPlayer(
                     player_id=player_id,
                     name=(row.get("full_name") or "").strip(),
-                    team=(row.get("team") or "").strip(),
+                    team=canonical_team(row.get("team")),
                     position=position,
                     season=season,
                     age=_age_on(row.get("birth_date") or "", reference),
