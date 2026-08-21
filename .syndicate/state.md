@@ -3722,6 +3722,111 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
+## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA.** Depth chart current to 2026-08-21. **LOCAL ONLY — NEVER DEPLOYED, NEVER PUSHED TO `main`, NEVER OBSERVED ON RENDER** `[measured 2026-08-21, lane nfl-fantasy-projections]`
+
+ESPN-scoring season + weekly projections for QB/RB/WR/TE/K/DST at
+`/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. Five commits
+on `session/nfl-fantasy-projections`, based at `344c4f21`. **Every number below
+is from this checkout, not from production.** Reference:
+`docs/ai_context/nfl_fantasy_engine_reference.md`.
+
+**MEASURED, held out.** 2025 projected from 2022-2024 only, graded on ONE common
+266-player set for every method:
+
+| | baseline "last year" | engine | |
+|---|---|---|---|
+| season MAE | 49.41 | **47.67** | engine better |
+| season spearman | 0.7058 | **0.7392** | engine better |
+| per-game MAE | 3.68 | **3.56** | engine better |
+| per-game spearman | 0.6138 | **0.6337** | engine better |
+
+Rank correlation better at EVERY position. **The test ran four times: it passed,
+then FAILED after a legitimate re-calibration, and the fail was reported rather
+than tuned away.** Fixing the defect that fail exposed produced this result.
+
+**THE AVAILABILITY COMPRESSION WAS THE DEFECT.** `_expected_games` scaled a role
+curve by a health RATIO shrunk to the position mean and clamped to [0.5, 1.35]:
+dispersion ratio 0.65 against the real spread, costing every genuine starter ~2
+games (fit-season bias `0-4: +6.81 | 5-9: +3.34 | 10-14: +0.58 | 15-17: -2.00`).
+Replaced with a DIRECT blend of a player's own games record and his projected
+role's average. Dispersion **0.65 → 0.79** (2024), **0.71 → 0.81** (2025); bias
++12.03 → +6.91.
+
+**THE TENSION THAT ALMOST HID IT: the blend is a WORSE predictor of GAMES (fit
+MAE 3.55 → 3.65) and a BETTER predictor of SEASON POINTS (48.08 → 47.55).**
+Compressing games toward the mean is exactly what minimises games error --
+correct regression to the mean -- but season points are a PRODUCT of games and
+rate, and a compressed factor biases the product. **A games-MAE sweep alone
+would have REJECTED this fix.** Do not optimise the sub-quantity.
+
+**TWO DEAD HYPOTHESES, measured, do not re-run:** the games curve IS
+survivor-conditioned but fixing it is a NO-OP (teams already field 11 players
+with carries and 15 with targets against a curve depth of 8, so zeros never
+reach the modelled ordinals); and in-season callups take only **0.1-1.8%** of
+team opportunity across 2023-25.
+
+**RESIDUAL BIAS IS NOT A CONSTANT OFFSET** — it flips SIGN between seasons
+(2024 -12.3 at >=8 games, 2025 +2.6). No level term removes it.
+
+**CALIBRATION.** Constants selected on 2024 ONLY; 2025 never used to select
+anything. Re-swept THREE times, most recently after the availability rebuild,
+and **the third pass changed NOTHING** — every material constant was already at
+the selected value, so the held-out result reproduces byte for byte. That is
+stability across a structural change, which is stronger evidence than the
+original selection. Confirmed with grid shape: `role_curve_strength` 0.0
+(monotone, span 6.52 MAE, natural bound — pulling teams toward the league-average
+split was the single largest accuracy loss in the engine);
+`availability_history_half_games` 2.0 (clean interior peak, span 1.90);
+`share_history_half_games` 18.0 (monotone to 18, turns at 26);
+`rz_weight_receiving` 1.0. Seven others span 0.05-0.18 MAE and ship UNFITTED.
+
+**A GRID'S WIDTH IS NOT ITS EFFECT SIZE.** The mechanical adoption rule flagged
+`season_recency_weights` as material on a 1.43 MAE span; ~1.35 of that is the gap
+between ONE prior season and more than one, which the default already clears.
+Every multi-season option is within 0.08 MAE of every other and the "winner" beat
+the incumbent by 0.0003 on a non-monotone ridge. REJECTED. The same rule
+mislabelled `role_curve_strength` an edge selection when 0.0 is a natural bound.
+Read the grid, not its width.
+
+**A TEAM CODE THAT DOES NOT JOIN IS A SILENT WHOLE-TEAM DEFECT.** Refetching
+`roster_2026.csv` changed Arizona from `ARI` to `AZ` while the schedule and pbp
+kept `ARI`. Nothing raised: every Arizona player stopped joining to a team volume
+or schedule, fell through to the no-market fallback, and STILL PRODUCED A
+PLAUSIBLE NUMBER — Trey McBride held TE1 and his projection went UP. Fixed with
+`fantasy_players.canonical_team()`; a test now asserts every roster team joins to
+BOTH the schedule and usage. **Re-verify after any roster or schedule refetch.**
+
+**THE ROLE PRIOR IS FITTED CONTEMPORANEOUSLY AND SPLIT BY EXPERIENCE.** Pairing
+the CURRENT chart with the PREVIOUS season's usage priced "rank-2 QB" off a
+population of displaced starters: Stetson Bennett, who has never taken an NFL
+snap, drew a 0.374 pass share and pulled Stafford to 0.815. Now fitted
+season-S-chart against season-S-usage over 2022-2025 (strictly before target),
+keyed `(position, rank, rookie|no_prior_role|prior_role)`.
+
+**HISTORICAL ROSTERS AND DEPTH CHARTS ARE NOW LOCAL** (`roster_{2022..2024}`,
+`depth_charts_{2022..2025}`, via `scripts/fetch_nfl_rosters_depth_charts.py`).
+Their absence was invisible — it surfaced as a calibration run scoring `inf` on
+every parameter because `load_fantasy_players(2024)` returned an empty roster.
+**nflverse publishes TWO depth-chart schemas** (dated snapshots for 2026,
+week-indexed `club_code`/`depth_team` for 2022-2025); reading only the first
+leaves every past season silently chart-less.
+
+**GATE:** `scripts/nfl_fantasy_input_checklist.py --season 2026` exits 0 — 49
+consumed fields populated, 15 documented sparse, 3 populated-but-unread surfaced
+as dead weight. Emits UNMEASURED, never 0%, from a local checkout.
+
+**NEWS/INJURY LAYER SHIPS OFF AND UNFITTED** — a MECHANISM added to an engine
+calibrated without it (`model_engine_standard.md` s4.4), and no archived
+historical news exists locally to grade its keyword weights. `?news=1` per
+request; reachability-tested. **A share promotion and an availability cut of
+reciprocal size leave the season total EXACTLY unchanged** (the pool normalises
+on `share x games`) — correct, and it reads as "inert"; test the two separately.
+
+**OWED BEFORE ANY DEPLOY** (nothing has been): build usage/news/input-report
+artifacts ON THE WORKER; set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so a
+request-path pbp parse fails loudly. A new usage FIELD needs
+`build_nfl_fantasy_usage.py --force`, not just a deploy.
+
 ## [nfl-player-props-model] NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE — WEB DEPLOY OF THE FIX SET IN FLIGHT, NOT YET CONFIRMED `[verified 2026-08-19]`
 
 `syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
