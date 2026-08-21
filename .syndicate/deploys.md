@@ -420,14 +420,22 @@ OBSERVED** — the NFL autorun is 6-hourly
 (`WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS=21600`). Deploy verified by CONTENT on
 the live SHA (per-event endpoint present, both corrected market keys present).
 
-**OWNERSHIP CAVEAT, measured from live env-vars and load-bearing for the next
-deploy:** once NFL has games inside the horizon, `_weekly_sport_claimed_by_fast_tick`
-hands NFL to the FAST TICK, which runs on **live-odds-worker**
-(`SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=true` there, `false` on
-refresh-worker). refresh-worker's weekly autorun drops exactly those sports
-using the same predicate, so the partition is complete and nothing falls
-through — but it means **this fix is on the wrong service for in-season
-capture**. live-odds-worker needs the same SHA before 2026-09-10.
+**OWNERSHIP CAVEAT — RETRACTED 2026-08-21, IT WAS WRONG.** This entry
+originally said the fast tick hands NFL to **live-odds-worker** in season, so
+the fix was "on the wrong service". That was reasoned from
+`_weekly_sport_claimed_by_fast_tick` in the CODE and never checked against the
+env. Measured from live env-vars afterwards:
+
+    refresh-worker    SYNDICATE_ACTIVE_SPORTS = nfl
+    live-odds-worker  SYNDICATE_ACTIVE_SPORTS = mlb,wnba,soccer
+
+`SYNDICATE_ACTIVE_SPORTS` gates EARLIER than the horizon predicate, so
+live-odds-worker drops NFL every tick regardless — confirmed in its own logs:
+`SWEEP_OWNERSHIP_EXCLUDED ... dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS`.
+
+**refresh-worker is the NFL owner and always was**, so this deploy was on the
+RIGHT service. A subsequent live-odds-worker deploy made on the retracted
+premise is harmless but was not needed for NFL.
 
 ---
 

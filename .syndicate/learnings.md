@@ -3956,3 +3956,38 @@ inheriting one as a permanent constraint, ask what it would COST to obtain —
 this repo already had the fetcher, the credit accounting and the precedent.
 Totals moves from "refused forever" to "refused until graded", which is a
 different roadmap.
+
+
+## 2026-08-21 — I DERIVED SERVICE OWNERSHIP FROM CODE AND SHIPPED TO THE WRONG WORKER. The env gate runs FIRST
+
+**Believed:** `_weekly_sport_claimed_by_fast_tick("nfl", today) == True`, so NFL
+is owned by the fast tick, which runs on **live-odds-worker** — therefore that
+service needed the NFL capture fix before the season. I said so to the user,
+wrote it into `state.md` and `deploys.md`, and deployed on it.
+
+**Actually:** `SYNDICATE_ACTIVE_SPORTS` is checked EARLIER than that predicate
+and live-odds-worker's value is `mlb,wnba,soccer`. It drops NFL on every single
+tick and can never reach the horizon logic at all:
+
+    [live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer
+      dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+
+`refresh-worker` carries `SYNDICATE_ACTIVE_SPORTS = nfl` and is the only service
+that runs NFL. The horizon predicate I computed was correct **and unreachable**.
+
+**How it surfaced:** not from re-reading the code, but from watching for a
+result that never came — 7 polls with no republish — and then reading the
+worker's LOGS to ask whether the step had run at all. The log line named the
+gate outright.
+
+**Rule:** a predicate you can evaluate locally tells you what the code WOULD do,
+not what the service DOES. Before attributing a behaviour to a service, read
+that service's env — and prefer a log line naming the decision over any local
+derivation. `project_which_service_runs_the_code` already said "loop ownership
+is an env flag that moves with no diff; read env-vars before diagnosing a
+worker": I read three env keys and stopped before the one that decides.
+
+**Second-order:** a null result is a lead. Seven identical readings looked like
+"not yet" and were actually "never" — the window was never going to produce it.
+When a watch comes back empty, ask whether the producer ran, before waiting
+longer.

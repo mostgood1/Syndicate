@@ -4283,11 +4283,23 @@ against current lines AND current game state. **Retires the vendor import.**
   Fixed; refresh-worker live on `59afbbb6`. 0 -> 80 rows on a live run.
 - **PRODUCTION BEHAVIOUR NOT YET OBSERVED.** Owed reading: a populated
   `nfl_source/oddsapi_player_props_2026_wk1.csv` on `/api/ops/artifacts/export`.
-- **In season, NFL props are captured by `live-odds-worker`, not
-  refresh-worker** -- `_weekly_sport_claimed_by_fast_tick` hands a sport with
-  games in the horizon to the fast tick, and refresh-worker drops exactly those.
-  The partition is complete (nothing falls through) but **live-odds-worker does
-  not have the fix**.
+- **NFL runs on `refresh-worker`, and ONLY there. CORRECTED 2026-08-21** —
+  an earlier line here said live-odds-worker owned NFL in season. That was
+  wrong. It was reasoned from `_weekly_sport_claimed_by_fast_tick` in the CODE
+  and never checked against the env. Measured from live env-vars:
+
+      refresh-worker    SYNDICATE_ACTIVE_SPORTS = nfl
+      live-odds-worker  SYNDICATE_ACTIVE_SPORTS = mlb,wnba,soccer
+      web               SYNDICATE_ACTIVE_SPORTS = mlb,wnba,soccer,nfl
+
+  `SYNDICATE_ACTIVE_SPORTS` gates EARLIER than the ownership predicate, so
+  live-odds-worker can never run NFL whatever the horizon says. Confirmed in
+  its own logs, every tick:
+
+      [live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer
+        dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+
+  The horizon predicate is real but unreachable for NFL on that service.
 - **The prop model does not beat the market**: -7.35% (best price, n=48,024) /
   -7.23% (DraftKings, n=13,368) over 64,007 graded bets, 2023-2025 REG closing
   lines. Fading it loses 16.93%, so the picks are correctly signed.

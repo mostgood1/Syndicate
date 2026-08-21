@@ -1220,8 +1220,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Verification: DONE for the measurement (ROI + denominator, per market).
   NOT done for production behaviour — see the three owed items.
 - **OWED, in priority order:**
-  1. **live-odds-worker needs `59afbbb6`** — it is the in-season owner of NFL
-     prop capture and does not have the fix. Before 2026-09-10.
+  1. ~~live-odds-worker needs the capture fix~~ **RETRACTED — WRONG.**
+     `SYNDICATE_ACTIVE_SPORTS` is `nfl` on refresh-worker and `mlb,wnba,soccer`
+     on live-odds-worker, and it gates EARLIER than the horizon predicate I
+     reasoned from, so live-odds-worker drops NFL every tick
+     (`SWEEP_OWNERSHIP_EXCLUDED ... dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS`).
+     **refresh-worker owns NFL and always did.** It needs `453c16ee` (the
+     schedule step); it already has capture + path fixes via `a5e0b462`.
   2. **web + a worker need `8fe78662`**, then a schedule fetch must RUN, then
      `?pattern=nfl_source/schedule_*.csv` non-zero on web is the reading that
      proves game context is no longer inert.
