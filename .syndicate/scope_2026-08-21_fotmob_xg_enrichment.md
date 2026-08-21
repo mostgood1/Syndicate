@@ -213,3 +213,42 @@ matches it never saw.
 **USER CONTEXT `[2026-08-21]`:** the user reports reaching for FotMob's live
 data manually for exactly this judgement -- whether a scoreline reflects the run
 of play -- which is momentum reasoning, not xG-total reasoning.
+
+
+## 9. WHAT THE MOMENTUM CHART ACTUALLY IS, AND THE TEST IT MUST PASS FIRST `[2026-08-21, from a user screenshot]`
+
+The user supplied FotMob's momentum panel for a live match: a SIGNED CONTINUOUS
+SERIES -- home above the axis, away below -- with goal markers and a "now"
+cursor. Goals sit at or just after sustained one-sided excursions, which is the
+read the user makes manually.
+
+**MODEL IT AS A SHAPE, NOT A SCALAR.** The informative features are the recent
+integral (~5-10 min), the current signed value, peak amplitude, and how
+SUSTAINED the present excursion is. A brief spike and a long plateau look
+different on that chart and must mean different things to the sim; collapsing
+the series to "momentum = 0.7" throws away the distinction the user is actually
+trading on.
+
+**THE PRECONDITION -- DOES IT LEAD OR DOES IT RECORD?**
+
+FotMob derives momentum FROM match events (shots, attacks, final-third
+possession). If a goal contributes to the momentum value, the spike AT a goal
+marker is MECHANICAL and carries no predictive content whatsoever. Only the
+BUILD-UP BEFORE the marker can be worth anything.
+
+Test, and it gates everything downstream:
+
+  for every goal, take momentum over the window BEFORE it, and compare that
+  distribution against windows NOT followed by a goal.
+
+If they do not separate, the chart is a good NARRATOR and a poor PREDICTOR --
+still useful to a human reading a match, worthless as a sim input. This must be
+answered on data before any wiring, and it is cheap: it needs the series and the
+goal timestamps, nothing else.
+
+**IT IS ANOTHER VENDOR'S MODEL OUTPUT, NOT AN OBSERVATION.** Depending on it
+means depending on FotMob's methodology, which can change silently and has no
+contract with us -- a different failure mode from a raw feed going 403. Worth
+pricing against the alternative: an equivalent could plausibly be computed from
+attack / dangerous-attack event counts if a source we already hold carries them,
+which would make the signal ours and auditable.
