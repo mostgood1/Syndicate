@@ -720,7 +720,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Follow-up filed as `#483` (whether Layer 2 ever wanted shard freshness at all).
 
 
-### wnba-live-odds-capture-gap — OPEN, NARROWED — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### wnba-live-odds-capture-gap — OPEN, NARROWED — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** **ROOT CAUSE FOUND `[00:45Z]`: the autorun is fine; `refresh_wnba_oddsapi_props.py`'s REUSE GUARD sits upstream of it and returns `reused_artifact_bundle` every tick, so the child that appends `book_quotes` never spawns. The guard's staleness bound is the PREGAME sweep interval (2h) and its reuse key carries no phase term, so a 240s live autorun cannot outrun it. THE FIX BELONGS IN THE GUARD, NOT THE AUTORUN.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a
   game goes live, instead of freezing at its last pregame quote.
   **Testable outcome:** for a WNBA game currently in live state, re-pull
@@ -829,12 +829,34 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `PERIOD_MARKET_DISCOVERY_DIAG matchup=DAL@IND discover_status=200` with live_lens
     projections/signals republishing every cycle. So the fetch works and the credentials/market list
     are fine — it simply is not landing in `book_quotes`.
-- **Next concrete step: find who OWNS the `book_quotes` append.** The autorun refreshes live-lens but
-  not the quote shard, and `ODDS_SWEEP_LAUNCHED sports=mlb,wnba` still runs the COMBINED sweep — the
-  original MLB-starves-WNBA path this lane root-caused. Prime suspect: the append is owned by the
-  combined sweep, so the new autorun never had the ability to advance it and `mode="fast"` may skip
-  the step that writes it. Verify by identifying the writer before changing anything.
-  `runStamp=None artifactsDir=None` on every `_PREV` line is the cheapest thread to pull.
+- **OWNER OF THE APPEND: FOUND, and the combined-sweep suspicion above was WRONG.** Traced
+  2026-08-21 00:45Z. `append_book_quotes` (`odds_book_quotes.py:328`) ← `_append_basketball_book_quotes`
+  (`fetch_basketball_oddsapi_props_local.py:330`, the CHILD) ← `refresh_wnba_oddsapi_props.py` (the
+  PARENT) ← the single step `_build_wnba_steps` builds. The autorun's own chain, not the combined
+  sweep's — so MLB starvation is exonerated for THIS symptom.
+- **WHY IT NEVER WRITES: the reuse guard, upstream of everything `mode="fast"` controls.**
+  `/api/ops/wnba/refresh-decision` names the branch outright — `decision="reused_artifact_bundle"`,
+  `recorded_at` advancing every tick (00:45:30Z, 00:46:36Z, same `input_hash`), so the parent runs
+  each tick and `_existing_artifact_bundle_state` returns a cached bundle each time; the child that
+  fetches never spawns. This is `#344`/`#383`'s documented fixpoint recurring.
+- **THE ACTUAL DEFECT, and it is not in the autorun.** Reuse IS bounded by
+  `_reuse_max_age_seconds("wnba")` — but that bound is the PREGAME sweep interval (2h default, no
+  override in `render.yaml`), and the reuse `step_key` is
+  `(artifact_root, date, do_edges, do_export)` with **no phase and no time component**, so a live
+  tick is indistinguishable from a pregame one. **A 240s live autorun is therefore gated by a 2h
+  pregame-derived staleness bound and cannot move this artifact by design.** Predicts a ~2h quote
+  cadence; observed batch spacing 84–162 min. The comment at
+  `run_live_odds_refresh_worker.py:343` — the snapshot fetch "runs UNCONDITIONALLY" under
+  `mode="fast"` — is true of MODE and false of the REUSE GUARD that sits above it. That gap is the bug.
+- **Confirmed NOT "prices were stable".** `append_book_quotes` is a CHANGE log (unmoved price writes
+  no row), so a flat `.jsonl` proves nothing on its own — but its state file carries a last-seen slot
+  written whenever anything is OBSERVED, precisely to separate stable from stopped-looking. All
+  5,489 keys read last-seen `00:07:49.815Z`, 36+ min cold. Nothing was observed.
+- Next concrete step: fix shape is a live-phase-aware reuse bound — give the guard a phase/live-game
+  term, or a separate max-age when a game is in progress. Do NOT touch the autorun; it works.
+  Re-verify with the last-seen slot and `refresh-decision`, not with `.jsonl` row counts.
+  UNVERIFIED: the 2h figure is the code default with no `render.yaml` override — live service
+  env-vars were NOT read, so a service-level override is still possible.
 - **Adjacent risk, NOT this lane's, surfaced because it was measured in the same window:**
   live-odds-worker hit **97.2% of its 2GB cap — 43.6MB headroom** at 00:17:03Z
   (`memory_anon_mb 992`, `container_memory_mb 2004`) with three live games, during
