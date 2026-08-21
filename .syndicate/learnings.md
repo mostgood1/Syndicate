@@ -4298,3 +4298,74 @@ read it, and shipped an inert cross-service reader. `live_lens_loop.py` writes
 `poll_active_leagues_for_tick`'s FULL return there — every in-play match with
 its projection and live props. **Where a comment and the writer disagree, the
 writer wins.**
+
+## 08-21 A KILLED PROCESS IS NOT A KILLED PIPELINE — `pkill` on the child leaves the wrapper running with STALE ARGS
+
+`pkill -f backtest_soccer_live_totals` killed the python. It did NOT kill the
+`bash -c "cmd_A; cmd_B"` wrapper, which then ran **cmd_B with the OLD
+arguments** and wrote `holdout_ON.json` at 21:02Z — a file with plausible
+numbers, a fresh timestamp, and entirely the wrong data (37 MLS matches from a
+window I had already rejected).
+
+Caught only by checking the file's OWN provenance (`window`, `leagues`) before
+reading its results. The tell was a timestamp that PREDATED the run I thought
+produced it.
+
+**RULE: kill the wrapper, not the child. And before reading any result file,
+check that it describes the run you think you launched — window, scope, and a
+timestamp AFTER you started it.** Third stale-artifact catch in one session;
+the other two were a board built before a deploy and a shortlist artifact that
+had not been regenerated.
+
+**Corollary that made this cheap:** write each run to a DISTINCT filename. A
+leftover cannot impersonate a result it cannot overwrite.
+
+## 08-21 FORBIDDEN: validating a finding on a window that does not contain the thing
+
+A held-out validation for a EUROPEAN bias was pointed at **June–July**, the
+European off-season. It returned 37 matches, all MLS. Had it run, it would have
+reported "held-out validation" while actually testing whether a European
+finding transfers to a different competition — and it would have looked
+entirely legitimate.
+
+**RULE: before running a validation, assert the window CONTAINS the population
+the finding is about.** One `fetch_events` count per league, seconds, and it
+turns a meaningless result into a caught error. An empty or wrong-population
+window and a genuine null result are indistinguishable in the output.
+
+## 08-21 MAE HIDES DIRECTION, AND DIRECTION IS THE WHOLE FIX
+
+I hypothesised the live totals mean OVER-predicts late and was ready to correct
+it. Signed bias showed the OPPOSITE: it under-predicts. **A correction applied
+in the hypothesised direction would have made the model strictly worse while
+looking like progress.**
+
+Two further hypotheses died the same way: a flat −0.18 offset that was my own
+neutral-ratings input, not a model defect; and "second-half rate too low",
+refuted by measuring 57.1% ± 3.7pp against an assumed 55–56% — inside one
+standard error, so changing the calibrated constant would have been fitting
+noise.
+
+**RULE: report SIGNED error beside absolute, always. Before changing a
+calibrated constant, measure what it encodes and compare against its standard
+error — a difference inside 1 SE is not evidence.** Three hypotheses, three
+refutations, one real defect (a resumed sim missing stoppage — a MISSING
+QUANTITY, not a tuned parameter).
+
+## 08-21 AN UNDERPOWERED TEST PASSES AND FAILS BY LUCK — RAISE n, DO NOT RE-ROLL THE SEED
+
+`test_red_carded_team_is_disadvantaged` failed after an unrelated change to the
+resume clock. Swept at one seed:
+
+    n= 150  diff +0.0267  (1 SE ~0.0384)   <- decided by noise
+    n= 600  diff -0.0817  (1 SE ~0.0192)
+    n=1500  diff -0.1313  (1 SE ~0.0121)   <- ~11 SE, unambiguous
+
+The mechanism was correct and LARGE. At n=150 the effect was smaller than one
+standard error, so the assertion was decided by the seed's trajectory: it passed
+before the change and failed after, and **both outcomes were luck**.
+
+**RULE: when a Monte Carlo test flips on an unrelated change, sweep n before
+touching anything. Re-rolling the seed until it goes green restores a pass that
+measures nothing** — and leaves the next person believing a mechanism is tested
+when it is not.
