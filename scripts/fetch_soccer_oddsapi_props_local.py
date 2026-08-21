@@ -374,6 +374,11 @@ def main() -> int:
     parser.add_argument("--region", type=str, default=os.environ.get("ODDS_API_REGION", "us"))
     parser.add_argument("--markets", type=str, default=None, help="Comma-separated market keys")
     parser.add_argument("--max-events", type=int, default=int(os.environ.get("ODDS_API_MAX_EVENTS", "30")))
+    parser.add_argument("--event-ids", type=str, default=None,
+                        help="Comma-separated OddsAPI event ids. Player props cost ONE CALL "
+                             "PER EVENT, so a 60s live refresh over a whole slate is the "
+                             "expensive shape: ~90 fixtures/tick is ~130k calls/day. Scoped "
+                             "to the matches actually in play it is a handful per tick.")
     parser.add_argument("--out", type=str, required=True)
     args = parser.parse_args()
 
@@ -387,6 +392,19 @@ def main() -> int:
 
     events = fetch_events(api_key, sport_key=sport_key, region=args.region)
     print(f"Fetched {len(events)} events for {sport_key}")
+    if args.event_ids:
+        wanted = {e.strip() for e in args.event_ids.split(",") if e.strip()}
+        before = len(events)
+        events = [e for e in events if str(e.get("id") or "") in wanted]
+        # Counted, and NAMED when it drops to zero: an empty scope must not look
+        # like an empty slate. The event-list call has already been spent either
+        # way, so reporting the miss is free and its absence would be a silent
+        # zero of exactly the kind this repo keeps paying for.
+        print(f"Scoped to {len(events)} of {before} events by --event-ids "
+              f"({len(wanted)} requested)", flush=True)
+        if not events:
+            print("PROPS_SCOPE_EMPTY: none of the requested event ids are in this "
+                  "sport key's current event list -- no per-event calls made", flush=True)
 
     rows: list[dict[str, Any]] = []
     prop_payloads: list[dict[str, Any]] = []

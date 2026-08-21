@@ -1212,6 +1212,42 @@ def _soccer_history_step(league: str, soccer_root: Path, python_exe: str) -> Ref
     )
 
 
+def _soccer_live_scope(date_str: str) -> dict[str, list[str]]:
+    """{league: [espn_event_id, ...]} for matches ACTUALLY IN PLAY right now.
+
+    THE ECONOMY OF THE LIVE REFRESH LIVES HERE. Soccer's cost is dominated by
+    player props, which OddsAPI prices at ONE CALL PER EVENT. A 60s refresh over
+    the whole slate is ~10 league calls + ~90 event calls per tick -- on the
+    order of 130k calls/day against a 5M cap, for a sport where at most a
+    handful of matches are in play at once. Scoped to those, the same cadence
+    costs single digits per tick.
+
+    Read from `live_state_<date>.json`, whose `games` map ALREADY means "in
+    play" -- `poll_soccer_live_state` keeps it separate from `match_box`
+    precisely so a finished match cannot present as live. No new source, no new
+    request, and the one signal that is already correct.
+
+    Returns {} on any failure, which yields NO live steps rather than
+    unscoped ones -- the safe direction, since the failure mode of guessing
+    wrong here is a bill.
+    """
+    scope: dict[str, list[str]] = {}
+    try:
+        from syndicate.features.soccer.sources import live_state_payload
+    except Exception:
+        return scope
+    for league in _SOCCER_LEAGUE_SLUGS:
+        try:
+            payload = live_state_payload(league, date_str)
+        except Exception:
+            continue
+        games = payload.get("games") if isinstance(payload, dict) else None
+        if isinstance(games, dict) and games:
+            scope[league] = [str(k) for k in games]
+    return scope
+
+
+
 def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     soccer_root = _local_source_bundle_root("soccer")
@@ -1428,6 +1464,54 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     str(soccer_root),
                 ),
                 description=f"Refresh {league} live match state and win-probability artifacts.",
+            )
+        )
+    # LIVE-PHASE ODDS, SCOPED TO MATCHES IN PLAY.
+    #
+    # `soccer_{league}_odds` / `_props` are pregame-only, so soccer prices were
+    # NEVER refreshed while a match was running: the card's `betting` block sat
+    # frozen at the last pregame sweep, and the board reported
+    # `no_two_sided_market_price` on 19 of 19 live rows (measured 2026-08-21).
+    #
+    # These are SEPARATE steps rather than widened phases, so the pregame path
+    # is untouched and the live path can carry a scope the pregame one must not
+    # have. Emitted ONLY for leagues with a match in play, which is what makes a
+    # 60s cadence affordable.
+    live_scope = _soccer_live_scope(args.date) if args.date else {}
+    for league, event_ids in sorted(live_scope.items()):
+        if league not in active_leagues:
+            continue
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_odds_live",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_odds_local.py",
+                    "--league", league,
+                    "--out", str(soccer_root / league / "api" / "odds" / "game_odds_current.csv"),
+                ),
+                description=f"LIVE {league} game odds ({len(event_ids)} in play).",
+            )
+        )
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_props_live",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_props_local.py",
+                    "--league", league,
+                    "--event-ids", ",".join(sorted(event_ids)),
+                    # SAME PATH the pregame step writes -- `props/{date}.csv`.
+                    # A live capture landing anywhere else would be a file
+                    # nothing reads, which is the shape of a refresh that
+                    # "succeeds" every tick and changes nothing on the board.
+                    "--out", str(soccer_root / league / "props" / f"{args.date}.csv"),
+                ),
+                description=f"LIVE {league} player props, scoped to {len(event_ids)} in play.",
             )
         )
     return steps
