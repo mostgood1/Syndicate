@@ -1248,7 +1248,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### nfl-fantasy-projections — OPEN, **MERGED TO `main` `[c1c811c3]`, NOT DEPLOYED** — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
+### nfl-fantasy-projections — OPEN, **LIVE ON PRODUCTION `[web aad7fb91]` AND SERVING A REAL BOARD** — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
 - Goal: a `/nfl/fantasy` surface serving ESPN-scoring 2026 season projections (PPR default, 12-team 1QB VOR draft board) for QB/RB/WR/TE/K/DST, plus per-week projections. **MET.**
 - Files: `syndicate/features/nfl/fantasy{,_scoring,_usage,_schedule,_players,_projection,_draft_board,_news}.py` (new), `syndicate/blueprints/nfl.py` (3 routes), `syndicate/features/shared/artifact_publisher.py` (+5 allowlist patterns), `syndicate/templates/nfl/fantasy.html` (new), `scripts/{build_nfl_fantasy_usage,fetch_nfl_rosters_depth_charts,backtest_nfl_fantasy_projections,calibrate_nfl_fantasy_projections,compare_nfl_fantasy_depth_charts,nfl_fantasy_input_checklist}.py` (new), `tests/test_nfl_fantasy.py` (new), `docs/ai_context/nfl_fantasy_engine_reference.md` (new), `reports/nfl_fantasy_*.json`.
 - Hypothesis: an opportunity-share engine re-based onto 2026 depth charts beats "last season's fantasy points" on held-out season MAE and rank correlation.
@@ -1262,7 +1262,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 **THE ENGINE DELIBERATELY DOES NOT USE smartsim2** — `state.md [football-smartsim2]` measured it strictly dominated by the close (w = -0.028, 751 OOS games). Environment comes from posted lines: 112 of 272 2026 games carry one, all 32 teams in 6-9 of them.
 
-**OWED:** the code is on `main` but nothing is on Render. If deployed, usage/news/input-report artifacts must be built ON THE WORKER (`load_season_usage` otherwise parses 100 MB of pbp in a request handler); set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so that fails loudly. A new usage FIELD needs `build_nfl_fantasy_usage.py --force`, not just a deploy.
+**OWED: the published artifact will not refresh itself.** It was pushed from a developer machine (`PUBLISH_OK`, 2,913,540 B, 18:35Z, user-approved), not built on the worker. The sustainable path is a refresh-worker autorun over `scripts/build_nfl_fantasy_projection_artifact.py --publish`, NOT built — and periodic work on that worker is never free (`#241` restart loop); this build holds the full engine ~23 s. Until then the board is a fixed 2026-08-21 snapshot. If deployed, usage/news/input-report artifacts must be built ON THE WORKER (`load_season_usage` otherwise parses 100 MB of pbp in a request handler); set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so that fails loudly. A new usage FIELD needs `build_nfl_fantasy_usage.py --force`, not just a deploy.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

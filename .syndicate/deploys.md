@@ -21140,3 +21140,55 @@ Two ways to finish, neither taken:
      the full engine for ~23 s.
 
 claim: RELEASED after this entry.
+
+## 2026-08-21 ~18:4xZ — web `aad7fb91` — NFL Fantasy Football surface IS LIVE AND SERVING
+
+service: web (`srv-d88ahvrbc2fs73eodu30`) | `713eacd9` → `aad7fb91`
+holder: `nfl-fantasy-projections` | preflight CLEAR ("only infrastructure
+processes running"). `render.yaml` NOT touched, so no `blueprint_sync`.
+
+**verify: `GET /nfl/api/fantasy/draft-board?limit=12` on production returns
+`available: true`, `source.mode: "artifact"`, `generated_at
+2026-08-21T18:35:14+00:00`, and a real ordered board** — Bijan Robinson RB1
+(VOR 167.9, proj 326.4), Ja'Marr Chase WR1 (153.4 / 311.4), Jahmyr Gibbs RB2.
+`/nfl/fantasy`, `?scoring=standard`, `?week=1` and the projections API all 200.
+
+**verify: the Fantasy pill is on the shared NFL nav** — `href="/nfl/fantasy"`
+present on `/nfl`, `/nfl/cards`, `/nfl/picks`; the hub carries
+`/nfl/fantasy?season=2026`. It was previously reachable only by typing the URL.
+NOT on `/nfl/live-lens`, `/nfl/props`, `/nfl/market-board` — those three render
+their own bespoke navs and never carried the shared module list. Pre-existing,
+unchanged by this work, and worth a separate look.
+
+**The artifact was published from a DEVELOPER MACHINE, not from the worker.**
+`publish_hot_artifact` → `PUBLISH_OK`, 2,913,540 bytes, at 18:35Z, with the
+user's explicit approval. It is the same authenticated push the worker would
+make and it landed at the same path
+(`nfl_source/fantasy/nfl_fantasy_projections_2026.json`, confirmed by
+`/api/ops/artifacts/export` count 1). **It will not refresh itself.** The
+sustainable path is a refresh-worker autorun over
+`scripts/build_nfl_fantasy_projection_artifact.py --publish`, which is NOT
+built — and before it is, note that periodic work on that worker is never free
+(`#241` caused a production restart loop) and this build holds the full engine
+for ~23 s.
+
+### Three defects found by deploying, each invisible until the served payload was read
+
+1. **`SKIP_NOT_ALLOWLISTED ... relative_path=None`.** The publisher expresses a
+   path relative to `SYNDICATE_DATA_ROOT`; unset, it resolved against the wrong
+   tree and the allowlist could not match a path it could not express. Not an
+   allowlist problem at all, though that is exactly what the log line says.
+2. **TLS `EOF occurred in violation of protocol` mid-upload.**
+   `publish_hot_artifact` defaults to a 10 s timeout, tuned for the small
+   per-date JSON most callers push; 2.83 MB does not fit in it. Surfaced only as
+   `publish -> False`. Now `--publish-timeout`, default 180 s.
+3. **THE PUBLISH WORKED AND THE ROUTE STILL SAID EMPTY.** `PUBLISH_OK`, file on
+   disk with count 1, and `/nfl/api/fantasy/draft-board` still
+   `available: false`. `load_projection_artifact` was `@lru_cache(season)` --
+   actively wrong on a service that RECEIVES pushed artifacts, because a process
+   that answered one request before the first publish memoises `None` until it
+   restarts. Now keyed on the file's `(mtime, size)`, so a publish invalidates
+   it. A regression test asserts the absent → published transition without a
+   restart.
+
+claim: RELEASED after this entry.
