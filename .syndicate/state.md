@@ -2336,14 +2336,31 @@ Re-check in-season with `scripts/probe_ncaaf_injury_feed.py`.
 
 ## [test-baselines] TEST BASELINES
 
-- **`tests/test_intelligence_state.py` is NOT "224 green" — that line was wrong
-  and is corrected here.** It carries **2 pre-existing failures on BOTH sides of
-  the reconcile** (`..._fallback_merge_falls_back_on_empty_pool`,
-  `..._recomputes_when_cached_snapshot_is_stale`), verified by swapping each
-  side's source + test file into one worktree. On the **deployed lineage** it is
-  **218 passed / 6 failed** (measured at `2b14fbeb`). **Gate against the lineage
-  you are shipping, not against `main`.** `[measured 08-14/15]`
-- It costs **~15 minutes**, so it is not a quick check.
+- **`tests/test_intelligence_state.py` — `224 passed, 10 subtests passed, 0
+  failed in 1361.70s`** `[measured 2026-08-20, lane intel-empty-pool-fallback-test,
+  todo.md #495]`. **It costs ~23 minutes, NOT the ~15 this line used to say.**
+- **READ THE NEXT TWO BULLETS BEFORE QUOTING THAT NUMBER.** This entry said, for
+  six days and in bold, that the file *is NOT "224 green" — that line was wrong
+  and is corrected here.* It is now 224 green again. **That is not a reverted
+  correction and must not be tidied into one** (`learnings.md` 08-20 forbids
+  re-applying a ledger edit by restoring an old revision). The 08-14/15 refutation
+  was RIGHT when written; both failures it named have since been resolved on their
+  merits:
+  - `..._fallback_merge_falls_back_on_empty_pool` — **fixed 2026-08-20**. The TEST
+    was the stale side: it asserted a `force_refresh` kwarg `#387` deliberately
+    removed from the `collect_all_recommendations:empty_fallback` call site. The
+    branch under test had been behaving correctly the whole time. `todo.md` `#495`.
+  - `..._recomputes_when_cached_snapshot_is_stale` — **passes on `main`**,
+    re-measured 2026-08-20 (72s), individually, not inferred from a suite total.
+    Cause of its recovery not investigated.
+- **THE LINEAGE CAVEAT SURVIVES, and now applies to MY number too.** The 224/0 run
+  was against the PRIMARY TREE's lineage (`d2222426` + the one-line test fix), **30
+  commits behind `origin/main`** at the time. The test file is byte-identical to
+  what shipped; the surrounding product code is not. **A clean tip-of-`main` number
+  is UNMEASURED** and costs ~23 min to take. **Gate against the lineage you are
+  shipping, not against `main`** — the rule that made the old
+  `218 passed / 6 failed` on the deployed lineage at `2b14fbeb` worth recording is
+  the same rule that bounds this replacement.
 - **`tests/test_intelligence.py` is 218 passed / 0 failed on committed `main`**
   `[measured 08-15 ~21:5xZ, lane red-intelligence-tests]`. It was **216/2** at
   the start of that session and 217/1 mid-way. All three reds were real, and
