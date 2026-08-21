@@ -1192,11 +1192,52 @@ def _market_tiles(
     if in_progress:
         ml_label = f"LIVE {ml_label}"
 
+    # BTTS AND CORNERS. Both are MODELLED on every build and neither reached a
+    # tile: `both_teams_scored_probability` sits on `total_distribution` and the
+    # corner means on `volume_projection`, and the pre-`_market_tiles` fallback
+    # truncated `metrics` to four, which is what dropped BTTS (this function's
+    # own docstring records that).
+    #
+    # NEITHER IS CAPTURED FROM A BOOK YET -- `DEFAULT_GAME_MARKETS` is
+    # ["h2h","totals","spreads"] -- so both tiles say "model only" in the
+    # sub-line rather than presenting a model number under a market-shaped
+    # heading. That is this function's stated rule and the reason MLS's empty
+    # book does not render as a price. When the market IS captured, the price
+    # replaces the label and the edge becomes real.
+    btts_p = _safe_float((total_distribution or {}).get("both_teams_scored_probability"))
+    btts_market = _safe_float((betting or {}).get("p_btts_yes"))
+    if btts_p is not None:
+        btts_title = f"BTTS YES {_fmt_pct(btts_p)}"
+        if btts_market is not None:
+            btts_sub = (f"Model {_fmt_pct(btts_p)} | Market {_fmt_pct(btts_market)} | "
+                        f"Edge {_fmt_edge(_edge_points(btts_p, btts_market))}")
+        else:
+            btts_sub = f"Model {_fmt_pct(btts_p)} | no market captured"
+        tiles_extra = [tile("Both teams to score", btts_title, btts_sub)]
+    else:
+        tiles_extra = []
+
+    vp = team_projection or {}
+    home_c, away_c = _safe_float(vp.get("home_corners")), _safe_float(vp.get("away_corners"))
+    if home_c is not None and away_c is not None:
+        total_c = home_c + away_c
+        corners_market = _safe_float((betting or {}).get("corners_total"))
+        if corners_market is not None:
+            side = "OVER" if total_c > corners_market else "UNDER"
+            corners_sub = f"Proj {total_c:.1f} | Line {corners_market:g} | {side}"
+        else:
+            # A MEAN, and labelled as one. There is no corner DISTRIBUTION
+            # published, so this cannot answer "over 9.5?" and must not look
+            # like it does.
+            corners_sub = f"{home_abbr} {home_c:.1f} | {away_abbr} {away_c:.1f} | model mean, no market"
+        tiles_extra.append(tile("Corners", f"{total_c:.1f} total", corners_sub))
+
     return [
         tile(ml_label, ml_title, ml_sub),
         tile(total_label, total_title, total_sub),
         tile(spread_label, spread_title, spread_sub),
         tile(prop_label, prop_title, prop_sub),
+        *tiles_extra,
     ]
 
 
@@ -1324,6 +1365,69 @@ def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abb
         "table_rows": table_rows,
         "rows": [],
     }
+
+
+def _momentum_section(
+    momentum: dict[str, Any] | None,
+    *,
+    away_abbr: str,
+    home_abbr: str,
+) -> list[dict[str, Any]]:
+    """Attack momentum as a card section -- the live-lens read of who is on top.
+
+    The panel the user tracks manually on FotMob/AiScore, computed from OUR OWN
+    ESPN commentary (`features/momentum.py`). Signed home-positive, so the
+    label has to name a TEAM rather than print a number nobody can orient: a
+    bare "+2.4" is unreadable without knowing which way is up.
+
+    A SPARKLINE, not a chart. The board renders text rows, so the series is
+    drawn with block characters -- enough to see a sustained excursion, which
+    is the thing that matters, without inventing a plotting layer.
+
+    Returns [] when there is no reading. An absent series and a flat one are
+    different states and must not render identically -- the reason
+    `poll_soccer_live_state._momentum_block` carries a stated `reason`.
+    """
+    if not isinstance(momentum, dict) or momentum.get("supported") is not True:
+        return []
+    series = momentum.get("series")
+    current = momentum.get("current")
+    if not isinstance(series, list) or not series or current is None:
+        return []
+
+    values = [float(p.get("v") or 0.0) for p in series if isinstance(p, dict)]
+    if not values:
+        return []
+    peak = max(1e-6, max(abs(v) for v in values))
+    # Eight levels, mid-band = neutral. Home above, away below.
+    blocks = "▁▂▃▄▅▆▇█"
+    spark = "".join(
+        blocks[min(len(blocks) - 1, int((v / peak + 1.0) / 2.0 * (len(blocks) - 1)))]
+        for v in values[-45:]
+    )
+
+    side = home_abbr if float(current) > 0 else (away_abbr if float(current) < 0 else "level")
+    strength = abs(float(current))
+    # Bands, not a raw number: the scale is arbitrary (weighted events under
+    # exponential decay), so an unlabelled magnitude invites false precision.
+    if strength < 1.0:
+        label = "balanced"
+    elif strength < 2.5:
+        label = f"{side} edging it"
+    elif strength < 5.0:
+        label = f"{side} on top"
+    else:
+        label = f"{side} pressing hard"
+
+    return [{
+        "title": "Attack momentum",
+        "rows": [
+            {"label": "Now", "value": label},
+            {"label": f"{away_abbr} ← last 45m → {home_abbr}", "value": spark},
+            {"label": "Pressure events", "value": str(momentum.get("events") or 0)},
+        ],
+    }]
+
 
 
 def _match_box_sections(
@@ -1477,6 +1581,11 @@ def _match_to_game(
     # in a payload `live_state_payload` has already loaded, so asking for it on
     # every match costs nothing.
     match_box = _match_box_state(league, str(match.get("date") or "")[:10], event_id)
+    # `games` holds only matches IN PLAY (`poll_soccer_live_state` keeps that
+    # separate from `match_box` on purpose, so a finished match cannot present
+    # a settled result as live). So this is None for pregame and final
+    # fixtures, and the momentum section correctly renders on neither.
+    live_game = _live_state_entry(league, str(match.get("date") or "")[:10], event_id, "games")
     effective_state = _effective_state_with_box(status_state, match.get("kickoff"), match_box)
     live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
 
@@ -1618,6 +1727,13 @@ def _match_to_game(
                 # REAL box first, sim box after -- the same order MLB's box tab
                 # uses, and the order that matters: on a finished match what
                 # happened outranks what was projected.
+                # LIVE-LENS FIRST while a match is in play: who is on top RIGHT
+                # NOW outranks both what has happened and what was projected.
+                *_momentum_section(
+                    live_game.get("momentum") if isinstance(live_game, dict) else None,
+                    away_abbr=_abbr(away_team, league),
+                    home_abbr=_abbr(home_team, league),
+                ),
                 *_match_box_sections(
                     match_box,
                     away_abbr=_abbr(away_team, league),
