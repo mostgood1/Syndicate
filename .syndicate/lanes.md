@@ -1015,7 +1015,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
-### wnba-halftime-elapsed — **OPEN, ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-halftime-elapsed — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
   **Testable outcome:** with period=2 and a blank clock, a +12 home margin and a
@@ -1066,7 +1066,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   diagnosable at all after three independent routes returned nothing.
 - Blocked by: none.
 
-### wnba-live-props-data — **OPEN — ALL 4 PHASES BUILT, WIRED AND DEPLOYED; PRICING STILL UNPROVEN.** `a41f88f8` live on live-odds-worker (capture tick) and refresh-worker (board build + prop gate). **VERIFIED: the wiring is REACHABLE and the refusal fires on real data** — first tick after landing, `WNBA_LIVE_BOX_EMPTY date=2026-08-21 games=3 players=0 -- nothing written`. **NOT VERIFIED: `players=0` means props have never seen a real player** — projection, probability and join have not run on live data; `livePropsCoverage` never populated, `rows_live_projected` never non-zero. DO NOT report live WNBA props as working. Deployed to the WRONG SERVICE first (refresh-worker skips wnba); see `deploys.md` `#498` and the learnings entry. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b capture / project / join-to-anchor, 33 tests + 20 subtests. **THE CHAIN HAS NEVER RUN END TO END IN PRODUCTION** — nothing calls the capture on a tick, so the artifact has never existed on a worker. Verified separately: live per-player data serves (`games=2 players_with_stats=39`), the anchor exists (`cards_sim_detail` → `min_mean` + `{stat}_mean` + `prop_ladders simCount 100`), and the empty-capture refusal fires on the real rolled slate. NEXT: 3(b) needs `liveModelProbOver`, which needs the remainder-scaling assumption GRADED — do not emit one until then. Narrative in `log/2026-08-21.md`. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-live-props-data — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ALL 4 PHASES BUILT, WIRED AND DEPLOYED; PRICING STILL UNPROVEN.** `a41f88f8` live on live-odds-worker (capture tick) and refresh-worker (board build + prop gate). **VERIFIED: the wiring is REACHABLE and the refusal fires on real data** — first tick after landing, `WNBA_LIVE_BOX_EMPTY date=2026-08-21 games=3 players=0 -- nothing written`. **NOT VERIFIED: `players=0` means props have never seen a real player** — projection, probability and join have not run on live data; `livePropsCoverage` never populated, `rows_live_projected` never non-zero. DO NOT report live WNBA props as working. Deployed to the WRONG SERVICE first (refresh-worker skips wnba); see `deploys.md` `#498` and the learnings entry. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b capture / project / join-to-anchor, 33 tests + 20 subtests. **THE CHAIN HAS NEVER RUN END TO END IN PRODUCTION** — nothing calls the capture on a tick, so the artifact has never existed on a worker. Verified separately: live per-player data serves (`games=2 players_with_stats=39`), the anchor exists (`cards_sim_detail` → `min_mean` + `{stat}_mean` + `prop_ladders simCount 100`), and the empty-capture refusal fires on the real rolled slate. NEXT: 3(b) needs `liveModelProbOver`, which needs the remainder-scaling assumption GRADED — do not emit one until then. Narrative in `log/2026-08-21.md`. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: live WNBA props. **Phase 1 (THIS LANE): persist the live per-player stat
   lines so a worker can read them.** The data was never missing --
   `/wnba/api/live_player_boxscore` serves minutes/pts/reb/ast/threes and has all
@@ -1236,8 +1236,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
   interval before any edge is priced** — same discipline as totals; an
   unbacktested live prop projection may be PUBLISHED but not PRICED.
-- Blocked by: none. NOT deployed — the capture still needs a worker tick to call
-  it (live-odds-worker's WNBA lane is the natural home, 240s cadence).
+- **HANDOFF `[2026-08-21]`.** Deployed and reachable; claims released; nothing
+  uncommitted. BOTH owed readings need a LIVE WNBA SLATE and neither is blocked
+  on code:
+  1. `WNBA_LIVE_BOX_CAPTURED games=N players=M` on live-odds-worker, then
+     `livePropsCoverage` on the lens and `rows_live_projected` on the board. If
+     the capture line appears and the other two stay empty, the fault is in the
+     join and its counters name it.
+  2. This lane's sibling `wnba-halftime-elapsed` needs a between-periods payload
+     (blank clock) to confirm the live lane survives the break.
+  Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
+  slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
