@@ -1162,9 +1162,12 @@ against a slate that actually had matches in play. Full evidence in
   `pipeline/layer2_shortlist.py`,
   `tests/test_layer2_sim_view_sides.py` (new),
   `tests/test_layer2_score_flatten.py`.
-  - `live_projection_join.py` was NOT edited in the end: it already recomputes
-    `edge_vs_market_pct` from `live_prob_over`, so the live verdict was correct
-    and merely unlabelled. The fix was in the two files that display it.
+  - `syndicate/features/shared/live_projection_join.py` and
+    `tests/test_live_prop_miss_attribution.py` ADDED to this lane 2026-08-21
+    ~23:5xZ, after the first production reading of `LIVE_PROJECTION_JOIN`
+    returned `miss_market=428 of 901` on MLB and the user asked for that gap
+    closed. (Its earlier exclusion note was correct at the time: the live
+    verdict was already right and merely unlabelled.)
 - Hypothesis: four independent defects, all of the same SHAPE — a number
   computed in one frame and displayed in another, with nothing on the surface
   saying which frame:
