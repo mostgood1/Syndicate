@@ -4233,3 +4233,68 @@ uniformly.**
   authored against the stale base and are SUPERSEDED, not lost. Restoring them
   resurrects dead status as if it were current, which is worse than dropping it.
 Here that was 28 lines to restore and 241 to correctly leave behind.
+
+## 2026-08-21 — AN UNCHANGED VALUE ACROSS A DEPLOY IS STALE DATA UNTIL PROVEN OTHERWISE
+
+**FORBIDDEN: concluding a deployed fix failed, from a reading whose artifact you
+have not shown was rebuilt by it.** Four false failures in one session, all this
+shape:
+
+1. Board baseline taken BEFORE the deploy — a pre-deploy rebuild satisfies it
+   while still running old code.
+2. Verified the layer2 SHORTLIST after waiting on the BOOK-GRID's rebuild.
+   Different artifacts, different writers. `written_at` sat at 16:36:25Z through
+   two "PASS" board rebuilds and two FAIL verdicts.
+3. Gate verification fired on a board built 6 minutes BEFORE the deploy went
+   live, and reported PARTIAL.
+4. Diagnosed the shortlist's writer as web — wrong;
+   `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is **false on web, true
+   on refresh-worker**.
+
+**The tell was available every time: RC Lens read `+1.63` twice.** A number
+byte-identical across a deploy is evidence about the READING, not the code.
+Compare the artifact's own timestamp against the deploy's `finishedAt` before
+believing any verdict.
+
+## 2026-08-21 — A SUCCESS-ONLY EMITTER MAKES ZERO INVISIBLE
+
+`_attach_confirmed_starters` printed inside `if confirmed:`. So "0 of 1 fixtures
+got a lineup" — the outcome needing investigation — logged NOTHING, and the
+silence read as "the step didn't run" for hours. I then concluded ESPN publishes
+lineups too late. **That was wrong**: ESPN had 22 confirmed starters for 3 of 4
+fixtures by 18:09Z. The real causes were a gate requiring BOTH sides to resolve
+>= 7 (Arsenal's 8 discarded for Coventry's 0; Standard's 9 for RAAL's 5) and a
+roster CSV with zero Coventry rows.
+
+**Rule: report the zero, not just the success.** Corollary already in this file
+— absence of a signal is a fact about the EMITTER first.
+
+## 2026-08-21 — A CONDITIONAL LOCAL IMPORT SHADOWS FOR THE WHOLE FUNCTION
+
+`live_lens_loop.py` took `from ... import write_json_file` inside a try/if in
+the WNBA branch. Python binds that name local for the entire function, so the
+snapshot write every sport reaches raised `UnboundLocalError` for mlb and soccer
+(wnba fine — its branch ran the import). **No live-lens snapshot was written for
+ANY sport.** Three consumers looked broken; one import was.
+
+An UNCONDITIONAL local import at the top of a function is harmless — it always
+runs before any use. Only the conditional one is a trap.
+`tests/test_live_lens_loop_no_shadowed_import.py` is the static guard, and it
+was verified to FAIL on the reverted source rather than merely pass on the fix.
+
+## 2026-08-21 — A NULL RESULT NEEDS A NEGATIVE CONTROL BEFORE IT IS EVIDENCE
+
+`/api/ops/artifacts/export?pattern=*soccer_live_lens*` returned `paths: []` and
+I nearly took it as proof the aggregate did not exist. `*mlb_live_lens*` returns
+0 paths too, and MLB's lens demonstrably works — the endpoint simply does not
+cover `live/`. **Run the control on something known-good before an absence
+counts.**
+
+## 2026-08-21 — A DOCSTRING DESCRIBES INTENT; THE CODE DESCRIBES BEHAVIOUR
+
+`soccer/live_lens.py` calls `live/soccer_live_lens.json` a "bookkeeping/
+validation snapshot only". I quoted that in a new module as the reason NOT to
+read it, and shipped an inert cross-service reader. `live_lens_loop.py` writes
+`poll_active_leagues_for_tick`'s FULL return there — every in-play match with
+its projection and live props. **Where a comment and the writer disagree, the
+writer wins.**

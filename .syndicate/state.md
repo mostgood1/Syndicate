@@ -69,7 +69,37 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
-## [soccer-live-match-state] Soccer cards can show live match state (VERIFIED 2026-08-20, NOT DEPLOYED)
+## [soccer-live-match-state] Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21)
+
+**All three live board gates read soccer's live re-sim and were measured on four
+matches actually in play** `[verified 2026-08-21 19:23Z, lane
+soccer-board-mlb-parity]`, board built 19:22:52Z i.e. AFTER the refresh-worker
+deploy (compared, not assumed). gate 2 PASS: 1144 rows considered, 58
+live-projected, 240/240 indexed, producer cap 4/12 reported. gate 3: index_size
+4, 19 considered, 19 projected, **19/19 withheld by
+`no_two_sided_market_price`** -- a named refusal, not a bare zero. gate 1
+`supported=true`, no corrections owed. **Every live probability MOVED off
+pregame** (Arsenal 0.79 -> 0.9125 after going 1-0; Standard Liege 0.41 ->
+0.3375 goalless at 32'), which is the check that separates a live tier from a
+pregame number in a live slot.
+
+**NOT YET SEEN: gate 3 PRICING a live edge.** Only withholding by name. Needs a
+live soccer market quoted two-sided; the four fixtures on 2026-08-21 were not.
+
+**Soccer live state does NOT cross services via the per-league files.**
+`poll_soccer_live_state.py` writes them with a raw `out_path.write_text()` on
+live-odds-worker; the board builds on refresh-worker, and `read_json_file`
+routes to keyvalue -- so neither the filesystem nor the key resolves. The only
+crossing artifact is `live/soccer_live_lens.json`, written through
+`refresh_state_store` by `live_lens_loop.py`, which carries
+`poll_active_leagues_for_tick`'s FULL return (every in-play match, its
+projection and its live props). `soccer/live_lens.py`'s docstring calling that
+path a "bookkeeping/validation snapshot only" describes INTENT, not behaviour.
+
+**Soccer's live projection publishes a scoreline distribution** (`9c8ec540`), so
+live totals AND spreads price at any line rather than only at 2.5.
+
+### Superseded: the 2026-08-20 card-only reading (kept because it is still true of the CARD)
 
 `origin/main` `ca75e0a1`; LIVE in production as grafts `bd4b1a67`
 (live-odds-worker, 21:33:45Z) and `075226dd` (web, 21:41:5xZ). Soccer's card

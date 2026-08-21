@@ -786,174 +786,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups=GSV-MIN`. Unowned as far as this lane knows.
 - Blocked by: none.
 
-### soccer-board-mlb-parity — OPEN, UNOWNED (session `56b563e0` checkpointed 2026-08-20 20:0x CDT) — **FIVE THINGS SHIPPED AND VERIFIED ON THE SERVED SURFACE; TWO SHIPPED BROKEN FIRST AND WERE CAUGHT BY THEIR OWN VERIFICATION.** Live: web `93b6d5a4` (unknown league slug 404s — 7/7 bad slugs, 10/10 leagues 200), web `0514f2d7` (card density 139 → 363/Mpx, 1074 → 970px), workers `68acf3ca`/`a05412f9` (departed players gone — Arsenal 28 → 23; squad absorption gone — Real Sociedad 50 → 24, zero Real Oviedo). ESPN-join regression guard re-run both sides: match rates identical, exact-canonical pairs la_liga 310→446, bundesliga 128→236. **STILL OPEN, and the reason this is not CLOSED:** five of the six collision pairs (incl. **Manchester City ↔ Manchester United, 0.812**) are fixed BY CONSTRUCTION and have never been rebuilt and read in production — only la_liga was. **`5848f64d`'s aggregates are LOCAL-MIRROR numbers**: `players_*.csv`/`rosters_*.csv` are absent from `HOT_ARTIFACT_PATTERNS` (403), so the builder's own inputs cannot be read from web. serie_a/bundesliga sit outside `week_dates_within_horizon`'s today+1 bound and rebuild themselves on 08-21 / 08-27 — not a failure, do not re-fire. Full narrative: `.syndicate/log/2026-08-20.md`. Measurements: `deploys.md` 21:14Z / 23:43Z / 01:01Z entries. — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
-- Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
-  carry the same information classes MLB's do. **Single testable outcome:** on a
-  fixed slate date, soccer's card renders (a) market tiles carrying selection +
-  price + model + edge rather than bare probabilities, (b) a box-score panel
-  built from real match state on a completed/live match instead of
-  "Box score unavailable", and (c) information density within 2x of MLB's
-  measured 544 leaf-text-items/Mpx — against soccer's measured 139 today.
-- Files:
-  - `syndicate/features/shared/game_board_contract.py` — the shared normalizer.
-    `_build_box_sections` clobbers a sport's own sections (:775, unconditional
-    assignment); `market_tiles` setdefault (:764) derives from `metrics[:4]`;
-    `_build_prop_status_rows` (:706) drops every synthesized row; the live
-    market-tile branch (:791) is unreachable when `metrics` is non-empty.
-  - `syndicate/features/soccer/cards.py` — **DECLARED OVERLAP, see Blocked by.**
-  - `syndicate/blueprints/soccer.py` — `/soccer` redirect (:87) and a new
-    date-scoped cross-league cards route.
-  - `syndicate/features/soccer/sources.py` — week->date resolution.
-  - `syndicate/templates/soccer/`, `syndicate/static/soccer/` (new files).
-  - `tests/test_soccer_*` (new), `.syndicate/*`.
-- The cross-session TODO list is deliberately NOT claimed here:
-  `mlb-overview-hydration-cost` already holds it and a second claim reads as
-  contested. I still reconcile my items into it at checkpoint, per CLAUDE.md.
-- **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, `adapters.py`,
-  ratings, `ingestion/*` — all held by `soccer-model-dispersion`. I do not
-  change what the model produces, only what the board does with it.
-- Hypothesis (diagnostic half, already tested): soccer's thin card is NOT a
-  missing-data problem — the data is in the payload and the shared normalizer
-  discards it. **CONFIRMED 2026-08-20 against production**, before any edit:
-  `/soccer/epl/api/cards` carries `betting.home_ml -590`, `away_ml +1400`,
-  `spread -1.5`, `total 2.5` and six per-market EV fields, while all four
-  rendered tiles read a bare probability with the matchup string repeated as
-  every sub-label. A completed MLS match (HOU 1-0 LA) carries `home.score`/
-  `away.score` in the same payload and renders "Box score unavailable".
-- Falsification test: if the same payloads had shown null prices / null EV /
-  no scores, the finding would be a data gap and this lane would be wrong to
-  open as UI work. They did not. Re-run `curl /soccer/<league>/api/cards` and
-  read `betting` + `home.score` before trusting any later claim here.
-- Verification: `scripts/ui_layout_probe.py` before/after on the soccer board
-  (the durable instrument named in `state.md [ui-board-cards]`), plus the
-  leaf-text-density measurement above re-taken against the SAME production
-  service, plus `python -m unittest tests.test_archives` green. A density
-  number taken against a dev box is not the reading.
-- **What shipped into the commit** (audit findings A-H, all measured on
-  production 2026-08-20 before any edit):
-  - **A. Landing.** `/soccer` -> `/soccer/cards?date=` across all ten
-    leagues. The old redirect landed on EPL matchweek 1 = ONE fixture,
-    kicking off the next day, out of 92 across the ten leagues. Soccer's
-    board was the only one keyed by (league, matchweek) rather than date and
-    each league runs its own calendar (MLS wk21 Aug 16-22 = 31 fixtures,
-    Bundesliga wk1 = Aug 28 = 1). The per-league board is untouched.
-  - **B. Market tiles.** Soccer now builds its own, mirroring
-    `mlb/cards.py::_market_tiles`. The generic `metrics[:4]` fallback showed
-    a bare probability with "COV @ ARS" as all four sub-labels while
-    `home_ml -590` / `away_ml +1400` / `total 2.5` / `spread -1.5` sat
-    unused on the same payload, and dropped BTTS + Over 2.5 to the cap.
-  - **C. Box score.** THREE instances of one clobber in `_normalize_game`
-    (`shared_box_sections`, `shared_prop_rows`, and the live tile branch)
-    each overwrote what the sport supplied. The July fix for
-    `shared_top_play_rows` had already named this shape and was never
-    applied to its neighbours. Also added a REAL score section: a completed
-    MLS match carried `home.score`/`away.score` and rendered "Box score
-    unavailable" because the builder read only the sim.
-  - **D. Props.** Joined to `build_soccer_picks`' captured price/edge via
-    props.py's OWN normaliser (not a second one). Rows are no longer
-    `is_synthesized`, so the status table stops rendering empty (0 -> 8).
-  - **E/F/G/H.** Top-play field mapping (value column held the MATCHUP
-    string); empty lens stat cells no longer rendered; the live tile branch
-    made reachable (it was guarded on a key the setdefault above it had
-    already filled — unreachable for any sport publishing `metrics`);
-    finished matches show a result instead of "not yet simulated".
-- **Edge is model-minus-market, deliberately NOT `betting.*_ev`.**
-  `build_soccer_picks.py:131` computes EV against ITS model prob, a
-  different vintage: `away_ml_ev 0.575` at +1400 implies ~10.5% where the
-  card renders 7.0%. Both fields stay on `betting` for other readers.
-- **Verification so far:** 19 new tests anchored to the production payloads
-  (4 assert reachability, off != on); 88 targeted soccer/board tests green;
-  `tests.test_archives` 31 failures before AND after, **the same 31 by
-  name** (diff clean) — all `data/`-dependent NFL/NBA/NCAAB tests that
-  cannot pass where `data/` is excluded by design. Rendered locally against
-  real artifacts: card height 1074 -> 829px, em-dash cells 6 -> 0, repeated
-  matchup sub-labels 4 -> 0, box sections 1 -> 2, prop status rows 0 -> 8.
-- **THE OPEN THREAD, and it is the one that matters:** the density number
-  that opened this lane (MLB 544 vs soccer 139 items/Mpx) has NOT been
-  re-taken against production. A local reading cannot take it — the mirror
-  has no picks/props for these dates, so the tiles that carry the new
-  content are empty locally. `_market_tiles` run over the real production
-  payload returns "COV ML +1400 | Model 7.0% | Market 6.3% | Edge +0.7 pts",
-  which proves the CODE and not the BOARD. Deploy web, then re-measure with
-  `scripts/ui_layout_probe.py` plus the leaf-density count, same service,
-  same instant. **A local reading must not be written up as the result.**
-- Blocked by: none, but **DECLARED OVERLAP**: `soccer-model-dispersion` (OPEN,
-  session `Soccer Session (fork)`, not running as of 2026-08-20 16:4xZ) claims
-  `syndicate/features/soccer/` with the parenthetical scope "(sim engine,
-  adapters, ratings, `ingestion/espn_match_stats.py`)". `cards.py` sits in that
-  directory and outside that parenthetical. I read it as not claimed, notified
-  that session with the exact file list before editing, and am proceeding on
-  that reading with the user's decision. **If that lane says otherwise, stop.**
-  Recording it here rather than omitting it, because a silent overlap is the
-  failure mode the lane protocol exists to prevent.
+### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-21 19:2xZ) — **SOCCER'S LIVE TIER IS WIRED AND VERIFIED ON FOUR LIVE MATCHES.** 16 commits on `origin/main`; live: web `c81a174c`, refresh-worker `af67b189`, live-odds-worker `bb01b616`. Gates 1/2/3 measured 19:23Z on a board built AFTER the deploy: gate 2 PASS (1144 considered, 58 live-projected, 240/240 indexed), gate 3 19/19 withheld by `no_two_sided_market_price` (named, not a bare zero), every live probability moved off pregame. Also verified: confirmed lineups reached the sim by player identity (Marseille 9/11 of ESPN's XI), the three-way `model_edge_pct` negation fixed (RC Lens away +1.63 → −1.65, 7/7 named regressions), Marseille totals priced at 3.0/3.5, Layer 2 today's slate 4/100 → 16/16. Narrative + dead ends: `.syndicate/log/2026-08-21.md`. Measurements: `deploys.md` 19:23Z entry. — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
+- Goal (unchanged): `/soccer` serves a date-scoped board whose cards carry the
+  same information classes MLB's do, and whose live tier updates during a match.
+- **OWED, and not claimed as done:**
+  1. **gate 3 has never been observed PRICING a live edge** — only withholding
+     by name. Needs a live soccer market quoted two-sided.
+  2. **The live totals lens is unproven**: harness ran n=1 with NEUTRAL ratings.
+     Multi-match aggregation is the next action.
+  3. **Per-side lineups shipped but never observed changing a build** — landed
+     after tonight's rebuilds.
+  4. **Two fair bases on one market**: home rows use `soccer_projections`'
+     de-vig, away/draw use layer2's `quote.fair_probability`. Residual median
+     0.47 / max 1.38 pts.
+  5. Inherited and still open: five of six ESPN-join collision pairs (incl.
+     Manchester City ↔ Manchester United, 0.812) fixed BY CONSTRUCTION and never
+     rebuilt in production; only la_liga was.
+- Files: `syndicate/features/shared/{board_enrichment,soccer_live_gameline_source,soccer_projections,layer2_board,publication_adapter,live_lens_loop}.py`,
+  `syndicate/features/soccer/{cards.py,features/live_lens.py,features/lineups.py}`,
+  `scripts/{build_soccer_artifacts,backtest_soccer_live_totals}.py`, `tests/test_soccer_*`.
+- **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, adapters,
+  ratings — held by `soccer-model-dispersion`.
+- Scope for next: `.syndicate/scope_2026-08-21_fotmob_xg_enrichment.md` (live
+  tier only; the argument AGAINST is in §6 and should be answered first).
+- Blocked by: none.
 
-- **LIVE MATCH STATE SHIPPED AND DEPLOYED `[2026-08-20T21:4xZ]`, session
-  `aeb71be7` (lane taken over; `56b563e0` is out of the active roster). On
-  `origin/main` as `ca75e0a1`; LIVE as grafts `bd4b1a67` (live-odds-worker,
-  21:33:45Z) and `075226dd` (web, 21:41:5xZ) -- both `--allow-off-main`,
-  measurement in `deploys.md`. Production reads `ALA 1 - 1 RAY` Final with real
-  Goals + Match stats sections, 0 pre-kickoff games showing a score, and 10 of
-  10 leagues publishing a `match_box` key absent at the parent SHA.
-  **ONE PATH STILL UNWITNESSED IN PRODUCTION: the LIVE CLOCK** -- every
-  production reading is of a FINISHED match, which correctly has no clock. It
-  was measured locally at the 70th and 83rd minutes pre-deploy. Next MLS
-  kickoffs ~23:30Z would close it.**
-- **A SECOND WEB DEPLOY WAS NEEDED, and the first `verify: PASSED` is why
-  `[2026-08-20T22:00Z, web `79cb457e`]`.** That first reading was true when
-  taken and FALSE THREE MINUTES LATER: web is reading the GIT-TRACKED MIRROR of
-  `recommendations_2026-08-20.json` (`generated_at 2026-07-20`, `status_state
-  "pre"`), so every score source correctly refused it while `match_box` on the
-  same disk carried `final: true, 1-1`. `_effective_state_with_box` lets the
-  fresher per-match ESPN reading set the state; upgrade-only, kickoff refusal
-  still applies. Now 6 of 6 reads serve `ALA 1 - 1 RAY` Final with real box
-  sections WHILE THE ARTIFACT IS STILL STALE.
-- **STILL BROKEN, NOT THIS LANE'S: some producer is serving web a month-old
-  `recommendations_*.json` mirror.** The card is resilient to it now, which is
-  not the same as fixed -- the sim projections, win probabilities and market
-  tiles on that card are still read from a 2026-07-20 artifact. Worth its own
-  lane. All
-  three gaps closed: real live AND final score, clock/period on the card, real
-  live+final box sections. Verified on live La Liga 401882908 in BOTH states
-  (83' 1-0, then FT 1-1 with `games` empty -- the finished case that
-  previously had no score path at all). 21 new tests fail without the change;
-  141 pass against `origin/main`. Narrative, evidence and the three mistakes
-  made: `.syndicate/log/2026-08-20.md`.
-- **Two diagnoses in the handoff were WRONG and are corrected in
-  `learnings.md`:** `live_home_score` is a real ESPN reading, not a
-  placeholder (the 12-match sample was 100% `pre`), and soccer's
-  `picks_*.csv`/`recommendations_*.json` ARE allowlisted and DO export 200.
-- **Squad price-coverage lead: SETTLED, both hypotheses wrong.**
-  `_normalize_player_name` EXONERATED (17/17 join); not a top-N cap (book
-  offers 47). Real causes are a DIFFERENT feed->sim join failure on word order
-  (`"Gabriel"` vs `"Magalhaes Gabriel"`), a partly stale squad, and players the
-  book does not list for the fixture.
-- **NEXT ACTION for whoever picks this up: deploy `web`** (claim + preflight;
-  nothing here is worker-side except `poll_soccer_live_state`, which needs
-  `live-odds-worker` to serve `match_box`). **DO NOT fix the name join with a
-  token-subset matcher** -- the squad contains `Gabriel`, `Gabriel Jesus` AND
-  `Gabriel Martinelli`; any fix must refuse on ambiguity.
-- **The primary-tree LANDMINE is RESOLVED `[re-checked 22:0xZ]`** -- a merge
-  brought both files forward; `git status` on `soccer/cards.py` and
-  `tests/test_soccer_board_mlb_parity.py` is clean there and the tree carries
-  `_artifact_score`/`_effective_state_with_box`. The duplicate ledger commit
-  `f9f6fcd8` was absorbed too; the primary tree is no longer ahead of
-  `origin/main`.
-- **Cause (2) of the price lead -- the stale squad -- was fixed by ANOTHER
-  session**: `5848f64d` "the squad was every player who had EVER played in the
-  league", recorded INERT by its own lane (worker code, no worker carries it).
-  Cause (1), the feed->sim NAME JOIN on word order, is still open.
-- **SESSION CLOSED 2026-08-20 22:1xZ (`aeb71be7`). LANE STAYS OPEN AND IS NOW
-  UNOWNED.** Everything shipped and deployed; ONE verification is outstanding
-  and it is not blocked by anything except the absence of a match.
-- **THE ONLY OPEN ITEM: witness the LIVE CLOCK in production.** Measured at
-  22:14:49Z, all ten leagues: **live=0**, so it could not be taken. (The earlier
-  "next MLS kickoffs ~23:30Z" note was WRONG -- MLS has no fixture in that
-  window.) Real next chances: **2026-08-21 18:45Z** (ligue_1 Strasbourg @
-  Marseille, belgian RAAL @ Standard Liege) and **19:00Z** (epl Coventry @
-  Arsenal, la_liga Real Sociedad @ Real Betis). Take the reading ~20 min after
-  kickoff. Assertions to make are written out in `log/2026-08-20.md` under
-  "session close" -- do not re-derive them.
-- Claims: none held. Deploys: none pending.
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
