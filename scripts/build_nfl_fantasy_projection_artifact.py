@@ -50,6 +50,11 @@ def main() -> int:
     parser.add_argument("--season", type=int, default=2026)
     parser.add_argument("--weeks", default="1-18", help="e.g. 1-18, or 1,2,3, or none")
     parser.add_argument("--publish", action="store_true", help="push to the web service")
+    # `publish_hot_artifact` defaults to 10s, which is tuned for the small
+    # per-date JSON most callers push. This artifact is ~2.8 MB and a 10s
+    # ceiling drops the TLS connection mid-upload ("EOF occurred in violation
+    # of protocol"), which surfaces only as `publish -> False`.
+    parser.add_argument("--publish-timeout", type=int, default=180)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -131,7 +136,7 @@ def main() -> int:
     if args.publish:
         from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 
-        published = publish_hot_artifact(target)
+        published = publish_hot_artifact(target, timeout_seconds=args.publish_timeout)
         print(f"publish -> {published}", flush=True)
         if not published:
             print(

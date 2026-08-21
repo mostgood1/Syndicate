@@ -377,6 +377,15 @@ def build_module_links(selected_week: int, active_label: str, *, season: int | N
         # orphaned pages, reachable only by typing the URL directly.
         ("Props", f"/nfl/props?season={resolved_season}&week={selected_week}"),
         ("Market Board", f"/nfl/market-board?season={resolved_season}&week={selected_week}"),
+        # Fantasy carries NO season or week, deliberately, and it is the only
+        # link here that does not. The rest of this list navigates the
+        # recommendation-snapshot domain -- `resolved_season` comes from which
+        # snapshots exist. The fantasy surface projects an UPCOMING season and
+        # owns a full 1-18 week domain, so during an offseason the two numbers
+        # genuinely differ; forwarding `season=2025` would land every visitor on
+        # a season the projection has nothing for, which renders as the empty
+        # state and looks like a broken page. Bare, it resolves its own default.
+        ("Fantasy", "/nfl/fantasy"),
         ("Hub", "/nfl/hub"),
     ]
     return [{"label": label, "href": href, "active": label == active_label} for label, href in links]

@@ -18,6 +18,10 @@
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
 
+  {% with route_label='/nfl/fantasy', title='Fantasy Football', body='ESPN-scoring season and weekly projections for QB/RB/WR/TE/K/DST, with a value-over-replacement draft board. Player usage comes from real play-by-play; team scoring environment is priced off posted market lines rather than the game simulator. Graded on a held-out season against a "what he did last year" baseline.', action_href='/nfl/fantasy?season=' ~ fantasy_season, action_label='Open fantasy projections' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
   {% with eyebrow='Stored weekly snapshots', title='Available NFL recommendation weeks', body='The hub surfaces the weekly recommendation snapshot files already present in the source repo, so the first Syndicate NFL module is driven by real stored outputs.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}
   {% endwith %}

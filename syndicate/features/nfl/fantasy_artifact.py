@@ -303,7 +303,15 @@ class ProjectionArtifact:
         return out
 
 
-@lru_cache(maxsize=4)
+def _artifact_fingerprint(path: Path) -> tuple[float, int] | None:
+    """``(mtime, size)`` for the artifact, or ``None`` when it is absent."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_mtime, stat.st_size)
+
+
 def load_projection_artifact(season: int) -> ProjectionArtifact | None:
     """Read the published artifact, or ``None`` when it is not on this substrate.
 
@@ -312,10 +320,30 @@ def load_projection_artifact(season: int) -> ProjectionArtifact | None:
     on-request rebuild -- both were how the pre-artifact version 500'd on
     production (``CLAUDE.md``: "If data is missing at request time, the correct
     behavior is a degraded/empty UI state, not an on-request backfill").
+
+    **THE CACHE IS KEYED ON THE FILE'S FINGERPRINT, NOT ON THE SEASON, AND THAT
+    IS THE WHOLE POINT.** A plain ``@lru_cache(season)`` here is actively wrong
+    on this service: artifacts arrive by being PUSHED from the worker at any
+    moment, so a web process that answered one request before the first publish
+    caches ``None`` and keeps serving the empty state until it restarts.
+    Measured on production 2026-08-21 -- the publish returned `PUBLISH_OK`,
+    `/api/ops/artifacts/export` confirmed the file on disk with count 1, and
+    `/nfl/api/fantasy/draft-board` still reported `available: false`. Nothing
+    was wrong except that the answer had been memoised before it existed.
+    Fingerprinting means the next publish invalidates the entry by itself.
     """
     path = artifact_path(season)
-    if not path.is_file():
+    fingerprint = _artifact_fingerprint(path)
+    if fingerprint is None:
         return None
+    return _load_projection_artifact(season, str(path), fingerprint)
+
+
+@lru_cache(maxsize=8)
+def _load_projection_artifact(
+    season: int, path_text: str, fingerprint: tuple[float, int]
+) -> ProjectionArtifact | None:
+    path = Path(path_text)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -334,6 +362,9 @@ def load_projection_artifact(season: int) -> ProjectionArtifact | None:
         },
         path=str(path),
     )
+
+
+load_projection_artifact.cache_clear = _load_projection_artifact.cache_clear  # type: ignore[attr-defined]
 
 
 def artifact_substrate(season: int) -> dict[str, Any]:

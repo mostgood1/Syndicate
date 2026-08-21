@@ -72,6 +72,12 @@ def hub():
         current_week=current,
         available_weeks=weeks,
         season=season,
+        # Its own season, not `latest_season()`. That resolves from which
+        # recommendation SNAPSHOTS exist, which is a different question from
+        # which season the fantasy engine projects -- and during an offseason
+        # the two genuinely differ, which would point the hub link at a season
+        # the projection surface has nothing for.
+        fantasy_season=DEFAULT_FANTASY_SEASON,
         summary_stats=[
             {"label": "Weeks with snapshots", "value": str(len(weeks))},
             {"label": "Latest season", "value": str(season)},

@@ -166,3 +166,37 @@ def test_served_payload_names_its_source():
     assert payload["source"]["generated_at"]
     assert payload["available"] is True
     assert payload["basis"]["artifact"]["exists"] is True
+
+
+@requires_artifact
+def test_a_newly_published_artifact_is_picked_up_without_a_restart(tmp_path, monkeypatch):
+    """THE PRODUCTION BUG THIS EXISTS TO PREVENT A SECOND TIME.
+
+    Artifacts arrive by being PUSHED from the worker at any moment, so a cache
+    keyed only on the season memoises the pre-publish answer and serves the
+    empty state until the process restarts. Measured on production: publish
+    returned PUBLISH_OK, /api/ops/artifacts/export showed the file on disk with
+    count 1, and the route still reported `available: false`.
+    """
+    import shutil
+
+    source = artifact_path(SEASON)  # resolved BEFORE the env is repointed
+    root = tmp_path / "nfl_source"
+    root.mkdir(parents=True)
+    monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(root))
+    load_projection_artifact.cache_clear()
+    try:
+        assert load_projection_artifact(SEASON) is None, "expected absent to start"
+        # ASK THE CODE WHERE IT LOOKS rather than assuming the layout. The NFL
+        # source root probes several candidates and, in an empty directory,
+        # settles on a `source_artifacts/` variant -- so a test that hardcodes
+        # `<root>/fantasy/` writes somewhere nothing reads and "fails" for a
+        # reason that has nothing to do with the behaviour under test.
+        destination = artifact_path(SEASON)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        after = load_projection_artifact(SEASON)
+        assert after is not None, "a published artifact was not picked up without a restart"
+        assert after.season_rows
+    finally:
+        load_projection_artifact.cache_clear()
