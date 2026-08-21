@@ -21714,3 +21714,34 @@ does not exist yet (nflverse's newest is 2025; the weekly report is a
 regular-season artifact). Served basis confirms it: `injuries_scanned: 0`,
 `players_with_availability_signal: 0`. It begins moving numbers when Week 1
 designations publish, and `NFL_INJURIES_FETCH` is already polling 6-hourly.
+
+### UPDATE 22:32Z — RECOVERED, DEGRADED. The loop broke on its own.
+
+No `server_failed` since **22:26:54** — five minutes without a cycle, which is
+the reading that matters, not any single 200. Home's response time FELL as
+caches warmed (20.9s -> 14.5s -> 9.9s -> 12.1s), the signature of an instance
+finally surviving one full warm-up instead of being killed mid-bootstrap.
+
+    board  200 in 0.23-0.45s   healthy
+    cards  200 in 1.28s        healthy
+    home   200 in 12.1s        SLOW, and still times out intermittently
+
+**No action was taken to recover it.** The publish flood drained (16/s at
+22:25:49 -> 1-2/s by 22:26:12) and web stopped being starved. Option 1 from the
+handover list -- "let it drain and see" -- is what actually happened, and it is
+worth recording that the two more invasive options were NOT needed.
+
+**Caveat on the degraded numbers:** the probe fired three routes back-to-back,
+so some of that load is self-inflicted. 12s on home is real regardless.
+
+**WHAT IS STILL TRUE AND UNFIXED:** home does per-game compute in the request
+path for 15 MLB games against a **5-second** health check. That is the
+architectural rule this repo already states, and it means any future load spike
+-- a worker restart, a publish burst, a bigger slate -- re-enters the same
+spiral. Tonight's trigger was self-inflicted (a three-service deploy at 21:52);
+the fragility was not.
+
+**STILL UNRESOLVED: the card fix `0aaf71f0` remains neither validated nor
+disproven.** It is rolled back with its latency effect never measured. Do not
+re-deploy it without timing `/soccer/api/cards` before and after -- the unit
+tests mock `read_json_file` and cannot see the cost.
