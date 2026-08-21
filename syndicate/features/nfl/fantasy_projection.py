@@ -100,6 +100,20 @@ class EngineConfig:
     Marked FITTED = selected on 2024, material effect. Marked UNFITTED = swept,
     no effect distinguishable from noise, left at its default. Marked
     STRUCTURAL = a definition, not an estimate.
+
+    **RE-SWEPT 2026-08-21** after the role prior was refitted, over 11
+    parameters with the three edge-selecting grids widened. The whole sweep
+    moved the fit-season MAE 48.68 -> 48.08, and the ADOPTION RULE was: a
+    parameter changes only if its grid spans at least ~0.4 MAE **and** its
+    optimum is interior (or at a natural bound). By that rule exactly one
+    parameter moved -- `share_history_half_games`, 12.0 -> 18.0. Seven others
+    spanned 0.06-0.24 MAE with ragged or edge-selecting curves and stayed at
+    their defaults; `season_recency_weights` spans 1.06 MAE but essentially all
+    of it is "one season versus several", and the default is already several.
+
+    A sweep that reports a best value for every parameter is not the same as a
+    sweep that MEASURED every parameter, and treating the two as equal is how a
+    grid search launders noise into constants.
     """
 
     #: How many prior seasons feed a player's history, most recent first, and
@@ -108,10 +122,14 @@ class EngineConfig:
     season_recency_weights: tuple[float, ...] = (1.0, 0.55, 0.30)
 
     #: Games of a player's own history at which his usage share is trusted
-    #: half as much as the role prior. FITTED: 8.0 -> 12.0, fit-season MAE
-    #: 49.34 -> 48.95, monotone improvement across 2/4/6/8/12 before
-    #: turning back at 18. Trust a player's own record MORE, not less.
-    share_history_half_games: float = 12.0
+    #: half as much as the role prior. FITTED, and re-fitted 2026-08-21 after
+    #: the role prior itself changed: 8.0 -> 12.0 -> 18.0. Rises monotonically
+    #: across 2/4/6/8/12/18 and TURNS BACK at 26, so this is a genuine interior
+    #: optimum rather than the grid edge it looked like on the narrower sweep.
+    #: Second-largest effect in the engine (fit-season MAE span 3.17 across the
+    #: grid). The direction is consistent both times: trust a player's own
+    #: record MORE than the role prior, not less.
+    share_history_half_games: float = 18.0
 
     #: Prior weight (in opportunities) pulling a player's efficiency toward the
     #: position mean. Separate per stat because the underlying noise differs by
@@ -998,6 +1016,15 @@ def role_priors(season: int) -> RolePriors:
         if not players:
             continue
         prior_players, _ = load_season_usage(fit_season - 1)
+        # WITHOUT the prior season's usage there is no way to tell a returning
+        # role-holder from a player who has never held one, and EVERY
+        # non-rookie would silently land in `no_prior_role` -- dragging that
+        # bucket toward starter-like shares, which is the opposite of what it
+        # means. Measured: pbp_2021 is not on this substrate, so the whole 2022
+        # cohort was being mislabelled that way. Rookies are unaffected (their
+        # bucket does not depend on prior usage), so that season still
+        # contributes what it legitimately can.
+        rookies_only = not prior_players
         league_rate = {
             team_field: _safe_divide(
                 sum(getattr(entry, team_field) for entry in teams.values()),
@@ -1010,6 +1037,8 @@ def role_priors(season: int) -> RolePriors:
                 continue
             usage = players.get(entry.player_id)
             prior_usage = prior_players.get(entry.player_id)
+            if rookies_only and not entry.is_rookie:
+                continue
             for pool, player_field, team_field in pools:
                 key = (
                     pool,

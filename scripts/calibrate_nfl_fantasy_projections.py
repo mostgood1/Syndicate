@@ -51,9 +51,14 @@ from syndicate.features.nfl.fantasy_scoring import resolve_scoring  # noqa: E402
 
 #: One pass, one parameter at a time. Candidate values bracket the hand-set
 #: default rather than exploring freely -- see the module docstring.
+#: Grids widened 2026-08-21 wherever the previous pass SELECTED A GRID EDGE.
+#: An edge selection is not an optimum -- it is the search telling you it ran
+#: out of room, and banking it as "fitted" claims a measurement the sweep did
+#: not make. `ypc`/`ypt` had bottomed out and `team_volume_prior_games` had
+#: topped out, so all three now extend past where they landed.
 SWEEPS: tuple[tuple[str, tuple], ...] = (
     ("role_curve_strength", (0.0, 0.25, 0.4, 0.5, 0.65, 0.8, 1.0)),
-    ("share_history_half_games", (2.0, 4.0, 6.0, 8.0, 12.0, 18.0)),
+    ("share_history_half_games", (2.0, 4.0, 6.0, 8.0, 12.0, 18.0, 26.0)),
     (
         "season_recency_weights",
         (
@@ -64,9 +69,11 @@ SWEEPS: tuple[tuple[str, tuple], ...] = (
             (1.0, 0.85, 0.7),
         ),
     ),
-    ("ypc_prior_opportunities", (30.0, 60.0, 90.0, 150.0, 250.0)),
-    ("ypt_prior_opportunities", (15.0, 30.0, 45.0, 80.0, 140.0)),
-    ("team_volume_prior_games", (2.0, 4.0, 8.0, 16.0, 32.0)),
+    ("ypc_prior_opportunities", (5.0, 15.0, 30.0, 60.0, 90.0, 150.0, 250.0)),
+    ("ypt_prior_opportunities", (2.0, 6.0, 15.0, 30.0, 45.0, 80.0, 140.0)),
+    ("catch_rate_prior_opportunities", (5.0, 15.0, 40.0, 90.0, 200.0)),
+    ("ypa_prior_opportunities", (30.0, 90.0, 180.0, 400.0, 900.0)),
+    ("team_volume_prior_games", (2.0, 8.0, 16.0, 32.0, 64.0, 128.0)),
     ("availability_prior_games", (4.0, 8.0, 12.0, 20.0, 40.0)),
     ("rz_weight_receiving", (0.0, 0.3, 0.55, 0.8, 1.0)),
     ("gl_weight_rushing", (0.0, 0.35, 0.65, 0.85, 1.0)),

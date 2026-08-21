@@ -2,7 +2,7 @@
  "season": 2025,
  "scoring": "ppr",
  "min_games": 8,
- "verdict": "PASS",
+ "verdict": "FAIL",
  "graded_players": 256,
  "results": [
   {
@@ -42,68 +42,68 @@
   {
    "label": "engine_no_market",
    "n": 256,
-   "mae": 49.55,
-   "bias": 10.93,
-   "spearman": 0.7272,
+   "mae": 50.0,
+   "bias": 12.03,
+   "spearman": 0.7287,
    "by_position": {
     "K": {
      "n": 27,
-     "mae": 30.03,
-     "spearman": 0.3933
+     "mae": 30.04,
+     "spearman": 0.3737
     },
     "QB": {
      "n": 27,
-     "mae": 60.05,
-     "spearman": 0.6361
+     "mae": 57.18,
+     "spearman": 0.6697
     },
     "RB": {
      "n": 61,
-     "mae": 56.48,
-     "spearman": 0.7639
+     "mae": 57.5,
+     "spearman": 0.7621
     },
     "TE": {
      "n": 50,
-     "mae": 36.74,
-     "spearman": 0.7898
+     "mae": 38.5,
+     "spearman": 0.7797
     },
     "WR": {
      "n": 91,
-     "mae": 54.63,
-     "spearman": 0.6654
+     "mae": 55.07,
+     "spearman": 0.6621
     }
    }
   },
   {
    "label": "engine_with_market_LEAKY",
    "n": 256,
-   "mae": 48.92,
-   "bias": 11.32,
-   "spearman": 0.737,
+   "mae": 49.23,
+   "bias": 12.43,
+   "spearman": 0.7373,
    "by_position": {
     "K": {
      "n": 27,
-     "mae": 29.4,
-     "spearman": 0.4989
+     "mae": 29.41,
+     "spearman": 0.4888
     },
     "QB": {
      "n": 27,
-     "mae": 56.4,
-     "spearman": 0.7607
+     "mae": 53.42,
+     "spearman": 0.7656
     },
     "RB": {
      "n": 61,
-     "mae": 56.33,
-     "spearman": 0.7746
+     "mae": 57.07,
+     "spearman": 0.7703
     },
     "TE": {
      "n": 50,
-     "mae": 36.62,
-     "spearman": 0.7938
+     "mae": 38.16,
+     "spearman": 0.7907
     },
     "WR": {
      "n": 91,
-     "mae": 54.29,
-     "spearman": 0.6705
+     "mae": 54.7,
+     "spearman": 0.6676
     }
    }
   }
@@ -146,9 +146,9 @@
   {
    "label": "engine_no_market",
    "n": 256,
-   "mae": 3.68,
-   "bias": 1.16,
-   "spearman": 0.6255,
+   "mae": 3.72,
+   "bias": 1.22,
+   "spearman": 0.6288,
    "by_position": {
     "K": {
      "n": 27,
@@ -157,32 +157,32 @@
     },
     "QB": {
      "n": 27,
-     "mae": 4.22,
-     "spearman": 0.3278
+     "mae": 4.07,
+     "spearman": 0.3547
     },
     "RB": {
      "n": 61,
-     "mae": 4.15,
-     "spearman": 0.6676
+     "mae": 4.23,
+     "spearman": 0.6683
     },
     "TE": {
      "n": 50,
-     "mae": 2.79,
-     "spearman": 0.6335
+     "mae": 2.95,
+     "spearman": 0.6069
     },
     "WR": {
      "n": 91,
-     "mae": 4.11,
-     "spearman": 0.5488
+     "mae": 4.14,
+     "spearman": 0.555
     }
    }
   },
   {
    "label": "engine_with_market_LEAKY",
    "n": 256,
-   "mae": 3.63,
-   "bias": 1.18,
-   "spearman": 0.6361,
+   "mae": 3.67,
+   "bias": 1.24,
+   "spearman": 0.6421,
    "by_position": {
     "K": {
      "n": 27,
@@ -191,23 +191,23 @@
     },
     "QB": {
      "n": 27,
-     "mae": 3.96,
-     "spearman": 0.4377
+     "mae": 3.81,
+     "spearman": 0.428
     },
     "RB": {
      "n": 61,
-     "mae": 4.14,
-     "spearman": 0.6735
+     "mae": 4.2,
+     "spearman": 0.6795
     },
     "TE": {
      "n": 50,
-     "mae": 2.78,
-     "spearman": 0.6278
+     "mae": 2.91,
+     "spearman": 0.621
     },
     "WR": {
      "n": 91,
-     "mae": 4.09,
-     "spearman": 0.5583
+     "mae": 4.11,
+     "spearman": 0.5637
     }
    }
   }
