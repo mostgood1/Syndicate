@@ -316,3 +316,32 @@ def test_schedule_fetcher_publishes_its_output():
     makes one. Without it the game-context input never reaches web."""
     source = (REPO_ROOT / "scripts" / "fetch_nfl_schedule.py").read_text(encoding="utf-8")
     assert "publish_hot_artifact" in source
+
+
+def test_nfl_refresh_actually_runs_the_schedule_fetch():
+    """The third thing the game-context input needed, and the one that was
+    missing longest: something that RUNS the fetcher.
+
+    An allowlist entry and a publish call are both inert if nothing invokes
+    the script. Before this, `fetch_nfl_schedule.py` was referenced only by its
+    own docstring, a sibling's comment, and a test.
+    """
+    import argparse
+    import importlib.util
+    import sys as _sys
+
+    path = REPO_ROOT / "scripts" / "refresh_odds_sources.py"
+    spec = importlib.util.spec_from_file_location("_refresh_odds_sources", path)
+    module = importlib.util.module_from_spec(spec)
+    _sys.modules["_refresh_odds_sources"] = module
+    spec.loader.exec_module(module)
+
+    args = argparse.Namespace(season=2026, week=1, date=None, phase="pregame")
+    steps = module._build_nfl_steps(args)
+    names = [s.name for s in steps]
+    assert "nfl_schedule_refresh" in names, names
+    step = next(s for s in steps if s.name == "nfl_schedule_refresh")
+    assert any("fetch_nfl_schedule.py" in str(part) for part in step.command), step.command
+    # Must run before the odds refresh -- the board's implied total should not
+    # be built from last cycle's spread.
+    assert names.index("nfl_schedule_refresh") < names.index("nfl_oddsapi_refresh"), names

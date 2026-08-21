@@ -909,6 +909,36 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("nfl", "NFL-Betting")
     season, week = _infer_nfl_context(source_root, artifact_root, args.season, args.week)
     steps = [
+        # `schedule_{season}.csv` FIRST, because it is now a MODEL INPUT and not
+        # just a calendar: syndicate/features/nfl/game_context.py reads its
+        # `spread_line`/`total_line` to build the implied team total the prop
+        # model's game-context adjustment runs on (+1.18 ROI points, measured
+        # paired on 16,906 held-out 2025 bets).
+        #
+        # IT HAD NO AUTOMATED CALLER AT ALL before this -- `fetch_nfl_schedule.py`
+        # was referenced only by its own docstring, a sibling's comment, and a
+        # test. So the file existed on a developer machine and was never
+        # refreshed or published anywhere, which made the whole mechanism inert
+        # in production however correctly it was wired. Three separate things
+        # were needed and all three were missing: an allowlist entry, a publish
+        # call, and THIS -- something that actually runs it.
+        #
+        # Every cycle rather than once a season: books move spreads and totals
+        # continuously, and a stale line is a wrong implied total, not a missing
+        # one -- which is the failure mode that stays invisible. The fetch is one
+        # small GitHub download.
+        RefreshStep(
+            name="nfl_schedule_refresh",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/fetch_nfl_schedule.py",
+                "--season",
+                str(season),
+            ),
+            description="Refresh the NFL schedule (spread_line/total_line) and publish it to web.",
+        ),
         RefreshStep(
             name="nfl_oddsapi_refresh",
             phases=("pregame", "live"),
