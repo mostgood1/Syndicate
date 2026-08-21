@@ -21823,3 +21823,39 @@ have expired on its own at ~22:54:34Z. I deployed at 22:42. That is the actual
 price paid for taking an active lane's lock mid-incident -- worth knowing next
 time the question comes up, because "wait for the TTL" was a cheaper option than
 it looked.
+
+## 2026-08-21T23:20Z — web `6c5abb51` -> `003a5866`. Buzz is a dialog, and the CSS item CLOSED.
+
+Lane: nfl-fantasy-projections. Claim taken normally (web was free), released
+after. `render.yaml` untouched. Web was already on `6c5abb51`, so this advanced
+by ONE commit — my own. The Layer 2 merge I expected to carry was already live,
+and I checked `lanes.md`/`deploys.md` for a do-not-deploy note on it first,
+having shipped a rolled-back commit unknowingly earlier tonight.
+
+verify (behaviour, production markup): `/nfl/fantasy` serves 101 buzz BUTTONS /
+414 quiet, the dialog element, and an 82-player / 93-item JSON payload;
+filtered view 45 buttons / 23 players.
+
+**THE PREVIOUSLY-UNVERIFIABLE CSS IS NOW MEASURED, and it is worth recording
+HOW, because the obstacle was the instrument.** The local check was blocked
+because the preview pane renders `file://` pages as static snapshots and CACHES
+the parsed stylesheet — it kept reporting `min-height: 0px` / `content-box` no
+matter what the file said, so a CSS edit could not be re-checked at all. The
+production host is blocked in the pane by policy, and a cross-origin fetch to it
+fails. What worked: download the PRODUCTION html, write it into the local dev
+server's `static/`, and load it over `http://localhost` — a real origin, parsed
+fresh.
+
+    badge min-height   24px   (computed; was 0px, box 34x17 -> 38x24)
+    panel box-sizing   border-box
+    desktop 713px      panel 666px, fits
+    narrow  521px      panel 489px, left 16 right 505, fits, no horizontal body scroll
+
+Under the old content-box rule that narrow panel computes to 489+37 = 526px in a
+521px viewport, which is the overflow this fixes. So the defect was real and the
+fix is now DEMONSTRATED, not merely reasoned — the previous entry's "unverified"
+caveat is discharged.
+
+Not a clean measurement of the phone preset: the pane reports 521x1129 for a
+375x812 preset (device scale factor). It is a genuine narrow-width test, not a
+375px one.
