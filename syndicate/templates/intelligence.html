@@ -728,8 +728,8 @@
     // total or spread margin for a straight win/lose pick) -- measured live
     // 2026-08-20: 109 of 114 h2h rows were blank here for exactly that
     // reason, while totals/spreads mostly weren't. `model_probability` is
-    // already attached to these rows by the backend (layer2_board.py) as the
-    // model's probability for THIS row's own `selection`/`side` -- reusing an
+    // attached to these rows by the backend (layer2_board.py) as the model's
+    // probability for THIS row's own `selection`/`side` -- reusing an
     // existing, backend-computed field, not inventing one; per that file's
     // own comment, "an invented projection on a betting board is worse than
     // an empty cell", which is exactly why this stays scoped to markets that
@@ -2177,7 +2177,13 @@
         const raw = Number(item.actual);
         return Number.isFinite(raw) ? raw : null;
       } },
-    { key: "winpct", label: "Win%", type: "number", getValue: (item) => confidenceValue(item) },
+    { key: "winpct", label: "Win%", type: "number", getValue: (item) => confidenceValue(item),
+      // `confidence` carried the BOOKS-QUOTING multiplier until 2026-08-21
+      // (0.5/0.7/0.85/1.0 straight off `_book_confidence`), so this column
+      // read "Win% 100%" to mean "5+ books quote this". It now carries the
+      // side-correct model probability and is blank where there is no model,
+      // which is the honest empty rather than a book count in a percent sign.
+      title: "The simulation's probability that THIS side wins. Blank where we have no model view for the row -- never a substitute number." },
     { key: "edge", label: "Edge", type: "number", getValue: (item) => edgeValue(item) },
     { key: "move", label: "Move", type: "number", getValue: movementSortValue },
   ];
@@ -2360,8 +2366,23 @@
               // unremarkable cases and a chip on 100% of rows is a chip nobody
               // reads -- and "no model at all" must never be typeset as though
               // the model had approved the row.
-              const simBadge = item.sim_view === "disagrees"
-                ? `<span class="board-badge board-badge--sim-disagrees" title="Our simulation rates this side ${Math.abs(Number(item.sim_disagreement_pct || 0)).toFixed(1)}% worse than the market price implies. It carries no weight in the score and has not been graded against outcomes.">sim disagrees</span>`
+              // A LIVE dissent is a different claim from a pregame one and
+              // gets its own words. `sim_basis === "live_resim"` means the
+              // verdict came from the re-sim watching the game right now, not
+              // from this morning's model -- for a reader holding a live
+              // ticket that is the difference between a stale opinion and a
+              // current one. Backend sets `sim_view` to `live_disagrees` only
+              // where the live join actually re-priced the row; a pregame
+              // projection sitting in a live game stays plain `disagrees`,
+              // because labelling it live would be the fabrication the
+              // Projected column already refuses.
+              const simDissents = item.sim_view === "disagrees" || item.sim_view === "live_disagrees";
+              const simIsLive = item.sim_view === "live_disagrees" || item.sim_basis === "live_resim";
+              const simPct = Math.abs(Number(item.sim_disagreement_pct || 0)).toFixed(1);
+              const simBadge = simDissents
+                ? `<span class="board-badge board-badge--sim-disagrees${simIsLive ? " board-badge--sim-disagrees-live" : ""}" title="${simIsLive
+                    ? `The LIVE re-sim, using the current game state, rates this side ${simPct}% worse than the live market price implies.`
+                    : `Our pregame simulation rates this side ${simPct}% worse than the market price implies.`} It carries no weight in the score and has not been graded against outcomes.">${simIsLive ? "live sim disagrees" : "sim disagrees"}</span>`
                 : "";
               return `
                 <tr ${rowAttrs}>

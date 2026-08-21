@@ -50,14 +50,46 @@ _PITCHER_DISTS: dict[str, tuple[str, str]] = {
 
 # market -> (likelihood bucket prefix, mean field). The bucket for a line is
 # derived: line 0.5 -> "<prefix>_1plus", 1.5 -> "_2plus", and so on.
+# `mean_key` IS THE SPELLING THE SIM ACTUALLY WRITES, not the market's name.
+#
+# Three of these eight named a field that does not exist in the artifact, so
+# `projected` resolved to None on EVERY row of those markets, forever -- a
+# permanently blank Projected cell that looked exactly like thin model coverage.
+#
+# MEASURED against a real `daily_summary` (2026-07-10), at the bucket-row level
+# rather than by grepping the file, because the fallback in `_hitter_means`
+# folds every `*_mean` from every bucket into one dict and a whole-file grep
+# cannot tell you which row carried what:
+#
+#     bucket            mean field present      _HITTER_BUCKETS wanted
+#     runs_1plus        r_mean                  runs_mean      <- never resolved
+#     doubles_1plus     2b_mean                 doubles_mean   <- never resolved
+#     triples_1plus     3b_mean                 triples_mean   <- never resolved
+#     hits_1plus        h_mean                  h_mean         ok
+#     rbi_1plus         rbi_mean                rbi_mean       ok
+#     total_bases_1plus tb_mean                 tb_mean        ok
+#     sb_1plus          sb_mean                 sb_mean        ok
+#
+# CONFIRMED ON THE SERVED BOARD, 2026-08-21 (user screenshot, one MLB game):
+# all eight `batter_runs_scored` rows showed a blank Projected while every
+# `batter_hits`, `batter_rbis` and `batter_hits_runs_rbis` row on the same
+# screen was populated. Nothing else on the board separated those rows.
+#
+# THE CODEBASE ALREADY KNEW. `_HRR_COMPONENT_MEANS` directly below is
+# `("h_mean", "r_mean", "rbi_mean")`, and `_derived_hrr_mean`'s docstring spells
+# it out -- "`h_mean` on hits_*, `r_mean` on runs_*, `rbi_mean` on rbi_*". So the
+# HRR derivation read runs correctly while the runs MARKET did not, in the same
+# file. A blank cell is silent, which is why this survived: there is no failure
+# mode here, only an absence, and `#429` had already trained everyone to read a
+# blank projection as honest.
 _HITTER_BUCKETS: dict[str, tuple[str, str]] = {
     "batter_hits": ("hits", "h_mean"),
     "batter_total_bases": ("total_bases", "tb_mean"),
     "batter_rbis": ("rbi", "rbi_mean"),
-    "batter_runs_scored": ("runs", "runs_mean"),
+    "batter_runs_scored": ("runs", "r_mean"),
     "batter_hits_runs_rbis": ("hits_runs_rbis", "hrr_mean"),
-    "batter_doubles": ("doubles", "doubles_mean"),
-    "batter_triples": ("triples", "triples_mean"),
+    "batter_doubles": ("doubles", "2b_mean"),
+    "batter_triples": ("triples", "3b_mean"),
     "batter_stolen_bases": ("sb", "sb_mean"),
 }
 

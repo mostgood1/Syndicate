@@ -2127,6 +2127,70 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ## [layer2_board_display] LAYER 2 BOARD -- USER-VISIBLE DISPLAY BUGS, 2026-08-20 AUDIT
 
+### 2026-08-21 -- FOUR MORE, ALL THE SAME SHAPE: a number computed in one frame, displayed in another `[code + artifact evidence, NOT a served-board read -- see the gap below]`
+
+Found from a user screenshot of the served board (one MLB game, all LIVE rows).
+Fixed on `claude/layer2-odds-refresh-kbcxs8`, lane
+`layer2-sim-view-and-live-projection`. **NOT deployed** -- `autoDeploy = no`.
+
+- **`Win%` WAS THE BOOKS-QUOTING MULTIPLIER, NOT A PROBABILITY.** `layer2_board.py`
+  published `score["book_confidence"]` as `confidence`, and
+  `intelligence.html:2180` renders `confidence` as the column labelled **Win%**.
+  So **"Win% 100%" meant "5+ books quote this market"**. Confirmed 5/5 against the
+  screenshot with nothing left over: 1 book -> 50%, 2 -> 70%, 3 -> 85%, 14 -> 100%,
+  21 -> 100%, exactly `_book_confidence`'s `((1,0.5),(2,0.7),(4,0.85))` ladder.
+  This is the most severe of the four: a reader takes it as a certainty.
+  Now carries the side-correct model probability; blank where there is no model.
+- **`model_probability` WAS THE WRONG SIDE'S.** `layer2_board.py` published
+  `projection["model_prob_over"]` with no side awareness. That field is always the
+  OVER/HOME framing -- the same file proves it at `_model_edge_for`, which maps
+  `"home": model_prob_over`. `sim_view` IS side-adjusted, so **away and draw rows
+  rendered a coherent badge beside the other side's probability**. Repro:
+  home -> `agrees`/0.62 (right); away -> `disagrees`/0.62 (away is 0.38).
+  Fixed by `_model_prob_for_side`, mirroring `_model_edge_for`'s three-way/two-way
+  logic rather than reimplementing it.
+- **THREE HITTER MARKETS COULD NEVER PROJECT.** `_HITTER_BUCKETS` named mean fields
+  that do not exist in the artifact, so `projected` was `None` on every row of
+  those markets forever -- indistinguishable from thin model coverage.
+  Measured at bucket-row level against a real `daily_summary` (2026-07-10):
+
+      batter_runs_scored  wanted runs_mean     artifact writes  r_mean
+      batter_doubles      wanted doubles_mean  artifact writes  2b_mean
+      batter_triples      wanted triples_mean  artifact writes  3b_mean
+
+  Matches the screenshot exactly: all 8 `batter_runs_scored` rows blank, every
+  `batter_hits`/`batter_rbis`/`batter_hits_runs_rbis` row populated.
+  **THE FILE ALREADY KNEW** -- `_HRR_COMPONENT_MEANS` is
+  `("h_mean", "r_mean", "rbi_mean")`, so the HRR derivation read runs correctly
+  while the runs MARKET did not, twenty lines apart.
+- **THE LIVE SIM'S VERDICT WAS UNLABELLED.** `live_projection_join` already
+  recomputes `edge_vs_market_pct` from `live_prob_over`, so on a re-priced live row
+  `sim_view` WAS the live sim's -- nothing said so. "our pregame model dislikes
+  this" and "the re-sim, watching the game, dislikes this" rendered identically.
+  Now `sim_view: live_disagrees` + `sim_basis`, gated on
+  `projection["basis"] == "live_resim"` and NOT on game state, so a pregame
+  projection sitting in a live game is not mislabelled live.
+- Also: exactly-zero `model_edge_pct` was bucketed as `agrees` (`>= 0`); now
+  `neutral`. And `pipeline/layer2_shortlist.py` now PRINTS the live-join
+  telemetry (`LIVE_PROJECTION_JOIN sport=... projected=... lens_indexed=...
+  miss_player=...`), which previously existed only inside the artifact payload --
+  so "why is the Live column blank" was unanswerable from production logs.
+
+**THE VERIFICATION GAP, STATED SO IT IS NOT CITED AS DONE:** none of this was read
+off the served board. This session's egress proxy returns **403 for
+`syndicate-an21.onrender.com`**, so the evidence is code + the real artifact files
++ the user's screenshot. Per this section's own 2026-08-20 note, checking the raw
+shortlist row shape is NOT sufficient for this class of fix -- the read owed is of
+`boardContract.cards`. Tests discriminate (5/5 fail pre-fix, pass post-fix), which
+is not the same thing as a production measurement.
+
+**Blank LIVE cells are NOT all a bug.** `attach_live_projections`' own telemetry
+records the ceiling: the live lens indexed 81 rows against 1,385 live board rows
+(2026-08-13). The join cannot project what the lens never produced, so some blanks
+are correct and the fix for them is in the lens, not the board. The new log line is
+what separates "lens produced nothing" from "lens had rows, join missed".
+
+
 **All five items from the 2026-08-20 user-directed board audit are FIXED and
 LIVE-VERIFIED.** `syndicate/templates/intelligence.html` unless noted.
 

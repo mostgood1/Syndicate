@@ -225,7 +225,25 @@ def test_the_board_columns_are_populated_from_the_row(monkeypatch):
     assert card["fair_price"] == -186.0
     assert card["ev_vs_fair_pct"] == 1.6332
     assert card["projected"] == -0.672 and card["sim_projection"] == -0.672
-    assert card["confidence"] == 0.85
+    # `confidence` IS THE WIN PROBABILITY, not the book-breadth factor.
+    #
+    # This asserted `0.85` -- `score["book_confidence"]`, straight off the
+    # `((1, 0.5), (2, 0.7), (4, 0.85))` books-quoting ladder -- and the column
+    # `intelligence.html` renders from this field is labelled **Win%**. So the
+    # test was pinning the defect: "Win% 85%" meant "3 or 4 books quote this".
+    # Confirmed on the served board 2026-08-21, where five distinct Win% values
+    # mapped 1:1 onto that ladder. The factor is still carried, under a name
+    # that says what it is.
+    #
+    # 0.6856, not 0.3144. This row is the AWAY side and its projection states no
+    # `side`, so `model_prob_over` is read as what its name guarantees -- the
+    # OVER/HOME number -- and the away probability is its complement. Sanity
+    # check on the fixture's own numbers: against a fair probability of 0.6507,
+    # 0.6856 is a ~3.5-point model view, while 0.3144 would be a -33-point one
+    # that `_MODEL_EDGE_MAX_POINTS` would drop outright.
+    assert card["confidence"] == 0.6856
+    assert card["model_probability"] == 0.6856
+    assert card["book_confidence"] == 0.85
     assert card["board_score"] == 1.3882
     assert card["board_score_components"]["freshness_factor"] == 1.0
     assert card["book_age_seconds"] == 101.1

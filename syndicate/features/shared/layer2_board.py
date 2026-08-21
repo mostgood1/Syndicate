@@ -889,6 +889,95 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     return -edge
 
 
+def _model_prob_for_side(row: Mapping[str, Any], side: Any = None) -> float | None:
+    """The model's probability for THIS ROW'S OWN side.
+
+    `model_prob_over` is NOT that number. It is always the projection's own
+    framing -- over, or home -- which this file already relies on twenty lines
+    up, where `_model_edge_for` maps `"home": projection.get("model_prob_over")`.
+
+    `_layer2_board_columns` published it as `model_probability` with no side
+    awareness at all, and two surfaces then read it as if it were side-correct:
+
+      - `intelligence.html:740` `displayProjection()` renders it as the
+        **Projected** cell for h2h rows, its own comment asserting the field is
+        "the model's probability for THIS row's own `selection`/`side`". It was
+        not.
+      - the **Win%** column (see `_layer2_board_columns`).
+
+    So an AWAY moneyline pick rendered the HOME win probability beside a
+    correctly-side-adjusted "sim disagrees" badge -- the two halves of one row
+    disagreeing because only one of them knew which side it was about.
+
+    Reproduced against these functions before the fix (sim likes home at 62%,
+    market fair home .55 / away .45):
+
+        home  -> sim_view=agrees     model_probability=0.62   correct
+        away  -> sim_view=disagrees  model_probability=0.62   the home number
+
+    The side logic here MIRRORS `_model_edge_for` deliberately -- same
+    three-way/two-way split, same refusal to negate across a draw leg -- because
+    two independent implementations of "which side is this" is exactly how the
+    soccer h2h sign inversion documented in that function happened.
+
+    ON LIVE ROWS THIS RETURNS THE LIVE NUMBER, and that is not a special case
+    here: `live_projection_join` overwrites `projection["model_prob_over"]` with
+    the re-sim's `live_prob_over` (`live_projection_join.py:465`), so reading
+    the same field after the live overlay yields the live probability. Callers
+    that need to know WHICH it is should read `projection["basis"]`.
+    """
+    projection = row.get("projection")
+    if not isinstance(projection, Mapping):
+        return None
+    model_prob_over = _as_float(projection.get("model_prob_over"))
+    row_side = str(side if side is not None else row.get("side") or "").strip().lower()
+
+    # THREE-WAY FIRST, for the reason `_model_edge_for` states: with a draw leg
+    # `1 - P(home)` is not `P(away)`, so the two-way identity below is not
+    # merely imprecise, it answers a question about a different outcome.
+    draw_prob = _as_float(projection.get("draw_probability"))
+    if draw_prob is not None:
+        by_side = {
+            "home": model_prob_over,
+            "draw": draw_prob,
+            "away": _as_float(projection.get("away_probability")),
+        }
+        # A three-way side we cannot price is DROPPED, not negated.
+        return by_side.get(row_side)
+
+    if model_prob_over is None:
+        return None
+    projected_side = str(projection.get("side") or "").strip().lower()
+    if not row_side:
+        return model_prob_over
+    if projected_side:
+        if projected_side == row_side:
+            return model_prob_over
+        # Two-way: P(other side) = 1 - P(this side). Exact, not an approximation.
+        return round(1.0 - model_prob_over, 6)
+
+    # NO STATED FRAMING. Fall back to the field's OWN DEFINITION rather than to
+    # its value.
+    #
+    # `prop_projections` sets `projection["side"]` on every projection it
+    # attaches (`prop_projections.py:949`), so this is the path for a producer
+    # that does not -- and returning `model_prob_over` unexamined there is the
+    # exact defect this function exists to remove, just one layer further out.
+    # The name is a guarantee: it is the OVER, and for a game market the HOME
+    # (`_model_edge_for` relies on that same guarantee to map `"home"`).
+    #
+    # The vocabularies are `prop_projections`'s own, copied deliberately from
+    # the two `next(...)` guards that pick `projected_side` there, so the two
+    # files cannot disagree about which token is the "over" side.
+    if row_side in {"over", "home", "yes", "1"}:
+        return model_prob_over
+    if row_side in {"under", "away", "no", "2"}:
+        return round(1.0 - model_prob_over, 6)
+    # A side this function cannot place is DROPPED, not guessed. A blank cell is
+    # recoverable; a confident wrong probability on a betting board is not.
+    return None
+
+
 def build_layer2_rows(
     grid: Iterable[Mapping[str, Any]],
     openings: Mapping[str, Mapping[str, Any]] | None = None,
@@ -2028,13 +2117,51 @@ def _layer2_board_columns(
         columns["projected"] = projected
         columns["sim_projection"] = projected
 
-    model_prob = _as_float(projection.get("model_prob_over"))
+    # SIDE-CORRECT, via `_model_prob_for_side`. Publishing
+    # `projection["model_prob_over"]` here was wrong on every row whose side is
+    # not the projection's framing -- every AWAY and every DRAW -- and two
+    # surfaces read it as if it were right. See that function for the repro.
+    model_prob = _model_prob_for_side(row)
     if model_prob is not None:
         columns["model_probability"] = model_prob
 
-    confidence = _as_float(score.get("book_confidence"))
-    if confidence is not None:
-        columns["confidence"] = confidence
+    # `Win%` MUST BE A WIN PROBABILITY. It was the books-quoting multiplier.
+    #
+    # This published `score["book_confidence"]` as `confidence`, and
+    # `intelligence.html:2180` renders `confidence` as the column labelled
+    # **Win%**. `book_confidence` is `_book_confidence(books_quoting)` -- a
+    # RELIABILITY factor from the `((1, 0.5), (2, 0.7), (4, 0.85))` ladder,
+    # else 1.0. It is not a probability of anything.
+    #
+    # CONFIRMED ON A USER SCREENSHOT of the served board, 2026-08-21, five
+    # distinct values mapping 1:1 onto the ladder with nothing left over:
+    #
+    #     BETMGM  (1 book)    Win%  50%    _book_confidence(1)  = 0.50
+    #     BETMGM  (2 bks)     Win%  70%    _book_confidence(2)  = 0.70
+    #     KALSHI  (3 bks)     Win%  85%    _book_confidence(3)  = 0.85
+    #     NOVIG   (14 bks)    Win% 100%    _book_confidence(14) = 1.00
+    #     KALSHI  (21 bks)    Win% 100%    _book_confidence(21) = 1.00
+    #
+    # So "Win% 100%" meant "five or more books quote this market" -- read by a
+    # bettor as a certainty. That is the worst available failure mode for this
+    # column, and it is why the fix is not a relabel: the number a reader wants
+    # from a column called Win% is the model probability for the side being
+    # recommended, which is exactly what `model_prob` above now is.
+    #
+    # BLANK WHERE THERE IS NO MODEL, deliberately. 43 of 108 rows carried no
+    # projection at the last count in this file's own history, and those must
+    # render an empty cell rather than a book count wearing a percent sign --
+    # the same rule the PROJECTED column already follows ("an invented
+    # projection on a betting board is worse than an empty cell").
+    if model_prob is not None:
+        columns["confidence"] = model_prob
+    # The book-breadth factor is still carried, under its own name, so the
+    # score breakdown keeps every term it always had. It is already inside
+    # `board_score_components` below; naming it at the top level too means a
+    # reader can find it without opening the tooltip.
+    book_confidence = _as_float(score.get("book_confidence"))
+    if book_confidence is not None:
+        columns["book_confidence"] = book_confidence
 
     # `#445`: SAY WHEN OUR OWN SIM DISAGREES WITH THE BET WE ARE SHOWING.
     #
@@ -2050,14 +2177,44 @@ def _layer2_board_columns(
     # `_SCORE_SIM_WEIGHT` is 0.0 for exactly that reason, and a filter would be
     # a weight of -infinity smuggled in as a rule. The EV is real even where the
     # sim dissents; the reader is told and decides.
+    # SAY WHICH SIM IT IS. A live row's verdict comes from the LIVE re-sim, and
+    # until now the board could not tell the reader that.
+    #
+    # `live_projection_join` overwrites `projection["model_prob_over"]` with the
+    # re-sim's `live_prob_over` and RECOMPUTES `edge_vs_market_pct` from it
+    # (`live_projection_join.py:583`), so on a live row that the re-sim priced,
+    # `model_edge_pct` -- and therefore this verdict -- is ALREADY the live
+    # sim's. The defect was that nothing said so: "our pregame model dislikes
+    # this" and "the re-sim, watching the game, dislikes this" rendered as the
+    # same three words, and they are not remotely the same claim to a bettor
+    # holding a live ticket.
+    #
+    # `basis` is the authority, not the game state: a row can be in a live game
+    # and still carry its pregame projection (the re-sim's coverage is bounded
+    # by the live lens' own -- `live_projection_join` records the ceiling at 81
+    # indexable rows against 1,385 live board rows). Reading `is_live` here
+    # would label those pregame numbers as live, which is the fabrication this
+    # whole column exists to avoid.
+    sim_basis = str(projection.get("basis") or "").strip().lower()
+    sim_is_live = sim_basis == "live_resim" or projection.get("live_prob_over") is not None
+    if sim_is_live:
+        columns["sim_basis"] = "live_resim"
+
     model_edge = _as_float(row.get("model_edge_pct"))
     if model_edge is None:
         columns["sim_view"] = "none"
     elif model_edge < 0:
-        columns["sim_view"] = "disagrees"
+        columns["sim_view"] = "live_disagrees" if sim_is_live else "disagrees"
         columns["sim_disagreement_pct"] = round(model_edge, 4)
+    elif model_edge > 0:
+        columns["sim_view"] = "live_agrees" if sim_is_live else "agrees"
     else:
-        columns["sim_view"] = "agrees"
+        # EXACTLY ZERO IS NOT AGREEMENT. It was folded into `agrees` by a `>= 0`
+        # test: the sim landing precisely on the market's own de-vigged price is
+        # the sim declining to take a view, and reporting that as endorsement
+        # overstates what the model said. Its own bucket, so it can never again
+        # be counted as support.
+        columns["sim_view"] = "neutral"
 
     composite = _as_float(score.get("score"))
     if composite is not None:

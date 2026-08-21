@@ -847,8 +847,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   game-card rail, not twice. **Testable outcome:** each game seats exactly one
   mini card, and clicking it filters the board to ALL that game's rows (both
   row families), not one family's.
-- Files: `syndicate/templates/intelligence.html` (`deriveGameCards` merge pass
-  only), `tests/js/game_rail_derive.test.mjs`.
+- Files: `tests/js/game_rail_derive.test.mjs`.
+- **The board-template claim (the `deriveGameCards` merge pass) was RELEASED
+  2026-08-21 to `layer2-sim-view-and-live-projection`.** Released on this
+  block's OWN evidence, not an assumption: it declares the owning session
+  "archived 2026-08-20 ~19:2x CT; nothing held, all deploy claims released" and
+  "All claims released", and its work is SHIPPED (web `feec7e17`, on `main` as
+  `84533712`). Same test the 2026-08-18 orphan sweep used. The released claim
+  was scoped to `deriveGameCards`; the releasing lane touches
+  `displayProjection`, the Win% column and the sim badges — disjoint regions.
+  The ONE BEHAVIOURAL READ still owed is unaffected: it is a read, not an edit.
 - **STATUS: live on web as `feec7e17` since 2026-08-20 19:10:37 CT** (deploy
   `dep-da3pbfrbc2fs73aj00b0`; grafted onto web's live SHA `f3a9bb0b`, NOT main —
   main's tip would have reverted a 25-deep off-main chain, see `state.md`).
@@ -1121,6 +1129,57 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 **AUTORUN IS LIVE AND HAS RUN (`a48c8530`, flag set on refresh-worker).** Its FIRST run published a DEGENERATE artifact over a correct one — `weeks: []`, 318 KB vs 2.83 MB, top player 525.5 pts vs a correct ~270 — because the worker has no `schedules_games.csv` and nothing in the repo writes it. Correct artifact republished by hand 20:19:28Z. `--prepare` now fetches the schedule, and the job refuses to publish when its OWN OUTPUT is degenerate (the input checklist could not see this: the schedule was not on its list). **OWED: the next autorun (~19:50Z tomorrow) is the real verification — it must either publish a healthy artifact or refuse and say why; neither has been observed.**
 
+
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720
+- Goal: the Layer 2 board never shows a number attributed to the sim that is
+  about a different side, a different quantity, or a different thing entirely.
+  **Testable outcome:** on the served board, (a) `model_probability` equals the
+  model's probability for THAT ROW'S OWN side, (b) the `Win%` column either
+  shows a real win probability or is renamed to what it actually is, (c) no
+  LIVE row shows a blank `Projected`/`Live` while a live re-sim exists for it,
+  and (d) a live row whose LIVE sim dissents says so.
+- Files: `syndicate/features/shared/layer2_board.py`,
+  `syndicate/features/shared/prop_projections.py`,
+  `syndicate/templates/intelligence.html`,
+  `syndicate/static/shared/board_cards.css`,
+  `pipeline/layer2_shortlist.py`,
+  `tests/test_layer2_sim_view_sides.py` (new),
+  `tests/test_layer2_score_flatten.py`.
+  - `live_projection_join.py` was NOT edited in the end: it already recomputes
+    `edge_vs_market_pct` from `live_prob_over`, so the live verdict was correct
+    and merely unlabelled. The fix was in the two files that display it.
+- Hypothesis: four independent defects, all of the same SHAPE — a number
+  computed in one frame and displayed in another, with nothing on the surface
+  saying which frame:
+  1. `layer2_board.py:2031` publishes `projection["model_prob_over"]` as
+     `model_probability` with NO side awareness. `model_prob_over` is always
+     the OVER/HOME framing (proved by the same file at `:871`, which maps
+     `"home": model_prob_over`). `sim_view` IS correctly side-adjusted via
+     `_model_edge_for`, so away/draw rows render a coherent badge beside an
+     incoherent probability.
+  2. `layer2_board.py:2036` publishes `score["book_confidence"]` as
+     `confidence`, which `intelligence.html:2180` renders as **`Win%`**.
+     `book_confidence` is `_book_confidence(books_quoting)` — a books-quoting
+     RELIABILITY MULTIPLIER (`(1,0.5),(2,0.7),(4,0.85)`, else `1.0`) — not a
+     win probability. "Win% 100%" means "≥5 books quote this".
+  3. LIVE rows render a blank `Projected` because `_layer2_board_columns` only
+     populates it from `projection["projected"]`, and the h2h fallback in
+     `displayProjection()` is gated to moneyline, so live PROP rows with a live
+     re-sim still show an em dash.
+  4. There is no LIVE analogue of `sim_view`: `live_model_probability` is
+     published but nothing compares it to the market, so a live row cannot say
+     the LIVE sim dissents even when it does.
+- Falsification test: for (1), build a row whose projection is framed on `home`
+  and read `model_probability` on the `away` candidate — if it already differs
+  from the home value, the hypothesis is wrong. For (2), if the five distinct
+  `Win%` values on the user's 2026-08-21 capture do NOT map 1:1 onto the
+  book-count ladder, it is not `book_confidence` and the diagnosis is wrong.
+- Verification: unit tests that FAIL on the current code and pass after (the
+  `off != on` discipline), plus a read of the SERVED board — `boardContract.cards`,
+  not the raw shortlist row shape, per `state.md [layer2_board_display]`'s own
+  note that checking only the raw rows is not sufficient for this class of fix.
+- Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
+  `main` ships nothing until someone takes a claim and deploys it.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
