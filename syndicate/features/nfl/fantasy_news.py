@@ -23,8 +23,20 @@ Both produce multipliers applied BEFORE the team's shares are normalised, so a
 promotion is paid for by that player's team-mates rather than inventing volume
 out of nothing -- the opportunity pool stays closed.
 
-Why it ships OFF
-----------------
+What ships, and what does not
+-----------------------------
+**The INJURY half now ships ON**, because it was graded and it earns it:
+`scripts/grade_nfl_fantasy_news.py` measures held-out MAE over 2,226
+player-weeks at 6.894 with no adjustment against 4.399 with the fitted
+multipliers -- a 36% improvement, on constants selected on 2022-2023 and only
+reported on 2024-2025.
+
+**The NEWS-TEXT half still ships OFF**, and the two are now separate flags
+(`use_injury_availability` and `use_news_adjustments`) precisely so that one
+being graded does not smuggle the other into production.
+
+Why the text half stays off
+---------------------------
 ``EngineConfig.use_news_adjustments`` defaults to ``False`` and the engine is
 correct without it. Two reasons, both from ``model_engine_standard.md``:
 
@@ -34,10 +46,19 @@ correct without it. Two reasons, both from ``model_engine_standard.md``:
   without re-fitting double-counts. Measured elsewhere in this repo: two
   mechanisms added to a calibrated engine produced a NEGATIVE interaction in 4
   of 4 markets.
-* There is no backtest for it. Historical news text is not archived locally, so
-  the keyword weights below are REASONED, NOT FITTED, and nothing in this repo
-  can currently tell you whether they help. A number that has never been graded
-  does not get to move a projection by default.
+* There is no backtest for it. Historical news TEXT is not archived -- ESPN
+  serves current headlines only -- so the keyword weights below are REASONED,
+  NOT FITTED, and nothing here can say whether they help. A number that has
+  never been graded does not get to move a projection by default.
+
+  Note what this does NOT excuse. Most fantasy "news" is a beat reporter
+  relaying the practice report, and `practice_status` archives exactly that.
+  So the coach-quote signal WAS gradeable after all, and it was graded:
+  practice participation alone scores +25.8% against the game designation's
+  +36.2%, and combining them scores +30.9% -- WORSE than the designation alone,
+  because eight cells split the same data too thin. The practice report is
+  already inside the designation the team publishes. That is a measured
+  negative result, not an untested assumption.
 
 Turning it on is a deliberate, per-request act (``?news=1``), the payload says
 when it did, and ``tests/test_nfl_fantasy_news.py`` asserts off != on so it can
@@ -71,17 +92,39 @@ from syndicate.features.nfl.sources import nfl_artifact_output_root
 
 ESPN_NEWS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/news"
 
-#: Injury designations -> multiplier on AVAILABILITY. These are the league's
-#: own published statuses, and the numbers are the practical reading of them,
-#: not estimates from data: "Out" means out, "Doubtful" is roughly a quarter
-#: chance, "Questionable" is close to a coin flip that mostly lands on playing.
+#: Injury designation -> multiplier on AVAILABILITY. **FITTED on 2022-2023 and
+#: reported on 2024-2025** by `scripts/grade_nfl_fantasy_news.py`. They were
+#: previously a "practical reading" of the designations, and that reading was
+#: materially wrong on two of the four that matter:
+#:
+#:   designation     reasoned   fitted   what the data says
+#:   out                 0.00    0.000   correct
+#:   doubtful            0.25    0.007   0 of 67 doubtful players played. AT ALL.
+#:   questionable        0.85    0.593   played 67% of the time, scored 61%
+#:   (no designation)      --    0.930   1,300 held-out rows the engine ignored
+#:
+#: "Doubtful" reads like a long shot and behaves like OUT. "Questionable" reads
+#: like a coin flip that mostly lands on playing, and it is closer to a real
+#: coin flip -- and the players who do suit up are diminished, so the cost is
+#: taken twice.
+#:
+#: Held-out MAE over 2,226 player-weeks: 6.894 with no adjustment, 4.672 with
+#: the reasoned constants, **4.399 with these**.
+#:
+#: The empty-string key is the row that carries a practice entry but NO game
+#: designation -- a real and common state, and the largest single group.
 INJURY_AVAILABILITY: dict[str, float] = {
     "out": 0.0,
     "injured reserve": 0.0,
     "ir": 0.0,
     "pup": 0.0,
-    "doubtful": 0.25,
-    "questionable": 0.85,
+    "doubtful": 0.01,
+    "questionable": 0.59,
+    "none": 0.93,
+    "": 0.93,
+    # Retired by the league in 2016 and absent from the modern feed, so it has
+    # no fitted value; left at a benign near-1.0 rather than dropped, because a
+    # missing key means "no adjustment" and that is the right answer for it.
     "probable": 0.95,
 }
 

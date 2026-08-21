@@ -228,6 +228,12 @@ class EngineConfig:
     use_game_script_pass_rate: bool = True
     use_red_zone_touchdown_share: bool = True
     use_role_curve: bool = True
+    #: The GRADED half: injury designation -> availability. Ships ON. Held-out
+    #: MAE 6.894 -> 4.399 over 2,226 player-weeks
+    #: (`scripts/grade_nfl_fantasy_news.py`). Separate from the flag below so
+    #: that grading one half cannot smuggle the ungraded half into production.
+    use_injury_availability: bool = True
+    #: The UNGRADED half: news TEXT -> opportunity share. Stays OFF.
     use_news_adjustments: bool = False
 
 
@@ -1553,9 +1559,14 @@ def project_team(
     # `news_availability`, and it runs before the share block below.
     news_share: dict[str, float] = {}
     news_availability: dict[str, float] = {}
-    if config.use_news_adjustments and news is not None:
-        news_share = dict(getattr(news, "share_multipliers", None) or {})
-        news_availability = dict(getattr(news, "availability_multipliers", None) or {})
+    if news is not None:
+        # Two flags, two halves. Availability is graded and on; share is not
+        # graded and is off. Reading them from one flag would have meant that
+        # grading the injury half quietly enabled the keyword half too.
+        if config.use_injury_availability:
+            news_availability = dict(getattr(news, "availability_multipliers", None) or {})
+        if config.use_news_adjustments:
+            news_share = dict(getattr(news, "share_multipliers", None) or {})
 
     games: dict[str, float] = {}
     raw_target: dict[str, float] = {}
@@ -1639,7 +1650,7 @@ def project_team(
         if injury is not None:
             games[key] *= injury
 
-    if config.use_news_adjustments and news is not None:
+    if news_share:
         # Applied BEFORE normalisation, so one player's promotion is paid for by
         # his team-mates rather than inventing volume out of nothing. The pool
         # stays closed either way.

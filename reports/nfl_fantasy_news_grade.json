@@ -1,0 +1,198 @@
+{
+ "scoring": "ppr",
+ "fit_seasons": [
+  2022,
+  2023
+ ],
+ "report_seasons": [
+  2024,
+  2025
+ ],
+ "schemes": {
+  "status": {
+   "label": "game designation only (what ships)",
+   "cells": 4,
+   "fitted_on_fit_seasons": {
+    "doubtful": 0.0069,
+    "none": 0.9304,
+    "out": 0.0,
+    "questionable": 0.5929
+   },
+   "grade": {
+    "n": 2226,
+    "mae_without": 6.894,
+    "mae_with": 4.399,
+    "improvement": 2.495,
+    "improvement_pct": 36.19
+   },
+   "calibration_report": {
+    "doubtful": {
+     "n": 67,
+     "played_rate": 0.0,
+     "empirical_multiplier": 0.0,
+     "shipped_multiplier": 0.01,
+     "mean_points": 0.0
+    },
+    "none": {
+     "n": 1300,
+     "played_rate": 0.9454,
+     "empirical_multiplier": 0.9258,
+     "shipped_multiplier": 0.93,
+     "mean_points": 10.92
+    },
+    "out": {
+     "n": 377,
+     "played_rate": 0.0,
+     "empirical_multiplier": 0.0,
+     "shipped_multiplier": 0.0,
+     "mean_points": 0.0
+    },
+    "questionable": {
+     "n": 481,
+     "played_rate": 0.6674,
+     "empirical_multiplier": 0.6085,
+     "shipped_multiplier": 0.59,
+     "mean_points": 6.69
+    }
+   }
+  },
+  "practice": {
+   "label": "practice participation only",
+   "cells": 3,
+   "fitted_on_fit_seasons": {
+    "dnp": 0.2407,
+    "full": 0.9148,
+    "limited": 0.6659
+   },
+   "grade": {
+    "n": 2226,
+    "mae_without": 6.894,
+    "mae_with": 5.118,
+    "improvement": 1.777,
+    "improvement_pct": 25.77
+   },
+   "calibration_report": {
+    "dnp": {
+     "n": 491,
+     "played_rate": 0.1446,
+     "empirical_multiplier": 0.1303,
+     "shipped_multiplier": null,
+     "mean_points": 1.56
+    },
+    "full": {
+     "n": 1153,
+     "played_rate": 0.9428,
+     "empirical_multiplier": 0.9259,
+     "shipped_multiplier": null,
+     "mean_points": 10.79
+    },
+    "limited": {
+     "n": 568,
+     "played_rate": 0.6778,
+     "empirical_multiplier": 0.6324,
+     "shipped_multiplier": null,
+     "mean_points": 7.29
+    }
+   }
+  },
+  "combined": {
+   "label": "designation x practice",
+   "cells": 8,
+   "fitted_on_fit_seasons": {
+    "doubtful/dnp": 0.0,
+    "none/dnp": 0.7694,
+    "none/full": 0.9436,
+    "none/limited": 0.9748,
+    "out/dnp": 0.0,
+    "questionable/dnp": 0.4212,
+    "questionable/full": 0.7285,
+    "questionable/limited": 0.5899
+   },
+   "grade": {
+    "n": 2226,
+    "mae_without": 6.894,
+    "mae_with": 4.764,
+    "improvement": 2.13,
+    "improvement_pct": 30.9
+   },
+   "calibration_report": {
+    "doubtful/dnp": {
+     "n": 42,
+     "played_rate": 0.0,
+     "empirical_multiplier": 0.0,
+     "shipped_multiplier": null,
+     "mean_points": 0.0
+    },
+    "none/dnp": {
+     "n": 56,
+     "played_rate": 0.75,
+     "empirical_multiplier": 0.7084,
+     "shipped_multiplier": null,
+     "mean_points": 8.15
+    },
+    "none/full": {
+     "n": 1060,
+     "played_rate": 0.9519,
+     "empirical_multiplier": 0.945,
+     "shipped_multiplier": null,
+     "mean_points": 11.11
+    },
+    "none/limited": {
+     "n": 184,
+     "played_rate": 0.9674,
+     "empirical_multiplier": 0.8811,
+     "shipped_multiplier": null,
+     "mean_points": 10.66
+    },
+    "out/dnp": {
+     "n": 330,
+     "played_rate": 0.0,
+     "empirical_multiplier": 0.0,
+     "shipped_multiplier": null,
+     "mean_points": 0.0
+    },
+    "out/limited": {
+     "n": 46,
+     "played_rate": 0.0,
+     "empirical_multiplier": 0.0,
+     "shipped_multiplier": null,
+     "mean_points": 0.0
+    },
+    "questionable/dnp": {
+     "n": 63,
+     "played_rate": 0.4603,
+     "empirical_multiplier": 0.3859,
+     "shipped_multiplier": null,
+     "mean_points": 4.92
+    },
+    "questionable/full": {
+     "n": 85,
+     "played_rate": 0.9176,
+     "empirical_multiplier": 0.7751,
+     "shipped_multiplier": null,
+     "mean_points": 7.76
+    },
+    "questionable/limited": {
+     "n": 320,
+     "played_rate": 0.6469,
+     "empirical_multiplier": 0.6158,
+     "shipped_multiplier": null,
+     "mean_points": 6.8
+    }
+   }
+  }
+ },
+ "grade_shipped": {
+  "n": 2226,
+  "mae_without": 6.894,
+  "mae_with": 4.4,
+  "improvement": 2.494,
+  "improvement_pct": 36.18
+ },
+ "verdict_injury_helps": true,
+ "best_scheme": "status",
+ "free_text_sentiment": {
+  "gradeable": false,
+  "reason": "ESPN serves current headlines only; no archive of pre-game text exists on this substrate, so a keyword rule cannot be graded. The practice report -- what most such quotes are about -- IS archived and is graded above."
+ }
+}

@@ -252,22 +252,12 @@ def test_reachability_injury_availability_cuts_games():
     assert after.fantasy_points < before.fantasy_points
 
 
-@requires_usage
-def test_news_flag_off_means_news_object_is_ignored():
-    """The inverse of reachability: passing news with the flag off must be a
-    no-op, or the flag is not actually the switch."""
-    plain = engine.project_team(SEASON, "ATL", ESPN_PPR)
-    target = max(plain, key=lambda row: row.fantasy_points)
-    news = NewsAdjustments(
-        season=SEASON,
-        generated_at="test",
-        share_multipliers={target.player_id: 2.0},
-        availability_multipliers={target.player_id: 0.1},
-    )
-    with_news = engine.project_team(SEASON, "ATL", ESPN_PPR, news=news)
-    assert {row.player_id: round(row.fantasy_points, 6) for row in plain} == {
-        row.player_id: round(row.fantasy_points, 6) for row in with_news
-    }
+# `test_news_flag_off_means_news_object_is_ignored` lived here and was REMOVED,
+# not weakened. It asserted that supplying a news object under the default
+# config changed nothing -- true while BOTH halves were off, and wrong the
+# moment the injury half was graded and shipped on. The two tests at the bottom
+# of this file replace it with the sharper claim: the graded half must reach the
+# projection, and the ungraded half must not, under that same default config.
 
 
 # ---------------------------------------------------------------------------
@@ -405,3 +395,61 @@ def test_news_classifier_signals_and_neutrality():
     assert up > 1.0 and matched_up
     assert down < 1.0 and matched_down
     assert neutral == pytest.approx(1.0) and not matched_neutral
+
+
+# ---------------------------------------------------------------------------
+# The two halves of the news layer are separately gated
+# ---------------------------------------------------------------------------
+
+@requires_usage
+def test_injury_availability_is_ON_by_default_and_reaches_the_projection():
+    """The GRADED half ships on. `scripts/grade_nfl_fantasy_news.py` measures
+    held-out MAE 6.894 -> 4.399 over 2,226 player-weeks, so it earns it -- but
+    only if it is actually reached."""
+    assert engine.DEFAULT_CONFIG.use_injury_availability is True
+
+    plain = engine.project_team(SEASON, "ATL", ESPN_PPR)
+    target = max(plain, key=lambda row: row.fantasy_points)
+    news = NewsAdjustments(
+        season=SEASON,
+        generated_at="test",
+        availability_multipliers={target.player_id: 0.59},
+    )
+    adjusted = engine.project_team(SEASON, "ATL", ESPN_PPR, news=news)
+
+    before = {row.player_id: row for row in plain}[target.player_id]
+    after = {row.player_id: row for row in adjusted}[target.player_id]
+    assert after.games < before.games, "injury availability is INERT on the default config"
+    assert after.fantasy_points < before.fantasy_points
+
+
+@requires_usage
+def test_the_ungraded_text_half_stays_OFF_even_when_news_is_supplied():
+    """Grading the injury half must not smuggle the keyword half into
+    production. That is why they are two flags and not one."""
+    assert engine.DEFAULT_CONFIG.use_news_adjustments is False
+
+    plain = engine.project_team(SEASON, "ATL", ESPN_PPR)
+    target = max(plain, key=lambda row: row.fantasy_points)
+    news = NewsAdjustments(
+        season=SEASON,
+        generated_at="test",
+        share_multipliers={target.player_id: 2.0},
+    )
+    with_share = engine.project_team(SEASON, "ATL", ESPN_PPR, news=news)
+    assert {row.player_id: round(row.fantasy_points, 6) for row in plain} == {
+        row.player_id: round(row.fantasy_points, 6) for row in with_share
+    }
+
+
+def test_injury_multipliers_are_the_fitted_values_not_the_reasoned_ones():
+    """The reasoned constants were wrong on two of the four that matter:
+    `doubtful` at 0.25 when 0 of 67 doubtful players played at all, and
+    `questionable` at 0.85 when they played 67% of the time and scored 61%."""
+    from syndicate.features.nfl.fantasy_news import INJURY_AVAILABILITY
+
+    assert INJURY_AVAILABILITY["out"] == 0.0
+    assert INJURY_AVAILABILITY["doubtful"] < 0.05, "doubtful behaves like OUT"
+    assert 0.5 < INJURY_AVAILABILITY["questionable"] < 0.7, "closer to a coin flip than to 0.85"
+    # The largest single group: on the report, no game designation.
+    assert INJURY_AVAILABILITY[""] > 0.9

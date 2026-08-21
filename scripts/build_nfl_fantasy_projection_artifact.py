@@ -235,13 +235,20 @@ def main() -> int:
     # Scoring profile is irrelevant to the STAT LINES this artifact stores --
     # see fantasy_artifact's module docstring. PPR is passed only because the
     # engine's signature requires one; nothing scoring-dependent is persisted.
+    # PASSED, not merely loaded. The first version of this bound `news` and
+    # then called `project_season` without it, so the graded injury-availability
+    # multipliers were computed, published as part of `basis`, and applied to
+    # nothing -- `model_engine_standard.md` s4.3's inert feature, in the one
+    # place where nothing would ever have raised. `use_injury_availability`
+    # decides whether they are USED; passing them decides whether they are
+    # REACHABLE, and those are different questions.
     news = load_news_adjustments(season)
-    season_rows = project_season(season, ESPN_PPR, DEFAULT_CONFIG)
+    season_rows = project_season(season, ESPN_PPR, DEFAULT_CONFIG, news)
     print(f"season: {len(season_rows)} projections in {time.monotonic() - started:.1f}s", flush=True)
 
     weekly: dict[int, list] = {}
     for week in weeks:
-        rows = project_season(season, ESPN_PPR, DEFAULT_CONFIG, week=week)
+        rows = project_season(season, ESPN_PPR, DEFAULT_CONFIG, news, week=week)
         if rows:
             weekly[week] = rows
     if weeks:
