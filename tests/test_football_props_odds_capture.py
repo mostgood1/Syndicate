@@ -212,3 +212,78 @@ def test_ambiguous_short_name_resolves_to_none_not_to_a_guess(monkeypatch):
     assert set(collisions) == {"t.hill"}
     assert collisions["t.hill"] == frozenset({"TYREEK", "TROY"})
     player_stats.player_name_index.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# Game context on the BOARD path. Reachability first (standard 4.3), then the
+# markets that deliberately ship unchanged.
+# ---------------------------------------------------------------------------
+
+def test_schedules_games_is_allowlisted_because_it_is_a_model_input():
+    """standard 3b: an unallowlisted model input is an unauditable one."""
+    from syndicate.features.shared.artifact_publisher import (
+        HOT_ARTIFACT_PATTERNS,
+        is_hot_artifact_relative_path,
+    )
+
+    assert "nfl_source/tracking/nflverse/schedules_games.csv" in HOT_ARTIFACT_PATTERNS
+    assert is_hot_artifact_relative_path("nfl_source/tracking/nflverse/schedules_games.csv")
+
+
+def _stub_context(monkeypatch, *, ratio, delta):
+    from syndicate.features.nfl import props
+
+    monkeypatch.setattr(props, "player_team_by_week", lambda season: {"P1": {1: "KC", 2: "KC", 3: "KC"}})
+    monkeypatch.setattr(props, "implied_total_ratio", lambda *a, **k: ratio)
+    monkeypatch.setattr(props, "favoured_by_delta", lambda *a, **k: delta)
+    return props
+
+
+def test_game_context_multiplier_off_differs_from_on(monkeypatch):
+    props = _stub_context(monkeypatch, ratio=1.25, delta=4.0)
+
+    monkeypatch.setenv("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "off")
+    off = props.nfl_game_context_multiplier(2025, 3, "P1", "receiving_yards")
+    monkeypatch.setenv("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "on")
+    on = props.nfl_game_context_multiplier(2025, 3, "P1", "receiving_yards")
+
+    assert off == 1.0
+    assert on != off, "game context is INERT on the board path"
+
+
+def test_markets_that_ship_unchanged_stay_exactly_one(monkeypatch):
+    """rushing_attempts (holdout MAE got worse) and anytime_td (fitted against
+    the RAW rate while production uses the shrunk one) must be no-ops."""
+    props = _stub_context(monkeypatch, ratio=1.25, delta=4.0)
+    monkeypatch.setenv("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "on")
+
+    for stat in ("rushing_attempts", "anytime_td"):
+        assert props.nfl_game_context_multiplier(2025, 3, "P1", stat) == 1.0, stat
+        assert props._NFL_GAME_CONTEXT_PARAMS[stat] == (0.0, 0.0), stat
+
+
+def test_unresolvable_context_is_a_no_op_not_a_guess(monkeypatch):
+    """`implied_total_ratio` returns None for an unknown lookup. That must
+    become exactly 1.0 here and never a fabricated adjustment."""
+    props = _stub_context(monkeypatch, ratio=None, delta=None)
+    monkeypatch.setenv("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "on")
+    assert props.nfl_game_context_multiplier(2025, 3, "P1", "receiving_yards") == 1.0
+
+
+def test_too_few_prior_weeks_is_a_no_op(monkeypatch):
+    from syndicate.features.nfl import props
+
+    monkeypatch.setattr(props, "player_team_by_week", lambda season: {"P1": {5: "KC"}})
+    monkeypatch.setenv("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "on")
+    assert props.nfl_game_context_multiplier(2025, 6, "P1", "receiving_yards") == 1.0
+
+
+def test_pass_and_rush_attempt_betas_have_opposite_signs():
+    """The falsifiable prediction the fit was judged against: a favoured team
+    throws less and runs more. Guards the shipped coefficients against a
+    re-fit that silently loses the football."""
+    from syndicate.features.nfl.props import _NFL_GAME_CONTEXT_PARAMS
+
+    _, pass_beta = _NFL_GAME_CONTEXT_PARAMS["passing_attempts"]
+    _, rush_beta = _NFL_GAME_CONTEXT_PARAMS["rushing_yards"]
+    assert pass_beta < 0 < rush_beta

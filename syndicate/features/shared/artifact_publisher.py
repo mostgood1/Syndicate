@@ -140,6 +140,21 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # shallow-depth "rosters"/"depth" dir in another sport's tree, not
     # verified here). `#208`'s lesson still applies: allowlisting PERMITS
     # the transfer, it does not by itself arm any autorun.
+    # The nflverse schedule, promoted to a MODEL INPUT 2026-08-20. It carries
+    # `spread_line` and `total_line` for every REG game (816/816 across
+    # 2023-2025, measured), which is what `syndicate/features/nfl/game_context.py`
+    # turns into an implied team total -- the first game-context input the NFL
+    # prop model has ever had. Measured on a 2025 holdout, paired on 16,906
+    # identical bets, it moves ROI -7.44% -> -6.26%.
+    #
+    # Allowlisted BECAUSE it became a model input, per model_engine_standard.md
+    # 3b: "every model input must be in HOT_ARTIFACT_PATTERNS, or it cannot be
+    # read or published through /api/ops/artifacts/* -- which means it cannot be
+    # audited on Render at all". An unallowlisted input is an unauditable one,
+    # and maintaining this list is part of shipping the input, not follow-up.
+    #
+    # `#208` as ever: this PERMITS the transfer, it does not make one happen.
+    "nfl_source/tracking/nflverse/schedules_games.csv",
     "nfl_source/tracking/nflverse/injuries/injuries_*.csv",
     "nfl_source/source_artifacts/data/processed/rosters/roster_*_snapshot.csv",
     "nfl_source/source_artifacts/data/processed/depth/depth_*_snapshot.csv",

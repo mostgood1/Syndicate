@@ -16,13 +16,15 @@ from __future__ import annotations
 
 import csv
 import math
+import os
 import statistics
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from syndicate.features.nfl.player_stats import STAT_KEYS
-from syndicate.features.nfl.player_stats import anytime_td_rate
+from syndicate.features.nfl.game_context import favoured_by_delta, implied_total_ratio
+from syndicate.features.nfl.player_stats import anytime_td_rate, player_team_by_week
 from syndicate.features.nfl.player_stats import player_rate
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.nfl.sources import default_nfl_source_root
@@ -221,6 +223,75 @@ def nfl_prop_display_stat(market_key: str) -> str:
     return str(market_key or "").split("::", 1)[0]
 
 
+# `#471` follow-up: per-market game-context coefficients, FITTED on 2023-2024
+# and reported on a 2025 holdout by `scripts/fit_nfl_props_game_context.py`.
+# (alpha, beta) in `mean * ratio**alpha * exp(beta * spread_delta)`, where both
+# ratio and delta are normalised against the PLAYER'S OWN history -- see
+# game_context.py for why that self-normalisation is what stops this
+# double-counting an effect the rolling mean already absorbed
+# (model_engine_standard.md 4.4).
+#
+# Measured, paired on the 16,906 bets both variants graded:
+#   baseline      hit 49.39%  brier 0.30273  ROI -7.44%
+#   game context  hit 50.05%  brier 0.30054  ROI -6.26%
+#
+# TWO MARKETS SHIP UNCHANGED AT (0.0, 0.0), each for a stated reason -- the same
+# discipline `#471`'s blend fix used when a market showed no real OOS benefit:
+#
+#   rushing_attempts  the ONE market whose holdout MAE got WORSE (+0.0030), and
+#                     its fitted alpha was ~0.00 anyway. Carries are driven by
+#                     game script, not scoring environment.
+#   anytime_td        THE FIT AND PRODUCTION USE DIFFERENT ESTIMATORS. The fit
+#                     ran on the raw per-player rate; this module uses `#471`'s
+#                     Gamma-Poisson SHRUNK `anytime_td_rate`. An alpha of 1.20
+#                     fitted against the raw rate is not a coefficient for the
+#                     shrunk one, and shipping it would apply a number nothing
+#                     measured. Needs a re-fit against the shrunk estimator.
+_NFL_GAME_CONTEXT_PARAMS: dict[str, tuple[float, float]] = {
+    "passing_yards": (0.40, -0.005),
+    "passing_attempts": (0.20, -0.010),
+    "passing_tds": (0.80, -0.005),
+    "interceptions": (0.60, -0.020),
+    "rushing_yards": (0.20, 0.010),
+    "rushing_attempts": (0.0, 0.0),
+    "receptions": (0.30, -0.005),
+    "receiving_yards": (0.60, -0.010),
+    "anytime_td": (0.0, 0.0),
+}
+
+
+def _nfl_game_context_enabled() -> bool:
+    raw = os.environ.get("SYNDICATE_NFL_PROPS_GAME_CONTEXT", "on")
+    return str(raw).strip().lower() not in {"0", "off", "false", "no"}
+
+
+def nfl_game_context_multiplier(season: int, week: int, player_id: str, stat: str) -> float:
+    """Multiplier on a player's projected mean for THIS week's game context.
+
+    Returns exactly 1.0 -- a real no-op -- when the feature is off, when the
+    market ships unchanged, or when the context cannot be resolved. That last
+    case is a deliberate choice and not a neutral default in the sense
+    model_engine_standard.md 4.2 warns about: `implied_total_ratio` returns None
+    rather than 1.0 for an unknown lookup, so "unfed" is distinguishable HERE at
+    the one place that can decide what to do about it, instead of being smeared
+    into every downstream number.
+    """
+    if not _nfl_game_context_enabled():
+        return 1.0
+    alpha, beta = _NFL_GAME_CONTEXT_PARAMS.get(stat, (0.0, 0.0))
+    if alpha == 0.0 and beta == 0.0:
+        return 1.0
+    by_week = player_team_by_week(season).get(player_id) or {}
+    prior_weeks = [w for w in by_week if w < int(week)]
+    if len(prior_weeks) < 2:
+        return 1.0
+    ratio = implied_total_ratio(season, week, by_week, prior_weeks=prior_weeks)
+    delta = favoured_by_delta(season, week, by_week, prior_weeks=prior_weeks)
+    if ratio is None or delta is None:
+        return 1.0
+    return float(ratio ** alpha) * math.exp(beta * float(delta))
+
+
 def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Real odds + real-rate-based sim rows for every quoted player prop
     this week. Entity = player's real full name (as quoted by the odds
@@ -267,6 +338,11 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
             stdev = None
         else:
             mean, stdev, n = player_rate(season, week, player_id, stat)
+        # Game context. Applied to the MEAN only: the rolling stdev describes
+        # this player's own game-to-game spread and a scoring-environment shift
+        # is not evidence about that dispersion.
+        if mean is not None:
+            mean = float(mean) * nfl_game_context_multiplier(season, week, player_id, stat)
         model_prob = _nfl_prop_model_probability(stat=stat, mean=mean, stdev=stdev, n=n, line=line)
         if model_prob is None:
             continue
