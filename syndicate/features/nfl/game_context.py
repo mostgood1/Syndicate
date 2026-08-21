@@ -60,7 +60,15 @@ def schedule_paths(season: int) -> list:
     The nflverse dump stays as a FALLBACK so the offline fit and backtest keep
     working on 2023-2025, which the per-season file does not cover locally.
     """
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
+
+    # The ARTIFACT OUTPUT ROOT first, because that is where
+    # scripts/fetch_nfl_schedule.py now writes (`#389`: the probing
+    # `default_nfl_source_root` returns the ephemeral checkout, since the repo
+    # mirror ships `upcoming_recs_*.csv` and the mounted disk does not). The
+    # probed root stays as a fallback so a dev checkout still resolves.
     return [
+        nfl_artifact_output_root() / f"schedule_{int(season)}.csv",
         default_nfl_source_root() / f"schedule_{int(season)}.csv",
         default_nfl_source_root() / "tracking" / "nflverse" / "schedules_games.csv",
     ]

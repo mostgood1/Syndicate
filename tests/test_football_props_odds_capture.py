@@ -366,3 +366,49 @@ def test_refresh_run_summary_is_auditable_from_web():
     # Scoped: it must not open the whole reports tree.
     assert not is_hot_artifact_relative_path(
         "reports/migration_runs/2026-08-20/unrelated_dir/anything.json")
+
+
+def test_schedule_is_written_to_the_artifact_root_not_the_probed_one(monkeypatch, tmp_path):
+    """`#389`, hit a second time.
+
+    `default_nfl_source_root()` probes for `upcoming_recs_*.csv` and returns the
+    first root that HAS it -- and the repo mirror ships those while the mounted
+    disk does not, so it resolves to the EPHEMERAL CHECKOUT. A schedule written
+    there is discarded on every deploy, and `publish_hot_artifact` is a silent
+    no-op because `relative_to_data_root()` returns None for a path outside the
+    data root.
+
+    Measured before the fix: the step reported `status=ok return_code=0` every
+    cycle while web's copy sat at its boot mtime with 67 lined games against
+    nflverse's 112.
+    """
+    import importlib.util
+    import sys as _sys
+
+    spec = importlib.util.spec_from_file_location(
+        "_fetch_nfl_schedule", REPO_ROOT / "scripts" / "fetch_nfl_schedule.py")
+    mod = importlib.util.module_from_spec(spec)
+    _sys.modules["_fetch_nfl_schedule"] = mod
+    spec.loader.exec_module(mod)
+
+    disk = tmp_path / "disk" / "nfl_source"
+    checkout = tmp_path / "checkout" / "nfl_source"
+    disk.mkdir(parents=True)
+    checkout.mkdir(parents=True)
+    (checkout / "upcoming_recs_2025_wk17.csv").write_text("x", encoding="utf-8")
+
+    monkeypatch.setattr(mod, "nfl_artifact_output_root", lambda: disk)
+    monkeypatch.setattr(mod, "default_nfl_source_root", lambda: checkout)
+
+    got = mod.schedule_path(2026)
+    assert got == disk / "schedule_2026.csv", got
+    assert "checkout" not in str(got), got
+
+
+def test_game_context_reads_where_the_schedule_is_written():
+    """Writer and reader must not diverge -- that divergence IS `#389`."""
+    from syndicate.features.nfl.game_context import schedule_paths
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
+
+    paths = schedule_paths(2026)
+    assert paths[0] == nfl_artifact_output_root() / "schedule_2026.csv", paths[0]

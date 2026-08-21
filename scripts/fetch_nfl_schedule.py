@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from syndicate.features.nfl.sources import default_nfl_source_root  # noqa: E402
+from syndicate.features.nfl.sources import default_nfl_source_root, nfl_artifact_output_root  # noqa: E402
 
 NFLVERSE_GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 
@@ -56,7 +56,32 @@ def fetch_nflverse_games() -> list[dict[str, str]]:
 
 
 def schedule_path(season: int, *, source_root: Path | None = None) -> Path:
-    root = source_root if source_root is not None else default_nfl_source_root()
+    """Where this season's schedule is WRITTEN.
+
+    `nfl_artifact_output_root()`, NOT `default_nfl_source_root()`. This is
+    `#389` exactly, hit a second time. That helper resolves via
+    `_first_existing_root`, which probes each candidate for
+    `upcoming_recs_*.csv` and returns the first root that HAS it -- and the
+    repo mirror ships those files while the mounted disk does not. So the
+    probe returns `/opt/render/project/src/data/nfl_source`, the EPHEMERAL
+    CHECKOUT, and every write lands somewhere nothing reads and every deploy
+    discards.
+
+    Measured 2026-08-21, and it is why the schedule never reached web:
+      - `nfl_schedule_refresh` ran every cycle, `status=ok return_code=0` in 1s;
+      - `artifact_publisher` logged NOTHING for the path, because
+        `relative_to_data_root()` returns None for a path outside the data
+        root, so `publish_hot_artifact` is a silent no-op;
+      - web's copy stayed at its 2026-08-02 boot mtime with 67 lined games
+        while nflverse had moved to 112 and 61 rows had different spreads.
+    A step reporting success every single cycle, delivering nothing.
+
+    `nfl_artifact_output_root` does no filesystem probing on purpose: env var,
+    else the shared data root. Its docstring is the write-side corollary of
+    "does this directory contain anything is not does it contain the file you
+    asked for".
+    """
+    root = source_root if source_root is not None else nfl_artifact_output_root()
     return root / f"schedule_{season}.csv"
 
 
