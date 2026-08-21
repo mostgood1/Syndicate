@@ -114,6 +114,22 @@ class EngineConfig:
     A sweep that reports a best value for every parameter is not the same as a
     sweep that MEASURED every parameter, and treating the two as equal is how a
     grid search launders noise into constants.
+
+    **RE-SWEPT A THIRD TIME 2026-08-21**, after `_expected_games` was rebuilt,
+    and **NOTHING CHANGED** -- every material parameter was already sitting at
+    the value the sweep selected. That is the useful result: these constants are
+    stable across a structural change to the availability model, which is
+    stronger evidence for them than the original selection was. The whole sweep
+    moved the fit season 46.47 -> 46.33 MAE across eleven parameters.
+
+    The one proposed change, `season_recency_weights` -> (1.0, 0.7, 0.5), was
+    REJECTED and the reason generalises: its grid spans 1.43 MAE, but ~1.35 of
+    that is the gap between using ONE prior season and using more than one, and
+    the default already uses more than one. Every multi-season option lies
+    within 0.08 MAE of every other, and the "winner" beats the incumbent by
+    0.0003 on a non-monotone ridge. **A span computed over a grid that contains
+    an obviously-bad option measures the bad option, not the parameter** -- so
+    read the grid, never just its width.
     """
 
     #: How many prior seasons feed a player's history, most recent first, and
