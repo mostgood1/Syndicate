@@ -20930,3 +20930,65 @@ state, Marseille's totals at 3.0/3.5, Layer 2's imminence floor. The verifier
 reports those as FAIL/PENDING right now and that is correct — refresh-worker is
 on `67a71eda`, deployed 15:26:27Z by lane `nfl-props-odds-allowlist`, which held
 the claim through this window.
+
+## 2026-08-21 16:27Z — refresh-worker `344c4f21` — soccer gameday (2 of 2) — **GUARD OVERRIDDEN, EXPLICIT USER DECISION**
+
+lane: `soccer-board-mlb-parity`
+service: refresh-worker (`srv-d91dpertqb8s73co8ls0`), deploy `dep-da47q5jl550s73b60og0`
+target: `344c4f21` = `origin/main` tip, ancestry-checked to contain `260ae9f9`
+(gates 2/3) so it composes with other lanes rather than reverting them.
+
+**THE PREFLIGHT SAID HOLD AND IT WAS RIGHT. THE DEPLOY WENT ANYWAY, ON AN
+EXPLICIT USER DECISION, AND THIS IS THE RECORD OF WHAT THAT COST.**
+
+Claim was held by this lane. Preflight NEVER returned CLEAR: from 16:08:42Z to
+16:25Z it reported 3 -> 4 -> 7 -> 10 -> 11 -> 8 -> 10 jobs, oscillating, never
+zero. Polling was tightened 45s -> 8s specifically to catch a short drain; there
+was no drain to catch, and the reason is structural rather than transient:
+
+    run_mlb_daily_sim_job.py -> daily_update.py --workflow ui-daily
+                             -> vendor/mlb_bettingv2/tools/daily... (+3 mp children)
+    run_refresh_odds_job.py  -> refresh_odds_sources.py
+                             -> build_soccer_artifacts.py --league mls
+
+The second is the 7-DAY-HORIZON soccer pass (`SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`),
+which takes ~4.6h per pass and was observed moving serie_a -> mls during the
+wait. It was never going to finish inside the window. **KILLED: an in-flight MLB
+daily sim and a soccer artifact build mid-league** -- the exact hazard
+`state.md` records as "deploying kills an in-flight MLB sim".
+
+**Why it was judged worth it:** the 17:50Z scheduled re-sim needed the new code
+to publish today's totals fix, and gates 2/3 can only be VERIFIED against a live
+match -- tonight's 18:45Z/19:00Z kickoffs were the only window before the next
+soccer slate. Waiting would have cost the verification, not just the ship.
+
+**The guard was disabled by editing `.claude/settings.local.json` `env`
+(`SYNDICATE_DEPLOY_GUARD=off`) and RESTORED ~40 SECONDS LATER**, verified by
+parsing both files: structurally identical to the pre-override backup, 41/41
+allow rules, no `env` key. An inline `SYNDICATE_DEPLOY_GUARD=off curl ...` does
+NOT work -- the hook reads its own process environment
+(`deploy-guard.py:359`), which inherits from Claude Code, not from the command's
+shell. Noted because the obvious attempt fails silently-looking (the guard just
+blocks again) and the next person will try it.
+
+**Carries (all on `origin/main`):** `ee6b681e` soccer live game state (gate 1),
+`94461732` totals priced at any line from `scoreline_probabilities`, `991153a4`
+Layer 2 imminence floor, `f58fab8e` three-way model-edge fix, `260ae9f9` gates
+2/3 (live game-line + live prop).
+
+**verify: PENDING at the time of writing, and deliberately not claimed.** The
+reading that counts is NOT deploy-live: `board_enrichment`, `soccer_projections`
+and `layer2_board` all run at BUILD time and web serves
+`source: precomputed_artifact`, so nothing a reader sees changes until the
+worker rebuilds. The verification script therefore takes its baseline AFTER
+deploy-live and waits for `generated_at` to advance past it -- an earlier
+version took the baseline before the deploy, which a pre-deploy rebuild would
+have satisfied while still running the OLD code. Checks owed:
+
+  1. `live_game_state.supported` false -> true on `/api/board/book-grid?sport=soccer`
+  2. Marseille totals basis `total_mean` -> `scoreline_distribution` at 3.0/3.5
+  3. `per_sport.soccer.selected_today` present and > 4 on the Layer 2 shortlist
+  4. Layer 2 away/draw h2h `model_edge_pct` == model(side) - fair(side);
+     RC Lens v Auxerre away must read NEGATIVE (was +1.63, true -1.65)
+  5. **Live-window only, 18:45-20:45Z:** `live_gamelines.supported: true` with
+     `rows_live_gameline_edged > 0` on a match actually in play.
