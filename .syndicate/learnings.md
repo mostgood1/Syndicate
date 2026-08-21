@@ -4152,3 +4152,38 @@ alternates.
 When the capture emitted nothing on refresh-worker I went looking for the
 EMITTER instead of waiting, and `skipped=` gave the answer immediately. The same
 instinct, applied one step earlier, would have prevented the deploy.
+
+## 2026-08-21 A `max(timestamp)` INSIDE A SEASON-SCOPED ARTIFACT IS A HINDSIGHT LEAK, AND IT FLATTERS
+
+`depth_charts_2025.csv` is named for the 2025 season and contains dated
+snapshots running **2025-08 through 2026-03**. Selecting "the current depth
+chart" as `max(dt)` therefore returns a chart from **March 2026** — five months
+after the season a backtest was grading. The projection was handed the answer.
+
+The reasoning that produced it was checked and still wrong: *"the 2026 season
+has not started, so the newest snapshot in the 2026 file is a preseason one."*
+True for 2026. False for every completed season in the same code path, and the
+docstring above the bug asserted the opposite discipline in plain English.
+
+**Two rules.**
+
+1. **Cut by the CALENDAR, not by the file.** A file-relative selector
+   (`max`, `last`, `[-1]`) inherits whatever window the file happens to cover,
+   and that window changes per season with no signal. The fix is an absolute
+   bound — here `PRESEASON_CUTOFF = "{season}-09-01"` — which is correct for
+   every season including the one that has not started.
+2. **A leak that flatters is the one that survives.** This one made the engine
+   look better, so nothing about the result invited suspicion. It was found
+   only because the user asked an offhand question about 2025 and the answer
+   required re-reading the selector. Assume any hindsight bug is of this kind:
+   the ones that hurt your numbers get investigated on their own.
+
+Related, same session, same shape — **a population definition is a measurement
+choice and gets it wrong silently**. "How many games does a starter play" was
+computed three ways before it was right: a season-total floor (>=50 touches)
+admitted backups who started three games and read **QB 10.3 games**; an
+opportunity-SHARE floor admitted mid-season replacements and read **11.0**;
+ranking within team-season read **14.28**, which is the real answer. All three
+returned a plausible number. The first two would have projected every starting
+quarterback in the league for ten or eleven games, and no test can see it.
+
