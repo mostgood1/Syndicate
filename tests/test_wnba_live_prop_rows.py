@@ -157,3 +157,60 @@ class PricingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SnapshotAdapterTests(unittest.TestCase):
+    """The snapshot contract `build_live_prop_index` actually reads.
+
+    THE MARKET KEY IS THE WHOLE RISK. `_snapshot_market` reads `prop` first and
+    the board speaks OddsAPI; keying on anything else is `#412` exactly --
+    `miss_no_market_alias = 1385 of 1385`, the join missing every row while the
+    correct key sat in the next field. These keys were verified against
+    production, not guessed.
+    """
+
+    LINES = {("paige bueckers", "points"): 17.5,
+             ("paige bueckers", "rebounds"): 5.5}
+
+    def _rows(self):
+        from syndicate.features.shared.wnba_live_prop_rows import build_live_prop_rows
+        return build_live_prop_rows([_LIVE], _sim([_ANCHOR]),
+                                    game_minutes_remaining=21.0, lines=self.LINES)["rows"]
+
+    def test_it_emits_the_boards_oddsapi_market_keys(self) -> None:
+        from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+        props = to_snapshot_live_props(self._rows())
+        self.assertEqual({p["prop"] for p in props}, {"player_points", "player_rebounds"})
+
+    def test_it_emits_the_snapshot_vocabulary_not_ours(self) -> None:
+        from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+        prop = to_snapshot_live_props(self._rows())[0]
+        for key in ("playerName", "prop", "line", "liveProjection", "liveModelProbOver"):
+            self.assertIn(key, prop)
+        for internal in ("player", "market", "liveProjectedStat"):
+            self.assertNotIn(internal, prop)
+
+    def test_liveProjection_is_present_because_the_index_requires_it(self) -> None:
+        """A row without it is skipped by the index even when a probability is
+        there -- it is the live-awareness evidence."""
+        from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+        for prop in to_snapshot_live_props(self._rows()):
+            self.assertIsNotNone(prop["liveProjection"])
+
+    def test_rows_with_no_line_are_DROPPED_not_half_emitted(self) -> None:
+        from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+        from syndicate.features.shared.wnba_live_prop_rows import build_live_prop_rows
+        rows = build_live_prop_rows([_LIVE], _sim([_ANCHOR]), game_minutes_remaining=21.0)
+        self.assertEqual(to_snapshot_live_props(rows), [],
+                         "a keyless row is worse than an absent one")
+
+    def test_an_unmappable_market_is_dropped_not_aliased_to_something_close(self) -> None:
+        """`player_double_double` exists on the board and cannot be projected
+        from a points mean. A wrong alias prices the wrong market."""
+        from syndicate.features.shared.wnba_live_prop_rows import (
+            BOARD_MARKET_KEYS, to_snapshot_live_props,
+        )
+        self.assertNotIn("double_double", BOARD_MARKET_KEYS)
+        rows = [{"market": "double_double", "player": "X", "line": 0.5,
+                 "liveProjectedStat": 1.0, "liveModelProbOver": 0.6}]
+        self.assertEqual(to_snapshot_live_props(rows), [])

@@ -1209,7 +1209,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `(player, market)`. 48 tests + 31 subtests across phases 1-3(b).
   **This does NOT open the join's gate** — `attach_live_projections_for_sport`
   still returns early on `sport != "mlb"`; that is phase 4.
-- **REMAINING PHASES:** (4) open the `sport != "mlb"` gate. Note the join's own
+- **PHASE 4 DONE — the gate is OPEN for wnba, and opening it did NOT create a
+  silent zero.** `_LIVE_PROP_SPORTS = {mlb, wnba}` in
+  `attach_live_projections_for_sport`. `to_snapshot_live_props` translates this
+  module's internal rows into the contract `build_live_prop_index` actually
+  reads (`playerName` / `prop` / `line` / `liveProjection` /
+  `liveModelProbOver`). **Market keys verified against production**
+  (`player_points` 45 rows, `player_assists` 21, `player_rebounds` 14,
+  `player_threes` 8) rather than guessed — `_snapshot_market` reads `prop` first
+  and the board speaks OddsAPI, which is `#412` exactly
+  (`miss_no_market_alias = 1385 of 1385`). Markets the board carries but this
+  cannot project (`player_double_double`, `player_points_rebounds_assists`,
+  `player_triple_double`) are DROPPED, never aliased to something close.
+  **A snapshot whose games carry no `liveProps` is now reported BY NAME**
+  ("producer not wired") instead of returning 0 rows as though the join had run
+  — replacing a named refusal with a silent zero is the permissive-default shape
+  this repo has a standing rule about. 202 tests + 45 subtests green across
+  props, the game-line join, live-edge policy/enforcement, book-grid and layer-1.
+- **WHAT REMAINS BEFORE ANY OF THIS IS LIVE:** nothing calls the capture on a
+  tick, and nothing writes `liveProps` onto the WNBA lens — so the gate is open
+  onto an empty room, which the new reason says out loud. That wiring plus a
+  deploy is the next step; the chain has still NEVER run end to end.
   `prob_std_err`/`PRICEABLE_SIGMA` refusal then applies ON TOP, exactly as for
   MLB — so opening it does not mean every row prices. Previously listed as (3b),
   now done:

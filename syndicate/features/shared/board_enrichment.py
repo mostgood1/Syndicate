@@ -940,7 +940,14 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
     the re-sim: that path is `refuse_if_compute_in_request_path` and belongs on
     live-odds-worker's tick.
     """
-    if sport != "mlb":
+    # PHASE 4 `[2026-08-21]`: WNBA joins MLB here. Its live tier is not a re-sim
+    # -- it is capture -> anchored projection -> a probability from a MEASURED
+    # residual (`wnba_live_prop_probability`, n=796 over 5 slates, replay
+    # reconciling 100%). The join does not care which produced the number; it
+    # cares that `liveModelProbOver` exists and that the interval behind it was
+    # measured rather than assumed, which is the bar MLB's 120-sim tier meets
+    # too.
+    if sport not in _LIVE_PROP_SPORTS:
         return {"supported": False, "reason": f"no live re-sim wired for {sport}", "rows_live_projected": 0}
     try:
         from syndicate.features.shared.live_projection_join import (
@@ -957,6 +964,22 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
             return {
                 "supported": True,
                 "reason": "no published live-lens snapshot",
+                "rows_live_projected": 0,
+            }
+        # OPENING A GATE MUST NOT REPLACE A NAMED REFUSAL WITH A SILENT ZERO.
+        # Before this change an unwired sport said "no live re-sim wired"; after
+        # it, a snapshot whose games carry no `liveProps` would simply report 0
+        # rows, which reads as "the join ran and found nothing worth pricing"
+        # and is the permissive-default shape this repo has a standing rule
+        # about. So the writer-not-wired case is detected and named.
+        if not any(
+            isinstance(game, dict) and game.get("liveProps")
+            for game in (snapshot.get("games") or [])
+        ):
+            return {
+                "supported": True,
+                "reason": f"live-lens snapshot for {sport} carries no liveProps "
+                          "(producer not wired)",
                 "rows_live_projected": 0,
             }
         return attach_live_projections(grid, build_live_prop_index(snapshot))
@@ -994,6 +1017,11 @@ def attach_margin_model(grid: list) -> dict:
 # Sports whose published live lens carries a game-line projection this join can
 # read. A NAMED SET, not a truthy check: an unlisted sport must fail closed and
 # say so, which is what makes a blank live column attributable.
+# Sports whose published live lens carries a PROP-tier projection this join can
+# read. Named for the same reason as `_LIVE_GAMELINE_SPORTS` below: an unlisted
+# sport must fail closed and say so.
+_LIVE_PROP_SPORTS = frozenset({"mlb", "wnba"})
+
 _LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba"})
 
 

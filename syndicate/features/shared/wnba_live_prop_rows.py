@@ -57,6 +57,24 @@ STAT_MAP: tuple[tuple[str, str, str], ...] = (
     ("threes_made", "threes_mean", "threes"),
 )
 
+# OUR LABEL -> THE BOARD'S MARKET KEY. Verified against production
+# `/api/board/book-grid?sport=wnba` (player_points 45 rows, player_assists 21,
+# player_rebounds 14, player_threes 8), NOT guessed.
+#
+# `_snapshot_market` reads `prop` first and the board speaks OddsAPI. Keying on
+# anything else is `#412` exactly: `miss_no_market_alias = 1385 of 1385`, the
+# join missing literally every row while the correct key sat in the next field.
+# Markets the board carries but this cannot project (`player_double_double`,
+# `player_points_rebounds_assists`, `player_triple_double`) are deliberately
+# ABSENT rather than mapped to something close -- a wrong alias prices the wrong
+# market, which is worse than not pricing it.
+BOARD_MARKET_KEYS: dict[str, str] = {
+    "points": "player_points",
+    "rebounds": "player_rebounds",
+    "assists": "player_assists",
+    "threes": "player_threes",
+}
+
 # AN APOSTROPHE IS INTRA-WORD; A HYPHEN SEPARATES WORDS. They cannot share a
 # rule. Caught by this module's own test: substituting a space for BOTH turned
 # `A'ja Wilson` into `a ja wilson`, which matches nothing -- the player would
@@ -196,3 +214,40 @@ def build_live_prop_rows(
         "priced": priced_rows,
         "unpriced_by_reason": unpriced_by_reason,
     }
+
+
+def to_snapshot_live_props(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Rows in the shape `build_live_prop_index` reads off the lens snapshot.
+
+    A SEPARATE VOCABULARY ON PURPOSE. This module's rows are internal
+    (`player`, `market`, `liveProjectedStat`); the snapshot contract is
+    `playerName` / `prop` / `liveProjection` / `liveModelProbOver`, and the
+    index keys on `(player, market, line)` with `liveProjection` as the
+    live-awareness evidence -- a row without it is skipped even when a
+    probability is present. Translating here, once, keeps the two from drifting.
+
+    Rows with no line, no projection or an unmappable market are DROPPED rather
+    than emitted half-formed: the index counts a keyless row as
+    `skipped_no_key`, which is a less useful signal than never claiming the row.
+    """
+    out: list[dict[str, Any]] = []
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        market_key = BOARD_MARKET_KEYS.get(str(row.get("market") or ""))
+        if not market_key:
+            continue
+        if row.get("line") is None or row.get("liveProjectedStat") is None:
+            continue
+        out.append({
+            "playerName": row.get("player"),
+            "prop": market_key,
+            "line": row.get("line"),
+            "liveProjection": row.get("liveProjectedStat"),
+            "liveModelProbOver": row.get("liveModelProbOver"),
+            # Carried through so a refused row is still attributable on the
+            # snapshot rather than only inside this process.
+            "residualSigma": row.get("residual_sigma"),
+            "notPricedReason": row.get("not_priced_reason"),
+        })
+    return out
