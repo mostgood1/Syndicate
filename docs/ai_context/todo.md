@@ -54,6 +54,23 @@ kwarg set, not a subset.
    `main`: that test **passes** (72s). The baseline line is dated 08-14/15 and
    was measured against the deployed lineage at `2b14fbeb`; it should not be
    inherited as current.
+
+   **REPLACEMENT NUMBER, with its lineage named: `224 passed, 10 subtests
+   passed, 0 failed in 1361.70s (22:41)`.** So the file is GREEN — this lane's
+   fix was the last red in it, and there is no second pre-existing failure
+   hiding behind the first. Two corrections to the old line fall out: the count
+   was `218 passed / 6 failed`, and the cost is **~23 minutes, not the ~15**
+   `state.md` records.
+
+   **CAVEAT — do not launder this into a tip-of-`main` baseline.** It ran
+   against the PRIMARY TREE's lineage (`d2222426` + this lane's test fix), which
+   was 30 commits behind `origin/main` at the time. The test file is
+   byte-identical to what shipped, but the surrounding product code in that tree
+   is not. `state.md`'s own rule — *gate against the lineage you are shipping,
+   not against `main`* — cuts against this measurement as much as it cut against
+   the one it replaces. What it establishes is that the two named failures are
+   gone and the file has no other red; a clean tip-of-`main` number is still
+   unmeasured and would cost ~23 minutes to take.
 2. **`#387`'s "it was already inert here" is true of the call site it was
    written about, and NOT universally.** The streamed board caller
    (`pipeline/intelligence_state.py:4636-4653`) passes `overview=None` on
