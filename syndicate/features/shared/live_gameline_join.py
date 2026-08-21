@@ -228,6 +228,33 @@ def prob_std_err(probability: Any, sims: Any) -> float | None:
     return math.sqrt(max(0.0, p_adj * (1.0 - p_adj)) / n_adj)
 
 
+def _analytic_markets_from_lens(lens: Mapping[str, Any]) -> dict[str, Any]:
+    """The lens's own per-market live probabilities, where it publishes them.
+
+    Reads `markets.spread` / `markets.total` -- the shape WNBA's
+    `_wnba_game_lens_markets` writes. Returns `{}` for a lens without them
+    (MLB), so the caller's distribution path is reached exactly as before.
+    """
+    markets = lens.get("markets")
+    if not isinstance(markets, Mapping):
+        return {}
+    out: dict[str, Any] = {}
+    spread = markets.get("spread")
+    if isinstance(spread, Mapping):
+        line = spread.get("homeLine")
+        prob = spread.get("p_win")
+        # `selection` is always "home" on this lens's spread block, so `p_win`
+        # IS P(home covers). Asserted rather than assumed: a lens that ever
+        # publishes the away side would otherwise be read as its opposite.
+        if line is not None and prob is not None and str(spread.get("selection") or "home").lower() == "home":
+            out["spread"] = {"line": line, "p_home_cover": prob}
+    total = markets.get("total")
+    if isinstance(total, Mapping) and total.get("p_win") is not None:
+        # Carried ONLY so the totals refusal can name itself; never priced.
+        out["total"] = {"line": total.get("line"), "p_over": total.get("p_win")}
+    return out
+
+
 def live_gameline_from_lens(
     lens_rows: Any, *, sources: tuple[str, ...] | None = None
 ) -> dict[str, Any] | None:
@@ -277,6 +304,12 @@ def live_gameline_from_lens(
             "as_of": lens.get("liveStateAsOf"),
             "carried_forward": bool(lens.get("liveStateCarriedForward")),
             "lane": lens.get("key"),
+            # LINE-SPECIFIC ANALYTIC PROBABILITIES, where the producer publishes
+            # them instead of a distribution. WNBA's lens carries a live cover
+            # probability at ONE line (`#475`), which prices that line and no
+            # other -- see `price_analytic_line_market`. Absent on MLB's lens,
+            # so this is `{}` there and the distribution path is untouched.
+            "analytic_markets": _analytic_markets_from_lens(lens),
         }
     return None
 
@@ -482,6 +515,102 @@ def price_moneyline(
     return out
 
 
+REASON_ANALYTIC_LINE_MISMATCH = "analytic_probability_is_only_valid_at_its_own_line"
+REASON_ANALYTIC_UNCALIBRATED = "analytic_estimator_never_backtested_for_this_market"
+
+# WHICH ANALYTIC MARKETS MAY BE PRICED, AND THE ONE THAT MAY NOT.
+#
+# SPREAD: `#481` refit the live margin scale against outcomes and DELIBERATELY
+# shared the fitted constant with the cover path, on the recorded argument that
+# "cover asks will (margin + spread) end positive -- the SAME question about how
+# a margin at time T predicts the final margin's sign that the win-prob fit
+# measured, so the fitted dispersion transfers". The interval is inherited on
+# that same argument. HONEST LIMIT: the 0.054 gap was measured on the WIN path;
+# a cover-specific grade has never been run, so this is a reasoned transfer and
+# not a direct measurement. Recorded here rather than in a commit message
+# because the next reader needs it at the point of use.
+#
+# TOTAL: refused, and NOT because the shape is missing. `_wnba_live_total_over_prob`
+# still carries `8.0 + 0.50 * min_left` -- a ported constant that has never been
+# backtested. `#481` looked at it and explicitly declined to refit it, because a
+# total is combined scoring rather than a margin's sign and "refitting needs
+# historical market totals, unavailable here". Pricing it would publish an
+# estimator whose error nobody has measured, which is precisely what this
+# module's first refusal exists to prevent. The reason is spelled out so this
+# reads as a KNOWN GAP with a known unblock (grade it against historical
+# totals), not as the same "no distribution" shrug the spread path used to get.
+#
+# Reuses `_SPREAD_MARKETS` rather than restating the membership: `#`-alt keys
+# (`spreads_alt`, `alternate_spreads`) were added to that set after 53 of 107
+# rows were found carrying no projection because a second copy had drifted.
+# Alt lines still route through here and are refused BY LINE below, which is
+# the accurate reason -- they are not unpriceable markets, they are the same
+# market at a number this probability does not describe.
+_ANALYTIC_PRICEABLE_MARKETS = _SPREAD_MARKETS
+
+
+def price_analytic_line_market(
+    *,
+    analytic: Any,
+    market: Any,
+    line: Any,
+    market_prob: Any,
+    analytic_std_err: Any,
+    sigma: float = PRICEABLE_SIGMA,
+) -> dict[str, Any] | None:
+    """Price a spread row from a line-specific analytic probability.
+
+    Returns None when this path does not apply at all, so the caller falls
+    through to the distribution path unchanged -- an absent analytic block must
+    not turn into a refusal that hides the real (distribution) reason.
+    """
+    if not isinstance(analytic, Mapping):
+        return None
+    market_key = str(market or "").strip().lower()
+    if market_key in _TOTALS_MARKETS:
+        # A named refusal, not a fall-through: "never backtested" is a different
+        # fact from "no distribution published", and collapsing them is how a
+        # known gap stops being visible.
+        if analytic.get("total") is not None:
+            out = withhold_totals()
+            out["withheld_reason"] = REASON_ANALYTIC_UNCALIBRATED
+            return out
+        return None
+    if market_key not in _ANALYTIC_PRICEABLE_MARKETS:
+        return None
+    block = analytic.get("spread")
+    if not isinstance(block, Mapping):
+        return None
+    try:
+        model_prob = float(block.get("p_home_cover"))
+        analytic_line = float(block.get("line"))
+        row_line = float(line)
+    except (TypeError, ValueError):
+        return None
+
+    # THE LINE MUST MATCH. A single probability describes P(home covers THIS
+    # number). The board carries alt spreads at many numbers, and answering them
+    # from one probability would invent a distribution -- the exact thing the
+    # distribution path exists to do honestly. Tolerance is exact-to-the-half
+    # because that is the granularity lines are quoted at.
+    if abs(analytic_line - row_line) > 1e-6:
+        out: dict[str, Any] = {
+            "model_prob": None, "market_prob": None, "edge_pp": None,
+            "std_err_basis": None, "prob_std_err": None, "priceable": False,
+            "withheld_reason": REASON_ANALYTIC_LINE_MISMATCH, "sigma": float(sigma),
+        }
+        return out
+
+    verdict = price_moneyline(
+        model_prob=model_prob,
+        market_prob=market_prob,
+        sims=None,
+        sigma=sigma,
+        analytic_std_err=analytic_std_err,
+    )
+    return verdict
+
+
 def withhold_totals() -> dict[str, Any]:
     """Totals always refuse: the re-sim gives a mean, not a distribution."""
     return {
@@ -654,15 +783,32 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             # same side or the subtraction spans opposite outcomes. This is the
             # identical trap `layer1_board.html:770` records for `projection.side`.
             side_token = "over" if market_key in _TOTALS_MARKETS else "home"
-            verdict = price_distribution_market(
-                dist=(hit.get("total_runs_dist") if market_key in _TOTALS_MARKETS
-                      else hit.get("margin_dist")),
-                line=row.get("line"),
-                side=side_token,
-                market=market_key,
-                market_prob=projection.get("market_fair_prob_over"),
-                sims=hit.get("sims_run"),
-            )
+            dist = (hit.get("total_runs_dist") if market_key in _TOTALS_MARKETS
+                    else hit.get("margin_dist"))
+            verdict = None
+            if not dist:
+                # NO DISTRIBUTION, BUT MAYBE AN ANALYTIC PROBABILITY AT THIS LINE.
+                # WNBA has no re-sim to histogram, but `#475`/`#481` already
+                # publish a live cover probability on the lens. It prices ONE
+                # line -- its own -- which is exactly why a distribution is
+                # preferred and why this refuses every other line by name
+                # instead of interpolating a shape nobody fitted.
+                verdict = price_analytic_line_market(
+                    analytic=hit.get("analytic_markets"),
+                    market=market_key,
+                    line=row.get("line"),
+                    market_prob=projection.get("market_fair_prob_over"),
+                    analytic_std_err=hit.get("analytic_std_err"),
+                )
+            if verdict is None:
+                verdict = price_distribution_market(
+                    dist=dist,
+                    line=row.get("line"),
+                    side=side_token,
+                    market=market_key,
+                    market_prob=projection.get("market_fair_prob_over"),
+                    sims=hit.get("sims_run"),
+                )
             _apply_verdict(row, projection, verdict, hit, coverage,
                            live_projected=verdict.get("model_prob"))
             continue

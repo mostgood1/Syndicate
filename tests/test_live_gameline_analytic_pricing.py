@@ -135,5 +135,92 @@ class IndexThreadingTests(unittest.TestCase):
         self.assertNotIn("analytic_std_err", hit)
 
 
+
+class AnalyticSpreadTests(unittest.TestCase):
+    """A spread priced from a LINE-SPECIFIC probability, and refused elsewhere.
+
+    WNBA publishes a live cover probability at ONE line (`#475`/`#481`). It
+    prices that line and no other; answering an alt line from it would invent a
+    distribution, which is the very thing the distribution path exists to do
+    honestly.
+    """
+
+    ANALYTIC = {"spread": {"line": 3.5, "p_home_cover": 0.72}}
+
+    def test_prices_at_the_matching_line(self) -> None:
+        v = J.price_analytic_line_market(
+            analytic=self.ANALYTIC, market="spreads", line=3.5,
+            market_prob=0.50, analytic_std_err=0.054,
+        )
+        self.assertIsNotNone(v)
+        self.assertTrue(v["priceable"])
+        self.assertEqual(v["std_err_basis"], "analytic_calibration")
+        self.assertAlmostEqual(v["edge_pp"], 22.0, places=6)
+
+    def test_refuses_a_different_line_by_name(self) -> None:
+        for other in (2.5, 4.5, -3.5, 0.0):
+            with self.subTest(line=other):
+                v = J.price_analytic_line_market(
+                    analytic=self.ANALYTIC, market="spreads_alt", line=other,
+                    market_prob=0.50, analytic_std_err=0.054,
+                )
+                self.assertFalse(v["priceable"])
+                self.assertEqual(v["withheld_reason"], J.REASON_ANALYTIC_LINE_MISMATCH)
+
+    def test_small_edge_still_refused_at_the_matching_line(self) -> None:
+        v = J.price_analytic_line_market(
+            analytic={"spread": {"line": 3.5, "p_home_cover": 0.55}},
+            market="spreads", line=3.5, market_prob=0.50, analytic_std_err=0.054,
+        )
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_NOT_PRICEABLE)
+
+    def test_totals_are_refused_as_UNCALIBRATED_not_as_missing_a_shape(self) -> None:
+        """The distinction is the point: a known gap must not read as a shrug.
+
+        `_wnba_live_total_over_prob` still carries the un-backtested
+        `8.0 + 0.50*min_left`; `#481` explicitly declined to refit it.
+        """
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.61}},
+            market="totals", line=165.5, market_prob=0.50, analytic_std_err=0.054,
+        )
+        self.assertIsNotNone(v)
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_ANALYTIC_UNCALIBRATED)
+        self.assertNotEqual(v["withheld_reason"], J.REASON_NO_LIVE_DISTRIBUTION)
+
+    def test_returns_None_when_the_path_does_not_apply(self) -> None:
+        """None means 'fall through', so MLB reaches the distribution path and
+        its real reason is not masked by this one."""
+        self.assertIsNone(J.price_analytic_line_market(
+            analytic=None, market="spreads", line=3.5, market_prob=0.5, analytic_std_err=0.054))
+        self.assertIsNone(J.price_analytic_line_market(
+            analytic={}, market="spreads", line=3.5, market_prob=0.5, analytic_std_err=0.054))
+        self.assertIsNone(J.price_analytic_line_market(
+            analytic=self.ANALYTIC, market="h2h", line=3.5, market_prob=0.5, analytic_std_err=0.054))
+
+    def test_lens_extraction_reads_the_wnba_markets_block(self) -> None:
+        lens = {
+            "source": "live_projection",
+            "modelHomeWinProb": 0.6,
+            "projection": {"homeMargin": 4.0, "total": 160.0},
+            "markets": {
+                "spread": {"homeLine": 3.5, "p_win": 0.72, "selection": "home"},
+                "total": {"line": 165.5, "p_win": 0.61},
+            },
+        }
+        got = J._analytic_markets_from_lens(lens)
+        self.assertEqual(got["spread"], {"line": 3.5, "p_home_cover": 0.72})
+        self.assertEqual(got["total"]["line"], 165.5)
+
+    def test_lens_without_markets_yields_empty_so_mlb_is_untouched(self) -> None:
+        self.assertEqual(J._analytic_markets_from_lens({"source": "live_mc"}), {})
+
+    def test_an_away_selection_spread_is_not_read_as_home(self) -> None:
+        """Guard against silently inverting the side if the lens ever changes."""
+        lens = {"markets": {"spread": {"homeLine": 3.5, "p_win": 0.72, "selection": "away"}}}
+        self.assertNotIn("spread", J._analytic_markets_from_lens(lens))
+
 if __name__ == "__main__":
     unittest.main()
