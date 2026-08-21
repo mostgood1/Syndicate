@@ -8,6 +8,11 @@ from syndicate.features.nfl.archive import build_archive_page_context
 from syndicate.features.nfl.cards import build_cards_page_context
 from syndicate.features.nfl.cards import build_nfl_market_board
 from syndicate.features.nfl.cards import nfl_projection_available_weeks
+from syndicate.features.nfl.fantasy import DEFAULT_FANTASY_SEASON
+from syndicate.features.nfl.fantasy import build_draft_board_payload
+from syndicate.features.nfl.fantasy import build_fantasy_page_context
+from syndicate.features.nfl.fantasy import build_fantasy_payload
+from syndicate.features.nfl.fantasy import resolve_league
 from syndicate.features.nfl.game_detail import build_game_detail_page_context
 from syndicate.features.nfl.live_lens import build_live_lens_page_context
 from syndicate.features.nfl.picks import build_betting_card_page_context
@@ -332,3 +337,99 @@ def preseason_market_board():
 def api_preseason_market_board():
     season = _selected_season()
     return jsonify(build_nfl_preseason_market_board(season, _selected_preseason_week(season)))
+
+
+# ---------------------------------------------------------------------------
+# Fantasy Football
+# ---------------------------------------------------------------------------
+#
+# Its own season/week resolvers rather than `_selected_season()`/
+# `_selected_week()`, for the reason the preseason block below already
+# documents: a fantasy projection's week domain is the FULL 1-18 schedule of an
+# upcoming season, while `available_weeks()` is driven by which projection
+# artifacts happen to exist for the CURRENT one. Sharing the resolver would
+# silently clamp a week-14 waiver question to whatever week the board last
+# published.
+
+
+def _fantasy_season() -> int:
+    raw = (request.args.get("season") or "").strip()
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return DEFAULT_FANTASY_SEASON
+
+
+def _fantasy_week() -> int | None:
+    """None means "whole season", which is the draft view and the default."""
+    raw = (request.args.get("week") or "").strip()
+    if not raw:
+        return None
+    try:
+        week = int(raw)
+    except ValueError:
+        return None
+    return week if 1 <= week <= 18 else None
+
+
+def _fantasy_flag(name: str) -> bool:
+    return (request.args.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _fantasy_league():
+    raw = (request.args.get("teams") or "").strip()
+    try:
+        teams = int(raw) if raw else None
+    except ValueError:
+        teams = None
+    return resolve_league(teams=teams, superflex=_fantasy_flag("superflex"))
+
+
+@nfl_bp.get("/fantasy")
+def fantasy():
+    context = build_fantasy_page_context(
+        season=_fantasy_season(),
+        scoring_key=request.args.get("scoring"),
+        week=_fantasy_week(),
+        use_news=_fantasy_flag("news"),
+        league=_fantasy_league(),
+    )
+    return render_template("nfl/fantasy.html", **context)
+
+
+@nfl_bp.get("/api/fantasy/projections")
+def api_fantasy_projections():
+    try:
+        limit = int((request.args.get("limit") or "400").strip())
+    except ValueError:
+        limit = 400
+    return jsonify(
+        build_fantasy_payload(
+            season=_fantasy_season(),
+            scoring_key=request.args.get("scoring"),
+            week=_fantasy_week(),
+            position=request.args.get("position"),
+            limit=max(1, min(limit, 2000)),
+            use_news=_fantasy_flag("news"),
+            league=_fantasy_league(),
+        )
+    )
+
+
+@nfl_bp.get("/api/fantasy/draft-board")
+def api_fantasy_draft_board():
+    try:
+        limit = int((request.args.get("limit") or "250").strip())
+    except ValueError:
+        limit = 250
+    return jsonify(
+        build_draft_board_payload(
+            season=_fantasy_season(),
+            scoring_key=request.args.get("scoring"),
+            limit=max(1, min(limit, 2000)),
+            use_news=_fantasy_flag("news"),
+            league=_fantasy_league(),
+        )
+    )

@@ -1,0 +1,162 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NFL Fantasy Football{% endblock %}
+{% block page_title %}Fantasy Football{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ff-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: .75rem 0 1.25rem; }
+  .ff-controls a { padding: .3rem .7rem; border: 1px solid var(--border, #444); border-radius: 999px;
+                   text-decoration: none; font-size: .85rem; }
+  .ff-controls a.on { background: var(--accent, #2f6feb); color: #fff; border-color: transparent; }
+  .ff-note { font-size: .85rem; opacity: .8; margin: .5rem 0 1rem; line-height: 1.5; }
+  .ff-scroll { overflow-x: auto; }
+  table.ff { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  table.ff th, table.ff td { padding: .35rem .55rem; border-bottom: 1px solid var(--border, #333);
+                             text-align: right; white-space: nowrap; }
+  table.ff th:nth-child(-n+4), table.ff td:nth-child(-n+4) { text-align: left; }
+  table.ff tbody tr:hover { background: rgba(127,127,127,.12); }
+  .pos { display: inline-block; min-width: 2.4rem; padding: .05rem .35rem; border-radius: 4px;
+         font-size: .75rem; font-weight: 600; text-align: center; }
+  .pos-QB { background: #7a3b8f; color: #fff; } .pos-RB { background: #1f7a4d; color: #fff; }
+  .pos-WR { background: #1f5f9e; color: #fff; } .pos-TE { background: #9e6a1f; color: #fff; }
+  .pos-K  { background: #555; color: #fff; }    .pos-DST { background: #7a2f2f; color: #fff; }
+  .tier { opacity: .65; font-variant-numeric: tabular-nums; }
+  .ff-basis { margin-top: 2rem; font-size: .8rem; opacity: .75; }
+  .ff-basis summary { cursor: pointer; }
+  .ff-basis pre { overflow-x: auto; padding: .75rem; background: rgba(127,127,127,.1); border-radius: 6px; }
+  .ff-section { margin-top: 2.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+  {% set base = '/nfl/fantasy?season=' ~ season ~ ('&week=' ~ week if week else '') ~ ('&news=1' if use_news else '') %}
+
+  <p class="ff-note">
+    {{ league_label }} &middot; <strong>{{ scoring_label }}</strong> &middot;
+    {% if week %}week {{ week }} projections{% else %}full-season projections and draft board{% endif %}.
+    Team scoring environment is priced off <strong>posted market lines</strong>
+    ({{ basis.market.games_with_line }} of {{ basis.market.regular_season_games }} {{ season }} games carry one),
+    not off Syndicate&rsquo;s own game simulator &mdash; that model is measured strictly dominated by the close.
+    Player usage comes from real play-by-play for {{ basis.history_seasons | join(', ') }};
+    roles from the {{ season }} depth chart taken {{ basis.roster.depth_chart_as_of }}.
+  </p>
+
+  <div class="ff-controls">
+    <span style="opacity:.7">Scoring:</span>
+    {% for key in available_scoring %}
+      <a class="{{ 'on' if key == scoring else '' }}"
+         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ key }}{{ '&week=' ~ week if week else '' }}{{ '&news=1' if use_news else '' }}">{{ key }}</a>
+    {% endfor %}
+    <span style="opacity:.7; margin-left:1rem">View:</span>
+    <a class="{{ '' if week else 'on' }}" href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}">Season / draft</a>
+    {% for w in range(1, 19) %}
+      <a class="{{ 'on' if week == w else '' }}"
+         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}&amp;week={{ w }}">{{ w }}</a>
+    {% endfor %}
+  </div>
+
+  {% if board %}
+    <h2>Draft board &mdash; by value over replacement</h2>
+    <p class="ff-note">
+      Ordered by points above what is freely available at the same position after every
+      starting slot in a {{ league_label }} league is filled &mdash; which is why an elite
+      tight end outranks a quarterback who outscores him. Replacement levels:
+      {% for pos, info in board_summary.by_position.items() %}{{ pos }} {{ info.replacement_points }}{% if not loop.last %} &middot; {% endif %}{% endfor %}.
+    </p>
+    <div class="ff-scroll">
+      <table class="ff">
+        <thead>
+          <tr>
+            <th>#</th><th>Rd</th><th>Pos</th><th>Player</th><th>Tm</th>
+            <th>VOR</th><th>Proj</th><th>G</th><th>PPG</th><th>Floor</th><th>Ceiling</th><th>Tier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in board %}
+          <tr>
+            <td>{{ row.draft.rank }}</td>
+            <td class="tier">{{ row.draft.projected_round }}</td>
+            <td><span class="pos pos-{{ row.position }}">{{ row.position }}{{ row.draft.position_rank }}</span></td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.team }}</td>
+            <td><strong>{{ row.draft.value_over_replacement }}</strong></td>
+            <td>{{ row.fantasy_points }}</td>
+            <td>{{ row.games }}</td>
+            <td>{{ row.points_per_game }}</td>
+            <td>{{ row.floor }}</td>
+            <td>{{ row.ceiling }}</td>
+            <td class="tier">T{{ row.draft.tier }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% for position in positions %}
+    {% set rows = by_position.get(position) or [] %}
+    {% if rows %}
+      <div class="ff-section">
+        <h2><span class="pos pos-{{ position }}">{{ position }}</span> &mdash; {{ rows | length }} projected</h2>
+        <div class="ff-scroll">
+          <table class="ff">
+            <thead>
+              <tr>
+                <th>#</th><th>Player</th><th>Tm</th>{% if week %}<th>Opp</th>{% endif %}
+                <th>{% if week %}Pts{% else %}Proj{% endif %}</th>
+                {% if not week %}<th>G</th><th>PPG</th>{% endif %}
+                <th>Floor</th><th>Ceiling</th>
+                {% if position in ('QB',) %}<th>Pass yd</th><th>Pass TD</th><th>INT</th>{% endif %}
+                {% if position in ('RB',) %}<th>Car</th><th>Ru yd</th><th>Ru TD</th><th>Rec</th><th>Re yd</th>{% endif %}
+                {% if position in ('WR','TE') %}<th>Tgt</th><th>Rec</th><th>Re yd</th><th>Re TD</th>{% endif %}
+                {% if position == 'K' %}<th>FG 0-39</th><th>40-49</th><th>50+</th><th>PAT</th>{% endif %}
+                {% if position == 'DST' %}<th>Sacks</th><th>INT</th><th>Fum</th><th>TD</th><th>PA</th>{% endif %}
+                <th>Basis</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows[:60] %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.team }}</td>
+                {% if week %}<td>{{ row.opponent or '&mdash;' }}</td>{% endif %}
+                <td><strong>{{ row.fantasy_points }}</strong></td>
+                {% if not week %}<td>{{ row.games }}</td><td>{{ row.points_per_game }}</td>{% endif %}
+                <td>{{ row.floor }}</td><td>{{ row.ceiling }}</td>
+                {% if position in ('QB',) %}
+                  <td>{{ row.stat_line.passing_yards }}</td><td>{{ row.stat_line.passing_tds }}</td><td>{{ row.stat_line.interceptions }}</td>
+                {% endif %}
+                {% if position in ('RB',) %}
+                  <td>{{ row.stat_line.carries }}</td><td>{{ row.stat_line.rushing_yards }}</td><td>{{ row.stat_line.rushing_tds }}</td>
+                  <td>{{ row.stat_line.receptions }}</td><td>{{ row.stat_line.receiving_yards }}</td>
+                {% endif %}
+                {% if position in ('WR','TE') %}
+                  <td>{{ row.stat_line.targets }}</td><td>{{ row.stat_line.receptions }}</td>
+                  <td>{{ row.stat_line.receiving_yards }}</td><td>{{ row.stat_line.receiving_tds }}</td>
+                {% endif %}
+                {% if position == 'K' %}
+                  <td>{{ row.stat_line.fg_made_0_39 }}</td><td>{{ row.stat_line.fg_made_40_49 }}</td>
+                  <td>{{ row.stat_line.fg_made_50_plus }}</td><td>{{ row.stat_line.pat_made }}</td>
+                {% endif %}
+                {% if position == 'DST' %}
+                  <td>{{ row.stat_line.dst_sacks }}</td><td>{{ row.stat_line.dst_interceptions }}</td>
+                  <td>{{ row.stat_line.dst_fumble_recoveries }}</td><td>{{ row.stat_line.dst_touchdowns }}</td>
+                  <td>{{ row.stat_line.dst_points_allowed }}</td>
+                {% endif %}
+                <td class="tier">{{ row.basis.share_source }}{% if row.basis.is_rookie %} &middot; rookie{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <details class="ff-basis">
+    <summary>What fed these numbers (substrate, validation, config)</summary>
+    <pre>{{ basis | tojson(indent=1) }}</pre>
+  </details>
+{% endblock %}

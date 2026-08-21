@@ -165,6 +165,24 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "nfl_source/tracking/nflverse/injuries/injuries_*.csv",
     "nfl_source/source_artifacts/data/processed/rosters/roster_*_snapshot.csv",
     "nfl_source/source_artifacts/data/processed/depth/depth_*_snapshot.csv",
+    # NFL fantasy-football projection engine (`lane nfl-fantasy-projections`).
+    # `model_engine_standard.md` s3: EVERY model input must be allowlisted, or
+    # it cannot be read or published through `/api/ops/artifacts/*` -- which
+    # means it cannot be audited on Render at all, and every question about it
+    # falls back to a local guess. Maintaining this list is part of shipping an
+    # input, not follow-up work.
+    #
+    # One document per season, not per week, deliberately: the allowlist drives
+    # publishing as well as reading and this repo's egress history is expensive
+    # (`#322`). The usage docs are ~4.7 MB each and there are four.
+    "nfl_source/fantasy/nfl_fantasy_usage_*.json",
+    "nfl_source/fantasy/nfl_fantasy_news_*.json",
+    "nfl_source/fantasy/nfl_fantasy_input_report_*.json",
+    # The engine reads these three nflverse families directly. `schedules_games`
+    # and `injuries` are already listed above; roster and depth charts were not,
+    # and an unallowlisted input is an unauditable one.
+    "nfl_source/tracking/nflverse/roster/roster_*.csv",
+    "nfl_source/tracking/nflverse/depth_charts/depth_charts_*.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the
