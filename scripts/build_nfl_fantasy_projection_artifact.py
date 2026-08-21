@@ -106,12 +106,14 @@ def _prepare_inputs(season: int, history: tuple) -> None:
     scripts = Path(__file__).resolve().parent
 
     _run(
-        "roster_depth_charts",
+        "roster_depth_charts_schedule",
         [
             sys.executable,
             str(scripts / "fetch_nfl_rosters_depth_charts.py"),
             "--seasons",
             str(season),
+            "--kinds",
+            "roster,depth_charts,schedule",
             "--force",
         ],
     )
@@ -129,6 +131,45 @@ def _prepare_inputs(season: int, history: tuple) -> None:
         )
     else:
         print("[fantasy_artifact] PREPARE_STEP usage skipped -- all artifacts present", flush=True)
+
+
+
+#: A real ESPN-PPR season leader lands near 350-400; this engine's own top row
+#: is 326. The ceiling is 480, not 600, and the difference matters: the
+#: degenerate artifact that reached production had its top player at 525.5,
+#: which a 600 ceiling waves through. A band wide enough to admit the failure
+#: it was written for is not a check. 480 still leaves ~20% of headroom over a
+#: genuinely exceptional projected season.
+PLAUSIBLE_TOP_SEASON_POINTS = (150.0, 480.0)
+
+
+def degenerate_reasons(season_rows, weekly, weeks) -> list[str]:
+    """Why this artifact must NOT be published, or an empty list.
+
+    CHECKS THE OUTPUT, NOT THE INPUTS, and that distinction is the whole point.
+    The pre-flight input check verifies the roster and the usage documents --
+    and the schedule was simply not on its list, so the first worker run sailed
+    through it and published an artifact with `weeks: []`, 318 KB against a
+    normal 2.83 MB, and Christian McCaffrey at 525 PPR points against a correct
+    ~270. Nothing raised, it overwrote a correct artifact, and the board it
+    produced looked entirely plausible.
+
+    An input checklist can only ever cover the inputs someone thought of. The
+    output has to be right regardless of which input was missing.
+    """
+    problems: list[str] = []
+    if weeks and not weekly:
+        problems.append(
+            f"{len(weeks)} weeks requested but 0 produced -- no schedule, so no game environments"
+        )
+    if not season_rows:
+        problems.append("no season projections produced")
+        return problems
+    top = max(row.fantasy_points for row in season_rows)
+    low, high = PLAUSIBLE_TOP_SEASON_POINTS
+    if not low <= top <= high:
+        problems.append(f"top season projection {top:.1f} is outside the plausible {low:.0f}-{high:.0f} band")
+    return problems
 
 
 def main() -> int:
@@ -229,6 +270,14 @@ def main() -> int:
             f"{PUBLISH_MAX_BYTES} ceiling. Drop weeks or trim columns.",
             flush=True,
         )
+        return 1
+
+    problems = degenerate_reasons(season_rows, weekly, weeks)
+    if problems:
+        print("REFUSING TO PUBLISH -- the artifact is degenerate:", flush=True)
+        for entry in problems:
+            print(f"  - {entry}", flush=True)
+        print(f"  the file at {target} was still written, for inspection.", flush=True)
         return 1
 
     published = None

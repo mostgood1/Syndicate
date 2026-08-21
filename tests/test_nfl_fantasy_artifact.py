@@ -392,3 +392,61 @@ def test_board_stat_columns_narrow_with_the_position_selection():
     keys = [key for key, _ in defense["board_stat_columns"]]
     assert "dst_sacks" in keys
     assert "carries" not in keys
+
+
+# ---------------------------------------------------------------------------
+# The publish guard
+# ---------------------------------------------------------------------------
+
+def _load_build_script():
+    import importlib.util
+    from pathlib import Path as _Path
+
+    path = _Path(__file__).resolve().parents[1] / "scripts" / "build_nfl_fantasy_projection_artifact.py"
+    spec = importlib.util.spec_from_file_location("_ff_build", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _Row:
+    def __init__(self, points):
+        self.fantasy_points = points
+
+
+def test_guard_refuses_the_artifact_that_actually_reached_production():
+    """THE REGRESSION. The first worker run published an artifact with
+    `weeks: []`, 318KB against a normal 2.83MB, and a top player at 525.5 PPR
+    points against a correct ~270 -- because the worker had no
+    `schedules_games.csv`, so there were no game environments.
+
+    Nothing raised. It overwrote a correct artifact and served a board that
+    looked entirely plausible. The pre-flight INPUT check could not see it: it
+    verifies the roster and the usage documents, and the schedule was not on
+    its list. An input checklist only covers the inputs someone thought of.
+    """
+    build = _load_build_script()
+    reasons = build.degenerate_reasons([_Row(525.5), _Row(300.0)], {}, list(range(1, 19)))
+    assert len(reasons) == 2, reasons
+    assert any("0 produced" in reason for reason in reasons)
+    assert any("outside the plausible" in reason for reason in reasons)
+
+
+def test_guard_lets_a_healthy_artifact_through():
+    build = _load_build_script()
+    assert build.degenerate_reasons([_Row(326.4), _Row(311.4)], {1: [_Row(20.0)]}, [1]) == []
+
+
+def test_guard_band_is_tight_enough_to_have_caught_it():
+    """A band wide enough to admit the failure it was written for is not a
+    check. The first version ran to 600 and waved 525.5 straight through."""
+    build = _load_build_script()
+    low, high = build.PLAUSIBLE_TOP_SEASON_POINTS
+    assert high < 525.5, "the ceiling must exclude the value that reached production"
+    assert high > 400.0, "but must still admit a genuinely exceptional season"
+    assert low > 0
+
+
+def test_guard_catches_an_empty_projection():
+    build = _load_build_script()
+    assert build.degenerate_reasons([], {}, []) == ["no season projections produced"]
