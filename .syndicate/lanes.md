@@ -1299,6 +1299,32 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   measured interval, so an edge off it would route around both
   `prob_interval_swamps_edge` and
   `analytic_estimator_never_backtested_for_this_market`. 14 tests + 8 subtests.
+- **PHASE 3 ANCHOR FOUND `[2026-08-21, measured]` — the blocker was an unknown,
+  not an absence.** `wnba_source/data/processed/cards_sim_detail_<date>.json`
+  (exportable, 2.1MB) carries per player under `games[].sim.players`:
+  `min_mean` (**expected minutes — phase 2's denominator**), `{pts,reb,ast,
+  threes,pra}_mean` + `_sd` + `_q{p10,p50,p90}`, and `prop_ladders[stat]` with
+  `simCount: 100`, a full `distribution` histogram and a `ladder` of
+  `{total, hitProb}`. Worked example: Paige Bueckers `min_mean 38.37,
+  pts_mean 23.39, pts_sd 7.33`. `props_predictions_*.csv` is 403 from WEB but
+  that is a route restriction — the lens builder runs on a WORKER and reads
+  these directly.
+- **THE ONE DECISION PHASE 3 STILL NEEDS, and it must not be made silently.**
+  `build_live_prop_index` keys on `liveModelProbOver`, a PROBABILITY. The ladder
+  above is the PREGAME distribution: it answers `P(final >= line)` from tip-off.
+  A LIVE prop needs `P(final >= line | current, minutes played)` — i.e. the
+  distribution of the REMAINDER over the minutes left, which is not the
+  full-game distribution and cannot be read off this ladder. Scaling it
+  (mean by `m/min_mean`, sd by `sqrt(m/min_mean)`) is the standard assumption
+  and is **UNMEASURED HERE** — making it silently is the same move as pricing
+  the un-backtested totals estimator. Options: (a) publish phase 2's PROJECTION
+  on the lens in a non-probability field and leave the join gate shut, or
+  (b) grade the scaling assumption, then price under `prob_std_err(p, simCount)`
+  — `simCount: 100` means the SAME interval machinery MLB's 120-sim game lines
+  already use would apply.
+- **NOT unblocked by this find: TOTALS.** The sim publishes no game-level total
+  distribution — `quarters` is `[]` and `players_summary` is bare counts. Totals
+  still needs the OddsAPI historical backfill and a grade.
 - **REMAINING PHASES:** (3) carry `liveModelProbOver` per
   `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
