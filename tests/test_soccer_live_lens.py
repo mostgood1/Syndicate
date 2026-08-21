@@ -55,9 +55,33 @@ class RedCardPenaltyTests(unittest.TestCase):
 
 class BuildResumeStateTests(unittest.TestCase):
     def test_carries_score_half_and_clock(self) -> None:
+        """Clock now carries the half's REMAINING STOPPAGE.
+
+        Was `900` -- the nominal time `espn_live_state` returns. A resumed sim
+        seeded with that played to the 90th minute and stopped, never
+        simulating the window where 5.5% of goals actually occur (10 of 182
+        sampled goals carry ESPN's `clock == 5400` stoppage cap). A FRESH match
+        gets stoppage when a half begins; the resumed path did not.
+        """
         state = build_resume_state(_live_state())
         self.assertEqual(state.half, 2)
-        self.assertEqual(state.clock_remaining, 900)
+        # 900 nominal + second_half_stoppage_base_seconds (300).
+        self.assertEqual(state.clock_remaining, 1200)
+
+    def test_stoppage_can_be_turned_off_and_that_changes_the_clock(self) -> None:
+        """Reachability: `off != on`. A flag whose two branches agree is inert,
+        and an inert fix is indistinguishable from a working one at every level
+        except the data."""
+        on = build_resume_state(_live_state())
+        off = build_resume_state(_live_state(), include_stoppage=False)
+        self.assertEqual(off.clock_remaining, 900)
+        self.assertEqual(on.clock_remaining - off.clock_remaining, 300)
+
+    def test_a_match_with_no_time_left_gets_no_stoppage(self) -> None:
+        """Already past the whistle: nothing left to play, so nothing is added.
+        Otherwise a finished match would resume with five minutes of football."""
+        state = build_resume_state({**_live_state(), "clock_remaining": 0})
+        self.assertEqual(state.clock_remaining, 0)
         self.assertEqual(state.score_home, 1)
         self.assertEqual(state.score_away, 0)
         self.assertEqual(state.home_team, "Home FC")
@@ -93,8 +117,18 @@ class ProjectLiveMatchTests(unittest.TestCase):
     def test_red_carded_team_is_disadvantaged_relative_to_no_card(self) -> None:
         even_state = _live_state(score_home=0, score_away=0, clock_remaining=2700)
         carded_state = _live_state(score_home=0, score_away=0, clock_remaining=2700, home_red_cards=1)
-        even_proj = project_live_match(even_state, home_rating=_NEUTRAL, away_rating=_NEUTRAL, simulations=150, seed=5)
-        carded_proj = project_live_match(carded_state, home_rating=_NEUTRAL, away_rating=_NEUTRAL, simulations=150, seed=5)
+        # 600, NOT 150. MEASURED 2026-08-21, same seed, sweeping n:
+        #     n= 150  even=0.3133  carded=0.3400  diff=+0.0267  (1 SE ~0.0384)
+        #     n= 600  even=0.3617  carded=0.2800  diff=-0.0817  (1 SE ~0.0192)
+        #     n=1500  even=0.3833  carded=0.2520  diff=-0.1313  (1 SE ~0.0121)
+        # The effect is REAL and large (~11 SE at n=1500). At 150 it is smaller
+        # than one standard error, so this assertion was decided by the seed's
+        # trajectory rather than by the mechanism -- it passed before an
+        # unrelated change to the resume clock and failed after, and BOTH
+        # outcomes were luck. Raising n is the fix; re-rolling the seed until it
+        # went green would have restored a pass that measured nothing.
+        even_proj = project_live_match(even_state, home_rating=_NEUTRAL, away_rating=_NEUTRAL, simulations=600, seed=5)
+        carded_proj = project_live_match(carded_state, home_rating=_NEUTRAL, away_rating=_NEUTRAL, simulations=600, seed=5)
         self.assertLess(carded_proj.home_win_probability, even_proj.home_win_probability)
 
 
