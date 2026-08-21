@@ -1263,8 +1263,22 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Verification: the capture REFUSES to store an empty/hollow payload (tested),
   because a persisted empty is served in preference to real data thereafter —
   `capture_wnba_pbp.py`'s recorded failure mode.
-- **REMAINING PHASES, none started:** (2) project each player's final line from
-  current stat + remainder off minutes/pace; (3) carry `liveModelProbOver` per
+- **PHASE 2 DONE (pure function, not wired):**
+  `syndicate/features/shared/wnba_live_prop_projection.py`. Mirrors `#475`'s
+  anchored shape deliberately rather than inventing a third live convention:
+  `projected = current + remaining * ((1-w)*pregame_rate + w*live_rate)`,
+  `w = played/pregame_minutes`. Collapses to the pregame number at tip-off and
+  to the actual stat at the buzzer (both tested — an estimator that misses its
+  own endpoints is wrong in the middle too). Remaining minutes CAPPED by the
+  game clock. **REFUSES without a pregame anchor** rather than extrapolating a
+  live rate — that input is exactly `#475`'s 240-point total. Worked example on
+  a real production line (Angel Reese 6 pts / 9 min, 12-pt anchor): projects
+  **16.08**, against a naive pace of 20.0 that is never produced.
+  **Publishes NO probability and prices NO edge** — this estimator has no
+  measured interval, so an edge off it would route around both
+  `prob_interval_swamps_edge` and
+  `analytic_estimator_never_backtested_for_this_market`. 14 tests + 8 subtests.
+- **REMAINING PHASES:** (3) carry `liveModelProbOver` per
   `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
   interval before any edge is priced** — same discipline as totals; an
