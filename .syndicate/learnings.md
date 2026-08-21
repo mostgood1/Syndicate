@@ -4536,3 +4536,36 @@ it before catching the header line.
 **Rule: a poll predicate must match the SHAPE of a real record, not the topic.**
 `^2026-` (a timestamped line) is a predicate; the search term is not, because the
 tool prints the search term back. Anchor on the record format.
+
+## 08-21 THE "EMPTY BOX SECTIONS" BUG NEVER EXISTED — I COUNTED THE WRONG FIELD
+
+Card sections come in TWO SHAPES. List sections carry `rows`. TABLE sections
+carry `table_rows` and set `"rows": []` **by design** (see
+`soccer/cards.py::_correct_score_section`, which returns both keys). Goals,
+Match stats and squad projections are all table sections.
+
+I measured `len(section["rows"])`, got 0 for every table section, and reported
+"box sections render 0 rows on all 4 games" in a UI audit. The truth, read from
+the same production payload with the right key:
+
+    Goals        3 table_rows   15' Havertz, 23' Saka, 49' Odegaard
+    Match stats 12 table_rows   Possession 35.5%/64.5%, Shots 4/20
+    ARS squad   23 table_rows   with prices and edges
+
+**WHAT THAT ONE WRONG FIELD COST:** a false audit finding; two commits
+(`0aaf71f0` reader swap, `94a53639` data_root path) shipped to fix a
+non-problem; a web deploy and rollback; a 502 misread as caused by my own
+change; and two wrong outage attributions chased in sequence. Every later
+"still 0 rows" reading LOOKED like confirmation that the fix had failed, so the
+bad metric kept generating new hypotheses instead of being questioned.
+
+**RULE: before reporting a count of zero as a defect, print the CONTAINER'S
+KEYS.** One `sorted(section.keys())` would have shown `table_rows` beside
+`rows` and ended this at the first reading. A zero from the wrong key is
+indistinguishable from a zero from missing data, and it is far more likely --
+missing data has a cause, a typo'd key needs none.
+
+**Corollary, and the reason this ran so long:** when a fix does not move a
+metric, suspect the METRIC before writing the next fix. I twice diagnosed the
+read path -- because that is where the PREVIOUS bug was -- rather than testing
+whether the measurement was sound.
