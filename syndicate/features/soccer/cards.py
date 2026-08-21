@@ -1035,6 +1035,7 @@ def _market_tiles(
     betting: dict,
     top_props: list,
     live_state_block: dict,
+    volume_projection: dict | None = None,
     prop_picks: dict | None = None,
     away_score: Any,
     home_score: Any,
@@ -1217,7 +1218,14 @@ def _market_tiles(
     else:
         tiles_extra = []
 
-    vp = team_projection or {}
+    # CORNERS LIVE ON `volume_projection`, NOT `team_projection`.
+    # The first version of this tile read `team_projection` -- which is a real
+    # dict on the payload, just not the one carrying corners -- so the tile
+    # silently never rendered. Verified on production 2026-08-22 pregame cards:
+    # BTTS appeared, corners did not, because `_safe_float(None)` is None and
+    # the branch is skipped. A tile that reads the wrong dict fails exactly like
+    # a tile whose data is missing.
+    vp = volume_projection or {}
     home_c, away_c = _safe_float(vp.get("home_corners")), _safe_float(vp.get("away_corners"))
     if home_c is not None and away_c is not None:
         total_c = home_c + away_c
@@ -1704,6 +1712,7 @@ def _match_to_game(
             win_prob=win_prob,
             total_distribution=total_distribution,
             team_projection=team_projection,
+            volume_projection=volume,
             betting=betting,
             top_props=top_props,
             prop_picks=prop_picks,
