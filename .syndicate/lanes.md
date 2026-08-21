@@ -1226,10 +1226,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   — replacing a named refusal with a silent zero is the permissive-default shape
   this repo has a standing rule about. 202 tests + 45 subtests green across
   props, the game-line join, live-edge policy/enforcement, book-grid and layer-1.
-- **WHAT REMAINS BEFORE ANY OF THIS IS LIVE:** nothing calls the capture on a
-  tick, and nothing writes `liveProps` onto the WNBA lens — so the gate is open
-  onto an empty room, which the new reason says out loud. That wiring plus a
-  deploy is the next step; the chain has still NEVER run end to end.
+- **WIRED `[2026-08-21]`.** The lens loop captures the live player box before
+  the WNBA build (after the headroom gate, so a skipping tick spends no HTTP
+  call) and `wnba/live_lens.py::_attach_live_props` CONSUMES that artifact and
+  stamps `liveProps` + `livePropsCoverage` per game. The builder never fetches.
+  Lines come from the card's `shared_prop_rows` — a FOURTH vocabulary for the
+  same four stats (`pts/reb/ast/threes`), verified against 2026-08-19 and
+  2026-08-16 rather than assumed. **COVERAGE IS KNOWINGLY THIN:** those are the
+  card's FEATURED props (8-9 per slate) not the board's ~120; the fuller source
+  is `oddsapi_player_props_<date>.csv`, readable on the worker, and is the
+  obvious next widening. Combination markets (`ra`/`pa`/`pr`) are unmapped —
+  they cannot come from a single stat mean.
+- **A PRECEDENCE BUG THE WIRING TEST CAUGHT:** `sim_game = (a or b) if
+  isinstance(pack, dict) else {}` — a conditional expression binds looser than
+  `or`, so every game WITHOUT an `evidence_pack` silently got `{}` including
+  those with a perfectly good `sim`. Surfaced as `players_matched 0 != 1`, not
+  by reading the line.
+- **STILL NEVER RUN END TO END.** Every hop is now wired and unit-tested, but
+  nothing has executed against a live slate: no deploy, and no WNBA game live
+  since the wiring landed. The prop join reports "producer not wired" by name
+  until it does. NEXT: deploy, then read `livePropsCoverage` and the join's
+  `rows_live_projected` on a live game.
   `prob_std_err`/`PRICEABLE_SIGMA` refusal then applies ON TOP, exactly as for
   MLB — so opening it does not mean every row prices. Previously listed as (3b),
   now done:

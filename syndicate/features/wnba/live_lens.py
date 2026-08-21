@@ -234,6 +234,113 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
     return True
 
 
+
+# `shared_prop_rows.market` -> this module's stat label. A FOURTH vocabulary for
+# the same four stats, verified against production rather than assumed: the
+# capture says `pts/reb/ast/threes_made`, the board says
+# `player_points/...`, `wnba_live_prop_rows` says `points/...`, and the card's
+# featured-prop rows say `pts/reb/ast/threes` (read off 2026-08-19 and
+# 2026-08-16). Combination markets (`ra`, `pa`, `pr`) are deliberately absent --
+# they cannot be projected from a single stat mean, and a wrong alias prices the
+# wrong market.
+_CARD_PROP_MARKETS: dict[str, str] = {
+    "pts": "points", "reb": "rebounds", "ast": "assists", "threes": "threes",
+}
+
+
+def _lines_from_cards(game: dict[str, Any]) -> dict[tuple[str, str], float]:
+    """`(normalized player, stat label) -> line` from the card's prop rows.
+
+    COVERAGE IS LIMITED AND THAT IS KNOWN: these are the card's FEATURED props
+    (8-9 per slate measured), not the board's full prop set (~120). The fuller
+    source is `oddsapi_player_props_<date>.csv`, which is readable on the worker
+    and is the obvious next widening. Using the verified-but-thin source beats
+    guessing at the wide one -- an unverified market key is `#412`, where the
+    join missed 1385 of 1385 rows.
+    """
+    from syndicate.features.shared.wnba_live_prop_rows import normalize_name
+
+    out: dict[tuple[str, str], float] = {}
+    for row in game.get("shared_prop_rows") or []:
+        if not isinstance(row, dict):
+            continue
+        label = _CARD_PROP_MARKETS.get(str(row.get("market") or "").strip().lower())
+        if not label:
+            continue
+        line = row.get("line")
+        if line is None:
+            line = row.get("market_line")
+        try:
+            line_value = float(line)
+        except (TypeError, ValueError):
+            continue
+        key = (normalize_name(row.get("name")), label)
+        out.setdefault(key, line_value)
+    return out
+
+
+def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
+    """Stamp `liveProps` on each game from the captured live player box."""
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+    from syndicate.features.shared.wnba_live_prop_rows import (
+        build_live_prop_rows,
+        to_snapshot_live_props,
+    )
+
+    relative = f"wnba_source/data/live/live_player_box_{date_str}.json"
+    record = read_json_file(data_root() / relative)
+    if not isinstance(record, dict):
+        return
+    payload = record.get("payload") if isinstance(record.get("payload"), dict) else record
+    by_event: dict[str, list[Any]] = {}
+    for entry in payload.get("games") or []:
+        if not isinstance(entry, dict):
+            continue
+        event_id = str(entry.get("event_id") or "").strip()
+        if event_id:
+            by_event[event_id] = entry.get("players") or []
+
+    for game in games:
+        players = by_event.get(str(game.get("event_id") or "").strip())
+        if not players:
+            continue
+        # EXPLICIT, because the one-line version was WRONG. A conditional
+        # expression binds looser than `or`, so
+        # `(a or b) if isinstance(pack, dict) else {}` silently yielded `{}` for
+        # every game without an `evidence_pack` -- including the ones that had a
+        # perfectly good `sim`. Caught by this module's own wiring test
+        # (players_matched 0 != 1), not by reading it.
+        sim_game: Any = game.get("sim") if isinstance(game.get("sim"), dict) else None
+        if sim_game is None:
+            pack = game.get("evidence_pack")
+            if isinstance(pack, dict) and isinstance(pack.get("sim"), dict):
+                sim_game = pack["sim"]
+        if sim_game is None:
+            sim_game = {}
+        built = build_live_prop_rows(
+            players,
+            sim_game,
+            game_minutes_remaining=_game_minutes_remaining(game),
+            lines=_lines_from_cards(game),
+        )
+        game["liveProps"] = to_snapshot_live_props(built["rows"])
+        game["livePropsCoverage"] = {
+            k: built[k] for k in ("players_seen", "players_matched", "rows_projected",
+                                  "priced", "unpriced_by_reason")
+        }
+
+
+def _game_minutes_remaining(game: dict[str, Any]) -> float | None:
+    """Minutes left in regulation, from the same status the lane reads."""
+    from syndicate.features.wnba.cards import _wnba_elapsed_minutes
+
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    elapsed = _wnba_elapsed_minutes(status.get("period"), status.get("clock"))
+    if elapsed is None:
+        return None
+    return max(0.0, 40.0 - float(elapsed))
+
+
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebuild: bool = False) -> dict[str, Any]:
     _run_wnba_live_lens_tick(selected_date)
     # CONSUME, DO NOT REBUILD. Measured 2026-08-08 on live-odds-worker (2Gi):
@@ -333,6 +440,18 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
             line_value = _live_line_value(live_game)
             if event_id and line_value is not None:
                 live_line_by_event_id[event_id] = line_value
+
+    # LIVE PROPS onto each game, for `build_live_prop_index` to read (phase 4).
+    # CONSUMES the capture artifact; never fetches. `capture_wnba_live_player_box.py`
+    # runs on the loop tick -- a builder that fetched ESPN here would be the
+    # inversion this function's own docstring is about.
+    try:
+        _attach_live_props(games, resolved_date)
+    except Exception as exc:  # noqa: BLE001
+        # Never fatal: a lens without liveProps degrades to the pre-phase-4
+        # behaviour, and the prop join reports "producer not wired" by name.
+        print(f"[wnba_live_lens] LIVE_PROPS_FAILED date={resolved_date} "
+              f"{type(exc).__name__}: {exc}", flush=True)
 
     rank_cards = [
         _rank_card(game, resolved_date, live_line=live_line_by_event_id.get(str(game.get("event_id") or "").strip()))

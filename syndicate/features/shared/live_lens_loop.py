@@ -310,6 +310,20 @@ def _acquire_process_lock() -> bool:
 		return False
 
 
+def _wnba_live_box_base_url() -> str:
+	"""Where the live player box is fetched from.
+
+	Web serves it; this loop runs on a worker. Configurable because the
+	worker-to-web hostname is an internal one in production and the public one
+	everywhere else -- hardcoding either breaks the other.
+	"""
+	return str(
+		os.environ.get("SYNDICATE_WNBA_LIVE_BOX_BASE_URL")
+		or os.environ.get("SYNDICATE_INTERNAL_WEB_BASE_URL")
+		or "https://syndicate-an21.onrender.com"
+	).strip().rstrip("/")
+
+
 def _is_live_lens_loop_enabled() -> bool:
 	return _env_bool("SYNDICATE_ENABLE_LIVE_LENS_LOOP", default=False)
 
@@ -571,6 +585,45 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				meta["memoryHeadroom"] = headroom_snapshot
 				print(f"[LIVE_LENS_TICK_DIAG] sport=wnba ok=False reason=low_headroom headroom={headroom_snapshot}", flush=True)
 				return meta
+		if sport == "wnba":
+			# CAPTURE BEFORE BUILD, so the lens consumes THIS tick's live player
+			# box rather than the previous one's. The builder itself never
+			# fetches -- that is the inversion its own docstring names -- so the
+			# producer has to run here, immediately before the consumer.
+			#
+			# Placed AFTER the headroom gate above deliberately: a tick that is
+			# about to skip the WNBA build should not spend an HTTP call first.
+			#
+			# NEVER FATAL. A capture failure leaves the lens without `liveProps`,
+			# which degrades to the pre-phase-4 behaviour and is reported by name
+			# ("producer not wired") rather than as a zero. The capture itself
+			# refuses to store an empty payload, so a quiet slate writes nothing.
+			try:
+				from scripts.capture_wnba_live_player_box import fetch as _capture_fetch
+				from scripts.capture_wnba_live_player_box import (
+					artifact_relative_path as _capture_path,
+					summarize as _capture_summarize,
+				)
+				from syndicate.features.shared.refresh_state_store import data_root, write_json_file
+
+				_payload = _capture_fetch(_wnba_live_box_base_url(), date_str)
+				_counts = _capture_summarize(_payload)
+				if _counts["games"] and _counts["players_with_stats"]:
+					write_json_file(
+						data_root() / _capture_path(date_str),
+						{"date": date_str, "source": "wnba/api/live_player_boxscore",
+						 "counts": {k: _counts[k] for k in ("games", "players_with_stats")},
+						 "per_game": _counts["per_game"], "payload": _payload},
+					)
+					print(f"[live_lens_loop] WNBA_LIVE_BOX_CAPTURED date={date_str} "
+					      f"games={_counts['games']} players={_counts['players_with_stats']}", flush=True)
+				else:
+					print(f"[live_lens_loop] WNBA_LIVE_BOX_EMPTY date={date_str} "
+					      f"games={_counts['games']} players={_counts['players_with_stats']} "
+					      "-- nothing written", flush=True)
+			except Exception as exc:
+				print(f"[live_lens_loop] WNBA_LIVE_BOX_FAILED date={date_str} "
+				      f"{type(exc).__name__}: {exc}", flush=True)
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
