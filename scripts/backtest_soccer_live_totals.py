@@ -146,6 +146,7 @@ def replay(
     lines: tuple[float, ...] = DEFAULT_LINES,
     source_root: Path | None = None,
     as_of: str | None = None,
+    include_stoppage: bool = True,
 ) -> dict[str, Any]:
     summary = fetch_match_summary(league, event_id)
 
@@ -176,7 +177,8 @@ def replay(
         state = build_live_state(summary, event_id=event_id, as_of_seconds=minute * 60.0)
         goals_so_far = int(state["score_home"]) + int(state["score_away"])
         projection = project_live_match(
-            state, home_rating=home_rating, away_rating=away_rating, simulations=simulations
+            state, home_rating=home_rating, away_rating=away_rating,
+            simulations=simulations, include_stoppage=include_stoppage,
         )
         scorelines = projection.scoreline_probabilities
         row: dict[str, Any] = {
@@ -250,6 +252,7 @@ def batch(
     ratings_file: Path | None,
     limit: int | None = None,
     source_root: Path | None = None,
+    include_stoppage: bool = True,
 ) -> dict[str, Any]:
     """Every COMPLETED match in `window`, across `leagues`, replayed and pooled.
 
@@ -317,7 +320,7 @@ def batch(
                 results.append(
                     replay(league, event_id, cutoffs=cutoffs, simulations=simulations,
                            ratings_file=ratings_file, source_root=source_root,
-                           as_of=event_date)
+                           as_of=event_date, include_stoppage=include_stoppage)
                 )
             except Exception as exc:
                 failures.append({"league": league, "event_id": event_id,
@@ -390,6 +393,9 @@ def main() -> int:
                         help="comma-separated leagues to pool across")
     parser.add_argument("--window", default=None, help="YYYYMMDD-YYYYMMDD")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--no-stoppage", action="store_true",
+                        help="A/B control: resume WITHOUT adding the half's remaining "
+                             "stoppage time, i.e. the pre-fix behaviour")
     parser.add_argument("--as-of", default=None,
                         help="single-match mode: the match date, so ratings are computed "
                              "without hindsight. Batch mode takes it from the event.")
@@ -418,6 +424,7 @@ def main() -> int:
             ratings_file=Path(args.ratings_file) if args.ratings_file else None,
             limit=args.limit,
             source_root=Path(args.source_root) if args.source_root else None,
+            include_stoppage=not args.no_stoppage,
         )
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -455,6 +462,7 @@ def main() -> int:
         ratings_file=Path(args.ratings_file) if args.ratings_file else None,
         source_root=Path(args.source_root) if args.source_root else None,
         as_of=args.as_of,
+        include_stoppage=not args.no_stoppage,
     )
 
     if args.json:

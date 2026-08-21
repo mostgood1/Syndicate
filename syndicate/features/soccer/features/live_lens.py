@@ -98,20 +98,67 @@ def apply_red_card_penalty(rating: dict[str, float], red_cards: int) -> dict[str
     return adjusted
 
 
-def build_resume_state(live_state: dict[str, Any], *, possession_owner: str = "home", pitch_position: int = 50):
+def build_resume_state(
+    live_state: dict[str, Any],
+    *,
+    possession_owner: str = "home",
+    pitch_position: int = 50,
+    include_stoppage: bool = True,
+    profile: CalibrationProfile = SOCCER_CALIBRATION_PROFILE,
+):
     """A ``PossessionState`` seeded from a live/cutoff state's half, clock,
     and score. Who actually has the ball right now isn't derivable from
     ESPN's event feed, so the starting possession owner/pitch position are
     a neutral default -- across many simulations this single assumption
     washes out; it's not worth the complexity of trying to infer it from
-    the most recent event."""
+    the most recent event.
+
+    STOPPAGE TIME IS ADDED BACK, and without it the resumed sim was
+    systematically short of match. A FRESH match gets stoppage when a half
+    begins (`match_simulator` seeds `half_seconds + first_half_stoppage`), but
+    a RESUMED one inherits `clock_remaining` from the live state, and
+    `espn_live_state._current_half_and_clock_remaining` returns NOMINAL time
+    only -- `(2 * half_seconds) - as_of`. So the resumption played to the 90th
+    minute and stopped, never simulating the window where **5.5% of goals
+    actually occur** (10 of 182 sampled goals carry `clock == 5400`, ESPN's
+    cap for 90'+ stoppage).
+
+    The missing amount is a CONSTANT ~300s, so the proportional shortfall
+    explodes as the match runs down -- which is exactly the shape of the
+    measured bias (160 matches, production as-of ratings):
+
+        cutoff   remaining   missing   shortfall   measured bias
+          45'      2700s       300s       10%         -0.059
+          75'       900s       300s       25%         -0.099
+          85'       300s       300s       50%         -0.197
+
+    Stoppage is played at the END of a half, so if the half has not ended the
+    WHOLE of it still lies ahead -- hence the full base rather than a prorated
+    share. Deterministic base, not a draw: `stoppage_seconds_sigma` would add
+    dispersion this does not reproduce, which is acceptable for a mean
+    correction and is stated rather than hidden.
+
+    NOT FIXED IN `espn_live_state`, deliberately: its docstring defines
+    stoppage as folded into the current half for cutoff semantics, and other
+    callers depend on that meaning. This is the single consumer that converts
+    live state into a simulation, so the correction belongs here.
+    """
+    remaining = int(round(live_state["clock_remaining"]))
+    half = int(live_state["half"])
+    if include_stoppage and remaining > 0:
+        base = (
+            profile.first_half_stoppage_base_seconds
+            if half <= 1
+            else profile.second_half_stoppage_base_seconds
+        )
+        remaining += int(round(float(base)))
     return build_initial_possession_state(
         home_team=live_state["home_team"],
         away_team=live_state["away_team"],
         owner=possession_owner,
         pitch_position=pitch_position,
-        half=int(live_state["half"]),
-        clock_remaining=int(round(live_state["clock_remaining"])),
+        half=half,
+        clock_remaining=remaining,
         score_home=int(live_state["score_home"]),
         score_away=int(live_state["score_away"]),
     )
@@ -185,6 +232,7 @@ def project_live_match(
     simulations: int = 300,
     seed: int = 1,
     possession_owner: str = "home",
+    include_stoppage: bool = True,
 ) -> LiveMatchProjection:
     home_rating = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
     away_rating = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
@@ -200,7 +248,10 @@ def project_live_match(
 
     for offset in range(max(1, simulations)):
         run_seed = seed + offset
-        resume_state = build_resume_state(live_state, possession_owner=possession_owner)
+        resume_state = build_resume_state(
+            live_state, possession_owner=possession_owner,
+            include_stoppage=include_stoppage, profile=profile,
+        )
         simulation_input = SoccerSimSimulationInput(
             home_team=live_state["home_team"],
             away_team=live_state["away_team"],
