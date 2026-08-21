@@ -1,0 +1,20 @@
+{
+  "matches": 25,
+  "lead_seconds": 120.0,
+  "horizon_seconds": 600.0,
+  "half_life": 300.0,
+  "pre_goal": {
+    "n": 76,
+    "mean": 1.1407,
+    "median": 0.7734,
+    "stdev": 2.7793,
+    "pct_positive": 0.5789
+  },
+  "control": {
+    "n": 638,
+    "mean": 0.0,
+    "median": 0.0,
+    "stdev": 2.9611,
+    "pct_positive": 0.4796
+  }
+}

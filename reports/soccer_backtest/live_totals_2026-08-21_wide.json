@@ -1,0 +1,413 @@
+{
+  "window": "20260801-20260820",
+  "leagues": [
+    "epl",
+    "la_liga",
+    "ligue_1",
+    "serie_a",
+    "bundesliga",
+    "eredivisie",
+    "primeira_liga",
+    "championship",
+    "belgian_pro_league",
+    "mls"
+  ],
+  "simulations": 100,
+  "ratings_source": "neutral (none supplied)",
+  "pooled": {
+    "matches": 50,
+    "cutoff_rows": 250,
+    "mae_projection": 0.864,
+    "mae_frozen": 1.488,
+    "brier_1_5": 0.1497,
+    "brier_2_5": 0.1966,
+    "brier_3_5": 0.1194,
+    "mae_improvement_vs_frozen": 0.624,
+    "beats_frozen_baseline": true
+  },
+  "by_cutoff": {
+    "15": {
+      "n": 50,
+      "mae_projection": 0.985,
+      "mae_frozen": 2.34,
+      "brier_2_5": 0.2538
+    },
+    "30": {
+      "n": 50,
+      "mae_projection": 0.9874,
+      "mae_frozen": 1.98,
+      "brier_2_5": 0.2135
+    },
+    "45": {
+      "n": 50,
+      "mae_projection": 0.9436,
+      "mae_frozen": 1.48,
+      "brier_2_5": 0.1941
+    },
+    "60": {
+      "n": 50,
+      "mae_projection": 0.7846,
+      "mae_frozen": 1.08,
+      "brier_2_5": 0.1701
+    },
+    "75": {
+      "n": 50,
+      "mae_projection": 0.6194,
+      "mae_frozen": 0.56,
+      "brier_2_5": 0.1516
+    }
+  },
+  "failures": [],
+  "matches": [
+    {
+      "league": "la_liga",
+      "event_id": "401882926",
+      "matchup": "Getafe @ Alav\u00e9s",
+      "actual_total": 3,
+      "mae": 1.518
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875655",
+      "matchup": "Excelsior @ SC Cambuur",
+      "actual_total": 4,
+      "mae": 0.796
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885491",
+      "matchup": "FC Famalicao @ Estoril",
+      "actual_total": 2,
+      "mae": 0.206
+    },
+    {
+      "league": "championship",
+      "event_id": "401880340",
+      "matchup": "Blackburn Rovers @ Wolverhampton Wanderers",
+      "actual_total": 3,
+      "mae": 0.672
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879041",
+      "matchup": "KV Kortrijk @ Club Brugge",
+      "actual_total": 2,
+      "mae": 0.33
+    },
+    {
+      "league": "mls",
+      "event_id": "761697",
+      "matchup": "New England Revolution @ CF Montr\u00e9al",
+      "actual_total": 3,
+      "mae": 0.826
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882918",
+      "matchup": "Rayo Vallecano @ Sevilla",
+      "actual_total": 1,
+      "mae": 1.27
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875654",
+      "matchup": "Telstar @ NEC Nijmegen",
+      "actual_total": 3,
+      "mae": 0.332
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885489",
+      "matchup": "Casa Pia @ Maritimo",
+      "actual_total": 1,
+      "mae": 0.518
+    },
+    {
+      "league": "championship",
+      "event_id": "401880339",
+      "matchup": "Preston North End @ Bolton Wanderers",
+      "actual_total": 3,
+      "mae": 0.354
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879039",
+      "matchup": "Cercle Brugge KSV @ Standard Liege",
+      "actual_total": 4,
+      "mae": 1.148
+    },
+    {
+      "league": "mls",
+      "event_id": "761699",
+      "matchup": "Nashville SC @ D.C. United",
+      "actual_total": 3,
+      "mae": 0.734
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882920",
+      "matchup": "Villarreal @ Racing Santander",
+      "actual_total": 3,
+      "mae": 1.0
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875653",
+      "matchup": "Willem II @ Go Ahead Eagles",
+      "actual_total": 5,
+      "mae": 1.492
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885484",
+      "matchup": "Arouca @ Vit\u00f3ria de Guimaraes",
+      "actual_total": 1,
+      "mae": 0.676
+    },
+    {
+      "league": "championship",
+      "event_id": "401880338",
+      "matchup": "Millwall @ Bristol City",
+      "actual_total": 2,
+      "mae": 0.388
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879037",
+      "matchup": "Union St.-Gilloise @ KVC Westerlo",
+      "actual_total": 6,
+      "mae": 2.326
+    },
+    {
+      "league": "mls",
+      "event_id": "761702",
+      "matchup": "Atlanta United FC @ Philadelphia Union",
+      "actual_total": 5,
+      "mae": 2.514
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882922",
+      "matchup": "Levante @ Espanyol",
+      "actual_total": 3,
+      "mae": 0.278
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875652",
+      "matchup": "Fortuna Sittard @ PSV Eindhoven",
+      "actual_total": 4,
+      "mae": 1.546
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885492",
+      "matchup": "Sporting CP @ Estrela",
+      "actual_total": 3,
+      "mae": 0.9
+    },
+    {
+      "league": "championship",
+      "event_id": "401880337",
+      "matchup": "Derby County @ Charlton Athletic",
+      "actual_total": 3,
+      "mae": 0.734
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879038",
+      "matchup": "Lommel SK @ Sint-Truidense",
+      "actual_total": 1,
+      "mae": 0.576
+    },
+    {
+      "league": "mls",
+      "event_id": "761696",
+      "matchup": "Orlando City SC @ Red Bull New York",
+      "actual_total": 5,
+      "mae": 1.502
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882923",
+      "matchup": "Elche @ Deportivo",
+      "actual_total": 2,
+      "mae": 0.362
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875651",
+      "matchup": "ADO Den Haag @ AZ Alkmaar",
+      "actual_total": 2,
+      "mae": 0.492
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885487",
+      "matchup": "Alverca @ FC Porto",
+      "actual_total": 0,
+      "mae": 1.258
+    },
+    {
+      "league": "championship",
+      "event_id": "401880336",
+      "matchup": "Lincoln City @ Middlesbrough",
+      "actual_total": 3,
+      "mae": 0.54
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879036",
+      "matchup": "KV Mechelen @ KAA Gent",
+      "actual_total": 2,
+      "mae": 0.544
+    },
+    {
+      "league": "mls",
+      "event_id": "761698",
+      "matchup": "LAFC @ Vancouver Whitecaps",
+      "actual_total": 1,
+      "mae": 0.872
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882925",
+      "matchup": "M\u00e1laga @ Atl\u00e9tico Madrid",
+      "actual_total": 2,
+      "mae": 0.546
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875650",
+      "matchup": "Feyenoord Rotterdam @ Sparta Rotterdam",
+      "actual_total": 1,
+      "mae": 0.872
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885485",
+      "matchup": "Acad\u00e9mico de Viseu @ Benfica",
+      "actual_total": 4,
+      "mae": 0.936
+    },
+    {
+      "league": "championship",
+      "event_id": "401880335",
+      "matchup": "West Bromwich Albion @ Norwich City",
+      "actual_total": 3,
+      "mae": 1.524
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879040",
+      "matchup": "Oud-Heverlee Leuven @ Royal Charleroi SC",
+      "actual_total": 3,
+      "mae": 0.746
+    },
+    {
+      "league": "mls",
+      "event_id": "761701",
+      "matchup": "Columbus Crew @ Inter Miami CF",
+      "actual_total": 3,
+      "mae": 0.472
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882908",
+      "matchup": "Alav\u00e9s @ Rayo Vallecano",
+      "actual_total": 2,
+      "mae": 0.352
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875649",
+      "matchup": "FC Utrecht @ FC Groningen",
+      "actual_total": 3,
+      "mae": 0.36
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885490",
+      "matchup": "Rio Ave @ Gil Vicente",
+      "actual_total": 0,
+      "mae": 1.252
+    },
+    {
+      "league": "championship",
+      "event_id": "401880334",
+      "matchup": "Queens Park Rangers @ Portsmouth",
+      "actual_total": 4,
+      "mae": 0.984
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879035",
+      "matchup": "Racing Genk @ Zulte-Waregem",
+      "actual_total": 3,
+      "mae": 1.128
+    },
+    {
+      "league": "mls",
+      "event_id": "761704",
+      "matchup": "Charlotte FC @ Chicago Fire FC",
+      "actual_total": 3,
+      "mae": 0.514
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875648",
+      "matchup": "Ajax Amsterdam @ PEC Zwolle",
+      "actual_total": 2,
+      "mae": 0.736
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885488",
+      "matchup": "Braga @ Moreirense",
+      "actual_total": 4,
+      "mae": 0.528
+    },
+    {
+      "league": "championship",
+      "event_id": "401880333",
+      "matchup": "Swansea City @ Stoke City",
+      "actual_total": 3,
+      "mae": 0.338
+    },
+    {
+      "league": "belgian_pro_league",
+      "event_id": "401879034",
+      "matchup": "RAAL La Louvi\u00e8re @ Anderlecht",
+      "actual_total": 3,
+      "mae": 1.156
+    },
+    {
+      "league": "mls",
+      "event_id": "761703",
+      "matchup": "San Diego FC @ Minnesota United FC",
+      "actual_total": 1,
+      "mae": 1.252
+    },
+    {
+      "league": "eredivisie",
+      "event_id": "401875647",
+      "matchup": "FC Twente @ Heerenveen",
+      "actual_total": 1,
+      "mae": 0.652
+    },
+    {
+      "league": "primeira_liga",
+      "event_id": "401885486",
+      "matchup": "C.D. Nacional @ Santa Clara",
+      "actual_total": 3,
+      "mae": 0.87
+    },
+    {
+      "league": "championship",
+      "event_id": "401880332",
+      "matchup": "Birmingham City @ Sheffield United",
+      "actual_total": 0,
+      "mae": 1.278
+    }
+  ]
+}

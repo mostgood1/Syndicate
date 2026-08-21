@@ -1,0 +1,105 @@
+{
+  "window": "20260815-20260820",
+  "leagues": [
+    "epl",
+    "la_liga",
+    "ligue_1"
+  ],
+  "simulations": 150,
+  "ratings_source": "neutral (none supplied)",
+  "pooled": {
+    "matches": 7,
+    "cutoff_rows": 35,
+    "mae_projection": 0.7667,
+    "mae_frozen": 1.4286,
+    "brier_1_5": 0.2565,
+    "brier_2_5": 0.2112,
+    "brier_3_5": 0.0527,
+    "mae_improvement_vs_frozen": 0.6619,
+    "beats_frozen_baseline": true
+  },
+  "by_cutoff": {
+    "15": {
+      "n": 7,
+      "mae_projection": 0.621,
+      "mae_frozen": 2.0,
+      "brier_2_5": 0.2485
+    },
+    "30": {
+      "n": 7,
+      "mae_projection": 0.781,
+      "mae_frozen": 1.8571,
+      "brier_2_5": 0.2771
+    },
+    "45": {
+      "n": 7,
+      "mae_projection": 0.9238,
+      "mae_frozen": 1.2857,
+      "brier_2_5": 0.1589
+    },
+    "60": {
+      "n": 7,
+      "mae_projection": 0.8143,
+      "mae_frozen": 1.1429,
+      "brier_2_5": 0.1764
+    },
+    "75": {
+      "n": 7,
+      "mae_projection": 0.6933,
+      "mae_frozen": 0.8571,
+      "brier_2_5": 0.195
+    }
+  },
+  "failures": [],
+  "matches": [
+    {
+      "league": "la_liga",
+      "event_id": "401882926",
+      "matchup": "Getafe @ Alav\u00e9s",
+      "actual_total": 3,
+      "mae": 1.5067
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882918",
+      "matchup": "Rayo Vallecano @ Sevilla",
+      "actual_total": 1,
+      "mae": 1.2627
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882920",
+      "matchup": "Villarreal @ Racing Santander",
+      "actual_total": 3,
+      "mae": 0.9253
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882922",
+      "matchup": "Levante @ Espanyol",
+      "actual_total": 3,
+      "mae": 0.2987
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882923",
+      "matchup": "Elche @ Deportivo",
+      "actual_total": 2,
+      "mae": 0.4013
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882925",
+      "matchup": "M\u00e1laga @ Atl\u00e9tico Madrid",
+      "actual_total": 2,
+      "mae": 0.5813
+    },
+    {
+      "league": "la_liga",
+      "event_id": "401882908",
+      "matchup": "Alav\u00e9s @ Rayo Vallecano",
+      "actual_total": 2,
+      "mae": 0.3907
+    }
+  ]
+}
