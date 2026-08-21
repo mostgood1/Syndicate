@@ -20180,3 +20180,81 @@ and would have passed by ACCIDENT once the read moved, because the names they
 invented ("Nwaneri", "Viktor Gyökeres") exist in the real repo roster. They
 now patch the read and assert against their own fixture, plus one test that
 patches `roster_rows` and asserts it is actually CALLED.
+
+---
+
+## 2026-08-20 19:10 CT (2026-08-21T00:10:37Z) — WEB `feec7e17` — Layer 2 rail listed NFL preseason games TWICE — **VERIFIED, and the verification had to be built because the obvious one was blind**
+
+**Lane:** `layer2-rail-duplicate-nfl-cards`. **Deploy** `dep-da3pbfrbc2fs73aj00b0`,
+`api` trigger. `deploy_started` 19:03:11 CT, `build_ended` 19:08:09 CT,
+`deploy_ended` 19:10:37 CT. Preflight **CLEAR** (only infrastructure processes).
+
+**What shipped.** `deriveGameCards` in `syndicate/templates/intelligence.html`
+now clusters duplicate game groups on CHIP IDENTITY across the whole pool. It
+used to do that only INSIDE a `sport|matchup text` bucket, so the same real game
+arriving in two text forms was never compared:
+
+    nfl|401873286                        "LV @ HOU"                             1 row
+      ESPN id, candidate_type=game, board_lane=watchlist
+    nfl|a697012ab3bb18d3549ff1bce61ed4da  "Las Vegas Raiders @ Houston Texans"  10 rows
+      OddsAPI event id, source=layer2_shortlist, board_lane=opportunity
+
+Both resolve to the SAME chip (one by id, one via the #365 full-name index) and
+each seated its own mini card. Same for SF @ LAC. Cross-text merges require date
+compatibility with the chip; same-text merges stay unconditional (#165
+follow-up #3 turns on a duplicate carrying its own resolvable but WRONG date).
+
+**verify: the SERVED BYTES, A/B ON THE SAME PAYLOAD.**
+`GET /intelligence`, `deriveGameCards` sliced out of what production actually
+returns, run over a real production capture from 18:20 CT:
+
+| | rail cards | NFL | chips seating >1 card |
+|---|---|---|---|
+| served page BEFORE deploy (`f3a9bb0b`) | 17 | 4 | **2** |
+| served page AFTER deploy (`feec7e17`) | 15 | 2 | **0** |
+
+MLB 9 / SOCCER 1 / WNBA 3 identical on both sides. The fix marker is present in
+the served bytes (1 occurrence), so this is the deployed artifact, not the SHA.
+
+**WHY THE OBVIOUS CHECK WOULD HAVE BEEN A FALSE PASS — the load-bearing part.**
+Between 18:20 and 18:59 CT the two ESPN-id rows dropped OUT of the live board
+(`candidate_type=game` rows **2 → 0**; the 21 OddsAPI rows unchanged). The
+duplicate needs BOTH row families present, so a census against the CURRENT
+payload reads **0 chips seating >1 card whether or not the fix shipped** — and
+it did, recorded above as non-discriminating. Reading that as verification would
+have banked a success against a slate change. What makes the table above
+evidence is the CONTROL: the same payload through the pre-deploy served page
+still reproduces 2. **A healthy reading is evidence only once you know what
+makes it read unhealthy.**
+
+**STILL OWED, and this deploy does NOT discharge it:** a behavioural read on a
+LIVE board where an ESPN-id `candidate_type=game` watchlist row and
+`layer2_shortlist` rows coexist for the same game. Everything above is replay.
+
+**GRAFTED ONTO THE LIVE SHA, DELIBERATELY — `--allow-off-main`.**
+Web's live commit `f3a9bb0b` sits on a chain of **25+ consecutive scoped-deploy
+commits, none of them ancestors of `main`** (walked 25 deep without reaching
+it). Deploying main's tip would have swapped **242 files / 46,949 insertions**
+and reverted the lot — soccer card + density work, the NFL artifact allowlist,
+NCAAF projections, the layer2 movement fixes, a 68-file consolidated deploy.
+That is this ledger's own "second deploy silently reverts the first", at 25x the
+scale of the case the rule was written for. So: `feec7e17` = `f3a9bb0b` +
+cherry-pick of `84533712` (which IS on `origin/main`). Verified before pushing —
+the graft's `intelligence.html` is byte-identical to main's (`e2fb3b16`); it
+changes exactly 2 files against the live SHA; and `f3a9bb0b` IS an ancestor, so
+it is strictly additive. **This adds one more off-main link. Taken knowingly.**
+
+**CLAIM FORCE-BROKEN — `soccer-stale-artifact-overwrite`, 28 min into a 45 min
+TTL, user decision.** Their deploy had already finished (`deploy_ended` 18:34:33
+CT). I messaged that session BEFORE forcing, not after, with the ancestry proof
+that nothing of theirs moves. **I did NOT rest this on the dead pid**: pid 21244
+was gone, but per this ledger's 2026-08-19 self-correction `deploy_claim.py`
+records the PID of the one-shot `acquire` SCRIPT, which always exits — it is not
+a liveness signal. The session was in fact alive 3 minutes before I looked.
+
+**LEDGER CORRECTION MADE THIS SESSION:** `layer2-board-chip-race` was recorded
+OPEN / "landed but never deployed". It was already LIVE — `gameChipsLoadedOnce`
+present **6 times** on `f3a9bb0b`. The 19:58Z reconciliation read `d9a23a38`,
+which WAS web's live SHA then; web deployed several times after. Lane closed
+verified. Same lesson as above: a deployed-SHA reading describes the SHA you
+read, not a standing property.
