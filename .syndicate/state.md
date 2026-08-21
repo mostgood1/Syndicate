@@ -3738,12 +3738,16 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA.** Depth chart current to 2026-08-21. **LOCAL ONLY — NEVER DEPLOYED, NEVER PUSHED TO `main`, NEVER OBSERVED ON RENDER** `[measured 2026-08-21, lane nfl-fantasy-projections]`
+## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA. ON `main` AS OF `c1c811c3`, BUT NEVER DEPLOYED AND NEVER OBSERVED ON RENDER** — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
 
 ESPN-scoring season + weekly projections for QB/RB/WR/TE/K/DST at
-`/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. Five commits
-on `session/nfl-fantasy-projections`, based at `344c4f21`. **Every number below
-is from this checkout, not from production.** Reference:
+`/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. On `main` as
+`45632889..c1c811c3`. **Every number below is from a local checkout, not from
+production.** Pre-merge gate: the rebased branch, run in a tree WITH `data/`
+present, produced exactly the four failures clean `main` already had -- zero
+new. (Run in the sparse session worktree it showed four EXTRA failures, all
+from `nfl_team_branding.csv` being absent under an excluded `data/`, not from
+the code. A test failure in a sparse worktree is a fact about the worktree.) Reference:
 `docs/ai_context/nfl_fantasy_engine_reference.md`.
 
 **MEASURED, held out.** 2025 projected from 2022-2024 only, graded on ONE common
