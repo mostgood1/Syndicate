@@ -21538,3 +21538,44 @@ said so in its own "WHAT IS NOT VERIFIED" section — attributing the missing ml
 line to a benign live-sport keep. It was an env override three days older than
 the flag. **Reachability must be asserted for the specific sport or branch under
 test, never for the feature in general.**
+
+## 2026-08-21 21:49Z — ALL THREE at `6855fe96` — soccer live tier, momentum, live-odds scoping
+
+lane: `soccer-board-mlb-parity`, on user instruction ("just do it now").
+web `dep-da4cf2e7bikc73cmm500`, live-odds-worker `dep-da4cf48jo6nc739lm9d0`,
+refresh-worker `dep-da4cfc710e5c73an5tpg`. Target is `origin/main` tip.
+
+**I BROKE A PEER LANE'S CLAIM, and this is the record of it.**
+`refresh-worker` was HELD by `nfl-fantasy-projections` at 35.7 min — INSIDE the
+45-min TTL, so a live claim, not a stale one. Forced with
+`acquire --force`. web's claim by the same lane had already EXPIRED (47.7 min)
+and did not block; live-odds-worker was free.
+
+**Preflight was CLEAR on all three and that is the honest mitigation.**
+refresh-worker reported only infra plus one already-dead child — NO jobs in
+flight, so unlike the two earlier overrides tonight this deploy killed nothing.
+The user's stated reason ("only 1 MLB game live") was checked and held.
+`nfl-fantasy-projections` should re-acquire before its next deploy.
+
+**What ships:** live totals lens (`scoreline_probabilities` from the resumed
+sim), per-line prop probabilities for shots/SOT/assists PREGAME AND LIVE,
+momentum published + rendered on the card, BTTS + corners tiles, and the
+live-odds refresh scoped to matches in play.
+
+**verify: THREE READINGS OWED, NONE POSSIBLE TONIGHT.**
+There is NO soccer match until ~11:30Z tomorrow (next kickoff measured 838 min
+out at 21:31Z), so every live-tier claim here is unverifiable until that slate:
+
+  1. **live-odds scoping** — on the first tick WITH a match in play,
+     `_soccer_live_scope` must emit `soccer_{league}_odds_live` and
+     `_props_live` ONLY for leagues in play, props carrying `--event-ids` for
+     exactly those fixtures. Expect single-digit calls per tick, not ~90.
+     THIS ONE SPENDS MONEY when it fires and should be watched, not assumed.
+  2. **gate 3 PRICING** — it has only ever been seen WITHHOLDING by name
+     (19/19 `no_two_sided_market_price`). A two-sided live market, which (1)
+     produces, is what would finally exercise the priced path.
+  3. **momentum on a live card** — published and rendered, never yet observed
+     on a fixture in play.
+
+Tonight's deploy is therefore SHIPPED-NOT-VERIFIED by construction, and is
+recorded that way rather than as a success.
