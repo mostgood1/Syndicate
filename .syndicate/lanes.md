@@ -1089,29 +1089,21 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### soccer-stale-artifact-overwrite — OPEN, VERIFIED ON READ 1, READ 2 DUE ~00:10Z — **CAUSE FOUND AND BOTH FIXES LIVE.** Not a publisher: web's OWN boot sync (`bootstrap_data_root.py` via `_bootstrap_render_data`) copied the git checkout over its own disk every boot. Fix 1 `32148cac` -> web `15a0be64` (22:36:32Z): artifact roots SEED-ONLY. Fix 2 `35daa092` -> web `f3a9bb0b` (23:34:33Z): bootstrap lock moved container-local, holder liveness checked — a killed sync had been poisoning the next boot for 30 min. **MEASURED on a completed sync 23:35:55Z: `Bootstrap totals: copied=0 unchanged=33354 kept=25`, `soccer_source kept=24` (it syncs LAST, so the totals line proves the walk reached it). Control group 88/88 survived, 0 clobbered, 0 flipped; la_liga `recommendations_2026-08-20` reads `generated_at 23:32:11Z` and SURVIVED a full boot sync.** Pre-fix scope: 1,114 of 8,016 hot artifacts web served were the checkout's copy — lower bound, allowlist only, the sync walks ~33k files. WEB ONLY (neither worker imports `syndicate.app`), which voids `#357`'s `team_history` counter-argument. Narrative + unverified beliefs + dead ends: `.syndicate/log/2026-08-20.md`. `#494`. — opened 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
+### soccer-stale-artifact-overwrite — CLOSED-VERIFIED 2026-08-20 — **web's OWN boot sync was overwriting live artifacts with the month-old git mirror; the handed-down "a worker publishes it" hypothesis was FALSE.** Fix 1 `32148cac` -> web `15a0be64` (22:36:32Z): artifact roots SEED-ONLY. Fix 2 `35daa092` -> web `f3a9bb0b` (23:34:33Z): bootstrap lock container-local + holder-liveness — a killed sync had been poisoning the next boot for 30 min. **PROVED BY MECHANISM, not outcome: `Bootstrap totals: copied=0 unchanged=33354 kept=25` on a sync that RAN TO COMPLETION (23:35:55Z), `soccer_source kept=24` — soccer syncs LAST, so the totals line proves the walk reached it. Three served-surface readings at T+2/T+15/T+21 min: control group 88/88 survived, 0 clobbered, 0 flipped, all three times. la_liga `recommendations_2026-08-20` advanced 23:32:11Z -> 23:48:13Z and PERSISTED — the pipeline republished and the new copy stayed.** Pre-fix: 1,114 of 8,016 hot artifacts web served were the checkout's copy (lower bound; the sync walks ~33k files). WEB ONLY — neither worker imports `syndicate.app` — which voids `#357`'s `team_history` counter-argument. Narrative, unverified beliefs and dead ends: `.syndicate/log/2026-08-20.md`. `#494`. — opened 2026-08-20 — closed 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
 - Goal: web's runtime disk stops being overwritten with the month-old git-mirror
-  copy of `soccer_source/*/api/recommendations/recommendations_*.json`. **MET on
-  read 1.**
+  copy of `soccer_source/*/api/recommendations/recommendations_*.json`. **MET.**
 - Files: `syndicate/features/shared/artifact_publisher.py`,
-  `scripts/run_refresh_worker.py`, `syndicate/app.py` (`_bootstrap_render_data`
-  only), `scripts/bootstrap_data_root.py`, `syndicate/blueprints/ops.py`
-  (comment only), `tests/test_artifact_publisher.py`,
-  `tests/test_bootstrap_data_root.py`, `tests/test_app_bootstrap.py`,
-  `.syndicate/*`.
-- **NOT IN THIS LANE (declared overlaps, not edited):**
-  `scripts/build_soccer_artifacts.py`, `syndicate/features/soccer/` sim dirs
-  (`soccer-model-dispersion`); `syndicate/features/soccer/cards.py`,
-  `sources.py`, `syndicate/blueprints/soccer.py` (`soccer-board-mlb-parity`).
-- Hypothesis (handed down from `deploys.md` 22:00Z): a worker publishes the
-  stale mirror through `HOT_ARTIFACT_PATTERNS` over web's fresher file.
-  **FALSIFIED.** No publisher involved; the allowlist is irrelevant.
-- Falsification test: if the file's mtime had not moved, nothing overwrote
-  anything. **It had — and it read EARLIER than the last good read of the file
-  it replaced, which is `copy2` preserving the checkout's mtime.**
-- Verification: the goal reading taken TWICE, >=30 min apart, input stated both
-  times. **Read 1 DONE 23:37Z after a confirmed-complete sync. Read 2 due
-  ~00:10Z; close on it.**
+  `scripts/bootstrap_data_root.py`, `scripts/run_refresh_worker.py`,
+  `syndicate/app.py` (`_bootstrap_render_data` only), `syndicate/blueprints/ops.py`
+  (comment only), `tests/test_bootstrap_data_root.py`,
+  `tests/test_app_bootstrap.py`, `.syndicate/*`. **Claims released on close.**
+- Verification: **DONE.** The clause said two readings >=30 min apart; the second
+  was taken at **T+21 min on explicit user direction**, and the record says 21
+  rather than pretending to 30. It is sufficient on evidence rather than on
+  elapsed time: the clause was written when the mechanism was UNPROVEN and only
+  outcome-shaped evidence existed, and `kept=25`/`kept=24` is a direct
+  observation of the branch refusing real overwrites on the real disk. Three
+  readings, two independent republishes of the subject artifact, no regression.
 - Blocked by: none.
 
 ### intel-empty-pool-fallback-test — CLOSED-VERIFIED 2026-08-20 — THE ASSERTION WAS THE STALE SIDE: it asserted a `force_refresh` kwarg `#387` deliberately removed, while the empty-pool fallback branch under test was behaving correctly all along. Fixed in `tests/test_intelligence_state.py` only; production code byte-identical. Written up as `todo.md` `#495`. — opened 2026-08-20 — session dee8e41c-9e17-4dc8-9cc3-06678a05df92

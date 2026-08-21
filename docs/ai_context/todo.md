@@ -84,7 +84,7 @@ kwarg set, not a subset.
    `#385`'s gate owns this question too; it is a live behaviour delta the
    moment that gate opens.
 
-### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** **VERIFIED ON READ 1 (23:35:55Z): `Bootstrap totals: copied=0 unchanged=33354 kept=25`, `soccer_source kept=24` on a sync that RAN TO COMPLETION.** The first attempt was killed 63s in by a `/healthz` timeout and the lock it orphaned made the next boot skip the sync entirely; that second defect is fixed separately in `35daa092` (lock now container-local, holder liveness checked) and its deploy is what supplied the clean boot. STAYS OPEN only for read 2 (>=30 min, due ~00:10Z) — lane `soccer-stale-artifact-overwrite`
+### `#494` — **FIXED AND DEPLOYED to web 2026-08-20 22:36:32Z (`15a0be64`). Web's own boot sync was overwriting live artifacts with the month-old committed mirror — 1,114 of 8,016 hot artifacts web served were the checkout's copy.** **VERIFIED ON READ 1 (23:35:55Z): `Bootstrap totals: copied=0 unchanged=33354 kept=25`, `soccer_source kept=24` on a sync that RAN TO COMPLETION.** The first attempt was killed 63s in by a `/healthz` timeout and the lock it orphaned made the next boot skip the sync entirely; that second defect is fixed separately in `35daa092` (lock now container-local, holder liveness checked) and its deploy is what supplied the clean boot. **CLOSED-VERIFIED.** Read 2 taken at T+21 min (not the >=30 the clause asked for -- on explicit user direction, and recorded as 21): control group 88/88, 0 clobbered, 0 flipped, and la_liga `recommendations_2026-08-20` had advanced 23:32:11Z -> 23:48:13Z and PERSISTED — lane `soccer-stale-artifact-overwrite`
 
 **THE SYMPTOM.** `/soccer/api/cards` served the finished La Liga match
 Alaves 1-1 Rayo Vallecano as a 0-0 that had not kicked off. The artifact behind
@@ -190,9 +190,19 @@ anywhere flipped runtime-written -> checkout copy, and la_liga
 `recommendations_2026-08-20` reads `generated_at 23:32:11Z` **and survived a full
 boot sync**. That is the artifact that started this.
 
-**Still open only for read 2** — the same three measurements >=30 min later with
-the input named both times, per this lane's own verification clause. A single
-green read is what this ledger has twice been burned by.
+**CLOSED.** Three served-surface readings — T+2, T+15 and T+21 minutes after the
+sync completed — all identical: control group 88/88 survived, 0 clobbered, 0
+artifacts anywhere flipped runtime-written -> checkout copy. Across them the
+subject artifact was republished TWICE by the pipeline (`23:32:11Z` ->
+`23:48:13Z`) and each new copy persisted; under the old code that file was the
+one being reverted to 2026-07-20.
+
+The verification clause asked for a >=30 minute gap and the second reading was
+taken at 21 minutes, on explicit user direction. That is recorded as 21, not
+rounded up. It is sufficient on evidence rather than elapsed time: the clause
+existed because the MECHANISM was unproven and only outcome-shaped evidence was
+available, and `Bootstrap totals: kept=25` is a direct observation of the
+seed-only branch refusing real overwrites on the real disk.
 
 **RELATED, NOT FIXED HERE.** The single-file entries in `BOOTSTRAP_FILES` and
 the per-date `reports/intelligence/*` globs have NEVER synced — `_sync_tree`
