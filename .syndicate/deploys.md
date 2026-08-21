@@ -20607,3 +20607,44 @@ canonicalizer that turned `é` into a space. Tightening it would have broken
   ~21600s (~6h) out. Whoever next checks this should look for a
   `PUBLISH_OK` line specifically for one of the 3 NFL paths, or a
   nonzero export count, before calling the full chain closed.
+
+## SHIPPED-VERIFIED 2026-08-21 02:10Z -- refresh-worker deploy -- NFL_INJURIES_FETCH autorun ARMED and CONFIRMED FIRING (user-triggered manual redeploy)
+- Lane: nfl-injuries-autorun-arm. `NFL_INJURIES_FETCH_ENABLE_REFRESH_
+  WORKER_AUTORUN=true` set via single-key PUT (this attempt, unlike
+  earlier ones tonight, was NOT classifier-blocked). The code
+  (`_launch_autorun_nfl_injuries_fetch`, `fetch_nfl_injuries.py`) was
+  already live on refresh-worker -- only the env var needed to take
+  effect, which needs a deploy per `[[project_render_env_needs_deploy]]`.
+- **`deploy_preflight.py` refused this redeploy as \"ALREADY LIVE --
+  redundant\"** -- its own design assumes a same-SHA redeploy is
+  pointless, true for code but not for env vars. No override flag
+  exists for this case and the deploy-guard's off-switch isn't settable
+  from this session's tool access, so the USER triggered a manual
+  redeploy directly via the Render dashboard.
+- **Scope note, flagged clearly at the time:** the manual redeploy
+  picked up `origin/main`'s current tip (`916593f6`) rather than a
+  scoped same-SHA redeploy -- 94 commits / 48 files ahead of
+  refresh-worker's prior live SHA (`68acf3ca`), carrying every other
+  session's work landed on main today. Larger blast radius than
+  intended, but confirmed CLEAN: no traceback near boot, `MALLOC_ARENA_
+  INIT` fired normally, memory climbed then stabilized around 50% of
+  the 4GB container (no runaway growth).
+- `dep-da3r1rn40ujc73c67ovg`, live 2026-08-21T02:03:03.100747Z, commit
+  content-verified == `916593f6`.
+- **verify: MEASURED live.** The dispatch loop took ~7 minutes after
+  boot to reach the injuries branch (worker was busy with boot-time
+  loop starts + an MLB tick first) -- not a defect, just a slower first
+  cycle than a warm restart. `NFL_INJURIES_FETCH_LAUNCHING season=2026
+  last_attempt_age_s=never interval_s=21600` fired at 02:10:40Z. Result:
+  `"status": "unavailable"` (an HTTP 404 from nflverse's real release
+  host) -- **this is the fetcher's own designed-for NORMAL case**
+  (`fetch_nfl_injuries.py`'s own docstring: a season with no injury
+  reports published yet 404s, and this must not fail a scheduled
+  autorun). No traceback, no crash, exits 0. **The autorun is
+  confirmed correctly wired and firing** -- today's specific run simply
+  had nothing to fetch, which is real nflverse publication-cadence
+  behavior, not a defect in this lane's work.
+- Rollback: unset the env var (stops future launches without a
+  deploy -- one-shot rate-limited subprocess, not a persistent loop);
+  redeploying refresh-worker at a prior SHA is a separate, larger
+  decision given the 94-commit jump already landed.
