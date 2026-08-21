@@ -175,6 +175,77 @@ class AnalyticSpreadTests(unittest.TestCase):
         self.assertFalse(v["priceable"])
         self.assertEqual(v["withheld_reason"], J.REASON_NOT_PRICEABLE)
 
+    def test_totals_now_PRICE_at_their_own_measured_interval(self) -> None:
+        """`#499` graded the totals transform (249 games / 23,712 samples), so
+        the blanket "never backtested" refusal is retired for wnba totals.
+
+        THE SIGMA IS FOUR TIMES THE WIN PATH'S (0.150 vs 0.054) and that is the
+        measurement, not a penalty: it is the worst calibration gap BY PREDICTED
+        BUCKET on held-out data. By minutes-left bucket it would read 0.023,
+        which is an averaging artifact -- +0.109 at p=0.35 and -0.150 at p=0.65
+        cancel within a time bucket. At 2 sigma this is a 30pp bar, so almost
+        nothing prices, which is correct for an estimator still visibly
+        under-dispersed.
+        """
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.95}},
+            market="totals", line=165.5, market_prob=0.50,
+            analytic_std_err=0.054, sport="wnba",
+        )
+        self.assertIsNotNone(v)
+        self.assertAlmostEqual(v["prob_std_err"], 0.150, places=6,
+                               msg="totals must use their OWN measured sigma, not the win path's")
+        self.assertEqual(v["std_err_basis"], "analytic_calibration")
+        self.assertTrue(v["priceable"], "a 45pp edge clears the 30pp bar")
+
+    def test_a_typical_totals_edge_is_still_refused_by_the_30pp_bar(self) -> None:
+        """The bar is the feature. 10pp is a large edge and must NOT price."""
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.60}},
+            market="totals", line=165.5, market_prob=0.50,
+            analytic_std_err=0.054, sport="wnba",
+        )
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_NOT_PRICEABLE)
+
+    def test_totals_at_a_DIFFERENT_line_still_refuse_by_line(self) -> None:
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.95}},
+            market="totals", line=170.5, market_prob=0.50,
+            analytic_std_err=0.054, sport="wnba",
+        )
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_ANALYTIC_LINE_MISMATCH)
+
+    def test_an_ABSENT_sport_refuses_rather_than_defaulting(self) -> None:
+        """No sport on the hit must not silently become wnba."""
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.95}},
+            market="totals", line=165.5, market_prob=0.50, analytic_std_err=0.054,
+        )
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_ANALYTIC_UNCALIBRATED)
+
+    def test_the_index_stamps_the_sport_so_the_lookup_cannot_default(self) -> None:
+        snap = {"games": [{"away_name": "A", "home_name": "B",
+                           "gameLens": [{"source": "live_projection",
+                                         "modelHomeWinProb": 0.6,
+                                         "projection": {"homeMargin": 4.0}}]}]}
+        idx = J.build_live_gameline_index(snap, sources=("live_projection",),
+                                          analytic_std_err=0.054, sport="wnba")
+        self.assertEqual(next(iter(idx.values()))["sport"], "wnba")
+
+    def test_a_sport_with_NO_totals_measurement_still_refuses_by_name(self) -> None:
+        """Retiring the refusal for a MEASURED pair must not retire it for
+        everything -- that would be the permissive default this repo forbids."""
+        v = J.price_analytic_line_market(
+            analytic={"total": {"line": 165.5, "p_over": 0.95}},
+            market="totals", line=165.5, market_prob=0.50,
+            analytic_std_err=0.054, sport="nba",
+        )
+        self.assertFalse(v["priceable"])
+        self.assertEqual(v["withheld_reason"], J.REASON_ANALYTIC_UNCALIBRATED)
+
     def test_totals_are_refused_as_UNCALIBRATED_not_as_missing_a_shape(self) -> None:
         """The distinction is the point: a known gap must not read as a shrug.
 
@@ -184,6 +255,7 @@ class AnalyticSpreadTests(unittest.TestCase):
         v = J.price_analytic_line_market(
             analytic={"total": {"line": 165.5, "p_over": 0.61}},
             market="totals", line=165.5, market_prob=0.50, analytic_std_err=0.054,
+            sport="nba",  # no totals measurement for this sport
         )
         self.assertIsNotNone(v)
         self.assertFalse(v["priceable"])

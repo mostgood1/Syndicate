@@ -125,6 +125,36 @@ ANALYTIC_LIVE_STD_ERR_BY_SPORT: dict[str, float] = {
     "wnba": 0.054,
 }
 
+# PER-MARKET OVERRIDE, where a market has its own measurement. `#499` graded the
+# live TOTALS transform over 249 games / 23,712 samples and refit its scale
+# (test Brier 0.1744 -> 0.1477), so "never backtested" no longer holds -- but
+# the number that came out is FOUR TIMES the win path's.
+#
+# 0.150 IS THE WORST CALIBRATION GAP BY PREDICTED BUCKET on held-out data, and
+# the choice of that denominator is the whole point. By MINUTES-LEFT bucket the
+# worst gap is 0.023, which would have set a 4.6pp bar -- and it is an artifact
+# of averaging: within a time bucket the +0.109 error at p=0.35 and the -0.150
+# at p=0.65 cancel to about -0.02. That is `#481`'s own finding restated ("the
+# aggregate means were unbiased, so the failure was DISPERSION"), and taking the
+# aggregate here would have flooded the board with noise priced at a bar six
+# times too tight.
+#
+# At 2 sigma this is a **30pp bar**, so almost nothing will price. That is the
+# CORRECT outcome for an estimator whose probabilities are still visibly
+# under-dispersed (predicted 0.65 -> actual 0.796), not a disappointment. What
+# it buys over the old blanket refusal is that each row is now refused by
+# `prob_interval_swamps_edge` against its OWN edge, which is data-driven and
+# per-row, instead of by a category-wide "never measured".
+#
+# The honest follow-up: calibration improves monotonically as the scale narrows
+# (0.208 at a=8.0, 0.150 at the shipped a=3.2, 0.125 at a=2.0) and the held-out
+# set prefers a=2.0 on Brier too. That was NOT adopted -- the scale was fitted on
+# TRAIN and switching to the test-preferred value is leakage. Refit on train with
+# calibration in the objective, then this number moves.
+ANALYTIC_LIVE_STD_ERR_BY_MARKET: dict[tuple[str, str], float] = {
+    ("wnba", "totals"): 0.150,
+}
+
 
 def analytic_std_err_for_sport(sport: Any) -> float | None:
     """The analytic estimator's standard error for this sport, or None.
@@ -557,6 +587,7 @@ def price_analytic_line_market(
     market_prob: Any,
     analytic_std_err: Any,
     sigma: float = PRICEABLE_SIGMA,
+    sport: Any = None,
 ) -> dict[str, Any] | None:
     """Price a spread row from a line-specific analytic probability.
 
@@ -566,16 +597,39 @@ def price_analytic_line_market(
     """
     if not isinstance(analytic, Mapping):
         return None
+    sport_key = str(sport or "").strip().lower()
     market_key = str(market or "").strip().lower()
     if market_key in _TOTALS_MARKETS:
-        # A named refusal, not a fall-through: "never backtested" is a different
-        # fact from "no distribution published", and collapsing them is how a
-        # known gap stops being visible.
-        if analytic.get("total") is not None:
+        block = analytic.get("total")
+        if not isinstance(block, Mapping):
+            return None
+        # `#499` MEASURED IT, so the blanket refusal is retired -- but only for
+        # a sport/market pair that HAS a measurement. Anything else still
+        # refuses by the same name it did before.
+        totals_sigma = ANALYTIC_LIVE_STD_ERR_BY_MARKET.get((sport_key, "totals"))
+        if totals_sigma is None:
             out = withhold_totals()
             out["withheld_reason"] = REASON_ANALYTIC_UNCALIBRATED
             return out
-        return None
+        try:
+            model_prob = float(block.get("p_over"))
+            analytic_line = float(block.get("line"))
+            row_line = float(line)
+        except (TypeError, ValueError):
+            return None
+        if abs(analytic_line - row_line) > 1e-6:
+            return {
+                "model_prob": None, "market_prob": None, "edge_pp": None,
+                "std_err_basis": None, "prob_std_err": None, "priceable": False,
+                "withheld_reason": REASON_ANALYTIC_LINE_MISMATCH, "sigma": float(sigma),
+            }
+        return price_moneyline(
+            model_prob=model_prob,
+            market_prob=market_prob,
+            sims=None,
+            sigma=sigma,
+            analytic_std_err=totals_sigma,
+        )
     if market_key not in _ANALYTIC_PRICEABLE_MARKETS:
         return None
     block = analytic.get("spread")
@@ -665,6 +719,7 @@ def build_live_gameline_index(
     *,
     sources: tuple[str, ...] | None = None,
     analytic_std_err: float | None = None,
+    sport: Any = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
 
@@ -721,6 +776,8 @@ def build_live_gameline_index(
         # accidentally price one sport's probability against another's bar.
         if analytic_std_err is not None:
             projection["analytic_std_err"] = float(analytic_std_err)
+        if sport is not None:
+            projection["sport"] = str(sport).strip().lower()
         index[key] = projection
     return index
 
@@ -799,6 +856,12 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
                     line=row.get("line"),
                     market_prob=projection.get("market_fair_prob_over"),
                     analytic_std_err=hit.get("analytic_std_err"),
+                    # From the INDEX, never a default. A default of "wnba" here
+                    # would price another sport's totals against WNBA's measured
+                    # sigma -- the permissive-default shape this repo forbids,
+                    # and the reason `lens_sources_for_sport` is an explicit
+                    # table rather than a relaxed check.
+                    sport=hit.get("sport"),
                 )
             if verdict is None:
                 verdict = price_distribution_market(
