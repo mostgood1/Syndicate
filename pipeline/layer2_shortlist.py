@@ -333,6 +333,46 @@ def build_layer2_shortlist(
                 except Exception as exc:  # never let enrichment break the build
                     enrichment[step] = {"error": f"{type(exc).__name__}"}
 
+            # SAY, IN THE LOGS, WHY THE LIVE COLUMNS ARE BLANK.
+            #
+            # `attach_live_projections` already returns everything needed to
+            # attribute a blank Live cell -- `rows_live_projected` against
+            # `snapshot_rows_indexed`, plus the three named miss reasons -- and
+            # it all went into the shortlist payload and nowhere else. So the
+            # only way to answer "is the live re-sim reaching the board" was to
+            # fetch and parse the served artifact, which is exactly the question
+            # a user asks when they see an em dash next to a game in progress.
+            #
+            # The distinction this makes readable, and it is the whole point:
+            #   projected == 0, indexed == 0  -> the LIVE LENS produced nothing
+            #   projected == 0, indexed  > 0  -> the lens has rows, the JOIN missed
+            #   projected  > 0, edged   == 0  -> joined, and declined to price
+            # Those three have completely different fixes and, until now, one
+            # identical symptom. Same contract as `#296`: a zero must be
+            # attributable, never bare.
+            #
+            # print(), not logger.info -- CLAUDE.md: logger.info never reaches
+            # Render's log collector from this process.
+            try:
+                live_stats = enrichment.get("live_projections")
+                if isinstance(live_stats, Mapping) and live_stats.get("supported") is not False:
+                    print(
+                        f"[layer2_shortlist] LIVE_PROJECTION_JOIN sport={sport} "
+                        f"considered={live_stats.get('rows_live_considered')} "
+                        f"projected={live_stats.get('rows_live_projected')} "
+                        f"edged={live_stats.get('rows_live_edged')} "
+                        f"prob_withheld={live_stats.get('rows_live_prob_withheld')} "
+                        f"lens_indexed={live_stats.get('snapshot_rows_indexed')} "
+                        f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
+                        f"miss_player={live_stats.get('miss_no_player')} "
+                        f"miss_market={live_stats.get('miss_no_market_alias')} "
+                        f"miss_line={live_stats.get('miss_no_line')}",
+                        flush=True,
+                    )
+            except Exception:
+                # An instrument that can break the build is worse than none.
+                pass
+
             result = build_layer2_rows(grid, openings=openings_index)
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:

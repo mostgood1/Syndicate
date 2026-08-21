@@ -545,6 +545,11 @@ body.syndicate-body .cards-shell {
    recommending on EV grounds -- not a hard warning, because the sim
    carries no weight in the score and has never been graded. */
 .board-badge--sim-disagrees { background: rgba(231, 76, 60, 0.2); color: #ffd9d3; border-color: rgba(231, 76, 60, 0.45); }
+/* A LIVE dissent must not read as the pregame one at a glance. Same red family
+   -- it is the same kind of warning -- but brighter and outlined, so a reader
+   scanning a board of mostly-pregame rows can see which verdicts are being made
+   by the re-sim watching the game right now. */
+.board-badge--sim-disagrees-live { background: rgba(231, 76, 60, 0.34); color: #fff1ee; border-color: rgba(231, 76, 60, 0.85); font-weight: 600; }
 
 /* WHICH SLICE OF THE GAME a line is for. `8.5 · totals_alt` sat beside
    `11.5 · totals` with nothing saying the first was FIRST FIVE INNINGS --

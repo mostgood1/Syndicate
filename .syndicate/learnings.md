@@ -36,6 +36,42 @@
 
 ---
 
+### 2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT quantity, however well-documented the real one is
+- What we believed: the Layer 2 board's `Win%` column showed a win probability,
+  and `model_probability` was the model's number for the row being recommended.
+  Both are what the field names say, and the frontend comment asserted the
+  second one outright.
+- What was actually true: `Win%` rendered `score["book_confidence"]` — the
+  books-quoting ladder `((1,0.5),(2,0.7),(4,0.85))`, else 1.0 — so **"Win% 100%"
+  meant "five or more books quote this market"**. And `model_probability` was
+  `projection["model_prob_over"]`, always the OVER/HOME framing, so every AWAY
+  and DRAW row showed the other side's probability next to a correctly
+  side-adjusted "sim disagrees" badge. Separately, `_HITTER_BUCKETS` named three
+  mean fields (`runs_mean`, `doubles_mean`, `triples_mean`) that do not exist in
+  the artifact (`r_mean`, `2b_mean`, `3b_mean`), so three whole markets could
+  never project.
+- How we found out: a USER LOOKED AT THE BOARD and said the sim-disagrees column
+  seemed wrong. Five distinct Win% values on one screenshot mapped 1:1 onto the
+  book-count ladder with nothing left over — a fingerprint no amount of reading
+  the producing code had surfaced, because every function was individually
+  correct and documented. The producing code even named the hazard: the comment
+  above `projection["side"]` says putting home's edge on the away row is "a
+  number that is right and labelled wrong, which reads as a real signal", and
+  the display layer then did precisely that with the probability.
+- The rule going forward: **a value crossing a layer boundary must be named for
+  the quantity it IS, and the consuming surface must be checked against that
+  name, not against the producer's docstring.** Two specific tripwires, both
+  cheap: (1) when a field is displayed, read the TEMPLATE to see what label sits
+  above it — `book_confidence` was honest everywhere except the one place a
+  human reads it; (2) any lookup key naming an external artifact's field must be
+  asserted against a real artifact, at the ROW level, because a key that never
+  resolves produces a blank, and a blank is indistinguishable from honest
+  missing coverage. `tests/test_layer2_sim_view_sides.py` holds both.
+- Cost: unknown but non-zero — a board presented "Win% 100%" on 5+-book markets
+  and the other side's probability on every away/draw row, for as long as those
+  surfaces have existed. No settled bets, so no measurable financial loss; the
+  loss is that the board's most reassuring column was its least meaningful.
+
 ### 2026-08-12 — EXONERATED: the soccer window is not the egress cause
 - What we believed: the change that tripled dates per sweep (5–6 → 15–18),
   shipped the same day the egress spike was noticed, caused the spike.
