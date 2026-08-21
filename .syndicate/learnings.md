@@ -3521,3 +3521,55 @@ trigger the defect, and label the result **verified-by-replay**, which is weaker
 than verified-in-the-wild and should never be recorded as the latter. Same
 family as `feedback-instrument-blindness` and
 `feedback-gate-on-the-output-not-the-input`.
+
+## FORBIDDEN: a `continue` that skips a check inside a loop whose only failure signal is a counter `[2026-08-20, #481]`
+
+**The belief overturned.** `scripts/verify_wnba_live_scale.py` exited **0** and
+printed `VERIFIED on 1 live row(s)` on the first live game it ever saw, having
+**compared nothing**. The obligation it was written to discharge was recorded as
+discharged on the strength of that exit code. It was caught only because the
+output line above the verdict said
+`payload omits live_margin/elapsed_min -- cannot recompute`.
+
+**The shape, which is general.** The loop was
+`for row: if inputs_missing: continue; ... if mismatch: bad += 1`, and the
+verdict was `return 2 if bad else 0`. A skipped row never touches `bad`, so
+**"could not check" is indistinguishable from "checked and passed"** in the only
+variable the exit code reads. This is the `unknown must not default permissive`
+rule, but the permissive branch is a `continue` rather than an `else` — which is
+why it does not look like a default at all, and why reviewing the comparison
+logic (which was correct) finds nothing.
+
+**The rule going forward.** **Count what you CHECKED, not just what you FAILED,
+and refuse to pass on zero checks.** Any verifier needs a third outcome
+alongside pass/fail: *did not verify*. Concretely: `checked`, `bad` and
+`unchecked` as separate counters; `if not checked: return <nonzero>`; and the
+skip path must PRINT what was missing. A success message should state its own
+denominator (`VERIFIED: 2 check(s) across 1 live row(s)`) so a zero is visible
+in the output rather than inferred from its absence.
+
+**Second defect, same script, independent.** It read `lane["live_margin"]` and
+`lane["elapsed_min"]` — fields `_wnba_game_lens` does not publish (margin is
+`projection.homeMargin`; elapsed is DERIVED from `status.period`/`clock`). So
+the skip fired on EVERY row, always. A verifier that has never once been run
+against the live shape it parses has not been tested, only written — and this
+one was authored in the same session as the fix it was meant to police, when no
+live game existed to run it against. **If you write a verifier you cannot
+execute yet, say so where the obligation is recorded**, or its first green run
+will be mistaken for the confirmation.
+
+**Also: drive the expected value by IMPORTING the shipped function.** This
+script re-implemented the blend locally, so it could have "verified" a formula
+production does not run — the same two-copies hazard `#475` called out.
+
+**Cost.** ~0. Caught on the first real live game, and the same run then produced
+the genuine confirmation (gap `0.00e+00`, both paths). Fixed in `2ff4ce5b`.
+
+## A WNBA/board date lookup must search YESTERDAY-UTC `[2026-08-20]`
+
+The board keys games by **ET business date**, so an ordinary 7pm ET tip —
+`2026-08-21T00:00Z` — is filed under `2026-08-20`. A today/tomorrow-UTC search
+therefore returns *"no live game"* during exactly the evening window when games
+are being played. Measured at 00:16Z with IND@DAL live and in Q1. Cheap to get
+right (search yesterday/today/tomorrow); the miss reads as a clean null result,
+which is the dangerous part — it looks like evidence of absence.

@@ -3351,7 +3351,22 @@ actually won 91.3%. Scale `6.0 + 0.35*min_left` replaced by a single
 `_WNBA_LIVE_MARGIN_SCALE = 2.1` (the fitted time coefficient is 0.00 because
 the pregame blend already carries time dependence). Applied to cover too, NOT
 to totals (different quantity, unfitted). LIVE on web `ba1d3368`.
-**Validated OFFLINE ONLY — no served-payload confirmation yet.**
+
+**SERVED-PAYLOAD CONFIRMATION DISCHARGED `[2026-08-20 19:2x CT / 00:2xZ]`.**
+Checked on IND@DAL while in progress: both the moneyline and cover paths
+reproduce the served value EXACTLY (gap `0.00e+00`) from a single fetch, at
+P1 4:55, margin -4, elapsed 5.083min — served `modelHomeWinProb` 0.4092787472,
+served `p_cover` 0.5273877166. Three samples over ~8 min, all exact;
+`markets.moneyline.p_win` agrees with the lane's own `modelHomeWinProb` to
+1e-6, so the verified number is the number the board shows. **This proves the
+deployed formula is what serves — it does NOT re-measure the -13.3% Brier,
+which still rests on the offline replay above.**
+**Read any live delta with its blend weight.** `blend_w = elapsed/40`, so
+5 minutes in the live term carries 0.13 of its eventual weight and the -0.04
+vs the old constant is the SMALLEST the change ever gets (observed growing:
+-0.0396 at w=0.114 -> -0.0581 at w=0.185). Late-game magnitude — margin +10,
+1:00 left, 0.9780 new vs 0.8190 old, +0.159 — is COMPUTED from the deployed
+function, not served.
 
 **WNBA does not re-sim live; MLB does `[2026-08-20]`.** 0 basketball matches
 for `resim` in `live_refresh_loop.py`; MLB has `mlb_needs_resim_game_pks()` +
