@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -168,6 +169,12 @@ _LENS_STATE_MAX_AGE_SECONDS = 15 * 60
 
 _LENS_ABSTRACT_TO_STATE = {"live": "live", "final": "final", "preview": "pregame"}
 
+# Sports with a real live STATUS source behind `attach_live_game_state_from_lens`.
+# Adding a sport here without a source that actually carries finished matches
+# turns a stated "unsupported" into a silent "supported, corrected 0" -- the
+# reading this module exists to keep distinguishable.
+_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer"})
+
 
 def _lens_generated_age_seconds(snapshot: dict) -> float | None:
     from datetime import datetime, timezone
@@ -181,6 +188,109 @@ def _lens_generated_age_seconds(snapshot: dict) -> float | None:
         return None
     now = datetime.now(parsed.tzinfo) if parsed.tzinfo is not None else datetime.now()
     return max(0.0, (now - parsed).total_seconds())
+
+
+def _coerce_score(value: Any) -> Any:
+    """An int score where one is recoverable, else the value untouched.
+
+    Deliberately NOT `int(value or 0)`: a missing score becoming 0-0 would read
+    as a real goalless scoreline, and the caller already treats None as "leave
+    the chip's score alone".
+    """
+    if value is None or isinstance(value, int):
+        return value
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return value
+
+
+def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | None] | None:
+    """Soccer's equivalent of MLB's lens `games`, from the live-state poller.
+
+    SOCCER'S LIVE STATE IS NOT AT `live/soccer_live_lens.json`. That path is a
+    bookkeeping snapshot for `live_lens_loop.py`'s own tick status and says so in
+    its docstring; the real per-match state is written per league by
+    `scripts/poll_soccer_live_state.py` to
+    `soccer_source/<league>/api/live_state/live_state_<date>.json`. Reading the
+    lens path for soccer would find a file, parse it, and correct nothing --
+    the failure mode this repo calls "supported: true, zero rows" and cannot
+    tell apart from "no matches live".
+
+    READS `match_box`, NOT `games`. The poller's own comment is explicit that
+    `games` means "matches IN PLAY" and a finished match must never appear
+    there, while `match_box` spans `in` AND `post`. Gate 1 exists to move a
+    frozen chip to `final`, so the map that carries finished matches is the only
+    correct input. Measured 2026-08-20: la_liga's completed ALA 1-1 RAY sat in
+    `match_box` with `count: 0` on `games`.
+
+    Returns (lens_games, age_seconds) or None when no league file could be read
+    at all -- which the caller must report differently from "read them, nothing
+    live", because those have different fixes.
+    """
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    root = data_root() / "soccer_source"
+    if not root.exists():
+        return None
+
+    # ESPN's status vocabulary, which soccer carries through verbatim. Distinct
+    # from MLB's `_LENS_ABSTRACT_TO_STATE` tokens rather than reusing them: a
+    # shared mapping would silently admit whichever vocabulary drifted first.
+    state_by_token = {"in": "live", "post": "final", "pre": "pregame"}
+
+    lens_games: list[dict] = []
+    oldest_age: float | None = None
+    files_read = 0
+    for league_dir in sorted(root.iterdir()):
+        if not league_dir.is_dir():
+            continue
+        payload = read_json_file(
+            league_dir / "api" / "live_state" / f"live_state_{selected_date}.json"
+        )
+        if not isinstance(payload, dict):
+            continue
+        files_read += 1
+        age = _lens_generated_age_seconds(payload)
+        if age is not None:
+            oldest_age = age if oldest_age is None else max(oldest_age, age)
+        match_box = payload.get("match_box")
+        if not isinstance(match_box, dict):
+            continue
+        for record in match_box.values():
+            if not isinstance(record, dict):
+                continue
+            state = state_by_token.get(str(record.get("status_state") or "").strip().lower())
+            # `final` is also asserted by its own boolean. Trust either, because
+            # a match that has ended must not keep pricing as live if one of the
+            # two fields is absent.
+            if state != "final" and bool(record.get("final")):
+                state = "final"
+            if not state:
+                continue
+            lens_games.append(
+                {
+                    "state": state,
+                    # The grid joins on team NAME; soccer publishes no abbr here,
+                    # and an absent key is better than a wrong one -- `_side_matches`
+                    # skips falsy tokens rather than matching on them.
+                    "home": {"name": record.get("home_team")},
+                    "away": {"name": record.get("away_team")},
+                    "detailed": record.get("status_detail") or record.get("status_display_clock"),
+                    # ESPN ships scores as STRINGS ("1"), and the MLB path this
+                    # shares publishes ints. Measured against the real
+                    # 2026-08-20 artifact: `home_score` arrived as `"1"`. A
+                    # string score compares and sorts wrong everywhere
+                    # downstream without ever raising, so it is coerced at the
+                    # boundary rather than trusted to be handled later.
+                    "home_score": _coerce_score(record.get("score_home")),
+                    "away_score": _coerce_score(record.get("score_away")),
+                }
+            )
+
+    if not files_read:
+        return None
+    return lens_games, oldest_age
 
 
 def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: str) -> dict:
@@ -225,48 +335,74 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
       direction, and an un-finaled game re-opens edges on a settled market --
       exactly what `live_edge_policy` refuses.
     """
-    if sport != "mlb":
+    if sport not in _LIVE_GAME_STATE_SPORTS:
         return {"supported": False, "reason": f"no live status source wired for {sport}", "rows_corrected": 0}
     try:
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
         from syndicate.features.shared.team_aliases import teams_match
 
-        snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
-        if not isinstance(snapshot, dict):
-            return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
-        page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
-        games = page.get("games") if isinstance(page.get("games"), list) else []
-        if not games:
-            return {"supported": True, "reason": "snapshot carries no games", "rows_corrected": 0}
-
-        age_seconds = _lens_generated_age_seconds(page)
-        if age_seconds is not None and age_seconds > _LENS_STATE_MAX_AGE_SECONDS:
-            return {
-                "supported": True,
-                "reason": "live-lens snapshot is staler than the chip it would correct",
-                "snapshot_age_seconds": round(age_seconds, 1),
-                "rows_corrected": 0,
-            }
-
-        lens_games = []
-        for game in games:
-            if not isinstance(game, dict):
-                continue
-            abstract = str((game.get("status") or {}).get("abstract") or "").strip().lower()
-            state = _LENS_ABSTRACT_TO_STATE.get(abstract)
-            if not state:
-                continue
-            score = (game.get("matchup") or {}).get("score") if isinstance(game.get("matchup"), dict) else {}
-            lens_games.append(
-                {
-                    "state": state,
-                    "home": game.get("home") if isinstance(game.get("home"), dict) else {},
-                    "away": game.get("away") if isinstance(game.get("away"), dict) else {},
-                    "detailed": (game.get("status") or {}).get("detailed"),
-                    "home_score": (score or {}).get("home"),
-                    "away_score": (score or {}).get("away"),
+        if sport == "soccer":
+            resolved = _soccer_live_state_games(selected_date)
+            if resolved is None:
+                return {
+                    "supported": True,
+                    "reason": "no published live-state artifact for any league",
+                    "rows_corrected": 0,
                 }
-            )
+            lens_games, age_seconds = resolved
+            if not lens_games:
+                return {
+                    "supported": True,
+                    "reason": "live-state artifacts carry no in-play or finished matches",
+                    "snapshot_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+                    "rows_corrected": 0,
+                }
+            # Same bound as MLB's, and for the same reason: a wedged poller must
+            # not freeze the board harder than the bug this fixes.
+            if age_seconds is not None and age_seconds > _LENS_STATE_MAX_AGE_SECONDS:
+                return {
+                    "supported": True,
+                    "reason": "live-state artifact is staler than the chip it would correct",
+                    "snapshot_age_seconds": round(age_seconds, 1),
+                    "rows_corrected": 0,
+                }
+        else:
+            snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+            if not isinstance(snapshot, dict):
+                return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
+            page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
+            games = page.get("games") if isinstance(page.get("games"), list) else []
+            if not games:
+                return {"supported": True, "reason": "snapshot carries no games", "rows_corrected": 0}
+
+            age_seconds = _lens_generated_age_seconds(page)
+            if age_seconds is not None and age_seconds > _LENS_STATE_MAX_AGE_SECONDS:
+                return {
+                    "supported": True,
+                    "reason": "live-lens snapshot is staler than the chip it would correct",
+                    "snapshot_age_seconds": round(age_seconds, 1),
+                    "rows_corrected": 0,
+                }
+
+            lens_games = []
+            for game in games:
+                if not isinstance(game, dict):
+                    continue
+                abstract = str((game.get("status") or {}).get("abstract") or "").strip().lower()
+                state = _LENS_ABSTRACT_TO_STATE.get(abstract)
+                if not state:
+                    continue
+                score = (game.get("matchup") or {}).get("score") if isinstance(game.get("matchup"), dict) else {}
+                lens_games.append(
+                    {
+                        "state": state,
+                        "home": game.get("home") if isinstance(game.get("home"), dict) else {},
+                        "away": game.get("away") if isinstance(game.get("away"), dict) else {},
+                        "detailed": (game.get("status") or {}).get("detailed"),
+                        "home_score": (score or {}).get("home"),
+                        "away_score": (score or {}).get("away"),
+                    }
+                )
     except Exception:
         _LOGGER.exception("BOOK_GRID_LENS_STATE_FAILURE sport=%s date=%s", sport, selected_date)
         return {"supported": True, "error": "live status join failed", "rows_corrected": 0}
@@ -312,7 +448,7 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             game["home_score"] = hit["home_score"]
         if hit.get("away_score") is not None:
             game["away_score"] = hit["away_score"]
-        game["state_source"] = "mlb_live_lens"
+        game["state_source"] = "soccer_live_state" if sport == "soccer" else "mlb_live_lens"
         corrected += 1
         transitions[f"{before or 'unknown'}->{hit['state']}"] = transitions.get(f"{before or 'unknown'}->{hit['state']}", 0) + 1
 
