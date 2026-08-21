@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,27 +23,41 @@ from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 
+# OddsAPI market keys, verified against the live API 2026-08-20 -- NOT guessed
+# from the standard-name column. Two of these were wrong for as long as this
+# file has existed and each one 422s on its own:
+#
+#   player_rec_yds        -> player_reception_yds       (INVALID_MARKET)
+#   player_interceptions  -> player_pass_interceptions  (INVALID_MARKET)
+#
+# A wrong key is indistinguishable from "the books have not posted this market
+# yet" at every level except the HTTP status, which fetch_player_props_chunked
+# used to swallow. See the endpoint note on fetch_player_props below for how
+# that combination kept NFL prop capture at exactly zero rows.
 DEFAULT_PLAYER_MARKETS = [
-    "player_rec_yds",
+    "player_reception_yds",
     "player_receptions",
     "player_rush_yds",
     "player_rush_attempts",
     "player_pass_yds",
     "player_pass_tds",
     "player_pass_attempts",
-    "player_interceptions",
+    "player_pass_interceptions",
     "player_anytime_td",
 ]
 
+# Standard names are the CONTRACT with syndicate/features/nfl/props.py and with
+# the props CSV every downstream consumer reads -- they are unchanged. Only the
+# API-side keys above moved.
 MARKET_STD_MAP: dict[str, str] = {
-    "player_rec_yds": "Receiving Yards",
+    "player_reception_yds": "Receiving Yards",
     "player_receptions": "Receptions",
     "player_rush_yds": "Rushing Yards",
     "player_rush_attempts": "Rushing Attempts",
     "player_pass_yds": "Passing Yards",
     "player_pass_tds": "Passing TDs",
     "player_pass_attempts": "Passing Attempts",
-    "player_interceptions": "Interceptions",
+    "player_pass_interceptions": "Interceptions",
     "player_anytime_td": "Anytime TD",
 }
 
@@ -164,8 +178,103 @@ def _pick_player_from_outcome(outcome: dict[str, Any]) -> str | None:
     return None
 
 
-def fetch_player_props(api_key: str, *, sport_key: str = "americanfootball_nfl", region: str = "us", markets: list[str] | None = None) -> list[dict[str, Any]]:
-    url = f"{_get_base_url()}/sports/{sport_key}/odds"
+class InvalidMarketError(RuntimeError):
+    """Every requested market was rejected by the API as an invalid key.
+
+    Distinct from "the books have not posted this market yet", which is a 200
+    with no such market in the payload. Conflating the two is what let this
+    file silently write header-only CSVs for months (see fetch_event_odds).
+    """
+
+
+def fetch_events(api_key: str, *, sport_key: str = "americanfootball_nfl") -> list[dict[str, Any]]:
+    """The season's scheduled events. Costs 1 credit and carries no odds."""
+    url = f"{_get_base_url()}/sports/{sport_key}/events"
+    response = requests.get(url, params={"apiKey": api_key}, timeout=20)
+    record_oddsapi_quota(response.headers, sport="nfl", endpoint=response.url)
+    response.raise_for_status()
+    payload = response.json()
+    return payload if isinstance(payload, list) else []
+
+
+def _event_window_days() -> float:
+    try:
+        return float(os.environ.get("ODDS_API_EVENT_WINDOW_DAYS", "8") or 8)
+    except Exception:
+        return 8.0
+
+
+def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None = None) -> list[dict[str, Any]]:
+    """The next slate only -- every event kicking off within `window_days` of
+    the EARLIEST upcoming kickoff.
+
+    `/events` returns the WHOLE season (measured 2026-08-20: 272 events), and
+    props are billed per event per market-region. Fetching all of them would
+    spend 272 x 9 = 2,448 credits a sweep to retrieve almost nothing, because
+    books do not post player props for a game weeks out. An NFL week runs
+    Thu -> Mon, so an 8-day window from the first upcoming kickoff is exactly
+    one slate.
+
+    Bounding on the earliest KICKOFF rather than on `--week` is deliberate: the
+    live endpoint can only ever serve upcoming events, so the week number names
+    the output shard -- it cannot widen what the API is willing to return.
+    """
+    window = float(window_days if window_days is not None else _event_window_days())
+    now = datetime.now(tz=timezone.utc)
+    dated: list[tuple[datetime, dict[str, Any]]] = []
+    for event in events or []:
+        raw = event.get("commence_time") or event.get("commenceTime")
+        if not raw:
+            continue
+        try:
+            when = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        if when < now:
+            continue
+        dated.append((when, event))
+    if not dated:
+        return []
+    dated.sort(key=lambda pair: pair[0])
+    cutoff = dated[0][0] + timedelta(days=window)
+    return [event for when, event in dated if when <= cutoff]
+
+
+def fetch_event_odds(
+    api_key: str,
+    event_id: str,
+    *,
+    sport_key: str = "americanfootball_nfl",
+    region: str = "us",
+    markets: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """Player props for ONE event.
+
+    THE ENDPOINT IS THE WHOLE POINT. This used to call the bulk
+    `/sports/{key}/odds` endpoint, which does not serve player props at all --
+    verified against the live API 2026-08-20:
+
+        GET /v4/sports/americanfootball_nfl/odds?markets=player_pass_yds
+          -> HTTP 422 {"error_code": "INVALID_MARKET",
+                       "message": "Markets not supported by this endpoint"}
+
+        GET /v4/sports/americanfootball_nfl/events/{id}/odds?markets=player_pass_yds
+          -> HTTP 200, real prices
+
+    Bulk `/odds` serves only the featured markets (h2h/spreads/totals); every
+    additional market, player props included, is per-event. That is why the
+    basketball fetcher has always used this shape
+    (scripts/fetch_basketball_oddsapi_props_local.py) and NFL never did.
+
+    The cost of getting this wrong was total and silent: all 9 markets 422'd,
+    the caller swallowed each one as a WARNING and returned [], and the run
+    wrote a header-only CSV indistinguishable from "no props offered today".
+    Measured 2026-08-20 on production: 13 of 14 weekly CSVs were 5-byte stubs,
+    and 101MB of NFL book_quotes held zero player rows.
+    """
+    url = f"{_get_base_url()}/sports/{sport_key}/events/{event_id}/odds"
     response = requests.get(
         url,
         params={
@@ -176,27 +285,129 @@ def fetch_player_props(api_key: str, *, sport_key: str = "americanfootball_nfl",
         },
         timeout=20,
     )
-    # response.url, not url: the markets= the attribution buckets read live in
-    # params, and the recorder redacts apiKey before persisting.
     record_oddsapi_quota(response.headers, sport="nfl", endpoint=response.url)
+    if response.status_code == 422:
+        raise HTTPError(response.text, response=response)
+    if response.status_code == 404:
+        # The event exists but has no odds published yet. Not an error.
+        return None
     response.raise_for_status()
-    return response.json()
+    payload = response.json()
+    return payload if isinstance(payload, dict) else None
 
 
-def fetch_player_props_chunked(api_key: str, *, sport_key: str = "americanfootball_nfl", region: str = "us", markets: list[str] | None = None) -> list[dict[str, Any]]:
-    aggregated: list[dict[str, Any]] = []
-    for market in markets or _player_markets():
+def fetch_player_props(
+    api_key: str,
+    *,
+    sport_key: str = "americanfootball_nfl",
+    region: str = "us",
+    markets: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Every in-scope event's props, all markets in one request per event.
+
+    Returns the same list-of-events-carrying-bookmakers shape the bulk endpoint
+    used to return, so parse_events_to_rows and _append_nfl_book_quotes need no
+    change.
+
+    All markets go in ONE request per event because billing is per
+    market-region either way -- one call is never more expensive than nine, and
+    a market this event does not offer is simply absent from a 200 rather than
+    an error (verified live 2026-08-20).
+    """
+    requested = list(markets or _player_markets())
+    events = fetch_events(api_key, sport_key=sport_key)
+    scoped = events_in_scope(events)
+    print(
+        f"OddsAPI events: {len(events)} in season, {len(scoped)} in the next slate "
+        f"(window {_event_window_days()}d); requesting {len(requested)} markets each.",
+        flush=True,
+    )
+    collected: list[dict[str, Any]] = []
+    invalid_market_events = 0
+    for event in scoped:
+        event_id = str(event.get("id") or "").strip()
+        if not event_id:
+            continue
         try:
-            aggregated.extend(fetch_player_props(api_key, sport_key=sport_key, region=region, markets=[market]))
+            payload = fetch_event_odds(
+                api_key, event_id, sport_key=sport_key, region=region, markets=requested
+            )
         except HTTPError as exc:
-            if getattr(getattr(exc, "response", None), "status_code", None) == 422:
-                print(f"WARNING: OddsAPI returned 422 for market '{market}'. Skipping this market.")
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status == 422:
+                invalid_market_events += 1
+                print(f"WARNING: 422 INVALID_MARKET for event {event_id}: {exc}", flush=True)
                 continue
             raise
-        except Exception as exc:
-            print(f"WARNING: Failed fetching market '{market}': {exc}")
-            continue
-    return aggregated
+        if payload and (payload.get("bookmakers") or []):
+            collected.append(payload)
+    # A 422 on EVERY event is a bad market key, not an empty market. Say so
+    # loudly rather than returning [] and letting the caller write a stub.
+    if scoped and invalid_market_events == len(scoped):
+        raise InvalidMarketError(
+            f"all {len(scoped)} events returned 422 INVALID_MARKET for "
+            f"markets={','.join(requested)} -- these keys are not valid for {sport_key}."
+        )
+    print(
+        f"OddsAPI props: {len(collected)} of {len(scoped)} events returned bookmakers.",
+        flush=True,
+    )
+    return collected
+
+
+def fetch_player_props_chunked(
+    api_key: str,
+    *,
+    sport_key: str = "americanfootball_nfl",
+    region: str = "us",
+    markets: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """One request per market per event.
+
+    Resilience fallback for the case where one bad market key would 422 an
+    entire combined request. Same credit cost, 9x the HTTP calls, so it is the
+    fallback and not the default.
+
+    Unlike the version this replaces, a market set that fails everywhere is
+    REPORTED: if every requested market 422'd, that raises instead of returning
+    an empty list.
+    """
+    requested = list(markets or _player_markets())
+    events = fetch_events(api_key, sport_key=sport_key)
+    scoped = events_in_scope(events)
+    merged: dict[str, dict[str, Any]] = {}
+    failed_markets: set[str] = set()
+    for market in requested:
+        for event in scoped:
+            event_id = str(event.get("id") or "").strip()
+            if not event_id:
+                continue
+            try:
+                payload = fetch_event_odds(
+                    api_key, event_id, sport_key=sport_key, region=region, markets=[market]
+                )
+            except HTTPError as exc:
+                if getattr(getattr(exc, "response", None), "status_code", None) == 422:
+                    print(f"WARNING: OddsAPI returned 422 for market '{market}'. Skipping.", flush=True)
+                    failed_markets.add(market)
+                    break
+                raise
+            except Exception as exc:
+                print(f"WARNING: Failed fetching '{market}' for event {event_id}: {exc}", flush=True)
+                continue
+            if not payload:
+                continue
+            existing = merged.get(event_id)
+            if existing is None:
+                merged[event_id] = payload
+            else:
+                existing.setdefault("bookmakers", [])
+                existing["bookmakers"].extend(payload.get("bookmakers") or [])
+    if requested and failed_markets == set(requested):
+        raise InvalidMarketError(
+            f"every requested market 422'd as INVALID_MARKET: {','.join(sorted(failed_markets))}"
+        )
+    return [payload for payload in merged.values() if payload.get("bookmakers")]
 
 
 def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -320,7 +531,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--out", type=str, required=True)
-    parser.add_argument("--mode", type=str, default=os.environ.get("ODDSAPI_PROPS_MODE", "per_market"), choices=["per_market", "combined"])
+    # "combined" = one request per event carrying all markets. Billing is per
+    # market-region either way, so combined is never dearer than per_market and
+    # costs 1 HTTP call per event instead of 9. per_market survives as the
+    # fallback for when a single bad key would 422 the whole batch.
+    parser.add_argument("--mode", type=str, default=os.environ.get("ODDSAPI_PROPS_MODE", "combined"), choices=["per_market", "combined"])
     parser.add_argument("--keep-existing-on-empty", action="store_true", default=True)
     parser.add_argument("--no-keep-existing-on-empty", action="store_false", dest="keep_existing_on_empty")
     parser.add_argument("--save-raw", action="store_true", default=True)
@@ -345,10 +560,20 @@ def main(argv: list[str] | None = None) -> int:
             events = fetch_player_props(api_key, region=region)
         else:
             events = fetch_player_props_chunked(api_key, region=region)
+    except InvalidMarketError as exc:
+        # Do NOT fall through to the CSV write. A bad market key produces the
+        # same zero rows as a quiet market, and writing the file anyway is
+        # exactly how this stayed invisible: 13 header-only weekly stubs on
+        # production and not one line of evidence that anything was wrong.
+        print(f"ERROR: OddsAPI rejected every requested market: {exc}")
+        return 2
     except HTTPError as exc:
         if getattr(getattr(exc, "response", None), "status_code", None) == 422:
             try:
                 events = fetch_player_props_chunked(api_key, region=region)
+            except InvalidMarketError as retry_exc:
+                print(f"ERROR: OddsAPI rejected every requested market: {retry_exc}")
+                return 2
             except Exception as retry_exc:
                 print(f"ERROR fetching OddsAPI player props (chunked) after 422: {retry_exc}")
                 return 2

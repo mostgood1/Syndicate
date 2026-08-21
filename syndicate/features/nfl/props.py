@@ -37,10 +37,15 @@ _NFL_PROP_MARKET_TO_STAT: dict[str, str] = {
     "Rushing Attempts": "rushing_attempts",
     "Receptions": "receptions",
     "Anytime TD": "anytime_td",
-    # Both fetched by scripts/fetch_nfl_oddsapi_props_local.py
-    # (player_rec_yds/player_interceptions) but silently dropped here until
-    # 2026-08-03 -- real odds rows for these two markets reached the CSV and
-    # were discarded before ever reaching the board.
+    # Added 2026-08-03, when this map was found to be dropping two markets the
+    # fetcher requested. CORRECTION 2026-08-20: the note here used to say "real
+    # odds rows for these two markets reached the CSV and were discarded" --
+    # they never did. The keys the fetcher asked OddsAPI for were themselves
+    # invalid (`player_rec_yds`, `player_interceptions`; the real keys are
+    # `player_reception_yds` and `player_pass_interceptions`), so both markets
+    # 422'd at the API and no row was ever produced to drop. Adding them here
+    # was still correct -- it is what makes them usable now that the fetcher
+    # asks for keys that exist.
     "Receiving Yards": "receiving_yards",
     "Interceptions": "interceptions",
 }
