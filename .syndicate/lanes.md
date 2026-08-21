@@ -1173,6 +1173,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   error bar must still be withheld, never priced at se=0.
 - Blocked by: none.
 
+### nfl-injuries-autorun-arm — OPEN — opened 2026-08-21 — session: nfl-injuries-autorun-arm
+- Goal: arm `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` in
+  production (refresh-worker) -- the code (`_launch_autorun_nfl_
+  injuries_fetch`, `scripts/fetch_nfl_injuries.py`, the `#441`-class
+  read-path fix in `injury_adjustment.py`, and the `publish_hot_
+  artifact()` wiring) is all already on refresh-worker's live SHA
+  (confirmed by content: 5 matches for the autorun function/env var name
+  in the live commit). This is a pure config+deploy action, no code
+  change -- same pattern as arming the roster/depth-chart autoruns
+  earlier this session. Offered as an optional ridealong to
+  `football-model-owner` first; that session ended without acting
+  (confirmed: env var absent across all 112 vars, no lane update
+  mentioning it), so taking it directly now on explicit user
+  instruction.
+- Files: none (pure Render config + deploy action).
+- Env var to set on refresh-worker:
+  `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN=true`.
+- Hypothesis: n/a (a deploy, not a diagnosis).
+- Falsification test: n/a.
+- Verification: production logs show `NFL_INJURIES_FETCH_LAUNCHING` (or
+  a named skip reason, e.g. `rate_limited` if a marker already exists)
+  within one refresh-worker tick after the deploy carries the new env
+  var. NFL is in season (confirmed via `_active_sports_for_date`
+  earlier this session), so a `not_in_season` skip would be a genuine
+  surprise. `disabled` reappearing means the deploy did not actually
+  carry the new value -- the exact failure mode
+  `[[project_render_env_needs_deploy]]` documents.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
