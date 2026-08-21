@@ -1138,6 +1138,12 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     # its behaviour is unchanged. Set only for a sport whose live
                     # probability is ANALYTIC and whose error bar has been measured.
                     analytic_std_err=analytic_std_err_for_sport(sport),
+                    # Carried so the per-MARKET interval lookup cannot fall back
+                    # to a default sport (`#499`). Without this the index stamps
+                    # no sport, `hit.get("sport")` is None, and wnba totals
+                    # refuse as UNCALIBRATED -- the pricing would be INERT while
+                    # every unit test passed.
+                    sport=sport,
                 ),
             )
         coverage["supported"] = True
