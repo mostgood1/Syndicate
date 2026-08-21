@@ -269,10 +269,24 @@ def fetch_espn_news(limit: int = 50, timeout: int = 30) -> tuple[list[dict[str, 
     its (correct) no-news state, not fail a request.
     """
     url = f"{ESPN_NEWS_URL}?limit={int(limit)}"
-    request = urllib.request.Request(url, headers={"User-Agent": "syndicate-fantasy/1.0"})
+
+    # NO CUSTOM HEADERS -- urllib's own default User-Agent, and this is load
+    # bearing. `live_game_state.py` already carried the rule ("DO NOT ADD A
+    # BROWSER USER-AGENT. ESPN returns HTTP 403 ... from Render's outbound IP",
+    # confirmed 2026-08-05 across three variants), and this function shipped
+    # with `User-Agent: syndicate-fantasy/1.0` anyway and got 403 in BOTH
+    # places. I read that as a local network block on my machine -- the one
+    # explanation that made the two failures unrelated, when in fact the same
+    # header caused both. A rule was already written down for this exact API.
+    request = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as error:
+        # CARRY THE STATUS CODE. "HTTPError" alone cost a deploy cycle: 403
+        # (they refused us) and 404 (we asked for the wrong thing) are
+        # different bugs and were indistinguishable in the worker log.
+        return [], f"unreachable: HTTP {error.code}"
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
         return [], f"unreachable: {type(error).__name__}"
     articles = payload.get("articles")
