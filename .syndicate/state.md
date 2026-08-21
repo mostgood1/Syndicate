@@ -3768,7 +3768,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web aad7fb91]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
+## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web + refresh-worker both 6855fe96, 2026-08-21T21:52Z]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
 
 ESPN-scoring season + weekly projections for QB/RB/WR/TE/K/DST at
 `/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. On `main` as
@@ -3779,6 +3779,22 @@ new. (Run in the sparse session worktree it showed four EXTRA failures, all
 from `nfl_team_branding.csv` being absent under an excluded `data/`, not from
 the code. A test failure in a sparse worktree is a fact about the worktree.) Reference:
 `docs/ai_context/nfl_fantasy_engine_reference.md`.
+
+**NEWS LAYER — two halves, and only one of them moves a number.**
+The INJURY half is fitted and gated on: game designation → availability, graded
+on 2,226 held-out player-weeks, MAE 6.894 → 4.399 (**+36.2%**). Measured
+negative: adding the practice report made it WORSE (+25.8% / +30.9% vs +36.2%),
+because the practice week is already priced into the designation.
+The TEXT half (coach quotes, camp/role/workload talk) is CAPTURED and DISPLAYED
+but **NOT SCORED** — `use_news_adjustments=False`. `scripts/capture_nfl_news.py`
+builds an append-only dated archive (worker autorun, currently `interval_s=21600`,
+env says 3600 and applies at the next worker deploy) precisely because the text
+was never ungradeable — it had merely never been STORED. Links use ESPN's own
+athlete tags: measured 92 of 95 player-links via `espn_tag`, 3 via name match.
+**NO CUSTOM HEADERS on any ESPN call** — see `learnings.md` 2026-08-21; a custom
+UA 403s from Render AND from a dev machine, and `live_game_state.py:50` is where
+that rule lives.
+**STILL UNMEASURED: the worker has never logged a successful capture.**
 
 **MEASURED, held out.** 2025 projected from 2022-2024 only, graded on ONE common
 266-player set for every method:

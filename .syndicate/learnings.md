@@ -4369,3 +4369,68 @@ before the change and failed after, and **both outcomes were luck**.
 touching anything. Re-rolling the seed until it goes green restores a pass that
 measures nothing** — and leaves the next person believing a mechanism is tested
 when it is not.
+
+## 2026-08-21 — FORBIDDEN: a deploy chained in the same shell command as anything naming another service
+
+`deploy-guard.py` decides WHICH SERVICE a command deploys by reading the
+command STRING. So a single call that released a `refresh-worker` claim and
+then ran the deploy entrypoint for `web` was gated as a **refresh-worker**
+deploy: it printed a refresh-worker remedy block for a web deploy, while the
+two services were in opposite states — web had a held claim and a CLEAR
+preflight, refresh-worker had neither.
+
+The failure mode that matters is not the false block; it is the false PASS.
+The same ambiguity with the states reversed lets a deploy through on ANOTHER
+service's preflight — and preflight is the check that stops a deploy landing
+on an in-flight job (2026-08-10: a deploy fired 61s after a smartsim child
+started, and cancelling it CAUSED the restart).
+
+**Rule: one deploy, one bash call, with no other `--service` in it.** Release
+claims, acquire claims and run preflights as their own calls.
+
+**Corollary, hit immediately after: the guard reads HEREDOC BODIES too.** The
+attempt to append this very rule to `learnings.md` was blocked, because the
+heredoc quoted the offending command. So the guard cannot distinguish
+"executing a deploy" from "writing the word deploy down". Two consequences:
+documenting deploy commands must go through a file-editing tool rather than a
+shell heredoc; and any measurement of "how often the guard fires" is inflated
+by writes that were never deploys.
+
+## 2026-08-21 — FORBIDDEN: explaining a local failure with a LOCAL cause when the same code runs in production
+
+`fetch_espn_news` sent `User-Agent: syndicate-fantasy/1.0` and got 403. I
+recorded that as **"a local network block on this machine"** and shipped, on the
+reasoning that production reaches ESPN — the live-lens polls it every 60s.
+
+The worker returned the identical error on its first run.
+
+The tell was in the shape of the explanation, not in the evidence. "Local
+network block" was the only available hypothesis that made the local failure
+say NOTHING about production. It severed the one link that would have forced a
+check, and I preferred it for exactly that reason. **A cause that conveniently
+quarantines a failure to the machine you are standing on deserves more
+scepticism than a cause that implicates production, not less** — the two are
+not symmetric, because only one of them lets you ship.
+
+Worse, the rule was already written, in capitals, about this exact API
+(`live_game_state.py:50`): *"DO NOT ADD A BROWSER USER-AGENT. ESPN returns HTTP
+403 ... from Render's outbound IP -- confirmed 2026-08-05 across three header
+variants, and again from this developer machine 2026-08-13, where PowerShell's
+default UA got 403 on the same URL that urllib's honest default fetched fine."*
+That final clause states outright that the dev machine and Render fail the same
+way for the same reason. I had read the file — I had copied the URL pattern out
+of the same neighbourhood — and took the header as my own free choice.
+
+**Rules:**
+1. Before attributing a failure to your environment, run the SAME call the way
+   a WORKING caller in this repo runs it. Difference first, environment second.
+2. "Production reaches ESPN" is not "production reaches THIS ESPN endpoint with
+   THESE headers". Cross-service capability claims must name the exact call.
+3. When you add a header, a timeout or a retry to a third-party call, grep for
+   an existing caller of that host first. This repo writes its outbound-request
+   rules INTO the module that learned them.
+
+Also fixed: the error carried only `HTTPError`, so 403 (refused) and 404 (wrong
+URL) were indistinguishable in the worker log — one deploy cycle spent on a
+diagnosis the status code would have given free. Related:
+[[feedback_absent_signal_is_about_the_emitter]], [[feedback_instrument_blindness]].

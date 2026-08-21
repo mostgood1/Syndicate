@@ -21579,3 +21579,51 @@ out at 21:31Z), so every live-tier claim here is unverifiable until that slate:
 
 Tonight's deploy is therefore SHIPPED-NOT-VERIFIED by construction, and is
 recorded that way rather than as a success.
+
+## 2026-08-21 — refresh-worker `e4159a59` then `ae941265`; web `e4159a59` — NFL fantasy news layer
+
+Lane: nfl-fantasy-projections. Claim taken and released for each; `render.yaml`
+never touched. Env keys changed via the single-key endpoint, NOT the blueprint:
+`NFL_NEWS_CAPTURE_ENABLE_REFRESH_WORKER_AUTORUN=true`,
+`NFL_NEWS_CAPTURE_INTERVAL_SECONDS` (21600 → 1800 → 3600).
+
+**web `e4159a59`** — verify: `/nfl/fantasy` 200 with 520 rows;
+`?position=RB&position=WR&stats=full` 311; `?week=3` 319; Buzz column present
+with 514 of 515 badges quiet and the page reading "No archive yet". That is the
+CORRECT empty state, not a blank column.
+
+**refresh-worker `e4159a59` (live 21:15:39Z)** — verify: the autorun fired at
+21:20:19Z and the capture returned
+`status=unreachable: HTTPError fetched=0 new=0 linked=0`.
+**A FAILED MEASUREMENT, and it falsified the prediction I had written into the
+commit.** I had recorded ESPN's 403 as "a local network block", which was the
+one reading that made the local failure irrelevant to production. It was my own
+`User-Agent`, and `live_game_state.py:50` already carried the rule in capitals
+for this exact API — including the clause saying the dev machine and Render
+fail the SAME way, which is the inference I had backwards.
+
+**refresh-worker `ae941265` (live 21:32:37Z)** — the fix: no custom headers.
+verify: from the machine that supposedly "could not reach ESPN",
+`status=ok, 50 articles, 35 linked -> 84 distinct players`, join path
+`espn_tag` 32 articles / 92 player-links vs `name_match` 3 / 3 — so the exact
+tag join carries 97% and the name fallback stayed an edge case.
+
+**Incidental, and it retires a worry rather than raising one:** the 21:45:29Z
+tick shows `NFL_PBP_FETCH`, `NFL_FANTASY_ARTIFACT`, `NFL_NEWS_CAPTURE`,
+`NFL_INJURIES_FETCH`, `NFL_ROSTER_SNAPSHOT` and `NFL_DEPTH_CHART_SNAPSHOT` all
+logging SKIPPED in the same second. **These branches are NOT `#341`-starved** —
+every one is evaluated on every tick. The adjacency test was defending against
+a failure this dispatch does not currently have.
+
+**OWED, and stated precisely because it has NOT been observed:** the worker has
+never once logged `status=ok`. The running container still holds
+`interval_s=21600` (I set the interval AFTER triggering the deploy, so it
+missed the env snapshot; preflight then correctly refused a same-commit
+redeploy as redundant). The marker was written 21:20:19Z, so the next attempt
+is ~03:20Z. The reading that settles it:
+
+    python scripts/render_logs.py --service refresh-worker --text "news_capture" --start "2026-08-22T03:00:00Z"
+
+`status=ok` there, or a live (non-quiet) Buzz badge on `/nfl/fantasy`, is the
+proof. Until then the worker's outbound path to THIS endpoint is unmeasured —
+the fix is verified only from a developer machine.

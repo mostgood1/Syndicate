@@ -1105,15 +1105,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### nfl-fantasy-projections — OPEN, **LIVE ON PRODUCTION `[web aad7fb91]` AND SERVING A REAL BOARD** — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
+### nfl-fantasy-projections — OPEN, **LIVE ON PRODUCTION: web + refresh-worker both on `6855fe96` (a peer lane's 21:52Z deploy, which CONTAINS my `ae941265` by content -- verified by reading `fantasy_news.py` at that SHA, not by ancestry alone); the NEWS LAYER is deployed and `/nfl/fantasy` serves 520 rows** — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
 - Goal: a `/nfl/fantasy` surface serving ESPN-scoring 2026 season projections (PPR default, 12-team 1QB VOR draft board) for QB/RB/WR/TE/K/DST, plus per-week projections. **MET.**
 - Files: `syndicate/features/nfl/fantasy{,_scoring,_usage,_schedule,_players,_projection,_draft_board,_news}.py` (new), `syndicate/blueprints/nfl.py` (3 routes), `syndicate/features/shared/artifact_publisher.py` (+5 allowlist patterns), `syndicate/templates/nfl/fantasy.html` (new), `scripts/{build_nfl_fantasy_usage,fetch_nfl_rosters_depth_charts,backtest_nfl_fantasy_projections,calibrate_nfl_fantasy_projections,compare_nfl_fantasy_depth_charts,nfl_fantasy_input_checklist}.py` (new), `tests/test_nfl_fantasy.py` (new), `docs/ai_context/nfl_fantasy_engine_reference.md` (new), `reports/nfl_fantasy_*.json`.
 - Hypothesis: an opportunity-share engine re-based onto 2026 depth charts beats "last season's fantasy points" on held-out season MAE and rank correlation.
-- Falsification test: **RAN FOUR TIMES. It PASSED, then FAILED after a legitimate re-calibration, and that FAIL was reported rather than tuned away; fixing the real defect it exposed produced the current PASS.** Projects 2025 from 2022-2024 only, graded on ONE common 266-player set for every method.
-- Verification: (1) the backtest above; (2) `scripts/nfl_fantasy_input_checklist.py --season 2026` exits 0; (3) `/nfl/fantasy` + both JSON routes 200 and rendered on a LOCAL instance, no console errors, week-5 byes correctly drop KC and CAR. **NOT verified on Render — nothing deployed.**
-- Blocked by: none.
+- Falsification test: **RAN FOUR TIMES; PASSED, then FAILED at `198a6a70` after a legitimate re-calibration, and that FAIL was reported rather than tuned away.** Current: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266 common set, held-out 2025).
+- Verification: web live on `e4159a59` — `/nfl/fantasy` 200/520 rows, RB+WR multiselect 311, `?week=3` 319, Buzz column rendering with 514/515 badges quiet and an honest "No archive yet". Injury layer graded on 2,226 held-out player-weeks: MAE 6.894 → 4.399 (**+36.2%**).
+- Blocked by: none. **DEPLOYED: web + refresh-worker both live on `ae941265`.** The autorun fired at 21:20:19Z and FAILED (`unreachable: HTTPError`), which falsified my "local network block" reading — the cause was my own `User-Agent`, and the rule was already at `live_game_state.py:50`. Fixed; the same code now returns `status=ok, 50 articles, 35 linked -> 84 players` (92/95 links via ESPN athlete tags). **ONE THING STILL OWED: the worker has never logged `status=ok`.** It holds `interval_s=21600` (I set the interval AFTER triggering the deploy, so it missed the env snapshot), so the next attempt is ~03:20Z; `render_logs.py --text news_capture --start 2026-08-22T03:00:00Z`, or a non-quiet Buzz badge, settles it.
+- Text/role signals ship INERT by choice: `use_news_adjustments=False`. Quotes are SHOWN, not scored, until the archive is deep enough to grade.
 
 **ON `main` as `45632889..c1c811c3` (6 commits), rebased clean onto `e0e32b53`.** engine · reference doc · depth chart + contemporaneous role prior + ARI fix · re-calibration (the reported FAIL) · availability fix (the PASS) · re-sweep (nothing changed). **`render.yaml` NOT touched, so no `blueprint_sync` and nothing applied to production. NOT DEPLOYED, no deploy claim ever taken — `autoDeploy = no`, so this push ships nothing until someone deploys it.** Full narrative: `.syndicate/log/2026-08-21.md`.
+
+**NEWS + COACH QUOTES SHIPPED 2026-08-21 21:1x-21:3xZ.** Injury half is fitted
+and gated ON (MAE 6.894 -> 4.399, +36.2%, 2,226 held-out player-weeks). Text half
+(camp/role/workload talk) is CAPTURED and DISPLAYED but **NOT SCORED** --
+`use_news_adjustments=False` -- because there is no archive to grade it against
+yet; `capture_nfl_news.py` now builds one, append-only, on a worker autorun.
+
+**THE FIRST WORKER RUN FAILED AND FALSIFIED MY EXPLANATION.** I had recorded
+ESPN's 403 as "a local network block" -- the one reading that made a local
+failure say nothing about production. Same error on the worker. Cause: my own
+`User-Agent`; the rule was already in capitals at `live_game_state.py:50`,
+including the clause saying the dev machine and Render fail the SAME way. Fixed
+in `ae941265`; now `status=ok, 50 articles, 35 linked -> 84 players`, 92 of 95
+links via ESPN's own athlete tags. **STILL OWED: the worker has never logged
+`status=ok`** -- it holds `interval_s=21600` because I set the interval AFTER
+triggering the deploy, so next attempt ~03:20Z.
+
+**Retired a worry:** the 21:45:29Z tick shows all six NFL autorun branches
+logging SKIPPED in the same second -- they are NOT `#341`-starved.
 
 **DEFECTS FOUND, all silent, all measured.** Role prior fitted only over players who PLAYED (a rank-2 QB priced at a 0.466 pass share, which CRUSHED starters after normalisation — Josh Allen at 12.09 PPG against a real ~24); rookie prior fitted against a reference cell that cannot exist (3.24x round-one multiplier, four rookies atop the board); expected games taken from the POSITION mean; role curve measured in season-total share while history used while-active share; **depth-chart snapshot taken as `max(dt)`, which for 2025 is 2026-03-14 — AFTER the season being graded** (now `PRESEASON_CUTOFF`; the rule is in `learnings.md`); **`AZ` vs `ARI` after a roster refetch, which silently unjoined an entire team while still producing plausible numbers**; and a harness defect that graded baseline and engine over DIFFERENT player sets (297 vs 275) and returned a verdict that was not one.
 
@@ -1121,6 +1141,39 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 **AUTORUN IS LIVE AND HAS RUN (`a48c8530`, flag set on refresh-worker).** Its FIRST run published a DEGENERATE artifact over a correct one — `weeks: []`, 318 KB vs 2.83 MB, top player 525.5 pts vs a correct ~270 — because the worker has no `schedules_games.csv` and nothing in the repo writes it. Correct artifact republished by hand 20:19:28Z. `--prepare` now fetches the schedule, and the job refuses to publish when its OWN OUTPUT is degenerate (the input checklist could not see this: the schedule was not on its list). **OWED: the next autorun (~19:50Z tomorrow) is the real verification — it must either publish a healthy artifact or refuse and say why; neither has been observed.**
 
+### soccer-layer2-dates — OWED PROOF PARTIALLY DISCHARGED 2026-08-21 21:2xZ (scheduled verification, read-only; nothing deployed, no claim taken)
+
+The end-to-end proof owed by this lane since it closed 2026-08-18 was measured
+against a slate that actually had matches in play. Full evidence in
+`.syndicate/deploys.md`, entry `2026-08-21 — soccer live lens verified on a LIVE slate`.
+
+- **Worker half — DISCHARGED.** live-odds-worker, 18:45Z–21:00Z, 635 tick-writes:
+  the four leagues with a live fixture (ligue_1 Marseille v Strasbourg,
+  belgian_pro_league Standard Liege v RAAL, epl Arsenal v Coventry, la_liga
+  Betis v Sociedad) each wrote `(1 live games)` on **every tick inside their
+  in-play interval**; the six leagues with no fixture wrote `(0 live games)` on
+  **all 384** of theirs. `6bdc50de` works, and the reading discriminates.
+- **Served-board half — STILL OWED.** All four matches were `post` by fetch time,
+  so `/soccer/<lg>/api/live-lens` correctly serves the `0 / No data` payload —
+  which post-match is indistinguishable from the 08-17 failure. Needs a fetch
+  DURING live play. **Next window: Sat 2026-08-22 09:00–10:50 CT, seven leagues
+  in play at once.**
+- Narrowing, not a substitute for that reading: cross-service transport IS proven —
+  the web service's `/api/ops/artifacts/stream` copy of ligue_1's live_state is
+  stamped `21:18:07.019Z` against the worker's write log at `21:18:07.032Z`
+  (sub-second), `match_box` populated. With `live_lens.py:129-134` mapping
+  `rank_cards` 1:1 over `payload["games"]`, the untested link is now the pure
+  function `_rank_card`, not the serve path.
+- **`LEAGUE_POLL_FAILED` FIRED — 5 times, 1.99% of live-league ticks, and ONLY on
+  leagues with a live match** (4× `SystemError: Objects/tupleobject.c:927`, a
+  CPython-internal signature the poller does not itself raise; 1× ESPN
+  ReadTimeout). Transient — surrounding ticks wrote N>0, so it did not cost the
+  verification — but a real defect on the live path. NOT root-caused; open.
+- `[LIVE_LENS_TICK_DIAG] sport=soccer` **absent** on all healthy ticks — soccer passes.
+  The 12 diagnostics that did fire are all `sport=mlb`, `ok=False`,
+  `UnboundLocalError: cannot access local variable 'write_json_file'`, on 12/12
+  MLB ticks sampled. **Live MLB fault, unrelated to soccer, unowned** — surfaced
+  here because it is failing continuously in production right now.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1346,7 +1399,3 @@ Blocks whose content was absent from the merged result. Appended verbatim, nothi
 - `odds-props-fabricated-probability` — odds-props-fabricated-probability — ORPHANED-CLAIMS-RELEASED 2026-08-15 — the two prop-refresh scripts released; work committed, artifact effect UNMEA → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
-
-
-
-

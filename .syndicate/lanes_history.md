@@ -11834,3 +11834,20 @@ lost no protection and no open lane left the session-start digest.
   kickoff. Assertions to make are written out in `log/2026-08-20.md` under
   "session close" -- do not re-derive them.
 - Claims: none held. Deploys: none pending.
+
+<!-- superseded 2026-08-21T21:1xZ; moved VERBATIM from lanes.md when the lane shipped -->
+### nfl-fantasy-projections — OPEN, SHIPPED AND MEASURED, NOT DEPLOYED, NOT PUSHED TO main — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
+- Goal: a `/nfl/fantasy` surface serving ESPN-scoring 2026 season projections (PPR default, 12-team 1QB VOR draft board) for QB/RB/WR/TE/K/DST, plus per-week projections. **MET.**
+- Files: `syndicate/features/nfl/fantasy{,_scoring,_usage,_schedule,_players,_projection,_draft_board,_news}.py` (new), `syndicate/blueprints/nfl.py` (3 routes), `syndicate/features/shared/artifact_publisher.py` (+5 allowlist patterns), `syndicate/templates/nfl/fantasy.html` (new), `scripts/{build_nfl_fantasy_usage,fetch_nfl_rosters_depth_charts,backtest_nfl_fantasy_projections,calibrate_nfl_fantasy_projections,compare_nfl_fantasy_depth_charts,nfl_fantasy_input_checklist}.py` (new), `tests/test_nfl_fantasy.py` (new), `docs/ai_context/nfl_fantasy_engine_reference.md` (new), `reports/nfl_fantasy_*.json`.
+- Hypothesis: an opportunity-share engine re-based onto 2026 depth charts beats "last season's fantasy points" on held-out season MAE and rank correlation.
+- Falsification test: **RAN FOUR TIMES. It PASSED, then FAILED after a legitimate re-calibration, and that FAIL was reported rather than tuned away; fixing the real defect it exposed produced the current PASS.** Projects 2025 from 2022-2024 only, graded on ONE common 266-player set for every method.
+- Verification: (1) the backtest above; (2) `scripts/nfl_fantasy_input_checklist.py --season 2026` exits 0; (3) `/nfl/fantasy` + both JSON routes 200 and rendered on a LOCAL instance, no console errors, week-5 byes correctly drop KC and CAR. **NOT verified on Render — nothing deployed.**
+- Blocked by: none.
+
+**BRANCH: `session/nfl-fantasy-projections`, 5 commits, based at `344c4f21`.** `767742e7` engine · `b34a3854` reference doc · `e9e73925` current depth chart + contemporaneous role prior + ARI team-code fix · `1e3930e2` availability fix (the PASS) · `ba611be2` re-sweep, nothing changed. **Not pushed to `main`, not deployed, no deploy claim ever taken.** Full narrative: `.syndicate/log/2026-08-21.md`.
+
+**DEFECTS FOUND, all silent, all measured.** Role prior fitted only over players who PLAYED (a rank-2 QB priced at a 0.466 pass share, which CRUSHED starters after normalisation — Josh Allen at 12.09 PPG against a real ~24); rookie prior fitted against a reference cell that cannot exist (3.24x round-one multiplier, four rookies atop the board); expected games taken from the POSITION mean; role curve measured in season-total share while history used while-active share; **depth-chart snapshot taken as `max(dt)`, which for 2025 is 2026-03-14 — AFTER the season being graded** (now `PRESEASON_CUTOFF`; the rule is in `learnings.md`); **`AZ` vs `ARI` after a roster refetch, which silently unjoined an entire team while still producing plausible numbers**; and a harness defect that graded baseline and engine over DIFFERENT player sets (297 vs 275) and returned a verdict that was not one.
+
+**THE ENGINE DELIBERATELY DOES NOT USE smartsim2** — `state.md [football-smartsim2]` measured it strictly dominated by the close (w = -0.028, 751 OOS games). Environment comes from posted lines: 112 of 272 2026 games carry one, all 32 teams in 6-9 of them.
+
+**OWED:** nothing is on Render. If deployed, usage/news/input-report artifacts must be built ON THE WORKER (`load_season_usage` otherwise parses 100 MB of pbp in a request handler); set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so that fails loudly. A new usage FIELD needs `build_nfl_fantasy_usage.py --force`, not just a deploy.
