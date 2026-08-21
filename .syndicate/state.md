@@ -3731,7 +3731,7 @@ independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
 
-## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — BUILT, WIRED, DEPLOYED, ALLOWLISTED, PUBLISH-WIRED — E2E EXPORT CONFIRMATION PENDING `[2026-08-20]`
+## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — ALL 3 AUTORUNS ARMED, DEPLOYED, CONFIRMED FIRING — ONE PUBLISH SUCCESS STILL PENDING `[2026-08-21]`
 
 `roster_snapshot_builder.py` and `depth_chart_snapshot_builder.py` are real
 (both already consumed by `ask_the_syndicate_data.py`'s team-profile
@@ -3758,14 +3758,23 @@ retry fired 2026-08-20T19:41:42Z, zero traceback in the full launch
 window, `rows_written=2930` (the real 2026 nflverse roster, Arizona
 included).
 
-**NOT armed, deliberately out of scope this session:**
-`NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` -- the fetch script
-(`scripts/fetch_nfl_injuries.py`) and the matching `#441`-class read-path
-fix in `injury_adjustment.py` landed earlier (`nfl-injuries-fetcher`
-lane, closed), but arming it was explicitly scoped OUT ("both autoruns"
-meant roster/depth-chart specifically); flagged as an optional low-risk
-ridealong to `football-model-owner`, not yet actioned as of this
-checkpoint.
+**`NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` -- ARMED
+2026-08-21.** Deliberately deferred initially ("both autoruns" meant
+roster/depth-chart specifically), offered as a ridealong to
+`football-model-owner`; that session ended without acting (env var
+confirmed absent across all 112 vars, no lane update mentioning it).
+Armed directly on explicit user instruction: env var set, then a
+user-triggered manual Render-dashboard redeploy (`deploy_preflight.py`
+correctly refused a same-SHA redeploy as "ALREADY LIVE -- redundant",
+no override exists for the env-var-only-refresh case). That manual
+redeploy picked up `origin/main`'s tip (`916593f6`, 94 commits/48 files
+past refresh-worker's prior SHA) rather than a scoped same-commit
+refresh -- flagged immediately, confirmed clean (no traceback, memory
+stabilized ~50% of container). `NFL_INJURIES_FETCH_LAUNCHING` fired
+2026-08-21T02:10:40Z, result `"status": "unavailable"` (a real HTTP
+404 from nflverse -- the fetcher's own documented NORMAL case for a
+season with no injury reports published yet, not a crash). Autorun
+confirmed correctly wired and firing.
 
 **HOT_ARTIFACT_PATTERNS allowlisting: DONE, DEPLOYED, but a SECOND gap
 found behind it (`nfl-artifact-allowlist-add` / `nfl-artifact-publish-
@@ -3787,15 +3796,20 @@ successful write, mirroring `generate_smartsim2_nfl_projections.py`'s
 existing pattern -- and deployed to refresh-worker (`d1a897b2`, live
 2026-08-20T21:57:44Z).
 
-**STILL PENDING: end-to-end confirmation.** All three layers (data
-exists -> allowlist permits -> code pushes) are live together for the
-first time, but no REAL autorun run has happened with all three fixes
-in place yet. Roster/depth-chart are rate-limited to one attempt per
-21600s from their last real run (2026-08-20T19:41:42Z) -- next window
-approx 2026-08-21T01:41:42Z. Injuries fetch remains unarmed. Whoever
-next observes one of these three scripts actually launch should check
-`artifact_published=` in its output and re-run the export check before
-calling this fully closed.
+**Roster/depth-chart's real retry (2026-08-21T01:42Z) hit a
+TRANSIENT, UNRELATED web-restart DNS blip on the publish call** --
+both wrote cleanly (`rows_written=2930` for roster, identical to the
+earlier confirmed run) but `artifact_published=False` for both, traced
+to `PUBLISH_FAILED ... Name or service not known` coincident with an
+unrelated web deploy finishing at 01:43:40Z. Confirmed the transport
+recovered fully (105 `PUBLISH_OK` lines for other artifacts within
+minutes). **This is the one remaining unverified link**: all 3 autoruns
+are armed, deployed, and confirmed firing correctly, but no clean
+end-to-end publish success (a real `PUBLISH_OK` for one of the 3 NFL
+paths, or a nonzero `/api/ops/artifacts/export` count) has happened
+yet. Next roster/depth-chart retry ~21600s from 2026-08-21T01:42Z;
+injuries fetch will retry on its own schedule too, and would also
+confirm the publish path once nflverse actually has data to return.
 
 ## [mlb-vendor-exit-audit] MLB VENDOR EXIT — 18 OF 20 PIPELINE STAGES HAVE NO NATIVE PRODUCER `[2026-08-20, MEASURED]`
 
