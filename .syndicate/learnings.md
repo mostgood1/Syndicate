@@ -3838,3 +3838,121 @@ the shared ledger the entire time.
 **Rule:** the lane block IS uncommitted work. Either open the worktree FIRST and
 write the lane block inside it, or run `adopt` afterwards even for a lane you
 just created. "New lane" does not mean "nothing to carry across".
+
+## 2026-08-21 — FORBIDDEN: concluding a capability is ABSENT from two adjacent artifacts
+
+**The belief overturned.** I told the user THREE TIMES that live WNBA props were
+structurally impossible because the platform has no live player state. It has
+had it all along: `/wnba/api/live_player_boxscore` serves minutes, points,
+rebounds, assists and threes for every player in a live game, and
+`cards.py::_public_live_player_boxscore_payload` has been fetching ESPN's
+summary endpoint the whole time. Read from production 2026-08-21 02:40Z: 17 and
+18 players across two live games.
+
+**How the wrong conclusion was reached, and why it felt rigorous.** I checked two
+things and generalised from them:
+1. `state.md` — "WNBA `live_state` carries only score/clock/period — no live
+   player state". TRUE, and about `live_state` specifically.
+2. The captured pbp payloads — team-level only (`away`/`home`/`total`/`unknown`),
+   and all-null skeletons besides.
+
+Two independent sources agreeing felt like confirmation. They were the same
+source twice: neither is the endpoint that has the data, and neither claims to
+enumerate what the platform can see. **A ledger sentence describes the thing it
+names, not the capability it seems to rule out.**
+
+**The rule going forward.** Before reporting a capability ABSENT, name the
+surface that WOULD carry it and check THAT — an API route, a payload key, a
+producer function — not two artifacts adjacent to it. Grepping for the concept
+(`live_player`, `boxscore`) takes one call and would have found it immediately.
+The asymmetry is the point: "present" needs one positive reading, "absent" needs
+a search over where it would live, and I spent the effort budget of the first on
+a claim of the second.
+
+**Cost.** A user asked for props four times across a session and was told three
+times it could not be done. The actual work is persistence, not ingestion, and
+was never scoped. `state.md` now carries the correction inline.
+
+---
+
+## 2026-08-21 — A HEALTHY LOG LINE CAN LOOK LIKE THE BUG (`written=0` was correct)
+
+**The belief overturned.** `[artifact_publisher] PULL_LIVE_LENS_SNAPSHOT
+path=live/wnba_live_lens.json ok=True written=0` on BOTH workers, while the
+board showed `index_size: 1` against three live games. I reported this to the
+user as the confirmed defect and the biggest blank-filler on the board.
+
+It is expected output. `write_json_file` routes every path outside
+`migration_runs/` to the keyvalue store and RETURNS BEFORE touching disk, so a
+disk-based pull correctly finds nothing to copy. The lens reaches its consumers
+through shared Redis, and `read_json_file` is keyvalue-aware. Nothing was broken.
+
+**Four hypotheses, all wrong, all tested against something ADJACENT to the file
+that decides the join:** the pull (healthy by design), a dead loop
+(`lastTickOk: true`), the WNBA headroom gate (no `LIVE_LENS_TICK_DIAG` lines),
+a stale builder (the live-lens API renders all three games). Each elimination
+was sound and none touched the artifact itself, because nothing could read it —
+`/api/ops/artifacts/export` is a disk read and returns empty for a keyvalue
+path, and `/wnba/api/live-lens` may rebuild from a published artifact rather
+than return stored bytes.
+
+**The rule going forward.** When a question is decided by ONE artifact, build
+the read for that artifact before forming a third hypothesis. `GET
+/api/ops/live-lens/snapshot-index?sport=wnba` now reads the lens through the
+same keyvalue-aware reader the join uses and reports the join's verdict per
+game; it answered in a single call what four rounds of inference could not, and
+it also disproved a fifth hypothesis of mine (a `pregame` lane on a FINAL game
+is correct, not a drop). The corollary to the standing "instrument blindness"
+rule: a reading is only evidence once you know what HEALTHY looks like, and
+`written=0` had a healthy meaning nobody had written down.
+
+---
+
+## 2026-08-21 — ABSENT IS NOT None, AND THE DIFFERENCE NAMES THE PRODUCER
+
+**The belief overturned, twice in a row on one field.** WNBA live moneylines
+were withheld `no_two_sided_market_price` with `market_prob=None`. I explained it
+first as books pulling the market on a near-decided game (disproved: two games at
+ordinary states showed the same null), then as an ordering bug in
+`_attach_sim_probability_edge` — a real bug, really fixed, which changed nothing
+here.
+
+**What settled it: the key was ABSENT from the served projection, not None.** My
+patch set `projection["market_fair_prob_over"] = fair` unconditionally, so had
+that function run, the key would exist even when the value did not. Its absence
+proved the function was never called — h2h rows build `row["projection"]`
+directly in their own branch, the "fourth producer" that file's own comments
+already flag.
+
+**The rule going forward.** On a dict-shaped payload, distinguish
+`key not in payload` from `payload[key] is None` before theorising about VALUES.
+Absent indicts the PRODUCER (this code path never ran); None indicts the INPUT
+(it ran and had nothing). Two of my three explanations were about the input; the
+answer was the producer, and one `in` check would have pointed there first.
+Carried into the fix: a one-sided market now yields None with the KEY PRESENT,
+so the join can tell "this producer does not do market prices" from "it does,
+and this row has none".
+
+---
+
+## 2026-08-21 — "UNAVAILABLE" IN A LEDGER ENTRY MEANS "NOT RETAINED", NOT "UNOBTAINABLE"
+
+`#481` declined to refit the WNBA live totals estimator because "refitting needs
+historical market totals, unavailable here", and that phrase had frozen totals
+as permanently unpriceable.
+
+**Half right, and the half that was wrong is the actionable half.** Verified
+rather than trusted: retained history genuinely has none — `book_quotes` for
+`2026-08-19/17/14/10` are ABSENT via export while the current date returns
+14.8MB (date-tokened keyvalue paths carry a TTL), and the local mirror has 0
+files. But `scripts/backfill_mlb_historical_odds.py` has been pulling OddsAPI's
+historical endpoints all along and documents the price in its own header
+(`/v4/historical/.../events` 1 credit, `/odds` 10 credits per market-region).
+The same endpoints exist for `basketball_wnba`.
+
+**The rule going forward.** "Unavailable" in a ledger entry is a statement about
+what was retained at the time of writing, not a property of the world. Before
+inheriting one as a permanent constraint, ask what it would COST to obtain —
+this repo already had the fetcher, the credit accounting and the precedent.
+Totals moves from "refused forever" to "refused until graded", which is a
+different roadmap.

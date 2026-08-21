@@ -1100,7 +1100,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
-### wnba-live-reuse-bound — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-live-reuse-bound — **CLOSED-VERIFIED 2026-08-21** — MEASURED ON A LIVE GAME: `book_quotes` capture cadence **3,676s -> 261s** (~14x). Before `00:07:49Z -> 01:09:05Z`; after `01:21:27Z -> 01:25:48Z`, the second capture steady-state rather than the deploy restart (one capture was deliberately NOT accepted as proof). `/api/ops/wnba/refresh-decision` carries `phase="live"` + `reuse_max_age_s=240.0` where both read null pre-deploy. Live `d68f343a` (live-odds-worker). Claim released. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: a WNBA live-phase tick actually re-fetches odds instead of being declined
   by the PREGAME staleness bound, so `book_quotes` advances at the live cadence.
   **Testable outcome:** with a game live, `/api/ops/wnba/refresh-decision` reads
@@ -1126,7 +1126,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### wnba-halftime-elapsed — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-halftime-elapsed — **OPEN, ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
   **Testable outcome:** with period=2 and a blank clock, a +12 home margin and a
@@ -1149,7 +1149,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   pre-fix), then a real between-periods payload from a live game.
 - Blocked by: none.
 
-### wnba-live-analytic-pricing — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+### wnba-live-analytic-pricing — **OPEN — EVERY GATE CLEARED, `priceable` STILL NEVER OBSERVED ABOVE 0** — `sim_count_unusable` is gone board-wide and rows carry `prob_std_err 0.054` / `std_err_basis analytic_calibration`; spreads price at their own line; totals refuse as `analytic_estimator_never_backtested_for_this_market`; h2h now stamps `market_fair_prob_over` (`a5e0b462`, user decision — the pregame EDGE stays refused). Live on refresh-worker. **DO NOT REPORT THIS CHAIN AS WORKING** until `rows_live_gameline_priceable > 0` is read on a live game. Deploy claim on refresh-worker STILL HELD pending that. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live-gameline join prices WNBA moneylines from the ANALYTIC live
   probability, so the board serves live opportunities for WNBA the way it
   already does for MLB. **Testable outcome:** on a live WNBA game,

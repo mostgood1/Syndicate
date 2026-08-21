@@ -3467,6 +3467,53 @@ constraint is DATA: WNBA `live_state` carries only score/clock/period — no
 live player state — so a re-sim would re-run pregame projections from a new
 score and add little for game lines and nothing for props.
 
+**CORRECTION `[2026-08-21, measured]`: "nothing for props" IS WRONG, and the
+sentence above misled a later session into saying live WNBA props were
+impossible three times.** It describes `live_state`, which does carry only
+score/clock/period. It does NOT describe what the platform can see.
+`/wnba/api/live_player_boxscore?date=...` serves LIVE PER-PLAYER LINES today —
+minutes, points, rebounds, assists, threes; 17 and 18 players across two live
+games, read from production 2026-08-21 02:40Z.
+`cards.py::_public_live_player_boxscore_payload` has been fetching ESPN's
+summary endpoint all along. The gap is not ingestion, it is PERSISTENCE: that
+fetch runs in the REQUEST PATH on web (`warn_if_compute_in_request_path`) while
+the prop join runs in the board build on a worker, so there is no artifact to
+read. Live props need: persist -> project (current stat + remainder off
+minutes/pace) -> carry `liveModelProbOver` per `(player, market, line)` on the
+lens -> open the `sport != "mlb"` gate in `attach_live_projections_for_sport`.
+Pricing an edge off it still needs a MEASURED interval, which does not exist yet.
+
+**WNBA LIVE GAME-LINE PRICING, state as of `[2026-08-21 03:2xZ]`.** Every gate
+is individually cleared and the end-to-end reading is STILL OWED:
+- capture cadence 3,676s -> **261s** (live-tick reuse bound, `d68f343a`)
+- analytic interval applied: rows carry `prob_std_err 0.054`,
+  `std_err_basis analytic_calibration`; `sim_count_unusable` gone board-wide
+- spreads price at their own line; totals refuse as
+  `analytic_estimator_never_backtested_for_this_market`
+- h2h now stamps `market_fair_prob_over` (`a5e0b462`)
+- **`rows_live_gameline_priceable` has NEVER been observed above 0.** Do not
+  report this chain as working until that reading exists.
+
+**READ THE LENS WITH THE INSTRUMENT, NOT BY INFERENCE `[2026-08-21]`.**
+`GET /api/ops/live-lens/snapshot-index?sport=wnba` reads the snapshot through
+the same keyvalue-aware reader the join uses and reports the join's verdict per
+game. Nothing else can: `/api/ops/artifacts/export` is a DISK read and the
+snapshot is keyvalue-routed (returns empty), and `/wnba/api/live-lens` may
+rebuild from a published artifact rather than return stored bytes. Four
+hypotheses about that pipeline were eliminated by measuring adjacent things and
+ALL FOUR WERE WRONG. `PULL_LIVE_LENS_SNAPSHOT ok=True written=0` is EXPECTED
+output for a keyvalue path, not a failure.
+
+**Historical WNBA market totals: retained data has none, OddsAPI does
+`[2026-08-21, measured]`.** `book_quotes` for `2026-08-19/17/14/10` are ABSENT
+via export while today's returns 14.8MB (date-tokened keyvalue paths carry a
+TTL); the local mirror has 0 files. So `#481` was right that refitting totals
+needs historical lines — but its "unavailable here" is WRONG.
+`scripts/backfill_mlb_historical_odds.py` already pulls OddsAPI's historical
+endpoints (`/v4/historical/.../events` 1 credit, `/odds` 10 credits per
+market-region) and the same exist for `basketball_wnba`. Totals is therefore
+"refused until graded", not "refused forever".
+
 **Unmeasured**: whether the ESPN fetch keeps succeeding on future natural
 cycles (one verified data point exists, the pattern isn't established
 yet).
