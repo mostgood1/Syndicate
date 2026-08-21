@@ -481,6 +481,12 @@ def capture_news_snapshot(season: int, *, limit: int = 60) -> dict[str, Any]:
                 "headline": str(article.get("headline") or "")[:300],
                 "description": str(article.get("description") or "")[:900],
                 "type": str(article.get("type") or ""),
+                # The article's own URL, so a reader can go and read the thing
+                # rather than take a 900-character excerpt as the whole story.
+                # Guarded at every hop: ESPN nests it three deep and older
+                # archive rows predate this field entirely, so the UI must treat
+                # an absent link as normal rather than as an error.
+                "link": str((((article.get("links") or {}).get("web") or {}).get("href") or ""))[:400],
                 "players": players,
                 "linked_via": via,
             }

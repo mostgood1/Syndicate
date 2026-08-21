@@ -568,12 +568,23 @@ def build_fantasy_page_context(
     for rows in shown.values():
         for row in rows:
             entries = news_by_player.get(row["player_id"]) or []
-            row["news"] = entries[:3]
+            row["news"] = entries[:6]
             row["news_count"] = len(entries)
     for row in board:
         entries = news_by_player.get(row["player_id"]) or []
-        row["news"] = entries[:3]
+        row["news"] = entries[:6]
         row["news_count"] = len(entries)
+
+    # ONE index for the whole page, not a copy per row. The board and the
+    # per-position tables both render, so attaching the article text to each
+    # row would emit every quote twice -- and the descriptions run to 900
+    # characters. The buttons carry only a player id and look the text up.
+    news_index = {
+        row["player_id"]: row["news"]
+        for source in (board, *shown.values())
+        for row in source
+        if row.get("news_count")
+    }
 
     stat_columns = (
         {name: populated_stat_columns(rows) for name, rows in shown.items()}
@@ -603,6 +614,7 @@ def build_fantasy_page_context(
         "showing_all_positions": showing_all,
         "board_stat_columns": board_stat_columns,
         "news_players": sum(1 for rows in shown.values() for row in rows if row.get("news_count")),
+        "news_index": news_index,
         "news_archive_days": len(
             {article.get("published", "")[:10] for entries in news_by_player.values() for article in entries}
         ),

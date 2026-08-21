@@ -30,10 +30,41 @@
   .pos-WR { background: #1f5f9e; color: #fff; } .pos-TE { background: #9e6a1f; color: #fff; }
   .pos-K  { background: #555; color: #fff; }    .pos-DST { background: #7a2f2f; color: #fff; }
   .tier { opacity: .65; font-variant-numeric: tabular-nums; }
-  .ff-buzz { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px;
-             font-size: .7rem; font-weight: 700; padding: .05rem .3rem; cursor: help;
+  /* A tap target, not just a label. It measured 34x17 before, which is fine for
+     a mouse and mean to a thumb. */
+  .ff-buzz { display: inline-flex; align-items: center; justify-content: center; gap: .25rem;
+             border: 0; border-radius: 999px; min-height: 1.5rem; min-width: 2.2rem;
+             font: inherit; font-size: .7rem; font-weight: 700; padding: .15rem .45rem; cursor: pointer;
              background: rgba(154,243,22,.18); color: var(--cards-accent-strong, #9af316); }
-  .ff-buzz.is-quiet { background: transparent; color: transparent; }
+  .ff-buzz:hover, .ff-buzz:focus-visible { background: rgba(154,243,22,.34); outline: none; }
+  .ff-buzz:focus-visible { box-shadow: 0 0 0 2px var(--cards-accent-strong, #9af316); }
+  .ff-buzz svg { width: .8rem; height: .8rem; fill: currentColor; }
+  /* QUIET ROWS ARE NOT BUTTONS. A control that opens an empty dialog is worse
+     than no control: it takes a click to teach the reader nothing. */
+  .ff-buzz-quiet { display: inline-block; min-width: 1.4rem; opacity: .25; font-size: .7rem;
+                   text-align: center; }
+  .ff-modal { position: fixed; inset: 0; z-index: 50; display: none; }
+  .ff-modal[open] { display: block; }
+  .ff-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.66); }
+  /* BORDER-BOX, and it is not cosmetic: with content-box the 1.15rem of padding
+     is ADDED to `calc(100% - 2rem)`, which measured 381px inside a 375px
+     viewport -- the dialog hung off the side of a phone screen. */
+  .ff-modal-panel { position: relative; box-sizing: border-box; margin: 6vh auto 0;
+                    max-width: 46rem; width: calc(100% - 2rem);
+                    max-height: 82vh; overflow-y: auto; border-radius: 12px; padding: 1rem 1.15rem 1.25rem;
+                    background: var(--panel, #14161a); border: 1px solid var(--border, #333);
+                    box-shadow: 0 18px 48px rgba(0,0,0,.55); }
+  .ff-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+                   border-bottom: 1px solid var(--border, #333); padding-bottom: .55rem; margin-bottom: .5rem; }
+  .ff-modal-close { border: 1px solid var(--border, #444); background: transparent; color: inherit;
+                    border-radius: 6px; cursor: pointer; font: inherit; line-height: 1; padding: .3rem .55rem; }
+  .ff-modal-close:hover { background: rgba(255,255,255,.08); }
+  .ff-item { padding: .6rem 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .ff-item:last-child { border-bottom: 0; }
+  .ff-item h4 { margin: 0 0 .2rem; font-size: .95rem; line-height: 1.35; }
+  .ff-item p { margin: .25rem 0 .35rem; opacity: .85; font-size: .85rem; line-height: 1.45; }
+  .ff-item .ff-meta { font-size: .72rem; opacity: .6; display: flex; gap: .6rem; flex-wrap: wrap; }
+  .ff-item a { color: var(--cards-accent-strong, #9af316); }
   table.ff th { cursor: pointer; user-select: none; position: sticky; top: 0;
                 background: var(--panel, #111); z-index: 1; }
   table.ff th:hover { text-decoration: underline; }
@@ -172,7 +203,7 @@
             <td>{{ row.floor }}</td>
             <td>{{ row.ceiling }}</td>
             <td class="tier">T{{ row.draft.tier }}</td>
-            <td>{% if row.news_count %}<span class="ff-buzz" title="{% for item in row.news %}{{ item.headline }}&#10;{% endfor %}">{{ row.news_count }}</span>{% else %}<span class="ff-buzz is-quiet">0</span>{% endif %}</td>
+            <td>{% if row.news_count %}<button type="button" class="ff-buzz" data-news-player="{{ row.player_id }}" data-news-name="{{ row.name }}" aria-haspopup="dialog" aria-label="Read {{ row.news_count }} news item(s) about {{ row.name }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5c-3.87 0-7 2.4-7 5.36 0 1.68 1 3.18 2.58 4.16-.1.8-.45 1.86-1.3 2.73 1.6-.2 2.9-.86 3.75-1.5.62.14 1.28.22 1.97.22 3.87 0 7-2.4 7-5.6S11.87 1.5 8 1.5Z"/></svg>{{ row.news_count }}</button>{% else %}<span class="ff-buzz-quiet" aria-hidden="true">&mdash;</span>{% endif %}</td>
             {% for key, label in board_stat_columns %}<td>{{ row.stat_line.get(key, 0) }}</td>{% endfor %}
           </tr>
           {% endfor %}
@@ -241,7 +272,7 @@
                     <td>{{ row.stat_line.dst_points_allowed }}</td>
                   {% endif %}
                 {% endif %}
-                <td>{% if row.news_count %}<span class="ff-buzz" title="{% for item in row.news %}{{ item.headline }}&#10;{% endfor %}">{{ row.news_count }}</span>{% else %}<span class="ff-buzz is-quiet">0</span>{% endif %}</td>
+                <td>{% if row.news_count %}<button type="button" class="ff-buzz" data-news-player="{{ row.player_id }}" data-news-name="{{ row.name }}" aria-haspopup="dialog" aria-label="Read {{ row.news_count }} news item(s) about {{ row.name }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5c-3.87 0-7 2.4-7 5.36 0 1.68 1 3.18 2.58 4.16-.1.8-.45 1.86-1.3 2.73 1.6-.2 2.9-.86 3.75-1.5.62.14 1.28.22 1.97.22 3.87 0 7-2.4 7-5.6S11.87 1.5 8 1.5Z"/></svg>{{ row.news_count }}</button>{% else %}<span class="ff-buzz-quiet" aria-hidden="true">&mdash;</span>{% endif %}</td>
                 <td class="tier">{{ row.basis.share_source }}{% if row.basis.is_rookie %} &middot; rookie{% endif %}</td>
               </tr>
               {% endfor %}
@@ -317,6 +348,96 @@
         rows.forEach(function (row) { body.appendChild(row); });
       });
     });
+  });
+})();
+</script>
+
+<div class="ff-modal" id="ff-news-modal" role="dialog" aria-modal="true" aria-labelledby="ff-news-title">
+  <div class="ff-modal-backdrop" data-ff-close></div>
+  <div class="ff-modal-panel">
+    <div class="ff-modal-head">
+      <h3 id="ff-news-title" style="margin:0;font-size:1rem"></h3>
+      <button type="button" class="ff-modal-close" data-ff-close>Close</button>
+    </div>
+    <div id="ff-news-body"></div>
+    <p style="margin:.75rem 0 0;font-size:.72rem;opacity:.6">
+      Shown, not scored &mdash; nothing here moves a projection.
+    </p>
+  </div>
+</div>
+
+{# ONE payload for the page, emitted as data rather than markup. `tojson`
+   escapes <, >, & and ' , so a single-quoted attribute-free script block is
+   safe for text that came from a third party. #}
+<script type="application/json" id="ff-news-data">{{ news_index|tojson }}</script>
+
+<script>
+(function () {
+  var data = {};
+  try {
+    var raw = document.getElementById('ff-news-data');
+    if (raw) { data = JSON.parse(raw.textContent || '{}'); }
+  } catch (err) { data = {}; }
+
+  var modal = document.getElementById('ff-news-modal');
+  var title = document.getElementById('ff-news-title');
+  var body  = document.getElementById('ff-news-body');
+  if (!modal || !title || !body) { return; }
+  var lastFocused = null;
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function when(published) {
+    if (!published) { return ''; }
+    var when = new Date(published);
+    if (isNaN(when.getTime())) { return published; }
+    return when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function open(playerId, name) {
+    var items = data[playerId] || [];
+    title.textContent = name + ' — ' + items.length + ' recent item' + (items.length === 1 ? '' : 's');
+    body.innerHTML = items.map(function (item) {
+      // The LINK is optional on purpose: rows archived before the field
+      // existed have none, and that is normal, not an error state.
+      var link = item.link
+        ? '<a href="' + esc(item.link) + '" target="_blank" rel="noopener noreferrer">Read on ESPN</a>'
+        : '';
+      var desc = item.description ? '<p>' + esc(item.description) + '</p>' : '';
+      var via = item.linked_via === 'espn_tag' ? 'tagged by ESPN' : 'matched by name';
+      return '<div class="ff-item"><h4>' + esc(item.headline) + '</h4>' + desc +
+             '<div class="ff-meta"><span>' + esc(when(item.published)) + '</span>' +
+             '<span>' + esc(via) + '</span>' + link + '</div></div>';
+    }).join('') || '<p style="opacity:.7">No stored items for this player.</p>';
+    modal.setAttribute('open', 'open');
+    var close = modal.querySelector('.ff-modal-close');
+    if (close) { close.focus(); }
+  }
+
+  function close() {
+    modal.removeAttribute('open');
+    // Return focus to the badge that opened it, or a keyboard user is dumped
+    // back at the top of a 500-row table.
+    if (lastFocused && lastFocused.focus) { lastFocused.focus(); }
+    lastFocused = null;
+  }
+
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest ? event.target.closest('.ff-buzz') : null;
+    if (trigger) {
+      lastFocused = trigger;
+      open(trigger.getAttribute('data-news-player'), trigger.getAttribute('data-news-name') || 'Player');
+      return;
+    }
+    if (event.target.closest && event.target.closest('[data-ff-close]')) { close(); }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && modal.hasAttribute('open')) { close(); }
   });
 })();
 </script>
