@@ -21385,3 +21385,156 @@ The row stays closed. Nothing owed.
 the pre-08-18 model in which live-odds-worker emits `ODDS_SWEEP_OUTCOME`, so
 every future run will report a null against a service that cannot produce that
 line. Left in place; not modified by this unattended run.
+
+## 2026-08-21 — READING OWED FOR THE 2026-08-17 CADENCE FLIP — **INCONCLUSIVE: THE FLAG IS STRUCTURALLY INERT FOR MLB**
+
+Scheduled reader `outs-props-coverage-check`, discharging the obligation opened
+by "2026-08-17 ~18:3xZ — CADENCE FLIP FIRED ON live-odds-worker". Ran 08-21 (the
+08-19 firing slipped); target date is still **2026-08-18**. Nothing deployed, no
+claim taken, no lane opened.
+
+**VERDICT: INCONCLUSIVE — NOT FAIL, and NOT Gate B(a) marker contention either.**
+`SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true` was live all day and its tier
+table was demonstrably applying — to **wnba and soccer**. It has never applied to
+**mlb**, and cannot, because a per-sport env override returns before the gate is
+reached. **The flip is a no-op for the one sport this lane cares about. Do not
+roll it back; it is untested, not failed.**
+
+### THE CAUSE, in the code that shipped (`cdaeaa58b9`, the SHA live-odds-worker ran on 08-18)
+
+`_pregame_sweep_interval_for_tick()` — the ONLY caller of the fixture gate:
+
+    explicit = os.environ.get(f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{sport.upper()}")
+    if not explicit:
+        explicit = os.environ.get("SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS")
+    if explicit:
+        # AN EXPLICIT ENV VALUE STILL WINS, deliberately: the per-sport override is
+        # the documented escape hatch for the incident where this gate misbehaves,
+        # so the gate must not be able to override the thing that turns it off.
+        return _pregame_sweep_interval_seconds(sport)      # <-- RETURNS HERE FOR MLB
+    ...
+    if _fixture_aware_cadence_enabled():                   # <-- never reached for mlb
+        print(f"... FIXTURE_CADENCE sport={sport} interval={resolved} reason={reason}")
+
+**`SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB=3600` is set on live-odds-worker**
+(full env paginated, 95 keys). It was set **2026-08-14** under `#15` — three days
+BEFORE the cadence flip — and is recorded in this file at the `#15` heading. The
+escape hatch was already engaged for MLB when the flag was turned on. Nobody
+checked, and the flag reads as live at every level except the sport.
+
+### THE SIGNATURE THAT PROVES IT WAS ACTIVE ON 08-18, not merely today
+
+1. **Not one `FIXTURE_CADENCE sport=mlb` line exists in the whole of 08-18** —
+   zero over 00:00–23:59Z — while wnba and soccer lines run all day. That is the
+   early return, printed by its own absence. The emitter is present in
+   `cdaeaa58b9` (`FIXTURE_CADENCE` x7), so the zero is real.
+2. **MLB swept on a flat ~3600s spacing all day**, which is the override's value,
+   not any fixture tier: 05:17, 06:18, 07:19, 08:21, 09:23, 10:24, 11:25, 12:27,
+   13:29, 14:31, 15:32, 16:33, 17:34, 18:36, 19:36, 20:40, 21:40Z. Hourly,
+   straight through first pitch, indifferent to the slate clock.
+3. Zero deploys touched live-odds-worker in the 08-18 daytime window; it ran
+   `cdaeaa58b9` continuously 08-18T01:59:34Z to 08-19T03:52:32Z.
+
+### CORRECTION — GATE B(a) IS RULED OUT, AND MY FIRST READ OF IT WAS WRONG
+
+I first built this on `ODDS_SWEEP_OUTCOME` counts (live-odds 0, refresh 56 of
+which 24 mlb) and read it as refresh-worker starving the flagged service. **That
+is the grading-is-not-a-launch error**, and the `2026-08-21 15:00-21:15Z` entry
+above had already named it. Re-derived here rather than taken on trust:
+
+- `ODDS_SWEEP_OUTCOME` is printed by `_report_odds_sweep_outcomes()`, called from
+  `_run_mlb_sim_tick()` behind `_mlb_sim_tick_owner_here()`. **live-odds-worker
+  has `SYNDICATE_MLB_SIM_TICK_OWNER=false`** — it *cannot* emit that line. Its
+  zero means nothing.
+- **`SYNDICATE_MLB_REFRESH_TICK_OWNER=true` on live-odds-worker and `false` on
+  refresh-worker.** The flagged service IS the MLB sweep owner. refresh-worker
+  was grading its launches off the shared store, not stealing them.
+- `ODDS_SWEEP_LAUNCHED`, the line that would have settled this directly, **did
+  not exist in `cdaeaa58b9`** — `63fc2c84` added it and is not an ancestor. On
+  08-18 a launch announced itself nowhere. The sweep spacing is the substitute.
+
+**Marker contention did not happen here. `7c4439f4`'s namespacing question is
+untouched by this reading and must not be actioned off it.**
+
+### THE MEASUREMENT — 08-18 fails both criteria, and the failure is uninformative
+
+`py -3 scripts/grade_production_outs_betting.py --json reports/phase7/outs_check_2026_08_18.json`
+
+| date | props `retrieved_at` | first commence | pre-first-pitch? | pitchers | with `outs` line |
+|---|---|---|---|---|---|
+| **2026-08-18** | 2026-08-19T04:37:15 | 2026-08-19T00:08:19Z | **NO, ~4.5h late** | **0** | **0** |
+| 2026-08-17 | 2026-08-18T02:27:48 | 2026-08-18T00:06:00Z | NO | 1 | 1 |
+
+08-18's artifact is literally `"pitcher_props": {}`, `counts: {players: 0,
+events_matched: 1}`. Commence times come from the same thin odds snapshot (n=1
+event on 08-18, 2 on 08-17), so they are a weak clock — but 04:37 the FOLLOWING
+day is post-slate under any reading.
+
+**Worth separating for whoever picks this up:** the hourly *odds sweep* wrote
+`tracking/book_quotes/` on schedule all day. The pitcher-props artifact is a
+DIFFERENT fetch with its own `props_cadence`, and it is the one landing
+post-slate. Moving the sweep cadence may not move the props capture at all. That
+is a hypothesis, not a measurement, and nothing here tests it.
+
+### BASELINE, RE-DERIVED — and it disagrees with the brief
+
+Over the 29 dates the published pitcher game log covers (2026-07-19..08-16;
+08-17 and 08-18 outcomes are not in it yet):
+
+- dates with ANY pitcher prop captured: **15/29 (51.7%)**
+- dates with **>=8 pitchers carrying an `outs` line: 1/29 (3.4%)** — only
+  2026-07-24 (26 lines). Next best 07-27 (6), 07-23 (4). The brief carried
+  "5 of 29"; my scan gives 1 of 29 by that definition, and 1 of 29 for ">=8 with
+  ANY prop" too. **Reported as measured, not reconciled.**
+- **`retrieved_at` is post-slate on 27 of 29 dates (93.1%).** The only two
+  same-day captures are 07-23 (22:23Z) and 07-24 (19:13Z) — and those are exactly
+  the two best-covered dates (4 and 26 outs lines). **The pre-slate theory the
+  flag encodes is supported by that 2-of-29. What is missing is the flag ever
+  getting to run for MLB.**
+
+### BETTING GRADE, with its side-blind baseline beside it (standing rule)
+
+n=95 graded starts over 15 dates with odds (342 starts seen, 246 no line, 1 push).
+
+| | hit | ROI |
+|---|---|---|
+| base rate, outcomes over the line | 54/95 = **56.84%** | — |
+| **ALWAYS OVER (no model)** | **56.84%** | **+0.79%** |
+| ALWAYS UNDER (no model) | 43.16% | -18.44% |
+| model, multiplicative | 48.42% (n=95) | -10.15% |
+| model, power | 48.42% (n=95) | -10.15% |
+
+SE at n=95 is **5.13%**; anything under ~10.3% is noise. The shipped model sits
+**8.42 pts BELOW side-blind ALWAYS OVER** — inside 2 SE, so not a result either
+way, and untouched by this deploy.
+
+### RECOMMENDED, NOT DONE (this reader deploys nothing)
+
+1. **Do NOT roll the cadence flag back.** Rolling back an inert flag would
+   "prove" the mechanism failed while changing nothing.
+2. **The one-line trial: unset `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB` on
+   live-odds-worker** (single-key endpoint, no `render.yaml`, no
+   `blueprint_sync`). Then `_pregame_sweep_interval_for_tick` reaches the gate
+   and `FIXTURE_CADENCE sport=mlb` becomes the reachability proof — the same
+   off-is-not-on check the engine standard requires and that nobody ran here.
+   **Cost first:** the code's own modelled effect is mlb 12.00 to 5.45
+   sweeps/day, i.e. FEWER calls, against a 5M OddsAPI cap MLB is 93% of.
+   Removing the override also gives up `#15`'s deliberate 2h to 1h, which a user
+   asked for by name — get that decision explicitly.
+3. **Test the props hypothesis before assuming cadence is the lever at all.**
+   The props fetch has its own cadence; the sweep cadence may not govern it.
+4. The **seal is still undeployed** — `bafb4fb2` on `main`, needs a
+   refresh-worker ship. Neither half of the fix has had a clean trial.
+5. **The reading is still owed.** This closes 08-18 as INCONCLUSIVE. A verdict
+   needs a date on which the gate actually evaluates MLB. **One slate is not a
+   verdict** in either direction.
+
+### RULE THIS EARNED
+
+**A feature flag verified as RUNNING is not verified as REACHING the case you
+care about.** The 08-17 verification read `FIXTURE_CADENCE` lines and called the
+gate live; every line in that sample was `wnba` or `soccer`, and that entry even
+said so in its own "WHAT IS NOT VERIFIED" section — attributing the missing mlb
+line to a benign live-sport keep. It was an env override three days older than
+the flag. **Reachability must be asserted for the specific sport or branch under
+test, never for the feature in general.**
