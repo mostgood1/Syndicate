@@ -1169,6 +1169,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   words, and they cannot share a rule. 33 tests + 20 subtests.
   **Verified against real production data:** the empty-capture refusal fired on
   the rolled slate (`games=3 players_with_stats=0` -> REFUSING to write).
+- **THE SCALING IS GRADED `[2026-08-21]` — and the assumption turned out to be
+  unnecessary.** `scripts/grade_wnba_live_prop_projection.py` replays ESPN pbp,
+  reconstructs each player's running points and minutes, drives the SHIPPED
+  projection at every scoring play, and scores it against the official final.
+  **The replay is self-checked and reconciles 100%** (6+ games, 118+ players,
+  points AND minutes exact) — a residual from an unreconciled replay measures
+  the bug, so the grader refuses to score one. Rather than grade the assumed
+  sd-scaling (`sqrt(m/min_mean)`), it MEASURES the projection's own residual,
+  which needs no assumption and is the quantity a consumer wants.
+  **POOLED n=796 over 5 slates:**
+
+      minutes_left      n     mean      sd   p90/sd
+           30-99       21    +0.18    6.03     1.71
+           20-30      129    +0.42    5.38     1.59
+           10-20      220    -0.54    5.30     1.61
+            5-10      136    -1.23    3.88     1.56
+             0-5      290    -1.69    2.70     1.90
+             ALL      796    -0.90    4.39
+
+  The interval SHRINKS MONOTONICALLY as the game runs down (6.03 -> 2.70), so a
+  single sd would price both ends wrongly. `p90/sd` sits at 1.56-1.71 against
+  1.64 for a normal, so the residual is APPROXIMATELY NORMAL in the bulk —
+  `P(final >= line) = 1 - Phi((line - projected)/sd_bucket)` is defensible with
+  the MEASURED sd. Two caveats for whoever prices it: the `0-5` bucket has
+  heavier tails (1.90) and a real late UNDER-projection bias (-1.69).
 - **REMAINING PHASES:** (3b) derive `liveModelProbOver` per
   `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
