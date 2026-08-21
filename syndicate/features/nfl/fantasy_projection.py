@@ -159,10 +159,22 @@ class EngineConfig:
     #: term, and not evidence that it should be.
     gl_weight_rushing: float = 0.65
 
-    #: Prior weight pulling a player's availability rate toward his position's
-    #: mean, in games. UNFITTED: 4/8/12/20 are within 0.001 objective of
-    #: each other.
-    availability_prior_games: float = 12.0
+    #: Games of a player's own record at which his own availability is trusted
+    #: half as much as his projected ROLE's average. FITTED on 2024: 2.0, i.e.
+    #: lean almost entirely on a player's own durability record once he has
+    #: any. Fit-season season-points MAE 48.08 -> 47.55 and spearman
+    #: 0.6813 -> 0.7012 against the ratio-and-clamp version this replaced --
+    #: an objective move of 0.023, an order of magnitude above the ~0.005 noise
+    #: floor that left seven other constants unfitted.
+    #:
+    #: NOTE THE TENSION, because it is the whole lesson of this parameter: the
+    #: blend is a slightly WORSE predictor of games (fit MAE 3.55 -> 3.65) and a
+    #: BETTER predictor of season points. Compressing games toward the mean is
+    #: what minimises games error -- it is correct regression to the mean -- but
+    #: season points are a PRODUCT of games and rate, and a compressed factor
+    #: biases the product. Optimising the sub-quantity was optimising the wrong
+    #: thing.
+    availability_history_half_games: float = 2.0
 
     #: Pass-rate response to game script: added pass rate per point of
     #: expected MARGIN against the team. NOT YET FITTED AND THEREFORE INERT
@@ -1321,36 +1333,6 @@ def _blend(history_value: float, prior_value: float, sample: float, half_sample:
     return alpha * history_value + (1.0 - alpha) * prior_value
 
 
-def _health_ratio(
-    player: FantasyPlayer,
-    history: PlayerHistory | None,
-    league: LeagueRates,
-    config: EngineConfig,
-) -> float:
-    """How durable this player is RELATIVE to his position's average.
-
-    Deliberately a ratio and not a games count. Availability is shrunk hard
-    toward the position mean because per-player injury rates are among the
-    least stable quantities in football: a player who missed six games last
-    year is only slightly likelier than his peers to miss six again, and a
-    model that carries that forward at full weight buries exactly the players
-    who are cheapest to draft.
-    """
-    position_games = league.availability.get(player.position, 15.0)
-    position_rate = min(position_games / config.games_in_season, 1.0)
-    if position_rate <= 0:
-        return 1.0
-    if history is None or history.raw_games <= 0:
-        return 1.0
-    rate = _shrink(
-        history.availability_rate,
-        history.raw_games,
-        position_rate,
-        config.availability_prior_games,
-    )
-    return max(min(rate / position_rate, 1.35), 0.5)
-
-
 def _expected_games(
     player: FantasyPlayer,
     history: PlayerHistory | None,
@@ -1358,35 +1340,56 @@ def _expected_games(
     config: EngineConfig,
     role_games: float | None,
 ) -> float:
-    """Projected games played, from ROLE first and health second.
+    """Projected games played: the player's OWN record blended with his ROLE.
 
-    THIS IS THE TERM THAT MAKES THE OPPORTUNITY SYSTEM CLOSE, and getting it
-    from the position mean instead was the single largest error in this engine.
+    THIS TERM MAKES THE OPPORTUNITY SYSTEM CLOSE, and two versions of it were
+    wrong before this one.
 
-    Playing time is mostly a fact about role, not about the position. A backup
-    quarterback's low games are not an injury signal -- he is healthy and on
-    the sideline. Handing him the QB position mean of 14.3 games gave him
-    fourteen games at a backup's (correctly high) while-active share, so the
-    normalisation that conserves a team's season pool had to take those
-    attempts from somebody, and it took them from the starter. Measured: Josh
-    Allen at 2,797 passing yards over a full season, roughly 70 yards a game
-    light, with nothing anywhere reporting a problem.
+    The first took games from the POSITION mean, which handed a backup
+    quarterback 14.3 games at a backup's (correctly high) while-active share --
+    so the normalisation that conserves a team's season pool took those
+    attempts from the starter. Josh Allen came out ~70 passing yards a game
+    light with nothing reporting a problem.
 
-    So games come from ``role_games`` -- the mean games played by the Nth
-    busiest player in that pool, measured over every team-season available --
-    scaled by the player's own durability relative to his position. The role
-    curve already embeds average health at that role, so the scaling is a
-    ratio, never a second absolute term.
+    The second took them from the ROLE curve scaled by a health RATIO that was
+    shrunk to the position mean and then clamped to [0.5, 1.35]. That fixed the
+    level and badly compressed the spread. Measured on 2024, bias by the number
+    of games a player actually went on to play:
+
+        actual  0-4 games   n=87   bias +6.81
+        actual  5-9 games   n=77   bias +3.34
+        actual 10-14 games  n=115  bias +0.58
+        actual 15-17 games  n=163  bias -2.00
+
+    -- a textbook regression-to-the-mean squeeze, dispersion ratio 0.65 against
+    the real spread, costing every genuine starter about two games. 2025 shows
+    the same shape (+5.38 / +3.40 / -0.59 / -1.81), so it is structural rather
+    than one season's noise.
+
+    So games are now a DIRECT blend of two quantities on the same scale --
+    the games this player has averaged, and the games his projected role
+    averages -- weighted by how much of his own record there is. No ratio, no
+    clamp beyond the length of a season. A player with three durable seasons
+    keeps them; a player with none inherits his role's mean.
+
+    ``availability_history_half_games`` is the blend weight and is FITTED on
+    the 2024 fit season against games-prediction error, never on 2025.
 
     ``role_games`` is ``None`` only before an ordinal is known (the first pass
-    over a roster), in which case the position mean is the right answer.
+    over a roster), where the position mean is the right answer.
     """
-    ratio = _health_ratio(player, history, league, config)
-    if role_games is None:
-        base = league.availability.get(player.position, 15.0)
-    else:
-        base = role_games
-    return max(min(base * ratio, float(config.games_in_season)), 0.0)
+    season_games = float(config.games_in_season)
+    role_estimate = (
+        role_games if role_games is not None else league.availability.get(player.position, 15.0)
+    )
+    if history is None or history.raw_games <= 0:
+        return max(min(role_estimate, season_games), 0.0)
+
+    own_estimate = history.availability_rate * season_games
+    half = config.availability_history_half_games
+    weight = history.raw_games / (history.raw_games + half) if half > 0 else 1.0
+    blended = weight * own_estimate + (1.0 - weight) * role_estimate
+    return max(min(blended, season_games), 0.0)
 
 
 def _role_games_for(

@@ -74,7 +74,7 @@ SWEEPS: tuple[tuple[str, tuple], ...] = (
     ("catch_rate_prior_opportunities", (5.0, 15.0, 40.0, 90.0, 200.0)),
     ("ypa_prior_opportunities", (30.0, 90.0, 180.0, 400.0, 900.0)),
     ("team_volume_prior_games", (2.0, 8.0, 16.0, 32.0, 64.0, 128.0)),
-    ("availability_prior_games", (4.0, 8.0, 12.0, 20.0, 40.0)),
+    ("availability_history_half_games", (0.0, 2.0, 5.0, 12.0, 25.0, 60.0)),
     ("rz_weight_receiving", (0.0, 0.3, 0.55, 0.8, 1.0)),
     ("gl_weight_rushing", (0.0, 0.35, 0.65, 0.85, 1.0)),
 )
