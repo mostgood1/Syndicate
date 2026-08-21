@@ -414,6 +414,99 @@ def api_ops_live_lens_status() -> Any:
     return jsonify(payload)
 
 
+@ops_bp.get("/api/ops/live-lens/snapshot-index")
+def api_ops_live_lens_snapshot_index() -> Any:
+    """What `build_live_gameline_index` ACTUALLY sees in the lens snapshot.
+
+    WHY THIS EXISTS. Measured 2026-08-21 with three WNBA games live: the board
+    reported `live_gamelines.index_size: 1` and 165 rows withheld as
+    `no_live_gameline_projection`, while `/wnba/api/live-lens` showed all three
+    games carrying a `live_projection` lane. Those two cannot both describe the
+    same bytes -- but neither one reads the file the JOIN reads. The snapshot is
+    written by `write_json_file`, which routes every path outside
+    `migration_runs/` to the keyvalue store and returns BEFORE touching disk, so
+    `/api/ops/artifacts/export` (a disk read) returns empty for it and
+    `/wnba/api/live-lens` may rebuild from a published artifact instead of
+    returning the stored snapshot -- its `cards_context_source` said
+    `published_artifact_no_live_status` while this was being diagnosed.
+
+    So there was no way to read the one artifact that decides the join, and four
+    hypotheses (broken pull, dead loop, headroom gate, stale builder) were each
+    eliminated by measuring something ADJACENT to it. This endpoint reads it
+    through the same keyvalue-aware `read_json_file` the join uses, and reports
+    the join's own verdict per game rather than a pretty version of the payload:
+    which key each game would be indexed under, whether a lens was accepted, and
+    when not, WHY.
+
+    Read-only and cheap: one keyvalue GET plus the same pure functions the join
+    calls. It computes no simulation and writes nothing.
+    """
+    from syndicate.features.shared.live_gameline_join import (
+        build_live_gameline_index,
+        lens_sources_for_sport,
+        live_gameline_from_lens,
+    )
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    sport = str(request.args.get("sport") or "wnba").strip().lower()
+    path = data_root() / "live" / f"{sport}_live_lens.json"
+    snapshot = read_json_file(path)
+    if not isinstance(snapshot, dict):
+        # Absent is a REAL answer and must not read as "no games": it means the
+        # join is reading nothing at all, which is a different defect.
+        return jsonify({
+            "ok": True, "sport": sport, "path": str(path),
+            "snapshot_present": False, "reason": "no_snapshot_at_path",
+        })
+
+    sources = lens_sources_for_sport(sport)
+    games_out: list[dict[str, Any]] = []
+    for game in (snapshot.get("games") or []):
+        if not isinstance(game, dict):
+            continue
+        matchup = game.get("matchup") if isinstance(game.get("matchup"), dict) else {}
+        # The SAME fall-through order the index uses, reported so a key that
+        # fails to build is visible rather than inferred.
+        candidates = []
+        for label, away_raw, home_raw in (
+            ("matchup", matchup.get("away"), matchup.get("home")),
+            ("top_level", game.get("away"), game.get("home")),
+            ("name_fields", game.get("away_name"), game.get("home_name")),
+        ):
+            away = away_raw.get("name") if isinstance(away_raw, dict) else away_raw
+            home = home_raw.get("name") if isinstance(home_raw, dict) else home_raw
+            candidates.append({"shape": label, "away": away, "home": home,
+                               "usable": bool(str(away or "").strip() and str(home or "").strip())})
+        lanes = [
+            {"source": lane.get("source"), "key": lane.get("key"),
+             "modelHomeWinProb": lane.get("modelHomeWinProb"),
+             "accepted_source": str(lane.get("source") or "").strip().lower() in sources}
+            for lane in (game.get("gameLens") or []) if isinstance(lane, dict)
+        ]
+        projection = live_gameline_from_lens(game.get("gameLens"), sources=sources)
+        games_out.append({
+            "away_name": game.get("away_name"), "home_name": game.get("home_name"),
+            "gamePk": game.get("gamePk"),
+            "key_candidates": candidates,
+            "lanes": lanes,
+            "join_accepts": projection is not None,
+            "home_win_prob": (projection or {}).get("home_win_prob"),
+            "has_analytic_markets": bool((projection or {}).get("analytic_markets")),
+        })
+
+    index = build_live_gameline_index(snapshot, sources=sources)
+    return jsonify({
+        "ok": True, "sport": sport, "path": str(path), "snapshot_present": True,
+        "accepted_lens_sources": list(sources),
+        "snapshot_date": snapshot.get("date"),
+        "snapshot_generated_at": snapshot.get("generated_at") or snapshot.get("generatedAt"),
+        "snapshot_game_count": len(snapshot.get("games") or []),
+        "index_size": len(index),
+        "indexed_keys": [list(k) for k in index],
+        "games": games_out,
+    })
+
+
 @ops_bp.get("/api/ops/win-prob-null")
 def api_ops_win_prob_null() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
