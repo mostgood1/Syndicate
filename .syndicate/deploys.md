@@ -17958,12 +17958,54 @@ Scoped cherry-pick `ba1d3368` (`#481` = `7afbdd1a`) onto web's live SHA
   0.3-0.4 won 11.6%. Everything was compressed toward 0.5 by a scale ~2.5x
   too wide.
 
-- **NOT YET OBSERVED ON A SERVED PAYLOAD.** No WNBA game is in progress, so
-  the live board cannot be checked against a real in-flight game yet. The
-  offline grade above is the substantive evidence; the served-payload
-  confirmation is owed on the next live slate. Next reader: on a live game,
-  compare `markets.moneyline.p_win` against the same `(margin, elapsed)` --
-  a 10-point lead with ~1 minute left should now read ~0.99, not ~0.82.
+- **~~NOT YET OBSERVED ON A SERVED PAYLOAD~~ -- DISCHARGED 2026-08-21T00:2xZ
+  (2026-08-20 19:2x CT).** Confirmed on IND@DAL while it was actually in
+  progress. Both halves of `#481` reproduce the served number EXACTLY, from
+  a single fetch (so the inputs and the output are the same instant):
+
+      P1 4:55   margin -4   elapsed 5.083min   blend_w 0.127   pregame 0.4500
+        moneyline  served modelHomeWinProb 0.4092787472
+                   recomputed (scale 2.1)   0.4092787472   gap 0.00e+00
+                   would-be OLD             0.4494074260   delta -0.0401
+        spread     served p_cover           0.5273877166
+                   recomputed (scale 2.1)   0.5273877166   gap 0.00e+00
+                   would-be OLD             0.5340448942   delta -0.0067
+
+  `markets.moneyline.p_win` agrees with the lane's own `modelHomeWinProb` to
+  1e-6, so the number verified is the number the board shows. A second
+  independent sample four minutes earlier (P1 5:27, margin -5) also matched
+  at gap 0.00e+00.
+
+  **READ THE DELTA WITH ITS BLEND WEIGHT, or it understates the fix by ~8x.**
+  Both samples are ~5 minutes into the game, where `blend_w = elapsed/40` is
+  only 0.13 -- the live term carries an eighth of its eventual weight, so
+  -0.04 is the SMALLEST the change ever gets, not its typical size. The
+  entry's own prediction was about the late-game end, and it holds: driving
+  the DEPLOYED function at margin +10 with 1:00 left (blend_w 0.975) gives
+  **0.9780 new vs 0.8190 old, a +0.159 swing** -- the predicted "~0.99, not
+  ~0.82". That late figure is COMPUTED from the shipped function, not served;
+  the game was still in Q1 at verification time. A served late-game sample is
+  a nice-to-have, not an obligation -- the formula is confirmed live, and
+  blend weight is arithmetic.
+
+- **The verification script was itself broken, and said VERIFIED anyway.**
+  `scripts/verify_wnba_live_scale.py` exited 0 on its first-ever live game
+  having compared nothing. Two independent defects, both fixed in this pass:
+  it read `lane["live_margin"]` / `lane["elapsed_min"]`, which the lane does
+  not publish (the margin is `projection.homeMargin`; elapsed is DERIVED from
+  `status.period`/`clock`), so every live row hit a `continue` -- and that
+  `continue` left the mismatch counter at 0, so unchecked rows printed as
+  passing. Now: unreproducible rows exit 3, never 0; the expected value is
+  IMPORTED from the shipped functions instead of a second copy of the blend
+  that could drift; and the cover path is checked too. Both new failure paths
+  were exercised against synthetic payloads before being trusted (a wrong
+  served value exits 2, a missing margin exits 3).
+
+  One more trap for the next reader, found the same way: **search
+  YESTERDAY-UTC.** The board keys games by ET business date, so a 7pm ET tip
+  (2026-08-21T00:00Z) is filed under `2026-08-20`. A today/tomorrow-UTC
+  search returns "no live game" during exactly the evening window when WNBA
+  games are played -- observed live at 00:16Z with IND@DAL in progress.
 
 - **Scope deliberately NOT extended to totals.** `_wnba_live_total_over_prob`
   keeps `8.0 + 0.50*min_left`: a total is combined scoring, not a margin's
