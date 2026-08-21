@@ -243,7 +243,16 @@ def soccer_live_gameline_index(
 # a shots distribution and prices this market and no other -- deliberately NOT
 # mapped onto `player_shots_on_target`, which is a different statistic with its
 # own pregame field.
+# Board market -> (probability dict on the live prop row, banked-count field).
+# Live now mirrors PREGAME, which prices all three per line. Before this, a
+# board pricing three prop markets pre-kickoff silently dropped to one the
+# moment a match went in play.
 SOCCER_LIVE_PROP_MARKET = "player_shots"
+SOCCER_LIVE_PROP_MARKETS: dict[str, tuple[str, str]] = {
+    "player_shots": ("shots_over_probabilities", "projected_final_shots"),
+    "player_shots_on_target": ("shots_on_target_over_probabilities", "projected_final_shots_on_target"),
+    "player_assists": ("assists_over_probabilities", "projected_final_assists"),
+}
 
 
 def soccer_live_prop_index(
@@ -289,33 +298,48 @@ def soccer_live_prop_index(
             if not isinstance(prop, Mapping):
                 continue
             player = _norm_name(prop.get("player_name"))
-            over = prop.get("shots_over_probabilities")
-            projected = _f(prop.get("projected_final_shots"))
-            if not player or not isinstance(over, Mapping) or not over:
+            if not player:
                 report["skipped_no_key"] += 1
                 continue
-            if projected is None:
-                # The live projection IS the live-awareness evidence, the same
-                # rule gate 2 applies to MLB.
-                report["skipped_no_live_projection"] += 1
-                continue
-            for raw_line, raw_prob in over.items():
-                line = _f(raw_line)
-                prob = _f(raw_prob)
-                report["rows_seen"] += 1
-                if line is None or prob is None:
-                    report["skipped_no_key"] += 1
+            banked_by_market = {
+                "player_shots": prop.get("shots_so_far"),
+                "player_shots_on_target": prop.get("shots_on_target_so_far"),
+                "player_assists": prop.get("assists_so_far"),
+            }
+            indexed_any = False
+            for market, (prob_field, mean_field) in SOCCER_LIVE_PROP_MARKETS.items():
+                over = prop.get(prob_field)
+                projected = _f(prop.get(mean_field))
+                if not isinstance(over, Mapping) or not over:
+                    # A market this row does not carry. Not a key failure --
+                    # an older snapshot has shots only, and must degrade to
+                    # shots rather than to nothing.
                     continue
-                index[(player, SOCCER_LIVE_PROP_MARKET, line)] = {
-                    "live_projection": projected,
-                    # Soccer publishes no PREGAME probability on this row, and
-                    # `model_prob_over` is the pregame slot. Leaving it None
-                    # keeps the live number from being read as one.
-                    "model_prob_over": None,
-                    "live_prob_over": prob,
-                    "actual_so_far": prop.get("shots_so_far"),
-                    "live_edge_hint": None,
-                    "side": "over",
-                }
-                report["rows_indexed"] += 1
+                if projected is None:
+                    # The live projection IS the live-awareness evidence, the
+                    # same rule gate 2 applies to MLB.
+                    report["skipped_no_live_projection"] += 1
+                    continue
+                for raw_line, raw_prob in over.items():
+                    line = _f(raw_line)
+                    prob = _f(raw_prob)
+                    report["rows_seen"] += 1
+                    if line is None or prob is None:
+                        report["skipped_no_key"] += 1
+                        continue
+                    index[(player, market, line)] = {
+                        "live_projection": projected,
+                        # Soccer publishes no PREGAME probability on this row,
+                        # and `model_prob_over` is the pregame slot. Leaving it
+                        # None keeps the live number from being read as one.
+                        "model_prob_over": None,
+                        "live_prob_over": prob,
+                        "actual_so_far": banked_by_market.get(market),
+                        "live_edge_hint": None,
+                        "side": "over",
+                    }
+                    report["rows_indexed"] += 1
+                    indexed_any = True
+            if not indexed_any:
+                report["skipped_no_key"] += 1
     return report

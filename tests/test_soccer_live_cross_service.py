@@ -20,6 +20,10 @@ import pytest
 from syndicate.features.shared import board_enrichment
 from syndicate.features.shared import soccer_live_gameline_source as src
 
+# The loader only accepts a snapshot whose `date` matches the requested one,
+# so the fixture must speak about the same day the assertions ask about.
+_TODAY = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).date().isoformat()
+
 
 def _projection():
     return {
@@ -53,7 +57,19 @@ def _aggregate_game():
     }
 
 
-def _write_aggregate(root, games, *, date="2026-08-21", generated_at="2026-08-21T19:20:00+00:00"):
+def _now_iso(offset_seconds: int = 0) -> str:
+    """A RELATIVE timestamp, because gate 1 refuses an artifact older than
+    `_LENS_STATE_MAX_AGE_SECONDS`. The first version of this fixture hardcoded
+    `2026-08-21T19:20:00+00:00`; it passed when written and failed an hour
+    later as wall-clock moved past the staleness bound -- the code was right
+    and the test was time-dependent."""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(seconds=offset_seconds)).isoformat()
+
+
+def _write_aggregate(root, games, *, date=_TODAY, generated_at=None):
+    generated_at = generated_at or _now_iso()
     d = root / "live"
     d.mkdir(parents=True, exist_ok=True)
     (d / "soccer_live_lens.json").write_text(
@@ -81,7 +97,7 @@ def root(tmp_path, monkeypatch):
 def test_aggregate_alone_feeds_the_games_loader(root):
     """NO per-league tree exists here -- exactly the board build's situation."""
     _write_aggregate(root, [_aggregate_game()])
-    games = src.soccer_live_games("2026-08-21")
+    games = src.soccer_live_games(_TODAY)
     assert len(games) == 1
     assert games[0]["home_team"] == "Arsenal"
     assert games[0]["projection"]["simulations"] == 400
@@ -89,7 +105,7 @@ def test_aggregate_alone_feeds_the_games_loader(root):
 
 def test_gate3_index_builds_from_the_aggregate_alone(root):
     _write_aggregate(root, [_aggregate_game()])
-    idx = src.soccer_live_gameline_index("2026-08-21")
+    idx = src.soccer_live_gameline_index(_TODAY)
     assert list(idx) == [("coventry city", "arsenal")]
     hit = idx[("coventry city", "arsenal")]
     assert hit["home_win_prob"] == 0.62
@@ -99,7 +115,7 @@ def test_gate3_index_builds_from_the_aggregate_alone(root):
 
 def test_gate2_index_builds_from_the_aggregate_alone(root):
     _write_aggregate(root, [_aggregate_game()])
-    report = src.soccer_live_prop_index("2026-08-21")
+    report = src.soccer_live_prop_index(_TODAY)
     assert report["live_games"] == 1
     assert report["rows_indexed"] == 2
     assert ("kai havertz", "player_shots", 2.5) in report["index"]
@@ -114,7 +130,7 @@ def test_gate1_corrects_from_the_aggregate_alone(root):
         "game": {"state": "pregame", "status_token": "2:00 PM CT"},
     }]
     out = board_enrichment.attach_live_game_state_from_lens(
-        grid, sport="soccer", selected_date="2026-08-21")
+        grid, sport="soccer", selected_date=_TODAY)
     assert out["supported"] is True
     assert out["rows_corrected"] == 1, out
     assert grid[0]["game"]["state"] == "live"
@@ -123,8 +139,8 @@ def test_gate1_corrects_from_the_aggregate_alone(root):
 
 def test_a_stale_dated_aggregate_is_refused(root):
     """A snapshot for another date must not price today's board."""
-    _write_aggregate(root, [_aggregate_game()], date="2026-08-20")
-    assert src.soccer_live_games("2026-08-21") == []
+    _write_aggregate(root, [_aggregate_game()], date="1999-01-01")
+    assert src.soccer_live_games(_TODAY) == []
 
 
 def test_empty_aggregate_falls_through_rather_than_masking(root):
@@ -133,13 +149,13 @@ def test_empty_aggregate_falls_through_rather_than_masking(root):
     _write_aggregate(root, [])
     d = root / "soccer_source" / "epl" / "api" / "live_state"
     d.mkdir(parents=True, exist_ok=True)
-    (d / "live_state_2026-08-21.json").write_text(
+    (d / f"live_state_{_TODAY}.json").write_text(
         json.dumps({
-            "league": "epl", "date": "2026-08-21",
+            "league": "epl", "date": _TODAY,
             "generated_at": "2026-08-21T19:20:00+00:00",
             "games": {"1": _aggregate_game()}, "match_box": {},
         }),
         encoding="utf-8",
     )
-    games = src.soccer_live_games("2026-08-21")
+    games = src.soccer_live_games(_TODAY)
     assert len(games) == 1, "per-league fallback was shadowed by an empty aggregate"

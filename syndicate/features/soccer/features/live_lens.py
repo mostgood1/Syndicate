@@ -315,6 +315,16 @@ class LivePlayerPropProjection:
     projected_remainder_shots: float
     projected_final_shots: float
     shots_over_probabilities: dict[str, float] = field(default_factory=dict)
+    # LIVE PARITY WITH PREGAME. The pregame artifact prices shots, shots on
+    # target AND assists per line; live carried shots only, so a board that
+    # priced three prop markets before kickoff silently dropped to one the
+    # moment a match went in play -- the opposite of what a live tier is for.
+    shots_on_target_so_far: int = 0
+    projected_final_shots_on_target: float = 0.0
+    shots_on_target_over_probabilities: dict[str, float] = field(default_factory=dict)
+    assists_so_far: int = 0
+    projected_final_assists: float = 0.0
+    assists_over_probabilities: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -325,10 +335,26 @@ class LivePlayerPropProjection:
             "projected_remainder_shots": self.projected_remainder_shots,
             "projected_final_shots": self.projected_final_shots,
             "shots_over_probabilities": dict(self.shots_over_probabilities),
+            "shots_on_target_so_far": self.shots_on_target_so_far,
+            "projected_final_shots_on_target": self.projected_final_shots_on_target,
+            "shots_on_target_over_probabilities": dict(self.shots_on_target_over_probabilities),
+            "assists_so_far": self.assists_so_far,
+            "projected_final_assists": self.projected_final_assists,
+            "assists_over_probabilities": dict(self.assists_over_probabilities),
         }
 
 
 _SHOT_LINES = (0.5, 1.5, 2.5, 3.5, 4.5)
+# IMPORTED, NOT RESTATED. These define what the PREGAME tier means by an
+# assist line and by "share of goals that are assisted". A second copy here
+# would let the two tiers drift into answering the same market with different
+# constants, which is the failure mode this repo has paid for repeatedly --
+# `live_gameline_join` says it plainly: "a second copy of this rule is how the
+# first one rotted".
+from syndicate.features.soccer.sim_engine.soccersim.player_props import (  # noqa: E402
+    _ASSIST_LINES,
+    _ASSISTED_GOAL_SHARE,
+)
 
 
 def project_live_player_props(
@@ -354,6 +380,15 @@ def project_live_player_props(
 
     home_remainder_shots: list[float] = []
     away_remainder_shots: list[float] = []
+    # Assists derive from GOALS, not shots -- pregame computes
+    # `team_goals * _ASSISTED_GOAL_SHARE * assist_share`, and reusing that
+    # formula is what keeps the two tiers answering the same question. The
+    # resumed sim's final score minus the score already on the board is the
+    # REMAINDER, which is the only part still to be allocated.
+    home_remainder_goals: list[float] = []
+    away_remainder_goals: list[float] = []
+    score_home_now = int(live_state.get("score_home") or 0)
+    score_away_now = int(live_state.get("score_away") or 0)
     for offset in range(max(1, simulations)):
         run_seed = seed + offset
         resume_state = build_resume_state(live_state, possession_owner=possession_owner)
@@ -379,23 +414,61 @@ def project_live_player_props(
         )
         home_remainder_shots.append(float(home_shots))
         away_remainder_shots.append(float(away_shots))
+        home_remainder_goals.append(max(0.0, float(int(output.final_score["home"]) - score_home_now)))
+        away_remainder_goals.append(max(0.0, float(int(output.final_score["away"]) - score_away_now)))
 
     mean_home_remainder = mean(home_remainder_shots) if home_remainder_shots else 0.0
     mean_away_remainder = mean(away_remainder_shots) if away_remainder_shots else 0.0
+    mean_home_remainder_goals = mean(home_remainder_goals) if home_remainder_goals else 0.0
+    mean_away_remainder_goals = mean(away_remainder_goals) if away_remainder_goals else 0.0
 
     projections: list[LivePlayerPropProjection] = []
-    for side, rows, team_remainder in (
-        ("home", home_player_rows, mean_home_remainder),
-        ("away", away_player_rows, mean_away_remainder),
+    for side, rows, team_remainder, team_remainder_goals in (
+        ("home", home_player_rows, mean_home_remainder, mean_home_remainder_goals),
+        ("away", away_player_rows, mean_away_remainder, mean_away_remainder_goals),
     ):
         if not rows:
             continue
         starters = {str(row.get("player_id")) for row in rows}
         usage_profiles = build_usage_profiles(rows, side=side, starters=starters)
         for profile_row in usage_profiles:
-            already = int(live_state.get("player_stats", {}).get(profile_row.player_id, {}).get("shots_so_far") or 0)
+            stats = live_state.get("player_stats", {}).get(profile_row.player_id, {}) or {}
+            already = int(stats.get("shots_so_far") or 0)
             remainder = team_remainder * profile_row.shot_share
             final_mean = already + remainder
+
+            # SHOTS ON TARGET. Pregame:
+            # `expected_shots_on_target = expected_shots * on_target_rate`,
+            # with the player's own rate clamped to [0.05, 0.80] and a 0.33
+            # fallback. Reused verbatim so the two tiers cannot answer the same
+            # market with different arithmetic.
+            rate = profile_row.on_target_rate
+            on_target_rate = min(0.80, max(0.05, float(rate))) if rate is not None else 0.33
+            sot_already = int(stats.get("shots_on_target_so_far") or 0)
+            sot_remainder = remainder * on_target_rate
+
+            # ASSISTS come from GOALS, not shots. Pregame:
+            # `team_goals * _ASSISTED_GOAL_SHARE * assist_share`. Applied to the
+            # sim's REMAINDER goals, because assists already recorded are
+            # banked and only the rest is still to be allocated.
+            assists_already = int(stats.get("assists_so_far") or 0)
+            assist_remainder = (
+                team_remainder_goals
+                * _ASSISTED_GOAL_SHARE
+                * min(1.0, max(0.0, float(profile_row.assist_share or 0.0)))
+            )
+
+            def _over(remaining: float, banked: int, lines) -> dict[str, float]:
+                # `int(line + 0.5)` is the smallest whole count that CLEARS the
+                # line; subtracting what is banked leaves what still has to
+                # happen. A player already past the line needs 0 more, and
+                # `poisson_at_least(x, 0)` is 1.0 -- which is correct and is why
+                # this is not clamped away.
+                return {
+                    f"{line:g}": round(poisson_at_least(remaining, max(0, int(line + 0.5) - banked)), 4)
+                    for line in lines
+                }
+
             projections.append(
                 LivePlayerPropProjection(
                     player_id=profile_row.player_id,
@@ -404,10 +477,13 @@ def project_live_player_props(
                     shots_so_far=already,
                     projected_remainder_shots=round(remainder, 4),
                     projected_final_shots=round(final_mean, 4),
-                    shots_over_probabilities={
-                        f"{line:g}": round(poisson_at_least(remainder, max(0, int(line + 0.5) - already)), 4)
-                        for line in _SHOT_LINES
-                    },
+                    shots_over_probabilities=_over(remainder, already, _SHOT_LINES),
+                    shots_on_target_so_far=sot_already,
+                    projected_final_shots_on_target=round(sot_already + sot_remainder, 4),
+                    shots_on_target_over_probabilities=_over(sot_remainder, sot_already, _SHOT_LINES),
+                    assists_so_far=assists_already,
+                    projected_final_assists=round(assists_already + assist_remainder, 4),
+                    assists_over_probabilities=_over(assist_remainder, assists_already, _ASSIST_LINES),
                 )
             )
     return tuple(projections)
