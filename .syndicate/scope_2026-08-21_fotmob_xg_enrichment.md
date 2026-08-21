@@ -137,6 +137,17 @@ PREGAME tier, where the lane's own falsification test already applies.
 of the lane's open question rather than an assumed win.** If it does not beat
 volume-only on the cutoff harness, it does not ship.
 
+**USER CONFIRMATION `[2026-08-21, user decision]`, and it is evidence rather
+than approval:** the user reports using FotMob's live xG MANUALLY, for the live
+tier specifically — reading whether a scoreline reflects the run of play. That
+is independent support for exactly the hypothesis (a) encodes, from someone
+acting on it with their own money, and it is the kind of signal that exists
+nowhere in the repo. It does NOT relax the verification bar in §5: a human
+reading xG in context is not the same claim as a Monte Carlo conditioned on an
+xG total, and the cutoff harness is still what decides. But it does move the
+live tier from "plausible" to "worth the spike", and it is the reason pregame
+stays out of scope rather than both being deferred.
+
 ## 7. Sequencing
 
 1. Spike: capture both reference matches, confirm shape, measure id join. **Output is a go/no-go.**
