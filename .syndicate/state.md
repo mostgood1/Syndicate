@@ -2160,6 +2160,18 @@ Fixed on `claude/layer2-odds-refresh-kbcxs8`, lane
 
   Matches the screenshot exactly: all 8 `batter_runs_scored` rows blank, every
   `batter_hits`/`batter_rbis`/`batter_hits_runs_rbis` row populated.
+  **MEASURED BEFORE/AFTER ON THE SAME REAL ARTIFACT** (15 games, 6,210 hitter
+  bucket rows), which is the strongest evidence in this whole block because it
+  is a coverage number rather than a code reading:
+
+      market               mean key BEFORE   before        after (r_mean/2b_mean/3b_mean)
+      batter_runs_scored   runs_mean          0/810   0%     810/810   100%
+      batter_doubles       doubles_mean       0/270   0%     270/270   100%
+      batter_triples       triples_mean       0/270   0%     270/270   100%
+
+  **0% -> 100% on 1,350 projections.** Values are the right MAGNITUDE, not merely
+  non-null: triples projects 0.058 against P(1+) 0.057, and for a rare event the
+  mean must approximate the probability -- a wrong-field join would not do that.
   **THE FILE ALREADY KNEW** -- `_HRR_COMPONENT_MEANS` is
   `("h_mean", "r_mean", "rbi_mean")`, so the HRR derivation read runs correctly
   while the runs MARKET did not, twenty lines apart.
