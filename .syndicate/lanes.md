@@ -1325,7 +1325,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **NOT unblocked by this find: TOTALS.** The sim publishes no game-level total
   distribution — `quarters` is `[]` and `players_summary` is bare counts. Totals
   still needs the OddsAPI historical backfill and a grade.
-- **REMAINING PHASES:** (3) carry `liveModelProbOver` per
+- **PHASE 3(a) DONE `[2026-08-21, user decision: option (a)]` — projections
+  published, NO probability.** `syndicate/features/shared/wnba_live_prop_rows.py`
+  joins the live capture to the sim anchor by NAME and emits one row per
+  (player, stat) carrying `liveProjectedStat`, `current`, `minutes_played/
+  remaining`, `pregame_mean/minutes`, plus `priceable: False` and
+  `not_priced_reason: live_prop_projection_has_no_measured_interval` spelled out
+  per row. **It carries no `liveModelProbOver`, so `build_live_prop_index`
+  cannot pick it up and the `sport != "mlb"` gate stays shut — by design, not by
+  omission**, and a test asserts no probability-shaped key ever appears.
+  Unmatched players are COUNTED AND NAMED (`players_unmatched`), because a name
+  join is the machinery whose 91% miss this project already paid an
+  investigation for. **A real defect the tests caught:** apostrophes were being
+  substituted with a space, so `A'ja Wilson` normalised to `a ja wilson` and
+  would have matched nothing — an apostrophe is intra-word, a hyphen separates
+  words, and they cannot share a rule. 33 tests + 20 subtests.
+  **Verified against real production data:** the empty-capture refusal fired on
+  the rolled slate (`games=3 players_with_stats=0` -> REFUSING to write).
+- **REMAINING PHASES:** (3b) derive `liveModelProbOver` per
   `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
   interval before any edge is priced** — same discipline as totals; an
