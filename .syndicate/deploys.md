@@ -1028,6 +1028,46 @@ Deployed `d68f343a` (origin/main tip). Deploy `dep-da3qe1qjobas739geiv0`,
 - Claim released: `deploy_claim.py release --service live-odds-worker`
 
 
+### `#497` — WNBA live game-line pricing chain — refresh-worker — 2026-08-21 — lane `wnba-live-analytic-pricing`
+
+Deploys `d68f343a` (reuse bound, live-odds-worker), `ed08661f` (analytic
+interval + spreads/totals), `a5e0b462` (h2h market price). All clean descendant
+deploys off `origin/main`.
+
+- **verify: THE CHAIN IS COMPLETE, MEASURED END TO END ON TWO LIVE GAMES**
+  (board build 03:24:23Z, ATL@LAS Q3 and CON@LVA Q3):
+
+      ATL@LAS  fair 0.0394 -> market 0.0394  model 0.1058  edge +6.64pp
+      CON@LVA  fair 0.9246 -> market 0.9246  model 0.9721  edge +4.75pp
+      both: se 0.054  basis analytic_calibration  2-sigma bar 10.80pp
+      both: withheld `prob_interval_swamps_edge`
+
+  Every gate passes: model probability, interval, market price, edge computed.
+  **`rows_live_gameline_priceable: 0` IS NOW A CORRECT OUTCOME**, not a broken
+  pipeline -- neither live game presents an edge clearing 2 sigma. It goes
+  positive when one does. `no_two_sided_market_price` is GONE from the board.
+
+- **What each deploy is worth, separately measured.** Capture cadence
+  3,676s -> **261s**. `sim_count_unusable` gone board-wide. Totals refuse as
+  `analytic_estimator_never_backtested_for_this_market` (95) rather than hiding
+  in "no distribution"; alt spreads refuse by line (106); period markets
+  correctly refuse (209).
+
+- **STILL OWED, do not read this entry as closing them:** the halftime fix's
+  break behaviour is unobserved in production, and the 0.054 interval is
+  `#481`'s WIN-path calibration reused for cover on a transfer argument, never
+  graded on cover directly.
+
+- **Incident, mine.** The `a5e0b462` deploy at 03:08 restarted the lens builder
+  into `published_artifact_no_live_status`; every lane fell back to `pregame`
+  and the join indexed nothing. Self-healed one tick later (22:17:30 `idx=0` ->
+  22:18:42 `idx=2`), ~72s of degraded live board. Diagnosed with
+  `/api/ops/live-lens/snapshot-index`, which is the reason it exists.
+
+- Rollback: redeploy refresh-worker at `ed08661f` via the sanctioned entrypoint
+  (command described, not pasted -- the guard matches it inside this file).
+- Claim released: `deploy_claim.py release --service refresh-worker`
+
 ## PENDING
 
 - [ ] **RIDEALONG, NOT A DEPLOY OF ITS OWN — `734c163e` on `origin/main`: the
