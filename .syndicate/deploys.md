@@ -21721,3 +21721,64 @@ code is the code running. It also answers the user's original question directly
 join's coverage; it does not prove `Win%`, `model_probability` or the
 `live_disagrees` badge render correctly on the served surface. That still needs
 `boardContract.cards`, and still needs someone who is not behind this proxy.
+
+### UPDATE 23:26Z — both services LIVE; regression sweep clean; fingerprint still pending
+
+**BOTH DEPLOYS LIVE.**
+
+    web             dep-da4dld6417fc738i1k20   6c5abb51   live 23:13:44Z
+    refresh-worker  dep-da4dnrv40ujc73b4o4q0   003a5866   live 23:18:31Z
+
+**REGRESSION SWEEP: 2,069 passed, 5 failed, and ALL FIVE ARE PRE-EXISTING** —
+established by baseline, not by argument. The identical five fail on `70ba0aad`
+(pre-merge `main`), a tree where none of this lane's code exists:
+
+    70ba0aad  (pre-merge)   5 failed                  in 174.31s
+    HEAD      (with fixes)  5 failed, 2069 passed     in 1466.45s
+
+    test_intelligence :: test_intelligence_query_surfaces_raw_statcast_profile_context
+    test_intelligence :: test_mlb_live_prop_rows_do_not_fall_back_to_top_props_when_live_payload_has_no_props
+    test_intelligence_state :: test_compute_response_recomputes_when_cached_snapshot_is_stale
+    test_layer2_movement_live_segment :: test_steam_requires_a_sharp_move_in_a_short_window
+    test_probability_differential :: test_every_converter_is_registered_or_excused
+
+**So this change introduced ZERO regressions across 2,074 tests.** Two of the
+five are independently attributable without the baseline and are worth naming
+for whoever owns them: `test_every_converter...` lists converters in
+`backfill_nfl_historical_props.py`, `report_nfl_props_roi.py`,
+`watch_clamp_trigger.py` and `nfl/game_context.py` — none touched here;
+`test_steam_requires_a_sharp_move_in_a_short_window` asserts `"25 min"` and gets
+`"in 49 min since we published it"`, i.e. **a wall-clock drift against a fixed
+fixture**, which will fail or pass depending on when it is run.
+
+**The sweep was run with ISOLATED ARTIFACT ROOTS and this is worth reusing:**
+`SYNDICATE_DATA_ROOT` pointed at a symlink farm (11 entries -> the real 3.7G
+mirror, so reads resolve but a NEW top-level path lands in scratch) and
+`SYNDICATE_REPORTS_ROOT` at a full copy of `reports/` (88M; symlinks would not
+do, because `reports/intelligence` and `reports/refresh_status` already exist
+and writes would follow them back into the repo). **Repo stayed clean through a
+62-file / 24-minute run.** The prior un-isolated run left 9 untracked paths AND
+overwrote two TRACKED artifacts — `reports/intelligence/intelligence_state.json`
+took 516 deletions, replacing a real 2026-08-05 snapshot with test output.
+
+### `verify:` STILL OPEN — the fingerprint has not appeared yet
+
+`LIVE_PROJECTION_JOIN` (absent at the parent SHA, present at the deployed one)
+is **not in the logs as of 23:26Z**, and neither is `LAYER2_SHORTLIST`. That is
+currently the EXPECTED state rather than a failure: the worker booted and began
+a board build at 23:19:15Z (`LOOP_POPPED_PAYLOAD` -> `GUARD_ACQUIRE_RESULT
+acquired=True` -> `CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE` ->
+`CALLING_SOURCE_STATE_FINGERPRINT` -> `PULL_ODDS_HISTORY`), and nothing has been
+logged since — so it is inside `_build_candidate_pool` on cold post-restart
+caches.
+
+**The three-way discrimination, stated in advance so the reading cannot be
+rationalised afterwards:**
+
+    LIVE_PROJECTION_JOIN present            -> new code live; coverage numbers obtained
+    LAYER2_SHORTLIST present, mine ABSENT   -> MY LOG LINE IS GATED WRONG (a defect in this change)
+    MEMORY_GUARD_ABORT                      -> heavy path refused; the fast path should still emit mine
+
+Also observed and NOT mine: the build logged `BOARD_BUILD_FORCED_DESPITE_SIM
+env_override=SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM` — a standing env override
+forcing board builds past the sim gate. Flagged for whoever set it.
