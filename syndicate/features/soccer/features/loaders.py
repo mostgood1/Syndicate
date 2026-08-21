@@ -21,6 +21,7 @@ from typing import Any
 from syndicate.features.soccer.contracts import SoccerMatchFeatures
 from syndicate.features.soccer.contracts import SoccerPlayerFeatures
 from syndicate.features.soccer.contracts import SoccerSimulationInput
+from difflib import SequenceMatcher
 from syndicate.features.soccer.features.team_names import canonical_team_name
 from syndicate.features.soccer.features.team_names import match_team_name
 
@@ -565,6 +566,55 @@ def build_soccer_match_features(
     )
 
 
+def _looks_like(candidate: str, target: str, *, threshold: float = 0.6) -> bool:
+    """Rough similarity, for EXPLAINING an alarm -- never for binding.
+
+    Deliberately looser than anything that decides a player's club. Its only
+    job is to answer "is this unbound source team plausibly the same club as
+    the fixture side that got zero players, spelled differently?" so the log
+    line points at the alias worth adding. Nothing downstream reads it.
+    """
+    if not candidate or not target:
+        return False
+    if candidate in target or target in candidate:
+        return True
+    return SequenceMatcher(None, candidate, target).ratio() >= threshold
+
+
+def _bind_player_team(source_team: str, fixture_by_canonical: dict[str, str]) -> str | None:
+    """The fixture team this player's club IS, or None when it is not playing.
+
+    Exact canonical identity, never fuzzy -- see the call site for the squad
+    absorption that fuzzy binding caused.
+
+    COMMA-JOINED TRANSFER ROWS are handled explicitly rather than by
+    accident. The ingested player CSVs record a mid-season move as a single
+    joined value -- `"Espanyol,Real Sociedad"`, `"Real Sociedad,Valencia"`,
+    `"Celta Vigo,Real Betis"` (3 such rows in la_liga alone). Under the old
+    fuzzy binding these matched by CONTAINMENT, scoring 0.9, which happened
+    to be right but for a reason that would equally have bound them to any
+    substring. Under exact binding they would silently vanish instead -- a
+    player who really did transfer to a club that really is playing today.
+
+    So: split on the comma and bind to whichever part is in this fixture. If
+    a row names BOTH sides of the fixture (a player who moved between the two
+    clubs facing each other), bind to neither and let the caller record it --
+    guessing which shirt they are wearing is not something this function can
+    do correctly, and picking one silently is how the original bug read.
+    """
+    if not source_team.strip():
+        return None
+    parts = [part.strip() for part in source_team.split(",") if part.strip()] or [source_team]
+    hits = {
+        fixture_by_canonical[canonical]
+        for canonical in (canonical_team_name(part) for part in parts)
+        if canonical and canonical in fixture_by_canonical
+    }
+    if len(hits) == 1:
+        return next(iter(hits))
+    return None
+
+
 def build_soccer_player_features(
     player_rows: list[dict[str, Any]],
     *,
@@ -579,9 +629,51 @@ def build_soccer_player_features(
     """
     features: list[SoccerPlayerFeatures] = []
     dropped_teams: dict[str, int] = {}
+    # EXACT canonical binding, by club identity. `match_team_name`'s fuzzy
+    # fallback is deliberately NOT used here any more.
+    #
+    # WHY. This function asks "which of TODAY'S fixture teams is this player's
+    # club?" of every row in the league, and rewrites the row's team to the
+    # answer. For a club that is not playing today the correct answer is
+    # "none" -- but a fuzzy matcher never returns none while any candidate is
+    # within 0.72, so it returned the nearest name instead.
+    #
+    # Measured on production 2026-08-21, la_liga, fixture Real Sociedad @
+    # Real Betis: the artifact carried **50 Real Sociedad players**. 21 were
+    # genuine. 26 were REAL OVIEDO, absorbed at ratio 0.750, plus 3
+    # comma-joined transfer rows. Every real Sociedad player's shot and prop
+    # share was therefore diluted across a squad 2.4x too large, and 26
+    # players who are not in the squad drew projections.
+    #
+    # It was never one club pair. Scored against the real club strings in
+    # each league's own data, SIX pairs collide, including **Manchester City
+    # vs Manchester United at 0.812**:
+    #     epl        Manchester City   <-> Manchester United    0.812
+    #     ligue_1    Paris FC          <-> Paris Saint Germain  containment
+    #     belgian    Cercle Brugge KSV <-> Club Brugge          containment
+    #     la_liga    Real Oviedo       <-> Real Sociedad        0.750
+    #     mls        LA Galaxy         <-> Los Angeles FC       0.750
+    #     mls        Atlanta United    <-> Minnesota United     0.722
+    # It only fires when one of a pair plays and the other does not -- when
+    # both are on the slate each matches itself exactly and wins outright,
+    # which is why this survived so long.
+    #
+    # RAISING THE THRESHOLD DOES NOT WORK: same-club and different-club score
+    # ranges overlap (same-club 0.833-0.933, different-club 0.722-0.812).
+    # Exact binding is only possible because `canonical_team_name` was fixed
+    # in the same change to fold accents rather than blow words apart
+    # ("alaves", not "alav s") -- the mangling those fuzzy scores existed to
+    # absorb. Legitimate spelling differences are now handled where they
+    # belong, in `_ALIASES`/`_NOISE_TOKENS`, deterministically.
+    fixture_by_canonical: dict[str, str] = {}
+    for team in fixture_teams:
+        canonical = canonical_team_name(team)
+        if canonical:
+            fixture_by_canonical.setdefault(canonical, team)
+
     for row in player_rows:
         source_team = str(row.get("team") or "")
-        fixture_team = match_team_name(source_team, fixture_teams)
+        fixture_team = _bind_player_team(source_team, fixture_by_canonical)
         if fixture_team is None:
             # #148 follow-up. Same "no error path for an unmatched case"
             # shape as #146's _load_player_rows -- a roster-CSV team name
@@ -625,10 +717,42 @@ def build_soccer_player_features(
                 adapter_metadata={"source_team": source_team, "source": row.get("source")},
             )
         )
-    if dropped_teams:
+    # THE ALARM IS AN EMPTY SIDE, NOT AN UNMATCHED ROW.
+    #
+    # This used to print every source team that failed to bind. Under the old
+    # fuzzy binding almost nothing failed, so that list was short and meant
+    # something. Under exact binding EVERY club not playing today fails to
+    # bind -- by design -- so the same print became ~26 clubs on every
+    # fixture, which is not a signal, it is noise that would bury the real
+    # one. (Observed immediately on the first run of this change: a single
+    # la_liga fixture printed all nineteen other clubs.)
+    #
+    # The condition actually worth shouting about is the one #148 was written
+    # for: a fixture team that ends up with NO players at all, because its
+    # name in the player CSV does not resolve to its name in the schedule.
+    # That is a silent zero for one side of a real match. Report THAT, with
+    # the near-misses that would explain it, and stay quiet about clubs whose
+    # only crime is not playing today.
+    bound_canonicals = {canonical_team_name(feature.team) for feature in features}
+    empty_sides = [
+        team for team in fixture_teams
+        if canonical_team_name(team) and canonical_team_name(team) not in bound_canonicals
+    ]
+    if empty_sides:
+        near = {
+            source: count
+            for source, count in dropped_teams.items()
+            if any(
+                _looks_like(canonical_team_name(source), canonical_team_name(team))
+                for team in empty_sides
+            )
+        }
         print(
-            f"[loaders] SOCCER_PLAYER_ROWS_UNMATCHED_TEAM league={league} date={date} "
-            f"fixture_teams={list(fixture_teams)} dropped_by_source_team={dropped_teams}",
+            f"[loaders] SOCCER_FIXTURE_TEAM_NO_PLAYERS league={league} date={date} "
+            f"empty_sides={empty_sides} player_rows={len(player_rows)} "
+            f"nearest_unbound_source_teams={near or 'none'} "
+            "(a fixture side resolved to zero players; if a nearest source team "
+            "above is that club under another spelling, add it to _ALIASES)",
             flush=True,
         )
     return tuple(features)

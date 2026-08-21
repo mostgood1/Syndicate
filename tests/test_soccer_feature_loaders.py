@@ -81,22 +81,167 @@ class BuildSoccerPlayerFeaturesTests(unittest.TestCase):
         self.assertEqual(features[0].player_name, "Real Player")
         self.assertEqual(features[0].team, "Manchester City")
 
-    def test_unmatched_team_prints_a_visible_drop_summary(self) -> None:
+    def test_a_club_that_simply_is_not_playing_today_is_dropped_QUIETLY(self) -> None:
+        """REPLACES `test_unmatched_team_prints_a_visible_drop_summary`, which
+        asserted that every unbound source team was announced.
+
+        That was right when binding was fuzzy: almost nothing failed to bind,
+        so the list was short and meant something. Binding is exact now, so
+        EVERY club not playing today fails to bind by design -- on the first
+        real run of this change one la_liga fixture printed all nineteen
+        other clubs. A signal that fires on normal operation is noise, and it
+        would bury the condition #148 actually cared about.
+
+        Real Madrid not playing in Manchester City v Everton is not an event.
+        """
+        rows = self._rows() + [
+            {"player_id": "p3", "player_name": "Toffee", "team": "Everton", "position": "DF"},
+        ]
+        with patch("builtins.print") as mocked_print:
+            features = build_soccer_player_features(
+                rows, league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"]
+            )
+        self.assertEqual({f.team for f in features}, {"Manchester City", "Everton"})
+        mocked_print.assert_not_called()
+
+    def test_a_fixture_side_with_ZERO_players_alarms_and_names_the_near_miss(self) -> None:
+        """The condition #148 was written for, kept and sharpened.
+
+        A side whose schedule spelling does not resolve against the player
+        CSV's spelling gets no players at all -- a silent zero for one half of
+        a real match. The log now names that side AND the unbound source team
+        that most plausibly IS that club, so the reader is pointed straight at
+        the `_ALIASES` entry worth adding rather than at nineteen innocent
+        clubs.
+        """
+        rows = [
+            {"player_id": "p1", "player_name": "Real Player", "team": "Manchester City", "position": "FW"},
+            {"player_id": "p2", "player_name": "Toffee", "team": "Everton", "position": "DF"},
+        ]
         with patch("builtins.print") as mocked_print:
             build_soccer_player_features(
-                self._rows(), league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"]
+                rows, league="epl", date="2026-08-01",
+                fixture_teams=["Manchester City", "Everton Football Club XI"],
             )
         mocked_print.assert_called_once()
-        printed_text = mocked_print.call_args.args[0]
-        self.assertIn("SOCCER_PLAYER_ROWS_UNMATCHED_TEAM", printed_text)
-        self.assertIn("Real Madrid", printed_text)
+        printed = mocked_print.call_args.args[0]
+        self.assertIn("SOCCER_FIXTURE_TEAM_NO_PLAYERS", printed)
+        self.assertIn("Everton Football Club XI", printed)
+        self.assertIn("Everton", printed)
 
-    def test_no_print_when_every_row_matches(self) -> None:
-        rows = [{"player_id": "p1", "player_name": "Real Player", "team": "Manchester City", "position": "FW"}]
+    def test_no_print_when_both_sides_have_players(self) -> None:
+        rows = [
+            {"player_id": "p1", "player_name": "Real Player", "team": "Manchester City", "position": "FW"},
+            {"player_id": "p2", "player_name": "Toffee", "team": "Everton", "position": "DF"},
+        ]
         with patch("builtins.print") as mocked_print:
-            features = build_soccer_player_features(rows, league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"])
-        self.assertEqual(len(features), 1)
+            features = build_soccer_player_features(
+                rows, league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"]
+            )
+        self.assertEqual(len(features), 2)
         mocked_print.assert_not_called()
+
+
+class SquadAbsorptionTests(unittest.TestCase):
+    """A club must never be able to absorb another club's squad.
+
+    Measured on production 2026-08-21, la_liga, Real Sociedad @ Real Betis:
+    the artifact carried 50 Real Sociedad players. 21 were genuine, 26 were
+    REAL OVIEDO absorbed at fuzzy ratio 0.750, and 3 were comma-joined
+    transfer rows. Every real Sociedad player's prop share was diluted across
+    a squad 2.4x too large.
+
+    Six club pairs collide this way across five leagues, including Manchester
+    City vs Manchester United at 0.812. It only fires when one of a pair plays
+    and the other does not, which is why it survived so long.
+    """
+
+    def _rows(self, *teams):
+        return [
+            {"player_id": f"p{i}", "player_name": f"P{i}", "team": team, "position": "FW"}
+            for i, team in enumerate(teams)
+        ]
+
+    def test_real_oviedo_is_not_absorbed_into_real_sociedad(self) -> None:
+        features = build_soccer_player_features(
+            self._rows("Real Sociedad", "Real Oviedo"),
+            league="la_liga", date="2026-08-21",
+            fixture_teams=["Real Sociedad", "Real Betis"],
+        )
+        self.assertEqual([f.team for f in features], ["Real Sociedad"])
+
+    def test_manchester_united_is_not_absorbed_into_manchester_city(self) -> None:
+        """0.812 -- the highest-scoring collision found, and the one that
+        would have been most visible had it landed on a City fixture."""
+        features = build_soccer_player_features(
+            self._rows("Manchester City", "Manchester United"),
+            league="epl", date="2026-08-21",
+            fixture_teams=["Manchester City", "Everton"],
+        )
+        self.assertEqual([f.team for f in features], ["Manchester City"])
+
+    def test_every_measured_collision_pair(self) -> None:
+        for league, absent, present, other in [
+            ("la_liga", "Real Oviedo", "Real Sociedad", "Real Betis"),
+            ("epl", "Manchester United", "Manchester City", "Everton"),
+            ("ligue_1", "Paris FC", "Paris Saint Germain", "Lyon"),
+            ("mls", "Los Angeles FC", "LA Galaxy", "Austin FC"),
+            ("belgian_pro_league", "Club Brugge", "Cercle Brugge KSV", "Genk"),
+            ("mls", "Minnesota United FC", "Atlanta United FC", "Austin FC"),
+        ]:
+            with self.subTest(league=league, absent=absent):
+                features = build_soccer_player_features(
+                    self._rows(present, absent),
+                    league=league, date="2026-08-21", fixture_teams=[present, other],
+                )
+                self.assertEqual([f.team for f in features], [present])
+
+    def test_legitimate_spelling_variants_STILL_BIND(self) -> None:
+        """The other half, and the reason exact binding needed the
+        canonicalizer fixed first. These clubs are spelled one way in the
+        player CSV and another in the schedule; binding them is not optional
+        -- dropping them would delete 11 clubs' entire squads."""
+        for league, csv_name, schedule_name in [
+            ("la_liga", "Alaves", "Alav\u00e9s"),
+            ("la_liga", "Atletico Madrid", "Atl\u00e9tico Madrid"),
+            ("bundesliga", "Borussia M.Gladbach", "Borussia M\u00f6nchengladbach"),
+            ("bundesliga", "Hamburger SV", "Hamburg SV"),
+            ("bundesliga", "Union Berlin", "1. FC Union Berlin"),
+            ("bundesliga", "Mainz 05", "Mainz"),
+            ("bundesliga", "Hoffenheim", "TSG Hoffenheim"),
+            ("ligue_1", "Auxerre", "AJ Auxerre"),
+            ("serie_a", "Inter", "Internazionale"),
+        ]:
+            with self.subTest(league=league, club=csv_name):
+                features = build_soccer_player_features(
+                    self._rows(csv_name),
+                    league=league, date="2026-08-21",
+                    fixture_teams=[schedule_name, "Some Other Club"],
+                )
+                self.assertEqual(len(features), 1, f"{csv_name} lost its squad")
+                self.assertEqual(features[0].team, schedule_name)
+
+    def test_a_transfer_row_binds_to_whichever_club_is_playing(self) -> None:
+        """The ingested CSVs record a mid-season move as one joined value --
+        "Espanyol,Real Sociedad". Under fuzzy binding these matched by
+        containment; under exact binding they would silently vanish, so they
+        are split and bound deliberately."""
+        features = build_soccer_player_features(
+            self._rows("Espanyol,Real Sociedad", "Real Sociedad,Valencia"),
+            league="la_liga", date="2026-08-21",
+            fixture_teams=["Real Sociedad", "Real Betis"],
+        )
+        self.assertEqual([f.team for f in features], ["Real Sociedad", "Real Sociedad"])
+
+    def test_a_transfer_between_the_two_clubs_playing_binds_to_NEITHER(self) -> None:
+        """Guessing which shirt they are wearing is not something this can do
+        correctly, and picking one silently is how the original bug read."""
+        features = build_soccer_player_features(
+            self._rows("Real Sociedad,Real Betis"),
+            league="la_liga", date="2026-08-21",
+            fixture_teams=["Real Sociedad", "Real Betis"],
+        )
+        self.assertEqual(features, ())
 
 
 class TeamRatingTests(unittest.TestCase):

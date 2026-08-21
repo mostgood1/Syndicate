@@ -11,14 +11,41 @@ comparison so new spellings degrade softly instead of dropping teams.
 from __future__ import annotations
 
 import re
+import unicodedata
 from difflib import SequenceMatcher
 
 _NOISE_TOKENS = {
     "fc", "cf", "afc", "sc", "ac", "as", "ss", "ssc", "cd", "rc", "rcd",
     "club", "de", "the",
+    # Added 2026-08-20. Same class as the entries above -- a club-type
+    # prefix one source carries and another does not -- found by comparing
+    # each league's players_*.csv club names against its own schedule:
+    #   "TSG Hoffenheim" vs "Hoffenheim", "AJ Auxerre" vs "Auxerre".
+    #   "Hamburger SV" vs "Hamburg SV" -- "sv" (Sportverein) is the same
+    #   class of club-type token as "fc"/"sc" already in this set.
+    "tsg", "aj", "sv",
 }
 
 _ALIASES: dict[str, str] = {
+    # Added 2026-08-20, from a measured comparison of every league's
+    # players_*.csv club names against that league's own schedule. These are
+    # the variants that survive accent-folding and noise-stripping and still
+    # differ -- genuine short/long forms, not spelling noise. Left as
+    # explicit entries rather than loosening the fuzzy threshold, because the
+    # same-club and different-club score ranges OVERLAP: same-club pairs run
+    # 0.833-0.933 and different-club pairs 0.722-0.812 (Manchester City vs
+    # Manchester United is 0.812), so no threshold separates them and one
+    # tuned to today's six collisions would be a coincidence.
+    "internazionale": "inter",
+    "inter milan": "inter",
+    "hamburger sv": "hamburg",
+    "hamburger": "hamburg",
+    "borussia m.gladbach": "borussia monchengladbach",
+    "borussia mgladbach": "borussia monchengladbach",
+    "m.gladbach": "borussia monchengladbach",
+    "mainz 05": "mainz",
+    "1. union berlin": "union berlin",
+    "1 union berlin": "union berlin",
     # EPL — football-data.co.uk short forms and market variants.
     "man city": "manchester city",
     "man united": "manchester united",
@@ -81,9 +108,41 @@ _ALIASES: dict[str, str] = {
 }
 
 
+def _fold_accents(text: str) -> str:
+    """`alaves`, not `alav s`.
+
+    THE DEFECT THIS FIXES. `canonical_team_name`'s ASCII scrub
+    (`[^a-z0-9' .]+` -> " ") treats every non-ASCII character as noise and
+    replaces it with a SPACE, which does not strip an accent -- it splits the
+    word in half:
+
+        Alaves           -> "alaves"
+        Alaves (accented)-> "alav s"
+        Atletico Madrid  -> "atletico madrid"
+        Atletico (acc.)  -> "atl tico madrid"
+        Monchengladbach  -> "m nchengladbach"
+
+    So an accented club name NEVER canonicalized to its unaccented twin, in
+    any of the five leagues that have them (la_liga, serie_a, ligue_1,
+    bundesliga, primeira_liga). `match_team_name`'s fuzzy fallback has been
+    compensating for that all along, and **that is why its threshold had to
+    be as low as 0.72** -- low enough to survive a word split, and therefore
+    also low enough to match Real Oviedo to Real Sociedad at 0.750 and
+    absorb an entire squad. Fixing the canonicalizer is what makes exact
+    binding possible downstream.
+
+    NFKD then drop combining marks, BEFORE the scrub, so the base letter
+    survives. Measured across all ten leagues' club lists: **0 distinct
+    clubs collapse into each other** as a result.
+    """
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def canonical_team_name(name: str) -> str:
     text = str(name or "").strip().lower()
     text = text.replace("&", "and")
+    text = _fold_accents(text)
     text = re.sub(r"[^a-z0-9' .]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     if text in _ALIASES:
