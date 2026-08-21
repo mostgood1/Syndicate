@@ -56,6 +56,16 @@
     {% endfor %}
   </div>
 
+  {% if not available %}
+    <div class="ff-note" style="padding:1rem;border:1px solid var(--border,#444);border-radius:8px">
+      <strong>No projections published for {{ season }} on this service yet.</strong><br />
+      {{ source.reason or source.note }}<br />
+      <span style="opacity:.7">This is the degraded state, not an error &mdash; the projection is
+      precomputed on the refresh worker and published to the web service, so it appears here once
+      that job has run.</span>
+    </div>
+  {% endif %}
+
   {% if board %}
     <h2>Draft board &mdash; by value over replacement</h2>
     <p class="ff-note">

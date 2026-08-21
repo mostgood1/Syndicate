@@ -175,6 +175,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # One document per season, not per week, deliberately: the allowlist drives
     # publishing as well as reading and this repo's egress history is expensive
     # (`#322`). The usage docs are ~4.7 MB each and there are four.
+    # The SERVED artifact: stat lines the web scores per request. This is the
+    # one the web dyno actually needs -- the usage/news docs below are worker
+    # inputs, allowlisted for auditability rather than for serving.
+    "nfl_source/fantasy/nfl_fantasy_projections_*.json",
     "nfl_source/fantasy/nfl_fantasy_usage_*.json",
     "nfl_source/fantasy/nfl_fantasy_news_*.json",
     "nfl_source/fantasy/nfl_fantasy_input_report_*.json",
