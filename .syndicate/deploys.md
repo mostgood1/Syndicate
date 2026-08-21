@@ -883,7 +883,60 @@ people learn to route around. Run the gate, read it, then deploy.
 
 ---
 
-### PENDING
+#### `#496` — WNBA live reuse bound — live-odds-worker — 2026-08-21 01:21Z — lane `wnba-live-reuse-bound`
+
+Deployed `d68f343a` (origin/main tip). Deploy `dep-da3qe1qjobas739geiv0`,
+`trigger=api`, live 01:21Z.
+
+- **verify: MEASURED ON A LIVE GAME (IND@DAL, Q3).** The capture cadence is the
+  reading that matters, and it changed by ~14x:
+
+      BEFORE  book_quotes last-seen  00:07:49Z -> 01:09:05Z   = 3,676s (61 min)
+      AFTER   book_quotes last-seen  01:21:27Z -> 01:25:48Z   =   261s (4.35 min)
+
+  `/api/ops/wnba/refresh-decision` now carries `phase="live"` and
+  `reuse_max_age_s=240.0`; both read `null` pre-deploy, which is the clean
+  discriminator that the NEW code is what is serving. Ticks between the two
+  captures correctly read `reused_artifact_bundle` — a bundle 96s old SHOULD be
+  reused at a 240s bound. Reuse is not the bug; reuse past the caller's own
+  cadence was.
+
+- **The restart is not the explanation, and I checked.** The 01:21:27 capture
+  alone would have been attributable to the deploy's own restart. The 01:25:48
+  capture is steady-state, 261s later — one live interval, unprompted.
+
+- **`--allow-rollback` was required and it was NOT a rollback.** live-odds-worker
+  was on `a05412f9`, NOT an ancestor of main, with 10 commits living only on that
+  deploy branch. `render_deploy` refuses a non-descendant. Verified by CONTENT
+  that all 10 are already on main — the WNBA autorun
+  (`_launch_autorun_wnba_live_refresh`), `#488`'s `_publisher_identity` and
+  `_publish_divergence_verdict`, `#480`'s geometry guard, and the four soccer
+  commits at their newest revision. Nothing live was lost; this re-parents the
+  service onto main so future deploys compose again.
+
+- **CORRECTION to this lane's earlier claim.** `book_quotes` was NOT frozen
+  indefinitely. It advanced 00:07:49Z -> 01:09:05Z pre-deploy, so the operative
+  pregame bound is ~3,600s, not the 7,200s code default recorded in
+  `wnba-live-odds-capture-gap`. That number was flagged UNVERIFIED there (code
+  default, live env-vars never read) and this is the evidence it was wrong. The
+  fix is unaffected — 240s against ~3,600s is still ~14x.
+
+- **I deployed during a live game and said I had not.** IND@DAL was in progress;
+  a watcher of mine misread halftime as FINAL and I repeated it as fact instead
+  of reading the served payload. `check_deploy_safety` warned "Live games in
+  progress" and I discounted it on that bad reading. No in-flight job was killed
+  (I waited for the odds child to go defunct, and the MLB sim was on another
+  service), but the disruption to live-lens ticks was real and unacknowledged at
+  the time. The halftime defect that caused the misread is fixed separately in
+  `3b41696d`.
+
+- Rollback: redeploy live-odds-worker at the prior SHA `a05412f9` via the
+  sanctioned deploy entrypoint, with the rollback flag (command described, not
+  pasted — the guard pattern-matches it inside this file).
+- Claim released: `deploy_claim.py release --service live-odds-worker`
+
+
+## PENDING
 
 - [ ] **RIDEALONG, NOT A DEPLOY OF ITS OWN — `734c163e` on `origin/main`: the
       props-snapshot `force_refresh` escape.** Whoever next deploys **either
