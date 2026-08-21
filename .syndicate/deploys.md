@@ -21262,3 +21262,62 @@ off for ~1 minute and restored, verified structurally identical to backup
 PRICING a live edge, only withholding one by name. That needs a live soccer
 market quoted two-sided, which tonight's four did not provide. The mechanism is
 verified; the priced outcome is not.
+
+## 2026-08-21 ~20:0x-20:4xZ — NFL fantasy: autorun LIVE, multiselect filters LIVE, and one BAD ARTIFACT SERVED
+
+web `c81a174c` → `aaea345b` (filters) · refresh-worker `f017c031` → `5357d52a`
+→ `a48c8530` (autorun, then the guard). Preflight CLEAR each time, claims held
+and released, `render.yaml` never touched.
+
+**THE AUTORUN WORKS AND ITS FIRST RUN SHIPPED A BROKEN BOARD.** Recorded in
+that order because both are true.
+
+verify (autorun fired): worker log
+`NFL_FANTASY_ARTIFACT_SKIPPED reason=rate_limited marker_age_s=970/interval_s=86400`
+and a served `generated_at` of **19:50:48Z**, newer than the 18:35:14Z hand
+publish. It built, published, and rate-limited itself for 24h.
+
+**verify (it was WRONG): `weeks: []` against 18 requested, 318 KB against a
+normal 2.83 MB, and Christian McCaffrey at 525.5 PPR points against a correct
+~270.** The worker has no `schedules_games.csv`, so there were no game
+environments: every weekly projection came out empty and the season fell back
+to a no-market path. Nothing raised. It OVERWROTE the correct artifact, and the
+board it produced looked entirely plausible — right names, believable order.
+Production served it for roughly the time it took to notice.
+
+Correct artifact republished by hand at **20:19:28Z**; final state verified: 18
+weeks, 2.83 MB, Bijan 326.4 / Chase 311.4, week 5 resolving BAL as opponent.
+
+### Why the input checklist could not catch it
+
+`model_engine_standard.md` s1's checklist verifies the roster and the usage
+documents. The schedule was simply **not on its list**. An input checklist only
+ever covers the inputs somebody thought of, and this engine reads an input that
+NOTHING IN THE REPO WRITES — `game_context.py` had independently recorded the
+same `count 0` absence months earlier.
+
+So the job now checks its OWN OUTPUT and refuses to publish:
+`degenerate_reasons()` blocks when weeks were requested and none produced, when
+there are no season rows, or when the top season projection leaves a plausible
+band. **The first band was 150-600, which waves 525.5 straight through — a band
+wide enough to admit the failure it was written for is not a check.** It is now
+150-480, and a test asserts the ceiling stays below 525.5.
+
+`--prepare` also fetches the schedule now (nflverse `nfldata/games.csv`, not
+season-scoped, so it did not fit the release-asset pattern the roster and depth
+charts use).
+
+### Also live
+
+Positions are MULTISELECT (`?position=RB,WR`, each pill toggling itself in or
+out), the rails reuse the Layer 2 board's `cards-tab` classes, and **the
+all-up draft board now takes the stat columns too** — "all projected stats" had
+widened only the per-position tables, so clicking it from the default view,
+where the board is the first and largest table, appeared to do nothing.
+
+### Owed
+
+The autorun is rate-limited until ~19:50Z tomorrow. **Its next run is the real
+verification of the guard** — it should either publish a healthy artifact (now
+that `--prepare` fetches the schedule) or refuse and say why. Neither has been
+observed yet on the worker.
