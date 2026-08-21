@@ -811,7 +811,7 @@ _MODEL_EDGE_MAX_POINTS = 15.0
 # carry it, this bound is the guard -- and it is a GUARD, not a calibration.
 
 
-def _model_edge_for(row: Mapping[str, Any], side: str) -> float | None:
+def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> float | None:
     """The sim's disagreement with the market, in POINTS OF PROBABILITY.
 
     Only `edge_vs_market_pct` qualifies. A mean-based `edge_vs_line` (WNBA, and
@@ -837,11 +837,56 @@ def _model_edge_for(row: Mapping[str, Any], side: str) -> float | None:
         # ranking at the ceiling value and make every affected row tie at the
         # top -- a wrong answer wearing a plausible one's clothes (#242).
         return None
-    # The projection is stated from one side; flip it for the other.
     projected_side = str(projection.get("side") or "").strip().lower()
-    if projected_side and projected_side != str(side).strip().lower():
-        return -edge
-    return edge
+    row_side = str(side).strip().lower()
+    if not projected_side or projected_side == row_side:
+        return edge
+
+    # NEGATION IS A TWO-WAY IDENTITY AND SOCCER h2h IS THREE-WAY.
+    #
+    # `-edge_home` is the other side's edge only when there IS exactly one other
+    # side, because P(away) = 1 - P(home) makes the two errors equal and
+    # opposite. With a draw leg the three edges sum to zero but are otherwise
+    # unrelated, so negating the home-framed edge answers a question about a
+    # different outcome.
+    #
+    # MEASURED on the served shortlist 2026-08-21, soccer h2h, 49 rows -- 23
+    # away and 13 draw take this branch:
+    #
+    #   RC Lens v Auxerre, away:  published +1.63  TRUE -1.65   SIGN INVERTED
+    #   Orlando v Real Salt Lake: published +9.47  TRUE +6.83
+    #   Arsenal v Coventry, draw: published +0.16  TRUE +0.18
+    #
+    # It looks nearly right on a heavy favourite and inverts on a close one,
+    # which is the worst available failure mode. `model_edge_pct` feeds
+    # `blended_score` and `sim_view`, so RC Lens ranked and rendered as a side
+    # the model LIKES while the model disliked it -- exactly the inversion this
+    # function's own docstring says the bound exists to prevent.
+    #
+    # So: price this side DIRECTLY where the three-way vector is present. Both
+    # terms stay in the unconditional three-way space, the property
+    # `soccer_projections._price_against_market` documents as what makes the
+    # comparison valid at all.
+    model_by_side = {
+        "home": _as_float(projection.get("model_prob_over")),
+        "draw": _as_float(projection.get("draw_probability")),
+        "away": _as_float(projection.get("away_probability")),
+    }
+    if model_by_side["draw"] is not None:
+        model_prob = model_by_side.get(row_side)
+        fair_prob = _as_float(fair)
+        if model_prob is None or fair_prob is None:
+            # A three-way market whose side we cannot price is dropped, NOT
+            # negated. Falling back to the two-way identity here is how the bug
+            # above would survive its own fix.
+            return None
+        direct = (model_prob - fair_prob) * 100.0
+        if abs(direct) > _MODEL_EDGE_MAX_POINTS:
+            return None
+        return round(direct, 4)
+
+    # Two-way market: the identity holds and MLB/WNBA behaviour is unchanged.
+    return -edge
 
 
 def build_layer2_rows(
@@ -1079,7 +1124,7 @@ def build_layer2_rows(
             lanes[lane] = lanes.get(lane, 0) + 1
 
             ev = expected_value_pct(price, fair) if fair is not None else None
-            model_edge = _model_edge_for(row, side)
+            model_edge = _model_edge_for(row, side, fair)
             # Computed ONCE, here, and stamped onto the candidate so the card
             # builder reuses it rather than recomputing against the same index.
             # Ranking on a movement number the card does not show (or showing
