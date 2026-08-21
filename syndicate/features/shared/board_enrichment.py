@@ -206,43 +206,74 @@ def _coerce_score(value: Any) -> Any:
 
 
 def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | None] | None:
-    """Soccer's equivalent of MLB's lens `games`, from the live-state poller.
+    """Soccer's equivalent of MLB's lens `games`, for the chip-state correction.
 
-    SOCCER'S LIVE STATE IS NOT AT `live/soccer_live_lens.json`. That path is a
-    bookkeeping snapshot for `live_lens_loop.py`'s own tick status and says so in
-    its docstring; the real per-match state is written per league by
-    `scripts/poll_soccer_live_state.py` to
-    `soccer_source/<league>/api/live_state/live_state_<date>.json`. Reading the
-    lens path for soccer would find a file, parse it, and correct nothing --
-    the failure mode this repo calls "supported: true, zero rows" and cannot
-    tell apart from "no matches live".
+    TWO SOURCES, AND THE ORDER IS THE POINT.
 
-    READS `match_box`, NOT `games`. The poller's own comment is explicit that
-    `games` means "matches IN PLAY" and a finished match must never appear
-    there, while `match_box` spans `in` AND `post`. Gate 1 exists to move a
-    frozen chip to `final`, so the map that carries finished matches is the only
-    correct input. Measured 2026-08-20: la_liga's completed ALA 1-1 RAY sat in
-    `match_box` with `count: 0` on `games`.
+    `live/soccer_live_lens.json` is written through `refresh_state_store`, i.e.
+    the KEYVALUE backend, so it is the only soccer live data a DIFFERENT service
+    can read. The board is built on refresh-worker; the per-league
+    `soccer_source/<league>/api/live_state/` files are a filesystem write on
+    live-odds-worker. Measured 2026-08-21 17:05Z: reading only the per-league
+    tree from the board build reported "no published live-state artifact for any
+    league" while all ten files existed and were seconds old.
 
-    Returns (lens_games, age_seconds) or None when no league file could be read
-    at all -- which the caller must report differently from "read them, nothing
-    live", because those have different fixes.
+    The aggregate carries `games` -- matches IN PLAY -- and NOT `match_box`. So
+    the per-league read stays, and is the only thing that can move a chip to
+    `final`: `match_box` spans `in` AND `post` while `games` is in-play only,
+    which is the asymmetry the poller's own comment insists on. Where both are
+    readable, both are used.
     """
     from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+    from syndicate.features.shared.soccer_live_gameline_source import soccer_live_games
 
-    root = data_root() / "soccer_source"
-    if not root.exists():
-        return None
-
-    # ESPN's status vocabulary, which soccer carries through verbatim. Distinct
-    # from MLB's `_LENS_ABSTRACT_TO_STATE` tokens rather than reusing them: a
-    # shared mapping would silently admit whichever vocabulary drifted first.
-    state_by_token = {"in": "live", "post": "final", "pre": "pregame"}
-
+    root = data_root()
     lens_games: list[dict] = []
     oldest_age: float | None = None
-    files_read = 0
-    for league_dir in sorted(root.iterdir()):
+    saw_source = False
+
+    # ESPN's status vocabulary, carried through verbatim by the poller. Kept
+    # distinct from MLB's `_LENS_ABSTRACT_TO_STATE` rather than shared: one
+    # mapping for two vocabularies would silently admit whichever drifted first.
+    state_by_token = {"in": "live", "post": "final", "pre": "pregame"}
+
+    def _add(record, state):
+        lens_games.append({
+            "state": state,
+            # The grid joins on team NAME; soccer publishes no abbr here, and
+            # `_side_matches` skips falsy tokens rather than matching on them.
+            "home": {"name": record.get("home_team")},
+            "away": {"name": record.get("away_team")},
+            "detailed": record.get("status_detail") or record.get("status_display_clock"),
+            # ESPN ships scores as STRINGS ("1"); the MLB path this shares
+            # publishes ints, and a string compares wrong downstream without
+            # ever raising.
+            "home_score": _coerce_score(record.get("score_home")),
+            "away_score": _coerce_score(record.get("score_away")),
+        })
+
+    # 1. IN-PLAY, from the cross-service aggregate.
+    try:
+        for game in soccer_live_games(selected_date):
+            saw_source = True
+            _add(game, "live")
+    except Exception:
+        _LOGGER.exception("SOCCER_LIVE_AGGREGATE_READ_FAILED date=%s", selected_date)
+
+    snapshot = read_json_file(root / "live" / "soccer_live_lens.json")
+    if isinstance(snapshot, dict):
+        age = _lens_generated_age_seconds(snapshot)
+        if age is not None:
+            oldest_age = age
+
+    # 2. FINISHED (and in-play) from the per-league `match_box`, where local.
+    source = root / "soccer_source"
+    try:
+        league_dirs = sorted(source.iterdir()) if source.exists() else []
+    except OSError:
+        league_dirs = []
+    seen = {(g["home"].get("name"), g["away"].get("name")) for g in lens_games}
+    for league_dir in league_dirs:
         if not league_dir.is_dir():
             continue
         payload = read_json_file(
@@ -250,7 +281,7 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
         )
         if not isinstance(payload, dict):
             continue
-        files_read += 1
+        saw_source = True
         age = _lens_generated_age_seconds(payload)
         if age is not None:
             oldest_age = age if oldest_age is None else max(oldest_age, age)
@@ -261,34 +292,20 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
             if not isinstance(record, dict):
                 continue
             state = state_by_token.get(str(record.get("status_state") or "").strip().lower())
-            # `final` is also asserted by its own boolean. Trust either, because
-            # a match that has ended must not keep pricing as live if one of the
+            # `final` is also asserted by its own boolean. Trust either: a match
+            # that has ended must not keep pricing as live because one of the
             # two fields is absent.
             if state != "final" and bool(record.get("final")):
                 state = "final"
             if not state:
                 continue
-            lens_games.append(
-                {
-                    "state": state,
-                    # The grid joins on team NAME; soccer publishes no abbr here,
-                    # and an absent key is better than a wrong one -- `_side_matches`
-                    # skips falsy tokens rather than matching on them.
-                    "home": {"name": record.get("home_team")},
-                    "away": {"name": record.get("away_team")},
-                    "detailed": record.get("status_detail") or record.get("status_display_clock"),
-                    # ESPN ships scores as STRINGS ("1"), and the MLB path this
-                    # shares publishes ints. Measured against the real
-                    # 2026-08-20 artifact: `home_score` arrived as `"1"`. A
-                    # string score compares and sorts wrong everywhere
-                    # downstream without ever raising, so it is coerced at the
-                    # boundary rather than trusted to be handled later.
-                    "home_score": _coerce_score(record.get("score_home")),
-                    "away_score": _coerce_score(record.get("score_away")),
-                }
-            )
+            key = (record.get("home_team"), record.get("away_team"))
+            if key in seen and state == "live":
+                # Already carried by the aggregate; do not double-count.
+                continue
+            _add(record, state)
 
-    if not files_read:
+    if not saw_source:
         return None
     return lens_games, oldest_age
 
