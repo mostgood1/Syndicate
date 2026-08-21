@@ -854,6 +854,23 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
         command.extend(["--bookmakers", str(args.bookmakers)])
     if markets:
         command.extend(["--markets", markets])
+    # Tell the child WHICH CALLER'S CADENCE this run belongs to, so its reuse
+    # guard can judge bundle freshness against that cadence rather than always
+    # against the pregame sweep's.
+    #
+    # Measured 2026-08-21 (IND@DAL live): the WNBA live autorun fired every
+    # ~4.3 min exactly as designed, and TEN CONSECUTIVE TICKS were declined
+    # `reused_artifact_bundle` (19:45:30-19:56:24 CT, identical input_hash)
+    # because the bundle was younger than the PREGAME bound -- so the child that
+    # fetches and appends `book_quotes` never spawned, and the quote shard's
+    # last-seen slot sat 36+ min cold. The autorun was correct; it was gated by
+    # a bound belonging to a different caller.
+    #
+    # Only "live" is forwarded. `args.phase` is also "all" for a combined run,
+    # which is NOT a live tick and must keep the pregame bound -- the child
+    # defaults to pregame, so saying nothing is the safe branch.
+    if str(getattr(args, "phase", "") or "").strip().lower() == "live":
+        command.extend(["--phase", "live"])
     return [
         RefreshStep(
             name="wnba_oddsapi_props_job",

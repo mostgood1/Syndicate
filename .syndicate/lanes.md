@@ -727,10 +727,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `wnba_source/tracking/book_quotes/<date>.jsonl` and confirm at least one
   market's `captured_at` is newer than the game's own kickoff time.
 - Files:
-  - `scripts/refresh_odds_sources.py` (`_build_wnba_steps`) — read-only
-    reference until the actual defect location is confirmed; do not edit
-    without re-claiming narrowly, same convention the soccer lane used for
-    this same file.
+  - **CLAIM RELEASED 2026-08-20 to `wnba-live-reuse-bound`** (session
+    `1f76348c`), narrowly and by this lane's own instruction below. The defect
+    location IS now confirmed and it is not in this file — only `_build_wnba_steps`
+    needs one line to pass the phase to the child. This lane is UNOWNED (session
+    `2bffd747` absent from the roster including archived), so holding a
+    read-only reference here would block the fix this lane exists to enable.
+    Path deliberately NOT written as a path on this line, because
+    `check_lane_invariants.py` parses any backticked path inside a `- Files:`
+    block as a live CLAIM and would keep reporting the file as contested.
+    Formerly: the WNBA step builder, read-only reference, "do not edit without
+    re-claiming narrowly, same convention the soccer lane used for this same
+    file" — which is exactly what was done.
   - Not claimed, read-only reference: `scripts/run_live_odds_refresh_worker.py`
     — likely relevant (soccer's autorun equivalent lived here), not yet
     confirmed WNBA has an analogous live-phase launcher at all.
@@ -1091,6 +1099,32 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Full narrative, evidence, dead ends: `.syndicate/log/2026-08-20.md`;
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
+
+### wnba-live-reuse-bound — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+- Goal: a WNBA live-phase tick actually re-fetches odds instead of being declined
+  by the PREGAME staleness bound, so `book_quotes` advances at the live cadence.
+  **Testable outcome:** with a game live, `/api/ops/wnba/refresh-decision` reads
+  `will_fetch` (not `reused_artifact_bundle`) on a live tick, and the
+  `book_quotes` state file's last-seen slot advances within one live interval.
+- Files:
+  - `scripts/refresh_wnba_oddsapi_props.py` — the reuse guard and its bound.
+  - `scripts/refresh_odds_sources.py` — NARROW RE-CLAIM, `_build_wnba_steps` only
+    (one line passing the phase to the child). Adopted from
+    `wnba-live-odds-capture-gap`, whose Files note prescribes exactly this
+    ("do not edit without re-claiming narrowly"); that lane is UNOWNED — its
+    session `2bffd747` is absent from the roster including archived. Released
+    back on close.
+- Hypothesis: n/a — root-caused already by session `1f76348c`, see
+  `wnba-live-odds-capture-gap` and `log/2026-08-20.md` Addendum 2.
+- Falsification test: if a live tick still reads `reused_artifact_bundle` after
+  the change, the bound is not the only gate and the source-root branch's
+  `should_recompute` (or something upstream) is also declining the fetch.
+- Verification: reachability FIRST (bound off != on — a pregame-phase call must
+  keep the old bound, a live-phase call must decline reuse at the live bound),
+  then the production reading above. `#383`'s credit-protection reasoning is the
+  constraint: the live bound must be ~one live interval, never unbounded.
+- Blocked by: none.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

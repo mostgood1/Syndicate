@@ -4900,7 +4900,7 @@ def _run_refresh_via_cli(
     return state
 
 
-def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None) -> dict[str, object] | None:
+def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None, phase: str | None = None) -> dict[str, object] | None:
     """Reusable prior outputs, or None if this step must actually run.
 
     `#345`: THE `input_hash` ARGUMENT WAS ACCEPTED AND NEVER READ. Reuse was
@@ -4962,6 +4962,31 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
+    # A LIVE tick judges freshness by the LIVE cadence, exactly as the bundle
+    # branch does. Applied here too on purpose: this branch had NO age bound at
+    # all -- it declines only when `should_recompute` says the inputs moved, and
+    # on a live tick the inputs frequently have not (same date, same market
+    # list), which is the same fixpoint `#383` bounded in the OTHER branch.
+    # Fixing only the branch observed failing is exactly the mistake the
+    # 2026-08-20 standing rule forbids: production happened to be served by
+    # `reused_artifact_bundle`, so this branch would have kept the bug alive the
+    # first time a source_root run took over.
+    #
+    # Gated on live specifically, so PREGAME behaviour here is byte-for-byte
+    # unchanged -- adding a pregame age bound to this branch would be a real
+    # behaviour change to a credit-spending path and is NOT in scope.
+    if str(phase or "").strip().lower() == "live":
+        live_max_age = _reuse_max_age_seconds("wnba", phase="live")
+        live_age = _bundle_age_seconds(snapshot_path)
+        if live_age is not None and live_max_age > 0 and live_age > live_max_age:
+            print(
+                f"[wnba_refresh] SOURCE_REUSE_DECLINED date={date_str} phase=live "
+                f"snapshot_age_s={int(live_age)} max_age_s={int(live_max_age)} "
+                f"path={snapshot_path}",
+                flush=True,
+            )
+            return None
+
     # The inputs moved -> the outputs on disk are stale no matter how complete
     # they look. Absent a recorded hash `should_recompute` returns True, so a
     # first run always fetches rather than trusting leftovers.
@@ -5001,8 +5026,60 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     }
 
 
-def _reuse_max_age_seconds(sport: str = "wnba") -> float:
+def _live_reuse_max_age_seconds() -> float:
+    """The reuse bound for a LIVE-phase run.
+
+    `#383`'s rule -- "the bound is the cadence that CALLS this" -- is right, and
+    this is that same rule applied to the other caller. The pregame sweep is not
+    the only thing that invokes this script any more: since the WNBA live
+    autorun shipped it also runs every `SYNDICATE_WNBA_LIVE_REFRESH_INTERVAL_SECONDS`
+    (240s) while a game is in progress. Judging THAT caller's bundle against the
+    PREGAME cadence made the autorun inert.
+
+    MEASURED, and the reason this exists. 2026-08-21, IND@DAL live:
+    `WNBA_LIVE_AUTORUN_LAUNCHED` fired every ~4.3 min exactly as designed, while
+    `/api/ops/wnba/refresh-decision` returned `reused_artifact_bundle` on every
+    tick (00:45:30Z, 00:46:36Z, same `input_hash`) and the child that fetches
+    never spawned. `book_quotes`'s state file told the same story from the other
+    side: all 5,489 keys' last-seen slot frozen at `00:07:49.815Z`, 36+ min cold,
+    so nothing was being OBSERVED -- not merely "prices did not move", which the
+    change-log design would otherwise make indistinguishable.
+
+    The comment at `run_live_odds_refresh_worker.py` claiming the snapshot fetch
+    "runs UNCONDITIONALLY" under `mode="fast"` is true of MODE and false of this
+    guard, which sits upstream of the branch that comment describes.
+
+    STILL BOUNDED, deliberately. `#344`/`#383` exist to protect OddsAPI credits
+    and this must not reopen that: one live interval means at most one fetch per
+    live tick, which is precisely what the autorun already intends to do and no
+    more. Unbounded here would be the `#383` bug inverted.
+    """
+    for name in (
+        "SYNDICATE_WNBA_LIVE_REUSE_MAX_AGE_SECONDS",
+        "SYNDICATE_WNBA_LIVE_REFRESH_INTERVAL_SECONDS",
+    ):
+        raw = str(os.environ.get(name) or "").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError:
+                continue
+            if value > 0:
+                return value
+    # Mirrors `_wnba_live_refresh_interval_seconds`'s own 240s default by
+    # CONFIGURATION rather than import, the same convention the pregame bound
+    # below uses and for the same reason.
+    return 240.0
+
+
+def _reuse_max_age_seconds(sport: str = "wnba", *, phase: str | None = None) -> float:
     """How stale a bundle may be and still be reused (`#383`).
+
+    `phase="live"` selects `_live_reuse_max_age_seconds` instead -- see there for
+    why, and for the measurement. Any other value (including None, the default)
+    keeps the pregame bound EXACTLY as it was: this change must be a no-op for
+    every caller that is not a live tick, so the default is deliberately the old
+    behaviour rather than anything inferred.
 
     TIED TO THE SWEEP INTERVAL BY CONFIGURATION, not by import. Reads the same
     env vars `live_refresh_loop._pregame_sweep_interval_seconds` reads, with the
@@ -5030,6 +5107,8 @@ def _reuse_max_age_seconds(sport: str = "wnba") -> float:
     window and spend OddsAPI credits the `#344` family exists to protect;
     looser reopens this bug.
     """
+    if str(phase or "").strip().lower() == "live":
+        return _live_reuse_max_age_seconds()
     for name in (
         f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{str(sport).strip().upper()}",
         "SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS",
@@ -5053,7 +5132,7 @@ def _bundle_age_seconds(path: Path) -> float | None:
         return None
 
 
-def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None) -> dict[str, object] | None:
+def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None, phase: str | None = None) -> dict[str, object] | None:
     """`#345`: same fix as `_existing_refresh_state` -- it took `input_hash` and
     never read it either. Fixed together because leaving one existence-only
     guard behind the other just moves the permanent-reuse to the second branch.
@@ -5102,11 +5181,12 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     # age is the honest measure of when this bundle was actually captured.
     # Declining here falls through to the real fetch rather than raising -- the
     # bundle is not corrupt, just too old to stand in for a due sweep.
-    max_age = _reuse_max_age_seconds("wnba")
+    max_age = _reuse_max_age_seconds("wnba", phase=phase)
     snapshot_age = _bundle_age_seconds(snapshot_path)
     if snapshot_age is not None and max_age > 0 and snapshot_age > max_age:
         print(
             f"[wnba_refresh] BUNDLE_REUSE_DECLINED date={date_str} "
+            f"phase={str(phase or 'pregame')} "
             f"snapshot_age_s={int(snapshot_age)} max_age_s={int(max_age)} "
             f"path={snapshot_path}",
             flush=True,
@@ -6290,6 +6370,14 @@ def main() -> int:
     parser.add_argument("--do-edges", action="store_true")
     parser.add_argument("--do-export", action="store_true")
     parser.add_argument("--do-push", action="store_true")
+    # Which caller's cadence this run belongs to, so the reuse bound can be
+    # judged against it (`_reuse_max_age_seconds`). Default "pregame", NOT
+    # inferred from the environment: `SYNDICATE_LIVE_ODDS_REFRESH_PHASE` is a
+    # SERVICE-level setting that reads "live" on live-odds-worker for pregame
+    # runs too, so inferring from it would apply the 240s bound to every run on
+    # that service and multiply OddsAPI spend. The phase is known precisely at
+    # the step builder and is passed explicitly from there.
+    parser.add_argument("--phase", choices=("pregame", "live"), default="pregame")
     parser.add_argument("--force-refresh", action="store_true")
     # 2026-07-19: --force-refresh alone used to also force smart_sim_overwrite
     # (see 10f51327, a deliberate one-time manual "nuke and rebuild" admin
@@ -6374,6 +6462,7 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
                 step_key=_reuse_step_key,
+                phase=str(getattr(args, "phase", "") or ""),
             )
             _reuse_source = state is not None
         if state is None and artifact_root and not bool(args.force_refresh):
@@ -6385,6 +6474,7 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
                 step_key=_reuse_step_key,
+                phase=str(getattr(args, "phase", "") or ""),
             )
         # `#344`: SAY WHICH BRANCH SERVED, and put it somewhere readable.
         #
@@ -6422,6 +6512,15 @@ def main() -> int:
                     "input_hash": str(refresh_input_hash),
                     "step_key": _reuse_step_key,
                     "force_refresh": bool(args.force_refresh),
+                    # Which caller's cadence this run was judged against. Without
+                    # it, `reused_artifact_bundle` cannot be told apart from the
+                    # SAME decision reached under a different bound -- which is
+                    # exactly the ambiguity that made the live-tick starvation
+                    # take a full game to spot.
+                    "phase": str(getattr(args, "phase", "") or "pregame"),
+                    "reuse_max_age_s": float(
+                        _reuse_max_age_seconds("wnba", phase=str(getattr(args, "phase", "") or ""))
+                    ),
                     "recorded_at": dt.datetime.utcnow().isoformat() + "Z",
                 },
             )
@@ -6429,6 +6528,7 @@ def main() -> int:
             print(f"[wnba_refresh] decision persist FAILED {type(exc).__name__}: {exc}", flush=True)
         print(
             f"[wnba_refresh] DECISION={_decision} date={target_date} "
+            f"phase={str(getattr(args, 'phase', '') or 'pregame')} "
             f"input_hash={str(refresh_input_hash)[:12]} force={bool(args.force_refresh)}",
             flush=True,
         )
