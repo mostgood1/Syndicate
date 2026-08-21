@@ -3449,3 +3449,75 @@ by content and served payload, independent of any test.
   8,016 hot artifacts were stale mirror copies rather than all ~33k. Fixed in
   `35daa092`. Trail: `deploys.md` 2026-08-20 22:36Z, `#494`.
 
+---
+
+## 2026-08-20 FORBIDDEN: staging a SHARED ledger file by path in the PRIMARY tree — `git add <path>` sweeps other sessions' uncommitted edits to that same file
+
+**Belief overturned:** that a targeted `git add .syndicate/lanes.md` is safe
+because it names one path. It is not. Targeted staging protects against a shared
+**INDEX**; it does nothing about a shared **TREE**. The granularity that matters
+is the FILE, and in the primary tree that file is contended.
+`project-shared-tree-commit-recipes` already said this about
+`git commit -- <path>` and `todo.md`; the same mechanism applies to `git add`
+and to `lanes.md` / `deploys.md`.
+
+**Measured 2026-08-20**, lane `layer2-rail-duplicate-nfl-cards`: my commit
+`d147ab02` carried two lane blocks I never wrote —
+`soccer-stale-artifact-overwrite` and `intel-empty-pool-fallback-test`, sitting
+uncommitted in the shared `lanes.md` when I staged it. Those sessions then
+committed their own copies, so the merge produced **two blocks per lane** — the
+exact invariant `lane-guard` and `check_lane_invariants.py` exist to protect,
+broken by the act of recording a lane.
+
+**Detection, one read:** `git show <yourcommit>:<file>` vs
+`git show <yourcommit>^:<file>`. Parent 0, yours 1 → you swept it. The tell at
+merge time is a conflict whose "your" side contains a block you did not write.
+**Do NOT hand-resolve that conflict** — resolving it keeps what you swept.
+
+**The rule going forward.** Make ledger edits wherever protocol wants them, but
+**COMMIT them from your own worktree**: branch from a fresh `origin/main`,
+rebuild the file as `origin/main` + only your own edits (line-based), then
+**assert the heading-level diff against `origin/main` shows ONLY your headings**
+before committing. The assert is the point — it fails loudly on a stale premise
+instead of succeeding quietly, which is the general form already recorded in
+`project-shared-tree-commit-recipes`.
+
+**Two smaller traps hit in the same pass, both costing real time:**
+- **`lanes.md` and `deploys.md` have MIXED line endings.** Every string-literal
+  patch is a coin flip; three failed on CRLF-vs-LF before switching to
+  line-based edits that preserve each line's own terminator.
+- **Git Bash mangles `git show <rev>:<path>`** into a bogus `rev\path` argument
+  and returns 0 matches — read naively that is "the lane is absent from main",
+  a false negative about the ledger itself. PowerShell gave the true answer.
+  Already a standing rule; hit again, so it is restated here.
+
+---
+
+## 2026-08-20 A CENSUS THAT CANNOT READ UNHEALTHY IS NOT A VERIFICATION — the slate can retire your test case between diagnosis and deploy
+
+**What happened.** The Layer 2 rail duplicated NFL games because two row
+families for one game reached the board. Between 18:20 and 18:59 CT one family
+LEFT the live board (`candidate_type=game` rows **2 → 0**; the 21
+`layer2_shortlist` rows unchanged). The duplicate needs BOTH. So the obvious
+post-deploy check — census the current payload for "chips seating more than one
+card" — returned **0**, and would have returned 0 with the fix reverted.
+
+**Why this is worth a rule.** The failure is not a bad metric; it is a metric
+that stopped being *connected to the defect* while nobody was looking. Nothing
+in the reading announces that. It looks exactly like success, and the deploy had
+genuinely just happened, so the causal story is right there waiting to be
+believed.
+
+**What was done instead.** Sliced `deriveGameCards` out of the **served bytes**
+of `GET /intelligence` and replayed an 18:20 CT production capture — input in
+which the defect provably reproduces — with the **pre-deploy served page as the
+control on the identical payload**: 17 cards / NFL 4 / **2** contested chips
+versus 15 / NFL 2 / **0**.
+
+**The rule.** Before accepting a green post-deploy reading, state what would
+make it read RED *right now*. If you cannot, the reading is not evidence and
+must not be written as verification — pair it with a control on input known to
+trigger the defect, and label the result **verified-by-replay**, which is weaker
+than verified-in-the-wild and should never be recorded as the latter. Same
+family as `feedback-instrument-blindness` and
+`feedback-gate-on-the-output-not-the-input`.

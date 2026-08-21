@@ -286,6 +286,16 @@ Product decisions, not engineering ones. Do not re-take them.
 - **Cut every deploy branch from the TARGET SERVICE's own live SHA** and check
   `git merge-base --is-ancestor` both ways. The services sit on divergent lines;
   a branch cut for web has been a **rollback** for refresh-worker. `[measured 08-14]`
+  **The web chain is now 25+ deep and this is the load-bearing number: walked back
+  25 consecutive scoped-deploy commits from live `f3a9bb0b` without reaching a commit
+  that is an ancestor of `main`. Deploying main's tip to web would swap 242 files /
+  46,949 insertions and revert the lot** — soccer card+density work, the NFL artifact
+  allowlist, NCAAF projections, the layer2 movement fixes, a 68-file consolidated
+  deploy. So `--allow-off-main` on a graft is the CORRECT choice for web, not a
+  shortcut; the escape hatch has become the normal path and the chain only grows.
+  Verify a graft three ways before pushing: the changed file byte-identical to main's,
+  only your files differing from the live SHA, and the live SHA an ANCESTOR of the
+  graft (strictly additive). `[measured 2026-08-20, lane layer2-rail-duplicate-nfl-cards]`
 - **Deployed SHAs move constantly** — five times in one evening, twice inside 25
   minutes. Re-read per service inside the step that uses one; never carry one
   across turns. A stale read nearly shipped a rollback. `[measured 08-14]`

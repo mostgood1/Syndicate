@@ -1161,130 +1161,34 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   on behaviour.**
 - Blocked by: none.
 
-### layer2-rail-duplicate-nfl-cards — **DEPLOYED AND VERIFIED 2026-08-20 19:10 CT (`feec7e17`, web) — SERVED-BYTES A/B: 2 chips seating >1 card → 0, NFL rail cards 4 → 2, on the SAME payload, with the pre-deploy served page as control.** One thing still owed and the lane stays OPEN for it: a behavioural read on a LIVE board where an ESPN-id `candidate_type=game` watchlist row and `layer2_shortlist` rows coexist for one game — everything measured so far is replay, because the ESPN-id rows dropped out of the live board (2 → 0) between 18:20 and 18:59 CT and the defect stopped being reproducible on tonight's slate. Full record in `deploys.md`. — **FIX MEASURED WITH THE REAL FUNCTION OVER THE REAL PRODUCTION PAYLOAD: NFL rail cards 4 → 2, chips seating >1 card 2 → 0, and MLB 9 / WNBA 3 / SOCCER 1 unchanged.** Commit `b9a7cd18` on `session/layer2-rail-duplicate-nfl-cards` in worktree `C:\tmp\syndicate-sessions\layer2-rail-duplicate-nfl-cards`. The push was BLOCKED by the session's auto-mode classifier, not by any lock — nothing is contended, it simply has not left this machine. Next session: `py -3 scripts/session_worktree.py land --lane layer2-rail-duplicate-nfl-cards`, then deploy web behind the two locks. — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
+### layer2-rail-duplicate-nfl-cards — OPEN, **UNOWNED** (session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT; nothing held, all deploy claims released) — **SHIPPED AND VERIFIED-BY-REPLAY; ONE BEHAVIOURAL READ OWED** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
-  game-card rail, not twice.
-  **Testable outcome:** on `/intelligence` with the NFL tab (or All) selected,
-  `LV @ HOU` and `SF @ LAC` each seat exactly one mini card, and clicking it
-  filters the board to ALL of that game's rows (both row families, 11 and 12
-  respectively), not just one family's.
+  game-card rail, not twice. **Testable outcome:** each game seats exactly one
+  mini card, and clicking it filters the board to ALL that game's rows (both
+  row families), not one family's.
 - Files: `syndicate/templates/intelligence.html` (`deriveGameCards` merge pass
-  only), `tests/` (new coverage if a JS-testable seam exists).
-- **ADOPTED FROM `layer2-board-chip-race`** (same file, same functions). That
-  lane's session `2bffd747` is absent from the session roster, its code is on
-  `origin/main` by CONTENT (`gameChipsLoadedOnce`, 6 occurrences), and its only
-  remaining obligation is a deploy of already-merged code, not an edit. User
-  decision 2026-08-20 to adopt rather than block. My change rides the same
-  pending web deploy and discharges that lane's verification too.
-- Hypothesis: n/a — root-caused and MEASURED against production before opening.
-- **Already established, measured 2026-08-20 against production (do not re-derive):**
-  - `/api/board/game-chips?sports=nfl` returns **2 chips, both unique**
-    (`401873286 LV @ HOU`, `401873285 SF @ LAC`). The chip feed is CLEAN — this
-    is not a chip-duplication bug.
-  - `/api/intelligence/query` carries **99 NFL rows in 18 game groups**, and two
-    real games each arrive as TWO groups from two different pipelines:
-    - `nfl|401873286` / `"LV @ HOU"` — 1 row, ESPN id, `candidate_type: game`,
-      `board_lane: watchlist` (the `_NFLDataProvider.games()` →
-      `game_market_recommendations` path, matchup in ABBREVIATIONS).
-    - `nfl|a697012ab3bb18d3549ff1bce61ed4da` / `"Las Vegas Raiders @ Houston
-      Texans"` — 10 rows, OddsAPI event id, `source: layer2_shortlist`,
-      `board_lane: opportunity` (matchup in FULL NAMES).
-    Same again for SF @ LAC (1 row + 11 rows).
-  - **The structural cause is one index.** `deriveGameCards`'s merge pass
-    (`intelligence.html:1599-1605`) buckets groups on `sport|matchup text`
-    ONLY. `"lv @ hou"` ≠ `"las vegas raiders @ houston texans"`, so the two
-    groups never land in the same bucket and are never compared — even though
-    BOTH resolve to the same chip object (one by id, one via the #365 full-name
-    index), which that block's own comment already calls "unambiguously the
-    same real game". The chip-identity clustering exists and is correct; it is
-    just gated behind a matchup-text bucket it can never cross.
-  - **Blast radius is EXACTLY 2, cross-sport.** Simulated the client's grouping
-    and chip resolution over the live payload for all 8 sports: 96 groups, 35
-    chip-resolved, **2 chips hit by more than one group — both NFL**. MLB, NBA,
-    WNBA, NHL, NCAAF, NCAAB and soccer are clean today.
+  only), `tests/js/game_rail_derive.test.mjs`.
+- **STATUS: live on web as `feec7e17` since 2026-08-20 19:10:37 CT** (deploy
+  `dep-da3pbfrbc2fs73aj00b0`; grafted onto web's live SHA `f3a9bb0b`, NOT main —
+  main's tip would have reverted a 25-deep off-main chain, see `state.md`).
+  Landed on `origin/main` as `84533712`. All claims released.
+- **VERIFIED on the SERVED BYTES**, A/B on one payload, control = the pre-deploy
+  served page: **17 cards / NFL 4 / 2 chips seating >1 card → 15 / NFL 2 / 0**;
+  MLB 9, SOCCER 1, WNBA 3 identical both sides. `game_rail_derive.test.mjs` 14
+  assertions pass and DISCRIMINATE (3 of 3 fail pre-change).
+- **THE ONE THING OWED, and the deploy does NOT discharge it:** a behavioural read
+  on a LIVE board carrying BOTH row families for one game — an ESPN-id
+  `candidate_type=game` watchlist row co-existing with `layer2_shortlist` rows.
+  Everything measured is REPLAY, because the ESPN-id rows left the live board
+  (2 → 0) between 18:20 and 18:59 CT and the defect stopped being reproducible.
+  **A census on the current payload reads 0 either way — do not mistake it for
+  confirmation.** Reproduce by finding a slate where both families are present,
+  then read `/api/intelligence/query` for two groups resolving to one chip.
 - Falsification test: if the two groups did NOT resolve to the same chip object,
   chip-identity clustering could not merge them and the fix is wrong. Checked:
-  they do — that is what the "2 chips hit by >1 group" census measures.
-- Verification: re-run the same production census after deploy and read **0
-  chips hit by more than one group**; plus a real page read showing one card
-  per game. A count of cards alone is NOT sufficient — state the census.
-- **RESULT, measured 2026-08-20 BEFORE deploy — the real `deriveGameCards`,
-  sliced verbatim out of the template and run over the real
-  `/api/intelligence/query` + `/api/board/game-chips` payloads:**
-  - date-filtered to 2026-08-20: rail cards **17 → 15**, NFL **4 → 2**, chips
-    seating >1 card **2 → 0**. MLB 9, WNBA 3, SOCCER 1 — byte-identical.
-  - per-sport tabs, all 8: only NFL changes; every other tab identical.
-  - **NO date filter (565 rows, the multi-day combined window): 168 → 166
-    cards, with MLB 15 / SOCCER 130 / WNBA 5 unchanged.** This is the
-    falsification that matters — it shows the merge removed the two
-    duplicates and did NOT hide a real game anywhere.
-  - merged counts are additive (10+1=11, 11+1=12) and BOTH ids resolve to
-    the surviving card through `gameKeyMergeMap`, so clicking it filters the
-    board to all of that game's rows, not one pipeline's.
-- **THE GUARD IS LIVE, NOT INERT (`off != on`), proven on synthetic fixtures:**
-  same teams + SAME day, two text forms → **1 card** (merges); same teams +
-  DIFFERENT days → **2 cards** (refuses). Without that guard the cross-text
-  rule would delete a real game, because `gameChipsByMatchup` is keyed on the
-  team pair with NO date.
-- `tests/js/game_rail_derive.test.mjs`: 3 new cases, **14 assertions pass**.
-  It DISCRIMINATES — against the pre-change function the new case fails 3 of
-  3, while the guard case and #165 follow-up #3 pass on both versions (a test
-  that passed on both would prove nothing). Run: `node
-  tests/js/game_rail_derive.test.mjs`.
-- Also fixed a REAL BUG IN THAT HARNESS: `deriveGameCards` reassigns
-  `gameKeyMergeMap`, which rebinds the injected Function PARAMETER, so every
-  read of the outer binding saw a permanently empty map. It now reads through
-  a closure over the parameter. An assertion on the merge map written against
-  the old harness would have failed for a reason that had nothing to do with
-  the product.
-- **NOT MINE, pre-existing on `origin/main`:**
-  `test_intelligence_state.py::IntelligenceStateTests::test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool`
-  fails identically WITH and WITHOUT this change (this lane touched no
-  Python). Spawned as its own task; do not attribute it here.
-- **LANDED ON `origin/main` as `84533712`**, content-verified there (the
-  pre-rebase sha `b9a7cd18` is not an ancestor — check by CONTENT, not sha).
-- **WEB DOES NOT RUN `main`, AND THIS ONE IS BIG.** Web's live commit
-  `f3a9bb0b` sits on a chain of **25+ consecutive scoped-deploy commits, none
-  of them ancestors of `main`** — walked back 25 deep without reaching main.
-  Deploying main's tip would have swapped **242 files / 46,949 insertions**
-  and reverted every one of them (soccer card + density work, the NFL artifact
-  allowlist, NCAAF projections, the layer2 movement fixes, a 68-file
-  consolidated deploy). That is `learnings.md`'s "second deploy silently
-  reverts the first", at 25x the scale of the case the rule was written for.
-- **DECISION (user, 2026-08-20): GRAFT ONTO THE LIVE SHA**, the same route
-  `soccer-board-mlb-parity` took. `deploy/web-layer2-rail-dupe` = `f3a9bb0b` +
-  cherry-pick `84533712` → **`feec7e17`**, pushed. Verified three ways before
-  pushing: the graft's `intelligence.html` is **byte-identical to main's**
-  (`e2fb3b16`); the graft changes **only my 2 files** against web's live SHA;
-  and `f3a9bb0b` IS an ancestor of the graft, so it is strictly additive and
-  reverts nothing web is running. JS test on the graft: 14 assertions, 0 fail.
-  Production-payload census on the graft's own template: **0 chips seating >1
-  card**. This adds one more off-main link — a real cost, taken knowingly,
-  because the alternative reverted 25 deploys.
-- **CLAIM: NOT FORCED.** web's claim was held by `soccer-stale-artifact-overwrite`
-  (acquired 23:26:27Z, TTL 00:11:27Z). Its pid 21244 was dead, but that pid is
-  the short-lived claim SCRIPT, not the session — **a dead claim pid is not
-  evidence the holder is gone**, and that session was active 3 minutes before I
-  looked. Messaged them instead, and waited. Their deploy had already finished
-  (`deploy_ended 23:34:33Z`); they simply had not released.
-- **DEPLOYED `feec7e17` to web 2026-08-20 19:10:37 CT** (deploy
-  `dep-da3pbfrbc2fs73aj00b0`, preflight CLEAR, claim force-broken off
-  `soccer-stale-artifact-overwrite` by user decision after messaging them).
-- **VERIFIED ON THE SERVED BYTES, NOT THE SHA.** `deriveGameCards` sliced out
-  of what `GET /intelligence` actually returns, run over an 18:20 CT production
-  capture, with the PRE-deploy served page as the control on the SAME payload:
-  served-before **17 cards / NFL 4 / 2 chips seating >1 card**; served-after
-  **15 / NFL 2 / 0**. MLB 9, SOCCER 1, WNBA 3 identical both sides.
-- **THE OBVIOUS CHECK WOULD HAVE BEEN A FALSE PASS.** Between 18:20 and 18:59
-  CT the ESPN-id rows left the live board (`candidate_type=game` **2 → 0**; the
-  21 OddsAPI rows unchanged). The duplicate needs BOTH families, so a census on
-  the CURRENT payload reads 0 whether or not the fix shipped — it does, and it
-  is recorded as non-discriminating. The control is what makes the table above
-  evidence.
-- **STILL OWED, and the deploy does NOT discharge it:** a behavioural read on a
-  live board carrying both row families for one game. Until then this is
-  verified-by-replay, which is weaker than verified-in-the-wild and should be
-  written that way.
+  they do.
+- Full narrative, evidence, dead ends: `.syndicate/log/2026-08-20.md`;
+  deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
