@@ -21029,3 +21029,68 @@ have satisfied while still running the OLD code. Checks owed:
   but the record was stranded. Re-landed from a worktree at origin/main. The tell was a grep for
   `WNBA_LIVE_BOX_` returning NOTHING in the primary tree while that exact string was in production logs at
   16:04:47Z: the grep was right and the assumption about which tree I was in was wrong.
+
+## 2026-08-21 16:39-16:58Z — VERIFIED: soccer gameday, all five fixes live
+
+Live at time of verification: web `8d5d6edf` (16:46:03Z), refresh-worker
+`8d5d6edf` (16:43:05Z). **My `344c4f21` was superseded on refresh-worker five
+minutes after going live by another lane's `8d5d6edf` — and NOTHING WAS
+REVERTED**, checked rather than assumed: all five commits are ancestors of
+`8d5d6edf` (gate1 `ee6b681e`, totals `94461732`, imminence `991153a4`,
+three-way `f58fab8e`, gates2/3 `260ae9f9`). This is the "deploy a commit that is
+on `origin/main`" rule paying out — serialisation could not have produced this,
+composition did.
+
+**verify: 4/4 board checks PASS on a board rebuilt AFTER deploy-live**
+(post-live baseline 16:36:46Z, rebuild 16:39:31Z):
+
+    live_game_state.supported   false -> TRUE
+    Marseille totals basis      total_mean -> scoreline_distribution
+                                3.0 -> 0.4744, 3.5 -> 0.3700 (was no probability at all)
+    layer2 selected_today       4 of 100 -> 16 of 16, imminence_seated 15,
+                                all four fixtures present incl. Marseille (had ZERO)
+    predictions.probabilities   0/4 -> 4/4 filled + draw, no market value borrowed
+
+**verify: three-way model edge PASS, on the named regressions, by VALUE:**
+
+    RC Lens      away   +1.63 -> -1.65   (true -1.65)  SIGN CORRECTED
+    Hull City    draw  -14.13 -> +0.21   (true +0.21)
+    Espanyol     draw   -7.65 -> +4.87   (true +4.87)  SIGN CORRECTED
+    Lommel SK    draw   +9.12 -> -2.55   (true -2.55)  SIGN CORRECTED
+    Newcastle    draw  -11.62 -> -1.99   (true -1.99)
+    Marseille    draw   +8.96 -> +1.87   (true +1.85)
+    Charlotte    draw   -6.95 -> -1.71   (true -1.71)
+
+7 of 7. Population: away/draw rows beyond 1.5pt went **26 of 37 -> 0 of 36**.
+
+**THE RESIDUAL-BASED PASS IS PARTLY TAUTOLOGICAL AND IS NOT THE EVIDENCE.**
+away/draw residual reads median 0.00 / max 0.00 because the fix and the checker
+compute `(model(side) - fair(side))` the same way; a test that cannot fail is
+not a test. The load-bearing evidence is the table above: those "true" values
+were computed from the PRE-fix payload hours earlier, and the post-fix board
+independently matches them.
+
+**KNOWN RESIDUAL, deliberately not papered over:** home rows still publish
+`projection.edge_vs_market_pct` (de-vigged by `soccer_projections`) while
+away/draw now use layer2's `quote.fair_probability`. TWO FAIR BASES on one
+market. Measured size: home residual median 0.47, max 1.38 points — against the
+3-14 point errors the fix removed, so a large net gain, but the three sides are
+not on a common basis and that is a real follow-up.
+
+**THREE FALSE VERIFICATION FAILURES ALONG THE WAY, ALL MINE, ALL THE SAME
+SHAPE: gating freshness on the WRONG ARTIFACT.**
+1. First run took the board baseline BEFORE the deploy — a pre-deploy rebuild
+   satisfies it while still running old code. Fixed by baselining after live.
+2. Then verified the SHORTLIST after waiting on the BOOK-GRID's rebuild. They
+   are different artifacts; `written_at` sat at 16:36:25Z through two "PASS"
+   board rebuilds and two FAIL verdicts with byte-identical numbers.
+3. Diagnosed the writer as web (`intelligence_state` loop) — WRONG:
+   `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is **false on web and
+   true on refresh-worker**. The 16:36:25Z artifact carried `imminence_seated`
+   because another lane's `a41f88f8` (15:53:40Z) already contained `991153a4`.
+**RULE: an unchanged value across a deploy is stale data until proven
+otherwise.** RC Lens reading +1.63 twice was the signal both times.
+
+Claims: refresh-worker released; web released after this entry.
+STILL OWED: gates 2/3 have no production reading during a LIVE match. Kickoffs
+18:45Z / 19:00Z tonight are the first opportunity.
