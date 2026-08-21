@@ -2049,6 +2049,22 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ## [wnba] WNBA
 
+- **`#499` WNBA live TOTALS pricing is DEPLOYED but NOT PROVEN `[2026-08-21T17:4xZ]`.**
+  Live on BOTH workers at `8d5d6edf` (refresh-worker 16:43:05Z, live-odds-worker
+  16:48:04Z, Render deploys API). Three parts: `_WNBA_LIVE_TOTAL_SCALE` refit
+  `8.0+0.50*min_left` -> `3.2` (held-out Brier 0.1744 -> 0.1477, n=249 games /
+  23,712 samples); `ANALYTIC_LIVE_STD_ERR_BY_MARKET {("wnba","totals"): 0.150}`;
+  and the fix for the second shipping INERT. **sigma=0.150 is the worst gap BY
+  PREDICTED BUCKET** — the by-minutes-left aggregate reads 0.023 and is an
+  averaging artifact (+0.109 at p=0.35 and -0.150 at p=0.65 cancel). At 2 sigma
+  the bar is ~30pp, so **near-zero priceable is the CORRECT outcome and priceable
+  volume is a bug signal.** WHAT IS NOT KNOWN: whether the pricing is REACHED.
+  Board at 16:49Z read `index_size: 0` / `considered: 0` / `withheld_by_reason: {}`
+  with all 3 games ESPN `state=pre` — **a zero is indistinguishable from an inert
+  feature.** The proof is the refusal reason moving from
+  `analytic_estimator_never_backtested_for_this_market` (category-wide) to
+  `prob_interval_swamps_edge` (per-row).
+
 - **Live in-game odds capture was silently dead for the full duration of any
   live game — fixed 2026-08-20, lane `wnba-live-odds-capture-gap`.** Root
   cause: the general combined `phase=live` sweep (`sports=mlb,wnba,soccer`,
