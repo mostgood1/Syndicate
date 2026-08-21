@@ -113,19 +113,50 @@ def _shared_predictions(game: dict[str, Any]) -> dict[str, Any]:
     if margin_mean is None and away_mean is not None and home_mean is not None:
         margin_mean = round(home_mean - away_mean, 3)
 
+    # `sim.win_probability` IS A SOURCE OF RECORD AND WAS NOT BEING READ --
+    # the same shape of defect as `sim.periods.full` immediately above, one key
+    # over.
+    #
+    # MEASURED ON PRODUCTION 2026-08-21, all four of the day's soccer fixtures:
+    # every one of the six `probabilities` fields was null on every card, while
+    # `sim.win_probability` carried {home 0.79, draw 0.14, away 0.07} on the
+    # SAME payload. This function looked for `predictions.p_home_win`; soccer
+    # publishes the model's 1X2 under `sim.win_probability` and its de-vigged
+    # MARKET view under `betting.p_home_win`, so neither lookup could ever hit.
+    #
+    # READ THE SIM, NOT `betting.*`, and that distinction is the whole point.
+    # `betting.p_home_win` is the market's de-vigged probability; putting it in
+    # a block called `predictions` would publish the market as the model's
+    # opinion and make every edge computed against it read as zero. The cover
+    # and total legs are therefore LEFT NULL rather than filled from `betting`:
+    # soccer publishes no model number for them on this payload, and a null a
+    # reader can see beats a market number wearing the model's label.
+    win_probability = _copy_mapping(sim.get("win_probability"))
+
+    # DRAW IS A REAL OUTCOME AND THE CONTRACT HAD NO KEY FOR IT. On a three-way
+    # sport it carries 14-23% of the outcome space, so a home/away-only block
+    # does not sum to 1 and cannot be read as a distribution. Emitted only when
+    # a producer actually supplies one, so two-way sports are unchanged rather
+    # than gaining a null field.
+    draw = _first_number(probabilities.get("draw"), win_probability.get("draw"), predictions.get("p_draw"))
+
+    result_probabilities = {
+        "home_win": _first_number(probabilities.get("home_win"), predictions.get("home_win_prob"), predictions.get("p_home_win"), win_probability.get("home")),
+        "away_win": _first_number(probabilities.get("away_win"), predictions.get("away_win_prob"), predictions.get("p_away_win"), win_probability.get("away")),
+        "home_cover": _first_number(probabilities.get("home_cover"), predictions.get("p_home_cover")),
+        "away_cover": _first_number(probabilities.get("away_cover"), predictions.get("p_away_cover")),
+        "total_over": _first_number(probabilities.get("total_over"), predictions.get("p_total_over")),
+        "total_under": _first_number(probabilities.get("total_under"), predictions.get("p_total_under")),
+    }
+    if draw is not None:
+        result_probabilities["draw"] = draw
+
     return {
         "away_mean": away_mean,
         "home_mean": home_mean,
         "total_mean": total_mean,
         "margin_mean": margin_mean,
-        "probabilities": {
-            "home_win": _first_number(probabilities.get("home_win"), predictions.get("home_win_prob"), predictions.get("p_home_win")),
-            "away_win": _first_number(probabilities.get("away_win"), predictions.get("away_win_prob"), predictions.get("p_away_win")),
-            "home_cover": _first_number(probabilities.get("home_cover"), predictions.get("p_home_cover")),
-            "away_cover": _first_number(probabilities.get("away_cover"), predictions.get("p_away_cover")),
-            "total_over": _first_number(probabilities.get("total_over"), predictions.get("p_total_over")),
-            "total_under": _first_number(probabilities.get("total_under"), predictions.get("p_total_under")),
-        },
+        "probabilities": result_probabilities,
     }
 
 
