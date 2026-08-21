@@ -345,3 +345,24 @@ def test_nfl_refresh_actually_runs_the_schedule_fetch():
     # Must run before the odds refresh -- the board's implied total should not
     # be built from last cycle's spread.
     assert names.index("nfl_schedule_refresh") < names.index("nfl_oddsapi_refresh"), names
+
+
+def test_refresh_run_summary_is_auditable_from_web():
+    """A run's own result must be readable, or a step that silently does
+    nothing cannot be diagnosed at all.
+
+    Measured 2026-08-21: a triggered NFL refresh launched and its schedule step
+    never published, and whether it RAN was unanswerable from outside -- the
+    child's stdout goes to a file on the worker's disk, and this summary (which
+    captures that stdout) was not allowlisted. `model_engine_standard.md` 3b
+    applied to the diagnostic rather than to a model input.
+    """
+    from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+
+    run = "reports/migration_runs/2026-08-20/odds_refresh_20260821_034504/"
+    assert is_hot_artifact_relative_path(run + "odds_refresh.json")
+    assert is_hot_artifact_relative_path(run + "odds_refresh.stderr.txt")
+    assert is_hot_artifact_relative_path(run + "refresh_and_gate_run.json")
+    # Scoped: it must not open the whole reports tree.
+    assert not is_hot_artifact_relative_path(
+        "reports/migration_runs/2026-08-20/unrelated_dir/anything.json")

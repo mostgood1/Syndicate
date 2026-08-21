@@ -287,6 +287,31 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # parse of the result artifact doesn't match what a pregame child writes".
     # Tiny by construction (one small JSON, overwritten each cycle, same shape
     # as `hot_artifact_pull_watermark.json` two entries below).
+    # A refresh run's OWN RESULT. Added 2026-08-21 after a triggered NFL refresh
+    # could not be diagnosed from outside at all.
+    #
+    # THE SPECIFIC DEAD END. `nfl_schedule_refresh` was added to
+    # `_build_nfl_steps` and deployed; the run launched (03:53:40Z,
+    # `--sports nfl --phase pregame`) and web's `schedule_2026.csv` never moved
+    # off its boot copy across 14 polls. Whether the step RAN and failed, or
+    # never ran, was unanswerable, because BOTH channels that would say are
+    # invisible from web:
+    #   - the child's stdout goes to `--stdout-path` on the WORKER's disk and
+    #     never reaches Render's log collector, so a missing `games_written=`
+    #     line is a fact about the emitter, not the step;
+    #   - this file, which captures that stdout (including the
+    #     `[refresh_odds_sources] START step=<name>` / `END step=<name>` trace)
+    #     plus `ok`/`returnCode`, was not allowlisted.
+    # That is exactly `model_engine_standard.md` 3b's "unallowlisted =
+    # unauditable", applied to the diagnostic rather than to a model input.
+    #
+    # Bounded on purpose: these are ~4-20KB each (measured on a real run dir),
+    # and the glob is per-segment so it cannot walk the whole reports tree.
+    # `#208` as ever -- this PERMITS the read, the worker still has to write it.
+    "reports/migration_runs/*/odds_refresh_*/odds_refresh.json",
+    "reports/migration_runs/*/odds_refresh_*/odds_refresh.stderr.txt",
+    "reports/migration_runs/*/odds_refresh_*/refresh_and_gate_run.json",
+    "reports/migration_runs/*/odds_refresh_*/refresh_job_status.json",
     "reports/refresh_status/latest/soccer_pregame_autorun_status.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
