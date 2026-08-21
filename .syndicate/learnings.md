@@ -4035,3 +4035,33 @@ is attributable, because a silent zero and a named zero need different fixes.
 Caught by the module's own test, before it ever ran against production — which
 is the argument for writing the accent/punctuation cases out explicitly rather
 than trusting a normaliser to be obviously right.
+
+## 2026-08-21 — FORBIDDEN: `cat >` on a ledger file. Append only, and re-check AFTER the rebase
+
+**What happened.** Writing today's checkpoint I ran `cat > .syndicate/log/2026-08-21.md`
+after checking the PRIMARY tree and finding no file for that date. Between the
+check and the write I rebased the worktree onto a newer `origin/main`, which DID
+have the file — another session had opened it at 02:10Z. The truncating write
+destroyed **195 lines** of their `nfl-injuries-autorun-arm` entry, and I pushed
+it.
+
+**Two independent mistakes, and the second is the general one.**
+1. `>` instead of `>>` on a file that is append-only by nature.
+2. The existence check was taken in a DIFFERENT TREE and BEFORE a rebase, so it
+   described a file that was not the one about to be overwritten. A check whose
+   answer can change between checking and acting is not a check.
+
+**What caught it:** the commit's own `--numstat`, `66 insertions / 195
+deletions`, read before moving on. **A ledger commit showing DELETIONS is almost
+always wrong** — these files only grow, and every prior incident in this family
+(4,993 staged deletions, the staged removal of an archive's only copy, a
+`todo.md` dropping five open items to zero copies) has that same signature.
+Restored from the pre-clobber SHA with my section appended below theirs, verified
+`78 insertions, 0 deletions` against the version I had destroyed.
+
+**The rule going forward.** Never `cat >` a `.syndicate/**` file — `>>` always,
+or an Edit against content you have just read IN THE TREE YOU ARE WRITING TO.
+Re-check existence AFTER any rebase or fetch, not before. And read
+`git diff --cached --numstat` before every ledger push: it is one line, it is
+the only thing that distinguishes "I added my entry" from "I replaced someone
+else's", and it has now caught this class twice.
