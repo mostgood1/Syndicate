@@ -366,7 +366,15 @@ def build_layer2_shortlist(
                         f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
                         f"miss_player={live_stats.get('miss_no_player')} "
                         f"miss_market={live_stats.get('miss_no_market_alias')} "
-                        f"miss_line={live_stats.get('miss_no_line')}",
+                        f"miss_line={live_stats.get('miss_no_line')} "
+                        # The two causes `miss_market` used to absorb. The first
+                        # production reading of this line (23:37Z 2026-08-21)
+                        # was `miss_market=428` with player and line both 0,
+                        # which named a vocabulary gap it could not actually
+                        # distinguish from a line mismatch.
+                        f"miss_line_match={live_stats.get('miss_no_line_match')} "
+                        f"miss_not_live={live_stats.get('miss_player_not_live')} "
+                        f"sample={live_stats.get('unmatched_samples')}",
                         flush=True,
                     )
             except Exception:

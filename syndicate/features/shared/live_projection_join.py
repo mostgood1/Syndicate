@@ -68,7 +68,29 @@ _MARKET_ALIASES: dict[str, tuple[str, ...]] = {
     "batter_hits_runs_rbis": ("hits_runs_rbis", "batter_hits_runs_rbis", "hrr"),
     "batter_stolen_bases": ("stolen_bases", "batter_stolen_bases", "sb"),
     "batter_walks": ("walks", "batter_walks", "bb"),
-    "batter_strikeouts": ("batter_strikeouts", "strikeouts_batter"),
+    # `hitter_strikeouts` IS THE SIM'S OWN FAMILY NAME and was missing, so a
+    # fetched market could never join. `features/mlb/ladders_build.py`'s
+    # `HITTER_PROPS` is the authoritative sim-vocabulary -> OddsAPI-key table
+    # and it reads `"hitter_strikeouts": {... "odds": "batter_strikeouts"}`;
+    # `batter_strikeouts` is in `DEFAULT_HITTER_MARKETS` in
+    # `scripts/fetch_mlb_oddsapi_local.py`, i.e. we pay for it every day.
+    #
+    # `strikeouts_batter`, which this listed instead, appears NOWHERE else in
+    # the repo -- it was a guess at a name rather than a name read off the
+    # producer. Kept anyway: it costs nothing and removing it is unrelated risk.
+    #
+    # It must NOT merge with the pitcher's `strikeouts` family, and it does not:
+    # union-find merges only names that share a family, and neither lists the
+    # other's. `_build_canonical_markets` says so; the test asserts it.
+    "batter_strikeouts": ("batter_strikeouts", "hitter_strikeouts", "strikeouts_batter"),
+    # WIRED AHEAD OF THE FEED, deliberately. These three are real OddsAPI keys
+    # mapped in `HITTER_PROPS`, but they are NOT in `DEFAULT_HITTER_MARKETS`, so
+    # nothing fetches them today and they cannot be on the board. Aliasing them
+    # now costs nothing, cannot mis-join (the families are disjoint), and means
+    # the day someone adds them to the fetch list this join already works
+    # instead of reading as a silent coverage gap.
+    "batter_doubles": ("doubles", "batter_doubles", "2b"),
+    "batter_triples": ("triples", "batter_triples", "3b"),
     "pitcher_strikeouts": ("strikeouts", "pitcher_strikeouts", "k"),
     "strikeouts": ("strikeouts", "pitcher_strikeouts", "k"),
     "pitcher_outs": ("outs", "pitcher_outs"),
@@ -212,6 +234,13 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     its complement, so keying on side would halve coverage for no gain.
     """
     index: dict[tuple[str, str, float], dict[str, Any]] = {}
+    # `(player, market) -> [lines]` and the bare player set. These exist ONLY to
+    # make a miss attributable: with a 3-part key, "no match" can mean the
+    # vocabulary is wrong, the LINE is different, or the player is not live at
+    # all -- three different bugs with three different fixes and, until now, one
+    # counter. `miss_no_market_alias` was carrying all three.
+    lines_by_player_market: dict[tuple[str, str], list[float]] = {}
+    players_seen: set[str] = set()
     games_seen = 0
     rows_seen = 0
     rows_indexed = 0
@@ -306,6 +335,10 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
                 # edge it exists to suppress, which is worse than no coverage.
                 skipped_no_live_projection += 1
                 continue
+            # AUXILIARY INDEXES, so a miss can be ATTRIBUTED instead of
+            # being lumped into one catch-all. See `attach_live_projections`.
+            lines_by_player_market.setdefault((player, market), []).append(line)
+            players_seen.add(player)
             index[(player, market, line)] = {
                 "live_projection": projection,
                 "model_prob_over": prop.get("modelProbOver"),
@@ -323,6 +356,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
 
     return {
         "index": index,
+        "lines_by_player_market": lines_by_player_market,
+        "players_seen": players_seen,
         "games_seen": games_seen,
         "live_games": live_games,
         "rows_seen": rows_seen,
@@ -344,6 +379,26 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     the model everywhere.
     """
     index = indexed.get("index") if isinstance(indexed, Mapping) else None
+    # The attribution indexes, defaulted rather than assumed present: this
+    # function is called with payloads built by an OLDER copy of
+    # `build_live_prop_index` across a deploy boundary (the two files ship as
+    # separate blobs onto a long-lived worker -- `pipeline/layer2_shortlist.py`
+    # records what that cost in production). Missing them must cost the
+    # ATTRIBUTION, never the join: with empty defaults every miss falls to
+    # `miss_no_market_alias`, which is exactly the old behaviour.
+    # PRESENCE, not truthiness. An EMPTY `players_seen` is a real state (a
+    # snapshot with no indexable rows) and must still attribute misses; an
+    # ABSENT one means an older builder produced this payload and cannot
+    # attribute anything. Collapsing those with `or {}` made every miss read as
+    # `miss_player_not_live` on a legacy payload -- inventing a cause, which is
+    # worse than the catch-all this split replaced.
+    _has_attribution = (
+        isinstance(indexed, Mapping)
+        and "players_seen" in indexed
+        and "lines_by_player_market" in indexed
+    )
+    lines_by_player_market = indexed.get("lines_by_player_market") or {} if _has_attribution else {}
+    players_seen = indexed.get("players_seen") or set() if _has_attribution else set()
     if not isinstance(index, dict):
         return {"supported": False, "reason": "no live snapshot", "rows_live_projected": 0}
 
@@ -355,6 +410,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     miss_no_player = 0
     miss_no_market_alias = 0
     miss_no_line = 0
+    miss_no_line_match = 0
+    miss_player_not_live = 0
     unmatched_samples: list[dict[str, Any]] = []
 
     for row in grid:
@@ -383,14 +440,54 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             if hit is not None:
                 break
         if hit is None:
-            miss_no_market_alias += 1
-            if len(unmatched_samples) < 5:
+            # ATTRIBUTE THE MISS. The key is `(player, market, line)`, so "no
+            # match" had three possible causes and one counter, and the counter
+            # was named for only one of them. Measured in production
+            # 2026-08-21 23:37Z: `miss_market=428` of 901 considered, with
+            # `miss_player=0` and `miss_line=0` -- which reads as "428 markets
+            # we cannot name" and was the reason this split was written. Those
+            # two zeros count DIFFERENT things (a row with no player NAME, a row
+            # with no LINE on the board) and neither could see this case.
+            #
+            # Cheapest test first, then narrowing:
+            #   player absent entirely -> not live, or a name-join failure
+            #   player present, market family absent -> a real VOCABULARY gap
+            #   both present, line absent -> the board quotes a line the re-sim
+            #                                did not price (multi-line markets:
+            #                                batter_hits_runs_rbis is fetched at
+            #                                1.5/2.5/3.5, batter_strikeouts at
+            #                                0.5/1.5)
+            tried = [_canonical_market(c) for c in _market_candidates(row.get("market"))]
+            if not _has_attribution:
+                # Older payload: keep the pre-split behaviour exactly rather
+                # than guessing which of the three causes applied.
+                miss_no_market_alias += 1
+            elif player not in players_seen:
+                miss_player_not_live += 1
+            elif not any((player, fam) in lines_by_player_market for fam in tried):
+                miss_no_market_alias += 1
+            else:
+                miss_no_line_match += 1
+            if len(unmatched_samples) < 8:
+                available = sorted(
+                    {
+                        line_value
+                        for fam in tried
+                        for line_value in lines_by_player_market.get((player, fam), ())
+                    }
+                )
                 unmatched_samples.append(
                     {
                         "player": player,
                         "board_market": row.get("market"),
                         "tried": list(_market_candidates(row.get("market"))),
                         "line": line,
+                        # WHAT THE INDEX DID HAVE for this player+market. An
+                        # absent field is just another null unless you can see
+                        # the keyspace it is absent from -- the same reasoning
+                        # `sample_prop_keys` already applies one level up.
+                        "lens_lines_available": available,
+                        "player_in_lens": player in players_seen,
                     }
                 )
             continue
@@ -634,5 +731,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "miss_no_player": miss_no_player,
         "miss_no_market_alias": miss_no_market_alias,
         "miss_no_line": miss_no_line,
+        # The two causes `miss_no_market_alias` used to absorb silently.
+        "miss_no_line_match": miss_no_line_match,
+        "miss_player_not_live": miss_player_not_live,
         "unmatched_samples": unmatched_samples,
     }
