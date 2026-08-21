@@ -1,5 +1,37 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#497` — **The deploy claim is not a global lock once sessions use worktrees** — found by lane `soccer-board-mlb-parity`, 2026-08-21, NOT FIXED ON PURPOSE
+
+`deploy_claim.py:63` sets `CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"`
+and `REPO_ROOT` resolves to the **worktree's** root. CLAUDE.md mandates one
+worktree per session, so every session gets a PRIVATE claim directory and the
+atomic `O_CREAT|O_EXCL` excludes nothing across sessions.
+
+**Measured 2026-08-21, two live claims on refresh-worker ten seconds apart:**
+`soccer-board-mlb-parity` (15:12:37Z, worktree) and `nfl-props-odds-allowlist`
+(15:12:27Z, primary tree). Both sessions were told `ACQUIRED`, and
+`deploy_preflight.py` printed **`deploy claim held by YOU`** off the worktree
+copy — the check whose job is to confirm the lock confirmed a lock that did not
+exist.
+
+**Only `.claude/hooks/deploy-guard.py` held the line**, because it runs from
+`$CLAUDE_PROJECT_DIR` and always reads the primary tree. It blocked the deploy
+and named the true holder. So the guard is currently the sole enforcement and
+the lock beneath it is decorative for any worktree session — a lock that reports
+success, which is the shape that lets 2026-08-15 recur (a verified
+refresh-worker fix silently reverted 8 minutes after going live).
+
+**The fix:** resolve `CLAIM_DIR` from the git COMMON dir (`git rev-parse
+--git-common-dir`) so every worktree shares one claim directory, and make
+`deploy_preflight.py` read that same path. **Deliberately not done on 08-21** —
+three sessions were actively deploying against the current behaviour and a lock
+is not something to change underneath them mid-slate.
+
+**Until then:** the PRIMARY tree's `.syndicate/deploy_claims/` is the only
+authoritative copy. Run `deploy_claim.py status` FROM THE PRIMARY TREE before
+believing you hold anything, and never `--force` on a worktree reading.
+Full evidence: `learnings.md`, 2026-08-21 entry.
+
 ### `#496` — **DELETED, not repaired: the `reports/intelligence` bootstrap entries had never copied a byte, and making them work would have degraded the board** — lane `bootstrap-intelligence-entries-dead`, 2026-08-20
 
 **What was there.** A `BOOTSTRAP_FILES` tuple of 8 named intelligence artifacts

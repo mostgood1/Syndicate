@@ -4065,3 +4065,51 @@ Re-check existence AFTER any rebase or fetch, not before. And read
 `git diff --cached --numstat` before every ledger push: it is one line, it is
 the only thing that distinguishes "I added my entry" from "I replaced someone
 else's", and it has now caught this class twice.
+
+## 2026-08-21 — THE DEPLOY CLAIM IS NOT A GLOBAL LOCK ONCE SESSIONS USE WORKTREES
+
+**FORBIDDEN: reading `deploy_claim.py acquire`'s own `ACQUIRED` as proof you
+hold a service.** It is proof you hold it *in the tree you ran it from*.
+
+`deploy_claim.py:63` — `CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"`.
+`REPO_ROOT` resolves to the **worktree's** root, and CLAUDE.md mandates that
+every session work in its own worktree. So each session gets its own private
+claim directory and the atomic `O_CREAT|O_EXCL` excludes nothing across
+sessions.
+
+**MEASURED 2026-08-21.** Two claims on refresh-worker, live at the same instant,
+ten seconds apart:
+
+    C:/tmp/syndicate-sessions/soccer-board-mlb-parity/.syndicate/deploy_claims/
+        holder soccer-board-mlb-parity   acquired 15:12:37Z  token cb5f26b7
+    C:/Users/tempadmin/OneDrive/Coding/Syndicate/.syndicate/deploy_claims/
+        holder nfl-props-odds-allowlist  acquired 15:12:27Z  token bf98b652
+
+Both sessions were told `ACQUIRED`. `deploy_claim.py status` run from the
+worktree reported `HELD by soccer-board-mlb-parity`; run from the primary tree,
+`HELD by nfl-props-odds-allowlist`. **`deploy_preflight.py` printed
+`deploy claim held by YOU` on the strength of the worktree copy** — so the
+preflight, the thing whose job is to say the lock is yours, confirmed a lock
+that did not exist.
+
+**What actually held the line:** `.claude/hooks/deploy-guard.py`, because it
+runs from `$CLAUDE_PROJECT_DIR` and therefore always reads the PRIMARY tree. It
+blocked the deploy and named the real holder. The guard is currently the ONLY
+enforcement of mutual exclusion; the lock underneath it is decorative for any
+session in a worktree.
+
+**Why this is the dangerous shape:** it is a lock that reports success. The
+2026-08-15 incident this claim exists to prevent — a verified refresh-worker fix
+silently reverted 8 minutes after going live, because two deploys did not
+contain each other — is reachable again by any path that does not go through the
+Bash hook, and nothing would report it.
+
+**How to apply until it is fixed:**
+- The PRIMARY tree's `.syndicate/deploy_claims/` is the only authoritative copy.
+  Read it directly, or run `deploy_claim.py status` **from the primary tree**,
+  before believing you hold anything.
+- Do not `--force` on the strength of a worktree reading. A claim that looks
+  free from your worktree may be held.
+- The fix is to resolve `CLAIM_DIR` from the git COMMON dir rather than
+  `REPO_ROOT` — deliberately NOT done on 2026-08-21 while three sessions were
+  actively deploying against the current behaviour. Tracked in `todo.md`.
