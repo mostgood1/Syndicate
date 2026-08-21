@@ -4224,3 +4224,41 @@ rows has to be visible in the artifact, not inferred from a thin card.
 compact card reads via `_extract_prop_group(summary,"pitcher","strikeouts")`),
 then a freshness trigger in the sim job so every ~15-min sim re-derives ladders
 against current lines AND current game state. **Retires the vendor import.**
+
+
+## [nfl-player-props] NFL player props: capture fixed, model priced and BEATEN by the market
+
+`[verified 2026-08-21, lane nfl-props-odds-allowlist]`
+
+- **NFL/NCAAF prop capture returned ZERO rows for its entire existence.** Bulk
+  `/sports/{key}/odds` does not serve player props (`422 INVALID_MARKET`,
+  verified live); they are per-event only. Two market keys were also invalid.
+  Fixed; refresh-worker live on `59afbbb6`. 0 -> 80 rows on a live run.
+- **PRODUCTION BEHAVIOUR NOT YET OBSERVED.** Owed reading: a populated
+  `nfl_source/oddsapi_player_props_2026_wk1.csv` on `/api/ops/artifacts/export`.
+- **In season, NFL props are captured by `live-odds-worker`, not
+  refresh-worker** -- `_weekly_sport_claimed_by_fast_tick` hands a sport with
+  games in the horizon to the fast tick, and refresh-worker drops exactly those.
+  The partition is complete (nothing falls through) but **live-odds-worker does
+  not have the fix**.
+- **The prop model does not beat the market**: -7.35% (best price, n=48,024) /
+  -7.23% (DraftKings, n=13,368) over 64,007 graded bets, 2023-2025 REG closing
+  lines. Fading it loses 16.93%, so the picks are correctly signed.
+- **Price shopping is worth +2.95 ROI points**, controlled on 12,986 identical
+  bets. Largest single lever measured.
+- **Backfilled odds now exist on disk**: 109,750 rows / 513,235 quotes / 579 of
+  816 REG games, 2023-2025. `data/nfl_source/` (untracked mirror).
+
+## [nfl-game-context] Game context is built and measured, and INERT in production
+
+`[verified 2026-08-21, lane nfl-props-odds-allowlist]`
+
+- Implied team total + spread, self-normalised against the player's own history,
+  fitted per market on 2023-2024. **Paired on 16,906 held-out 2025 bets:
+  -7.44% -> -6.26% (+1.18 pts)**, brier and hit rate moving with it.
+- **DEPLOYED INERT on web `7c2e92c0`.** It read
+  `tracking/nflverse/schedules_games.csv`, which is gitignored and has no writer
+  in this repo -- `count: 0` on web with the pattern confirmed deployed.
+  Multiplier collapses to 1.0 for every player. Harmless, but doing nothing.
+- Fix landed on `8fe78662` (reads `schedule_{season}.csv`, allowlisted, publish
+  call added to `fetch_nfl_schedule.py`) and is **NOT DEPLOYED**.

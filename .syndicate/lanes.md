@@ -1211,6 +1211,26 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   firing; today's run simply had nothing real to fetch.
 - Blocked by: none.
 
+### nfl-props-odds-allowlist — OPEN, NARROWED — **THE ASK'S PREMISE WAS FALSE AND THE REAL DEFECT WAS BIGGER.** The allowlist was already fixed (re-verified `count: 14`); 13 of 14 files were stubs sharing one `copy2` mtime, so the prior lane's "production == mirror" finding was circular. Real cause: NFL/NCAAF prop capture called the BULK odds endpoint (422, player props are per-event) with two invalid market keys, every 422 swallowed — **zero rows ever captured**. Fixed and live on refresh-worker `59afbbb6` (0 -> 80 rows). Backfilled 2023-2025 (109,750 rows / 513,235 quotes / 579 of 816 games) and **PRICED THE MODEL FOR THE FIRST TIME: -7.35% best price over 64,007 bets — it does not beat the market**, though fading it loses 16.93% so the picks are correctly signed. Price shopping worth **+2.95 ROI pts** (controlled). Game context built, fitted, **+1.18 pts paired on 16,906 held-out bets** — but **DEPLOYED INERT on web** (read a gitignored file with no writer); fix landed `8fe78662`, undeployed. Narrative: `log/2026-08-21.md`. Measurements: `deploys.md` 02:37Z. — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
+- Goal: a real ROI number for NFL player props. **MET** — 64,007 graded bets.
+- Files: `scripts/fetch_nfl_oddsapi_props_local.py`, `scripts/fetch_ncaaf_oddsapi_props_local.py`,
+  `scripts/fetch_nfl_schedule.py`, `syndicate/features/nfl/{props,player_stats,game_context}.py`,
+  `syndicate/features/shared/artifact_publisher.py`, 4 new analysis scripts,
+  `tests/test_football_props_odds_capture.py`.
+- Verification: DONE for the measurement (ROI + denominator, per market).
+  NOT done for production behaviour — see the three owed items.
+- **OWED, in priority order:**
+  1. **live-odds-worker needs `59afbbb6`** — it is the in-season owner of NFL
+     prop capture and does not have the fix. Before 2026-09-10.
+  2. **web + a worker need `8fe78662`**, then a schedule fetch must RUN, then
+     `?pattern=nfl_source/schedule_*.csv` non-zero on web is the reading that
+     proves game context is no longer inert.
+  3. **Populated `oddsapi_player_props_2026_wk1.csv`** replacing the 5-byte stub
+     — the behavioural proof the capture fix works in production. 6-hourly.
+- Claims held: NONE (web and refresh-worker both released).
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

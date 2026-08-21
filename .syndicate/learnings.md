@@ -3752,3 +3752,89 @@ the push to be verified.** A self-confirming check is not evidence, and
   what the remaining five commits of that session used. Two sessions sharing
   one lane slug also made the deploy-claim table unable to say which of them
   held a service, so the shared slug is worth resolving on sight.
+
+
+## 2026-08-21 — A GITIGNORED FILE CANNOT BE A MODEL INPUT. Allowlisting it does not help, and the result is a feature that is live, tested, deployed and does nothing
+
+**Believed:** wiring the NFL prop model to `spread_line`/`total_line` from
+`data/nfl_source/tracking/nflverse/schedules_games.csv` and adding that path to
+`HOT_ARTIFACT_PATTERNS` was enough to ship the game-context mechanism.
+
+**Actually:** the file is `.gitignore:96` (`data/nfl_source/tracking/`) and **no
+script in this repo writes it**. It exists on a developer machine and nowhere
+else. So on web `game_context()` returned `{}`, `implied_total_ratio()` returned
+`None`, and the multiplier collapsed to **1.0 for every player** — output
+byte-identical to a build without the feature, with passing tests and a green
+deploy. `model_engine_standard.md` §0, exactly.
+
+**Rule:** an input needs THREE independent things, and any one missing makes it
+inert: (1) a **producer that runs in production** — git-tracked is one way, a
+fetcher is another, "it's on my disk" is neither; (2) an **allowlist entry**;
+(3) a **publish call** (`#208`: the allowlist permits, only a call transfers).
+Check all three before wiring, and prefer an artifact production already
+produces over one you would have to start producing.
+
+**How it was caught:** on the served surface, not by a test.
+`?pattern=...schedules_games.csv` -> `count: 0`. Critically, that zero was
+disambiguated: the allowlist pattern was confirmed present **in the deployed
+commit**, so `count: 0` meant FILE-ABSENT and not PATTERN-ABSENT. Those two
+readings are identical from outside and have opposite remedies.
+
+
+## 2026-08-21 — A REACHABILITY PROBE SAMPLED FROM REAL DATA CAN BE DEGENERATE, and then it reports a live mechanism as dead
+
+**Believed:** `off != on` on a real row proves a mechanism is reachable, so
+probing `train_rows[0]` was a fair test.
+
+**Actually:** that row's `pred_mean` was `0.0` (a passer's receiving_yards), and
+`0 * ratio**alpha * exp(beta*delta) == 0` for every alpha and beta. The check
+printed `off=0.000000 on=0.000000` and refused to fit. The **guard was right to
+refuse; the diagnosis would have been wrong** — the mechanism was live.
+
+**Rule:** PIN a reachability probe to a synthetic, non-degenerate input, and
+assert the identity too (`alpha=0, beta=0` must return the input unchanged).
+Then separately assert the REAL rows carry varying input — a live function over
+constant data is still inert in practice. Both checks, not either.
+
+
+## 2026-08-21 — A DOCUMENTED "acceptable for v1" LIMITATION IS A LIVE DEFECT THE MOMENT DATA ARRIVES TO EXERCISE IT
+
+**Believed:** `short_name_from_full`'s docstring already named the collision
+("two players sharing a first initial + last name would collide — acceptable for
+a v1"), so it was a known, bounded simplification.
+
+**Actually:** nothing had ever MEASURED its consequence, because no real quoted
+NFL prop line had ever been captured to join against. The first time one was,
+`player_name_index`'s `setdefault` handed **"Troy Hill" (a cornerback, priced
++4000) Tyreek Hill's game log**, and "D.J. Montgomery" (+3000) David
+Montgomery's. Price from the longshot, model rate AND outcome from the star.
+Headline result: **anytime_td at +125% ROI**, entirely an artifact.
+
+It touches 14 of 573 short names in 2023 (2.4%) — and dominated the result
+anyway, because the errors are **not random**: a collision systematically pairs
+a cheap price with a good player, which is precisely the shape of a fake edge.
+
+**Rule:** a known limitation with no measurement is an unexploded one, and "it's
+only 2.4%" is not a bound on impact when the errors are biased toward the thing
+you are looking for. When new data first makes an old simplification testable,
+test it before trusting anything downstream. And `unknown` must resolve to
+`None`, never to a confident guess — a wrongly resolved join prices a projection
+against a different human being, which is worse at any stake than no bet.
+
+
+## 2026-08-21 — OPENING A LANE IN THE PRIMARY TREE AND THEN OPENING A WORKTREE SILENTLY DROPS THE LANE BLOCK
+
+**Believed:** `adopt` is only needed when a lane has PRE-EXISTING uncommitted
+work, so a brand-new lane can skip straight to `open`.
+
+**Actually:** `/lane open` writes the block into whichever tree you are in — the
+PRIMARY tree — and `session_worktree.py open` creates a fresh checkout from
+`origin/main` that does not carry it. The block sat uncommitted in the primary
+tree for the whole session: `grep nfl-props-odds-allowlist .syndicate/lanes.md`
+returned **0** in the worktree, 0 in `lanes_closed.md`, 0 in `lanes_history.md`,
+and `git log -S` showed it had never been committed. The lane was unguarded in
+the shared ledger the entire time.
+
+**Rule:** the lane block IS uncommitted work. Either open the worktree FIRST and
+write the lane block inside it, or run `adopt` afterwards even for a lane you
+just created. "New lane" does not mean "nothing to carry across".
