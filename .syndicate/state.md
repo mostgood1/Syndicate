@@ -3768,7 +3768,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web + refresh-worker both 6855fe96, 2026-08-21T21:52Z]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
+## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web 8a7b2407, refresh-worker 6855fe96, read 2026-08-21T22:46Z]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
 
 ESPN-scoring season + weekly projections for QB/RB/WR/TE/K/DST at
 `/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. On `main` as
@@ -3787,8 +3787,8 @@ negative: adding the practice report made it WORSE (+25.8% / +30.9% vs +36.2%),
 because the practice week is already priced into the designation.
 The TEXT half (coach quotes, camp/role/workload talk) is CAPTURED and DISPLAYED
 but **NOT SCORED** — `use_news_adjustments=False`. `scripts/capture_nfl_news.py`
-builds an append-only dated archive (worker autorun, currently `interval_s=21600`,
-env says 3600 and applies at the next worker deploy) precisely because the text
+builds an append-only dated archive (worker autorun, `interval_s=3600`,
+CONFIRMED from the worker's own skip line) precisely because the text
 was never ungradeable — it had merely never been STORED. Links use ESPN's own
 athlete tags: measured 92 of 95 player-links via `espn_tag`, 3 via name match.
 **NO CUSTOM HEADERS on any ESPN call** — see `learnings.md` 2026-08-21; a custom

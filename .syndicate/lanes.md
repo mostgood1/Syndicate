@@ -1105,7 +1105,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### nfl-fantasy-projections — OPEN, **LIVE ON PRODUCTION: web + refresh-worker both on `6855fe96` (a peer lane's 21:52Z deploy, which CONTAINS my `ae941265` by content -- verified by reading `fantasy_news.py` at that SHA, not by ancestry alone); the NEWS LAYER is deployed and `/nfl/fantasy` serves 520 rows** — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA**: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266, held-out 2025). — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
+### nfl-fantasy-projections — OPEN, **LIVE AND VERIFIED END TO END: web `8a7b2407`, refresh-worker `6855fe96`. The news layer captures, publishes and renders — 101 live Buzz badges on `/nfl/fantasy`, from 0 six hours ago.** — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
 - Goal: a `/nfl/fantasy` surface serving ESPN-scoring 2026 season projections (PPR default, 12-team 1QB VOR draft board) for QB/RB/WR/TE/K/DST, plus per-week projections. **MET.**
 - Files: `syndicate/features/nfl/fantasy{,_scoring,_usage,_schedule,_players,_projection,_draft_board,_news}.py` (new), `syndicate/blueprints/nfl.py` (3 routes), `syndicate/features/shared/artifact_publisher.py` (+5 allowlist patterns), `syndicate/templates/nfl/fantasy.html` (new), `scripts/{build_nfl_fantasy_usage,fetch_nfl_rosters_depth_charts,backtest_nfl_fantasy_projections,calibrate_nfl_fantasy_projections,compare_nfl_fantasy_depth_charts,nfl_fantasy_input_checklist}.py` (new), `tests/test_nfl_fantasy.py` (new), `docs/ai_context/nfl_fantasy_engine_reference.md` (new), `reports/nfl_fantasy_*.json`.
 - Hypothesis: an opportunity-share engine re-based onto 2026 depth charts beats "last season's fantasy points" on held-out season MAE and rank correlation.
@@ -1115,6 +1115,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Text/role signals ship INERT by choice: `use_news_adjustments=False`. Quotes are SHOWN, not scored, until the archive is deep enough to grade.
 
 **ON `main` as `45632889..c1c811c3` (6 commits), rebased clean onto `e0e32b53`.** engine · reference doc · depth chart + contemporaneous role prior + ARI fix · re-calibration (the reported FAIL) · availability fix (the PASS) · re-sweep (nothing changed). **`render.yaml` NOT touched, so no `blueprint_sync` and nothing applied to production. NOT DEPLOYED, no deploy claim ever taken — `autoDeploy = no`, so this push ships nothing until someone deploys it.** Full narrative: `.syndicate/log/2026-08-21.md`.
+
+
+**OPEN RISK, not owed work:** the PRIMARY SHARED TREE holds an orphaned commit
+`318b2b7a` (1 ahead / 57 behind). Its content is already on `main` via
+`80b772ee`, but it was authored against a 47-commit-stale `.syndicate/`. A
+rebase or force-push from that tree can REVERT tonight's ledger. Left alone
+deliberately — another session may hold uncommitted edits in those files.
 
 **NEWS + COACH QUOTES SHIPPED 2026-08-21 21:1x-21:3xZ.** Injury half is fitted
 and gated ON (MAE 6.894 -> 4.399, +36.2%, 2,226 held-out player-weeks). Text half
@@ -1128,7 +1135,7 @@ failure say nothing about production. Same error on the worker. Cause: my own
 `User-Agent`; the rule was already in capitals at `live_game_state.py:50`,
 including the clause saying the dev machine and Render fail the SAME way. Fixed
 in `ae941265`; now `status=ok, 50 articles, 35 linked -> 84 players`, 92 of 95
-links via ESPN's own athlete tags. **OWED MEASUREMENT DISCHARGED 22:28:32Z:** the worker logged
+links via ESPN's own athlete tags. **NOTHING OWED ON THE NEWS LAYER.** Discharged 22:28:32Z: the worker logged
 `status=ok fetched=50 linked=35`, published, and the served page went from 0 live
 Buzz badges to **101** (58 players with coverage) -- it holds `interval_s=21600` because I set the interval AFTER
 triggering the deploy, so next attempt ~03:20Z.

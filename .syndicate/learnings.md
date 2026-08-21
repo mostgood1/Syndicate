@@ -4434,3 +4434,69 @@ Also fixed: the error carried only `HTTPError`, so 403 (refused) and 404 (wrong
 URL) were indistinguishable in the worker log — one deploy cycle spent on a
 diagnosis the status code would have given free. Related:
 [[feedback_absent_signal_is_about_the_emitter]], [[feedback_instrument_blindness]].
+
+## 2026-08-21 — READ THE TTL BEFORE BREAKING A LOCK. The force bought 12 minutes.
+
+I broke `soccer-board-mlb-parity`'s live `web` claim at 32.1 min while that
+session was awake and mid-incident on that exact service. The claim's TTL is 45
+min, so it would have expired on its own **~12 minutes later**. Nobody computed
+that at the time — not me when I raised the objection, and not the escalation
+that followed. The choice was framed as "force, or wait indefinitely", and the
+real choice was "force, or wait 12 minutes".
+
+**Rule: before forcing a claim, print its age against the TTL and state the
+remaining wait.** The protocol's `--force` is for a session that is GONE; when
+the holder is alive, the honest question is whether the work can wait N minutes,
+and N is a number the tooling already knows. A remaining-wait figure belongs in
+the guard's own output, next to where it prints the holder.
+
+Not a rule about overruling: the user decided with the risk stated, twice, and
+that is their call. It is a rule about the MISSING NUMBER that made the decision
+look more expensive than it was.
+
+## 2026-08-21 — FORBIDDEN: asserting a trend from one sample, especially a scary one
+
+I reported web as "sliding" because I measured `/` at 19.7s where a peer's entry
+said 12.1s. A watcher then produced the actual series across that window:
+**10.2 / 10.4 / 19.5 BEFORE I touched anything**, and 12.8 / 11.4 / 17.8 after.
+19.7 was an ordinary member of the spread. There was no trend.
+
+The direction of the error is the part worth keeping: a single alarming sample
+gets promoted to a trend, while a single reassuring sample is (correctly)
+distrusted. That asymmetry feels like caution and is really just noise with a
+narrative attached — and here it went into a live incident thread, where it
+would have pushed a peer lane toward a more invasive fix than the evidence
+supported.
+
+**Rule: two readings minimum before the word "worse", and say n.** If a watcher
+is already running, read ITS series rather than firing a fresh probe and
+reasoning off the newest point. Related: [[feedback_rate_not_count]],
+[[feedback_absence_in_a_window_is_not_absence]].
+
+## 2026-08-21 — Reasoning off an invented clock, and querying a window in the future
+
+I concluded the worker "has logged nothing for ~30 minutes" when the true time
+was 21:54 and the container was two minutes old. I then queried logs with
+`--start 22:10` — a window that had not happened yet — and read the empty result
+as evidence of silence.
+
+Two cheap defences, both of which I had and did not use: `date -u` costs one
+line, and `render_logs.py` PRINTS ITS OWN `COVERED` range, which is the ground
+truth about what was actually inspected. Twice in one session an empty result
+was really a window problem: once the future window, once a 2-page pagination
+cap that ended coverage at 21:53 while I read it as "logging stopped".
+
+**Rule: never state an elapsed time without reading the clock, and never treat
+an empty log result as absence until the tool's own COVERED range contains the
+period you care about.** Related: [[feedback_instrument_blindness]].
+
+## 2026-08-21 — A poll that matched its own instrument
+
+Polling for the capture with `grep -E "NFL_NEWS_CAPTURE"` matched the log
+reader's echo of its own search string (`# refresh-worker text='NFL_NEWS_CAPTURE'`)
+and printed "FIRED" for something that had not happened. I reported success from
+it before catching the header line.
+
+**Rule: a poll predicate must match the SHAPE of a real record, not the topic.**
+`^2026-` (a timestamped line) is a predicate; the search term is not, because the
+tool prints the search term back. Anchor on the record format.
