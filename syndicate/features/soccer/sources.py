@@ -193,9 +193,45 @@ def live_state_path(league: str, selected_date: str) -> Path:
 
 
 def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None:
-    # Not cached: this file is overwritten by the live poller every cycle,
-    # unlike the once-per-date recommendations artifact above.
-    return load_json(live_state_path(league, selected_date))
+    """The live poller's per-league state, readable ACROSS SERVICES.
+
+    Not cached: overwritten by the poller every cycle, unlike the once-per-date
+    recommendations artifact above.
+
+    READS THROUGH `refresh_state_store` FIRST, and that is the whole point.
+    This file is written by **live-odds-worker to its own disk**, and web has a
+    different disk -- a hard Render constraint. A bare `load_json` therefore
+    returned None on web for every match ever played, so the card rendered
+    "Goals" and "Match stats" as EMPTY HEADERS while
+    `/api/ops/artifacts/export` (which reads the keyvalue-backed store) showed
+    a fully populated `match_box` for the same fixture.
+
+    MEASURED 2026-08-21 on the four finished European matches: artifact carried
+    score 3-0 with 3 goals and both teams' stats; the card showed the right
+    score (that comes from the readable recommendations artifact) and 0 rows in
+    every box section. Same cross-service split fixed earlier that day for the
+    BOARD gates in `soccer_live_gameline_source.soccer_live_games` -- this is
+    the second reader, which that fix did not touch.
+
+    FALLS BACK TO DISK. `read_json_file` routes to the keyvalue store only when
+    the backend IS keyvalue (`_keyvalue_backed`); locally it reads the
+    filesystem anyway. The explicit fallback covers the remaining case -- a
+    keyvalue backend configured while the file exists only on THIS box, which
+    is the normal state of a dev checkout that has run the poller itself.
+    Without it, this fix would break local development to fix production.
+    """
+    path = live_state_path(league, selected_date)
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        payload = read_json_file(path)
+        if isinstance(payload, dict) and payload:
+            return payload
+    except Exception:
+        # Never fatal: a store hiccup degrades to the disk read below, which is
+        # exactly the previous behaviour rather than a blank card.
+        pass
+    return load_json(path)
 
 
 def picks_path(league: str, selected_date: str) -> Path:
