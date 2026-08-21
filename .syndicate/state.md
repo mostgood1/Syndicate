@@ -2372,14 +2372,32 @@ Re-check in-season with `scripts/probe_ncaaf_injury_feed.py`.
   - `..._recomputes_when_cached_snapshot_is_stale` — **passes on `main`**,
     re-measured 2026-08-20 (72s), individually, not inferred from a suite total.
     Cause of its recovery not investigated.
-- **THE LINEAGE CAVEAT SURVIVES, and now applies to MY number too.** The 224/0 run
-  was against the PRIMARY TREE's lineage (`d2222426` + the one-line test fix), **30
-  commits behind `origin/main`** at the time. The test file is byte-identical to
-  what shipped; the surrounding product code is not. **A clean tip-of-`main` number
-  is UNMEASURED** and costs ~23 min to take. **Gate against the lineage you are
-  shipping, not against `main`** — the rule that made the old
-  `218 passed / 6 failed` on the deployed lineage at `2b14fbeb` worth recording is
-  the same rule that bounds this replacement.
+- **LINEAGE CAVEAT DISCHARGED — this number IS a tip-of-`main` reading.**
+  Re-measured at `56b4dd41` (tip): **`224 passed, 10 subtests passed, 0 failed in
+  1668.24s`**, identical pass/fail to the first run, which was taken on the primary
+  tree's lineage (`d2222426` + the fix), 30 commits behind. **The 34 commits of
+  product code between them change nothing for this file.**
+- **The COST figure is the one thing that moved: 22:41 then, 27:48 now.** Read
+  **~25-30 min**, not ~23. Other sessions were writing the shared `data/`
+  throughout both runs, so load is the likely cause — **not isolated, not
+  claimed.**
+- **HOW the tip run was taken, because a naive re-run would NOT have been valid.**
+  `learnings.md` 08-16 forbids a fresh `git worktree` as a baseline for anything
+  that reads `data/`, and this suite DOES reach the real disk (`tests/conftest.py`
+  isolates `data/prediction_ledger.json` precisely because tests were writing it
+  through `data_root()`). So: worktree at tip, sparse-checkout of every top-level
+  dir EXCEPT `data/`, and `data/` supplied as a **junction to the primary tree's
+  `data/`** — the same bytes the first run used, making the product code the only
+  delta. **`SYNDICATE_DATA_ROOT` alone would have been WRONG:** `data_root()`
+  honours it, but `REPO_ROOT / "data"` and the per-sport path helpers do not, so
+  those reads would have silently fallen back to the worktree's own lossy copy —
+  the inert-redirect failure that rule was written about.
+- **Neither run is hermetic.** The junction shares a LIVE directory that other
+  sessions write, and the suite writes into it. Same exposure both times, so the
+  comparison holds; a sealed number is still untaken.
+- **Gate against the lineage you are shipping, not against `main`** — the rule
+  that made the old `218 passed / 6 failed` at `2b14fbeb` worth recording. It is
+  satisfied here, not waived.
 - **`tests/test_intelligence.py` is 218 passed / 0 failed on committed `main`**
   `[measured 08-15 ~21:5xZ, lane red-intelligence-tests]`. It was **216/2** at
   the start of that session and 217/1 mid-way. All three reds were real, and

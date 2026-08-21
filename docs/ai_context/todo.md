@@ -107,15 +107,28 @@ kwarg set, not a subset.
    was `218 passed / 6 failed`, and the cost is **~23 minutes, not the ~15**
    `state.md` records.
 
-   **CAVEAT — do not launder this into a tip-of-`main` baseline.** It ran
-   against the PRIMARY TREE's lineage (`d2222426` + this lane's test fix), which
-   was 30 commits behind `origin/main` at the time. The test file is
-   byte-identical to what shipped, but the surrounding product code in that tree
-   is not. `state.md`'s own rule — *gate against the lineage you are shipping,
-   not against `main`* — cuts against this measurement as much as it cut against
-   the one it replaces. What it establishes is that the two named failures are
-   gone and the file has no other red; a clean tip-of-`main` number is still
-   unmeasured and would cost ~23 minutes to take.
+   **CAVEAT NOW DISCHARGED — re-measured at tip.** The first run was against the
+   PRIMARY TREE's lineage (`d2222426` + this lane's test fix), 30 commits behind
+   `origin/main`, so it was NOT a tip-of-`main` baseline and this entry said so.
+   Re-taken at `56b4dd41` (tip): **`224 passed, 10 subtests passed, 0 failed in
+   1668.24s`** — identical pass/fail. **The 34 commits of product code between the
+   two change nothing for this file.**
+
+   **The cost figure moved and the earlier one was optimistic: 22:41 then, 27:48
+   now — read ~25-30 min.** Other sessions were writing the shared `data/` during
+   both runs, so load is the likely cause; not isolated, not claimed.
+
+   **A naive re-run would have produced an invalid number that looked fine.**
+   `learnings.md` 08-16 forbids a fresh `git worktree` as a baseline for anything
+   reading `data/`, and this suite reaches the real disk — `tests/conftest.py`
+   isolates `data/prediction_ledger.json` because tests were writing it through
+   `data_root()`. The tip run therefore used a worktree with every top-level dir
+   EXCEPT `data/`, and `data/` as a **junction to the primary tree's `data/`**, so
+   both runs read the same bytes and the product code is the only delta.
+   **`SYNDICATE_DATA_ROOT` alone would have been wrong** — `data_root()` honours
+   it, `REPO_ROOT / "data"` and the per-sport helpers do not, so part of the reads
+   would have silently used the worktree's own lossy copy. Neither run is
+   hermetic: the shared `data/` is live and written during the run.
 2. **`#387`'s "it was already inert here" is true of the call site it was
    written about, and NOT universally.** The streamed board caller
    (`pipeline/intelligence_state.py:4636-4653`) passes `overview=None` on
