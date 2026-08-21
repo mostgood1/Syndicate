@@ -117,6 +117,10 @@ class FantasyPlayer:
     """One rostered player, as the projection engine needs him."""
 
     player_id: str
+    #: ESPN's own athlete id. Carried so news articles can be joined by the
+    #: tag ESPN attaches to them rather than by matching a name, which has to
+    #: drop every ambiguous case to stay safe.
+    espn_id: str
     name: str
     team: str
     position: str
@@ -306,6 +310,7 @@ def load_fantasy_players(
             players.append(
                 FantasyPlayer(
                     player_id=player_id,
+                    espn_id=(row.get("espn_id") or "").strip(),
                     name=(row.get("full_name") or "").strip(),
                     team=canonical_team(row.get("team")),
                     position=position,

@@ -2524,6 +2524,96 @@ def _nfl_fantasy_artifact_script_args(season: int) -> list[str]:
     ]
 
 
+_NFL_NEWS_SKIP_LOG_AT: dict[str, float] = {}
+
+
+def _nfl_news_capture_enabled() -> bool:
+    raw = str(os.environ.get("NFL_NEWS_CAPTURE_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_news_capture_interval_seconds() -> int:
+    # SIX-HOURLY, not daily, and the difference is the point. This job exists
+    # to BUILD AN ARCHIVE, and the feed rolls: a headline published at 09:00
+    # can be gone from a 60-item window by 21:00. A daily poll would quietly
+    # lose most of what was written. The capture is append-only within the day,
+    # so four polls cost four small merges and keep everything.
+    raw = str(os.environ.get("NFL_NEWS_CAPTURE_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 21600)
+    except Exception:
+        value = 21600
+    return max(1800, value)
+
+
+def _nfl_news_capture_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_news_capture.json"
+
+
+def _launch_autorun_nfl_news_capture(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Archive the NFL news feed so the text layer can EVENTUALLY be graded.
+
+    The injury half of the news layer was gradeable the day it was written,
+    because nflverse archives the weekly report back to 2009. The TEXT half was
+    not gradeable at all -- and that was never a property of the problem, only
+    a consequence of nobody having stored it. This stores it.
+
+    Cheap by the standards of this worker: one HTTP GET and a small JSON merge,
+    nothing like the ~725MB projection build, so it runs in-process rather than
+    as a subprocess.
+    """
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_NEWS_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= 60.0:
+            _NFL_NEWS_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_NEWS_CAPTURE_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_news_capture_enabled():
+        return _skip("disabled", "NFL_NEWS_CAPTURE_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+
+    interval = _nfl_news_capture_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_news_capture_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_news_capture_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_NEWS_CAPTURE_MARKER_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    script_path = Path(__file__).resolve().parent / "capture_nfl_news.py"
+    print(f"[refresh_worker] NFL_NEWS_CAPTURE_LAUNCHING interval_s={interval}", flush=True)
+    try:
+        subprocess.Popen([sys.executable, str(script_path), "--limit", "60", "--publish"])
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_NEWS_CAPTURE_LAUNCH_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+    return True
+
+
 def _launch_autorun_nfl_fantasy_artifact(
     *,
     latest_manifest_path: Path,
@@ -4378,6 +4468,17 @@ def main() -> int:
             # rather than running inline, so the poll loop is free again
             # immediately. It sits behind the pbp fetch specifically because it
             # CONSUMES what that job produces.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_news_capture(
+            # Beside the fantasy artifact it feeds, and for the same reason the
+            # artifact sits high: `#341` starvation. This one is six-hourly
+            # rather than daily, so it wins at most four ticks a day, and it is
+            # one HTTP GET.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

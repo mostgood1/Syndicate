@@ -27,6 +27,7 @@ from syndicate.features.nfl.fantasy_draft_board import LeagueSettings
 from syndicate.features.nfl.fantasy_draft_board import board_summary
 from syndicate.features.nfl.fantasy_draft_board import build_draft_board
 from syndicate.features.nfl.fantasy_news import load_news_adjustments
+from syndicate.features.nfl.fantasy_news import recent_news_by_player
 from syndicate.features.nfl.fantasy_players import roster_substrate
 from syndicate.features.nfl.fantasy_projection import DEFAULT_CONFIG
 from syndicate.features.nfl.fantasy_projection import EngineConfig
@@ -558,6 +559,22 @@ def build_fantasy_page_context(
             for name in selected_positions
         }
 
+    # RECENT NEWS IS SHOWN, NOT SCORED. The quotes are attached to rows so a
+    # reader can see what is being said about a player -- which is useful on
+    # draft day by itself -- while the multiplier that would let those words
+    # move a number stays off until the archive is deep enough to grade it.
+    # Displaying evidence and weighting it are different acts.
+    news_by_player = recent_news_by_player(season)
+    for rows in shown.values():
+        for row in rows:
+            entries = news_by_player.get(row["player_id"]) or []
+            row["news"] = entries[:3]
+            row["news_count"] = len(entries)
+    for row in board:
+        entries = news_by_player.get(row["player_id"]) or []
+        row["news"] = entries[:3]
+        row["news_count"] = len(entries)
+
     stat_columns = (
         {name: populated_stat_columns(rows) for name, rows in shown.items()}
         if full_stats
@@ -585,6 +602,10 @@ def build_fantasy_page_context(
         "selected_positions": selected_positions,
         "showing_all_positions": showing_all,
         "board_stat_columns": board_stat_columns,
+        "news_players": sum(1 for rows in shown.values() for row in rows if row.get("news_count")),
+        "news_archive_days": len(
+            {article.get("published", "")[:10] for entries in news_by_player.values() for article in entries}
+        ),
         "position_counts": counts,
         "by_position": shown,
         "board": board[:BOARD_VIEW_LIMIT],

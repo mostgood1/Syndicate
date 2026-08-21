@@ -181,6 +181,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "nfl_source/fantasy/nfl_fantasy_projections_*.json",
     "nfl_source/fantasy/nfl_fantasy_usage_*.json",
     "nfl_source/fantasy/nfl_fantasy_news_*.json",
+    # The news ARCHIVE: one document per day, append-only. Dated rather than
+    # per-season because the point is a growing record -- the text half of the
+    # news layer cannot be graded until there is history to grade it against.
+    "nfl_source/fantasy/news_archive/nfl_news_*.json",
     "nfl_source/fantasy/nfl_fantasy_input_report_*.json",
     # The engine reads these three nflverse families directly. `schedules_games`
     # and `injuries` are already listed above; roster and depth charts were not,

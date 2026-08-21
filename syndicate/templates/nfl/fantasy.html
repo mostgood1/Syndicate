@@ -30,6 +30,10 @@
   .pos-WR { background: #1f5f9e; color: #fff; } .pos-TE { background: #9e6a1f; color: #fff; }
   .pos-K  { background: #555; color: #fff; }    .pos-DST { background: #7a2f2f; color: #fff; }
   .tier { opacity: .65; font-variant-numeric: tabular-nums; }
+  .ff-buzz { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px;
+             font-size: .7rem; font-weight: 700; padding: .05rem .3rem; cursor: help;
+             background: rgba(154,243,22,.18); color: var(--cards-accent-strong, #9af316); }
+  .ff-buzz.is-quiet { background: transparent; color: transparent; }
   table.ff th { cursor: pointer; user-select: none; position: sticky; top: 0;
                 background: var(--panel, #111); z-index: 1; }
   table.ff th:hover { text-decoration: underline; }
@@ -149,7 +153,7 @@
         <thead>
           <tr>
             <th>#</th><th>Rd</th><th>Pos</th><th>Player</th><th>Tm</th>
-            <th>VOR</th><th>Proj</th><th>G</th><th>PPG</th><th>Floor</th><th>Ceiling</th><th>Tier</th>
+            <th>VOR</th><th>Proj</th><th>G</th><th>PPG</th><th>Floor</th><th>Ceiling</th><th>Tier</th><th>Buzz</th>
             {% for key, label in board_stat_columns %}<th>{{ label }}</th>{% endfor %}
           </tr>
         </thead>
@@ -168,6 +172,7 @@
             <td>{{ row.floor }}</td>
             <td>{{ row.ceiling }}</td>
             <td class="tier">T{{ row.draft.tier }}</td>
+            <td>{% if row.news_count %}<span class="ff-buzz" title="{% for item in row.news %}{{ item.headline }}&#10;{% endfor %}">{{ row.news_count }}</span>{% else %}<span class="ff-buzz is-quiet">0</span>{% endif %}</td>
             {% for key, label in board_stat_columns %}<td>{{ row.stat_line.get(key, 0) }}</td>{% endfor %}
           </tr>
           {% endfor %}
@@ -199,7 +204,7 @@
                   {% if position == 'K' %}<th>FG 0-39</th><th>40-49</th><th>50+</th><th>PAT</th>{% endif %}
                   {% if position == 'DST' %}<th>Sacks</th><th>INT</th><th>Fum</th><th>TD</th><th>PA</th>{% endif %}
                 {% endif %}
-                <th>Basis</th>
+                <th>Buzz</th><th>Basis</th>
               </tr>
             </thead>
             <tbody>
@@ -236,6 +241,7 @@
                     <td>{{ row.stat_line.dst_points_allowed }}</td>
                   {% endif %}
                 {% endif %}
+                <td>{% if row.news_count %}<span class="ff-buzz" title="{% for item in row.news %}{{ item.headline }}&#10;{% endfor %}">{{ row.news_count }}</span>{% else %}<span class="ff-buzz is-quiet">0</span>{% endif %}</td>
                 <td class="tier">{{ row.basis.share_source }}{% if row.basis.is_rookie %} &middot; rookie{% endif %}</td>
               </tr>
               {% endfor %}
@@ -252,6 +258,22 @@
     stat the projection actually produces{% else %}Columns shown are the ones carrying a value
     for that position{% endif %}.
   </p>
+
+  <div class="ff-note" style="margin-top:2rem;padding:.75rem 1rem;border:1px solid var(--border,#444);border-radius:8px">
+    <strong>News &amp; coach quotes.</strong>
+    {% if news_archive_days %}
+      Showing headlines from a {{ news_archive_days }}-day archive &mdash; {{ news_players }} of the
+      players on screen have recent coverage. Hover the <span class="ff-buzz">n</span> badge to read them.
+    {% else %}
+      <em>No archive yet.</em> The capture job stores the feed daily; nothing is shown until it has run.
+    {% endif %}
+    <br />
+    <span style="opacity:.75">These quotes are <strong>shown, not scored</strong>. The INJURY signal
+    IS modelled &mdash; the team's own game designation, fitted on 2022-23 and worth a 36% error
+    reduction on held-out weeks. Role and performance talk ("running with the ones", "more targets")
+    has no structured equivalent and no archive deep enough to grade yet, so it is displayed and
+    deliberately left out of the numbers until it can be measured.</span>
+  </div>
 
   <details class="ff-basis">
     <summary>What fed these numbers (substrate, validation, config)</summary>

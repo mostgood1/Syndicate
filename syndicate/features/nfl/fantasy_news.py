@@ -132,6 +132,15 @@ INJURY_AVAILABILITY: dict[str, float] = {
 #: module docstring. Deliberately timid: the largest promotion here is +25% and
 #: the largest demotion -40%, because a headline is weak evidence and this
 #: multiplies a quantity the engine already measured properly.
+#:
+#: THESE ARE ABOUT ROLE AND PERFORMANCE, NOT HEALTH, and that is the whole
+#: reason the layer still exists after the injury half was graded. The injury
+#: axis is well covered: the team's own game designation is published weekly,
+#: it is archived back to 2009, and grading showed the practice report adds
+#: NOTHING beyond it. None of that touches "he has been the best player on the
+#: field in camp", "the coaches want him more involved", or "he is running with
+#: the ones" -- which are claims about opportunity share, arrive only as prose,
+#: and have no structured equivalent anywhere in the feed.
 NEWS_SHARE_SIGNALS: tuple[tuple[str, float], ...] = (
     (r"\bnamed (?:the )?starter\b", 1.25),
     (r"\bwill start\b", 1.20),
@@ -149,7 +158,27 @@ NEWS_SHARE_SIGNALS: tuple[tuple[str, float], ...] = (
     (r"\bsuspended\b", 0.60),
     (r"\bholdout\b|\bholding out\b", 0.80),
     (r"\btrade request\b", 0.90),
+    # Performance and coach-quote shapes, which the injury report cannot carry.
+    (r"\brunning with the (?:ones|first team|starters)\b", 1.20),
+    (r"\bmore (?:targets|touches|carries|snaps)\b", 1.15),
+    (r"\bbigger workload\b|\bfeature(?:d)? back\b", 1.18),
+    (r"\bturning heads\b|\bbest player on the field\b", 1.10),
+    (r"\bimpress(?:ed|ive|ing)\b|\blooked explosive\b", 1.08),
+    (r"\bearn(?:ed|ing) (?:more|a bigger)\b", 1.12),
+    (r"\bfell? behind\b|\bslipp(?:ed|ing) down\b", 0.85),
+    (r"\bfewer (?:targets|touches|carries|snaps)\b", 0.85),
+    (r"\bstruggl(?:ed|ing)\b|\bdrop(?:s|ped) problem\b", 0.90),
+    (r"\bwork(?:ing)? with the (?:twos|second team|backups)\b", 0.75),
 )
+
+#: Which axis a matched signal belongs to. The injury axis is already graded
+#: and modelled from the team's own designation, so a headline repeating it
+#: must not double-count; only the ROLE axis is allowed to move share.
+_INJURY_AXIS_PATTERNS = frozenset({
+    r"\bsuspended\b",
+    r"\bholdout\b|\bholding out\b",
+    r"\btrade request\b",
+})
 
 #: A single player's share is never moved further than this in either
 #: direction, however many headlines mention him. Without a clamp, three
@@ -365,6 +394,130 @@ def build_news_adjustments(
         injuries_scanned=injuries_scanned,
         source_status=status,
     )
+
+
+def espn_id_index(season: int) -> dict[str, str]:
+    """``espn_id -> gsis_id`` for the season's fantasy players.
+
+    ESPN TAGS ITS OWN ARTICLES WITH ATHLETE IDS, and using them is strictly
+    better than matching on a name. Name matching has to drop every ambiguous
+    case to stay safe (two active players really can share a name), it breaks
+    on "D.J." versus "DJ" and on suffixes, and it cannot tell a mention from a
+    subject. The roster carries `espn_id`, so the join is exact.
+
+    Name matching is kept as a FALLBACK for articles carrying no athlete tag,
+    which is common for wire copy.
+    """
+    index: dict[str, str] = {}
+    for player in load_fantasy_players(season):
+        espn = (getattr(player, "espn_id", "") or "").strip()
+        if espn and player.player_id:
+            index[espn] = player.player_id
+    return index
+
+
+def _tagged_players(article: dict[str, Any], espn_index: dict[str, str]) -> list[str]:
+    """gsis_ids ESPN itself attached to this article."""
+    found: list[str] = []
+    for category in article.get("categories") or []:
+        if not isinstance(category, dict):
+            continue
+        if category.get("type") != "athlete":
+            continue
+        raw = category.get("athleteId") or (category.get("athlete") or {}).get("id")
+        mapped = espn_index.get(str(raw).strip()) if raw else None
+        if mapped and mapped not in found:
+            found.append(mapped)
+    return found
+
+
+def capture_news_snapshot(season: int, *, limit: int = 60) -> dict[str, Any]:
+    """One poll of the feed, shaped for the archive.
+
+    Stores the TEXT alongside the linkage, because the point of the archive is
+    to make a keyword rule gradeable later -- and a rule that has not been
+    written yet cannot have its features extracted now. Keeping only today's
+    classification would bake in today's guesses.
+    """
+    from datetime import date
+
+    articles, status = fetch_espn_news(limit=limit)
+    espn_index = espn_id_index(season)
+    names = _name_index(load_fantasy_players(season))
+    captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    rows: list[dict[str, Any]] = []
+    linked = 0
+    for article in articles:
+        text = _article_text(article)
+        players = _tagged_players(article, espn_index)
+        via = "espn_tag" if players else ""
+        if not players:
+            normalized = _normalise_name(text)
+            for key, player in names.items():
+                if len(key) >= 6 and key in normalized and player.player_id:
+                    players.append(player.player_id)
+                    via = "name_match"
+        if players:
+            linked += 1
+        rows.append(
+            {
+                "id": str(article.get("id") or article.get("headline") or "")[:120],
+                "published": str(article.get("published") or ""),
+                "headline": str(article.get("headline") or "")[:300],
+                "description": str(article.get("description") or "")[:900],
+                "type": str(article.get("type") or ""),
+                "players": players,
+                "linked_via": via,
+            }
+        )
+
+    return {
+        "season": season,
+        "captured_at": captured_at,
+        "captured_date": captured_at[:10],
+        "source_status": status,
+        "articles": rows,
+        "linked_players": linked,
+    }
+
+
+def news_archive_path(day: str) -> Path:
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
+
+    return nfl_artifact_output_root() / "fantasy" / "news_archive" / f"nfl_news_{day}.json"
+
+
+def recent_news_by_player(season: int, *, days: int = 21) -> dict[str, list[dict[str, Any]]]:
+    """``gsis_id -> recent articles``, newest first, from the ARCHIVE.
+
+    Reads only published archive files, never the network: this is on the web
+    request path, and a page that fetches a third-party feed per request is
+    both slow and a dependency on someone else's uptime.
+    """
+    from datetime import date, timedelta
+    from syndicate.features.nfl.sources import default_nfl_source_root
+
+    root = default_nfl_source_root() / "fantasy" / "news_archive"
+    out: dict[str, list[dict[str, Any]]] = {}
+    if not root.is_dir():
+        return out
+    today = date.today()
+    for offset in range(days):
+        day = (today - timedelta(days=offset)).isoformat()
+        path = root / f"nfl_news_{day}.json"
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for article in payload.get("articles") or []:
+            for player_id in article.get("players") or []:
+                out.setdefault(player_id, []).append(article)
+    for entries in out.values():
+        entries.sort(key=lambda item: item.get("published") or "", reverse=True)
+    return out
 
 
 def write_news_artifact(season: int, *, limit: int = 50) -> Path:
