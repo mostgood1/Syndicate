@@ -21192,3 +21192,73 @@ for ~23 s.
    restart.
 
 claim: RELEASED after this entry.
+
+## 2026-08-21 19:23Z — VERIFIED ON LIVE MATCHES: soccer gates 1/2/3
+
+Live: live-odds-worker `bb01b616` (19:12:02Z), refresh-worker `af67b189`
+(19:21:02Z), web `c81a174c`. Board built **19:22:52Z**, i.e. AFTER the
+refresh-worker deploy — checked by comparison, not assumed, because two earlier
+readings today fired on a board built BEFORE the deploy and reported a false
+FAIL.
+
+**The reading is on four matches actually in play** (Standard Liege 0-0 32',
+Marseille 0-0 34', Arsenal 1-0 18', Real Betis 0-0 17'), which is the thing
+gate 1 shipped without and gates 2/3 had never had.
+
+**gate 3 — live game lines: REACHING AND WITHHOLDING BY NAME**
+
+    index_size                     4     (all four live matches indexed)
+    rows_live_gameline_considered  19
+    rows_live_gameline_projected   19
+    rows_live_gameline_priceable   0
+    withheld_by_reason  {"no_two_sided_market_price": 19}
+
+Zero edges, but 19 of 19 withheld by a NAMED reason: the join ran, indexed
+every live match, projected every row, and declined to price because the
+in-play h2h markets are not quoted two-sided. That is a legitimate refusal.
+All day it had reported `rows_live_gameline_edged: 0` with
+`"no soccer match in play"` — a bare zero over an artifact that did not exist.
+
+**gate 2 — live props: PASS**
+
+    live_games_in_snapshot   4
+    rows_live_considered     1144
+    rows_live_projected      58
+    snapshot_rows_indexed    240 / 240 seen   (nothing dropped in indexing)
+    players_at_producer_cap  4 / 12           (the cap travels with the count)
+    miss_no_line 595, miss_no_market_alias 491   (named, not silent)
+
+**gate 1**: `supported=true, reason=None, transitions={}` — reading its source
+cleanly, no corrections owed because the board's own chips already had these
+matches live.
+
+**THE DISCRIMINATING CHECK, and the one that actually matters:** a live
+probability must have MOVED off its pregame value, or the board is showing a
+pregame number in a live slot — the exact thing the live tier exists to remove.
+All moved, in the directions game state implies:
+
+    Arsenal          pregame 0.7900 -> live 0.9125   (after going 1-0 at 18')
+    Standard Liege   pregame 0.4100 -> live 0.3375   (goalless at 32')
+    Marseille        pregame 0.4650 -> live 0.5625
+    Real Betis       pregame 0.5275 -> live 0.4875
+    Marseille (tot)  pregame 0.4744 -> live 0.0500
+
+**WHAT MADE THE ALL-DAY ZERO:** `live_lens_loop.py` was raising
+`UnboundLocalError: write_json_file` for mlb AND soccer (wnba fine — its branch
+ran the shadowing import), so NO live-lens snapshot was written for any sport.
+Three consumers looked broken; one conditional local import was. Fixed in
+`99e56561`, and the tick went clean at 19:15:13Z (`tick=True|True`) — the
+proximate cause of every zero before that.
+
+**Deploy cost, recorded:** the refresh-worker deploy was fired on an explicit
+user instruction with the guard overridden (preflight HOLD, 12 jobs). It killed
+an MLB daily sim with its vendor children, a `daily_update --workflow ui-daily`,
+and a `build_soccer_artifacts --league la_liga` refresh — the last of which was
+cheap, la_liga already holding lineup-aware artifacts from 18:22:47Z. Guard was
+off for ~1 minute and restored, verified structurally identical to backup
+(41/41 allow rules, no `env` key).
+
+**STILL OPEN, and not claimed as done:** gate 3 has never been observed
+PRICING a live edge, only withholding one by name. That needs a live soccer
+market quoted two-sided, which tonight's four did not provide. The mechanism is
+verified; the priced outcome is not.
