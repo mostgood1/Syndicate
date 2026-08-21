@@ -1905,3 +1905,22 @@ table.board-blotter tbody tr:last-child td {
   color: #ef4444;
   font-weight: 800;
 }
+
+
+/* ---- odds range filter -------------------------------------------------
+   Sits inside the "More filters" disclosure beside the tab rows, so it has to
+   read as one of them rather than as a transplanted form control. Colours come
+   from the same variables the surrounding pills use; nothing here hard-codes a
+   value that would only work on one theme. */
+.board-odds-filter { display: flex; flex-direction: column; gap: .4rem; width: 100%; padding: .55rem .7rem;
+  border: 1px solid var(--card-border, rgba(255,255,255,.12)); border-radius: 10px;
+  background: var(--card-surface, rgba(255,255,255,.03)); }
+.board-odds-filter__head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.board-odds-filter__label { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+.board-odds-filter__readout { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .82rem; }
+.board-odds-filter__row { display: grid; grid-template-columns: 4.6rem 1fr; align-items: center; gap: .6rem; font-size: .76rem; }
+.board-odds-filter__row input[type="range"] { width: 100%; accent-color: var(--accent, #6ea8fe); min-height: 1.5rem; }
+.board-odds-filter__row input[type="range"]:focus-visible { outline: 2px solid var(--accent, #6ea8fe); outline-offset: 3px; }
+/* The note explains a real behaviour (unpriced rows survive the filter), so it
+   must stay legible rather than decorative -- .6 is the floor here, not .4. */
+.board-odds-filter__note { margin: .1rem 0 0; font-size: .69rem; line-height: 1.4; opacity: .6; }

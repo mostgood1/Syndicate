@@ -48,6 +48,21 @@
           <div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div>
           <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
           <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+          <div class="board-odds-filter" id="board-odds-filter">
+            <div class="board-odds-filter__head">
+              <span class="board-odds-filter__label">Odds range</span>
+              <output id="board-odds-filter-readout" class="board-odds-filter__readout" for="board-odds-min board-odds-max"></output>
+            </div>
+            <label class="board-odds-filter__row">
+              <span>Shortest</span>
+              <input type="range" id="board-odds-min" min="0" step="1" aria-label="Shortest odds to show">
+            </label>
+            <label class="board-odds-filter__row">
+              <span>Longest</span>
+              <input type="range" id="board-odds-max" min="0" step="1" aria-label="Longest odds to show">
+            </label>
+            <p class="board-odds-filter__note">Hides prices outside the range. Rows with no posted price are never hidden by this filter &mdash; an unpriced row is not a longshot.</p>
+          </div>
           <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
         </div>
       </details>
@@ -161,6 +176,104 @@
     { value: "5", label: "5%+" },
     { value: "8", label: "8%+" },
   ];
+  // THE ODDS LADDER. Discrete stops, NOT a linear numeric range, and the
+  // difference is the whole design.
+  //
+  // American odds run from about -2000 to +10000 on this board. A linear
+  // slider over that span puts ~90% of its travel in the region between
+  // -2000 and -300 -- prices almost nobody filters on -- and compresses the
+  // entire -110..+300 band, which is where essentially every real decision
+  // is made, into a few pixels. So the slider moves over an INDEX into this
+  // ladder and every stop is a round number a bettor recognises.
+  //
+  // WHY MIN/MAX IS EVEN WELL-DEFINED ON AMERICAN ODDS: the range (-100, +100)
+  // is empty, so ascending numeric order is exactly descending implied
+  // probability -- -1000 (90.9%), -110 (52.4%), +110 (47.6%), +6000 (1.6%).
+  // "Shortest" is therefore the low end and "longest" the high end with no
+  // special-casing around zero. `board_sim_view_display.test.mjs` asserts that
+  // monotonicity rather than trusting this comment.
+  //
+  // The two ends are deliberate sentinels well outside any real price, so the
+  // default range excludes nothing and reads as "Any".
+  const ODDS_LADDER = [
+    -100000, -1000, -600, -400, -300, -250, -200, -175, -150, -130, -120, -110,
+    100, 110, 120, 130, 150, 175, 200, 250, 300, 400, 500, 750, 1000, 1500,
+    2000, 3000, 5000, 100000,
+  ];
+  const ODDS_LADDER_MIN_DEFAULT = 0;
+  const ODDS_LADDER_MAX_DEFAULT = ODDS_LADDER.length - 1;
+
+  function clampOddsIndex(raw, fallback) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(29, Math.max(0, Math.round(n)));
+  }
+
+  function oddsFilterIsNarrowed() {
+    return state.oddsMin > ODDS_LADDER_MIN_DEFAULT || state.oddsMax < ODDS_LADDER_MAX_DEFAULT;
+  }
+
+  function matchesOddsRange(item) {
+    if (!oddsFilterIsNarrowed()) return true;
+    const price = Number(item.odds ?? item.odds_current);
+    // AN UNPRICED ROW IS NOT A LONGSHOT. A missing price cannot satisfy a
+    // price constraint, but hiding it would be the silent drop this board
+    // refuses everywhere else -- those rows already render "pending market"
+    // and the reader can see exactly what they are. The filter removes prices
+    // it can read and outside the range; it never removes an absence.
+    if (!Number.isFinite(price)) return true;
+    // Ascending numeric American odds == descending implied probability (the
+    // (-100, +100) gap is empty), so this needs no special case around zero.
+    if (price < ODDS_LADDER[state.oddsMin]) return false;
+    if (price > ODDS_LADDER[state.oddsMax]) return false;
+    return true;
+  }
+
+  function renderOddsFilter() {
+    const minInput = document.getElementById("board-odds-min");
+    const maxInput = document.getElementById("board-odds-max");
+    const readout = document.getElementById("board-odds-filter-readout");
+    if (!minInput || !maxInput) return;
+    minInput.max = String(ODDS_LADDER_MAX_DEFAULT);
+    maxInput.max = String(ODDS_LADDER_MAX_DEFAULT);
+    minInput.value = String(state.oddsMin);
+    maxInput.value = String(state.oddsMax);
+    if (readout) {
+      readout.textContent = oddsFilterIsNarrowed()
+        ? `${oddsLadderLabel(state.oddsMin)} to ${oddsLadderLabel(state.oddsMax)}`
+        : "Any price";
+    }
+    if (minInput.dataset.bound === "1") return;
+    minInput.dataset.bound = "1";
+    maxInput.dataset.bound = "1";
+    const commit = (which) => (event) => {
+      const value = clampOddsIndex(event.target.value, which === "min" ? 0 : 29);
+      // THE HANDLES MUST NOT CROSS. Letting them pass through each other gives
+      // an empty inverted range that looks like "the board has no rows" --
+      // exactly the unexplained-empty-board failure this page keeps paying for.
+      // The pushed handle moves with the dragged one instead.
+      if (which === "min") {
+        state.oddsMin = value;
+        if (state.oddsMax < value) state.oddsMax = value;
+      } else {
+        state.oddsMax = value;
+        if (state.oddsMin > value) state.oddsMin = value;
+      }
+      syncUrlState();
+      renderOddsFilter();
+      updateFilterDisclosure();
+      renderBoardBody();
+    };
+    minInput.addEventListener("input", commit("min"));
+    maxInput.addEventListener("input", commit("max"));
+  }
+
+  function oddsLadderLabel(index) {
+    if (index <= ODDS_LADDER_MIN_DEFAULT || index >= ODDS_LADDER_MAX_DEFAULT) return "Any";
+    const value = ODDS_LADDER[index];
+    return value > 0 ? `+${value}` : String(value);
+  }
+
   const STEAM_TABS = [
     { value: "all", label: "All opportunities" },
     { value: "steam", label: "⚡ Steam moves only" },
@@ -320,6 +433,10 @@
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
+    // Indices into ODDS_LADDER, clamped on read: a hand-edited or stale URL
+    // must not put the slider off its own scale and silently empty the board.
+    oddsMin: clampOddsIndex(urlParams.get("odds_min"), 0),
+    oddsMax: clampOddsIndex(urlParams.get("odds_max"), 29),
     // An explicit ?view= always wins. Otherwise the default is
     // viewport-dependent: the blotter is an 11-column table with a
     // min-width of 880px, which on a 390px phone is a 2.3x horizontal
@@ -406,6 +523,8 @@
     if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
+    if (state.oddsMin > ODDS_LADDER_MIN_DEFAULT) url.searchParams.set("odds_min", String(state.oddsMin)); else url.searchParams.delete("odds_min");
+    if (state.oddsMax < ODDS_LADDER_MAX_DEFAULT) url.searchParams.set("odds_max", String(state.oddsMax)); else url.searchParams.delete("odds_max");
     if (state.view && state.view !== "blotter") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
@@ -511,6 +630,7 @@
       renderFilterTabs();
       renderBoardBody();
     });
+    renderOddsFilter();
     updateFilterDisclosure();
   }
 
@@ -522,6 +642,7 @@
     const active = [];
     if (state.marketFamily && state.marketFamily !== "all") active.push("market");
     if (state.minEdge > 0) active.push("edge");
+    if (oddsFilterIsNarrowed()) active.push("odds");
     if (state.steamOnly) active.push("steam");
     return active;
   }
@@ -545,6 +666,8 @@
   function clearRefinements() {
     state.marketFamily = "all";
     state.minEdge = 0;
+    state.oddsMin = ODDS_LADDER_MIN_DEFAULT;
+    state.oddsMax = ODDS_LADDER_MAX_DEFAULT;
     state.steamOnly = false;
     syncUrlState();
     renderFilterTabs();
@@ -1173,6 +1296,12 @@
     // "Steam moves only", which is the one view where they must never
     // disappear.
     if (state.minEdge > 0 && !isSteamCandidate(item) && edgeValue(item) * 100 < state.minEdge) return false;
+    // THE ODDS RANGE, and note it does NOT exempt steam the way min-edge does.
+    // That asymmetry is deliberate and the reasons are different: edgeValue()
+    // defaults a steam row to 0, so a min-edge filter would hide every steam
+    // row as an ARTEFACT of the default. A steam row's PRICE is real, and a
+    // +6000 steam longshot is exactly what this filter exists to remove.
+    if (!matchesOddsRange(item)) return false;
     if (state.steamOnly && !isSteamCandidate(item)) return false;
     if (state.marketFamily !== "all") {
       const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
