@@ -1227,9 +1227,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      (`SWEEP_OWNERSHIP_EXCLUDED ... dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS`).
      **refresh-worker owns NFL and always did.** It needs `453c16ee` (the
      schedule step); it already has capture + path fixes via `a5e0b462`.
-  2. **web + a worker need `8fe78662`**, then a schedule fetch must RUN, then
-     `?pattern=nfl_source/schedule_*.csv` non-zero on web is the reading that
-     proves game context is no longer inert.
+  2. **ALL FOUR SERVICES ARE NOW ON THE RIGHT CODE** (refresh-worker +
+     live-odds-worker `453c16ee`, web `9b8c49c6`), content-verified. But the
+     schedule has **NOT been observed republishing**, and that is the open
+     question:
+     - Triggered an NFL refresh (`/api/ops/odds-refresh/run`, job `91059c41`).
+       It launched on refresh-worker at **03:53:40Z**
+       (`--sports nfl --phase pregame`) and was STILL IN FLIGHT at 04:07Z.
+     - 14 polls across two windows: `schedule_2026.csv` on web is UNCHANGED at
+       mtime `2026-08-02T03:29:35`, frac `0.0` — still the boot copy.
+     - **`artifact_publisher` never emitted ANY verdict for a schedule path** —
+       no PUBLISH_OK, no PUBLISH_SKIPPED_UNCHANGED, no SKIP_NOT_ALLOWLISTED. So
+       the publish call did not execute; the step either did not run or failed
+       before it.
+     - CANNOT BE RESOLVED FROM OUTSIDE: the run's own `odds_refresh.json` (the
+       per-step results) is on the worker's disk and is NOT in
+       HOT_ARTIFACT_PATTERNS, so it is unreadable from web. Child stdout also
+       goes to `--stdout-path` on disk, never to Render's log collector, so the
+       ABSENCE of `games_written=` proves nothing about the emitter.
+     **NEXT DIAGNOSTIC, in order:** (a) allowlist
+     `reports/migration_runs/*/odds_refresh*.json` so a run's per-step result is
+     auditable at all — this is the "unallowlisted = unauditable" gap the
+     standard names, and it is why this question is stuck; (b) re-read the
+     schedule mtime once the in-flight run finishes; (c) only then suspect the
+     step itself.
   3. **Populated `oddsapi_player_props_2026_wk1.csv`** replacing the 5-byte stub
      — the behavioural proof the capture fix works in production. 6-hourly.
 - Claims held: NONE (web and refresh-worker both released).
