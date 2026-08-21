@@ -1495,9 +1495,10 @@ unsaved anywhere.
   mean-based reachability comparisons and were durably fixed via
   per-seed-vector comparison, the technique every other test in the
   family already used). `todo.md`'s own addendum for items (7)/(8) is
-  NOT YET WRITTEN as of this checkpoint — blocked by an active cross-lane
-  claim (`mlb-overview-hydration-cost`), a Monitor is watching for it to
-  clear. Every other doc (reference doc §2A/§2B, inventory doc, both
+  NOT YET WRITTEN as of that checkpoint. **THE BLOCKER IS GONE
+  `[2026-08-20 ~20:0xZ]`: lane `mlb-overview-hydration-cost` released its
+  `todo.md` claim and is now CLOSED, so nothing holds that file for this
+  addendum. Whatever Monitor was watching for it to clear can stop.**
   reports) is written and pushed.
 - **Genuinely still open (non-faceoff)**: player-level usage-weight
   producer's small-sample floor (< 5 games falls back to heuristic, by
