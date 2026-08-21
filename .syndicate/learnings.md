@@ -4569,3 +4569,47 @@ missing data has a cause, a typo'd key needs none.
 metric, suspect the METRIC before writing the next fix. I twice diagnosed the
 read path -- because that is where the PREVIOUS bug was -- rather than testing
 whether the measurement was sound.
+
+## 2026-08-21 — The preview pane CANNOT verify a CSS edit. It caches the parsed stylesheet.
+
+Measured while fixing the Buzz dialog. The pane renders `file://` pages as
+static SNAPSHOTS, and on re-navigation it kept applying the FIRST load's
+stylesheet: `getComputedStyle` reported `min-height: 0px` and
+`box-sizing: content-box` while `grep` confirmed both replacement rules were
+present in the file being loaded. A fresh filename did not defeat it either.
+
+**This is the dangerous class of instrument failure, because it reads as a
+CODE failure.** The obvious conclusion — "my CSS is wrong, it isn't applying" —
+is exactly what the tool is showing you, and it is false. I nearly rewrote
+working rules to satisfy a cached stylesheet.
+
+**What actually works, and it is cheap:** put the HTML on a REAL http origin.
+Download the deployed page, write it into the dev server's `static/`, load
+`http://localhost:PORT/static/<file>.html`. Fresh parse, correct computed
+styles, and it measures the code that is actually in PRODUCTION rather than a
+local render. Two temp files went into the shared tree to do this; both were
+removed, and that cleanup is part of the technique, not an afterthought.
+
+**Corollary for reading old results:** a measurement taken on the FIRST load of
+a snapshot IS trustworthy — that is where the 375px-viewport overflow was
+caught, and it matched content-box arithmetic exactly. It is the SECOND and
+later loads that lie. So "the pane is unreliable" does not retract the finding
+that came from it; it retracts the re-checks.
+
+Related: [[feedback_instrument_blindness]], [[feedback_confirm_the_code_ran]].
+
+## 2026-08-21 — A tooltip is not a reading surface, and the data was already there
+
+The Buzz column shipped as `title=` text. The archive had been storing a
+900-character `description` per article the whole time — the part that actually
+says something about a player's role — and a tooltip could show none of it,
+cannot be opened by touch at all, and vanishes when the pointer moves.
+
+The lesson is not "use a dialog". It is that **the display was quietly capping
+what the data could say**, and nothing failed or logged to reveal it. Same shape
+as the 26 unfed sim inputs in `model_engine_standard.md`: a neutral-looking
+surface hiding a live gap.
+
+**When adding a UI affordance for stored data, print the FIELD LIST of what is
+stored and ask which fields the surface can physically show.** Here that is one
+command and it would have named `description` on day one.

@@ -12725,3 +12725,48 @@ close. **That is evaluation, not plumbing.** The plumbing is done.
 - Blocked by: refresh-worker deploy hold + claim, for the DEPLOY only.
 
 
+
+
+### nfl-fantasy-projections — CLOSED-VERIFIED 2026-08-21 — **`/nfl/fantasy` is live and serving: ESPN-scoring 2026 season + weekly projections, VOR draft board, and a news layer that captures, publishes, accumulates and renders.** web `003a5866`, refresh-worker `6855fe96`. — opened 2026-08-21 — session e8d83eb5-3cbb-4c8b-824f-86cc86442160
+- Goal: a `/nfl/fantasy` surface serving ESPN-scoring 2026 season projections (PPR default, 12-team 1QB VOR draft board) for QB/RB/WR/TE/K/DST, plus per-week projections. **MET.**
+- Files: `syndicate/features/nfl/fantasy{,_scoring,_usage,_schedule,_players,_projection,_draft_board,_news}.py` (new), `syndicate/blueprints/nfl.py` (3 routes), `syndicate/features/shared/artifact_publisher.py` (+5 allowlist patterns), `syndicate/templates/nfl/fantasy.html` (new), `scripts/{build_nfl_fantasy_usage,fetch_nfl_rosters_depth_charts,backtest_nfl_fantasy_projections,calibrate_nfl_fantasy_projections,compare_nfl_fantasy_depth_charts,nfl_fantasy_input_checklist}.py` (new), `tests/test_nfl_fantasy.py` (new), `docs/ai_context/nfl_fantasy_engine_reference.md` (new), `reports/nfl_fantasy_*.json`.
+- Hypothesis: an opportunity-share engine re-based onto 2026 depth charts beats "last season's fantasy points" on held-out season MAE and rank correlation.
+- Falsification test: **RAN FOUR TIMES; PASSED, then FAILED at `198a6a70` after a legitimate re-calibration, and that FAIL was reported rather than tuned away.** Current: season MAE 49.41 → 47.67, spearman 0.7058 → 0.7392; per-game 3.68 → 3.56, 0.6138 → 0.6337 (n=266 common set, held-out 2025).
+- Verification: **RAN, and each claim below is a reading.** Falsification test passed on all four criteria (season MAE 49.41 -> 47.67, spearman 0.7058 -> 0.7392; per-game 3.68 -> 3.56, 0.6138 -> 0.6337; n=266 held-out 2025) after FAILING once at `198a6a70` and being fixed rather than tuned. Injury layer graded on 2,226 held-out player-weeks: MAE 6.894 -> 4.399 (+36.2%). Worker captured twice — 22:28:32Z `new=50`, 23:29:29Z `new=2 total=52`, so the archive ACCUMULATES. Served page: 101 Buzz buttons / 414 inert, 82-player payload; dialog opens, Escape/backdrop/Close dismiss, focus returns, panel-click keeps it open.
+- Blocked by: none. **DEPLOYED: web + refresh-worker both live on `ae941265`.** The autorun fired at 21:20:19Z and FAILED (`unreachable: HTTPError`), which falsified my "local network block" reading — the cause was my own `User-Agent`, and the rule was already at `live_game_state.py:50`. Fixed; the same code now returns `status=ok, 50 articles, 35 linked -> 84 players` (92/95 links via ESPN athlete tags). **ONE THING STILL OWED: the worker has never logged `status=ok`.** It holds `interval_s=21600` (I set the interval AFTER triggering the deploy, so it missed the env snapshot), so the next attempt is ~03:20Z; `render_logs.py --text news_capture --start 2026-08-22T03:00:00Z`, or a non-quiet Buzz badge, settles it.
+- Text/role signals ship INERT by choice: `use_news_adjustments=False`. Quotes are SHOWN, not scored, until the archive is deep enough to grade.
+
+**ON `main` as `45632889..c1c811c3` (6 commits), rebased clean onto `e0e32b53`.** engine · reference doc · depth chart + contemporaneous role prior + ARI fix · re-calibration (the reported FAIL) · availability fix (the PASS) · re-sweep (nothing changed). **`render.yaml` NOT touched, so no `blueprint_sync` and nothing applied to production. NOT DEPLOYED, no deploy claim ever taken — `autoDeploy = no`, so this push ships nothing until someone deploys it.** Full narrative: `.syndicate/log/2026-08-21.md`.
+
+
+**OPEN RISK, not owed work:** the PRIMARY SHARED TREE holds an orphaned commit
+`318b2b7a` (1 ahead / 57 behind). Its content is already on `main` via
+`80b772ee`, but it was authored against a 47-commit-stale `.syndicate/`. A
+rebase or force-push from that tree can REVERT tonight's ledger. Left alone
+deliberately — another session may hold uncommitted edits in those files.
+
+**NEWS + COACH QUOTES SHIPPED 2026-08-21 21:1x-21:3xZ.** Injury half is fitted
+and gated ON (MAE 6.894 -> 4.399, +36.2%, 2,226 held-out player-weeks). Text half
+(camp/role/workload talk) is CAPTURED and DISPLAYED but **NOT SCORED** --
+`use_news_adjustments=False` -- because there is no archive to grade it against
+yet; `capture_nfl_news.py` now builds one, append-only, on a worker autorun.
+
+**THE FIRST WORKER RUN FAILED AND FALSIFIED MY EXPLANATION.** I had recorded
+ESPN's 403 as "a local network block" -- the one reading that made a local
+failure say nothing about production. Same error on the worker. Cause: my own
+`User-Agent`; the rule was already in capitals at `live_game_state.py:50`,
+including the clause saying the dev machine and Render fail the SAME way. Fixed
+in `ae941265`; now `status=ok, 50 articles, 35 linked -> 84 players`, 92 of 95
+links via ESPN's own athlete tags. **NOTHING OWED ON THE NEWS LAYER.** Discharged 22:28:32Z: the worker logged
+`status=ok fetched=50 linked=35`, published, and the served page went from 0 live
+Buzz badges to **101** (58 players with coverage) -- it holds `interval_s=21600` because I set the interval AFTER
+triggering the deploy, so next attempt ~03:20Z.
+
+**Retired a worry:** the 21:45:29Z tick shows all six NFL autorun branches
+logging SKIPPED in the same second -- they are NOT `#341`-starved.
+
+**DEFECTS FOUND, all silent, all measured.** Role prior fitted only over players who PLAYED (a rank-2 QB priced at a 0.466 pass share, which CRUSHED starters after normalisation — Josh Allen at 12.09 PPG against a real ~24); rookie prior fitted against a reference cell that cannot exist (3.24x round-one multiplier, four rookies atop the board); expected games taken from the POSITION mean; role curve measured in season-total share while history used while-active share; **depth-chart snapshot taken as `max(dt)`, which for 2025 is 2026-03-14 — AFTER the season being graded** (now `PRESEASON_CUTOFF`; the rule is in `learnings.md`); **`AZ` vs `ARI` after a roster refetch, which silently unjoined an entire team while still producing plausible numbers**; and a harness defect that graded baseline and engine over DIFFERENT player sets (297 vs 275) and returned a verdict that was not one.
+
+**THE ENGINE DELIBERATELY DOES NOT USE smartsim2** — `state.md [football-smartsim2]` measured it strictly dominated by the close (w = -0.028, 751 OOS games). Environment comes from posted lines: 112 of 272 2026 games carry one, all 32 teams in 6-9 of them.
+
+**AUTORUN IS LIVE AND HAS RUN (`a48c8530`, flag set on refresh-worker).** Its FIRST run published a DEGENERATE artifact over a correct one — `weeks: []`, 318 KB vs 2.83 MB, top player 525.5 pts vs a correct ~270 — because the worker has no `schedules_games.csv` and nothing in the repo writes it. Correct artifact republished by hand 20:19:28Z. `--prepare` now fetches the schedule, and the job refuses to publish when its OWN OUTPUT is degenerate (the input checklist could not see this: the schedule was not on its list). **OWED: the next autorun (~19:50Z tomorrow) is the real verification — it must either publish a healthy artifact or refuse and say why; neither has been observed.**

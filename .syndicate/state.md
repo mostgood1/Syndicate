@@ -3844,7 +3844,7 @@ likely why several snapshots had never been produced.
 order, and the team_id-vs-name traps.
 
 
-## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web 8a7b2407, refresh-worker 6855fe96, read 2026-08-21T22:46Z]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
+## [nfl-fantasy-engine] NFL FANTASY FOOTBALL ENGINE — **PASSES ITS FALSIFICATION TEST ON ALL FOUR CRITERIA, AND IS LIVE ON PRODUCTION `[web 003a5866, refresh-worker 6855fe96, read 2026-08-21T23:2xZ]`** — `/nfl/api/fantasy/draft-board` returns `available: true`, `mode: artifact`, and a real ordered board (Bijan Robinson RB1 VOR 167.9); the Fantasy pill is on the shared NFL nav — `render.yaml` was not touched, so no `blueprint_sync`; with `autoDeploy = no` this push ships nothing until someone deploys it. Depth chart current to 2026-08-21. `[measured 2026-08-21, lane nfl-fantasy-projections]`
 
 ESPN-scoring season + weekly projections for QB/RB/WR/TE/K/DST at
 `/nfl/fantasy`, with `/nfl/api/fantasy/{projections,draft-board}`. On `main` as
@@ -3867,10 +3867,11 @@ builds an append-only dated archive (worker autorun, `interval_s=3600`,
 CONFIRMED from the worker's own skip line) precisely because the text
 was never ungradeable — it had merely never been STORED. Links use ESPN's own
 athlete tags: measured 92 of 95 player-links via `espn_tag`, 3 via name match.
+**The Buzz column is a DIALOG, not a tooltip** (`003a5866`): click the badge for the headline, the full description, when it ran and whether ESPN tagged it. Quiet rows are inert dashes, not empty buttons; article text is emitted ONCE per page as JSON keyed by player, because both tables render.
 **NO CUSTOM HEADERS on any ESPN call** — see `learnings.md` 2026-08-21; a custom
 UA 403s from Render AND from a dev machine, and `live_game_state.py:50` is where
 that rule lives.
-**MEASURED 2026-08-21T22:28:32Z — the worker captured successfully:** `status=ok fetched=50 linked=35`, published, and `/nfl/fantasy` went from 0 live Buzz badges to 101 (58 players with coverage). Whole chain proven: worker fetch -> archive -> publish -> web disk -> request path -> rendered row.
+**MEASURED TWICE, AND THE ARCHIVE ACCUMULATES.** 22:28:32Z `fetched=50 new=50 total_today=50`; 23:29:29Z `fetched=50 new=2 total_today=52 linked=36` — 48 of 50 recognised as repeats by article id and the file GREW, which is the append-only merge doing the one job it exists for. Detail: `status=ok fetched=50 linked=35`, published, and `/nfl/fantasy` went from 0 live Buzz badges to 101 (58 players with coverage). Whole chain proven: worker fetch -> archive -> publish -> web disk -> request path -> rendered row.
 
 **MEASURED, held out.** 2025 projected from 2022-2024 only, graded on ONE common
 266-player set for every method:
