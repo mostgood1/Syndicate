@@ -604,13 +604,28 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 					artifact_relative_path as _capture_path,
 					summarize as _capture_summarize,
 				)
-				from syndicate.features.shared.refresh_state_store import data_root, write_json_file
+				# ALIASED, and that is load-bearing rather than style. `write_json_file`
+				# is already imported at module scope (line 37). Importing it again
+				# HERE binds it as a LOCAL for the whole enclosing function, so the
+				# snapshot write below -- which every sport reaches and which runs
+				# BEFORE this block for mlb/soccer -- raised UnboundLocalError.
+				#
+				# MEASURED IN PRODUCTION 2026-08-21 18:49Z, mid-slate:
+				#   latestTick.ok=false, mlb AND soccer both
+				#   "UnboundLocalError: cannot access local variable 'write_json_file'"
+				# No live-lens snapshot was written for ANY sport while two soccer
+				# matches were in play, so every downstream live join read an absent
+				# artifact and correctly reported zero.
+				from syndicate.features.shared.refresh_state_store import (
+					data_root as _kv_data_root,
+					write_json_file as _kv_write_json_file,
+				)
 
 				_payload = _capture_fetch(_wnba_live_box_base_url(), date_str)
 				_counts = _capture_summarize(_payload)
 				if _counts["games"] and _counts["players_with_stats"]:
-					write_json_file(
-						data_root() / _capture_path(date_str),
+					_kv_write_json_file(
+						_kv_data_root() / _capture_path(date_str),
 						{"date": date_str, "source": "wnba/api/live_player_boxscore",
 						 "counts": {k: _counts[k] for k in ("games", "players_with_stats")},
 						 "per_game": _counts["per_game"], "payload": _payload},
