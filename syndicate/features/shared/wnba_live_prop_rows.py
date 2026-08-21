@@ -5,20 +5,28 @@ PHASE 3(a) of live WNBA props, and the shape of it is a recorded user decision
 one line; this pairs each live player with their pregame anchor and emits a row
 per stat.
 
-**IT PUBLISHES A PROJECTION AND NO PROBABILITY, DELIBERATELY.**
-`build_live_prop_index` keys on `liveModelProbOver`, so nothing here will be
-picked up by the prop join and the `sport != "mlb"` gate stays shut. That is the
-point of option (a). The sim's `prop_ladders[stat]` DOES carry a real
-distribution (`simCount: 100`, a histogram and a `{total, hitProb}` ladder), but
-it is the PREGAME distribution: it answers `P(final >= line)` from tip-off,
-while a live prop needs `P(final >= line | current, minutes played)` -- the
-distribution of the REMAINDER over the minutes left. Scaling the full-game
-distribution to the remainder (mean by `m/min_mean`, sd by `sqrt(m/min_mean)`)
-is the standard assumption and is UNMEASURED HERE. Publishing a probability off
-it would be the same act as pricing the un-backtested live totals estimator,
-which this board already refuses by name
-(`analytic_estimator_never_backtested_for_this_market`). Grade the scaling and
-`prob_std_err(p, simCount)` applies honestly; until then, projections only.
+**IT NOW EMITS `liveModelProbOver`, AND ONLY BECAUSE THE ERROR WAS MEASURED.**
+Phase 3(a) deliberately published a projection and no probability, because the
+live remainder distribution was unmeasured and a probability off an unmeasured
+estimator is the same act as pricing the un-backtested totals transform this
+board refuses by name. Phase 3(b) removed that objection the honest way:
+`scripts/grade_wnba_live_prop_projection.py` replayed ESPN play-by-play, drove
+the SHIPPED projection at every scoring play and scored it against the official
+final -- n=796 over 5 slates, the replay reconciling 100% against the official
+boxscore on every one. `wnba_live_prop_probability` turns that measurement into
+`P(final >= line)`; see it for the bucketed sigma and the three choices behind
+it.
+
+A ROW IS PRICED ONLY WHEN A LINE IS SUPPLIED for its `(player, market)`. A
+probability needs something to be a probability ABOUT, and inventing a line
+would price a market nobody quoted. Rows without one still carry
+`liveProjectedStat` and say why they are unpriced.
+
+THIS DOES NOT OPEN THE JOIN'S GATE. `attach_live_projections_for_sport` still
+returns early on `sport != "mlb"`; that is phase 4 and a separate decision.
+Emitting the field makes these rows ELIGIBLE, and the join's own
+`prob_std_err`/`PRICEABLE_SIGMA` refusal still applies on top exactly as it does
+for MLB.
 
 MATCHING IS BY NAME, AND THE MISSES ARE COUNTED. The live capture carries
 `player` + `team_tri`; the sim carries `player_name` under `sim.players.{home,
@@ -35,6 +43,7 @@ import re
 import unicodedata
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.shared.wnba_live_prop_probability import live_prop_prob_over
 from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
 
 # (live-capture key, sim mean key, market label). Declared rather than derived:
@@ -98,6 +107,7 @@ def build_live_prop_rows(
     sim_game: Any,
     *,
     game_minutes_remaining: Any = None,
+    lines: Mapping[tuple[str, str], Any] | None = None,
 ) -> dict[str, Any]:
     """One row per (player, stat), plus the counters that make a zero readable."""
     sim_index = index_sim_players(sim_game)
@@ -106,7 +116,9 @@ def build_live_prop_rows(
     players_matched = 0
     players_unmatched: list[str] = []
     projected = 0
+    priced_rows = 0
     withheld_by_reason: dict[str, int] = {}
+    unpriced_by_reason: dict[str, int] = {}
 
     for player in live_players or ():
         if not isinstance(player, Mapping):
@@ -140,18 +152,38 @@ def build_live_prop_rows(
                 "liveProjectedStat": verdict.get("projected"),
                 "basis": verdict.get("basis"),
                 "unavailable_reason": verdict.get("unavailable_reason"),
-                # SPELLED OUT so nobody has to infer it from a missing key.
-                # `build_live_prop_index` needs `liveModelProbOver`; this row
-                # carries none and is therefore invisible to the prop join by
-                # design, not by omission.
-                "priceable": False,
-                "not_priced_reason": "live_prop_projection_has_no_measured_interval",
             }
+            # PHASE 3(b): the probability the prop join keys on, from the
+            # MEASURED residual (see `wnba_live_prop_probability`). Emitted ONLY
+            # when a line is supplied for this (player, market) -- a probability
+            # needs something to be a probability ABOUT, and inventing a line
+            # would price a market nobody quoted.
+            line = None
+            if lines:
+                line = lines.get((normalize_name(name), market))
+            priced = live_prop_prob_over(
+                projected=row["liveProjectedStat"],
+                line=line,
+                minutes_remaining=verdict.get("minutes_remaining"),
+            )
+            row["line"] = line
+            row["residual_sigma"] = priced.get("residual_sigma")
+            if priced.get("prob_over") is None:
+                row["liveModelProbOver"] = None
+                row["not_priced_reason"] = priced.get("unavailable_reason")
+            else:
+                row["liveModelProbOver"] = priced["prob_over"]
+                row["not_priced_reason"] = None
             if row["liveProjectedStat"] is None:
                 reason = str(verdict.get("unavailable_reason") or "unknown")
                 withheld_by_reason[reason] = withheld_by_reason.get(reason, 0) + 1
             else:
                 projected += 1
+            if row.get("liveModelProbOver") is not None:
+                priced_rows += 1
+            elif row["liveProjectedStat"] is not None:
+                reason = str(row.get("not_priced_reason") or "unknown")
+                unpriced_by_reason[reason] = unpriced_by_reason.get(reason, 0) + 1
             rows.append(row)
 
     return {
@@ -161,8 +193,6 @@ def build_live_prop_rows(
         "players_unmatched": players_unmatched,
         "rows_projected": projected,
         "withheld_by_reason": withheld_by_reason,
-        # The whole surface is unpriced; stated once at the top so a reader does
-        # not have to notice it row by row.
-        "priced": 0,
-        "not_priced_reason": "live_prop_projection_has_no_measured_interval",
+        "priced": priced_rows,
+        "unpriced_by_reason": unpriced_by_reason,
     }

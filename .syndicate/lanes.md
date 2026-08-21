@@ -1194,7 +1194,25 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `P(final >= line) = 1 - Phi((line - projected)/sd_bucket)` is defensible with
   the MEASURED sd. Two caveats for whoever prices it: the `0-5` bucket has
   heavier tails (1.90) and a real late UNDER-projection bias (-1.69).
-- **REMAINING PHASES:** (3b) derive `liveModelProbOver` per
+- **PHASE 3(b) DONE — `liveModelProbOver` is emitted, from the MEASURED
+  residual.** `wnba_live_prop_probability.py` turns the projection into
+  `P(final >= line) = 1 - Phi((line - projected) / sigma(minutes_remaining))`
+  using the graded table above. Three choices, each recorded at the point of
+  use: (i) **tail-matched sigma**, `max(sd, p90/1.6449)` — measured sd, widened
+  ONLY where the observed tail is fatter than normal, which is the `0-5` bucket
+  alone (2.70 -> 3.12); (ii) **NO bias correction** though one was measured, as
+  the per-bucket mean flips sign (+0.42 .. -1.69) and fitting it at n=796 is
+  fitting noise — a wrong correction shifts every probability one way, worse
+  than a slightly wide interval; (iii) **refuses outside the measured range** —
+  unknown minutes remaining gets None with a reason, never a default sigma and
+  never 0.0. A row prices ONLY when a line is supplied for its
+  `(player, market)`. 48 tests + 31 subtests across phases 1-3(b).
+  **This does NOT open the join's gate** — `attach_live_projections_for_sport`
+  still returns early on `sport != "mlb"`; that is phase 4.
+- **REMAINING PHASES:** (4) open the `sport != "mlb"` gate. Note the join's own
+  `prob_std_err`/`PRICEABLE_SIGMA` refusal then applies ON TOP, exactly as for
+  MLB — so opening it does not mean every row prices. Previously listed as (3b),
+  now done:
   `(player, market, line)` on WNBA's lens rows; (4) open the `sport != "mlb"`
   gate in `attach_live_projections_for_sport`. **Phase 2 needs a MEASURED
   interval before any edge is priced** — same discipline as totals; an
