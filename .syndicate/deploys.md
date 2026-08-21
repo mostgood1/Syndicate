@@ -21094,3 +21094,49 @@ otherwise.** RC Lens reading +1.63 twice was the signal both times.
 Claims: refresh-worker released; web released after this entry.
 STILL OWED: gates 2/3 have no production reading during a LIVE match. Kickoffs
 18:45Z / 19:00Z tonight are the first opportunity.
+
+## 2026-08-21 ~18:2xZ — web `713eacd9` — NFL fantasy surface: 500 → 200 degraded. ARTIFACT NOT YET PUBLISHED.
+
+service: web (`srv-d88ahvrbc2fs73eodu30`) | from `8d5d6edf` → `713eacd9`
+holder: `nfl-fantasy-projections` | claim acquired 18:17:20Z, preflight CLEAR
+("only infrastructure processes running" — no sim or job to kill)
+trigger: api, via `scripts/render_deploy.py`. **`render.yaml` NOT touched, so no
+`blueprint_sync`.**
+
+**verify: `/nfl/api/fantasy/draft-board?limit=2` on production returns HTTP 200
+with `available: false`, `source.mode: "unavailable"`, and a reason naming the
+job to run.** All four routes 200:
+
+    /nfl/fantasy                        200
+    /nfl/api/fantasy/draft-board        200
+    /nfl/api/fantasy/projections        200
+    /nfl/api/fantasy/projections?week=1 200
+
+**That IS the intended outcome of this deploy and it is worth stating plainly:
+before it, these three routes 500'd** — the engine ran inside the request
+handler and raised when its ~61 MB of raw nflverse input was absent, which on
+the web dyno it always is (Render disks are per-service; measured
+`schedules_games.csv` count 0 from `/api/ops/artifacts/export` on an
+already-allowlisted pattern, against a control returning 14). The deploy
+replaced three 500s with a degraded state that names its own cause.
+
+**WHAT IS NOT DONE: the projection artifact is not published, so the surface is
+empty.** `basis.artifact.exists: false`, expected at
+`/opt/render/project/data/nfl_source/fantasy/nfl_fantasy_projections_2026.json`.
+The artifact is built and verified LOCALLY (2.83 MB, 736 players, 18 weeks,
+parity with the engine to 0.055 pts on ~300-point season projections). Pushing
+it to the web service was **blocked by the session's permission classifier** —
+it is an authenticated POST to production — so it was not attempted further.
+
+Two ways to finish, neither taken:
+  1. publish the already-built artifact to `/api/ops/artifacts/publish`
+     (one call, gets the surface live immediately, but the artifact then
+     originates from a laptop rather than the worker);
+  2. deploy refresh-worker and add an autorun that runs
+     `scripts/build_nfl_fantasy_projection_artifact.py --publish`. This is the
+     sustainable path and is what the reason string tells an operator to do.
+     **Note the risk before adding it:** periodic work on refresh-worker is
+     never free (`#241` caused a production restart loop), and this build holds
+     the full engine for ~23 s.
+
+claim: RELEASED after this entry.
