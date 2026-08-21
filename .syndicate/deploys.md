@@ -20992,3 +20992,40 @@ have satisfied while still running the OLD code. Checks owed:
      RC Lens v Auxerre away must read NEGATIVE (was +1.63, true -1.65)
   5. **Live-window only, 18:45-20:45Z:** `live_gamelines.supported: true` with
      `rows_live_gameline_edged > 0` on a match actually in play.
+
+### 2026-08-21 16:44Z — wnba totals pricing ON — live-odds-worker + refresh-worker — 8d5d6edf
+- lane: wnba-live-props-data
+- what: `#499` totals pricing enabled for wnba. `b7cf3421` refit `_WNBA_LIVE_TOTAL_SCALE` 8.0+0.50*min_left -> 3.2
+  (test Brier 0.1744 -> 0.1477, n=249 games / 23,712 samples). `d06a70d4` retired the blanket
+  `analytic_estimator_never_backtested_for_this_market` refusal via
+  `ANALYTIC_LIVE_STD_ERR_BY_MARKET = {("wnba","totals"): 0.150}`. `8d5d6edf` fixed the wiring that shipped INERT.
+- sigma provenance: 0.150 is the worst calibration gap BY PREDICTED BUCKET on held-out data. The
+  by-minutes-left aggregate reads 0.023 and is an averaging artifact (+0.109 at p=0.35 and -0.150 at
+  p=0.65 cancel). Shipping 0.023 would have set a 4.6pp bar instead of 30pp. Same dispersion-not-bias
+  shape `#481` found.
+- INERT-SHIP CAUGHT PRE-DEPLOY: `d06a70d4`'s numstat showed board_enrichment.py with 0 changed lines --
+  the `sport=sport` edit silently did not apply, so `hit.get("sport")` was None and wnba totals would have
+  refused as UNCALIBRATED in production while all 128 tests passed. `8d5d6edf` fixes it and adds a
+  ReachabilityTests class that reads the call site, because no arithmetic test can catch an unreached path.
+- deploys: live-odds-worker dep-da480r0u01pc73euibd0 live 16:48:04Z (I triggered; preflight held on
+  "3 jobs in flight" 16:36-16:41, waited for the 16:42:02Z window rather than killing them).
+  refresh-worker ALREADY live on the same SHA at 16:43:05Z -- the `soccer-board-mlb-parity` session
+  deployed origin/main tip, which carried these commits. I did NOT force their claim; checking first
+  showed the deploy I wanted was already done.
+- verify: NOT YET PAID. Served `/api/board/book-grid?sport=wnba` at 16:49Z reads
+  `live_gamelines.index_size: 0`, `rows_live_gameline_considered: 0`, `withheld_by_reason: {}`.
+  That is CORRECT AND UNINFORMATIVE: ESPN shows all 3 wnba games `state=pre`, first tip 23:30Z. Zero
+  here is the world being zero, not the feature working.
+  THE READING THAT WOULD PAY THIS: during a live game, totals rows must report
+  `prob_interval_swamps_edge` (per-row, edge-aware) and NOT
+  `analytic_estimator_never_backtested_for_this_market` (category-wide). The reason CHANGE is the
+  reachability proof. Expect `rows_live_gameline_priceable` to stay at or near 0 -- at sigma=0.150 the
+  2-sigma bar is 30pp and almost nothing should clear it. PRICED TOTALS APPEARING IN VOLUME WOULD BE A
+  BUG SIGNAL, not success.
+- rollback: redeploy a41f88f8 on both workers (the prior live SHA on each).
+- CORRECTION (appended 2026-08-21, same session): the two commits recording this deploy were first made on
+  a STALE local `main` -- 2 ahead / 56 BEHIND origin/main, based at 31184d54, which predates BOTH the props
+  chain and all three totals commits. Nothing was reverted (a push would have been rejected non-fast-forward)
+  but the record was stranded. Re-landed from a worktree at origin/main. The tell was a grep for
+  `WNBA_LIVE_BOX_` returning NOTHING in the primary tree while that exact string was in production logs at
+  16:04:47Z: the grep was right and the assumption about which tree I was in was wrong.
