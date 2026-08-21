@@ -20570,3 +20570,40 @@ and names the nearest unbound source team, pointing at the alias worth adding.
 tuning it.** 0.72 looked like a tolerance choice; it was scar tissue over a
 canonicalizer that turned `é` into a space. Tightening it would have broken
 11 clubs; fixing the thing underneath let the tolerance be removed entirely.
+
+## END-TO-END RETRY OBSERVED 2026-08-21 01:42Z -- roster/depth-chart autoruns fired with all three fixes live, publish attempt hit a TRANSIENT, UNRELATED web restart
+- Lane: nfl-artifact-publish-wiring (final verification step).
+- The roster-snapshot and depth-chart-snapshot autoruns both fired for
+  real at 01:42:12Z / 01:43:33Z respectively, the first real runs since
+  the AZ-alias fix + allowlist + publish-wiring were all live together.
+- **Write side: both clean, no traceback.** Roster: `rows_written=2930`
+  (identical count to the earlier confirmed-clean run). Depth-chart:
+  no crash observed.
+- **Publish side: both `artifact_published=False`** -- but NOT a defect
+  in this session's fix. Checked by content: `[artifact_publisher]
+  PUBLISH_FAILED path=nfl_source/source_artifacts/data/processed/
+  rosters/roster_2026_snapshot.csv ... error=<urlopen error [Errno -2]
+  Name or service not known>` -- and the SAME error, at the SAME few
+  seconds (01:42:47-01:42:59Z), hit EVERY OTHER artifact type on the
+  worker (MLB, soccer, WNBA book_grid pulls, clv_openings, live_lens),
+  not just NFL. Traced the cause rather than assuming a regression:
+  web (`srv-d88ahvrbc2fs73eodu30`) finished an UNRELATED deploy at
+  `01:43:40.499658Z` -- the internal hostname (`syndicate-an21:10000`)
+  was transiently unresolvable during that container's own restart
+  window, and both NFL autoruns' single attempt this cycle landed
+  inside it. **Confirmed the transport recovered fully, not just
+  assumed:** 105 `PUBLISH_OK` lines for other artifacts fired within
+  minutes of web coming back up (01:44:33Z onward).
+- **Real `/api/ops/artifacts/export` counts, checked directly against
+  production:** `count: 0` for all three patterns (rosters, depth,
+  injuries) -- unsurprising given the only two real attempts both hit
+  the transient window and injuries remains unarmed. This is the
+  expected, honest state, not a hidden failure.
+- **Conclusion: the publish-wiring fix is confirmed structurally
+  correct** (attempted publish on both real launches, logged the
+  attempt and its outcome clearly, degraded gracefully without
+  crashing either write) **but has not yet had a clean end-to-end
+  success on a real run.** The next roster/depth-chart retry is another
+  ~21600s (~6h) out. Whoever next checks this should look for a
+  `PUBLISH_OK` line specifically for one of the 3 NFL paths, or a
+  nonzero export count, before calling the full chain closed.
