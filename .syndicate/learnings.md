@@ -3573,3 +3573,33 @@ therefore returns *"no live game"* during exactly the evening window when games
 are being played. Measured at 00:16Z with IND@DAL live and in Q1. Cheap to get
 right (search yesterday/today/tomorrow); the miss reads as a clean null result,
 which is the dangerous part — it looks like evidence of absence.
+
+## 2026-08-20 — FORBIDDEN: verifying pushed content by slicing a computed substring out of it. Anchor on the LINE. Twice in one session my own checker said ABSENT about content that was PRESENT.
+
+- **What happened, twice, same session, same shape.** Both times I pushed a
+  ledger edit and then "verified" it by pulling the file off `origin/main` and
+  testing a *computed slice* of it.
+  1. Checked my lane block carried the new baseline number by extracting the
+     block with `IndexOf("`n### ", start)` and searching the slice. Reported
+     `carries number: False`. **The number was there** — the slice ended before
+     it.
+  2. Checked the old `state.md` bullet was gone by testing whether the string
+     `is NOT "224 green"` still appeared anywhere. Reported the old line
+     **still present**. It was not: my *replacement text deliberately quotes the
+     old line*, so the substring matched my own new prose.
+- **Why it is dangerous rather than merely annoying.** Both failures were
+  FALSE NEGATIVES on a push I had already made — the reassuring action after
+  each is to "re-apply" the edit. Re-applying a ledger edit that already landed
+  is the thing the two 08-20 FORBIDDEN rules above this one exist to stop. A
+  broken verifier here does not just fail to confirm; it *argues for* the
+  forbidden action.
+- **The rule:** verify pushed ledger content by anchoring on the line
+  (`Select-String '^- \*\*`the-bullet-prefix`'`, `grep -n`), and assert on
+  what makes the NEW state distinguishable, not on the absence of old wording
+  the new wording may legitimately quote. If a check reports absent, re-check by
+  a second method before believing it — in both cases the line-anchored re-check
+  was the one that settled it.
+- **Same family as** the 08-20 Git Bash `rev:path` rule (a tool reporting
+  ABSENT for a file that exists) and `feedback_read_the_field_you_already_have`.
+  The failure is not in the repo; it is in the instrument, and the instrument's
+  wrong answer was the comfortable one both times.

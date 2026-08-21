@@ -635,25 +635,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Blocked by:** none.
 
 
-### football-model-owner — CLOSED-VERIFIED 2026-08-20 — **NCAAF+NFL model track closed on measurement (dominated; every lever priced or null; picks SUPPRESSED live and verified). Consolidation shipped: 114 files / 3 deploys, content-verified.** — opened 2026-08-18 — session: football-model-owner
-- **Nothing held:** no deploy claim, no file claims (this block never had a
-  `Files:` section), no grants. `ahead 0` — all work on `origin/main`.
-- **Live and verified:** picks SUPPRESSED (`/ncaaf/api/picks` 0 cards + reason);
-  board serves SP+ wk1; consolidation grafts `db469003` / `a381d652` / `454f3caa`.
-- **CLOSED ON MEASUREMENT — do not reopen without new data:** model is dominated
-  (R² 17.8% vs market 41.6%, w=−0.028); injuries PRICED (17 seasons, 4,431
-  games); situational all 8 priced (1,746 games); returning production null
-  (pooled t=−0.89, code removed); every `SP_RATING_SCALE` 6..24 loses; blending
-  w≈0. ATS: the model trails always-bet-the-underdog by ~4.3 pts in BOTH sports.
-- **OWED BY OTHERS, not this lane:** `smartsim2_projections_*.csv` allowlist —
-  orphaned after THREE failed handoffs; both football generators' publish calls
-  stay INERT until someone adds the line. `tests/test_football_projection_publish.py`
-  flips from xfail to unexpected-success when it lands.
-- **Soccer suite:** `--deselect tests/test_soccer_market_anchoring.py` → 633 pass
-  in 149.6s vs 875.8s. Do NOT lower its `simulations=` counts to speed it up.
-- Full narrative: `.syndicate/log/2026-08-{19,20}.md`. Exit criterion and the
-  dead levers: `docs/ai_context/ncaaf_beat_the_close_strategy.md`.
-
 ### mlb-overview-hydration-cost — OPEN — **DEPLOYED `d0ea983d` to refresh-worker 2026-08-20 13:59:33Z. THE BRANCH IS PROVEN TO FIRE IN PRODUCTION (`pruned=9/9`) AND THE MECHANISM DOES REAL WORK ON A COMPLETED SLATE — `date=2026-08-19 games=15 pruned=15 plays_dropped=1125`, against 1,067 measured locally on a 15-game completed slate. Pregame slates prune ~nothing (`plays_dropped=1`), which is correct, not inert. STILL UNPROVEN: that this moves the ~2GB excursion — that needs the live-slate window against a comparably-aged process.** — opened 2026-08-19 — **UNOWNED (session `80b3e432` archived 2026-08-20 ~10:4x CDT). The closing reading is SCHEDULED, not abandoned: `mlb-387-live-slate-read` fires 2026-08-20 22:15 CDT and takes the live-slate FEED_LIVE_PRUNE + memory reading. A MECHANISM ONLY verdict there does NOT close this lane.** — **BOTH CUTS LANDED ON `origin/main` (`ab99d236`), MEASURED LOCALLY, NOT DEPLOYED. Peak RSS 142.9 → 114.5 MB on a 15-game slate with a byte-identical games list; plus a per-build ~125MB dead odds_history read removed, proven dead by the shard WRITER's schema. The 3000MB floor is untouched and stays untouched.**
 - Goal: `#387`'s named real fix — make the MLB overview hydration path (`build_cards_page_context` as reached from `_MLBDataProvider.games()`) cheap enough that refresh-worker can hydrate MLB under normal load, WITHOUT lowering `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB). Testable outcome: a measured peak-RSS reduction for the worker-path call on a real 15-game slate, with byte-identical candidate-relevant output.
 - Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_cards_worker_projection.py` (new), `scripts/measure_cards_context_rss.py` (new), `.syndicate/*`.
@@ -860,64 +841,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups=GSV-MIN`. Unowned as far as this lane knows.
 - Blocked by: none.
 
-### layer2-board-chip-race — **CLOSED-VERIFIED 2026-08-20 19:1x CT — IT IS LIVE ON WEB. THE "NEVER DEPLOYED" HEADER BELOW WAS WRONG.** Content-verified by `layer2-rail-duplicate-nfl-cards` against web's ACTUAL live SHA `f3a9bb0b`: `gameChipsLoadedOnce` present, **6 occurrences**. The 19:58Z reconciliation checked `d9a23a38`, which WAS web's live SHA at that moment; web deployed several times after, and one of those carried this. **A deployed-SHA reading describes the SHA YOU READ, not a standing property** — re-read before acting on a handed-down deploy verdict. File claim released to the adopting lane; nothing owed. — superseded header follows — **Reconciliation check 2026-08-20 19:58Z found this: landed on `origin/main` (`164a38bf`) but content-verified ABSENT from web's live SHA (`d9a23a38`, 19:46:49Z) -- never actually deployed, only merged. web's claim is held by `soccer-board-mlb-parity` (genuinely active). Handing off: deploy the next time web's claim frees up, scoped onto its then-current live SHA, then content-verify `gameChipsLoadedOnce` is present before closing.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
-- Goal: fix a confirmed render-order race on the Layer 2 board's compact
-  game-card strip -- a follow-on to `layer2-board-pick-clarity` /
-  `layer2-board-movement-display`, both CLOSED, same file.
-  **Testable outcome:** on a fresh page load, today's real games' mini
-  cards render directly in the chip-based (scores/live-status) style,
-  with no visible flash-then-relayout from the plain fallback style.
-- Files: **CLAIM RELEASED 2026-08-20 to `layer2-rail-duplicate-nfl-cards`**
-  (session `23024227`), user decision. This lane's EDIT is finished and LIVE;
-  only a deploy VERIFICATION was owed, and holding a file claim for that blocked
-  a real fix in the same function. The adopting lane's change to that same
-  template shipped in `feec7e17`, which is what content-verified this lane live.
-  Formerly claimed: the Layer 2 board template (`loadGameChips()`, the initial
-  synchronous render call site at the bottom of the IIFE,
-  `renderGameCards`/`deriveGameCards`) -- path deliberately NOT written as a path
-  here, because `check_lane_invariants.py` parses any backticked path inside a
-  `- Files:` block as a live CLAIM and would keep reporting this released lane as
-  contesting the file.
-- Hypothesis: n/a (root-caused already, see below).
-- **Already established, measured 2026-08-20 (do not re-derive):**
-  - The board's mini game-card strip has two render styles: a chip-based
-    one (team abbrs, live score, status token) when `chipForGame(group)`
-    finds a match in `gameChipsById`/`gameChipsByMatchup`, and a plain
-    fallback (matchup text only) when it doesn't.
-  - **This is NOT a chip-matching bug.** Measured live against the
-    production board (`/api/board/game-chips`, `/api/intelligence/query`):
-    of 89 total game groups, 56 failed to match a chip -- but re-scoped to
-    ONLY today's (`game_date` 2026-08-20) real games, **15 of 15 (100%)
-    matched.** Every one of the 56 apparent mismatches was a future-dated
-    game (1-3 days out, `source_board_date` 2026-08-20 spanning a
-    multi-day `combined_board_window`), where a scoreboard chip correctly
-    does not exist yet. The simpler card for those is correct, expected
-    behaviour, not a defect.
-  - **The real, reproducible cause is a load-order race.** On page load,
-    if `initialIntelligenceResponse` is present (server-rendered, the
-    normal case), `renderIntelligence(merged)` runs SYNCHRONOUSLY
-    (`intelligence.html:2547-2552`) -- including the first paint of the
-    mini game-card strip -- while `gameChipsById`/`gameChipsByMatchup`
-    are still their initial empty `Map()`s, because `loadGameChips()`
-    is not called until the NEXT line, 2557. So the strip's first paint
-    is always the plain fallback style for every game, including today's
-    real ones, and then re-renders into the richer chip style a moment
-    later once `loadGameChips()`'s fetch resolves (it calls
-    `renderBoardBody()` itself, `intelligence.html:1322`). Confirmed by
-    code read (call-site line numbers), not yet reproduced with a timed
-    screenshot/network-waterfall capture -- that is the next concrete
-    step, not a re-derivation of the mechanism.
-- Falsification test: n/a, implementation lane, mechanism confirmed by
-  code read. If a timed capture shows the strip using the chip style on
-  its FIRST paint even before `loadGameChips()`'s network request
-  resolves, the mechanism above is wrong and needs re-diagnosis.
-- Verification: reload the live board with network throttling (or just a
-  slow enough connection to observe the transition) and confirm no
-  visible flash-then-relayout for today's games; re-run this session's
-  same "100% chip-match for today" measurement post-deploy as a
-  regression check that the reorder did not break matching itself.
-- Blocked by: none.
-
 ### soccer-board-mlb-parity — OPEN, UNOWNED (session `aeb71be7` closed 2026-08-20 22:1xZ; DEPLOYED, only the live-clock reading outstanding) — **LANDED ON `origin/main` (`51b7e765` + `9849e9b5`) AND LIVE ON WEB (`547b541b`, 18:07:09Z, grafted onto the live SHA — NOT main, see `deploys.md` for why deploying main's tip would have reverted ten commits). PRODUCTION READING TAKEN on the SAME card, same service: density 139 → 176 items/Mpx, height 1074 → 878px, em-dash cells 6 → 0, prop status rows 0 → 8, and the tiles now serve real prices (`COV ML +1400 | Model 8.7% | Market 6.3% | Edge +2.4 pts`). ONE USER-FOUND REGRESSION: the date board filtered on the UTC day, so eight MLS matches played 08-19 Central appeared on the 08-20 board already Final — fixed, deployed, re-verified with a PREDICATE (0 off-date cards across three dates) rather than a count. **DENSITY TARGET NOW MET (`bfdd0179` + `0514f2d7`, live 18:59:52Z): 363/Mpx against a 2x bar of 331 (MLB re-read at 663 this session), card 1074 → 970px, box tab 30 → 238 items, visible panel 51 → 97/Mpx. The FIRST of those two deploys DID NOT WORK — production read 255 where local read 427, because the local mirror has no odds and the overview grid collapses to a shape production never renders; the fix was probed against the LIVE page. Blast radius verified on NFL, NCAAF and mobile: 0 clipped elements, 0 body overflow. MLB does not load this stylesheet.** — opened 2026-08-20 — session 56b563e0-4c1a-4436-8e3b-ba3624fbeab0
 - Goal: `/soccer` serves a DATE-scoped, cross-league game-card board whose cards
   carry the same information classes MLB's do. **Single testable outcome:** on a
@@ -1116,46 +1039,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   The board currently runs on the vendor artifact; removing its writer first
   converts a degraded path into an outage.
 
-
-### soccer-stale-artifact-overwrite — CLOSED-VERIFIED 2026-08-20 — **web's OWN boot sync was overwriting live artifacts with the month-old git mirror; the handed-down "a worker publishes it" hypothesis was FALSE.** Fix 1 `32148cac` -> web `15a0be64` (22:36:32Z): artifact roots SEED-ONLY. Fix 2 `35daa092` -> web `f3a9bb0b` (23:34:33Z): bootstrap lock container-local + holder-liveness — a killed sync had been poisoning the next boot for 30 min. **PROVED BY MECHANISM, not outcome: `Bootstrap totals: copied=0 unchanged=33354 kept=25` on a sync that RAN TO COMPLETION (23:35:55Z), `soccer_source kept=24` — soccer syncs LAST, so the totals line proves the walk reached it. Three served-surface readings at T+2/T+15/T+21 min: control group 88/88 survived, 0 clobbered, 0 flipped, all three times. la_liga `recommendations_2026-08-20` advanced 23:32:11Z -> 23:48:13Z and PERSISTED — the pipeline republished and the new copy stayed.** Pre-fix: 1,114 of 8,016 hot artifacts web served were the checkout's copy (lower bound; the sync walks ~33k files). WEB ONLY — neither worker imports `syndicate.app` — which voids `#357`'s `team_history` counter-argument. Narrative, unverified beliefs and dead ends: `.syndicate/log/2026-08-20.md`. `#494`. — opened 2026-08-20 — closed 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
-- Goal: web's runtime disk stops being overwritten with the month-old git-mirror
-  copy of `soccer_source/*/api/recommendations/recommendations_*.json`. **MET.**
-- Files: `syndicate/features/shared/artifact_publisher.py`,
-  `scripts/bootstrap_data_root.py`, `scripts/run_refresh_worker.py`,
-  `syndicate/app.py` (`_bootstrap_render_data` only), `syndicate/blueprints/ops.py`
-  (comment only), `tests/test_bootstrap_data_root.py`,
-  `tests/test_app_bootstrap.py`, `.syndicate/*`. **Claims released on close.**
-- Verification: **DONE.** The clause said two readings >=30 min apart; the second
-  was taken at **T+21 min on explicit user direction**, and the record says 21
-  rather than pretending to 30. It is sufficient on evidence rather than on
-  elapsed time: the clause was written when the mechanism was UNPROVEN and only
-  outcome-shaped evidence existed, and `kept=25`/`kept=24` is a direct
-  observation of the branch refusing real overwrites on the real disk. Three
-  readings, two independent republishes of the subject artifact, no regression.
-- Blocked by: none.
-
-### intel-empty-pool-fallback-test — CLOSED-VERIFIED 2026-08-20 — THE ASSERTION WAS THE STALE SIDE: it asserted a `force_refresh` kwarg `#387` deliberately removed, while the empty-pool fallback branch under test was behaving correctly all along. Fixed in `tests/test_intelligence_state.py` only; production code byte-identical. Written up as `todo.md` `#495`. — opened 2026-08-20 — session dee8e41c-9e17-4dc8-9cc3-06678a05df92
-- Goal: `tests/test_intelligence_state.py::IntelligenceStateTests::test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool` passes on `origin/main` for the RIGHT reason — the stale side is fixed, not the assertion loosened.
-- Files: `tests/test_intelligence_state.py`, `docs/ai_context/todo.md`
-- Hypothesis: THE ASSERTION IS THE STALE SIDE, not the fallback path. `#387` deliberately removed `force_refresh` from the `collect_all_recommendations:empty_fallback` call site (`syndicate/features/intelligence.py:10527-10542`); the test still asserts `force_refresh=True`. The empty-pool branch itself behaves correctly.
-- Falsification test: the reproduce diff is ONLY the `force_refresh` kwarg, and the fallback otherwise fires and returns the richer pool. Measured: `Expected: collect_all_recommendations(selected_date='2026-06-10', force_refresh=True, log_pipeline=False, overview=[])` / `Actual: (selected_date='2026-06-10', log_pipeline=False, overview=[])`, with `COLLECT_SPAN_EXIT stage=collect_all_recommendations:empty_fallback rows=20` and `result == richer_pool`. If the delta had been anything MORE than that kwarg — wrong rows, branch not taken — the code would have been the stale side instead. It was not.
-- Verification: **RAN, ALL THREE PARTS DISCHARGED.**
-  - named test **PASSES**; `-k "fallback_merge or candidate_identity"` in this file **4 passed**; `tests/test_candidate_fallback_gate.py` **4 passed**.
-  - **THE CORRECTED ASSERTION STILL DISCRIMINATES** — proved by perturbation, not by inspection (08-16 rule: *a verifier that cannot FAIL cannot PASS*; a loosened assertion is not a fix). Adding a fourth kwarg `force_refresh=False` to the production call site makes the corrected test **FAIL**. The call site was then restored **byte-identical** — sha256 `f8d0f67a36d546d8…` before and after, `git diff` empty on `syndicate/features/intelligence.py`.
-- **LEDGER CORRECTION OWED BY THIS LANE, recorded in `#495`:** `state.md` `[test-baselines]` records TWO pre-existing failures in this file. The second, `..._recomputes_when_cached_snapshot_is_stale`, **passes on `main`** (re-measured 2026-08-20, 72s). That baseline is dated 08-14/15 against lineage `2b14fbeb` and must not be inherited as current. **THE REPLACEMENT BASELINE IS NOW MEASURED: `224 passed, 10 subtests passed, 0 failed in 1361.70s (22:41)` — the file is GREEN, this lane's fix was the last red in it, and the old line's cost figure (~15 min) is wrong too; it is ~23. CAVEAT DISCHARGED: re-measured at tip `56b4dd41` — `224 passed, 10 subtests passed, 0 failed in 1668.24s`, identical pass/fail to the primary-tree run, so the 34 intervening commits of product code change nothing for this file. Cost moved though: 22:41 -> 27:48, so read ~25-30 min. The tip run needed a junction to the primary tree's `data/` (worktree sparse-checked-out WITHOUT `data/`) because `learnings.md` 08-16 forbids a fresh worktree as a baseline for disk-reading tests and this suite reaches the disk; `SYNDICATE_DATA_ROOT` alone would have been an inert redirect. Neither run is hermetic — the shared `data/` is live. The correction to `state.md` does not depend on it — the individual 72s re-measurement of the second named failure carries that on its own.**
-- **NOT FIXED, DELIBERATELY, AND HANDED TO `#385`:** `#387`'s "`force_refresh` was already inert here" is true of the call site it was written about and NOT universally. The streamed board caller (`pipeline/intelligence_state.py:4636-4653`) passes `overview=None` on purpose, so there the kwarg DOES reach `build_intelligence_overview` — its removal turned a forced re-hydration into a cached one. Restoring it would reinstate exactly the re-hydration `#387` removed for memory reasons, and the branch is unreachable in production today because the same caller sets `apply_empty_pool_fallback=not board_l2a_fallback_enabled()`. It becomes a live behaviour delta the moment `#385`'s gate opens.
-- Blocked by: none.
-
-### bootstrap-intelligence-entries-dead — CLOSED-VERIFIED 2026-08-20 — landed `0dd9c6cd` — **the `reports/intelligence` bootstrap entries were DELETED, not activated.** They had never copied a byte (`_sync_tree` returns immediately for a non-directory) and activating them would have degraded the board: on the keyvalue backend those paths read from Redis with no filesystem fallback, so a seeded file has no CONTENT — but its FILENAME and MTIME are what `_intelligence_state_read_path` and `blueprints/intelligence.py` use to pick "latest", so months-old seeds would inject dates with nothing behind them. Seven weeks of production already ran the experiment: zero intelligence files bootstrapped since `2fc3673e` (2026-07-03), no incident attributed to a missing seed. **Two guards replace them, both PROVEN load-bearing — 12 offenders against the pre-deletion code, 0 after; 29 tests green.** The first is strictly safer than what it replaces: it blocks the directory root whose return would resurrect the 3.2 GB `evaluation_ledger.jsonl` OOM. **Provable no-op on behaviour — the deleted code never executed**, so no production reading was required or possible. `#496`. — opened 2026-08-20 — closed 2026-08-20 — session eb7a0536-82ff-45d7-8ce8-748a9034b388
-- Goal: no bootstrap pair points into `reports/intelligence`, guarded by a test.
-  **MET.**
-- Files: `scripts/bootstrap_data_root.py`, `tests/test_bootstrap_data_root.py`,
-  `docs/ai_context/todo.md`, `.syndicate/*`. **Claims released on close.**
-- Verification: DONE. `_bootstrap_root_pairs()` yields zero `reports/intelligence`
-  pairs; `test_no_bootstrap_pair_points_into_reports_intelligence` and
-  `test_no_bootstrap_pair_is_a_file` fail against the pre-deletion code and pass
-  after. Not deployed on its own; ships with the next web deploy.
-- Blocked by: none.
 
 ### layer2-rail-duplicate-nfl-cards — OPEN, **UNOWNED** (session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT; nothing held, all deploy claims released) — **SHIPPED AND VERIFIED-BY-REPLAY; ONE BEHAVIOURAL READ OWED** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
