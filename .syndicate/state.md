@@ -4524,3 +4524,47 @@ against current lines AND current game state. **Retires the vendor import.**
   Multiplier collapses to 1.0 for every player. Harmless, but doing nothing.
 - Fix landed on `8fe78662` (reads `schedule_{season}.csv`, allowlisted, publish
   call added to `fetch_nfl_schedule.py`) and is **NOT DEPLOYED**.
+
+## [soccer-live-tier] SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT
+
+**Live gates 1/2/3 work.** `[measured 2026-08-21 19:23Z, lane
+soccer-board-mlb-parity]` Four live matches, on a board built AFTER the deploy
+(checked, not assumed). Gate 2: 1144 rows considered, 58 live-projected,
+240/240 snapshot rows indexed. Gate 3: reaching, and withholding 19/19 by
+`no_two_sided_market_price` — a NAMED refusal, not a bare zero. Every live
+probability moved off its pregame value (Arsenal 0.79 → 0.9125 after 1-0).
+
+**The all-day zero was ONE SHADOWED IMPORT.** `live_lens_loop.py` raised
+`UnboundLocalError: write_json_file` for mlb AND soccer — a conditional
+function-local import in a WNBA branch bound the name local for the whole
+function. NO live-lens snapshot was written for ANY sport. Three consumers
+looked broken. Fixed `99e56561`, static regression test added.
+
+**SOCCER PRICES ARE NOT CAPTURED DURING PLAY** `[2026-08-21]` —
+`soccer_{league}_odds`/`_props`/`_picks` are `phases=("pregame",)`. The card's
+`betting` block is frozen at the last pregame sweep, which is the SAME root
+cause as gate 3's 19/19 withholding. A live-scoped refresh is written
+(`b17c1999`, `_soccer_live_scope` + `--event-ids`) and **is NOT DEPLOYED**.
+Props cost ONE CALL PER EVENT: unscoped 60s ticks are ~130k calls/day, scoped
+to matches in play, single digits per tick.
+
+**WNBA HAS NO GAME-LINES STEP** — only `wnba_oddsapi_props_job`. Identified
+2026-08-21, NOT closed.
+
+**Resumed sims were short a half's stoppage** `[held-out validated
+2026-08-21]` — `espn_live_state` returns NOMINAL clock, so a resumption played
+to the 90th minute and stopped, never simulating where 5.5% of goals occur.
+Fixed `a27578bf`. Held-out (70 European matches, Aug 2026): bias eliminated at
+all four cutoffs; **Brier 2.5 0.1454 → 0.1285 BETTER; MAE 0.6394 → 0.6665
+WORSE** — adding real football adds variance. Brier at the line is the
+objective; MAE of a point estimate is not.
+
+**Momentum LEADS goals, computed from OUR OWN ESPN commentary**
+`[measured 2026-08-21]` — pre-goal mean +1.141 vs control 0.000, Cohen's
+d = +0.397 (n=76/638), goals EXCLUDED and the read strictly causal. No vendor
+dependency, no id join. Published to `games[].momentum` and rendered on the
+card — **never yet seen on a live card.**
+
+**`second_half_shot_multiplier = 1.22` IS NOT WRONG.** Measured 57.1% ± 3.7pp
+second-half goal share against its assumed 55–56% — inside one standard error.
+Do not change it without a larger sample.
