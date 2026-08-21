@@ -1173,7 +1173,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   error bar must still be withheld, never priced at se=0.
 - Blocked by: none.
 
-### nfl-injuries-autorun-arm — OPEN — opened 2026-08-21 — session: nfl-injuries-autorun-arm
+### nfl-injuries-autorun-arm — CLOSED-VERIFIED 2026-08-21 — armed, deployed (`916593f6` live via user-triggered manual redeploy), CONFIRMED FIRING (LAUNCHING -> unavailable/404, the normal case) — opened 2026-08-21 — session: nfl-injuries-autorun-arm
 - Goal: arm `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` in
   production (refresh-worker) -- the code (`_launch_autorun_nfl_
   injuries_fetch`, `scripts/fetch_nfl_injuries.py`, the `#441`-class
@@ -1192,14 +1192,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `NFL_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN=true`.
 - Hypothesis: n/a (a deploy, not a diagnosis).
 - Falsification test: n/a.
-- Verification: production logs show `NFL_INJURIES_FETCH_LAUNCHING` (or
-  a named skip reason, e.g. `rate_limited` if a marker already exists)
-  within one refresh-worker tick after the deploy carries the new env
-  var. NFL is in season (confirmed via `_active_sports_for_date`
-  earlier this session), so a `not_in_season` skip would be a genuine
-  surprise. `disabled` reappearing means the deploy did not actually
-  carry the new value -- the exact failure mode
-  `[[project_render_env_needs_deploy]]` documents.
+- Verification: DONE. `deploy_preflight.py` refused a same-SHA
+  redeploy as "ALREADY LIVE -- redundant" (no override flag exists for
+  the env-var-refresh case, and the deploy-guard's off-switch isn't
+  settable from this session's own tool access) -- user triggered a
+  manual redeploy via the Render dashboard instead. That redeploy picked
+  up `origin/main`'s tip (`916593f6`, 94 commits/48 files past
+  refresh-worker's prior live SHA `68acf3ca`) rather than a scoped
+  same-SHA redeploy -- flagged clearly as a larger-than-intended blast
+  radius at the time, then confirmed CLEAN (no traceback near boot,
+  memory climbed then stabilized ~50% of container, no runaway growth).
+  `NFL_INJURIES_FETCH_LAUNCHING` fired at 02:10:40Z (dispatch loop took
+  ~7min post-boot to reach it -- worker was busy with loop starts + an
+  MLB tick first, not a defect). Result: `"status": "unavailable"`
+  (HTTP 404 from nflverse) -- the fetcher's own documented NORMAL case
+  for a season with no injury reports published yet, not a crash
+  (confirmed no traceback). Autorun is confirmed correctly wired and
+  firing; today's run simply had nothing real to fetch.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
