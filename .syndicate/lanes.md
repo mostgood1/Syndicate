@@ -1128,8 +1128,9 @@ failure say nothing about production. Same error on the worker. Cause: my own
 `User-Agent`; the rule was already in capitals at `live_game_state.py:50`,
 including the clause saying the dev machine and Render fail the SAME way. Fixed
 in `ae941265`; now `status=ok, 50 articles, 35 linked -> 84 players`, 92 of 95
-links via ESPN's own athlete tags. **STILL OWED: the worker has never logged
-`status=ok`** -- it holds `interval_s=21600` because I set the interval AFTER
+links via ESPN's own athlete tags. **OWED MEASUREMENT DISCHARGED 22:28:32Z:** the worker logged
+`status=ok fetched=50 linked=35`, published, and the served page went from 0 live
+Buzz badges to **101** (58 players with coverage) -- it holds `interval_s=21600` because I set the interval AFTER
 triggering the deploy, so next attempt ~03:20Z.
 
 **Retired a worry:** the 21:45:29Z tick shows all six NFL autorun branches

@@ -21684,3 +21684,33 @@ services and 502s every route for ~2 minutes -- adding an outage to an outage.
 
 **verify: NOTHING IS VERIFIED HERE.** Web is down at handover. That is the
 reading.
+
+## 2026-08-21T22:28:32Z — OWED MEASUREMENT DISCHARGED: the worker captured news
+
+Follows the entry above. The obligation was: the refresh-worker had never once
+logged a successful capture, so the User-Agent fix was verified only from a
+developer machine.
+
+    2026-08-21T22:28:32.747Z  [news_capture] status=ok fetched=50 new=50
+                              total_today=50 linked=35 -> /opt/render/project/
+                              data/nfl_source/fantasy/news_archive/nfl_news_2026-08-21.json
+    2026-08-21T22:28:32.770Z  [news_capture] publish -> True
+
+END-TO-END, read off the served page (not the worker's own claim):
+`/nfl/fantasy` now renders **101 live Buzz badges** against 414 quiet, and the
+note reads "58 of the players on screen have recent coverage". Before the
+capture it was 0 live / 514 quiet and "No archive yet". So: worker fetch ->
+archive -> publish -> web disk -> request path -> rendered row. Every hop.
+
+Also fixed on the back of this reading (`7b3d7664`): the note said "from a
+2-day archive" on the archive's FIRST day. `news_archive_days` counts distinct
+PUBLICATION dates among the headlines shown, which is not how long the archive
+has been collecting. Now "published across N day(s)".
+
+**STILL TRUE AND UNCHANGED: none of this moves a projection.** The text half is
+`use_news_adjustments=False` by choice. The INJURY half is fitted (+36.2%) and
+wired, but inert for a calendar reason, not a code one -- `injuries_2026.csv`
+does not exist yet (nflverse's newest is 2025; the weekly report is a
+regular-season artifact). Served basis confirms it: `injuries_scanned: 0`,
+`players_with_availability_signal: 0`. It begins moving numbers when Week 1
+designations publish, and `NFL_INJURIES_FETCH` is already polling 6-hourly.

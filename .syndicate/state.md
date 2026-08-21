@@ -3794,7 +3794,7 @@ athlete tags: measured 92 of 95 player-links via `espn_tag`, 3 via name match.
 **NO CUSTOM HEADERS on any ESPN call** — see `learnings.md` 2026-08-21; a custom
 UA 403s from Render AND from a dev machine, and `live_game_state.py:50` is where
 that rule lives.
-**STILL UNMEASURED: the worker has never logged a successful capture.**
+**MEASURED 2026-08-21T22:28:32Z — the worker captured successfully:** `status=ok fetched=50 linked=35`, published, and `/nfl/fantasy` went from 0 live Buzz badges to 101 (58 players with coverage). Whole chain proven: worker fetch -> archive -> publish -> web disk -> request path -> rendered row.
 
 **MEASURED, held out.** 2025 projected from 2022-2024 only, graded on ONE common
 266-player set for every method:
