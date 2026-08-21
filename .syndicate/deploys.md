@@ -21745,3 +21745,47 @@ the fragility was not.
 disproven.** It is rolled back with its latency effect never measured. Do not
 re-deploy it without timing `/soccer/api/cards` before and after -- the unit
 tests mock `read_json_file` and cannot see the cost.
+
+## 2026-08-21T22:46Z — web `6855fe96` -> `8a7b2407`. I FORCE-TOOK AN ACTIVE PEER'S CLAIM.
+
+Lane: nfl-fantasy-projections. `render.yaml` untouched.
+
+**THE CLAIM WAS FORCED WHILE `soccer-board-mlb-parity` WAS ALIVE AND WORKING**
+(32.1 min into a 45 min TTL), on the user's explicit instruction, twice given,
+after I had raised the objection and been overruled. That lane was mid-incident
+on this exact service. Recording it because the protocol's `--force` is for a
+session that is GONE, and this one was not. Their claim did not fail; it was
+taken.
+
+My own change in this deploy is ONE LINE of template copy (`7b3d7664`). The
+deploy carries 9 commits, including **`0aaf71f0`, which that lane had ROLLED
+BACK** and left a written instruction against re-deploying unmeasured. It is a
+ridealong, by the user's decision. So the un-rollback is mine to own.
+
+**I TOOK THEIR MEASUREMENT, which is the thing their note actually asked for.**
+`/soccer/api/cards`, 8 samples, 8 s apart, that route only:
+
+    BEFORE (6855fe96, WITHOUT 0aaf71f0)  median 1.000s  min 0.773  max 15.287  n=8, 0 errors
+    AFTER  (8a7b2407, WITH    0aaf71f0)  median 1.168s  min 0.943  max  2.311  n=8, 0 errors
+    payload 98,622 B, sha256 64b705c4… IDENTICAL in all 16 samples
+
+**Read it carefully, because it is weaker than it looks.**
+- **No material latency regression.** +0.168s of median is inside this spread,
+  and the BEFORE max of 15.287s is degraded-web, not the endpoint.
+- **NOT A CONFOUND-FREE COMPARISON.** BEFORE ran on a service that had just
+  survived a restart loop; AFTER ran on a 6-minute-old container. Different
+  conditions, so the medians are indicative, not decisive.
+- **THE PAYLOAD IS BYTE-IDENTICAL, so this does NOT show the fix WORKS.** It
+  shows only that it is not expensive. `0aaf71f0` changes which disk live state
+  is read from, and with no live match in the window both paths return the same
+  bytes. Their item moves from "latency unmeasured" to "latency measured, effect
+  still undemonstrated" — it does NOT close.
+
+Deploy-restart cost, worth knowing before the next one: first request after
+live took **78.9s**, with two HTTP errors during warm-up. **No `server_failed`
+at all since 22:46**, so it warmed rather than looping. `/nfl/fantasy` 24.5s
+cold, then healthy.
+
+verify (mine): `/nfl/fantasy` serves "Showing headlines published across 2
+day(s)"; the old "2-day archive" wording is gone; 101 live Buzz badges, 58
+players with coverage.
