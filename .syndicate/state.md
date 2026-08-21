@@ -3483,8 +3483,22 @@ minutes/pace) -> carry `liveModelProbOver` per `(player, market, line)` on the
 lens -> open the `sport != "mlb"` gate in `attach_live_projections_for_sport`.
 Pricing an edge off it still needs a MEASURED interval, which does not exist yet.
 
+**ALL 4 PHASES BUILT, WIRED AND DEPLOYED `[2026-08-21]` — `a41f88f8` on
+live-odds-worker (capture tick) and refresh-worker (board build + prop gate).
+THE WIRING IS REACHABLE AND THE REFUSAL FIRES: first lens tick after landing,
+`WNBA_LIVE_BOX_EMPTY date=2026-08-21 games=3 players=0 -- nothing written`.
+**PRICING IS UNPROVEN — `players=0` means props have never seen a real player;
+`livePropsCoverage` never populated, `rows_live_projected` never non-zero. DO
+NOT report live WNBA props as working.** The projection's error IS measured
+(n=796, 5 slates, replay reconciling 100%): residual sd 6.03 -> 2.70 as the
+clock runs down, `p90/sd` 1.56-1.71 vs 1.6449 normal.
+**WHICH SERVICE RUNS THE WNBA LENS: live-odds-worker**, not refresh-worker —
+`TICK_COMPLETE skipped=['mlb','nba','wnba','soccer']` there. The docstring in
+`wnba/live_lens.py` says otherwise and is WRONG; ownership is env-driven.
+Superseded note follows.
+
 **PHASES 1-3(a) ARE BUILT AND ON `main`, NONE WIRED, NONE DEPLOYED
-`[2026-08-21]`.** `capture_wnba_live_player_box.py` (persist),
+`[2026-08-21, superseded same day]`.** `capture_wnba_live_player_box.py` (persist),
 `wnba_live_prop_projection.py` (project), `wnba_live_prop_rows.py` (join to
 anchor). 33 tests + 20 subtests. **The chain has NEVER run end to end in
 production** — nothing calls the capture on a tick, so the artifact has never
