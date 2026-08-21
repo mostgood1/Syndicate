@@ -401,6 +401,8 @@ def fantasy():
         week=_fantasy_week(),
         use_news=_fantasy_flag("news"),
         league=_fantasy_league(),
+        position=request.args.get("position"),
+        stat_view=request.args.get("stats"),
     )
     return render_template("nfl/fantasy.html", **context)
 

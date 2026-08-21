@@ -184,6 +184,61 @@ def _resolve_projections(
     }
 
 
+#: Every projected stat, grouped and ordered for the FULL stat view. The
+#: artifact carries all of these per player and per week; the default view
+#: shows only the handful that matter for a position, which is readable but
+#: hides that the projection is a complete stat line rather than a score.
+FULL_STAT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("pass_attempts", "Pass att"),
+    ("passing_yards", "Pass yd"),
+    ("passing_tds", "Pass TD"),
+    ("interceptions", "INT"),
+    ("passing_2pt", "Pass 2pt"),
+    ("carries", "Car"),
+    ("rushing_yards", "Rush yd"),
+    ("rushing_tds", "Rush TD"),
+    ("rushing_2pt", "Rush 2pt"),
+    ("targets", "Tgt"),
+    ("receptions", "Rec"),
+    ("receiving_yards", "Rec yd"),
+    ("receiving_tds", "Rec TD"),
+    ("receiving_2pt", "Rec 2pt"),
+    ("fumbles_lost", "Fum lost"),
+    ("fg_made_0_39", "FG 0-39"),
+    ("fg_made_40_49", "FG 40-49"),
+    ("fg_made_50_plus", "FG 50+"),
+    ("fg_missed", "FG miss"),
+    ("pat_made", "PAT"),
+    ("pat_missed", "PAT miss"),
+    ("dst_sacks", "Sacks"),
+    ("dst_interceptions", "Def INT"),
+    ("dst_fumble_recoveries", "Fum rec"),
+    ("dst_safeties", "Safety"),
+    ("dst_touchdowns", "Def TD"),
+    ("dst_blocked_kicks", "Blk"),
+    ("dst_points_allowed", "Pts allowed"),
+)
+
+
+def populated_stat_columns(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """The full-stat columns that actually carry a value for these rows.
+
+    A quarterback has no field goals and a kicker has no targets, so rendering
+    all 28 columns for every group would be 28 columns of mostly zeros. Asking
+    the DATA which columns are live keeps the full view honest -- a column that
+    appears is a column with something in it -- and it adapts by itself if a
+    future projection starts populating a stat that is empty today.
+    """
+    live: list[tuple[str, str]] = []
+    for key, label in FULL_STAT_COLUMNS:
+        for row in rows:
+            value = row.get("stat_line", {}).get(key)
+            if value:
+                live.append((key, label))
+                break
+    return live
+
+
 def resolve_league(
     teams: int | None = None,
     superflex: bool = False,
@@ -376,40 +431,90 @@ def build_draft_board_payload(
     }
 
 
+#: Rows rendered per position group when one is selected. Generous, because a
+#: position view is what a mid-draft or waiver-wire question actually reads.
+POSITION_VIEW_LIMIT = 120
+
+#: Rows in the all-up board. The whole-league view is for the top of the draft;
+#: past this it is the position views that answer the question, and every extra
+#: row costs page weight on a page that reached 267 KB before this control
+#: existed.
+BOARD_VIEW_LIMIT = 200
+
+
 def build_fantasy_page_context(
     season: int = DEFAULT_FANTASY_SEASON,
     scoring_key: str | None = None,
     week: int | None = None,
     use_news: bool = False,
     league: LeagueSettings | None = None,
+    position: str | None = None,
+    stat_view: str | None = None,
 ) -> dict[str, Any]:
-    """Context for the Fantasy Football page."""
+    """Context for the Fantasy Football page.
+
+    ``position`` selects a single positional grouping. It filters SERVER-SIDE
+    rather than hiding rows in the browser: the all-up page carries every
+    position at once and had grown to 267 KB, and a position view is a
+    different question ("who is left at running back") than the board answers,
+    not a subset of it that happens to be scrolled to.
+
+    The board is still priced against the FULL pool whichever view is shown --
+    replacement level is a property of the league, not of what is on screen --
+    so a filtered view's VOR and tier numbers stay comparable to the all-up
+    board's.
+    """
     settings = league or DEFAULT_LEAGUE
     payload = build_fantasy_payload(
         season=season,
         scoring_key=scoring_key,
         week=week,
-        limit=400,
+        limit=2000,
         use_news=use_news,
         league=settings,
     )
+    selected = (position or "ALL").strip().upper()
+    if selected not in POSITION_ORDER:
+        selected = "ALL"
+
     by_position: dict[str, list[dict[str, Any]]] = {name: [] for name in POSITION_ORDER}
     for row in payload["rows"]:
         by_position.setdefault(row["position"], []).append(row)
+    for rows in by_position.values():
+        rows.sort(key=lambda row: -row["fantasy_points"])
+
     board = [row for row in payload["rows"] if row.get("draft")]
     board.sort(key=lambda row: row["draft"]["rank"])
+    if selected != "ALL":
+        board = [row for row in board if row["position"] == selected]
+
+    full_stats = (stat_view or "").strip().lower() in {"full", "all", "1", "true"}
+    counts = {name: len(rows) for name, rows in by_position.items()}
+    if selected == "ALL":
+        shown = {name: rows[:60] for name, rows in by_position.items()}
+    else:
+        shown = {selected: by_position.get(selected, [])[:POSITION_VIEW_LIMIT]}
+
+    stat_columns = {
+        name: populated_stat_columns(rows) for name, rows in shown.items()
+    } if full_stats else {}
+
     return {
         "title": "Fantasy Football",
         "season": season,
         "week": week,
+        "full_stats": full_stats,
+        "stat_columns": stat_columns,
         "scoring": payload["scoring"],
         "scoring_label": payload["scoring_label"],
         "available_scoring": payload["available_scoring"],
         "league_label": settings.label,
         "use_news": use_news,
         "positions": POSITION_ORDER,
-        "by_position": by_position,
-        "board": board[:200],
+        "selected_position": selected,
+        "position_counts": counts,
+        "by_position": shown,
+        "board": board[:BOARD_VIEW_LIMIT],
         "board_summary": payload["board_summary"],
         "source": payload["source"],
         "available": payload["available"],

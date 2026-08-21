@@ -22,6 +22,13 @@
   .pos-WR { background: #1f5f9e; color: #fff; } .pos-TE { background: #9e6a1f; color: #fff; }
   .pos-K  { background: #555; color: #fff; }    .pos-DST { background: #7a2f2f; color: #fff; }
   .tier { opacity: .65; font-variant-numeric: tabular-nums; }
+  table.ff th { cursor: pointer; user-select: none; position: sticky; top: 0;
+                background: var(--panel, #111); z-index: 1; }
+  table.ff th:hover { text-decoration: underline; }
+  table.ff th::after { content: ''; opacity: .4; font-size: .7em; margin-left: .25rem; }
+  table.ff th[data-dir="asc"]::after  { content: '\25B2'; opacity: .9; }
+  table.ff th[data-dir="desc"]::after { content: '\25BC'; opacity: .9; }
+  table.ff td { font-variant-numeric: tabular-nums; }
   .ff-basis { margin-top: 2rem; font-size: .8rem; opacity: .75; }
   .ff-basis summary { cursor: pointer; }
   .ff-basis pre { overflow-x: auto; padding: .75rem; background: rgba(127,127,127,.1); border-radius: 6px; }
@@ -34,7 +41,7 @@
 
   <p class="ff-note">
     {{ league_label }} &middot; <strong>{{ scoring_label }}</strong> &middot;
-    {% if week %}week {{ week }} projections{% else %}full-season projections and draft board{% endif %}.
+    {% if week %}<strong>week {{ week }}</strong> projections &mdash; per-game stat lines for that opponent{% else %}full-season projections and draft board{% endif %}.
     Team scoring environment is priced off <strong>posted market lines</strong>
     ({{ basis.market.games_with_line }} of {{ basis.market.regular_season_games }} {{ season }} games carry one),
     not off Syndicate&rsquo;s own game simulator &mdash; that model is measured strictly dominated by the close.
@@ -48,6 +55,18 @@
       <a class="{{ 'on' if key == scoring else '' }}"
          href="/nfl/fantasy?season={{ season }}&amp;scoring={{ key }}{{ '&week=' ~ week if week else '' }}{{ '&news=1' if use_news else '' }}">{{ key }}</a>
     {% endfor %}
+    <span style="opacity:.7; margin-left:1rem">Position:</span>
+    <a class="{{ 'on' if selected_position == 'ALL' else '' }}"
+       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}">All</a>
+    {% for pos in positions %}
+      <a class="{{ 'on' if selected_position == pos else '' }}"
+         href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}&amp;position={{ pos }}">{{ pos }}<span style="opacity:.55"> {{ position_counts.get(pos, 0) }}</span></a>
+    {% endfor %}
+    <span style="opacity:.7; margin-left:1rem">Stats:</span>
+    <a class="{{ '' if full_stats else 'on' }}"
+       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}{{ '&position=' ~ selected_position if selected_position != 'ALL' else '' }}">Key</a>
+    <a class="{{ 'on' if full_stats else '' }}"
+       href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}{{ '&week=' ~ week if week else '' }}{{ '&position=' ~ selected_position if selected_position != 'ALL' else '' }}&amp;stats=full">All projected stats</a>
     <span style="opacity:.7; margin-left:1rem">View:</span>
     <a class="{{ '' if week else 'on' }}" href="/nfl/fantasy?season={{ season }}&amp;scoring={{ scoring }}">Season / draft</a>
     {% for w in range(1, 19) %}
@@ -67,10 +86,12 @@
   {% endif %}
 
   {% if board %}
-    <h2>Draft board &mdash; by value over replacement</h2>
+    <h2>{% if selected_position == 'ALL' %}Draft board &mdash; by value over replacement{% else %}{{ selected_position }} draft board &mdash; by value over replacement{% endif %}</h2>
     <p class="ff-note">
       Ordered by points above what is freely available at the same position after every
-      starting slot in a {{ league_label }} league is filled &mdash; which is why an elite
+      starting slot in a {{ league_label }} league is filled. Replacement level is computed
+      over the FULL player pool whichever position is shown, so these numbers stay
+      comparable across views &mdash; which is why an elite
       tight end outranks a quarterback who outscores him. Replacement levels:
       {% for pos, info in board_summary.by_position.items() %}{{ pos }} {{ info.replacement_points }}{% if not loop.last %} &middot; {% endif %}{% endfor %}.
     </p>
@@ -108,7 +129,8 @@
     {% set rows = by_position.get(position) or [] %}
     {% if rows %}
       <div class="ff-section">
-        <h2><span class="pos pos-{{ position }}">{{ position }}</span> &mdash; {{ rows | length }} projected</h2>
+        <h2><span class="pos pos-{{ position }}">{{ position }}</span> &mdash;
+          showing {{ rows | length }} of {{ position_counts.get(position, rows | length) }} projected</h2>
         <div class="ff-scroll">
           <table class="ff">
             <thead>
@@ -117,16 +139,20 @@
                 <th>{% if week %}Pts{% else %}Proj{% endif %}</th>
                 {% if not week %}<th>G</th><th>PPG</th>{% endif %}
                 <th>Floor</th><th>Ceiling</th>
-                {% if position in ('QB',) %}<th>Pass yd</th><th>Pass TD</th><th>INT</th>{% endif %}
-                {% if position in ('RB',) %}<th>Car</th><th>Ru yd</th><th>Ru TD</th><th>Rec</th><th>Re yd</th>{% endif %}
-                {% if position in ('WR','TE') %}<th>Tgt</th><th>Rec</th><th>Re yd</th><th>Re TD</th>{% endif %}
-                {% if position == 'K' %}<th>FG 0-39</th><th>40-49</th><th>50+</th><th>PAT</th>{% endif %}
-                {% if position == 'DST' %}<th>Sacks</th><th>INT</th><th>Fum</th><th>TD</th><th>PA</th>{% endif %}
+                {% if full_stats %}
+                  {% for key, label in stat_columns.get(position, []) %}<th>{{ label }}</th>{% endfor %}
+                {% else %}
+                  {% if position in ('QB',) %}<th>Pass yd</th><th>Pass TD</th><th>INT</th>{% endif %}
+                  {% if position in ('RB',) %}<th>Car</th><th>Ru yd</th><th>Ru TD</th><th>Rec</th><th>Re yd</th>{% endif %}
+                  {% if position in ('WR','TE') %}<th>Tgt</th><th>Rec</th><th>Re yd</th><th>Re TD</th>{% endif %}
+                  {% if position == 'K' %}<th>FG 0-39</th><th>40-49</th><th>50+</th><th>PAT</th>{% endif %}
+                  {% if position == 'DST' %}<th>Sacks</th><th>INT</th><th>Fum</th><th>TD</th><th>PA</th>{% endif %}
+                {% endif %}
                 <th>Basis</th>
               </tr>
             </thead>
             <tbody>
-              {% for row in rows[:60] %}
+              {% for row in rows %}
               <tr>
                 <td>{{ loop.index }}</td>
                 <td>{{ row.name }}</td>
@@ -135,25 +161,29 @@
                 <td><strong>{{ row.fantasy_points }}</strong></td>
                 {% if not week %}<td>{{ row.games }}</td><td>{{ row.points_per_game }}</td>{% endif %}
                 <td>{{ row.floor }}</td><td>{{ row.ceiling }}</td>
-                {% if position in ('QB',) %}
-                  <td>{{ row.stat_line.passing_yards }}</td><td>{{ row.stat_line.passing_tds }}</td><td>{{ row.stat_line.interceptions }}</td>
-                {% endif %}
-                {% if position in ('RB',) %}
-                  <td>{{ row.stat_line.carries }}</td><td>{{ row.stat_line.rushing_yards }}</td><td>{{ row.stat_line.rushing_tds }}</td>
-                  <td>{{ row.stat_line.receptions }}</td><td>{{ row.stat_line.receiving_yards }}</td>
-                {% endif %}
-                {% if position in ('WR','TE') %}
-                  <td>{{ row.stat_line.targets }}</td><td>{{ row.stat_line.receptions }}</td>
-                  <td>{{ row.stat_line.receiving_yards }}</td><td>{{ row.stat_line.receiving_tds }}</td>
-                {% endif %}
-                {% if position == 'K' %}
-                  <td>{{ row.stat_line.fg_made_0_39 }}</td><td>{{ row.stat_line.fg_made_40_49 }}</td>
-                  <td>{{ row.stat_line.fg_made_50_plus }}</td><td>{{ row.stat_line.pat_made }}</td>
-                {% endif %}
-                {% if position == 'DST' %}
-                  <td>{{ row.stat_line.dst_sacks }}</td><td>{{ row.stat_line.dst_interceptions }}</td>
-                  <td>{{ row.stat_line.dst_fumble_recoveries }}</td><td>{{ row.stat_line.dst_touchdowns }}</td>
-                  <td>{{ row.stat_line.dst_points_allowed }}</td>
+                {% if full_stats %}
+                  {% for key, label in stat_columns.get(position, []) %}<td>{{ row.stat_line.get(key, 0) }}</td>{% endfor %}
+                {% else %}
+                  {% if position in ('QB',) %}
+                    <td>{{ row.stat_line.passing_yards }}</td><td>{{ row.stat_line.passing_tds }}</td><td>{{ row.stat_line.interceptions }}</td>
+                  {% endif %}
+                  {% if position in ('RB',) %}
+                    <td>{{ row.stat_line.carries }}</td><td>{{ row.stat_line.rushing_yards }}</td><td>{{ row.stat_line.rushing_tds }}</td>
+                    <td>{{ row.stat_line.receptions }}</td><td>{{ row.stat_line.receiving_yards }}</td>
+                  {% endif %}
+                  {% if position in ('WR','TE') %}
+                    <td>{{ row.stat_line.targets }}</td><td>{{ row.stat_line.receptions }}</td>
+                    <td>{{ row.stat_line.receiving_yards }}</td><td>{{ row.stat_line.receiving_tds }}</td>
+                  {% endif %}
+                  {% if position == 'K' %}
+                    <td>{{ row.stat_line.fg_made_0_39 }}</td><td>{{ row.stat_line.fg_made_40_49 }}</td>
+                    <td>{{ row.stat_line.fg_made_50_plus }}</td><td>{{ row.stat_line.pat_made }}</td>
+                  {% endif %}
+                  {% if position == 'DST' %}
+                    <td>{{ row.stat_line.dst_sacks }}</td><td>{{ row.stat_line.dst_interceptions }}</td>
+                    <td>{{ row.stat_line.dst_fumble_recoveries }}</td><td>{{ row.stat_line.dst_touchdowns }}</td>
+                    <td>{{ row.stat_line.dst_points_allowed }}</td>
+                  {% endif %}
                 {% endif %}
                 <td class="tier">{{ row.basis.share_source }}{% if row.basis.is_rookie %} &middot; rookie{% endif %}</td>
               </tr>
@@ -165,8 +195,56 @@
     {% endif %}
   {% endfor %}
 
+  <p class="ff-note" style="opacity:.65">
+    Every column is sortable &mdash; click a header to sort, click again to reverse.
+    {% if not full_stats %}&ldquo;All projected stats&rdquo; above widens each table to every
+    stat the projection actually produces{% else %}Columns shown are the ones carrying a value
+    for that position{% endif %}.
+  </p>
+
   <details class="ff-basis">
     <summary>What fed these numbers (substrate, validation, config)</summary>
     <pre>{{ basis | tojson(indent=1) }}</pre>
   </details>
+<script>
+(function () {
+  // Click-to-sort on every column of every projection table.
+  //
+  // CLIENT-SIDE deliberately: the rows are already on the page, so a
+  // round-trip per column would rebuild the whole payload for a reordering the
+  // browser does instantly. Numeric cells are compared as NUMBERS -- a string
+  // sort puts 9 above 80, which on a projection table looks like real data
+  // rather than like a bug.
+  var toNumber = function (text) {
+    var cleaned = (text || '').replace(/[^0-9.\-]/g, '');
+    if (cleaned === '' || cleaned === '-' || cleaned === '.') { return null; }
+    var value = parseFloat(cleaned);
+    return isNaN(value) ? null : value;
+  };
+
+  document.querySelectorAll('table.ff').forEach(function (table) {
+    var body = table.tBodies[0];
+    if (!body) { return; }
+    table.querySelectorAll('thead th').forEach(function (header, index) {
+      header.addEventListener('click', function () {
+        var descending = header.getAttribute('data-dir') !== 'desc';
+        table.querySelectorAll('thead th').forEach(function (other) {
+          other.removeAttribute('data-dir');
+        });
+        header.setAttribute('data-dir', descending ? 'desc' : 'asc');
+        var rows = Array.prototype.slice.call(body.rows);
+        rows.sort(function (left, right) {
+          var a = (left.cells[index] || {}).textContent || '';
+          var b = (right.cells[index] || {}).textContent || '';
+          var x = toNumber(a), y = toNumber(b), result;
+          if (x === null || y === null) { result = a.trim().localeCompare(b.trim()); }
+          else { result = x - y; }
+          return descending ? -result : result;
+        });
+        rows.forEach(function (row) { body.appendChild(row); });
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}

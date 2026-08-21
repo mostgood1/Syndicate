@@ -19,6 +19,7 @@ import json
 import pytest
 
 from syndicate.features.nfl.fantasy import build_draft_board_payload
+from syndicate.features.nfl.fantasy import build_fantasy_page_context
 from syndicate.features.nfl.fantasy import build_fantasy_payload
 from syndicate.features.nfl.fantasy_artifact import ARTIFACT_VERSION
 from syndicate.features.nfl.fantasy_artifact import artifact_path
@@ -200,3 +201,149 @@ def test_a_newly_published_artifact_is_picked_up_without_a_restart(tmp_path, mon
         assert after.season_rows
     finally:
         load_projection_artifact.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# Positional groupings
+# ---------------------------------------------------------------------------
+
+@requires_artifact
+def test_position_view_filters_server_side_and_keeps_league_wide_replacement():
+    """A position view is a different question from the board, not a scroll
+    position -- and its VOR must stay comparable to the all-up board's, which
+    means replacement level is computed over the FULL pool either way."""
+    everything = build_fantasy_page_context(SEASON, scoring_key="ppr")
+    running_backs = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB")
+
+    assert everything["selected_position"] == "ALL"
+    assert running_backs["selected_position"] == "RB"
+
+    # Only the selected group is rendered.
+    assert set(running_backs["by_position"]) == {"RB"}
+    assert set(everything["by_position"]) == set(everything["positions"])
+
+    # The board narrows to the position...
+    assert running_backs["board"], "expected a filtered board"
+    assert {row["position"] for row in running_backs["board"]} == {"RB"}
+
+    # ...but the pricing does not change, because replacement level is a
+    # property of the league, not of what is on screen.
+    board_by_id = {row["player_id"]: row for row in everything["board"]}
+    for row in running_backs["board"]:
+        twin = board_by_id.get(row["player_id"])
+        if twin is None:
+            continue
+        assert row["draft"]["value_over_replacement"] == twin["draft"]["value_over_replacement"]
+        assert row["draft"]["replacement_points"] == twin["draft"]["replacement_points"]
+
+
+@requires_artifact
+def test_position_counts_report_the_full_pool_not_the_rendered_slice():
+    """The heading says "showing N of M". M must be the real pool, or the page
+    quietly under-reports how many players it knows about."""
+    context = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB")
+    rendered = len(context["by_position"]["RB"])
+    total = context["position_counts"]["RB"]
+    assert total >= rendered
+    assert total > 100, f"expected a real RB pool, got {total}"
+
+
+@requires_artifact
+def test_unknown_position_falls_back_to_all_rather_than_emptying_the_page():
+    context = build_fantasy_page_context(SEASON, scoring_key="ppr", position="quarterbackish")
+    assert context["selected_position"] == "ALL"
+    assert context["board"]
+
+
+@requires_artifact
+@pytest.mark.parametrize(
+    "position,expected",
+    [
+        ("QB", {"passing_yards", "passing_tds", "interceptions"}),
+        ("RB", {"carries", "rushing_yards", "rushing_tds", "receptions"}),
+        ("WR", {"targets", "receptions", "receiving_yards", "receiving_tds"}),
+        ("TE", {"targets", "receptions", "receiving_yards"}),
+        ("K", {"fg_made_0_39", "fg_made_40_49", "fg_made_50_plus", "pat_made"}),
+        ("DST", {"dst_sacks", "dst_interceptions", "dst_touchdowns", "dst_points_allowed"}),
+    ],
+)
+def test_every_position_carries_real_projected_STATS_not_just_points(position, expected):
+    """The surface projects STAT LINES, not only fantasy scores.
+
+    This is the property that lets one artifact serve three scoring profiles,
+    and it is worth asserting per position because each reads a different
+    subset and a missing key scores silently as zero.
+    """
+    context = build_fantasy_page_context(SEASON, scoring_key="ppr", position=position)
+    rows = context["by_position"][position]
+    assert rows, f"no {position} rows"
+    top = rows[0]
+    missing = [key for key in expected if key not in top["stat_line"]]
+    assert not missing, f"{position} top row missing {missing}"
+    assert any(top["stat_line"][key] for key in expected), f"{position} stats all zero"
+
+
+@requires_artifact
+def test_full_stat_view_shows_only_columns_that_carry_a_value():
+    """A quarterback has no field goals. Rendering all 28 columns for every
+    group would be mostly zeros, so the column set is derived from the DATA --
+    which also means it adapts if a stat starts being populated later."""
+    from syndicate.features.nfl.fantasy import FULL_STAT_COLUMNS
+
+    for position, expected_present, expected_absent in (
+        ("QB", "passing_yards", "fg_made_0_39"),
+        ("RB", "carries", "dst_sacks"),
+        ("K", "fg_made_0_39", "targets"),
+        ("DST", "dst_sacks", "carries"),
+    ):
+        context = build_fantasy_page_context(
+            SEASON, scoring_key="ppr", position=position, stat_view="full"
+        )
+        keys = [key for key, _ in context["stat_columns"][position]]
+        assert keys, f"{position} produced no stat columns"
+        assert expected_present in keys, f"{position} missing {expected_present}"
+        assert expected_absent not in keys, f"{position} should not show {expected_absent}"
+        assert set(keys) <= {key for key, _ in FULL_STAT_COLUMNS}
+
+
+@requires_artifact
+def test_full_stat_view_is_wider_than_the_key_view():
+    key_view = build_fantasy_page_context(SEASON, scoring_key="ppr", position="RB")
+    full_view = build_fantasy_page_context(
+        SEASON, scoring_key="ppr", position="RB", stat_view="full"
+    )
+    assert not key_view["full_stats"]
+    assert full_view["full_stats"]
+    assert len(full_view["stat_columns"]["RB"]) >= 10
+
+
+@requires_artifact
+@pytest.mark.parametrize("week", [1, 5, 12])
+def test_weekly_view_carries_per_week_projected_stats_and_an_opponent(week):
+    """The artifact breaks stats out by week, so the weekly view is a real
+    per-game stat line against a named opponent -- not the season line divided
+    by seventeen."""
+    context = build_fantasy_page_context(
+        SEASON, scoring_key="ppr", position="RB", week=week, stat_view="full"
+    )
+    rows = context["by_position"]["RB"]
+    assert rows, f"no RB rows in week {week}"
+    top = rows[0]
+    assert top["week"] == week
+    assert top["opponent"], "weekly row has no opponent"
+    # A single game, not a season: a lead back carries ~10-25 times.
+    assert 0 < top["stat_line"]["carries"] < 40, top["stat_line"]["carries"]
+    assert 0 < top["stat_line"]["rushing_yards"] < 200
+
+
+@requires_artifact
+def test_weekly_stats_differ_by_opponent():
+    """If every week were identical the weekly view would be decoration."""
+    lines = []
+    for week in (1, 5, 12):
+        context = build_fantasy_page_context(
+            SEASON, scoring_key="ppr", position="RB", week=week, stat_view="full"
+        )
+        top = context["by_position"]["RB"][0]
+        lines.append((top["opponent"], round(top["fantasy_points"], 2)))
+    assert len({value for _, value in lines}) > 1, f"weekly projections are identical: {lines}"
