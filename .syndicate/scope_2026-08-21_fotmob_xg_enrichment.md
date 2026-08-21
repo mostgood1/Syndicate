@@ -162,3 +162,54 @@ live state. FotMob is an enrichment with a named fallback, or it is nothing.
 **Unchanged ceiling:** player props are bounded by our own roster CSVs, not by
 any upstream feed. We hold zero Coventry per-90 rows; their confirmed XI was
 unusable today whatever the source.
+
+
+## 8. THE STRONGEST ARGUMENT FOR FOTMOB IS MOMENTUM, NOT xG `[added 2026-08-21, user direction]`
+
+§3 argued for in-match xG. That is real but secondary. The better-evidenced gap
+is that **the resumed sim has no notion of the current state of play**, and the
+code says so in as many words. `features/live_lens.py::build_resume_state`:
+
+> "Who actually has the ball right now isn't derivable from **ESPN's event
+> feed**, so the starting possession owner/pitch position are a neutral
+> default -- across many simulations this single assumption washes out"
+
+ESPN is NAMED as the limitation. FotMob publishes a momentum/pressure series
+that answers exactly that question.
+
+**BUT NOT WHERE IT FIRST APPEARS TO.** That docstring is correct that the
+possession SEED washes out over many simulations, and replacing it would buy
+almost nothing. Do not build that.
+
+**The leverage is RATE MODULATION over the remaining minutes.** The sim resumes
+with SEASON-LEVEL `home/away_attack_rating` and a CONSTANT
+`pace_seconds_per_event = 12.0` (`sim_engine/soccersim/contracts.py:124`).
+Nothing in the resume state distinguishes a match that is end-to-end right now
+from one that has died. Two fixtures at 1-0, 70', with identical shot counts
+are the SAME OBJECT to the model even if one side is camped in the opposition
+box. Momentum is the signal that separates them, and it maps onto pace and
+attack rate rather than onto the seed.
+
+**This is now testable, which it was not when §6 was written.**
+`scripts/backtest_soccer_live_totals.py` replays completed matches at cutoffs
+with as-of ratings, so "does momentum-modulated pace beat constant pace" is a
+comparison on identical cutoffs rather than an opinion. Measured baseline to
+beat, 50 matches / 10 leagues / neutral ratings:
+
+    pooled MAE 0.864 vs frozen 1.488
+    Brier 1.5/2.5/3.5 = 0.1497 / 0.1966 / 0.1194
+    75' is the one cutoff where FROZEN WINS (0.6194 vs 0.560)
+
+That last line is where momentum should help most if it helps at all: late in a
+match, whether the remaining minutes are frantic or dead is precisely what
+decides the total, and it is exactly what the model cannot currently see.
+
+**The §6 caution still stands and is not weakened by this.** `home_attack_rating`
+is CALIBRATED; modulating it with a live signal is adding a MECHANISM to a
+fitted rate, so the rate absorbing that variance must be re-fitted or the two
+will fight. And the falsification bar is unchanged: fit on one slice, score on
+matches it never saw.
+
+**USER CONTEXT `[2026-08-21]`:** the user reports reaching for FotMob's live
+data manually for exactly this judgement -- whether a scoreline reflects the run
+of play -- which is momentum reasoning, not xG-total reasoning.
