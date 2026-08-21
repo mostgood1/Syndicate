@@ -326,6 +326,86 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]]) -> 
     return {"rows": rows, "no_anchor": sorted(no_anchor)}
 
 
+
+# ---------------------------------------------------------------- totals ----
+#
+# GRADING THE LIVE TOTALS ESTIMATOR. `_wnba_live_total_over_prob` still carries
+# `8.0 + 0.50 * min_left`, a ported constant `#481` explicitly declined to refit
+# because "refitting needs historical market totals, unavailable here". That was
+# half right: retained `book_quotes` genuinely expire, but ESPN's own
+# `pickcenter` carries the closing `overUnder` per past game, free. So the grade
+# costs no OddsAPI credits and needs no backfill.
+#
+# METHOD MIRRORS `#481`'s: drive the SHIPPED functions over real games and score
+# against outcomes, with a NEUTRAL pregame anchor so the LIVE transform is what
+# is being measured rather than the quality of a pregame total projection. The
+# market's own line stands in as the pregame projection (the honest neutral
+# choice -- it is what the market thought before tip) and `p_total_over` starts
+# at 0.5. `#481` recorded the same caveat for its own neutral anchor: it makes
+# the pregame BLEND look worse than it is, and that is a property of the test
+# setup, not a finding about the blend.
+
+
+def grade_totals_event(summary: dict[str, Any]) -> dict[str, Any] | None:
+    """Score the shipped live-total transform at every scoring play."""
+    from syndicate.features.wnba.cards import (
+        _wnba_live_total_over_prob,
+        _wnba_live_total_projection,
+    )
+
+    picks = summary.get("pickcenter") if isinstance(summary.get("pickcenter"), list) else []
+    line = None
+    for pick in picks:
+        if isinstance(pick, dict) and pick.get("overUnder") is not None:
+            try:
+                line = float(pick["overUnder"])
+            except (TypeError, ValueError):
+                continue
+            break
+    if line is None:
+        return None
+
+    plays = summary.get("plays") or []
+    samples: list[dict[str, Any]] = []
+    final_total = None
+    for play in plays:
+        now = elapsed_minutes(play.get("period"), play.get("clock"))
+        if now is None:
+            continue
+        try:
+            running = float(play.get("homeScore")) + float(play.get("awayScore"))
+        except (TypeError, ValueError):
+            continue
+        final_total = running
+        if not play.get("scoringPlay"):
+            continue
+        projected = _wnba_live_total_projection(line, running, now)
+        if projected is None:
+            continue
+        prob = _wnba_live_total_over_prob(0.5, projected, line, now)
+        if prob is None:
+            continue
+        samples.append({
+            "elapsed": round(now, 3),
+            "minutes_left": round(max(0.0, 40.0 - now), 3),
+            "current_total": running,
+            "projected_total": round(float(projected), 3),
+            "prob_over": float(prob),
+        })
+    if final_total is None or not samples:
+        return None
+    # PUSH IS EXCLUDED, not counted as a loss. A total landing exactly on the
+    # line is neither over nor under, and scoring it either way biases the
+    # calibration in a direction nobody chose.
+    if abs(final_total - line) < 1e-9:
+        return {"line": line, "final_total": final_total, "samples": [], "push": True}
+    outcome = 1.0 if final_total > line else 0.0
+    for sample in samples:
+        sample["outcome"] = outcome
+        sample["brier"] = (sample["prob_over"] - outcome) ** 2
+    return {"line": line, "final_total": final_total, "samples": samples, "push": False}
+
+
 def event_ids_for_date(date_str: str) -> list[str]:
     payload = _get(f"{_SCOREBOARD}?dates={date_str.replace('-', '')}")
     return [str(e.get("id")) for e in (payload.get("events") or []) if e.get("id")]

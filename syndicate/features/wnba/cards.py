@@ -1102,6 +1102,21 @@ def _wnba_live_total_projection(
     return float(current_total) + (rate * minutes_left)
 
 
+# `#499`. Refitted 2026-08-21 against 249 games / 23,712 samples of real ESPN
+# play-by-play with ESPN's own closing totals line, graded on actual outcomes.
+# Replaces `8.0 + 0.50 * min_left`, which was ~2.5x too wide at every clock
+# point. See `_wnba_live_total_over_prob` for the full measurement and for the
+# location offset the held-out set rejected.
+#
+# STILL NOT PRICED. `price_analytic_line_market` refuses totals by name, and
+# turning that off is a SEPARATE decision from improving the estimate -- the
+# same split `#481` kept between "which probability to use" and "is it safe to
+# price an edge off it". The measured worst calibration gap on held-out data is
+# **0.023**, which is what an analytic interval for totals would be built from,
+# directly analogous to `#481`'s 0.054 on the win path.
+_WNBA_LIVE_TOTAL_SCALE: float = 3.2
+
+
 def _wnba_live_total_over_prob(
     pregame_p_total_over: float | None,
     projected_total: float | None,
@@ -1119,7 +1134,35 @@ def _wnba_live_total_over_prob(
     if total_line is None or projected_total is None or elapsed_min is None:
         return pregame_p_total_over
     min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
-    scale = 8.0 + 0.50 * min_left
+    # `#499`: REFIT AGAINST OUTCOMES. `8.0 + 0.50 * min_left` was ported and
+    # never backtested -- `#481` looked at it, declined to refit for want of
+    # "historical market totals, unavailable here", and this board has been
+    # refusing to price it by name ever since
+    # (`analytic_estimator_never_backtested_for_this_market`).
+    #
+    # The lines were never unavailable, only unretained: ESPN's `pickcenter`
+    # carries the closing `overUnder` per past game, free, so the grade cost no
+    # OddsAPI credits. Graded by replaying real play-by-play through THIS
+    # function over **249 games / 23,712 samples**, game-level 50/50 split:
+    #
+    #     before  8.0 + 0.50*min_left   test Brier 0.1744
+    #     after   3.2 (constant)        test Brier 0.1477   (-0.0267)
+    #
+    # THE FAILURE WAS DISPERSION, NOT BIAS -- the worst calibration gap barely
+    # moved (-0.028 -> -0.023) while Brier fell 15%. The old scale ran 8..28
+    # across the clock and compressed every probability toward 0.5.
+    #
+    # THE FITTED TIME COEFFICIENT IS 0.00, and that is the same result `#481`
+    # got on the win path for the same reason: the pregame blend below already
+    # carries the time dependence via `blend_w`, so a second time term was
+    # double-counting it. Two independent markets, one structure.
+    #
+    # A LOCATION OFFSET WAS TRIED AND REJECTED BY THE TEST SET. The projection
+    # under-shoots by ~2 points (measured -1.09 early to -3.35 late), so a +4
+    # offset looked justified and improved TRAIN (0.1845 -> 0.1798) while making
+    # TEST worse (0.1744 -> 0.1757). Fitting it jointly with the scale also lost
+    # to the scale alone on test. It is not applied.
+    scale = _WNBA_LIVE_TOTAL_SCALE
     live_over_prob = _margin_win_prob(projected_total - total_line, scale=scale)
     if live_over_prob is None:
         return pregame_p_total_over

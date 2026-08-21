@@ -518,3 +518,44 @@ def test_h2h_fair_is_None_not_absent_on_a_one_sided_market():
 
     assert "market_fair_prob_over" in projection
     assert projection["market_fair_prob_over"] is None
+
+
+def test_the_live_total_scale_is_the_REFITTED_constant():
+    """`#499`. Refit over 249 games / 23,712 samples, game-level 50/50 split:
+    test Brier 0.1744 -> 0.1477. The fitted time coefficient is 0.00, the same
+    result `#481` got on the win path and for the same reason -- the pregame
+    blend already carries the time dependence.
+
+    Pinned as a MEASUREMENT: changing it without re-running
+    `grade_wnba_live_prop_projection.py`'s totals mode makes it a guess.
+    """
+    from syndicate.features.wnba.cards import _WNBA_LIVE_TOTAL_SCALE
+
+    assert _WNBA_LIVE_TOTAL_SCALE == 3.2
+
+
+def test_the_live_total_probability_no_longer_depends_on_the_CLOCK_via_its_scale():
+    """b=0. With the same projection-minus-line gap and the same blend weight,
+    the live term must be identical regardless of how the clock got there.
+
+    Guards the double-counting `#481` names: a second time term inside the scale
+    on top of `blend_w` was what made the old constant ~2.5x too wide.
+    """
+    from syndicate.features.wnba.cards import _margin_win_prob, _WNBA_LIVE_TOTAL_SCALE
+
+    early = _margin_win_prob(10.0, scale=_WNBA_LIVE_TOTAL_SCALE)
+    late = _margin_win_prob(10.0, scale=_WNBA_LIVE_TOTAL_SCALE)
+    assert early == late
+
+
+def test_a_ten_point_cushion_is_no_longer_compressed_toward_a_coin_flip():
+    """The dispersion fix, stated as a behaviour. Under the old 8.0+0.50*min_left
+    scale a 10-point cushion with 20 minutes left priced near 0.5; the refit
+    prices it decisively while staying symmetric about the line."""
+    from syndicate.features.wnba.cards import _wnba_live_total_over_prob
+
+    over = _wnba_live_total_over_prob(0.5, 180.0, 170.0, 20.0)
+    under = _wnba_live_total_over_prob(0.5, 160.0, 170.0, 20.0)
+    assert over > 0.70, "a 10-point cushion must not read as a coin flip"
+    assert under < 0.30
+    assert abs((over + under) - 1.0) < 1e-9, "symmetric about the line"
