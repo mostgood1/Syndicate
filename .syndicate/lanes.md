@@ -1038,51 +1038,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   pre-fix), then a real between-periods payload from a live game.
 - Blocked by: none.
 
-### nfl-props-odds-allowlist — OPEN, NARROWED — **THE ASK'S PREMISE WAS FALSE AND THE REAL DEFECT WAS BIGGER.** The allowlist was already fixed (re-verified `count: 14`); 13 of 14 files were stubs sharing one `copy2` mtime, so the prior lane's "production == mirror" finding was circular. Real cause: NFL/NCAAF prop capture called the BULK odds endpoint (422, player props are per-event) with two invalid market keys, every 422 swallowed — **zero rows ever captured**. Fixed and live on refresh-worker `59afbbb6` (0 -> 80 rows). Backfilled 2023-2025 (109,750 rows / 513,235 quotes / 579 of 816 games) and **PRICED THE MODEL FOR THE FIRST TIME: -7.35% best price over 64,007 bets — it does not beat the market**, though fading it loses 16.93% so the picks are correctly signed. Price shopping worth **+2.95 ROI pts** (controlled). Game context built, fitted, **+1.18 pts paired on 16,906 held-out bets** — but **DEPLOYED INERT on web** (read a gitignored file with no writer); fix landed `8fe78662`, undeployed. Narrative: `log/2026-08-21.md`. Measurements: `deploys.md` 02:37Z. — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
-- Goal: a real ROI number for NFL player props. **MET** — 64,007 graded bets.
-- Files: `scripts/fetch_nfl_oddsapi_props_local.py`, `scripts/fetch_ncaaf_oddsapi_props_local.py`,
-  `scripts/fetch_nfl_schedule.py`, `syndicate/features/nfl/{props,player_stats,game_context}.py`,
-  `syndicate/features/shared/artifact_publisher.py`, 4 new analysis scripts,
-  `tests/test_football_props_odds_capture.py`.
-- Verification: DONE for the measurement (ROI + denominator, per market).
-  NOT done for production behaviour — see the three owed items.
-- **OWED, in priority order:**
-  1. ~~live-odds-worker needs the capture fix~~ **RETRACTED — WRONG.**
-     `SYNDICATE_ACTIVE_SPORTS` is `nfl` on refresh-worker and `mlb,wnba,soccer`
-     on live-odds-worker, and it gates EARLIER than the horizon predicate I
-     reasoned from, so live-odds-worker drops NFL every tick
-     (`SWEEP_OWNERSHIP_EXCLUDED ... dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS`).
-     **refresh-worker owns NFL and always did.** It needs `453c16ee` (the
-     schedule step); it already has capture + path fixes via `a5e0b462`.
-  2. **ALL FOUR SERVICES ARE NOW ON THE RIGHT CODE** (refresh-worker +
-     live-odds-worker `453c16ee`, web `9b8c49c6`), content-verified. But the
-     schedule has **NOT been observed republishing**, and that is the open
-     question:
-     - Triggered an NFL refresh (`/api/ops/odds-refresh/run`, job `91059c41`).
-       It launched on refresh-worker at **03:53:40Z**
-       (`--sports nfl --phase pregame`) and was STILL IN FLIGHT at 04:07Z.
-     - 14 polls across two windows: `schedule_2026.csv` on web is UNCHANGED at
-       mtime `2026-08-02T03:29:35`, frac `0.0` — still the boot copy.
-     - **`artifact_publisher` never emitted ANY verdict for a schedule path** —
-       no PUBLISH_OK, no PUBLISH_SKIPPED_UNCHANGED, no SKIP_NOT_ALLOWLISTED. So
-       the publish call did not execute; the step either did not run or failed
-       before it.
-     - CANNOT BE RESOLVED FROM OUTSIDE: the run's own `odds_refresh.json` (the
-       per-step results) is on the worker's disk and is NOT in
-       HOT_ARTIFACT_PATTERNS, so it is unreadable from web. Child stdout also
-       goes to `--stdout-path` on disk, never to Render's log collector, so the
-       ABSENCE of `games_written=` proves nothing about the emitter.
-     **NEXT DIAGNOSTIC, in order:** (a) allowlist
-     `reports/migration_runs/*/odds_refresh*.json` so a run's per-step result is
-     auditable at all — this is the "unallowlisted = unauditable" gap the
-     standard names, and it is why this question is stuck; (b) re-read the
-     schedule mtime once the in-flight run finishes; (c) only then suspect the
-     step itself.
-  3. **Populated `oddsapi_player_props_2026_wk1.csv`** replacing the 5-byte stub
-     — the behavioural proof the capture fix works in production. 6-hourly.
-- Claims held: NONE (web and refresh-worker both released).
+### nfl-props-odds-allowlist — OPEN, NARROWED TO ONE UNDEPLOYED FIX — **THE CAPTURE FIX IS VERIFIED IN PRODUCTION.** `oddsapi_player_props_2026_wk1.csv` went **5 bytes -> 12,142** at 2026-08-21T14:08:06Z with a FRACTIONAL mtime (runtime write, not a boot copy): **84 rows, 84 distinct players, real DraftKings Anytime TD prices**, captured unattended by refresh-worker. First real NFL player-prop capture this platform has ever made. The model was also PRICED for the first time: **-7.35% over 64,007 bets** — it does not beat the market (fading it loses 16.93%, so the picks are correctly signed, they just do not clear the vig). Price shopping **+2.95 ROI pts** (controlled, identical bets); game context **+1.18 pts** (paired, held-out). **REMAINING: one landed-but-undeployed fix, deliberately left to ride along on the next main deploy — see OWED.** — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
+- Goal: a real ROI number for NFL player props. **MET** — 64,007 graded bets, `reports/nfl_props_roi.json`.
+- Claims held: **NONE.** refresh-worker released 2026-08-21 deliberately rather than
+  held through polling — the service was busy on nearly every check for two hours and
+  other lanes needed it. Holding a lock while waiting on an unpredictable condition is
+  the retired-coordinator anti-pattern.
+- **OWED — ONE ITEM, and it needs NO dedicated deploy:**
+  `a41f88f8` on main fixes `#389` hit a second time: `fetch_nfl_schedule.py` wrote via
+  the PROBING `default_nfl_source_root()`, which returns the root holding
+  `upcoming_recs_*.csv` — shipped by the repo mirror, absent from the mounted disk — so
+  every write landed in `/opt/render/project/src/data/nfl_source`, the EPHEMERAL
+  CHECKOUT, and `publish_hot_artifact` was a silent no-op (`relative_to_data_root()`
+  returns None outside the data root, hence no publisher verdict of any kind). The step
+  reported `status=ok return_code=0` in 1s every cycle and delivered nothing.
+  Writer now uses `nfl_artifact_output_root()` (no probing); reader
+  (`game_context.schedule_paths`) puts that same root first. 2 regression tests.
+  **WHOEVER DEPLOYS MAIN TO refresh-worker NEXT PICKS THIS UP FOR FREE.** Then verify:
+  `nfl_source/schedule_2026.csv` on web must gain a **FRACTIONAL** mtime (whole-second =
+  another boot copy, not a publish) AND its lined-game count must go **67 -> ~112**.
+  Both together; a fresh mtime alone could be a rewrite of stale bytes. Measured
+  2026-08-21: web 67 lined vs nflverse 112, 61 rows differing on spread/total.
+  NOT URGENT — it only feeds the game-context multiplier (+1.18 pts on a -7.35% model),
+  and NFL Week 1 is 2026-09-10.
+- Also landed this session: run-summary artifacts are now allowlisted
+  (`reports/migration_runs/*/odds_refresh_*/`), which is what made the above
+  diagnosable at all after three independent routes returned nothing.
 - Blocked by: none.
-
 
 ### wnba-live-props-data — **OPEN — PHASES 1-3(a) BUILT AND ON `main`, NONE WIRED, NONE DEPLOYED.** capture / project / join-to-anchor, 33 tests + 20 subtests. **THE CHAIN HAS NEVER RUN END TO END IN PRODUCTION** — nothing calls the capture on a tick, so the artifact has never existed on a worker. Verified separately: live per-player data serves (`games=2 players_with_stats=39`), the anchor exists (`cards_sim_detail` → `min_mean` + `{stat}_mean` + `prop_ladders simCount 100`), and the empty-capture refusal fires on the real rolled slate. NEXT: 3(b) needs `liveModelProbOver`, which needs the remainder-scaling assumption GRADED — do not emit one until then. Narrative in `log/2026-08-21.md`. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: live WNBA props. **Phase 1 (THIS LANE): persist the live per-player stat
