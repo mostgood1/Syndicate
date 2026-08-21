@@ -371,9 +371,24 @@ def _attach_confirmed_starters(league: str, iso_date: str, fixtures: list[dict[s
     except Exception as error:
         print(f"attach_confirmed_starters failed for {league} {iso_date}, falling back to season-only allocation: {error}")
         return fixtures
-    confirmed = sum(1 for fixture in updated if fixture.get("home_starter_ids"))
-    if confirmed:
-        print(f"confirmed lineups found for {confirmed}/{len(updated)} {league} fixtures on {iso_date}")
+    # ALWAYS REPORT, INCLUDING ZERO. This printed only inside `if confirmed:`,
+    # so the outcome that actually needs investigating -- no fixture got a
+    # lineup -- produced no line at all. Measured 2026-08-21: three of four
+    # fixtures had 22 ESPN starters posted and none reached the sim, and the
+    # silence made it look like a publication-timing miss for hours. A zero
+    # that cannot be seen is indistinguishable from a step that never ran.
+    #
+    # Counted PER SIDE, because the gate is now per side: a fixture can be
+    # home-confirmed and away-unconfirmed, and "1/1 fixtures" would hide that.
+    home_confirmed = sum(1 for fixture in updated if fixture.get("home_starter_ids"))
+    away_confirmed = sum(1 for fixture in updated if fixture.get("away_starter_ids"))
+    sides = 2 * len(updated)
+    print(
+        f"[build_soccer_artifacts] SOCCER_CONFIRMED_LINEUPS league={league} date={iso_date} "
+        f"sides_confirmed={home_confirmed + away_confirmed}/{sides} "
+        f"home={home_confirmed}/{len(updated)} away={away_confirmed}/{len(updated)}",
+        flush=True,
+    )
     return updated
 
 

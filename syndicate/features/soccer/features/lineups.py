@@ -106,12 +106,32 @@ def fetch_confirmed_starter_ids(
 
     home_ids = resolve_starter_ids(home_player_rows, home_names)
     away_ids = resolve_starter_ids(away_player_rows, away_names)
-    if len(home_ids) < min_starters or len(away_ids) < min_starters:
+    # PER SIDE, NOT PER FIXTURE. This used to `return None` when EITHER side
+    # resolved fewer than `min_starters`, which discards a side whose lineup
+    # matched perfectly well because the OTHER side did not.
+    #
+    # MEASURED against the real ESPN feed, 2026-08-21 18:11Z, today's slate:
+    #   Marseille v Strasbourg      home 10  away  7   -> was kept
+    #   Standard Liege v RAAL       home  9  away  5   -> was DISCARDED WHOLE
+    #   Arsenal v Coventry          home  8  away  0   -> was DISCARDED WHOLE
+    # Standard's nine confirmed starters and Arsenal's eight were thrown away
+    # for the other club's name-matching gap. The two sides are allocated
+    # independently downstream (`adapters.py` keys `side_starters` by
+    # home/away), so a per-side decision is coherent rather than a partial
+    # application of something that needs both halves.
+    #
+    # The EVIDENCE BAR PER SIDE IS UNCHANGED: a side still needs
+    # `min_starters` resolved names or it contributes nothing and falls back
+    # to season-only allocation. This widens WHICH sides qualify, not how
+    # little evidence qualifies one.
+    home_ok = len(home_ids) >= min_starters
+    away_ok = len(away_ids) >= min_starters
+    if not home_ok and not away_ok:
         # Lineup was posted but too few names matched our season-data
-        # roster to trust the result (name-matching gap, mid-season
-        # signing not yet in the per-90 source, etc.).
+        # roster on either side to trust anything (name-matching gap,
+        # mid-season signing not yet in the per-90 source, etc.).
         return None
-    return home_ids, away_ids
+    return (home_ids if home_ok else set()), (away_ids if away_ok else set())
 
 
 def attach_confirmed_starters(
@@ -151,8 +171,16 @@ def attach_confirmed_starters(
         )
         if result is not None:
             home_ids, away_ids = result
-            new_fixture["home_starter_ids"] = tuple(home_ids)
-            new_fixture["away_starter_ids"] = tuple(away_ids)
+            # An EMPTY side means "not confirmed", and must stay absent rather
+            # than be written as an empty tuple: `()` and "no key" both read as
+            # falsy to the consumer, but a caller counting confirmed fixtures
+            # (`build_soccer_artifacts._attach_confirmed_starters`) tests the
+            # HOME key specifically, so writing `()` there would make an
+            # away-only confirmation look like a home confirmation of nobody.
+            if home_ids:
+                new_fixture["home_starter_ids"] = tuple(home_ids)
+            if away_ids:
+                new_fixture["away_starter_ids"] = tuple(away_ids)
         updated.append(new_fixture)
     return updated
 
