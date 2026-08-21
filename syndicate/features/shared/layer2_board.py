@@ -143,6 +143,28 @@ SHORTLIST_ROWS_PER_SPORT = 100
 # being wasted on a sport that has only one.
 SHORTLIST_KIND_FLOOR = 30
 
+# Slots guaranteed to rows kicking off ON the board's own date, before merit
+# takes over. Env: SYNDICATE_SHORTLIST_IMMINENCE_FLOOR. 0 disables.
+#
+# THE RANKING HAS NO NOTION OF WHEN A GAME STARTS. `_score_of` is pure EV/model
+# merit, so a sport whose horizon spans several days competes today's slate
+# against every future fixture in the window on equal terms -- and loses,
+# because there are simply more future rows.
+#
+# MEASURED on the served shortlist 2026-08-21, soccer, 100 rows: **4** were for
+# that day's four fixtures and 96 were dated 08-22 through 08-27. One of the
+# four -- Marseille v Strasbourg, kicking off in three hours -- had ZERO rows,
+# while Newcastle v Liverpool the following day held 6. The board a person opens
+# to bet today's slate was 96% about other days.
+#
+# This is deliberately a FLOOR and not a re-ranking: today's rows are seated
+# first, then merit fills the rest exactly as before, so a genuinely better
+# future row still makes the board. Sized under the kind floors so the two
+# guarantees together cannot consume the per-sport budget. An unused floor
+# flows to merit rather than being wasted, the same way `kind_floor` behaves
+# for a sport with only one kind.
+SHORTLIST_IMMINENCE_FLOOR = 25
+
 # Most rows any ONE game may contribute. Env: SYNDICATE_SHORTLIST_ROWS_PER_GAME.
 #
 # 6, sized off the measured concentration: on the 200-row served board of
@@ -2048,6 +2070,27 @@ def _sport_horizon_days(row: Mapping[str, Any], horizon_days: int | None) -> int
     return max(int(horizon_days), window - 1)
 
 
+def _kicks_off_on_date(row: Mapping[str, Any], now: datetime) -> bool:
+    """Does this row's game start on the board's own date?
+
+    A row with NO start time is NOT imminent. `_within_horizon` keeps such a row
+    (dropping it would hide a whole sport if a feed stopped stamping starts),
+    but that argument does not transfer: keeping an unknown row is safe, while
+    SEATING one on a guarantee meant for today would spend today's reserved
+    slots on rows that may not be today at all -- the permissive-default trap.
+    """
+    raw = row.get("commence_time")
+    if not raw:
+        return False
+    try:
+        start = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return start.astimezone(timezone.utc).date() == now.date()
+
+
 def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | None) -> bool:
     horizon_days = _sport_horizon_days(row, horizon_days)
     if horizon_days is None:
@@ -2073,6 +2116,7 @@ def select_shortlist(
     *,
     per_sport: int = SHORTLIST_ROWS_PER_SPORT,
     kind_floor: int = SHORTLIST_KIND_FLOOR,
+    imminence_floor: int | None = None,
     horizon_days: int | None = SHORTLIST_HORIZON_DAYS,
     now: datetime | None = None,
     min_value_pct: float | None = None,
@@ -2095,6 +2139,11 @@ def select_shortlist(
     the shortlist.
     """
     reference_now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    imminence_floor_value = (
+        imminence_floor
+        if imminence_floor is not None
+        else int(_env_float("SYNDICATE_SHORTLIST_IMMINENCE_FLOOR", SHORTLIST_IMMINENCE_FLOOR))
+    )
     value_floor = (
         float(min_value_pct)
         if min_value_pct is not None
@@ -2304,18 +2353,48 @@ def select_shortlist(
         picked.extend(game[:floor])
         picked.extend(prop[:floor])
 
+        # TODAY'S SLATE IS SEATED BEFORE MERIT, not instead of it.
+        imminence_floor = max(0, int(imminence_floor_value))
+        imminent_seated = 0
+        if imminence_floor:
+            already = {id(row) for row in picked}
+            imminent = [
+                row
+                for row in ranked
+                if id(row) not in already and _kicks_off_on_date(row, reference_now)
+            ]
+            seated = imminent[:imminence_floor]
+            imminent_seated = len(seated)
+            picked.extend(seated)
+
         chosen_ids = {id(row) for row in picked}
         remainder = [row for row in ranked + other if id(row) not in chosen_ids]
         remainder.sort(key=_score_of, reverse=True)
         picked.extend(remainder[: max(0, limit - len(picked))])
 
-        picked = sorted(picked, key=_score_of, reverse=True)[:limit]
+        # TRUNCATE THE MERIT TAIL, NOT THE GUARANTEES. The old line re-sorted
+        # the whole list by score and cut, which silently discards the very rows
+        # the floors above just guaranteed whenever the floors are large
+        # relative to `limit` -- a guarantee that a later line can undo is not
+        # one. Guaranteed rows keep their slots and are ordered by score among
+        # themselves; only the merit fill absorbs the cut.
+        guaranteed_count = min(len(picked), floor * 2 + imminent_seated)
+        head = sorted(picked[:guaranteed_count], key=_score_of, reverse=True)
+        tail = sorted(picked[guaranteed_count:], key=_score_of, reverse=True)
+        picked = (head + tail)[:limit]
         selected.extend(dict(row) for row in picked)
         per_sport_report[sport] = {
             "available": len(rows),
             "selected": len(picked),
             "game": sum(1 for row in picked if str(row.get("kind") or "") == "game"),
             "prop": sum(1 for row in picked if str(row.get("kind") or "") == "prop"),
+            # A RATE, NOT A COUNT: how much of the board is the day it claims to
+            # be about. `selected_today` alone cannot say whether a low number
+            # is crowding-out or simply a light slate -- `available_today` is the
+            # denominator that separates them.
+            "available_today": sum(1 for row in rows if _kicks_off_on_date(row, reference_now)),
+            "selected_today": sum(1 for row in picked if _kicks_off_on_date(row, reference_now)),
+            "imminence_seated": imminent_seated,
         }
 
     selected.sort(key=_score_of, reverse=True)
@@ -2326,6 +2405,7 @@ def select_shortlist(
         "active_sports": sorted(per_sport_report.keys()),
         "per_sport_limit": int(per_sport),
         "kind_floor": int(kind_floor),
+        "imminence_floor": int(imminence_floor_value),
         "horizon_days": horizon_days,
         "min_value_pct": value_floor,
         "hold_multiple": hold_multiple,
