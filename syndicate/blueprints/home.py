@@ -5364,7 +5364,30 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
         from syndicate.features.mlb.cards import build_cards_page_context
         from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 
+        # STAGE TIMING. The 2026-08-21 22:1xZ outage was a restart loop: home
+        # takes 20-25s cold, Render's health check times out at 5s, the instance
+        # is cycled before it can warm, and repeat. The logs made
+        # `_mlb_game_market_recommendation_rows` look like the cost because it
+        # emits one DIAG line per game -- but it is pure dict work on an
+        # in-memory payload. The visible thing was not the expensive thing.
+        #
+        # THE HYPOTHESIS THIS MEASURES: `build_cards_page_context` caches on
+        # `_path_cache_signature(live_lens_report_path)` (mlb/cards.py:5700),
+        # which is `st_mtime_ns` -- so every live-lens rewrite invalidates the
+        # WHOLE page context. That report refreshes on a ~60s interval, so on a
+        # live 15-game slate home rebuilds the entire context every minute and
+        # concurrent requests queue behind the rebuild.
+        #
+        # Logged rather than fixed on that reasoning alone: the surgical fix
+        # (drop live-lens from the key, since `_apply_mlb_live_scores` below
+        # re-applies scores anyway) changes a cache shared with the MLB hub
+        # page, and it must not be shipped on an untested inference. These four
+        # numbers say which stage actually costs, from production, in one slate.
+        import time as _t
+
+        _t0 = _t.perf_counter()
         payload = build_cards_page_context(context.context_label)
+        _t_build = _t.perf_counter() - _t0
         games = list(payload.get("games") or [])
         # Board audit, found live 2026-07-31: without this, markets["ml"/
         # "totals"] only ever carries real odds for games the recommendation
@@ -5373,13 +5396,34 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
         # in production right now. Layer 1's market board already backfills
         # from this same odds artifact (source_cards_api_payload); this is
         # that identical enrichment, reused rather than duplicated inline.
+        _t1 = _t.perf_counter()
         games = _enrich_games_with_tracked_market_lines(games, context.context_label)
+        _t_enrich = _t.perf_counter() - _t1
+
+        _t2 = _t.perf_counter()
         for game in games:
             if isinstance(game, dict) and not game.get("game_market_recommendations"):
                 rows = _mlb_game_market_recommendation_rows(game)
                 if rows:
                     game["game_market_recommendations"] = rows
-        return _apply_mlb_live_scores(games, context.context_label) if is_active_today else games
+        _t_rows = _t.perf_counter() - _t2
+
+        _t3 = _t.perf_counter()
+        result = _apply_mlb_live_scores(games, context.context_label) if is_active_today else games
+        _t_scores = _t.perf_counter() - _t3
+
+        # One line, not one per game -- the per-game DIAG lines are what made
+        # the cheap stage look like the expensive one.
+        print(
+            f"[home] MLB_GAMES_STAGE_MS games={len(games)} "
+            f"build_cards_page_context={_t_build * 1000:.0f} "
+            f"enrich_tracked_lines={_t_enrich * 1000:.0f} "
+            f"per_game_reco_rows={_t_rows * 1000:.0f} "
+            f"apply_live_scores={_t_scores * 1000:.0f} "
+            f"total={(_t.perf_counter() - _t0) * 1000:.0f}",
+            flush=True,
+        )
+        return result
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context.context_label, season=context.season, week=context.week)
