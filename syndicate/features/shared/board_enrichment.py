@@ -898,6 +898,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 "rows_live_gameline_edged": 0}
     try:
         from syndicate.features.shared.live_gameline_join import (
+            analytic_std_err_for_sport,
             attach_live_gamelines,
             build_live_gameline_index,
             lens_sources_for_sport,
@@ -912,7 +913,15 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 "rows_live_gameline_edged": 0,
             }
         coverage = attach_live_gamelines(
-            grid, build_live_gameline_index(snapshot, sources=lens_sources_for_sport(sport))
+            grid,
+            build_live_gameline_index(
+                snapshot,
+                sources=lens_sources_for_sport(sport),
+                # None for MLB, so its sims-derived interval stays in charge and
+                # its behaviour is unchanged. Set only for a sport whose live
+                # probability is ANALYTIC and whose error bar has been measured.
+                analytic_std_err=analytic_std_err_for_sport(sport),
+            ),
         )
         coverage["supported"] = True
         return coverage

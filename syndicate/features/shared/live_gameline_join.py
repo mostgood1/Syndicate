@@ -92,6 +92,55 @@ LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
 }
 _DEFAULT_LENS_SOURCES: tuple[str, ...] = (LIVE_STATE_LENS_SOURCE,)
 
+# AN ANALYTIC ESTIMATOR'S ERROR BAR, WHERE THERE IS NO SIM COUNT TO DERIVE ONE.
+#
+# `prob_std_err` answers "how noisy is this Monte-Carlo estimate" from `n`.
+# WNBA has no `n`: `state.md` records that WNBA deliberately does NOT re-sim
+# live -- `#481`'s live probability is an ANALYTIC transform of the pregame sim
+# (a logistic on the live margin, blended toward the pregame anchor). So the
+# sims gate refused every WNBA row forever, and the counter said
+# `sim_count_unusable`. Measured on production 2026-08-21 01:3xZ against a live
+# IND@DAL: `rows_live_gameline_considered: 194`, `priceable: 0`.
+#
+# THE BAR IS STILL A MEASUREMENT, NOT A WAIVER. This is the whole point of the
+# module's first refusal, so an analytic estimator does not get to skip it --
+# it has to bring its own honest interval. `#481` refit that transform against
+# outcomes and reported a HELD-OUT worst calibration gap of **0.054** over
+# 36,482 samples on a game-level split (before the refit it was 0.240). That
+# gap -- the largest observed distance between predicted and realised frequency
+# in any bucket -- is the conservative reading of "how wrong this estimator is
+# allowed to be", and it is used directly as the standard error.
+#
+# Consequences, stated so nobody reads a quiet board as a bug: at
+# `PRICEABLE_SIGMA = 2.0` a WNBA live moneyline edge must clear **10.8 pp**
+# before it prices. That is deliberately harsher than MLB's ~9.1 pp at n=120,
+# p=0.5, because a calibration gap is a bias and does not shrink with more
+# ticks. The honest lever is re-fitting the transform (which narrows the gap),
+# exactly as the honest lever on the MLB side is raising the sim count.
+#
+# A sport ABSENT from this table and carrying no sims is still refused. Absence
+# must not read as "no uncertainty" -- that is the `0.0` substitution this
+# module's own `prob_std_err` docstring calls the worst available.
+ANALYTIC_LIVE_STD_ERR_BY_SPORT: dict[str, float] = {
+    "wnba": 0.054,
+}
+
+
+def analytic_std_err_for_sport(sport: Any) -> float | None:
+    """The analytic estimator's standard error for this sport, or None.
+
+    None means "this sport has no measured analytic interval", which leaves the
+    sims path in charge and, absent sims, leaves the row refused.
+    """
+    value = ANALYTIC_LIVE_STD_ERR_BY_SPORT.get(str(sport or "").strip().lower())
+    if value is None:
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out > 0.0 else None
+
 
 def lens_sources_for_sport(sport: Any) -> tuple[str, ...]:
     """Accepted `source` stamps for this sport, defaulting to MLB's.
@@ -348,6 +397,7 @@ def price_moneyline(
     market_prob: Any,
     sims: Any,
     sigma: float = PRICEABLE_SIGMA,
+    analytic_std_err: Any = None,
 ) -> dict[str, Any]:
     """Price one side, or refuse it by name.
 
@@ -359,6 +409,7 @@ def price_moneyline(
         "model_prob": None,
         "market_prob": None,
         "edge_pp": None,
+        "std_err_basis": None,
         "prob_std_err": None,
         "priceable": False,
         "withheld_reason": None,
@@ -371,19 +422,42 @@ def price_moneyline(
         return out
     out["model_prob"] = p
 
+    # TWO WAYS TO GET AN INTERVAL, AND NEVER A THIRD. Either the estimator ran
+    # n trials (Monte Carlo, MLB) or it is analytic and brings a measured
+    # calibration error (WNBA, `#481`). What is NOT allowed is pricing without
+    # one -- see `ANALYTIC_LIVE_STD_ERR_BY_SPORT`. The sims path is tried first
+    # so MLB's behaviour is bit-for-bit unchanged, including its refusals.
     try:
         n = int(sims)
     except (TypeError, ValueError):
         n = 0
-    if n < _min_sims():
-        out["withheld_reason"] = REASON_UNUSABLE_SIMS
-        return out
 
-    se = prob_std_err(p, n)
+    se: float | None = None
+    basis = None
+    if n >= _min_sims():
+        se = prob_std_err(p, n)
+        basis = "sim_count"
     if se is None:
+        try:
+            candidate = float(analytic_std_err) if analytic_std_err is not None else None
+        except (TypeError, ValueError):
+            candidate = None
+        # `> 0.0` is load-bearing: a 0.0 here would read as perfect precision and
+        # make every edge priceable, which is the exact substitution this
+        # module has already paid for once (`PHI @ MIN se=0.0`).
+        if candidate is not None and candidate > 0.0:
+            se = candidate
+            basis = "analytic_calibration"
+    if se is None:
+        # Unchanged for MLB: no usable sims and no analytic interval means the
+        # row is refused by the SAME name it was before.
         out["withheld_reason"] = REASON_UNUSABLE_SIMS
         return out
     out["prob_std_err"] = se
+    # Which interval decided this row. Without it, an analytic verdict and a
+    # sim-derived one are indistinguishable in the ledger, and this module's
+    # premise is that every zero is diagnosable by name.
+    out["std_err_basis"] = basis
 
     try:
         q = float(market_prob)
@@ -458,7 +532,10 @@ def _norm_team(value: Any) -> str:
 
 
 def build_live_gameline_index(
-    snapshot: Any, *, sources: tuple[str, ...] | None = None
+    snapshot: Any,
+    *,
+    sources: tuple[str, ...] | None = None,
+    analytic_std_err: float | None = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
 
@@ -510,6 +587,11 @@ def build_live_gameline_index(
             continue
         projection = dict(projection)
         projection["game_pk"] = game.get("gamePk")
+        # Stamped per HIT rather than read at pricing time so the interval and
+        # the projection it describes travel together -- a later caller cannot
+        # accidentally price one sport's probability against another's bar.
+        if analytic_std_err is not None:
+            projection["analytic_std_err"] = float(analytic_std_err)
         index[key] = projection
     return index
 
@@ -594,6 +676,9 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             # keeps one devig ordering in the board path.
             market_prob=projection.get("market_fair_prob_over"),
             sims=hit.get("sims_run"),
+            # Present only for a sport with a MEASURED analytic interval; None
+            # everywhere else, which leaves the sims gate in charge.
+            analytic_std_err=hit.get("analytic_std_err"),
         )
 
         _apply_verdict(row, projection, verdict, hit, coverage)

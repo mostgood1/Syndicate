@@ -1149,6 +1149,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   pre-fix), then a real between-periods payload from a live game.
 - Blocked by: none.
 
+### wnba-live-analytic-pricing — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+- Goal: the live-gameline join prices WNBA moneylines from the ANALYTIC live
+  probability, so the board serves live opportunities for WNBA the way it
+  already does for MLB. **Testable outcome:** on a live WNBA game,
+  `/api/board/book-grid?sport=wnba` reports `rows_live_gameline_priceable > 0`
+  (measured 0 of 194 considered, 2026-08-21 01:3xZ, all withheld).
+- Files:
+  - `syndicate/features/shared/live_gameline_join.py` — the sims-derived
+    standard error and the moneyline pricing gate.
+- Hypothesis: n/a — measured. `price_moneyline` refuses when `sims <
+  _min_sims()`, and WNBA's live probability is an ANALYTIC transform of a
+  pregame sim (`#481`), so it carries no sim count. `state.md` records that
+  WNBA deliberately does not re-sim live, so the sim count will never arrive.
+- Falsification test: if `rows_live_gameline_priceable` stays 0 after the
+  change, the sims gate was not the only blocker — check
+  `live_resim_published_no_distribution_for_this_market` (101 rows, the
+  spread/total path, which genuinely does need a distribution and is NOT in
+  scope here) and `segment_is_not_full_game` (92, correctly refused).
+- Verification: reachability FIRST (an analytic row prices with a std err and
+  MLB's sims path is byte-identical), then the production counter above.
+  **The refusal must survive**: an analytic estimator without a defensible
+  error bar must still be withheld, never priced at se=0.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
