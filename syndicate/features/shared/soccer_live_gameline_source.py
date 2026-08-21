@@ -115,6 +115,50 @@ def soccer_live_games(selected_date: str, *, data_root: Any = None) -> list[dict
     return out
 
 
+def _histograms_from_scorelines(scorelines: Any) -> tuple[dict[float, float], dict[float, float]]:
+    """(total-goals histogram, home-margin histogram) from a scoreline dict.
+
+    THE LIVE TOTALS LENS. `price_distribution_market` prices ANY line off a
+    histogram keyed by NUMBER, while the sim publishes exact scorelines keyed
+    "H-A" -- so this is the one transformation between them. Without it the live
+    board could answer 2.5 and nothing else, via the single analytic
+    probability, which is least useful exactly when the live tier matters most:
+    a 2-0 at 60' is quoted at 3.5 and 4.5, not 2.5.
+
+    `margin_dist` is HOME-POSITIVE (`home - away`), matching `run_margin_dist`'s
+    frame, because `price_distribution_market` documents that the pregame spread
+    rule transfers unchanged only under that frame -- getting it backwards
+    produced measured 19-28 point phantom edges on 2026-08-08.
+
+    Summing rather than sampling: two scorelines can share a total (2-1 and 3-0
+    are both 3) and a margin (2-1 and 3-2 are both +1), so the mass must be
+    accumulated, not overwritten.
+    """
+    totals: dict[float, float] = {}
+    margins: dict[float, float] = {}
+    if not isinstance(scorelines, Mapping):
+        return totals, margins
+    for key, raw in scorelines.items():
+        prob = _f(raw)
+        if prob is None:
+            continue
+        parts = str(key).replace(":", "-").split("-")
+        if len(parts) != 2:
+            continue
+        try:
+            home, away = int(parts[0]), int(parts[1])
+        except (TypeError, ValueError):
+            continue
+        totals[float(home + away)] = totals.get(float(home + away), 0.0) + prob
+        margins[float(home - away)] = margins.get(float(home - away), 0.0) + prob
+    # A distribution that does not sum to ~1 cannot be priced against; returning
+    # empty makes the caller refuse by name rather than price against missing
+    # mass.
+    if not 0.99 <= sum(totals.values()) <= 1.01:
+        return {}, {}
+    return totals, margins
+
+
 def soccer_live_gameline_index(
     selected_date: str, *, data_root: Any = None
 ) -> dict[tuple[str, str], dict[str, Any]]:
@@ -143,6 +187,9 @@ def soccer_live_gameline_index(
         home_goals = _f(projection.get("projected_final_home_goals"))
         away_goals = _f(projection.get("projected_final_away_goals"))
         over = _f(projection.get("over_2_5_probability"))
+        _live_totals, _live_margins = _histograms_from_scorelines(
+            projection.get("scoreline_probabilities")
+        )
 
         index[key] = {
             "home_win_prob": home_p,
@@ -160,12 +207,15 @@ def soccer_live_gameline_index(
                 if home_goals is not None and away_goals is not None
                 else None
             ),
-            # NO DISTRIBUTIONS. The live projection publishes summary
-            # probabilities and means only, so totals/spreads are refused by
-            # name downstream rather than answered from a mean. `{}` is what
-            # every consumer already reads as "no shape".
-            "total_runs_dist": {},
-            "margin_dist": {},
+            # THE LIVE SHAPES. Derived from the resumed sim's own scoreline
+            # distribution, so totals and spreads price at ANY line instead of
+            # only at the one analytic threshold below. Empty on a snapshot
+            # written before the producer carried `scoreline_probabilities`,
+            # and `{}` reads as "no distribution" everywhere downstream -- so an
+            # older lens degrades to the previous behaviour rather than to a
+            # wrong number.
+            "total_runs_dist": _live_totals,
+            "margin_dist": _live_margins,
             # ONE analytic line, WNBA-shaped (`price_analytic_line_market`).
             "analytic_markets": (
                 {"totals": {"line": SOCCER_LIVE_TOTALS_LINE, "prob_over": over}}

@@ -147,6 +147,14 @@ class LiveMatchProjection:
     projected_total_corners: float
     home_red_card_applied: bool
     away_red_card_applied: bool
+    # THE SHAPE, NOT JUST P(OVER 2.5). The resumed sim already produces an exact
+    # final scoreline per run and was discarding all of it after counting one
+    # threshold, so the live board could price 2.5 and nothing else -- the same
+    # limitation the PREGAME artifact had until `scoreline_probabilities` was
+    # summed there. Live lines move off 2.5 constantly (a 2-0 at 60' is quoted
+    # at 3.5/4.5), so a single-threshold answer is least useful exactly when the
+    # live tier matters most.
+    scoreline_probabilities: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -164,6 +172,7 @@ class LiveMatchProjection:
             "projected_total_corners": self.projected_total_corners,
             "home_red_card_applied": self.home_red_card_applied,
             "away_red_card_applied": self.away_red_card_applied,
+            "scoreline_probabilities": dict(self.scoreline_probabilities),
         }
 
 
@@ -183,6 +192,7 @@ def project_live_match(
     already_away_corners = int(live_state.get("away_corners_so_far") or 0)
 
     home_wins = draws = away_wins = over_2_5 = both_scored = 0
+    scorelines: dict[str, int] = {}
     final_home_goals: list[float] = []
     final_away_goals: list[float] = []
     final_home_corners: list[float] = []
@@ -211,6 +221,7 @@ def project_live_match(
             away_wins += 1
         else:
             draws += 1
+        scorelines[f"{final_home}-{final_away}"] = scorelines.get(f"{final_home}-{final_away}", 0) + 1
         if final_home + final_away >= 3:
             over_2_5 += 1
         if final_home > 0 and final_away > 0:
@@ -237,6 +248,12 @@ def project_live_match(
         projected_total_corners=round(mean(final_home_corners) + mean(final_away_corners), 4),
         home_red_card_applied=int(live_state.get("home_red_cards") or 0) > 0,
         away_red_card_applied=int(live_state.get("away_red_cards") or 0) > 0,
+        # Rounded to the same 4dp as every other probability here, and NOT
+        # pruned: a scoreline the sim never produced is absent rather than
+        # zero, so a consumer can tell "outside the simulated support" from
+        # "simulated and never happened" -- the distinction
+        # `_total_prob_from_scorelines` refuses a line on.
+        scoreline_probabilities={k: round(v / n, 4) for k, v in sorted(scorelines.items())},
     )
 
 
