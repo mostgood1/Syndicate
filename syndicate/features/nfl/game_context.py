@@ -36,8 +36,34 @@ from typing import Any
 from syndicate.features.nfl.sources import default_nfl_source_root
 
 
-def schedule_path():
-    return default_nfl_source_root() / "tracking" / "nflverse" / "schedules_games.csv"
+def schedule_paths(season: int) -> list:
+    """Where a season's spread/total can be read from, best source first.
+
+    `schedule_{season}.csv` FIRST, and this ordering is the whole reason this
+    function exists rather than a constant. The nflverse dump
+    (`tracking/nflverse/schedules_games.csv`) is what the 2023-2025 fit was run
+    against, but it is **gitignored** (`.gitignore:96 data/nfl_source/tracking/`)
+    and no script in this repo writes it -- so it exists on a developer machine
+    and NOWHERE in production. Wiring the board to it produced a mechanism that
+    was live, tested, deployed, and silently inert: `game_context` returned {},
+    `implied_total_ratio` returned None, and the multiplier collapsed to 1.0 for
+    every player. Measured on the served surface 2026-08-21:
+    `/api/ops/artifacts/export?pattern=nfl_source/tracking/nflverse/
+    schedules_games.csv` -> count 0, with the allowlist pattern confirmed
+    present in the deployed commit, so that zero is FILE-ABSENT and not
+    pattern-absent.
+
+    `schedule_{season}.csv` carries the same `spread_line` / `total_line`
+    columns, is what `sources.real_schedule_path` and `nfl_target_week` already
+    read, and has a real production fetcher (`scripts/fetch_nfl_schedule.py`).
+
+    The nflverse dump stays as a FALLBACK so the offline fit and backtest keep
+    working on 2023-2025, which the per-season file does not cover locally.
+    """
+    return [
+        default_nfl_source_root() / f"schedule_{int(season)}.csv",
+        default_nfl_source_root() / "tracking" / "nflverse" / "schedules_games.csv",
+    ]
 
 
 @lru_cache(maxsize=8)
@@ -48,9 +74,9 @@ def game_context(season: int) -> dict[tuple[int, str], dict[str, Any]]:
     look up that team's own side of the game -- the away team's implied total is
     not the home team's.
     """
-    path = schedule_path()
     out: dict[tuple[int, str], dict[str, Any]] = {}
-    if not path.exists():
+    path = next((candidate for candidate in schedule_paths(season) if candidate.exists()), None)
+    if path is None:
         return out
     with path.open("r", encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
@@ -59,6 +85,10 @@ def game_context(season: int) -> dict[tuple[int, str], dict[str, Any]]:
                 week = int(row.get("week") or 0)
             except (TypeError, ValueError):
                 continue
+            # `schedule_{season}.csv` holds ONE season, so its `season` column is
+            # redundant there; the shared nflverse dump holds many and the filter
+            # is load-bearing. Applied to both rather than branching, so the two
+            # sources cannot diverge in what they admit.
             if row_season != season or str(row.get("game_type") or "").strip() != "REG":
                 continue
             try:

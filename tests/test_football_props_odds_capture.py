@@ -287,3 +287,32 @@ def test_pass_and_rush_attempt_betas_have_opposite_signs():
     _, pass_beta = _NFL_GAME_CONTEXT_PARAMS["passing_attempts"]
     _, rush_beta = _NFL_GAME_CONTEXT_PARAMS["rushing_yards"]
     assert pass_beta < 0 < rush_beta
+
+
+def test_per_season_schedule_is_allowlisted_and_preferred_over_the_gitignored_dump():
+    """The mechanism's input must be one production actually has.
+
+    `tracking/nflverse/schedules_games.csv` is gitignored and no script in this
+    repo writes it, so a board wired to it is inert everywhere but a dev
+    machine -- measured: export count 0 with the pattern confirmed deployed.
+    `schedule_{season}.csv` has a real fetcher and must come first.
+    """
+    from syndicate.features.nfl.game_context import schedule_paths
+    from syndicate.features.shared.artifact_publisher import (
+        HOT_ARTIFACT_PATTERNS,
+        is_hot_artifact_relative_path,
+    )
+
+    assert "nfl_source/schedule_*.csv" in HOT_ARTIFACT_PATTERNS
+    assert is_hot_artifact_relative_path("nfl_source/schedule_2026.csv")
+
+    order = [p.name for p in schedule_paths(2026)]
+    assert order[0] == "schedule_2026.csv", order
+    assert "schedules_games.csv" in order[-1], order
+
+
+def test_schedule_fetcher_publishes_its_output():
+    """Allowlisting only PERMITS the transfer (`#208`); this is the call that
+    makes one. Without it the game-context input never reaches web."""
+    source = (REPO_ROOT / "scripts" / "fetch_nfl_schedule.py").read_text(encoding="utf-8")
+    assert "publish_hot_artifact" in source

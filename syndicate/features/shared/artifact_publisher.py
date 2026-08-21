@@ -154,6 +154,13 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # and maintaining this list is part of shipping the input, not follow-up.
     #
     # `#208` as ever: this PERMITS the transfer, it does not make one happen.
+    # The per-season schedule, and the one game_context.py actually reads in
+    # production. Carries `spread_line` / `total_line`, is written by
+    # scripts/fetch_nfl_schedule.py, and is what sources.real_schedule_path and
+    # nfl_target_week already use. The nflverse dump on the next line is a
+    # local-only fallback (gitignored, no writer in this repo), so WITHOUT this
+    # entry the game-context mechanism is inert everywhere that matters.
+    "nfl_source/schedule_*.csv",
     "nfl_source/tracking/nflverse/schedules_games.csv",
     "nfl_source/tracking/nflverse/injuries/injuries_*.csv",
     "nfl_source/source_artifacts/data/processed/rosters/roster_*_snapshot.csv",

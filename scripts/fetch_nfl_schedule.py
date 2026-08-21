@@ -80,7 +80,33 @@ def main() -> None:
         for row in season_games:
             writer.writerow({column: row.get(column, "") for column in SCHEDULE_COLUMNS})
 
+    # PUBLISH TO WEB. `schedule_{season}.csv` became a MODEL INPUT on
+    # 2026-08-20 -- syndicate/features/nfl/game_context.py reads its
+    # `spread_line`/`total_line` to build the implied team total the prop
+    # model's game-context adjustment runs on, and that adjustment is
+    # evaluated on WEB (blueprints/nfl.py serves the props board).
+    #
+    # Without this call the mechanism is live, tested, deployed and SILENTLY
+    # INERT: game_context() returns {}, implied_total_ratio() returns None, and
+    # the multiplier collapses to 1.0 for every player. That is exactly what
+    # happened first time round with the nflverse dump -- measured on the
+    # served surface, `/api/ops/artifacts/export` returned count 0 with the
+    # allowlist pattern confirmed present in the deployed commit.
+    #
+    # `#208`: the allowlist PERMITS this transfer, only this call makes one.
+    # Best-effort, exactly like fetch_nfl_injuries.py -- a transfer failure
+    # must never fail the fetch.
+    published = False
+    publish_error = ""
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(path)
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail the fetch
+        publish_error = f"{type(exc).__name__}: {exc}"
+
     weeks = sorted({int(row["week"]) for row in season_games if row.get("week")})
+    print(f"published={published}" + (f" publish_error={publish_error}" if publish_error else ""))
     print(f"games_written={len(season_games)}")
     print(f"weeks={weeks}")
     print(f"schedule_path={path}")
