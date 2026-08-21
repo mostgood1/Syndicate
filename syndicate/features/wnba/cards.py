@@ -1244,6 +1244,39 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
     period = live_state.get("period") if live_state.get("period") is not None else status.get("period")
     clock = live_state.get("clock") if live_state.get("clock") is not None else status.get("clock")
     elapsed_min = _wnba_elapsed_minutes(period, clock)
+    if elapsed_min is None:
+        # BETWEEN-PERIOD BREAKS. The clock blanks at halftime and at each
+        # quarter end, so `_wnba_elapsed_minutes` cannot parse it and returns
+        # None -- and None does not degrade gracefully here. It makes `source`
+        # fall back to `pregame`, which EMPTIES `markets` for the whole break,
+        # and it makes `_wnba_live_margin_win_prob` short-circuit to the
+        # pregame anchor, DISCARDING the live margin entirely.
+        #
+        # MEASURED against the real shipped functions: with a 0.45 pregame
+        # anchor, a home team up 12 at halftime and a home team down 12 both
+        # publish 0.4500. For ~15 real minutes the board serves its tip-off
+        # opinion of a game that is half over. Observed live 2026-08-21,
+        # IND@DAL: the `live_projection` lane vanished for a ~20-minute hole
+        # between samples at 19:58 and 20:19 CT.
+        #
+        # DELIBERATELY NARROW. This does NOT adopt a "blank clock means the
+        # period ended" rule -- that would be wrong by a full period if ESPN
+        # ever blanks the clock at a period's START, which has not been
+        # observed either way. It defers to
+        # `_infer_period_clock_from_status_text`, which maps only the EXPLICIT
+        # break labels ("Halftime" -> period 2 at 0:00, "End of 3rd" ->
+        # period 3 at 0:00) and was itself confirmed against a live halftime
+        # game on 2026-08-01. Any other unparseable clock still yields None,
+        # so this cannot change behaviour outside a named break.
+        break_period, break_clock = _infer_period_clock_from_status_text(
+            status.get("detail") if isinstance(status, dict) else None
+        )
+        if break_period is None:
+            break_period, break_clock = _infer_period_clock_from_status_text(
+                status.get("status") if isinstance(status, dict) else None
+            )
+        if break_period is not None and break_clock:
+            elapsed_min = _wnba_elapsed_minutes(break_period, break_clock)
     is_final = bool(live_state.get("final")) or bool(status.get("final"))
     is_live = (bool(live_state.get("in_progress")) or bool(status.get("in_progress"))) and not is_final
     if is_live:

@@ -1126,6 +1126,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
+### wnba-halftime-elapsed — OPEN — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
+- Goal: the live win/cover probability must keep using the live margin during a
+  BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
+  **Testable outcome:** with period=2 and a blank clock, a +12 home margin and a
+  -12 home margin produce DIFFERENT probabilities (today both return the
+  pregame anchor exactly).
+- Files:
+  - `syndicate/features/wnba/cards.py` — `_wnba_elapsed_minutes` and the
+    `source`/`markets` fallback that keys off its None.
+- Hypothesis: n/a — measured, not inferred. `_wnba_elapsed_minutes(2, "")`
+  returns None because the clock fails to parse; `_wnba_live_margin_win_prob`
+  then short-circuits to `pregame_p_home_win`, and `source` falls back to
+  `pregame` so `markets` is emptied for the whole break. Confirmed by driving
+  the real shipped functions: margin +12 and -12 both return 0.4500 against a
+  0.45 anchor.
+- Falsification test: if a blank clock also occurs at a period's START, then
+  "blank clock = period complete" overstates elapsed by a full period and this
+  fix is wrong in that state. NARROW fix chosen for exactly this reason —
+  confirm against a real captured halftime payload before generalising.
+- Verification: reachability FIRST (a halftime case that FAILS on purpose
+  pre-fix), then a real between-periods payload from a live game.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
