@@ -164,6 +164,44 @@ def player_name_collisions(season: int) -> dict[str, frozenset[str]]:
     }
 
 
+@lru_cache(maxsize=8)
+def player_team_by_week(season: int) -> dict[str, dict[int, str]]:
+    """{player_id: {week: team_abbr}} from each play's `posteam`.
+
+    PER WEEK, not per season, and that is not pedantry: players are traded and
+    signed mid-season, and a game-context lookup keyed on the wrong team reads
+    the wrong side of the wrong game -- an error that would be invisible because
+    it still returns a plausible number.
+
+    The team for a week is the MODE of `posteam` over that player's plays that
+    week. A mode rather than the first value because a player can appear on a
+    play credited to the opposing offence (a lateral, a turnover return), and
+    one such play must not reassign him for the whole week.
+
+    `posteam` was already in `_PLAY_COLUMNS` for injury_adjustment, so this adds
+    no new column and no extra memory per play.
+    """
+    counts: dict[str, dict[int, dict[str, int]]] = {}
+    for play in load_player_plays(season):
+        team = str(play.get("posteam") or "").strip()
+        if not team:
+            continue
+        week = play["week"]
+        for key in ("passer_player_id", "rusher_player_id", "receiver_player_id"):
+            player_id = play.get(key)
+            if not player_id:
+                continue
+            per_week = counts.setdefault(player_id, {}).setdefault(week, {})
+            per_week[team] = per_week.get(team, 0) + 1
+    return {
+        player_id: {
+            week: max(teams.items(), key=lambda kv: kv[1])[0]
+            for week, teams in weeks.items()
+        }
+        for player_id, weeks in counts.items()
+    }
+
+
 def short_name_from_full(full_name: str) -> str:
     """"Drake Maye" -> "D.Maye" -- real player-prop odds carry full names
     while nflverse pbp uses first-initial.last-name; this bridges the two
