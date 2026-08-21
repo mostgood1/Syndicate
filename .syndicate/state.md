@@ -1938,6 +1938,44 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 **Owner: `soccer-model-coverage` (new) for the model; UI Lane G for the card.**
 
+- **THE SQUAD FED TO THE SIM WAS WRONG TWICE OVER, BOTH FIXED AND MEASURED
+  `[2026-08-20/21, lane soccer-board-mlb-parity]`.**
+  (1) `_load_player_rows` unioned every season's `players_*.csv` and deduped
+  keeping the newest row, so any player who ever appeared in the league
+  survived forever under their last-known club — Arsenal carried Partey,
+  Tierney, Jorginho, Sterling and Kiwior. **Arsenal 28 → 23**, verified on an
+  artifact rebuilt `2026-08-20T23:43:04`.
+  (2) `build_soccer_player_features` bound player rows to fixture teams by
+  FUZZY match, so a club not playing today was absorbed by the nearest name —
+  **26 Real Oviedo players inside a 21-man Real Sociedad**. **50 → 24**,
+  verified on an artifact rebuilt `2026-08-21T01:01:32`, zero Oviedo players
+  remaining. Live on workers `68acf3ca` / `a05412f9`.
+- **`canonical_team_name` DESTROYED accents rather than stripping them, and
+  that is why the fuzzy threshold was 0.72.** The ASCII scrub turned every
+  non-ASCII char into a SPACE (`Alavés` → `alav s`), so an accented club name
+  never canonicalized to its unaccented twin in the five leagues that have
+  them. Fixed with NFKD folding; **0 distinct clubs merge** as a result.
+  `match_team_name` no longer binds a player to a fixture at all.
+- **SIX club pairs could absorb each other**, only when one plays and the
+  other does not: **Manchester City ↔ Manchester United (0.812)**, Paris FC ↔
+  PSG, Cercle ↔ Club Brugge, Real Oviedo ↔ Real Sociedad (0.750), LA Galaxy ↔
+  LAFC (0.750), Atlanta ↔ Minnesota United (0.722). Only la_liga has been
+  REBUILT AND READ; the other five are fixed by construction, unobserved.
+- **A bad league slug used to serve EPL.** `/soccer/laliga/cards` (canonical is
+  `la_liga`) returned 200 with Arsenal fixtures. `normalize_league` maps
+  anything unknown onto `DEFAULT_LEAGUE`; a `url_value_preprocessor` now 404s
+  it once for every route. Verified on the served site: 7/7 bad slugs 404,
+  10/10 leagues 200. web `93b6d5a4`.
+- **`players_*.csv` and `rosters_*.csv` are NOT in `HOT_ARTIFACT_PATTERNS`**
+  (403 on `/api/ops/artifacts/export`). The builder's own inputs cannot be
+  read from web, so any aggregate quoted about them is a LOCAL MIRROR number.
+  `recommendations_*.json` and `picks_*.csv` ARE allowlisted — an earlier
+  claim to the contrary was a malformed request, not a gap.
+- **`week_dates_within_horizon` bounds artifact builds to today+1.** A league
+  whose next fixture is further out builds NOTHING, and no re-trigger changes
+  that — it is not a failure. Override is
+  `SYNDICATE_SOCCER_SIM_HORIZON_DAYS`, and it needs a worker deploy to take.
+
 - **Soccer serves ZERO shortlist rows and that is the INTENDED interim state,
   not an outage.** Its whole presence was one-book longshot props whose `ev_pct`
   was arithmetically `-assumed_hold_pct`. **Read `rows_uninformative_ev` before

@@ -3678,3 +3678,77 @@ source verifies nothing until you know which one filled it) and
 `feedback_instrument_blindness`. **It was caught only because the user asked for
 the push to be verified.** A self-confirming check is not evidence, and
 "I already verified it" is not a reason to skip re-deriving when asked.
+## 2026-08-20 — OVERTURNED: a loose threshold is a SYMPTOM. Ask what it compensates for before tuning it.
+
+- **What was believed:** `match_team_name`'s 0.72 fuzzy threshold was a
+  tolerance choice — the price of matching team names across three sources
+  that spell them differently, to be tightened or loosened as needed.
+- **What is true:** it was scar tissue. `canonical_team_name`'s ASCII scrub
+  (`[^a-z0-9' .]+` → `" "`) does not STRIP a non-ASCII character, it replaces
+  it with a SPACE, which splits the word: `Alavés` → `alav s`, `Atlético
+  Madrid` → `atl tico madrid`, `Mönchengladbach` → `m nchengladbach`. An
+  accented club name could therefore never canonicalize to its unaccented
+  twin, in any of the five leagues that have them. The threshold had to be
+  low enough to survive a split word — **and low enough to match Real Oviedo
+  to Real Sociedad at 0.750**, folding 26 Oviedo players into a 21-man
+  Sociedad squad in production.
+- **Why tuning could not have worked, and this is the load-bearing part:**
+  same-club and different-club score ranges OVERLAP. Same-club pairs run
+  0.833–0.933; different-club pairs run 0.722–**0.812** (Manchester City vs
+  Manchester United). No threshold separates them. One tuned to the six
+  collisions I could see would have been a coincidence, not a fix — and
+  tightening it far enough to exclude Oviedo would have deleted 11 clubs'
+  entire squads.
+- **How to apply:** when a similarity threshold, a retry count, a timeout or a
+  tolerance looks oddly generous, treat the number as EVIDENCE ABOUT SOMETHING
+  UPSTREAM before treating it as a knob. Ask what breaks if it is tightened,
+  and why it was set there. Here the answer — "accented names arrive mangled"
+  — was a one-line bug three files away, and fixing it let the tolerance be
+  removed from that path entirely rather than re-tuned.
+
+## 2026-08-20 — OVERTURNED: "N of N" is worth nothing until you know the sample COULD have contained a counterexample.
+
+- **What was believed:** `live_home_score`/`live_away_score` are a placeholder
+  the artifact builder writes, not a real reading. Evidence: the string `"0"`
+  on **12 of 12** sampled matches, *including* `status_state == "pre"`.
+- **What is true:** they are ESPN's own `competitors[].score`
+  (`espn_lineups.py:143`), a real reading at every point in a match's life,
+  including a final score. It reads `"0"` before kickoff because that is what
+  the scoreboard says before kickoff. I acted on the belief and made soccer
+  publish NO score — **removing a working final score rather than a
+  fabrication.** Caught by the `soccer-live-score-clock-box` session, whose
+  census I re-ran to confirm: 57 git-tracked matches, `status_state == "pre"`
+  on all 57.
+- **The reasoning error:** I wrote that `INCLUDING status_state == "pre"` as
+  if pre-kickoff matches STRENGTHENED the case — a placeholder showing up even
+  before kickoff. It is the exact opposite. **Every match in the sample was
+  pre-kickoff**, so a real scoreboard reading and a hardcoded placeholder are
+  indistinguishable across all twelve observations. The sample could not
+  discriminate between the hypotheses, and I read uniformity as confirmation
+  of the one I already held — then wrote it into a code comment as established
+  fact, where the next reader would have inherited it.
+- **How to apply:** before citing "N of N", state what a COUNTEREXAMPLE would
+  have looked like and confirm the sample could have contained one. Twelve
+  pre-kickoff matches cannot tell you what a live match does. A uniform result
+  from a sample that cannot discriminate is not weak evidence — it is no
+  evidence, and it is the most persuasive-feeling kind of nothing.
+
+## 2026-08-20 — FORBIDDEN: in a tree you did not create, an unexplained diff is another session's work until proven otherwise.
+
+- **What happened:** I ran `git checkout -- syndicate/features/soccer/cards.py`
+  in the shared lane worktree, on a 67-line diff I had not written. I checked
+  that the function it contained was already on `origin/main`, concluded the
+  working copy was a redundant leftover, and discarded it. It was almost
+  certainly the `soccer-live-score-clock-box` session's in-flight work — they
+  independently reported two `Edit` calls that "reported success and never
+  reached disk" in that window.
+- **Why the check was not a check:** "this code is already on main" cannot
+  distinguish *already landed* from *someone else's work in progress on top of
+  it*. Both look identical from the file's content. `git status --porcelain`
+  tells you WHAT changed and never WHO. `git checkout --` has no undo.
+- **How to apply:** if a tree you did not create is dirty in ways you cannot
+  account for, do not clean it — move. `git worktree add` + cherry-pick lands
+  your own commit without touching anything else, costs ~30 seconds, and is
+  what the remaining five commits of that session used. Two sessions sharing
+  one lane slug also made the deploy-claim table unable to say which of them
+  held a service, so the shared slug is worth resolving on sight.
