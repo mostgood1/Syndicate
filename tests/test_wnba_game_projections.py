@@ -430,3 +430,44 @@ def test_loader_degrades_gracefully_on_a_row_written_before_263(monkeypatch):
     row_h2h = _row("h2h")
     attach_wnba_game_projections([row_h2h], index)
     assert row_h2h["projection"]["basis"] == "margin_win_prob"
+
+
+def test_live_row_still_carries_the_MARKET_fair_price_while_its_edge_is_suppressed():
+    """The de-vig is MARKET data; only the EDGE is a model claim.
+
+    THE BUG THIS PINS WAS ORDERING, and it was invisible in isolation.
+    `_attach_sim_probability_edge` runs inside `attach_projections`
+    (`book_grid_artifact.py:222`), which executes BEFORE
+    `attach_live_gamelines_for_sport` (line 252). `live_edge_unavailable_reason`
+    returns None once a row is live-aware -- but nothing has marked it
+    live-aware at that point, so a live row always took the early return and
+    never reached the fair computation. The live game-line join then marked the
+    row live_aware, looked for `market_fair_prob_over`, and found the None this
+    function had skipped past.
+
+    Measured 2026-08-21, two WNBA games live at ordinary states: both carried a
+    live model probability and a valid interval (se=0.054,
+    basis=analytic_calibration) and were still withheld
+    `no_two_sided_market_price`, while the same rows carried two-sided prices
+    from 8 books.
+    """
+    row = _row(
+        "totals",
+        line=164.5,
+        consensus=_TOTALS_CONSENSUS,
+        sides=_TOTALS_SIDES,
+        game_state="live",
+    )
+    index = _index(total=163.08, p_total_over=0.49, sim_market_total=164.5)
+    attach_wnba_game_projections([row], index)
+    projection = row["projection"]
+
+    # The suppression is UNCHANGED -- this half must keep failing loudly if
+    # anyone "fixes" the live edge by publishing it.
+    assert projection["edge_vs_market_pct"] is None
+    assert "pregame projection" in projection["edge_unavailable_reason"]
+
+    # ...and the market's own price is now present for the live join to use.
+    fair = projection.get("market_fair_prob_over")
+    assert fair is not None, "the live game-line join needs the de-vigged market price"
+    assert 0.0 < float(fair) < 1.0

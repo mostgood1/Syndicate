@@ -261,12 +261,35 @@ def _attach_sim_probability_edge(
     projection.pop("probability_unavailable_reason", None)
 
     live_reason = live_edge_unavailable_reason(row)
+    # THE FAIR PRICE IS MARKET DATA, NOT A MODEL CLAIM, so it is computed and
+    # stamped BEFORE the edge suppression rather than after it. Suppressing
+    # `edge_vs_market_pct` on a live row is correct and is preserved exactly
+    # below; withholding the MARKET's own de-vigged probability is a different
+    # thing, and it starved the live game-line join.
+    #
+    # THE BUG WAS ORDERING, and it could only be seen in production. This runs
+    # inside `attach_projections` (`book_grid_artifact.py:222`), which executes
+    # BEFORE `attach_live_gamelines_for_sport` (line 252). `live_edge_unavailable_reason`
+    # returns None once a row is live-aware -- but at THIS point in the build
+    # nothing has marked it live-aware yet, so a live row always took the early
+    # return and never reached the fair computation. The join then marked the
+    # row `live_aware: true`, looked for `market_fair_prob_over`, and found the
+    # None that this function had skipped past. Nothing recomputes it in
+    # between, so the field was permanently absent on exactly the live rows the
+    # live join exists to price.
+    #
+    # Measured 2026-08-21 with two WNBA games live at ordinary states (ATL@LAS
+    # end of Q1, CON@LVA mid-Q2): both carried a live model probability and a
+    # valid interval (`se=0.054`, `basis=analytic_calibration`) and were still
+    # withheld as `no_two_sided_market_price` with `mkt=None`, while the same
+    # rows carried real two-sided prices from 8 books. The prices were there
+    # the whole time; only the de-vig was missing.
+    fair = _no_vig_over_probability(row)
+    projection["market_fair_prob_over"] = fair
     if live_reason:
         projection["edge_vs_market_pct"] = None
         projection["edge_unavailable_reason"] = live_reason
         return
-    fair = _no_vig_over_probability(row)
-    projection["market_fair_prob_over"] = fair
     if fair is None:
         # REUSED, not a sixth phrasing: `_edge_unavailable_reason` already
         # enumerates every way a two-sided fair can fail to exist (one-sided
