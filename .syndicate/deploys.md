@@ -22748,3 +22748,50 @@ default closed (the main line of every market survives, so the board stays
 populated and the omission is named and recoverable). Both rules are asserted in
 `tests/js/board_sim_view_display.test.mjs` so a later change cannot swap which
 control gets which rule.
+
+## 2026-08-22T18:46:34Z — `#505` recommendation_id identity join, refresh-worker, `a1e89ff3`
+
+`dep-da4ut2ijobas73d0p030`. refresh-worker ONLY — `ledger_bridge` is called from
+`run_refresh_worker.py` and nowhere web or live-odds executes.
+
+**BEFORE:** live `4eeffb5c` (18:18:05Z). Composition checked both directions:
+`a1e89ff3` contains `4eeffb5c` (no revert) and contains `#505`. Verified BY
+CONTENT on the deploying tree, not by ancestry alone — 10 occurrences of
+`_settlement_identity`/`_AMBIGUOUS` in `ledger_bridge.py`, 3 of the accumulator
+fix in `run_refresh_worker.py`. Nothing substantial in flight at trigger time:
+one process, no MLB sim, no soccer subprocess, 63.1% memory.
+
+**`deploy_preflight.py` STILL COULD NOT RUN** — no `RENDER_API_KEY` in this
+session. No CLEAR verdict for this SHA. Claim held; on-main verified with git.
+
+**WHAT THIS CHANGES THAT THE OTHERS DID NOT: it writes to the portfolio.**
+`#502`/`#504` moved data and scheduling; this decides OUTCOMES on user bets. So
+the failure mode worth naming is a FALSE settle, not a missed one.
+
+**Why a false settle is unlikely BY CONSTRUCTION, not by hope.** The collapsed
+key (segment dropped) can only merge records that share
+`event_id|market|entity|side|line`. If those records DISAGREE on outcome the
+index marks `_AMBIGUOUS` and refuses. If they AGREE, settling from the merged
+key gives the same answer either constituent would have — so the collapse is
+safe precisely where it is lossy. The residual risk is a wrong `entity` mapping
+producing a match against a DIFFERENT wager, and `event_id`+`market`+`side`+
+`line` all agreeing by coincidence is a narrow target.
+
+**VERIFY — the reading, and what would FALSIFY the fix.** Next `[ledger_bridge]`
+line, now carrying a per-reason breakdown:
+
+    matched_by_identity > 0                      -> the join works
+    index_sizes.by_identity large + matched 0    -> the ENTITY MAPPING IS WRONG
+    skip_reasons.unkeyable_bet high              -> bets cannot key at all
+    skip_reasons.identity_ambiguous > 0          -> the segment collapse is biting
+
+**The entity mapping (`player_name/player/name/team/selection`) is a HYPOTHESIS.**
+It is reasoned from the bet slip's own comments, NOT measured against production
+records — the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`, so it cannot be read from any service with an API. The
+breakdown above is the instrument that settles it. Do not tune anything until
+that reading exists.
+
+**Timing: the daily gate still holds.** Settlement ran 17:28Z, so this does not
+run again until 2026-08-23 after 06:00 CT. It should now get a PROMPT tick
+(`#504`), rather than waiting on a soccer spacing-gate coincidence.
