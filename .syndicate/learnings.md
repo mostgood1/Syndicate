@@ -5022,3 +5022,81 @@ the same session I had to reverse it.
   a truncated list is indistinguishable from a short one.
 - Cost: two 8-minute sweep re-runs. Cheap here; the same shape silently
   under-reports a regression set.
+## 08-22 TWO REAL LEADS AT LAST — and they came from questions I did not think to ask
+
+**1. LA LIGA 80-84' REPLICATES HELD OUT. The first result all session to survive
+a clean test above break-even.**
+
+    DISCOVERY (98 matches)    80-84'  0.3954  lift 1.77
+    HELD-OUT  (222 matches)   80-84'  0.3604  lift 1.57   CLEARS 2-1 (33.3%)
+
+The 222 were the FIT half, never scored on time. Held-out profile shows real
+structure, not a lone spike: quiet 16-28' (~0.17), a first-half rise to 0.3018
+at 40-44', flat mid-second-half, then 0.3604 at 80-84' falling to 0.2374 by
+88-92' as the window runs out.
+
+**THE POOLED NUMBER WAS HIDING THIS.** Pooled 80-84' read 0.3320 / lift 1.35
+across all leagues. Split by league: la_liga 1.78, epl 1.24 (largest sample, does
+NOT clear 2-1), mls 1.17, primeira_liga **0.89 -- below base**. I reported a
+league-averaged number as a property of football. Same averaging error that made
+momentum look like a global null when it was conditional, running the other way.
+
+**2. FOTMOB xG BEATS ITS OWN CONTROL. Chance QUALITY adds where VOLUME does not.**
+
+    top decile        xg 1.19   bigchance 1.30   count 1.09  <- control
+    at 80-84'         xg  clock 0.2972 -> 0.4000  delta +0.1028
+                      count               0.2778  delta -0.0194  HURTS
+
+`count` is the ESPN-equivalent feature and it hurts by -0.019, replicating the
+ESPN momentum increment (-0.0516) on completely different data. That is the
+FotMob question answered: xG measures something shot counts cannot.
+
+**BUT n IS ~90 IN THAT CELL, AND THE PRECEDENT IS UGLY.** The last promising
+tail number this session was **40.2%** at n=276, and preregistration killed it.
+This one reads **40.0%** at n=90. Treat +0.103 as UNVALIDATED until it survives
+the same treatment. Reading a tail result after the fact is how the 40.2%
+happened.
+
+**THE METHOD LESSON, twice over:** both leads came from splits I had not thought
+to make -- the user asked for leagues individually, and for the full sampling
+range. Neither was a modelling insight; both were "you are averaging over
+something that differs". Before reporting a pooled effect, enumerate the
+dimensions it averages over and check the big ones.
+
+## 08-22 THE xG RESULT DID NOT REPLICATE — AND THE CONTROL THAT "PROVED" IT WAS ARITHMETIC
+
+Pre-registered (`fdf1b892`, committed before the fresh sample existed), scored on
+246 fresh matches, ZERO overlap with discovery. Identical procedure, top quartile
+inside the 80-84' band:
+
+                  discovery(n=90)   fresh(n=241)
+        xg            +0.1028          +0.0319
+        count         -0.0194          +0.1107
+
+**THE RANKING REVERSES.** On discovery xG beat count by 0.12; on fresh count beats
+xG by 0.08, and count FLIPS SIGN. "Chance quality beats chance volume" was the
+whole case for a FotMob dependency, and it is dead — not weakened, reversed.
+
+**FORBIDDEN: a control matched by THRESHOLD VALUE when the features are on
+different scales.** The first scoring run applied xG's threshold (0.8905) to
+both. xG-pressure ranges 0.09..1.82; count-pressure ranges 1.55..13.76. So the
+threshold fired on 24% of the band for xG and **100% for count** — the control
+selected the ENTIRE band, making its delta `+0.0000` BY ARITHMETIC, before any
+data existed. That forced zero then read as *"the control does not clear"*, which
+was the single sentence justifying the dependency. Match controls by SELECTION
+RATE. Rebuilt that way the control scored +0.1447 and won.
+
+**The tell was in the output I had already read**: `count` fired on 963 samples
+and `xg` on 229, and the delta was EXACTLY +0.0000. An exact zero on a
+noisy empirical quantity is a computation, not a measurement. Same family as the
+box-section `rows: []` error — the discriminating number was on screen and I
+was reading the verdict line instead.
+
+**THREE tail results have now failed to replicate this session** (momentum 40.2%,
+xG +0.1028, and the xG-over-count ranking). All three were read AFTER seeing the
+tail, at n<300. The one result that DID replicate (la_liga 80-84', 222 held-out)
+was tested because the user asked for a split, not because a number looked good.
+
+**What actually survives:** the CLOCK. Both samples independently show 80-84'
+elevated over base (0.2972 and 0.2793 vs base 0.2562). That is the third
+independent confirmation, and it needs no vendor dependency at all.

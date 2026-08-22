@@ -22903,3 +22903,140 @@ symbol hits and 6 `cards.py` hits in `3ada3512`, and `apply_live_scores` still
 0-93ms on `-79r7g` afterwards. This is exactly the 2026-08-15 silent-revert
 check, run rather than assumed — it came back clean because their branch had
 merged `origin/main` after mine landed.
+## 2026-08-22 ~19:19Z — `3ada3512` — WEB + refresh-worker — four of five reported board defects
+
+Lane `layer2-sim-view-and-live-projection`. Claims `de7fb84df009c4ce` (web),
+`b201b54a07da1fe4` (worker). Both deploys carry exactly `3ada3512` — the SHA
+read before triggering, no drift, verified on each.
+`deploy_preflight.py` still cannot run (no `RENDER_API_KEY`): **no CLEAR
+verdict**; on-main checked with git, in-flight jobs by hand.
+
+**WHAT WAS KILLED, and the judgement behind it.** The user's condition was
+"deploy it once the sim finishes", meaning the 15-game `props_now_available`
+run. **That one completed** (gone from `processes[]` by 19:17:10Z, ~26 min).
+What the worker deploy DID kill was a *different* job that started after it: a
+5-game `fingerprint_change` re-sim (pid 680), ~1 minute into its vendor chain,
+plus a `serie_a` artifact build and a season-manifest build. Judged acceptable
+and stated rather than glossed:
+
+- `fingerprint_change` sims re-fire automatically on the next odds change; this
+  one was a minute old.
+- Waiting for "no sim at all" is unbounded — three fired in the 2.5 hours
+  before this (17:02 2-game, 18:51 15-game, 19:16 5-game).
+- **Memory was at 96.8% of 4,096 MB with 132 MB headroom** and 2,019 MB
+  "unexplained". A restart reclaims that (measured today: 90.9% → 15.6%), so the
+  deploy relieves a real risk rather than only costing one.
+
+**SHIPPED — four of the five defects the user reported at ~19:1xZ:**
+
+1. **The alt-line filter did not work on soccer.** v1 tested the market name for
+   a `_alt` suffix; soccer has no such market (`DEFAULT_GAME_MARKETS` is
+   `h2h/totals/spreads`) and expresses alts as several rows of ONE market at
+   different lines. Now: `_alt` suffix OR not the primary line of its
+   (event, market, segment, player) group. Primary = most books quoting, ties to
+   median then lower line, deterministic across renders.
+2. **Bet slip defaults minimized**, persisted; only a literal `"false"` opens it.
+3. **`LAYER2_BOARD_HEALTH`** per sport, over published rows.
+4. **Player-miss attribution** (`player_no_roster` vs `player_name_miss`).
+
+**NOT FIXED — and the deploy must not be read as fixing them.** Stale lines,
+blank projections and absent movement are now MEASURABLE, not repaired. They
+were the three reports that could only be checked by eyeballing the page.
+
+**VERIFY — two log reads and four page reads.**
+
+Logs (mine to take):
+
+    LAYER2_BOARD_HEALTH sport=soccer
+      no_proj / live_proj / edged   -> "projections all blank"
+      age_p50s / p90s / maxs        -> "extremely stale lines"
+      all_movement_eligible vs matched -> "line movement non-existent"
+    PREGAME_PROJECTION_JOIN sport=soccer
+      player_no_roster vs player_name_miss -> who owns the 6,056
+
+Page (the user's — the proxy 403s the host from this container):
+
+    (a) clicking an alt-line tab highlights it
+    (b) default load shows NO soccer alt lines AND the board is not empty
+    (c) bet slip opens minimized
+    (d) counts strip moves with filters
+
+A LEAD ALREADY IN HAND for the staleness report, not yet confirmed as the cause:
+`soccer_source/data/book_grid/book_grid_2026-08-22.json` is **14.3 MB, above the
+publish sweep's repair limit**, and appears in `SWEEP_SKIPPED_DETAIL` on every
+cycle. Direct stream publishes succeed; if one misses, nothing repairs it and
+the board keeps serving the last copy. The health line's age percentiles will
+confirm or kill this.
+
+### LIVE — `3ada3512` on both services, and the memory question answered
+
+    web             live 19:21:49Z  (dep-da4vbr2jobas73d278ug)
+    refresh-worker  live 19:23:21Z  -> superseded 19:29:37Z by
+                    dep-da4vh5fqj5pc73bbhtag, trigger `service_updated`,
+                    SAME COMMIT `3ada3512`. Someone changed a service setting;
+                    the redeploy carries the identical SHA, so the
+                    instrumentation is live either way. Checked rather than
+                    assumed — a `deactivated` status on my own deploy id looked
+                    at first like the work had been rolled back.
+
+**MEMORY — measured, and it settles the "unexplained" question.**
+
+    before deploy  19:18:15Z   3,963 MB   96.8%   unexplained 2,019 MB
+    after restart  19:33:08Z      93 MB    2.3%   unexplained     2.9 MB
+
+A 42x drop, and the unexplained pool went to essentially nothing. Consistent
+with the 90.9% -> 15.6% reading earlier today. **The accumulation is
+uptime-driven and a restart fully reclaims it** — it is not a leak that survives
+a process, and it is not any single job's working set. That is now measured
+twice on the same day rather than inferred once.
+
+Both claims released (`de7fb84df009c4ce`, `b201b54a07da1fe4`).
+
+**STILL UNREAD:** `LAYER2_BOARD_HEALTH` has never appeared — the worker
+restarted at 19:29:37Z and the first shortlist of a cold boot is 10-19 minutes
+out. The three user reports it exists to answer (stale lines, blank projections,
+absent movement) remain UNDIAGNOSED. Nothing below or above should be read as
+having explained them.
+
+---
+
+## 2026-08-22 ~19:39Z — `ffa8e4df` — BOTH WORKERS — the publisher repair path (`6b193fee`)
+
+Claims `579afff01cbf6043` (refresh-worker), `015337abad508f7c` (live-odds-worker).
+Deployed `ffa8e4df`; `merge-base --is-ancestor 6b193fee ffa8e4df` verified before
+claiming it shipped. `deploy_preflight.py` still cannot run (no
+`RENDER_API_KEY`) — **no CLEAR verdict**.
+
+**WEB DELIBERATELY NOT DEPLOYED.** The fix is in the SWEEP, which runs on the
+workers (`live_lens_loop.py`, `live_refresh_loop.py`, `run_queued_refresh_job.py`,
+`run_mlb_daily_sim_job.py`). Web is the RECEIVER. A web deploy costs a
+user-visible ~90s of 502s at cutover — measured 18:43-18:44Z on the user's own
+browser — and spending that for a change web does not execute would be a cost
+with no benefit. Web stays on `3ada3512`, which already carries every
+user-facing fix.
+
+**live-odds-worker included after checking, not assumed.** `grep` for the sweep
+entrypoints put them in `live_refresh_loop`/`live_lens_loop`, and
+`render.yaml:748` runs `run_live_odds_refresh_worker.py` — so it sweeps too and
+had the same missing retry path.
+
+**KILLED:** a 4-game `fingerprint_change` MLB re-sim (pid 66) and a
+`build_season_betting_cards_manifest` run. Auto-refiring; memory was healthy
+(35%) so this deploy was NOT relieving pressure the way 19:20Z's was — the only
+justification here is the user's explicit "deploy it".
+
+**A COST WORTH NAMING:** this restarts the worker again, so the FIRST-EVER
+`LAYER2_BOARD_HEALTH` reading — already pushed back by the 19:29:37Z
+`service_updated` redeploy — moves out another 10-19 minutes. The three user
+reports it exists to answer are still undiagnosed, and this deploy delays that
+answer rather than advancing it.
+
+**VERIFY — and note it CANNOT be verified by absence.** The repair path only
+fires when a direct publish fails, and soccer's have been succeeding all day. So
+a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
+
+    [artifact_publisher] SWEEP_REPAIRING path=<...> reason=direct_publish_failed bytes=<...>
+
+printed only when the exemption actually engages. Until that line appears after
+a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
+IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.

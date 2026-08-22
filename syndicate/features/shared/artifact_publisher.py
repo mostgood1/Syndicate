@@ -1013,6 +1013,7 @@ def _publish_streamed(
         # path: a failed publish must retry next sweep, not be suppressed by its
         # own attempt.
         _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
+        _note_direct_publish_succeeded(relative_path)
         _publish_budget_record(size)
         print(
             f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} transport=stream bytes={size}",
@@ -1027,18 +1028,21 @@ def _publish_streamed(
                 flush=True,
             )
             return None
+        _note_direct_publish_failed(relative_path)
         print(
             f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
             flush=True,
         )
         return False
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        _note_direct_publish_failed(relative_path)
         print(
             f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
             flush=True,
         )
         return False
     except Exception as exc:  # pragma: no cover - defensive, must never raise
+        _note_direct_publish_failed(relative_path)
         print(
             f"[artifact_publisher] PUBLISH_UNEXPECTED_ERROR path={relative_path} url={url} transport=stream error={exc}",
             flush=True,
@@ -1142,6 +1146,7 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         # Recorded only after the upload is acknowledged -- a failed publish must
         # be retried next sweep, not suppressed by its own attempt.
         _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
+        _note_direct_publish_succeeded(relative_path)
         _publish_budget_record(len(body))
         print(
             f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} bytes={len(body)}",
@@ -1149,9 +1154,13 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         )
         return True
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        _note_direct_publish_failed(relative_path)
         print(f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} error={exc}", flush=True)
         return False
     except Exception as exc:  # pragma: no cover - defensive, must never raise
+        # Marked for repair on the UNEXPECTED path too. A publish that failed
+        # in a way nobody predicted is not more likely to have landed.
+        _note_direct_publish_failed(relative_path)
         print(f"[artifact_publisher] PUBLISH_UNEXPECTED_ERROR path={relative_path} url={url} error={exc}", flush=True)
         return False
 
@@ -1224,6 +1233,43 @@ _PUBLISH_MAX_AGE_DAYS = 1
 # it only with a measured reason and its own verification.
 _PUBLISH_MAX_BYTES = 12 * 1024 * 1024
 
+# PATHS WHOSE DIRECT PUBLISH FAILED AND WHICH THE SWEEP MUST THEREFORE REPAIR,
+# regardless of `_PUBLISH_MAX_BYTES`.
+#
+# `publish_hot_artifact` records its checksum ONLY after the upload is
+# acknowledged, and says why: "a failed publish must be retried next sweep, not
+# suppressed by its own attempt." That is the whole recovery design — and for
+# any file over the ceiling THE RETRY IT NAMES DOES NOT EXIST, because
+# `_publish_skip_reason` refuses it before `publish_hot_artifact` is ever
+# reached. So the biggest artifacts are precisely the ones with no repair path,
+# which is the inverse of what anyone would assume from reading either half
+# alone.
+#
+# MEASURED 2026-08-22: `soccer_source/data/book_grid/book_grid_2026-08-22.json`
+# is 14.3MB against a 12MB ceiling and appears in `SWEEP_SKIPPED_DETAIL` on
+# every cycle. Its direct stream publishes were succeeding, so nothing was
+# broken that day — but a single failed one would have stranded the board on a
+# stale grid until the file next changed AND a direct publish happened to work.
+#
+# WHY NOT JUST RAISE THE CEILING: the bound's own comment forbids it without a
+# measured reason, and the reason it gives still holds — the sweep would then
+# ship 51MB `odds_history` shards on every cycle, which is bandwidth, disk churn
+# and receiver time. This does not raise it. It exempts ONLY paths a direct
+# publish has already tried and failed on, so the sweep resumes being the retry
+# it was always documented to be. A path leaves the set as soon as any publish
+# of it succeeds.
+_FAILED_DIRECT_PUBLISH: set[str] = set()
+
+
+def _note_direct_publish_failed(relative_path: str) -> None:
+    if relative_path:
+        _FAILED_DIRECT_PUBLISH.add(relative_path)
+
+
+def _note_direct_publish_succeeded(relative_path: str) -> None:
+    _FAILED_DIRECT_PUBLISH.discard(relative_path)
+
+
 _DATE_TOKEN = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
 
 
@@ -1247,12 +1293,20 @@ def _publish_skip_reason(path: Path, today: date) -> str | None:
     """Why this file must not be published, or None to publish it."""
     artifact_date = _artifact_date(path)
     if artifact_date is not None and (today - artifact_date).days > _PUBLISH_MAX_AGE_DAYS:
+        # Checked FIRST and never exempted: repairing a stale slate is not a
+        # repair, it is shipping something the receiver correctly does not want.
         return f"stale_slate:{artifact_date.isoformat()}"
     try:
         size = path.stat().st_size
     except OSError:
         return None
     if size > _PUBLISH_MAX_BYTES:
+        # THE ONE EXEMPTION: a file whose direct publish failed. See
+        # `_FAILED_DIRECT_PUBLISH` — without this the ceiling silently removes
+        # the retry that `publish_hot_artifact` documents as the recovery path.
+        relative_path = relative_to_data_root(path)
+        if relative_path and relative_path in _FAILED_DIRECT_PUBLISH:
+            return None
         return f"too_large:{size}"
     return None
 
@@ -1329,6 +1383,23 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
                     detail = reason.split(":", 1)[1] if ":" in reason else ""
                     examples.append(f"{shown}({detail})" if detail else shown)
                 continue
+            # SAY WHEN A REPAIR IS HAPPENING. A file over the ceiling that the
+            # sweep publishes anyway is the exemption doing its job, and it is
+            # otherwise indistinguishable in the logs from the ceiling having
+            # been raised — which is the change this deliberately did NOT make.
+            repairing = ""
+            try:
+                rel = relative_to_data_root(candidate)
+                if rel and rel in _FAILED_DIRECT_PUBLISH:
+                    repairing = rel
+            except Exception:
+                repairing = ""
+            if repairing:
+                print(
+                    f"[artifact_publisher] SWEEP_REPAIRING path={repairing} "
+                    f"reason=direct_publish_failed bytes={candidate.stat().st_size}",
+                    flush=True,
+                )
             if publish_hot_artifact(candidate):
                 published += 1
             else:

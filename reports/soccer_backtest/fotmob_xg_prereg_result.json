@@ -1,0 +1,55 @@
+{
+  "rule": {
+    "feature": "xg",
+    "half_life": 900.0,
+    "window": 600.0,
+    "step": 60.0,
+    "time_lo_s": 4800.0,
+    "time_hi_s": 5040.0,
+    "xg_pressure_threshold": 0.8905,
+    "derived_from": "FotMob discovery holdout ONLY (92 matches)",
+    "discovery_values": {
+      "clock_only": 0.2972,
+      "with_feature": 0.4,
+      "delta": 0.1028
+    },
+    "bands": {
+      "PASS": "fresh hit >= clock-only on the SAME fresh sample + 0.02",
+      "ALSO_REQUIRED": "fresh hit > fresh BASE RATE (the do-nothing check the earlier prereg omitted)",
+      "FAIL": "delta < 0.02 or hit <= base rate"
+    }
+  },
+  "n_fresh": 246,
+  "overlap": 0,
+  "results": {
+    "xg": {
+      "base": 0.25624384567182884,
+      "clock": 0.2793354101765317,
+      "hit": 0.31877729257641924,
+      "n_fired": 229,
+      "n_band": 963,
+      "delta": 0.03944188239988755,
+      "ci": [
+        0.26183574050154135,
+        0.38169874818089344
+      ],
+      "beats_clock": true,
+      "beats_base": true
+    },
+    "count": {
+      "base": 0.25624384567182884,
+      "clock": 0.2793354101765317,
+      "hit": 0.4240506329113924,
+      "n_fired": 158,
+      "n_band": 963,
+      "delta": 0.1447152227348607,
+      "ci": [
+        0.3496922402163018,
+        0.5020146138929011
+      ],
+      "beats_clock": true,
+      "beats_base": true
+    }
+  },
+  "verdict": "AMBIGUOUS -- xG clears but so does count. No FotMob dependency justified."
+}
