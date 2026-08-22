@@ -226,3 +226,7 @@ reports/sim_runs/
 # refresh_worker_status.json) which a directory rule would shadow.
 reports/refresh_status/latest/retention_cursor_local.json
 reports/refresh_status/latest/worker_drain_state_*.json
+
+# Test fallout: a literal Windows path used as a filename on Linux.
+# Committed by accident 2026-08-22 via `git add -A`; untracked again the same day.
+Z:\\*

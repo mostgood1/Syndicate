@@ -1260,6 +1260,44 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   SESSION: the sim's stake share on REAL rows; the agent proxy 403s
   `syndicate-an21.onrender.com`, so no served artifact was readable. Stage A now
   emits `sim_coverage` so the first production commit answers it as a number.
+- **SCORING RE-EVALUATED `[user decision 2026-08-22]` — `_SCORE_SIM_WEIGHT`
+  0.0 → 0.125 WITH A HARD CAP `_SCORE_SIM_CAP_PCT = 1.5`. THE FIX IS THE CAP,
+  NOT THE COEFFICIENT.** The file's prior argument — *"there is NO value of this
+  constant that produces a credible board"* — is correct **for a bare weight**,
+  which scales with the edge so a large enough disagreement always wins
+  eventually (0.25 fails like 0.5, later). But this module already solved that
+  once, for the movement term, and said so in its own comment: *"a cap is the
+  STRUCTURAL fix for it rather than a smaller number that fails the same way
+  later."* The sim term never got that treatment. **Measured by
+  `scripts/score_sim_weight_impact.py`, which REPLAYS the 2026-08-08
+  distribution that caused the zeroing** (286/300 negative-EV, median edge
+  10.36/10.80/12.49/11.99):
+
+      configuration                negative-EV rows promoted   side-picking
+      0.5 uncapped (2026-08-08)              286/286              yes
+      0.0 (the state replaced)                 0/286              NO
+      0.125 capped at 1.5                      0/286              yes
+
+  The pathological row worked: `ev -5, edge +12` → at 0.5 `-5 + 6.00 = +1.00`
+  (ranks, the failure); at 0.125-capped `-5 + 1.50 = -3.50` (does not rank).
+  **THE POINT OF THE CHANGE:** at 0.0 the board provably **could not pick a
+  side** — EV against a proportional de-vig is `1/overround - 1`, identical for
+  every side — so it ordered by hold and broke ties arbitrarily. Any non-zero
+  contribution makes the sim the entire tiebreak. Both constants are
+  env-overridable (`SYNDICATE_SCORE_SIM_WEIGHT`, `SYNDICATE_SCORE_SIM_CAP_PCT`;
+  cap 0.0 restores the old behaviour exactly), so this is reversible in seconds
+  without a deploy. **STILL A SCREEN, NOT A VALIDATION** — it proves the weight
+  cannot repeat the 2026-08-08 arithmetic failure, NOT that the sim is right;
+  that still needs `settled > 0` + Stage A's per-bet component decomposition.
+- **DEPLOY BLOCKER, CROSS-LANE, NOT MINE TO FIX.**
+  `syndicate/templates/intelligence.html:84-89` carries a STATIC disclosure
+  reading *"the sim contributed to the ranking of NONE of them (`sim_component`
+  non-zero on 0)"*. **This change makes that text FALSE.** The file is held by
+  `layer2-sim-view-and-live-projection`, so it is surfaced, not edited. Shipping
+  the scoring change without updating it means the board tells the user the
+  opposite of what it is doing. `layer2_board.py:39`'s comment goes stale the
+  same way (same lane). **Do not deploy this scoring change until that lane
+  updates both.**
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
@@ -1275,8 +1313,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `scripts/portfolio_commit_input_checklist.py`,
   `syndicate/blueprints/intelligence.py`,
   `syndicate/templates/portfolio.html`,
+  `syndicate/features/shared/opportunity_signals.py`,
+  `scripts/score_sim_weight_impact.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
-  `tests/test_execution_ledger.py`
+  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

@@ -1,5 +1,81 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#508` — **`_SCORE_SIM_WEIGHT` 0.0 → 0.125 WITH A HARD CAP. The fix is the CAP, not the coefficient — the same structural fix the movement term already had. Measured against the distribution that caused the zeroing. NOT DEPLOYED, and blocked cross-lane by a UI disclosure this makes false.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+
+**THE USER ASKED FOR THIS DIRECTLY** after being told the sim contributes 0 to
+ranking. The prior gate (`settled > 0` before raising the weight) was a
+documented decision; this overrides it deliberately and says so.
+
+**WHY A BARE WEIGHT WAS NEVER THE ANSWER, and the old comment is right about
+that.** *"There is NO value of this constant that produces a credible board"* is
+correct **for a bare weight**: it scales with the edge, so a large enough model
+disagreement always wins eventually — 0.25 fails exactly like 0.5, just later.
+That is why the previous answer was 0.0, and it was the right answer to the
+question being asked.
+
+**BUT THIS MODULE ALREADY SOLVED THIS ONCE AND SAID SO.** The movement term
+directly below carries: *"The failure mode that killed the sim term was
+domination (ev ~ -5 against model_edge ~ +12), and A CAP IS THE STRUCTURAL FIX
+for it rather than a smaller number that fails the same way later."* Movement
+got a weight AND `_SCORE_MOVEMENT_CAP_PCT`. The sim term never got the cap. It
+has one now: `_SCORE_SIM_CAP_PCT = 1.5`, saturating at 12 points of model edge —
+the median of the measured production distribution — so a TYPICAL sim view earns
+nearly the whole allowance and an extreme one earns no more.
+
+**MEASURED, by a harness that REPLAYS the 2026-08-08 distribution rather than
+asserting against it** (`scripts/score_sim_weight_impact.py`; families 48/35/24/193,
+median edges 10.36/10.80/12.49/11.99, 286 of 300 rows negative-EV):
+
+    configuration                  negative-EV rows promoted   side-picking
+    0.5 uncapped (2026-08-08)                286/286              yes
+    0.0 (the state replaced)                   0/286              NO
+    0.125 capped at 1.5                        0/286              yes
+
+The pathological row worked: `ev -5, model_edge +12` → at 0.5 `-5 + 6.00 =
++1.00`, positive and model-dominated, which was the failure; at 0.125-capped
+`-5 + 1.50 = -3.50`, still negative, does not rank.
+
+**WHAT THE CHANGE ACTUALLY BUYS.** At 0.0 the board **could not pick a side at
+all** — `blended_score` reduces to `ev_pct`, and EV against a proportional
+de-vig is `1/overround - 1`, IDENTICAL for every side of a market, so it ordered
+markets by hold and broke ties arbitrarily (Famalicao/Estoril: draw -750, home
++4500, away +6000, all `ev 8.6383`). Any non-zero contribution makes the sim the
+**entire** tiebreak between sides. That is the largest behavioural change here
+and it is not a matter of degree.
+
+**REVERSIBLE WITHOUT A DEPLOY.** Both constants are env-overridable —
+`SYNDICATE_SCORE_SIM_WEIGHT`, `SYNDICATE_SCORE_SIM_CAP_PCT`. Setting the cap to
+`0.0` restores the previous behaviour EXACTLY (pinned by a test). A malformed
+env value falls back to the default rather than to zero, deliberately: silently
+disabling a scoring term on a typo is the same class of failure as the same
+day's `SYNDICATE_REFRESH_STATE_BACKEND` incident.
+
+**A TEST WAS REPLACED, NOT DELETED.**
+`test_the_sim_weight_is_zero_until_settlement_validates_the_model` pinned
+`_SCORE_SIM_WEIGHT == 0.0` — a PROXY. What deserved protection was the behaviour
+the constant was chosen to prevent. It is now
+`test_the_sim_term_cannot_promote_a_negative_ev_row_at_any_measured_edge`
+(all four families) plus an unbounded-edge version and a **control** asserting a
+bare weight WOULD fail the same guard, so the tests are not vacuously true.
+Strictly stronger: the old test would have passed a change that raised the cap
+and failed one that left behaviour identical. `learnings.md` 2026-08-20.
+
+**STILL A SCREEN, NOT A VALIDATION.** This proves the weight cannot repeat the
+2026-08-08 *arithmetic* failure. It does NOT prove the sim is RIGHT — that needs
+`settled > 0` and CLV decomposed by component, which `#507` now emits per bet.
+Until then the honest description is **"price-led, sim-breaks-ties"**, NOT "our
+model found these".
+
+**DEPLOY BLOCKER, CROSS-LANE, NOT FIXED HERE.**
+`syndicate/templates/intelligence.html:84-89` is a STATIC disclosure reading
+*"the sim contributed to the ranking of NONE of them (`sim_component` non-zero
+on 0)"*. **This change makes that text false**, and the file is held by
+`layer2-sim-view-and-live-projection` — surfaced, not edited, per the lane rule.
+`layer2_board.py:39` goes stale the same way, same lane. **Do not deploy the
+scoring change until that lane updates both**, or the board will tell the user
+the opposite of what it is doing.
+
+
 ### `#506` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **Measured 2026-08-22T19:0xZ via the Render API**, 24h at 1h resolution on

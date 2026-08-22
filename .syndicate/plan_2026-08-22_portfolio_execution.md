@@ -335,7 +335,32 @@ was readable. The 57.6% is a synthetic row and must not be quoted as production.
 answers it as a number instead of an inference, alongside the per-position
 attribution.
 
-### Why the answer is NOT to raise the weight
+### SUPERSEDED 2026-08-22 by a user decision — the weight WAS raised, with a cap
+
+**The section below argued against raising `_SCORE_SIM_WEIGHT`. The user asked
+for it directly and that is their call.** What shipped is not the thing this
+section argued against, though, and the distinction is the whole point:
+
+- **A bare weight was never the answer, and the argument below is right about
+  that.** It scales with the edge, so a large enough disagreement always wins
+  eventually — 0.25 fails exactly like 0.5, just later.
+- **What shipped is a weight PLUS A HARD CAP** (`_SCORE_SIM_WEIGHT = 0.125`,
+  `_SCORE_SIM_CAP_PCT = 1.5`) — the same structural treatment the movement term
+  in the same file already had, and which its own comment recommends for
+  precisely this failure: *"a cap is the STRUCTURAL fix for it rather than a
+  smaller number that fails the same way later."*
+- **Measured against the distribution that caused the zeroing**
+  (`scripts/score_sim_weight_impact.py`): 0.5 uncapped promotes **286/286**
+  negative-EV rows; 0.125-capped promotes **0/286** and still separates sides.
+  `ev -5, edge +12` goes `+1.00` at 0.5 and `-3.50` capped.
+- Reversible without a deploy: `SYNDICATE_SCORE_SIM_CAP_PCT=0.0` restores the
+  old behaviour exactly.
+
+**Everything below still holds about what this does NOT establish.** It is a
+screen against an arithmetic failure, not evidence the sim is right. Full
+working: `todo.md #508`.
+
+### The original argument, kept because it is still the reason the cap is needed
 
 That constant's own comment already argues this, and it is right:
 
