@@ -30,6 +30,8 @@ from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_
 from syndicate.features.mlb.ladders_common import build_module_links as build_mlb_module_links
 from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import daily_top_props_path
+from syndicate.features.mlb.sources import live_lens_report_path
+from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.sources import available_dates as nba_available_dates
@@ -3670,6 +3672,175 @@ def _mlb_feed_live_states_uncached(game_pks: list[int], selected_date: str, *, o
     return results
 
 
+# THE LIVE LENS IS THE RIGHT SOURCE FOR THIS, and it was already on web's disk.
+#
+# The obvious fix for the statsapi fan-out above is to allowlist
+# `raw/statsapi/feed_live/**` so the local read hits. It is the wrong fix, and
+# `board_enrichment.attach_live_game_state_from_lens` already measured why on
+# 2026-08-13 (`#413`): `_mlb_feed_live_payload` takes the file if it EXISTS,
+# with no freshness check, so "whenever a game's feed was first captured becomes
+# that game's permanent state for the rest of the day". Today that file is
+# absent on web, so home fetches live and is slow but correct; publishing it
+# would make home fast and WRONG -- MIL @ SD read `live / TOP 9` while the lens
+# read Final, and CLE @ DET read `BOT 1` two hours after first pitch.
+#
+# The pipeline agrees with itself about this. `vendor/mlb_bettingv2/tools/
+# daily_update.py` re-fetches the PRIOR day's feeds with the reason stated
+# inline: "Prior-day reconciliation must fetch the final game feed, not a stale
+# pregame cache entry." Those files are settlement artifacts, not a live source,
+# and at ~3.2MB x 15 per slate they are not free to publish either.
+#
+# `live_lens_report_<date>.json` is already in `HOT_ARTIFACT_PATTERNS`, already
+# republished to web on a ~60s cadence (its mtime is in the cards context cache
+# key, which is why that key turns over), and `#413` trusted it enough to
+# OVERRIDE the board's frozen state with it. It carries everything this needs:
+#
+#     games[].gamePk
+#     games[].status.{abstract, detailed}
+#     games[].matchup.score.{away, home}
+#     games[].gameLens[0].progress.{inning, half, outs}
+#
+# -- including the inning/outs detail, so the status line the card renders is
+# reconstructed rather than degraded. Verified against a real report: game 822974
+# carries `Live / In Progress`, score 10-9, `progress {inning 9, half bottom,
+# outs 2}`.
+#
+# GUARD, taken from `#413` rather than invented (same 15 minutes as
+# `board_enrichment._LENS_STATE_MAX_AGE_SECONDS`, for the same reason): past
+# `_MLB_LIVE_LENS_MAX_AGE_SECONDS` the report is refused and the caller falls
+# through to the (now single-flighted) statsapi path. A wedged lens must not
+# freeze home harder than the bug being fixed -- which is exactly the failure
+# allowlisting feed_live would have shipped.
+_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60
+
+# Keyed on the report's SIGNATURE (mtime_ns, size), not on a wall clock. A
+# content key cannot serve a stale value at all, so this needs no TTL and has
+# none of `_MLB_FEED_LIVE_STATE_CACHE`'s freshness caveat -- when the worker
+# republishes the report the key changes and the next read reparses. One entry:
+# home only ever asks about the selected date.
+_MLB_LIVE_LENS_STATES_CACHE: dict[str, tuple[tuple[int, int], dict[int, dict[str, Any]]]] = {}
+_MLB_LIVE_LENS_STATES_GUARD = threading.Lock()
+
+
+def _mlb_inning_ordinal(inning: Any) -> str:
+    """`9` -> `9th`. StatsAPI sends `currentInningOrdinal`; the lens sends an int.
+
+    Reconstructed so a card served from the lens reads identically to one served
+    from the feed, rather than subtly differently.
+    """
+    try:
+        value = int(inning)
+    except (TypeError, ValueError):
+        return str(inning or "").strip()
+    if value <= 0:
+        return ""
+    if 11 <= (value % 100) <= 13:
+        return f"{value}th"
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+    return f"{value}{suffix}"
+
+
+def _mlb_live_lens_state_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    status = row.get("status") if isinstance(row.get("status"), dict) else {}
+    abstract = str(status.get("abstract") or "").strip()
+    detailed = str(status.get("detailed") or "").strip()
+    if not abstract and not detailed:
+        return None
+    matchup = row.get("matchup") if isinstance(row.get("matchup"), dict) else {}
+    score = matchup.get("score") if isinstance(matchup.get("score"), dict) else {}
+
+    lens_entries = row.get("gameLens") if isinstance(row.get("gameLens"), list) else []
+    progress: dict[str, Any] = {}
+    for entry in lens_entries:
+        if isinstance(entry, dict) and isinstance(entry.get("progress"), dict):
+            progress = entry["progress"]
+            break
+    inning = _mlb_inning_ordinal(progress.get("inning"))
+    half = str(progress.get("half") or "").strip().lower()
+    outs = progress.get("outs")
+
+    # Same three bits, same order, same separator as `_mlb_feed_live_state`.
+    status_bits = [
+        bit
+        for bit in [
+            detailed,
+            f"{half.title()} {inning}".strip() if inning and half else None,
+            f"{outs} out" if outs == 1 else f"{outs} outs" if outs not in {None, ""} else None,
+        ]
+        if bit
+    ]
+    return {
+        "away_pts": score.get("away"),
+        "home_pts": score.get("home"),
+        # The same canonical predicates the statsapi path uses -- StatsAPI reports
+        # abstract "Live" during warmup, so `detailed` has to agree (`#98`/`#100`).
+        "in_progress": _mlb_status_is_live(abstract, detailed),
+        "final": _mlb_status_is_final(abstract, detailed),
+        "status": " | ".join(status_bits) if status_bits else detailed or abstract or None,
+    }
+
+
+def _mlb_live_lens_states(selected_date: str) -> dict[int, dict[str, Any]]:
+    """Per-game live state from the published live-lens report. No network.
+
+    Returns `{}` -- never a partial or stale answer -- when the report is
+    absent, unparseable, or older than `_MLB_LIVE_LENS_MAX_AGE_SECONDS`, so the
+    caller falls through to the statsapi path exactly as it does today.
+    """
+    path = live_lens_report_path(selected_date)
+    try:
+        stat = path.stat()
+        signature = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return {}
+
+    with _MLB_LIVE_LENS_STATES_GUARD:
+        cached = _MLB_LIVE_LENS_STATES_CACHE.get(selected_date)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+
+    report = load_json_file(path)
+    if not isinstance(report, dict):
+        return {}
+    age_seconds = _mlb_live_lens_age_seconds(report)
+    if age_seconds is not None and age_seconds > _MLB_LIVE_LENS_MAX_AGE_SECONDS:
+        # `#413`'s guard. Deliberately NOT cached: the same bytes become usable
+        # again the moment the worker republishes, and caching a refusal against
+        # a content key would outlive the condition that caused it.
+        return {}
+
+    states: dict[int, dict[str, Any]] = {}
+    for row in report.get("games") or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            game_pk = int(row.get("gamePk") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not game_pk:
+            continue
+        state = _mlb_live_lens_state_from_row(row)
+        if state is not None:
+            states[game_pk] = state
+
+    with _MLB_LIVE_LENS_STATES_GUARD:
+        _MLB_LIVE_LENS_STATES_CACHE.clear()
+        _MLB_LIVE_LENS_STATES_CACHE[selected_date] = (signature, states)
+    return states
+
+
+def _mlb_live_lens_age_seconds(report: dict[str, Any]) -> float | None:
+    raw = str(report.get("generatedAt") or report.get("generated_at") or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    now = datetime.now(parsed.tzinfo) if parsed.tzinfo is not None else datetime.now()
+    return max(0.0, (now - parsed).total_seconds())
+
+
 def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
     game_pks: list[int] = []
     for game in games:
@@ -3681,7 +3852,25 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
             continue
         if game_pk:
             game_pks.append(game_pk)
-    live_states = _mlb_feed_live_states(game_pks, selected_date)
+
+    # LENS FIRST, NETWORK ONLY FOR WHAT IT DOES NOT COVER. On a live slate the
+    # lens carries every game, so the statsapi fan-out below runs with an empty
+    # list and home makes no network call at all. When the lens is absent or
+    # stale (`_mlb_live_lens_states` returns {} rather than a partial answer),
+    # every game falls through and behaviour is exactly what it is today.
+    lens_states = _mlb_live_lens_states(selected_date)
+    live_states: dict[int, dict[str, Any] | None] = {}
+    missing_pks: list[int] = []
+    for game_pk in game_pks:
+        state = lens_states.get(game_pk)
+        if state is not None:
+            # Copied: `_MLB_LIVE_LENS_STATES_CACHE` holds these across requests
+            # and the value is assigned onto a game dict that reaches templates.
+            live_states[game_pk] = dict(state)
+        else:
+            missing_pks.append(game_pk)
+    if missing_pks:
+        live_states.update(_mlb_feed_live_states(missing_pks, selected_date))
 
     enriched: list[dict[str, Any]] = []
     for game in games:

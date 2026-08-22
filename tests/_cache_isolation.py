@@ -87,6 +87,10 @@ def clear_mlb_wall_clock_caches() -> None:
     mlb_cards._MLB_TODAY_CACHE.clear()
     home_module._MLB_FEED_LIVE_STATE_CACHE.clear()
     home_module._MLB_FEED_LIVE_STATE_REFRESH_LOCKS.clear()
+    # Keyed on the report's (mtime_ns, size), so it cannot serve a stale value
+    # -- but a test that writes two different reports to one tmp path inside the
+    # same filesystem mtime granularity could still collide. Cheap to clear.
+    home_module._MLB_LIVE_LENS_STATES_CACHE.clear()
 
 
 class WallClockCacheIsolationMixin:

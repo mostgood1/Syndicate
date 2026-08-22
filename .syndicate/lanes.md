@@ -1270,6 +1270,23 @@ against a slate that actually had matches in play. Full evidence in
   falsified against the old path (second concurrent request blocked 8.00s, 4 fetches
   started; new path returns in <1s with 1 fetch).
 - Blocked by: none. Deploy not taken — no claim acquired, `render.yaml` untouched.
+- **UPDATE 2026-08-22: the statsapi fan-out is now GONE from the request path, and
+  NOT by allowlisting `feed_live`.** That was the plan and it was a regression:
+  `_mlb_feed_live_payload` takes the file if it EXISTS with no freshness check, so
+  publishing it would have frozen every game at capture time — the defect `#413`
+  measured on 2026-08-13 (MIL @ SD `live / TOP 9` against a lens reading Final).
+  `vendor/mlb_bettingv2/tools/daily_update.py` says the same of its own files:
+  prior-day reconciliation re-fetches because the cache is "a stale pregame cache
+  entry". Instead `_apply_mlb_live_scores` reads `live_lens_report_<date>.json`,
+  already allowlisted and already republished ~60s, which carries score, status AND
+  `gameLens[].progress.{inning,half,outs}` — so the card's status line is
+  reconstructed, not degraded. Measured end to end on the real 2026-06-01 report
+  restamped to now: **9/9 games resolved, 0 statsapi calls**, game 822974 ->
+  `In Progress | Bottom 9th | 2 outs`, score 10-9. Stale/absent report -> `{}` ->
+  falls through to the (single-flighted) network path, i.e. today's behaviour.
+  Regression check: the `-k "mlb or home or cards or cache or board"` sweep fails
+  18 tests both WITH and WITHOUT this change — `comm` on the two sorted lists is
+  empty in both directions, so all 18 are pre-existing and there are no regressions.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
