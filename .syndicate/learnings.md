@@ -4727,3 +4727,44 @@ up -- so it is recorded as a hypothesis for a fresh slice, not a result.
 panel of who is on top, which is what the user reads it for manually, and the
 sign convention is verified correct against live scorelines. It is a narrator.
 It is not a timing signal, and nothing should price off it.
+
+## 08-22 THE PRE-REGISTERED TEST KILLED THE 40.2%, AND MY OWN PASS/FAIL BANDS WERE WRONG
+
+Rule fixed in advance (`0fff6254`): fire when 34-38 min into a half AND pressure
+>= 9.2525 (90th pct, derived from the FIT half only). Scored on 158 matches from
+a DIFFERENT period, all 699 prior ids excluded:
+
+    hypothesis (post-hoc)  0.402
+    FRESH hit rate         0.2547
+    time-window only       0.3063   (n=1580)
+    momentum increment    -0.0516
+    fresh base rate        0.2631
+
+**MOMENTUM ACTIVELY HURTS.** The full rule is 5.2 points BELOW the time window
+alone, and BELOW the base rate -- firing on pressure selects worse-than-average
+moments. The 40.2% was an artifact of picking the time window AFTER seeing which
+decile won on the holdout, exactly as suspected.
+
+**MY PRE-REGISTERED BANDS WERE THEMSELVES DEFECTIVE.** They read
+`>= 0.25 -> WEAK PASS (clears 3-1)`, so the run printed **WEAK PASS** for a rule
+that loses to doing nothing. I set the bands against BREAK-EVEN and never against
+the BASE RATE. A signal must beat the base rate before break-even is even the
+right question -- otherwise "profitable at 3-1" is satisfied by any rule that
+fires during a period when goals are common, including a rule with no signal at
+all.
+
+**RULE: a pre-registered threshold must include the do-nothing baseline, not
+just the economic one.** Beating break-even is necessary and not sufficient; the
+comparison that decides whether a FEATURE works is against the base rate, and
+against the simpler feature it claims to improve on.
+
+**WHAT REPLICATED:** the clock, not the momentum. 34-38 minutes into a half ran
+0.3186 on holdout and 0.3063 on fresh, against base rates of 0.2342 and 0.2631 --
+a stable ~1.16-1.36x lift from an unbiased decile split both times. That effect
+is real, needs none of this machinery, and is almost certainly in the market
+price already.
+
+**STANDING: momentum is a NARRATOR.** Three tests now -- global AUC (0.5417
+held out), conditional tail (killed by preregistration), and the increment over
+time alone (NEGATIVE). Nothing should price off it. The chart stays because it
+honestly describes who is on top, which is what it is read for.
