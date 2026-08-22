@@ -12,13 +12,31 @@ the current quote -- so a live mark is a running preview of the number that
 decides whether a market ever gets real money. A pick drifting the wrong way
 for three hours is knowable at hour one.
 
-**LIKE FOR LIKE, OR NOT AT ALL.** The mark joins on `clv_opening_ledger`'s key,
-which includes the bookmaker, so an order taken at BetMGM is re-priced against
-BetMGM's current quote and never against whichever book happens to be best now.
-The board publishes the BEST book's price; comparing our BetMGM entry to a
-different book's current best would manufacture movement out of book disagreement
-and read as a signal. When the book we used has stopped quoting, that is
-`book_no_longer_quoting` -- a named absence, not a substituted price.
+**LIKE FOR LIKE, OR NOT AT ALL** -- but the JOIN and the COMPARISON are widened
+and narrowed separately, and getting that backwards was this module's first bug.
+
+An order taken at BetMGM must be re-priced against BetMGM, never against
+whichever book happens to be best now; comparing to a different book would
+manufacture movement out of book disagreement and read as signal. The first
+version enforced that by joining on the full opening key, bookmaker included.
+It measured `LIVE_MARKS orders=21 marked=0
+reasons={'book_no_longer_quoting': 21}` -- every single order, one reason.
+
+**Twenty-one identical reasons is a broken join, not twenty-one pulled lines.**
+An opening is recorded per (market, book), but a BOARD row is one row per market
+carrying whichever book is best AT THAT MOMENT. The instant the best book
+rotates -- which is most of the time -- a bookmaker-bearing key stops matching
+its own market. So the join now runs at MARKET level (`market_key`) and the
+comparison re-narrows to our own book through `quote.book_prices`, which carries
+our price at every book that quoted the side. `clv_join` already resolves the
+close this way for the same reason, so this follows the existing convention
+rather than inventing a second one.
+
+The two failures are now DISTINCT, which is the whole point: the market is not
+on the board at all (`market_not_on_board`) versus the market is there but our
+book has stopped quoting it (`book_no_longer_quoting`). Collapsed into one
+reason, a broken join is indistinguishable from a quiet slate -- and reads
+entirely plausible on a page, which is how it would have survived.
 
 **AMERICAN ODDS ARE NOT LINEAR AND ARE NEVER SUBTRACTED HERE.** -110 to -130 and
 +200 to +180 are not comparable as arithmetic, and a "price moved 20" column
@@ -47,6 +65,7 @@ __all__ = ["mark_orders_to_board", "marks_report_line"]
 # `clv_join`'s "an unresolved row is a datum, not a silent drop".
 REASON_MARKED = "marked"
 REASON_UNKEYABLE = "unkeyable"
+REASON_MARKET_GONE = "market_not_on_board"
 REASON_BOOK_GONE = "book_no_longer_quoting"
 REASON_NO_CURRENT_PRICE = "no_current_price"
 REASON_NO_TAKEN_PRICE = "no_taken_price"
@@ -87,6 +106,7 @@ def mark_orders_to_board(
     """
     from syndicate.features.shared.clv_join import clv_pct_from_prices
     from syndicate.features.shared.clv_position_join import (
+        market_key,
         opening_key_for_position,
         opening_key_for_row,
     )
@@ -94,11 +114,12 @@ def mark_orders_to_board(
     stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     marked_at = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    by_key: dict[str, Mapping[str, Any]] = {}
+    # Indexed by MARKET, not by (market, book) -- see the note above.
+    by_market: dict[str, Mapping[str, Any]] = {}
     for row in rows:
-        key = opening_key_for_row(row)
+        key = market_key(opening_key_for_row(row))
         if key:
-            by_key.setdefault(key, row)
+            by_market.setdefault(key, row)
 
     marks: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
@@ -112,6 +133,9 @@ def mark_orders_to_board(
         key = order.get("opening_key")
         key = key if isinstance(key, str) and key else opening_key_for_position(order)
         taken = _taken_price(order)
+        # Carried on every mark, including the failures: "betmgm pulled" is
+        # actionable and "book pulled" is not.
+        taken_book = str(order.get("book") or "").strip().lower() or None
 
         def _mark(reason: str, **extra: Any) -> None:
             reasons[reason] = reasons.get(reason, 0) + 1
@@ -121,6 +145,7 @@ def mark_orders_to_board(
                     "position_key": order.get("position_key"),
                     "opening_key": key,
                     "taken_price": taken,
+                    "taken_book": taken_book,
                     "marked_at": marked_at,
                     "reason": reason,
                     **extra,
@@ -133,16 +158,32 @@ def mark_orders_to_board(
         if key is None:
             _mark(REASON_UNKEYABLE, current_price=None, clv_pct=None)
             continue
-        row = by_key.get(key)
+        row = by_market.get(market_key(key))
         if row is None:
-            # The exact market at the exact book is not on the board right now.
-            # Usually the book pulled the line or the game started.
-            _mark(REASON_BOOK_GONE, current_price=None, clv_pct=None)
+            # The market itself is off the board -- the game started, or the
+            # candidate stopped clearing whatever gate put it there.
+            _mark(REASON_MARKET_GONE, current_price=None, clv_pct=None)
             continue
         quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
-        current = _as_float((quote or {}).get("price"))
+        # RE-NARROW TO OUR OWN BOOK. The row's top-level `price` is the BEST
+        # book's, which is not necessarily ours; using it would reintroduce
+        # precisely the best-of-N selection effect the same-book rule exists to
+        # avoid. `book_prices` is keyed by book name -- lowercased here because
+        # the ledger stores our book lowercased and the board does not promise
+        # to.
+        our_book = taken_book or ""
+        book_prices = (quote or {}).get("book_prices")
+        current = None
+        if isinstance(book_prices, Mapping) and our_book:
+            for name, price in book_prices.items():
+                if str(name).strip().lower() == our_book:
+                    current = _as_float(price)
+                    break
         if current is None:
-            _mark(REASON_NO_CURRENT_PRICE, current_price=None, clv_pct=None)
+            # The market is on the board and our book is not quoting it. This
+            # is the reason the old code reported for everything, and it is now
+            # narrow enough to mean something.
+            _mark(REASON_BOOK_GONE, current_price=None, clv_pct=None)
             continue
 
         clv = clv_pct_from_prices(taken, current)
@@ -155,7 +196,7 @@ def mark_orders_to_board(
         _mark(
             REASON_MARKED,
             current_price=current,
-            current_book=(quote or {}).get("bookmaker"),
+            current_book=our_book,
             clv_pct=clv,
         )
 
@@ -164,7 +205,7 @@ def mark_orders_to_board(
         "marked_at": marked_at,
         "orders": len(orders),
         "board_rows": len(rows),
-        "board_distinct_keys": len(by_key),
+        "board_distinct_markets": len(by_market),
         "marked": marked,
         "reasons": dict(sorted(reasons.items())),
         "moved_toward": moved_toward,

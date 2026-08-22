@@ -13,6 +13,7 @@ from syndicate.features.shared.clv_position_join import opening_key_for_row
 from syndicate.features.shared.position_marks import (
     REASON_BOOK_GONE,
     REASON_MARKED,
+    REASON_MARKET_GONE,
     REASON_NO_TAKEN_PRICE,
     REASON_UNKEYABLE,
     mark_orders_to_board,
@@ -20,7 +21,9 @@ from syndicate.features.shared.position_marks import (
 )
 
 
-def _row(price=-110, bookmaker="BetMGM", **overrides):
+def _row(price=-110, bookmaker="BetMGM", book_prices=None, **overrides):
+    """A board row: ONE row per market, carrying whichever book is best now,
+    with every book's price in `quote.book_prices`."""
     row = {
         "sport": "mlb",
         "event_id": "evt-1",
@@ -29,7 +32,11 @@ def _row(price=-110, bookmaker="BetMGM", **overrides):
         "player_name": "Steven Kwan",
         "side": "Over",
         "line": 0.5,
-        "quote": {"bookmaker": bookmaker, "price": price},
+        "quote": {
+            "bookmaker": bookmaker,
+            "price": price,
+            "book_prices": book_prices if book_prices is not None else {bookmaker: price},
+        },
     }
     row.update(overrides)
     return row
@@ -83,21 +90,51 @@ def test_movement_is_probability_points_not_price_arithmetic():
     assert a["marks"][0]["clv_pct"] != b["marks"][0]["clv_pct"]
 
 
-def test_the_mark_uses_the_same_book_we_took():
-    """A different book's current price is not our line moving -- it is book
-    disagreement, and comparing them would manufacture a signal."""
+def test_a_rotated_best_book_still_marks_at_OUR_book():
+    """THE REGRESSION TEST. Production measured `orders=21 marked=0
+    reasons={'book_no_longer_quoting': 21}` because the join carried the
+    bookmaker, and a board row carries whichever book is best right now. The
+    market is still there and our book is still quoting it -- the join simply
+    could not see it."""
     taken = _row(price=-110, bookmaker="BetMGM")
-    other_book = _row(price=-140, bookmaker="FanDuel")
-    report = mark_orders_to_board([_order(taken)], [other_book])
+    # FanDuel is now best, but BetMGM still quotes the side at -130.
+    now = _row(price=-140, bookmaker="FanDuel", book_prices={"FanDuel": -140, "BetMGM": -130})
+    report = mark_orders_to_board([_order(taken)], [now])
+    assert report["marked"] == 1
+    assert report["marks"][0]["current_price"] == -130  # OURS, not FanDuel's -140
+    assert report["marks"][0]["current_book"] == "betmgm"
+
+
+def test_the_best_books_price_is_never_substituted_for_ours():
+    """Widening the JOIN must not widen the COMPARISON. If our book has gone,
+    the answer is an absence -- taking the best book's price instead would
+    reintroduce the best-of-N selection effect as a fake line move."""
+    taken = _row(price=-110, bookmaker="BetMGM")
+    now = _row(price=-140, bookmaker="FanDuel", book_prices={"FanDuel": -140})
+    report = mark_orders_to_board([_order(taken)], [now])
     assert report["marked"] == 0
     assert report["reasons"][REASON_BOOK_GONE] == 1
     assert report["marks"][0]["current_price"] is None
 
 
-def test_a_book_that_stopped_quoting_is_named_not_blank():
-    report = mark_orders_to_board([_order()], [])
-    assert report["reasons"][REASON_BOOK_GONE] == 1
-    assert report["marks"][0]["reason"] == REASON_BOOK_GONE
+def test_market_gone_and_book_gone_are_DIFFERENT_facts():
+    """Collapsed into one reason, a broken join is indistinguishable from a
+    quiet slate -- which is exactly how the bug above survived review."""
+    taken = _row(bookmaker="BetMGM")
+    off_board = mark_orders_to_board([_order(taken)], [])
+    still_there = mark_orders_to_board(
+        [_order(taken)], [_row(bookmaker="FanDuel", book_prices={"FanDuel": -140})]
+    )
+    assert off_board["reasons"] == {REASON_MARKET_GONE: 1}
+    assert still_there["reasons"] == {REASON_BOOK_GONE: 1}
+
+
+def test_book_matching_is_case_insensitive():
+    """The ledger stores our book lowercased; the board does not promise to."""
+    taken = _row(bookmaker="BetMGM")
+    now = _row(price=-130, bookmaker="BETMGM", book_prices={"BETMGM": -130})
+    report = mark_orders_to_board([_order(taken)], [now])
+    assert report["marked"] == 1
 
 
 def test_the_fill_price_wins_over_the_request():
