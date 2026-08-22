@@ -6,8 +6,8 @@
   // under 1080px it docks to the bottom of the viewport, collapsed by
   // default to this handle's 48px and expanding to a 62vh scrollable
   // sheet only while tapped open; at/above 1080px it stays a normal
-  // static column, expanded by default (existing behavior), collapsible
-  // down to just the handle on demand. Root-caused 2026-08-03 (mobile)
+  // static column, collapsed by default since 2026-08-22 (see
+  // `defaultState`) to a 36px strip, expandable on demand. Root-caused 2026-08-03 (mobile)
   // and 2026-08-04 (desktop): neither collapse was ever wired up, so the
   // rail rendered permanently expanded on every width -- covering the
   // board on phones, and just taking up the full column on desktop with
@@ -56,8 +56,44 @@
     }
   }
 
+  // COLLAPSED BY DEFAULT AT EVERY WIDTH `[user decision, 2026-08-22]`.
+  //
+  // Desktop used to default to "expanded". `bet_slip.js` was changed the same
+  // day to open its panel minimized, and that was reported back as not having
+  // worked -- correctly. There are TWO independent defaults here: the SLIP's
+  // own collapsed state, and the RAIL that contains it (plus watchlist,
+  // portfolio and parlays). Collapsing the slip inside a rail that is still
+  // expanded leaves a full second column open on the board, which is what the
+  // reader actually sees and what they were asking to get rid of.
+  //
+  // I verified the first fix by reading `data-collapsed="true"` off the slip
+  // element. That was true, and it was not the question -- the measurement
+  // matched the change instead of the complaint.
+  //
+  // PERSISTED, matching `bet_slip.js`'s reasoning exactly: a reader who opens
+  // the rail is making a choice about how they work, and re-collapsing it on
+  // every page load would undo that silently. Default collapsed, override
+  // sticks. Only an explicit "expanded" opens it, so an absent key, a storage
+  // failure and a garbage value all land on the default -- the inverse is how a
+  // default stops applying the moment storage misbehaves.
+  var RAIL_STATE_STORAGE_KEY = "syndicate_board_rail_state_v1";
+
   function defaultState() {
-    return window.matchMedia(MOBILE_QUERY).matches ? "collapsed" : "expanded";
+    try {
+      return window.localStorage.getItem(RAIL_STATE_STORAGE_KEY) === "expanded"
+        ? "expanded"
+        : "collapsed";
+    } catch (e) {
+      return "collapsed";
+    }
+  }
+
+  function rememberState(state) {
+    try {
+      window.localStorage.setItem(RAIL_STATE_STORAGE_KEY, state);
+    } catch (e) {
+      // Storage unavailable -- the toggle still works for this page load.
+    }
   }
 
   function setState(rail, layout, state) {
@@ -82,6 +118,7 @@
       var expanded = rail.getAttribute("data-rail-state") === "expanded";
       var nextExpanded = !expanded;
       setState(rail, layout, nextExpanded ? "expanded" : "collapsed");
+      rememberState(nextExpanded ? "expanded" : "collapsed");
       handle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
       handle.textContent = nextExpanded ? EXPANDED_LABEL : collapsedLabel();
       if (!nextExpanded) seedSlipCount(handle);
