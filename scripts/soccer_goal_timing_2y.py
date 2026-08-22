@@ -241,8 +241,14 @@ def main() -> int:
                 if len(rows) < 200:
                     continue
                 tested += 1
-                clock, hit, n, _ = cell_score(rows, args.pct)
-                if n >= 40 and (hit - clock) >= 0.02 and hit >= _BE_31:
+                clock, hit, n, fci = cell_score(rows, args.pct)
+                # The fit cell must clear break-even on its LOWER BOUND, the
+                # same test holdout has to pass. Selecting on the point
+                # estimate against 0.25 is nearly free when the base rate is
+                # ~0.26 -- it passed 421 of 1503 cells, which is not a filter,
+                # it is a formality, and it inflates the multiple-testing bill
+                # that Stage 2 then has to pay.
+                if n >= 40 and (hit - clock) >= 0.02 and fci[0] > _BE_31:
                     cand.append({"league": lg, "band": b, "feature": feature,
                                  "fit_clock": round(clock, 4), "fit_hit": round(hit, 4),
                                  "fit_delta": round(hit - clock, 4), "fit_n": n})
@@ -256,7 +262,12 @@ def main() -> int:
           % ("league", "band", "feat", "fit d", "HOLD", "n", "delta", "95% CI"))
     cache = {}
     survivors = []
-    for c in cand[:60]:
+    scored_cap = 120
+    if len(cand) > scored_cap:
+        print("  NOTE: %d selected, scoring the top %d by fit delta -- %d NOT scored."
+              % (len(cand), scored_cap, len(cand) - scored_cap))
+        print("        (an unscored candidate is untested, not rejected)")
+    for c in cand[:scored_cap]:
         if c["feature"] not in cache:
             cache[c["feature"]] = samples(hold, half_life=args.half_life,
                                           window=args.window, step=args.step,
@@ -282,7 +293,24 @@ def main() -> int:
     print("\n=== RESULT ===")
     print("  %d selected on fit -> %d survive on holdout" % (len(cand), len(survivors)))
     print("  (chance alone would pass ~%d of %d)" % (max(1, int(len(cand) * 0.05)), len(cand)))
-    for s in survivors:
+    # SURVIVOR COUNT OVERSTATES DISCOVERIES, and by a lot. `xg`, `inbox` and
+    # `bigchance` are three readings of the same underlying quantity -- shot
+    # quality -- so one genuinely hot (league, band) cell surfaces as three
+    # "survivors" that are not independent evidence of anything. Collapse to
+    # DISTINCT CELLS before counting, or a single lucky bucket reads as a
+    # cluster of findings. Same error family as reporting a league-averaged
+    # number as a property of football.
+    distinct = {}
+    for sv in survivors:
+        key = (sv["league"], sv["band"])
+        if key not in distinct or sv["hold_delta"] > distinct[key]["hold_delta"]:
+            distinct[key] = sv
+    print("  DISTINCT (league, band) cells among survivors: %d" % len(distinct))
+    if len(survivors) != len(distinct):
+        print("    (%d survivor rows collapse to %d cells -- correlated features"
+              % (len(survivors), len(distinct)))
+        print("     on the same bucket are not independent findings)")
+    for s in sorted(distinct.values(), key=lambda x: -x["hold_delta"]):
         print("    %s %d-%d' %s: %.4f CI[%.3f,%.3f] n=%d  2-1:%s"
               % (s["league"], s["band"] * 4, (s["band"] + 1) * 4, s["feature"],
                  s["hold_hit"], s["ci"][0], s["ci"][1], s["hold_n"],
@@ -294,7 +322,8 @@ def main() -> int:
     Path(args.out).write_text(json.dumps(
         {"n_matches": len(matches), "by_league": by_league, "base_rate": base,
          "clock": clock_rows, "tested": tested, "selected": len(cand),
-         "candidates": cand[:60], "survivors": survivors}, indent=2), encoding="utf-8")
+         "candidates": cand[:120], "survivors": survivors,
+         "distinct_cells": [list(k) for k in distinct]}, indent=2), encoding="utf-8")
     print("\nwrote %s" % args.out)
     return 0
 

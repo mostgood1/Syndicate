@@ -230,3 +230,10 @@ reports/sim_runs/
 # refresh_worker_status.json) which a directory rule would shadow.
 reports/refresh_status/latest/retention_cursor_local.json
 reports/refresh_status/latest/worker_drain_state_*.json
+
+# 2-year FotMob research cache: the 46MB RAW json is regenerable from the
+# committed .gz (scripts/soccer_fotmob_harvest_2y.py --help). Commit the gz.
+reports/soccer_backtest/fotmob_2y.json
+reports/soccer_backtest/fotmob_2y_shotsonly.json
+reports/soccer_backtest/fotmob_xg_fresh.json
+reports/soccer_backtest/fotmob_xg_cache.json
