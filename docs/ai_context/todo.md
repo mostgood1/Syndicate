@@ -74,6 +74,32 @@ count as fresh history is a production behaviour decision, not a test fix.
 one was built on the broken measurement and would have reported ~25 phantom
 "fixed" tests on the first CI run.
 
+### `#505` PROGRESS `[2026-08-22, final for this session]` — **19 failing of 9,391**
+
+    76 (broken env)  ->  ~51 real  ->  35  ->  19
+
+**33 fixed across two passes, and NOT ONE WAS A PRODUCT BUG.** Every failure
+was a test describing a contract the code had moved past, and in several cases
+the source change was a documented fix with a production incident behind it.
+The suite had drifted; the system had not. Patterns, all recurring:
+inert patch targets, a scalar->mapping contract change, a Windows path on
+Linux, two date time bombs, a positional index into a rendered table, and a
+finer error bucket misread as a regression.
+
+**Two real source bugs surfaced only by reading the failures** (both filed or
+fixed above): the bare-`None` degrade branch in `ask_the_syndicate_adapter`,
+and the `_active_player_logs_fallback_paths` / `boxscore_history_max_date`
+mismatch.
+
+**REMAINING 19, and one of them is a NEW kind of problem:**
+`test_layer2_movement_live_segment.py` passes 27/27 in isolation and fails 1 in
+the full run — **order-dependent, i.e. cross-file pollution of the `#503`
+class, in a file that is otherwise clean.** Worth taking before the singles:
+pollution makes every other number in this list less trustworthy.
+
+The other 18 are singles across 15 files, plus the 2 in
+`test_wnba_refresh_runner` deliberately left to `wnba-live-odds-capture-gap`.
+
 **NOT caused by `#502`/`#503`/`#504`, and not test pollution.** Zero failures
 are in any momentum file. Three files were sampled IN ISOLATION and then re-run
 in a detached worktree at **clean `origin/main`** — identical counts in all
