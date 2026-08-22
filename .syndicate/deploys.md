@@ -22288,3 +22288,25 @@ bridge that CAN is inside the evaluation-settlement autorun, still
 `autorun_enabled=False` for `#275`'s measured memory cost. So a parlay in the
 ledger will still read pending after this fix, correctly and for a different
 reason.
+
+### 17:05:58Z / 17:06:23Z — SUPERSEDED by another session, and the fix SURVIVED. This is the on-main rule paying out, 5 minutes later.
+
+A parallel session deployed `e6002cdc` to refresh-worker (17:05:58Z) and web
+(17:06:23Z), ~90 seconds after mine went live. Checked before assuming anything:
+
+    2aa1df54 (my deploy)   ancestor of e6002cdc   -> YES
+    662f9e1b (ledger fix)  ancestor of e6002cdc   -> YES
+    git show e6002cdc:syndicate/features/prediction_ledger.py | grep -c _publish_shared_payload  -> 3
+
+**Verified BY CONTENT, not only by ancestry** — the third line is the one that
+actually proves the code is in the deployed tree.
+
+**This is the exact scenario `#502`'s deploy could have lost.** Had I taken the
+`--allow-off-main` escape hatch offered at the time (my branch was 5 commits
+BEHIND main), this 17:05:58Z deploy would have silently wiped the ledger fix
+within two minutes of it going live, and the next reading would have shown
+`settled_count: 0` with no obvious cause. Both deploys cut from `main`, so they
+COMPOSE. Serialisation could not have delivered this — only being on main could.
+
+Live SHA on both services is now `e6002cdc`, which carries the fix. The verify
+(`settled_count > 0`, after ~06:57Z 2026-08-23) is unchanged.
