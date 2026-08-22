@@ -423,7 +423,17 @@ def _prop_status_text(game: Any) -> str:
     character for character rather than to be tidier.
     """
     status = game.get("status") if isinstance(game, dict) and isinstance(game.get("status"), dict) else {}
-    return f"{status.get('abstract') or ''} {status.get('detailed') or ''}".strip().lower()
+    # DELEGATED, not re-implemented. The first cut of this copied the composition
+    # inline "to match character for character" -- and then the fix to
+    # `_status_text` landed and this copy did not move with it. The 2026-08-22
+    # 01:2xZ reading showed the result: `live_games: 2` (correct, from the fixed
+    # index) beside `prop_status_text: ""` on all three games (the stale copy),
+    # which reads as a contradiction in a payload whose whole job is to be
+    # believed. A diagnostic that can disagree with the code it measures is
+    # worse than no diagnostic.
+    from syndicate.features.shared.live_projection_join import _status_text
+
+    return _status_text(status)
 
 
 @ops_bp.get("/api/ops/live-lens/snapshot-index")
