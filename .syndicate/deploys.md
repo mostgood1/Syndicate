@@ -23727,3 +23727,54 @@ same MCP-bypasses-`deploy-guard.py` note.
 
 **STILL NOT MEASURED: `with_series > 0`.** Nothing about the taxonomy is
 verified on real data yet. Two check-ins are armed (22:48Z, 23:35Z).
+
+
+## 2026-08-22 23:23:16Z -- refresh-worker `1e48e08e` -- NOT MINE, and it carried my work anyway
+
+**Recorded by `portfolio-decision-and-execution`, which did not deploy it.** A
+peer session deployed refresh-worker at 23:23:16Z (live 23:26:49Z) on
+`1e48e08ef`, which contains `e5021022e` (the CLV position join) and `f163c096b`
+(live marks + the three page fixes) — both verified ancestors. So `#522` reached
+production without the deploy I was waiting to run.
+
+**THE COORDINATION GAP, stated because it cost real work.** I held this deploy
+from ~23:0x to ~23:31 specifically to protect in-flight MLB sims, re-checking
+`ALL_PROCESS_MEMORY` four times: `tip_off_window` (8 pks) → `evening_next_day_sim`
+(08-23) → `fingerprint_change` (15 pks), container 92-94% throughout. The peer's
+deploy restarted the container mid-`fingerprint_change` — instance `-76gjr` →
+`-sxsww`, process count 13 → 2, memory 93.9% → 55.1%. That sim died exactly the
+way `deploy_preflight.py`'s docstring describes.
+
+**The claim was FREE the entire time, because I was deliberately not holding
+one.** The protocol says take a claim before deploying; I read "don't wedge a
+service while idle" into that and released between checks. That is backwards for
+a HOLD: the claim is the only mechanism that tells another session a service is
+being protected, so **a hold is exactly when to hold the claim**. An unheld claim
+during a wait means the thing you are waiting for is unprotected, and the waiting
+buys nothing except your own restraint. Proposed for `learnings.md`: *hold the
+claim while you are holding the deploy, with `target=` naming what you are
+waiting on* — `deploy_claim.py status` already prints a `target=` field that was
+empty here.
+
+Not a criticism of the peer: they checked a free claim and deployed, which is the
+documented procedure. The gap is in my use of the lock, not in their use of it.
+
+deploy: dep-da52up2jobas73dcgdm0, build 23:23:16-23:26:49Z, `status: live`,
+`trigger: api`. Claim acquired 23:32Z to deploy, found redundant, released 23:33Z
+without deploying.
+
+verify: **PENDING, not yet satisfiable.** Every `PORTFOLIO_COMMIT` / `PLAN_WRITTEN`
+line so far (23:20:06, 23:22:40, 23:25:27) carries instance `-76gjr` — the OLD
+instance on the OLD code. The new instance came up at 23:26:49 and has not yet
+reached a Layer 2 shortlist rebuild. The reading owed is on `-sxsww`:
+
+    [clv_position_join] CLV_POSITION_JOIN ... matched=N no_key_match=M derivation_disagrees=D
+    [position_marks] LIVE_MARKS ... marked=N toward=T against=A avg_clv_pct=X
+
+`derivation_disagrees > 0` means every pre-stamp order is unjoinable and Stage C
+cannot use tonight's data. `no_key_match > 0` with `derivation_disagrees == 0` is
+narrower: the position is keyable, its opening was never recorded.
+
+Last pre-deploy plan for reference, so the post-deploy numbers have something to
+sit against: `date=2026-08-22 rows_in=1481 sized=12 positions=7 staked=$29.47
+sim_share=0.8314`.
