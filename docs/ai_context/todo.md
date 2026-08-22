@@ -1007,6 +1007,56 @@ found independently, a day earlier, in a different subsystem.
 
     76 failed, 9245 passed, 66 skipped, 2 xfailed, 373 subtests passed
 
+## `#518` — **SOCCER: MOMENTUM IS DIRECTIONAL — build the WHO model, fix the half-life, threshold the card** `[2026-08-22, lane soccer-board-mlb-parity]`
+
+**Established (holdout, 5,552 matches, 10 leagues, report:** `https://claude.ai/code/artifact/5fbb6973-a515-40e8-96fc-d041a6267adb` **):**
+FotMob's signed momentum series predicts WHICH TEAM scores next (dAUC +0.071, AUC .577, top
+decile P(home next) .645 vs bottom .439, calibrated, 94% survives a 60s lag) and team-to-score-
+in-15-min (+0.033 / +0.029). It adds ~nothing to WHETHER/HOW MANY/WHEN: any-goal-in-15 +0.0007,
+goals-remaining +0.0003, BTTS -0.0009, period timing +0.0001, corners -0.010 (ESPN, 699 m).
+Winner market: +0.039 at 0-15', +0.004 by 75-90'. Scripts: `scripts/soccer_signal_decision_deepdive.py`,
+`scripts/soccer_outcome_markets_test.py`. Data: `reports/soccer_backtest/fotmob_2y.json.gz` (committed).
+
+**CORRECTION `[2026-08-22, same session, before any code shipped]`:** items 1-2 below as first written
+were WRONG and were caught before shipping, not after. "Half-life 300→60" transferred a finding from
+FotMob's OWN momentum series onto `momentum.py`'s ESPN-event-weighted proxy, which computes something
+structurally different. Tested directly against the production weighting scheme (`_EVENT_WEIGHTS`, ESPN
+commentary, 699 matches, holdout): dAUC is **-0.0006 to +0.0002 at every half-life from 30s to 1800s**,
+monotonically WORSE as half-life grows — the signature of no effect, not underpowered noise. Changing the
+constant would have been a no-op dressed as a fix. The |40| threshold is worse than a no-op: it is
+calibrated to FotMob's bounded 0-100 momentum scale, and the ESPN proxy outputs an unbounded weighted sum
+with no such scale — applying it would be meaningless on the actual production output.
+**Net: the ESPN-derived momentum this card currently ships has no measured goal-timing signal in 699
+matches at any tested half-life. Item 3 (ingest FotMob's real series) is not next in line, it is the only
+path to shipping anything real — building the card threshold or fixing the half-life on the ESPN proxy is
+wasted work until that lands.**
+
+**Do, in order:**
+1. **BUILT + TESTED, NOT DEPLOYED `[2026-08-22, same session]`** — `ingestion/fotmob_match_id.py` (name+
+   ccode join, decoy-tested against the Canada/Brazil trap) + `ingestion/fotmob_momentum.py` (clock-bounded
+   fetch, never-fatal) wired into `poll_soccer_live_state.py` in place of the retired ESPN proxy. No fallback
+   to the proxy — a join/fetch miss now returns `supported: False` and the card hides the panel, same
+   contract as before. 21 new tests (14 unit + 7 pinning the card threshold boundaries). Commit `00c4b1b8`.
+2. **BUILT in the same commit** — `cards.py` `_momentum_chart` strength bands retuned from the old
+   ESPN-proxy-scale constants (1.0/2.5/5.0) to FotMob's measured 0-100 scale (40/60/80). Below 40 reads
+   "Balanced" even when nonzero.
+3. **OWED — deploy.** Behind the two-lock protocol (`deploy_claim.py` + `deploy_preflight.py`), needs
+   live-odds-worker (owns `poll_soccer_live_state.py`) redeployed at a SHA containing `00c4b1b8`, then
+   verified against an actual live match — the join has unit tests but has never resolved a REAL FotMob
+   fixture end-to-end. First live verification should log `fotmob_match_id` per resolved match and count
+   join misses; a silent 0% resolve rate would look identical to a quiet slate.
+4. A next-team-to-score model on the live card: logistic on signed FotMob momentum (60s), score diff, clock,
+   home flag; surface P(home next)/P(away next) and edge vs next-goal / team-in-15 markets where quoted.
+   EXCLUDE mls (AUC .509) and belgian_pro_league (.520) until fitted per league.
+5. Score `goal_in_window_probability` (the sim) on the same holdout — never done; clock+one FotMob field
+   beats clock-only by +0.018 at 2 min and the sim's number for the same question is unknown. Adding momentum
+   to the sim's shot rate is a MECHANISM → re-fit per `model_engine_standard.md`.
+
+**WAIT, not NO:** the 2-minute "goal coming" signal (lift 2.27x at top 0.5%, +95% vs a naive book, -vig vs a
+sharp one) is gated on the live-odds pilot (`scripts/soccer_market_prices_momentum.py`: partial corr +0.14,
+n=106, needs ≥195 → ~2 more match-days). Live odds sample every ~333s (OUR cadence — 69% of consecutive
+pairs identical) against a 60s half-life; the "60-second live refresh" shipped 08-22 shows a 160s floor.
+
 ## `#517` CORRECTION `[2026-08-22, same session]` — READ THIS BEFORE THE NUMBERS BELOW
 
 **The 76 figure is retracted.** `cffi` was absent from the measuring

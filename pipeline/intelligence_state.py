@@ -4984,6 +4984,78 @@ class IntelligenceStateService:
             print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_layer2_shortlist")
 
+        # PORTFOLIO COMMIT + PAPER EXECUTION, immediately after the shortlist
+        # they derive from. Both are dark by default.
+        #
+        # **DELIBERATELY NOT IN `run_refresh_worker`'s AUTORUN CHAIN**, and the
+        # reason is `#341`/`#504`. That chain is an exclusive `elif`, and its
+        # own comment states the only shape that is safe to put near the front:
+        # DAILY-GATED (wins at most one tick per 24h) and INLINE (never holds a
+        # job slot). The commit job is neither — it must re-run whenever the
+        # shortlist changes, which is every few minutes. Put at the front it
+        # would steal ticks from the refresh branches; put at the back it would
+        # starve exactly as settlement did, reaching its branch once in 45
+        # minutes by coincidence.
+        #
+        # It is not an independent refresh job at all — it is a DERIVATION of
+        # the artifact written three lines above. So it belongs here, where its
+        # input is already in hand and it cannot contend for a slot it does not
+        # need.
+        #
+        # COST is bounded and small: it re-reads one artifact this process just
+        # wrote and sizes at most `max_positions` rows (12 by default). That
+        # matters on a worker measured at 88–96% of 4GiB all evening, which is
+        # also why it is wrapped — a sizing failure must never take down the
+        # board build that just succeeded.
+        try:
+            from pipeline.portfolio_commit import run_portfolio_commit
+
+            commit_result = run_portfolio_commit(str(selected_date or ""))
+            if commit_result.get("status") == "ok":
+                totals = (commit_result.get("plan") or {}).get("totals") or {}
+                print(
+                    f"[intelligence_state] PORTFOLIO_COMMIT date={selected_date} "
+                    f"positions={totals.get('positions')} "
+                    f"staked=${totals.get('staked_dollars')} "
+                    f"sim_share={totals.get('sim_share_of_staked')}",
+                    flush=True,
+                )
+                # PAPER EXECUTION ONLY, and `inline=True` ENFORCES that rather
+                # than trusting configuration: `execution_ledger`'s own docstring
+                # says the placer must never run inside `refresh-worker`, which
+                # has 110 OOM kills on record and restarts mid-job. Paper cannot
+                # double-spend, so the harness that generates Stage C's evidence
+                # is safe here; going live has to move to its own service, and
+                # this call refuses rather than letting configuration decide.
+                from pipeline.execute_portfolio import run_execution
+
+                exec_result = run_execution(str(selected_date or ""), inline=True)
+                if exec_result.get("status") == "ok":
+                    print(
+                        f"[intelligence_state] PORTFOLIO_EXECUTED date={selected_date} "
+                        f"mode={exec_result.get('mode')} placed={exec_result.get('placed')} "
+                        f"duplicates={exec_result.get('duplicates')} "
+                        f"skipped={exec_result.get('skipped')}",
+                        flush=True,
+                    )
+                elif exec_result.get("reason") not in {"disabled", "no_plan"}:
+                    print(
+                        f"[intelligence_state] PORTFOLIO_EXECUTE_SKIPPED "
+                        f"status={exec_result.get('status')} reason={exec_result.get('reason')}",
+                        flush=True,
+                    )
+            elif commit_result.get("reason") not in {"disabled", "no_shortlist"}:
+                # `disabled` and `no_shortlist` are the expected quiet states and
+                # would be pure noise every cycle. Anything else is a real
+                # refusal and must be readable.
+                print(
+                    f"[intelligence_state] PORTFOLIO_COMMIT_SKIPPED "
+                    f"status={commit_result.get('status')} reason={commit_result.get('reason')}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(f"[intelligence_state] PORTFOLIO_COMMIT_FAILED error={exc}", flush=True)
+
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,

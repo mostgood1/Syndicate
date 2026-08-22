@@ -23268,6 +23268,160 @@ instrument has produced today.** NCAAF opens ~08-29; a fifth in-season sport at
 400/sport could breach the ceiling, and the failure mode is an opaque
 "Connection closed by server".
 
+## 2026-08-22T21:16:34Z — VERIFIED ON THE SERVED SURFACE: `rows_admitted_by_blend = 159`
+
+**Lane `portfolio-decision-and-execution`. The reading the 20:39/20:46 deploy
+was waiting on, taken from `/api/board/layer2-shortlist` by the user** (the
+agent proxy 403s that host, which is why every prior reading this session came
+from Render logs and metrics).
+
+    rows_admitted_by_blend   159
+    rows_below_value_floor  1212
+    total_rows              1223      -> 13.0% of the served board
+
+**NOT ZERO, so the scoring change is NOT inert.** 159 rows are on the board
+because the BLENDED score cleared the family value floor where raw `ev_pct`
+would not have. Before 2026-08-22 `_row_value_pct` returned `ev_pct` first and
+the `score.value_pct` fallback was dead code, so every one of those 159 rows was
+being cut by price alone, upstream of anything the simulation had to say.
+
+**THE SERVED ROW ALSO CONFIRMS THE CAPPED SIM TERM BY CONTENT**, which ancestry
+could not: the sample row's `score` block carries **`sim_capped: false`** — a
+field that exists only in the 2026-08-22 change. `sim_component: null` on that
+row is correct, not a fault: its `model_edge_pct` is `null`, so there is no sim
+term to contribute, and `value_pct 4.7034 == ev_component 4.7034` closes the
+arithmetic.
+
+**THE SIM'S REACH IS FAR WORSE THAN THE SHORTLIST SUGGESTED, and this is the
+finding worth carrying forward.** `LAYER2_BOARD_HEALTH` reported `edged` 94/100
+mlb and 28/100 soccer, but that is measured AFTER selection and is biased upward
+by it. At the GRID level, `rows_with_model_edge / grid_rows`:
+
+    mlb       2372 /   2922   81.2%
+    nfl        682 /   1309   52.1%
+    wnba       186 /    982   18.9%
+    soccer     210 /  20039    1.0%     <- twenty thousand rows, two hundred edges
+
+So the capped sim term is a real signal on MLB, half a signal on NFL, and
+**arithmetically almost absent on soccer** — the board there is price shopping
+with a rounding error of model on top. Raising the weight or the cap would not
+change that; the constraint is coverage, not coefficient. `soccer`'s own
+`projections` block names the cause: `unmatched_player_rows 6059`,
+`player_miss_name 5716`, `unsupported_market_rows 3188` against
+`rows_considered 20039`.
+
+**A SECOND DEPLOY IS IN FLIGHT AND IS NOW OPTIONAL**,
+`dep-da512h0u01pc73dktveg` on `6cd980b4`, triggered 21:14:44Z at the user's
+instruction and `update_in_progress` at 21:17:15Z. It adds `admitted_by_blend=`
+to the `LAYER2_SHORTLIST` LOG line. **The counter was already on the endpoint**
+(it shipped in `ecf928c6`, which the running `b13a3a73` contains), so this
+deploy buys log-readability for sessions without HTTP access to the web host —
+not the number itself. Cost: a 2-game MLB `fingerprint_change` sim, against 15
+games had it been fired an hour earlier.
+
+**Claim `b3a38f31d57ab2f2` held on refresh-worker for this deploy; release after
+it lands.**
+
+## 2026-08-22T21:52:19Z — STAGE A IS LIVE AND PRODUCING. First real portfolio: 9 positions, $30.27, 79% sim-attributed
+
+**Lane `portfolio-decision-and-execution`. Deploy `dep-da51bu3bc2fs73fh0hig`,
+`471cbac9d`, live 21:38:15.820603Z. First post-boot shortlist 21:52:18Z.**
+
+    [intelligence_state] LAYER2_SHORTLIST date=2026-08-22 rows=1223 considered=17096
+                         below_floor=1127 admitted_by_blend=145
+    [portfolio_commit]   PLAN_WRITTEN rows_in=1223 sized=12 positions=9
+                         staked=$30.27 bankroll=$1000.0 scale=1.0
+                         refusals={'below_min_ev_pct': 391, 'below_min_stake': 3,
+                                   'beyond_max_positions': 6,
+                                   'no_model_edge_pct': 779, 'zero_kelly_stake': 35}
+    [intelligence_state] PORTFOLIO_COMMIT date=2026-08-22 positions=9
+                         staked=$30.27 sim_share=0.7906
+
+**THREE FIRSTS IN ONE LINE-GROUP.**
+
+1. **`admitted_by_blend=145` IS IN THE LOGS**, which is what the 21:34 deploy
+   was for. It reconciles with the 159 read off `/api/board/layer2-shortlist`
+   at 21:16 — different build, same magnitude — so the counter and the endpoint
+   agree and neither needs the other.
+2. **A REAL COMMITTED PORTFOLIO: 9 positions, $30.27 of $1,000 = 3.0% of
+   bankroll at risk.** That is the intended conservatism, not a fault: quarter
+   Kelly (`_DEFAULT_KELLY_MULTIPLIER` 0.25) shrunk again by
+   `_MIN_SAMPLE_CREDIBILITY` 0.25 because `settled_sample_size` is still zero
+   everywhere. 1/16th Kelly by construction.
+3. **`sim_share = 0.7906` ON REAL ROWS.** 79% of the committed money is
+   attributable to the simulation rather than to price shopping. **This is the
+   per-bet component decomposition `_SCORE_SIM_WEIGHT`'s own comment names as
+   the unlock condition and calls "what nobody has been able to supply."** It
+   now exists, per position, every build. NOTE the earlier 57.6% figure was a
+   SYNTHETIC row and was retracted; this one is production.
+
+**EVERY ROW IS ACCOUNTED FOR**, which is the contract `commit_portfolio` was
+built to keep: 1223 rows in, 9 committed, and the five named refusals sum to the
+rest. The largest by far is **`no_model_edge_pct: 779`** — 64% of the board
+cannot be sized because the sim has no probability view on it. That is the
+coverage gap from `deploys.md` 21:16 arriving in dollars: soccer's 210 edges
+across 20,039 grid rows is why two thirds of the board is unsizable, and no
+scoring coefficient changes it.
+
+**STAGE B IS STILL DARK.** `SYNDICATE_EXECUTION_ENABLED` is unset, so the commit
+ran alone this cycle — deliberately, one reading at a time. The owed Stage B
+reading stays `placed=N duplicates=0`, then `placed=0 duplicates=N` on the
+following build.
+
+**Claim `bf4e370da185fd16` released after this reading.**
+
+## 2026-08-22T22:07-22:12Z — STAGE B VERIFIED IN PRODUCTION. Idempotency holds across board rebuilds
+
+**Lane `portfolio-decision-and-execution`. `SYNDICATE_EXECUTION_ENABLED` set by
+the user; restart `dep-da51n2jbc2fs73fhu7cg` live 21:58:58Z carrying
+`471cbac9d`** — the wiring commit, so unlike the 21:33 flag this one had the
+code it gates. Verified BEFORE waiting, with the rule written an hour earlier.
+
+    22:07:48  LAYER2_SHORTLIST rows=1223 below_floor=1311 admitted_by_blend=137
+              PLAN_WRITTEN positions=5 staked=$15.07 bankroll=$1000.0
+              PORTFOLIO_COMMIT positions=5 staked=$15.07 sim_share=0.8374
+              EXECUTED mode=paper venue=paper armed=False
+                       positions=5 placed=5 duplicates=0 skipped=0
+                       summary={orders: 5, by_status: {filled: 5},
+                                filled_stake_dollars: 15.07, modes: ['paper'],
+                                unreconciled: 0}
+
+    22:10:34  EXECUTED positions=5 placed=0 duplicates=5 skipped=0
+                       summary={orders: 5, filled_stake_dollars: 15.07,
+                                unreconciled: 0}
+
+**THE SECOND LINE IS THE ACCEPTANCE READING, and it is clean.** The plan did not
+shift between those two builds, so all five came back as duplicates, the ledger
+stayed at 5 orders / $15.07, and **not one order duplicated across a rebuild.**
+That property is load-bearing rather than nice: this fires on EVERY board build,
+every few minutes, so without it the ledger would grow by five phantom bets per
+cycle. Proven in production, not only in a unit test.
+
+**A CASE I DID NOT DESIGN FOR, and it behaved correctly:** at 22:12:51 the
+2026-08-23 board ran with `positions=0 placed=0 duplicates=0`, reporting an
+empty plan rather than erroring or writing an empty ledger entry.
+
+**BOTH SAFETY SWITCHES HELD.** `armed=False` and `modes: ['paper']` on every
+line — nothing could have reached a venue even had one been configured, and
+`inline=True` would have refused live regardless.
+
+**`sim_share = 0.8374`**, against 0.7906 on the 21:52 build. 79–84% of committed
+money attributable to the simulation across two independent production builds.
+
+**A NUANCE STATED BEFORE THE DATA ARRIVED, and worth keeping.** The plan had
+shifted 9 positions/$30.27 (21:52) -> 5/$15.07 (22:07) as games went live and
+final, so `placed=0` was NOT guaranteed to be the right reading. The correct
+criterion is narrower: **a position that repeats must return as a duplicate and
+never re-place; genuinely new positions SHOULD place.** This build happened to
+be the clean case. A future mixed reading (`placed>0` alongside `duplicates>0`)
+is correct behaviour, not a leak — the leak signature is the same
+`position_key` filling twice, which `orders` and `filled_stake_dollars` would
+show.
+
+**STAGE A AND STAGE B ARE BOTH LIVE AND MEASURED.** What remains is Stage C,
+which needs paper slates to accumulate and then a CLV join against each
+position's `attribution` — no further code to deploy for it.
+
 ## 2026-08-22 22:01:23Z — live-odds-worker `e807a489` — `#514` basketball momentum capture
 
 - **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da51ocv40ujc73adkrbg`
