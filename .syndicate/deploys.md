@@ -22581,3 +22581,49 @@ measurement, not a drive-by edit at the end of a long session.
 Worth recording as a dead end so nobody repeats it: forcing this job by interval
 does not work while the soccer queue is draining, because the interval gate is
 not what was blocking it — the chain position was.
+
+## 2026-08-22T18:18:05Z — `#504` settlement chain move, refresh-worker, `4eeffb5c` — **VERIFIED**
+
+**Deployed by another session's trigger, not mine, and I did not re-fire.** A
+deploy of `4eeffb5c` was already in flight (18:14:35Z, `trigger=api`) when I took
+the claim. `4eeffb5c` sits on top of `284c1e1e` (`#504`), verified BY CONTENT —
+`git show 4eeffb5c:scripts/run_refresh_worker.py` has settlement at position 2.
+Triggering my own would have cancelled a running deploy to ship byte-identical
+code. Live 18:18:05Z.
+
+**Process honesty: the claim did NOT serialise this one.** I acquired it AFTER
+that deploy was triggered. The outcome is the one intended, but the lock did no
+work here and should not be credited with any.
+
+**VERIFY — the reading that proves it, not the thing I was going to watch:**
+
+    18:28:38.192696098Z  RECONCILIATION_AUTORUN_GATED    (branch 1, declines)
+    18:28:38.194012988Z  LEDGER_INDEX_SIZE autorun_enabled=True   (branch 2)
+
+**1.3 MILLISECONDS APART, SAME TICK.** Branch 2 is now reached the instant
+branch 1 declines. Against the pre-move behaviour on the same worker:
+
+    17:26:38  RECONCILIATION_AUTORUN_GATED   (branch 1)
+    17:28:34  LEDGER_INDEX_SIZE              (branch 13)  <- 116 SECONDS later,
+                                                             a different tick,
+                                                             reached once in 45 min
+
+`116s and lucky` -> `1.3ms and structural`. That is the whole change, measured.
+
+**A METRIC ERROR OF MINE, CORRECTED BEFORE IT MISLED THE RECORD.** I first
+proposed verifying by "time from worker start to `LEDGER_INDEX_SIZE`", expecting
+11min -> ~1min. That conflates two things. Pre-move, branch 1 itself did not log
+until **9.1 min** after startup, so most of the 11 was the worker's STARTUP
+CYCLE, not chain position. Post-move the same figure is **10.5 min**
+(18:18:05 -> 18:28:38) — barely different, and by that metric the change would
+have looked like it did nothing. The co-occurrence of the two lines is the
+metric that isolates chain position; elapsed-since-boot does not.
+
+**What is NOT verified, and must not be read into the above:** settlement did not
+RUN here. The daily gate declines for the rest of 2026-08-22 CT (it ran at
+17:28Z). This proves the branch is now REACHED promptly, which was `#504`'s
+entire claim. Whether `parlays_settled` moves off 0 is a separate question that
+tomorrow's run answers.
+
+Also live in that reading: `autorun_enabled=True` (env still set), index grown
+3,538,491 -> 3,561,802 bytes since 17:28Z.
