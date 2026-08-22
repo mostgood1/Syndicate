@@ -22534,3 +22534,50 @@ serie_a (the leagues in `unmatched_by_league`), pairable against the 12
 `board_names`. And `edge_why` must resolve into the two new keys. Neither has
 been observed. One pair is already confirmed from the OLD reading and still not
 applied: board `Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
+
+### 18:02:36Z — forced cycle ABANDONED, interval key DISARMED. It never fired.
+
+**The forced cycle did not produce a run.** `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1200`
+was set 17:48:25Z (deploy live 17:52:07Z) and removed at 18:02:36Z having
+produced **zero** settlement runs — no `LEDGER_INDEX_SIZE`, no `[ledger_bridge]`
+in the whole 17:52–18:02 window. Disarmed on user instruction; waiting for the
+daily run instead.
+
+Set to `""` rather than deleted: the gate is
+`if str(os.environ.get(...) or "").strip():`, so an empty value is falsy and the
+daily gate resumes. A true delete needs `replace:true`, which rewrites the WHOLE
+env block — the same blast radius as a blueprint sync, for no gain. **Note for
+the next reader: the key is PRESENT-BUT-EMPTY on the live service, not absent.
+Empty == off here, but do not read its presence as "the override is on".**
+
+**WHY IT NEVER FIRED — and it partially rehabilitates the starvation idea I
+retracted earlier.** Settlement is branch 13 of 14 in an exclusive `elif` chain.
+Measured 18:00:16.855Z:
+
+    SOCCER_UNIT_LAUNCHED league=la_liga unit=1/44 due=12 spacing_seconds=300
+
+Branch 12 (`soccer_weekly_refresh`) WON that tick, which stops the chain before
+13. Soccer has **44 units queued, 12 due**, and launches one every 300s. So
+settlement only gets a turn in the gaps where soccer's spacing gate blocks AND
+all 11 earlier branches decline — exactly the 17:28:34Z coincidence
+(`SOCCER_AUTORUN_SKIPPED reason=spacing_gate`, then settlement 0.65ms later).
+
+**The correction to my own record:** I claimed starvation, retracted it on seeing
+the 17:28 run, and the truth is in between. Settlement is REACHABLE but
+CONTENDED — it is not blocked, it is competing for scarce free ticks behind a
+branch that wins every ~5 minutes while a 44-unit queue drains. "It ran once" and
+"it runs when needed" are different claims, and I conflated them when I
+retracted.
+
+**This is the same defect class `#341` fixed for reconciliation, one branch
+lower.** `#341` moved reconciliation to the FRONT on the argument that a
+daily-gated inline job wins at most one tick a day and so costs the refresh
+branches almost nothing. **That argument applies verbatim to settlement, which
+was left at 13.** It is the obvious follow-up and is NOT done here — moving an
+expensive job earlier in the chain is a real change that deserves its own
+measurement, not a drive-by edit at the end of a long session.
+
+**Cost of the whole forced-cycle attempt: 2 restarts, 0 runs, 0 information.**
+Worth recording as a dead end so nobody repeats it: forcing this job by interval
+does not work while the soccer queue is draining, because the interval gate is
+not what was blocking it — the chain position was.
