@@ -22200,3 +22200,51 @@ a hypothesis, not a finding, and must not be recorded as one.**
 The measurement window for BOTH `#498` and `#499` was therefore ~20 minutes wide
 (00:15Z–~00:20Z), not the full slate. Both readings above stand; neither can be
 re-taken until `#501` is fixed.
+
+## 2026-08-22T17:00Z — `#502` portfolio ledger service-split, BOTH services, `2aa1df54`
+
+**Deployed by lane `portfolio-ledger-service-split`, on explicit user instruction
+("deploy it to both services", "deploy both now, accept the kill").**
+
+    web            srv-d88ahvrbc2fs73eodu30   dep-da4tbb6417fc73dg2oo0   17:00:28Z
+    refresh-worker srv-d91dpertqb8s73co8ls0   dep-da4tbgv40ujc73a0coj0   17:00:51Z
+
+**BEFORE (the readings this must be compared against):**
+
+    web             8fafac88  live 16:56:31Z   (another session, 4 min earlier)
+    refresh-worker  5e99fdcb  live 01:26:40Z   (15h old, behind main by the 5 commits)
+
+**COMPOSITION CHECKED, not assumed.** Every SHA live on either service is an
+ancestor of `2aa1df54` — `8fafac88`, `5e99fdcb`, `1dca9659`, `2cfa1507` all
+returned CONTAINED under `git merge-base --is-ancestor`. This deploy therefore
+ADDS and reverts nothing, which is the property the on-main rule exists to buy
+and the one the 2026-08-15 incident lost. Worth stating because web had been
+deployed by a parallel session four minutes earlier: had I cut off my own branch
+instead of main, that session's soccer live-cards work would have gone.
+
+**WHAT WAS NOT DONE, and this is a real gap in the record.**
+`deploy_preflight.py` COULD NOT RUN: this session has no `RENDER_API_KEY` (nor
+`ADMIN_TOKEN`), and the script reads only `os.environ` and a repo `.env`, neither
+of which has it. So there is **no CLEAR verdict for `2aa1df54`**, and nothing
+below should be read as if there were. What WAS held:
+
+- Both deploy claims, acquired and held across the deploy (`621ebee14c970a00`
+  refresh-worker, `8aed21376c71b520` web) — so serialisation against parallel
+  sessions, the guard's core purpose, was intact.
+- On-main, verified with git rather than with preflight's check.
+- The in-flight-job check, which is the substantive thing preflight adds, was
+  **explicitly waived by the user** after being shown what was running.
+
+**KILLED DELIBERATELY.** At 16:50:48Z refresh-worker was running a full MLB daily
+sim (`run_mlb_daily_sim_job.py`, 15 game_pks, 1000 sims, pid 39890), the
+`ui-daily` daily_update, `daily_update_multi_profile`, and a live EPL
+`build_soccer_artifacts` — at 90.9% of 4096MB. The user was shown this and chose
+to deploy anyway. Today's 16:47 MLB run is lost; it re-runs on the next tick.
+
+**VERIFY — NOT YET DONE AT TIME OF WRITING.** The reading that proves this worked
+is `settled_count > 0` (and `avg_clv` non-null) on `/api/portfolio/summary`,
+which has read `0`/`null` for weeks. It CANNOT be taken immediately:
+reconciliation is daily-gated and last ran 06:57:03Z, so the first settlement
+pass under the new code is the next one. A green deploy is NOT evidence the fix
+works — it is only evidence the code is live. Do not close `#502` on the deploy.
+
