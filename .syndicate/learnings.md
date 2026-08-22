@@ -5238,3 +5238,59 @@ than anything else, and shot COUNT (free from ESPN) matched or beat xG. Five
 promising numbers died this session -- 40.2%, xG +0.1028, xG-over-count,
 la_liga 80-84', 40-48' peak -- and all five were read off a tail or a bug
 before a control existed. The control was always the cheap part.
+
+## 08-22 REVERSAL: there IS a signal. I had spent the whole day testing at the WRONG TIMESCALE.
+
+The cell sweep's negative was real about its own cells and WRONG as a general
+claim. A pooled model over all ~380k samples, clock as a 24-way one-hot
+baseline (the strongest clock-only predictor), holdout AUC:
+
+    window   60s  dAUC +0.0238        window 300s  +0.0081
+             120s       +0.0189               600s  +0.0088   <-- EVERY earlier test
+             180s       +0.0143               900s  +0.0058
+
+Monotonic in window. **Every analysis today used a 600s window and a 900s
+half-life. The signal lives at 60-120s with a 60s half-life.** Football momentum
+decays in about a minute; I smeared it across fifteen and then concluded five
+times that it was not there. That was a design assumption I never tested, not a
+property of the game.
+
+**CORRECTED NULL (the first one was wrong).** `rng.shuffle(yperm)` globally
+permutes TRAINING labels, which trains BOTH arms on noise and makes the
+increment ~0 by construction -- far too lenient, and the docstring claimed
+within-match. Correct null permutes FEATURE ROWS within time band, leaving
+clock and labels intact so only the feature link breaks:
+    real +0.0181   null -0.0022, +0.0002, +0.0018, -0.0057
+Ten times the null's best run.
+
+**THE DRIVER IS FOTMOB'S OWN MOMENTUM, and nothing else.**
+    solo (added to clock)      leave-one-out
+      vmom_abs  +0.0098          +0.0118   <-- unique, irreplaceable
+      xg        +0.0046          -0.0002
+      inbox     +0.0045          -0.0001
+Every shot feature is redundant; dropping any costs nothing. This REVERSES
+"FotMob has not earned a dependency" -- it has, for MOMENTUM, not for xG.
+
+**BUT MOMENTUM IS MOSTLY REACTIVE, and that is the honest headline.**
+    AUC predicting FUTURE goals 0.5242   AUC predicting PAST goals 0.6050
+It rises AFTER attacks and goals, far more than it anticipates them. And its
+per-minute stamp can overlap the label window, so it was re-tested lagged:
+    lag   0s  dAUC +0.0181 (vmom +0.0098)
+         60s        +0.0138 (vmom +0.0076)   <-- the defensible number
+        120s        +0.0098 (vmom +0.0046)
+76% of the effect survives a strict 60s lag, so it is not a bucket artifact --
+but it decays fast, which is what a genuinely short-lived signal looks like.
+
+**ECONOMICS, and the reason this is still not a green light.** At a 120s window
+the base rate is 0.0581, so the 2-1/3-1 bars from the 10-minute work DO NOT
+APPLY. Lagged, top 2% of predicted risk hits 0.0946 [0.085,0.105], lift 1.63x,
+needing better than ~9.6-1. Whether that is exploitable depends entirely on how
+books price live goal markets -- and they price them with their own shot and
+pressure models, which see the same 1.63x. NOT MEASURED. That is a test against
+live odds, which is a different question from this one.
+
+**THE METHOD LESSON.** "No signal" is only ever a claim about the test you ran.
+Five negatives at one timescale said nothing about other timescales, and the
+one-line fix (sweep the window) was available from the start. A negative result
+needs its power characterised before it is trusted, exactly as a positive needs
+a null.
