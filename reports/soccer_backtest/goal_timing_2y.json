@@ -1,0 +1,3046 @@
+{
+  "n_matches": 5552,
+  "by_league": {
+    "primeira_liga": 631,
+    "la_liga": 770,
+    "epl": 766,
+    "ligue_1": 614,
+    "serie_a": 762,
+    "bundesliga": 612,
+    "belgian_pro_league": 240,
+    "championship": 552,
+    "eredivisie": 306,
+    "mls": 299
+  },
+  "base_rate": 0.26320163327269636,
+  "clock": [
+    {
+      "lo_min": 0,
+      "hi_min": 4,
+      "n": 5034,
+      "hit": 0.2324,
+      "lift": 0.883,
+      "ci": [
+        0.221,
+        0.2443
+      ]
+    },
+    {
+      "lo_min": 4,
+      "hi_min": 8,
+      "n": 6712,
+      "hit": 0.2396,
+      "lift": 0.91,
+      "ci": [
+        0.2295,
+        0.2499
+      ]
+    },
+    {
+      "lo_min": 8,
+      "hi_min": 12,
+      "n": 6712,
+      "hit": 0.249,
+      "lift": 0.946,
+      "ci": [
+        0.2388,
+        0.2594
+      ]
+    },
+    {
+      "lo_min": 12,
+      "hi_min": 16,
+      "n": 6712,
+      "hit": 0.2436,
+      "lift": 0.926,
+      "ci": [
+        0.2335,
+        0.254
+      ]
+    },
+    {
+      "lo_min": 16,
+      "hi_min": 20,
+      "n": 6712,
+      "hit": 0.2408,
+      "lift": 0.915,
+      "ci": [
+        0.2307,
+        0.2511
+      ]
+    },
+    {
+      "lo_min": 20,
+      "hi_min": 24,
+      "n": 6712,
+      "hit": 0.2546,
+      "lift": 0.967,
+      "ci": [
+        0.2443,
+        0.2652
+      ]
+    },
+    {
+      "lo_min": 24,
+      "hi_min": 28,
+      "n": 6712,
+      "hit": 0.2551,
+      "lift": 0.969,
+      "ci": [
+        0.2448,
+        0.2656
+      ]
+    },
+    {
+      "lo_min": 28,
+      "hi_min": 32,
+      "n": 6712,
+      "hit": 0.2496,
+      "lift": 0.948,
+      "ci": [
+        0.2393,
+        0.26
+      ]
+    },
+    {
+      "lo_min": 32,
+      "hi_min": 36,
+      "n": 6712,
+      "hit": 0.2472,
+      "lift": 0.939,
+      "ci": [
+        0.237,
+        0.2576
+      ]
+    },
+    {
+      "lo_min": 36,
+      "hi_min": 40,
+      "n": 6712,
+      "hit": 0.2667,
+      "lift": 1.013,
+      "ci": [
+        0.2562,
+        0.2774
+      ]
+    },
+    {
+      "lo_min": 40,
+      "hi_min": 44,
+      "n": 6712,
+      "hit": 0.2859,
+      "lift": 1.086,
+      "ci": [
+        0.2752,
+        0.2968
+      ]
+    },
+    {
+      "lo_min": 44,
+      "hi_min": 48,
+      "n": 6712,
+      "hit": 0.2932,
+      "lift": 1.114,
+      "ci": [
+        0.2824,
+        0.3042
+      ]
+    },
+    {
+      "lo_min": 48,
+      "hi_min": 52,
+      "n": 6712,
+      "hit": 0.2801,
+      "lift": 1.064,
+      "ci": [
+        0.2695,
+        0.291
+      ]
+    },
+    {
+      "lo_min": 52,
+      "hi_min": 56,
+      "n": 6712,
+      "hit": 0.2795,
+      "lift": 1.062,
+      "ci": [
+        0.2689,
+        0.2904
+      ]
+    },
+    {
+      "lo_min": 56,
+      "hi_min": 60,
+      "n": 6712,
+      "hit": 0.275,
+      "lift": 1.045,
+      "ci": [
+        0.2645,
+        0.2858
+      ]
+    },
+    {
+      "lo_min": 60,
+      "hi_min": 64,
+      "n": 6710,
+      "hit": 0.2827,
+      "lift": 1.074,
+      "ci": [
+        0.2721,
+        0.2936
+      ]
+    },
+    {
+      "lo_min": 64,
+      "hi_min": 68,
+      "n": 6707,
+      "hit": 0.2769,
+      "lift": 1.052,
+      "ci": [
+        0.2663,
+        0.2877
+      ]
+    },
+    {
+      "lo_min": 68,
+      "hi_min": 72,
+      "n": 6697,
+      "hit": 0.2737,
+      "lift": 1.04,
+      "ci": [
+        0.2632,
+        0.2845
+      ]
+    },
+    {
+      "lo_min": 72,
+      "hi_min": 76,
+      "n": 6689,
+      "hit": 0.2531,
+      "lift": 0.962,
+      "ci": [
+        0.2428,
+        0.2637
+      ]
+    },
+    {
+      "lo_min": 76,
+      "hi_min": 80,
+      "n": 6654,
+      "hit": 0.2567,
+      "lift": 0.975,
+      "ci": [
+        0.2463,
+        0.2673
+      ]
+    },
+    {
+      "lo_min": 80,
+      "hi_min": 84,
+      "n": 6554,
+      "hit": 0.2695,
+      "lift": 1.024,
+      "ci": [
+        0.2588,
+        0.2803
+      ]
+    },
+    {
+      "lo_min": 84,
+      "hi_min": 88,
+      "n": 6328,
+      "hit": 0.2805,
+      "lift": 1.066,
+      "ci": [
+        0.2696,
+        0.2917
+      ]
+    },
+    {
+      "lo_min": 88,
+      "hi_min": 92,
+      "n": 5485,
+      "hit": 0.2676,
+      "lift": 1.017,
+      "ci": [
+        0.2561,
+        0.2795
+      ]
+    },
+    {
+      "lo_min": 92,
+      "hi_min": 96,
+      "n": 1996,
+      "hit": 0.2465,
+      "lift": 0.937,
+      "ci": [
+        0.2281,
+        0.2659
+      ]
+    }
+  ],
+  "tested": 2367,
+  "selected": 416,
+  "candidates": [
+    {
+      "league": "mls",
+      "band": 23,
+      "feature": "count",
+      "fit_clock": 0.2492,
+      "fit_hit": 0.3766,
+      "fit_delta": 0.1274,
+      "fit_n": 77
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 13,
+      "feature": "xg",
+      "fit_clock": 0.259,
+      "fit_hit": 0.3735,
+      "fit_delta": 0.1145,
+      "fit_n": 166,
+      "hold_clock": 0.25,
+      "hold_hit": 0.2973,
+      "hold_n": 74,
+      "hold_delta": 0.0473,
+      "ci": [
+        0.2053,
+        0.4093
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 23,
+      "feature": "xg",
+      "fit_clock": 0.2492,
+      "fit_hit": 0.3636,
+      "fit_delta": 0.1145,
+      "fit_n": 77
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 13,
+      "feature": "inbox",
+      "fit_clock": 0.259,
+      "fit_hit": 0.3735,
+      "fit_delta": 0.1145,
+      "fit_n": 166,
+      "hold_clock": 0.25,
+      "hold_hit": 0.2297,
+      "hold_n": 74,
+      "hold_delta": -0.0203,
+      "ci": [
+        0.1487,
+        0.3375
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 9,
+      "feature": "bigchance",
+      "fit_clock": 0.3062,
+      "fit_hit": 0.4151,
+      "fit_delta": 0.1089,
+      "fit_n": 212,
+      "hold_clock": 0.2833,
+      "hold_hit": 0.2667,
+      "hold_n": 90,
+      "hold_delta": -0.0167,
+      "ci": [
+        0.1862,
+        0.3662
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 23,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2722,
+      "fit_hit": 0.3806,
+      "fit_delta": 0.1084,
+      "fit_n": 134,
+      "hold_clock": 0.183,
+      "hold_hit": 0.2373,
+      "hold_n": 59,
+      "hold_delta": 0.0543,
+      "ci": [
+        0.1469,
+        0.3598
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3923,
+      "fit_delta": 0.1077,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.3778,
+      "hold_n": 90,
+      "hold_delta": 0.0778,
+      "ci": [
+        0.2846,
+        0.481
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "xg",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3956,
+      "fit_delta": 0.1077,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3333,
+      "hold_n": 81,
+      "hold_delta": 0.0748,
+      "ci": [
+        0.2403,
+        0.4415
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "inbox",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3923,
+      "fit_delta": 0.1077,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.3333,
+      "hold_n": 90,
+      "hold_delta": 0.0333,
+      "ci": [
+        0.2445,
+        0.4358
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 23,
+      "feature": "subs",
+      "fit_clock": 0.3135,
+      "fit_hit": 0.4207,
+      "fit_delta": 0.1072,
+      "fit_n": 164,
+      "hold_clock": 0.2591,
+      "hold_hit": 0.325,
+      "hold_n": 80,
+      "hold_delta": 0.0659,
+      "ci": [
+        0.2324,
+        0.4336
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "xg",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4202,
+      "fit_delta": 0.1062,
+      "fit_n": 426,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.328,
+      "hold_n": 186,
+      "hold_delta": 0.0323,
+      "ci": [
+        0.2646,
+        0.3983
+      ],
+      "survived": true
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 11,
+      "feature": "inbox",
+      "fit_clock": 0.2349,
+      "fit_hit": 0.3373,
+      "fit_delta": 0.1024,
+      "fit_n": 166,
+      "hold_clock": 0.2331,
+      "hold_hit": 0.2568,
+      "hold_n": 74,
+      "hold_delta": 0.0236,
+      "ci": [
+        0.171,
+        0.3665
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 3,
+      "feature": "count",
+      "fit_clock": 0.2364,
+      "fit_hit": 0.3373,
+      "fit_delta": 0.1009,
+      "fit_n": 166,
+      "hold_clock": 0.2264,
+      "hold_hit": 0.3919,
+      "hold_n": 74,
+      "hold_delta": 0.1655,
+      "ci": [
+        0.2886,
+        0.5058
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 8,
+      "feature": "bigchance",
+      "fit_clock": 0.2368,
+      "fit_hit": 0.3349,
+      "fit_delta": 0.0981,
+      "fit_n": 209,
+      "hold_clock": 0.2972,
+      "hold_hit": 0.2747,
+      "hold_n": 91,
+      "hold_delta": -0.0225,
+      "ci": [
+        0.1936,
+        0.3741
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 10,
+      "feature": "bigchance",
+      "fit_clock": 0.3168,
+      "fit_hit": 0.4147,
+      "fit_delta": 0.0979,
+      "fit_n": 217,
+      "hold_clock": 0.323,
+      "hold_hit": 0.3483,
+      "hold_n": 89,
+      "hold_delta": 0.0253,
+      "ci": [
+        0.2575,
+        0.4517
+      ],
+      "survived": true
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 11,
+      "feature": "xg",
+      "fit_clock": 0.2349,
+      "fit_hit": 0.3313,
+      "fit_delta": 0.0964,
+      "fit_n": 166,
+      "hold_clock": 0.2331,
+      "hold_hit": 0.2568,
+      "hold_n": 74,
+      "hold_delta": 0.0236,
+      "ci": [
+        0.171,
+        0.3665
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 22,
+      "feature": "bigchance",
+      "fit_clock": 0.2069,
+      "fit_hit": 0.303,
+      "fit_delta": 0.0961,
+      "fit_n": 406,
+      "hold_clock": 0.2587,
+      "hold_hit": 0.1098,
+      "hold_n": 173,
+      "hold_delta": -0.1488,
+      "ci": [
+        0.0714,
+        0.1652
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 0,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2691,
+      "fit_hit": 0.3651,
+      "fit_delta": 0.096,
+      "fit_n": 126,
+      "hold_clock": 0.2297,
+      "hold_hit": 0.2419,
+      "hold_n": 62,
+      "hold_delta": 0.0122,
+      "ci": [
+        0.1525,
+        0.3615
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "inbox",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4061,
+      "fit_delta": 0.0921,
+      "fit_n": 426,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.328,
+      "hold_n": 186,
+      "hold_delta": 0.0323,
+      "ci": [
+        0.2646,
+        0.3983
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "count",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3791,
+      "fit_delta": 0.0912,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3704,
+      "hold_n": 81,
+      "hold_delta": 0.1118,
+      "ci": [
+        0.2733,
+        0.4792
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "inbox",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3791,
+      "fit_delta": 0.0912,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3333,
+      "hold_n": 81,
+      "hold_delta": 0.0748,
+      "ci": [
+        0.2403,
+        0.4415
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 8,
+      "feature": "ontarget",
+      "fit_clock": 0.2368,
+      "fit_hit": 0.3254,
+      "fit_delta": 0.0885,
+      "fit_n": 209,
+      "hold_clock": 0.2972,
+      "hold_hit": 0.2889,
+      "hold_n": 90,
+      "hold_delta": -0.0083,
+      "ci": [
+        0.2054,
+        0.3896
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "bigchance",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4005,
+      "fit_delta": 0.0865,
+      "fit_n": 427,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.3763,
+      "hold_n": 186,
+      "hold_delta": 0.0806,
+      "ci": [
+        0.3099,
+        0.4478
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2727,
+      "fit_hit": 0.3589,
+      "fit_delta": 0.0861,
+      "fit_n": 209,
+      "hold_clock": 0.3306,
+      "hold_hit": 0.3333,
+      "hold_n": 90,
+      "hold_delta": 0.0028,
+      "ci": [
+        0.2445,
+        0.4358
+      ],
+      "survived": false
+    },
+    {
+      "league": "championship",
+      "band": 2,
+      "feature": "inbox",
+      "fit_clock": 0.2519,
+      "fit_hit": 0.3377,
+      "fit_delta": 0.0857,
+      "fit_n": 385,
+      "hold_clock": 0.2425,
+      "hold_hit": 0.2635,
+      "hold_n": 167,
+      "hold_delta": 0.021,
+      "ci": [
+        0.2025,
+        0.3351
+      ],
+      "survived": false
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "bigchance",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3613,
+      "fit_delta": 0.0832,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4536,
+      "hold_n": 194,
+      "hold_delta": 0.128,
+      "ci": [
+        0.3851,
+        0.5239
+      ],
+      "survived": true
+    },
+    {
+      "league": "ligue_1",
+      "band": 14,
+      "feature": "count",
+      "fit_clock": 0.2984,
+      "fit_hit": 0.3812,
+      "fit_delta": 0.0828,
+      "fit_n": 425,
+      "hold_clock": 0.2553,
+      "hold_hit": 0.2606,
+      "hold_n": 188,
+      "hold_delta": 0.0053,
+      "ci": [
+        0.2031,
+        0.3277
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 23,
+      "feature": "ontarget",
+      "fit_clock": 0.2722,
+      "fit_hit": 0.3534,
+      "fit_delta": 0.0812,
+      "fit_n": 133,
+      "hold_clock": 0.183,
+      "hold_hit": 0.2143,
+      "hold_n": 56,
+      "hold_delta": 0.0312,
+      "ci": [
+        0.1271,
+        0.3382
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 15,
+      "feature": "count",
+      "fit_clock": 0.2718,
+      "fit_hit": 0.3514,
+      "fit_delta": 0.0796,
+      "fit_n": 424,
+      "hold_clock": 0.2566,
+      "hold_hit": 0.3191,
+      "hold_n": 188,
+      "hold_delta": 0.0625,
+      "ci": [
+        0.2567,
+        0.3888
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 21,
+      "feature": "count",
+      "fit_clock": 0.3285,
+      "fit_hit": 0.4078,
+      "fit_delta": 0.0793,
+      "fit_n": 206,
+      "hold_clock": 0.3063,
+      "hold_hit": 0.3452,
+      "hold_n": 84,
+      "hold_delta": 0.0389,
+      "ci": [
+        0.2523,
+        0.4517
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "bigchance",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3636,
+      "fit_delta": 0.0789,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.3,
+      "hold_n": 90,
+      "hold_delta": 0.0,
+      "ci": [
+        0.2151,
+        0.4013
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 13,
+      "feature": "ontarget",
+      "fit_clock": 0.259,
+      "fit_hit": 0.3373,
+      "fit_delta": 0.0783,
+      "fit_n": 166,
+      "hold_clock": 0.25,
+      "hold_hit": 0.2568,
+      "hold_n": 74,
+      "hold_delta": 0.0068,
+      "ci": [
+        0.171,
+        0.3665
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 21,
+      "feature": "count",
+      "fit_clock": 0.2157,
+      "fit_hit": 0.2927,
+      "fit_delta": 0.077,
+      "fit_n": 492,
+      "hold_clock": 0.2755,
+      "hold_hit": 0.301,
+      "hold_n": 206,
+      "hold_delta": 0.0255,
+      "ci": [
+        0.2424,
+        0.3668
+      ],
+      "survived": false
+    },
+    {
+      "league": "championship",
+      "band": 9,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2468,
+      "fit_hit": 0.3232,
+      "fit_delta": 0.0764,
+      "fit_n": 393,
+      "hold_clock": 0.3084,
+      "hold_hit": 0.3728,
+      "hold_n": 169,
+      "hold_delta": 0.0644,
+      "ci": [
+        0.3035,
+        0.4478
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 20,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3306,
+      "fit_hit": 0.4067,
+      "fit_delta": 0.0761,
+      "fit_n": 450,
+      "hold_clock": 0.2685,
+      "hold_hit": 0.3433,
+      "hold_n": 201,
+      "hold_delta": 0.0748,
+      "ci": [
+        0.2811,
+        0.4113
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 9,
+      "feature": "vmom_abs",
+      "fit_clock": 0.303,
+      "fit_hit": 0.379,
+      "fit_delta": 0.076,
+      "fit_n": 219,
+      "hold_clock": 0.3427,
+      "hold_hit": 0.3656,
+      "hold_n": 93,
+      "hold_delta": 0.0229,
+      "ci": [
+        0.2749,
+        0.467
+      ],
+      "survived": true
+    },
+    {
+      "league": "championship",
+      "band": 2,
+      "feature": "xg",
+      "fit_clock": 0.2519,
+      "fit_hit": 0.3273,
+      "fit_delta": 0.0753,
+      "fit_n": 385,
+      "hold_clock": 0.2425,
+      "hold_hit": 0.2395,
+      "hold_n": 167,
+      "hold_delta": -0.003,
+      "ci": [
+        0.1811,
+        0.3096
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 17,
+      "feature": "xg",
+      "fit_clock": 0.2951,
+      "fit_hit": 0.3704,
+      "fit_delta": 0.0752,
+      "fit_n": 216,
+      "hold_clock": 0.2528,
+      "hold_hit": 0.236,
+      "hold_n": 89,
+      "hold_delta": -0.0169,
+      "ci": [
+        0.1598,
+        0.3339
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 17,
+      "feature": "inbox",
+      "fit_clock": 0.2951,
+      "fit_hit": 0.3704,
+      "fit_delta": 0.0752,
+      "fit_n": 216,
+      "hold_clock": 0.2528,
+      "hold_hit": 0.2247,
+      "hold_n": 89,
+      "hold_delta": -0.0281,
+      "ci": [
+        0.1504,
+        0.3218
+      ],
+      "survived": false
+    },
+    {
+      "league": "championship",
+      "band": 19,
+      "feature": "count",
+      "fit_clock": 0.253,
+      "fit_hit": 0.3281,
+      "fit_delta": 0.0751,
+      "fit_n": 381,
+      "hold_clock": 0.2714,
+      "hold_hit": 0.2635,
+      "hold_n": 167,
+      "hold_delta": -0.0079,
+      "ci": [
+        0.2025,
+        0.3351
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 20,
+      "feature": "xg",
+      "fit_clock": 0.2442,
+      "fit_hit": 0.319,
+      "fit_delta": 0.0748,
+      "fit_n": 163,
+      "hold_clock": 0.3562,
+      "hold_hit": 0.2603,
+      "hold_n": 73,
+      "hold_delta": -0.0959,
+      "ci": [
+        0.1734,
+        0.3711
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 12,
+      "feature": "vmom_abs",
+      "fit_clock": 0.28,
+      "fit_hit": 0.3548,
+      "fit_delta": 0.0747,
+      "fit_n": 451,
+      "hold_clock": 0.2382,
+      "hold_hit": 0.3073,
+      "hold_n": 192,
+      "hold_delta": 0.0691,
+      "ci": [
+        0.2463,
+        0.3758
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "ontarget",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3589,
+      "fit_delta": 0.0742,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.1778,
+      "hold_n": 90,
+      "hold_delta": -0.1222,
+      "ci": [
+        0.1125,
+        0.2694
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2907,
+      "fit_hit": 0.3641,
+      "fit_delta": 0.0734,
+      "fit_n": 217,
+      "hold_clock": 0.2584,
+      "hold_hit": 0.2697,
+      "hold_n": 89,
+      "hold_delta": 0.0112,
+      "ci": [
+        0.1884,
+        0.37
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 15,
+      "feature": "inbox",
+      "fit_clock": 0.2776,
+      "fit_hit": 0.3502,
+      "fit_delta": 0.0726,
+      "fit_n": 217,
+      "hold_clock": 0.2949,
+      "hold_hit": 0.3596,
+      "hold_n": 89,
+      "hold_delta": 0.0646,
+      "ci": [
+        0.2676,
+        0.4631
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "inbox",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3505,
+      "fit_delta": 0.0724,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4227,
+      "hold_n": 194,
+      "hold_delta": 0.0971,
+      "ci": [
+        0.3553,
+        0.493
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 9,
+      "feature": "bigchance",
+      "fit_clock": 0.303,
+      "fit_hit": 0.3733,
+      "fit_delta": 0.0703,
+      "fit_n": 217,
+      "hold_clock": 0.3427,
+      "hold_hit": 0.3596,
+      "hold_n": 89,
+      "hold_delta": 0.0169,
+      "ci": [
+        0.2676,
+        0.4631
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "ontarget",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3571,
+      "fit_delta": 0.0693,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.2963,
+      "hold_n": 81,
+      "hold_delta": 0.0377,
+      "ci": [
+        0.2079,
+        0.4031
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 18,
+      "feature": "count",
+      "fit_clock": 0.2763,
+      "fit_hit": 0.3445,
+      "fit_delta": 0.0682,
+      "fit_n": 209,
+      "hold_clock": 0.3472,
+      "hold_hit": 0.4111,
+      "hold_n": 90,
+      "hold_delta": 0.0639,
+      "ci": [
+        0.3151,
+        0.5144
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 7,
+      "feature": "vmom_abs",
+      "fit_clock": 0.2887,
+      "fit_hit": 0.3568,
+      "fit_delta": 0.0681,
+      "fit_n": 426,
+      "hold_clock": 0.2782,
+      "hold_hit": 0.204,
+      "hold_n": 201,
+      "hold_delta": -0.0742,
+      "ci": [
+        0.1541,
+        0.265
+      ],
+      "survived": false
+    },
+    {
+      "league": "la_liga",
+      "band": 22,
+      "feature": "xg",
+      "fit_clock": 0.2841,
+      "fit_hit": 0.352,
+      "fit_delta": 0.0679,
+      "fit_n": 446,
+      "hold_clock": 0.2794,
+      "hold_hit": 0.2222,
+      "hold_n": 198,
+      "hold_delta": -0.0572,
+      "ci": [
+        0.1699,
+        0.2851
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 16,
+      "feature": "inbox",
+      "fit_clock": 0.2692,
+      "fit_hit": 0.3371,
+      "fit_delta": 0.0679,
+      "fit_n": 534,
+      "hold_clock": 0.2708,
+      "hold_hit": 0.3026,
+      "hold_n": 228,
+      "hold_delta": 0.0318,
+      "ci": [
+        0.2467,
+        0.3651
+      ],
+      "survived": false
+    },
+    {
+      "league": "championship",
+      "band": 18,
+      "feature": "count",
+      "fit_clock": 0.2624,
+      "fit_hit": 0.3298,
+      "fit_delta": 0.0674,
+      "fit_n": 382,
+      "hold_clock": 0.2395,
+      "hold_hit": 0.1737,
+      "hold_n": 167,
+      "hold_delta": -0.0659,
+      "ci": [
+        0.1237,
+        0.2383
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 21,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3057,
+      "fit_hit": 0.3729,
+      "fit_delta": 0.0672,
+      "fit_n": 413,
+      "hold_clock": 0.2817,
+      "hold_hit": 0.2632,
+      "hold_n": 190,
+      "hold_delta": -0.0185,
+      "ci": [
+        0.2057,
+        0.33
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 20,
+      "feature": "count",
+      "fit_clock": 0.3043,
+      "fit_hit": 0.3709,
+      "fit_delta": 0.0665,
+      "fit_n": 213,
+      "hold_clock": 0.3732,
+      "hold_hit": 0.375,
+      "hold_n": 88,
+      "hold_delta": 0.0018,
+      "ci": [
+        0.2811,
+        0.4794
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 8,
+      "feature": "bigchance",
+      "fit_clock": 0.2575,
+      "fit_hit": 0.3234,
+      "fit_delta": 0.0658,
+      "fit_n": 167,
+      "hold_clock": 0.2669,
+      "hold_hit": 0.2237,
+      "hold_n": 76,
+      "hold_delta": -0.0432,
+      "ci": [
+        0.1446,
+        0.3293
+      ],
+      "survived": false
+    },
+    {
+      "league": "epl",
+      "band": 11,
+      "feature": "inbox",
+      "fit_clock": 0.285,
+      "fit_hit": 0.3495,
+      "fit_delta": 0.0645,
+      "fit_n": 535,
+      "hold_clock": 0.2695,
+      "hold_hit": 0.3333,
+      "hold_n": 231,
+      "hold_delta": 0.0639,
+      "ci": [
+        0.2757,
+        0.3964
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 16,
+      "feature": "inbox",
+      "fit_clock": 0.2907,
+      "fit_hit": 0.3548,
+      "fit_delta": 0.0642,
+      "fit_n": 217,
+      "hold_clock": 0.2584,
+      "hold_hit": 0.2921,
+      "hold_n": 89,
+      "hold_delta": 0.0337,
+      "ci": [
+        0.2078,
+        0.3936
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 14,
+      "feature": "inbox",
+      "fit_clock": 0.2984,
+      "fit_hit": 0.3624,
+      "fit_delta": 0.0639,
+      "fit_n": 425,
+      "hold_clock": 0.2553,
+      "hold_hit": 0.2819,
+      "hold_n": 188,
+      "hold_delta": 0.0266,
+      "ci": [
+        0.2225,
+        0.3501
+      ],
+      "survived": false
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "xg",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3419,
+      "fit_delta": 0.0638,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4536,
+      "hold_n": 194,
+      "hold_delta": 0.128,
+      "ci": [
+        0.3851,
+        0.5239
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 14,
+      "feature": "bigchance",
+      "fit_clock": 0.2915,
+      "fit_hit": 0.3548,
+      "fit_delta": 0.0634,
+      "fit_n": 217,
+      "hold_clock": 0.3202,
+      "hold_hit": 0.2809,
+      "hold_n": 89,
+      "hold_delta": -0.0393,
+      "ci": [
+        0.1981,
+        0.3818
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 14,
+      "feature": "ontarget",
+      "fit_clock": 0.2589,
+      "fit_hit": 0.3221,
+      "fit_delta": 0.0632,
+      "fit_n": 534,
+      "hold_clock": 0.2752,
+      "hold_hit": 0.2851,
+      "hold_n": 228,
+      "hold_delta": 0.0099,
+      "ci": [
+        0.2304,
+        0.3469
+      ],
+      "survived": false
+    },
+    {
+      "league": "la_liga",
+      "band": 19,
+      "feature": "subs",
+      "fit_clock": 0.2657,
+      "fit_hit": 0.3282,
+      "fit_delta": 0.0625,
+      "fit_n": 908,
+      "hold_clock": 0.278,
+      "hold_hit": 0.2376,
+      "hold_n": 383,
+      "hold_delta": -0.0404,
+      "ci": [
+        0.1977,
+        0.2827
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 12,
+      "feature": "ontarget",
+      "fit_clock": 0.28,
+      "fit_hit": 0.3424,
+      "fit_delta": 0.0624,
+      "fit_n": 441,
+      "hold_clock": 0.2382,
+      "hold_hit": 0.2158,
+      "hold_n": 190,
+      "hold_delta": -0.0224,
+      "ci": [
+        0.1632,
+        0.2796
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 9,
+      "feature": "inbox",
+      "fit_clock": 0.3062,
+      "fit_hit": 0.3684,
+      "fit_delta": 0.0622,
+      "fit_n": 209,
+      "hold_clock": 0.2833,
+      "hold_hit": 0.3111,
+      "hold_n": 90,
+      "hold_delta": 0.0278,
+      "ci": [
+        0.2249,
+        0.4128
+      ],
+      "survived": false
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 8,
+      "feature": "ontarget",
+      "fit_clock": 0.2575,
+      "fit_hit": 0.3193,
+      "fit_delta": 0.0617,
+      "fit_n": 166,
+      "hold_clock": 0.2669,
+      "hold_hit": 0.3784,
+      "hold_n": 74,
+      "hold_delta": 0.1115,
+      "ci": [
+        0.2765,
+        0.4923
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 13,
+      "feature": "count",
+      "fit_clock": 0.3076,
+      "fit_hit": 0.3687,
+      "fit_delta": 0.0611,
+      "fit_n": 217,
+      "hold_clock": 0.3652,
+      "hold_hit": 0.3708,
+      "hold_n": 89,
+      "hold_delta": 0.0056,
+      "ci": [
+        0.2777,
+        0.4745
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 11,
+      "feature": "inbox",
+      "fit_clock": 0.3445,
+      "fit_hit": 0.4055,
+      "fit_delta": 0.0611,
+      "fit_n": 217,
+      "hold_clock": 0.3427,
+      "hold_hit": 0.3258,
+      "hold_n": 89,
+      "hold_delta": -0.0169,
+      "ci": [
+        0.2374,
+        0.4287
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "count",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3445,
+      "fit_delta": 0.0598,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.2778,
+      "hold_n": 90,
+      "hold_delta": -0.0222,
+      "ci": [
+        0.1958,
+        0.378
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 1,
+      "feature": "count",
+      "fit_clock": 0.2364,
+      "fit_hit": 0.2962,
+      "fit_delta": 0.0598,
+      "fit_n": 449,
+      "hold_clock": 0.225,
+      "hold_hit": 0.1979,
+      "hold_n": 192,
+      "hold_delta": -0.0271,
+      "ci": [
+        0.1477,
+        0.26
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 14,
+      "feature": "bigchance",
+      "fit_clock": 0.2512,
+      "fit_hit": 0.311,
+      "fit_delta": 0.0598,
+      "fit_n": 209,
+      "hold_clock": 0.2556,
+      "hold_hit": 0.2111,
+      "hold_n": 90,
+      "hold_delta": -0.0444,
+      "ci": [
+        0.1395,
+        0.3063
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 10,
+      "feature": "bigchance",
+      "fit_clock": 0.2724,
+      "fit_hit": 0.3318,
+      "fit_delta": 0.0594,
+      "fit_n": 425,
+      "hold_clock": 0.2699,
+      "hold_hit": 0.2865,
+      "hold_n": 192,
+      "hold_delta": 0.0165,
+      "ci": [
+        0.2272,
+        0.3541
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 14,
+      "feature": "ontarget",
+      "fit_clock": 0.2915,
+      "fit_hit": 0.3502,
+      "fit_delta": 0.0588,
+      "fit_n": 217,
+      "hold_clock": 0.3202,
+      "hold_hit": 0.2022,
+      "hold_n": 89,
+      "hold_delta": -0.118,
+      "ci": [
+        0.1319,
+        0.2972
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 7,
+      "feature": "xg",
+      "fit_clock": 0.2887,
+      "fit_hit": 0.3474,
+      "fit_delta": 0.0587,
+      "fit_n": 426,
+      "hold_clock": 0.2782,
+      "hold_hit": 0.2849,
+      "hold_n": 186,
+      "hold_delta": 0.0067,
+      "ci": [
+        0.2249,
+        0.3537
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 12,
+      "feature": "count",
+      "fit_clock": 0.3289,
+      "fit_hit": 0.3876,
+      "fit_delta": 0.0586,
+      "fit_n": 209,
+      "hold_clock": 0.3528,
+      "hold_hit": 0.3444,
+      "hold_n": 90,
+      "hold_delta": -0.0083,
+      "ci": [
+        0.2545,
+        0.4472
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 3,
+      "feature": "inbox",
+      "fit_clock": 0.2846,
+      "fit_hit": 0.3427,
+      "fit_delta": 0.0581,
+      "fit_n": 426,
+      "hold_clock": 0.2675,
+      "hold_hit": 0.1129,
+      "hold_n": 186,
+      "hold_delta": -0.1546,
+      "ci": [
+        0.075,
+        0.1664
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3459,
+      "fit_delta": 0.0581,
+      "fit_n": 185,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.2353,
+      "hold_n": 85,
+      "hold_delta": -0.0233,
+      "ci": [
+        0.1578,
+        0.3357
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 21,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3073,
+      "fit_hit": 0.365,
+      "fit_delta": 0.0577,
+      "fit_n": 200,
+      "hold_clock": 0.3268,
+      "hold_hit": 0.3118,
+      "hold_n": 93,
+      "hold_delta": -0.0149,
+      "ci": [
+        0.2267,
+        0.4119
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 9,
+      "feature": "xg",
+      "fit_clock": 0.3062,
+      "fit_hit": 0.3636,
+      "fit_delta": 0.0574,
+      "fit_n": 209,
+      "hold_clock": 0.2833,
+      "hold_hit": 0.3111,
+      "hold_n": 90,
+      "hold_delta": 0.0278,
+      "ci": [
+        0.2249,
+        0.4128
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 9,
+      "feature": "ontarget",
+      "fit_clock": 0.3062,
+      "fit_hit": 0.3636,
+      "fit_delta": 0.0574,
+      "fit_n": 209,
+      "hold_clock": 0.2833,
+      "hold_hit": 0.1556,
+      "hold_n": 90,
+      "hold_delta": -0.1278,
+      "ci": [
+        0.095,
+        0.2443
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 19,
+      "feature": "vmom_abs",
+      "fit_clock": 0.2316,
+      "fit_hit": 0.2887,
+      "fit_delta": 0.0571,
+      "fit_n": 575,
+      "hold_clock": 0.2377,
+      "hold_hit": 0.2602,
+      "hold_n": 246,
+      "hold_delta": 0.0225,
+      "ci": [
+        0.2093,
+        0.3184
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 17,
+      "feature": "xg",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3447,
+      "fit_delta": 0.0568,
+      "fit_n": 441,
+      "hold_clock": 0.2474,
+      "hold_hit": 0.3158,
+      "hold_n": 190,
+      "hold_delta": 0.0684,
+      "ci": [
+        0.2539,
+        0.385
+      ],
+      "survived": true
+    },
+    {
+      "league": "championship",
+      "band": 19,
+      "feature": "inbox",
+      "fit_clock": 0.253,
+      "fit_hit": 0.3097,
+      "fit_delta": 0.0568,
+      "fit_n": 381,
+      "hold_clock": 0.2714,
+      "hold_hit": 0.2754,
+      "hold_n": 167,
+      "hold_delta": 0.0041,
+      "ci": [
+        0.2133,
+        0.3477
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 10,
+      "feature": "xg",
+      "fit_clock": 0.3168,
+      "fit_hit": 0.3733,
+      "fit_delta": 0.0565,
+      "fit_n": 217,
+      "hold_clock": 0.323,
+      "hold_hit": 0.3371,
+      "hold_n": 89,
+      "hold_delta": 0.014,
+      "ci": [
+        0.2474,
+        0.4402
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 10,
+      "feature": "inbox",
+      "fit_clock": 0.3168,
+      "fit_hit": 0.3733,
+      "fit_delta": 0.0565,
+      "fit_n": 217,
+      "hold_clock": 0.323,
+      "hold_hit": 0.3371,
+      "hold_n": 89,
+      "hold_delta": 0.014,
+      "ci": [
+        0.2474,
+        0.4402
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 17,
+      "feature": "count",
+      "fit_clock": 0.2739,
+      "fit_hit": 0.3301,
+      "fit_delta": 0.0562,
+      "fit_n": 209,
+      "hold_clock": 0.3111,
+      "hold_hit": 0.2333,
+      "hold_n": 90,
+      "hold_delta": -0.0778,
+      "ci": [
+        0.158,
+        0.3305
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 13,
+      "feature": "count",
+      "fit_clock": 0.2753,
+      "fit_hit": 0.3315,
+      "fit_delta": 0.0562,
+      "fit_n": 534,
+      "hold_clock": 0.2862,
+      "hold_hit": 0.2807,
+      "hold_n": 228,
+      "hold_delta": -0.0055,
+      "ci": [
+        0.2264,
+        0.3423
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 19,
+      "feature": "vmom_abs",
+      "fit_clock": 0.2688,
+      "fit_hit": 0.3249,
+      "fit_delta": 0.0561,
+      "fit_n": 437,
+      "hold_clock": 0.2274,
+      "hold_hit": 0.276,
+      "hold_n": 192,
+      "hold_delta": 0.0486,
+      "ci": [
+        0.2177,
+        0.3432
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 17,
+      "feature": "subs",
+      "fit_clock": 0.2739,
+      "fit_hit": 0.3297,
+      "fit_delta": 0.0558,
+      "fit_n": 367,
+      "hold_clock": 0.3111,
+      "hold_hit": 0.293,
+      "hold_n": 157,
+      "hold_delta": -0.0181,
+      "ci": [
+        0.2274,
+        0.3685
+      ],
+      "survived": false
+    },
+    {
+      "league": "la_liga",
+      "band": 22,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2841,
+      "fit_hit": 0.3398,
+      "fit_delta": 0.0557,
+      "fit_n": 462,
+      "hold_clock": 0.2794,
+      "hold_hit": 0.2829,
+      "hold_n": 205,
+      "hold_delta": 0.0035,
+      "ci": [
+        0.2257,
+        0.3481
+      ],
+      "survived": false
+    },
+    {
+      "league": "la_liga",
+      "band": 16,
+      "feature": "ontarget",
+      "fit_clock": 0.2603,
+      "fit_hit": 0.3159,
+      "fit_delta": 0.0556,
+      "fit_n": 535,
+      "hold_clock": 0.2769,
+      "hold_hit": 0.2298,
+      "hold_n": 235,
+      "hold_delta": -0.0471,
+      "ci": [
+        0.1806,
+        0.2877
+      ],
+      "survived": false
+    },
+    {
+      "league": "primeira_liga",
+      "band": 21,
+      "feature": "ontarget",
+      "fit_clock": 0.2466,
+      "fit_hit": 0.3022,
+      "fit_delta": 0.0556,
+      "fit_n": 407,
+      "hold_clock": 0.2566,
+      "hold_hit": 0.2151,
+      "hold_n": 172,
+      "hold_delta": -0.0414,
+      "ci": [
+        0.1603,
+        0.2824
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 5,
+      "feature": "count",
+      "fit_clock": 0.299,
+      "fit_hit": 0.3541,
+      "fit_delta": 0.055,
+      "fit_n": 209,
+      "hold_clock": 0.2556,
+      "hold_hit": 0.3111,
+      "hold_n": 90,
+      "hold_delta": 0.0556,
+      "ci": [
+        0.2249,
+        0.4128
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 16,
+      "feature": "ontarget",
+      "fit_clock": 0.2907,
+      "fit_hit": 0.3456,
+      "fit_delta": 0.055,
+      "fit_n": 217,
+      "hold_clock": 0.2584,
+      "hold_hit": 0.2135,
+      "hold_n": 89,
+      "hold_delta": -0.0449,
+      "ci": [
+        0.1411,
+        0.3095
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 5,
+      "feature": "ontarget",
+      "fit_clock": 0.299,
+      "fit_hit": 0.3541,
+      "fit_delta": 0.055,
+      "fit_n": 209,
+      "hold_clock": 0.2556,
+      "hold_hit": 0.3111,
+      "hold_n": 90,
+      "hold_delta": 0.0556,
+      "ci": [
+        0.2249,
+        0.4128
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 21,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3028,
+      "fit_hit": 0.3578,
+      "fit_delta": 0.055,
+      "fit_n": 422,
+      "hold_clock": 0.2885,
+      "hold_hit": 0.2381,
+      "hold_n": 189,
+      "hold_delta": -0.0504,
+      "ci": [
+        0.183,
+        0.3037
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2692,
+      "fit_hit": 0.324,
+      "fit_delta": 0.0548,
+      "fit_n": 534,
+      "hold_clock": 0.2708,
+      "hold_hit": 0.307,
+      "hold_n": 228,
+      "hold_delta": 0.0362,
+      "ci": [
+        0.2508,
+        0.3697
+      ],
+      "survived": true
+    },
+    {
+      "league": "ligue_1",
+      "band": 14,
+      "feature": "xg",
+      "fit_clock": 0.2984,
+      "fit_hit": 0.3529,
+      "fit_delta": 0.0545,
+      "fit_n": 425,
+      "hold_clock": 0.2553,
+      "hold_hit": 0.2926,
+      "hold_n": 188,
+      "hold_delta": 0.0372,
+      "ci": [
+        0.2322,
+        0.3612
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 19,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3155,
+      "fit_hit": 0.3699,
+      "fit_delta": 0.0544,
+      "fit_n": 219,
+      "hold_clock": 0.3155,
+      "hold_hit": 0.3118,
+      "hold_n": 93,
+      "hold_delta": -0.0037,
+      "ci": [
+        0.2267,
+        0.4119
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 1,
+      "feature": "vmom_slope",
+      "fit_clock": 0.288,
+      "fit_hit": 0.3425,
+      "fit_delta": 0.0544,
+      "fit_n": 219,
+      "hold_clock": 0.2781,
+      "hold_hit": 0.2,
+      "hold_n": 90,
+      "hold_delta": -0.0781,
+      "ci": [
+        0.1304,
+        0.2941
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 19,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2688,
+      "fit_hit": 0.3227,
+      "fit_delta": 0.0539,
+      "fit_n": 437,
+      "hold_clock": 0.2274,
+      "hold_hit": 0.232,
+      "hold_n": 194,
+      "hold_delta": 0.0046,
+      "ci": [
+        0.1781,
+        0.2962
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 12,
+      "feature": "inbox",
+      "fit_clock": 0.3289,
+      "fit_hit": 0.3828,
+      "fit_delta": 0.0538,
+      "fit_n": 209,
+      "hold_clock": 0.3528,
+      "hold_hit": 0.4444,
+      "hold_n": 90,
+      "hold_delta": 0.0917,
+      "ci": [
+        0.3462,
+        0.5473
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 18,
+      "feature": "bigchance",
+      "fit_clock": 0.2763,
+      "fit_hit": 0.3301,
+      "fit_delta": 0.0538,
+      "fit_n": 209,
+      "hold_clock": 0.3472,
+      "hold_hit": 0.2556,
+      "hold_n": 90,
+      "hold_delta": -0.0917,
+      "ci": [
+        0.1767,
+        0.3544
+      ],
+      "survived": false
+    },
+    {
+      "league": "epl",
+      "band": 11,
+      "feature": "xg",
+      "fit_clock": 0.285,
+      "fit_hit": 0.3383,
+      "fit_delta": 0.0533,
+      "fit_n": 535,
+      "hold_clock": 0.2695,
+      "hold_hit": 0.3247,
+      "hold_n": 231,
+      "hold_delta": 0.0552,
+      "ci": [
+        0.2676,
+        0.3875
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "bigchance",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3407,
+      "fit_delta": 0.0528,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3457,
+      "hold_n": 81,
+      "hold_delta": 0.0871,
+      "ci": [
+        0.2512,
+        0.4541
+      ],
+      "survived": true
+    },
+    {
+      "league": "championship",
+      "band": 10,
+      "feature": "ontarget",
+      "fit_clock": 0.3039,
+      "fit_hit": 0.3558,
+      "fit_delta": 0.0519,
+      "fit_n": 385,
+      "hold_clock": 0.3353,
+      "hold_hit": 0.4072,
+      "hold_n": 167,
+      "hold_delta": 0.0719,
+      "ci": [
+        0.3356,
+        0.483
+      ],
+      "survived": true
+    },
+    {
+      "league": "primeira_liga",
+      "band": 15,
+      "feature": "count",
+      "fit_clock": 0.2681,
+      "fit_hit": 0.3197,
+      "fit_delta": 0.0516,
+      "fit_n": 441,
+      "hold_clock": 0.2342,
+      "hold_hit": 0.2947,
+      "hold_n": 190,
+      "hold_delta": 0.0605,
+      "ci": [
+        0.2345,
+        0.3631
+      ],
+      "survived": false
+    },
+    {
+      "league": "championship",
+      "band": 19,
+      "feature": "xg",
+      "fit_clock": 0.253,
+      "fit_hit": 0.3045,
+      "fit_delta": 0.0515,
+      "fit_n": 381,
+      "hold_clock": 0.2714,
+      "hold_hit": 0.2874,
+      "hold_n": 167,
+      "hold_delta": 0.0161,
+      "ci": [
+        0.2242,
+        0.3602
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 6,
+      "feature": "count",
+      "fit_clock": 0.2759,
+      "fit_hit": 0.3271,
+      "fit_delta": 0.0512,
+      "fit_n": 425,
+      "hold_clock": 0.2194,
+      "hold_hit": 0.1968,
+      "hold_n": 188,
+      "hold_delta": -0.0226,
+      "ci": [
+        0.1463,
+        0.2595
+      ],
+      "survived": false
+    },
+    {
+      "league": "serie_a",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2542,
+      "fit_hit": 0.3052,
+      "fit_delta": 0.051,
+      "fit_n": 534,
+      "hold_clock": 0.2774,
+      "hold_hit": 0.2807,
+      "hold_n": 228,
+      "hold_delta": 0.0033,
+      "ci": [
+        0.2264,
+        0.3423
+      ],
+      "survived": false
+    },
+    {
+      "league": "mls",
+      "band": 19,
+      "feature": "xg",
+      "fit_clock": 0.2842,
+      "fit_hit": 0.3349,
+      "fit_delta": 0.0508,
+      "fit_n": 209,
+      "hold_clock": 0.3194,
+      "hold_hit": 0.2556,
+      "hold_n": 90,
+      "hold_delta": -0.0639,
+      "ci": [
+        0.1767,
+        0.3544
+      ],
+      "survived": false
+    },
+    {
+      "league": "_pooled",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2662,
+      "fit_hit": 0.317,
+      "fit_delta": 0.0508,
+      "fit_n": 3871,
+      "hold_clock": 0.2827,
+      "hold_hit": 0.3337,
+      "hold_n": 1678,
+      "hold_delta": 0.051,
+      "ci": [
+        0.3116,
+        0.3567
+      ],
+      "survived": true
+    },
+    {
+      "league": "primeira_liga",
+      "band": 22,
+      "feature": "ontarget",
+      "fit_clock": 0.2731,
+      "fit_hit": 0.3239,
+      "fit_delta": 0.0508,
+      "fit_n": 355,
+      "hold_clock": 0.2248,
+      "hold_hit": 0.1974,
+      "hold_n": 152,
+      "hold_delta": -0.0274,
+      "ci": [
+        0.1419,
+        0.2678
+      ],
+      "survived": false
+    },
+    {
+      "league": "ligue_1",
+      "band": 16,
+      "feature": "count",
+      "fit_clock": 0.2606,
+      "fit_hit": 0.3113,
+      "fit_delta": 0.0507,
+      "fit_n": 424,
+      "hold_clock": 0.2686,
+      "hold_hit": 0.4255,
+      "hold_n": 188,
+      "hold_delta": 0.1569,
+      "ci": [
+        0.357,
+        0.497
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 14,
+      "feature": "count",
+      "fit_clock": 0.2991,
+      "fit_hit": 0.3495,
+      "fit_delta": 0.0505,
+      "fit_n": 535,
+      "hold_clock": 0.2565,
+      "hold_hit": 0.2078,
+      "hold_n": 231,
+      "hold_delta": -0.0487,
+      "ci": [
+        0.1605,
+        0.2647
+      ],
+      "survived": false
+    },
+    {
+      "league": "epl",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2864,
+      "fit_hit": 0.3364,
+      "fit_delta": 0.05,
+      "fit_n": 535,
+      "hold_clock": 0.2766,
+      "hold_hit": 0.3593,
+      "hold_n": 231,
+      "hold_delta": 0.0827,
+      "ci": [
+        0.3002,
+        0.423
+      ],
+      "survived": true
+    },
+    {
+      "league": "primeira_liga",
+      "band": 17,
+      "feature": "inbox",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3379,
+      "fit_delta": 0.05,
+      "fit_n": 441,
+      "hold_clock": 0.2474,
+      "hold_hit": 0.3053,
+      "hold_n": 190,
+      "hold_delta": 0.0579,
+      "ci": [
+        0.2442,
+        0.3741
+      ],
+      "survived": false
+    },
+    {
+      "league": "bundesliga",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2576,
+      "fit_hit": 0.3075,
+      "fit_delta": 0.0499,
+      "fit_n": 426,
+      "hold_clock": 0.328,
+      "hold_hit": 0.3656,
+      "hold_n": 186,
+      "hold_delta": 0.0376,
+      "ci": [
+        0.2997,
+        0.4369
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 19,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3387,
+      "fit_hit": 0.3885,
+      "fit_delta": 0.0499,
+      "fit_n": 435,
+      "hold_clock": 0.2459,
+      "hold_hit": 0.2486,
+      "hold_n": 185,
+      "hold_delta": 0.0027,
+      "ci": [
+        0.1919,
+        0.3156
+      ],
+      "survived": false
+    },
+    {
+      "league": "eredivisie",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2776,
+      "fit_hit": 0.3272,
+      "fit_delta": 0.0495,
+      "fit_n": 217,
+      "hold_clock": 0.2949,
+      "hold_hit": 0.3146,
+      "hold_n": 89,
+      "hold_delta": 0.0197,
+      "ci": [
+        0.2275,
+        0.417
+      ],
+      "survived": false
+    }
+  ],
+  "survivors": [
+    {
+      "league": "mls",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2847,
+      "fit_hit": 0.3923,
+      "fit_delta": 0.1077,
+      "fit_n": 209,
+      "hold_clock": 0.3,
+      "hold_hit": 0.3778,
+      "hold_n": 90,
+      "hold_delta": 0.0778,
+      "ci": [
+        0.2846,
+        0.481
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "xg",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4202,
+      "fit_delta": 0.1062,
+      "fit_n": 426,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.328,
+      "hold_n": 186,
+      "hold_delta": 0.0323,
+      "ci": [
+        0.2646,
+        0.3983
+      ],
+      "survived": true
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 3,
+      "feature": "count",
+      "fit_clock": 0.2364,
+      "fit_hit": 0.3373,
+      "fit_delta": 0.1009,
+      "fit_n": 166,
+      "hold_clock": 0.2264,
+      "hold_hit": 0.3919,
+      "hold_n": 74,
+      "hold_delta": 0.1655,
+      "ci": [
+        0.2886,
+        0.5058
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 10,
+      "feature": "bigchance",
+      "fit_clock": 0.3168,
+      "fit_hit": 0.4147,
+      "fit_delta": 0.0979,
+      "fit_n": 217,
+      "hold_clock": 0.323,
+      "hold_hit": 0.3483,
+      "hold_n": 89,
+      "hold_delta": 0.0253,
+      "ci": [
+        0.2575,
+        0.4517
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "inbox",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4061,
+      "fit_delta": 0.0921,
+      "fit_n": 426,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.328,
+      "hold_n": 186,
+      "hold_delta": 0.0323,
+      "ci": [
+        0.2646,
+        0.3983
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "count",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3791,
+      "fit_delta": 0.0912,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3704,
+      "hold_n": 81,
+      "hold_delta": 0.1118,
+      "ci": [
+        0.2733,
+        0.4792
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 13,
+      "feature": "bigchance",
+      "fit_clock": 0.314,
+      "fit_hit": 0.4005,
+      "fit_delta": 0.0865,
+      "fit_n": 427,
+      "hold_clock": 0.2957,
+      "hold_hit": 0.3763,
+      "hold_n": 186,
+      "hold_delta": 0.0806,
+      "ci": [
+        0.3099,
+        0.4478
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "bigchance",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3613,
+      "fit_delta": 0.0832,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4536,
+      "hold_n": 194,
+      "hold_delta": 0.128,
+      "ci": [
+        0.3851,
+        0.5239
+      ],
+      "survived": true
+    },
+    {
+      "league": "ligue_1",
+      "band": 15,
+      "feature": "count",
+      "fit_clock": 0.2718,
+      "fit_hit": 0.3514,
+      "fit_delta": 0.0796,
+      "fit_n": 424,
+      "hold_clock": 0.2566,
+      "hold_hit": 0.3191,
+      "hold_n": 188,
+      "hold_delta": 0.0625,
+      "ci": [
+        0.2567,
+        0.3888
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 21,
+      "feature": "count",
+      "fit_clock": 0.3285,
+      "fit_hit": 0.4078,
+      "fit_delta": 0.0793,
+      "fit_n": 206,
+      "hold_clock": 0.3063,
+      "hold_hit": 0.3452,
+      "hold_n": 84,
+      "hold_delta": 0.0389,
+      "ci": [
+        0.2523,
+        0.4517
+      ],
+      "survived": true
+    },
+    {
+      "league": "championship",
+      "band": 9,
+      "feature": "vmom_slope",
+      "fit_clock": 0.2468,
+      "fit_hit": 0.3232,
+      "fit_delta": 0.0764,
+      "fit_n": 393,
+      "hold_clock": 0.3084,
+      "hold_hit": 0.3728,
+      "hold_n": 169,
+      "hold_delta": 0.0644,
+      "ci": [
+        0.3035,
+        0.4478
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 20,
+      "feature": "vmom_abs",
+      "fit_clock": 0.3306,
+      "fit_hit": 0.4067,
+      "fit_delta": 0.0761,
+      "fit_n": 450,
+      "hold_clock": 0.2685,
+      "hold_hit": 0.3433,
+      "hold_n": 201,
+      "hold_delta": 0.0748,
+      "ci": [
+        0.2811,
+        0.4113
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 9,
+      "feature": "vmom_abs",
+      "fit_clock": 0.303,
+      "fit_hit": 0.379,
+      "fit_delta": 0.076,
+      "fit_n": 219,
+      "hold_clock": 0.3427,
+      "hold_hit": 0.3656,
+      "hold_n": 93,
+      "hold_delta": 0.0229,
+      "ci": [
+        0.2749,
+        0.467
+      ],
+      "survived": true
+    },
+    {
+      "league": "eredivisie",
+      "band": 15,
+      "feature": "inbox",
+      "fit_clock": 0.2776,
+      "fit_hit": 0.3502,
+      "fit_delta": 0.0726,
+      "fit_n": 217,
+      "hold_clock": 0.2949,
+      "hold_hit": 0.3596,
+      "hold_n": 89,
+      "hold_delta": 0.0646,
+      "ci": [
+        0.2676,
+        0.4631
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "inbox",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3505,
+      "fit_delta": 0.0724,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4227,
+      "hold_n": 194,
+      "hold_delta": 0.0971,
+      "ci": [
+        0.3553,
+        0.493
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 18,
+      "feature": "count",
+      "fit_clock": 0.2763,
+      "fit_hit": 0.3445,
+      "fit_delta": 0.0682,
+      "fit_n": 209,
+      "hold_clock": 0.3472,
+      "hold_hit": 0.4111,
+      "hold_n": 90,
+      "hold_delta": 0.0639,
+      "ci": [
+        0.3151,
+        0.5144
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 11,
+      "feature": "inbox",
+      "fit_clock": 0.285,
+      "fit_hit": 0.3495,
+      "fit_delta": 0.0645,
+      "fit_n": 535,
+      "hold_clock": 0.2695,
+      "hold_hit": 0.3333,
+      "hold_n": 231,
+      "hold_delta": 0.0639,
+      "ci": [
+        0.2757,
+        0.3964
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 22,
+      "feature": "xg",
+      "fit_clock": 0.2781,
+      "fit_hit": 0.3419,
+      "fit_delta": 0.0638,
+      "fit_n": 465,
+      "hold_clock": 0.3256,
+      "hold_hit": 0.4536,
+      "hold_n": 194,
+      "hold_delta": 0.128,
+      "ci": [
+        0.3851,
+        0.5239
+      ],
+      "survived": true
+    },
+    {
+      "league": "belgian_pro_league",
+      "band": 8,
+      "feature": "ontarget",
+      "fit_clock": 0.2575,
+      "fit_hit": 0.3193,
+      "fit_delta": 0.0617,
+      "fit_n": 166,
+      "hold_clock": 0.2669,
+      "hold_hit": 0.3784,
+      "hold_n": 74,
+      "hold_delta": 0.1115,
+      "ci": [
+        0.2765,
+        0.4923
+      ],
+      "survived": true
+    },
+    {
+      "league": "primeira_liga",
+      "band": 17,
+      "feature": "xg",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3447,
+      "fit_delta": 0.0568,
+      "fit_n": 441,
+      "hold_clock": 0.2474,
+      "hold_hit": 0.3158,
+      "hold_n": 190,
+      "hold_delta": 0.0684,
+      "ci": [
+        0.2539,
+        0.385
+      ],
+      "survived": true
+    },
+    {
+      "league": "serie_a",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2692,
+      "fit_hit": 0.324,
+      "fit_delta": 0.0548,
+      "fit_n": 534,
+      "hold_clock": 0.2708,
+      "hold_hit": 0.307,
+      "hold_n": 228,
+      "hold_delta": 0.0362,
+      "ci": [
+        0.2508,
+        0.3697
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 12,
+      "feature": "inbox",
+      "fit_clock": 0.3289,
+      "fit_hit": 0.3828,
+      "fit_delta": 0.0538,
+      "fit_n": 209,
+      "hold_clock": 0.3528,
+      "hold_hit": 0.4444,
+      "hold_n": 90,
+      "hold_delta": 0.0917,
+      "ci": [
+        0.3462,
+        0.5473
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 11,
+      "feature": "xg",
+      "fit_clock": 0.285,
+      "fit_hit": 0.3383,
+      "fit_delta": 0.0533,
+      "fit_n": 535,
+      "hold_clock": 0.2695,
+      "hold_hit": 0.3247,
+      "hold_n": 231,
+      "hold_delta": 0.0552,
+      "ci": [
+        0.2676,
+        0.3875
+      ],
+      "survived": true
+    },
+    {
+      "league": "mls",
+      "band": 22,
+      "feature": "bigchance",
+      "fit_clock": 0.2879,
+      "fit_hit": 0.3407,
+      "fit_delta": 0.0528,
+      "fit_n": 182,
+      "hold_clock": 0.2586,
+      "hold_hit": 0.3457,
+      "hold_n": 81,
+      "hold_delta": 0.0871,
+      "ci": [
+        0.2512,
+        0.4541
+      ],
+      "survived": true
+    },
+    {
+      "league": "championship",
+      "band": 10,
+      "feature": "ontarget",
+      "fit_clock": 0.3039,
+      "fit_hit": 0.3558,
+      "fit_delta": 0.0519,
+      "fit_n": 385,
+      "hold_clock": 0.3353,
+      "hold_hit": 0.4072,
+      "hold_n": 167,
+      "hold_delta": 0.0719,
+      "ci": [
+        0.3356,
+        0.483
+      ],
+      "survived": true
+    },
+    {
+      "league": "_pooled",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2662,
+      "fit_hit": 0.317,
+      "fit_delta": 0.0508,
+      "fit_n": 3871,
+      "hold_clock": 0.2827,
+      "hold_hit": 0.3337,
+      "hold_n": 1678,
+      "hold_delta": 0.051,
+      "ci": [
+        0.3116,
+        0.3567
+      ],
+      "survived": true
+    },
+    {
+      "league": "ligue_1",
+      "band": 16,
+      "feature": "count",
+      "fit_clock": 0.2606,
+      "fit_hit": 0.3113,
+      "fit_delta": 0.0507,
+      "fit_n": 424,
+      "hold_clock": 0.2686,
+      "hold_hit": 0.4255,
+      "hold_n": 188,
+      "hold_delta": 0.1569,
+      "ci": [
+        0.357,
+        0.497
+      ],
+      "survived": true
+    },
+    {
+      "league": "epl",
+      "band": 15,
+      "feature": "xg",
+      "fit_clock": 0.2864,
+      "fit_hit": 0.3364,
+      "fit_delta": 0.05,
+      "fit_n": 535,
+      "hold_clock": 0.2766,
+      "hold_hit": 0.3593,
+      "hold_n": 231,
+      "hold_delta": 0.0827,
+      "ci": [
+        0.3002,
+        0.423
+      ],
+      "survived": true
+    },
+    {
+      "league": "bundesliga",
+      "band": 16,
+      "feature": "xg",
+      "fit_clock": 0.2576,
+      "fit_hit": 0.3075,
+      "fit_delta": 0.0499,
+      "fit_n": 426,
+      "hold_clock": 0.328,
+      "hold_hit": 0.3656,
+      "hold_n": 186,
+      "hold_delta": 0.0376,
+      "ci": [
+        0.2997,
+        0.4369
+      ],
+      "survived": true
+    }
+  ],
+  "distinct_cells": [
+    [
+      "mls",
+      15
+    ],
+    [
+      "bundesliga",
+      13
+    ],
+    [
+      "belgian_pro_league",
+      3
+    ],
+    [
+      "eredivisie",
+      10
+    ],
+    [
+      "mls",
+      22
+    ],
+    [
+      "epl",
+      22
+    ],
+    [
+      "ligue_1",
+      15
+    ],
+    [
+      "eredivisie",
+      21
+    ],
+    [
+      "championship",
+      9
+    ],
+    [
+      "bundesliga",
+      20
+    ],
+    [
+      "eredivisie",
+      9
+    ],
+    [
+      "eredivisie",
+      15
+    ],
+    [
+      "mls",
+      18
+    ],
+    [
+      "epl",
+      11
+    ],
+    [
+      "belgian_pro_league",
+      8
+    ],
+    [
+      "primeira_liga",
+      17
+    ],
+    [
+      "serie_a",
+      16
+    ],
+    [
+      "mls",
+      12
+    ],
+    [
+      "championship",
+      10
+    ],
+    [
+      "_pooled",
+      15
+    ],
+    [
+      "ligue_1",
+      16
+    ],
+    [
+      "epl",
+      15
+    ],
+    [
+      "bundesliga",
+      16
+    ]
+  ]
+}

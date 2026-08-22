@@ -1,0 +1,36 @@
+{
+  "real": {
+    "selected": 416,
+    "survivors": 29,
+    "distinct": 23
+  },
+  "null": [
+    {
+      "selected": 250,
+      "survivors": 25,
+      "distinct": 15
+    },
+    {
+      "selected": 277,
+      "survivors": 27,
+      "distinct": 22
+    },
+    {
+      "selected": 272,
+      "survivors": 24,
+      "distinct": 17
+    },
+    {
+      "selected": 242,
+      "survivors": 20,
+      "distinct": 15
+    },
+    {
+      "selected": 245,
+      "survivors": 16,
+      "distinct": 13
+    }
+  ],
+  "null_mean_distinct": 16.4,
+  "verdict": "NOISE -- the sweep produces this many 'survivors' on data with NO feature-label link. The surviving cells are not evidence."
+}
