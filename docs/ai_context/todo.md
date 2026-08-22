@@ -124,14 +124,23 @@ unmatched rows across 4 fixtures on the 08-23 window and 4 of those are these.
    scoped sample (`bb709247`) is live but no shortlist has completed on it yet.
 3. `edge_why` has not yet been observed resolving into the two new keys.
 
-**AND A SYSTEMIC OBSTACLE WORTH ITS OWN LOOK:** the Layer 2 shortlist runs at
-the END of a full intelligence-state cycle, which from a cold boot takes ~10
-minutes. Peer sessions have been deploying refresh-worker roughly that often
-(17:09:28, 17:17:30, 17:42:09, 17:52:07), and every deploy SIGTERMs the worker
-and restarts that cycle from zero. Between 17:02:31Z and 17:36:42Z — 34 minutes
-— the shortlist completed **once**. If that cadence is normal during active
-hours, the board's own ranking artifact is being rebuilt far less often than the
-2-minute `BOOK_GRID_TICK` suggests, and nobody is measuring it.
+**WHAT SLOWED THE READINGS — measured, and smaller than it first looked.** The
+Layer 2 shortlist runs at the END of a full intelligence-state cycle. From a
+COLD boot the first one takes 10-19 minutes; once warm it settles to every 4-6:
+
+    mlb     17:28:20  17:32:21  17:38:06
+    soccer  17:30:32  17:36:42  17:39:37
+
+Peer deploys SIGTERM the worker and restart that cold clock — 17:09:28,
+17:17:30, 17:42:09, 17:52:07 — so with deploys ~10 min apart you get roughly one
+warm cycle between them, not none.
+
+**An earlier draft of this entry said "the shortlist completed once in 34
+minutes" and that was wrong.** It counted only SOCCER lines across a window that
+began before `PREGAME_PROJECTION_JOIN` existed (the code went live 17:09:28), so
+the absence before that point was the log line not existing, not the cycle not
+running. Corrected here rather than left, because inheriting a wrong cadence
+figure is exactly what the `4-of-1,142` correction above is about.
 
 **Cross-lane note:** `soccer_projections.py` is listed in `soccer-board-parity`,
 which is OPEN but UNOWNED. Claimed narrowly and recorded in `lanes.md`.
