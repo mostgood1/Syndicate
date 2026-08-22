@@ -123,6 +123,16 @@ Live `a1e89ff3` 18:50:02Z, refresh-worker only.
   `avg_clv` over 3 rows "is a metric with no denominator, which is worse than
   the honest `null` it returns today." `avg_clv: null` is a REFUSAL, not a bug.
 
+**A BACKFILL CAN ONLY REACH HALF THE INPUTS** `[verified 2026-08-22 with
+`fnmatch` against all 151 patterns]`. `settlement_inputs/closing_lines_*.csv`,
+`settlement_inputs/finals_*.json` and `reports/intelligence/clv_openings/*` are
+PULLABLE. `evaluation_ledger_chunks/<date>.jsonl` and its `index.json` are
+**NOT REACHABLE** — not allowlisted, refresh-worker serves no HTTP. So "pull it
+down and backfill locally" settles STRAIGHT bets only; parlays need the bridge,
+which needs evaluation records that cannot leave the worker.
+`scripts/backfill_portfolio_settlement.py` (preview-by-default) exists for this
+and has NOT been run against production.
+
 **NOT VERIFIED — `#505`'s `entity` mapping** (`player_name/player/name/team/
 selection`) is reasoned from the bet slip's comments, never measured against
 real evaluation records: the ledger is worker-local and not in

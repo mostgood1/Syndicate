@@ -1149,9 +1149,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
   `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `scripts/backfill_portfolio_settlement.py`,
   `tests/test_prediction_ledger_shared_store.py`,
   `tests/test_evaluation_settlement_autorun_ordering.py`,
-  `tests/test_ledger_bridge_identity_join.py`
+  `tests/test_ledger_bridge_identity_join.py`,
+  `tests/test_backfill_portfolio_settlement.py`
 - **Status: three defects found, all FIXED AND DEPLOYED. The goal is NOT met —
   nothing has settled yet.** Narrative and evidence: `log/2026-08-22.md`.
   Subject facts: `state.md [portfolio-settlement]`.
@@ -1161,9 +1163,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Unverified and load-bearing:** `#505`'s `entity` field mapping was never
   measured against real evaluation records (worker-local, not in
   `HOT_ARTIFACT_PATTERNS`).
+- Backfill tool BUILT and NOT RUN against production:
+  `scripts/backfill_portfolio_settlement.py`, preview-by-default. Ran in preview
+  in-session; it proved the tool works and nothing about production (no local
+  portfolio ledger; the one local evaluation chunk holds a single
+  `record_type: prediction` row, not a wager).
 - Verification still owed: the next `[ledger_bridge]` line, 2026-08-23 after
   06:00 CT. `matched_by_identity > 0` = the join works; `by_identity` large with
-  `matched_by_identity: 0` = the entity mapping is wrong.
+  `matched_by_identity: 0` = the entity mapping is wrong. **That same line also
+  gates the backfill** — do not run it with `--commit` before that reading.
+- Session `74a0966a` ARCHIVED 2026-08-22. All four deploy claims free at exit.
 - **NOTE for whoever owns `refresh-worker-oom-recurrence`:** this lane edited
   `scripts/run_refresh_worker.py`, which your lane nominally holds. Your block is
   no longer in `lanes.md` so `lane-guard` saw no claim. Flagged because the
