@@ -1302,8 +1302,110 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         )
         league_slugs = selected
 
+    # LIVE-PHASE ODDS, SCOPED TO MATCHES IN PLAY.
+    #
+    # BUILT HERE, PREPENDED BELOW, AND THE ORDER IS THE POINT (`#514`).
+    #
+    # These steps used to be appended LAST, behind every league's sim rebuild.
+    # The comment above the pregame loop in this same function already records
+    # what that costs: `The run does not reach the end`, dying reproducibly at
+    # around step 27 of ~50, and the fix there was to move the cheap captures
+    # ahead of the expensive sims. The live captures were added later and
+    # landed at the back, so they inherited the starvation the reorder had just
+    # removed -- and they are the steps with the least tolerance for it: a
+    # pregame price that misses a cycle drifts, a live price that misses one is
+    # deleted from the board by `opportunity_gate`'s 900s ceiling.
+    #
+    # Measured 2026-08-22: soccer board quote age p50 23,941s (6.7h), max
+    # 49,626s (13.8h), zero live rows published, while primeira_liga had a match
+    # in play and its live_state artifact said so.
+    #
+    # Same steps, same call volume, different order -- the identical argument
+    # the pregame reorder makes, applied to the half that was still wrong. And
+    # it makes the tick overrun survivable rather than fatal: a run that dies
+    # mid-list now loses sims and picks, having already captured every live
+    # price in its first seconds.
+    #
+    # `soccer_{league}_odds` / `_props` are pregame-only, so soccer prices were
+    # NEVER refreshed while a match was running: the card's `betting` block sat
+    # frozen at the last pregame sweep, and the board reported
+    # `no_two_sided_market_price` on 19 of 19 live rows (measured 2026-08-21).
+    #
+    # These are SEPARATE steps rather than widened phases, so the pregame path
+    # is untouched and the live path can carry a scope the pregame one must not
+    # have. Emitted ONLY for leagues with a match in play, which is what makes a
+    # 60s cadence affordable.
+    live_steps: list[RefreshStep] = []
+    live_scope = _soccer_live_scope(args.date) if args.date else {}
+    for league, event_ids in sorted(live_scope.items()):
+        if league not in active_leagues:
+            continue
+        live_steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_odds_live",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_odds_local.py",
+                    "--league", league,
+                    "--out", str(soccer_root / league / "api" / "odds" / "game_odds_current.csv"),
+                ),
+                description=f"LIVE {league} game odds ({len(event_ids)} in play).",
+            )
+        )
+        live_steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_props_live",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_props_local.py",
+                    "--league", league,
+                    "--event-ids", ",".join(sorted(event_ids)),
+                    # SAME PATH the pregame step writes -- `props/{date}.csv`.
+                    # A live capture landing anywhere else would be a file
+                    # nothing reads, which is the shape of a refresh that
+                    # "succeeds" every tick and changes nothing on the board.
+                    "--out", str(soccer_root / league / "props" / f"{args.date}.csv"),
+                ),
+                description=f"LIVE {league} player props, scoped to {len(event_ids)} in play.",
+            )
+        )
+
     pinned_date = str(getattr(args, "soccer_date", "") or "").strip()
+    # `poll_soccer_live_state` is cheap and it is what WRITES the artifact
+    # `_soccer_live_scope` reads, so leaving it at the back of a list that does
+    # not reach its end would let the scope this whole block depends on go
+    # stale exactly when matches are running. The live-lens loop writes the same
+    # artifact on its own tick, so this is belt-and-braces rather than the only
+    # writer -- but a cheap step queued behind the expensive ones is the mistake
+    # this reorder exists to stop making.
+    for league in league_slugs:
+        live_steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_live_state",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/poll_soccer_live_state.py",
+                    "--league",
+                    league,
+                    "--date",
+                    args.date,
+                    "--source-root",
+                    str(soccer_root),
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Refresh {league} live match state and win-probability artifacts.",
+            )
+        )
+
     steps: list[RefreshStep] = []
+    steps.extend(live_steps)
     for league in league_slugs:
         history_step = _soccer_history_step(league, soccer_root, python_exe)
         if history_step is not None:
@@ -1409,7 +1511,34 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_artifacts",
-                phases=("pregame", "live"),
+                # `#514`. A LEAGUE WITH A MATCH IN PLAY DROPS OUT OF THE LIVE PHASE
+                # HERE, and this is what pays for the rest of the change.
+                #
+                # This is the expensive step -- `build_soccer_artifacts.py`, the sim
+                # rebuild, the thing this function's own comment blames for the run
+                # dying around step 27. It ran on EVERY live tick, and the live tick
+                # is 60 seconds.
+                #
+                # Two reasons it should not:
+                #
+                #  1. It rebuilds a PREGAME artifact. The sim is built from schedule
+                #     and ratings, not from match state; re-running it while a match
+                #     is under way produces the same numbers at the cost of the
+                #     whole tick budget. The board's live view comes from
+                #     `live_projection_join` and the live re-sim, not from here.
+                #  2. Widening the launcher's league scope to include in-play
+                #     leagues (`_due_leagues_for_sport`, same `#514`) would otherwise
+                #     MULTIPLY this: one sim rebuild per live league per 60s, on a
+                #     box that was already at 89.9% of 2048MB. The scope fix and this
+                #     one have to ship together or the scope fix makes the overrun
+                #     worse than it found it.
+                #
+                # Leagues NOT in play keep `live` and so keep rebuilding through a
+                # long live phase -- which matters because the phase is GLOBAL, so
+                # soccer sits in "live" for the whole of an MLB evening whether or
+                # not any soccer is playing. Dropping `live` unconditionally would
+                # stop soccer's sims for hours at a time.
+                phases=("pregame",) if league in live_scope else ("pregame", "live"),
                 cwd=REPO_ROOT,
                 command=(
                     python_exe,
@@ -1443,75 +1572,6 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     str(soccer_root),
                 ),
                 description=f"Grade {league}'s simulated projections against captured odds into an EV/edge picks artifact.",
-            )
-        )
-    for league in league_slugs:
-        steps.append(
-            RefreshStep(
-                name=f"soccer_{league}_live_state",
-                phases=("live",),
-                cwd=REPO_ROOT,
-                command=(
-                    python_exe,
-                    "scripts/poll_soccer_live_state.py",
-                    "--league",
-                    league,
-                    "--date",
-                    args.date,
-                    "--source-root",
-                    str(soccer_root),
-                    "--out-root",
-                    str(soccer_root),
-                ),
-                description=f"Refresh {league} live match state and win-probability artifacts.",
-            )
-        )
-    # LIVE-PHASE ODDS, SCOPED TO MATCHES IN PLAY.
-    #
-    # `soccer_{league}_odds` / `_props` are pregame-only, so soccer prices were
-    # NEVER refreshed while a match was running: the card's `betting` block sat
-    # frozen at the last pregame sweep, and the board reported
-    # `no_two_sided_market_price` on 19 of 19 live rows (measured 2026-08-21).
-    #
-    # These are SEPARATE steps rather than widened phases, so the pregame path
-    # is untouched and the live path can carry a scope the pregame one must not
-    # have. Emitted ONLY for leagues with a match in play, which is what makes a
-    # 60s cadence affordable.
-    live_scope = _soccer_live_scope(args.date) if args.date else {}
-    for league, event_ids in sorted(live_scope.items()):
-        if league not in active_leagues:
-            continue
-        steps.append(
-            RefreshStep(
-                name=f"soccer_{league}_odds_live",
-                phases=("live",),
-                cwd=REPO_ROOT,
-                command=(
-                    python_exe,
-                    "scripts/fetch_soccer_oddsapi_odds_local.py",
-                    "--league", league,
-                    "--out", str(soccer_root / league / "api" / "odds" / "game_odds_current.csv"),
-                ),
-                description=f"LIVE {league} game odds ({len(event_ids)} in play).",
-            )
-        )
-        steps.append(
-            RefreshStep(
-                name=f"soccer_{league}_props_live",
-                phases=("live",),
-                cwd=REPO_ROOT,
-                command=(
-                    python_exe,
-                    "scripts/fetch_soccer_oddsapi_props_local.py",
-                    "--league", league,
-                    "--event-ids", ",".join(sorted(event_ids)),
-                    # SAME PATH the pregame step writes -- `props/{date}.csv`.
-                    # A live capture landing anywhere else would be a file
-                    # nothing reads, which is the shape of a refresh that
-                    # "succeeds" every tick and changes nothing on the board.
-                    "--out", str(soccer_root / league / "props" / f"{args.date}.csv"),
-                ),
-                description=f"LIVE {league} player props, scoped to {len(event_ids)} in play.",
             )
         )
     return steps

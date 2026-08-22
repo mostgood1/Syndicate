@@ -3289,7 +3289,22 @@ def _live_refresh_loop_sports() -> str | None:
 	return raw or None
 
 
-def _sweep_ownership_exclusion(sport: str) -> str | None:
+def _sweep_active_sports_strict() -> bool:
+	"""Make `SYNDICATE_ACTIVE_SPORTS` absolute again, weekly carve-out included.
+
+	The carve-out below is right for the configuration that exists today, but it
+	takes an operator's "this service does not handle that sport" and overrides it
+	on a predicate the operator did not write. That deserves an off switch, and
+	the switch has to be here rather than "just remove the sport from the
+	schedule", because a weekly sport's claim is derived from the schedule.
+
+	Defaults OFF (carve-out active), because the failure it prevents is measured
+	and the failure it could cause is hypothetical.
+	"""
+	return _env_bool("SYNDICATE_SWEEP_ACTIVE_SPORTS_STRICT", default=False)
+
+
+def _sweep_ownership_exclusion(sport: str, *, date_str: str | None = None) -> str | None:
 	"""Why THIS service must not sweep `sport`, or None to sweep it.
 
 	WHY THIS EXISTS (2026-08-17). `_live_refresh_loop_effective_sports` fell back
@@ -3339,7 +3354,48 @@ def _sweep_ownership_exclusion(sport: str) -> str | None:
 	if raw_active:
 		active = {piece.strip().lower() for piece in raw_active.split(",") if piece.strip()}
 		if active and normalized not in active:
-			return "not_in_SYNDICATE_ACTIVE_SPORTS"
+			# `#514`. THE WEEKLY CARVE-OUT ABOVE WAS HALF-APPLIED, and the half
+			# that was missing is the half that had teeth.
+			#
+			# The docstring says weekly sports are deliberately not gated here,
+			# because their ownership is DYNAMIC: on a game day the fast tick
+			# CLAIMS nfl/ncaaf/ncaab and refresh-worker's
+			# `_active_weekly_sports_for_date` drops exactly those, on the SAME
+			# predicate, so one owner still writes. That reasoning was applied to
+			# `WEEKLY_SPORTS_REFRESH_TICK_OWNER` and not to
+			# `SYNDICATE_ACTIVE_SPORTS`, which sits above it and drops the sport
+			# outright -- so the yield happened and the claim did not.
+			#
+			# Measured 2026-08-22 21:0x-21:14Z, with NFL games in progress:
+			#
+			#     live-odds-worker  SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer
+			#                       dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+			#     refresh-worker    SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false
+			#     nfl book_grid     PUBLISH_SKIPPED_UNCHANGED, same checksum
+			#                       155e7a2a5123 at 21:13:37Z and 21:14:48Z
+			#     board age p50     36,478s (10.1h) against MLB's 487s
+			#
+			# This is the SAME 24-hour-stale-NFL symptom `#325`/2026-08-07
+			# already fixed once at the launch site; it came back through a
+			# different gate. `LIVE_MARKET_MAX_AGE_SECONDS` is 900s, so a price
+			# that old is not merely stale -- every live NFL row is deleted by
+			# `opportunity_gate` before it can reach the board.
+			#
+			# The write race stays impossible for the reason it was impossible
+			# before: both sides call `_weekly_sport_claimed_by_fast_tick`. Do
+			# not reimplement the predicate on either side.
+			if (
+				not _sweep_active_sports_strict()
+				and normalized in _WEEKLY_SPORTS_TICK_EXCLUDABLE
+				and _weekly_sport_claimed_by_fast_tick(normalized, str(date_str or central_today_iso()))
+			):
+				print(
+					f"[live_refresh_loop] SWEEP_OWNERSHIP_WEEKLY_CLAIM sport={normalized} "
+					f"kept=true reason=claimed_by_fast_tick_despite_SYNDICATE_ACTIVE_SPORTS",
+					flush=True,
+				)
+			else:
+				return "not_in_SYNDICATE_ACTIVE_SPORTS"
 	if normalized == "mlb" and not _mlb_refresh_tick_owner_here():
 		return "SYNDICATE_MLB_REFRESH_TICK_OWNER=false"
 	return None
@@ -3356,7 +3412,7 @@ def _live_refresh_loop_effective_sports(selected_date: str) -> list[str]:
 	kept: list[str] = []
 	dropped: list[str] = []
 	for sport in candidates:
-		reason = _sweep_ownership_exclusion(sport)
+		reason = _sweep_ownership_exclusion(sport, date_str=selected_date)
 		if reason is None:
 			kept.append(sport)
 		else:
@@ -3372,6 +3428,37 @@ def _live_refresh_loop_effective_sports(selected_date: str) -> list[str]:
 			f"kept={','.join(kept) or '<none>'} dropped={' '.join(dropped)}",
 			flush=True,
 		)
+		# `#514`. NOT SILENT IS NOT THE SAME AS LEGIBLE. The line above ran every
+		# tick for the whole of the NFL outage and named the right sport and the
+		# right reason -- and read as routine partitioning, because a correct
+		# exclusion and a catastrophic one are the same sentence.
+		#
+		# What separates them is whether the dropped sport is PLAYING. This is
+		# the only remaining shape of the bug that the weekly carve-out above
+		# does not fix: a NON-weekly sport (nba, nhl) excluded by
+		# `SYNDICATE_ACTIVE_SPORTS` while in progress. That case is deliberately
+		# NOT auto-claimed -- unlike the weekly sports there is no counterpart
+		# that yields on the same predicate, so claiming it here would be a real
+		# double-write race rather than a partition. So: say it, loudly, and let
+		# a human move the ownership. A warning nobody can miss beats a race
+		# nobody can see.
+		try:
+			for entry in dropped:
+				sport_slug = entry.split(":", 1)[0]
+				if _sport_has_in_progress_fixture(sport_slug, now_epoch=time.time()):
+					print(
+						f"[live_refresh_loop] SWEEP_OWNERSHIP_DROPPED_WHILE_LIVE "
+						f"date={selected_date} sport={sport_slug} detail={entry} "
+						f"-- this sport has a fixture in progress and this service will "
+						f"not refresh its odds; confirm another owner does",
+						flush=True,
+					)
+		except Exception as exc:  # noqa: BLE001 - a diagnostic must never break the tick
+			print(
+				f"[live_refresh_loop] SWEEP_OWNERSHIP_LIVENESS_PROBE_FAILED "
+				f"error={type(exc).__name__}: {exc}",
+				flush=True,
+			)
 	return kept
 
 
@@ -4261,6 +4348,182 @@ def _next_fixture_epoch_by_league(sport: str, *, now_epoch: float) -> dict[str, 
 	return dict(found)
 
 
+# `#514`. HOW LONG AFTER KICKOFF A FIXTURE IS STILL PLAYING.
+#
+# Needed because `_next_fixture_epoch_by_league` answers "when does this league
+# NEXT play", and to do that it must discard fixtures that have already started
+# (`epoch <= now_epoch: continue`). That is correct for its own question and
+# catastrophic for this one: a league whose match is UNDER WAY contributes no
+# clock at all, so it is absent from `_due_leagues_for_sport`'s candidate set --
+# not due, not skipped, invisible. `_league_interval_from_epoch`'s
+# `fixture_in_progress` branch is therefore unreachable from that caller, and the
+# leagues the board most needs a fresh price for are precisely the ones the scope
+# excludes.
+#
+# Measured 2026-08-22 21:13:37Z: primeira_liga had a match live
+# (`live_state_2026-08-22.json (1 live games, 3 box scores)`) while the launched
+# command read `--soccer-leagues mls`. Soccer's board quote age p50 was 23,941s
+# (6.7h), max 49,626s (13.8h), against a 900s `LIVE_MARKET_MAX_AGE_SECONDS` --
+# so every live soccer row was being deleted by `opportunity_gate` for staleness
+# that this scope caused.
+#
+# A WINDOW, NOT AN END TIME, because the schedule adapter gives kickoffs and not
+# final whistles. Sized to the longest ordinary match plus its overhead: 90' +
+# half-time + stoppage + a delay margin. Erring long costs one league's refresh
+# for a while after it finishes; erring short costs the price during play, which
+# is the whole point.
+_IN_PROGRESS_FIXTURE_WINDOW_DEFAULTS: dict[str, int] = {"soccer": int(3.5 * 3600)}
+_IN_PROGRESS_FIXTURE_WINDOW_FALLBACK = 4 * 3600
+
+
+def _in_progress_fixture_window_seconds(sport: str) -> int:
+	sport = str(sport or "").strip().lower()
+	raw = str(os.environ.get(f"SYNDICATE_IN_PROGRESS_FIXTURE_WINDOW_SECONDS_{sport.upper()}") or "").strip()
+	if not raw:
+		raw = str(os.environ.get("SYNDICATE_IN_PROGRESS_FIXTURE_WINDOW_SECONDS") or "").strip()
+	try:
+		value = int(raw) if raw else int(
+			_IN_PROGRESS_FIXTURE_WINDOW_DEFAULTS.get(sport, _IN_PROGRESS_FIXTURE_WINDOW_FALLBACK)
+		)
+	except ValueError:
+		value = int(_IN_PROGRESS_FIXTURE_WINDOW_DEFAULTS.get(sport, _IN_PROGRESS_FIXTURE_WINDOW_FALLBACK))
+	return max(0, value)
+
+
+def _in_progress_leagues_for_sport(sport: str, *, now_epoch: float) -> set[str]:
+	"""Leagues with a fixture that has KICKED OFF and is plausibly still running.
+
+	The mirror image of `_next_fixture_epoch_by_league`, over the same events and
+	the same league-prefixed `event_id`, keeping exactly what that function throws
+	away. Two dates rather than one: a fixture that kicked off late yesterday
+	local can still be inside the window now.
+
+	Returns a set rather than a clock because there is nothing to rank -- a league
+	playing right now is due, full stop, and no cadence tier applies to it.
+
+	Never raises. An unreadable date is skipped, matching
+	`_next_fixture_epoch_by_league`; an empty result is the same answer as "no
+	league is playing", which is the SAFE direction here because this only ever
+	ADDS leagues to a scope. Nothing it returns can narrow one.
+	"""
+	sport = str(sport or "").strip().lower()
+	window = _in_progress_fixture_window_seconds(sport)
+	if window <= 0:
+		return set()
+	live: set[str] = set()
+	base = central_datetime_from_epoch(now_epoch).date()
+	for offset in (-1, 0):
+		date_str = (base + timedelta(days=offset)).isoformat()
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+		except Exception:
+			continue
+		for event in events or []:
+			league = _league_from_event_id(getattr(event, "event_id", None))
+			if league is None:
+				continue
+			if league in live:
+				continue
+			try:
+				epoch = event.start_time_epoch()
+			except Exception:
+				epoch = None
+			if epoch is None:
+				continue
+			elapsed = float(now_epoch) - float(epoch)
+			if 0.0 <= elapsed <= float(window):
+				live.add(league)
+	return live
+
+
+def _sport_has_in_progress_fixture(sport: str, *, now_epoch: float) -> bool:
+	"""Is ANY fixture of this sport inside its in-progress window right now?
+
+	The sport-granularity twin of `_in_progress_leagues_for_sport`, and
+	deliberately NOT `_LIVE_STATUS_CHECKERS[sport]`: that registry's fallback is
+	`_espn_has_live_game`, which shells out to a helper script with a 12s timeout
+	on every call. Running it once per dropped sport per 60s tick, purely to emit
+	a warning, would cost more than the refresh it is warning about. This reads
+	the same TTL-cached schedule the cadence ladder already reads, and costs
+	nothing new.
+
+	Approximate on purpose. A postponed fixture reads as in progress for a few
+	hours, which is the right error for something whose only job is to say
+	"look at this".
+	"""
+	window = _in_progress_fixture_window_seconds(sport)
+	if window <= 0:
+		return False
+	base = central_datetime_from_epoch(now_epoch).date()
+	for offset in (-1, 0):
+		date_str = (base + timedelta(days=offset)).isoformat()
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+		except Exception:
+			continue
+		for event in events or []:
+			try:
+				epoch = event.start_time_epoch()
+			except Exception:
+				continue
+			if epoch is None:
+				continue
+			if 0.0 <= (float(now_epoch) - float(epoch)) <= float(window):
+				return True
+	return False
+
+
+def _artifact_live_leagues_for_sport(sport: str, date_str: str) -> set[str]:
+	"""Leagues whose OWN live-state artifact says a match is in progress.
+
+	A second, independent signal on top of the kickoff window, and a stronger one:
+	it reflects what actually happened rather than what was scheduled, so it keeps
+	a delayed or long-running match in scope past the window and does not depend on
+	the schedule adapter being readable.
+
+	ARTIFACT ONLY -- no per-league ESPN fallback. `_soccer_has_live_game` already
+	pays that cost at sport granularity and short-circuits on the first live
+	league; doing it here would turn one call into one per league, every tick, to
+	answer a question the kickoff window above already answers for free. This is
+	the cheap corroborating read, not the primary one.
+	"""
+	sport = str(sport or "").strip().lower()
+	if sport != "soccer":
+		return set()
+	try:
+		from syndicate.features.soccer.sources import active_leagues_for_date
+
+		leagues = active_leagues_for_date(date_str)
+	except Exception:
+		return set()
+	live: set[str] = set()
+	for league in leagues or ():
+		normalized = str(league or "").strip().lower()
+		if not normalized:
+			continue
+		try:
+			if _soccer_has_live_game_via_artifact(normalized, date_str):
+				live.add(normalized)
+		except Exception:
+			continue
+	return live
+
+
+def _live_now_leagues_for_sport(sport: str, *, now_epoch: float, date_str: str | None = None) -> set[str]:
+	"""Union of both liveness signals. The set that must never be scoped out."""
+	resolved_date = str(date_str or central_today_iso())
+	found: set[str] = set()
+	try:
+		found |= _in_progress_leagues_for_sport(sport, now_epoch=now_epoch)
+	except Exception:
+		pass
+	try:
+		found |= _artifact_live_leagues_for_sport(sport, resolved_date)
+	except Exception:
+		pass
+	return found
+
+
 def _league_interval_from_epoch(next_epoch: float | None, *, now_epoch: float) -> tuple[int | None, str]:
 	"""Tier lookup for ONE league. Same ladder as the sport-level path.
 
@@ -4348,9 +4611,28 @@ def _due_leagues_for_sport(
 	else:
 		candidates = sorted({str(x).strip().lower() for x in leagues if str(x).strip()})
 
+	# `#514`. LIVE LEAGUES ARE UNIONED IN, NOT FILTERED FROM `candidates`.
+	#
+	# They have to be: `by_league` is built from FUTURE fixtures only, so a league
+	# whose match is under way is not in `candidates` at all and no amount of
+	# per-league tier logic below can reach it. This is the one path that puts it
+	# back, and it is deliberately unconditional -- a league that is playing is
+	# due every tick, with no marker check and no interval, because 60s is the
+	# cadence a moving live price needs and `LIVE_MARKET_MAX_AGE_SECONDS` (900s)
+	# deletes anything slower from the board outright.
+	live_now = _live_now_leagues_for_sport(sport, now_epoch=now_epoch)
+	if leagues is not None:
+		# An explicit league list is a caller's scope, not a suggestion; never
+		# widen past it. Only the unscoped call (the real launch path) grows.
+		live_now &= set(candidates)
+
 	due: list[str] = []
 	reasons: dict[str, str] = {}
-	for league in candidates:
+	for league in sorted(set(candidates) | live_now):
+		if league in live_now:
+			due.append(league)
+			reasons[league] = "due:live_now"
+			continue
 		interval, reason = _league_interval_from_epoch(by_league.get(league), now_epoch=now_epoch)
 		if interval is None or interval <= 0:
 			due.append(league)

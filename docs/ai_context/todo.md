@@ -1,5 +1,104 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#515` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
+
+`#514` diagnosed WHY live bets were limited. This is the fix, plus the measurement
+that reordered its priorities.
+
+**THE MEASUREMENT THAT CHANGED THE PLAN.** `#514` treated scoping as the main
+cause. Counting the tick's own verdict line over 20:31–21:33Z on live-odds-worker:
+
+    LIVE ODDS REFRESH TICK: True    5
+    LIVE ODDS REFRESH TICK: False  47      -> 9.6%
+
+Every False carried `A refresh run is already active (pid=1827)`. The configured
+interval is 60s; the **observed launch cadence was ~12 minutes**. Scoping decides
+WHAT a launch covers; this decides whether there is a launch. It outranks
+everything in `#514`.
+
+(From 21:33Z the next 8 ticks were all True — the MLB sim had finished. So the
+9.6% is a busy-slate number, not an all-day one, and the busy slate is when live
+bets exist.)
+
+**FIX 1 — NFL had no owner, and it was a code defect, not config.**
+`_sweep_ownership_exclusion` let `SYNDICATE_ACTIVE_SPORTS` drop nfl/ncaaf on
+live-odds-worker. Its own docstring says weekly sports are deliberately NOT gated
+there, because ownership is DYNAMIC — on a game day the fast tick claims them and
+refresh-worker's `_active_weekly_sports_for_date` drops them on the SAME
+predicate. That carve-out was applied to `WEEKLY_SPORTS_REFRESH_TICK_OWNER` and
+not to `SYNDICATE_ACTIVE_SPORTS`, which sits above it. **The yield happened and
+the claim did not.** Now carved out, scoped to `_weekly_sport_claimed_by_fast_tick`,
+with `SYNDICATE_SWEEP_ACTIVE_SPORTS_STRICT=1` as the off switch.
+
+`test_the_two_services_partition_the_sports_with_no_overlap_and_no_gap` passed
+throughout the outage because it compared `_live_refresh_loop_effective_sports`
+under both services' env — and this file's own docstring records that
+refresh-worker never calls that function. It asserted a partition between one
+real list and one hypothetical one. Replaced with a test that compares the two
+paths each service ACTUALLY runs and asserts nfl has exactly one owner under both
+branches of the predicate.
+
+**FIX 2 — soccer's per-league scope excluded the leagues that were playing.**
+`_next_fixture_epoch_by_league` skips fixtures with `epoch <= now_epoch` (correct
+for "when does this league next play"), so a league mid-match contributes no
+clock and is absent from `_due_leagues_for_sport`'s candidate set — not due, not
+skipped. `_league_interval_from_epoch`'s `fixture_in_progress` branch was
+unreachable from that caller, which is the tell. Live leagues are now unioned in
+ahead of the ladder, from two signals: a kickoff window (3.5h, configurable) and
+the league's own `live_state` artifact. Fails open in the only safe direction —
+it can only ever GROW a scope.
+
+**FIX 3 — the live captures ran last, behind every sim.** `_build_soccer_steps`
+already carries the comment that the run dies around step 27 of ~50 and that the
+fix was to move cheap captures ahead of expensive sims. That reorder was applied
+to the pregame loops; the live captures were added later and landed at the back,
+inheriting the starvation the reorder had just removed. They are the steps least
+able to afford it: a pregame price that misses a cycle drifts, a live price that
+misses one is DELETED by `opportunity_gate`'s 900s ceiling. Live odds, live props
+and live-state polling now run first. Same steps, same call volume.
+
+**FIX 4 — and it is what pays for fix 2.** `soccer_{league}_artifacts` (the sim
+rebuild) ran on every 60s live tick. Widening the launcher's league scope would
+have multiplied that: one sim per live league per minute, on a box at 89.9% of
+2048MB. An in-play league now drops `live` from that step's phases. Leagues NOT
+in play keep it — **because the refresh phase is GLOBAL**, so soccer sits in
+"live" for the whole of an MLB evening whether or not soccer is playing, and a
+blanket drop would stop soccer's sims for hours.
+
+**NOT FIXED, and the next thing to look at.** That global phase is its own defect.
+`effective_phase = "live" if any_live else "pregame"` is one value for the whole
+tick, but liveness is per-sport and per-match. While MLB is live — 14 hours a day
+— every soccer step marked `phases=("pregame",)` is skipped, which is the whole
+pregame odds and props capture for the nine leagues that are not playing. That is
+a better explanation of soccer's 13.8h max quote age than anything in `#514`, and
+none of the four fixes above touch it. A per-sport phase is the real fix and is
+not a small change.
+
+**ALSO NOT FIXED:** a NON-weekly sport (nba, nhl) excluded by
+`SYNDICATE_ACTIVE_SPORTS` while in progress. Deliberately not auto-claimed —
+unlike the weekly sports there is no counterpart yielding on the same predicate,
+so claiming it would be a real double-write race. Instead a new
+`SWEEP_OWNERSHIP_DROPPED_WHILE_LIVE` line names it, because
+`SWEEP_OWNERSHIP_EXCLUDED` ran every tick throughout the NFL outage with the
+right sport and the right reason and read as routine. The probe reads the
+TTL-cached schedule, never `_espn_has_live_game` (a subprocess with a 12s
+timeout, per sport, per 60s tick, to emit a warning).
+
+**Tests:** `tests/test_live_league_scope_in_progress.py` (19),
+`tests/test_soccer_live_step_order.py` (11), `tests/test_sweep_ownership_gate.py`
+rewritten (20). The three reds in `test_refresh_odds_sources.py` are
+pre-existing — verified identical against a stashed baseline in the same session.
+
+**VERIFICATION AFTER DEPLOY — name the readings, do not accept absence of error:**
+1. `LAYER2_BOARD_HEALTH sport=nfl age_p50s` must fall from ~36,000 to minutes.
+2. `LAYER2_BOARD_HEALTH sport=soccer live_rows` must exceed 3 while a match is on.
+3. `FIXTURE_CADENCE sport=soccer league=<x> due:live_now` must appear for the
+   league whose `live_state` says a match is in play.
+4. `SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl` must appear on a game day.
+5. The True/False ratio of `LIVE ODDS REFRESH TICK` over a busy hour — the 9.6%
+   baseline is recorded above. **This is the one that says whether 60s was
+   actually achieved**, and fix 4 is the only one of the four aimed at it.
+
 ### `#514` — **Live bets are limited because almost nothing REFRESHES a live price. Three separate scoping bugs, one gate. DIAGNOSED IN PRODUCTION 2026-08-22 21:0x–21:14Z, NOT FIXED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
 
 The user asked why so few live bets exist with soccer, MLB and NFL all in play.
