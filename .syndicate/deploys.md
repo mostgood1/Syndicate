@@ -22862,3 +22862,33 @@ publish sweep's repair limit**, and appears in `SWEEP_SKIPPED_DETAIL` on every
 cycle. Direct stream publishes succeed; if one misses, nothing repairs it and
 the board keeps serving the last copy. The health line's age percentiles will
 confirm or kill this.
+
+### LIVE — `3ada3512` on both services, and the memory question answered
+
+    web             live 19:21:49Z  (dep-da4vbr2jobas73d278ug)
+    refresh-worker  live 19:23:21Z  -> superseded 19:29:37Z by
+                    dep-da4vh5fqj5pc73bbhtag, trigger `service_updated`,
+                    SAME COMMIT `3ada3512`. Someone changed a service setting;
+                    the redeploy carries the identical SHA, so the
+                    instrumentation is live either way. Checked rather than
+                    assumed — a `deactivated` status on my own deploy id looked
+                    at first like the work had been rolled back.
+
+**MEMORY — measured, and it settles the "unexplained" question.**
+
+    before deploy  19:18:15Z   3,963 MB   96.8%   unexplained 2,019 MB
+    after restart  19:33:08Z      93 MB    2.3%   unexplained     2.9 MB
+
+A 42x drop, and the unexplained pool went to essentially nothing. Consistent
+with the 90.9% -> 15.6% reading earlier today. **The accumulation is
+uptime-driven and a restart fully reclaims it** — it is not a leak that survives
+a process, and it is not any single job's working set. That is now measured
+twice on the same day rather than inferred once.
+
+Both claims released (`de7fb84df009c4ce`, `b201b54a07da1fe4`).
+
+**STILL UNREAD:** `LAYER2_BOARD_HEALTH` has never appeared — the worker
+restarted at 19:29:37Z and the first shortlist of a cold boot is 10-19 minutes
+out. The three user reports it exists to answer (stale lines, blank projections,
+absent movement) remain UNDIAGNOSED. Nothing below or above should be read as
+having explained them.
