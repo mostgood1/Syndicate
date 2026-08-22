@@ -22376,3 +22376,66 @@ against the git mirror showed board `Inter Milan` vs sim `Internazionale`,
 board-side spellings are a RECONSTRUCTION of OddsAPI, not a measurement. The
 mirror carries no soccer quote side at all. Writing aliases off them would be
 guessing dressed as a fix; the log line exists to supply the real names.
+
+## 2026-08-22T17:13Z — settlement autorun ENABLED on refresh-worker (env, not blueprint). It RAN. It settled NOTHING.
+
+**User instruction: "enable the evaluation settlement autorun so parlays settle too."**
+Set via the Render env API on refresh-worker only, NOT `render.yaml` — the key is
+`sync: false` precisely so a runtime enable is not reverted by a blueprint sync,
+and a `render.yaml` push would fire `blueprint_sync` across all three services.
+Both keys set in ONE merge call (`replace:false`), because a window with the
+autorun enabled while `LOOKBACK_DAYS` was still at its 21-day default is the
+OOM configuration:
+
+    EVALUATION_SETTLEMENT_LOOKBACK_DAYS                   = 3
+    EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN   = true
+
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` deliberately NOT set — setting
+it at all overrides the daily gate.
+
+**THE RESULT, verbatim — the first `[ledger_bridge]` line in seven days:**
+
+    17:28:34.610Z  LEDGER_INDEX_SIZE bytes=3538491 ... autorun_enabled=True
+    17:29:45.514Z  [ledger_bridge] {"straight_settled": 0, "parlays_settled": 0,
+                                    "skipped": 25131, "dates_bridged": 3}
+
+**The parlay did NOT settle, and neither did anything else.**
+
+**COST: ~40MB, against my ~759MB projection. My estimate was an order of
+magnitude too conservative and should not be reused.** Peak `memory_current_mb`
+3,064.9 during the pass vs 3,027 after, one `climb_mb_per_s: 34.9` sample, whole
+pass 71s. The 4.05–4.19x RSS-per-JSON-byte coefficient does NOT describe this
+path as run — the streamed reader plus per-date freeing dominates. **Do not
+generalise this to a wider window:** the 332MB `2026-08-16` chunk was OUTSIDE a
+3-day window and is the one the coefficient was measured against.
+
+**WHY NOTHING SETTLED — mechanism, from the code, not guessed.**
+`_outcome_by_recommendation` indexes an evaluation record ONLY if its outcome is
+in `{win,loss,push,void}`. Every portfolio prediction whose `recommendation_id`
+(or, for a parlay, any leg's) misses that index is counted `skipped`. So
+`skipped: 25131` with `straight_settled: 0` says **the index was empty or
+non-matching for all three dates** — i.e. `settle_ledger_for_dates` settled no
+evaluation records in the window, or none of them match the portfolio's ids.
+
+`25,131 / 3 dates ≈ 8,377` predictions per pass. That is NOT a contradiction of
+"3-5 tracked bets": the raw ledger carries years of stakeless auto-tracked rows
+(`portfolio_summary._is_user_placed_bet` filters on `stake is not None`), so the
+bridge examines all of them and `/portfolio` shows the handful with stakes.
+
+**TWO CANDIDATE CAUSES, NOT YET DISTINGUISHED — do not act as if either is
+established:**
+1. The parlay's legs are outside the 3-day window (flagged as a risk BEFORE
+   enabling; a 4-leg cross-sport bet of unknown age).
+2. Settlement settled 0 evaluation records for 08-20..08-22 (grading absent for
+   those dates), so the index was empty.
+
+`straight_settled: 0` leans toward (2) — with a non-empty index some straight
+bet would likely have matched — but that is an inference, not a measurement.
+
+**THE DIAGNOSTIC THAT DISTINGUISHES THEM EXISTS AND I COULD NOT REACH IT.**
+`syndicate/blueprints/ops.py:1152` serves the settlement autorun status file,
+which carries `settle_ledger_for_dates`' own per-date `summaries` (matched /
+settled / already_resolved counts). It is on WEB over HTTP, and this session's
+egress to `syndicate-an21.onrender.com` is 403'd by policy. **Read that endpoint
+before widening the lookback** — widening is the right move only under cause (1),
+and under cause (2) it is expense for nothing.
