@@ -13,6 +13,7 @@ from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
 from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
+from syndicate.features.soccer.sources import game_markets_rows
 from syndicate.features.soccer.sources import live_state_payload
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import picks_rows
@@ -660,6 +661,93 @@ def _live_state_entry(league: str, date_str: str, event_id: str, key: str) -> di
         return None
     entry = section.get(event_id)
     return entry if isinstance(entry, dict) else None
+
+
+def _game_event_market_data(league: str, date_str: str, home_team: str, away_team: str) -> dict[str, Any]:
+    """`p_btts_yes` and `corners_total` from the per-event capture.
+
+    These do NOT come through `picks_{date}.csv` -- the picks pipeline never
+    graded them -- so they are read from the capture directly. Matched on team
+    name for the same reason `_market_data_for_match` is: the Odds API's event
+    id is a different id space than ESPN's, and the names are the only field
+    both sources share.
+
+    BTTS IS DE-VIGGED. Raw implied yes+no sums to ~1.05-1.08, and the card
+    compares this against a MODEL probability that sums to 1 by construction --
+    handing it the vigged number would show an edge that is really the book's
+    margin. Proportional de-vig, the same method `_no_vig_over_probability`
+    uses for three-way h2h.
+
+    CORNERS TAKES THE MOST-QUOTED LINE, not the first or the longest. An
+    alternate ladder carries 15 lines; the one with the most books is the main
+    market, and ties break toward the most balanced pricing (the two sides
+    closest together), which is what "main line" means when book counts tie.
+    """
+    if not date_str or not home_team or not away_team:
+        return {}
+    rows = [
+        row
+        for row in game_markets_rows(league, date_str)
+        if str(row.get("home_team") or "").strip() == home_team
+        and str(row.get("away_team") or "").strip() == away_team
+    ]
+    if not rows:
+        return {}
+
+    out: dict[str, Any] = {}
+
+    def _implied(american: Any) -> float | None:
+        price = _safe_float(american)
+        if price is None or price == 0:
+            return None
+        return (100.0 / (price + 100.0)) if price > 0 else ((-price) / ((-price) + 100.0))
+
+    # --- BTTS: best price per side, then de-vig the pair together.
+    best: dict[str, float] = {}
+    for row in rows:
+        if str(row.get("market_key") or "") != "btts":
+            continue
+        side = str(row.get("side") or "").strip().lower()
+        price = _safe_float(row.get("price"))
+        if side in {"yes", "no"} and price is not None:
+            if side not in best or price > best[side]:
+                best[side] = price
+    p_yes, p_no = _implied(best.get("yes")), _implied(best.get("no"))
+    if p_yes is not None and p_no is not None and (p_yes + p_no) > 0:
+        out["p_btts_yes"] = round(p_yes / (p_yes + p_no), 4)
+        out["btts_yes_price"] = best.get("yes")
+    elif p_yes is not None:
+        # One-sided: publish the price but NOT a probability. A vigged
+        # single-side implied would be compared against a de-vigged model
+        # number and manufacture an edge from the hold alone.
+        out["btts_yes_price"] = best.get("yes")
+
+    # --- Corners: the most-quoted line.
+    by_line: dict[float, dict[str, list[float]]] = {}
+    for row in rows:
+        if str(row.get("market_key") or "") != "alternate_totals_corners":
+            continue
+        line = _safe_float(row.get("line"))
+        price = _safe_float(row.get("price"))
+        side = str(row.get("side") or "").strip().lower()
+        if line is None or price is None or side not in {"over", "under"}:
+            continue
+        by_line.setdefault(line, {"over": [], "under": []})[side].append(price)
+    two_sided = {
+        line: sides for line, sides in by_line.items() if sides["over"] and sides["under"]
+    }
+    if two_sided:
+        def _rank(item):
+            line, sides = item
+            books = len(sides["over"]) + len(sides["under"])
+            balance = abs(max(sides["over"]) - max(sides["under"]))
+            return (-books, balance, line)
+
+        line, sides = sorted(two_sided.items(), key=_rank)[0]
+        out["corners_total"] = line
+        out["corners_over_price"] = max(sides["over"])
+        out["corners_under_price"] = max(sides["under"])
+    return out
 
 
 def _market_data_for_match(league: str, date_str: str, home_team: str, away_team: str) -> dict[str, Any]:
@@ -1598,6 +1686,11 @@ def _match_to_game(
     live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
 
     betting = _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team)
+    # Additive: BTTS/corners come from a DIFFERENT capture than picks, so they
+    # are merged rather than replacing anything `_market_data_for_match` set.
+    betting.update(
+        _game_event_market_data(league, str(match.get("date") or "")[:10], home_team, away_team)
+    )
     prop_picks = _prop_picks_by_player(league, week, season)
     # TWO SOURCES, most-trusted first, and BOTH are real readings.
     #

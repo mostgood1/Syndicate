@@ -238,6 +238,24 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
     return load_json(live_state_path(league, selected_date))
 
 
+def game_markets_path(league: str, selected_date: str) -> Path:
+    return _api_read_path(league, "props", f"game_markets_{selected_date}.csv")
+
+
+def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
+    """Per-event GAME markets (btts, corners) captured from the per-event
+    endpoint. Not cached, same reason as `picks_rows`: regenerated as odds
+    move, and gunicorn workers never recycle."""
+    path = game_markets_path(league, selected_date)
+    if not path.exists():
+        return ()
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return tuple(dict(row) for row in csv.DictReader(handle))
+    except Exception:
+        return ()
+
+
 def picks_path(league: str, selected_date: str) -> Path:
     return _api_read_path(league, "picks", f"picks_{selected_date}.csv")
 

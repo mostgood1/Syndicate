@@ -498,7 +498,18 @@ def main() -> int:
     _append_soccer_prop_book_quotes(league=str(args.league), payloads=prop_payloads)
 
     if game_rows:
-        game_out = Path(args.game_out) if args.game_out else Path(args.out).with_name("game_event_markets_current.csv")
+        # Beside --out, i.e. under `soccer_source/<league>/props/`, which
+        # `artifact_publisher.HOT_ARTIFACT_PATTERNS` already allowlists as
+        # `soccer_source/*/props/*.csv`. A new directory would need its own
+        # allowlist entry and would be invisible to web until it got one --
+        # the exact failure that made live_state unreadable there.
+        # DATE-SCOPED, matching picks/props convention, so a stale file cannot
+        # answer for today.
+        game_out = (
+            Path(args.game_out)
+            if args.game_out
+            else Path(args.out).with_name(f"game_markets_{Path(args.out).stem}.csv")
+        )
         game_df = pd.DataFrame(game_rows)
         # THE FEED DUPLICATES (book, market, side, line) WITH DIFFERENT PRICES.
         # Measured 2026-08-22, fanduel `alternate_totals_corners`: 50 outcomes
