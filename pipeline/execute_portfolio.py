@@ -76,6 +76,14 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         line=line_value,
         player_name=(str(position.get("player_name")).strip() or None) if position.get("player_name") else None,
         book=(str(position.get("book")).strip() or None) if position.get("book") else None,
+        segment=position.get("segment"),
+        # Copied onto the order so the bet stays legible and re-priceable once
+        # the plan that described it has been rewritten -- which happens on
+        # every board build, i.e. every few minutes. See `_LEAN_FIELDS`.
+        home_team=position.get("home_team"),
+        away_team=position.get("away_team"),
+        commence_time=position.get("commence_time"),
+        opening_key=position.get("opening_key"),
     )
 
 

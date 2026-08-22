@@ -238,3 +238,115 @@ def test_api_mirrors_the_page_payload(app_client, paper_env):
 def test_live_mode_is_visible_in_the_payload(paper_env):
     paper_env["mode"] = "live"
     assert _payload(paper_env)["execution_mode"] == "live"
+
+
+# --- the three defects the page's own screenshot surfaced, 2026-08-22 --------
+
+
+def test_orphan_orders_keep_the_identity_of_the_bet(paper_env):
+    """14 orders showed as `MLB batter_hits over betrivers -112` -- unidentifiable.
+
+    The plan that named the player and the teams is rewritten on every board
+    build, so an orphan cannot borrow identity from it. The LEDGER has to carry
+    it, and the page has to render it.
+    """
+    paper_env["plan"] = _plan(positions=[])
+    paper_env["orders"] = [
+        _order(
+            position_key="gone",
+            player_name="Steven Kwan",
+            line=1.5,
+            home_team="COL",
+            away_team="CLE",
+        )
+    ]
+    payload = _payload(paper_env)
+    orphan = payload["orphan_orders"][0]
+    assert orphan["player_name"] == "Steven Kwan"
+    assert orphan["line"] == 1.5
+    assert orphan["home_team"] == "COL"
+
+
+def test_orphan_identity_reaches_the_rendered_page(app_client, paper_env):
+    paper_env["plan"] = _plan(positions=[])
+    paper_env["orders"] = [
+        _order(position_key="gone", player_name="Steven Kwan", home_team="COL", away_team="CLE")
+    ]
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "Steven Kwan" in body
+    assert "CLE" in body and "COL" in body
+
+
+def test_the_flags_report_the_WORKER_state_not_this_process(paper_env):
+    """The page said "COMMIT JOB off" beside filled orders it had just rendered.
+
+    True of the web service, worthless to a reader: the jobs run on
+    refresh-worker. The worker stamps its own state into the plan.
+    """
+    paper_env["commit"] = False  # web's env says off...
+    paper_env["execution"] = False
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        job_state={
+            "commit_enabled": True,  # ...the worker that wrote the plan says on
+            "execution_enabled": True,
+            "execution_mode": "paper",
+            "recorded_by": "refresh-worker",
+        },
+    )
+    payload = _payload(paper_env)
+    assert payload["commit_enabled"] is True
+    assert payload["execution_enabled"] is True
+    assert payload["job_state_source"] == "worker"
+
+
+def test_without_a_worker_stamp_the_flags_say_where_they_came_from(paper_env):
+    """A plan predating `job_state` falls back to the local env -- and SAYS so,
+    rather than presenting web's environment as if it were the worker's."""
+    paper_env["commit"] = False
+    paper_env["plan"] = _plan(positions=[_position()])
+    payload = _payload(paper_env)
+    assert payload["job_state_source"] == "web_env"
+    assert payload["commit_enabled"] is False
+
+
+def test_live_marks_are_joined_onto_positions_by_order_identity(paper_env):
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        live_marks={
+            "marked": 1,
+            "moved_toward": 1,
+            "moved_against": 0,
+            "avg_clv_pct": 2.5,
+            "marks": [
+                {
+                    "idempotency_key": "k1",
+                    "position_key": "abc123",
+                    "reason": "marked",
+                    "current_price": -130,
+                    "clv_pct": 2.5,
+                }
+            ],
+        },
+    )
+    paper_env["orders"] = [_order()]
+    payload = _payload(paper_env)
+    assert payload["rows"][0]["mark"]["current_price"] == -130
+    assert payload["live_marks"]["avg_clv_pct"] == 2.5
+
+
+def test_an_orphan_also_gets_its_live_mark(paper_env):
+    """An orphan is still a bet, and usually the one you most want to look at."""
+    paper_env["plan"] = _plan(positions=[])
+    paper_env["orders"] = [_order(position_key="gone")]
+    paper_env["plan"]["live_marks"] = {
+        "marked": 1,
+        "marks": [{"idempotency_key": "k1", "reason": "marked", "current_price": -130, "clv_pct": 2.5}],
+    }
+    payload = _payload(paper_env)
+    assert payload["orphan_orders"][0]["mark"]["clv_pct"] == 2.5
+
+
+def test_a_position_with_no_mark_carries_none_rather_than_a_fake_one(paper_env):
+    paper_env["plan"] = _plan(positions=[_position()])
+    assert _payload(paper_env)["rows"][0]["mark"] is None

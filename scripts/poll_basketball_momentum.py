@@ -52,17 +52,43 @@ _BROWSER_UA = (
 )
 
 
-def _get_json(url: str, *, timeout: int = 25) -> dict[str, Any]:
-    request = urllib.request.Request(
-        url, headers={"Accept": "application/json", "User-Agent": _BROWSER_UA}
-    )
+def _get_json(url: str, *, timeout: int = 25, browser_ua: bool = False) -> dict[str, Any]:
+    """Fetch JSON, and SAY SO when it fails.
+
+    **`browser_ua=False` IS THE MEASURED DEFAULT AND MUST STAY THAT WAY FOR
+    `site.api.espn.com`.** `scripts/fetch_espn_live_status_for_date.py` records
+    the probe, run from Render itself on 2026-08-05 against a game confirmed
+    genuinely live: the bare `Mozilla/5.0` UA returned **403**, a fuller
+    realistic Chrome header set returned **403**, and NO custom headers at all
+    -- urllib's own `Python-urllib/x.y` -- returned **200**. ESPN appears to
+    fingerprint the browser-spoof pattern specifically. **Local testing cannot
+    reproduce it; only Render's egress IP is blocked.**
+
+    This module shipped with the browser UA on both calls, copied from
+    `basketball_props_smart_sim._http_get_json_local`, whose comment argues the
+    OPPOSITE for its own endpoint. Two comments in this repo give contradictory
+    advice and only one of them was measured against the scoreboard from
+    Render. Cost: the scoreboard 403'd on every tick of a live WNBA slate, the
+    bare `except` swallowed it, and `live_events=0` was indistinguishable from
+    "no games in play" for the whole evening.
+
+    **THE SWALLOWED ERROR IS THE DEEPER DEFECT.** A 403 and an empty slate
+    returned the same `{}`. Failures are now printed with their reason, so this
+    can never again be silent.
+    """
+    headers = {"Accept": "application/json"}
+    if browser_ua:
+        headers["User-Agent"] = _BROWSER_UA
+    request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             if response.status != 200:
+                print(f"[basketball_momentum] FETCH_STATUS {response.status} url={url}", flush=True)
                 return {}
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, dict) else {}
-    except Exception:
+    except Exception as exc:
+        print(f"[basketball_momentum] FETCH_FAILED {type(exc).__name__}: {exc} url={url}", flush=True)
         return {}
 
 
@@ -75,9 +101,19 @@ def live_event_ids(league: str, date_str: str) -> list[str]:
     """
     ymd = date_str.replace("-", "")
     url = f"https://site.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}/scoreboard?dates={ymd}"
+    # NO browser UA: `site.api.espn.com` 403s on it from Render (see `_get_json`).
     scoreboard = _get_json(url)
+    events = scoreboard.get("events")
+    # Total vs in-play, because `live_events=0` alone cannot tell "3 games, none
+    # tipped" from "the scoreboard call returned nothing" -- which is exactly
+    # the ambiguity that hid the 403.
+    print(
+        f"[basketball_momentum] SCOREBOARD league={league} date={date_str} "
+        f"events_total={len(events) if isinstance(events, list) else 'ABSENT'}",
+        flush=True,
+    )
     out: list[str] = []
-    for event in scoreboard.get("events") or []:
+    for event in events or []:
         if not isinstance(event, dict):
             continue
         status = ((event.get("status") or {}).get("type") or {})
@@ -90,8 +126,21 @@ def live_event_ids(league: str, date_str: str) -> list[str]:
 
 
 def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
+    """`site.web.api.espn.com` -- a DIFFERENT host from the scoreboard's.
+
+    The browser UA is established for this host elsewhere in the repo
+    (`basketball_props_smart_sim._espn_summary_local`,
+    `grade_wnba_live_prop_projection`), so it is tried first. But the two hosts
+    have already been shown to disagree about UA policy, so an empty result
+    falls back to urllib's honest default rather than giving up -- the variant
+    measured at 200 from Render for the sibling endpoint.
+    """
     url = f"https://site.web.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}/summary?event={event_id}"
-    return _get_json(url)
+    payload = _get_json(url, browser_ua=True)
+    if not payload:
+        print(f"[basketball_momentum] SUMMARY_RETRY_DEFAULT_UA event={event_id}", flush=True)
+        payload = _get_json(url)
+    return payload
 
 
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
@@ -168,6 +217,48 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     path = momentum_artifact_path(out_root, league_code=league, date_str=date_str)
     append_momentum_artifact(payload, path=path)
     print(f"[basketball_momentum] appended {path}", flush=True)
+
+    # **A SHAPE LINE PER CAPTURED GAME, because `with_series=1` says a series
+    # was BUILT and nothing about whether its numbers are right.**
+    #
+    # The artifact itself cannot be read from a Claude Code session: the ops
+    # export endpoint is on `syndicate-an21.onrender.com`, which the agent
+    # proxy answers 403 to at CONNECT (an org policy denial, not an auth
+    # failure -- an ADMIN_TOKEN does not change it). Logs are the one channel
+    # that does reach out, so the check goes here rather than into a fetch.
+    #
+    # Deliberately a SHAPE, not a dump: series lengths, endpoint values, the
+    # narrator's presence under its own name, and the clock. Enough to catch
+    # an empty axis, a mis-signed series, a clock that does not track the game,
+    # or a narrator that quietly vanished -- without putting a game's worth of
+    # JSON through the log collector every 2.5 minutes.
+    for event_id, block in (payload.get("games") or {}).items():
+        if not block.get("pressure"):
+            # ONE LINE PER GAME, INCLUDING THE ONES THAT FAILED. The
+            # `NO_SERIES` block above only fires when the WHOLE slate is
+            # empty, so on a mixed slate a game that failed to parse would
+            # otherwise print nothing at all and hide behind its neighbour's
+            # success -- `with_series=1` on a two-game slate reads as fine.
+            print(
+                f"[basketball_momentum] SHAPE event={event_id} "
+                f"supported={block.get('supported')} reason={block.get('reason')!r} "
+                f"events={block.get('events')} -- no series",
+                flush=True,
+            )
+            continue
+        pressure = block["pressure"]
+        seconds = pressure.get("seconds") or {}
+        possessions = pressure.get("possessions") or {}
+        narrator = block.get("scoring_narrator") or {}
+        print(
+            f"[basketball_momentum] SHAPE event={event_id} "
+            f"events={block.get('events')} "
+            f"as_of_s={block.get('as_of_seconds')} as_of_poss={block.get('as_of_possessions')} "
+            f"sec_pts={len(seconds.get('series') or [])} sec_now={seconds.get('current')} "
+            f"poss_pts={len(possessions.get('series') or [])} poss_now={possessions.get('current')} "
+            f"narrator={'yes' if narrator else 'NO'} narrator_events={narrator.get('events')}",
+            flush=True,
+        )
     return payload
 
 

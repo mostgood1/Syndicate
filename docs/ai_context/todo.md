@@ -1,5 +1,100 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#522` — **Stage C's precondition was missing and nobody would have noticed until the analysis returned empty: NOTHING joined a committed position to the opening price recorded for its market. Built, plus live marks and three page defects. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
+
+**THE GAP.** `clv_opening_ledger` has been recording openings all along —
+`OPENINGS date=2026-08-22 rows_in=1223 written=37 already=3105 unkeyable=0`,
+read from refresh-worker 2026-08-22T22:40Z. `clv_join` resolves a close. The
+piece that never existed is the one in the middle: Stage A and Stage B carry
+**no reference to `clv_opening_ledger` at all**, so no committed position was
+connected to the opening it was taken against.
+
+That gap is invisible while it accumulates. Every day of paper trading looks
+productive and produces orders that may or may not be joinable, and you find out
+at the end. `#505` is the same shape with a bill: a settlement join keyed on an
+id that changed whenever the price moved, **4,560 `no_key_match` of 8,276**,
+found long after the data was unrecoverable. `_opening_key`'s own docstring
+hands the problem forward — *"the mapping ... must be measured against real data
+before any CLV number is published."*
+
+**TWO PATHS, AND THE COMPARISON IS THE MEASUREMENT**
+(`syndicate/features/shared/clv_position_join.py`):
+
+- `stamped` — `commit_portfolio` calls `opening_key_for_row` on the SAME row in
+  the SAME run, a few lines after `record_openings` wrote that row's opening.
+  Exact by construction.
+- `derived` — `opening_key_for_position` rebuilds the key from the stored
+  position. The path every already-placed order needs.
+
+Stamping alone would have fixed the future, taught nothing about the orders
+already on disk, and left the derivation **permanently untested** because
+nothing would exercise it. Running both over the same plan makes the derivation
+a checkable claim; a disagreement is reported with an example naming the key it
+built, because a count says the derivation is wrong and only an example says
+which field.
+
+**The derived path CALLS `_opening_key` rather than reimplementing it**, so
+every normalisation (lowercasing `side`/`market`/`player`, `float` on `line`) is
+shared and case drift is *unreachable* rather than tested for. Exactly one step
+is hand-written: the position stores `book`, the ledger reads `quote.bookmaker`.
+That remap has its own test — dropping it does not fail to match, it matches
+**another book's** opening and yields a plausible wrong CLV, which is worse.
+
+**LIVE MARKS** (`syndicate/features/shared/position_marks.py`). Between "what we
+took" and "did it win" the only honest question is whether the market moved
+toward us, and the page answered with silence. Every order for the date is
+re-priced against the board the worker just built. Same quantity Stage C gates
+on — CLV is this against the close instead of the current quote.
+
+- **Same book or nothing.** Joins on the opening key, which includes the
+  bookmaker. A book that stopped quoting is `book_no_longer_quoting`, a named
+  absence, never a substituted price — comparing our entry to a different book's
+  current best manufactures movement out of book disagreement.
+- **American odds are never subtracted.** −110→−130 and +200→+180 are both "20"
+  and are not the same move. Everything goes through `clv_pct_from_prices`, the
+  SAME function the CLV path uses, so the page cannot disagree with the ledger
+  it previews.
+
+**THREE PAGE DEFECTS, all surfaced by the user's own screenshot of the live page:**
+
+1. **Orphan orders lost the bet.** 14 rendered as `MLB batter_hits over
+   betrivers -112` — unidentifiable. An orphan's position left the plan and the
+   plan is rewritten on **every board build**, so it cannot borrow identity.
+   `player_name`/`line` were on the record and merely unrendered (fixes
+   retroactively); matchup and `segment` were absent and are now in
+   `_LEAN_FIELDS`, along with `opening_key` so an order stays re-priceable
+   without reconstruction.
+2. **Nothing showed live tracking** — the marks above.
+3. **The status line reported the wrong process.** "COMMIT JOB off / EXECUTION
+   JOB off" sat above 3 committed positions and 14 filled orders: web reading
+   its OWN env for flags that gate a job on refresh-worker. The worker now
+   stamps `job_state` into the plan; web falls back to local env only when no
+   plan exists, and labels it `(web env)`.
+
+**Back-compat pinned by test:** orders predating `opening_key` still mark via
+the derivation, because board rows carry `segment: None` and legacy records omit
+it — both key to `segment=`. If that stops holding the whole back catalogue goes
+dark at once, so it is a test rather than luck.
+
+33 tests. Marks and the join run on the WORKER over rows already in memory and
+land in the plan artifact; web reads an answer instead of indexing ~1,200 rows
+per pageview.
+
+**OWED — and it is the whole point of the item.** The production reading is one
+log line on refresh-worker after deploy:
+`[clv_position_join] CLV_POSITION_JOIN ... matched=N no_key_match=M
+derivation_disagrees=D`. **`derivation_disagrees > 0` means every pre-stamp
+order is unjoinable and Stage C cannot use tonight's data.** `no_key_match > 0`
+with `derivation_disagrees == 0` is a narrower problem — the position is keyable
+but its opening was never recorded. Deploy held 2026-08-22T23:0x–23:1xZ:
+refresh-worker was running `run_mlb_daily_sim_job.py` (tip-off window, then
+`evening_next_day_sim` for 08-23), and deploying kills an in-flight sim.
+
+**STORAGE NOTE for whoever sizes the window.** `opening_ledger_path` is
+`{date}.jsonl` — **date-tokened, so a 10-day TTL** in the keyvalue store
+(`#284`/`#508`). Stage C's accumulation window has a hard ceiling of ~10 days
+unless openings are copied somewhere durable first.
+
 ### `#521` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
 
 `#520` diagnosed WHY live bets were limited. This is the fix, plus the measurement

@@ -79,6 +79,28 @@
             {% if game.compact_box_line %}
               <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
             {% endif %}
+            {%- set c_recon = game.shared_final_reconciliation if game.shared_final_reconciliation is defined else none -%}
+            {% if c_recon and c_recon.facts %}
+              {#- RECONCILIATION. How the pregame read actually played out --
+                  the fact this card can uniquely show once the match is over,
+                  since the pregame projection and the real result now both
+                  exist. A HIT needs no more than its own projected value +
+                  a mark; a MISS earns the actual number, because "wrong" is
+                  not useful on its own. -#}
+              <div class="cards-strip-recon-score" title="{{ c_recon.hits }} of {{ c_recon.graded }} graded reads hit">{{ c_recon.hits }}/{{ c_recon.graded }} hit</div>
+              <div class="cards-strip-pregame-facts">
+                {% for f in c_recon.facts %}
+                  <span class="cards-strip-pregame-fact{% if f.label == 'Top sim score' %} cards-strip-pregame-fact--score{% endif %}{% if f.hit == true %} is-hit{% elif f.hit == false %} is-miss{% endif %}">
+                    <span class="cards-strip-pregame-fact-label">{{ f.label }}</span>
+                    {{ f.projected }}
+                    {%- if f.hit == true %}<span class="cards-strip-recon-mark">✓</span>
+                    {%- elif f.hit == false %}<span class="cards-strip-recon-mark">✗</span> <span class="cards-strip-recon-actual">{{ f.actual }}</span>
+                    {%- else %}<span class="cards-strip-recon-actual">· {{ f.actual }}</span>
+                    {%- endif %}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
           {% else %}
             {%- set c_pre = game.shared_compact_pregame if game.shared_compact_pregame is defined else none -%}
             {#- PREGAME COMPACT CARD. Date/time on its own top line (the

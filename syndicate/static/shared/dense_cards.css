@@ -1417,3 +1417,20 @@ a.cards-head-team-name:focus-visible {
 .cards-strip-pregame-fact-pct {
   font-variant-numeric: tabular-nums; color: var(--cards-accent-strong);
 }
+
+/* --- FINAL card reconciliation --- how the pregame read (above) played out.
+   Same win/loss hues as `.cards-starter-ladder-badge` (MLB's reference), kept
+   to text rather than a full badge -- these sit inline in the facts grid, not
+   as a standalone pill. */
+.cards-strip-recon-score {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--cards-muted, rgba(255,255,255,0.62));
+  margin-top: 4px; margin-bottom: 1px;
+}
+.cards-strip-recon-mark { margin-left: 4px; }
+.cards-strip-pregame-fact.is-hit .cards-strip-recon-mark { color: #56c989; font-weight: 700; }
+.cards-strip-pregame-fact.is-miss .cards-strip-recon-mark { color: #e86868; font-weight: 700; }
+.cards-strip-recon-actual {
+  color: var(--cards-muted, rgba(255,255,255,0.58));
+  font-weight: 500;
+}

@@ -104,10 +104,25 @@ _LEAN_FIELDS = (
     "sport",
     "event_id",
     "market",
+    "segment",
     "side",
     "line",
     "player_name",
     "book",
+    # THE MATCHUP, carried because a placed order has to stay readable after the
+    # position leaves the plan. Measured 2026-08-22: 14 orders sat on
+    # `/portfolio/paper` as `MLB batter_hits over betrivers -112` -- a row nobody
+    # could identify as a bet, because the plan that named the player and the
+    # teams had been rewritten by the next board build. The ledger is the
+    # durable record; if it needs another artifact to be legible, it is not one.
+    "home_team",
+    "away_team",
+    "commence_time",
+    # THE RE-PRICING KEY. `clv_opening_ledger`'s identity for this market, so an
+    # order can be joined back to the board -- for a live mark now, and for the
+    # close later -- without reconstructing anything. `#505` is what
+    # reconstruction costs: 4,560 `no_key_match` of 8,276.
+    "opening_key",
     "requested_price",
     "requested_stake_dollars",
     "submitted_at",
@@ -141,6 +156,14 @@ class OrderRequest:
     line: float | None = None
     player_name: str | None = None
     book: str | None = None
+    segment: str | None = None
+    # Optional because orders placed before these existed have none, and an
+    # absent matchup must read as absent rather than be invented. Everything
+    # placed from here on carries them.
+    home_team: str | None = None
+    away_team: str | None = None
+    commence_time: str | None = None
+    opening_key: str | None = None
 
 
 def execution_mode() -> str:
@@ -277,6 +300,11 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "line": request.line,
         "player_name": request.player_name,
         "book": request.book,
+        "segment": request.segment,
+        "home_team": request.home_team,
+        "away_team": request.away_team,
+        "commence_time": request.commence_time,
+        "opening_key": request.opening_key,
         "requested_price": request.requested_price,
         "requested_stake_dollars": request.requested_stake_dollars,
         "submitted_at": _utc_now(),

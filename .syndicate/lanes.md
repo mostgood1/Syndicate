@@ -1360,6 +1360,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2500, `source` flips `default` -> `stored`); 60 lane tests and 344 related
   tests pass. **No production slate has been committed — do not report Stage A
   as working.**
+- **Stage C's precondition built, `#522`.** Nothing joined a committed position
+  to the opening price recorded for its market — Stage A and Stage B carried no
+  reference to `clv_opening_ledger` at all, while the openings were being
+  recorded all along (3,105 for 08-22, `unkeyable=0`). Built on day 1 rather
+  than at the end of the window, because that gap is invisible while it
+  accumulates and `#505` is the same shape with a bill. Two paths — a key
+  stamped from the same row in the same run, and a derivation for orders already
+  placed — and the comparison between them IS the measurement; the derivation
+  calls `_opening_key` rather than reimplementing it, so only the
+  `book`→`quote.bookmaker` remap is hand-written. Plus live marks
+  (`position_marks.py`): every order re-priced against the board, same book only,
+  always in probability points via `clv_pct_from_prices`. Plus three page
+  defects from the user's screenshot — orphan orders showed no player/line/
+  matchup, nothing showed live tracking, and the status line read WEB's env for
+  flags gating a WORKER job ("COMMIT JOB off" above 14 filled orders). 33 tests.
+  **NOT DEPLOYED — refresh-worker was mid-sim 23:0x–23:1xZ.** The owed reading is
+  `CLV_POSITION_JOIN ... derivation_disagrees=` on refresh-worker: non-zero means
+  every pre-stamp order is unjoinable and Stage C cannot use tonight's data.
 - **Stage B read surface shipped (`/portfolio/paper`).** The plan and the
   ledger both crossed the service boundary already (`_keyvalue_backed` True for
   `execution_ledger.json` and `portfolio_plan_<date>.json`), but nothing
@@ -1393,7 +1411,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
   `syndicate/templates/portfolio_paper.html`,
   `syndicate/static/shared/paper_portfolio_pulse.js`,
-  `tests/test_portfolio_paper_page.py`
+  `tests/test_portfolio_paper_page.py`,
+  `syndicate/features/shared/clv_position_join.py`,
+  `syndicate/features/shared/position_marks.py`,
+  `tests/test_clv_position_join.py`,
+  `tests/test_position_marks.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

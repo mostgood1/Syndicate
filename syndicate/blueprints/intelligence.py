@@ -3281,20 +3281,44 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         _LOGGER.exception("PAPER_LEDGER_READ_FAILURE date=%s", selected_date)
         ledger_error = f"{type(exc).__name__}: {exc}"
 
+    job_state = (plan or {}).get("job_state") or {}
     positions = (plan or {}).get("positions") or []
     # Join the ledger onto the plan by `position_key`, so a row shows both what
     # was decided and what happened to it.
     by_key = {str(order.get("position_key") or ""): order for order in orders}
+    # Live marks are computed by the WORKER against the board it just built and
+    # ride in the plan artifact; this only looks them up. Keyed by
+    # `idempotency_key` because that is the identity of an ORDER, and marks
+    # cover orphans whose position is no longer in the plan.
+    live_marks = (plan or {}).get("live_marks") or {}
+    marks_by_order = {
+        str(mark.get("idempotency_key") or ""): mark
+        for mark in (live_marks.get("marks") or [])
+    }
     rows = []
     for position in positions:
         order = by_key.get(str(position.get("position_key") or ""))
-        rows.append({**position, "order": order})
+        rows.append(
+            {
+                **position,
+                "order": order,
+                "mark": marks_by_order.get(str((order or {}).get("idempotency_key") or "")),
+            }
+        )
 
     return {
         "date": selected_date,
-        "commit_enabled": portfolio_commit_enabled(),
-        "execution_enabled": execution_enabled(),
-        "execution_mode": execution_mode(),
+        # THE WORKER'S FLAG STATE, NOT THIS PROCESS'S. The jobs run on
+        # refresh-worker; reading the env here reported "off" on a page full of
+        # committed positions and filled orders, which is true of the web
+        # service and worthless to a reader. The worker stamps `job_state` into
+        # the plan; these fall back to the local env only when no plan has been
+        # written yet, and `job_state_source` says which one you are looking at.
+        "commit_enabled": bool(job_state.get("commit_enabled", portfolio_commit_enabled())),
+        "execution_enabled": bool(job_state.get("execution_enabled", execution_enabled())),
+        "execution_mode": str(job_state.get("execution_mode") or execution_mode()),
+        "job_state_source": "worker" if job_state else "web_env",
+        "live_marks": live_marks,
         "plan_present": isinstance(plan, dict),
         "generated_at": (plan or {}).get("generated_at"),
         "bankroll_units": (plan or {}).get("bankroll_units"),
@@ -3309,7 +3333,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "clv_join": (plan or {}).get("clv_join") or {},
         "rows": rows,
         "orphan_orders": [
-            order
+            {**order, "mark": marks_by_order.get(str(order.get("idempotency_key") or ""))}
             for order in orders
             if str(order.get("position_key") or "")
             not in {str(p.get("position_key") or "") for p in positions}
