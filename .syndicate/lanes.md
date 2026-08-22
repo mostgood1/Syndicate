@@ -1247,6 +1247,31 @@ against a slate that actually had matches in play. Full evidence in
   daily-gated and last ran 06:57:03Z, so the first pass under the new code has
   not happened yet. Deploying is not verifying — do not close on the deploy.
 
+### render-web-request-path — OPEN — opened 2026-08-22 — session 726ef4ff-981a-593c-b89f-d31ee630b92d
+- Goal: web stops being SIGTERM'd during live MLB slates — no ~90s restart cadence, no ~15s no-listener 502 windows.
+- Files: `syndicate/blueprints/home.py`, `syndicate/features/mlb/cards.py`,
+  `tests/test_home_mlb_feed_live_single_flight.py`, `tests/test_mlb_cards_context_cache_bounds.py`,
+  `tests/_cache_isolation.py`, `tests/conftest.py`.
+- Hypothesis: the 502s are NOT slow cold boots (boot-to-listening measured 2.7s). They are
+  `/healthz` starvation: `_apply_mlb_live_scores` makes up to 15 live statsapi calls per home
+  request because `raw/statsapi/feed_live/**` is in none of the 175 `HOT_ARTIFACT_PATTERNS`,
+  so all 8 request slots (2 workers x 4 threads) block and the health check times out at 5s.
+- Falsification test: if `apply_live_scores` were cheap, or if terms correlated with deploys
+  rather than with unanswered health checks, the hypothesis is dead. Measured 2026-08-22:
+  `apply_live_scores` 3318/7991/8400/5498/3494ms (8400 > the 8000ms budget = network);
+  terms at 17:14:08 / 17:15:38 / 17:17:38 on container `-2mdsk`, new gunicorn master pid each,
+  no deploy after 17:12:59; healthz unanswered 17:16:34 -> 17:17:58 (84s).
+- Verification: **NOT DISCHARGED — nothing is deployed.** Two readings, both post-deploy:
+  (1) zero unexplained `Handling signal: term` on web across a full live MLB slate, and
+  (2) memory-over-uptime staying off the 2,147,483,600 B ceiling (baseline to beat:
+  369 MB at boot -> 2,026,717,200 B after ~7.5h, 2026-08-22). Secondary instrument:
+  `CONTEXT_CACHE_EVICTED ... web=True` should become RARE; unchanged rate means the idle
+  bound is not working. Code-level: 24 new tests pass, and the load-bearing one is
+  falsified against the old path (second concurrent request blocked 8.00s, 4 fetches
+  started; new path returns in <1s with 1 fetch).
+- Blocked by: none. Deploy not taken — no claim acquired, `render.yaml` untouched.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

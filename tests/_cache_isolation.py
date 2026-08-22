@@ -65,6 +65,30 @@ def clear_nba_cards_caches() -> None:
     _NBA_CARDS_CONTEXT_CACHE.clear()
 
 
+def clear_mlb_wall_clock_caches() -> None:
+    """Reset the MLB cards caches and home's feed-live single-flight cache.
+
+    Two hazards, same shape as WNBA's and NBA's above:
+
+    * `_MLB_CARDS_CONTEXT_CACHE` / `_MLB_TODAY_CACHE` now store
+      `(last_used, payload)` and drop entries that go idle. Nothing serves a
+      stale value, but a test that reaches into either container directly wants
+      a known starting state.
+    * `home._MLB_FEED_LIVE_STATE_CACHE` IS a wall-clock-TTL cache in the exact
+      sense this file exists for: it is keyed on `(selected_date, game_pks)`
+      with no content fingerprint, so two tests using the same date literal
+      inside one 20s window would silently share a result -- and the second
+      would never reach the statsapi fan-out it was written to exercise.
+    """
+    from syndicate.blueprints import home as home_module
+    from syndicate.features.mlb import cards as mlb_cards
+
+    mlb_cards._MLB_CARDS_CONTEXT_CACHE.clear()
+    mlb_cards._MLB_TODAY_CACHE.clear()
+    home_module._MLB_FEED_LIVE_STATE_CACHE.clear()
+    home_module._MLB_FEED_LIVE_STATE_REFRESH_LOCKS.clear()
+
+
 class WallClockCacheIsolationMixin:
     """Mix into a `unittest.TestCase` that builds WNBA/NBA cards payloads.
 
@@ -77,5 +101,7 @@ class WallClockCacheIsolationMixin:
         super().setUp()
         clear_wnba_wall_clock_caches()
         clear_nba_cards_caches()
+        clear_mlb_wall_clock_caches()
+        self.addCleanup(clear_mlb_wall_clock_caches)
         self.addCleanup(clear_nba_cards_caches)
         self.addCleanup(clear_wnba_wall_clock_caches)

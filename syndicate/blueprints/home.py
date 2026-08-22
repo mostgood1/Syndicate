@@ -15,6 +15,7 @@ import socket
 from pathlib import Path
 import re
 import subprocess
+import threading
 import time
 from typing import Any
 from urllib.error import URLError
@@ -3466,7 +3467,174 @@ def _mlb_feed_live_state(selected_date: str, game_pk: int) -> dict[str, Any] | N
     }
 
 
+# THE SINGLE MOST EXPENSIVE THING ON HOME'S REQUEST PATH, measured in
+# production 2026-08-22 from the `MLB_GAMES_STAGE_MS` line below:
+#
+#   17:16:28  build_cards_page_context=4303  ...  apply_live_scores=7991
+#   17:16:30  build_cards_page_context=397   ...  apply_live_scores=8400
+#   17:16:34  build_cards_page_context=703   ...  apply_live_scores=5498
+#
+# `per_game_reco_rows` was 0-13ms in every sample, so the function both
+# `.syndicate/scope_2026-08-21_home_request_path_compute.md` and the comment in
+# `_MLBDataProvider.games` suspected is not the cost and never was, and neither
+# is the live-lens cache-key invalidation that comment hypothesised.
+# `apply_live_scores` is the cost, and 8400 > the 8000ms
+# `overall_timeout` below is the proof it is NETWORK: the wall-clock budget was
+# exhausted, which disk reads cannot do.
+#
+# WHY IT IS NETWORK ON WEB, ALWAYS. `_mlb_feed_live_payload` reads
+# `raw_feed_live_path()` first and only calls statsapi when that misses -- but
+# `mlb_source/source_artifacts/data/raw/statsapi/feed_live/**` matches NONE of
+# the 175 entries in `HOT_ARTIFACT_PATTERNS` (checked 2026-08-22; the only
+# `/raw/` entries there are NHL's `player_game_stats.csv`). The worker's
+# feed_live artifacts have no route to web's disk, so for today's date the local
+# read misses for every game and every home request makes up to 15 live HTTPS
+# calls to statsapi.mlb.com, uncached.
+#
+# WHAT THAT COST THE SERVICE. Concurrency is WEB_CONCURRENCY=2 x
+# GUNICORN_THREADS=4 = 8 request slots. A handful of concurrent home requests
+# hold all 8 for 3-8s each, `/healthz` then cannot be answered inside Render's
+# 5s health-check timeout, and the process is SIGTERM'd. Measured on one
+# container (`-2mdsk`, booted 17:12:55, no deploy after 17:12:59): terms at
+# 17:14:08, 17:15:38 and 17:17:38, each a NEW gunicorn master pid, each followed
+# by ~15s with no listener -- during which every request is a Render 502. Health
+# checks went unanswered for 84s (17:16:34 -> 17:17:58) straddling the last one.
+# p95 latency tracked it: 0.8-1.5s baseline -> 11.9 -> 18.4 -> 26.5 -> 30.5s.
+#
+# TWO PROPERTIES FIX IT, and the second matters more than the first.
+#
+# 1. A wall-clock TTL, so the fan-out runs at most once per window instead of
+#    once per request. NOT `@lru_cache` -- `features/soccer/sources.py` records
+#    why in prose: gunicorn workers never auto-recycle, so an lru_cache here
+#    would freeze the first-ever read until the next deploy, converting a
+#    latency bug into a silent staleness bug. An explicit TTL cannot do that.
+# 2. SINGLE FLIGHT. A TTL alone does nothing for the failure this is about: on
+#    a cold window, all 8 threads miss simultaneously and all 8 pay the 8s. Only
+#    one thread is ever allowed to fetch a given key; the rest take the previous
+#    value if there is one, or the same all-None map the 8s budget already
+#    returns today, and they take it IMMEDIATELY. That is what keeps a slot free
+#    for `/healthz` even while statsapi is down.
+#
+# EMPTINESS IS NEVER CACHED AS AUTHORITATIVE -- `learnings.md` 2026-08-18 has a
+# rule for exactly this ("1,282 BVP cache files, every one `by_batter: {}`"). A
+# result that resolved nothing is returned but not stored, so recovery is
+# immediate; single flight is what keeps the retry from costing 8 threads.
+#
+# FRESHNESS: a live score can be up to `_MLB_FEED_LIVE_STATE_TTL_SECONDS` old.
+# That is inside the noise of a page whose own context is already bucketed at 60s
+# (`_MLB_TODAY_CACHE_TTL_SECONDS`), but it is a real change and is stated rather
+# than claimed away. The architecturally correct fix is to allowlist feed_live
+# so the local read hits; this makes the request path survivable until then.
+_MLB_FEED_LIVE_STATE_TTL_SECONDS = 20.0
+_MLB_FEED_LIVE_STATE_CACHE_MAX_ENTRIES = 16
+_MLB_FEED_LIVE_STATE_CACHE: "OrderedDict[tuple[str, tuple[int, ...]], tuple[float, dict[int, dict[str, Any] | None]]]" = OrderedDict()
+_MLB_FEED_LIVE_STATE_REFRESH_LOCKS: "OrderedDict[tuple[str, tuple[int, ...]], threading.Lock]" = OrderedDict()
+# Guards the two containers above ONLY. It is never held across a fetch -- that
+# would reintroduce the stampede this exists to remove.
+_MLB_FEED_LIVE_STATE_GUARD = threading.Lock()
+
+
+def _mlb_feed_live_states_cache_key(game_pks: list[int], selected_date: str) -> tuple[str, tuple[int, ...]]:
+    return (str(selected_date or ""), tuple(sorted({int(pk) for pk in game_pks})))
+
+
+def _mlb_feed_live_states_cached(
+    cache_key: tuple[str, tuple[int, ...]],
+) -> tuple[float, dict[int, dict[str, Any] | None]] | None:
+    with _MLB_FEED_LIVE_STATE_GUARD:
+        entry = _MLB_FEED_LIVE_STATE_CACHE.get(cache_key)
+        if entry is not None:
+            _MLB_FEED_LIVE_STATE_CACHE.move_to_end(cache_key)
+        return entry
+
+
+def _mlb_feed_live_states_store(
+    cache_key: tuple[str, tuple[int, ...]],
+    states: dict[int, dict[str, Any] | None],
+) -> None:
+    with _MLB_FEED_LIVE_STATE_GUARD:
+        _MLB_FEED_LIVE_STATE_CACHE[cache_key] = (time.time(), states)
+        _MLB_FEED_LIVE_STATE_CACHE.move_to_end(cache_key)
+        while len(_MLB_FEED_LIVE_STATE_CACHE) > _MLB_FEED_LIVE_STATE_CACHE_MAX_ENTRIES:
+            _MLB_FEED_LIVE_STATE_CACHE.popitem(last=False)
+
+
+def _mlb_feed_live_states_refresh_lock(cache_key: tuple[str, tuple[int, ...]]) -> threading.Lock:
+    with _MLB_FEED_LIVE_STATE_GUARD:
+        lock = _MLB_FEED_LIVE_STATE_REFRESH_LOCKS.get(cache_key)
+        if lock is None:
+            lock = threading.Lock()
+            _MLB_FEED_LIVE_STATE_REFRESH_LOCKS[cache_key] = lock
+        _MLB_FEED_LIVE_STATE_REFRESH_LOCKS.move_to_end(cache_key)
+        # Bounded like the cache, but a HELD lock is never dropped -- dropping
+        # one would let a second thread start the same fetch, which is the one
+        # thing this whole structure exists to prevent.
+        if len(_MLB_FEED_LIVE_STATE_REFRESH_LOCKS) > _MLB_FEED_LIVE_STATE_CACHE_MAX_ENTRIES:
+            for stale_key in [k for k, v in _MLB_FEED_LIVE_STATE_REFRESH_LOCKS.items() if not v.locked()]:
+                if len(_MLB_FEED_LIVE_STATE_REFRESH_LOCKS) <= _MLB_FEED_LIVE_STATE_CACHE_MAX_ENTRIES:
+                    break
+                if stale_key != cache_key:
+                    _MLB_FEED_LIVE_STATE_REFRESH_LOCKS.pop(stale_key, None)
+        return lock
+
+
+def _mlb_feed_live_states_project(
+    source: dict[int, dict[str, Any] | None],
+    results: dict[int, dict[str, Any] | None],
+) -> dict[int, dict[str, Any] | None]:
+    # Copy each state out. A cached entry is shared by every request in the
+    # window, and `_apply_mlb_live_scores` hands it straight to a game dict that
+    # goes on to templates and other callers -- so one request must not be able
+    # to reach into another's cached value.
+    for game_pk in results:
+        value = source.get(game_pk)
+        results[game_pk] = dict(value) if isinstance(value, dict) else None
+    return results
+
+
 def _mlb_feed_live_states(game_pks: list[int], selected_date: str, *, overall_timeout: float = 8.0) -> dict[int, dict[str, Any] | None]:
+    results: dict[int, dict[str, Any] | None] = {pk: None for pk in game_pks}
+    if not game_pks:
+        return results
+
+    try:
+        cache_key = _mlb_feed_live_states_cache_key(game_pks, selected_date)
+    except (TypeError, ValueError):
+        # A game_pk that will not coerce cannot be a cache key. Old behaviour
+        # was to let it fail inside its own worker thread and come back None;
+        # keep exactly that rather than making a malformed input fail earlier.
+        return _mlb_feed_live_states_uncached(game_pks, selected_date, overall_timeout=overall_timeout)
+    entry = _mlb_feed_live_states_cached(cache_key)
+    if entry is not None and (time.time() - entry[0]) < _MLB_FEED_LIVE_STATE_TTL_SECONDS:
+        return _mlb_feed_live_states_project(entry[1], results)
+
+    refresh_lock = _mlb_feed_live_states_refresh_lock(cache_key)
+    if not refresh_lock.acquire(blocking=False):
+        # Someone else is already paying for this fetch. Do NOT queue behind
+        # them: the whole point is that at most one request thread is ever
+        # blocked on statsapi. Serve the last good value if there is one,
+        # otherwise the all-None map -- which is exactly what this function
+        # already returns today when the wall-clock budget expires.
+        if entry is not None:
+            return _mlb_feed_live_states_project(entry[1], results)
+        return results
+    try:
+        # Re-check: the holder may have finished between our miss and our
+        # acquire, in which case their fresh result is better than another fetch.
+        entry = _mlb_feed_live_states_cached(cache_key)
+        if entry is not None and (time.time() - entry[0]) < _MLB_FEED_LIVE_STATE_TTL_SECONDS:
+            return _mlb_feed_live_states_project(entry[1], results)
+        fetched = _mlb_feed_live_states_uncached(
+            list(cache_key[1]), selected_date, overall_timeout=overall_timeout
+        )
+        if any(value is not None for value in fetched.values()):
+            _mlb_feed_live_states_store(cache_key, fetched)
+        return _mlb_feed_live_states_project(fetched, results)
+    finally:
+        refresh_lock.release()
+
+
+def _mlb_feed_live_states_uncached(game_pks: list[int], selected_date: str, *, overall_timeout: float = 8.0) -> dict[int, dict[str, Any] | None]:
     # Each _mlb_feed_live_state() call can fall through to a real network
     # call (_fetch_mlb_feed_live -> statsapi.mlb.com, 5s socket timeout) when
     # no local raw-feed artifact exists yet for that game. Running them one

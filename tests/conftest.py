@@ -86,6 +86,21 @@ def _clear_nba_cards_caches() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _clear_mlb_wall_clock_caches() -> None:
+    # home._MLB_FEED_LIVE_STATE_CACHE is keyed on (selected_date, game_pks) plus
+    # a 20s wall-clock TTL and no content fingerprint, so two tests sharing a
+    # date literal inside one window would share a result -- and the second
+    # would never reach the statsapi fan-out it exists to exercise. Same reason
+    # the WNBA/NBA fixtures above exist; same shared definition, so the unittest
+    # entrypoints get it too via WallClockCacheIsolationMixin.
+    from tests._cache_isolation import clear_mlb_wall_clock_caches
+
+    clear_mlb_wall_clock_caches()
+    yield
+    clear_mlb_wall_clock_caches()
+
+
+@pytest.fixture(autouse=True)
 def _no_background_loops_in_tests():
     # create_app wires _start_background_loops onto the app's first request
     # for non-Render runs, so ANY test that touches a test client spawns the
