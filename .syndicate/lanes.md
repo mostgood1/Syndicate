@@ -1145,39 +1145,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Narrative, evidence and dead ends: `.syndicate/log/2026-08-22.md`.
 - Blocked by: none.
 ### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
-- Goal: a bet logged on the WEB service can be settled by the reconciliation
-  autorun that runs on REFRESH-WORKER, so `/portfolio` stops reading every
-  position as pending.
+- Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
+  `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
-  `tests/test_prediction_ledger_shared_store.py`
-- Hypothesis (stated before fixing): the settlement machinery is not broken and
-  never was. `data/prediction_ledger.json` is read and written with raw
-  `path.read_text()` / `path.write_text()` under `data_root()`, and all three
-  Render services set `SYNDICATE_DATA_ROOT=/opt/render/project/data` while each
-  owns a SEPARATE 50GB disk (`dsk-d8bi8prbc2fs73en7dig` web,
-  `dsk-d91f7ggk1i2s73ar37a0` refresh-worker). The bet slip writes on web; the
-  reconciliation autorun reads on refresh-worker. Two different files behind one
-  path string, so reconciliation settles an empty ledger and web serves an
-  unsettled one.
-- Falsification test: if `prediction_ledger.json` matched any entry in
-  `HOT_ARTIFACT_PATTERNS`, the publisher would carry it across the boundary and
-  the hypothesis would be wrong. Checked mechanically against all 151 patterns
-  with `fnmatch` — NO MATCH, in either direction.
-- Verification: unit tests that FAIL on the current code and pass after —
-  specifically a two-service simulation (write under one data root, read under
-  another) which is the exact thing the current code cannot do. Production
-  verification is `settled_count > 0` on `/api/portfolio/summary`, and that
-  needs a deploy of BOTH web and refresh-worker.
+  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `tests/test_prediction_ledger_shared_store.py`,
+  `tests/test_evaluation_settlement_autorun_ordering.py`,
+  `tests/test_ledger_bridge_identity_join.py`
+- **Status: three defects found, all FIXED AND DEPLOYED. The goal is NOT met —
+  nothing has settled yet.** Narrative and evidence: `log/2026-08-22.md`.
+  Subject facts: `state.md [portfolio-settlement]`.
+  - `#502` ledger crosses the service boundary — live both services `2aa1df54`
+  - `#504` settlement 13th -> 2nd in the chain — live `4eeffb5c`, VERIFIED 1.3ms
+  - `#505` join on a stable identity — live `a1e89ff3`, refresh-worker only
+- **Unverified and load-bearing:** `#505`'s `entity` field mapping was never
+  measured against real evaluation records (worker-local, not in
+  `HOT_ARTIFACT_PATTERNS`).
+- Verification still owed: the next `[ledger_bridge]` line, 2026-08-23 after
+  06:00 CT. `matched_by_identity > 0` = the join works; `by_identity` large with
+  `matched_by_identity: 0` = the entity mapping is wrong.
+- **NOTE for whoever owns `refresh-worker-oom-recurrence`:** this lane edited
+  `scripts/run_refresh_worker.py`, which your lane nominally holds. Your block is
+  no longer in `lanes.md` so `lane-guard` saw no claim. Flagged because the
+  change moves an expensive job earlier in the tick chain.
 - Blocked by: none.
-- **DEPLOYED 2026-08-22T17:00Z to BOTH services on user instruction**, SHA
-  `2aa1df54` (on `origin/main`; composition verified — every live SHA is an
-  ancestor, so nothing was reverted). Full record including what could NOT be
-  verified (`deploy_preflight.py` unrunnable — no `RENDER_API_KEY` in session)
-  is in `deploys.md`.
-- **STILL OPEN because the VERIFY is outstanding.** `settled_count > 0` on
-  `/api/portfolio/summary` is the reading that proves it; reconciliation is
-  daily-gated and last ran 06:57:03Z, so the first pass under the new code has
-  not happened yet. Deploying is not verifying — do not close on the deploy.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

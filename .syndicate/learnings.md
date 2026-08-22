@@ -4906,3 +4906,68 @@ enrichment.md` recorded it as unverified-and-probably-signed; it is neither.
 measured and is weak. FotMob supplies the one thing ESPN structurally cannot --
 chance QUALITY (shot xG) rather than shot COUNTS -- and there is now a hard bar
 to clear: beat 0.3320 at 80-84', and beat +0.02 as an increment over the clock.
+
+## 2026-08-22 — FORBIDDEN: never join on an id minted from a content hash of a payload that carries live prices
+
+`recommendation_id` looks like an identity and is a **snapshot hash**.
+`record_recommendation` mints it via `_stable_id` over `prediction_id` + the
+whole recommendation payload + `artifact_metadata` — so it changes every time
+odds, edge or probability move. A portfolio bet stores the id on screen at click
+time; settlement decides a later snapshot under a later id; the join finds
+nothing. That is `matched: 0`, `4,560 no_key_match of 8,276`, and
+`skipped: 25131`.
+
+**The tell, and it was in the repo the whole time:**
+`pipeline/intelligence_state.py:2028` already said those ids come from "a content
+hash of the full recommendation payload (incl. live odds/edge/probability)" and
+would mint a fresh row "purely from ordinary price drift". A mitigation was built
+around that fact (gate recording on `source_fingerprint`) without anyone asking
+what it meant for the JOIN downstream.
+
+**The rule:** an identity you join on must be derived from what makes the thing
+THE SAME THING — for a wager, `event|market|entity|side|line`. If a mutable
+observation (price, edge, timestamp, a run id) is inside the hash, it is a
+version stamp, not an identity, and it must never be the only join key.
+`clv_opening_ledger._opening_key` gets this right and reports `unkeyable=0`;
+the settlement join got it wrong and reported `matched: 0`. Both were available
+to compare at any point.
+
+## 2026-08-22 — FORBIDDEN: verifying a REORDERING by elapsed-time-since-boot
+
+I proposed verifying `#504` (moving settlement up an `elif` chain) by measuring
+worker-start -> first log line, expecting 11min -> ~1min. **That metric would
+have shown 11min -> 10.5min and read as "the change did nothing" on a change
+that demonstrably worked.** Most of that window is the worker's startup cycle
+before the chain is evaluated at all — a property of the tick loop, not of chain
+position.
+
+**The rule:** to verify a change in ORDER, measure ORDER — the co-occurrence of
+the branch's marker with the marker of the branch above it. `#504`'s real
+reading is `RECONCILIATION_AUTORUN_GATED` at 18:28:38.192696 and
+`LEDGER_INDEX_SIZE` at 18:28:38.194012: **1.3ms, same tick**, against 116s and a
+different tick before. Elapsed-since-boot measures the loop; delta-between-
+branches measures the chain.
+
+## 2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override
+
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` exists as a documented escape
+hatch for "forcing a fast cycle to confirm a fix". Set to 1200 at 17:48Z and
+removed at 18:02Z it produced **zero runs, cost two restarts, and returned no
+information**. The interval gate was never what blocked settlement — chain
+position was, and an interval override cannot make a branch be evaluated.
+
+**Stop re-investigating this.** If settlement is not running, read WHICH branch
+took the tick before touching any gate. A job can be enabled, correctly
+configured, past its interval, and still never evaluated.
+
+## 2026-08-22 — the retraction was as wrong as the claim. "It ran once" is not "it runs"
+
+I asserted settlement was starved by chain position, then RETRACTED it on seeing
+a single run at 17:28:34Z, then found the retraction wrong too: it got that tick
+0.65ms after `SOCCER_AUTORUN_SKIPPED reason=spacing_gate`, i.e. by coincidence,
+and 45 minutes produced exactly one such coincidence.
+
+**The rule:** a single successful observation refutes "never", not "reliably".
+When retracting a starvation/contention claim, the evidence needed is a RATE
+over a window, not one instance. I recorded the retraction as settled fact in
+the same session I had to reverse it.
