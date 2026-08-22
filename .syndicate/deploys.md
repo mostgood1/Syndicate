@@ -23553,3 +23553,136 @@ Render request logs (`path=/portfolio/paper`, `statusCode=200`) or from the user
 own browser. **A 200 on an EMPTY page is not the reading** — the page renders 200
 in all four of its absence states, so status alone cannot distinguish "the plan is
 displayed" from "the plan is missing and the empty state is displayed".
+
+## 2026-08-22 22:46-22:53Z — live-odds-worker + web `bf7a52ca` — `#520`/`#521` live-refresh scoping — SCOPE FIXES VERIFIED, OUTCOME PENDING
+
+`lane layer2-sim-view-and-live-projection`. Claims held on all three; refresh-worker
+RELEASED UNDEPLOYED (below). Preflight COULD NOT RUN — `RENDER_API_KEY` absent in
+this container — so its substance was done by hand: SHA confirmed on `origin/main`,
+`render.yaml` untouched (so no `blueprint_sync`), and in-flight jobs checked per
+service before each trigger. Say so rather than imply the script passed.
+
+    live-odds-worker  dep-da52dnvqj5pc73bjkpi0  live 22:50:24Z
+    syndicate (web)   dep-da52ds0u01pc73dp2lqg  live 22:51:00Z
+    both carried bf7a52ca — the SHA intended, no branch-tip drift this time
+
+**verify: NFL IS IN THE SWEEP AGAIN, and the launch line says so, not an absence.**
+
+    before   SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer
+                                      dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+                                              ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+    after    SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl kept=true
+                 reason=claimed_by_fast_tick_despite_SYNDICATE_ACTIVE_SPORTS
+             SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,nfl,soccer
+                                      dropped=ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+             ODDS_SWEEP_LAUNCHED sports=mlb,nfl,soccer count=3   (22:51:36Z, 22:53:04Z)
+
+`ODDS_SWEEP_LAUNCHED` is the load-bearing line: the ownership gate keeping nfl is
+only a decision, the launch is the command actually issued. ncaaf STAYS dropped and
+that is correct — its season opens ~08-29, so it has no games in the horizon and the
+carve-out is scoped to the claim, not to the sport.
+
+**verify: THE SOCCER SCOPE NOW CONTAINS THE LEAGUES THAT ARE PLAYING.**
+
+    before   refresh_odds_sources.py ... --soccer-leagues mls
+             (while primeira_liga's own live_state_2026-08-22.json said 1 live game)
+    after    FIXTURE_CADENCE sport=soccer league=primeira_liga due:live_now
+             FIXTURE_CADENCE sport=soccer league=la_liga       due:live_now
+             FIXTURE_CADENCE sport=soccer scope=league due=la_liga,mls,primeira_liga of=9
+
+Two leagues added, both with the new `due:live_now` reason, and the other six still
+skipping on their own tier (`skip:mid:17h_out:age=14296s<28800s`). So the fix ADDS
+without disabling the cadence gate — which is what the paired test asserts and what
+would otherwise have turned a scope fix into a call-volume regression.
+
+**NOT YET MEASURED — the outcome, as opposed to the mechanism.** Every reading above
+is the SCOPE. The thing the user asked for is a fresh price, and that shows up one
+layer later, in `LAYER2_BOARD_HEALTH`:
+
+    nfl     age_p50s 36,478 (10.1h)  ->  must fall to minutes
+    soccer  age_p50s 23,941 (6.7h)   ->  must fall for la_liga/primeira_liga rows
+    soccer  live_rows 0-3 of 400     ->  must exceed 3 while a match is on
+
+That lag is real and not a hedge: the shortlist is built by refresh-worker, which is
+still on the OLD code, from a `book_grid` live-odds-worker has only just started
+refreshing. A scope that is correct and a price that is fresh are different claims
+and this entry only supports the first.
+
+**refresh-worker NOT DEPLOYED, deliberately.** A 10-game MLB sim (pid 647,
+`--only-game-pks 823100,823261,...,824798`) started there at ~22:45Z. Two sims were
+already killed today by deploys at 21:34 and 21:58. It needs `refresh_odds_sources.py`
+for fixes 3 and 4 (live captures first, sim rebuild dropped for in-play leagues) but
+NOT for the two verified above, which live in the tick and the tick runs only on
+live-odds-worker. Claim released rather than held, so the 45-min TTL cannot wedge the
+service for another session.
+
+**web carried the UI fixes** (rail collapsed by default, MLS chip join) — those are
+reader-visible and unverified from here; the proxy 403s the Render host from this
+container, so they need a human look or a later browser check.
+
+### OUTCOME MEASURED 22:57:59Z — the prices are fresh. `LAYER2_BOARD_HEALTH`, same line, before and after.
+
+    sport   metric        before (21:06-21:14Z)   after (22:57:59Z)
+    nfl     rows                             23           115      5.0x
+    nfl     live_rows                         0            65
+    nfl     age_p50s             36,478 (10.1h)      307 (5m)    119x
+    soccer  age_p50s              23,941 (6.7h)   751 (12.5m)     32x
+    mlb     live_rows                        37           248
+    mlb     live_proj                        21            31
+
+NFL is the clean result: a board that was 23 frozen rows republishing an
+unchanged `book_grid` checksum is now 115 rows, 65 of them live, on a five-minute
+median quote. It was never a board defect — nothing was refreshing the price, and
+`opportunity_gate` was correctly deleting what it was given.
+
+Soccer's p50 fell 32x. Its p90 (30,652s) and max (48,888s) did NOT, and that is
+expected rather than a shortfall: those are the six leagues NOT playing, which
+still ride their own tier, plus the global-phase defect recorded as unfixed in
+`#521` — while ANY sport is live the whole tick runs `--phase live`, so a quiet
+soccer league's pregame capture never runs at all. The fix deployed here moves
+the leagues that are in play; nothing here moves the ones that are not.
+
+**SOCCER `live_rows` IS STILL 0, AND THAT TARGET WAS NOT MET.** Fresh prices were
+necessary and are not sufficient. A row reaches the live tier only if
+`game_state_of` returns `live`, and for nine of the ten soccer leagues the board
+never carries a real status: `_unsimulated_game` in `soccer/cards.py` defaults
+`status_state` to `"pre"`, and only the SIMULATED path stamps a real one — the sim
+runs for MLS alone. So soccer rows are structurally `pregame` no matter how fresh
+their price is. That is a different defect in a different file and this deploy
+does not touch it. Do not read "soccer p50 751s" as "soccer live bets work".
+
+**A NEW NUMBER WORTH WATCHING:** nfl `no_proj=86` of 115 rows. NFL had
+`pregame_proj=23 no_proj=0` when it had 23 rows; the 92 rows the refresh added are
+almost all unprojected. Not a regression — these rows did not exist before — but
+NFL projection coverage is now 25%, and nobody has looked at why.
+
+
+## 2026-08-22 23:08:55Z -- web `a1dc1e9a` -- soccer compact cards: pregame redesign + final reconciliation
+
+what: `_scoreboard_strip_soccer.html` pregame branch redesigned (date/time
+top line, away/home rows with sim-projected totals, BTTS/goals/corners/top-
+sim-score facts grid); new `elif game.live_state.final` branch preserves the
+old final layout AND adds a reconciliation grid grading those same four
+facts against the real result (`_compact_final_reconciliation`, cards.py).
+Full context: user request in-session, no todo item (UI-only, no research
+claim attached).
+
+claim: acquired 23:04:17Z, preflight CLEAR immediately (no in-flight jobs on
+web), deployed as a separate command per protocol. Released 23:09Z.
+
+deploy: dep-da52m23bc2fs73fkkfng, live 23:08:55Z, confirmed via
+`deploys?limit=1` returning `live a1dc1e9a`. Health check 200 immediately
+after.
+
+verify: fetched `/soccer/cards?date=2026-08-23` (pregame slate) and
+`/soccer/cards?date=2026-08-22` (today, mixed) directly from production.
+2026-08-23: 24/24 cards render `.cards-strip-pregame-rows` +
+`.cards-strip-pregame-facts`. 2026-08-22: 44 cards, 6 still pregame, 38
+finals rendering `.cards-strip-recon-score` with real hit/miss counts (19
+hit / 62 miss across all graded facts). Spot-checked one card (Man Utd vs
+Hull City): BTTS projected Yes, actual No -> red miss, correct; Goals and
+Corners had no captured market line and correctly rendered "X proj · Y
+total" with NO hit/miss mark rather than a fabricated grade -- the rule the
+tests pin (`test_soccer_final_reconciliation.py::
+test_model_only_goals_projection_reports_but_does_not_grade`) held on real
+data, not just in the test suite.

@@ -1422,6 +1422,12 @@ def _compact_pregame_facts(
             top_score = {
                 "text": f"{away_abbr} {away_goals} - {home_abbr} {home_goals}",
                 "pct": _fmt_pct(prob),
+                # Ints alongside the display string, read by
+                # `_compact_final_reconciliation` -- re-parsing "AWY 1 - HME 1"
+                # back into numbers would be more fragile than keeping the
+                # values that built it in the first place.
+                "home_goals": int(home_goals),
+                "away_goals": int(away_goals),
             }
             break
 
@@ -1435,6 +1441,115 @@ def _compact_pregame_facts(
         "goals": goals_text,
         "corners": corners_text,
         "top_score": top_score,
+        # RAW values alongside the display text, read by
+        # `_compact_final_reconciliation` once the match is over to grade
+        # against the ACTUAL result. The pregame template reads only the
+        # text fields above; these are private to this pair of functions.
+        "_goals_line": total_line,
+        "_corners_line": corners_line,
+    }
+
+
+def _actual_corners_total(match_box: dict | None) -> float | None:
+    """Total corners from the real box score, or None if ESPN never reported
+    it. Reads the SAME `"Corners"` stat label `_squad_box_sections` renders
+    from `wonCorners` -- see `ingestion/espn_match_box.py::_TEAM_STATS`."""
+    teams = (match_box or {}).get("teams") or {}
+    home = _safe_float(((teams.get("home") or {}).get("stats") or {}).get("Corners"))
+    away = _safe_float(((teams.get("away") or {}).get("stats") or {}).get("Corners"))
+    if home is None or away is None:
+        return None
+    return home + away
+
+
+def _compact_final_reconciliation(
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    away_score: Any,
+    home_score: Any,
+    match_box: dict | None,
+    pregame_facts: dict | None,
+) -> dict[str, Any] | None:
+    """How the pregame read (BTTS / goals / corners / top score) actually
+    played out, for the FINAL compact card.
+
+    Every fact GRADES against a real market line where one was captured
+    (`_goals_line`/`_corners_line` on `pregame_facts`), never against a
+    fabricated one -- a "proj" fact with no market line is shown as
+    projected-vs-actual with no hit/miss verdict, because there was no line
+    to have hit or missed. Same rule `_compact_pregame_facts` and
+    `_market_tiles` already follow for an uncaptured market.
+    """
+    if not pregame_facts:
+        return None
+    away_goals, home_goals = _safe_float(away_score), _safe_float(home_score)
+    if away_goals is None or home_goals is None:
+        return None
+    total_goals = away_goals + home_goals
+
+    facts: list[dict[str, Any]] = []
+
+    # --- BTTS ---
+    if pregame_facts.get("btts") is not None:
+        actual_btts = "Yes" if (away_goals > 0 and home_goals > 0) else "No"
+        facts.append({
+            "label": "BTTS", "projected": pregame_facts["btts"], "actual": actual_btts,
+            "hit": actual_btts == pregame_facts["btts"],
+        })
+
+    # --- Goals ---
+    goals_line = pregame_facts.get("_goals_line")
+    if goals_line is not None:
+        side = pregame_facts["goals"][:1]  # "o" or "u"
+        went_over = total_goals > goals_line
+        facts.append({
+            "label": "Goals", "projected": pregame_facts["goals"],
+            "actual": f"{total_goals:.0f} total",
+            "hit": went_over if side == "o" else not went_over,
+        })
+    elif pregame_facts.get("goals") is not None:
+        # Model-only projection, no market line -- report, do not grade.
+        facts.append({
+            "label": "Goals", "projected": pregame_facts["goals"],
+            "actual": f"{total_goals:.0f} total", "hit": None,
+        })
+
+    # --- Corners ---
+    actual_corners = _actual_corners_total(match_box)
+    corners_line = pregame_facts.get("_corners_line")
+    if corners_line is not None and actual_corners is not None:
+        side = pregame_facts["corners"][:1]
+        went_over = actual_corners > corners_line
+        facts.append({
+            "label": "Corners", "projected": pregame_facts["corners"],
+            "actual": f"{actual_corners:.0f} total",
+            "hit": went_over if side == "o" else not went_over,
+        })
+    elif pregame_facts.get("corners") is not None and actual_corners is not None:
+        facts.append({
+            "label": "Corners", "projected": pregame_facts["corners"],
+            "actual": f"{actual_corners:.0f} total", "hit": None,
+        })
+
+    # --- Top sim score ---
+    top = pregame_facts.get("top_score")
+    if top is not None:
+        hit = top.get("home_goals") == int(home_goals) and top.get("away_goals") == int(away_goals)
+        facts.append({
+            "label": "Top sim score",
+            "projected": f"{top['text']} ({top['pct']})",
+            "actual": f"{away_abbr} {away_goals:.0f} - {home_abbr} {home_goals:.0f}",
+            "hit": hit,
+        })
+
+    if not facts:
+        return None
+    graded = [f for f in facts if f["hit"] is not None]
+    return {
+        "facts": facts,
+        "hits": sum(1 for f in graded if f["hit"]),
+        "graded": len(graded),
     }
 
 
@@ -1968,6 +2083,21 @@ def _match_to_game(
         f"{away_team} {_fmt_pct(win_prob.get('away'))}."
     )
 
+    # Computed once, as a local, so the FINAL card's reconciliation
+    # (`_compact_final_reconciliation` below) can grade against the exact
+    # same pregame facts the PREGAME card showed -- not a second read of
+    # `team_projection`/`betting` that could drift from what was displayed
+    # before kickoff.
+    compact_pregame_facts = _compact_pregame_facts(
+        away_abbr=_abbr(away_team, league),
+        home_abbr=_abbr(home_team, league),
+        team_projection=team_projection,
+        total_distribution=total_distribution,
+        volume_projection=volume,
+        betting=betting,
+        scoreline_probabilities=match.get("scoreline_probabilities"),
+    )
+
     return {
         "gamePk": event_id or f"{league}_{match.get('date')}_{home_team}_{away_team}".replace(" ", "_"),
         "event_id": event_id,
@@ -2067,14 +2197,17 @@ def _match_to_game(
         # PREGAME COMPACT CARD facts (BTTS / goals / corners / top score).
         # Read by `_scoreboard_strip_soccer.html`'s non-live branch only --
         # `shared_momentum` above is the live branch's equivalent slot.
-        "shared_compact_pregame": _compact_pregame_facts(
+        "shared_compact_pregame": compact_pregame_facts,
+        # FINAL COMPACT CARD reconciliation: how each of those four facts
+        # actually played out. Grades against the pregame facts computed
+        # above, so the two can never disagree about what was projected.
+        "shared_final_reconciliation": _compact_final_reconciliation(
             away_abbr=_abbr(away_team, league),
             home_abbr=_abbr(home_team, league),
-            team_projection=team_projection,
-            total_distribution=total_distribution,
-            volume_projection=volume,
-            betting=betting,
-            scoreline_probabilities=match.get("scoreline_probabilities"),
+            away_score=away_score,
+            home_score=home_score,
+            match_box=match_box,
+            pregame_facts=compact_pregame_facts,
         ),
         # CHART DATA for the live panel. Kept separate from the box sections
         # below: those are tables, and a shape rendered as a table row is what
