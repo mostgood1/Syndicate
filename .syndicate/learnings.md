@@ -4861,3 +4861,48 @@ sign across others (+0.054 at 16-20', -0.050 at 8-12'). Noise-shaped.
 edges.** `end=5100` was written once, carried through four analyses, and hid the
 only result that clears a real break-even. No amount of feature engineering
 inside the window could have recovered what the window excluded.
+
+## 08-22 POOLED RESULT: THE CLOCK IS THE ONLY REAL SIGNAL — and FotMob IS reachable
+
+Pooled 370 matches (212 holdout + 158 fresh), 32,501 samples, base 0.2450:
+
+    TIME    80-84'   0.3320  lift 1.35   <- best, essentially AT 2-1 break-even
+            36-40'   0.3122  lift 1.27
+            12-16'   0.1851  lift 0.76   (quietest)
+    EVENTS  corner / shot-off-target     lift 1.19
+            shot-ON-target               lift 0.97  (BELOW base)
+    MOMENTUM top-3 deciles               lift 1.12
+    MARGIN  margin 1                     lift 1.06
+    COMBOS  "all types"                  lift 1.03  (dilutes)
+
+**FOUR HYPOTHESES OF MINE DIED HERE, all measured:**
+1. Momentum predicts WHEN -- AUC 0.5417 held out.
+2. Momentum works conditionally in a time window -- prereg killed it, and the
+   increment over the clock was NEGATIVE (-0.0516).
+3. Momentum is better at saying NO goal -- pooled bottom-3 lift 0.92 vs top-3
+   1.12. The TOP discriminates more. Also non-monotonic: decile 1 reads 1.10
+   because near-zero pressure means "early match", not "quiet match".
+4. Score state matters -- "losing by 1 late pushes" does NOT appear. At 80-84',
+   margin 1 (0.3283) is BELOW the bucket average (0.3320).
+
+**REPLICATION IS OF THE PATTERN, NOT THE BUCKET.** 80-84' ran 0.3455 holdout ->
+0.3135 fresh, while 36-40' ran 0.2889 -> 0.3434. Both late-half windows are
+elevated in both samples (1.20-1.48) but which one WINS flips. Picking the
+single best bucket is the same overfit that killed the 40.2%.
+CONFOUND, stated: the fresh set is Jun-Aug 2026, heavily MLS/early-season, base
+0.2610 vs 0.2331 -- a robustness check across different football, not like-for-like.
+
+**FOTMOB IS REACHABLE, and the scope doc's blocker was WRONG.**
+
+    /api/matchDetails?matchId=      -> 404
+    /api/data/matchDetails?matchId= -> 200, 276,792 bytes
+    expectedGoals YES · xg YES · momentum YES · shotmap YES
+    NO x-mas signing header needed. AiScore root: 403 (blocked).
+
+The path moved from `/api/` to `/api/data/`. `scope_2026-08-21_fotmob_xg_
+enrichment.md` recorded it as unverified-and-probably-signed; it is neither.
+
+**WHY THIS NOW MATTERS MORE, not less.** Everything we already own has been
+measured and is weak. FotMob supplies the one thing ESPN structurally cannot --
+chance QUALITY (shot xG) rather than shot COUNTS -- and there is now a hard bar
+to clear: beat 0.3320 at 80-84', and beat +0.02 as an increment over the clock.
