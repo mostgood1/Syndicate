@@ -79,12 +79,26 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
     )
 
 
-def run_execution(selected_date: str, *, force: bool = False) -> dict[str, Any]:
+def run_execution(
+    selected_date: str, *, force: bool = False, inline: bool = False
+) -> dict[str, Any]:
     """Place today's committed plan. Returns a status payload, never raises.
 
     `force` bypasses only the enablement flag. It does NOT bypass the mode, the
     live arm, or the unreconciled check -- a convenience flag that can reach
     real money is not a convenience.
+
+    **`inline=True` REFUSES LIVE MODE STRUCTURALLY.** It is passed by the one
+    caller that runs inside the intelligence-state build on `refresh-worker`,
+    and it exists because this module's own contract says the placer must never
+    run there: that service has 110 OOM kills on record and restarts mid-job,
+    which is what the write-ahead exists to survive rather than something to
+    invite. Paper cannot double-spend, so the harness that generates Stage C's
+    evidence is safe inline; real money has to move to its own service.
+
+    Enforced HERE rather than by configuration, because "set the env var
+    correctly" is exactly the guarantee that failed on 2026-08-22 when an
+    unrecognised value for a different key silently meant something else.
     """
     normalized = str(selected_date or "").strip()
     if not normalized:
@@ -93,6 +107,20 @@ def run_execution(selected_date: str, *, force: bool = False) -> dict[str, Any]:
         return {"status": "skipped", "reason": "disabled", "date": normalized}
 
     mode = execution_mode()
+    if inline and mode == LIVE:
+        # Loud, not silent: a live-configured worker that quietly fell back to
+        # paper would produce a ledger nobody could trust the `mode` field on.
+        print(
+            "[execute_portfolio] REFUSED_LIVE_INLINE date="
+            f"{normalized} -- live placement must not run inside refresh-worker; "
+            "run it from its own service",
+            flush=True,
+        )
+        return {
+            "status": "skipped",
+            "reason": "live_mode_refused_inline",
+            "date": normalized,
+        }
 
     # UNRECONCILED ORDERS BLOCK A NEW RUN, in live mode only. An order left in
     # the write-ahead state was sent, or may have been, with an unknown result.
