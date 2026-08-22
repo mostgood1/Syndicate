@@ -64,22 +64,42 @@ def matches_for_date(date_yyyymmdd: str) -> list[dict[str, Any]]:
     return out
 
 
-def _clock_seconds(shot: dict[str, Any]) -> float | None:
-    """Shot time in seconds from kickoff.
+def _clock_seconds(shot: dict[str, Any], first_half_stoppage: float = 0.0) -> float | None:
+    """Shot time in seconds of REAL ELAPSED PLAY, monotonic across halves.
 
     `min` is the displayed minute and `minAdded` is stoppage on top of it, so a
-    90+4 shot is min=90, minAdded=4. Both are folded in: dropping `minAdded`
-    would stack every stoppage shot onto the 45th and 90th minute and corrupt
-    exactly the late window that matters most.
+    90+4 shot is min=90, minAdded=4. Both must be folded in -- dropping
+    `minAdded` stacks every stoppage shot onto the 45th and 90th minute.
+
+    BUT FOLDING ALONE COLLIDES THE HALVES, and that bug produced a headline.
+    A first-half 45+3 becomes minute 48, which is indistinguishable from a
+    genuine second-half 48th minute. Measured over 40 matches, 4.4% of all
+    shots landed in a bucket shared with the other half, concentrated in
+    45-52'. A 10-minute window opened at 44' then accumulated goals from
+    first-half stoppage AND ~9 minutes of the second half -- roughly 13 minutes
+    of play scored as 10 -- and duly reported 40-48' as the densest scoring
+    period in football. It is an artifact of the clock, not a property of the
+    game.
+
+    The fix uses the `period` field the payload has carried all along: the
+    second half is offset past the end of first-half stoppage, so the timeline
+    is strictly monotonic and each bucket contains exactly one half.
     """
     minute = shot.get("min")
     if minute is None:
         return None
     try:
-        total = float(minute) + float(shot.get("minAdded") or 0.0)
+        base = float(minute) + float(shot.get("minAdded") or 0.0)
     except (TypeError, ValueError):
         return None
-    return total * 60.0
+    period = str(shot.get("period") or "")
+    if period == "SecondHalf":
+        # 45 + s1 marks the real end of the first half; the second half runs on
+        # from there rather than restarting inside the first half's stoppage.
+        return (45.0 + first_half_stoppage + (base - 45.0)) * 60.0
+    if period and period != "FirstHalf":
+        return None          # extra time / shootouts: a different question
+    return base * 60.0
 
 
 def shots_for_match(match_id: Any) -> dict[str, Any] | None:
@@ -103,10 +123,20 @@ def shots_for_match(match_id: Any) -> dict[str, Any] | None:
     general = payload.get("general") or {}
     home_id = (general.get("homeTeam") or {}).get("id")
 
+    # How long first-half stoppage actually ran, from the match's own data.
+    # Needed before any second-half time can be placed on the timeline.
+    first_half_stoppage = 0.0
+    for shot in raw:
+        if str(shot.get("period") or "") == "FirstHalf":
+            try:
+                first_half_stoppage = max(first_half_stoppage, float(shot.get("minAdded") or 0.0))
+            except (TypeError, ValueError):
+                pass
+
     shots: list[dict[str, Any]] = []
     goals: list[dict[str, Any]] = []
     for shot in raw:
-        seconds = _clock_seconds(shot)
+        seconds = _clock_seconds(shot, first_half_stoppage)
         if seconds is None:
             continue
         try:
@@ -123,6 +153,7 @@ def shots_for_match(match_id: Any) -> dict[str, Any] | None:
             "blocked": bool(shot.get("isBlocked")),
             "situation": str(shot.get("situation") or ""),
             "event": str(shot.get("eventType") or ""),
+            "period": str(shot.get("period") or ""),
         }
         shots.append(row)
         if row["event"] == "Goal":
@@ -159,9 +190,18 @@ def shots_for_match(match_id: Any) -> dict[str, Any] | None:
         if minute is None:
             continue
         try:
-            t = (float(minute) + float(e.get("minutesAddedTime") or 0.0)) * 60.0
+            added = float(e.get("minutesAddedTime") or 0.0)
+            base = float(minute) + added
         except (TypeError, ValueError):
             continue
+        # matchFacts events carry no `period`, but it is inferable: a stoppage
+        # event is stamped at the half's nominal end (45 or 90) with the added
+        # minutes alongside. Anything past 45 that is not first-half stoppage
+        # belongs to the second half and takes the same offset as the shots.
+        if float(minute) > 45.0:
+            t = (45.0 + first_half_stoppage + (base - 45.0)) * 60.0
+        else:
+            t = base * 60.0
         events.append({
             "t": t,
             "type": str(e.get("type") or ""),
@@ -175,7 +215,12 @@ def shots_for_match(match_id: Any) -> dict[str, Any] | None:
         "away_team": (general.get("awayTeam") or {}).get("name"),
         "shots": sorted(shots, key=lambda s: s["t"]),
         "goals": sorted(goals, key=lambda g: g["t"]),
+        # Vendor momentum is per DISPLAY minute and cannot be re-based onto the
+        # elapsed timeline without knowing which half each point belongs to, so
+        # it stays on FotMob's own clock. Any analysis joining it to shot times
+        # must account for that; it is not interchangeable with `t`.
         "vendor_momentum": vendor,
+        "first_half_stoppage_min": first_half_stoppage,
         "events": sorted(events, key=lambda e: e["t"]),
     }
 

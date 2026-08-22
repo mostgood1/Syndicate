@@ -5160,3 +5160,46 @@ correlates with severity, the net is inverted.
 **Also, small and costly:** a Render deploy showing `deactivated` is not a
 rollback. Mine showed it because a `service_updated` redeploy of the IDENTICAL
 commit superseded it six minutes later. Check the SHA, not the status word.
+
+## 08-22 THE ANSWER, at 5,552 matches: THE EVENT SIGNALS ARE NOISE. The clock is real and too small to bet.
+
+Two years, ten leagues, 9 signals (xg, count, ontarget, inbox, bigchance,
+FotMob's OWN momentum abs+slope, red-card advantage, subs) x 10 leagues x 24
+time bands. Fit-half selects, holdout-half scores once, distinct cells only.
+
+**NULL CONTROL SETTLES IT.** Same pipeline, goal series swapped BETWEEN matches
+within league (severs feature-label link, KEEPS within-match label clustering):
+
+    REAL      distinct cells 23
+    NULL runs                15, 22, 17, 15, 13   mean 16.4
+
+23 against a null that routinely produces 22. The sweep MANUFACTURES ~16
+"surviving" cells on data with no signal in it; it found 23. That excess is
+run-to-run variation, not a discovery. **Every individual cell in that list --
+including the ones clearing 2-1 with tight CIs -- is indistinguishable from
+what the machine produces on noise.** This is why the earlier "36 survivors vs
+~20 by chance" line was worthless: I made the 20 up by multiplying 0.05 by 417.
+
+**THE CLOCK IS REAL BUT SMALL.** Corrected profile, holdout, n~6,700/band:
+16-20' 0.2408 [0.231,0.251] rising to 44-48' 0.2932 [0.282,0.304], second half
+flat ~0.27-0.28. Non-overlapping CIs, smooth shape -- real structure. But the
+BEST band is 0.2932 and 2-1 needs 0.3333. **Nothing clears 2-1 anywhere in the
+match.** 3-1 (0.25) is cleared by the base rate alone (~0.264), i.e. by betting
+blind, which no book will price.
+
+**A CLOCK BUG MANUFACTURED THE FIRST ANSWER.** `_clock_seconds` folded
+`minAdded` into `min`, so first-half 45+3 became minute 48 and collided with a
+genuine second-half 48th. 4.4% of all shots shared a bucket with the other
+half, concentrated in 45-52'. A window opened at 44' swept ~13 minutes of play
+scored as 10. That printed 40-48' as the densest scoring period (lift 1.21) --
+a counterintuitive result contradicting the user's late-game intuition, with
+n=6,712 and tight CIs. Corrected: 1.21 -> 1.11, and the late game went 0.94 ->
+1.02. **Large n made the artifact MORE convincing, not less.** The `period`
+field was in the payload from the first fetch.
+
+**WHAT THIS CLOSES.** Stop building momentum/event-triggered goal bets. FotMob
+is not owed a production dependency: its own momentum series ranked no better
+than anything else, and shot COUNT (free from ESPN) matched or beat xG. Five
+promising numbers died this session -- 40.2%, xG +0.1028, xG-over-count,
+la_liga 80-84', 40-48' peak -- and all five were read off a tail or a bug
+before a control existed. The control was always the cheap part.
