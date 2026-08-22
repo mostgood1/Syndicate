@@ -79,6 +79,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
+def _log(message: str) -> None:
+    """Progress to STDERR, so `--json` leaves stdout machine-readable.
+
+    Found by running it: the first `--json` invocation could not be piped into
+    `json.load` because these lines were interleaved on stdout. A report you
+    have to hand-strip before parsing is a report nobody parses.
+    """
+    print(message, file=sys.stderr, flush=True)
+
+
 def _iso(value: str) -> str:
     token = str(value or "").strip()[:10]
     date.fromisoformat(token)  # raises on malformed input rather than skewing a window
@@ -228,7 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("give either --pending or both --from and --to")
 
     if not dates:
-        print("no dates to backfill -- the ledger has no unsettled positions with a resolvable date")
+        _log("no dates to backfill -- the ledger has no unsettled positions with a resolvable date")
         return 0
     if args.max_dates > 0:
         dates = dates[: args.max_dates]
@@ -244,10 +254,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("--mode local requires at least one --result-root pointing at pulled settlement_inputs")
 
     banner = "COMMIT (writing)" if args.commit else "PREVIEW (throwaway ledger copy, nothing is written)"
-    print(f"[backfill] {banner} mode={args.mode} dates={len(dates)} first={dates[0]} last={dates[-1]}", flush=True)
+    _log(f"[backfill] {banner} mode={args.mode} dates={len(dates)} first={dates[0]} last={dates[-1]}")
     if args.mode == "local":
-        print("[backfill] local mode settles STRAIGHT bets only -- parlays need the bridge, "
-              "which needs evaluation records that cannot leave refresh-worker", flush=True)
+        _log("[backfill] local mode settles STRAIGHT bets only -- parlays need the bridge, "
+             "which needs evaluation records that cannot leave refresh-worker")
 
     reports: list[dict[str, Any]] = []
     for target_date in dates:
@@ -261,20 +271,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         reports.append(report)
         delta = report.get("ledger_delta", {})
         bridge = report.get("bridge") or {}
-        print(
+        _log(
             f"[backfill] {target_date} newly_settled={delta.get('newly_settled')} "
             f"still_pending={delta.get('still_pending')} "
             f"records={report.get('records_for_date', 'n/a')} "
+            f"index={json.dumps(bridge.get('index_sizes', {}), sort_keys=True)} "
             f"matched_by_id={bridge.get('matched_by_id', 'n/a')} "
             f"matched_by_identity={bridge.get('matched_by_identity', 'n/a')} "
-            f"skip_reasons={json.dumps(bridge.get('skip_reasons', {}), sort_keys=True)}",
-            flush=True,
+            f"skip_reasons={json.dumps(bridge.get('skip_reasons', {}), sort_keys=True)}"
         )
 
     total_new = sum(int((r.get("ledger_delta") or {}).get("newly_settled") or 0) for r in reports)
-    print(f"[backfill] DONE dates={len(reports)} newly_settled_total={total_new}", flush=True)
+    _log(f"[backfill] DONE dates={len(reports)} newly_settled_total={total_new}")
     if not args.commit:
-        print("[backfill] nothing was written. Re-run with --commit once the numbers above look right.", flush=True)
+        _log("[backfill] nothing was written. Re-run with --commit once the numbers above look right.")
         if ledger_path is not None:
             ledger_path.unlink(missing_ok=True)
 
