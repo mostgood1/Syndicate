@@ -13,6 +13,7 @@ Requires ODDS_API_KEY in the environment (or .env).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -508,7 +509,7 @@ def main() -> int:
         game_out = (
             Path(args.game_out)
             if args.game_out
-            else Path(args.out).with_name(f"game_markets_{Path(args.out).stem}.csv")
+            else Path(args.out).with_name(f"game_markets_{Path(args.out).stem}.json")
         )
         game_df = pd.DataFrame(game_rows)
         # THE FEED DUPLICATES (book, market, side, line) WITH DIFFERENT PRICES.
@@ -535,7 +536,40 @@ def main() -> int:
             print(f"GAME_MARKET_DUPLICATE_QUOTES collapsed={collapsed} of {before} "
                   "(same book/market/side/line, different price; feed carries no "
                   "field distinguishing them -- kept the better price)", flush=True)
-        _write_text_atomic(game_out, game_df.to_csv(index=False))
+        # JSON, NOT CSV, AND WRITTEN THROUGH THE STORE.
+        #
+        # Measured 2026-08-22: the CSV version captured correctly (4,562 rows,
+        # 118 fixtures, 0 duplicates in production) and the card STILL rendered
+        # "no market captured" on all 44 fixtures. The data was there and the
+        # team names matched exactly -- `Manchester United @ Hull City`, 92
+        # rows, identical strings on both sides. The JOIN never ran, because
+        # the READ could not: `game_markets_rows` resolves via `_api_read_path`
+        # + `path.exists()`, a FILESYSTEM check, and the poller writes to the
+        # worker's disk. Web never sees that file.
+        #
+        # `read_json_file` crosses services (it reads the keyvalue store keyed
+        # by path) and is JSON-ONLY, which is why this is no longer a CSV.
+        # `live_state` is the proof that `data_root()` + `read_json_file`
+        # reaches web; this artifact now takes the same route.
+        payload = {
+            "date": Path(args.out).stem,
+            "league": args.league,
+            "region": args.region,
+            "generated_at": pd.Timestamp.now("UTC").isoformat(),
+            "rows_collapsed_as_duplicates": collapsed,
+            "rows": game_df.to_dict(orient="records"),
+        }
+        _write_text_atomic(game_out, json.dumps(payload, indent=2, default=str))
+        try:
+            from syndicate.features.shared.refresh_state_store import write_json_file
+
+            write_json_file(game_out, payload)
+        except Exception as exc:  # pragma: no cover - never fatal
+            # Named, not silent: without the store write the disk copy is
+            # worker-local and web cannot read it -- which is the entire
+            # defect this change exists to fix.
+            print(f"GAME_MARKET_STORE_WRITE_FAILED {type(exc).__name__}: {exc} "
+                  "-- disk copy written, but web will not see it", flush=True)
         print(f"Wrote {len(game_df)} game-market rows to {game_out}", flush=True)
     else:
         # Named, not silent: these markets are thin at some books and an empty

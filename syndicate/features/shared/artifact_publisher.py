@@ -557,6 +557,12 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # the file never got published/pulled to web's disk.
     "soccer_source/*/api/odds/game_odds_current.csv",
     "soccer_source/*/props/*.csv",
+    # `game_markets_<date>.json` -- btts/corners from the per-event endpoint.
+    # JSON rather than CSV because the cross-service store is JSON-only, and
+    # the card reads this on WEB while the poller writes it on a worker. The
+    # `*.csv` line above does NOT cover it, and without this entry the artifact
+    # is invisible to web exactly as the CSV version was.
+    "soccer_source/*/props/game_markets_*.json",
     "soccer_source/*/api/picks/picks_*.csv",
     # CORRECTED 2026-08-08. This note used to read: "reports/intelligence/
     # board_snapshot.json and intelligence_state.json are intentionally excluded

@@ -239,21 +239,56 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
 
 
 def game_markets_path(league: str, selected_date: str) -> Path:
-    return _api_read_path(league, "props", f"game_markets_{selected_date}.csv")
+    return _api_read_path(league, "props", f"game_markets_{selected_date}.json")
 
 
-def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
-    """Per-event GAME markets (btts, corners) captured from the per-event
-    endpoint. Not cached, same reason as `picks_rows`: regenerated as odds
-    move, and gunicorn workers never recycle."""
+def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, Any], ...]:
+    """Per-event GAME markets (btts, corners), readable ACROSS SERVICES.
+
+    THE PATH IS BUILT FROM `data_root()`, for the same reason
+    `live_state_payload` is: `read_json_file` derives its keyvalue key FROM THE
+    PATH, and `_api_read_path` returns "the first root that actually HAS it" --
+    on web the file exists on NEITHER root, because the poller wrote it to the
+    worker's disk.
+
+    Measured 2026-08-22: the first version of this read a CSV via
+    `_api_read_path` + `path.exists()`. Capture was correct in production
+    (4,562 rows, 118 fixtures, 0 duplicates) and the team names matched the
+    card exactly, yet every tile still said "no market captured" -- the join
+    never ran because the READ could not. That is also why the artifact is now
+    JSON: the cross-service store is JSON-only.
+
+    Not cached, same reason as `picks_rows`: regenerated as odds move, and
+    gunicorn workers never recycle.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        payload = read_json_file(
+            data_root()
+            / "soccer_source"
+            / league
+            / "props"
+            / f"game_markets_{selected_date}.json"
+        )
+        if isinstance(payload, dict):
+            rows = payload.get("rows")
+            if isinstance(rows, list) and rows:
+                return tuple(r for r in rows if isinstance(r, dict))
+    except Exception:
+        pass
+    # Local/dev fallback: the on-disk copy, where the repo root IS the real
+    # location and there is no store.
     path = game_markets_path(league, selected_date)
     if not path.exists():
         return ()
     try:
-        with path.open("r", encoding="utf-8", newline="") as handle:
-            return tuple(dict(row) for row in csv.DictReader(handle))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return ()
+    rows = payload.get("rows") if isinstance(payload, dict) else None
+    return tuple(r for r in rows if isinstance(r, dict)) if isinstance(rows, list) else ()
 
 
 def picks_path(league: str, selected_date: str) -> Path:
