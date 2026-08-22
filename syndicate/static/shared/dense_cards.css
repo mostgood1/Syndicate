@@ -1326,3 +1326,43 @@ a.cards-head-team-name:focus-visible {
   color: var(--cards-muted, rgba(255,255,255,0.5));
   margin-top: 2px;
 }
+
+/* --- Compact (scoreboard strip) live card ---
+   The strip is the row you scan; when a match is live it has to carry the
+   score and the clock, which the old "away @ home" head did not. */
+.cards-strip-live-head {
+  display: flex; justify-content: flex-end; margin-bottom: 2px;
+}
+.cards-strip-live-clock {
+  font-size: 11px; font-weight: 700; color: #7ddc8f;
+  font-variant-numeric: tabular-nums;
+}
+.cards-strip-live-rows { display: flex; flex-direction: column; gap: 2px; }
+.cards-strip-live-row { display: flex; align-items: center; gap: 6px; }
+.cards-strip-live-crest { width: 15px; height: 15px; object-fit: contain; flex: 0 0 auto; }
+.cards-strip-live-crest--text {
+  width: 15px; text-align: center; font-size: 9px; font-weight: 700;
+  color: var(--cards-muted, rgba(255,255,255,0.6));
+}
+.cards-strip-live-team {
+  flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cards-strip-live-score {
+  flex: 0 0 auto; font-size: 14px; font-weight: 700;
+  font-variant-numeric: tabular-nums; min-width: 1.2em; text-align: right;
+}
+.cards-strip-momentum {
+  display: flex; align-items: center; gap: 5px; margin-top: 4px;
+}
+.cards-strip-momentum-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.3); flex: 0 0 auto;
+}
+.cards-strip-momentum-dot.is-home { background: #d64545; }
+.cards-strip-momentum-dot.is-away { background: #3b82c4; }
+.cards-strip-momentum-label {
+  font-size: 10px; font-weight: 600;
+  color: var(--cards-muted, rgba(255,255,255,0.68));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
