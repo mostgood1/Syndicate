@@ -445,6 +445,20 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     matched = 0
     edged = 0
     edge_blocked = 0
+    # WHICH refusal, not just how many. `rows_live_edge_withheld` is a single
+    # total over three unrelated causes, and soccer has been sitting at
+    # `projected=114 edged=0 prob_withheld=0` -- joined, holding a live
+    # probability, and priced zero times. The total says that happened; it
+    # cannot say whether the market had no fair value, the prop was already
+    # decided, or the arithmetic failed. Those are three different fixes.
+    edge_withheld_by_reason: dict[str, int] = {}
+
+    def _withhold(projection: dict, reason: str, text: str) -> None:
+        nonlocal edge_blocked
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = text
+        edge_blocked += 1
+        edge_withheld_by_reason[reason] = edge_withheld_by_reason.get(reason, 0) + 1
     prob_withheld = 0
     considered = 0
     miss_no_player = 0
@@ -692,25 +706,34 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         banked = hit.get("actual_so_far")
         row_line = _as_float(row.get("line"))
         if banked is not None and row_line is not None and (_as_float(banked) or 0.0) > row_line:
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = (
+            _withhold(
+                projection,
+                "over_already_decided",
                 "the over is already decided, so the market is settled and there is "
-                "no price to beat"
+                "no price to beat",
             )
-            edge_blocked += 1
             continue
 
         live_prob = hit.get("live_prob_over")
         fair = projection.get("market_fair_prob_over")
         if live_prob is None or fair is None:
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = (
-                "live re-sim produced no probability for this market, so there is "
-                "nothing honest to price against it"
-                if live_prob is None
-                else "no market fair value to price the live projection against"
-            )
-            edge_blocked += 1
+            if live_prob is None:
+                _withhold(
+                    projection,
+                    "no_live_probability",
+                    "live re-sim produced no probability for this market, so there is "
+                    "nothing honest to price against it",
+                )
+            else:
+                # THE ONE THE SOCCER READING POINTS AT. A live probability that
+                # arrived and has nothing to price against is a de-vig gap on
+                # the QUOTE side, not a failure of the re-sim -- and until now
+                # it was indistinguishable from the re-sim producing nothing.
+                _withhold(
+                    projection,
+                    "no_market_fair_value",
+                    "no market fair value to price the live projection against",
+                )
             continue
         try:
             # Same formula and inputs as `attach_projections`
@@ -719,9 +742,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             # number drift apart, which is what retired `book_grid`.
             projection["edge_vs_market_pct"] = round((float(live_prob) - float(fair)) * 100.0, 2)
         except (TypeError, ValueError):
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = "live edge inputs were not numeric"
-            edge_blocked += 1
+            _withhold(projection, "inputs_not_numeric", "live edge inputs were not numeric")
             continue
         projection["live_prob_over"] = live_prob
         projection.pop("edge_unavailable_reason", None)
@@ -745,6 +766,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # priced nothing this tick; a gap between them means it priced some.
         "rows_live_prob_withheld": prob_withheld,
         "rows_live_edge_withheld": edge_blocked,
+        "edge_withheld_by_reason": dict(sorted(edge_withheld_by_reason.items())),
         "live_games_in_snapshot": indexed.get("live_games"),
         "snapshot_rows_seen": indexed.get("rows_seen"),
         "snapshot_rows_indexed": indexed.get("rows_indexed"),
