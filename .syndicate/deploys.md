@@ -23779,6 +23779,26 @@ interesting one.
 **Preflight still could not run** (`RENDER_API_KEY` unset) — same substitution
 caveat as the two earlier deploys.
 
+### `#514` capture SUSTAINED — check #2, 23:35Z
+
+Five consecutive successful captures on `ca152db2`: **23:19:54, 23:22:42,
+23:29:58, 23:32:24, 23:35:02**, every one `fetched=1 games=1 with_series=1`
+followed by `appended .../live_momentum_2026-08-22.jsonl`. ~2.5 min cadence, so
+the jsonl is accumulating roughly one row per two and a half minutes of game.
+Zero `NO_SERIES` lines — every fetched game produced a series.
+
+**AND A CLEAN NEGATIVE THAT SETTLES THE UA QUESTION: zero
+`SUMMARY_RETRY_DEFAULT_UA` lines.** The fallback added in the hotfix has never
+fired, so the browser UA works on `site.web.api.espn.com` (summary) while
+`site.api.espn.com` (scoreboard) rejects it. The two hosts genuinely have
+different policies — that was a hypothesis when the hotfix shipped and is now
+measured. The contradictory comments in `fetch_espn_live_status_for_date.py`
+and `basketball_props_smart_sim` were BOTH right, about different hosts.
+
+**STILL OWED: the artifact's content.** Needs `/api/ops/artifacts/export` with
+`ADMIN_TOKEN`. `with_series=1` says a series was built, not that its numbers
+are right.
+
 
 ## 2026-08-22 23:23:16Z -- refresh-worker `1e48e08e` -- NOT MINE, and it carried my work anyway
 

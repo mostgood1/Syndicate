@@ -5526,3 +5526,38 @@ is not a market here.
 60s. The card shows a 5x over-smoothed series. And production momentum is
 ESPN-commentary-derived; the signal that carries is FotMob's series, which is
 not wired.
+
+## 08-22 ESPN'S TWO HOSTS HAVE DIFFERENT User-Agent POLICIES, and this repo documents both without saying so
+
+Measured from Render, 2026-08-22, during a live WNBA slate:
+
+    site.api.espn.com      (scoreboard)  browser-spoof UA -> 403     no custom UA -> 200
+    site.web.api.espn.com  (summary)     browser-spoof UA -> 200 (fallback never fired)
+
+**Two comments in this repo give opposite advice and BOTH ARE CORRECT — about
+different hosts.** `scripts/fetch_espn_live_status_for_date.py` says never use a
+spoofed UA (probed from Render: bare `Mozilla/5.0` 403, full Chrome header set
+403, no headers 200). `basketball_props_smart_sim._http_get_json_local` says a
+browser UA is the FIX for soft-blocking. Neither names the host as the reason.
+
+I read the second, applied it to the first's endpoint, and the scoreboard 403'd
+on every tick of a live game. A bare `except` returned `{}`, so a 403 and an
+empty slate were the same observation: `live_events=0`. I checked that zero
+TWICE before tip-off and read it as correct pregame behaviour.
+
+**RULE: when two comments in this codebase contradict each other, the
+difference is usually a scope neither one states.** Find the axis — host,
+service, phase, sport — before picking a side. Picking the more recent or the
+more confident one is guessing.
+
+**RULE: never let a fetch helper swallow its status.** `except: return {}` cost
+most of a scarce live window here. A 403 and an empty result are different
+facts and must print differently. `#514`'s helper now logs status and URL on
+every failure, and the caller prints `events_total` so "3 games, none tipped"
+can never again look like "the call returned nothing".
+
+**COROLLARY on where diagnostics go.** A `NO_SERIES` diagnostic shipped 40
+minutes earlier could not catch this: it ran only after summaries were fetched,
+and the failure was one hop upstream. **Instrument the FIRST hop, not the
+interesting one.**
+
