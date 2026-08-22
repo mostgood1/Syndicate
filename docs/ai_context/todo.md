@@ -1,5 +1,39 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#502` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22, NOT STARTED, no lane claimed
+
+Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
+
+**The gap in one line:** `live_pbp_stats_<date>.jsonl` persists only AGGREGATES
+(`pbp_attempts`, `pbp_possessions`, `pbp_recent`); the per-play stream is built
+in-process on the vendor app and discarded. Momentum needs a per-event,
+timestamped, team-signed artifact and nothing writes one.
+
+**Already solved, do not rebuild:** the SVG chart renders for any sport that
+sets `game["shared_momentum"]` (`_game_card_generic.html:190-245`, rendered by
+every sport's board); the clock model is `game_shape.py:483`
+`basketball_elapsed_minutes`, test-pinned against WNBA's copy; NBA and WNBA
+already tick on the worker via `live_lens_loop.py:150`.
+
+**Measured off the tracked mirror 2026-08-22** (61 files, 126 game records):
+`pointsAttempted` IS present in ESPN's basketball plays — 2,778 attempts across
+19 populated records, **0 in `UNKNOWN`**, so team attribution is clean. But the
+buckets are keyed by TRICODE and `pbp_attempts["home"]`/`["away"]` are ZERO on
+every record — the same trap `game_shape.py:459` already records for
+`pbp_possessions`. Coverage of those 19 records is **one date (2026-06-27)**,
+13 games, 17 WNBA / 2 NBA.
+
+**Blocking decisions (scope §7), all before code:** seconds vs possessions for
+the decay axis; whether the narrator (`scoring`) series is published at all;
+whether momentum may ever become a sim input (if yes,
+`model_engine_standard.md` binds in full, including a re-fit).
+
+**Sequencing note:** validation needs a live slate, and **WNBA is the only
+basketball league in season on 2026-08-22** — NBA is out, NCAAB not until
+November. `soccer-board-mlb-parity` (OPEN) owns `soccer/cards.py` and
+`_game_card_generic.html`, so the shared-chart extraction must wait for it;
+build basketball's own copy first.
+
 ### `#501` — **The WNBA live-lens went to ZERO ~00:20Z DURING LIVE PLAY and did not come back, while capture kept writing players. Both `#498` and `#499` lost their measurement window to it.** — found by lane `wnba-live-props-data`, 2026-08-21, NOT FIXED, CAUSE UNKNOWN
 
 **Corrects this item's own first framing.** It was filed as "the halftime state
