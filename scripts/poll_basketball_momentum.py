@@ -217,6 +217,48 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     path = momentum_artifact_path(out_root, league_code=league, date_str=date_str)
     append_momentum_artifact(payload, path=path)
     print(f"[basketball_momentum] appended {path}", flush=True)
+
+    # **A SHAPE LINE PER CAPTURED GAME, because `with_series=1` says a series
+    # was BUILT and nothing about whether its numbers are right.**
+    #
+    # The artifact itself cannot be read from a Claude Code session: the ops
+    # export endpoint is on `syndicate-an21.onrender.com`, which the agent
+    # proxy answers 403 to at CONNECT (an org policy denial, not an auth
+    # failure -- an ADMIN_TOKEN does not change it). Logs are the one channel
+    # that does reach out, so the check goes here rather than into a fetch.
+    #
+    # Deliberately a SHAPE, not a dump: series lengths, endpoint values, the
+    # narrator's presence under its own name, and the clock. Enough to catch
+    # an empty axis, a mis-signed series, a clock that does not track the game,
+    # or a narrator that quietly vanished -- without putting a game's worth of
+    # JSON through the log collector every 2.5 minutes.
+    for event_id, block in (payload.get("games") or {}).items():
+        if not block.get("pressure"):
+            # ONE LINE PER GAME, INCLUDING THE ONES THAT FAILED. The
+            # `NO_SERIES` block above only fires when the WHOLE slate is
+            # empty, so on a mixed slate a game that failed to parse would
+            # otherwise print nothing at all and hide behind its neighbour's
+            # success -- `with_series=1` on a two-game slate reads as fine.
+            print(
+                f"[basketball_momentum] SHAPE event={event_id} "
+                f"supported={block.get('supported')} reason={block.get('reason')!r} "
+                f"events={block.get('events')} -- no series",
+                flush=True,
+            )
+            continue
+        pressure = block["pressure"]
+        seconds = pressure.get("seconds") or {}
+        possessions = pressure.get("possessions") or {}
+        narrator = block.get("scoring_narrator") or {}
+        print(
+            f"[basketball_momentum] SHAPE event={event_id} "
+            f"events={block.get('events')} "
+            f"as_of_s={block.get('as_of_seconds')} as_of_poss={block.get('as_of_possessions')} "
+            f"sec_pts={len(seconds.get('series') or [])} sec_now={seconds.get('current')} "
+            f"poss_pts={len(possessions.get('series') or [])} poss_now={possessions.get('current')} "
+            f"narrator={'yes' if narrator else 'NO'} narrator_events={narrator.get('events')}",
+            flush=True,
+        )
     return payload
 
 
