@@ -419,6 +419,14 @@ def build_layer2_shortlist(
                         f"matches_in_source={proj_stats.get('matches_in_source')} "
                         f"unmatched_match={proj_stats.get('unmatched_match_rows')} "
                         f"unmatched_player={proj_stats.get('unmatched_player_rows')} "
+                        # The player bucket is now the LARGEST and had no
+                        # attribution at all -- same contract the league split
+                        # already meets one level up.
+                        f"player_no_roster={proj_stats.get('player_miss_no_roster')} "
+                        f"player_name_miss={proj_stats.get('player_miss_name')} "
+                        f"matches_with_players={proj_stats.get('matches_with_players')} "
+                        f"board_players={proj_stats.get('unmatched_player_sample')} "
+                        f"sim_players={proj_stats.get('sim_roster_sample')} "
                         f"unsupported_market={proj_stats.get('unsupported_market_rows')} "
                         f"reason={proj_stats.get('reason')} "
                         f"error={proj_stats.get('error')} "

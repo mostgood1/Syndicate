@@ -729,6 +729,12 @@ def _scorer_race_for(index: "SoccerProjectionIndex", match_id: str, match: Mappi
 # keep on one row.
 _SIM_FIXTURES_PER_LEAGUE = 12
 
+# Player samples are capped harder than fixture ones: a soccer slate has ~10
+# fixtures and ~500 players, so an uncapped list would not fit on a log line the
+# collector keeps intact.
+_PLAYER_SAMPLE_CAP = 10
+_ROSTER_SAMPLE_PER_MATCH = 8
+
 
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
@@ -757,6 +763,42 @@ def attach_soccer_projections(
     rows_by_league: dict[str, int] = {}
     unmatched_by_league: dict[str, int] = {}
     unmatched_fixtures: dict[str, str] = {}
+    # SAME SPLIT AS `unmatched_by_league`, one level down. `unmatched_player` is
+    # now the LARGEST bucket (6,057 rows, measured 18:31:07Z, and it grew when
+    # the team-name join was fixed because more rows reach this stage) and it
+    # covers two states with different owners:
+    #
+    #   the sim published NO players for this match  -> producer gap
+    #   it published players and this name is absent -> a name join problem,
+    #                                                   the player-level twin of
+    #                                                   what 13 aliases just fixed
+    #
+    # Paired samples for the same reason as the fixture ones: an alias cannot be
+    # written from the board's spelling alone.
+    player_miss_no_roster = 0
+    player_miss_name = 0
+    unmatched_players: dict[str, str] = {}
+    roster_sample_by_match: dict[str, list[str]] = {}
+
+    def _note_player_miss(match: Mapping[str, Any], row: Mapping[str, Any], roster: Mapping[str, Any]) -> None:
+        nonlocal player_miss_no_roster, player_miss_name
+        league = str(match.get("league") or "").strip() or "?"
+        board_name = str(row.get("player_name") or "").strip() or "?"
+        if not roster:
+            player_miss_no_roster += 1
+            return
+        player_miss_name += 1
+        # Keyed by (league, player) so one player's twelve prop rows contribute
+        # one sample, not twelve -- the fixture samples learned this already.
+        key = f"{league}|{board_name}"
+        if key not in unmatched_players and len(unmatched_players) < _PLAYER_SAMPLE_CAP:
+            unmatched_players[key] = board_name
+            match_id = str(match.get("match_id") or "").strip()
+            if match_id and match_id not in roster_sample_by_match:
+                roster_sample_by_match[match_id] = sorted(
+                    str((entry or {}).get("player_name") or name)
+                    for name, entry in list(roster.items())
+                )[:_ROSTER_SAMPLE_PER_MATCH]
 
     for row in grid:
         market = str(row.get("market") or "").strip().lower()
@@ -836,6 +878,11 @@ def attach_soccer_projections(
             prob = (race.get("by_player") or {}).get(name) if race else None
             if prob is None:
                 unmatched_player += 1
+                # The scorer race is DERIVED from the same per-match player
+                # entries, so its absence is the same two states.
+                _note_player_miss(
+                    match, row, index.players_by_match.get(match_id) or {}
+                )
                 continue
             projection = _probability_projection(
                 float(prob),
@@ -855,6 +902,7 @@ def attach_soccer_projections(
             entry = players.get(_norm_name(row.get("player_name")))
             if entry is None:
                 unmatched_player += 1
+                _note_player_miss(match, row, players)
                 continue
             # PER-LINE PROBABILITY FIRST, mean only as a fallback. Falls
             # through to the shared tail below rather than pricing here, so
@@ -959,6 +1007,14 @@ def attach_soccer_projections(
         "rows_by_league": dict(sorted(rows_by_league.items())),
         "unmatched_by_league": dict(sorted(unmatched_by_league.items())),
         "unmatched_fixtures_count": len(unmatched_fixtures),
+        # The player-level split, same contract as the league one above.
+        "player_miss_no_roster": player_miss_no_roster,
+        "player_miss_name": player_miss_name,
+        "unmatched_player_sample": sorted(unmatched_players),
+        "sim_roster_sample": sorted(
+            name for names in roster_sample_by_match.values() for name in names
+        )[: _PLAYER_SAMPLE_CAP * 2],
+        "matches_with_players": len(index.players_by_match),
         "unmatched_fixture_sample": sorted(unmatched_fixtures)[:12],
         "indexed_fixture_sample": indexed_fixtures,
         # `match_for` returns None for these BY DESIGN (a wrong projection is
