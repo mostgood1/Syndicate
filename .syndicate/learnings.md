@@ -36,6 +36,40 @@
 
 ---
 
+### 2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-var change RESTARTS the service on the commit it is already running
+
+**Measured twice in one evening, the second time after I had already been
+caught by the first shape.**
+
+Render redeploys on an env-var change, and with `autoDeploy: no` that redeploy
+carries **the commit the service is already on** — it does not pull the branch
+tip. So setting a feature flag ships the flag and NOT the code the flag gates.
+
+    dep-da51b13bc2fs73fgu5n0  trigger=service_updated  live 21:33:18Z
+      carried 6cd980b4  <- the same commit it was already running
+      origin/main was 471cbac9d, one commit ahead, holding the wiring
+
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED=1` went live against a binary with no
+caller for the job it enables. Second time tonight the config landed and the
+code did not: an hour earlier `admitted_by_blend=` was committed 18 minutes
+AFTER the worker deployed, so the counter could never appear either.
+
+**THE RULE.** Enabling a flag is TWO changes, not one: the env var, and a code
+deploy of a SHA that contains what the flag gates. Verify the second with
+`git merge-base --is-ancestor <feature-sha> <live-sha>` — the deploy list's
+`commit.id` is the live SHA and is the only thing that answers it. A
+`service_updated` entry in the deploy history is a RESTART, and reading it as an
+update is the same category error as reading a green deploy status as a content
+check.
+
+**AND THE DEEPER ONE, which is why this rates a FORBIDDEN rather than a note:**
+a flag whose gated code is absent behaves EXACTLY like a flag that is off. There
+is no error, no log line, and no failing test — the same signature as
+`model_engine_standard.md`'s unfed input, and as a counter that exists at the
+builder and never reaches the endpoint. **Whenever a flag is turned on, the
+acceptance reading is the feature's own affirmative token** (here
+`PORTFOLIO_COMMIT date=… positions=…`), never the absence of an error.
+
 ### 2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the same store without saying which surface. A 4-minute refresh-worker outage came from that ambiguity
 
 **What happened.** A recommendation to change the eviction policy on the
