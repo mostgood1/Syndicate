@@ -1709,7 +1709,31 @@ tree clean.
 `memory_high_water.json`, so every test run leaves an untracked file that trips
 commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
 
-### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED** on `claude/live-lens-momentum-basketball-3hlx7g`, lane `basketball-live-momentum`; NOT DEPLOYED and NOTHING CALLS THE PRODUCER
+### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED AND DEPLOYED, CAPTURING ON A LIVE WNBA SLATE**; lane `basketball-live-momentum`
+
+**STATUS 2026-08-22 ~23:5xZ — the header above USED TO SAY "NOT DEPLOYED and
+NOTHING CALLS THE PRODUCER" and both halves are now false.** `live_lens_loop.py`
+calls the producer on every nba/wnba tick, and `live-odds-worker` has been
+appending to
+`/opt/render/project/data/wnba_source/source_artifacts/data/live_lens/live_momentum_2026-08-22.jsonl`
+since 23:19:54Z — eight-plus consecutive `fetched=1 games=1 with_series=1`
+captures at a ~2.5 min cadence, zero `NO_SERIES`, zero
+`SUMMARY_RETRY_DEFAULT_UA`. Deploy ledger: `.syndicate/deploys.md`, the
+23:14:06Z entry and its check-ins.
+
+**WHAT IS STILL NOT VERIFIED, and it is the thing that matters:** the artifact's
+CONTENT. `with_series=1` proves a series was BUILT, not that its numbers are
+right — the pressure series could be empty on one axis, `as_of_seconds` could be
+failing to track the game clock, and the tenths-format clock path
+(`_normalize_clock`) may never have been exercised on real data. The ops export
+endpoint is **unreachable from a Claude Code session**: `syndicate-an21` answers
+**403 at CONNECT** through the agent proxy, an organization policy denial that an
+`ADMIN_TOKEN` does not change. The workaround shipped in PR #5 is a per-game
+`SHAPE` log line; read it from `live-odds-worker` logs, not from a fetch.
+
+**Phase C cannot start until that content check passes**, and Phase D (reader +
+`game["shared_momentum"]` on the card) is deliberately behind Phase C — the card
+should not display a number nobody has validated.
 
 Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 
