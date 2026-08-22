@@ -3354,7 +3354,7 @@ def _sweep_ownership_exclusion(sport: str, *, date_str: str | None = None) -> st
 	if raw_active:
 		active = {piece.strip().lower() for piece in raw_active.split(",") if piece.strip()}
 		if active and normalized not in active:
-			# `#514`. THE WEEKLY CARVE-OUT ABOVE WAS HALF-APPLIED, and the half
+			# `#520`. THE WEEKLY CARVE-OUT ABOVE WAS HALF-APPLIED, and the half
 			# that was missing is the half that had teeth.
 			#
 			# The docstring says weekly sports are deliberately not gated here,
@@ -3428,7 +3428,7 @@ def _live_refresh_loop_effective_sports(selected_date: str) -> list[str]:
 			f"kept={','.join(kept) or '<none>'} dropped={' '.join(dropped)}",
 			flush=True,
 		)
-		# `#514`. NOT SILENT IS NOT THE SAME AS LEGIBLE. The line above ran every
+		# `#520`. NOT SILENT IS NOT THE SAME AS LEGIBLE. The line above ran every
 		# tick for the whole of the NFL outage and named the right sport and the
 		# right reason -- and read as routine partitioning, because a correct
 		# exclusion and a catastrophic one are the same sentence.
@@ -4348,7 +4348,7 @@ def _next_fixture_epoch_by_league(sport: str, *, now_epoch: float) -> dict[str, 
 	return dict(found)
 
 
-# `#514`. HOW LONG AFTER KICKOFF A FIXTURE IS STILL PLAYING.
+# `#520`. HOW LONG AFTER KICKOFF A FIXTURE IS STILL PLAYING.
 #
 # Needed because `_next_fixture_epoch_by_league` answers "when does this league
 # NEXT play", and to do that it must discard fixtures that have already started
@@ -4611,7 +4611,7 @@ def _due_leagues_for_sport(
 	else:
 		candidates = sorted({str(x).strip().lower() for x in leagues if str(x).strip()})
 
-	# `#514`. LIVE LEAGUES ARE UNIONED IN, NOT FILTERED FROM `candidates`.
+	# `#520`. LIVE LEAGUES ARE UNIONED IN, NOT FILTERED FROM `candidates`.
 	#
 	# They have to be: `by_league` is built from FUTURE fixtures only, so a league
 	# whose match is under way is not in `candidates` at all and no amount of

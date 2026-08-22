@@ -109,6 +109,41 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
         f"with_series={payload['with_series']}",
         flush=True,
     )
+    # **WHEN GAMES ARE PRESENT AND NONE CARRIED A SERIES, SAY WHY -- PER GAME.**
+    #
+    # `with_series=0` is ambiguous between "no live games" and "live games we
+    # could not parse", and those need completely different responses. Without
+    # this the two print the SAME line, which is the failure this repo names
+    # repeatedly: a gate that fires silently cannot be told from a builder that
+    # never ran.
+    #
+    # It matters most in exactly the window where it is least recoverable.
+    # Every test of this taxonomy so far has run on hand-built fixtures, because
+    # ESPN is 403 from a Claude Code sandbox -- so the first real payload is
+    # also the first chance for `_team_index` or `_classify` to be wrong about
+    # the feed's actual shape, and WNBA is the only basketball league in season.
+    #
+    # The three things printed are the three that can be wrong: a stated
+    # `reason` from the block, whether `plays` arrived at all, and whether the
+    # header yielded competitors (no competitors -> no home side -> every event
+    # silently unsigned and dropped).
+    if summaries and not payload.get("with_series"):
+        for event_id, block in (payload.get("games") or {}).items():
+            summary = summaries.get(event_id) or {}
+            plays = summary.get("plays")
+            header = summary.get("header") if isinstance(summary.get("header"), dict) else {}
+            competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
+            first = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+            competitors = first.get("competitors") if isinstance(first.get("competitors"), list) else None
+            print(
+                f"[basketball_momentum] NO_SERIES event={event_id} "
+                f"supported={block.get('supported')} reason={block.get('reason')!r} "
+                f"events={block.get('events')} "
+                f"plays={len(plays) if isinstance(plays, list) else 'ABSENT'} "
+                f"competitors={len(competitors) if competitors is not None else 'ABSENT'}",
+                flush=True,
+            )
+
     if dry_run:
         print("[basketball_momentum] DRY RUN -- nothing written", flush=True)
         return payload

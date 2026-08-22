@@ -1304,7 +1304,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
     # LIVE-PHASE ODDS, SCOPED TO MATCHES IN PLAY.
     #
-    # BUILT HERE, PREPENDED BELOW, AND THE ORDER IS THE POINT (`#514`).
+    # BUILT HERE, PREPENDED BELOW, AND THE ORDER IS THE POINT (`#520`).
     #
     # These steps used to be appended LAST, behind every league's sim rebuild.
     # The comment above the pregame loop in this same function already records
@@ -1511,7 +1511,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_artifacts",
-                # `#514`. A LEAGUE WITH A MATCH IN PLAY DROPS OUT OF THE LIVE PHASE
+                # `#520`. A LEAGUE WITH A MATCH IN PLAY DROPS OUT OF THE LIVE PHASE
                 # HERE, and this is what pays for the rest of the change.
                 #
                 # This is the expensive step -- `build_soccer_artifacts.py`, the sim
@@ -1527,7 +1527,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 #     whole tick budget. The board's live view comes from
                 #     `live_projection_join` and the live re-sim, not from here.
                 #  2. Widening the launcher's league scope to include in-play
-                #     leagues (`_due_leagues_for_sport`, same `#514`) would otherwise
+                #     leagues (`_due_leagues_for_sport`, same `#520`) would otherwise
                 #     MULTIPLY this: one sim rebuild per live league per 60s, on a
                 #     box that was already at 89.9% of 2048MB. The scope fix and this
                 #     one have to ship together or the scope fix makes the overrun

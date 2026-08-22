@@ -35,9 +35,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from scripts.build_soccer_artifacts import _fill_promoted
 from scripts.build_soccer_artifacts import _load_player_rows
 from scripts.build_soccer_artifacts import _load_team_ratings
-from syndicate.features.soccer.features.momentum import momentum_at
-from syndicate.features.soccer.features.momentum import momentum_events
-from syndicate.features.soccer.features.momentum import momentum_series
+from syndicate.features.soccer.ingestion.fotmob_momentum import fotmob_momentum_block
 from syndicate.features.soccer.features.live_lens import goal_in_window_probability
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
@@ -184,35 +182,16 @@ def _build_match_boxes(
     return boxes
 
 
-def _momentum_block(summary: dict[str, Any], live_state: dict[str, Any], as_of_seconds: float | None) -> dict[str, Any]:
-    """Signed attack-momentum series + the value at the current clock.
-
-    Never fatal: a match whose commentary is thin or absent returns a stated
-    reason rather than a zero, because a flat series and an absent one mean
-    different things to anyone reading the card.
-    """
-    try:
-        events = momentum_events(summary, home_team=live_state["home_team"], include_goals=False)
-        if not events:
-            return {"supported": True, "reason": "no pressure events in commentary yet",
-                    "current": 0.0, "series": []}
-        clock = float(as_of_seconds) if as_of_seconds is not None else float(
-            2 * 2700.0 - float(live_state.get("clock_remaining") or 0.0)
-        )
-        series = [
-            {"t": int(t), "v": v}
-            for t, v in momentum_series(events, until_seconds=clock, step_seconds=60.0)
-        ]
-        return {
-            "supported": True,
-            "current": momentum_at(events, clock),
-            "events": len(events),
-            "as_of_seconds": clock,
-            "series": series,
-        }
-    except Exception as exc:  # pragma: no cover - defensive, never fatal
-        return {"supported": False, "reason": f"{type(exc).__name__}: {exc}",
-                "current": None, "series": []}
+# The ESPN-commentary momentum proxy (`features/momentum.py`, formerly wired
+# here as `_momentum_block`) was RETIRED as the production feed 2026-08-22.
+# Swept across every half-life 30s-1800s against its own production weighting
+# scheme, holdout, 699 matches: dAUC ran -0.0006 to +0.0002, monotonically
+# WORSE as half-life grew -- the signature of no effect, not underpowered
+# noise (`docs/ai_context/todo.md` #518). It is not reused as a fallback below:
+# a confident-looking chart built on a disproven signal is worse than the
+# panel simply not appearing, which is what `supported: False` already does
+# on the card. The module and its tests remain in the repo -- unused in
+# production, still an honest description of what it computes.
 
 
 def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
@@ -347,23 +326,25 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "away_corners_so_far": live_state["away_corners_so_far"],
                 "projection": projection.to_dict(),
                 "goal_windows": goal_windows,
-                # ATTACK MOMENTUM, computed from the SAME summary already in
-                # hand -- no extra request. A signed pressure series (home
-                # positive), the shape FotMob/AiScore draw, built from ESPN's
-                # commentary feed rather than a vendor's model output.
+                # ATTACK MOMENTUM, from FotMob's own per-minute series
+                # (`fotmob_momentum.py`), not computed from `summary` -- the
+                # ESPN-derived proxy this used to call was retired 2026-08-22,
+                # see the note above `poll_league`. One extra HTTP call per
+                # live match per tick (FotMob has no bulk momentum endpoint);
+                # never fatal, `supported: False` with a reason on any join or
+                # fetch failure so the card hides the panel rather than
+                # showing a stale or empty one.
                 #
-                # Goals are EXCLUDED from the series (`include_goals=False`).
-                # A momentum series that counts goals spikes AT the goal and so
-                # correlates with goals by construction while predicting
-                # nothing. Measured 2026-08-21 with them excluded and the read
-                # strictly causal: two minutes before a goal, momentum favours
-                # the side that scores by +1.141 against a control mean of
-                # 0.000 (Cohen's d = +0.397, n=76 pre-goal / 638 control).
-                #
-                # `current` is the value AS OF the live clock, not end-of-feed:
-                # reading the whole series would let a card show pressure from
-                # after the moment it claims to describe.
-                "momentum": _momentum_block(summary, live_state, as_of_seconds),
+                # `as_of_seconds` bounds the series to the live clock, not
+                # end-of-feed: reading the whole series would let a card show
+                # pressure from after the moment it claims to describe.
+                "momentum": fotmob_momentum_block(
+                    league=league,
+                    home_team=live_state["home_team"],
+                    away_team=live_state["away_team"],
+                    iso_date=iso_date,
+                    as_of_seconds=as_of_seconds,
+                ),
                 "live_player_props": [row.to_dict() for row in sorted(live_props, key=lambda r: r.projected_final_shots, reverse=True)[:12]],
             }
 

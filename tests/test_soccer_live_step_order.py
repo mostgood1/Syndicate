@@ -1,4 +1,4 @@
-"""`#514`. The live-scoped soccer captures must run BEFORE the sims, not after.
+"""`#520`. The live-scoped soccer captures must run BEFORE the sims, not after.
 
 WHY THIS EXISTS. `_build_soccer_steps` already carries a long comment recording
 that its own step list does not reach the end -- reproducibly dying around step
@@ -152,7 +152,7 @@ def test_a_league_not_in_play_keeps_its_sim_in_the_live_phase(_one_live_league):
 
 
 def test_with_nothing_in_play_every_sim_keeps_its_live_phase(monkeypatch):
-    """The pre-`#514` behaviour, unchanged, whenever no match is running."""
+    """The pre-`#520` behaviour, unchanged, whenever no match is running."""
     monkeypatch.setattr(ros, "_soccer_live_scope", lambda date: {})
     steps = [s for s in ros._build_soccer_steps(_args()) if s.name.endswith("_artifacts")]
     assert steps

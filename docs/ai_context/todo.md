@@ -1,11 +1,11 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#515` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
+### `#521` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
 
-`#514` diagnosed WHY live bets were limited. This is the fix, plus the measurement
+`#520` diagnosed WHY live bets were limited. This is the fix, plus the measurement
 that reordered its priorities.
 
-**THE MEASUREMENT THAT CHANGED THE PLAN.** `#514` treated scoping as the main
+**THE MEASUREMENT THAT CHANGED THE PLAN.** `#520` treated scoping as the main
 cause. Counting the tick's own verdict line over 20:31–21:33Z on live-odds-worker:
 
     LIVE ODDS REFRESH TICK: True    5
@@ -14,7 +14,7 @@ cause. Counting the tick's own verdict line over 20:31–21:33Z on live-odds-wor
 Every False carried `A refresh run is already active (pid=1827)`. The configured
 interval is 60s; the **observed launch cadence was ~12 minutes**. Scoping decides
 WHAT a launch covers; this decides whether there is a launch. It outranks
-everything in `#514`.
+everything in `#520`.
 
 (From 21:33Z the next 8 ticks were all True — the MLB sim had finished. So the
 9.6% is a busy-slate number, not an all-day one, and the busy slate is when live
@@ -70,7 +70,7 @@ blanket drop would stop soccer's sims for hours.
 tick, but liveness is per-sport and per-match. While MLB is live — 14 hours a day
 — every soccer step marked `phases=("pregame",)` is skipped, which is the whole
 pregame odds and props capture for the nine leagues that are not playing. That is
-a better explanation of soccer's 13.8h max quote age than anything in `#514`, and
+a better explanation of soccer's 13.8h max quote age than anything in `#520`, and
 none of the four fixes above touch it. A per-sport phase is the real fix and is
 not a small change.
 
@@ -99,7 +99,17 @@ pre-existing — verified identical against a stashed baseline in the same sessi
    baseline is recorded above. **This is the one that says whether 60s was
    actually achieved**, and fix 4 is the only one of the four aimed at it.
 
-### `#514` — **Live bets are limited because almost nothing REFRESHES a live price. Three separate scoping bugs, one gate. DIAGNOSED IN PRODUCTION 2026-08-22 21:0x–21:14Z, NOT FIXED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
+### `#520` — **Live bets are limited because almost nothing REFRESHES a live price. Three separate scoping bugs, one gate. DIAGNOSED IN PRODUCTION 2026-08-22 21:0x–21:14Z, NOT FIXED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
+
+> **RENUMBERED 2026-08-22, from `#514`/`#515`.** A peer session had already
+> taken 514-517 for unrelated work (basketball momentum, watermark tests, stale
+> patch targets, the pytest baseline) and pushed first. Both sides appended to
+> the top of this file in the same window, which is the second id collision
+> today. The code comments and tests were renumbered with these entries, so a
+> `#520` in `live_refresh_loop.py` resolves here and not to somebody's
+> basketball lane -- a stale cross-reference is worse than no reference,
+> because it reads as deliberate.
+
 
 The user asked why so few live bets exist with soccer, MLB and NFL all in play.
 The board is not the cause — the gate is doing exactly what it should, on prices
@@ -186,6 +196,104 @@ candidate set. Code-only, deployable normally. (3) Tick overrun: separate, measu
 **Not yet established:** whether soccer's live prices would clear the 900s gate even if
 refreshed — the books' own soccer live cadence is unmeasured. Fixing (2) is what makes
 that measurable.
+### `#519` — **The paper portfolio had no read surface: two artifacts crossed the service boundary and nothing rendered them. `/portfolio/paper` ships. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
+
+Stage A (`#507`) and Stage B (`#512`) both ran in production on 2026-08-22 —
+`PORTFOLIO_COMMIT` 9 positions/$30.27/sim_share 0.7906, then `PORTFOLIO_EXECUTED
+placed=5 duplicates=0` followed by `placed=0 duplicates=5`. Both artifacts were
+already `_keyvalue_backed`, so web could see them. **Nothing displayed either
+one.** The only way to read a committed position was to fetch JSON, which is not
+a way to track a portfolio in real time.
+
+`GET /portfolio/paper` + `GET /api/portfolio/paper`
+(`syndicate/blueprints/intelligence.py`, `templates/portfolio_paper.html`,
+`static/shared/paper_portfolio_pulse.js`). A pure read of the plan and the
+ledger, joined by `position_key`, polling every 45s on the established
+`portfolio_pulse.js` contract (server-renders first paint, JS re-renders the
+same blocks in place with the same format strings).
+
+**IT IS A SEPARATE PAGE ON PURPOSE, and this is the load-bearing decision.**
+`/portfolio` is the user's OWN logged bets. `portfolio_summary._is_user_placed_bet`
+exists precisely because auto-tracked model rows once flooded that page with
+1000+ "tracked plays" nobody had bet. Rendering simulated positions beside real
+ones would rebuild exactly that confusion with better formatting, and on a page
+about money the failure mode is someone believing a simulated fill was theirs.
+Each page links to the other and says which is which.
+
+**THE FOUR ABSENCE STATES STAY DISTINCT** — commit job off / no plan artifact /
+a plan that committed zero positions / positions whose orders were never placed.
+They have four different fixes and one shared "nothing here" would read as the
+first when it is usually the third. The zero-position case is labelled a
+decision, not a gap, and the refusal counts are shown beside it.
+
+**A LEDGER THAT CANNOT BE READ SAYS SO.** `execution_ledger._load()` RAISES
+rather than reading empty (`#512`); the page surfaces that as an explicit banner
+instead of an empty table, because "no bets" and "cannot see the bets" render
+identically and only one of them is safe. Orders whose position has since left
+the plan are shown as orphans rather than dropped — an order that was submitted
+must never disappear to make a page tidy.
+
+Also surfaced per position: `board_score`, the signed `stake_dollars_sim_delta`
+and `side_picked_by` from `#509`'s attribution, and plan-level
+`sim_share_of_staked` + `sim_coverage`. That is the decomposition `#509`/`#510`
+need to be readable at a glance rather than reconstructed from JSON.
+
+12 tests (`tests/test_portfolio_paper_page.py`), all four absence states plus
+the orphan and unreadable-ledger paths. **Local render only — production HTTP is
+unreachable from a Claude session (`state.md:2811`), so the deployed reading is
+owed: `/portfolio/paper` renders 200 with a non-empty positions table on a date
+where `PORTFOLIO_COMMIT` logged positions > 0.**
+
+### `#518` — **The remaining pytest failures are a DIFFERENT KIND from the 34 already fixed: guards that are RIGHT, firing on real drift in production code.** — categorised by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+
+`#517` fixed 34 failures and every one was a stale TEST — a test describing a
+contract the code had moved past. **The ~20 that remain are mostly the
+opposite**, and treating them the same way would mean deleting real signal.
+
+Categorised, so the next session does not have to rediscover which is which:
+
+**(a) GUARDS CORRECTLY REPORTING DRIFT — the test is right, the code moved.**
+Fixing these means changing production behaviour, and none of it is this lane's
+to decide:
+
+- `test_nfl_injuries_fetch_autorun` (2) — asserts the injuries fetch sits at
+  position <= 2 and directly behind the pbp fetch in the autorun dispatch
+  chain. It is now at 5: `nfl_fantasy_artifact` and `nfl_news_capture` were
+  inserted between them. Either the ordering guarantee still matters (restore
+  the order) or it does not (relax the guard) — a real call about what must run
+  before what on refresh-worker.
+- `test_slate_date_timezone_discipline` (1) — a repo-wide guard listing files
+  making timezone-ambiguous date calls. **4 new files** now do, among them
+  `syndicate/features/nfl/fantasy_news.py`. This is the guard doing exactly its
+  job; the fix is in those four files' date handling.
+- `test_probability_differential` (1) — registry-completeness. **6**
+  converter-shaped functions are neither in `REGISTRY` nor excused in
+  `NOT_A_SCALAR_CONVERTER`, including `scripts/soccer_market_prices_momentum.py:
+  american_to_prob`. Each needs a per-function judgement about whether it is a
+  scalar converter.
+
+**(b) A GENUINE SOURCE INCONSISTENCY, found while triaging.**
+`test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking`
+— `odds_history_paths_for_sport` returns `[shared, artifact, tracking]` and that
+assertion PASSES, but `load_odds_history_payload_for_sport` then returns
+`{"source": "tracking"}`. **The loader does not follow its own sibling's
+precedence.** Not investigated further; it is a one-line contradiction between
+two functions in `odds_control_plane.py`.
+
+**(c) STALE TESTS, the `#517` pattern, still worth taking.** The remaining
+singles across `test_generate_smartsim2_nfl_*`, `test_intelligence_state`,
+`test_memory_*`, `test_mlb_sim_run_reconcile`, `test_nba_refresh_runner`,
+`test_ops`, `test_refresh_worker` are undiagnosed but are the population `#517`
+kept finding.
+
+**(d) DELIBERATELY LEFT.** `test_wnba_refresh_runner` (2) — both turn on the
+input-hash refresh-decision gate that `wnba-live-odds-capture-gap` is rewriting.
+
+**WHY THIS MATTERS MORE THAN THE COUNT:** the baseline gate cannot tell (a)
+from (c). A guard firing on real drift and a test describing a dead contract
+are both "one more failing test", and only one of them should ever be made to
+pass by editing the test. Anyone driving the number to zero without this split
+will quietly delete the guards.
 
 ### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
 
@@ -1168,11 +1276,19 @@ path to shipping anything real — building the card threshold or fixing the hal
 wasted work until that lands.**
 
 **Do, in order:**
-1. Ingest FotMob momentum into production (`ingestion/fotmob_shots.py` already reads it; the ESPN↔FotMob
-   match-id join is the missing piece). This IS the signal — `momentum.py`'s ESPN proxy is not, per the
-   correction above.
-2. Once FotMob's series is live: card indicator colours NOTHING below |momentum| 40 on FotMob's 0-100 scale
-   (goal rate 0.93-0.99x of clock there); 60-80 = 1.19x, 80+ = 1.23x. Does not apply to the ESPN proxy.
+1. **BUILT + TESTED, NOT DEPLOYED `[2026-08-22, same session]`** — `ingestion/fotmob_match_id.py` (name+
+   ccode join, decoy-tested against the Canada/Brazil trap) + `ingestion/fotmob_momentum.py` (clock-bounded
+   fetch, never-fatal) wired into `poll_soccer_live_state.py` in place of the retired ESPN proxy. No fallback
+   to the proxy — a join/fetch miss now returns `supported: False` and the card hides the panel, same
+   contract as before. 21 new tests (14 unit + 7 pinning the card threshold boundaries). Commit `00c4b1b8`.
+2. **BUILT in the same commit** — `cards.py` `_momentum_chart` strength bands retuned from the old
+   ESPN-proxy-scale constants (1.0/2.5/5.0) to FotMob's measured 0-100 scale (40/60/80). Below 40 reads
+   "Balanced" even when nonzero.
+3. **OWED — deploy.** Behind the two-lock protocol (`deploy_claim.py` + `deploy_preflight.py`), needs
+   live-odds-worker (owns `poll_soccer_live_state.py`) redeployed at a SHA containing `00c4b1b8`, then
+   verified against an actual live match — the join has unit tests but has never resolved a REAL FotMob
+   fixture end-to-end. First live verification should log `fotmob_match_id` per resolved match and count
+   join misses; a silent 0% resolve rate would look identical to a quiet slate.
 4. A next-team-to-score model on the live card: logistic on signed FotMob momentum (60s), score diff, clock,
    home flag; surface P(home next)/P(away next) and edge vs next-goal / team-in-15 markets where quoted.
    EXCLUDE mls (AUC .509) and belgian_pro_league (.520) until fitted per league.

@@ -64,7 +64,7 @@ def _effective(monkeypatch, capsys, **env):
     # Drive through the configured override so the season calendar is not part
     # of the test -- this is about the ownership gate, not about who is in season.
     monkeypatch.setenv("SYNDICATE_LIVE_ODDS_REFRESH_SPORTS", env.pop("_sports"))
-    # `#514`. The weekly carve-out consults the real schedule adapter, whose answer
+    # `#520`. The weekly carve-out consults the real schedule adapter, whose answer
     # would otherwise depend on the calendar the suite happens to run on -- the
     # exact wall-clock time-bomb `test_layer2_shortlist_wiring.py` warns about.
     # Pinned per test. `None` means "do not patch", for the tests that predate the
@@ -104,7 +104,7 @@ def test_refresh_workers_real_env_keeps_only_the_weekly_sports_on_the_tick(monke
 
 
 def test_live_odds_workers_real_env_sweeps_its_three_plus_a_weekly_sport_with_games(monkeypatch, capsys):
-    """`#514` CORRECTED THIS TEST. Its old form asserted `nfl not in kept`.
+    """`#520` CORRECTED THIS TEST. Its old form asserted `nfl not in kept`.
 
     That assertion was true of the code and false of the system. On a day NFL has
     games, refresh-worker's `_active_weekly_sports_for_date` DROPS nfl -- on the
@@ -135,7 +135,7 @@ def test_live_odds_workers_real_env_sweeps_its_three_plus_a_weekly_sport_with_ga
 
 def test_a_weekly_sport_with_no_games_stays_excluded_by_active_sports(monkeypatch, capsys):
     """The carve-out is scoped to the claim, not to the sport. No games, no claim,
-    no override -- ACTIVE_SPORTS applies exactly as it did before `#514`, and the
+    no override -- ACTIVE_SPORTS applies exactly as it did before `#520`, and the
     sport stays with refresh-worker's 6-hourly autorun, which does still own it."""
     kept, _ = _effective(
         monkeypatch,
@@ -165,7 +165,7 @@ def test_strict_mode_restores_the_absolute_reading_of_active_sports(monkeypatch,
 
 @pytest.mark.parametrize("nfl_has_games", [True, False])
 def test_exactly_one_owner_writes_nfl_whether_or_not_it_has_games(monkeypatch, nfl_has_games):
-    """`#514` REPLACED THE OLD PARTITION TEST, which measured the wrong thing.
+    """`#520` REPLACED THE OLD PARTITION TEST, which measured the wrong thing.
 
     The old version compared `_live_refresh_loop_effective_sports` under each
     service's env and asserted the two lists were disjoint and covering. But this
@@ -272,7 +272,7 @@ def test_active_sports_still_excludes_an_UNCLAIMED_weekly_sport(monkeypatch, cap
     the service does not handle that sport at all. It still applies -- to every
     sport, and to a weekly sport too whenever the fast tick has not claimed it.
 
-    `#514` narrowed this from "always" to "unless claimed", and nothing wider.
+    `#520` narrowed this from "always" to "unless claimed", and nothing wider.
     """
     kept, _ = _effective(
         monkeypatch, capsys, _sports="nfl,mlb",

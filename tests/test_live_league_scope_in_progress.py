@@ -1,4 +1,4 @@
-"""`#514`. A league whose match is UNDER WAY must never be scoped out of the sweep.
+"""`#520`. A league whose match is UNDER WAY must never be scoped out of the sweep.
 
 WHY THIS EXISTS. Measured in production 2026-08-22 21:13:37Z:
 
@@ -181,7 +181,7 @@ def test_the_in_progress_league_becomes_due_even_though_it_has_no_next_fixture(m
 
     `mls` plays tonight and is due on the ladder. `primeira_liga` is playing RIGHT
     NOW and has nothing scheduled after it, so `_next_fixture_epoch_by_league`
-    returns nothing for it. Before `#514` the scope was `mls` alone.
+    returns nothing for it. Before `#520` the scope was `mls` alone.
     """
     today = loop.central_datetime_from_epoch(NOW).date().isoformat()
     _schedule(
@@ -238,7 +238,7 @@ def test_an_explicit_league_list_is_never_widened(monkeypatch):
 
 def test_liveness_failing_can_never_narrow_the_scope(monkeypatch):
     """The fail-open direction. If both signals blow up, the answer must be the
-    pre-`#514` answer -- never a scope with the live league removed."""
+    pre-`#520` answer -- never a scope with the live league removed."""
     today = loop.central_datetime_from_epoch(NOW).date().isoformat()
     _schedule(monkeypatch, {today: [_Event("mls:1", NOW + 1800)]})
 
