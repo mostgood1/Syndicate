@@ -1,5 +1,93 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#514` — **Live bets are limited because almost nothing REFRESHES a live price. Three separate scoping bugs, one gate. DIAGNOSED IN PRODUCTION 2026-08-22 21:0x–21:14Z, NOT FIXED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
+
+The user asked why so few live bets exist with soccer, MLB and NFL all in play.
+The board is not the cause — the gate is doing exactly what it should, on prices
+nobody is updating.
+
+**The gate.** `opportunity_gate.evaluate` (`syndicate/features/shared/opportunity_gate.py:255`):
+a row whose `game_state` resolves to `live` and whose `book_age_seconds` exceeds
+`LIVE_MARKET_MAX_AGE_SECONDS` (900s) returns `LANE_DEAD/live_market_stale`, and
+`layer2_board.build_layer2_rows` publishes `LANE_OPPORTUNITY` only
+(`layer2_board.py:1343`). So a live row on a 6-hour-old price is deleted, correctly.
+
+**The measurement** (`LAYER2_BOARD_HEALTH`, refresh-worker, 21:06:08Z and 21:14:43Z):
+
+| sport | rows | live_rows | live_proj | age_p50 |
+|---|---|---|---|---|
+| mlb | 400 | 37 | 21 | 487s (8m) |
+| nfl | 23 | 0 | 0 | 36,478s (10.1h) |
+| soccer | 400 | 0–3 | 0 | 23,941s (6.7h) |
+| wnba | 400 | 0 | 0 | 581s (10m) |
+
+MLB is the control: its live tier works, and its p50 is inside the 900s window.
+Everything else is outside it by 25–40×.
+
+**Cause 1 — nothing refreshes NFL odds at all.** `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`
+is `true` on live-odds-worker only (`render.yaml:857`; `false` on web `:147` and on
+refresh-worker `:501`). live-odds-worker excludes NFL. Affirmative reading, every
+tick:
+
+    [live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-22
+      kept=mlb,wnba,soccer
+      dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+
+The service that DOES have `SYNDICATE_ACTIVE_SPORTS=nfl` is refresh-worker, which is
+the one with the loop off. Neither owns it, so nobody does. Corroborated:
+`nfl_source/data/book_grid/book_grid_2026-08-22.json` logged
+`PUBLISH_SKIPPED_UNCHANGED checksum=155e7a2a5123` at 21:13:37Z and again at 21:14:48Z —
+the NFL grid is frozen, not slow. NFL's live LENS does run (refresh-worker,
+`live_lens_tick_after_nfl`), so this is odds-only.
+
+`SYNDICATE_ACTIVE_SPORTS` is **not in `render.yaml` on any service** — it is live-only
+drift, which is why this is invisible from the repo.
+
+**Cause 2 — soccer's per-league cadence structurally excludes the leagues that are
+playing.** `#440` Phase 1c scopes the soccer launch to "due" leagues via
+`_due_league_scope_text` → `_due_leagues_for_sport` → `_next_fixture_epoch_by_league`
+(`live_refresh_loop.py:4220`). That last function skips any fixture with
+`epoch <= now_epoch`, so a league whose match is UNDER WAY contributes no clock. Its
+candidate set is `sorted(by_league)`, so such a league is not "due", not "skipped" —
+it is **absent**, and the fail-open rule the docstring promises never fires.
+`_league_interval_from_epoch`'s `return None, "fixture_in_progress"` branch
+(`:4278`) is unreachable from this caller.
+
+Observed consequence, 21:13:37Z: one primeira_liga match live
+(`live_state_2026-08-22.json (1 live games, ...)`) while the launched command was
+
+    refresh_odds_sources.py --sports mlb,soccer --phase live --soccer-leagues mls
+
+MLS only. The nine European leagues sit on their last pregame capture — hence p50 6.7h,
+max 49,626s (13.8h).
+
+**Cause 3 — the tick is losing ticks to its own overrun.** Repeatedly, on live-odds-worker:
+
+    LIVE ODDS REFRESH SKIP/ERROR DETAIL: A refresh run is already active (pid=1827).
+    LIVE ODDS REFRESH TICK: False
+
+with `SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS=60`. Even the sports that ARE in
+scope refresh less often than configured. This is a throughput ceiling on top of the
+two scoping bugs, not an alternative to them.
+
+**What this is NOT.** Not the row cap (400/sport, raised earlier today — soccer and
+WNBA both fill it). Not the projection join (`#503` — soccer pregame joins at 53%).
+Not `live_rows` reading the wrong field: `market_state` IS copied onto published rows
+at `layer2_board.py:1697` and set only by `opportunity_gate.annotate`, so the counter
+is sound. MLB's 37 live rows on the same counter prove it discriminates.
+
+**Fix order, cheapest first.** (1) NFL: give the live-odds loop an owner for NFL —
+either add `nfl` to live-odds-worker's `SYNDICATE_ACTIVE_SPORTS` or enable the loop on
+refresh-worker. **Both are env changes; `SYNDICATE_ACTIVE_SPORTS` is live-only, so
+putting it in `render.yaml` fires `blueprint_sync` — see `#284`. Needs an explicit
+decision.** (2) Soccer: make an in-progress fixture due — either record `now_epoch` for
+a league with a started-but-unfinished fixture, or union the live-state leagues into the
+candidate set. Code-only, deployable normally. (3) Tick overrun: separate, measure first.
+
+**Not yet established:** whether soccer's live prices would clear the 900s gate even if
+refreshed — the books' own soccer live cadence is unmeasured. Fixing (2) is what makes
+that measurable.
+
 ### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
 
 **Not to be confused with `unsupported_market=40`, which prompted the look and
