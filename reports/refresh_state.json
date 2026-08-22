@@ -253,20 +253,20 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "6b651b92c283000eeecc4fe291e2b0c1209d48bbfee409c2c5581780ccbb28d2",
-      "updatedAt": "2026-08-03T15:56:12-05:00",
+      "inputHash": "8f7eaf519c0f663ea8572016cdead5ecabf434cecc18fceba5e0717f9cbfca4f",
+      "updatedAt": "2026-08-22T19:20:26-05:00",
       "outputs": [
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\current_week.json",
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\real_betting_lines_2026_10_01.json",
-        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle\\oddsapi_player_props_2026_wk4.csv"
+        "/tmp/tmpz7kz2l33/bundle/current_week.json",
+        "/tmp/tmpz7kz2l33/bundle/real_betting_lines_2026_10_01.json",
+        "/tmp/tmpz7kz2l33/bundle/oddsapi_player_props_2026_wk4.csv"
       ],
       "metadata": {
-        "artifact_root": "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpdai7n808\\bundle"
+        "artifact_root": "/tmp/tmpz7kz2l33/bundle"
       }
     },
     "nba_artifact_bundle::2026-05-22:1:1": {
-      "inputHash": "497109f04bc20997c737a42e82a9dc846556df12bdc42b99550027fc88f2de40",
-      "updatedAt": "2026-08-03T16:49:55-05:00",
+      "inputHash": "938c1357a1cc974ea5c37416f6343d356c48d1ae614319e7f1f8c26f125091a7",
+      "updatedAt": "2026-08-22T19:20:12-05:00",
       "outputs": [],
       "metadata": {
         "date": "2026-05-22",
@@ -375,17 +375,17 @@
       }
     },
     "mlb_live_lens:2026-05-22": {
-      "inputHash": "3f10207db9cc78db9e79b76d416c6ca2ffb346e6dca2904f261f1bb9e7ace335",
-      "updatedAt": "2026-08-05T02:07:40-05:00",
+      "inputHash": "157a87ee9b1bf8198d6c1af2084e8a25d9d0fe29b1f8a8ad571d4a32a5f40743",
+      "updatedAt": "2026-08-22T19:19:23-05:00",
       "outputs": [
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
+        "/tmp/tmpmxhyvy0w/source/data/live_lens/live_lens_report_2026_05_22.json",
+        "/tmp/tmpmxhyvy0w/source/data/live_lens/live_lens_2026_05_22.jsonl",
+        "/tmp/tmpmxhyvy0w/source/data/live_lens/prop_registry/live_prop_registry_2026_05_22.json"
       ],
       "metadata": {
         "date": "2026-05-22",
         "trigger": "syndicate_refresh",
-        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpmwyeonji\\source"
+        "source_root": "/tmp/tmpmxhyvy0w/source"
       }
     },
     "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp1_hka7q1\\bundle:2026-05-22:1:1": {
@@ -456,6 +456,68 @@
         "date": "2026-06-29",
         "reused": false,
         "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp9m8ygngq\\bundle"
+      }
+    },
+    "nba_artifact_bundle:/tmp/tmp36i630a9/bundle:2026-05-22:1:1": {
+      "inputHash": "1bbf57e60c97500fe85c59a3c67d2602a9e8f6cb6ee6f3029df5bc66e44f8f7d",
+      "updatedAt": "2026-08-22T19:20:12-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "/tmp/tmp36i630a9/bundle"
+      }
+    },
+    "nba_artifact_bundle:/tmp/tmpqwtgoi4_/bundle:2026-05-22:1:1": {
+      "inputHash": "425c4f9a3d8a0faaaae010bb86ef31fbeb206fa3681e5aeb6381e60331a6cd51",
+      "updatedAt": "2026-08-22T19:20:12-05:00",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "/tmp/tmpqwtgoi4_/bundle"
+      }
+    },
+    "ncaab_odds_current:2026-05-22": {
+      "inputHash": "6be4503f50d2b5665237c1be5fbae5746d04c4bbdf73a998e9867069bf24fee0",
+      "updatedAt": "2026-08-22T19:20:13-05:00",
+      "outputs": [
+        "/tmp/tmpwb04wypi/odds_history/odds_2026-05-22.csv"
+      ],
+      "metadata": {
+        "date": "2026-05-22",
+        "mode": "current",
+        "region": "us",
+        "bookmakers": "",
+        "markets": "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2",
+        "rows": 1
+      }
+    },
+    "ncaaf_artifact_bundle": {
+      "inputHash": "c2811fde25f48dcddcf93474b70ae8dee6c26473df5e73b49ce06461fdecf4a1",
+      "updatedAt": "2026-08-22T19:20:21-05:00",
+      "outputs": [
+        "/tmp/tmpnpzpcky5/bundle/college_football_schedule_2025_predicted_totals_enhanced.csv"
+      ],
+      "metadata": {
+        "artifact_root": "/tmp/tmpnpzpcky5/bundle",
+        "season": 2025
+      }
+    },
+    "nhl_artifact_bundle:2026-05-22": {
+      "inputHash": "6e9253bfe0fdb5ca32c6e7a717f1019deaf834636416efd3898d94f394b25ff6",
+      "updatedAt": "2026-08-22T19:20:27-05:00",
+      "outputs": [
+        "/tmp/tmpj0rproo8/bundle/data/processed/predictions_2026-05-22.csv",
+        "/tmp/tmpj0rproo8/bundle/data/processed/recommendations_sim_2026-05-22.csv",
+        "/tmp/tmpj0rproo8/bundle/data/processed/props_recommendations_2026-05-22.csv",
+        "/tmp/tmpj0rproo8/bundle/data/processed/roster_snapshot_2026-05-22.csv",
+        "/tmp/tmpj0rproo8/bundle/data/processed/lineups_2026-05-22.csv",
+        "/tmp/tmpj0rproo8/bundle/data/processed/starting_goalies_2026-05-22.csv"
+      ],
+      "metadata": {
+        "artifact_root": "/tmp/tmpj0rproo8/bundle",
+        "date": "2026-05-22"
       }
     }
   }

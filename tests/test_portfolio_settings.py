@@ -102,3 +102,21 @@ def test_the_settings_path_carries_no_date_token():
 def test_slate_ceiling_is_reported_in_dollars():
     settings, _ = ps.update_settings({"bankroll_units": 1000, "max_slate_exposure_fraction": 0.2})
     assert settings.max_slate_exposure_units() == pytest.approx(200.0)
+
+
+def test_a_write_that_does_not_land_is_reported_rather_than_read_as_saved(monkeypatch):
+    """A write that RAISES is easy. A write that returns cleanly and does not
+    land is the one that costs you -- and on a keyvalue backend with a payload
+    guard and an eviction policy, that is a real shape."""
+    swallowed = {}
+
+    def _swallow(path, payload):
+        swallowed["called"] = True  # accepted, then dropped on the floor
+
+    monkeypatch.setattr(ps, "write_json_file", _swallow)
+    settings, rejected = ps.update_settings({"bankroll_units": 3000})
+    assert swallowed.get("called") is True
+    assert "_store" in rejected
+    assert "write_not_durable" in rejected["_store"]
+    # And the caller is not handed a value that was never stored.
+    assert settings.bankroll_units != 3000.0

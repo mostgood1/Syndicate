@@ -97,21 +97,76 @@ Checked, not assumed:
    `prediction_ledger.py`) and I have not edited it. **Surfaced, not fixed** —
    see OPEN QUESTIONS.
 
-**UNVERIFIED:** I have not measured current Redis memory or eviction counts;
-the 96% / 34,529 / 38,865 figures are the store's own dated comments from
-2026-07-31 and 2026-08-10, not a reading taken today. A reading should be taken
-before Stage B chooses its storage.
+### THE UNVERIFIED LINE IS NOW DISCHARGED, AND IT REVERSES THE CONCLUSION
 
-**What this means for the plan:** Stage B's storage is an open decision with
-three candidates, none free — (i) a non-date-scoped keyvalue path, cheapest and
-weakest, still LRU-evictable; (ii) the artifact publisher's HTTP path
-(`artifact_publisher.py`) plus a `HOT_ARTIFACT_PATTERNS` allowlist entry, which
-is how every other cross-service artifact travels; (iii) a real Postgres, which
-is a `render.yaml` change and therefore a `blueprint_sync` that rewrites the
-whole env block on all three services and 502s every route for ~2 minutes
-(CLAUDE.md `#284`, measured 2026-08-08). **(iii) is the only one that is
-actually durable, and it is the one with a production blast radius.** Decide
-before building, not during.
+**Measured 2026-08-22T19:0xZ via the Render API, 24h at 1h resolution on
+`red-d88bvljbc2fs73epfhhg`:**
+
+| | ledger's dated figure | measured today |
+|---|---|---|
+| memory | 96% | **36.6%** — 98.2 MB of 268.4 MB |
+| 24h range | — | 83.5–118.1 MB, i.e. **31–44%** |
+| headroom | ~10 MB | **~170 MB** |
+| evicted keys | 34,529 (07-31), 38,865 (08-10) | not reachable via the metrics API; **at 37% of maxmemory nothing is being evicted** |
+
+`#324`'s `migration_runs/` exclusion did what it was built to do — it reclaimed
+the 211 MB backlog and the store has stayed in the low-40s ever since. **The 96%
+figure describes a state that has not held for two weeks**, and it was about to
+drive a Postgres decision with a three-service `blueprint_sync` blast radius.
+
+Also read off the live instance and NOT previously recorded anywhere:
+
+- `persistenceMode: journal_snapshot`. **This store is not a pure cache** — it
+  journals and snapshots to disk. That is a materially different durability
+  story from the one "it's a Redis cache" implies.
+- `maxmemoryPolicy: allkeys_lru`, Redis 8.1.4, plan `starter`.
+- **`maxmemoryPolicy` is NOT declared in `render.yaml`.** So changing it is a
+  dashboard/API edit, NOT a `blueprint_sync` — and it cuts the other way too: a
+  future sync could reset it, since the blueprint does not pin it.
+- **No Postgres instance exists in the account at all** (`list_postgres_instances`
+  → none), confirming the blueprint read.
+
+### THE DECISION, revised on that measurement
+
+**Postgres is not needed for Stage B.** Option (iii) was only compelling
+against a store at 96% with no headroom; against 170 MB of headroom with journal
+persistence it is a `blueprint_sync` bought for very little.
+
+**Recommended, in order of leverage:**
+
+1. **`allkeys_lru` → `volatile_lru` on `syndicate-refresh-state`.** One setting,
+   no deploy, no sync, no code change. It makes the eviction policy match the
+   TTL discipline the code already has: date-scoped keys carry TTLs and stay
+   evictable; keys with no TTL — the bankroll, the execution ledger,
+   `prediction_ledger.json` — become **structurally un-evictable** rather than
+   merely un-evicted at current usage. Render supports the value. **This is a
+   production change and is the user's call, not mine.**
+   *Caveat to state with it:* because the blueprint does not declare the policy,
+   a future `render.yaml` sync may reset it to the default. Pinning it in
+   `render.yaml` is itself a sync, so the two should be done together and
+   deliberately, or the policy re-checked after any sync.
+2. **No date token on anything that must not expire.** Already implemented and
+   pinned by a test for the settings path; Stage B's ledger inherits the rule.
+3. **Verify the write landed.** `update_settings` now reads back what it wrote
+   and reports `write_not_durable` rather than returning "saved" — a write that
+   raises is easy, a write that returns cleanly and does not land is the one
+   that costs you.
+4. **Belt-and-braces disk mirror for the Stage B ledger**, via the artifact
+   publisher and a `HOT_ARTIFACT_PATTERNS` entry, so a lost key is recoverable
+   rather than fatal. Worth it for the money record; not worth it for settings.
+
+**Still UNVERIFIED:** the actual `evicted_keys` / `keyspace_misses` counters.
+The metrics API exposes memory, not Redis INFO, so "nothing is being evicted" is
+an inference from 37% occupancy against maxmemory rather than a direct read. It
+is a sound inference and it is not a measurement.
+
+**Superseded by the measurement above** — kept because the reasoning is still
+the right shape, only its inputs were wrong. The three candidates were (i) a
+non-date-scoped keyvalue path, (ii) the artifact publisher plus a
+`HOT_ARTIFACT_PATTERNS` entry, (iii) a real Postgres. On the 96% figure only
+(iii) looked durable. On the measured 36.6% with journal persistence, **(i) plus
+(ii) as a recovery mirror is sufficient**, and (iii)'s `blueprint_sync` blast
+radius is avoided entirely.
 
 ---
 
@@ -202,6 +257,110 @@ so the test asserts the denominator: N shortlist rows in, K committed, K < N,
 and a named reason for every dropped row.
 
 **Cost: low. No new data, no new model, no deploy risk beyond a worker job.**
+
+---
+
+## THE SIM'S ROLE — measured, and the premise needs correcting
+
+**"Right now it's EV only" is true of RANKING and false of SIZING**, and the
+difference decides what work is worth doing.
+
+`_SCORE_SIM_WEIGHT = 0.0` means the simulation contributes nothing to which rows
+reach the shortlist or in what order. But Stage A's stake is driven by
+`model_edge_pct` — the sim's disagreement with the market — and **measured
+2026-08-22 on a representative row** (`ev_pct 4.5`, `model_edge_pct 3.2`, -110,
+reliability 0.82):
+
+    stake with the sim's edge      0.003132   ($3.13 of $1,000)
+    stake with the sim's edge = 0  0.001328   ($1.33) -- pure de-vig price edge
+    the sim's share of the stake   57.6%
+
+So **the simulation is already the majority owner of the money in a committed
+position**, while contributing exactly nothing to the ranking.
+
+**It is also what picks the side, because the ranking provably cannot.**
+`opportunity_signals.py:352-390` states this outright: at weight 0.0
+`blended_score` reduces to `ev_pct`, and EV against a proportional de-vig is
+`1/overround - 1` — **identical for every side of a market**. The shortlist
+therefore orders markets by hold and breaks ties arbitrarily (its opening
+production state: Famalicao/Estoril at `ev 8.6383` on draw -750, home +4500 and
+away +6000 alike). What actually chooses a side is Stage A's refusals: the wrong
+side sizes to zero Kelly and is dropped as `zero_kelly_stake`.
+
+### Why the answer is NOT to raise the weight
+
+That constant's own comment already argues this, and it is right:
+
+> *"There is NO value of this constant that produces a credible recommendation
+> board, because the missing input is `settled > 0`, not a coefficient. 0.5
+> grants authority we have not earned; 0.0 grants none and leaves a board that
+> cannot discriminate. Both are bad; only one is bad honestly."*
+
+It was zeroed because at 0.5 the sim term DOMINATED — `ev_pct ~ -5` against
+`model_edge ~ +12` across four independent market families, 286 of 300 rows — so
+the board was selecting *rows where an unvalidated model most disagrees with the
+market*, which is the worst possible rule if the model is miscalibrated.
+`opportunity_signals.py` is unclaimed by any open lane, so this lane COULD raise
+it. It should not: nothing has changed about the evidence.
+
+### What the comment asks for, and what Stage A now supplies
+
+The unlock condition is stated exactly once and has never been met:
+
+> *"TO RAISE IT AGAIN you need S6: `settled > 0` and **CLV decomposed BY
+> COMPONENT**, so the EV term and the sim term can be compared on outcomes
+> rather than on taste. That is what this constant's own comment below already
+> demanded, and **what nobody has been able to supply**."*
+
+Decomposing CLV by component requires knowing, per bet, **which component put
+the money there** — and nothing recorded that, so the condition could never be
+met however long settlement ran. `stake_attribution` in `portfolio_commit.py`
+now records it on every committed position:
+
+    stake_fraction            full, as committed
+    stake_fraction_ev_only    the identical row re-sized with model_edge_pct = 0
+    stake_fraction_sim_delta  the difference (SIGNED)
+    sim_share_of_stake        delta / full
+    side_picked_by            "simulation" when the EV-only counterfactual
+                              would not have been a bet at all
+
+The counterfactual is exact rather than estimated — re-size the same row with
+the sim's edge zeroed and what remains is the pure de-vig price edge. Plan-level
+totals carry `staked_dollars_sim_attributed`, `sim_share_of_staked`, and
+`positions_where_sim_picked_the_side`.
+
+**The delta is deliberately NOT clamped at zero.** A small negative sim edge
+still clears Kelly on a good enough price, so the sim can legitimately SHRINK a
+position without vetoing it. Clamping would credit the sim only where it helps,
+which is how a component gets credited for an edge it does not have.
+
+Worked example, three rows, $1,000 bankroll:
+
+    e3  ev 6.0  sim 0.5   $2.06   ev-only $1.77  sim $0.29   14.0%  side: price
+    e1  ev 4.5  sim 3.2   $3.13   ev-only $1.33  sim $1.80   57.6%  side: price
+    e2  ev -1.0 sim 6.0   $3.08   ev-only $0.00  sim $3.08  100.0%  side: SIM
+    ----------------------------------------------------------------------
+    staked $8.27 | sim-attributed $5.17 (62.5%) | sim picked the side on 1 of 3
+
+`e2` is the case that matters: a position that exists **only** because the model
+said so. When settlement lands, those are the bets whose CLV answers whether the
+sim has an edge — and until then they are exactly the bets to be most careful
+about.
+
+### So the order of work is unchanged, and now unblocked
+
+1. `#502`/`#504` land settlement → `settled > 0`.
+2. Stage C joins CLV against `attribution`, per component, per market.
+3. **Then** `_SCORE_SIM_WEIGHT` moves on a number instead of on taste — or
+   stays at 0.0 on a number, which is an equally good outcome and a far better
+   one than today's "nobody could ever check".
+
+**One thing that follows immediately, independent of settlement:** the comment
+insists that at weight 0.0 the board "must NOT be presented as *our model found
+these*". That is correct for the SHORTLIST. It is not correct for the PORTFOLIO
+— a committed position is sim-sized and sim-sided, and `sim_share_of_stake` says
+by how much, per bet. The `/portfolio` surface may say so; the Layer 2 board
+still may not.
 
 ---
 

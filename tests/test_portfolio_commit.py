@@ -373,3 +373,92 @@ def test_a_failing_input_checklist_blocks_the_plan_write(tmp_path, monkeypatch):
     # The evidence rides along, not just the verdict.
     assert any("model_probability" in line for line in result["failures"])
     assert not runner.portfolio_plan_path("2026-08-22").exists()
+
+
+# --------------------------------------------------------------------------
+# Sim/EV stake attribution -- the S6 input
+# --------------------------------------------------------------------------
+
+
+def _plan(rows, **settings_overrides):
+    return commit_portfolio(
+        rows, selected_date="2026-08-22", settings=_settings(**settings_overrides)
+    )
+
+
+def test_the_two_components_sum_to_the_committed_stake():
+    """If they do not sum, the decomposition is not a decomposition."""
+    position = _plan([_row()])["positions"][0]
+    attribution = position["attribution"]
+    assert attribution["stake_dollars_ev_only"] + attribution["stake_dollars_sim_delta"] == pytest.approx(
+        position["stake_dollars"], abs=0.02
+    )
+
+
+def test_a_row_with_no_sim_disagreement_attributes_nothing_to_the_sim():
+    attribution = _plan([_row(model_edge_pct=0.0)])["positions"][0]["attribution"]
+    assert attribution["stake_dollars_sim_delta"] == pytest.approx(0.0, abs=0.01)
+    assert attribution["sim_share_of_stake"] == pytest.approx(0.0, abs=1e-3)
+    assert attribution["side_picked_by"] == "price_shopping"
+
+
+def test_a_position_that_exists_only_because_of_the_sim_says_so():
+    """Negative EV alone, positive with the model. The whole stake is the sim's,
+    and the side was chosen by the model rather than by price shopping."""
+    attribution = _plan([_row(ev_pct=-1.0, model_edge_pct=6.0)])["positions"][0]["attribution"]
+    assert attribution["stake_dollars_ev_only"] == pytest.approx(0.0, abs=0.01)
+    assert attribution["sim_share_of_stake"] == pytest.approx(1.0, abs=1e-3)
+    assert attribution["side_picked_by"] == "simulation"
+
+
+def test_a_stronger_sim_edge_attributes_more_of_the_stake_to_the_sim():
+    weak = _plan([_row(model_edge_pct=1.0)])["positions"][0]["attribution"]
+    strong = _plan([_row(model_edge_pct=6.0)])["positions"][0]["attribution"]
+    assert strong["sim_share_of_stake"] > weak["sim_share_of_stake"]
+
+
+def test_plan_totals_aggregate_the_attribution():
+    rows = [
+        _row(event_id="e1", ev_pct=4.5, model_edge_pct=3.2),
+        _row(event_id="e2", ev_pct=-1.0, model_edge_pct=6.0),
+        _row(event_id="e3", ev_pct=6.0, model_edge_pct=0.5),
+    ]
+    totals = _plan(rows)["totals"]
+    assert totals["positions"] == 3
+    assert 0.0 < totals["sim_share_of_staked"] <= 1.0
+    assert totals["staked_dollars_sim_attributed"] <= totals["staked_dollars"]
+    # e2 is the only one the model alone put on the board.
+    assert totals["positions_where_sim_picked_the_side"] == 1
+
+
+def test_attribution_is_scaled_with_the_stake_not_left_at_pre_budget_size():
+    """The slate ceiling shrinks the committed stake; a counterfactual left at
+    its pre-budget size would exceed it and the split would stop summing."""
+    rows = [_row(event_id=f"e{index}") for index in range(8)]
+    plan = _plan(rows, max_slate_exposure_fraction=0.01)
+    assert plan["totals"]["slate_scale_factor"] < 1.0
+    for position in plan["positions"]:
+        attribution = position["attribution"]
+        assert attribution["stake_dollars_ev_only"] <= position["stake_dollars"] + 0.02
+        assert attribution["stake_dollars_ev_only"] + attribution["stake_dollars_sim_delta"] == pytest.approx(
+            position["stake_dollars"], abs=0.02
+        )
+
+
+def test_a_sim_edge_that_shrinks_a_position_is_recorded_as_negative_not_clamped():
+    """A small negative sim edge still clears Kelly on a good enough price, so
+    the sim SHRANK this bet without vetoing it. Clamping that to zero would
+    credit the sim only when it helps, which is how a component gets an edge it
+    has not earned."""
+    attribution = _plan([_row(ev_pct=8.0, model_edge_pct=-1.0)])["positions"][0]["attribution"]
+    assert attribution["stake_dollars_sim_delta"] < 0
+    assert attribution["sim_share_of_stake"] < 0
+
+
+def test_a_zero_sim_edge_attributes_exactly_zero_not_a_rounding_artifact():
+    """Regression: differencing a 5dp committed fraction against a 6dp
+    counterfactual reported 2e-06 as a 0.15% sim contribution on a row whose sim
+    edge was exactly zero."""
+    attribution = _plan([_row(model_edge_pct=0.0)])["positions"][0]["attribution"]
+    assert attribution["stake_fraction_sim_delta"] == 0.0
+    assert attribution["sim_share_of_stake"] == 0.0

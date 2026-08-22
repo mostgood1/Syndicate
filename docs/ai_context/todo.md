@@ -1,5 +1,101 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#506` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**Measured 2026-08-22T19:0xZ via the Render API**, 24h at 1h resolution on
+`red-d88bvljbc2fs73epfhhg` (`syndicate-refresh-state`):
+
+    memory      98.2 MB of 268.4 MB = 36.6%
+    24h range   83.5 - 118.1 MB  (31 - 44%)
+    headroom    ~170 MB
+
+`refresh_state_store.py:139-205` records 96% memory, 34,529 LRU-evicted keys and
+a 44% keyspace miss rate. **Those are 2026-07-31 and 2026-08-10 figures and have
+not held for two weeks** — `#324`'s `migration_runs/` exclusion reclaimed the
+211 MB backlog and the store has stayed in the low-40s since. The stale figure
+was about to drive a Postgres decision whose only delivery mechanism is a
+`render.yaml` push, i.e. a `blueprint_sync` across all three services (`#284`).
+
+**Read off the live instance and not previously recorded anywhere:**
+
+- `persistenceMode: journal_snapshot` — **this store is not a pure cache.** It
+  journals AND snapshots to disk. Materially different durability from what
+  "it's a Redis cache" implies, and nothing in the repo said so.
+- `maxmemoryPolicy: allkeys_lru`, Redis 8.1.4, plan `starter`.
+- **`maxmemoryPolicy` is NOT declared in `render.yaml`** — so changing it is a
+  dashboard/API edit and NOT a sync. It cuts both ways: a future sync could
+  reset it, because the blueprint does not pin it.
+- **No Postgres instance exists in the account** (`list_postgres_instances` →
+  none), confirming the blueprint read.
+
+**RECOMMENDED, and it is a production change so it is the user's call:**
+`allkeys_lru` → **`volatile_lru`**. One setting, no deploy, no sync, no code.
+It aligns eviction with the TTL discipline the code already has — date-scoped
+keys carry TTLs and stay evictable, while keys with NO TTL (the bankroll, the
+Stage B execution ledger, and `#502`'s `prediction_ledger.json`) become
+**structurally un-evictable** instead of merely un-evicted at today's usage.
+Render supports the value. Pinning it in `render.yaml` afterwards is itself a
+sync, so either do both deliberately together or re-check the policy after any
+future sync.
+
+**STILL UNVERIFIED:** actual `evicted_keys` / `keyspace_misses`. The metrics API
+exposes memory, not Redis INFO, so "nothing is being evicted" is an inference
+from 37% occupancy against maxmemory — sound, but an inference, not a reading.
+
+**ALSO SHIPPED against this:** `update_settings` now READS BACK what it wrote and
+reports `write_not_durable` instead of returning "saved". A write that raises is
+easy; a write that returns cleanly and does not land is the one that costs you,
+and on this backend (payload guard + eviction policy) that is a real shape.
+
+### `#507` — **The sim is ALREADY 57.6% of a committed stake and is what picks the side — while contributing 0.0 to the ranking. Stage A now records the per-bet decomposition `_SCORE_SIM_WEIGHT`'s own comment says nobody could supply.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**"The board is EV only" is true of RANKING and false of SIZING.** Measured
+2026-08-22 on a representative row (`ev_pct 4.5`, `model_edge_pct 3.2`, -110,
+reliability 0.82):
+
+    stake with the sim's edge      0.003132   ($3.13 of a $1,000 bankroll)
+    stake with the sim's edge = 0  0.001328   ($1.33) -- pure de-vig price edge
+    sim's share of the stake       57.6%
+
+**And the sim is what picks the side, because the ranking provably cannot.**
+`opportunity_signals.py:352-390`: at weight 0.0 `blended_score` reduces to
+`ev_pct`, and EV against a proportional de-vig is `1/overround - 1` — identical
+for every side of a market. The shortlist orders markets by hold and breaks ties
+arbitrarily. What chooses a side is Stage A's refusals: the wrong side sizes to
+zero Kelly and drops as `zero_kelly_stake`.
+
+**NOT FIXED BY RAISING THE WEIGHT, and this lane deliberately did not.**
+`opportunity_signals.py` is unclaimed and could have been edited. The constant's
+own comment is right that no value works — it was zeroed because at 0.5 the sim
+term DOMINATED (`ev ~ -5` vs `model_edge ~ +12`, 286 of 300 rows across four
+market families), selecting rows where an unvalidated model most disagrees with
+the market. Nothing about the evidence has changed.
+
+**WHAT SHIPPED INSTEAD — the stated unlock condition.** The comment names it
+once: *"S6: `settled > 0` and CLV decomposed BY COMPONENT ... what nobody has
+been able to supply."* Decomposing CLV by component needs to know, per bet,
+which component put the money there — and nothing recorded that, so the
+condition could never be met however long settlement ran.
+`stake_attribution` now emits, per committed position:
+`stake_fraction_ev_only` (the identical row re-sized with `model_edge_pct = 0`),
+`stake_fraction_sim_delta` (SIGNED), `sim_share_of_stake`, and `side_picked_by`
+— plus plan totals `staked_dollars_sim_attributed`, `sim_share_of_staked`,
+`positions_where_sim_picked_the_side`. The counterfactual is exact, not
+estimated.
+
+**The delta is deliberately NOT clamped at zero:** a small negative sim edge
+still clears Kelly on a good enough price, so the sim can legitimately SHRINK a
+position without vetoing it, and clamping would credit the sim only where it
+helps. Two tests pin both directions; a third pins a rounding regression where a
+5dp committed fraction differenced against a 6dp counterfactual reported 2e-06
+as a 0.15% sim contribution on a row whose sim edge was exactly zero.
+
+**A NUANCE FOR THE SURFACE:** the comment insists the Layer 2 board must not be
+presented as "our model found these" at weight 0.0. That stays true of the
+SHORTLIST. It is NOT true of the PORTFOLIO — a committed position is sim-sized
+and sim-sided, and `sim_share_of_stake` says by how much, per bet.
+
+
 ### `#505` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **The user asked whether the Layer 2 board / intelligence layer can be connected

@@ -1214,11 +1214,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      `bankroll_manager` property, so it is equally true of `_attach_board_stakes`
      on the Layer 1 pool: `confidence` does not move the served stake.** That
      file is read-only for this lane — recorded, NOT fixed.
+- **STORAGE RESOLVED `[measured 2026-08-22T19:0xZ, Render API]` — the ledger's
+  own figure was two weeks stale and reversed the decision.** The keyvalue
+  `red-d88bvljbc2fs73epfhhg` is at **36.6%** (98.2MB / 268.4MB), 24h range
+  83.5–118.1MB, **~170MB headroom** — not the 96% / 34,529-evicted that
+  `refresh_state_store.py:139-205` records from 2026-07-31. `#324` reclaimed it.
+  Also newly recorded: `persistenceMode: journal_snapshot` (**not a pure
+  cache** — it journals AND snapshots), `maxmemoryPolicy: allkeys_lru` which is
+  **NOT in `render.yaml`** (so changeable without a `blueprint_sync`, and
+  resettable BY one), and **no Postgres exists in the account**. **Therefore
+  Stage B does not need Postgres and the plan no longer carries a
+  three-service sync.** Recommended and NOT taken (production change, user's
+  call): `allkeys_lru` → `volatile_lru`, which makes no-TTL keys — the
+  bankroll, the Stage B ledger, `#502`'s `prediction_ledger.json` —
+  structurally un-evictable. STILL UNVERIFIED: `evicted_keys`/`keyspace_misses`;
+  the metrics API exposes memory, not Redis INFO. Full working: `todo.md #506`.
+- **SIM ROLE MEASURED, and the premise "the board is EV only" needed
+  correcting: it is true of RANKING and false of SIZING.** On a representative
+  row the sim owns **57.6%** of the stake (0.003132 vs 0.001328 with
+  `model_edge_pct` zeroed), and it is what **picks the side** — at
+  `_SCORE_SIM_WEIGHT = 0.0` `blended_score` reduces to `ev_pct`, which is
+  identical for every side of a market, so the shortlist cannot discriminate and
+  Stage A's `zero_kelly_stake` refusal does it instead. **Deliberately did NOT
+  raise the weight** (`opportunity_signals.py` is unclaimed, so this lane
+  could have): the constant's own comment is right that no value works, because
+  the missing input is `settled > 0`, not a coefficient. Shipped instead the
+  thing that comment says *"nobody has been able to supply"* — per-bet CLV
+  decomposition by component (`stake_attribution`: `stake_fraction_ev_only`,
+  signed `stake_fraction_sim_delta`, `sim_share_of_stake`, `side_picked_by`,
+  plus plan totals). The delta is NOT clamped at zero, because a small negative
+  sim edge can legitimately shrink a position and clamping would credit the sim
+  only where it helps. Full working: `todo.md #507`.
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
-  2500, `source` flips `default` -> `stored`). **No production slate has been
-  committed — do not report Stage A as working.**
+  2500, `source` flips `default` -> `stored`); 60 lane tests and 344 related
+  tests pass. **No production slate has been committed — do not report Stage A
+  as working.**
 - Files:
   `.syndicate/plan_2026-08-22_portfolio_execution.md`,
   `syndicate/features/shared/portfolio_settings.py`,

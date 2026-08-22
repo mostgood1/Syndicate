@@ -242,5 +242,25 @@ def update_settings(changes: Mapping[str, Any]) -> tuple[PortfolioSettings, dict
             # The write is the whole point of this call -- a failure here must
             # surface, not resolve to "saved" with the old value returned.
             rejected["_store"] = f"write_failed: {type(exc).__name__}: {exc}"
+        else:
+            # READ IT BACK. A write that raises is easy; a write that returns
+            # cleanly and does not land is the one that costs you -- and on this
+            # store that is a real shape, not a hypothetical: `write_json_file`
+            # routes to the keyvalue backend, whose payload guard can reject and
+            # whose policy can evict. Without this, "saved" and "silently did
+            # not save" are the same screen.
+            try:
+                stored_back, _ = _read_stored()
+                for name, value in payload.items():
+                    if name == "updated_at":
+                        continue
+                    if _coerce(name, stored_back.get(name)) != _coerce(name, value):
+                        rejected["_store"] = (
+                            f"write_not_durable: {name} read back as "
+                            f"{stored_back.get(name)!r}, expected {value!r}"
+                        )
+                        break
+            except Exception as exc:
+                rejected["_store"] = f"readback_failed: {type(exc).__name__}: {exc}"
 
     return resolve_settings(), rejected

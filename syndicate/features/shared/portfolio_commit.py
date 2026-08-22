@@ -342,7 +342,12 @@ def commit_portfolio(
             refuse("zero_kelly_stake")
             continue
         apply_price_reliability(candidate, inputs)
-        priced.append({"row": row, "inputs": inputs, "candidate": candidate})
+        attribution = stake_attribution(
+            row, inputs, settled_sample_size=samples.get(sport, 0)
+        )
+        priced.append(
+            {"row": row, "inputs": inputs, "candidate": candidate, "attribution": attribution}
+        )
 
     # Exposure budgeting BEFORE the count cut, so the per-game cap sees every
     # correlated leg rather than only the ones that survived truncation --
@@ -370,9 +375,11 @@ def commit_portfolio(
         slate_scale = ceiling / total_fraction
 
     positions: list[dict[str, Any]] = []
+    sim_dollars = 0.0
     for item in priced:
         row, inputs, candidate = item["row"], item["inputs"], item["candidate"]
         stake = dict(candidate.get("stake") or {})
+        pre_budget = _as_float(stake.get("stake_fraction_pre_exposure"))
         fraction = (_as_float(stake.get("stake_fraction")) or 0.0) * slate_scale
         dollars = round(fraction * resolved.bankroll_units, 2)
         if dollars < resolved.min_stake_units:
@@ -381,6 +388,34 @@ def commit_portfolio(
             # the sizer just said to bet least on.
             refuse("below_min_stake")
             continue
+        # Scale the EV-only counterfactual by whatever the budgeting and the
+        # slate ceiling did to the real stake, so the two are comparable at the
+        # size actually committed rather than at the pre-budget one.
+        raw = item["attribution"]
+        budget_scale = (fraction / pre_budget) if pre_budget else 1.0
+        # Quantise the counterfactual to the SAME precision the committed
+        # fraction carries. `apply_exposure_budgets` rounds to 5dp and
+        # `apply_price_reliability` to 6dp, and differencing across that
+        # mismatch reported a 2e-06 artifact as a 0.15% sim contribution on a
+        # row whose sim edge was exactly zero. A decomposition that invents a
+        # component out of rounding is worse than none.
+        ev_only = round(raw["_ev_only_basis"] * budget_scale, 5)
+        sim_delta = round(fraction - ev_only, 6)
+        # NOT clamped at zero. A small NEGATIVE sim edge still clears Kelly on a
+        # good enough price, so the sim can legitimately SHRINK a position it
+        # did not veto -- and that is exactly the kind of contribution S6 needs
+        # to be able to score. Clamping would hide the sim's losses and keep
+        # only its gains, which is how a component gets credited for an edge it
+        # does not have.
+        attribution = {
+            "stake_fraction_ev_only": ev_only,
+            "stake_fraction_sim_delta": sim_delta,
+            "sim_share_of_stake": round(sim_delta / fraction, 4) if fraction else None,
+            "stake_dollars_ev_only": round(ev_only * resolved.bankroll_units, 2),
+            "stake_dollars_sim_delta": round(sim_delta * resolved.bankroll_units, 2),
+            "side_picked_by": raw["side_picked_by"],
+        }
+        sim_dollars += attribution["stake_dollars_sim_delta"]
         quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
         position = {field: row.get(field) for field in _POSITION_IDENTITY_FIELDS}
         position.update(
@@ -404,6 +439,10 @@ def commit_portfolio(
                 "market_fair_probability": round(inputs.market_fair_probability, 5),
                 "price_reliability": round(inputs.price_reliability, 5),
                 "board_score": _score_value(row),
+                # THE S6 INPUT. See `stake_attribution` -- this is what lets
+                # settlement decompose CLV by component and is the stated
+                # condition for ever raising `_SCORE_SIM_WEIGHT` off 0.0.
+                "attribution": attribution,
                 # The full breadcrumb, so the number is inspectable rather than
                 # trusted: which Kelly fraction, shrunk by how much, on what
                 # settled evidence.
@@ -439,6 +478,15 @@ def commit_portfolio(
             ),
             "slate_scale_factor": round(slate_scale, 6),
             "slate_exposure_ceiling_dollars": round(resolved.max_slate_exposure_units(), 2),
+            # Plan-level answer to "how much of tonight's money is the model?"
+            # -- reportable on the surface, and the aggregate S6 needs.
+            "staked_dollars_sim_attributed": round(sim_dollars, 2),
+            "sim_share_of_staked": (
+                round(sim_dollars / staked_dollars, 4) if staked_dollars else None
+            ),
+            "positions_where_sim_picked_the_side": sum(
+                1 for item in positions if item["attribution"]["side_picked_by"] == "simulation"
+            ),
         },
         "rows_in": rows_in,
         "sized": len(priced),
@@ -446,6 +494,70 @@ def commit_portfolio(
         # account for every row it was given is not a plan.
         "refusals": dict(sorted(refusals.items())),
         "exposure": exposure,
+    }
+
+
+def stake_attribution(
+    row: Mapping[str, Any],
+    inputs: SizingInputs,
+    *,
+    settled_sample_size: int = 0,
+) -> dict[str, Any]:
+    """How much of this stake is the SIM, and how much is price shopping.
+
+    **This is the measurement `_SCORE_SIM_WEIGHT`'s own comment says nobody has
+    been able to supply.** That comment (`opportunity_signals.py:352-390`) sets
+    exactly one condition for raising the weight off 0.0: *"S6: `settled > 0`
+    and CLV decomposed BY COMPONENT, so the EV term and the sim term can be
+    compared on outcomes rather than on taste."* Decomposing CLV by component
+    requires knowing, per bet, which component put the money there. Nothing
+    recorded that, so the condition could never be met no matter how long
+    settlement ran.
+
+    The decomposition is exact rather than estimated, because the counterfactual
+    is available: re-size the identical row with the sim's edge set to zero.
+    What remains is the pure de-vig price edge -- the stake this position would
+    have carried on line shopping alone.
+
+        stake_fraction            full, as committed
+        stake_fraction_ev_only    the same row with model_edge_pct = 0
+        stake_fraction_sim_delta  the difference
+        sim_share_of_stake        delta / full
+
+    Measured 2026-08-22 on a representative row (`ev_pct 4.5`, `model_edge_pct
+    3.2`, -110, reliability 0.82): full 0.003132, EV-only 0.001328, **sim share
+    57.6%**. So the simulation is already the majority owner of the money in a
+    committed position, while contributing exactly nothing to the ranking.
+
+    **`side_picked_by` is the other half, and it matters more than the split.**
+    At `_SCORE_SIM_WEIGHT = 0.0` the ranking provably cannot pick a side: the
+    same comment shows `blended_score` reduces to `ev_pct`, and EV against a
+    proportional de-vig is `1/overround - 1`, IDENTICAL for every side of a
+    market. So the shortlist orders markets by hold and breaks ties arbitrarily.
+    What actually chooses a side downstream is THIS module's refusals -- a row
+    whose sim edge points the other way sizes to zero and is dropped as
+    `zero_kelly_stake`. When the EV-only counterfactual would also have been
+    positive, price shopping picked the side; when it would not, the sim did,
+    and the position exists only because the model said so.
+    """
+    ev_only_row = dict(row)
+    ev_only_row["model_edge_pct"] = 0.0
+    ev_inputs, _ = sizing_inputs_from_row(ev_only_row)
+    ev_only_fraction = 0.0
+    if ev_inputs is not None:
+        ev_candidate = sizing_candidate(ev_only_row, ev_inputs)
+        ev_candidate["stake"] = compute_board_stake(
+            ev_candidate, settled_sample_size=settled_sample_size
+        )
+        apply_price_reliability(ev_candidate, ev_inputs)
+        ev_only_fraction = _as_float((ev_candidate.get("stake") or {}).get("stake_fraction")) or 0.0
+    return {
+        "stake_fraction_ev_only": round(ev_only_fraction, 6),
+        # Filled in by the caller once exposure budgeting and the slate scale
+        # have run, so the numbers describe the stake actually committed rather
+        # than the pre-budget one.
+        "_ev_only_basis": ev_only_fraction,
+        "side_picked_by": "price_shopping" if ev_only_fraction > 0.0 else "simulation",
     }
 
 
