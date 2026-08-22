@@ -1,13 +1,171 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#503` — **Soccer's pregame projection join misses ~99.6% of the board, AND that one failure is also what makes every soccer LIVE row unpriceable. The report's live half was FALSE.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, INSTRUMENTED AND DEPLOYED (`e6002cdc`), CAUSE NOT YET NAMED
+### `#505` — **The settlement join matched on an id that changes every time the price moves. That is the `matched: 0` / `4,560 no_key_match`, and it is why `/portfolio` never settles.** — lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
+
+**`recommendation_id` is not an identity, it is a snapshot hash.**
+`record_recommendation` mints it as `_stable_id("rec", {...})` over
+`prediction_id` + the **whole recommendation payload** + `artifact_metadata`.
+`pipeline/intelligence_state.py:2028` already says the consequence out loud:
+those ids come "from a content hash of the full recommendation payload (incl.
+live odds/edge/probability)", so a rebuild "would mint a fresh 'new' pending row
+almost every cycle purely from ordinary price drift".
+
+The board re-records **150 recommendations per rebuild**
+(`BOARD_STATE_LEDGER_RECORDED`, live today). So:
+
+    user clicks a bet  -> stores the id on screen at that instant
+    price drifts       -> board mints a NEW id for the SAME wager
+    settlement decides -> settles the LATER snapshot, under the later id
+    the bridge joins   -> the two ids never meet
+
+That is the whole defect. It also explains the chunk sizes nobody liked
+(95-332MB/day): the same opportunities re-recorded under fresh ids all day.
+
+**This was mis-scoped for most of a session, mine included.** `#502` (the
+service split), `#503`'s window, `#504` (chain position) and the lookback widen
+are all real and all necessary — and none of them could ever have moved
+`parlays_settled` off 0, because the join underneath was matching on a value
+that does not survive a price tick. Chasing the schedule was chasing the wrong
+layer.
+
+**THE FIX — a second tier, not a replacement.**
+`ledger_bridge._settlement_identity()`: a stable, content-addressed key modelled
+on `clv_opening_ledger._opening_key`, which solves the same problem and reports
+`unkeyable=0` on 1,538 real rows today. Two differences from it, one chosen and
+one forced:
+
+- **bookmaker REMOVED, deliberately.** An outcome is book-independent; a price
+  is not. Keeping it would split one settled result across every book quoting it.
+- **segment REMOVED, forced.** The bet slip captures exactly
+  `recommendation_id, pick, line, event_id, game_date`. Segment is not among
+  them, so an identity carrying it could never match a portfolio bet at all.
+
+**AND THE REFUSAL THAT GOES WITH IT.** Dropping `segment` collapses a first-half
+and a full-game bet onto one key. `learnings.md` 2026-08-15 is explicit — *never
+treat equality of a LABEL as identity of a BET* — so `_outcome_by_identity`
+marks a key whose settled records DISAGREE as `_AMBIGUOUS` and **refuses to
+settle from it**, counted as `identity_ambiguous`. Records that AGREE are the
+normal case (one wager, many drifting ids) and collapse cleanly.
+
+Tier 1 (exact `recommendation_id`) is kept and tried first: when it matches
+there is no inference in it, and it costs nothing.
+
+**THE INSTRUMENT, which is half the value.** The old summary was
+`straight_settled / parlays_settled / skipped`, and `skipped: 25131` on
+2026-08-22 could not distinguish "the window held nothing settled" from "the ids
+drift". This repo's own note on the settlement join says the same thing —
+*"4,560 `no_key_match` of 8,276 with no per-reason breakdown deeper than the
+name"*. Now reported: `matched_by_id`, `matched_by_identity`, `index_sizes`
+(`by_id` / `by_identity` / `ambiguous`), and `skip_reasons`
+(`no_settled_match` / `unkeyable_bet` / `identity_ambiguous` /
+`parlay_legs_undecided`).
+
+**A SILENT NO-OP CAUGHT BEFORE IT SHIPPED.** The worker accumulated the bridge
+summary with `if isinstance(value, (int, float))`, which drops nested dicts on
+the floor — the entire breakdown would have been computed every run and reached
+**no log**. Fixed to merge one level deep, and the print truncation raised
+400 -> 1200 (a truncated JSON summary reads as valid while losing the counters
+that say why).
+
+Tests: `tests/test_ledger_bridge_identity_join.py` (15). **13 of 15 fail on the
+pre-fix code**; the 2 that pass either way assert unchanged behaviour (exact-id
+tier still wins; the parlay signature stays backward compatible). The existing
+`test_ledger_bridge.py` (11) passes untouched — this is additive.
+
+**NOT DEPLOYED, and the field mapping is a HYPOTHESIS until a real run reports
+on it.** `entity` is taken as the first of
+`player_name / player / name / team / selection` on both sides; that mapping is
+reasoned from the bet slip's own comments, not measured against production
+records, because the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`. **The breakdown above is what will falsify it**: a run
+returning `by_identity` large and `matched_by_identity: 0` means the mapping is
+wrong, and `unkeyable_bet` counts how many bets cannot key at all. That is the
+reading to take first, before any further tuning.
+
+### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED
+
+`#341` moved `_launch_autorun_reconciliation` to the front of the exclusive
+`elif` chain, on the argument that a **daily-gated INLINE** job wins at most one
+tick per 24h and so costs the refresh branches almost nothing. It left
+`_launch_autorun_evaluation_settlement` at the back, and seven NFL autoruns were
+later inserted ABOVE it. So the job that actually puts outcomes on `/portfolio`
+ended up **13th of 14 — further back than the job `#341` fixed.**
+
+**MEASURED 2026-08-22, which is why this is not a guess.** Settlement was enabled
+at 17:13Z and reached its branch **exactly once in 45 minutes**, at
+17:28:34.610Z — 0.65ms after `SOCCER_AUTORUN_SKIPPED reason=spacing_gate`. It got
+that tick by coincidence. At 18:00:16.855Z the chain stopped one branch short:
+
+    SOCCER_UNIT_LAUNCHED league=la_liga unit=1/44 due=12 spacing_seconds=300
+
+44 queued soccer units at one per 300s, plus `mlb_refresh` (9th) which this file
+already documents as winning "nearly every tick during a slate".
+
+**A DEAD END WORTH RECORDING: forcing it by interval does not work.**
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1200` was set and produced
+**ZERO** runs in ten minutes, then removed. The interval gate was never the
+blocker — chain position was. Cost: 2 restarts, 0 runs, 0 information.
+
+**MY OWN RECORD, CORRECTED TWICE.** I claimed starvation, retracted it on seeing
+the 17:28 run, and the truth is in between: settlement is **REACHABLE but
+CONTENDED**. "It ran once" and "it runs when needed" are different claims and I
+conflated them when I retracted. The retraction was as wrong as the original
+claim.
+
+**THE FIX:** settlement moved to directly behind reconciliation. It now precedes
+`mlb_refresh`, both weekly refreshes, and all seven NFL branches. The two
+adjacent branches are the two daily-gated inline evaluation jobs, in the order
+that matters — reconciliation emits `closing_lines_{date}.csv`, settlement and
+the bridge consume it.
+
+**WHERE THIS DIFFERS FROM `#341`, and it is a real caveat, not a formality:**
+reconciliation is cheap; settlement is not. One tick a day it can now block the
+loop during a slate while reading 95–332MB ledger chunks and, if records settle,
+rewriting a whole chunk per record. **The 2026-08-22 pass cost ~40MB / 71s but
+settled ZERO records, so the write path is STILL UNEXERCISED in production.**
+What bounds it: `EVALUATION_SETTLEMENT_LOOKBACK_DAYS` (now 7), and `#256`'s
+claim-before-work, which means a death mid-pass advances the epoch instead of
+hot-looping — the defect behind the 110 OOM kills of 2026-08-07.
+
+Tests: `tests/test_evaluation_settlement_autorun_ordering.py` (7). **3 of 7 fail
+on the pre-move code**, per the `off != on` rule; the 4 that pass either way
+assert invariants that must hold regardless (in-chain, no duplicate/dropped
+branch, daily-gated + inline + claim-before-work still true).
+
+One existing test needed its bound moved: `test_pbp_fetch_sits_high_in_the_chain`
+pinned `index <= 1`, now `<= 2` for the one permitted insertion — and
+**strengthened** while there, asserting directly that pbp precedes the
+high-frequency branches, which is the invariant the index was only a proxy for.
+The other 4 failures in that area are **PRE-EXISTING** — verified by running them
+against the pre-move code, where the same 4 fail.
+
+**NOT DEPLOYED.** It also lands in `scripts/run_refresh_worker.py`, which the
+ledger records as nominally belonging to lane `refresh-worker-oom-recurrence` —
+whose block is no longer in `lanes.md`, so no enforceable claim exists and
+`lane-guard` sees nothing. Flagged rather than ignored, because that lane's
+subject is refresh-worker OOM and this change moves an expensive job earlier.
+
+### `#503` — **Soccer team-name join: FIXED AND VERIFIED IN PRODUCTION (2,587 → 87 unmatched rows). The live `edged=0` is a SEPARATE plumbing gap and remains open, as does `unmatched_player`.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
 
 **Reported as:** "none of the soccer data from sims (pregame or live) is joining
 with the board."
 
-**The pregame half is true.** `rows_with_projection: 4` of ~1,142
-(`state.md`: "READ FIXED, JOIN NOT" — `#379`'s window widening took
-`matches_in_source` 3 -> 99 and moved the joined count by nothing).
+**THE PREGAME HALF IS ALSO FALSE, and the number I opened this on was stale.**
+First `PREGAME_PROJECTION_JOIN` reading, refresh-worker 2026-08-22 17:30:32Z:
+
+    considered=20013  projected=9598 (48%)  with_prob=8922
+    matches_in_source=95   ambiguous_keys=0
+    dates_read=[08-22..08-28]   leagues_indexed=all 10
+    unmatched_player=5138   unsupported_market=2691   unmatched_match=2586
+
+`state.md`'s "rows_with_projection still 4 of 1,142" was written before `#379`'s
+window widening actually ran in production. I carried it forward as current and
+built a diagnosis on it. **Corrected in `state.md`; do not reuse that figure.**
+
+**AND THE GAP IS NOT WHERE THE OLD ROW SAYS.** `unmatched_match` is 2,586 rows
+across only **12 distinct fixtures** — a team-name problem, but a small one.
+The dominant bucket is `unmatched_player: 5,138`, a PLAYER-identity problem on
+the scorer/shots markets. Those are different subsystems.
 
 **The live half is false, and production said so before anything was changed:**
 
@@ -19,8 +177,17 @@ live probability, and not one is priced. That is `LIVE_PROJECTION_JOIN`'s own
 third case — "joined, and declined to price" — and it has a different fix from a
 broken join.
 
-**THE TWO ARE ONE DEFECT, and this is the part worth keeping.** Traced through
-the code, not measured yet:
+**~~THE TWO ARE ONE DEFECT~~ — REFUTED BY THE SPLIT I BUILT TO CONFIRM IT.**
+
+18:04:56Z: `edge_withheld=133 edge_why={'no_fair_value_devig_failed': 133}`.
+**133 of 133 in the de-vig bucket, ZERO in the no-pregame-projection bucket.**
+
+I predicted the opposite. The hypothesis was that these rows carried no pregame
+projection, so `_price_against_market` never ran and no fair value was ever
+computed — making the live symptom downstream of the pregame join. Every one of
+those 133 rows HAS a pregame projection. The pregame join is not involved at
+all. The reasoning below is kept because it is sound about the MECHANISM and
+wrong about which branch fires:
 
   * `market_fair_prob_over` is written in exactly one place for soccer,
     `soccer_projections._price_against_market` (line ~638).
@@ -30,10 +197,43 @@ the code, not measured yet:
     (line 549) and refuses the edge when `market_fair_prob_over` is absent.
 
 So a row the PREGAME join missed can never carry a live edge, whatever the live
-re-sim does. 1,138 rows with no pregame projection is also 1,138 rows with no
-fair value for the live tier to price against. **Fix the name join and both
-symptoms go.** The reading that confirms it is `edge_why` on the live log line
-coming back dominated by `no_market_fair_value`.
+re-sim does.
+
+**THE ACTUAL CAUSE: THE FAIR VALUE EXISTS AND THE LIVE JOIN CANNOT SEE IT.**
+
+Soccer player-prop markets are quoted one-sided (over only), so
+`_no_vig_over_probability` — which needs both legs — returns None, and
+`market_fair_prob_over` is never set. That is expected and already handled:
+`attach_margin_model` fills one-sided rows from the book's measured margin.
+
+But the two halves write to different containers:
+
+    attach_margin_model      -> quote["fair_probability"] / quote["fair_method"]
+                                (`layer2_board.py:1097`, `"book_margin_model"`)
+    live_projection_join     -> reads projection["market_fair_prob_over"]
+                                (`live_projection_join.py:718`)
+
+`market_fair_prob_over` is written in exactly three places platform-wide
+(`prop_projections:952`, `soccer_projections:638`, `nfl_game_projections:416`),
+all from `_no_vig_over_probability`. The margin model's answer never reaches
+the field the live edge reads. One number, two homes, and they do not meet.
+
+**NOT FIXED HERE, DELIBERATELY.** Making the live join fall back to the quote's
+`book_margin_model` fair value is a PRICING change, not an instrument one, and
+`layer2_board.py:587-604` already carries deliberate policy treating that value
+as an ESTIMATE rather than a measured fair — a 4.5% moneyline hold vs 12% on
+props, per `book_margin_model`'s own docstring. Wiring it through without
+honouring that distinction would publish estimate-derived edges as though they
+were measured. Needs its own decision.
+
+**STILL AMBIGUOUS, and instrumented in the follow-up:** `no_market_fair_value`
+covers two states with different owners — a row with NO pregame projection
+(`_price_against_market` never ran) versus a row WITH one whose market is
+one-sided so de-vig has no answer. Split into
+`no_fair_value_no_pregame_projection` and `no_fair_value_devig_failed`,
+discriminated on the pregame `basis` snapshotted at entry (the live tier
+overwrites `basis` with `live_resim`, so reading it later would classify every
+row as "had a pregame projection" — stable and wrong).
 
 **SHIPPED (`e6002cdc`, refresh-worker live 17:09:28Z) — instruments only, no
 join behaviour touched:**
@@ -55,9 +255,99 @@ no quote side at all. `#374` added five vendor aliases and its note is explicit
 that each was verified against a real fixture. Writing aliases off a guess would
 be the same mistake with a worse audit trail.
 
-**NEXT ACTION:** read the two log lines from refresh-worker, then either add
-verified entries to `_SOCCER_VENDOR_NAME_ALIASES` (name-miss case) or take it to
-the producer (league-not-simulated case). `unmatched_by_league` decides which.
+**THE SIM-SIDE SAMPLE SHIPPED USELESS AND IS FIXED.** It sorted every indexed
+fixture alphabetically and took 12, so the first reading answered about
+belgian_pro_league / bundesliga / championship while every league with real
+misses (epl 510, la_liga 972, serie_a 606, ligue_1 240, mls 247) fell off the
+end — 11 of the 12 board-side fixtures had no sim-side counterpart to pair
+against. Now scoped to the leagues that actually miss, with a per-league quota.
+One pair WAS fully visible and is confirmed: board
+`belgian_pro_league|Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
+
+## VERIFIED 18:31:07Z — before and after, same log line, 26 minutes apart
+
+| metric | before | after |
+|---|---|---|
+| `rows_with_projection` | 9,598 / 20,014 (48.0%) | **10,684 / 20,028 (53.3%)** |
+| `rows_with_true_probability` | 8,922 | **9,905** |
+| `unmatched_match_rows` | 2,587 | **87** (−96.6%) |
+| `unmatched_fixtures` | 12 | **3** |
+| `unmatched_by_league` | belgian 5, epl 510, la_liga 972, ligue_1 240, mls 247, primeira 6, serie_a 607 | **ligue_1 81, primeira_liga 6** |
+
+**+1,086 rows projected; five leagues to exactly zero.** `matches_in_source`
+(95) and `ambiguous_keys` (0) unchanged, so the index did not move underneath
+the measurement.
+
+**The three survivors were PRE-REGISTERED as not-name-problems** before the
+reading, so the result could not be rationalised afterwards:
+
+- `ligue_1|Paris Saint Germain v Rennes` (81 rows) — the board carries BOTH
+  directions of this fixture; the sim has only `Stade Rennais v
+  Paris Saint-Germain` (Rennes home). **An odds-side data question**, and the
+  one genuinely new finding from this reading.
+- `primeira_liga|CF Estrela v Braga`, `Moreirense FC v Benfica` (6 rows) —
+  neither club appears in the sim's primeira_liga slate at all. Producer gap.
+
+**LOOKS LIKE A REGRESSION AND IS NOT:** `unmatched_player` 5,138 → 6,057 and
+`unsupported_market` 2,691 → 3,200. Both sit DOWNSTREAM of the match join — rows
+formerly rejected at the match stage now reach the player and market stages. The
+buckets did not grow; the population reaching them did.
+
+---
+
+**SIX ALIASES SHIPPED (`2b0b708b`), each quoted off a production line.** The
+17:36:42Z reading was for the **08-23** window, and its (still alphabetical)
+sample happened to include `bundesliga` — so board and sim spellings for a
+second league were pairable without waiting for the scoped sample:
+
+    board                 sim                    league
+    Royal Antwerp         Antwerp                belgian_pro_league
+    1. FC Köln            FC Cologne             bundesliga
+    Hamburger SV          Hamburg SV             bundesliga
+    FSV Mainz 05          Mainz                  bundesliga
+    SC Paderborn          SC Paderborn 07        bundesliga
+    Union Berlin          1. FC Union Berlin     bundesliga
+
+REACHABILITY MEASURED FIRST: **0 of 5 fixtures join without these entries, 5 of
+5 with them**, and the off-run reproduces the five production fixture strings
+character for character. TSG Hoffenheim / Borussia Dortmund / Eintracht
+Frankfurt / Genk↔Racing Genk sit in the same broken fixtures, already match, and
+are deliberately NOT in the map — a working entry buys nothing and hides which
+ones are load-bearing.
+
+`Royal Antwerp v Genk` is the worked example of why one alias is worth hundreds
+of rows: Genk matched fine, but `match_for` requires BOTH sides, so the whole
+fixture was lost. Fixtures are the unit of loss, not clubs. bundesliga was 401
+unmatched rows across 4 fixtures on the 08-23 window and 4 of those are these.
+
+**STILL OPEN, in priority order:**
+
+1. **The one-sided fair value never reaching the live edge** (above). This is
+   what `edged=0` actually is, and it is a decision, not a diagnosis.
+2. **`unmatched_player: 6,057`** — now unambiguously the largest bucket, and it
+   GREW because the match join got better. Untouched. Not the cause of
+   `edged=0`.
+3. **The board carries both directions of `PSG v Rennes`** (81 rows). New,
+   small, and an odds-side question rather than a projection one.
+4. **DONE AND VERIFIED** — 13 aliases, `unmatched_match` 2,587 → 87.
+
+**WHAT SLOWED THE READINGS — measured, and smaller than it first looked.** The
+Layer 2 shortlist runs at the END of a full intelligence-state cycle. From a
+COLD boot the first one takes 10-19 minutes; once warm it settles to every 4-6:
+
+    mlb     17:28:20  17:32:21  17:38:06
+    soccer  17:30:32  17:36:42  17:39:37
+
+Peer deploys SIGTERM the worker and restart that cold clock — 17:09:28,
+17:17:30, 17:42:09, 17:52:07 — so with deploys ~10 min apart you get roughly one
+warm cycle between them, not none.
+
+**An earlier draft of this entry said "the shortlist completed once in 34
+minutes" and that was wrong.** It counted only SOCCER lines across a window that
+began before `PREGAME_PROJECTION_JOIN` existed (the code went live 17:09:28), so
+the absence before that point was the log line not existing, not the cycle not
+running. Corrected here rather than left, because inheriting a wrong cadence
+figure is exactly what the `4-of-1,142` correction above is about.
 
 **Cross-lane note:** `soccer_projections.py` is listed in `soccer-board-parity`,
 which is OPEN but UNOWNED. Claimed narrowly and recorded in `lanes.md`.

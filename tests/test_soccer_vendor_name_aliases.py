@@ -1,100 +1,218 @@
-"""`#374` -- five clubs the odds feed spells differently from the team artifacts.
+"""The six `#503` aliases, each quoted from a production log line.
 
-Found while chasing why belgian_pro_league sat at 5/43 after its unit demonstrably
-WROTE. The sim was fine; the join was not.
+`#374` added five vendor aliases and its note is explicit that each was
+"verified against a real 0-projection fixture on the served board where the sim
+HAD the match under its own name". Finding those meant fetching the served
+board, then the sim artifacts, then diffing by hand.
 
-THE CLEANEST PROOF OF THE CLASS is `SK Beveren`. On 2026-08-16, three of four
-belgian fixtures projected and one did not -- same league, same date, same sim
-file, same everything except that the club was renamed from Waasland-Beveren in
-2022 and the artifacts still carry the old name. Nothing else can explain a
-single fixture failing among its own siblings.
+`PREGAME_PROJECTION_JOIN` now prints the BOARD spelling and the SIM spelling of
+the same unmatched fixture on one line, so the six below are quoted from two
+readings (refresh-worker 2026-08-22 17:36:42Z and 17:39:37Z) rather than
+reconstructed. That distinction is the whole point: an earlier pass in this same
+session guessed `Inter Milan`/`Internazionale` from the git mirror and was
+right, and guessed nothing else usefully, because the mirror carries no quote
+side at all.
 
-NOT A SWEEP. 23 board clubs are missing from the derived alias map and most join
-anyway, because the projection index also matches on the normalised name
-directly. Only a club the SIM SPELLS DIFFERENTLY actually costs a fixture, so
-each entry here is tied to an observed 0-projection fixture where the sim held
-the match under its own name.
+WHAT THIS FILE PINS, and why each part is separate:
 
-TWO CANDIDATES WERE REJECTED, and they matter as much as the five kept:
-`Real Salt Lake`/`Austin FC` (0.17) and `Los Angeles FC`/`Chicago Fire FC` (0.41)
-came from a substring heuristic that matched on the token "FC". They are
-different fixtures entirely. A similarity score is a filter for candidates, not
-the decision -- which cuts both ways: `New York Red Bulls`/`Red Bull New York`
-scores 0.46, below those rejects, and is kept because MLS has exactly one such
-club and the identity is not in doubt.
+  * REACHABILITY FIRST (`off != on`). The model-engine standard requires it for
+    anything behind a switch, and an alias map is exactly that: a wrong entry
+    and a missing entry both render as a blank projection. The fixture test
+    below asserts 0/5 without these entries -- if someone deletes them and the
+    test still passes, the test was never measuring them.
+  * BOTH SIDES OF EACH PAIR. `canonical_team` must return None for the board
+    spelling before, and the club after. A pair where the sim side does NOT
+    resolve is an alias pointing at nothing, which fails silently.
+  * THE PAIRS THAT ALREADY WORKED ARE ASSERTED TOO, and are NOT in the map.
+    Adding a working pair buys nothing and hides which entries are
+    load-bearing.
 """
 
 from __future__ import annotations
 
-import pytest
+import json
+from pathlib import Path
 
-from syndicate.features.shared.team_aliases import _soccer_alias_to_name, teams_match
-
-
-@pytest.fixture(autouse=True)
-def _fresh_alias_map():
-    # The map is lru_cached and built from artifacts; a stale cache would make
-    # these assertions describe a map the process built before the edit.
-    _soccer_alias_to_name.cache_clear()
-    yield
-    _soccer_alias_to_name.cache_clear()
-
-
-@pytest.mark.parametrize(
-    "board_name,sim_name",
-    [
-        ("SK Beveren", "Waasland-Beveren"),
-        ("FC Twente Enschede", "FC Twente"),
-        ("FC Zwolle", "PEC Zwolle"),
-        ("Real Racing Club de Santander", "Racing Santander"),
-        ("New York Red Bulls", "Red Bull New York"),
-    ],
+from syndicate.features.shared.soccer_projections import (
+    attach_soccer_projections,
+    load_soccer_projections,
 )
-def test_the_odds_feed_name_joins_to_the_sim_name(board_name, sim_name):
-    assert teams_match("soccer", board_name, sim_name)
+from syndicate.features.shared.team_aliases import canonical_team, teams_match
+
+DATE = "2026-08-23"
+
+# (league, board spelling, sim spelling) -- both quoted from the same log line.
+REPAIRED = [
+    ("belgian_pro_league", "Royal Antwerp", "Antwerp"),
+    # From the 18:04:56Z reading -- the first taken with the sim-side sample
+    # SCOPED to the leagues that actually miss. The unscoped version could only
+    # answer about alphabetically-early leagues; scoping it made all twelve
+    # unmatched fixtures pairable in one line.
+    ("epl", "Brighton and Hove Albion", "Brighton & Hove Albion"),
+    ("la_liga", "Athletic Bilbao", "Athletic Club"),
+    ("la_liga", "Deportivo La Coruña", "Deportivo"),
+    ("ligue_1", "Rennes", "Stade Rennais"),
+    ("mls", "Los Angeles FC", "LAFC"),
+    ("serie_a", "Atalanta BC", "Atalanta"),
+    ("serie_a", "Inter Milan", "Internazionale"),
+    ("bundesliga", "1. FC Köln", "FC Cologne"),
+    ("bundesliga", "Hamburger SV", "Hamburg SV"),
+    ("bundesliga", "FSV Mainz 05", "Mainz"),
+    ("bundesliga", "SC Paderborn", "SC Paderborn 07"),
+    ("bundesliga", "Union Berlin", "1. FC Union Berlin"),
+]
+
+# Spellings the two feeds already agreed on, from the same fixtures. Present so
+# a future change that "fixes" them by adding map entries is visibly redundant.
+ALREADY_MATCHED = [
+    ("bundesliga", "TSG Hoffenheim", "TSG Hoffenheim"),
+    # `Paris Saint Germain` vs `Paris Saint-Germain`: the hyphen is removed by
+    # normalisation, so no entry is needed. Asserted because it LOOKS like the
+    # same class of problem as the seven above and is not.
+    ("ligue_1", "Paris Saint Germain", "Paris Saint-Germain"),
+    ("la_liga", "Málaga", "Málaga"),
+    ("bundesliga", "Borussia Dortmund", "Borussia Dortmund"),
+    ("bundesliga", "Eintracht Frankfurt", "Eintracht Frankfurt"),
+    # Matches on the shared-suffix heuristic, with no map entry.
+    ("belgian_pro_league", "Genk", "Racing Genk"),
+]
+
+# The five fixtures production named, spelled as each feed spells them.
+FIXTURES = [
+    ("belgian_pro_league", ("Royal Antwerp", "Genk"), ("Antwerp", "Racing Genk")),
+    ("epl", ("Brighton and Hove Albion", "Aston Villa"), ("Brighton & Hove Albion", "Aston Villa")),
+    ("la_liga", ("Athletic Bilbao", "Sevilla"), ("Athletic Club", "Sevilla")),
+    ("la_liga", ("Barcelona", "Athletic Bilbao"), ("Barcelona", "Athletic Club")),
+    ("la_liga", ("Málaga", "Deportivo La Coruña"), ("Málaga", "Deportivo")),
+    ("ligue_1", ("Rennes", "Paris Saint Germain"), ("Stade Rennais", "Paris Saint-Germain")),
+    ("mls", ("Los Angeles FC", "Portland Timbers"), ("LAFC", "Portland Timbers")),
+    ("serie_a", ("Atalanta BC", "Sassuolo"), ("Atalanta", "Sassuolo")),
+    ("serie_a", ("Inter Milan", "Monza"), ("Internazionale", "Monza")),
+    ("bundesliga", ("1. FC Köln", "TSG Hoffenheim"), ("FC Cologne", "TSG Hoffenheim")),
+    ("bundesliga", ("Borussia Dortmund", "Hamburger SV"), ("Borussia Dortmund", "Hamburg SV")),
+    ("bundesliga", ("FSV Mainz 05", "SC Paderborn"), ("Mainz", "SC Paderborn 07")),
+    ("bundesliga", ("Union Berlin", "Eintracht Frankfurt"), ("1. FC Union Berlin", "Eintracht Frankfurt")),
+]
 
 
-@pytest.mark.parametrize(
-    "left,right",
-    [
-        # The two the heuristic got wrong -- different fixtures sharing "FC".
-        ("Real Salt Lake", "Austin FC"),
-        ("Los Angeles FC", "Chicago Fire FC"),
-        # Same fixture, opposing clubs: must never collapse into each other.
-        ("SK Beveren", "Anderlecht"),
-        # Two Dutch clubs whose new aliases both mention a city-less stem.
-        ("FC Zwolle", "FC Twente"),
-        ("Racing Santander", "Real Madrid"),
-    ],
-)
-def test_the_new_aliases_create_no_false_matches(left, right):
-    assert not teams_match("soccer", left, right)
+def _index(tmp_path: Path):
+    by_league: dict[str, list[tuple[str, str]]] = {}
+    for league, _board, sim in FIXTURES:
+        by_league.setdefault(league, []).append(sim)
+    for league, sims in by_league.items():
+        path = tmp_path / league / "api" / "recommendations" / f"recommendations_{DATE}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "league": league,
+                    "generated_at": "2026-08-22T17:00:00",
+                    "matches": [
+                        {
+                            "match_id": f"{league}-{i}",
+                            "event_id": f"espn-{league}-{i}",
+                            "league": league,
+                            "matchup": {"home_team": home, "away_team": away},
+                            "win_probability": {"home": 0.45, "draw": 0.28, "away": 0.27},
+                        }
+                        for i, (home, away) in enumerate(sims)
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+    return load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
 
-def test_every_alias_target_resolves_in_the_derived_map():
-    """An entry whose target does not resolve is SILENTLY DROPPED.
-
-    `_soccer_alias_to_name` only applies an override when the espn-side name is
-    already in the map (`if canonical:`). A typo on the right-hand side
-    therefore fails closed and invisibly -- the alias simply never exists, and
-    the fixture keeps rendering blank with no error anywhere.
-    """
-    from syndicate.features.shared.team_aliases import (
-        _SOCCER_VENDOR_NAME_ALIASES,
-        fold_accents,
-        normalize,
-    )
-
-    mapping = _soccer_alias_to_name()
-    unresolved = [
-        f"{vendor} -> {espn}"
-        for vendor, espn in _SOCCER_VENDOR_NAME_ALIASES.items()
-        if not (mapping.get(normalize(espn)) or mapping.get(fold_accents(espn)))
+def _grid():
+    return [
+        {
+            "sport": "soccer",
+            "kind": "game",
+            "market": "h2h",
+            "league": league,
+            "event_id": f"oddsapi-{i}",
+            "home_team": board[0],
+            "away_team": board[1],
+            "line": None,
+        }
+        for i, (league, board, _sim) in enumerate(FIXTURES)
     ]
-    assert not unresolved, f"alias targets that resolve to nothing: {unresolved}"
 
 
-def test_the_existing_aliases_still_work():
-    # Regression guard on the four that predate `#374`.
-    assert teams_match("soccer", "Sint Truiden", "Sint-Truidense")
-    assert teams_match("soccer", "Sporting Lisbon", "Sporting CP")
+def test_every_repaired_pair_now_names_one_club() -> None:
+    for league, board, sim in REPAIRED:
+        assert teams_match("soccer", board, sim), f"{league}: {board!r} != {sim!r}"
+
+
+def test_the_sim_side_of_every_alias_resolves_to_a_real_club() -> None:
+    """An alias whose TARGET does not resolve is an entry pointing at nothing.
+
+    `_soccer_alias_to_name` only registers a vendor alias when
+    `mapping.get(normalize(espn_name))` finds something, so a typo in the value
+    makes the whole entry a silent no-op.
+    """
+    for league, _board, sim in REPAIRED:
+        assert canonical_team("soccer", sim) is not None, f"{league}: sim side {sim!r} unresolvable"
+
+
+def test_the_pairs_that_already_agreed_are_not_in_the_map() -> None:
+    """They match without help, so an entry would be dead weight that reads as live."""
+    from syndicate.features.shared.team_aliases import _SOCCER_VENDOR_NAME_ALIASES
+
+    for league, board, sim in ALREADY_MATCHED:
+        assert teams_match("soccer", board, sim), f"{league}: {board!r} != {sim!r}"
+        assert board.lower() not in _SOCCER_VENDOR_NAME_ALIASES, board
+
+
+def test_one_bad_name_costs_the_WHOLE_fixture() -> None:
+    """`match_for` requires both sides, which is why one alias recovers 500+ rows.
+
+    `Royal Antwerp v Genk` missed although Genk matches fine. Stated as a test
+    because it is the non-obvious economics of this map: fixtures are the unit
+    of loss, not clubs.
+    """
+    assert teams_match("soccer", "Genk", "Racing Genk")
+    assert not teams_match("soccer", "Royal Antwerp", "Racing Genk")
+
+
+def test_all_five_production_fixtures_join(tmp_path: Path) -> None:
+    coverage = attach_soccer_projections(_grid(), _index(tmp_path))
+    assert coverage["rows_with_projection"] == len(FIXTURES), coverage["unmatched_fixture_sample"]
+    assert coverage["unmatched_match_rows"] == 0
+    assert coverage["unmatched_fixture_sample"] == []
+
+
+def test_REACHABILITY_without_the_map_entries_none_of_them_join(tmp_path: Path, monkeypatch) -> None:
+    """off != on. Without this, the test above passes on a map that does nothing.
+
+    Measured against the real map: 0 of 5 join without these entries, 5 of 5
+    with them, and the unmatched fixture strings reproduce the production line
+    character for character.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(aliases, "_SOCCER_VENDOR_NAME_ALIASES", {}, raising=True)
+    aliases._soccer_alias_to_name.cache_clear()
+    try:
+        coverage = attach_soccer_projections(_grid(), _index(tmp_path))
+        # `Paris Saint Germain`/`Paris Saint-Germain` normalises without the
+        # map, so the ligue_1 fixture still joins on the AWAY side -- but
+        # `Rennes`/`Stade Rennais` does not, and `match_for` needs both. Every
+        # fixture here is lost without the map.
+        assert coverage["rows_with_projection"] == 0
+        assert coverage["unmatched_match_rows"] == len(FIXTURES)
+        # THE COUNT, not the sample, is the total. The board-side sample is
+        # capped at 12 and there are 13 fixtures here, so `Inter Milan v Monza`
+        # (last in sort order) is truncated away -- which briefly read as "that
+        # one joined without the map" while writing this test. It did not.
+        # Asserting the count first is what makes the cap visible instead of
+        # silently subtracting from the evidence.
+        assert coverage["unmatched_fixtures_count"] == len(FIXTURES)
+        expected = sorted(f"{lg}|{b[0]} v {b[1]}" for lg, b, _s in FIXTURES)
+        assert coverage["unmatched_fixture_sample"] == expected[:12]
+        assert "serie_a|Inter Milan v Monza" in expected
+    finally:
+        # The map is `lru_cache`d, so a stale empty build would poison every
+        # later test in the process.
+        aliases._soccer_alias_to_name.cache_clear()

@@ -3,37 +3,78 @@
     <div class="cards-scoreboard-strip">
       {% for game in games %}
         <a class="cards-strip-card cards-strip-card--soccer" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
-          <div class="cards-strip-head">
-            <span class="cards-status-badge">{{ game.status }}</span>
-            <span data-role="strip-detail">{{ game.detail }}</span>
-          </div>
-          <div class="cards-head-left cards-head-matchup">
-            <div class="cards-head-team">
-              {% if game.away.logo_url %}
-                <img class="cards-strip-logo cards-strip-crest" src="{{ game.away.logo_url }}" alt="{{ game.away.name }} crest" loading="lazy" />
-              {% else %}
-                <div class="cards-strip-logo">{{ game.away.abbr }}</div>
-              {% endif %}
-              <div>
-                <div class="cards-head-team-name">{{ game.away.name }}</div>
-                <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+          {%- set c_live = game.shared_is_live and game.away.score is not none and game.home.score is not none -%}
+          {%- set c_mom = game.shared_momentum if game.shared_momentum is defined else none -%}
+          {% if c_live %}
+            {#- LIVE COMPACT CARD. Away row one, home row two, each with its
+                score, clock upper-right, momentum status underneath. The old
+                strip rendered "away @ home" with NO SCORE AT ALL and a status
+                badge -- on a live match the one thing it could not tell you
+                was the thing you opened it for. -#}
+            <div class="cards-strip-live-head">
+              <span class="cards-strip-live-clock">{{ game.shared_game_state.clock or 'LIVE' }}</span>
+            </div>
+            <div class="cards-strip-live-rows">
+              <div class="cards-strip-live-row">
+                {% if game.away.logo_url %}
+                  <img class="cards-strip-live-crest" src="{{ game.away.logo_url }}" alt="" loading="lazy" />
+                {% else %}
+                  <span class="cards-strip-live-crest cards-strip-live-crest--text">{{ game.away.abbr }}</span>
+                {% endif %}
+                <span class="cards-strip-live-team">{{ game.away.abbr }}</span>
+                <span class="cards-strip-live-score">{{ game.away.score }}</span>
+              </div>
+              <div class="cards-strip-live-row">
+                {% if game.home.logo_url %}
+                  <img class="cards-strip-live-crest" src="{{ game.home.logo_url }}" alt="" loading="lazy" />
+                {% else %}
+                  <span class="cards-strip-live-crest cards-strip-live-crest--text">{{ game.home.abbr }}</span>
+                {% endif %}
+                <span class="cards-strip-live-team">{{ game.home.abbr }}</span>
+                <span class="cards-strip-live-score">{{ game.home.score }}</span>
               </div>
             </div>
-            <span class="cards-score-divider">@</span>
-            <div class="cards-head-team">
-              {% if game.home.logo_url %}
-                <img class="cards-strip-logo cards-strip-crest" src="{{ game.home.logo_url }}" alt="{{ game.home.name }} crest" loading="lazy" />
-              {% else %}
-                <div class="cards-strip-logo">{{ game.home.abbr }}</div>
-              {% endif %}
-              <div>
-                <div class="cards-head-team-name">{{ game.home.name }}</div>
-                <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+            {#- Only when there is a chart on the full card behind it. A status
+                with nothing to check it against is an assertion. -#}
+            {% if c_mom and c_mom.points %}
+              <div class="cards-strip-momentum">
+                <span class="cards-strip-momentum-dot{% if c_mom.side_is_home %} is-home{% elif c_mom.side_is_away %} is-away{% endif %}"></span>
+                <span class="cards-strip-momentum-label">{{ c_mom.label }}</span>
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="cards-strip-head">
+              <span class="cards-status-badge">{{ game.status }}</span>
+              <span data-role="strip-detail">{{ game.detail }}</span>
+            </div>
+            <div class="cards-head-left cards-head-matchup">
+              <div class="cards-head-team">
+                {% if game.away.logo_url %}
+                  <img class="cards-strip-logo cards-strip-crest" src="{{ game.away.logo_url }}" alt="{{ game.away.name }} crest" loading="lazy" />
+                {% else %}
+                  <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+                {% endif %}
+                <div>
+                  <div class="cards-head-team-name">{{ game.away.name }}</div>
+                  <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+                </div>
+              </div>
+              <span class="cards-score-divider">@</span>
+              <div class="cards-head-team">
+                {% if game.home.logo_url %}
+                  <img class="cards-strip-logo cards-strip-crest" src="{{ game.home.logo_url }}" alt="{{ game.home.name }} crest" loading="lazy" />
+                {% else %}
+                  <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+                {% endif %}
+                <div>
+                  <div class="cards-head-team-name">{{ game.home.name }}</div>
+                  <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+                </div>
               </div>
             </div>
-          </div>
-          {% if game.compact_box_line %}
-            <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
+            {% if game.compact_box_line %}
+              <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
+            {% endif %}
           {% endif %}
         </a>
       {% endfor %}

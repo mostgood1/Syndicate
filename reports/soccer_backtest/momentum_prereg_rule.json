@@ -1,0 +1,26 @@
+{
+  "weights": {
+    "shot-on-target": 1.0,
+    "shot-hit-woodwork": 1.0,
+    "shot-blocked": 1.0,
+    "shot-off-target": 1.0,
+    "corner-awarded": 1.0,
+    "offside": 1.0
+  },
+  "half_life": 900.0,
+  "goal_window": 600.0,
+  "step": 60.0,
+  "time_in_half_min_s": 2040.0,
+  "time_in_half_max_s": 2280.0,
+  "pressure_threshold": 9.2525,
+  "derived_from": "fit half of the 699-match cache ONLY",
+  "predictions": {
+    "base_rate_expected": 0.234,
+    "breakeven_3_1": 0.25,
+    "breakeven_2_1": 0.3333,
+    "hypothesis_hit_rate": 0.402,
+    "passes_if": "hit rate on FRESH matches >= 0.333 (clears 2-1)",
+    "weak_pass_if": ">= 0.25 (clears 3-1) but < 0.333",
+    "fails_if": "< 0.25"
+  }
+}

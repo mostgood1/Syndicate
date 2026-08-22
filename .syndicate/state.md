@@ -69,6 +69,67 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
+
+**`/api/portfolio/summary` read `settled_count: 0, avg_clv: null` for weeks, and
+settlement was never the cause.** Three defects, stacked; the first two are FIXED
+AND LIVE, the third is fixed and live but UNPROVEN against real data.
+
+**1. The ledger never crossed the web/worker boundary (`#502`).** The bet slip
+writes `prediction_ledger.json` on WEB; the reconciliation autorun that settles
+it runs on REFRESH-WORKER. All three services set
+`SYNDICATE_DATA_ROOT=/opt/render/project/data` and **Render gives each its own
+disk** (web `dsk-d8bi8prbc2fs73en7dig`, refresh-worker
+`dsk-d91f7ggk1i2s73ar37a0`). One path string, two files.
+`prediction_ledger.json` matches **none of the 151 `HOT_ARTIFACT_PATTERNS`**
+(checked with `fnmatch`, both directions), so the publisher never carried it
+either. FIXED: IO routes through the keyvalue store, disk written first as the
+durable copy (Redis is a 256MB instance measured at 96% with 34,529 LRU
+evictions), promotion upward-only so an empty worker ledger cannot shadow real
+bets. Live both services `2aa1df54` 17:04Z.
+
+**2. Settlement was reached once in 45 minutes (`#504`).** It sat 13th of 14 in
+an exclusive `elif` chain, behind `mlb_refresh` and a soccer branch draining 44
+units at one per 300s. Moved to 2nd, directly behind reconciliation. VERIFIED by
+co-occurrence: `RECONCILIATION_AUTORUN_GATED` 18:28:38.192696 and
+`LEDGER_INDEX_SIZE` 18:28:38.194012 — **1.3ms, same tick**, against **116s and a
+different tick** before. Live `4eeffb5c` 18:18:05Z.
+
+**3. The join keyed on `recommendation_id`, which is a SNAPSHOT HASH (`#505`).**
+`record_recommendation` mints it over `prediction_id` + the whole recommendation
+payload + `artifact_metadata`; `pipeline/intelligence_state.py:2028` already
+says it comes from "a content hash of the full recommendation payload (incl.
+live odds/edge/probability)" and drifts "purely from ordinary price drift". The
+board re-records 150 recommendations per rebuild, so a bet's click-time id and
+settlement's later id never meet. That is the `matched: 0` and
+`4,560 no_key_match of 8,276` this repo already recorded. FIXED: a second tier
+keyed on a stable identity modelled on `clv_opening_ledger._opening_key`,
+bookmaker excluded (outcomes are book-independent) and segment excluded (the bet
+slip never captures it), with disagreeing records marked ambiguous and REFUSED.
+Live `a1e89ff3` 18:50:02Z, refresh-worker only.
+
+**MEASURED FACTS worth not re-deriving:**
+- A settlement pass over 3 dates costs **~40MB / 71s** — NOT the ~1.4GB the
+  4.05-4.19x RSS coefficient predicts. That coefficient does not describe this
+  path as run. It settled ZERO records though, so the WRITE path
+  (`_replace_ledger_line`, a whole-chunk rewrite per settled record) is **still
+  unexercised in production**.
+- Current evaluation chunks: 95-332MB/day (largest `2026-08-16` at 331,787,011 B).
+- Opportunity tracking and CLV BOTH run daily and are healthy:
+  `BOARD_STATE_LEDGER_RECORDED recommendation_count=150` and
+  `[clv_opening_ledger] OPENINGS ... already=1538 unkeyable=0`.
+- **CLV is deliberately NOT wired to the portfolio.** `clv_join.py` states why:
+  the ledger holds ~3 user bets against 11,864 opportunities, so
+  `avg_clv` over 3 rows "is a metric with no denominator, which is worse than
+  the honest `null` it returns today." `avg_clv: null` is a REFUSAL, not a bug.
+
+**NOT VERIFIED — `#505`'s `entity` mapping** (`player_name/player/name/team/
+selection`) is reasoned from the bet slip's comments, never measured against
+real evaluation records: the ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`, so no service with an API can read it. The next
+`[ledger_bridge]` line carries the breakdown that falsifies it —
+`by_identity` large with `matched_by_identity: 0` means the mapping is wrong.
+
 ## [soccer-live-match-state] Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21)
 
 **All three live board gates read soccer's live re-sim and were measured on four
@@ -2728,10 +2789,13 @@ One line per item. Where a thing is live, the SHA is the one that carries it, no
 | odds-sweep ownership gate (`20025cc4`) | **HALF-WORKING** — fires on live-odds-worker (`kept=mlb,wnba,soccer dropped=nfl,ncaaf`), NOT reached on refresh-worker. `#129` reads OPEN again. |
 | WNBA phase-2 autorun | **INERT** — launcher fires, `launched=ok runStamp=None artifactsDir=None`, `MAIN_ENTRY` never appears. Reproduced across two boots. |
 | soccer live lens (`6bdc50de`) | **FIXED** — 7 leagues → 10; the three that vanished were exactly the three with matches in play |
-| soccer projection window (`6aaa11af`+`b4d82364`) | **READ FIXED, JOIN NOT** — 30 artifacts across six dates, `matches_in_source` 3 → 99, but `rows_with_projection` still 4 of 1,142; 1,138 unmatched |
+| soccer projection window (`6aaa11af`+`b4d82364`) | **WORKS — DO NOT USE THE OLD 4-of-1,142 FIGURE.** Measured 2026-08-22 18:04:56Z (`PREGAME_PROJECTION_JOIN`, refresh-worker): `considered 20,014`, `projected 9,598` (48%), `with_prob 8,922`, `matches_in_source 95`, all 10 leagues indexed, `ambiguous_keys 0`, full 7-date window read. The remaining gap is **player identity, not team names**: `unmatched_player 5,138` > `unsupported_market 2,691` > `unmatched_match 2,587` (only 12 distinct fixtures). `todo.md #503`. |
 | soccer live-lens observability (`461774cb`+`481de91d`) | live both workers; **emits only on failure**, so no reading yet |
 | monotone props seal (`bafb4fb2`) | **ROLLED BACK** at its requester's sequencing objection; 08-19 cadence read is unconfounded |
 | MLB live game-line model | **SCORED — the model LOSES to the market** on every population |
+| soccer team-name aliases (`2b0b708b`+`2e3265d7`) | **FIXED AND VERIFIED IN PRODUCTION 2026-08-22 18:31:07Z.** 13 aliases, deployed `4eeffb5c`. `unmatched_match_rows` **2,587 → 87** (−96.6%), `unmatched_fixtures` 12 → 3, `rows_with_projection` 9,598 → **10,684** (48.0% → 53.3%); belgian/epl/la_liga/mls/serie_a all to zero. `matches_in_source` 95 and `ambiguous_keys` 0 unchanged across the measurement. Survivors are fixture-absence, not names: the board carries BOTH directions of `PSG v Rennes` (81 rows, sim has only Rennes-home), and primeira_liga's Braga/Benfica are absent from the sim slate entirely. |
+| soccer LIVE edge (`edged=0`) | **NOT the pregame join — a PLUMBING gap.** 18:04:56Z: `edge_withheld 133, edge_why {'no_fair_value_devig_failed': 133}` — 133 of 133 rows HAVE a pregame projection. Soccer player props are one-sided, so `market_fair_prob_over` is never set; `attach_margin_model`'s replacement lands in `quote["fair_probability"]` (`layer2_board:1097`) while the live join reads `projection["market_fair_prob_over"]` (`live_projection_join:718`). The number exists and the reader cannot see it. **Bridging it is a PRICING decision** — `layer2_board:587-604` treats a `book_margin_model` fair as an ESTIMATE. |
+| production HTTP from a Claude session | **UNREACHABLE.** The agent proxy returns `connect_rejected — gateway answered 403 to CONNECT` for `syndicate-an21.onrender.com:443`. Not auth. Every production fact must come from Render LOGS via MCP; do not budget time for curling the board or `/api/ops/...`. |
 | soccer model | **LOSES to the market** — multiclass Brier 0.5875 vs 0.5737, worse in 8 of 9 leagues; errors sit on FAVOURITES |
 | `#445` NCAAF season projections | FIXED, **not deployable until the season opens** (~08-29) |
 | `#455` / `#456` | both FIXED; deploy state per service, check by content |

@@ -22376,3 +22376,422 @@ against the git mirror showed board `Inter Milan` vs sim `Internazionale`,
 board-side spellings are a RECONSTRUCTION of OddsAPI, not a measurement. The
 mirror carries no soccer quote side at all. Writing aliases off them would be
 guessing dressed as a fix; the log line exists to supply the real names.
+
+## 2026-08-22T17:13Z — settlement autorun ENABLED on refresh-worker (env, not blueprint). It RAN. It settled NOTHING.
+
+**User instruction: "enable the evaluation settlement autorun so parlays settle too."**
+Set via the Render env API on refresh-worker only, NOT `render.yaml` — the key is
+`sync: false` precisely so a runtime enable is not reverted by a blueprint sync,
+and a `render.yaml` push would fire `blueprint_sync` across all three services.
+Both keys set in ONE merge call (`replace:false`), because a window with the
+autorun enabled while `LOOKBACK_DAYS` was still at its 21-day default is the
+OOM configuration:
+
+    EVALUATION_SETTLEMENT_LOOKBACK_DAYS                   = 3
+    EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN   = true
+
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` deliberately NOT set — setting
+it at all overrides the daily gate.
+
+**THE RESULT, verbatim — the first `[ledger_bridge]` line in seven days:**
+
+    17:28:34.610Z  LEDGER_INDEX_SIZE bytes=3538491 ... autorun_enabled=True
+    17:29:45.514Z  [ledger_bridge] {"straight_settled": 0, "parlays_settled": 0,
+                                    "skipped": 25131, "dates_bridged": 3}
+
+**The parlay did NOT settle, and neither did anything else.**
+
+**COST: ~40MB, against my ~759MB projection. My estimate was an order of
+magnitude too conservative and should not be reused.** Peak `memory_current_mb`
+3,064.9 during the pass vs 3,027 after, one `climb_mb_per_s: 34.9` sample, whole
+pass 71s. The 4.05–4.19x RSS-per-JSON-byte coefficient does NOT describe this
+path as run — the streamed reader plus per-date freeing dominates. **Do not
+generalise this to a wider window:** the 332MB `2026-08-16` chunk was OUTSIDE a
+3-day window and is the one the coefficient was measured against.
+
+**WHY NOTHING SETTLED — mechanism, from the code, not guessed.**
+`_outcome_by_recommendation` indexes an evaluation record ONLY if its outcome is
+in `{win,loss,push,void}`. Every portfolio prediction whose `recommendation_id`
+(or, for a parlay, any leg's) misses that index is counted `skipped`. So
+`skipped: 25131` with `straight_settled: 0` says **the index was empty or
+non-matching for all three dates** — i.e. `settle_ledger_for_dates` settled no
+evaluation records in the window, or none of them match the portfolio's ids.
+
+`25,131 / 3 dates ≈ 8,377` predictions per pass. That is NOT a contradiction of
+"3-5 tracked bets": the raw ledger carries years of stakeless auto-tracked rows
+(`portfolio_summary._is_user_placed_bet` filters on `stake is not None`), so the
+bridge examines all of them and `/portfolio` shows the handful with stakes.
+
+**TWO CANDIDATE CAUSES, NOT YET DISTINGUISHED — do not act as if either is
+established:**
+1. The parlay's legs are outside the 3-day window (flagged as a risk BEFORE
+   enabling; a 4-leg cross-sport bet of unknown age).
+2. Settlement settled 0 evaluation records for 08-20..08-22 (grading absent for
+   those dates), so the index was empty.
+
+`straight_settled: 0` leans toward (2) — with a non-empty index some straight
+bet would likely have matched — but that is an inference, not a measurement.
+
+**THE DIAGNOSTIC THAT DISTINGUISHES THEM EXISTS AND I COULD NOT REACH IT.**
+`syndicate/blueprints/ops.py:1152` serves the settlement autorun status file,
+which carries `settle_ledger_for_dates`' own per-date `summaries` (matched /
+settled / already_resolved counts). It is on WEB over HTTP, and this session's
+egress to `syndicate-an21.onrender.com` is 403'd by policy. **Read that endpoint
+before widening the lookback** — widening is the right move only under cause (1),
+and under cause (2) it is expense for nothing.
+
+### 17:45:20Z — lookback widened 3 -> 7 on user instruction. IT WILL NOT RUN AGAIN TODAY.
+
+`EVALUATION_SETTLEMENT_LOOKBACK_DAYS=7` (env API, merge). Deploy
+`dep-da4u0c0u01pc73dbkgtg` on `be6f816b`; ledger fix verified present by
+ancestry. Concern about widening before reading the ops status endpoint was
+raised, the user reaffirmed, so it is their call and it is done.
+
+**THE DAILY GATE MAKES THIS A TOMORROW CHANGE, and that is not obvious.**
+Settlement RAN today at 17:28-17:29Z, so the status epoch now carries today's
+CENTRAL date. `_evaluation_settlement_should_run_now` hits
+`if now_central.date() == last_central_date: return False` for the rest of
+2026-08-22 CT. The restart does NOT reset this -- the status lives in keyvalue,
+not on the ephemeral disk. **Next run: 2026-08-23 CT once the hour is >= 6.**
+Widening the window today changes what tomorrow's run sweeps; it does not
+produce a second run tonight.
+
+**THE UNTESTED PATH THIS OPENS, stated before it runs rather than after.** A
+7-day window is 2026-08-16..08-22, which pulls in the **332MB `2026-08-16`
+chunk** -- the largest measured, and the one the 4.05-4.19x coefficient was
+taken against. Two different risks, and the second is the one to watch:
+
+- MEMORY: probably fine. The 3-day pass added ~40MB with a 185MB largest chunk.
+  Even scaling naively by bytes, 332MB suggests ~72MB. Nowhere near the ~570MB
+  headroom.
+- **TIME AND I/O: genuinely untested.** The 3-day pass settled ZERO records, so
+  it never exercised the WRITE path. `_replace_ledger_line` rewrites the WHOLE
+  chunk once per settled record. If 08-16 has settleable records, each one is
+  ~332MB of I/O, and settlement runs INLINE in the tick loop. 100 records would
+  be ~33GB of I/O in one inline pass. Nothing has ever measured this in
+  production, because the autorun has never settled anything.
+
+**Why this is still survivable:** `#256` claims the run BEFORE the work, so a
+death mid-pass advances the epoch and it does not re-run in a hot loop. That is
+the specific defect behind the 110 OOM kills of 2026-08-07, and it is fixed.
+Worst case is one bad pass and a restart, not an eleven-hour outage.
+
+**What to read tomorrow, in order:** the `[ledger_bridge]` line (does
+`parlays_settled` move off 0), then `/api/ops/evaluation-settlement/status` for
+`summaries` -- which is what actually distinguishes "the parlay was outside the
+window" from "settlement settles nothing at all". The second question is still
+open and widening does not answer it.
+---
+
+## 2026-08-22 ~17:38Z — `bb709247` — refresh-worker — instrument CORRECTIONS after the first reading
+
+Lane `layer2-sim-view-and-live-projection`, claim `e76b7a33f528275d` (mine,
+acquired 17:02Z, still held). Deployed `bb709247`, verified equal to
+`origin/main` at trigger time. `deploy_preflight.py` STILL CANNOT RUN here — no
+`RENDER_API_KEY` — so again **no CLEAR verdict**; on-main checked with git,
+in-flight jobs checked by hand.
+
+**KILLED:** a ligue_1 `refresh_odds_sources` + `build_soccer_artifacts` pair
+(pids 706/707/724). No MLB sim was running. Both re-fire on the next 2-minute
+tick, which is why this was judged low-cost rather than waived by anyone.
+
+**WHAT THE PREVIOUS DEPLOY'S READING SAID — and it refuted the premise twice.**
+
+`PREGAME_PROJECTION_JOIN sport=soccer`, 17:30:32Z, the first one ever emitted:
+
+    considered=20013  projected=9598 (48%)  with_prob=8922
+    matches_in_source=95   ambiguous_keys=0
+    leagues_indexed=all 10   dates_read=[08-22..08-28]
+    unmatched_player=5138   unsupported_market=2691   unmatched_match=2586
+
+The soccer pregame join WORKS. `state.md`'s "4 of 1,142" was stale — written
+before `#379`'s widening ran in production — and I carried it forward as current
+and diagnosed on top of it. That row is now marked SUPERSEDED. And the gap is
+not where it pointed: `unmatched_match` is 2,586 rows across only 12 distinct
+fixtures, while `unmatched_player` (5,138) is the dominant bucket and a
+different subsystem.
+
+`LIVE_PROJECTION_JOIN sport=soccer`: `edge_withheld=100
+edge_why={'no_market_fair_value': 100}` — the `#503` hypothesis confirmed 100 of
+100. All 100 are player-prop rows with `player_in_lens: false`, the same
+population as the 5,138. So the live symptom is downstream of the PLAYER join,
+not the team-name join I had named.
+
+**MY OWN INSTRUMENT WAS INDICTED BY ITS FIRST READING, and that is what this
+deploy fixes.** `indexed_fixture_sample` sorted alphabetically and took 12, so
+it answered about belgian_pro_league / bundesliga / championship while every
+league with real misses fell off the end — 11 of 12 board-side fixtures had no
+sim-side counterpart to pair against. Now scoped to leagues that actually miss,
+per-league quota, and empty on a clean join. Also split
+`no_market_fair_value` into `no_fair_value_no_pregame_projection` vs
+`no_fair_value_devig_failed`, on a `basis` snapshot taken at entry because the
+live tier overwrites `basis` and reading it later would classify every row the
+same way.
+
+**VERIFY — a log read, not a green deploy.** Next `PREGAME_PROJECTION_JOIN
+sport=soccer` must carry `sim_names` entries for epl / la_liga / ligue_1 / mls /
+serie_a (the leagues in `unmatched_by_league`), pairable against the 12
+`board_names`. And `edge_why` must resolve into the two new keys. Neither has
+been observed. One pair is already confirmed from the OLD reading and still not
+applied: board `Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
+
+### 18:02:36Z — forced cycle ABANDONED, interval key DISARMED. It never fired.
+
+**The forced cycle did not produce a run.** `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1200`
+was set 17:48:25Z (deploy live 17:52:07Z) and removed at 18:02:36Z having
+produced **zero** settlement runs — no `LEDGER_INDEX_SIZE`, no `[ledger_bridge]`
+in the whole 17:52–18:02 window. Disarmed on user instruction; waiting for the
+daily run instead.
+
+Set to `""` rather than deleted: the gate is
+`if str(os.environ.get(...) or "").strip():`, so an empty value is falsy and the
+daily gate resumes. A true delete needs `replace:true`, which rewrites the WHOLE
+env block — the same blast radius as a blueprint sync, for no gain. **Note for
+the next reader: the key is PRESENT-BUT-EMPTY on the live service, not absent.
+Empty == off here, but do not read its presence as "the override is on".**
+
+**WHY IT NEVER FIRED — and it partially rehabilitates the starvation idea I
+retracted earlier.** Settlement is branch 13 of 14 in an exclusive `elif` chain.
+Measured 18:00:16.855Z:
+
+    SOCCER_UNIT_LAUNCHED league=la_liga unit=1/44 due=12 spacing_seconds=300
+
+Branch 12 (`soccer_weekly_refresh`) WON that tick, which stops the chain before
+13. Soccer has **44 units queued, 12 due**, and launches one every 300s. So
+settlement only gets a turn in the gaps where soccer's spacing gate blocks AND
+all 11 earlier branches decline — exactly the 17:28:34Z coincidence
+(`SOCCER_AUTORUN_SKIPPED reason=spacing_gate`, then settlement 0.65ms later).
+
+**The correction to my own record:** I claimed starvation, retracted it on seeing
+the 17:28 run, and the truth is in between. Settlement is REACHABLE but
+CONTENDED — it is not blocked, it is competing for scarce free ticks behind a
+branch that wins every ~5 minutes while a 44-unit queue drains. "It ran once" and
+"it runs when needed" are different claims, and I conflated them when I
+retracted.
+
+**This is the same defect class `#341` fixed for reconciliation, one branch
+lower.** `#341` moved reconciliation to the FRONT on the argument that a
+daily-gated inline job wins at most one tick a day and so costs the refresh
+branches almost nothing. **That argument applies verbatim to settlement, which
+was left at 13.** It is the obvious follow-up and is NOT done here — moving an
+expensive job earlier in the chain is a real change that deserves its own
+measurement, not a drive-by edit at the end of a long session.
+
+**Cost of the whole forced-cycle attempt: 2 restarts, 0 runs, 0 information.**
+Worth recording as a dead end so nobody repeats it: forcing this job by interval
+does not work while the soccer queue is draining, because the interval gate is
+not what was blocking it — the chain position was.
+
+## 2026-08-22T18:18:05Z — `#504` settlement chain move, refresh-worker, `4eeffb5c` — **VERIFIED**
+
+**Deployed by another session's trigger, not mine, and I did not re-fire.** A
+deploy of `4eeffb5c` was already in flight (18:14:35Z, `trigger=api`) when I took
+the claim. `4eeffb5c` sits on top of `284c1e1e` (`#504`), verified BY CONTENT —
+`git show 4eeffb5c:scripts/run_refresh_worker.py` has settlement at position 2.
+Triggering my own would have cancelled a running deploy to ship byte-identical
+code. Live 18:18:05Z.
+
+**Process honesty: the claim did NOT serialise this one.** I acquired it AFTER
+that deploy was triggered. The outcome is the one intended, but the lock did no
+work here and should not be credited with any.
+
+**VERIFY — the reading that proves it, not the thing I was going to watch:**
+
+    18:28:38.192696098Z  RECONCILIATION_AUTORUN_GATED    (branch 1, declines)
+    18:28:38.194012988Z  LEDGER_INDEX_SIZE autorun_enabled=True   (branch 2)
+
+**1.3 MILLISECONDS APART, SAME TICK.** Branch 2 is now reached the instant
+branch 1 declines. Against the pre-move behaviour on the same worker:
+
+    17:26:38  RECONCILIATION_AUTORUN_GATED   (branch 1)
+    17:28:34  LEDGER_INDEX_SIZE              (branch 13)  <- 116 SECONDS later,
+                                                             a different tick,
+                                                             reached once in 45 min
+
+`116s and lucky` -> `1.3ms and structural`. That is the whole change, measured.
+
+**A METRIC ERROR OF MINE, CORRECTED BEFORE IT MISLED THE RECORD.** I first
+proposed verifying by "time from worker start to `LEDGER_INDEX_SIZE`", expecting
+11min -> ~1min. That conflates two things. Pre-move, branch 1 itself did not log
+until **9.1 min** after startup, so most of the 11 was the worker's STARTUP
+CYCLE, not chain position. Post-move the same figure is **10.5 min**
+(18:18:05 -> 18:28:38) — barely different, and by that metric the change would
+have looked like it did nothing. The co-occurrence of the two lines is the
+metric that isolates chain position; elapsed-since-boot does not.
+
+**What is NOT verified, and must not be read into the above:** settlement did not
+RUN here. The daily gate declines for the rest of 2026-08-22 CT (it ran at
+17:28Z). This proves the branch is now REACHED promptly, which was `#504`'s
+entire claim. Whether `parlays_settled` moves off 0 is a separate question that
+tomorrow's run answers.
+
+Also live in that reading: `autorun_enabled=True` (env still set), index grown
+3,538,491 -> 3,561,802 bytes since 17:28Z.
+---
+
+## 2026-08-22 ~18:14Z — `4eeffb5c` — refresh-worker — THIRTEEN soccer name aliases
+
+Lane `layer2-sim-view-and-live-projection`, claim `188efafc1f8177ba`.
+`deploy_preflight.py` still cannot run (no `RENDER_API_KEY`) — **no CLEAR
+verdict**; on-main verified with git, in-flight jobs checked by hand
+(`process_count: 2` at 18:13:45Z — worker and its shell, no child jobs, so
+**nothing was killed**).
+
+**DEPLOYED SHA IS NOT THE ONE I READ.** `git rev-parse origin/main` returned
+`902e8b1d`; `trigger_deploy` ships the BRANCH TIP and by then a peer had pushed
+`4eeffb5c` (18:13:48Z, seconds later). Verified rather than assumed:
+`merge-base --is-ancestor 902e8b1d 4eeffb5c` passes, so all thirteen aliases are
+in it, and the peer delta is additive (gitignore, a worker autorun-ordering
+change, tests). Third time this session that the tip moved under a deploy —
+the habit of diffing the deployed SHA against the intended one is what keeps
+catching it.
+
+**WHAT SHIPPED: 13 aliases, in two rounds, every pair quoted off a production
+log line.** Reachability measured both times — **0 of 13 fixtures join without
+the map, 13 of 13 with it** — and the off-run reproduces the production fixture
+strings character for character.
+
+    round 1 (17:36/17:39 readings)   Royal Antwerp, 1. FC Köln, Hamburger SV,
+                                     FSV Mainz 05, SC Paderborn, Union Berlin
+    round 2 (18:04 scoped reading)   Brighton and Hove Albion, Athletic Bilbao,
+                                     Deportivo, Rennes, Los Angeles FC,
+                                     Atalanta BC, Inter Milan
+
+**VERIFY — the reading that proves it, and it is NOT a green deploy.** Next
+`PREGAME_PROJECTION_JOIN sport=soccer` must show `unmatched_fixtures` fall from
+12 and `unmatched_by_league` drop for belgian_pro_league (5), epl (510),
+la_liga (972), ligue_1 (240), mls (247), serie_a (607). If a league does NOT
+move, its remaining fixtures are a different defect and must not be counted as
+this fix underperforming.
+
+**AND A HYPOTHESIS THIS SESSION PUBLISHED AND THEN REFUTED.** `#503` claimed the
+live tier's `edged=0` was downstream of the pregame join — rows with no pregame
+projection, hence no fair value. The split built to confirm it read
+`edge_why={'no_fair_value_devig_failed': 133}`: **133 of 133 rows HAVE a pregame
+projection.** The real cause is that soccer player props are one-sided, so
+`market_fair_prob_over` is never set, and `attach_margin_model`'s replacement
+lands in `quote["fair_probability"]` while the live join reads
+`projection["market_fair_prob_over"]`. The number exists and the reader cannot
+see it. **Deliberately NOT fixed in this deploy** — bridging them is a PRICING
+change and `layer2_board:587-604` already treats a `book_margin_model` fair as
+an ESTIMATE (4.5% moneyline hold vs 12% on props). These aliases do not touch it.
+
+### VERIFIED 18:31:07Z — `4eeffb5c` — the 13 aliases, measured before and after
+
+`PREGAME_PROJECTION_JOIN sport=soccer`, same log line, same slate, 26 minutes
+apart across the deploy:
+
+| metric | 18:04:56Z (before) | 18:31:07Z (after) |
+|---|---|---|
+| `rows_with_projection` | 9,598 / 20,014 (48.0%) | **10,684 / 20,028 (53.3%)** |
+| `rows_with_true_probability` | 8,922 | **9,905** |
+| `unmatched_match_rows` | 2,587 | **87** (−96.6%) |
+| `unmatched_fixtures` | 12 | **3** |
+| `unmatched_by_league` | belgian 5, epl 510, la_liga 972, ligue_1 240, mls 247, primeira 6, serie_a 607 | **ligue_1 81, primeira_liga 6** |
+
+**+1,086 rows now carry a projection**, and five leagues went to exactly zero
+unmatched. `matches_in_source` (95) and `ambiguous_keys` (0) are unchanged, so
+this is the join improving and not the index changing underneath it.
+
+**THE THREE SURVIVORS ARE THE THREE I PRE-REGISTERED AS *NOT* NAME PROBLEMS**,
+written into the check-in BEFORE this reading so the result could not be
+rationalised afterwards:
+
+- `ligue_1|Paris Saint Germain v Rennes` (81 rows) — the sim has
+  `Stade Rennais v Paris Saint-Germain`, i.e. Rennes at HOME. The board carries
+  **both directions of the same fixture**; only one exists in the sim. That is
+  an odds-side data question, not an alias.
+- `primeira_liga|CF Estrela v Braga`, `primeira_liga|Moreirense FC v Benfica`
+  (6 rows) — neither Braga nor Benfica appears anywhere in the sim's
+  primeira_liga slate. Fixture absence; the producer's problem.
+
+**NOT A REGRESSION, and it will look like one:** `unmatched_player` rose
+5,138 → 6,057 and `unsupported_market` 2,691 → 3,200. Both are DOWNSTREAM of the
+match join — rows that used to be rejected at the match stage now get far enough
+to be judged on player and market. The buckets did not grow; the population
+reaching them did.
+
+Claim `188efafc1f8177ba` **released**.
+
+---
+
+## 2026-08-22 ~18:39Z — `28b2c706` — WEB — alt-tab fix, alt default flip, bet-type filter, filter-aware counts bar
+
+Lane `layer2-sim-view-and-live-projection`, claim `8baea61799086948`. Deployed
+SHA equals the one pushed — first time this session the tip did not move under
+the trigger. `deploy_preflight.py` still cannot run (no `RENDER_API_KEY`): **no
+CLEAR verdict**; on-main verified with git.
+
+Web-only (template + CSS + a JS test). No worker path touched, no join, no
+pricing.
+
+**VERIFY — four separate reads on the served board, none of which a green deploy
+substitutes for:**
+
+1. Click an alt-line tab → **the clicked button becomes the highlighted one.**
+   This is the actual reported defect: the filter worked and the tab never moved,
+   because the handler mutated state without re-rendering the tab row.
+2. Load `/intelligence` with no query string → **no `totals_alt` or
+   `spreads_alt` rows**, and the main line of every market still present. The
+   board must NOT be empty; if it is, this is the odds-range failure again in a
+   new place and should be reverted rather than tuned.
+3. The bet-type row lists markets **with counts**, and selecting one leaves the
+   others selectable (the option list is built ignoring the bet-type filter
+   itself — otherwise it collapses to one entry with no way back).
+4. The counts strip changes when a filter changes, shows "N of M" only when they
+   differ, and shows "N hidden by K filters" only when N > 0.
+
+**A DEFAULT WAS REVERSED HERE AND THE REASONING IS ON RECORD**, because
+reversing one this morning's commit argued for looks like drift: the odds range
+must default open (its broken default rendered a BLANK board); the alt filter may
+default closed (the main line of every market survives, so the board stays
+populated and the omission is named and recoverable). Both rules are asserted in
+`tests/js/board_sim_view_display.test.mjs` so a later change cannot swap which
+control gets which rule.
+
+## 2026-08-22T18:46:34Z — `#505` recommendation_id identity join, refresh-worker, `a1e89ff3`
+
+`dep-da4ut2ijobas73d0p030`. refresh-worker ONLY — `ledger_bridge` is called from
+`run_refresh_worker.py` and nowhere web or live-odds executes.
+
+**BEFORE:** live `4eeffb5c` (18:18:05Z). Composition checked both directions:
+`a1e89ff3` contains `4eeffb5c` (no revert) and contains `#505`. Verified BY
+CONTENT on the deploying tree, not by ancestry alone — 10 occurrences of
+`_settlement_identity`/`_AMBIGUOUS` in `ledger_bridge.py`, 3 of the accumulator
+fix in `run_refresh_worker.py`. Nothing substantial in flight at trigger time:
+one process, no MLB sim, no soccer subprocess, 63.1% memory.
+
+**`deploy_preflight.py` STILL COULD NOT RUN** — no `RENDER_API_KEY` in this
+session. No CLEAR verdict for this SHA. Claim held; on-main verified with git.
+
+**WHAT THIS CHANGES THAT THE OTHERS DID NOT: it writes to the portfolio.**
+`#502`/`#504` moved data and scheduling; this decides OUTCOMES on user bets. So
+the failure mode worth naming is a FALSE settle, not a missed one.
+
+**Why a false settle is unlikely BY CONSTRUCTION, not by hope.** The collapsed
+key (segment dropped) can only merge records that share
+`event_id|market|entity|side|line`. If those records DISAGREE on outcome the
+index marks `_AMBIGUOUS` and refuses. If they AGREE, settling from the merged
+key gives the same answer either constituent would have — so the collapse is
+safe precisely where it is lossy. The residual risk is a wrong `entity` mapping
+producing a match against a DIFFERENT wager, and `event_id`+`market`+`side`+
+`line` all agreeing by coincidence is a narrow target.
+
+**VERIFY — the reading, and what would FALSIFY the fix.** Next `[ledger_bridge]`
+line, now carrying a per-reason breakdown:
+
+    matched_by_identity > 0                      -> the join works
+    index_sizes.by_identity large + matched 0    -> the ENTITY MAPPING IS WRONG
+    skip_reasons.unkeyable_bet high              -> bets cannot key at all
+    skip_reasons.identity_ambiguous > 0          -> the segment collapse is biting
+
+**The entity mapping (`player_name/player/name/team/selection`) is a HYPOTHESIS.**
+It is reasoned from the bet slip's own comments, NOT measured against production
+records — the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`, so it cannot be read from any service with an API. The
+breakdown above is the instrument that settles it. Do not tune anything until
+that reading exists.
+
+**Timing: the daily gate still holds.** Settlement ran 17:28Z, so this does not
+run again until 2026-08-23 after 06:00 CT. It should now get a PROMPT tick
+(`#504`), rather than waiting on a soccer spacing-gate coincidence.
