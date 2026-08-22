@@ -3206,6 +3206,62 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 
 ## [mlb-sim-artifacts-live] WEB `055dfc67` — THE FIVE MLB SIM ARTIFACTS ARE IN PRODUCTION `[2026-08-18 22:54:51Z]` — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
+## [web-request-path-latency] WEB'S 502s WERE `/healthz` STARVATION, NOT SLOW COLD BOOTS — FIXED AND MEASURED `[2026-08-22, lane render-web-request-path]`
+
+**COLD BOOT IS NOT A PROBLEM AND NEVER WAS.** Boot-to-listening on web is
+**2.7s** (17:12:52.36 `sh -c` -> 17:12:55.09 gunicorn `Listening at` -> 17:12:58.43
+first `/healthz` 200). Stop diagnosing boot time.
+
+**THE 502s WERE RESTARTS.** Web was SIGTERM'd every ~90s during live MLB slates
+with ~15s of no listener after each. Container `-2mdsk`, booted 17:12:55, **no
+deploy after 17:12:59**: terms at 17:14:08 / 17:15:38 / 17:17:38, a NEW gunicorn
+master pid each time; health checks unanswered **84s** (17:16:34 -> 17:17:58).
+Render 502s carry `responseBytes=223158` — that is Render's own error page and is
+how you separate them from app errors. `WORKER TIMEOUT` appeared **zero** times
+in three days, so `GUNICORN_TIMEOUT=60` is EXONERATED.
+
+**CAUSE:** `_mlb_feed_live_payload` fell through to statsapi for every game
+because `mlb_source/source_artifacts/data/raw/statsapi/feed_live/**` matches
+**none of the 175** `HOT_ARTIFACT_PATTERNS`. 15 live HTTPS calls per home request,
+uncached, against 8 request slots (`WEB_CONCURRENCY=2` x `GUNICORN_THREADS=4`).
+
+**FIXED — `apply_live_scores` on `games=15`, measured on production:**
+
+    BEFORE  3318 / 7991 / 8400 / 5498 / 3494 / 3802 / 3694 ms
+    AFTER   0-93 ms (max 93, 14 samples, two instances, two deploys)
+
+Live scores now come from `live_lens_report_<date>.json` (already allowlisted,
+republished ~60s). The residual statsapi path is SINGLE-FLIGHTED: at most one
+request thread can ever block on it. Live on web `8149e51d` / `3ada3512`.
+
+**DO NOT ALLOWLIST `raw/statsapi/feed_live`.** It is the obvious fix and it is a
+REGRESSION: `_mlb_feed_live_payload` takes the file if it EXISTS with **no
+freshness check**, so publishing it freezes every game at capture time — `#413`,
+measured 2026-08-13, MIL @ SD reading `live / TOP 9` against a lens reading Final.
+It also buys **no speed**: `vendor/mlb_bettingv2/tools/daily_update.py` refreshes
+those files **prior-day only** ("must fetch the final game feed, not a stale
+pregame cache entry"), so a freshness gate rejects them and falls through anyway.
+~3.2 MB x 15 per publish cycle on top.
+
+**`MLB_GAMES_STAGE_MS` settles two WRONG hypotheses** and is the instrument for
+any future work here: `per_game_reco_rows` was **0-13ms in every sample** (the
+`scope_2026-08-21_home_request_path_compute.md` suspect), and the live-lens
+cache-key invalidation its follow-up proposed was not the cost either.
+
+**NOT VERIFIED: the card-cache idle bound.** `_MLB_CARDS_CONTEXT_CACHE` /
+`_MLB_TODAY_CACHE` now bound on IDLE time (300s / 120s), targeting a ratchet
+measured at 369 MB -> 2,026,717,200 B over ~7.5h against a 2,147,483,600 B
+ceiling. Post-deploy readings are directionally better at comparable ages and
+**that is not proof**. Peers redeploy web every 20-30 min, so no instance
+survives long enough to show it. Instrument: memory-over-uptime, plus the rate
+of `CONTEXT_CACHE_EVICTED ... web=True` falling.
+
+**NEXT BOTTLENECK:** `build_cards_page_context`, now dominant at 1803-2402 ms on
+a cache miss.
+
+---
+
+
 ## [web-preflight-dead-sample] WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08-18, collapsed from 2 stacked sections]`
 
 **COLLAPSED 2026-08-18 by lane `ledger-coherence-sweep`, under an explicit
