@@ -223,14 +223,78 @@ eq('alt-only drops the main line', altAllows('alt', { market: 'totals' }), false
 eq('main-only keeps props (they are not an alt ladder)',
   altAllows('main', { market: 'player_shots' }), true);
 
-console.log('\n--- and the DEFAULT hides nothing, same rule the odds range shipped broken ---');
-const defaultAlt = ['main', 'alt'].includes(String(new URLSearchParams('').get('alt_lines') || ''))
-  ? new URLSearchParams('').get('alt_lines')
-  : 'all';
-eq('an absent url param resolves to "all", not to a mode', defaultAlt, 'all');
-for (const market of ['h2h', 'totals', 'totals_alt', 'spreads', 'spreads_alt', 'player_shots']) {
+// THE DEFAULT IS NOW "main" -- alt lines hidden until asked for
+// `[user decision, 2026-08-22]`. This REVERSES the assertion this file
+// originally carried, and the reversal is deliberate rather than a regression:
+//
+//   the odds range must default to showing everything, because its broken
+//   default hid EVERY row and the board rendered blank.
+//   the alt filter may default to hiding, because hiding alt lines leaves the
+//   MAIN line of every market standing -- the board is still populated and the
+//   omission is a named, recoverable subset.
+//
+// A default that hides a known subset is a product choice. A default that can
+// empty the board is a bug. Both rules are asserted here so a later change
+// cannot quietly swap which one applies to which control.
+console.log('\n--- the DEFAULT hides alt lines, and nothing else ---');
+const readAlt = (qs) => (['main', 'alt', 'all'].includes(String(new URLSearchParams(qs).get('alt_lines') || ''))
+  ? new URLSearchParams(qs).get('alt_lines')
+  : 'main');
+eq('an absent url param resolves to "main"', readAlt(''), 'main');
+eq('an empty param resolves to "main"', readAlt('alt_lines='), 'main');
+eq('garbage resolves to "main"', readAlt('alt_lines=banana'), 'main');
+eq('"all" is honoured -- the reader can still ask for everything', readAlt('alt_lines=all'), 'all');
+eq('"alt" is honoured', readAlt('alt_lines=alt'), 'alt');
+
+const defaultAlt = readAlt('');
+for (const market of ['h2h', 'h2h_3_way', 'totals', 'spreads', 'player_shots', 'batter_runs_scored']) {
   eq(`a ${market} row survives the default`, altAllows(defaultAlt, { market }), true);
 }
+for (const market of ['totals_alt', 'spreads_alt']) {
+  eq(`a ${market} row is hidden by the default`, altAllows(defaultAlt, { market }), false);
+}
+// The load-bearing property: the default must never remove a MAIN market.
+eq('every main game market survives the default',
+  ['h2h', 'totals', 'spreads'].every((m) => altAllows(defaultAlt, { market: m })), true);
+
+// --- bet type -------------------------------------------------------------
+//
+// Distinct from the game/prop family selector that already existed: this picks
+// ONE market. Its options are built from the rows actually present, so it can
+// never offer a slice that is empty for a reason the reader cannot see.
+const betTypeLabel = (new Function(
+  `${extract('betTypeLabel')}\n${html.match(/const BET_TYPE_LABELS = \{[\s\S]*?\};/)[0]}\nreturn betTypeLabel;`
+))();
+
+console.log('\n--- bet-type labels are readable, and an unknown market still appears ---');
+eq('h2h reads as Moneyline', betTypeLabel('h2h'), 'Moneyline');
+eq('totals_alt names itself as alt', betTypeLabel('totals_alt'), 'Total (alt)');
+eq('a prop drops its sport prefix', betTypeLabel('player_shots_on_target'), 'Shots On Target');
+eq('a batter prop drops its prefix too', betTypeLabel('batter_runs_scored'), 'Runs Scored');
+// The rule that matters for a feed that adds markets: never hide what you
+// cannot label. A hardcoded list would drop this row from the selector
+// entirely, and the reader would have no way to reach those bets.
+eq('an unmapped market is title-cased, not dropped',
+  betTypeLabel('corner_kicks_asian'), 'Corner Kicks Asian');
+eq('an empty market yields an empty label, not "Undefined"', betTypeLabel(''), '');
+eq('null is safe', betTypeLabel(null), '');
+
+// Mirror of the matcher's bet-type branch.
+const betAllows = (sel, item) => (sel === 'all'
+  ? true
+  : String(item.market || item.market_key || '').trim().toLowerCase() === sel);
+
+console.log('\n--- selecting a bet type keeps exactly that market ---');
+eq('all keeps everything', betAllows('all', { market: 'h2h' }), true);
+eq('h2h keeps h2h', betAllows('h2h', { market: 'h2h' }), true);
+eq('h2h drops totals', betAllows('h2h', { market: 'totals' }), false);
+// The pairing that would be wrong if this used a prefix test, exactly as the
+// alt filter would have been: `totals` must not select `totals_alt`.
+eq('totals does NOT select totals_alt', betAllows('totals', { market: 'totals_alt' }), false);
+eq('totals_alt selects only itself', betAllows('totals_alt', { market: 'totals_alt' }), true);
+eq('market_key is honoured when market is absent', betAllows('h2h', { market_key: 'h2h' }), true);
+eq('a row with no market is dropped by a specific selection',
+  betAllows('h2h', {}), false);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

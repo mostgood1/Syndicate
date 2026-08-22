@@ -1,0 +1,536 @@
+{
+  "holdout_matches": 212,
+  "base_rate": 0.2331,
+  "time": [
+    {
+      "lo": 0,
+      "hi": 4,
+      "n": 636,
+      "hit": 0.2091,
+      "lift": 0.897,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 4,
+      "hi": 8,
+      "n": 848,
+      "hit": 0.1922,
+      "lift": 0.825,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 8,
+      "hi": 12,
+      "n": 848,
+      "hit": 0.1722,
+      "lift": 0.739,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 12,
+      "hi": 16,
+      "n": 848,
+      "hit": 0.1722,
+      "lift": 0.739,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 16,
+      "hi": 20,
+      "n": 848,
+      "hit": 0.1769,
+      "lift": 0.759,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 20,
+      "hi": 24,
+      "n": 848,
+      "hit": 0.1958,
+      "lift": 0.84,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 24,
+      "hi": 28,
+      "n": 848,
+      "hit": 0.1969,
+      "lift": 0.845,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 28,
+      "hi": 32,
+      "n": 848,
+      "hit": 0.2323,
+      "lift": 0.997,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 32,
+      "hi": 36,
+      "n": 848,
+      "hit": 0.2583,
+      "lift": 1.108,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 36,
+      "hi": 40,
+      "n": 848,
+      "hit": 0.2889,
+      "lift": 1.239,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 40,
+      "hi": 44,
+      "n": 848,
+      "hit": 0.2771,
+      "lift": 1.189,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 44,
+      "hi": 48,
+      "n": 848,
+      "hit": 0.25,
+      "lift": 1.073,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 48,
+      "hi": 52,
+      "n": 848,
+      "hit": 0.2417,
+      "lift": 1.037,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 52,
+      "hi": 56,
+      "n": 848,
+      "hit": 0.2441,
+      "lift": 1.047,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 56,
+      "hi": 60,
+      "n": 848,
+      "hit": 0.2465,
+      "lift": 1.057,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 60,
+      "hi": 64,
+      "n": 848,
+      "hit": 0.2559,
+      "lift": 1.098,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 64,
+      "hi": 68,
+      "n": 848,
+      "hit": 0.2465,
+      "lift": 1.057,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 68,
+      "hi": 72,
+      "n": 848,
+      "hit": 0.2158,
+      "lift": 0.926,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 72,
+      "hi": 76,
+      "n": 848,
+      "hit": 0.2182,
+      "lift": 0.936,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 76,
+      "hi": 80,
+      "n": 848,
+      "hit": 0.2241,
+      "lift": 0.961,
+      "window_avail_min": 10.0
+    },
+    {
+      "lo": 80,
+      "hi": 84,
+      "n": 848,
+      "hit": 0.3455,
+      "lift": 1.482,
+      "window_avail_min": 8.49
+    },
+    {
+      "lo": 84,
+      "hi": 88,
+      "n": 846,
+      "hit": 0.2636,
+      "lift": 1.131,
+      "window_avail_min": 4.5
+    },
+    {
+      "lo": 88,
+      "hi": 92,
+      "n": 211,
+      "hit": 0.2275,
+      "lift": 0.976,
+      "window_avail_min": 2.0
+    }
+  ],
+  "solo": [
+    {
+      "type": "corner-awarded",
+      "count": 5423,
+      "top_decile_hit": 0.2776,
+      "lift": 1.191
+    },
+    {
+      "type": "foul",
+      "count": 30982,
+      "top_decile_hit": 0.2433,
+      "lift": 1.044
+    },
+    {
+      "type": "free-kick",
+      "count": 205,
+      "top_decile_hit": 0.2304,
+      "lift": 0.989
+    },
+    {
+      "type": "handball",
+      "count": 633,
+      "top_decile_hit": 0.2042,
+      "lift": 0.876
+    },
+    {
+      "type": "offside",
+      "count": 2277,
+      "top_decile_hit": 0.2556,
+      "lift": 1.097
+    },
+    {
+      "type": "shot-blocked",
+      "count": 4841,
+      "top_decile_hit": 0.2733,
+      "lift": 1.173
+    },
+    {
+      "type": "shot-hit-woodwork",
+      "count": 382,
+      "top_decile_hit": 0.2401,
+      "lift": 1.03
+    },
+    {
+      "type": "shot-off-target",
+      "count": 6242,
+      "top_decile_hit": 0.2776,
+      "lift": 1.191
+    },
+    {
+      "type": "shot-on-target",
+      "count": 3575,
+      "top_decile_hit": 0.2251,
+      "lift": 0.966
+    },
+    {
+      "type": "substitution",
+      "count": 6150,
+      "top_decile_hit": 0.2717,
+      "lift": 1.166
+    },
+    {
+      "type": "var---referee-decision-cancelled",
+      "count": 219,
+      "top_decile_hit": 0.2958,
+      "lift": 1.269
+    },
+    {
+      "type": "yellow-card",
+      "count": 2841,
+      "top_decile_hit": 0.254,
+      "lift": 1.09
+    }
+  ],
+  "combos": [
+    {
+      "combo": "all types",
+      "types": [
+        "blocked-pass",
+        "corner-awarded",
+        "deleted-after-review",
+        "foul",
+        "free-kick",
+        "handball",
+        "offside",
+        "own-goal",
+        "penalty---hit-woodwork",
+        "penalty---missed",
+        "penalty---saved",
+        "penalty---scored",
+        "red-card",
+        "save",
+        "shot-blocked",
+        "shot-hit-woodwork",
+        "shot-off-target",
+        "shot-on-target",
+        "substitution",
+        "var---referee-decision-cancelled",
+        "var---referee-decision-confirmed",
+        "yellow-card"
+      ],
+      "top_decile_hit": 0.239,
+      "lift": 1.025
+    },
+    {
+      "combo": "shots only",
+      "types": [
+        "shot-blocked",
+        "shot-hit-woodwork",
+        "shot-off-target",
+        "shot-on-target"
+      ],
+      "top_decile_hit": 0.2701,
+      "lift": 1.159
+    },
+    {
+      "combo": "shots+corners",
+      "types": [
+        "corner-awarded",
+        "shot-blocked",
+        "shot-hit-woodwork",
+        "shot-off-target",
+        "shot-on-target"
+      ],
+      "top_decile_hit": 0.2792,
+      "lift": 1.198
+    },
+    {
+      "combo": "set pieces",
+      "types": [
+        "corner-awarded",
+        "free-kick",
+        "penalty---saved",
+        "penalty---scored"
+      ],
+      "top_decile_hit": 0.269,
+      "lift": 1.154
+    },
+    {
+      "combo": "cards+subs",
+      "types": [
+        "red-card",
+        "substitution",
+        "yellow-card"
+      ],
+      "top_decile_hit": 0.268,
+      "lift": 1.15
+    },
+    {
+      "combo": "fouls only",
+      "types": [
+        "foul"
+      ],
+      "top_decile_hit": 0.2433,
+      "lift": 1.044
+    },
+    {
+      "combo": "top-4 solo",
+      "types": [
+        "corner-awarded",
+        "shot-blocked",
+        "shot-off-target",
+        "var---referee-decision-cancelled"
+      ],
+      "top_decile_hit": 0.2792,
+      "lift": 1.198
+    }
+  ],
+  "cross": [
+    {
+      "lo": 0,
+      "hi": 4,
+      "n": 636,
+      "time_only": 0.2091,
+      "with_feature": 0.2264,
+      "delta": 0.0173
+    },
+    {
+      "lo": 4,
+      "hi": 8,
+      "n": 848,
+      "time_only": 0.1922,
+      "with_feature": 0.2264,
+      "delta": 0.0342
+    },
+    {
+      "lo": 8,
+      "hi": 12,
+      "n": 848,
+      "time_only": 0.1722,
+      "with_feature": 0.1226,
+      "delta": -0.0495
+    },
+    {
+      "lo": 12,
+      "hi": 16,
+      "n": 848,
+      "time_only": 0.1722,
+      "with_feature": 0.1462,
+      "delta": -0.0259
+    },
+    {
+      "lo": 16,
+      "hi": 20,
+      "n": 848,
+      "time_only": 0.1769,
+      "with_feature": 0.2311,
+      "delta": 0.0542
+    },
+    {
+      "lo": 20,
+      "hi": 24,
+      "n": 848,
+      "time_only": 0.1958,
+      "with_feature": 0.1981,
+      "delta": 0.0024
+    },
+    {
+      "lo": 24,
+      "hi": 28,
+      "n": 848,
+      "time_only": 0.1969,
+      "with_feature": 0.1934,
+      "delta": -0.0035
+    },
+    {
+      "lo": 28,
+      "hi": 32,
+      "n": 848,
+      "time_only": 0.2323,
+      "with_feature": 0.2547,
+      "delta": 0.0224
+    },
+    {
+      "lo": 32,
+      "hi": 36,
+      "n": 848,
+      "time_only": 0.2583,
+      "with_feature": 0.3066,
+      "delta": 0.0483
+    },
+    {
+      "lo": 36,
+      "hi": 40,
+      "n": 848,
+      "time_only": 0.2889,
+      "with_feature": 0.3255,
+      "delta": 0.0366
+    },
+    {
+      "lo": 40,
+      "hi": 44,
+      "n": 848,
+      "time_only": 0.2771,
+      "with_feature": 0.2972,
+      "delta": 0.02
+    },
+    {
+      "lo": 44,
+      "hi": 48,
+      "n": 848,
+      "time_only": 0.25,
+      "with_feature": 0.2783,
+      "delta": 0.0283
+    },
+    {
+      "lo": 48,
+      "hi": 52,
+      "n": 848,
+      "time_only": 0.2417,
+      "with_feature": 0.2358,
+      "delta": -0.0059
+    },
+    {
+      "lo": 52,
+      "hi": 56,
+      "n": 848,
+      "time_only": 0.2441,
+      "with_feature": 0.2358,
+      "delta": -0.0083
+    },
+    {
+      "lo": 56,
+      "hi": 60,
+      "n": 848,
+      "time_only": 0.2465,
+      "with_feature": 0.2075,
+      "delta": -0.0389
+    },
+    {
+      "lo": 60,
+      "hi": 64,
+      "n": 848,
+      "time_only": 0.2559,
+      "with_feature": 0.2311,
+      "delta": -0.0248
+    },
+    {
+      "lo": 64,
+      "hi": 68,
+      "n": 848,
+      "time_only": 0.2465,
+      "with_feature": 0.2783,
+      "delta": 0.0318
+    },
+    {
+      "lo": 68,
+      "hi": 72,
+      "n": 848,
+      "time_only": 0.2158,
+      "with_feature": 0.2123,
+      "delta": -0.0035
+    },
+    {
+      "lo": 72,
+      "hi": 76,
+      "n": 848,
+      "time_only": 0.2182,
+      "with_feature": 0.2406,
+      "delta": 0.0224
+    },
+    {
+      "lo": 76,
+      "hi": 80,
+      "n": 848,
+      "time_only": 0.2241,
+      "with_feature": 0.2311,
+      "delta": 0.0071
+    },
+    {
+      "lo": 80,
+      "hi": 84,
+      "n": 848,
+      "time_only": 0.3455,
+      "with_feature": 0.3679,
+      "delta": 0.0224
+    },
+    {
+      "lo": 84,
+      "hi": 88,
+      "n": 846,
+      "time_only": 0.2636,
+      "with_feature": 0.2736,
+      "delta": 0.01
+    }
+  ]
+}
