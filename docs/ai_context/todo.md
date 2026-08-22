@@ -1,5 +1,148 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#501` — **The WNBA live-lens went to ZERO ~00:20Z DURING LIVE PLAY and did not come back, while capture kept writing players. Both `#498` and `#499` lost their measurement window to it.** — found by lane `wnba-live-props-data`, 2026-08-21, NOT FIXED, CAUSE UNKNOWN
+
+**Corrects this item's own first framing.** It was filed as "the halftime state
+emits the wrong reason string". The halftime reading was real but the diagnosis
+was wrong: play resumed and **the lens did not recover**.
+
+Measured across two FRESH board builds (`generated_at` 00:37:53Z and 00:41:47Z —
+the board is rebuilding, so this is not a stale artifact), with BOTH games live
+in the 3rd quarter:
+
+    00:15Z  index_size 2 | considered 430 | projected 230 | snapshot_rows_seen 8   <- working
+    00:37Z  index_size 0 | considered 182 | projected 0   | snapshot_rows_seen None
+    00:41Z  index_size 0 | considered 359 | projected 0   | snapshot_rows_seen None
+    withheld: no_live_gameline_projection 85 -> 178 | segment_is_not_full_game 97 -> 181
+    live_projections.reason "live-lens snapshot for wnba carries no liveProps (producer not wired)"
+
+**Capture is NOT the broken half** — `live-odds-worker` kept succeeding right
+through it: `WNBA_LIVE_BOX_CAPTURED games=1 players=18` (00:34:09Z, 00:36:22Z)
+and `games=2 players=39` (00:38:19Z). So the producer writes and the board reads
+nothing. The break is in CONSUMPTION, downstream of capture.
+
+The sharpest discriminator is `snapshot_rows_seen`: **8 at 00:15Z, then the key
+absent entirely**. That is not "snapshot present but empty" — the snapshot stops
+being readable at all. Worth testing against the web/worker disk split first
+(`CLAUDE.md`: web and worker cannot share a disk; cross-service state goes
+through `refresh_state_store` with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`),
+because a producer that succeeds while the consumer sees nothing is the exact
+signature of that split. **Not yet investigated — do not treat that as the cause.**
+
+Note also `no_two_sided_market_price` and the pricing reasons vanished from the
+map entirely: once `no_live_gameline_projection` fires, nothing downstream of it
+runs, which is why `#499` cannot be re-measured while this is broken.
+
+**Secondary defect, still real and cheap:** the reason string
+`"...(producer not wired)"` is emitted for a producer that demonstrably IS wired
+and IS producing. A reader cannot tell "never built" from "built, wired, and
+currently failing to be consumed" — precisely the ambiguity `#498` existed to
+remove, and why it sat unverifiable for weeks. Give the states distinct strings.
+
+### `#500` — **`#499`'s totals gate cannot be diagnosed from the served board: `analytic_line` is never surfaced next to the row line** — found by lane `wnba-live-props-data`, 2026-08-21, NOT FIXED
+
+`price_analytic_line_market()` refuses a totals row when
+`abs(analytic_line - row_line) > 1e-6`, where `analytic_line` comes from the
+lens's `markets.total.line` (`live_gameline_join.py:284`). On 2026-08-21, **0 of
+65** totals/totals_alt rows matched, despite a board ladder (144.5 … 179.5)
+straddling both games' `total_mean` (146.4 / 171.3). A match is possible in
+principle; it did not happen once.
+
+Two explanations are indistinguishable from the outside, and they have opposite
+consequences: either the lens line simply sat off-ladder for these two games
+(fine, wait for another slate), or it is stale / off the half-point grid, in
+which case **totals are REACHED but can never CLEAR and `#499` is inert in
+outcome**. Nothing on the served row lets you tell.
+
+**The fix:** carry `analytic_line` (and the delta to the row line) onto the
+`live_gameline` block whenever the refusal is `..._only_valid_at_its_own_line`.
+One live reading then settles `#499` instead of waiting on coincidence.
+
+**BLOCKED — CROSS-LANE.** `live_gameline_join.py` is claimed by lane
+`live-edge-basis` (`lanes.md`: "left guarded because it now SOLELY owns
+`live_gameline_join.py`"). Patch is prepared but NOT applied:
+`docs/ai_context/patches/500_surface_analytic_line.md`. Needs that lane's
+release or an explicit override before it lands.
+
+### `#499` — **WNBA live TOTALS pricing IS REACHED in production — proven 2026-08-21 by the ORDER of the refusal gates, not by the reason string the verifier was built to watch for. The sigma=0.150 interval has still never been observed APPLIED.** — lane `wnba-live-props-data`, REACHABILITY VERIFIED / OUTCOME UNPROVEN
+
+Shipped and live on both workers at `8d5d6edf` (refresh-worker 16:43:05Z,
+live-odds-worker 16:48:04Z): `b7cf3421` refit `_WNBA_LIVE_TOTAL_SCALE`
+(`8.0 + 0.50*min_left` → constant `3.2`; held-out Brier 0.1744 → 0.1477, n=249
+games / 23,712 samples), `d06a70d4` enabled totals pricing via
+`ANALYTIC_LIVE_STD_ERR_BY_MARKET = {("wnba","totals"): 0.150}`, `8d5d6edf` fixed
+`d06a70d4` having shipped **INERT** (`board_enrichment.py` never passed `sport`,
+so `hit.get("sport")` was None and totals refused as UNCALIBRATED — with all 128
+unit tests passing).
+
+**Reading 2026-08-22T00:15Z, two live games** (`MIN @ WSH` Halftime, `GS @ CHI`
+2:59 2nd Quarter):
+
+    index_size 2 | considered 430 | projected 230 | priceable 3 | withheld 427
+      223  analytic_probability_is_only_valid_at_its_own_line
+      200  segment_is_not_full_game
+        4  no_two_sided_market_price
+        0  analytic_estimator_never_backtested_for_this_market  <- the INERT reason, GONE
+        0  prob_interval_swamps_edge                            <- what the verifier watches for
+
+**Why that is a PASS and not the `3 INCONCLUSIVE` the verifier reported.** In
+`live_gameline_join.py`, `price_analytic_line_market()` looks up
+`ANALYTIC_LIVE_STD_ERR_BY_MARKET.get((sport_key, "totals"))` at `:609` and
+returns `REASON_ANALYTIC_UNCALIBRATED` at `:612` **strictly before** the
+line-match test that returns `REASON_ANALYTIC_LINE_MISMATCH` at `:624`. So a
+**totals** row carrying `analytic_probability_is_only_valid_at_its_own_line`
+could only have reached that line with `totals_sigma` non-None — i.e.
+`sport_key == "wnba"` resolved and the `0.150` entry was found. Observed
+directly on `('totals','full')` line 154.5 and `('totals_alt','full')` line
+150.5. **`8d5d6edf` is live and REACHED; `d06a70d4` is no longer inert.**
+
+**STILL OPEN, and the reason the item is not closed:** the interval has never
+priced a row and may be structurally unable to — 0 of 65 totals rows matched
+their lens line. See `#500`, which is the instrument that decides it.
+
+The 3 `priceable` rows were **h2h, not totals** (`priceable true,
+std_err_basis analytic_calibration, prob_std_err 0.054, edge_pp -23.29`).
+`priceable` 3 ≪ `withheld` 427 is the CORRECT shape here — at sigma=0.150 the
+2-sigma bar is ~30pp, so volume would have been the bug signal, not success.
+
+Verifier corrected the same day so it stops reporting this state as
+"nothing checkable": `scripts/verify_wnba_totals_pricing.py`.
+
+### `#498` — **WNBA live props capture + projection SEEN NON-EMPTY for the first time 2026-08-21 — then the lens went to zero ~00:20Z DURING LIVE PLAY and did not recover, while capture kept returning players** — lane `wnba-live-props-data`, VERIFIED IN-WINDOW / REGRESSION OPEN (`#501`)
+
+The chain (capture → projection → rows → probability) had been deployed and its
+REFUSAL path verified, but had never once been observed producing output; every
+prior check ran pre-tip, and a pre-tip zero is indistinguishable from an inert
+feature.
+
+**Capture** (`live-odds-worker` — that service owns the tick, not
+`refresh-worker`):
+
+    23:02–23:31Z  WNBA_LIVE_BOX_EMPTY date=2026-08-21 games=3 players=0   (repeated)
+                  WNBA_LIVE_BOX_FAILED ... HTTP Error 502: Bad Gateway    (4x)
+    23:34:05Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=2 players=20   <- first ever
+    23:55:44Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=2 players=37
+    00:18:31Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=1 players=21
+
+**Projection** (served board, 00:15Z): `rows_live_projected: 5`,
+`rows_live_edged: 5`, `rows_live_considered: 376`,
+`snapshot_rows_seen/indexed: 8`, `snapshot_live_prob_seen/indexed: 8`,
+`snapshot_skipped_no_live_projection: 0`, and the pre-tip "producer not wired"
+reason **gone**. That is the pass, and it is the first one this item has ever had.
+
+**Not closed, for three measured reasons:**
+1. The window CLOSED and stayed closed: by 00:37Z and again 00:41Z, on fresh
+   builds with both games live in the 3rd quarter, `rows_live_projected` was 0
+   and `snapshot_rows_seen` had gone from 8 to absent — while capture was still
+   logging `players=39`. The pass above is real but it is ~20 minutes wide.
+   See `#501`, which is the blocker for re-measuring either item.
+2. Even in the WORKING reading, `live_games_in_snapshot: 0` and
+   `snapshot_by_game_state: {"unknown": ...}` — game-state stamping is
+   unpopulated, so the snapshot cannot say which game a row belongs to.
+3. Only **8 of 37** captured players reached the index
+   (`miss_player_not_live: 247`, `miss_no_market_alias: 90`). The alias gap in
+   particular is a straightforward, unexamined loss.
+
 ### `#497` — **The deploy claim is not a global lock once sessions use worktrees** — found by lane `soccer-board-mlb-parity`, 2026-08-21, NOT FIXED ON PURPOSE
 
 `deploy_claim.py:63` sets `CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"`

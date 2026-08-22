@@ -22174,3 +22174,29 @@ Two further gaps visible even in the WORKING reading: `live_games_in_snapshot: 0
 and `snapshot_by_game_state: {"unknown": ...}` (game-state stamping unpopulated),
 and only 8 of 37 captured players reached the index — `miss_player_not_live: 247`,
 `miss_no_market_alias: 90`.
+
+### CORRECTION, same session 2026-08-22T00:37–00:42Z — it was NOT halftime
+
+The entry above attributes the collapse of both readings to halftime. **Play
+resumed and the lens did not recover**, so that attribution is wrong and the
+defect is larger than recorded. Measured on two FRESH builds (`generated_at`
+00:37:53Z, 00:41:47Z — rebuilding, not a stale artifact), both games live in the
+3rd quarter:
+
+    00:15Z  index_size 2 | considered 430 | projected 230 | snapshot_rows_seen 8
+    00:37Z  index_size 0 | considered 182 | projected 0   | snapshot_rows_seen None
+    00:41Z  index_size 0 | considered 359 | projected 0   | snapshot_rows_seen None
+    no_live_gameline_projection 85 -> 178 | segment_is_not_full_game 97 -> 181
+
+Capture never stopped: `WNBA_LIVE_BOX_CAPTURED games=1 players=18` (00:34:09Z,
+00:36:22Z), `games=2 players=39` (00:38:19Z). Producer writes, board reads
+nothing — the break is in CONSUMPTION.
+
+`snapshot_rows_seen` going from `8` to **absent** (not to `0`) is the sharpest
+discriminator: the snapshot stops being readable, rather than being read as
+empty. Filed as `#501`. **Cause NOT investigated — the web/worker disk split is
+a hypothesis, not a finding, and must not be recorded as one.**
+
+The measurement window for BOTH `#498` and `#499` was therefore ~20 minutes wide
+(00:15Z–~00:20Z), not the full slate. Both readings above stand; neither can be
+re-taken until `#501` is fixed.
