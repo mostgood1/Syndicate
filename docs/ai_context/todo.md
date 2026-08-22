@@ -981,11 +981,19 @@ path to shipping anything real — building the card threshold or fixing the hal
 wasted work until that lands.**
 
 **Do, in order:**
-1. Ingest FotMob momentum into production (`ingestion/fotmob_shots.py` already reads it; the ESPN↔FotMob
-   match-id join is the missing piece). This IS the signal — `momentum.py`'s ESPN proxy is not, per the
-   correction above.
-2. Once FotMob's series is live: card indicator colours NOTHING below |momentum| 40 on FotMob's 0-100 scale
-   (goal rate 0.93-0.99x of clock there); 60-80 = 1.19x, 80+ = 1.23x. Does not apply to the ESPN proxy.
+1. **BUILT + TESTED, NOT DEPLOYED `[2026-08-22, same session]`** — `ingestion/fotmob_match_id.py` (name+
+   ccode join, decoy-tested against the Canada/Brazil trap) + `ingestion/fotmob_momentum.py` (clock-bounded
+   fetch, never-fatal) wired into `poll_soccer_live_state.py` in place of the retired ESPN proxy. No fallback
+   to the proxy — a join/fetch miss now returns `supported: False` and the card hides the panel, same
+   contract as before. 21 new tests (14 unit + 7 pinning the card threshold boundaries). Commit `00c4b1b8`.
+2. **BUILT in the same commit** — `cards.py` `_momentum_chart` strength bands retuned from the old
+   ESPN-proxy-scale constants (1.0/2.5/5.0) to FotMob's measured 0-100 scale (40/60/80). Below 40 reads
+   "Balanced" even when nonzero.
+3. **OWED — deploy.** Behind the two-lock protocol (`deploy_claim.py` + `deploy_preflight.py`), needs
+   live-odds-worker (owns `poll_soccer_live_state.py`) redeployed at a SHA containing `00c4b1b8`, then
+   verified against an actual live match — the join has unit tests but has never resolved a REAL FotMob
+   fixture end-to-end. First live verification should log `fotmob_match_id` per resolved match and count
+   join misses; a silent 0% resolve rate would look identical to a quiet slate.
 4. A next-team-to-score model on the live card: logistic on signed FotMob momentum (60s), score diff, clock,
    home flag; surface P(home next)/P(away next) and edge vs next-goal / team-in-15 markets where quoted.
    EXCLUDE mls (AUC .509) and belgian_pro_league (.520) until fitted per league.

@@ -1532,11 +1532,21 @@ def _momentum_chart(
 
     side = home_abbr if float(current) > 0 else (away_abbr if float(current) < 0 else None)
     strength = abs(float(current))
-    if strength < 1.0:
+    # Thresholds are FotMob's OWN 0-100 momentum scale, not tuned by eye. The
+    # 2026-08-22 deep dive measured goal-rate lift by band on this exact scale
+    # (holdout, 5,552 matches): <40 carries no lift at all (0.93-0.99x of
+    # clock-expected), 40-60 is weak (1.07x), 60-80 real (1.19x), 80+ strong
+    # (1.23x). Below 40 this reads "Balanced" even when `current` is nonzero,
+    # because a confident-sounding label on a band with no measured lift would
+    # be a stronger claim than the data supports. `momentum.py`'s ESPN proxy
+    # is NOT the source feeding `current` any more -- see `fotmob_momentum.py`
+    # and `docs/ai_context/todo.md` #518; these bands are meaningless against
+    # that proxy's unbounded scale and must not be reused if it ever is.
+    if strength < 40.0:
         label = "Balanced"
-    elif strength < 2.5:
-        label = f"{side} edging it"
-    elif strength < 5.0:
+    elif strength < 60.0:
+        label = f"{side} shading it"
+    elif strength < 80.0:
         label = f"{side} on top"
     else:
         label = f"{side} pressing hard"
