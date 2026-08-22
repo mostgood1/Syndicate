@@ -248,6 +248,82 @@ _CARD_PROP_MARKETS: dict[str, str] = {
 }
 
 
+# THE BOARD'S MARKET KEY -> our stat label, for the WIDE odds source. Same four
+# stats as `_CARD_PROP_MARKETS`, keyed by what the OddsAPI CSV actually writes
+# in its `market` column (verified against a real
+# `oddsapi_player_props_<date>.csv`: player_assists, player_points,
+# player_rebounds, player_threes).
+_WIDE_PROP_MARKETS: dict[str, str] = {
+    "player_points": "points",
+    "player_rebounds": "rebounds",
+    "player_assists": "assists",
+    "player_threes": "threes",
+}
+
+
+def _lines_from_odds_csv(game: dict[str, Any], date_str: str) -> dict[tuple[str, str], float]:
+    """`(normalized player, stat label) -> line` from the FULL prop feed.
+
+    THIS IS THE WIDENING `_lines_from_cards` NAMED AND DEFERRED. That function
+    reads the card's FEATURED props -- "8-9 per slate measured" by its own
+    docstring -- and a live prop row cannot exist without a line, so the featured
+    set was a hard ceiling on live WNBA coverage.
+
+    MEASURED IN PRODUCTION 2026-08-22 01:2xZ, two WNBA games live: the lens
+    published **6 live prop rows in total** (2 + 4), and the board's join
+    consumed 6 of 6 with a live probability on every one. The join was perfect;
+    the feed into it was the constraint. `oddsapi_player_props_<date>.csv`
+    carried 539 rows on a sampled slate against those 8-9.
+
+    ONE LINE PER (player, stat), chosen by MODE across books rather than by
+    first-seen. Books disagree -- the same slate quotes 19.5 and 20.5 for one
+    scorer -- and first-seen would make coverage depend on CSV row order, which
+    is a different answer every capture. The mode is the market's own consensus
+    and is stable; ties break low, deliberately, so the choice is deterministic
+    rather than dict-ordered.
+
+    Scoped to THIS GAME by `event_id`, because the CSV holds the whole slate and
+    a player-name key alone would join across games.
+
+    Never raises and never returns partial garbage: any failure yields `{}` and
+    the caller falls back to the card lines, which is exactly today's behaviour.
+    """
+    from collections import Counter
+
+    from syndicate.features.shared.refresh_state_store import data_root
+    from syndicate.features.shared.wnba_live_prop_rows import normalize_name
+
+    event_id = str(game.get("event_id") or "").strip()
+    if not event_id:
+        return {}
+    path = data_root() / "wnba_source" / "data" / "processed" / f"oddsapi_player_props_{date_str}.csv"
+    points: dict[tuple[str, str], Counter] = {}
+    try:
+        import csv
+
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if str(row.get("event_id") or "").strip() != event_id:
+                    continue
+                label = _WIDE_PROP_MARKETS.get(str(row.get("market") or "").strip().lower())
+                if not label:
+                    continue
+                player = normalize_name(row.get("player_name"))
+                if not player:
+                    continue
+                try:
+                    point = float(str(row.get("point") or "").strip())
+                except (TypeError, ValueError):
+                    continue
+                points.setdefault((player, label), Counter())[point] += 1
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+    # `min` on the (-count, point) pair: most-quoted first, lowest line on a tie.
+    return {key: min(counter.items(), key=lambda kv: (-kv[1], kv[0]))[0] for key, counter in points.items()}
+
+
 def _lines_from_cards(game: dict[str, Any]) -> dict[tuple[str, str], float]:
     """`(normalized player, stat label) -> line` from the card's prop rows.
 
@@ -317,17 +393,38 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
                 sim_game = pack["sim"]
         if sim_game is None:
             sim_game = {}
+        # WIDE SOURCE FIRST, CARD LINES OVERLAID. The card's featured props are
+        # the verified-but-thin set; the CSV is the full one. Overlaying the
+        # cards last means a featured prop keeps the exact line the card shows,
+        # so nothing a reader can already see changes value -- the CSV only adds
+        # players the card never carried.
+        lines = _lines_from_odds_csv(game, date_str)
+        wide_line_count = len(lines)
+        lines.update(_lines_from_cards(game))
         built = build_live_prop_rows(
             players,
             sim_game,
             game_minutes_remaining=_game_minutes_remaining(game),
-            lines=_lines_from_cards(game),
+            lines=lines,
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {
             k: built[k] for k in ("players_seen", "players_matched", "rows_projected",
                                   "priced", "unpriced_by_reason")
         }
+        # THE FUNNEL, END TO END, so a thin row count is attributable without a
+        # deploy. `players_unmatched` is the one that names a NAME-JOIN failure
+        # -- the producer already collected it and nothing published it, which
+        # is why 6 rows looked like a mystery for an evening. Capped at 12 names
+        # because this rides on every game in the snapshot.
+        game["livePropsCoverage"].update({
+            "lines_available": len(lines),
+            "lines_from_odds_csv": wide_line_count,
+            "lines_from_cards_only": len(lines) - wide_line_count,
+            "players_unmatched_count": len(built.get("players_unmatched") or []),
+            "players_unmatched_sample": list(built.get("players_unmatched") or [])[:12],
+            "withheld_by_reason": built.get("withheld_by_reason"),
+        })
 
 
 def _game_minutes_remaining(game: dict[str, Any]) -> float | None:

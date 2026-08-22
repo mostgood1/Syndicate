@@ -1161,6 +1161,8 @@ against a slate that actually had matches in play. Full evidence in
   `syndicate/static/shared/board_cards.css`,
   `pipeline/layer2_shortlist.py`,
   `syndicate/blueprints/ops.py`,
+  `syndicate/features/wnba/live_lens.py`,
+  `tests/test_wnba_live_prop_line_source.py` (new),
   `tests/test_layer2_sim_view_sides.py` (new),
   `tests/test_layer2_score_flatten.py`.
   - `syndicate/features/shared/live_projection_join.py` and

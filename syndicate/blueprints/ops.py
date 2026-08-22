@@ -423,7 +423,17 @@ def _prop_status_text(game: Any) -> str:
     character for character rather than to be tidier.
     """
     status = game.get("status") if isinstance(game, dict) and isinstance(game.get("status"), dict) else {}
-    return f"{status.get('abstract') or ''} {status.get('detailed') or ''}".strip().lower()
+    # DELEGATED, not re-implemented. The first cut of this copied the composition
+    # inline "to match character for character" -- and then the fix to
+    # `_status_text` landed and this copy did not move with it. The 2026-08-22
+    # 01:2xZ reading showed the result: `live_games: 2` (correct, from the fixed
+    # index) beside `prop_status_text: ""` on all three games (the stale copy),
+    # which reads as a contradiction in a payload whose whole job is to be
+    # believed. A diagnostic that can disagree with the code it measures is
+    # worse than no diagnostic.
+    from syndicate.features.shared.live_projection_join import _status_text
+
+    return _status_text(status)
 
 
 @ops_bp.get("/api/ops/live-lens/snapshot-index")
@@ -519,6 +529,12 @@ def api_ops_live_lens_snapshot_index() -> Any:
             # here would be a different measurement wearing the same name.
             "prop_status_text": _prop_status_text(game),
             "live_prop_count": len(game.get("liveProps") or []) if isinstance(game.get("liveProps"), list) else 0,
+            # THE PRODUCER'S OWN FUNNEL. `build_live_prop_rows` has always
+            # returned players_seen / players_matched / players_unmatched /
+            # withheld_by_reason / unpriced_by_reason; the lens stamped a subset
+            # on the game and nothing surfaced any of it. So "the lens wrote 6
+            # rows" was readable and "why 6" was not.
+            "live_props_coverage": game.get("livePropsCoverage"),
             "archived_prop_count": len(game.get("archivedLiveProps") or []) if isinstance(game.get("archivedLiveProps"), list) else 0,
             # THE PROP KEY NAMES THE LENS ACTUALLY EMITS. `_MARKET_ALIASES` is
             # MLB-only, so a basketball market joins only if both sides happen to
