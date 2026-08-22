@@ -1,6 +1,37 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#502` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22, NOT STARTED, no lane claimed
+### `#503` — **`test_live_lens_loop_publish_watermark` POISONS ITS OWN NEXT RUN: it writes the watermark into the REAL `reports/` tree, then reads it back.** — found by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED (outside that lane's files)
+
+`PublishWatermarkTests::test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`.
+Measured, two consecutive runs of the SAME single test, nothing else changed:
+
+    rm reports/refresh_status/latest/live_lens_publish_watermark.json
+    run 1 -> 1 passed          (and WRITES {"epoch": 9.0} to that real path)
+    run 2 -> AssertionError: [9.0, 3.0, 6.0] != [1.0, 3.0, 6.0]
+
+**The first element is exactly the epoch the previous run left on disk** — 9.0
+after a single-test run, 13.0 after a longer one. Cycles 2 and 3 are correct in
+both runs, which is what makes it look like a logic bug and is why the shape
+matters: only the FIRST cycle reads the stale file.
+
+**It passes on a clean checkout and fails on any machine that has run it
+before**, which is why CI is green and nobody has hit it. That asymmetry is the
+whole defect: the suite is not reproducible locally, and the failure appears
+attached to whatever change a session happens to be making at the time. This
+session nearly attributed it to an unrelated `artifact_publisher.py` edit and
+only ruled that out by stashing.
+
+Fix is presumably to point the watermark at a tmp path (or clear it in
+setUp), in `tests/test_live_lens_loop_publish_watermark.py` and/or
+`_live_lens_publish_watermark_path()` — `syndicate/features/shared/live_lens_loop.py`
+is claimed by `soccer-board-mlb-parity`, so this needs that lane or a fresh one.
+
+**Related, same class, cheap:** `.gitignore` covers
+`reports/live_refresh_loop/memory_diagnostics.json` and `last_*.json` but NOT
+`memory_high_water.json`, so every test run leaves an untracked file that trips
+commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
+
+### `#502` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED** on `claude/live-lens-momentum-basketball-3hlx7g`, lane `basketball-live-momentum`; NOT DEPLOYED and NOTHING CALLS THE PRODUCER
 
 Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 

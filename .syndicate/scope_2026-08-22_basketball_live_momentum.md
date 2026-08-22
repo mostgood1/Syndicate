@@ -271,7 +271,57 @@ clock stops, so seconds-decay is the wrong axis entirely).
 
 ---
 
-## 7. Decisions owed before any code
+## 7. Decisions — ANSWERED 2026-08-22 by the user
+
+**1. Decay axis: PUBLISH BOTH, DECIDE IN PHASE C.** Phase B writes the
+seconds-decayed series AND `poss_est` alongside in the same artifact; the
+Phase C sweep settles which axis wins with data rather than a Phase A guess.
+This is why the item stopped blocking Phase B: the question does not need an
+answer to make progress, only to make a *choice*, and the choice is deferred to
+where the evidence will be.
+
+**2. The narrator series IS published, under a name that cannot be mistaken.**
+Phase C needs it as the outcome variable and re-deriving it later is worse.
+Published as **`scoring_narrator`**, never `scoring_momentum` — `learnings.md`
+2026-08-21 FORBIDS publishing a field under a name that describes a different
+quantity, and "momentum" on a series that counts points is exactly that.
+
+**3. Sim input: NOT DECIDED, and deliberately not needed yet.** Momentum is
+display-and-validation only until Phase C returns a number. If pressure does
+not lead scoring the question is moot; if it does,
+`model_engine_standard.md` binds in full (input checklist over
+`dataclasses.fields()`, reachability test, and a re-fit of whatever rates were
+absorbing the mechanism).
+
+**4. Deploy posture: BUILD PHASE B, STOP BEFORE DEPLOY.** The producer and the
+allowlist land on the branch; nothing reaches production without a separate
+decision. Consequence, stated because it is a real cost: Phase C slips past
+this week's WNBA slate, and WNBA is the only basketball league in season.
+
+### 7a. LANE COLLISION, found at Phase B planning — this SHAPES the build
+
+`syndicate/features/wnba/live_lens.py` is claimed by
+`layer2-sim-view-and-live-projection` (OPEN). `live_lens_loop.py` is claimed by
+`soccer-board-mlb-parity`. Neither may be edited from this lane.
+
+**Resolution: Phase B is built as a SCRIPT plus a shared module, which is
+soccer's own shape** — `scripts/poll_soccer_live_state.py` is a script the loop
+imports, not code inside `features/soccer/`. So the producer lands entirely in
+unclaimed files:
+
+    syndicate/features/shared/basketball_momentum_artifacts.py   NEW
+    scripts/poll_basketball_momentum.py                          NEW
+    syndicate/features/shared/artifact_publisher.py              allowlist only
+
+**WHAT THIS LEAVES UNDONE, AND IT MUST NOT BE MISREAD AS WIRED.** Nothing calls
+the script. Adding it to `live_lens_loop._LIVE_LENS_BUILDERS` (or to the two
+sports' snapshot builders) is a one-line change in a claimed file and is part
+of the deploy step the user has deferred. This is `#208`'s lesson in a second
+guise: a producer that exists and a producer that RUNS are different states,
+and so are an allowlisted pattern and a transferred artifact. Phase B ships
+capture CAPABILITY, not capture.
+
+## 8. Original framing of the decisions (kept — this is what was owed before §7 answered them)
 
 1. **Seconds or possessions for the decay axis** (§3c). Possessions is the
    better answer if `poss_est` coverage in PRODUCTION (not the mirror) is

@@ -59,10 +59,20 @@ def momentum_at(
     clock_seconds: float,
     *,
     half_life_seconds: float,
+    axis_key: str = _T_KEY,
 ) -> float:
     """Signed momentum as of `clock_seconds`: positive = home on top.
 
     STRICTLY CAUSAL -- only events at or before `clock_seconds` contribute.
+
+    `axis_key` selects WHAT decays. The default is elapsed seconds, which is
+    the only axis soccer has. Basketball rows also carry `possession_index`, so
+    the same function decays over possessions -- one half-life that ports
+    across NBA/WNBA/NCAAB pace regimes instead of three tunings. Which axis
+    wins is Phase C's question (scope section 7, decision 1: publish both,
+    decide with data); this parameter is what makes answering it free rather
+    than a rebuild. `half_life_seconds` is then read in the units of the axis,
+    not necessarily seconds -- the name is kept for the soccer pin.
 
     `half_life_seconds` is REQUIRED and has no default, unlike soccer's
     `momentum_at`. A shared module cannot have a defensible default: soccer
@@ -81,7 +91,7 @@ def momentum_at(
     total = 0.0
     for event in events:
         try:
-            t = float(event[_T_KEY])
+            t = float(event[axis_key])
         except (KeyError, TypeError, ValueError):
             # A row without a usable clock cannot be placed in time. Skipping is
             # the only honest option -- dropping it to 0.0 would put it at
@@ -104,6 +114,7 @@ def momentum_series(
     until_seconds: float,
     half_life_seconds: float,
     step_seconds: float = 60.0,
+    axis_key: str = _T_KEY,
 ) -> list[tuple[float, float]]:
     """(clock_seconds, momentum) samples -- the shape the vendor charts draw.
 
@@ -120,7 +131,7 @@ def momentum_series(
     t = 0.0
     limit = float(until_seconds)
     while t <= limit:
-        out.append((t, momentum_at(rows, t, half_life_seconds=half_life_seconds)))
+        out.append((t, momentum_at(rows, t, half_life_seconds=half_life_seconds, axis_key=axis_key)))
         t += float(step_seconds)
     return out
 

@@ -227,6 +227,54 @@ def _classify(play: Mapping[str, Any]) -> tuple[str, float] | None:
     return None
 
 
+
+def possession_index_stream(plays: Any) -> list[float]:
+    """Running game-level possession estimate, one entry per play, in feed order.
+
+    **THE SECOND DECAY AXIS** (scope section 7, decision 1: publish both, decide
+    in Phase C). A half-life in SECONDS means different things in a fast NCAAB
+    game and a slow NBA one, so it needs re-tuning per league; a half-life in
+    POSSESSIONS ports across all three unchanged.
+
+    Uses the platform's existing estimator so two possession counts cannot
+    disagree: `FGA + TOV + 0.44*FTA - OREB`, which
+    `vendor/wnba_betting_repo/app.py:3572` computes and `game_shape.py:447`
+    documents. **Computed HERE from the play stream rather than joined from the
+    `live_pbp_stats` family**, deliberately: that family's coverage measured 19
+    of 126 records on ONE date in the tracked mirror, and a decay axis that
+    silently disappears when its source artifact is thin is worse than one that
+    is merely mis-scaled.
+
+    Accumulated over BOTH teams -- it counts possessions in the GAME, which is
+    the clock this replaces, not possessions BY a team.
+    """
+    out: list[float] = []
+    total = 0.0
+    for play in (plays if isinstance(plays, list) else []):
+        if isinstance(play, dict):
+            attempted = play.get("pointsAttempted")
+            try:
+                attempted_int = int(attempted) if attempted is not None else 0
+            except (TypeError, ValueError):
+                attempted_int = 0
+            shooting = bool(play.get("shootingPlay"))
+            type_text = str((play.get("type") or {}).get("text") or "").strip().lower()
+            text = str(play.get("text") or "").strip().lower()
+            if shooting and attempted_int in (2, 3):
+                total += 1.0
+            elif shooting and attempted_int == 1:
+                total += 0.44
+            elif "turnover" in type_text or "turnover" in text:
+                total += 1.0
+            elif "offensive rebound" in type_text or "offensive rebound" in text:
+                total -= 1.0
+        # Emitted for EVERY play, including the ones that move nothing, so the
+        # list stays index-aligned with `plays`. A filtered list would silently
+        # misalign every annotation after the first non-scoring play.
+        out.append(round(total, 3))
+    return out
+
+
 def basketball_pressure_events(
     summary: Mapping[str, Any],
     *,
@@ -268,8 +316,9 @@ def basketball_pressure_events(
     if not isinstance(plays, list):
         return []
 
+    possessions = possession_index_stream(plays)
     out: list[dict[str, Any]] = []
-    for play in plays:
+    for play_index, play in enumerate(plays):
         if not isinstance(play, dict):
             continue
         classified = _classify(play)
@@ -295,6 +344,7 @@ def basketball_pressure_events(
 
         out.append({
             "clock_seconds": seconds,
+            "possession_index": possessions[play_index],
             "team": credited,
             "committed_by": tricode if credited != tricode else None,
             "sign": 1.0 if credited == resolved_home else -1.0,
@@ -336,8 +386,9 @@ def basketball_scoring_events(
     if not isinstance(plays, list):
         return []
 
+    possessions = possession_index_stream(plays)
     out: list[dict[str, Any]] = []
-    for play in plays:
+    for play_index, play in enumerate(plays):
         if not isinstance(play, dict):
             continue
         try:
@@ -354,6 +405,7 @@ def basketball_scoring_events(
             continue
         out.append({
             "clock_seconds": seconds,
+            "possession_index": possessions[play_index],
             "team": tricode,
             "sign": 1.0 if tricode == resolved_home else -1.0,
             "weight": float(points),
@@ -392,9 +444,17 @@ def elapsed_seconds(play: Mapping[str, Any], *, league_code: str) -> float | Non
     return round(float(minutes) * 60.0, 3)
 
 
+# Half-life on the POSSESSION axis, for the same sweep. ~8 possessions is
+# roughly two minutes of NBA game time at league-average pace, so the two
+# defaults describe a comparable window and the Phase C sweep compares like
+# with like. Equally a CHOSEN constant.
+DEFAULT_HALF_LIFE_POSSESSIONS = 8.0
+
 __all__ = [
+    "DEFAULT_HALF_LIFE_POSSESSIONS",
     "DEFAULT_HALF_LIFE_SECONDS",
     "basketball_pressure_events",
     "basketball_scoring_events",
     "elapsed_seconds",
+    "possession_index_stream",
 ]

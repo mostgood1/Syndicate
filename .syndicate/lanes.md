@@ -1215,6 +1215,21 @@ against a slate that actually had matches in play. Full evidence in
   - `tests/test_basketball_momentum.py` (NEW)
   - READ-ONLY, deliberately: `syndicate/features/soccer/features/momentum.py`,
     `syndicate/features/shared/game_shape.py`
+  - **ADDED FOR PHASE B 2026-08-22** (collision-checked at add time, all unclaimed):
+    `syndicate/features/shared/basketball_momentum_artifacts.py` (NEW),
+    `scripts/poll_basketball_momentum.py` (NEW),
+    `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
+    `tests/test_basketball_momentum_artifacts.py` (NEW)
+- **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
+  `syndicate/features/wnba/live_lens.py` is claimed by
+  `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by
+  `soccer-board-mlb-parity`. Neither is editable from here, and WNBA is the only
+  basketball league in season. So the producer is a SCRIPT plus a shared module —
+  soccer's own shape, since `scripts/poll_soccer_live_state.py` is a script the
+  loop imports rather than code inside `features/soccer/`. **NOTHING CALLS IT.**
+  Wiring it into the tick is a one-line change in a claimed file and belongs to
+  the deploy step, which the user has deferred. Phase B ships capture
+  CAPABILITY, not capture — `#208` in a second guise.
 - **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
   The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
   `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
