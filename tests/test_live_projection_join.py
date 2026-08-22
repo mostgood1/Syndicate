@@ -64,7 +64,14 @@ class LiveProjectionJoinTests(unittest.TestCase):
                  "line": 1.5, "game": {"state": "live"}}]
         coverage = attach_live_projections(grid, build_live_prop_index(_snapshot()))
         self.assertEqual(coverage["rows_live_projected"], 0)
-        self.assertEqual(coverage["miss_no_market_alias"], 1)
+        # `miss_no_market_alias` used to absorb this, and that was the defect
+        # `#296`'s contract exists to prevent: "Nobody Here" is not in the live
+        # lens AT ALL, which is a different fact from the market vocabulary
+        # missing. The 2026-08-21 production reading -- `miss_market=428` with
+        # player and line both 0 -- is what forced the split, and this row is
+        # the player case.
+        self.assertEqual(coverage["miss_player_not_live"], 1)
+        self.assertEqual(coverage["miss_no_market_alias"], 0)
         self.assertTrue(coverage["unmatched_samples"])
         self.assertIn("tried", coverage["unmatched_samples"][0])
 
