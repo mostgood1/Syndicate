@@ -1232,6 +1232,10 @@ against a slate that actually had matches in play. Full evidence in
     `wnba/cards.py` and `wnba/live_lens.py` are claimed by other lanes and were
     NOT edited — every one of the six failures was a stale TEST target, and both
     source files are the correct side.
+  - **ADDED FOR `#505` 2026-08-22** (user asked for the no-new-failures gate;
+    all unclaimed): `scripts/pytest_baseline.py` (NEW),
+    `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
+    `requirements-dev.txt`.
 - **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
   `syndicate/features/wnba/live_lens.py` is claimed by
   `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by

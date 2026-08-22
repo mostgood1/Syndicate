@@ -60,12 +60,38 @@ decoration.
 — CI installs only `requirements.txt`, so a pytest step needs the dependency
 declared first. That is a real (small) part of why the suite has never run in CI.
 
-**Suggested order:** fix the top files first (`test_refresh_state_store.py` 18,
-`test_ask_headline_from_board.py` 11, `test_wnba_refresh_runner.py` 6 = 46%
-of all failures), re-measure, then wire pytest in ENFORCED — never
-`continue-on-error`. An interim option if the tail proves stubborn: gate on a
-NO-NEW-FAILURES baseline rather than zero, which is honest about the debt
-instead of hiding it. That is a policy call, not a mechanical one.
+**RESOLVED AS A NO-NEW-FAILURES GATE 2026-08-22** (user decision), which
+closes `#504`'s CI half without pretending the debt is gone:
+
+- `scripts/pytest_baseline.py` — `--update` records the failing set;
+  bare invocation fails when the set GROWS. **It also fails when a baselined
+  test starts PASSING**, with the remedy printed: a baseline that never shrinks
+  stops describing reality, and "no new failures" quietly becomes "no
+  information".
+- `tests/pytest_baseline.json` — the recorded set.
+- `ci.yml` job `pytest-baseline`, ENFORCED, never `continue-on-error`. A
+  SEPARATE job so the ~27-minute suite does not delay the fast `test` job.
+- `pytest` declared in `requirements-dev.txt` (it was in no requirements file
+  at all).
+
+**Test identity is the junit `classname::name` pair, not a pytest node id.**
+Node ids must be reconstructed from a dotted classname whose module/class
+boundary is ambiguous, and scraping them from `-q` stdout is worse — a
+parametrised id can contain spaces and ` - `. The junit pair needs no parsing.
+
+**THE BASELINE IS ENVIRONMENT-SENSITIVE, and the CI install is narrow on
+purpose.** It was generated on Python 3.11 with **psutil and playwright
+ABSENT**. `requirements-dev.txt` carries psutil, whose PRESENCE CHANGES
+BEHAVIOUR — `memory_observability` selects a psutil backend over its procfs
+one, and two baselined failures are memory tests. So CI installs
+`requirements.txt` + pytest only. If the first CI run reports phantom
+regressions, that is an environment mismatch, not a code regression: compare
+the two installs before touching any test.
+
+**Still owed, and unchanged by this:** the 76 themselves. The gate stops the
+number growing; it does not shrink it. Fix the top three files first
+(`test_refresh_state_store.py` 18, `test_ask_headline_from_board.py` 11,
+`test_wnba_refresh_runner.py` 6 = 46% of all failures), then `--update`.
 
 ### `#504` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
 
