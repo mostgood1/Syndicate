@@ -374,11 +374,60 @@ def build_layer2_shortlist(
                         # distinguish from a line mismatch.
                         f"miss_line_match={live_stats.get('miss_no_line_match')} "
                         f"miss_not_live={live_stats.get('miss_player_not_live')} "
-                        f"sample={live_stats.get('unmatched_samples')}",
+                        f"sample={live_stats.get('unmatched_samples')} "
+                        # The soccer live path returns EARLY with a stated
+                        # reason and none of the counters above, so every field
+                        # on this line read `None` and the line said nothing.
+                        # `reason` is where its answer lives.
+                        f"reason={live_stats.get('reason')} "
+                        f"soccer_live_games={live_stats.get('live_games')} "
+                        f"soccer_rows_seen={live_stats.get('rows_seen')}",
                         flush=True,
                     )
             except Exception:
                 # An instrument that can break the build is worse than none.
+                pass
+
+            # AND THE SAME FOR THE PREGAME TIER, which had no log line at all.
+            #
+            # `attach_projections` returns a full coverage payload per sport and
+            # it went into the shortlist artifact and nowhere else -- so the only
+            # way to answer "is the SIM reaching the board" was to fetch and
+            # parse the served artifact. Soccer has been at
+            # `rows_with_projection: 4` of ~1,142 for days and the shape of that
+            # zero was never readable from the logs.
+            #
+            # Deliberately for EVERY sport, not soccer alone: the same blank
+            # column, produced by the same absent join, currently looks
+            # identical on all eight.
+            try:
+                proj_stats = enrichment.get("projections")
+                if isinstance(proj_stats, Mapping) and proj_stats.get("supported") is not False:
+                    print(
+                        f"[layer2_shortlist] PREGAME_PROJECTION_JOIN sport={sport} "
+                        f"considered={proj_stats.get('rows_considered')} "
+                        f"projected={proj_stats.get('rows_with_projection')} "
+                        f"with_prob={proj_stats.get('rows_with_true_probability')} "
+                        f"matches_in_source={proj_stats.get('matches_in_source')} "
+                        f"unmatched_match={proj_stats.get('unmatched_match_rows')} "
+                        f"unmatched_player={proj_stats.get('unmatched_player_rows')} "
+                        f"unsupported_market={proj_stats.get('unsupported_market_rows')} "
+                        f"reason={proj_stats.get('reason')} "
+                        f"error={proj_stats.get('error')} "
+                        # Soccer-only attribution. Absent on other sports, which
+                        # is why they print as None rather than being a second
+                        # log line nobody greps for.
+                        f"dates_read={proj_stats.get('dates_read')} "
+                        f"leagues_indexed={proj_stats.get('leagues_indexed')} "
+                        f"ambiguous_keys={proj_stats.get('ambiguous_team_keys')} "
+                        f"rows_by_league={proj_stats.get('rows_by_league')} "
+                        f"unmatched_by_league={proj_stats.get('unmatched_by_league')} "
+                        f"unmatched_fixtures={proj_stats.get('unmatched_fixtures_count')} "
+                        f"board_names={proj_stats.get('unmatched_fixture_sample')} "
+                        f"sim_names={proj_stats.get('indexed_fixture_sample')}",
+                        flush=True,
+                    )
+            except Exception:
                 pass
 
             result = build_layer2_rows(grid, openings=openings_index)

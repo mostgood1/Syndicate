@@ -731,13 +731,39 @@ def attach_soccer_projections(
     unmatched_match = 0
     unmatched_player = 0
     unsupported_market = 0
+    # ATTRIBUTION FOR `unmatched_match_rows`, which until now was a bare total.
+    #
+    # It has read ~99.6% of the grid for days (`state.md`: 1,138 of 1,142) and
+    # that one number cannot distinguish the three things it can mean, which
+    # have three unrelated fixes:
+    #
+    #   the league is not in the index at all  -> the SIM did not run it, or its
+    #                                             file is outside the window
+    #   the league IS indexed, rows still miss -> the NAME join failed
+    #   the league is indexed and matches      -> nothing to fix here
+    #
+    # Per-league counts separate the first two by themselves; the paired name
+    # samples (board side and index side, same league) settle the third. Same
+    # contract `#296` set and `LIVE_PROJECTION_JOIN` already follows for the
+    # live tier: a zero must be attributable, never bare.
+    rows_by_league: dict[str, int] = {}
+    unmatched_by_league: dict[str, int] = {}
+    unmatched_fixtures: dict[str, str] = {}
 
     for row in grid:
         market = str(row.get("market") or "").strip().lower()
         considered += 1
+        row_league = str(row.get("league") or "").strip() or "?"
+        rows_by_league[row_league] = rows_by_league.get(row_league, 0) + 1
         match = index.match_for(row)
         if match is None:
             unmatched_match += 1
+            unmatched_by_league[row_league] = unmatched_by_league.get(row_league, 0) + 1
+            # Keyed by fixture so a 900-row league contributes ONE sample --
+            # every row of a missed fixture misses identically, and a sample
+            # list of the same pair nine hundred times names nothing.
+            fixture = f"{row.get('home_team')} v {row.get('away_team')}"
+            unmatched_fixtures.setdefault(f"{row_league}|{fixture}", fixture)
             continue
 
         projection: dict[str, Any] | None = None
@@ -879,10 +905,36 @@ def attach_soccer_projections(
         if projection.get("model_prob_over") is not None:
             with_probability += 1
 
+    # THE INDEX SIDE OF THE SAME PAIRING. Without it the unmatched samples say
+    # what the BOARD calls a fixture and nothing about what the SIM calls it,
+    # which is exactly half of a name-join question. Capped, and one entry per
+    # indexed fixture.
+    indexed_fixtures: list[str] = []
+    for (index_home, index_away), match in index.by_teams.items():
+        matchup = match.get("matchup") or {}
+        league = str(match.get("league") or "").strip() or "?"
+        indexed_fixtures.append(
+            f"{league}|{matchup.get('home_team') or index_home} v "
+            f"{matchup.get('away_team') or index_away}"
+        )
+
     return {
         "supported": True,
         "leagues": sorted(set(index.leagues)),
         "matches_in_source": index.matches,
+        # Which dates were actually read, so "the sim never ran that day" is
+        # distinguishable from "it ran and the names missed".
+        "dates_read": list(index.dates),
+        "leagues_indexed": sorted({str(m.get("league") or "").strip() for m in index.by_teams.values() if m.get("league")}),
+        "rows_by_league": dict(sorted(rows_by_league.items())),
+        "unmatched_by_league": dict(sorted(unmatched_by_league.items())),
+        "unmatched_fixtures_count": len(unmatched_fixtures),
+        "unmatched_fixture_sample": sorted(unmatched_fixtures)[:12],
+        "indexed_fixture_sample": sorted(indexed_fixtures)[:12],
+        # `match_for` returns None for these BY DESIGN (a wrong projection is
+        # worse than a blank one), so they are unmatched rows with a cause that
+        # is not a name failure and must not be read as one.
+        "ambiguous_team_keys": len(index.ambiguous_team_keys),
         "rows_considered": considered,
         "rows_with_projection": projected,
         "rows_with_true_probability": with_probability,
