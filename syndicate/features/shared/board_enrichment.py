@@ -818,10 +818,68 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                     )
                     distribution_index = None
                 prop_coverage = attach_wnba_projections(grid, index, distribution_index)
+            # MERGE THE NUMERATOR AND THE DENOMINATOR TOGETHER, OR NEITHER.
+            #
+            # This used to spread `prop_coverage` and then overwrite ONLY
+            # `rows_with_projection` with props + games. `rows_considered` stayed
+            # prop-only, so the payload counted a population in its numerator
+            # that its denominator never saw. Found by a parallel session;
+            # confirmed on production 2026-08-22:
+            #
+            #   considered=396 projected=375 unmatched_player=3 unsupported=40
+            #       -> 375+3+40 = 418, not 396          (+22 game rows)
+            #   considered=176 projected=176 unmatched_player=0 unsupported=20
+            #       -> 176 projected out of 176 considered, WITH 20 unsupported
+            #
+            # The second is the clearest tell: 100% projected and 20 refusals in
+            # the same breath is arithmetically impossible for one population.
+            #
+            # Two things went wrong downstream of that. `pct_projected` is
+            # computed INSIDE the prop join over prop-only numbers and was then
+            # left untouched while its numerator was replaced — three fields in
+            # one dict that no longer agreed. And the top-line read as prop
+            # coverage: 375/396 looks like "95% of WNBA props projected" when
+            # part of the numerator is game lines.
+            #
+            # Same class as `#364`, which this file's comment above records as
+            # WNBA running "36.4% coverage with 0.0% of it on game rows". That
+            # fix correctly made the two joins INDEPENDENT; the merge that
+            # stitched them back together quietly reintroduced the mismatch.
+            #
+            # Both populations now contribute to both totals, `pct_projected` is
+            # recomputed over the merged pair, and every per-population number
+            # stays reachable under `prop_coverage` / `game_coverage`. The
+            # invariant a reader can now rely on:
+            #
+            #   rows_considered == rows_with_projection
+            #                      + unmatched_player_rows      (props)
+            #                      + unsupported_market_rows    (props)
+            #                      + unmatched_game_rows        (games)
+            prop_considered = int(prop_coverage.get("rows_considered") or 0)
+            game_considered = int(game_coverage.get("rows_considered") or 0)
+            prop_projected = int(prop_coverage.get("rows_with_projection") or 0)
+            game_projected = int(game_coverage.get("rows_with_projection") or 0)
+            merged_considered = prop_considered + game_considered
+            merged_projected = prop_projected + game_projected
             return {
                 **prop_coverage,
-                "rows_with_projection": int(prop_coverage.get("rows_with_projection") or 0)
-                + int(game_coverage.get("rows_with_projection") or 0),
+                "rows_considered": merged_considered,
+                "rows_with_projection": merged_projected,
+                # Recomputed, never inherited. The inherited one described a
+                # population this payload no longer reports.
+                "pct_projected": (
+                    round(100.0 * merged_projected / merged_considered, 1)
+                    if merged_considered
+                    else 0.0
+                ),
+                # Carried up so the invariant above can actually be checked from
+                # the top level rather than only by opening a sub-dict.
+                "unmatched_game_rows": int(game_coverage.get("unmatched_game_rows") or 0),
+                # The two halves, unmerged, so "95% of props" stays answerable.
+                "prop_rows_considered": prop_considered,
+                "prop_rows_with_projection": prop_projected,
+                "game_rows_considered": game_considered,
+                "game_rows_with_projection": game_projected,
                 "prop_coverage": prop_coverage,
                 "game_coverage": game_coverage,
             }
