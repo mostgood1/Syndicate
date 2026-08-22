@@ -29,7 +29,16 @@ was about to drive a Postgres decision whose only delivery mechanism is a
   none), confirming the blueprint read.
 
 **RECOMMENDED, and it is a production change so it is the user's call:**
-`allkeys_lru` → **`volatile_lru`**. One setting, no deploy, no sync, no code.
+`allkeys_lru` → **`volatile_lru`** — **on the KEY VALUE INSTANCE's own settings
+page (`red-d88bvljbc2fs73epfhhg`), NOT any service's Environment tab.** Naming
+the store without naming the surface cost a 4-minute `refresh-worker` outage on
+2026-08-22 (19:31:36Z → 19:35:31Z) when the value went into
+`SYNDICATE_REFRESH_STATE_BACKEND` instead; `_state_backend_kind()` maps any
+unrecognised value to `"filesystem"`, so it would have silently routed all
+cross-service state to per-service disks had `assert_refresh_state_backend_ready`
+not refused at startup. `learnings.md` 2026-08-22. **AS OF 19:3xZ THE POLICY IS
+STILL `allkeys_lru`** — verified via `get_key_value`, `updatedAt` unchanged
+since the instance was created 2026-05-22. One setting, no deploy, no sync, no code.
 It aligns eviction with the TTL discipline the code already has — date-scoped
 keys carry TTLs and stay evictable, while keys with NO TTL (the bankroll, the
 Stage B execution ledger, and `#502`'s `prediction_ledger.json`) become

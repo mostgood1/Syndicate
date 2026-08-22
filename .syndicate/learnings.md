@@ -36,6 +36,41 @@
 
 ---
 
+### 2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the same store without saying which surface. A 4-minute refresh-worker outage came from that ambiguity
+
+**What happened.** A recommendation to change the eviction policy on the
+keyvalue store was written as *"`allkeys_lru` → `volatile_lru` on
+`syndicate-refresh-state`"*. There are TWO settable things whose names both
+point at that store: the Key Value instance's `maxmemoryPolicy` (Redis's own
+eviction rule) and the services' `SYNDICATE_REFRESH_STATE_BACKEND` env var
+(which backend the APP routes to). The value went into the env var.
+
+**Measured.** `refresh-worker` crash-looped 2026-08-22T19:31:36Z → 19:35:31Z:
+
+    REFRESH_STATE_BACKEND = volatile_lru
+    RuntimeError: Local state backend not allowed in multi-service deployment
+                  for refresh-worker: volatile_lru
+
+Recovery on a new instance at 19:35:31.931Z, `BACKGROUND_LOOP_START`
+19:35:33.035Z, then `PUBLISH_OK` ×2, `MLB_LINEUP_STATE games=15 posted=5`,
+`OVERVIEW_SPORT_BEGIN sport=mlb`. Web and live-odds-worker were never affected
+(0 matches for the same error text; web's `PUBLISH_OK` proves it was up).
+
+**THE RULE.** When recommending a change to a hosted resource, name the SURFACE
+as well as the resource: *"the Key Value instance's own settings page"* vs
+*"the service's Environment tab"*. A resource name alone is not an address when
+two surfaces answer to it.
+
+**WHY IT WAS ONLY 4 MINUTES, and this is the part to keep.**
+`_state_backend_kind()` maps any unrecognised value to `"filesystem"` — so
+`volatile_lru` did not error, it silently meant "use the local disk". On Render
+that is three separate disks, i.e. `#502`'s failure applied to the entire board,
+and it would have run HAPPILY while every cross-service artifact went private,
+discoverable days later. `assert_refresh_state_backend_ready` refuses at startup
+BEFORE any state is touched, which converted a silent multi-day corruption into
+a loud four-minute outage. **A permissive parse plus a strict startup assert is
+the pattern**: the assert is doing the work the `.get(key, default)` cannot.
+
 ### 2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT quantity, however well-documented the real one is
 - What we believed: the Layer 2 board's `Win%` column showed a win probability,
   and `model_probability` was the model's number for the row being recommended.
