@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
+
+**Not to be confused with `unsupported_market=40`, which prompted the look and
+is CORRECT.** `_UNSUPPORTED_MARKETS = {"player_double_double",
+"player_triple_double"}` (`wnba_projections.py:84`): the WNBA model ships
+per-stat MEANS, and a double-double is a joint threshold across several stats
+that a mean cannot express. Refused by name rather than projected with a wrong
+number. Covering those 40 needs a joint distribution, not a counter change.
+
+**The real defect.** `attach_wnba_projections`'s loop has exactly three terminal
+paths per counted row, so the invariant is
+`rows_considered == rows_with_projection + unmatched_player_rows + unsupported_market_rows`.
+Production never satisfies it:
+
+    considered   proj+unmatched+unsupported   delta
+        396              418                   +22
+        391              416                   +25
+        176              196                   +20
+
+**Cause** — `board_enrichment.py` `_attach_projections_by_sport`, wnba branch:
+
+    return {
+        **prop_coverage,                       # rows_considered = PROPS ONLY
+        "rows_with_projection": prop + game,   # PROPS + GAME ROWS
+        ...
+    }
+
+WNBA runs two independent joins (`attach_wnba_game_projections` and
+`attach_wnba_projections`). The merge SUMS `rows_with_projection` across both
+while `rows_considered` comes from `**prop_coverage`, and the prop join counts
+only `kind == "prop"`. The 20–25 row overshoot is the game lines.
+
+**Two consequences.** (1) The line OVERSTATES prop coverage — 375/396 reads as
+95% of props projected, but part of that numerator is game rows; the real prop
+figure is `396 - 40 - 3 = 353`. (2) `pct_projected` is computed INSIDE the prop
+join on prop-only numbers and the merge overwrites `rows_with_projection`
+without recomputing it, so three fields in one payload disagree.
+
+**Same class as `#364`**, whose comment sits directly above this code: WNBA once
+ran "36.4% coverage with 0.0% of it on game rows". That fix correctly made the
+two joins independent; the merge that stitched them back together re-introduced
+a denominator mismatch one level up.
+
+**FIX (small, not taken).** Keep `rows_considered` and `rows_with_projection`
+from the same population — either report game coverage under its own key or add
+a `rows_considered` spanning both. Both halves already ride along as
+`prop_coverage` / `game_coverage` sub-dicts, so nothing is lost either way. Add
+a test pinning the sum invariant so it cannot drift back.
+
+**NOT FIXED, and deliberately.** `board_enrichment.py` is claimed by TWO open
+lanes — `soccer-board-mlb-parity` and `layer2-sim-view-and-live-projection`, the
+latter actively deploying when this was found. `wnba_projections.py` is
+unclaimed. User decision 2026-08-22: leave it. **It is a reporting defect, not a
+board defect** — no price, edge or stake is wrong because of it; only the
+diagnostic reads high.
+
+
 ### `#512` — **Stage B BUILT: the execution ledger, running on paper. Idempotent, write-ahead, two switches for real money. NOT DEPLOYED, dark by default.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 `syndicate/features/shared/execution_ledger.py` + `pipeline/execute_portfolio.py`,
