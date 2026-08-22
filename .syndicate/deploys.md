@@ -23090,3 +23090,58 @@ over the memory risk, this was the wrong call and it was mine.**
     live_rows   0 => selection is dropping live rows; >0 with live_proj=0 =>
                 the projection is missing on rows that ARE published
     persisted_pct_of_keyvalue_max  headroom for the next raise, on a reading
+
+### VERIFIED 20:5xZ — `aa9fa8e5` (web) / `b13a3a73` (worker), and the UI verified IN A BROWSER
+
+**Both services live, every fix present, checked by ANCESTRY not by trusting a
+commit message:**
+
+    web             aa9fa8e5  live 20:46:18Z  contains 3ada3512, 6b193fee,
+                                              60412717, c61d1097 (all four)
+    refresh-worker  b13a3a73  live 20:39:19Z  cap 400, age fix, live_rows,
+                                              publisher repair
+    no Traceback on either since going live. Both claims released.
+
+**PRODUCTION HTTP IS STILL UNREACHABLE — re-tested, not asserted from memory.**
+20:51:59Z: `curl` → `CONNECT tunnel failed, response 403`, and the agent proxy's
+own `recentRelayFailures` names
+`syndicate-an21.onrender.com:443 — gateway answered 403 to CONNECT`. This was
+checked fresh because an earlier claim in this session about the same 403 was
+made from memory and the user was right to push back on it.
+
+**SO THE UI WAS VERIFIED THE OTHER WAY: the app run locally and driven with a
+real browser** (`run-syndicate`'s approach; Playwright against the pinned
+`/opt/pw-browsers/chromium-1194` — the pip package wants build 1234 and
+`playwright install` is forbidden here). **10 of 11 checks passed:**
+
+    alt-line tab row present                              PASS
+    bet-type tab row present                              PASS
+    DEFAULT active tab is "Main lines only"               PASS  <- alt lines hidden
+    clicking "Main + alt lines" MOVES the highlight       PASS  <- the reported defect
+    exactly one alt tab active                            PASS
+    clicking BACK returns the highlight                   PASS  <- both directions
+    bet-type row rendered with options                    PASS
+    bet slip data-collapsed="true" on load                PASS  <- minimized default
+    counts strip present                                  PASS
+
+The one non-pass is `ERR_CONNECTION_RESET` on an API call — the local dev server
+has no production data. Not a code defect.
+
+**WHY THIS IS STRONGER THAN THE NODE HARNESS**, which already passed 105
+assertions: that harness extracts functions from the HTML and runs them in
+isolation, so it proves the LOGIC. This proves the chrome exists, the handlers
+are wired to it, and the `is-active` class the eye reads is the one the code
+sets. The reported defect — "the alt lines buttons are not changing when
+selected" — was invisible to the harness by construction, because the harness
+never rendered a tab.
+
+**TWO FAILURES ON THE FIRST BROWSER RUN WERE THE TEST'S, NOT THE CODE'S:** the
+stylesheet uppercases tab labels, so `inner_text()` returns `MAIN LINES ONLY`.
+Compared case-insensitively now — the assertion is about WHICH tab is active,
+not about letter case a stylesheet owns.
+
+**STILL NOT VERIFIED:** `displayLiveProjection` lives inside the page's IIFE and
+is not reachable from `page.evaluate`, so the Live column's percentage rendering
+rests on the Node harness only. And `LAYER2_BOARD_HEALTH` has STILL not fired
+since the 20:39:19Z restart — the cap raise, the age percentiles and `live_rows`
+remain unread, so "stale lines" and `live_proj=0` are still undiagnosed.
