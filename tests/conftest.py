@@ -4,6 +4,50 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _isolate_intelligence_state(tmp_path_factory):
+    """Keep the suite out of the repo's REAL intelligence-state files.
+
+    Same failure as `_isolate_prediction_ledger` below, different file. A full
+    `pytest tests/` run rewrites `reports/intelligence/intelligence_state.json`
+    and appends to `intelligence_state_history.jsonl`, because
+    `persist_intelligence_state` writes to module-level paths resolved through
+    `reports_root()` at import.
+
+    **Why that is worse here than an untracked scratch file.** Both are TRACKED
+    and must stay tracked -- `intelligence_state.json` is the `#43`
+    worker->web artifact-transport file, listed in `artifact_publisher`'s hot
+    patterns. So they cannot be gitignored the way the `#503` byproducts were,
+    and every full run left the tree dirty with locally-computed values sitting
+    on top of production-shaped data. `335dca07` is what happens next: a
+    `git add -A` swept exactly this class and rewrote all eight sport manifests'
+    `artifact_paths` to a local checkout path. The tree being clean after a test
+    run is what stops that, so it is worth a fixture rather than a habit.
+
+    Suite-wide and autouse for the same reason as the ledger fixture: many test
+    files reach `persist_intelligence_state` indirectly through the query API
+    and the background loop, so a fix in any one of them leaves the rest open.
+
+    Tests that care about these paths patch them explicitly, which takes
+    precedence over this default.
+    """
+    from unittest.mock import patch as _patch
+
+    from pipeline import intelligence_state
+
+    state_dir = tmp_path_factory.mktemp("intelligence_state")
+    with _patch.object(
+        intelligence_state,
+        "INTELLIGENCE_STATE_PATH",
+        state_dir / "intelligence_state.json",
+    ), _patch.object(
+        intelligence_state,
+        "INTELLIGENCE_HISTORY_PATH",
+        state_dir / "intelligence_state_history.jsonl",
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_prediction_ledger(tmp_path_factory):
     # The suite was writing this dev machine's REAL data/prediction_ledger.json.
     # intelligence.py:7706 calls record_prediction() on every query, and
