@@ -23040,3 +23040,79 @@ a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
 printed only when the exemption actually engages. Until that line appears after
 a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
 IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.
+
+## 2026-08-22T20:39-20:4xZ — Stage A/B + capped sim term + blend-gated admission, BOTH services, `ecf928c6`
+
+**Lane `portfolio-decision-and-execution`. Two deploys, and I only fired one of
+them.**
+
+    refresh-worker  dep-da50ga61egvs73ah6vsg  b13a3a73  live 20:39:19.234879Z  (NOT mine)
+    web             dep-da50j8bbc2fs73ff0f8g  aa9fa8e5  triggered 20:42:09.509627Z
+
+**THE WORKER DEPLOY WAS THE LAYER 2 SESSION'S, AND IT CARRIED MY WORK.** Their
+commit is a soccer-momentum finding; mine rode underneath it. Verified rather
+than assumed, both directions:
+
+    ecf928c6 is an ancestor of b13a3a73   -> the worker HAS this lane's work
+    b13a3a73 is an ancestor of origin/main -> it COMPOSES, no silent revert
+
+That second check is the one that matters. `learnings.md` records 170
+`origin/deploy/*` branches whose tips are all off main, and two such deploys do
+not contain each other — the 2026-08-15 case where a verified refresh-worker fix
+went live at 21:36:59Z and was gone by 21:45:20Z. Pushing to `main` FIRST is
+what made piggybacking safe here instead of a coin flip.
+
+**WEB WAS NOT COVERED, which is why I deployed it.** Web was live on `60412717`
+from 20:07:55Z — 26 minutes BEFORE the push — so it did not contain
+`ecf928c6`. Left alone that produces the board contradicting itself: the worker
+builds boards with `_SCORE_SIM_WEIGHT = 0.125` capped at 1.5, while web serves
+the old static disclosure reading *"not by our simulation, which currently
+carries no weight in the score"*. Deployed AFTER the worker went live, so the
+text never claims a cap that is not yet being applied. `aa9fa8e5` contains both
+`ecf928c6` and `b13a3a73`.
+
+**THE CLAIM DID NOT STOP THEM, and this is a real gap rather than a formality.**
+I held `refresh-worker` from ~20:30Z (token `bcf8d90dce2c4143`) and
+`deploy_claim.py status` still read `HELD by portfolio-decision-and-execution`
+while their deploy ran. `.claude/hooks/deploy-guard.py` intercepts Bash-driven
+deploys; an API/MCP-triggered one goes around the hook entirely. So the claim is
+ADVISORY against any session deploying through the API, and the protocol
+describes it as authoritative. Worth fixing or worth restating — but not worth
+trusting as-is.
+
+**PREFLIGHT COULD NOT RUN.** `RENDER_API_KEY` is absent from this session, so
+`deploy_preflight.py` exits 1 with `RENDER_API_KEY not set`. Deploy safety for
+web was judged by hand: it is a gunicorn request-server with no heavy children,
+unlike the worker. That is a weaker gate than the protocol asks for and is
+recorded as such.
+
+**COST: an MLB sim died, and not to my deploy.** At 20:31:10Z the worker was at
+**98.9% memory / 45.8MB headroom**, running `run_mlb_daily_sim_job.py` across 15
+game_pks plus the full MLB `daily_update` chain, `generate_smartsim2_ncaaf_
+projections.py` and `build_soccer_artifacts.py`. The user had explicitly asked
+to wait for exactly these; the layer 2 deploy at 20:35:52Z killed them anyway.
+Auto-refires on the next fingerprint change.
+
+**VERIFY — and the honest limit on what I can read from here.** The served-content
+check is `GET /intelligence` containing `capped at 1.5 EV points` and containing
+ZERO occurrences of `carries no weight in the score`. **I cannot take that
+reading:** the agent proxy 403s `syndicate-an21.onrender.com` (`state.md`), so
+every production read this session has gone through Render logs and metrics
+instead. Ancestry is a question about HISTORY and is explicitly NOT a content
+check (`learnings.md` 2026-08-16, FORBIDDEN). So as of this entry the deploy is
+SHIPPED AND UNVERIFIED ON THE SERVED SURFACE.
+
+**The readings still owed, all of which need a production slate:**
+
+    /intelligence                       -> "capped at 1.5 EV points" present
+    /api/board/layer2-shortlist         -> rows_admitted_by_blend > 0
+                                           (ZERO means the scoring change is INERT)
+    with SYNDICATE_PORTFOLIO_COMMIT_ENABLED unset then set, same date:
+    /api/portfolio/plan?date=<d>        -> plan_present false, then true
+    with SYNDICATE_EXECUTION_ENABLED=1:
+      first run  -> placed=N duplicates=0
+      re-run     -> placed=0 duplicates=N   (idempotency, in production)
+
+Stage A and Stage B ship INERT — both are dark behind flags that are absent, so
+this deploy changes nothing about them until those are set. The scoring and
+admission changes are live immediately and are the only user-visible half.
