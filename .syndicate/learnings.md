@@ -5294,3 +5294,46 @@ Five negatives at one timescale said nothing about other timescales, and the
 one-line fix (sweep the window) was available from the start. A negative result
 needs its power characterised before it is trusted, exactly as a positive needs
 a null.
+
+## 08-22 LIVE ODDS PILOT: plumbing works, answer is 1.8 match-days away
+
+**WE DO HAVE LIVE ODDS HISTORY, but it effectively STARTED TODAY** -- the 60s
+live-odds work deployed this evening is what produced it. Coverage by date:
+
+    2026-08-22  2300 markets, 1523 live, 370 live TOTALS, 36 events, 31 MB
+    2026-08-21  live-totals events 0
+    2026-08-19  8 events, none with >=10 snapshots
+    2026-08-14  163 markets, 5 capture passes, live h2h stamped 08-10 (STALE)
+
+Do not read "58 odds_history dates" as 58 usable dates. One is usable.
+
+**RESOLUTION IS THE BINDING CONSTRAINT.** Snapshots arrive every ~333s median.
+That gap is OURS, not the books': 69% of consecutive pairs carry IDENTICAL odds
+and 92% are labelled `flat`, so history is POLL-triggered, not change-triggered.
+The signal has a ~60s half-life, so a spike is usually over before the next
+price exists. We shipped "60-second live refresh" today and the observed floor
+is 160s. Worth knowing before anyone trusts the cadence claim.
+
+**THE PILOT ASKED THE CHEAP QUESTION.** "Does my signal beat the book at
+predicting goals" needs GOALS -- ~30 positives at this sample, which resolves
+nothing. "Does the book's PRICE move with momentum" needs no goals at all, so it
+has far more power per match. Result, de-vigged Over prob vs vmom_abs,
+residualised on clock+clock^2+score:
+
+    raw corr      +0.0692
+    PARTIAL corr  +0.1446   1 SE 0.0990   n=106   -> 1.46 SE, NOT resolved
+
+**THE USEFUL OUTPUT IS THE POWER CALCULATION, not the correlation.** To resolve
++0.1446 at 2 SE needs n >= 195 in-play observations. Today gave 106 from 11
+joined matches. **That is 1.8 more match-days.** Two more Saturdays of capture
+answers a question that has been open all session -- and the pipeline now exists
+to answer it automatically.
+
+Sign is positive, i.e. books probably DO track sustained pressure, which is the
+unsurprising direction. Note what this design can and cannot see: at 333s
+sampling it tests whether books track SUSTAINED pressure. It CANNOT see whether
+they miss brief spikes -- which is precisely where an edge would live.
+
+**Clock alignment is by FotMob kickoff time, never by assuming the first live
+snapshot is kickoff** -- books quote in-play markets before the whistle, so that
+assumption would shift every match by an unknown offset.
