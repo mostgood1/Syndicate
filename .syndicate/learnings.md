@@ -4727,3 +4727,98 @@ up -- so it is recorded as a hypothesis for a fresh slice, not a result.
 panel of who is on top, which is what the user reads it for manually, and the
 sign convention is verified correct against live scorelines. It is a narrator.
 It is not a timing signal, and nothing should price off it.
+
+## 08-22 THE PRE-REGISTERED TEST KILLED THE 40.2%, AND MY OWN PASS/FAIL BANDS WERE WRONG
+
+Rule fixed in advance (`0fff6254`): fire when 34-38 min into a half AND pressure
+>= 9.2525 (90th pct, derived from the FIT half only). Scored on 158 matches from
+a DIFFERENT period, all 699 prior ids excluded:
+
+    hypothesis (post-hoc)  0.402
+    FRESH hit rate         0.2547
+    time-window only       0.3063   (n=1580)
+    momentum increment    -0.0516
+    fresh base rate        0.2631
+
+**MOMENTUM ACTIVELY HURTS.** The full rule is 5.2 points BELOW the time window
+alone, and BELOW the base rate -- firing on pressure selects worse-than-average
+moments. The 40.2% was an artifact of picking the time window AFTER seeing which
+decile won on the holdout, exactly as suspected.
+
+**MY PRE-REGISTERED BANDS WERE THEMSELVES DEFECTIVE.** They read
+`>= 0.25 -> WEAK PASS (clears 3-1)`, so the run printed **WEAK PASS** for a rule
+that loses to doing nothing. I set the bands against BREAK-EVEN and never against
+the BASE RATE. A signal must beat the base rate before break-even is even the
+right question -- otherwise "profitable at 3-1" is satisfied by any rule that
+fires during a period when goals are common, including a rule with no signal at
+all.
+
+**RULE: a pre-registered threshold must include the do-nothing baseline, not
+just the economic one.** Beating break-even is necessary and not sufficient; the
+comparison that decides whether a FEATURE works is against the base rate, and
+against the simpler feature it claims to improve on.
+
+**WHAT REPLICATED:** the clock, not the momentum. 34-38 minutes into a half ran
+0.3186 on holdout and 0.3063 on fresh, against base rates of 0.2342 and 0.2631 --
+a stable ~1.16-1.36x lift from an unbiased decile split both times. That effect
+is real, needs none of this machinery, and is almost certainly in the market
+price already.
+
+**STANDING: momentum is a NARRATOR.** Three tests now -- global AUC (0.5417
+held out), conditional tail (killed by preregistration), and the increment over
+time alone (NEGATIVE). Nothing should price off it. The chart stays because it
+honestly describes who is on top, which is what it is read for.
+---
+
+## 2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will out-argue a fresh measurement
+
+Three related errors in one session, all the same shape: **treating a
+description of the system as the system.**
+
+**1. I diagnosed for two hours on a number the ledger had, and production
+didn't.** `state.md` said the soccer projection join served
+`rows_with_projection: 4` of 1,142. I quoted it forward as current, built a
+mechanism around it, wrote a `todo.md` item on it, and shipped instrumentation
+to explain it. The first real reading was **9,598 of 20,014 (48%)** — the join
+had been working since `#379`'s window fix actually ran. The figure predated
+that deploy and nobody had re-measured.
+
+**RULE: a number in `state.md` is a RECORD OF A MEASUREMENT, with a date and a
+deploy behind it. Before building on one, ask what would have changed it since —
+and if the answer is "a fix that has landed", re-measure first.** `state.md`'s
+own header says it is "current, verified system state"; that phrasing is what
+makes a stale row so persuasive. This is the third time this file has recorded a
+variant of *literally true and materially misleading* (see the `autoDeploy = no`
+entry). Mark the row SUPERSEDED with the new reading rather than deleting it, so
+the next reader can see the correction happened.
+
+**2. I read the absence of an instrument as the absence of the thing.** I
+claimed the Layer 2 shortlist "completed once in 34 minutes" and called it
+systemic starvation. The window I counted over **began before the log line
+existed** — it was deployed mid-window. Measured properly: 10-19 min from a cold
+boot, then every 4-6. I nearly wrote a second wrong figure into the ledger while
+correcting the first.
+
+**RULE: before concluding "X did not happen" from a log query, establish that
+the line COULD have been emitted over the whole window** — the code was deployed
+and the emitting path was reachable. A zero from a query whose instrument was
+half-deployed is not a zero.
+
+**3. My own instrument shipped useless and its first reading proved it.** The
+soccer coverage sampled the sim side by sorting every indexed fixture
+alphabetically and taking 12. It reliably returned the three leagues with almost
+no misses and dropped every league that actually had them — the board side named
+12 fixtures and the sim side could pair with **one**.
+
+**RULE: a sample must be drawn from the population the QUESTION is about, not
+from whatever a stable sort puts first.** An instrument that reliably samples
+the cases with nothing to report is worse than no instrument: it looks like an
+answer. Scoping it to the failing leagues made all twelve pairable in one
+reading and yielded 13 verified aliases within the hour.
+
+**AND THE COUNTERWEIGHT, because this session also got one right by design:**
+the `no_market_fair_value` split was built to CONFIRM the hypothesis that live
+`edged=0` was downstream of the pregame join. It read
+`{'no_fair_value_devig_failed': 133}` — 133 of 133 rows HAVE a pregame
+projection — and refuted it. An instrument built so that it CAN return the
+answer you do not want is the only kind worth deploying.

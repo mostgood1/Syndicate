@@ -22627,3 +22627,51 @@ tomorrow's run answers.
 
 Also live in that reading: `autorun_enabled=True` (env still set), index grown
 3,538,491 -> 3,561,802 bytes since 17:28Z.
+---
+
+## 2026-08-22 ~18:14Z — `4eeffb5c` — refresh-worker — THIRTEEN soccer name aliases
+
+Lane `layer2-sim-view-and-live-projection`, claim `188efafc1f8177ba`.
+`deploy_preflight.py` still cannot run (no `RENDER_API_KEY`) — **no CLEAR
+verdict**; on-main verified with git, in-flight jobs checked by hand
+(`process_count: 2` at 18:13:45Z — worker and its shell, no child jobs, so
+**nothing was killed**).
+
+**DEPLOYED SHA IS NOT THE ONE I READ.** `git rev-parse origin/main` returned
+`902e8b1d`; `trigger_deploy` ships the BRANCH TIP and by then a peer had pushed
+`4eeffb5c` (18:13:48Z, seconds later). Verified rather than assumed:
+`merge-base --is-ancestor 902e8b1d 4eeffb5c` passes, so all thirteen aliases are
+in it, and the peer delta is additive (gitignore, a worker autorun-ordering
+change, tests). Third time this session that the tip moved under a deploy —
+the habit of diffing the deployed SHA against the intended one is what keeps
+catching it.
+
+**WHAT SHIPPED: 13 aliases, in two rounds, every pair quoted off a production
+log line.** Reachability measured both times — **0 of 13 fixtures join without
+the map, 13 of 13 with it** — and the off-run reproduces the production fixture
+strings character for character.
+
+    round 1 (17:36/17:39 readings)   Royal Antwerp, 1. FC Köln, Hamburger SV,
+                                     FSV Mainz 05, SC Paderborn, Union Berlin
+    round 2 (18:04 scoped reading)   Brighton and Hove Albion, Athletic Bilbao,
+                                     Deportivo, Rennes, Los Angeles FC,
+                                     Atalanta BC, Inter Milan
+
+**VERIFY — the reading that proves it, and it is NOT a green deploy.** Next
+`PREGAME_PROJECTION_JOIN sport=soccer` must show `unmatched_fixtures` fall from
+12 and `unmatched_by_league` drop for belgian_pro_league (5), epl (510),
+la_liga (972), ligue_1 (240), mls (247), serie_a (607). If a league does NOT
+move, its remaining fixtures are a different defect and must not be counted as
+this fix underperforming.
+
+**AND A HYPOTHESIS THIS SESSION PUBLISHED AND THEN REFUTED.** `#503` claimed the
+live tier's `edged=0` was downstream of the pregame join — rows with no pregame
+projection, hence no fair value. The split built to confirm it read
+`edge_why={'no_fair_value_devig_failed': 133}`: **133 of 133 rows HAVE a pregame
+projection.** The real cause is that soccer player props are one-sided, so
+`market_fair_prob_over` is never set, and `attach_margin_model`'s replacement
+lands in `quote["fair_probability"]` while the live join reads
+`projection["market_fair_prob_over"]`. The number exists and the reader cannot
+see it. **Deliberately NOT fixed in this deploy** — bridging them is a PRICING
+change and `layer2_board:587-604` already treats a `book_margin_model` fair as
+an ESTIMATE (4.5% moneyline hold vs 12% on props). These aliases do not touch it.
