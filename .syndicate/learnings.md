@@ -5050,3 +5050,63 @@ was tested because the user asked for a split, not because a number looked good.
 **What actually survives:** the CLOCK. Both samples independently show 80-84'
 elevated over base (0.2972 and 0.2793 vs base 0.2562). That is the third
 independent confirmation, and it needs no vendor dependency at all.
+
+---
+
+## 2026-08-22 (later) — A rule written from one sport's vocabulary is a rule about that sport; and a safety net that skips the biggest cases is not a safety net
+
+Three overturned beliefs, two of them mine and shipped.
+
+**1. THE ALT-LINE FILTER I SHIPPED DID NOTHING ON SOCCER, and the user found it,
+not me and not the tests.** I defined "alt line" as a market whose name ends
+`_alt`, because that is how MLB and NFL quote them. Soccer's
+`DEFAULT_GAME_MARKETS` is exactly `["h2h","totals","spreads"]` — it has no such
+market, and expresses the same concept as SEVERAL ROWS OF ONE MARKET at
+different lines. The filter matched nothing; "Main lines only" was a no-op on
+the sport with the worst ladder problem. I had even written a test asserting
+`totals_alt` is alt and `totals` is not, which passed and proved nothing about
+soccer.
+
+**RULE: before writing a rule that spans sports, check the VOCABULARY of the
+sport you are actually fixing.** One `grep` of `DEFAULT_GAME_MARKETS` would have
+shown it. A cross-sport rule verified against one sport's data is a
+single-sport rule with a misleading name — and the test suite will happily
+confirm it, because the fixtures come from the same sport as the rule.
+
+The v2 definition is "not the primary line of its (event, market, segment,
+player) group", with primary = most books quoting. That is a claim about the
+CONCEPT rather than about a naming convention, so it survives a feed that
+renames things.
+
+**2. THE INSTRUMENT I BUILT TO CONFIRM A HYPOTHESIS REFUTED IT — which is the
+only reason to build one.** I had published, in `todo.md` and to the user, that
+soccer's live `edged=0` was downstream of the pregame join: rows with no pregame
+projection get no `market_fair_prob_over`, so no edge. The split read
+`{'no_fair_value_devig_failed': 133}` — **133 of 133 rows HAVE a pregame
+projection.** The real cause is that `attach_margin_model` writes
+`quote["fair_probability"]` while the live join reads
+`projection["market_fair_prob_over"]`: the number exists and the reader cannot
+see it.
+
+**RULE, stated positively because this one went right: build the counter so it
+CAN return the answer you do not want.** Had I logged only "edges withheld: 133"
+I would have shipped the wrong fix with a number that appeared to support it.
+The split cost four lines and overturned a published conclusion.
+
+**3. A RETRY PATH THAT EXCLUDES THE LARGEST CASES IS NOT A RETRY PATH.**
+`publish_hot_artifact` withholds its checksum on failure and says why: "a failed
+publish must be retried next sweep." `_publish_skip_reason` refuses anything
+over 12MB *before* that function is reached. Both are correct alone. Together
+they mean the biggest artifacts — the ones a stale copy hurts most — were the
+only ones with **no way back**, and the call site had been printing "(sweep will
+NOT repair this above 12MB)" the whole time.
+
+**RULE: when one component documents another as its recovery path, verify the
+recovery path actually covers it.** The failure mode is silent by construction —
+it only opens on an error, so a system where errors are rare will look healthy
+for months. Ask "which inputs does my safety net skip?", and if the answer
+correlates with severity, the net is inverted.
+
+**Also, small and costly:** a Render deploy showing `deactivated` is not a
+rollback. Mine showed it because a `service_updated` redeploy of the IDENTICAL
+commit superseded it six minutes later. Check the SHA, not the status word.
