@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#505` — **THE FULL PYTEST SUITE IS NOT GREEN ON `main`: 76 failures across 26 files, 9,245 passing. This is what blocks putting pytest in CI (`#504`'s owed half).** — measured by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+
+`python -m pytest tests/` on this branch, 26m58s:
+
+    76 failed, 9245 passed, 66 skipped, 2 xfailed, 373 subtests passed
+
+**NOT caused by `#502`/`#503`/`#504`, and not test pollution.** Zero failures
+are in any momentum file. Three files were sampled IN ISOLATION and then re-run
+in a detached worktree at **clean `origin/main`** — identical counts in all
+three places, so these reproduce standalone and are genuinely on main:
+
+    test_ask_headline_from_board.py     11 failed, 8 passed   (isolation AND origin/main)
+    test_layer2_projection_carry.py      4 failed             (isolation AND origin/main)
+    test_nba_cards_keyvalue_backend.py   3 failed             (isolation AND origin/main)
+
+Distribution — the top two files are a third of the total, so this is likely a
+handful of causes rather than 76:
+
+```
+     18 tests/test_refresh_state_store.py
+     11 tests/test_ask_headline_from_board.py
+      6 tests/test_wnba_refresh_runner.py
+      5 tests/test_quote_join_reason_stats.py
+      4 tests/test_layer2_projection_carry.py
+      3 tests/test_wnba_cards_keyvalue_backend.py
+      3 tests/test_refresh_odds_sources.py
+      3 tests/test_nba_cards_keyvalue_backend.py
+      2 tests/test_sweep_skip_detail.py
+      2 tests/test_ops.py
+      2 tests/test_nfl_injuries_fetch_autorun.py
+      2 tests/test_intelligence_state.py
+      2 tests/test_generate_smartsim2_nfl_projections.py
+      1 tests/test_slate_date_timezone_discipline.py
+      1 tests/test_refresh_worker.py
+      1 tests/test_probability_differential.py
+      1 tests/test_odds_control_plane.py
+      1 tests/test_nfl_roster_depth_autorun.py
+      1 tests/test_nba_refresh_runner.py
+      1 tests/test_mlb_sim_run_reconcile.py
+      1 tests/test_memory_watchdog.py
+      1 tests/test_memory_observability.py
+      1 tests/test_live_projection_join.py
+      1 tests/test_layer2_movement_live_segment.py
+      1 tests/test_generate_smartsim2_nfl_preseason_projections.py
+      1 tests/test_ask_board_candidates.py
+```
+
+**WHY CI CANNOT SIMPLY BE SWITCHED ON.** `ci.yml` runs
+`python -m unittest tests.test_archives` (383 tests, green) and nothing else.
+Adding a pytest step today lands red on the first run, and `ci.yml`'s own
+comments already argue against exactly that: *"a check that is red on arrival
+is a check people learn to ignore, and then it is worth less than nothing — it
+looks like coverage"*, and *"a permanently-tolerated failure is how a gate
+becomes decoration."* Adding it behind `continue-on-error` would be that
+decoration.
+
+**Also note pytest is in NEITHER `requirements.txt` NOR `requirements-dev.txt`**
+— CI installs only `requirements.txt`, so a pytest step needs the dependency
+declared first. That is a real (small) part of why the suite has never run in CI.
+
+**Suggested order:** fix the top files first (`test_refresh_state_store.py` 18,
+`test_ask_headline_from_board.py` 11, `test_wnba_refresh_runner.py` 6 = 46%
+of all failures), re-measure, then wire pytest in ENFORCED — never
+`continue-on-error`. An interim option if the tail proves stubborn: gate on a
+NO-NEW-FAILURES baseline rather than zero, which is honest about the debt
+instead of hiding it. That is a policy call, not a mechanical one.
+
 ### `#504` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
 
 Confirmed in a **detached worktree at `origin/main`**, run in isolation, so
@@ -59,13 +126,16 @@ one; the red test beside it is the only reason anyone looked.
 mock. Falsified — restoring the stale target fails BOTH, where before it failed
 only the non-vacuous one.
 
-## `#504` OWED — the CI-visibility half, NOT fixed
+## `#504` OWED — the CI-visibility half, NOT fixed — **BLOCKED, see `#505`**
 
 `.github/workflows/ci.yml:37` runs `python -m unittest tests.test_archives` and
 nothing else, so `main` can carry deterministic pytest failures indefinitely
 and still show green. Fixing the six tests does not change that; the next
 stale patch target will sit exactly as long. Wiring pytest into CI is only
-safe once the full suite is green and is a decision for whoever owns CI.
+safe once the full suite is green, and **it is not**: measured 2026-08-22,
+**76 failures across 26 files** on clean `origin/main` (`#505`). Turning CI on
+today would land red on the first run, which `ci.yml`'s own comments argue is
+worse than no check at all.
 
 ### `#503` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
 

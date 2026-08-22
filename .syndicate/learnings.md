@@ -4685,3 +4685,36 @@ ticks last wins.** A clean zero is easier to diagnose than intermittent truth.
 **RULE: a sequencing check is only worth the service it points at.** Before
 claiming a feature is live, resolve which service executes it -- from env and
 routing, not from the name -- and check THAT SHA.
+
+## 08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES
+
+Running the full pytest suite (`python -m pytest tests/`) leaves the working
+tree dirty in two ways at once: it MODIFIES tracked files —
+`reports/manifests/*.json` (all 8 sports), `reports/refresh_state.json`,
+`reports/intelligence/intelligence_state.json`,
+`data/mlb_source/.../live_lens_2026_06_02.jsonl` — and it CREATES untracked
+ones, including `reports/sim_runs/`, `reports/win_prob_null/`,
+`reports/mlb_odds_diag/`, and a literal
+`Z:\definitely\does\not\exist\perf.jsonl` from a Windows-path test.
+
+`git add -A && git commit` after that run committed **38 files and ~10,500
+insertions when exactly ONE file was intended**, including a 10,049-line diff
+to `intelligence_state.json`. It was pushed before I read the stat. The `git
+status --porcelain` that would have shown it ran in the same command, ABOVE the
+add — so the evidence was printed and the commit happened anyway.
+
+**RULE: stage explicitly. `git add <path> [<path>...]`, never `-A`, never `.`**
+Every commit in this session that did name its paths was clean; the one that
+did not was not.
+
+**COROLLARY, and it is the part that nearly hid this: `.gitignore` cannot save
+you here.** Several of these byproducts are legitimately TRACKED files that the
+suite rewrites, so there is no ignore rule that makes `-A` safe. Earlier in this
+same session I gitignored four *untracked* byproducts (`#503`) and that was
+correct — but it addresses a different half of the problem and must not be
+mistaken for having solved this one.
+
+Recovery, for the next person: `git reset --soft HEAD~1 && git reset`, then
+`git checkout --` the tracked byproducts and `git clean -fd -- reports/ data/`
+the untracked ones, re-stage by name, and force-push (safe only on your own
+unshared branch — never on someone else's).
