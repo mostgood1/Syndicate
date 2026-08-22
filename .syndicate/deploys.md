@@ -22795,3 +22795,111 @@ that reading exists.
 **Timing: the daily gate still holds.** Settlement ran 17:28Z, so this does not
 run again until 2026-08-23 after 06:00 CT. It should now get a PROMPT tick
 (`#504`), rather than waiting on a soccer spacing-gate coincidence.
+
+---
+
+## 2026-08-22 19:03Z — web `8149e51d` — home's statsapi fan-out and the card-cache retention buffer
+
+**Lane:** `render-web-request-path`. **Claim:** web, held by that lane, token
+`ab6c087b…`. **Contains** `c02b07e6` (my merge to main), verified by CONTENT not
+just ancestry: 14 `home.py` symbol hits, 6 `cards.py`. Render deployed the branch
+tip `8149e51d` rather than the `commitId` passed, because a peer pushed to main
+in the 40s between my push and the trigger — checked rather than assumed.
+
+**WHAT SHIPPED** (three changes, one theme):
+1. home no longer calls statsapi per game — live scores come from
+   `live_lens_report_<date>.json`, already allowlisted and already on web's disk.
+2. the residual statsapi path is SINGLE-FLIGHTED: at most one request thread can
+   ever block on it.
+3. the two MLB card caches gain an IDLE bound (not age-since-insert), so a hot
+   key is never dropped and dead generations are.
+
+**NOT DONE, DELIBERATELY:** allowlisting `raw/statsapi/feed_live`. It was the
+plan and it was a regression — `_mlb_feed_live_payload` takes the file if it
+EXISTS with no freshness check, so publishing it freezes every game at capture
+time (`#413`, measured 2026-08-13). It would also have bought no speed: the
+vendor pipeline only refreshes those files prior-day, calling its own cache "a
+stale pregame cache entry".
+
+**DEVIATION, STATED:** `deploy_preflight.py` was NOT run to CLEAR. It needs
+`RENDER_API_KEY`, absent here, and would have returned UNKNOWN regardless —
+**zero `ALL_PROCESS_MEMORY` lines on web in the preceding 2 hours**, confirming
+`state.md [web-preflight-dead-sample]` is still live (dead since 2026-08-14).
+The other three gates were checked by hand and pass: target on `origin/main`,
+claim mine, not redundant against live `28b2c706`. The gate's purpose — jobs in
+flight a deploy would kill — does not apply to web, which runs none by design.
+
+**BEFORE (the numbers this must beat):**
+
+    restarts        3 unexplained `Handling signal: term` in 4 min on one
+                    container (`-2mdsk` 17:14:08 / 17:15:38 / 17:17:38), new
+                    gunicorn master pid each, ~15s no listener after each
+    healthz         unanswered 84s (17:16:34 -> 17:17:58)
+    apply_live_scores  3318 / 7991 / 8400 / 5498 / 3494 ms  (8400 > the 8000ms
+                    budget, i.e. the wall clock was exhausted)
+    p95 latency     0.8-1.5s baseline, spiking 11.9 -> 18.4 -> 26.5 -> 30.5s
+    memory          instance `-hpvr8`, booted 18:43:  405 MB @2min ->
+                    1014 MB @7min -> 1048 MB @12min, ceiling 2,147,483,600 B
+
+**VERIFY — MEASUREMENT PENDING, nothing here is proven yet.** Two readings, and
+they are INDEPENDENT so a null on one is still attributable:
+  (a) `apply_live_scores` < 50ms and zero unexplained `term` across a live slate
+      -> changes 1 and 2 work. Same numbers unchanged -> they do not.
+  (b) memory at ~60 min post-boot materially under the 18:43 curve above
+      -> change 3 works. `CONTEXT_CACHE_EVICTED ... web=True` should also become
+      RARE; unchanged rate means the idle purge is not firing.
+
+**Rollback:** `trigger_deploy` with `28b2c706d55faa4377b90194a13198192eaeca47`
+(verified an ancestor of origin/main, so a clean target).
+
+**READING — 2026-08-22 19:26Z. CHANGES 1 AND 2 ARE PROVEN. CHANGE 3 IS NOT.**
+
+**`apply_live_scores`, the number this deploy existed to move, on `games=15`:**
+
+    BEFORE   3318 / 7991 / 8400 / 5498 / 3494 / 3802 / 3694 ms
+    AFTER      10 /    0 /   10 /    0 /    0 /   61 /   64 /    0 /
+                0 /    0 /   11 /    0 /    0 /   93 ms
+
+**0-93 ms against 3318-8400 ms — ~100x, max 93ms over 14 samples.** Held across
+TWO instances and TWO deploys (`-ml2r8` 19:09, `-79r7g` 19:21), so it is not a
+warm-cache artifact of one boot. Predicted "<50ms"; actual max 93ms — the
+prediction was slightly optimistic and is recorded as stated, not adjusted after
+the fact.
+
+**The lens IS resolving in production, by inference and it is a sound one:** a
+missing or stale report returns `{}`, which sends all 15 games to the statsapi
+path, where the single-flight HOLDER still pays the full fetch. Not one sample
+shows seconds. If the lens were not resolving, the holder's cost would appear.
+
+**No restarts, no errors:** zero `Handling signal: term`, zero `Booting worker`,
+zero `Traceback` on `-ml2r8` between 19:09:35 and its replacement, and none on
+`-79r7g` since. Against 3 unexplained terms in 4 minutes pre-deploy.
+
+**CHANGE 3 (the memory idle bound) IS NOT ESTABLISHED, and may not be today.**
+
+    baseline `-hpvr8`  405 MB @+2min   1014 MB @+7min   1048 MB @+12min
+    after    `-ml2r8`  844 MB @+5min    950 MB @+10min
+    after    `-79r7g`  818 MB @+3min
+
+Directionally better at comparable ages, but these windows are FAR too short:
+the failure being fixed is a ratchet to 2,026,717,200 B over ~7.5 hours. **The
+obstacle is structural — peer sessions are deploying web every ~20-30 minutes
+(18:39, 19:03 mine, 19:18), so no instance survives long enough to produce the
+reading.** Do not record change 3 as working on the numbers above. The
+instrument remains memory-over-uptime plus a drop in the rate of
+`CONTEXT_CACHE_EVICTED ... web=True`.
+
+**NEXT BOTTLENECK, now visible because the old one is gone:**
+`build_cards_page_context` is the dominant term at 1803 / 2402 / 1909 / 2294 ms
+on a cache miss. That is the live-lens-mtime cache-key hypothesis from
+`scope_2026-08-21_home_request_path_compute.md`, still unaddressed. Not fixed
+here and not claimed.
+
+**A PEER DEPLOYED WEB AT 19:18 WHILE THIS LANE HELD THE CLAIM** (`3ada3512`,
+another session's `tmp-land` merge). Recorded as fact, not blame — the claim
+tool showed web HELD by `render-web-request-path` at acquire time. **My work
+survived it**, verified BY CONTENT and not by ancestry alone: 14 `home.py`
+symbol hits and 6 `cards.py` hits in `3ada3512`, and `apply_live_scores` still
+0-93ms on `-79r7g` afterwards. This is exactly the 2026-08-15 silent-revert
+check, run rather than assumed — it came back clean because their branch had
+merged `origin/main` after mine landed.

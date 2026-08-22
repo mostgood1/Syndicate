@@ -1210,6 +1210,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Regression check: the `-k "mlb or home or cards or cache or board"` sweep fails
   18 tests both WITH and WITHOUT this change — `comm` on the two sorted lists is
   empty in both directions, so all 18 are pre-existing and there are no regressions.
+- **DEPLOYED AND MEASURED 2026-08-22 19:09Z, web `8149e51d` (contains `c02b07e6`).**
+  `apply_live_scores` **3318-8400ms -> 0-93ms** on `games=15`, 14 samples across two
+  instances and two deploys. Zero `term`, zero `Traceback` since. **Changes 1 and 2 are
+  PROVEN; change 3 (memory idle bound) is NOT** — peers redeploy web every ~20-30 min so
+  no instance lives long enough to show the ratchet, which took ~7.5h to reach 2.03 GB.
+  Claim released. Full working in `deploys.md`. **Lane stays OPEN on change 3 alone.**
+  Next bottleneck now visible: `build_cards_page_context` 1803-2402ms on a cache miss.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
