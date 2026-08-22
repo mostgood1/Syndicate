@@ -708,6 +708,13 @@ def build_layer2_shortlist(
     # per sport, because soccer's answer and MLB's are different and a combined
     # number hides both.
     try:
+        # Imported here for the same reason the movement helpers are: a
+        # NameError raised while computing an instrument must not take the
+        # build down.
+        from syndicate.features.shared.layer2_board import (
+            _row_quote_age_seconds as _row_quote_age,
+        )
+
         published_rows = shortlist.get("rows") or []
         health: dict[str, dict[str, object]] = {}
         ages_by_sport: dict[str, list[float]] = {}
@@ -715,7 +722,7 @@ def build_layer2_shortlist(
             slug = str(row.get("sport") or "?").strip().lower() or "?"
             bucket = health.setdefault(
                 slug,
-                {"rows": 0, "pregame_proj": 0, "live_proj": 0, "no_proj": 0, "edged": 0},
+                {"rows": 0, "pregame_proj": 0, "live_proj": 0, "no_proj": 0, "edged": 0, "live_rows": 0},
             )
             bucket["rows"] = int(bucket["rows"]) + 1  # type: ignore[call-overload]
             projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else None
@@ -728,9 +735,27 @@ def build_layer2_shortlist(
                 bucket["pregame_proj"] = int(bucket["pregame_proj"]) + 1  # type: ignore[call-overload]
             if (projection or {}).get("edge_vs_market_pct") is not None:
                 bucket["edged"] = int(bucket["edged"]) + 1  # type: ignore[call-overload]
-            age = row.get("age_seconds")
-            if isinstance(age, (int, float)):
+            # `age_seconds` IS NOT ON A PUBLISHED ROW. The first reading came
+            # back `age_p50s=None` on all four sports, which read as "no ages"
+            # and actually meant "wrong field". The grid row has
+            # `age_seconds`; the BOARD row carries it under
+            # `quote.book_age_seconds` / `quote.quote_seen_age_seconds`, and
+            # `_row_quote_age_seconds` is the existing resolver that prefers
+            # seen-age and falls back to book age. Reusing it rather than
+            # reaching into `quote` here, so the staleness the board REPORTS
+            # and the staleness its own max-age gate ENFORCES cannot diverge.
+            age = _row_quote_age(row)
+            if age is not None:
                 ages_by_sport.setdefault(slug, []).append(float(age))
+            # WHY `live_proj` IS ZERO — the counter alone cannot say whether no
+            # live row reached the board or live rows reached it unprojected.
+            # Measured 2026-08-22 20:1xZ: `live_proj=0` on ALL FOUR sports
+            # including MLB, whose live re-sim demonstrably works, so the
+            # distinction decides whether this is a projection failure or a
+            # SELECTION one (a live row with no edge is dropped by the A3
+            # filter before it is ever published).
+            if str(row.get("market_state") or "").strip().lower() == "live":
+                bucket["live_rows"] = int(bucket.get("live_rows") or 0) + 1  # type: ignore[call-overload]
         for slug, bucket in health.items():
             ages = sorted(ages_by_sport.get(slug) or [])
             if ages:
@@ -746,6 +771,7 @@ def build_layer2_shortlist(
                 f"pregame_proj={bucket.get('pregame_proj')} "
                 f"live_proj={bucket.get('live_proj')} "
                 f"no_proj={bucket.get('no_proj')} "
+                f"live_rows={bucket.get('live_rows')} "
                 f"edged={bucket.get('edged')} "
                 f"age_p50s={bucket.get('age_p50_s')} "
                 f"age_p90s={bucket.get('age_p90_s')} "
