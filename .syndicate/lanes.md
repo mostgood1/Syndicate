@@ -1228,8 +1228,16 @@ against a slate that actually had matches in play. Full evidence in
   another) which is the exact thing the current code cannot do. Production
   verification is `settled_count > 0` on `/api/portfolio/summary`, and that
   needs a deploy of BOTH web and refresh-worker.
-- Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
-  `main` ships nothing until someone takes a claim and deploys it.
+- Blocked by: none.
+- **DEPLOYED 2026-08-22T17:00Z to BOTH services on user instruction**, SHA
+  `2aa1df54` (on `origin/main`; composition verified — every live SHA is an
+  ancestor, so nothing was reverted). Full record including what could NOT be
+  verified (`deploy_preflight.py` unrunnable — no `RENDER_API_KEY` in session)
+  is in `deploys.md`.
+- **STILL OPEN because the VERIFY is outstanding.** `settled_count > 0` on
+  `/api/portfolio/summary` is the reading that proves it; reconciliation is
+  daily-gated and last ran 06:57:03Z, so the first pass under the new code has
+  not happened yet. Deploying is not verifying — do not close on the deploy.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
