@@ -49,8 +49,30 @@ LEAGUE_SPORT_KEYS: dict[str, str] = {
     "belgian_pro_league": "soccer_belgium_first_div",
 }
 
-# btts/draw_no_bet/double_chance confirmed unavailable (HTTP 422) against the
-# live API on the current plan/region as of 2026-07-21 -- not attempted here.
+# CORRECTED 2026-08-22. This block previously read "btts/draw_no_bet/
+# double_chance confirmed unavailable (HTTP 422) ... on the current
+# plan/region". THAT CONCLUSION WAS WRONG, and re-probing the live API shows
+# why: `INVALID_MARKET` carries TWO DIFFERENT MESSAGES and only one means the
+# market does not exist.
+#
+#     btts                -> "Markets NOT SUPPORTED BY THIS ENDPOINT: btts"
+#     both_teams_to_score -> "INVALID markets: both_teams_to_score"
+#
+# The first is a VALID key on the wrong endpoint; the second is a key that does
+# not exist. Read as a bare 422, they look identical -- and the region was not
+# the variable either (422 on both `us` and `eu`).
+#
+# `btts` and `alternate_totals_corners` are served from the PER-EVENT endpoint,
+# the same one player props use. Confirmed on the live API 2026-08-22 against
+# soccer_epl, Manchester United @ Hull City:
+#     btts                     -> 4 books
+#     alternate_totals_corners -> 1 book
+#     team_totals              -> valid key, 0 books pricing it
+# See `fetch_soccer_oddsapi_props_local.py`, which already calls that endpoint.
+#
+# These stay OUT of this list because this module requests the BULK endpoint
+# and they genuinely are not served there -- the capture belongs with the
+# per-event fetcher, not here.
 DEFAULT_GAME_MARKETS = ["h2h", "totals", "spreads"]
 
 

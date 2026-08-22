@@ -55,6 +55,25 @@ DEFAULT_PLAYER_MARKETS = [
     "player_to_receive_red_card",
 ]
 
+# GAME-LEVEL markets that are ONLY served from the PER-EVENT endpoint, not the
+# bulk one. `fetch_soccer_oddsapi_odds_local.py` previously recorded these as
+# "confirmed unavailable (HTTP 422)"; that read a bare status code and missed
+# that `INVALID_MARKET` carries two different messages --
+# "Markets NOT SUPPORTED BY THIS ENDPOINT" (valid key, wrong endpoint) vs
+# "INVALID markets" (no such key). These are the former.
+#
+# They ride the per-event request THIS module already makes, comma-joined into
+# the same `markets=` param, so capturing them costs NO ADDITIONAL CALLS --
+# only the per-market-per-region billing.
+#
+# REGION `us` BY EXPLICIT USER DECISION [2026-08-22]. Measured book coverage on
+# soccer_epl, Manchester United @ Hull City:
+#     us            btts= 7  corners= 7      <- chosen, 2 units/event
+#     uk            btts=11  corners= 4
+#     eu            btts= 4  corners= 1
+#     us,uk,eu,au   btts=29  corners=18      (8 units/event)
+DEFAULT_GAME_EVENT_MARKETS = ["btts", "alternate_totals_corners"]
+
 MARKET_STD_MAP: dict[str, str] = {
     "player_goal_scorer_anytime": "Anytime Goalscorer",
     "player_first_goal_scorer": "First Goalscorer",
@@ -311,6 +330,51 @@ def _parse_bookmaker_markets(
     return rows
 
 
+def parse_event_to_game_rows(event: dict[str, Any], *, league: str) -> list[dict[str, Any]]:
+    """GAME-level rows (btts, corners) from a per-event payload.
+
+    A SEPARATE SHAPE FROM `parse_event_to_rows`, deliberately. That one is
+    player-keyed (`player`, `over_price`, `under_price`) and BTTS outcomes are
+    "Yes"/"No" with no player at all -- routing them through it would file
+    "Yes" as a footballer's name and quietly corrupt a props artifact.
+
+    One row per (market, side, line, book): flat, so a caller can pick a best
+    price without re-deriving which outcome was which.
+    """
+    home = str(event.get("home_team") or "")
+    away = str(event.get("away_team") or "")
+    game_time = str(event.get("commence_time") or "")
+    event_id = str(event.get("id") or "")
+    out: list[dict[str, Any]] = []
+    for bookmaker in _ordered_bookmakers(event.get("bookmakers") or []):
+        book_key = str(bookmaker.get("key") or "")
+        for market in bookmaker.get("markets") or []:
+            market_key = str(market.get("key") or "")
+            if market_key not in set(DEFAULT_GAME_EVENT_MARKETS):
+                continue
+            for outcome in market.get("outcomes") or []:
+                price = outcome.get("price")
+                if price is None:
+                    continue
+                # `point` is the corner line; BTTS has none, and None is kept
+                # rather than defaulted so "no line" stays distinguishable from
+                # "line 0".
+                point = outcome.get("point")
+                out.append({
+                    "league": league,
+                    "market_key": market_key,
+                    "side": str(outcome.get("name") or "").strip().lower(),
+                    "line": float(point) if point is not None else None,
+                    "price": price,
+                    "book": book_key,
+                    "event_id": event_id,
+                    "home_team": home,
+                    "away_team": away,
+                    "game_time": game_time,
+                })
+    return out
+
+
 def _stable_props_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=df.columns if df is not None else None)
@@ -380,6 +444,11 @@ def main() -> int:
                              "expensive shape: ~90 fixtures/tick is ~130k calls/day. Scoped "
                              "to the matches actually in play it is a handful per tick.")
     parser.add_argument("--out", type=str, required=True)
+    parser.add_argument("--game-out", type=str, default=None,
+                        help="where to write the per-event GAME markets (btts, corners). "
+                             "Defaults beside --out.")
+    parser.add_argument("--no-game-markets", action="store_true",
+                        help="skip btts/corners; player props only")
     args = parser.parse_args()
 
     api_key = os.environ.get("ODDS_API_KEY")
@@ -389,6 +458,10 @@ def main() -> int:
 
     sport_key = args.sport_key or LEAGUE_SPORT_KEYS[args.league]
     markets = [m.strip() for m in args.markets.split(",")] if args.markets else _player_markets()
+    game_markets = [] if args.no_game_markets else list(DEFAULT_GAME_EVENT_MARKETS)
+    # ONE request carries both. Splitting them would double the per-event call
+    # count for no benefit -- the endpoint is identical.
+    request_markets = markets + game_markets
 
     events = fetch_events(api_key, sport_key=sport_key, region=args.region)
     print(f"Fetched {len(events)} events for {sport_key}")
@@ -407,20 +480,57 @@ def main() -> int:
                   "sport key's current event list -- no per-event calls made", flush=True)
 
     rows: list[dict[str, Any]] = []
+    game_rows: list[dict[str, Any]] = []
     prop_payloads: list[dict[str, Any]] = []
     for event in events[: max(1, args.max_events)]:
         event_id = str(event.get("id") or "")
         if not event_id:
             continue
         payload = fetch_event_player_props(
-            api_key, sport_key=sport_key, event_id=event_id, region=args.region, markets=markets
+            api_key, sport_key=sport_key, event_id=event_id, region=args.region, markets=request_markets
         )
         if payload is None:
             continue
         rows.extend(parse_event_to_rows(payload, league=args.league))
+        game_rows.extend(parse_event_to_game_rows(payload, league=args.league))
         prop_payloads.append(payload)
 
     _append_soccer_prop_book_quotes(league=str(args.league), payloads=prop_payloads)
+
+    if game_rows:
+        game_out = Path(args.game_out) if args.game_out else Path(args.out).with_name("game_event_markets_current.csv")
+        game_df = pd.DataFrame(game_rows)
+        # THE FEED DUPLICATES (book, market, side, line) WITH DIFFERENT PRICES.
+        # Measured 2026-08-22, fanduel `alternate_totals_corners`: 50 outcomes
+        # for 15 lines, with Over 4.5 at BOTH -7000 and -8000 (and Under 4.5 at
+        # 2000 and 1400). The pairs are internally consistent, so these look
+        # like two corner variants collapsed under one key upstream -- and the
+        # outcome objects carry only `name`/`point`/`price`, with `description`
+        # None on all 50, so THERE IS NO FIELD TO TELL THEM APART.
+        #
+        # Keep the bettor-favourable price (consistent with the price-shopping
+        # result this repo already measured) and REPORT the collapse. Silently
+        # taking whichever row sorted first would make a downstream "best price"
+        # arbitrary, and hide that the feed is ambiguous here at all.
+        keys = ["event_id", "market_key", "side", "line", "book"]
+        before = len(game_df)
+        game_df = (
+            game_df.sort_values("price", ascending=False, kind="stable")
+            .drop_duplicates(subset=keys, keep="first")
+            .sort_values(keys, kind="stable")
+        )
+        collapsed = before - len(game_df)
+        if collapsed:
+            print(f"GAME_MARKET_DUPLICATE_QUOTES collapsed={collapsed} of {before} "
+                  "(same book/market/side/line, different price; feed carries no "
+                  "field distinguishing them -- kept the better price)", flush=True)
+        _write_text_atomic(game_out, game_df.to_csv(index=False))
+        print(f"Wrote {len(game_df)} game-market rows to {game_out}", flush=True)
+    else:
+        # Named, not silent: these markets are thin at some books and an empty
+        # file must not read as "not captured".
+        print("NO_GAME_MARKET_ROWS: btts/corners returned no priced outcomes "
+              f"for {len(events)} event(s) in region {args.region}", flush=True)
 
     df = _stable_props_df(pd.DataFrame(rows))
     out_path = Path(args.out)
