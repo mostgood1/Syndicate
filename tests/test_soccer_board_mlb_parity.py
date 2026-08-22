@@ -422,6 +422,18 @@ class ScorelineTests(unittest.TestCase):
         self.assertIsNone(cards._scoreline_section(None, away_abbr="COV", home_abbr="ARS"))
         self.assertIsNone(cards._scoreline_section({}, away_abbr="COV", home_abbr="ARS"))
 
+    def test_a_hyphenated_non_scoreline_key_is_skipped_not_mis_parsed(self) -> None:
+        """`key.partition("-")` splits on the FIRST hyphen, so a key with more
+        than one hyphen (never produced by the sim, but this reads whatever
+        the payload sends) would otherwise "parse" as a scoreline with
+        non-numeric sides -- found 2026-08-22 by a test on this function's new
+        sibling, `_compact_pregame_facts`, using a deliberately adversarial
+        key that outranked every real scoreline by probability."""
+        dist = {"not-a-score-key": 0.9, **self.DIST}
+        section = cards._scoreline_section(dist, away_abbr="COV", home_abbr="ARS")
+        self.assertIsNotNone(section)
+        self.assertEqual(section["table_rows"][0][0], "COV 0 - ARS 3")
+
 
 class BoxSectionSurvivalTests(unittest.TestCase):
     def test_soccer_supplied_table_sections_survive_normalization(self) -> None:
