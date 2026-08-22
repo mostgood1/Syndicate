@@ -131,17 +131,52 @@ def shots_for_match(match_id: Any) -> dict[str, Any] | None:
             # for "did a goal happen", which is the question being scored.
             goals.append({"t": seconds, "home": (not row["home"]) if shot.get("isOwnGoal") else row["home"]})
 
-    momentum = content.get("momentum")
+    # --- FotMob's OWN per-minute momentum, normalised to [{minute, value}] ---
+    # Their MODEL output, not an observation. Kept so it can be scored against
+    # the same bar as everything else rather than trusted because it is theirs.
+    vendor: list[dict[str, Any]] = []
+    main = ((content.get("momentum") or {}).get("main") or {}) if isinstance(content.get("momentum"), dict) else {}
+    for point in (main.get("data") or []):
+        if not isinstance(point, dict):
+            continue
+        try:
+            vendor.append({"t": float(point["minute"]) * 60.0, "value": float(point["value"])})
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    # --- Timed events: cards and substitutions ---
+    # These carry a clock, so they are legitimately available live. Match-level
+    # `content.stats` is NOT extracted as a feature: those are FULL-MATCH
+    # TOTALS known only at the whistle, so using one at minute 70 would leak
+    # the future into a live prediction. Kept out of the feature set on purpose.
+    events: list[dict[str, Any]] = []
+    facts = content.get("matchFacts") or {}
+    raw_events = (facts.get("events") or {}).get("events") if isinstance(facts.get("events"), dict) else None
+    for e in (raw_events or []):
+        if not isinstance(e, dict):
+            continue
+        minute = e.get("time")
+        if minute is None:
+            continue
+        try:
+            t = (float(minute) + float(e.get("minutesAddedTime") or 0.0)) * 60.0
+        except (TypeError, ValueError):
+            continue
+        events.append({
+            "t": t,
+            "type": str(e.get("type") or ""),
+            "home": bool(e.get("isHome")),
+            "card": str(e.get("card") or "") or None,
+        })
+
     return {
         "match_id": match_id,
         "home_team": (general.get("homeTeam") or {}).get("name"),
         "away_team": (general.get("awayTeam") or {}).get("name"),
         "shots": sorted(shots, key=lambda s: s["t"]),
         "goals": sorted(goals, key=lambda g: g["t"]),
-        # FotMob's OWN momentum series, carried through unread. Their model
-        # output, not an observation -- kept so it can be scored against the
-        # same bar as ours rather than trusted because it is theirs.
-        "vendor_momentum": momentum if isinstance(momentum, (dict, list)) else None,
+        "vendor_momentum": vendor,
+        "events": sorted(events, key=lambda e: e["t"]),
     }
 
 
