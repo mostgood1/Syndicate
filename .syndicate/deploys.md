@@ -23728,6 +23728,57 @@ same MCP-bypasses-`deploy-guard.py` note.
 **STILL NOT MEASURED: `with_series > 0`.** Nothing about the taxonomy is
 verified on real data yet. Two check-ins are armed (22:48Z, 23:35Z).
 
+## 2026-08-22 23:14:06Z — live-odds-worker `ca152db2` — `#514` **THE SERIES IS BUILT ON REAL DATA**
+
+- **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da52qfm417fc73e1jgo0`
+- **holder:** lane `basketball-live-momentum`, token `9075f9c771bd712a` (released)
+- **live at:** 23:17:41Z
+- **verify:** `[basketball_momentum] fetched=1 games=1 **with_series=1**` plus
+  `appended /opt/render/project/data/wnba_source/source_artifacts/data/live_lens/live_momentum_2026-08-22.jsonl`
+  at **23:19:54Z**, repeated at **23:22:42Z**. Preceded on both ticks by
+  `SCOREBOARD ... events_total=3` and `live_events=1`.
+
+**THIS IS THE MEASUREMENT `#514` HAS OWED SINCE PHASE A.** Every prior test ran
+on hand-built fixtures because ESPN is 403 from a Claude Code sandbox. Against
+a live WNBA payload the whole chain held: scoreboard reachable, in-play filter
+correct, summary parsed, `_team_index` resolved a home side, `_classify`
+matched real plays, the elapsed-second clock derivation placed them, both decay
+axes produced a series, and the artifact was appended. Sustained across ticks
+(~2.8 min cadence — slower than the pregame ~90s because the live WNBA build is
+now doing real work), so the jsonl accumulates one row per tick rather than
+capturing once.
+
+**STILL NOT INSPECTED: the artifact's CONTENT.** `with_series=1` proves a
+series was built, not that its numbers are right. Reading one block (pressure
+non-empty on BOTH axes, `scoring_narrator` present under that name,
+`as_of_seconds` sane against the game clock, whether the tenths-format clock
+`_normalize_clock` handles actually appears in the feed) needs
+`/api/ops/artifacts/export` with `ADMIN_TOKEN`, which this session does not
+have. **Owed, and now possible for the first time — the data exists.**
+
+### WHAT WENT WRONG FIRST, AND IT COST MOST OF THE SLATE
+
+The 22:01Z and 22:30Z deploys captured NOTHING. `live_events=0` on every tick
+of a live game, while the sibling `WNBA_LIVE_BOX_CAPTURED games=1 players=10`
+saw it at the same instant (23:10:06Z). Cause: **`site.api.espn.com` returns
+403 to a browser-spoof User-Agent from Render's egress**, and a bare `except`
+swallowed it, so a 403 and an empty slate both read as `live_events=0`.
+
+`scripts/fetch_espn_live_status_for_date.py` had the answer written down since
+2026-08-05 — probed from Render, three variants, browser UA 403 / full Chrome
+headers 403 / **no custom headers 200** — and says outright not to reintroduce
+a spoofed UA. I copied the UA from `basketball_props_smart_sim`, whose comment
+argues the opposite for a DIFFERENT host, and never reconciled them.
+
+**The `NO_SERIES` diagnostic shipped at 22:30Z could not have caught it**: it
+only runs once summaries are fetched, and the failure was upstream. The fix
+adds `SCOREBOARD ... events_total=N` at the FIRST hop and prints every fetch
+failure with its status. Diagnostics have to cover the first hop, not just the
+interesting one.
+
+**Preflight still could not run** (`RENDER_API_KEY` unset) — same substitution
+caveat as the two earlier deploys.
+
 
 ## 2026-08-22 23:23:16Z -- refresh-worker `1e48e08e` -- NOT MINE, and it carried my work anyway
 
