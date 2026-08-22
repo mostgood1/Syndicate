@@ -22288,3 +22288,69 @@ bridge that CAN is inside the evaluation-settlement autorun, still
 `autorun_enabled=False` for `#275`'s measured memory cost. So a parlay in the
 ledger will still read pending after this fix, correctly and for a different
 reason.
+---
+
+## 2026-08-22 ~17:06Z — `e6002cdc` — refresh-worker AND web — soccer/live join INSTRUMENTATION (+ the alt-line filter)
+
+Lane `layer2-sim-view-and-live-projection`. Claims held across both:
+`e76b7a33f528275d` (refresh-worker), `96fb36a83ed70f8c` (web). Deployed
+`e6002cdc`, which was `origin/main`'s tip at trigger time — `trigger_deploy`
+ships the branch tip rather than a named SHA, and this time the tip was exactly
+the commit intended, verified against `git rev-parse origin/main` immediately
+before.
+
+`deploy_preflight.py` **COULD NOT RUN** — same gap as the 16:5xZ entry above:
+this session has no `RENDER_API_KEY`. There is no CLEAR verdict for `e6002cdc`.
+What was held instead: both claims, on-main verified with git, and the
+in-flight-job check done by hand via `ALL_PROCESS_MEMORY` (below).
+
+**NO JOB WAS KILLED BY THIS DEPLOY.** At 17:02:22Z refresh-worker was running a
+narrow 2-game MLB re-sim (`--only-game-pks 823509,823831`, reason
+`fingerprint_change`). A parallel session's `2aa1df54` deploy at 17:00:51Z
+already SIGTERM'd it (`WORKER_SHUTDOWN` 17:03:35Z, commit `5e99fdcb`), so it was
+gone before this deploy was triggered. That session held its own claims and its
+deploy preceded this session's acquire — correct serialisation, not a conflict.
+
+**WHAT SHIPPED — three instruments and one feature, no behaviour change to any
+join:**
+
+1. `PREGAME_PROJECTION_JOIN`, a log line that did not exist for any sport.
+   `attach_projections` returns a full coverage payload and it went into the
+   artifact and nowhere else.
+2. Soccer pregame attribution: `rows_by_league` / `unmatched_by_league`,
+   `leagues_indexed`, `dates_read`, `ambiguous_team_keys`, and PAIRED name
+   samples (board side and sim side).
+3. `edge_withheld_by_reason` on the live join, printed beside
+   `rows_live_edge_withheld` — neither was on the log line.
+4. The alt-line filter (web only), default "all" so nothing is hidden.
+
+**VERIFY — the reading that proves this worked, and it is a LOG READ, not a
+green deploy.** Two lines from refresh-worker after the next Layer 2 shortlist
+build:
+
+    [layer2_shortlist] PREGAME_PROJECTION_JOIN sport=soccer ...
+        -> `unmatched_by_league` splits "the sim never ran this league" from
+           "the names missed", and `board_names`/`sim_names` give both
+           spellings of the same fixture. THAT is what an alias needs.
+    [layer2_shortlist] LIVE_PROJECTION_JOIN sport=soccer ... edge_why=...
+        -> names which of the three refusals produced `edged=0`.
+
+**THE PREMISE THIS CORRECTED, and it matters more than the instruments.** The
+task was opened on "none of the soccer data from sims (pregame or live) is
+joining with the board". The live half is FALSE and production said so:
+
+    16:46:32Z  soccer considered=2714 projected=114 edged=0 prob_withheld=0
+    16:56:03Z  soccer considered=1076 projected=122 edged=0 prob_withheld=0
+
+The live re-sim reaches the board, 114-122 rows join, every one holds a live
+probability, and not one is priced. That is the third case
+`LIVE_PROJECTION_JOIN`'s own comment names — "joined, and declined to price" —
+and it has a completely different fix from a broken join. The pregame half of
+the report stands: `rows_with_projection: 4` of ~1,142.
+
+**NOT VERIFIED AND NOT CLAIMED:** no alias was added. Reproducing the join
+against the git mirror showed board `Inter Milan` vs sim `Internazionale`,
+`ACF Fiorentina` vs `Fiorentina`, `Parma Calcio 1913` vs `Parma` — but those
+board-side spellings are a RECONSTRUCTION of OddsAPI, not a measurement. The
+mirror carries no soccer quote side at all. Writing aliases off them would be
+guessing dressed as a fix; the log line exists to supply the real names.
