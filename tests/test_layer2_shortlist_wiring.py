@@ -266,7 +266,11 @@ def test_shortlist_policy_is_layer2_boards_not_redefined_here(shard):
     shard["mlb"] = _two_sided()
     out = build_layer2_shortlist("2026-08-08", ["mlb"])
 
-    assert out["per_sport_limit"] == layer2_board.SHORTLIST_ROWS_PER_SPORT == 100
+    # The POINT of this assertion is that the shortlist takes the limit from
+    # layer2_board rather than redefining its own -- not that the number is
+    # 100. Pinning the literal made this fail on a deliberate policy change
+    # (100 -> 400) while the property it guards was never violated.
+    assert out["per_sport_limit"] == layer2_board.SHORTLIST_ROWS_PER_SPORT
     assert out["kind_floor"] == layer2_board.SHORTLIST_KIND_FLOOR == 30
     assert out["horizon_days"] == layer2_board.SHORTLIST_HORIZON_DAYS == 1
 

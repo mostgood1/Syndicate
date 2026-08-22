@@ -131,7 +131,44 @@ _IDENTITY_FIELDS = (
 # `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES` bounded count while the caller needed
 # bytes, and that was invisible for three weeks. The writer logs the bytes it
 # actually persisted so the real constraint stays observable.
-SHORTLIST_ROWS_PER_SPORT = 100
+def _shortlist_rows_per_sport() -> int:
+    """How many rows per sport reach the persisted board. Env-overridable.
+
+    RAISED 100 -> 400 `[user decision, 2026-08-22: "we should let everything
+    flow"]`, and NOT removed, because removing it breaks the board outright.
+
+    THE BINDING CONSTRAINT IS THE KEYVALUE WRITE, NOT READABILITY. The original
+    comment sized this as "a readability bound, not a memory bound" against a
+    2.4MB state. The real ceiling is `refresh_state_store._keyvalue_max_bytes`
+    = **8MB**, and that number is itself measured rather than chosen: an
+    intelligence state at 8.9MB reproducibly gets "Connection closed by server".
+
+    So the arithmetic, at the ~1.0 KB/row measured on production 2026-08-07:
+
+        100/sport x 4 active   ~0.4 MB    (today)
+        400/sport x 4 active   ~1.6 MB    (this change)
+        400/sport x 8 active   ~3.2 MB    (a full winter slate)
+        UNCAPPED               soccer ALONE is 20,025 grid rows, ~20 MB
+
+    Uncapped is not a bigger board, it is a board that fails to persist and
+    therefore serves nothing. 400 keeps a full eight-sport slate under half the
+    ceiling while quadrupling what a reader sees.
+
+    `persisted_bytes` is already reported on every build and is now checked
+    against the ceiling below, so the next raise can be made on a reading
+    instead of on this arithmetic.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_ROWS_PER_SPORT") or "").strip()
+    try:
+        value = int(raw) if raw else 400
+    except ValueError:
+        value = 400
+    # Floor of 1: a zero or negative override would empty the board silently,
+    # which is the failure mode every other bound in this file guards against.
+    return max(1, value)
+
+
+SHORTLIST_ROWS_PER_SPORT = _shortlist_rows_per_sport()
 
 # Each kind is guaranteed this many slots before merit takes over.
 #
@@ -2678,6 +2715,27 @@ def select_shortlist(
         }
 
     selected.sort(key=_score_of, reverse=True)
+    persisted_bytes = len(json.dumps(selected, default=str))
+    # Read from the store rather than hardcoded: if someone raises
+    # SYNDICATE_KEYVALUE_MAX_BYTES, this percentage must move with it or it
+    # becomes a second, silently-stale copy of the same limit.
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        _keyvalue_ceiling = int(_keyvalue_max_bytes())
+    except Exception:
+        _keyvalue_ceiling = 0
+    if _keyvalue_ceiling and persisted_bytes > _keyvalue_ceiling // 2:
+        # LOUD BEFORE IT BREAKS. The write fails at the ceiling with an opaque
+        # "Connection closed by server" (measured at 8.9MB), so a warning that
+        # only fires AT the limit fires too late to be actionable.
+        print(
+            f"[layer2_board] SHORTLIST_PERSIST_LARGE bytes={persisted_bytes} "
+            f"ceiling={_keyvalue_ceiling} rows={len(selected)} "
+            f"per_sport={int(per_sport)} "
+            f"-- lower SYNDICATE_LAYER2_ROWS_PER_SPORT if this approaches the ceiling",
+            flush=True,
+        )
     return {
         "rows": selected,
         "per_sport": per_sport_report,
@@ -2729,5 +2787,13 @@ def select_shortlist(
         "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_stale_kickoff": stale_kickoff,
-        "persisted_bytes": len(json.dumps(selected, default=str)),
+        "persisted_bytes": persisted_bytes,
+        # THE HEADROOM, so the next raise is made on a reading rather than on
+        # the arithmetic in `_shortlist_rows_per_sport`'s docstring. The board
+        # is only PART of the intelligence-state payload, so the shortlist's own
+        # share reaching the ceiling is not the failure point -- it is the point
+        # at which the ceiling stops being comfortably far away.
+        "persisted_pct_of_keyvalue_max": round(100.0 * persisted_bytes / _keyvalue_ceiling, 1)
+        if _keyvalue_ceiling
+        else None,
     }
