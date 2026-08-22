@@ -10,12 +10,66 @@
   {% set lens_rows = game.shared_lens_rows if game.shared_lens_rows is defined else period_rows %}
   {% set probability_rows = game.shared_probability_rows if game.shared_probability_rows is defined else [] %}
   {% set total_rows = game.shared_total_rows if game.shared_total_rows is defined else [] %}
+  {#- HOISTED to the top with the other sets. Jinja `set` binds at the point
+      it is reached, and the LIVE HEAD references `mom` -- so leaving this
+      beside the chart (line ~247) left the head's momentum status silently
+      false on every card. Same trap this file already records for
+      `mom_uid`, hit again from the other direction. -#}
+  {% set mom = game.shared_momentum if game.shared_momentum is defined else none %}
   {% set box_sections = game.shared_box_sections if game.shared_box_sections is defined else [] %}
   {% set prop_rows = game.shared_prop_rows if game.shared_prop_rows is defined else [] %}
   {% set prop_status_rows = game.shared_prop_status_rows if game.shared_prop_status_rows is defined else prop_rows %}
   {% set top_play_rows = game.shared_top_play_rows if game.shared_top_play_rows is defined else [] %}
   {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
 
+  {#- LIVE HEAD: a STACKED SCORELINE, not a horizontal "A @ B".
+      Away on row one, home on row two, each with its score, and the clock in
+      the upper right -- the shape every scoreboard uses, and the one MLB's own
+      card already reads as. The horizontal head put the score in the middle
+      between two crests, which at a glance answers "who is playing" but not
+      "what is the score and how long is left" -- the two questions a LIVE card
+      exists to answer. Pregame keeps the horizontal head, where there is no
+      score and the matchup IS the content. -#}
+  {% if live_state and game.away.score is not none and game.home.score is not none %}
+  <div class="cards-strip-head cards-strip-head--live">
+    <div class="cards-live-scoreline">
+      <div class="cards-live-row">
+        {% if game.away.logo_url %}
+          <img class="cards-live-crest" src="{{ game.away.logo_url }}" alt="" loading="lazy" />
+        {% else %}
+          <span class="cards-live-crest cards-live-crest--text">{{ game.away.abbr }}</span>
+        {% endif %}
+        <span class="cards-live-team">{{ game.away.name }}</span>
+        <span class="cards-live-score">{{ game.away.score }}</span>
+      </div>
+      <div class="cards-live-row">
+        {% if game.home.logo_url %}
+          <img class="cards-live-crest" src="{{ game.home.logo_url }}" alt="" loading="lazy" />
+        {% else %}
+          <span class="cards-live-crest cards-live-crest--text">{{ game.home.abbr }}</span>
+        {% endif %}
+        <span class="cards-live-team">{{ game.home.name }}</span>
+        <span class="cards-live-score">{{ game.home.score }}</span>
+      </div>
+      {#- MOMENTUM STATUS, directly under the scoreline. The chart itself lives
+          further down the card; this is the one-line read of it at the point
+          the eye already is. Only when there IS a chart -- a label with no
+          curve behind it is an assertion the reader cannot check. -#}
+      {% if mom and mom.points %}
+        <div class="cards-live-momentum">
+          <span class="cards-live-momentum-dot{% if mom.side_is_home %} is-home{% elif mom.side_is_away %} is-away{% endif %}"></span>
+          <span class="cards-live-momentum-label">{{ mom.label }}</span>
+        </div>
+      {% endif %}
+    </div>
+    <div class="cards-live-clock">
+      <span class="cards-live-clock-time">{{ game.shared_game_state.clock or game.status_badge or 'LIVE' }}</span>
+      {% if game.shared_game_state and game.shared_game_state.period %}
+        <span class="cards-live-clock-period">{{ game.shared_game_state.period }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
   <div class="cards-strip-head">
     <div class="cards-head-left cards-head-matchup">
       <div class="cards-head-team"{% if game.away.primary_color %} style="--cards-team-accent: {{ game.away.primary_color }};"{% endif %}>
@@ -76,6 +130,7 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
 
   <div class="cards-score-ribbon">
     <div class="cards-score-meta">
@@ -195,7 +250,6 @@
         version emitted a Unicode-block sparkline into a label/value row in the
         box grid: correct data, buried and flat. Only rendered for a match in
         play; `shared_momentum` is None otherwise, by construction. -#}
-    {% set mom = game.shared_momentum if game.shared_momentum is defined else none %}
     {#- Own id, not `card_dom_id`: that is set at line ~166 from `game.gamePk`,
         AFTER this block in template order, so referencing it here yields an
         EMPTY suffix. Measured: every card rendered `clipPath id="mom-up-"`,
@@ -229,10 +283,33 @@
             <clipPath id="mom-up-{{ mom_uid }}"><rect x="0" y="0" width="100" height="22" /></clipPath>
             <clipPath id="mom-dn-{{ mom_uid }}"><rect x="0" y="22" width="100" height="22" /></clipPath>
           </defs>
+          {#- HALF-TIME AND FULL-TIME TICKS. The axis is now a FIXED 0-90, so
+              these are fixed too and mean the same thing on every card. -#}
+          <line class="cards-momentum-tick" x1="50" y1="2" x2="50" y2="42" />
           <polyline class="cards-momentum-home" points="{{ ns.all }}" fill="none" clip-path="url(#mom-up-{{ mom_uid }})" />
           <polyline class="cards-momentum-away" points="{{ ns.all }}" fill="none" clip-path="url(#mom-dn-{{ mom_uid }})" />
           <line class="cards-momentum-axis" x1="0" y1="22" x2="100" y2="22" />
+          {#- WHERE "NOW" IS. Without it a trace ending at x=44 reads as
+              truncated data rather than as a match at the 40th minute. Omitted
+              once the match is effectively over, where it would just sit on
+              the right edge adding nothing. -#}
+          {% if mom.now_x is defined and mom.now_x < 99 %}
+            <line class="cards-momentum-now" x1="{{ mom.now_x }}" y1="2" x2="{{ mom.now_x }}" y2="42" />
+          {% endif %}
+          {#- GOALS, on the same axis as the trace. This is the pairing that
+              makes the panel checkable by eye: the build-up is supposed to
+              PRECEDE the marker. Own goals are marked so a mark on the
+              conceding side's half is not read as a scoring surge. -#}
+          {% for g in mom.goals %}
+            <circle class="cards-momentum-goal{% if g.own_goal %} is-own{% endif %}"
+                    cx="{{ g.x }}" cy="{{ 8 if g.home else 36 }}" r="2.6">
+              <title>{{ g.clock }} {{ g.scorer }}{% if g.own_goal %} (own goal){% endif %}</title>
+            </circle>
+          {% endfor %}
         </svg>
+        <div class="cards-momentum-axis-labels" aria-hidden="true">
+          <span>0'</span><span>45'</span><span>90'</span>
+        </div>
         <div class="cards-momentum-legend">
           <span class="cards-momentum-key cards-momentum-key--home">{{ mom.home_abbr }}</span>
           <span class="cards-mini-copy">{{ mom.events }} pressure events</span>

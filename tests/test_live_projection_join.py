@@ -64,23 +64,24 @@ class LiveProjectionJoinTests(unittest.TestCase):
                  "line": 1.5, "game": {"state": "live"}}]
         coverage = attach_live_projections(grid, build_live_prop_index(_snapshot()))
         self.assertEqual(coverage["rows_live_projected"], 0)
-
-        # `#505`. The reason is `miss_player_not_live`, not
-        # `miss_no_market_alias`. A finer bucket was added since this was
-        # written, and it is the CORRECT one for this fixture: "Nobody Here" is
-        # absent from the lens entirely, so the join never gets as far as
-        # trying market aliases. Asserting the old bucket made a more precise
-        # attribution look like a regression.
+        # `miss_no_market_alias` used to absorb this, and that was the defect
+        # `#296`'s contract exists to prevent: "Nobody Here" is not in the live
+        # lens AT ALL, which is a different fact from the market vocabulary
+        # missing. The 2026-08-21 production reading -- `miss_market=428` with
+        # player and line both 0 -- is what forced the split, and this row is
+        # the player case.
         self.assertEqual(coverage["miss_player_not_live"], 1)
         self.assertEqual(coverage["miss_no_market_alias"], 0)
 
-        # THE INVARIANT THIS TEST IS NAMED FOR, pinned directly rather than via
-        # one bucket: every considered row lands in exactly one reason. That
-        # survives new buckets being added, which is what broke the assertion
-        # above, and it is the thing that would actually catch a silent drop.
+        # THE INVARIANT THIS TEST IS NAMED FOR, added by `#510` alongside the
+        # bucket assertion above. Both branches reached the same fix for the
+        # bucket independently; this is the part only one had. It pins the
+        # claim in the test's NAME -- every considered row lands in exactly one
+        # reason -- rather than one bucket's value, so it survives the next
+        # split of the kind `#296` just made, which is precisely what broke the
+        # old assertion.
         miss_total = sum(value for key, value in coverage.items() if key.startswith("miss_"))
         self.assertEqual(miss_total + coverage["rows_live_projected"], coverage["rows_live_considered"])
-
         self.assertTrue(coverage["unmatched_samples"])
         self.assertIn("tried", coverage["unmatched_samples"][0])
 

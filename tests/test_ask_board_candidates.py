@@ -145,7 +145,7 @@ class BoardCandidatesTests(unittest.TestCase):
         self.assertLess(last_modelled, first_unmodelled)
 
     def test_a_row_without_a_model_says_so_rather_than_showing_a_number(self) -> None:
-        """`#505`. Resolves the column BY NAME, not by position.
+        """`#510`. Resolves the column BY NAME, not by position.
 
         This read `row[4]`, which was the model-edge column until a `Price`
         column was added ahead of it. The columns are now

@@ -1113,99 +1113,93 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### soccer-layer2-dates — OWED PROOF PARTIALLY DISCHARGED 2026-08-21 21:2xZ (scheduled verification, read-only; nothing deployed, no claim taken)
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **ORIGINAL GOAL MET AND VERIFIED. Soccer team-name join FIXED IN PRODUCTION (2,587 -> 87 unmatched). Now carrying five later user-reported board defects: 2 fixed, 3 INSTRUMENTED BUT UNDIAGNOSED — and the instrument that answers them has never once been read.**
+- Goal (met): the Layer 2 board never shows a number attributed to the sim that
+  is about a different side, quantity or thing. Outcomes (a)-(d) all done and
+  unit-tested. **The SERVED-board read was never taken** — the agent proxy 403s
+  `syndicate-an21.onrender.com` from a Claude session (`state.md`).
+- **OPEN, in priority order:**
+  1. **READ `LAYER2_BOARD_HEALTH`.** Never observed; three worker restarts in a
+     row reset the cold-boot clock. It answers three live user reports —
+     stale lines / blank projections / no movement — which are **UNDIAGNOSED**,
+     not fixed. Read `sport=mlb` as the control.
+  2. **`unmatched_player: ~6,056`** — largest soccer bucket. The
+     `player_no_roster` vs `player_name_miss` split is deployed and unread; it
+     decides whether this is the alias map's problem or the sim producer's.
+  3. **The one-sided fair value never reaching the live edge** (`todo.md #503`).
+     A PRICING decision, not a bug fix. Deliberately not taken.
+  4. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Only fires on
+     a direct-publish failure; a quiet log is expected and proves nothing.
+     Affirmative token `SWEEP_REPAIRING`.
+  5. Four board UI behaviours tested but never seen on the served page.
+- Files: `syndicate/features/shared/{layer2_board,prop_projections,live_projection_join,soccer_projections,team_aliases,artifact_publisher}.py`, `pipeline/layer2_shortlist.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,artifact_publish_repair_over_ceiling}.py`, `tests/js/board_sim_view_display.test.mjs`.
+  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
+    `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
+    `artifact_publisher.py` claimed 2026-08-22 for the sweep repair path.
+    `board_enrichment.py` deliberately untouched.
+- **Cross-lane, unowned, NOT fixed by me:**
+  `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
+  is RED on `main` — stale fallout from `28e55d86`, whose session was active.
+- Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` (two blocks).
+- Blocked by: none.
+### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
+- Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
+  `/portfolio` stops reading every position as pending.
+- Files: `syndicate/features/prediction_ledger.py`,
+  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `scripts/backfill_portfolio_settlement.py`,
+  `tests/test_prediction_ledger_shared_store.py`,
+  `tests/test_evaluation_settlement_autorun_ordering.py`,
+  `tests/test_ledger_bridge_identity_join.py`,
+  `tests/test_backfill_portfolio_settlement.py`
+- **Status: three defects found, all FIXED AND DEPLOYED. The goal is NOT met —
+  nothing has settled yet.** Narrative and evidence: `log/2026-08-22.md`.
+  Subject facts: `state.md [portfolio-settlement]`.
+  - `#502` ledger crosses the service boundary — live both services `2aa1df54`
+  - `#504` settlement 13th -> 2nd in the chain — live `4eeffb5c`, VERIFIED 1.3ms
+  - `#505` join on a stable identity — live `a1e89ff3`, refresh-worker only
+- **Unverified and load-bearing:** `#505`'s `entity` field mapping was never
+  measured against real evaluation records (worker-local, not in
+  `HOT_ARTIFACT_PATTERNS`).
+- Backfill tool BUILT and NOT RUN against production:
+  `scripts/backfill_portfolio_settlement.py`, preview-by-default. Ran in preview
+  in-session; it proved the tool works and nothing about production (no local
+  portfolio ledger; the one local evaluation chunk holds a single
+  `record_type: prediction` row, not a wager).
+- Verification still owed: the next `[ledger_bridge]` line, 2026-08-23 after
+  06:00 CT. `matched_by_identity > 0` = the join works; `by_identity` large with
+  `matched_by_identity: 0` = the entity mapping is wrong. **That same line also
+  gates the backfill** — do not run it with `--commit` before that reading.
+- Session `74a0966a` ARCHIVED 2026-08-22. All four deploy claims free at exit.
+- **NOTE for whoever owns `refresh-worker-oom-recurrence`:** this lane edited
+  `scripts/run_refresh_worker.py`, which your lane nominally holds. Your block is
+  no longer in `lanes.md` so `lane-guard` saw no claim. Flagged because the
+  change moves an expensive job earlier in the tick chain.
+- Blocked by: none.
 
-The end-to-end proof owed by this lane since it closed 2026-08-18 was measured
-against a slate that actually had matches in play. Full evidence in
-`.syndicate/deploys.md`, entry `2026-08-21 — soccer live lens verified on a LIVE slate`.
-
-- **Worker half — DISCHARGED.** live-odds-worker, 18:45Z–21:00Z, 635 tick-writes:
-  the four leagues with a live fixture (ligue_1 Marseille v Strasbourg,
-  belgian_pro_league Standard Liege v RAAL, epl Arsenal v Coventry, la_liga
-  Betis v Sociedad) each wrote `(1 live games)` on **every tick inside their
-  in-play interval**; the six leagues with no fixture wrote `(0 live games)` on
-  **all 384** of theirs. `6bdc50de` works, and the reading discriminates.
-- **Served-board half — STILL OWED.** All four matches were `post` by fetch time,
-  so `/soccer/<lg>/api/live-lens` correctly serves the `0 / No data` payload —
-  which post-match is indistinguishable from the 08-17 failure. Needs a fetch
-  DURING live play. **Next window: Sat 2026-08-22 09:00–10:50 CT, seven leagues
-  in play at once.**
-- Narrowing, not a substitute for that reading: cross-service transport IS proven —
-  the web service's `/api/ops/artifacts/stream` copy of ligue_1's live_state is
-  stamped `21:18:07.019Z` against the worker's write log at `21:18:07.032Z`
-  (sub-second), `match_box` populated. With `live_lens.py:129-134` mapping
-  `rank_cards` 1:1 over `payload["games"]`, the untested link is now the pure
-  function `_rank_card`, not the serve path.
-- **`LEAGUE_POLL_FAILED` FIRED — 5 times, 1.99% of live-league ticks, and ONLY on
-  leagues with a live match** (4× `SystemError: Objects/tupleobject.c:927`, a
-  CPython-internal signature the poller does not itself raise; 1× ESPN
-  ReadTimeout). Transient — surrounding ticks wrote N>0, so it did not cost the
-  verification — but a real defect on the live path. NOT root-caused; open.
-- `[LIVE_LENS_TICK_DIAG] sport=soccer` **absent** on all healthy ticks — soccer passes.
-  The 12 diagnostics that did fire are all `sport=mlb`, `ok=False`,
-  `UnboundLocalError: cannot access local variable 'write_json_file'`, on 12/12
-  MLB ticks sampled. **Live MLB fault, unrelated to soccer, unowned** — surfaced
-  here because it is failing continuously in production right now.
-
-### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720
-- Goal: the Layer 2 board never shows a number attributed to the sim that is
-  about a different side, a different quantity, or a different thing entirely.
-  **Testable outcome:** on the served board, (a) `model_probability` equals the
-  model's probability for THAT ROW'S OWN side, (b) the `Win%` column either
-  shows a real win probability or is renamed to what it actually is, (c) no
-  LIVE row shows a blank `Projected`/`Live` while a live re-sim exists for it,
-  and (d) a live row whose LIVE sim dissents says so.
-- Files: `syndicate/features/shared/layer2_board.py`,
-  `syndicate/features/shared/prop_projections.py`,
-  `syndicate/templates/intelligence.html`,
-  `syndicate/static/shared/board_cards.css`,
-  `pipeline/layer2_shortlist.py`,
-  `syndicate/blueprints/ops.py`,
-  `syndicate/features/wnba/live_lens.py`,
-  `tests/test_wnba_live_prop_line_source.py` (new),
-  `tests/test_layer2_sim_view_sides.py` (new),
-  `tests/test_layer2_score_flatten.py`.
-  - `syndicate/features/shared/live_projection_join.py` and
-    `tests/test_live_prop_miss_attribution.py` ADDED to this lane 2026-08-21
-    ~23:5xZ, after the first production reading of `LIVE_PROJECTION_JOIN`
-    returned `miss_market=428 of 901` on MLB and the user asked for that gap
-    closed. (Its earlier exclusion note was correct at the time: the live
-    verdict was already right and merely unlabelled.)
-- Hypothesis: four independent defects, all of the same SHAPE — a number
-  computed in one frame and displayed in another, with nothing on the surface
-  saying which frame:
-  1. `layer2_board.py:2031` publishes `projection["model_prob_over"]` as
-     `model_probability` with NO side awareness. `model_prob_over` is always
-     the OVER/HOME framing (proved by the same file at `:871`, which maps
-     `"home": model_prob_over`). `sim_view` IS correctly side-adjusted via
-     `_model_edge_for`, so away/draw rows render a coherent badge beside an
-     incoherent probability.
-  2. `layer2_board.py:2036` publishes `score["book_confidence"]` as
-     `confidence`, which `intelligence.html:2180` renders as **`Win%`**.
-     `book_confidence` is `_book_confidence(books_quoting)` — a books-quoting
-     RELIABILITY MULTIPLIER (`(1,0.5),(2,0.7),(4,0.85)`, else `1.0`) — not a
-     win probability. "Win% 100%" means "≥5 books quote this".
-  3. LIVE rows render a blank `Projected` because `_layer2_board_columns` only
-     populates it from `projection["projected"]`, and the h2h fallback in
-     `displayProjection()` is gated to moneyline, so live PROP rows with a live
-     re-sim still show an em dash.
-  4. There is no LIVE analogue of `sim_view`: `live_model_probability` is
-     published but nothing compares it to the market, so a live row cannot say
-     the LIVE sim dissents even when it does.
-- Falsification test: for (1), build a row whose projection is framed on `home`
-  and read `model_probability` on the `away` candidate — if it already differs
-  from the home value, the hypothesis is wrong. For (2), if the five distinct
-  `Win%` values on the user's 2026-08-21 capture do NOT map 1:1 onto the
-  book-count ladder, it is not `book_confidence` and the diagnosis is wrong.
-- Verification: unit tests that FAIL on the current code and pass after (the
-  `off != on` discipline), plus a read of the SERVED board — `boardContract.cards`,
-  not the raw shortlist row shape, per `state.md [layer2_board_display]`'s own
-  note that checking only the raw rows is not sufficient for this class of fix.
-- Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
-  `main` ships nothing until someone takes a claim and deploys it.
+### render-web-request-path — **OPEN, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — **SHIPPED AND MEASURED; ONE ITEM OWED**
+- Goal: web stops being SIGTERM'd during live MLB slates. **Changes 1 and 2 MET.**
+- **Claims: NONE held.** Released deliberately at archive time so no future session
+  is blocked on `home.py` / `mlb/cards.py` by a dead owner — the orphan failure the
+  2026-08-18 sweep had to clean up across 8 lanes.
+- **VERIFIED** (web `8149e51d` 19:09:35Z, still live under peer `3ada3512`):
+  `apply_live_scores` **3318-8400ms -> 0-93ms** on `games=15`, 14 samples across two
+  instances and two deploys. Zero `Handling signal: term` since, against 3 in 4 min
+  before. Cold boot exonerated at 2.7s boot-to-listening.
+- **OWED, THE ONLY OPEN ITEM:** the card-cache idle bound is **NOT** verified.
+  Baseline to beat: 369 MB -> 2,026,717,200 B over ~7.5h, ceiling 2,147,483,600 B.
+  Post-deploy numbers are directionally better at comparable ages and that is not
+  proof. **Blocked in practice** — peers redeploy web every 20-30 min so no instance
+  lives long enough. Instrument: memory-over-uptime + the rate of
+  `CONTEXT_CACHE_EVICTED ... web=True` falling.
+- **DO NOT allowlist `raw/statsapi/feed_live`** — it freezes live scores (`#413`) and
+  buys no speed. Full reasoning in `state.md [web-request-path-latency]`.
+- Narrative + evidence: `log/2026-08-22.md` (session `726ef4ff`). Deploy record and
+  the stated preflight deviation: `deploys.md` 2026-08-22 19:03Z.
+- Next bottleneck, now visible: `build_cards_page_context` 1803-2402ms on a miss.
 
 ### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
-- Goal: Phase A of `#502` — a shared causal-decay core and a basketball pressure-event
+- Goal: Phase A of `#507` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
   no reader, no card, no wiring.** Scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 - Files:
@@ -1220,23 +1214,23 @@ against a slate that actually had matches in play. Full evidence in
     `scripts/poll_basketball_momentum.py` (NEW),
     `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
-  - **ADDED FOR `#503` 2026-08-22** (user asked for the fix; collision-checked,
+  - **ADDED FOR `#508` 2026-08-22** (user asked for the fix; collision-checked,
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
     which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
     `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
     `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
     was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
-  - **ADDED FOR `#504` 2026-08-22** (user asked for the fix; both unclaimed):
+  - **ADDED FOR `#509` 2026-08-22** (user asked for the fix; both unclaimed):
     `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
     `wnba/cards.py` and `wnba/live_lens.py` are claimed by other lanes and were
     NOT edited — every one of the six failures was a stale TEST target, and both
     source files are the correct side.
-  - **ADDED FOR `#505` 2026-08-22** (user asked for the no-new-failures gate;
+  - **ADDED FOR `#510` 2026-08-22** (user asked for the no-new-failures gate;
     all unclaimed): `scripts/pytest_baseline.py` (NEW),
     `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
     `requirements-dev.txt`.
-  - **ADDED FOR `#505` TEST FIXES 2026-08-22** (user asked for the top three
+  - **ADDED FOR `#510` TEST FIXES 2026-08-22** (user asked for the top three
     files; all unclaimed): `tests/test_refresh_state_store.py`,
     `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
     `syndicate/blueprints/ask_the_syndicate_adapter.py` (ONE-LINE source fix:
@@ -1248,7 +1242,7 @@ against a slate that actually had matches in play. Full evidence in
   - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
     `syndicate/features/shared/live_lens_loop.py` is claimed by
     `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
-    the conflict was surfaced, so `#502`'s momentum capture is now wired into
+    the conflict was surfaced, so `#507`'s momentum capture is now wired into
     `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
     (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
     before the builder, touching no soccer or MLB path. It deliberately imports

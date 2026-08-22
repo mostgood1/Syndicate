@@ -640,7 +640,7 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				print(f"[live_lens_loop] WNBA_LIVE_BOX_FAILED date={date_str} "
 				      f"{type(exc).__name__}: {exc}", flush=True)
 		if sport in ("nba", "wnba"):
-			# `#502` Phase B: ATTACK MOMENTUM CAPTURE, basketball's analogue of the
+			# `#507` Phase B: ATTACK MOMENTUM CAPTURE, basketball's analogue of the
 			# soccer `momentum` block that `poll_soccer_live_state` writes into
 			# `live_state_<date>.json`.
 			#

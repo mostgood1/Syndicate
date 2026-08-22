@@ -1,4 +1,4 @@
-"""`#502` Phase B wiring: the momentum capture actually FIRES on the tick.
+"""`#507` Phase B wiring: the momentum capture actually FIRES on the tick.
 
 **REACHABILITY BEFORE CORRECTNESS.** `model_engine_standard.md` makes this the
 first test for anything behind a flag or a branch, and `#208` states the

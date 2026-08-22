@@ -94,7 +94,7 @@ def test_model_bearing_rows_outrank_ev_only_rows():
 
 
 def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
-    """`#505`. Two contract changes this had to catch up with, and the second
+    """`#510`. Two contract changes this had to catch up with, and the second
     makes the test stronger than it was.
 
     1. The call returns `(rows, excluded_count)`, so `top` had to be
@@ -118,7 +118,7 @@ def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
 
 # --- the fallbacks, so an answer never gets worse than before -----------------
 #
-# `#505`. These assert `== (None, 0)`, not `is None`. `_board_top_opportunities`
+# `#510`. These assert `== (None, 0)`, not `is None`. `_board_top_opportunities`
 # returns `(rows_or_None, excluded_count)` -- the second term is how many rows
 # the positive-edge veto removed, which the caller needs in order to say "1 row
 # with a non-positive edge was left out" rather than a bare "nothing found".
@@ -149,7 +149,7 @@ def test_sport_filter_is_exact_so_nba_does_not_match_wnba(monkeypatch):
 
 
 def test_an_unimportable_reader_degrades_instead_of_raising_typeerror(monkeypatch):
-    """`#505`. The import-failure branch returned a BARE `None` while every
+    """`#510`. The import-failure branch returned a BARE `None` while every
     other branch -- and the sole caller, which destructures -- uses a 2-tuple.
     So the one path written to DEGRADE an answer raised `TypeError: cannot
     unpack non-sequence NoneType` instead, turning a soft failure hard.

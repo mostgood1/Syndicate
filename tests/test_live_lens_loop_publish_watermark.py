@@ -57,7 +57,7 @@ class _Run(NamedTuple):
     correct when nothing else has warmed the module. Measured 2026-08-22:
     the same test yields `[1, 3, 6]` alone and `[1, 3, 7]` when
     `test_live_lens_loop_publish_instrumentation.py` runs first in the same
-    process -- a second reproducibility defect underneath `#503`'s watermark
+    process -- a second reproducibility defect underneath `#508`'s watermark
     one, and invisible until the first was fixed.
 
     Capturing the publish instant lets the tests assert the INVARIANT (each
@@ -123,7 +123,7 @@ def _run_cycles(count: int, *, publish_side_effect=None):
 
 
 class _IsolatedWatermarkTestCase(unittest.TestCase):
-    """`#503`. Every test here runs against an ISOLATED watermark file.
+    """`#508`. Every test here runs against an ISOLATED watermark file.
 
     **WHY THIS EXISTS, because the failure was invisible and self-inflicted.**
     These tests drove the real loop, which persists its watermark through
@@ -194,7 +194,7 @@ class _IsolatedWatermarkTestCase(unittest.TestCase):
 
 class PublishWatermarkTests(_IsolatedWatermarkTestCase):
     def test_the_loop_does_not_write_its_watermark_into_the_repo_tree(self) -> None:
-        """`#503`'s regression guard: the property that makes the suite
+        """`#508`'s regression guard: the property that makes the suite
         reproducible, asserted directly rather than inferred from the other
         tests happening to pass twice.
 
@@ -237,7 +237,7 @@ class PublishWatermarkTests(_IsolatedWatermarkTestCase):
         # runs of this same test.
         #
         # Pinning a guessed constant to fix a flake would have replaced one
-        # non-reproducible assertion with another -- which is what `#503` is
+        # non-reproducible assertion with another -- which is what `#508` is
         # about, so getting it wrong here in the same file would be its own
         # punchline. What must hold is that the watermark is at or after the
         # last publish this run started, and never before it.
@@ -258,7 +258,7 @@ class PublishWatermarkTests(_IsolatedWatermarkTestCase):
         re-sent on the next cycle.
 
         **THIS USED TO ASSERT `== [1.0, 3.0, 6.0]` AND THAT WAS A SECOND
-        REPRODUCIBILITY BUG** (`#503`). The list came from a tick table that
+        REPRODUCIBILITY BUG** (`#508`). The list came from a tick table that
         assumed exactly three `time.time()` reads per cycle; the in-sweep
         memory sampler reads the clock a variable number of times, so the same
         test yields `[1, 3, 6]` alone and `[1, 3, 7]` when

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 428 rules `[generated]`
+## Index — 531 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4686,6 +4686,524 @@ ticks last wins.** A clean zero is easier to diagnose than intermittent truth.
 claiming a feature is live, resolve which service executes it -- from env and
 routing, not from the name -- and check THAT SHA.
 
+## 08-22 MOMENTUM DOES NOT PREDICT *WHEN* A GOAL IS COMING — and the earlier positive result did not imply it would
+
+Swept 5 weight variants x 6 half-lives (90s-900s) over 200 completed matches
+from last season, held out by match-id hash, target = "does a goal land in the
+next 10 minutes", feature = ABSOLUTE pressure (a goal happening is about
+pressure on either side; signed momentum answers WHO, not WHETHER):
+
+    BEST ON FIT : on-target-heavy @ 600s   AUC 0.5403
+    ITS HOLDOUT :                          AUC 0.5107   (base rate 0.2471)
+    every variant x half-life: holdout AUC 0.49 - 0.54
+
+**0.5107 is a coin flip. Not usable for timing.** WHO, conditional on a goal
+having happened, is no better: best fit `shots-only @ 900s` 0.5961 -> holdout
+**0.5224** on n=1221.
+
+**THE TRAP, AND IT IS THE WHOLE LESSON.** The 08-21 lead/lag test found
+momentum elevated before goals: +1.141 vs 0.000 control, Cohen's d = +0.397,
+and that result was sound. It answered: *given a goal happened, was momentum
+elevated 2 min before, versus a control instant?* -- retrospective, and
+oriented to the side that scored.
+
+The question worth acting on is: *at an ARBITRARY instant, is a goal coming?*
+The signal does not survive the translation. **"Separates from control" and
+"predicts the event" are different claims**, and only the first was earned. The
+phrase "momentum LEADS goals" -- written into a commit message and a state.md
+section -- reads as the second.
+
+**RULE: a retrospective separation result is a HYPOTHESIS about prediction, not
+evidence of it.** Before building on one, restate it as the forward question
+(at time T, with only information available at T, what happens next?) and score
+it held out against the base rate. The two differ by ~0.04 AUC here, which is
+the difference between a feature and nothing.
+
+**ALSO: the best HOLDOUT row was not the best FIT row** (`corners-heavy @ 900s`,
+0.5426). Selecting it would be fitting the holdout -- the same error one level
+up -- so it is recorded as a hypothesis for a fresh slice, not a result.
+
+**WHAT THIS DOES NOT RETRACT:** the chart itself. It is an honest DESCRIPTIVE
+panel of who is on top, which is what the user reads it for manually, and the
+sign convention is verified correct against live scorelines. It is a narrator.
+It is not a timing signal, and nothing should price off it.
+
+## 08-22 THE PRE-REGISTERED TEST KILLED THE 40.2%, AND MY OWN PASS/FAIL BANDS WERE WRONG
+
+Rule fixed in advance (`0fff6254`): fire when 34-38 min into a half AND pressure
+>= 9.2525 (90th pct, derived from the FIT half only). Scored on 158 matches from
+a DIFFERENT period, all 699 prior ids excluded:
+
+    hypothesis (post-hoc)  0.402
+    FRESH hit rate         0.2547
+    time-window only       0.3063   (n=1580)
+    momentum increment    -0.0516
+    fresh base rate        0.2631
+
+**MOMENTUM ACTIVELY HURTS.** The full rule is 5.2 points BELOW the time window
+alone, and BELOW the base rate -- firing on pressure selects worse-than-average
+moments. The 40.2% was an artifact of picking the time window AFTER seeing which
+decile won on the holdout, exactly as suspected.
+
+**MY PRE-REGISTERED BANDS WERE THEMSELVES DEFECTIVE.** They read
+`>= 0.25 -> WEAK PASS (clears 3-1)`, so the run printed **WEAK PASS** for a rule
+that loses to doing nothing. I set the bands against BREAK-EVEN and never against
+the BASE RATE. A signal must beat the base rate before break-even is even the
+right question -- otherwise "profitable at 3-1" is satisfied by any rule that
+fires during a period when goals are common, including a rule with no signal at
+all.
+
+**RULE: a pre-registered threshold must include the do-nothing baseline, not
+just the economic one.** Beating break-even is necessary and not sufficient; the
+comparison that decides whether a FEATURE works is against the base rate, and
+against the simpler feature it claims to improve on.
+
+**WHAT REPLICATED:** the clock, not the momentum. 34-38 minutes into a half ran
+0.3186 on holdout and 0.3063 on fresh, against base rates of 0.2342 and 0.2631 --
+a stable ~1.16-1.36x lift from an unbiased decile split both times. That effect
+is real, needs none of this machinery, and is almost certainly in the market
+price already.
+
+**STANDING: momentum is a NARRATOR.** Three tests now -- global AUC (0.5417
+held out), conditional tail (killed by preregistration), and the increment over
+time alone (NEGATIVE). Nothing should price off it. The chart stays because it
+honestly describes who is on top, which is what it is read for.
+---
+
+## 2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will out-argue a fresh measurement
+
+Three related errors in one session, all the same shape: **treating a
+description of the system as the system.**
+
+**1. I diagnosed for two hours on a number the ledger had, and production
+didn't.** `state.md` said the soccer projection join served
+`rows_with_projection: 4` of 1,142. I quoted it forward as current, built a
+mechanism around it, wrote a `todo.md` item on it, and shipped instrumentation
+to explain it. The first real reading was **9,598 of 20,014 (48%)** — the join
+had been working since `#379`'s window fix actually ran. The figure predated
+that deploy and nobody had re-measured.
+
+**RULE: a number in `state.md` is a RECORD OF A MEASUREMENT, with a date and a
+deploy behind it. Before building on one, ask what would have changed it since —
+and if the answer is "a fix that has landed", re-measure first.** `state.md`'s
+own header says it is "current, verified system state"; that phrasing is what
+makes a stale row so persuasive. This is the third time this file has recorded a
+variant of *literally true and materially misleading* (see the `autoDeploy = no`
+entry). Mark the row SUPERSEDED with the new reading rather than deleting it, so
+the next reader can see the correction happened.
+
+**2. I read the absence of an instrument as the absence of the thing.** I
+claimed the Layer 2 shortlist "completed once in 34 minutes" and called it
+systemic starvation. The window I counted over **began before the log line
+existed** — it was deployed mid-window. Measured properly: 10-19 min from a cold
+boot, then every 4-6. I nearly wrote a second wrong figure into the ledger while
+correcting the first.
+
+**RULE: before concluding "X did not happen" from a log query, establish that
+the line COULD have been emitted over the whole window** — the code was deployed
+and the emitting path was reachable. A zero from a query whose instrument was
+half-deployed is not a zero.
+
+**3. My own instrument shipped useless and its first reading proved it.** The
+soccer coverage sampled the sim side by sorting every indexed fixture
+alphabetically and taking 12. It reliably returned the three leagues with almost
+no misses and dropped every league that actually had them — the board side named
+12 fixtures and the sim side could pair with **one**.
+
+**RULE: a sample must be drawn from the population the QUESTION is about, not
+from whatever a stable sort puts first.** An instrument that reliably samples
+the cases with nothing to report is worse than no instrument: it looks like an
+answer. Scoping it to the failing leagues made all twelve pairable in one
+reading and yielded 13 verified aliases within the hour.
+
+**AND THE COUNTERWEIGHT, because this session also got one right by design:**
+the `no_market_fair_value` split was built to CONFIRM the hypothesis that live
+`edged=0` was downstream of the pregame join. It read
+`{'no_fair_value_devig_failed': 133}` — 133 of 133 rows HAVE a pregame
+projection — and refuted it. An instrument built so that it CAN return the
+answer you do not want is the only kind worth deploying.
+
+## 08-22 THE BEST GOAL WINDOW WAS HIDDEN BY MY OWN SAMPLING CUTOFF
+
+Every momentum sweep sampled `start=300, end=5100` -- so **80-95' was never a
+decision point**. The densest scoring period in football was excluded by a
+constant I chose and never questioned. Sampling the full match (to 5700s):
+
+    clock    n     hit     lift   window available
+    80-84   848   0.3455   1.48        8.5 min     <<< best in the match
+    36-40   848   0.2889   1.24       10.0 min
+    84-88   846   0.2636   1.13        4.5 min
+    88-92   211   0.2275   0.98        2.0 min
+     8-16         0.1722   0.74       10.0 min     (quietest)
+
+**80-84' clears the 2-1 break-even (33.3%) on the CLOCK ALONE**, base rate
+0.2331. And the `window available` column is why later is not better: by 88'
+only 2 minutes of a 10-minute window remain, so the rate keeps climbing while
+the bet stops existing. 80-84' is where rate and runway overlap.
+
+**EVENTS, TESTED INDIVIDUALLY FOR THE FIRST TIME.** Earlier sweeps moved four
+shot families together, so no single type could be seen:
+
+    corner-awarded    1.19      shot-ON-target   0.97   <- BELOW base
+    shot-off-target   1.19      handball         0.88
+    shot-blocked      1.17      "all types"      1.03   <- dilutes
+
+**Shots ON target predict goals WORSE than shots off target.** Goals are
+excluded from the feature, so a remaining on-target shot is a SAVED one -- the
+chance is spent. Off-target and blocked shots mean pressure still building.
+Anyone hand-weighting these would have ranked them the other way round; I did,
+in the shipped chart (`shot-on-target: 3.0` vs `shot-off-target: 1.5`).
+
+Crossed against time, the best feature adds +0.02 at the money bucket and flips
+sign across others (+0.054 at 16-20', -0.050 at 8-12'). Noise-shaped.
+
+**RULE: a sampling range is a modelling assumption. State it and test its
+edges.** `end=5100` was written once, carried through four analyses, and hid the
+only result that clears a real break-even. No amount of feature engineering
+inside the window could have recovered what the window excluded.
+
+## 08-22 POOLED RESULT: THE CLOCK IS THE ONLY REAL SIGNAL — and FotMob IS reachable
+
+Pooled 370 matches (212 holdout + 158 fresh), 32,501 samples, base 0.2450:
+
+    TIME    80-84'   0.3320  lift 1.35   <- best, essentially AT 2-1 break-even
+            36-40'   0.3122  lift 1.27
+            12-16'   0.1851  lift 0.76   (quietest)
+    EVENTS  corner / shot-off-target     lift 1.19
+            shot-ON-target               lift 0.97  (BELOW base)
+    MOMENTUM top-3 deciles               lift 1.12
+    MARGIN  margin 1                     lift 1.06
+    COMBOS  "all types"                  lift 1.03  (dilutes)
+
+**FOUR HYPOTHESES OF MINE DIED HERE, all measured:**
+1. Momentum predicts WHEN -- AUC 0.5417 held out.
+2. Momentum works conditionally in a time window -- prereg killed it, and the
+   increment over the clock was NEGATIVE (-0.0516).
+3. Momentum is better at saying NO goal -- pooled bottom-3 lift 0.92 vs top-3
+   1.12. The TOP discriminates more. Also non-monotonic: decile 1 reads 1.10
+   because near-zero pressure means "early match", not "quiet match".
+4. Score state matters -- "losing by 1 late pushes" does NOT appear. At 80-84',
+   margin 1 (0.3283) is BELOW the bucket average (0.3320).
+
+**REPLICATION IS OF THE PATTERN, NOT THE BUCKET.** 80-84' ran 0.3455 holdout ->
+0.3135 fresh, while 36-40' ran 0.2889 -> 0.3434. Both late-half windows are
+elevated in both samples (1.20-1.48) but which one WINS flips. Picking the
+single best bucket is the same overfit that killed the 40.2%.
+CONFOUND, stated: the fresh set is Jun-Aug 2026, heavily MLS/early-season, base
+0.2610 vs 0.2331 -- a robustness check across different football, not like-for-like.
+
+**FOTMOB IS REACHABLE, and the scope doc's blocker was WRONG.**
+
+    /api/matchDetails?matchId=      -> 404
+    /api/data/matchDetails?matchId= -> 200, 276,792 bytes
+    expectedGoals YES · xg YES · momentum YES · shotmap YES
+    NO x-mas signing header needed. AiScore root: 403 (blocked).
+
+The path moved from `/api/` to `/api/data/`. `scope_2026-08-21_fotmob_xg_
+enrichment.md` recorded it as unverified-and-probably-signed; it is neither.
+
+**WHY THIS NOW MATTERS MORE, not less.** Everything we already own has been
+measured and is weak. FotMob supplies the one thing ESPN structurally cannot --
+chance QUALITY (shot xG) rather than shot COUNTS -- and there is now a hard bar
+to clear: beat 0.3320 at 80-84', and beat +0.02 as an increment over the clock.
+
+## 2026-08-22 — FORBIDDEN: never join on an id minted from a content hash of a payload that carries live prices
+
+`recommendation_id` looks like an identity and is a **snapshot hash**.
+`record_recommendation` mints it via `_stable_id` over `prediction_id` + the
+whole recommendation payload + `artifact_metadata` — so it changes every time
+odds, edge or probability move. A portfolio bet stores the id on screen at click
+time; settlement decides a later snapshot under a later id; the join finds
+nothing. That is `matched: 0`, `4,560 no_key_match of 8,276`, and
+`skipped: 25131`.
+
+**The tell, and it was in the repo the whole time:**
+`pipeline/intelligence_state.py:2028` already said those ids come from "a content
+hash of the full recommendation payload (incl. live odds/edge/probability)" and
+would mint a fresh row "purely from ordinary price drift". A mitigation was built
+around that fact (gate recording on `source_fingerprint`) without anyone asking
+what it meant for the JOIN downstream.
+
+**The rule:** an identity you join on must be derived from what makes the thing
+THE SAME THING — for a wager, `event|market|entity|side|line`. If a mutable
+observation (price, edge, timestamp, a run id) is inside the hash, it is a
+version stamp, not an identity, and it must never be the only join key.
+`clv_opening_ledger._opening_key` gets this right and reports `unkeyable=0`;
+the settlement join got it wrong and reported `matched: 0`. Both were available
+to compare at any point.
+
+## 2026-08-22 — FORBIDDEN: verifying a REORDERING by elapsed-time-since-boot
+
+I proposed verifying `#504` (moving settlement up an `elif` chain) by measuring
+worker-start -> first log line, expecting 11min -> ~1min. **That metric would
+have shown 11min -> 10.5min and read as "the change did nothing" on a change
+that demonstrably worked.** Most of that window is the worker's startup cycle
+before the chain is evaluated at all — a property of the tick loop, not of chain
+position.
+
+**The rule:** to verify a change in ORDER, measure ORDER — the co-occurrence of
+the branch's marker with the marker of the branch above it. `#504`'s real
+reading is `RECONCILIATION_AUTORUN_GATED` at 18:28:38.192696 and
+`LEDGER_INDEX_SIZE` at 18:28:38.194012: **1.3ms, same tick**, against 116s and a
+different tick before. Elapsed-since-boot measures the loop; delta-between-
+branches measures the chain.
+
+## 2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override
+
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` exists as a documented escape
+hatch for "forcing a fast cycle to confirm a fix". Set to 1200 at 17:48Z and
+removed at 18:02Z it produced **zero runs, cost two restarts, and returned no
+information**. The interval gate was never what blocked settlement — chain
+position was, and an interval override cannot make a branch be evaluated.
+
+**Stop re-investigating this.** If settlement is not running, read WHICH branch
+took the tick before touching any gate. A job can be enabled, correctly
+configured, past its interval, and still never evaluated.
+
+## 2026-08-22 — the retraction was as wrong as the claim. "It ran once" is not "it runs"
+
+I asserted settlement was starved by chain position, then RETRACTED it on seeing
+a single run at 17:28:34Z, then found the retraction wrong too: it got that tick
+0.65ms after `SOCCER_AUTORUN_SKIPPED reason=spacing_gate`, i.e. by coincidence,
+and 45 minutes produced exactly one such coincidence.
+
+**The rule:** a single successful observation refutes "never", not "reliably".
+When retracting a starvation/contention claim, the evidence needed is a RATE
+over a window, not one instance. I recorded the retraction as settled fact in
+the same session I had to reverse it.
+
+### 2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that will start finding it
+- What we believed: `raw/statsapi/feed_live/**` being absent from
+  `HOT_ARTIFACT_PATTERNS` was the whole bug — home fell through to 15 live
+  statsapi calls per request purely because the local read missed, so
+  allowlisting it would make the read hit and the latency vanish. The user asked
+  for exactly that.
+- What was actually true: `_mlb_feed_live_payload` takes the file **if it
+  EXISTS**, with no freshness check. Publishing it would have frozen every game
+  at whatever inning it was captured — the defect `#413` had already measured on
+  2026-08-13 (MIL @ SD reading `live / TOP 9` against a lens reading Final; CLE @
+  DET `BOT 1` two hours after first pitch). It would also have bought **no
+  speed**: `vendor/mlb_bettingv2/tools/daily_update.py` refreshes those files
+  prior-day only, saying so inline — "must fetch the final game feed, not a stale
+  pregame cache entry" — so a freshness gate would reject them and fall through
+  anyway. Plus ~48 MB per publish cycle against a 2 GB/hr brake.
+- How we found out: grepping for other readers of `raw_feed_live_path` before
+  touching the allowlist. `board_enrichment.py` documents the whole failure in
+  its own docstring, including the sentence that anticipated this exact change:
+  "Fixing the cache reader is the deeper fix... but it re-introduces per-game
+  network I/O into a path that already has an 8s wall-clock budget."
+- The rule going forward: **an allowlist entry is a change to the CONSUMER, not
+  to the producer.** Before adding one, find every reader of that path and check
+  what it does when the file is suddenly present. A reader that gates on
+  EXISTENCE rather than freshness converts a latency fix into a silent
+  correctness bug. The producer's refresh cadence is the second question: an
+  artifact refreshed prior-day cannot serve a live surface no matter who can read
+  it.
+- Cost: none — caught before shipping. The alternative (`live_lens_report`, already
+  allowlisted, already fresh) removed the network call with no new egress and no
+  staleness, and carried the inning/outs detail a naive swap would have dropped.
+
+### 2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not just the display
+- What we believed: a background regression sweep written as
+  `pytest ... 2>&1 | tail -12` had produced a complete failure list, and the 11
+  `FAILED` lines in its output file were all of them.
+- What was actually true: pytest reported **18 failed**. The `tail` was part of
+  the pipeline, so only the last 12 lines were ever written to the task's output
+  file — 7 failure names never existed anywhere to be read. A baseline
+  comparison built on that list would have compared 11 against 18 and looked
+  like 7 regressions, or been "resolved" by hand-waving.
+- How we found out: `grep -c "^FAILED"` on the output file returned 11 while the
+  summary line in the same file said 18. The two numbers were in the same file
+  and disagreed.
+- The rule going forward: **when backgrounding a command whose output you will
+  analyse later, redirect the FULL stream to a file and filter at read time.**
+  `cmd > /tmp/out.txt 2>&1` then `grep`, never `cmd | tail -N`. Any pipeline
+  stage that drops lines is destroying evidence you have not looked at yet — and
+  a truncated list is indistinguishable from a short one.
+- Cost: two 8-minute sweep re-runs. Cheap here; the same shape silently
+  under-reports a regression set.
+## 08-22 TWO REAL LEADS AT LAST — and they came from questions I did not think to ask
+
+**1. LA LIGA 80-84' REPLICATES HELD OUT. The first result all session to survive
+a clean test above break-even.**
+
+    DISCOVERY (98 matches)    80-84'  0.3954  lift 1.77
+    HELD-OUT  (222 matches)   80-84'  0.3604  lift 1.57   CLEARS 2-1 (33.3%)
+
+The 222 were the FIT half, never scored on time. Held-out profile shows real
+structure, not a lone spike: quiet 16-28' (~0.17), a first-half rise to 0.3018
+at 40-44', flat mid-second-half, then 0.3604 at 80-84' falling to 0.2374 by
+88-92' as the window runs out.
+
+**THE POOLED NUMBER WAS HIDING THIS.** Pooled 80-84' read 0.3320 / lift 1.35
+across all leagues. Split by league: la_liga 1.78, epl 1.24 (largest sample, does
+NOT clear 2-1), mls 1.17, primeira_liga **0.89 -- below base**. I reported a
+league-averaged number as a property of football. Same averaging error that made
+momentum look like a global null when it was conditional, running the other way.
+
+**2. FOTMOB xG BEATS ITS OWN CONTROL. Chance QUALITY adds where VOLUME does not.**
+
+    top decile        xg 1.19   bigchance 1.30   count 1.09  <- control
+    at 80-84'         xg  clock 0.2972 -> 0.4000  delta +0.1028
+                      count               0.2778  delta -0.0194  HURTS
+
+`count` is the ESPN-equivalent feature and it hurts by -0.019, replicating the
+ESPN momentum increment (-0.0516) on completely different data. That is the
+FotMob question answered: xG measures something shot counts cannot.
+
+**BUT n IS ~90 IN THAT CELL, AND THE PRECEDENT IS UGLY.** The last promising
+tail number this session was **40.2%** at n=276, and preregistration killed it.
+This one reads **40.0%** at n=90. Treat +0.103 as UNVALIDATED until it survives
+the same treatment. Reading a tail result after the fact is how the 40.2%
+happened.
+
+**THE METHOD LESSON, twice over:** both leads came from splits I had not thought
+to make -- the user asked for leagues individually, and for the full sampling
+range. Neither was a modelling insight; both were "you are averaging over
+something that differs". Before reporting a pooled effect, enumerate the
+dimensions it averages over and check the big ones.
+
+## 08-22 THE xG RESULT DID NOT REPLICATE — AND THE CONTROL THAT "PROVED" IT WAS ARITHMETIC
+
+Pre-registered (`fdf1b892`, committed before the fresh sample existed), scored on
+246 fresh matches, ZERO overlap with discovery. Identical procedure, top quartile
+inside the 80-84' band:
+
+                  discovery(n=90)   fresh(n=241)
+        xg            +0.1028          +0.0319
+        count         -0.0194          +0.1107
+
+**THE RANKING REVERSES.** On discovery xG beat count by 0.12; on fresh count beats
+xG by 0.08, and count FLIPS SIGN. "Chance quality beats chance volume" was the
+whole case for a FotMob dependency, and it is dead — not weakened, reversed.
+
+**FORBIDDEN: a control matched by THRESHOLD VALUE when the features are on
+different scales.** The first scoring run applied xG's threshold (0.8905) to
+both. xG-pressure ranges 0.09..1.82; count-pressure ranges 1.55..13.76. So the
+threshold fired on 24% of the band for xG and **100% for count** — the control
+selected the ENTIRE band, making its delta `+0.0000` BY ARITHMETIC, before any
+data existed. That forced zero then read as *"the control does not clear"*, which
+was the single sentence justifying the dependency. Match controls by SELECTION
+RATE. Rebuilt that way the control scored +0.1447 and won.
+
+**The tell was in the output I had already read**: `count` fired on 963 samples
+and `xg` on 229, and the delta was EXACTLY +0.0000. An exact zero on a
+noisy empirical quantity is a computation, not a measurement. Same family as the
+box-section `rows: []` error — the discriminating number was on screen and I
+was reading the verdict line instead.
+
+**THREE tail results have now failed to replicate this session** (momentum 40.2%,
+xG +0.1028, and the xG-over-count ranking). All three were read AFTER seeing the
+tail, at n<300. The one result that DID replicate (la_liga 80-84', 222 held-out)
+was tested because the user asked for a split, not because a number looked good.
+
+**What actually survives:** the CLOCK. Both samples independently show 80-84'
+elevated over base (0.2972 and 0.2793 vs base 0.2562). That is the third
+independent confirmation, and it needs no vendor dependency at all.
+
+---
+
+## 2026-08-22 (later) — A rule written from one sport's vocabulary is a rule about that sport; and a safety net that skips the biggest cases is not a safety net
+
+Three overturned beliefs, two of them mine and shipped.
+
+**1. THE ALT-LINE FILTER I SHIPPED DID NOTHING ON SOCCER, and the user found it,
+not me and not the tests.** I defined "alt line" as a market whose name ends
+`_alt`, because that is how MLB and NFL quote them. Soccer's
+`DEFAULT_GAME_MARKETS` is exactly `["h2h","totals","spreads"]` — it has no such
+market, and expresses the same concept as SEVERAL ROWS OF ONE MARKET at
+different lines. The filter matched nothing; "Main lines only" was a no-op on
+the sport with the worst ladder problem. I had even written a test asserting
+`totals_alt` is alt and `totals` is not, which passed and proved nothing about
+soccer.
+
+**RULE: before writing a rule that spans sports, check the VOCABULARY of the
+sport you are actually fixing.** One `grep` of `DEFAULT_GAME_MARKETS` would have
+shown it. A cross-sport rule verified against one sport's data is a
+single-sport rule with a misleading name — and the test suite will happily
+confirm it, because the fixtures come from the same sport as the rule.
+
+The v2 definition is "not the primary line of its (event, market, segment,
+player) group", with primary = most books quoting. That is a claim about the
+CONCEPT rather than about a naming convention, so it survives a feed that
+renames things.
+
+**2. THE INSTRUMENT I BUILT TO CONFIRM A HYPOTHESIS REFUTED IT — which is the
+only reason to build one.** I had published, in `todo.md` and to the user, that
+soccer's live `edged=0` was downstream of the pregame join: rows with no pregame
+projection get no `market_fair_prob_over`, so no edge. The split read
+`{'no_fair_value_devig_failed': 133}` — **133 of 133 rows HAVE a pregame
+projection.** The real cause is that `attach_margin_model` writes
+`quote["fair_probability"]` while the live join reads
+`projection["market_fair_prob_over"]`: the number exists and the reader cannot
+see it.
+
+**RULE, stated positively because this one went right: build the counter so it
+CAN return the answer you do not want.** Had I logged only "edges withheld: 133"
+I would have shipped the wrong fix with a number that appeared to support it.
+The split cost four lines and overturned a published conclusion.
+
+**3. A RETRY PATH THAT EXCLUDES THE LARGEST CASES IS NOT A RETRY PATH.**
+`publish_hot_artifact` withholds its checksum on failure and says why: "a failed
+publish must be retried next sweep." `_publish_skip_reason` refuses anything
+over 12MB *before* that function is reached. Both are correct alone. Together
+they mean the biggest artifacts — the ones a stale copy hurts most — were the
+only ones with **no way back**, and the call site had been printing "(sweep will
+NOT repair this above 12MB)" the whole time.
+
+**RULE: when one component documents another as its recovery path, verify the
+recovery path actually covers it.** The failure mode is silent by construction —
+it only opens on an error, so a system where errors are rare will look healthy
+for months. Ask "which inputs does my safety net skip?", and if the answer
+correlates with severity, the net is inverted.
+
+**Also, small and costly:** a Render deploy showing `deactivated` is not a
+rollback. Mine showed it because a `service_updated` redeploy of the IDENTICAL
+commit superseded it six minutes later. Check the SHA, not the status word.
+
+## 08-22 THE ANSWER, at 5,552 matches: THE EVENT SIGNALS ARE NOISE. The clock is real and too small to bet.
+
+Two years, ten leagues, 9 signals (xg, count, ontarget, inbox, bigchance,
+FotMob's OWN momentum abs+slope, red-card advantage, subs) x 10 leagues x 24
+time bands. Fit-half selects, holdout-half scores once, distinct cells only.
+
+**NULL CONTROL SETTLES IT.** Same pipeline, goal series swapped BETWEEN matches
+within league (severs feature-label link, KEEPS within-match label clustering):
+
+    REAL      distinct cells 23
+    NULL runs                15, 22, 17, 15, 13   mean 16.4
+
+23 against a null that routinely produces 22. The sweep MANUFACTURES ~16
+"surviving" cells on data with no signal in it; it found 23. That excess is
+run-to-run variation, not a discovery. **Every individual cell in that list --
+including the ones clearing 2-1 with tight CIs -- is indistinguishable from
+what the machine produces on noise.** This is why the earlier "36 survivors vs
+~20 by chance" line was worthless: I made the 20 up by multiplying 0.05 by 417.
+
+**THE CLOCK IS REAL BUT SMALL.** Corrected profile, holdout, n~6,700/band:
+16-20' 0.2408 [0.231,0.251] rising to 44-48' 0.2932 [0.282,0.304], second half
+flat ~0.27-0.28. Non-overlapping CIs, smooth shape -- real structure. But the
+BEST band is 0.2932 and 2-1 needs 0.3333. **Nothing clears 2-1 anywhere in the
+match.** 3-1 (0.25) is cleared by the base rate alone (~0.264), i.e. by betting
+blind, which no book will price.
+
+**A CLOCK BUG MANUFACTURED THE FIRST ANSWER.** `_clock_seconds` folded
+`minAdded` into `min`, so first-half 45+3 became minute 48 and collided with a
+genuine second-half 48th. 4.4% of all shots shared a bucket with the other
+half, concentrated in 45-52'. A window opened at 44' swept ~13 minutes of play
+scored as 10. That printed 40-48' as the densest scoring period (lift 1.21) --
+a counterintuitive result contradicting the user's late-game intuition, with
+n=6,712 and tight CIs. Corrected: 1.21 -> 1.11, and the late game went 0.94 ->
+1.02. **Large n made the artifact MORE convincing, not less.** The `period`
+field was in the payload from the first fetch.
+
+**WHAT THIS CLOSES.** Stop building momentum/event-triggered goal bets. FotMob
+is not owed a production dependency: its own momentum series ranked no better
+than anything else, and shot COUNT (free from ESPN) matched or beat xG. Five
+promising numbers died this session -- 40.2%, xG +0.1028, xG-over-count,
+la_liga 80-84', 40-48' peak -- and all five were read off a tail or a bug
+before a control existed. The control was always the cheap part.
+
 ## 08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES
 
 Running the full pytest suite (`python -m pytest tests/`) leaves the working
@@ -4710,7 +5228,7 @@ did not was not.
 **COROLLARY, and it is the part that nearly hid this: `.gitignore` cannot save
 you here.** Several of these byproducts are legitimately TRACKED files that the
 suite rewrites, so there is no ignore rule that makes `-A` safe. Earlier in this
-same session I gitignored four *untracked* byproducts (`#503`) and that was
+same session I gitignored four *untracked* byproducts (`#508`) and that was
 correct — but it addresses a different half of the problem and must not be
 mistaken for having solved this one.
 
@@ -4721,7 +5239,7 @@ unshared branch — never on someone else's).
 
 ## 08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A worktree shares site-packages
 
-I reported `#505` as "76 failures across 26 files on clean `origin/main`", and
+I reported `#510` as "76 failures across 26 files on clean `origin/main`", and
 backed it by re-running three sampled files in a detached worktree at
 `origin/main`, getting identical counts. That check was real and it was not
 sufficient. **`git worktree` gives you a different CODE tree and the SAME Python

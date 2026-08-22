@@ -96,7 +96,7 @@ class RefreshStateStoreTests(unittest.TestCase):
                 refresh_state_store.reports_root()
 
         with TemporaryDirectory() as tmp_dir:
-            # `#505`. NESTED THREE DEEP, NOT AT THE TEMP ROOT. `repo_root_from`
+            # `#510`. NESTED THREE DEEP, NOT AT THE TEMP ROOT. `repo_root_from`
             # is `Path(file).resolve().parents[3]`, and every real caller passes
             # a module `__file__` under `syndicate/features/<area>/`, where
             # `parents[3]` is the repo root. A probe at `<tmp>/probe.py` has

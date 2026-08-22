@@ -445,6 +445,20 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     matched = 0
     edged = 0
     edge_blocked = 0
+    # WHICH refusal, not just how many. `rows_live_edge_withheld` is a single
+    # total over three unrelated causes, and soccer has been sitting at
+    # `projected=114 edged=0 prob_withheld=0` -- joined, holding a live
+    # probability, and priced zero times. The total says that happened; it
+    # cannot say whether the market had no fair value, the prop was already
+    # decided, or the arithmetic failed. Those are three different fixes.
+    edge_withheld_by_reason: dict[str, int] = {}
+
+    def _withhold(projection: dict, reason: str, text: str) -> None:
+        nonlocal edge_blocked
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = text
+        edge_blocked += 1
+        edge_withheld_by_reason[reason] = edge_withheld_by_reason.get(reason, 0) + 1
     prob_withheld = 0
     considered = 0
     miss_no_player = 0
@@ -533,6 +547,14 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             continue
 
         projection = dict(row.get("projection") or {})
+        # SNAPSHOT THE PREGAME BASIS BEFORE ANYTHING BELOW OVERWRITES IT.
+        # `projection["basis"]` becomes "live_resim" a few lines down, so by the
+        # time the edge is decided there is no longer any way to ask whether a
+        # PREGAME projection existed for this row -- and that question is what
+        # separates a de-vig gap from a pregame-join miss when the edge is
+        # refused for want of a fair value. Read once, here, while it is still
+        # true.
+        pregame_basis = str(projection.get("basis") or "").strip()
         # KEEP THE PREGAME NUMBER RATHER THAN OVERWRITING IT (`#412`). The three
         # numbers a live row needs are the live projection, the pregame sim's
         # projection, and what has ACTUALLY happened so far -- and this used to
@@ -692,25 +714,63 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         banked = hit.get("actual_so_far")
         row_line = _as_float(row.get("line"))
         if banked is not None and row_line is not None and (_as_float(banked) or 0.0) > row_line:
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = (
+            _withhold(
+                projection,
+                "over_already_decided",
                 "the over is already decided, so the market is settled and there is "
-                "no price to beat"
+                "no price to beat",
             )
-            edge_blocked += 1
             continue
 
         live_prob = hit.get("live_prob_over")
         fair = projection.get("market_fair_prob_over")
         if live_prob is None or fair is None:
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = (
-                "live re-sim produced no probability for this market, so there is "
-                "nothing honest to price against it"
-                if live_prob is None
-                else "no market fair value to price the live projection against"
-            )
-            edge_blocked += 1
+            if live_prob is None:
+                _withhold(
+                    projection,
+                    "no_live_probability",
+                    "live re-sim produced no probability for this market, so there is "
+                    "nothing honest to price against it",
+                )
+            else:
+                # THE ONE THE SOCCER READING POINTS AT -- 100 of 100 withheld
+                # here, measured 2026-08-22 17:30:32Z. A live probability that
+                # arrived and has nothing to price against is a QUOTE-side gap,
+                # not a failure of the re-sim.
+                #
+                # SPLIT AGAIN, because "no fair value" still covers two states
+                # that need different owners, and the first reading could not
+                # tell them apart:
+                #
+                #   the row has NO PREGAME PROJECTION AT ALL. `market_fair_prob_over`
+                #     is written only by the pregame join's `_price_against_market`
+                #     (`soccer_projections.py`), which runs only after a projection
+                #     was produced -- so a row the pregame join missed can never
+                #     carry a live edge, whatever the re-sim does. Owner: the
+                #     pregame join (soccer's `unmatched_player` is 5,138).
+                #
+                #   the row HAS a pregame projection and the DE-VIG still could
+                #     not answer -- a one-sided market, which soccer player props
+                #     routinely are. Owner: the fair-value/margin model.
+                #
+                # `basis` is the discriminator: every projection the pregame join
+                # produces stamps one, and this function has already overwritten
+                # it with "live_resim" above -- so `sim_basis`, preserved from the
+                # pregame value at entry, is what says whether a pregame
+                # projection existed. Read from the ENTRY snapshot rather than
+                # the mutated dict for exactly that reason.
+                had_pregame = bool(pregame_basis)
+                _withhold(
+                    projection,
+                    "no_fair_value_devig_failed" if had_pregame else "no_fair_value_no_pregame_projection",
+                    "no market fair value to price the live projection against"
+                    + (
+                        " (the market is one-sided, so de-vig has no answer)"
+                        if had_pregame
+                        else " (this row carried no pregame projection, so no fair"
+                        " value was ever computed for it)"
+                    ),
+                )
             continue
         try:
             # Same formula and inputs as `attach_projections`
@@ -719,9 +779,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             # number drift apart, which is what retired `book_grid`.
             projection["edge_vs_market_pct"] = round((float(live_prob) - float(fair)) * 100.0, 2)
         except (TypeError, ValueError):
-            projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = "live edge inputs were not numeric"
-            edge_blocked += 1
+            _withhold(projection, "inputs_not_numeric", "live edge inputs were not numeric")
             continue
         projection["live_prob_over"] = live_prob
         projection.pop("edge_unavailable_reason", None)
@@ -745,6 +803,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # priced nothing this tick; a gap between them means it priced some.
         "rows_live_prob_withheld": prob_withheld,
         "rows_live_edge_withheld": edge_blocked,
+        "edge_withheld_by_reason": dict(sorted(edge_withheld_by_reason.items())),
         "live_games_in_snapshot": indexed.get("live_games"),
         "snapshot_rows_seen": indexed.get("rows_seen"),
         "snapshot_rows_indexed": indexed.get("rows_indexed"),

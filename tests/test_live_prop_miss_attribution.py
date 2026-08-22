@@ -102,3 +102,115 @@ def test_an_unreadable_status_is_unknown_not_live():
     idx = build_live_prop_index(_status_snap({"someOtherKey": "whatever"}))
     assert idx["live_games"] == 0
     assert list(idx["by_game_state"]) == ["unknown"]
+
+
+# --- WHY an edge was withheld, not just how many -------------------------
+#
+# `rows_live_edge_withheld` is one total over three unrelated causes, and the
+# soccer reading on production 2026-08-22 16:46Z was the case it cannot
+# explain: `projected=114 edged=0 prob_withheld=0`. Every one of those 114 rows
+# joined AND carried a live probability AND was priced zero times. The total
+# says that happened; it cannot say which of "no fair value on the quote side",
+# "the prop is already decided", or "the arithmetic failed" did it -- and those
+# have three different owners.
+#
+# Same contract as the miss counters above: a zero must be attributable.
+
+def test_a_row_with_no_market_fair_value_names_the_quote_side():
+    """The live re-sim did its job; the DE-VIG had no answer."""
+    # Line ABOVE the fixture's banked `actualSoFar` -- a decided prop is
+    # refused earlier and for a different reason, which is exactly the
+    # distinction this test exists to make.
+    idx = build_live_prop_index(_snapshot([_prop("Aaron Judge", "hitter_strikeouts", 5.5)]))
+    row = _row("Aaron Judge", "batter_strikeouts", 5.5)
+    row["projection"] = {}          # no `market_fair_prob_over`
+    out = attach_live_projections([row], idx)
+    assert out["rows_live_projected"] == 1
+    assert out["rows_live_edged"] == 0
+    # No pregame `basis`, so no pregame projection ever existed for this row --
+    # `_price_against_market` never ran and no fair value was ever computed.
+    assert out["edge_withheld_by_reason"] == {"no_fair_value_no_pregame_projection": 1}
+
+
+def test_a_settled_prop_is_named_as_settled_rather_than_as_a_missing_price():
+    """`actualSoFar` past the line: the book has settled, so there is no bet.
+
+    Counted apart from the fair-value case deliberately -- this one is the join
+    working exactly as designed and must never be read as a defect.
+    """
+    idx = build_live_prop_index(
+        _snapshot([_prop("Aaron Judge", "hitter_strikeouts", 0.5, actualSoFar=3)])
+    )
+    row = _row("Aaron Judge", "batter_strikeouts", 0.5)
+    row["projection"] = {"market_fair_prob_over": 0.3}
+    out = attach_live_projections([row], idx)
+    assert out["rows_live_edged"] == 0
+    assert out["edge_withheld_by_reason"] == {"over_already_decided": 1}
+
+
+def test_a_row_that_prices_is_absent_from_the_withheld_split():
+    idx = build_live_prop_index(_snapshot([_prop("Aaron Judge", "hitter_strikeouts", 5.5)]))
+    row = _row("Aaron Judge", "batter_strikeouts", 5.5)
+    row["projection"] = {"market_fair_prob_over": 0.3}
+    out = attach_live_projections([row], idx)
+    assert out["rows_live_edged"] == 1
+    assert out["edge_withheld_by_reason"] == {}
+
+
+def test_the_split_reconciles_with_the_total_it_explains():
+    """A breakdown that does not sum to its total is worse than no breakdown."""
+    idx = build_live_prop_index(
+        _snapshot(
+            [
+                _prop("Aaron Judge", "hitter_strikeouts", 5.5),
+                _prop("Mookie Betts", "hitter_strikeouts", 0.5, actualSoFar=3),
+            ]
+        )
+    )
+    rows = [_row("Aaron Judge", "batter_strikeouts", 5.5)]
+    settled = _row("Mookie Betts", "batter_strikeouts", 0.5)
+    settled["projection"] = {"market_fair_prob_over": 0.3}
+    rows.append(settled)
+    out = attach_live_projections(rows, idx)
+    assert sum(out["edge_withheld_by_reason"].values()) == out["rows_live_edge_withheld"]
+    assert out["edge_withheld_by_reason"] == {
+        "no_fair_value_no_pregame_projection": 1,
+        "over_already_decided": 1,
+    }
+
+
+def test_a_pregame_projection_whose_devig_failed_is_NOT_blamed_on_the_join():
+    """Two states, one symptom, two owners -- measured 100/100 on soccer.
+
+    A row that HAS a pregame projection and still has no fair value is a
+    one-sided market: the de-vig genuinely has no answer, and that belongs to
+    the fair-value/margin model. A row with NO pregame projection never had
+    `_price_against_market` run at all, and that belongs to the pregame join.
+    Sending the second owner the first owner's rows is how a 5,138-row player
+    miss gets mistaken for a pricing bug.
+    """
+    idx = build_live_prop_index(_snapshot([_prop("Aaron Judge", "hitter_strikeouts", 5.5)]))
+    row = _row("Aaron Judge", "batter_strikeouts", 5.5)
+    # A pregame projection exists (it has a basis) but carries no fair value --
+    # exactly what a one-sided market produces.
+    row["projection"] = {"basis": "prop_projection", "projected": 6.1}
+    out = attach_live_projections([row], idx)
+    assert out["rows_live_edged"] == 0
+    assert out["edge_withheld_by_reason"] == {"no_fair_value_devig_failed": 1}
+
+
+def test_the_live_tier_overwriting_basis_cannot_erase_the_discriminator():
+    """`basis` becomes "live_resim" during the join, so it must be read at entry.
+
+    Reading it after the mutation would classify EVERY row as "had a pregame
+    projection" -- the counter would be perfectly stable, perfectly wrong, and
+    would point at the wrong subsystem forever.
+    """
+    idx = build_live_prop_index(_snapshot([_prop("Aaron Judge", "hitter_strikeouts", 5.5)]))
+    row = _row("Aaron Judge", "batter_strikeouts", 5.5)
+    row["projection"] = {}          # no basis at all
+    out = attach_live_projections([row], idx)
+    # The join stamped `live_resim` on the row on its way through...
+    assert row["projection"]["basis"] == "live_resim"
+    # ...and the classification still says there was no pregame projection.
+    assert out["edge_withheld_by_reason"] == {"no_fair_value_no_pregame_projection": 1}

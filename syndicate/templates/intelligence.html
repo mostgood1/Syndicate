@@ -48,6 +48,8 @@
           <div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div>
           <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
           <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+          <div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div>
+          <div class="board-tabs cards-tabs board-tabs--wrap" id="board-bettype-tabs" role="tablist" aria-label="Bet type filter"></div>
           <div class="board-odds-filter" id="board-odds-filter">
             <div class="board-odds-filter__head">
               <span class="board-odds-filter__label">Odds range</span>
@@ -55,11 +57,11 @@
             </div>
             <label class="board-odds-filter__row">
               <span>Shortest</span>
-              <input type="range" id="board-odds-min" min="0" step="1" aria-label="Shortest odds to show">
+              <input type="range" id="board-odds-min" min="0" max="29" step="1" value="0" aria-label="Shortest odds to show">
             </label>
             <label class="board-odds-filter__row">
               <span>Longest</span>
-              <input type="range" id="board-odds-max" min="0" step="1" aria-label="Longest odds to show">
+              <input type="range" id="board-odds-max" min="0" max="29" step="1" value="29" aria-label="Longest odds to show">
             </label>
             <p class="board-odds-filter__note">Hides prices outside the range. Rows with no posted price are never hidden by this filter &mdash; an unpriced row is not a longshot.</p>
           </div>
@@ -204,9 +206,24 @@
   const ODDS_LADDER_MAX_DEFAULT = ODDS_LADDER.length - 1;
 
   function clampOddsIndex(raw, fallback) {
-    const n = Number(raw);
+    // ABSENT IS NOT ZERO, and conflating them shipped a BLANK BOARD.
+    //
+    // `urlParams.get("odds_max")` returns `null` when the parameter is not
+    // there, and `Number(null)` is `0` -- a finite number -- so the
+    // `Number.isFinite` guard accepted it and the fallback never ran. With no
+    // URL params at all (i.e. every normal visit) `oddsMax` came out 0 instead
+    // of 29, both handles pinned to the low sentinel, and the visible range
+    // collapsed to [-100000, -100000]. Every row on the board failed it.
+    //
+    // `Number("")` is 0 too, so an empty parameter had the same effect.
+    // Checked as a STRING first for that reason: only a non-empty string is a
+    // value the caller actually supplied.
+    if (raw === null || raw === undefined) return fallback;
+    const text = String(raw).trim();
+    if (!text) return fallback;
+    const n = Number(text);
     if (!Number.isFinite(n)) return fallback;
-    return Math.min(29, Math.max(0, Math.round(n)));
+    return Math.min(ODDS_LADDER_MAX_DEFAULT, Math.max(0, Math.round(n)));
   }
 
   function oddsFilterIsNarrowed() {
@@ -278,6 +295,153 @@
     { value: "all", label: "All opportunities" },
     { value: "steam", label: "⚡ Steam moves only" },
   ];
+  // ALTERNATE LINES. The feed quotes `totals_alt` and `spreads_alt` alongside
+  // the main number, and one game can contribute a dozen of them -- a ladder of
+  // 6.5/7.5/8.5/9.5 totals where the board is really only asking about one bet.
+  // They are legitimate rows and are not hidden by default; this is the
+  // reader's control over how much of the ladder reaches their eyes, the same
+  // role the odds range plays for longshots.
+  const ALT_LINE_TABS = [
+    { value: "all", label: "Main + alt lines" },
+    { value: "main", label: "Main lines only" },
+    { value: "alt", label: "Alt lines only" },
+  ];
+
+  // WHAT MAKES A ROW AN ALT LINE, and it is the MARKET NAME rather than a guess
+  // about which number is "the" line.
+  //
+  // The alternative would be comparing each row's line against the consensus
+  // for its event+market and calling the outliers alt -- which invents a fact
+  // the feed already states, and gets it wrong the moment two books disagree on
+  // the main number. `_movement_is_tracked` in `layer2_board.py` makes the same
+  // distinction from the other side and warns about the same trap: `totals_alt`
+  // and `spreads_alt` START WITH a tracked market name, so a prefix test would
+  // sweep the main markets in with them. Suffix, not prefix.
+  // BET TYPE — the specific market, not the game/prop family `MARKET_TABS`
+  // already covers. Labels only where the raw token is not self-explanatory;
+  // anything unmapped is title-cased rather than hidden, so a market the feed
+  // adds tomorrow still appears with a readable name instead of vanishing from
+  // a hardcoded list.
+  const BET_TYPE_LABELS = {
+    h2h: "Moneyline",
+    h2h_3_way: "Moneyline (3-way)",
+    h2h_lay: "Moneyline (lay)",
+    spreads: "Spread",
+    spreads_alt: "Spread (alt)",
+    totals: "Total",
+    totals_alt: "Total (alt)",
+  };
+
+  function betTypeLabel(market) {
+    const key = String(market || "").trim().toLowerCase();
+    if (!key) return "";
+    if (BET_TYPE_LABELS[key]) return BET_TYPE_LABELS[key];
+    return key.replace(/^player_|^batter_|^pitcher_/, "").replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  // BUILT FROM THE DATA, and from the rows that survive every OTHER filter --
+  // so the options describe what selecting one would actually show. A static
+  // list would offer bet types this slate does not have, and every one of those
+  // is a click that empties the board for no stated reason.
+  function betTypeTabs() {
+    const counts = new Map();
+    for (const item of lastRenderItems) {
+      if (!matchesFilters(item) || !matchesLane(item)) continue;
+      if (!matchesClientFilters(item, { ignoreBetType: true })) continue;
+      const key = String(item.market || item.market_key || "").trim().toLowerCase();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const tabs = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([key, n]) => ({ value: key, label: `${betTypeLabel(key)} (${n})` }));
+    // The current selection is kept even at zero, so a filter combination that
+    // empties it does not silently reset to "All" and hide why the board is
+    // blank.
+    if (state.betType !== "all" && !counts.has(state.betType)) {
+      tabs.unshift({ value: state.betType, label: `${betTypeLabel(state.betType)} (0)` });
+    }
+    return [{ value: "all", label: "All bet types" }, ...tabs];
+  }
+
+  // WHAT MAKES A ROW AN ALT LINE — and the first version of this got it wrong
+  // for the sport that needed it most.
+  //
+  // v1 tested the MARKET NAME for a `_alt` suffix, because MLB and NFL quote
+  // `totals_alt` / `spreads_alt` as distinct markets. **Soccer has no such
+  // market**: `fetch_soccer_oddsapi_odds_local.DEFAULT_GAME_MARKETS` is exactly
+  // `["h2h", "totals", "spreads"]`. It expresses the same concept as SEVERAL
+  // ROWS OF ONE MARKET at different lines — totals at 1.5, 2.5, 3.5 — so the
+  // suffix test matched nothing at all and "Main lines only" left every soccer
+  // alt line on the board. Reported by the user, correctly.
+  //
+  // So a row is an alt line if EITHER holds:
+  //   * its market is explicitly an alt market (`_alt` suffix), or
+  //   * it is not the PRIMARY line of its (event, market, segment) group.
+  //
+  // PRIMARY = most books quoting, because that is what "the" line means to a
+  // book. Ties break toward the line closer to the group median, then on the
+  // line value itself so the choice is deterministic across renders — an
+  // unstable primary would make rows flicker in and out on every refresh.
+  //
+  // Groups are computed once per render (`altGroupPrimary`) rather than per
+  // row: this runs inside a filter over every item, and a per-row scan would be
+  // O(n^2) on a 20,000-row slate.
+  let altPrimaryByGroup = new Map();
+
+  function altGroupKey(item) {
+    return [
+      String(item.event_id || item.game_pk || ""),
+      String(item.market || item.market_key || "").trim().toLowerCase(),
+      String(item.segment || "full"),
+      // Player props are per-player ladders; one player's 0.5/1.5/2.5 must not
+      // be judged against another's.
+      String(item.player_name || ""),
+    ].join("|");
+  }
+
+  function rebuildAltGroups(items) {
+    const groups = new Map();
+    for (const item of items) {
+      const line = numericValue(item.line);
+      if (line === null) continue;            // no line: cannot be an alt of anything
+      const key = altGroupKey(item);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({
+        line,
+        books: Number((item.quote && item.quote.books_quoting) || item.books_quoting || 0) || 0,
+      });
+    }
+    const primary = new Map();
+    for (const [key, rows] of groups) {
+      const lines = [...new Set(rows.map((r) => r.line))].sort((a, b) => a - b);
+      if (lines.length <= 1) continue;        // a single line is never "alt"
+      const median = lines[Math.floor(lines.length / 2)];
+      const byLine = new Map();
+      for (const r of rows) byLine.set(r.line, Math.max(byLine.get(r.line) || 0, r.books));
+      let best = null;
+      for (const line of lines) {
+        const cand = { line, books: byLine.get(line) || 0 };
+        if (
+          best === null
+          || cand.books > best.books
+          || (cand.books === best.books && Math.abs(cand.line - median) < Math.abs(best.line - median))
+          || (cand.books === best.books && Math.abs(cand.line - median) === Math.abs(best.line - median) && cand.line < best.line)
+        ) best = cand;
+      }
+      primary.set(key, best.line);
+    }
+    altPrimaryByGroup = primary;
+  }
+
+  function isAltLine(item) {
+    const market = String((item && (item.market || item.market_key)) || "").trim().toLowerCase();
+    if (market.endsWith("_alt")) return true;
+    const key = altGroupKey(item);
+    if (!altPrimaryByGroup.has(key)) return false;   // single-line group
+    const line = numericValue(item.line);
+    return line !== null && line !== altPrimaryByGroup.get(key);
+  }
   const VIEW_TABS = [
     { value: "cards", label: "Cards" },
     { value: "blotter", label: "Blotter" },
@@ -457,6 +621,18 @@
       ? urlParams.get("lane")
       : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
+    // DEFAULT "main" -- alt lines are hidden until asked for `[user decision,
+    // 2026-08-22]`. This is the opposite of the odds range's default, and the
+    // difference is that hiding alt lines LEAVES A POPULATED BOARD: the main
+    // line of every market survives. The odds range shipped blank because its
+    // broken default hid EVERYTHING, which is a different failure. A default
+    // that hides a known, named subset is a product choice; one that can empty
+    // the board is a bug.
+    altLines: ["main", "alt", "all"].includes(String(urlParams.get("alt_lines") || "")) ? urlParams.get("alt_lines") : "main",
+    // Specific market, e.g. `h2h` / `totals` / `player_points`. Distinct from
+    // `marketFamily`, which is only the game-vs-prop split. Options are built
+    // from the markets actually present, so it can never offer an empty slice.
+    betType: urlParams.get("bet_type") || "all",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
     // shareable board configuration like sport/date/filters are). null
@@ -529,6 +705,11 @@
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
+    // "main" is the DEFAULT now, so "all" and "alt" are the states worth
+    // putting in the URL. Writing the default would make every shared link
+    // carry a parameter that changes nothing.
+    if (state.altLines !== "main") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
+    if (state.betType !== "all") url.searchParams.set("bet_type", state.betType); else url.searchParams.delete("bet_type");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -624,6 +805,24 @@
       renderFilterTabs();
       renderBoardBody();
     });
+    renderTabs("board-alt-tabs", ALT_LINE_TABS, state.altLines, (value) => {
+      state.altLines = value;
+      syncUrlState();
+      // `renderFilterTabs()`, NOT `updateFilterDisclosure()`. The tab row's
+      // active state is baked in at render time by `renderTabs`, so a handler
+      // that mutates state without re-rendering leaves the old button
+      // highlighted forever -- the filter WORKED and looked broken, which is
+      // worse than not working. Every other handler in this function calls it;
+      // this one did not.
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-bettype-tabs", betTypeTabs(), state.betType, (value) => {
+      state.betType = value;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
+    });
     renderTabs("board-steam-tabs", STEAM_TABS, state.steamOnly ? "steam" : "all", (value) => {
       state.steamOnly = value === "steam";
       syncUrlState();
@@ -644,6 +843,8 @@
     if (state.minEdge > 0) active.push("edge");
     if (oddsFilterIsNarrowed()) active.push("odds");
     if (state.steamOnly) active.push("steam");
+    if (state.altLines !== "main") active.push("alt");
+    if (state.betType !== "all") active.push("bet_type");
     return active;
   }
 
@@ -669,6 +870,8 @@
     state.oddsMin = ODDS_LADDER_MIN_DEFAULT;
     state.oddsMax = ODDS_LADDER_MAX_DEFAULT;
     state.steamOnly = false;
+    state.altLines = "main";
+    state.betType = "all";
     syncUrlState();
     renderFilterTabs();
     renderBoardBody();
@@ -875,9 +1078,32 @@
     const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
     const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
     const projection = isProp ? item.live_projection : (item.live_projection ?? item.live_total);
-    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
-    const numeric = Number(projection);
-    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
+      const numeric = Number(projection);
+      return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    }
+    // THE SAME GAP `displayProjection` CLOSED FOR THE PREGAME COLUMN, still
+    // open here. A game line has no natural live COUNT — there is no
+    // "projected margin so far" — so the live re-sim's output for h2h/spreads
+    // is a PROBABILITY, published as `live_model_probability`
+    // (`layer2_board._live_projection_columns`). Until now this function read
+    // only `live_projection`/`live_total`, so every live game-line row rendered
+    // an em dash while the backend held a live number for it.
+    //
+    // Worse, before the backend fix that accompanies this: the probability WAS
+    // being written into `live_projection`, so the cell showed "0.2" for a 19%
+    // live win probability. Blank was the better of those two failures; a
+    // percentage is better than both.
+    //
+    // Scoped to game markets and to a real 0..1, for the reason
+    // `layer2_board.py` states about its own columns: "an invented projection
+    // on a betting board is worse than an empty cell." A prop with no live
+    // count still renders blank — its live number is a count and we do not
+    // have one.
+    if (isProp) return null;
+    const prob = Number(item.live_model_probability);
+    if (!Number.isFinite(prob) || prob <= 0 || prob > 1) return null;
+    return `${(prob * 100).toFixed(1)}%`;
   }
 
   // The real box-score/current-game-state value right now -- distinct from
@@ -1289,7 +1515,12 @@
     return String(item.candidate_type || item.type || "").trim().toLowerCase() === "steam";
   }
 
-  function matchesClientFilters(item) {
+  function matchesClientFilters(item, options) {
+    // `ignoreBetType` lets the bet-type option list count rows under every
+    // OTHER active filter without excluding them by the very selection being
+    // offered -- otherwise picking one bet type would collapse the list to
+    // that one option and there would be no way back except Clear.
+    const ignoreBetType = Boolean(options && options.ignoreBetType);
     // A steam move carries no "edge" (it's a movement signal, not a
     // model-vs-price gap) -- edgeValue() defaults it to 0, so a nonzero
     // min-edge filter would silently hide every steam row, including under
@@ -1303,6 +1534,15 @@
     // +6000 steam longshot is exactly what this filter exists to remove.
     if (!matchesOddsRange(item)) return false;
     if (state.steamOnly && !isSteamCandidate(item)) return false;
+    if (state.altLines !== "all") {
+      const alt = isAltLine(item);
+      if (state.altLines === "main" && alt) return false;
+      if (state.altLines === "alt" && !alt) return false;
+    }
+    if (!ignoreBetType && state.betType !== "all") {
+      const market = String(item.market || item.market_key || "").trim().toLowerCase();
+      if (market !== state.betType) return false;
+    }
     if (state.marketFamily !== "all") {
       const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
       const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
@@ -2665,6 +2905,10 @@
     // calls see the same date-filtered item list, so this warm-up and
     // renderGameCards' own internal derivation stay consistent.
     const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    // BEFORE any filtering: `isAltLine` reads these groups, and a group built
+    // from an already-alt-filtered list would only ever contain the primary and
+    // conclude nothing is alt.
+    rebuildAltGroups(dateFiltered);
     deriveGameCards(dateFiltered);
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
     renderGameCards(dateFiltered);
@@ -2673,6 +2917,9 @@
     // filter has it hidden from view.
     window.SyndicateWatchlist.checkForAlerts(dateFiltered);
     renderTopStrip(clientFiltered);
+    // The strip is filter-aware now, so it must follow every filter change --
+    // it used to render only on fetch.
+    renderSummaryStrip(null);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
     } else {
@@ -2801,18 +3048,50 @@
     `).join("");
   }
 
+  // THE STRIP DESCRIBED THE SLATE, NOT THE VIEW. `lane_counts` comes from the
+  // server and never moved when a filter did, so "12 live · 88 pregame" sat
+  // above a board narrowed to nine rows and quietly contradicted it. A reader
+  // cannot tell a filter that hid 90 rows from a slate that only had ten.
+  //
+  // Now it reports BOTH, and only says "of N" when the two differ -- an
+  // unfiltered board should not grow noise to state that nothing is hidden.
+  let lastSummaryData = null;
+
   function renderSummaryStrip(data) {
+    if (data) lastSummaryData = data;
+    const payload = lastSummaryData;
     const container = document.getElementById("board-summary-strip");
-    if (!container) return;
-    const boardContract = data.boardContract || {};
+    if (!container || !payload) return;
+    const boardContract = payload.boardContract || {};
     const laneCounts = boardContract.lane_counts || {};
     const parts = [];
     if (boardContract.board_summary && boardContract.board_summary.headline) {
       parts.push(boardContract.board_summary.headline);
     }
-    if (laneCounts.live !== undefined) parts.push(`${laneCounts.live} live`);
-    if (laneCounts.pregame !== undefined) parts.push(`${laneCounts.pregame} pregame`);
-    if (data.parlays && data.parlays.length) parts.push(`${data.parlays.length} parlays`);
+
+    // Counted over the SAME pipeline the board renders, so the numbers cannot
+    // drift from what is on screen.
+    const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    const shown = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
+    const liveShown = shown.filter((item) => itemMarketState(item) === "live").length;
+    const pregameShown = shown.length - liveShown;
+
+    const withTotal = (label, visible, total) => (
+      typeof total === "number" && total !== visible
+        ? `${visible} of ${total} ${label}`
+        : `${visible} ${label}`
+    );
+    parts.push(withTotal("live", liveShown, laneCounts.live));
+    parts.push(withTotal("pregame", pregameShown, laneCounts.pregame));
+
+    // The one number that says a filter is doing something. Shown only when it
+    // is, and it names the CAUSE rather than leaving the reader to infer it.
+    const hidden = dateFiltered.length - shown.length;
+    if (hidden > 0) {
+      const active = activeRefinements();
+      parts.push(`${hidden} hidden by ${active.length} filter${active.length === 1 ? "" : "s"}`);
+    }
+    if (payload.parlays && payload.parlays.length) parts.push(`${payload.parlays.length} parlays`);
     if (!parts.length) {
       container.hidden = true;
       return;

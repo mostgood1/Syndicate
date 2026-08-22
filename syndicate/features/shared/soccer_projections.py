@@ -722,6 +722,20 @@ def _scorer_race_for(index: "SoccerProjectionIndex", match_id: str, match: Mappi
     return result
 
 
+# How many SIM-side fixtures to show per league that has unmatched rows. Enough
+# to spot the club under a different spelling (a league's slate is ~10 fixtures
+# and a missed one is usually adjacent to its match in sorted order), small
+# enough that ten leagues cannot push the log line past what a collector will
+# keep on one row.
+_SIM_FIXTURES_PER_LEAGUE = 12
+
+# Player samples are capped harder than fixture ones: a soccer slate has ~10
+# fixtures and ~500 players, so an uncapped list would not fit on a log line the
+# collector keeps intact.
+_PLAYER_SAMPLE_CAP = 10
+_ROSTER_SAMPLE_PER_MATCH = 8
+
+
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
 ) -> dict[str, Any]:
@@ -731,13 +745,75 @@ def attach_soccer_projections(
     unmatched_match = 0
     unmatched_player = 0
     unsupported_market = 0
+    # ATTRIBUTION FOR `unmatched_match_rows`, which until now was a bare total.
+    #
+    # It has read ~99.6% of the grid for days (`state.md`: 1,138 of 1,142) and
+    # that one number cannot distinguish the three things it can mean, which
+    # have three unrelated fixes:
+    #
+    #   the league is not in the index at all  -> the SIM did not run it, or its
+    #                                             file is outside the window
+    #   the league IS indexed, rows still miss -> the NAME join failed
+    #   the league is indexed and matches      -> nothing to fix here
+    #
+    # Per-league counts separate the first two by themselves; the paired name
+    # samples (board side and index side, same league) settle the third. Same
+    # contract `#296` set and `LIVE_PROJECTION_JOIN` already follows for the
+    # live tier: a zero must be attributable, never bare.
+    rows_by_league: dict[str, int] = {}
+    unmatched_by_league: dict[str, int] = {}
+    unmatched_fixtures: dict[str, str] = {}
+    # SAME SPLIT AS `unmatched_by_league`, one level down. `unmatched_player` is
+    # now the LARGEST bucket (6,057 rows, measured 18:31:07Z, and it grew when
+    # the team-name join was fixed because more rows reach this stage) and it
+    # covers two states with different owners:
+    #
+    #   the sim published NO players for this match  -> producer gap
+    #   it published players and this name is absent -> a name join problem,
+    #                                                   the player-level twin of
+    #                                                   what 13 aliases just fixed
+    #
+    # Paired samples for the same reason as the fixture ones: an alias cannot be
+    # written from the board's spelling alone.
+    player_miss_no_roster = 0
+    player_miss_name = 0
+    unmatched_players: dict[str, str] = {}
+    roster_sample_by_match: dict[str, list[str]] = {}
+
+    def _note_player_miss(match: Mapping[str, Any], row: Mapping[str, Any], roster: Mapping[str, Any]) -> None:
+        nonlocal player_miss_no_roster, player_miss_name
+        league = str(match.get("league") or "").strip() or "?"
+        board_name = str(row.get("player_name") or "").strip() or "?"
+        if not roster:
+            player_miss_no_roster += 1
+            return
+        player_miss_name += 1
+        # Keyed by (league, player) so one player's twelve prop rows contribute
+        # one sample, not twelve -- the fixture samples learned this already.
+        key = f"{league}|{board_name}"
+        if key not in unmatched_players and len(unmatched_players) < _PLAYER_SAMPLE_CAP:
+            unmatched_players[key] = board_name
+            match_id = str(match.get("match_id") or "").strip()
+            if match_id and match_id not in roster_sample_by_match:
+                roster_sample_by_match[match_id] = sorted(
+                    str((entry or {}).get("player_name") or name)
+                    for name, entry in list(roster.items())
+                )[:_ROSTER_SAMPLE_PER_MATCH]
 
     for row in grid:
         market = str(row.get("market") or "").strip().lower()
         considered += 1
+        row_league = str(row.get("league") or "").strip() or "?"
+        rows_by_league[row_league] = rows_by_league.get(row_league, 0) + 1
         match = index.match_for(row)
         if match is None:
             unmatched_match += 1
+            unmatched_by_league[row_league] = unmatched_by_league.get(row_league, 0) + 1
+            # Keyed by fixture so a 900-row league contributes ONE sample --
+            # every row of a missed fixture misses identically, and a sample
+            # list of the same pair nine hundred times names nothing.
+            fixture = f"{row.get('home_team')} v {row.get('away_team')}"
+            unmatched_fixtures.setdefault(f"{row_league}|{fixture}", fixture)
             continue
 
         projection: dict[str, Any] | None = None
@@ -802,6 +878,11 @@ def attach_soccer_projections(
             prob = (race.get("by_player") or {}).get(name) if race else None
             if prob is None:
                 unmatched_player += 1
+                # The scorer race is DERIVED from the same per-match player
+                # entries, so its absence is the same two states.
+                _note_player_miss(
+                    match, row, index.players_by_match.get(match_id) or {}
+                )
                 continue
             projection = _probability_projection(
                 float(prob),
@@ -821,6 +902,7 @@ def attach_soccer_projections(
             entry = players.get(_norm_name(row.get("player_name")))
             if entry is None:
                 unmatched_player += 1
+                _note_player_miss(match, row, players)
                 continue
             # PER-LINE PROBABILITY FIRST, mean only as a fallback. Falls
             # through to the shared tail below rather than pricing here, so
@@ -879,10 +961,66 @@ def attach_soccer_projections(
         if projection.get("model_prob_over") is not None:
             with_probability += 1
 
+    # THE INDEX SIDE OF THE SAME PAIRING. Without it the unmatched samples say
+    # what the BOARD calls a fixture and nothing about what the SIM calls it,
+    # which is exactly half of a name-join question.
+    #
+    # SCOPED TO THE LEAGUES THAT ACTUALLY MISS, and that is a CORRECTION rather
+    # than a refinement. The first cut sorted every indexed fixture
+    # alphabetically and took the first 12 -- so the production reading at
+    # 17:30:32Z returned belgian_pro_league, bundesliga and championship, while
+    # every league with real misses (epl 510, la_liga 972, serie_a 606,
+    # ligue_1 240, mls 247) fell off the end. The board side named 12 fixtures
+    # and the sim side answered about none of them. An instrument that reliably
+    # samples the leagues with nothing to report is worse than no sample: it
+    # looks like an answer.
+    #
+    # Per-league quota rather than one global cap, for the same reason -- one
+    # busy league would otherwise crowd out the rest.
+    # NOTHING UNMATCHED MEANS NO SAMPLE. The first guard here read
+    # `if missing_leagues and league not in missing_leagues`, which on a clean
+    # join short-circuits to false and dumps EVERY indexed fixture onto the log
+    # line -- the largest output in the case with nothing to investigate.
+    missing_leagues = set(unmatched_by_league)
+    by_league_fixtures: dict[str, list[str]] = {}
+    for (index_home, index_away), match in index.by_teams.items():
+        league = str(match.get("league") or "").strip() or "?"
+        if league not in missing_leagues:
+            continue
+        matchup = match.get("matchup") or {}
+        by_league_fixtures.setdefault(league, []).append(
+            f"{league}|{matchup.get('home_team') or index_home} v "
+            f"{matchup.get('away_team') or index_away}"
+        )
+    indexed_fixtures: list[str] = []
+    for league in sorted(by_league_fixtures):
+        indexed_fixtures.extend(sorted(by_league_fixtures[league])[:_SIM_FIXTURES_PER_LEAGUE])
+
     return {
         "supported": True,
         "leagues": sorted(set(index.leagues)),
         "matches_in_source": index.matches,
+        # Which dates were actually read, so "the sim never ran that day" is
+        # distinguishable from "it ran and the names missed".
+        "dates_read": list(index.dates),
+        "leagues_indexed": sorted({str(m.get("league") or "").strip() for m in index.by_teams.values() if m.get("league")}),
+        "rows_by_league": dict(sorted(rows_by_league.items())),
+        "unmatched_by_league": dict(sorted(unmatched_by_league.items())),
+        "unmatched_fixtures_count": len(unmatched_fixtures),
+        # The player-level split, same contract as the league one above.
+        "player_miss_no_roster": player_miss_no_roster,
+        "player_miss_name": player_miss_name,
+        "unmatched_player_sample": sorted(unmatched_players),
+        "sim_roster_sample": sorted(
+            name for names in roster_sample_by_match.values() for name in names
+        )[: _PLAYER_SAMPLE_CAP * 2],
+        "matches_with_players": len(index.players_by_match),
+        "unmatched_fixture_sample": sorted(unmatched_fixtures)[:12],
+        "indexed_fixture_sample": indexed_fixtures,
+        # `match_for` returns None for these BY DESIGN (a wrong projection is
+        # worse than a blank one), so they are unmatched rows with a cause that
+        # is not a name failure and must not be read as one.
+        "ambiguous_team_keys": len(index.ambiguous_team_keys),
         "rows_considered": considered,
         "rows_with_projection": projected,
         "rows_with_true_probability": with_probability,

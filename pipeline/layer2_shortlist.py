@@ -374,11 +374,76 @@ def build_layer2_shortlist(
                         # distinguish from a line mismatch.
                         f"miss_line_match={live_stats.get('miss_no_line_match')} "
                         f"miss_not_live={live_stats.get('miss_player_not_live')} "
-                        f"sample={live_stats.get('unmatched_samples')}",
+                        # `projected > 0, edged == 0` is the case this line
+                        # could name but not explain -- measured on soccer
+                        # 2026-08-22 16:46Z: 114 projected, 0 edged, 0
+                        # prob_withheld. The withhold count and its per-reason
+                        # split are where that answer lives, and neither was
+                        # printed.
+                        f"edge_withheld={live_stats.get('rows_live_edge_withheld')} "
+                        f"edge_why={live_stats.get('edge_withheld_by_reason')} "
+                        f"sample={live_stats.get('unmatched_samples')} "
+                        # The soccer live path returns EARLY with a stated
+                        # reason and none of the counters above, so every field
+                        # on this line read `None` and the line said nothing.
+                        # `reason` is where its answer lives.
+                        f"reason={live_stats.get('reason')} "
+                        f"soccer_live_games={live_stats.get('live_games')} "
+                        f"soccer_rows_seen={live_stats.get('rows_seen')}",
                         flush=True,
                     )
             except Exception:
                 # An instrument that can break the build is worse than none.
+                pass
+
+            # AND THE SAME FOR THE PREGAME TIER, which had no log line at all.
+            #
+            # `attach_projections` returns a full coverage payload per sport and
+            # it went into the shortlist artifact and nowhere else -- so the only
+            # way to answer "is the SIM reaching the board" was to fetch and
+            # parse the served artifact. Soccer has been at
+            # `rows_with_projection: 4` of ~1,142 for days and the shape of that
+            # zero was never readable from the logs.
+            #
+            # Deliberately for EVERY sport, not soccer alone: the same blank
+            # column, produced by the same absent join, currently looks
+            # identical on all eight.
+            try:
+                proj_stats = enrichment.get("projections")
+                if isinstance(proj_stats, Mapping) and proj_stats.get("supported") is not False:
+                    print(
+                        f"[layer2_shortlist] PREGAME_PROJECTION_JOIN sport={sport} "
+                        f"considered={proj_stats.get('rows_considered')} "
+                        f"projected={proj_stats.get('rows_with_projection')} "
+                        f"with_prob={proj_stats.get('rows_with_true_probability')} "
+                        f"matches_in_source={proj_stats.get('matches_in_source')} "
+                        f"unmatched_match={proj_stats.get('unmatched_match_rows')} "
+                        f"unmatched_player={proj_stats.get('unmatched_player_rows')} "
+                        # The player bucket is now the LARGEST and had no
+                        # attribution at all -- same contract the league split
+                        # already meets one level up.
+                        f"player_no_roster={proj_stats.get('player_miss_no_roster')} "
+                        f"player_name_miss={proj_stats.get('player_miss_name')} "
+                        f"matches_with_players={proj_stats.get('matches_with_players')} "
+                        f"board_players={proj_stats.get('unmatched_player_sample')} "
+                        f"sim_players={proj_stats.get('sim_roster_sample')} "
+                        f"unsupported_market={proj_stats.get('unsupported_market_rows')} "
+                        f"reason={proj_stats.get('reason')} "
+                        f"error={proj_stats.get('error')} "
+                        # Soccer-only attribution. Absent on other sports, which
+                        # is why they print as None rather than being a second
+                        # log line nobody greps for.
+                        f"dates_read={proj_stats.get('dates_read')} "
+                        f"leagues_indexed={proj_stats.get('leagues_indexed')} "
+                        f"ambiguous_keys={proj_stats.get('ambiguous_team_keys')} "
+                        f"rows_by_league={proj_stats.get('rows_by_league')} "
+                        f"unmatched_by_league={proj_stats.get('unmatched_by_league')} "
+                        f"unmatched_fixtures={proj_stats.get('unmatched_fixtures_count')} "
+                        f"board_names={proj_stats.get('unmatched_fixture_sample')} "
+                        f"sim_names={proj_stats.get('indexed_fixture_sample')}",
+                        flush=True,
+                    )
+            except Exception:
                 pass
 
             result = build_layer2_rows(grid, openings=openings_index)
@@ -630,6 +695,97 @@ def build_layer2_shortlist(
         shortlist["movement_rows_matched"] = -1
     if openings_error:
         shortlist["openings_error"] = openings_error
+
+    # PER-SPORT HEALTH OF THE ROWS ACTUALLY PUBLISHED (`#505`).
+    #
+    # Every counter above describes a STAGE — the join, the ledger, the grid.
+    # None of them describes THE BOARD, and three separate user reports on
+    # 2026-08-22 were about the board: stale lines, blank projections, no
+    # movement. Each was answerable only by eyeballing the served page, which
+    # is the position `#296` exists to prevent.
+    #
+    # Counted over `shortlist["rows"]` — what a reader actually sees — and split
+    # per sport, because soccer's answer and MLB's are different and a combined
+    # number hides both.
+    try:
+        # Imported here for the same reason the movement helpers are: a
+        # NameError raised while computing an instrument must not take the
+        # build down.
+        from syndicate.features.shared.layer2_board import (
+            _row_quote_age_seconds as _row_quote_age,
+        )
+
+        published_rows = shortlist.get("rows") or []
+        health: dict[str, dict[str, object]] = {}
+        ages_by_sport: dict[str, list[float]] = {}
+        for row in published_rows:
+            slug = str(row.get("sport") or "?").strip().lower() or "?"
+            bucket = health.setdefault(
+                slug,
+                {"rows": 0, "pregame_proj": 0, "live_proj": 0, "no_proj": 0, "edged": 0, "live_rows": 0},
+            )
+            bucket["rows"] = int(bucket["rows"]) + 1  # type: ignore[call-overload]
+            projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else None
+            basis = str((projection or {}).get("basis") or "").strip()
+            if not projection:
+                bucket["no_proj"] = int(bucket["no_proj"]) + 1  # type: ignore[call-overload]
+            elif basis == "live_resim":
+                bucket["live_proj"] = int(bucket["live_proj"]) + 1  # type: ignore[call-overload]
+            else:
+                bucket["pregame_proj"] = int(bucket["pregame_proj"]) + 1  # type: ignore[call-overload]
+            if (projection or {}).get("edge_vs_market_pct") is not None:
+                bucket["edged"] = int(bucket["edged"]) + 1  # type: ignore[call-overload]
+            # `age_seconds` IS NOT ON A PUBLISHED ROW. The first reading came
+            # back `age_p50s=None` on all four sports, which read as "no ages"
+            # and actually meant "wrong field". The grid row has
+            # `age_seconds`; the BOARD row carries it under
+            # `quote.book_age_seconds` / `quote.quote_seen_age_seconds`, and
+            # `_row_quote_age_seconds` is the existing resolver that prefers
+            # seen-age and falls back to book age. Reusing it rather than
+            # reaching into `quote` here, so the staleness the board REPORTS
+            # and the staleness its own max-age gate ENFORCES cannot diverge.
+            age = _row_quote_age(row)
+            if age is not None:
+                ages_by_sport.setdefault(slug, []).append(float(age))
+            # WHY `live_proj` IS ZERO — the counter alone cannot say whether no
+            # live row reached the board or live rows reached it unprojected.
+            # Measured 2026-08-22 20:1xZ: `live_proj=0` on ALL FOUR sports
+            # including MLB, whose live re-sim demonstrably works, so the
+            # distinction decides whether this is a projection failure or a
+            # SELECTION one (a live row with no edge is dropped by the A3
+            # filter before it is ever published).
+            if str(row.get("market_state") or "").strip().lower() == "live":
+                bucket["live_rows"] = int(bucket.get("live_rows") or 0) + 1  # type: ignore[call-overload]
+        for slug, bucket in health.items():
+            ages = sorted(ages_by_sport.get(slug) or [])
+            if ages:
+                # p50/p90/max rather than a mean: one dead line among fresh ones
+                # barely moves a mean, and a dead line is exactly the complaint.
+                bucket["age_p50_s"] = int(ages[len(ages) // 2])
+                bucket["age_p90_s"] = int(ages[min(len(ages) - 1, int(len(ages) * 0.9))])
+                bucket["age_max_s"] = int(ages[-1])
+        for slug, bucket in sorted(health.items()):
+            print(
+                f"[layer2_shortlist] LAYER2_BOARD_HEALTH sport={slug} "
+                f"rows={bucket.get('rows')} "
+                f"pregame_proj={bucket.get('pregame_proj')} "
+                f"live_proj={bucket.get('live_proj')} "
+                f"no_proj={bucket.get('no_proj')} "
+                f"live_rows={bucket.get('live_rows')} "
+                f"edged={bucket.get('edged')} "
+                f"age_p50s={bucket.get('age_p50_s')} "
+                f"age_p90s={bucket.get('age_p90_s')} "
+                f"age_maxs={bucket.get('age_max_s')} "
+                # Cross-sport, stated as such so nobody reads them as this
+                # sport's: they are computed once over the whole shortlist.
+                f"all_openings_loaded={shortlist.get('openings_loaded')} "
+                f"all_movement_eligible={shortlist.get('movement_eligible_rows')} "
+                f"all_movement_matched={shortlist.get('movement_rows_matched')}",
+                flush=True,
+            )
+        shortlist["board_health_by_sport"] = health
+    except Exception:
+        pass
 
     # RECORD THE OPENING PRICE OF EVERY ROW WE ARE ABOUT TO PUBLISH (audit §7 #1).
     #

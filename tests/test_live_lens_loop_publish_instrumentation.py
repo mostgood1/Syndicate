@@ -106,7 +106,7 @@ def _run_one_cycle(*, publish_raises: bool = False, pull_enabled: bool = True, i
 
 
 class _IsolatedWatermarkTestCase(unittest.TestCase):
-    """`#503`. Redirect the publish watermark away from the REAL repo tree.
+    """`#508`. Redirect the publish watermark away from the REAL repo tree.
 
     This file drives `_live_lens_background_loop`, which persists its watermark
     through `_record_live_lens_publish_watermark` -> the real

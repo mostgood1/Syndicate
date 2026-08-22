@@ -198,6 +198,54 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # MLS has exactly one New York Red Bulls and the identity is not in doubt;
     # a similarity threshold is a filter for candidates, not the decision.
     "new york red bulls": "red bull new york",
+    # `#503`. SIX MORE, and unlike `#374`'s five these were not found by hand --
+    # `PREGAME_PROJECTION_JOIN` prints the board-side and sim-side spelling of
+    # the same unmatched fixture on one line, so each pair below is quoted from
+    # a single production reading (refresh-worker 2026-08-22 17:36:42Z and
+    # 17:39:37Z) rather than reconstructed.
+    #
+    # Every one was checked BOTH ways before being written: `canonical_team`
+    # returns None for the board spelling and a real club for the sim spelling,
+    # which is precisely the shape this map repairs. Pairs where the board and
+    # sim spellings ALREADY matched (TSG Hoffenheim, Borussia Dortmund,
+    # Eintracht Frankfurt, Genk/Racing Genk) are deliberately absent -- adding a
+    # working pair buys nothing and hides which entries are load-bearing.
+    #
+    # Note `Genk`: the fixture `Royal Antwerp v Genk` missed even though Genk
+    # matches fine, because `match_for` requires BOTH sides. One bad name costs
+    # the whole fixture, which is why a single alias can recover 500+ rows.
+    "royal antwerp": "Antwerp",
+    "1. fc köln": "FC Cologne",
+    "hamburger sv": "Hamburg SV",
+    "fsv mainz 05": "Mainz",
+    "sc paderborn": "SC Paderborn 07",
+    "union berlin": "1. FC Union Berlin",
+    # SEVEN MORE, from the first reading taken with the sim-side sample SCOPED
+    # to the leagues that actually miss (refresh-worker 2026-08-22 18:04:56Z).
+    # The unscoped version could only ever answer about alphabetically-early
+    # leagues; with it fixed, all twelve unmatched fixtures became pairable at
+    # once and these are the seven that needed help.
+    "brighton and hove albion": "Brighton & Hove Albion",
+    "athletic bilbao": "Athletic Club",
+    "rennes": "Stade Rennais",
+    "los angeles fc": "LAFC",
+    "atalanta bc": "Atalanta",
+    "inter milan": "Internazionale",
+    # THIS ONE RUNS THE OTHER WAY, and it is why the map is not named
+    # "board_name -> sim_name". Here the BOARD spelling resolves
+    # (`deportivo la coruña` is the artifact name) and the SIM's short
+    # `Deportivo` does not -- so the unresolvable side is the sim's. The map's
+    # actual contract is "spelling nothing can resolve" -> "spelling the
+    # artifacts know", whichever feed happens to hold which.
+    #
+    # `Deportivo` alone is the kind of generic club word that should be
+    # suspected of colliding, so it was checked rather than assumed: across all
+    # ten configured leagues exactly ONE canonical name contains "deportivo"
+    # (`deportivo la coruña`); Alavés is `alavés`, not `deportivo alavés`. If a
+    # second Deportivo ever enters the configured set this entry must go --
+    # `_soccer_alias_to_name` drops ambiguous DERIVED keys but cannot police a
+    # hand-written one.
+    "deportivo": "Deportivo La Coruña",
 }
 
 
