@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 428 rules `[generated]`
+## Index — 531 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4971,3 +4971,54 @@ and 45 minutes produced exactly one such coincidence.
 When retracting a starvation/contention claim, the evidence needed is a RATE
 over a window, not one instance. I recorded the retraction as settled fact in
 the same session I had to reverse it.
+
+### 2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that will start finding it
+- What we believed: `raw/statsapi/feed_live/**` being absent from
+  `HOT_ARTIFACT_PATTERNS` was the whole bug — home fell through to 15 live
+  statsapi calls per request purely because the local read missed, so
+  allowlisting it would make the read hit and the latency vanish. The user asked
+  for exactly that.
+- What was actually true: `_mlb_feed_live_payload` takes the file **if it
+  EXISTS**, with no freshness check. Publishing it would have frozen every game
+  at whatever inning it was captured — the defect `#413` had already measured on
+  2026-08-13 (MIL @ SD reading `live / TOP 9` against a lens reading Final; CLE @
+  DET `BOT 1` two hours after first pitch). It would also have bought **no
+  speed**: `vendor/mlb_bettingv2/tools/daily_update.py` refreshes those files
+  prior-day only, saying so inline — "must fetch the final game feed, not a stale
+  pregame cache entry" — so a freshness gate would reject them and fall through
+  anyway. Plus ~48 MB per publish cycle against a 2 GB/hr brake.
+- How we found out: grepping for other readers of `raw_feed_live_path` before
+  touching the allowlist. `board_enrichment.py` documents the whole failure in
+  its own docstring, including the sentence that anticipated this exact change:
+  "Fixing the cache reader is the deeper fix... but it re-introduces per-game
+  network I/O into a path that already has an 8s wall-clock budget."
+- The rule going forward: **an allowlist entry is a change to the CONSUMER, not
+  to the producer.** Before adding one, find every reader of that path and check
+  what it does when the file is suddenly present. A reader that gates on
+  EXISTENCE rather than freshness converts a latency fix into a silent
+  correctness bug. The producer's refresh cadence is the second question: an
+  artifact refreshed prior-day cannot serve a live surface no matter who can read
+  it.
+- Cost: none — caught before shipping. The alternative (`live_lens_report`, already
+  allowlisted, already fresh) removed the network call with no new egress and no
+  staleness, and carried the inning/outs detail a naive swap would have dropped.
+
+### 2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not just the display
+- What we believed: a background regression sweep written as
+  `pytest ... 2>&1 | tail -12` had produced a complete failure list, and the 11
+  `FAILED` lines in its output file were all of them.
+- What was actually true: pytest reported **18 failed**. The `tail` was part of
+  the pipeline, so only the last 12 lines were ever written to the task's output
+  file — 7 failure names never existed anywhere to be read. A baseline
+  comparison built on that list would have compared 11 against 18 and looked
+  like 7 regressions, or been "resolved" by hand-waving.
+- How we found out: `grep -c "^FAILED"` on the output file returned 11 while the
+  summary line in the same file said 18. The two numbers were in the same file
+  and disagreed.
+- The rule going forward: **when backgrounding a command whose output you will
+  analyse later, redirect the FULL stream to a file and filter at read time.**
+  `cmd > /tmp/out.txt 2>&1` then `grep`, never `cmd | tail -N`. Any pipeline
+  stage that drops lines is destroying evidence you have not looked at yet — and
+  a truncated list is indistinguishable from a short one.
+- Cost: two 8-minute sweep re-runs. Cheap here; the same shape silently
+  under-reports a regression set.

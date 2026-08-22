@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#506` — **Web's intermittent 502s were `/healthz` starvation, not slow cold boots. Home made 15 live statsapi calls per request. FIXED, DEPLOYED AND MEASURED (3318-8400ms → 0-93ms); ONE SUB-ITEM UNVERIFIED.** — lane `render-web-request-path`, 2026-08-22
+
+**Cold boot was never the problem — 2.7s boot-to-listening.** Web was being
+SIGTERM'd every ~90s during live MLB slates with ~15s of no listener after each.
+Container `-2mdsk`, booted 17:12:55, **no deploy after 17:12:59**: terms at
+17:14:08 / 17:15:38 / 17:17:38, new gunicorn master pid each; healthz unanswered
+**84s** (17:16:34 → 17:17:58). `WORKER TIMEOUT`: zero in three days, so
+`GUNICORN_TIMEOUT=60` is EXONERATED.
+
+**Cause:** `_mlb_feed_live_payload` fell through to statsapi for every game
+because `raw/statsapi/feed_live/**` matches none of the 175
+`HOT_ARTIFACT_PATTERNS`. 15 uncached HTTPS calls per home request against 8
+request slots (`WEB_CONCURRENCY=2` × `GUNICORN_THREADS=4`).
+
+**SHIPPED (web `8149e51d`, 19:09:35Z), `apply_live_scores` on `games=15`:**
+
+    BEFORE  3318 / 7991 / 8400 / 5498 / 3494 / 3802 / 3694 ms
+    AFTER   0-93 ms (max 93, 14 samples, two instances, two deploys)
+
+Scores now come from `live_lens_report_<date>.json` — already allowlisted,
+republished ~60s, and it carries `gameLens[].progress.{inning,half,outs}` so the
+card's status line is reconstructed, not degraded. The residual statsapi path is
+single-flighted: at most one request thread can ever block on it.
+
+**DO NOT "FIX" THIS BY ALLOWLISTING `feed_live`.** It was the plan and it is a
+regression — `_mlb_feed_live_payload` gates on EXISTENCE, not freshness, so
+publishing it freezes every game at capture time (`#413`, measured 2026-08-13).
+It buys no speed either: those files are refreshed **prior-day only**.
+
+**OPEN — the only unverified half.** The `_MLB_CARDS_CONTEXT_CACHE` /
+`_MLB_TODAY_CACHE` idle bound (300s / 120s) targets a ratchet measured at
+369 MB → 2,026,717,200 B over ~7.5h, ceiling 2,147,483,600 B. Post-deploy numbers
+are directionally better at comparable ages and **that is not proof**. Blocked in
+practice: peers redeploy web every 20-30 min so no instance lives long enough.
+Instrument: memory-over-uptime + the rate of `CONTEXT_CACHE_EVICTED ... web=True`
+falling.
+
+**NEXT BOTTLENECK, now visible:** `build_cards_page_context` at 1803-2402 ms on a
+cache miss — the live-lens-mtime cache-key hypothesis in
+`.syndicate/scope_2026-08-21_home_request_path_compute.md`, still unaddressed.
+
+Detail: `state.md [web-request-path-latency]`, `log/2026-08-22.md`, `deploys.md`
+19:03Z.
+
 ### `#505` — **The settlement join matched on an id that changes every time the price moves. That is the `matched: 0` / `4,560 no_key_match`, and it is why `/portfolio` never settles.** — lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
 
 **`recommendation_id` is not an identity, it is a snapshot hash.**

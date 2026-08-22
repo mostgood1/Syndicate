@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 428 rules `[generated]`
+## Index — 531 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 65**
+**FORBIDDEN — 90**
 
+- [2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT q…](#2026-08-21-forbidden-never-publish-a-field-under-a-name-that-describes-a-different-quantity-however-well-documented-the-real-one-is)
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
@@ -45,6 +46,30 @@
 - [2026-08-16 — FORBIDDEN: instrumenting a WRAPPER when the hot path has siblings that rea…](#2026-08-16-forbidden-instrumenting-a-wrapper-when-the-hot-path-has-siblings-that-reach-the-same-work-directly-twice-in-one-night)
 - [2026-08-17 — FORBIDDEN: diagnosing from FILTERED log projections. Six wrong attribution…](#2026-08-17-forbidden-diagnosing-from-filtered-log-projections-six-wrong-attributions-one-question-and-the-answer-was-in-the-lines-i-was-truncating)
 - [2026-08-18 — FORBIDDEN: never apply a transform to a shared file by patching the transf…](#2026-08-18-forbidden-never-apply-a-transform-to-a-shared-file-by-patching-the-transforms-own-source-with-strreplace-session-football-model-owner)
+- [2026-08-19 — FORBIDDEN: never treat a green local `pytest` run as evidence about CI. **…](#2026-08-19-forbidden-never-treat-a-green-local-pytest-run-as-evidence-about-ci-ci-runs-unittest-and-conftestpy-does-not-exist-to-it)
+- [2026-08-20 — FORBIDDEN: never repair, rebuild or optimise a scheduled job without first…](#2026-08-20-forbidden-never-repair-rebuild-or-optimise-a-scheduled-job-without-first-establishing-that-anything-still-consumes-it-fixing-a-dead-job-can-be-worse-than-leaving-it-broken)
+- [2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEV…](#2026-08-20-corrected-below-forbidden-buying-data-before-probing-it-exists-and-never-diagnose-a-vendor-from-your-own-broken-query)
+- [2026-08-20 — FORBIDDEN: an assertion whose subject is a TEMPLATE must not take the ambi…](#2026-08-20-forbidden-an-assertion-whose-subject-is-a-template-must-not-take-the-ambient-data-mirror-as-its-input-pin-the-fixture-then-prove-the-pin-is-load-bearing)
+- [2026-08-20 — FORBIDDEN: never read a ledger file with `git show <rev>:<path>` from Git…](#2026-08-20-forbidden-never-read-a-ledger-file-with-git-show-revpath-from-git-bash-it-returns-empty-and-empty-reads-as-another-session-deleted-it)
+- [2026-08-20 — FORBIDDEN: never re-apply a ledger edit with `git checkout <sha> -- <ledge…](#2026-08-20-forbidden-never-re-apply-a-ledger-edit-with-git-checkout-sha----ledger-file-it-is-a-revert-of-everyone-elses-entries-wearing-the-clothes-of-an-append)
+- [2026-08-20 — FORBIDDEN: concluding a producer was REPLACED because a module says it rep…](#2026-08-20-forbidden-concluding-a-producer-was-replaced-because-a-module-says-it-replaced-it)
+- [2026-08-20 — FORBIDDEN: fixing a guard bug ONLY in the guard you found it in](#2026-08-20-forbidden-fixing-a-guard-bug-only-in-the-guard-you-found-it-in)
+- [2026-08-20 — FORBIDDEN: a guard test that asserts against the live ledger](#2026-08-20-forbidden-a-guard-test-that-asserts-against-the-live-ledger)
+- [2026-08-20 — FORBIDDEN: reading a KILLED pytest run as a result. I retracted a 12-failu…](#2026-08-20-forbidden-reading-a-killed-pytest-run-as-a-result-i-retracted-a-12-failure-report-that-never-existed)
+- [2026-08-20 FORBIDDEN: staging a SHARED ledger file by path in the PRIMARY tree — `git a…](#2026-08-20-forbidden-staging-a-shared-ledger-file-by-path-in-the-primary-tree-git-add-path-sweeps-other-sessions-uncommitted-edits-to-that-same-file)
+- [FORBIDDEN: a `continue` that skips a check inside a loop whose only failure signal is a…](#forbidden-a-continue-that-skips-a-check-inside-a-loop-whose-only-failure-signal-is-a-counter-2026-08-20-481)
+- [2026-08-20 — FORBIDDEN: verifying pushed content by slicing a computed substring out of…](#2026-08-20-forbidden-verifying-pushed-content-by-slicing-a-computed-substring-out-of-it-anchor-on-the-line-twice-in-one-session-my-own-checker-said-absent-about-content-that-was-present)
+- [2026-08-20 — FORBIDDEN: in a tree you did not create, an unexplained diff is another se…](#2026-08-20-forbidden-in-a-tree-you-did-not-create-an-unexplained-diff-is-another-sessions-work-until-proven-otherwise)
+- [2026-08-21 — FORBIDDEN: concluding a capability is ABSENT from two adjacent artifacts](#2026-08-21-forbidden-concluding-a-capability-is-absent-from-two-adjacent-artifacts)
+- [2026-08-21 — FORBIDDEN: `cat >` on a ledger file. Append only, and re-check AFTER the r…](#2026-08-21-forbidden-cat-on-a-ledger-file-append-only-and-re-check-after-the-rebase)
+- [2026-08-21 — FORBIDDEN: taking a CODE COMMENT as authority for WHICH SERVICE runs somet…](#2026-08-21-forbidden-taking-a-code-comment-as-authority-for-which-service-runs-something)
+- [08-21 FORBIDDEN: validating a finding on a window that does not contain the thing](#08-21-forbidden-validating-a-finding-on-a-window-that-does-not-contain-the-thing)
+- [2026-08-21 — FORBIDDEN: a deploy chained in the same shell command as anything naming a…](#2026-08-21-forbidden-a-deploy-chained-in-the-same-shell-command-as-anything-naming-another-service)
+- [2026-08-21 — FORBIDDEN: explaining a local failure with a LOCAL cause when the same cod…](#2026-08-21-forbidden-explaining-a-local-failure-with-a-local-cause-when-the-same-code-runs-in-production)
+- [2026-08-21 — FORBIDDEN: asserting a trend from one sample, especially a scary one](#2026-08-21-forbidden-asserting-a-trend-from-one-sample-especially-a-scary-one)
+- [2026-08-22 — FORBIDDEN: never join on an id minted from a content hash of a payload tha…](#2026-08-22-forbidden-never-join-on-an-id-minted-from-a-content-hash-of-a-payload-that-carries-live-prices)
+- [2026-08-22 — FORBIDDEN: verifying a REORDERING by elapsed-time-since-boot](#2026-08-22-forbidden-verifying-a-reordering-by-elapsed-time-since-boot)
+- [2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that w…](#2026-08-22-forbidden-never-allowlist-an-artifact-without-reading-the-consumer-that-will-start-finding-it)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -76,13 +101,15 @@
 - [2026-08-16 — FORBIDDEN: never add an instrument without first checking who captures the…](learnings_evidence.md#2026-08-16-forbidden-never-add-an-instrument-without-first-checking-who-captures-the-channel-it-writes-to) `[evidence]`
 - [2026-08-16 — FORBIDDEN: trusting a commit you verified only BEFORE `git commit`. Guards…](learnings_evidence.md#2026-08-16-forbidden-trusting-a-commit-you-verified-only-before-git-commit-guards-cannot-see-corruption-that-happens-during-it) `[evidence]`
 
-**EXONERATED — 3**
+**EXONERATED — 5**
 
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause)
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
+- [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
+- [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 360**
+**Rules and corrections — 436**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -250,6 +277,82 @@
 - [2026-08-19 — RULE: a mass-deletion diff is not self-explaining. Compare DISTINCT lines…](#2026-08-19-rule-a-mass-deletion-diff-is-not-self-explaining-compare-distinct-lines-before-accepting-it-was-just-dedupe)
 - [2026-08-19 — RULE: when diagnosis has failed repeatedly, look for the fix that does not…](#2026-08-19-rule-when-diagnosis-has-failed-repeatedly-look-for-the-fix-that-does-not-need-the-cause)
 - [2026-08-19 — RULE: a cause must explain the TIMING, not just the mechanism. Date the ch…](#2026-08-19-rule-a-cause-must-explain-the-timing-not-just-the-mechanism-date-the-change-before-believing-it)
+- [2026-08-19 — RULE: a flag's NAME is a hypothesis about its meaning, not its meaning. Re…](#2026-08-19-rule-a-flags-name-is-a-hypothesis-about-its-meaning-not-its-meaning-read-the-setter-before-gating-on-it)
+- [2026-08-19 — VERIFY WHAT THE THING YOU CHANGED *DEPENDS ON*](#2026-08-19-verify-what-the-thing-you-changed-depends-on)
+- [2026-08-19 — RULE: to find where variance is CREATED, decompose the outcome. Correlatin…](#2026-08-19-rule-to-find-where-variance-is-created-decompose-the-outcome-correlating-its-inputs-finds-what-moves-with-it-which-is-a-different-question)
+- [2026-08-19 — CORRECTION: `git commit -- <paths>` fixes the shared INDEX. It is the DELI…](#2026-08-19-correction-git-commit----paths-fixes-the-shared-index-it-is-the-delivery-mechanism-for-a-shared-file-i-applied-it-to-both-and-caused-two-more-incidents)
+- [2026-08-19 — OVERTURNED: `SYNDICATE_DEPLOY_GUARD=off` works as an inline Bash prefix](#2026-08-19-overturned-syndicate_deploy_guardoff-works-as-an-inline-bash-prefix)
+- [2026-08-19 — a disclaimer marker must PRECEDE the path it disclaims, not follow it](#2026-08-19-a-disclaimer-marker-must-precede-the-path-it-disclaims-not-follow-it)
+- [2026-08-19 — NEAR-MISS: an object-database merge updates the REF, not the working tree,…](#2026-08-19-near-miss-an-object-database-merge-updates-the-ref-not-the-working-tree-and-a-later-working-tree-write-can-silently-revert-real-content)
+- [2026-08-19 — I declared a deploy FAILED 60 seconds after it went live, and it had not](#2026-08-19-i-declared-a-deploy-failed-60-seconds-after-it-went-live-and-it-had-not)
+- [2026-08-19 — NEAR-MISS: a multi-step object-database commit re-resolved `origin/main` m…](#2026-08-19-near-miss-a-multi-step-object-database-commit-re-resolved-originmain-mid-construction)
+- [2026-08-19 — A commit's own summary line overclaimed "closes to zero" while its body te…](#2026-08-19-a-commits-own-summary-line-overclaimed-closes-to-zero-while-its-body-text-said-otherwise)
+- [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
+- [2026-08-19 — OVERTURNED: "leak-free" is not "representative" -- a backtest can be metho…](#2026-08-19-overturned-leak-free-is-not-representative----a-backtest-can-be-methodologically-clean-and-still-measure-the-wrong-pipeline)
+- [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
+- [2026-08-19 — a single read of a MULTI-WORKER service is not a measurement](#2026-08-19-a-single-read-of-a-multi-worker-service-is-not-a-measurement)
+- [2026-08-20 — OVERTURNED: I reported "CI is green" and closed the lane on a 16-run green…](#2026-08-20-overturned-i-reported-ci-is-green-and-closed-the-lane-on-a-16-run-green-streak-that-did-not-span-the-hours-ci-actually-fails-a-streak-is-a-sample-check-whether-it-covers-the-condition-that-breaks-the-thing)
+- [2026-08-19 — READ THE WRITER BEFORE INSTRUMENTING THE READER. A branch that turns on a…](#2026-08-19-read-the-writer-before-instrumenting-the-reader-a-branch-that-turns-on-a-key-is-answered-by-the-schema-not-by-a-deploy)
+- [2026-08-20 — A STANDING INSTRUCTION BLOCK GOES STALE SILENTLY, AND STALE READS AS AUTHO…](#2026-08-20-a-standing-instruction-block-goes-stale-silently-and-stale-reads-as-authoritative)
+- [2026-08-20 — "Everything upstream is correct" is a REASON TO LOOK FURTHER DOWN, not a r…](#2026-08-20-everything-upstream-is-correct-is-a-reason-to-look-further-down-not-a-reason-to-doubt-the-symptom)
+- [2026-08-20 — I NAMED A VERIFICATION CHECK WITHOUT CONFIRMING THE INSTRUMENT COULD SEE](#2026-08-20-i-named-a-verification-check-without-confirming-the-instrument-could-see)
+- [2026-08-20 — OVERTURNED (pre-registered): soccer is not under-dispersed anymore, and fi…](#2026-08-20-overturned-pre-registered-soccer-is-not-under-dispersed-anymore-and-fixing-dispersion-missing-inputs-did-not-close-the-gap-to-the-market)
+- [CORRECTION, same day, after the user asked "are you sure you're looking correctly"](#correction-same-day-after-the-user-asked-are-you-sure-youre-looking-correctly)
+- [2026-08-20 — "strictly dominated" is a different diagnosis from "broken", and it change…](#2026-08-20-strictly-dominated-is-a-different-diagnosis-from-broken-and-it-changes-the-fix)
+- [2026-08-20 — ONE ERROR IN FIVE GUISES: validating against a PROXY, not the objective](#2026-08-20-one-error-in-five-guises-validating-against-a-proxy-not-the-objective)
+- [2026-08-20 — A NULL HAS A SAMPLE SIZE. I called a lever dead, revived it, then buried i…](#2026-08-20-a-null-has-a-sample-size-i-called-a-lever-dead-revived-it-then-buried-it-properly)
+- [2026-08-20 — TRIMMING state.md AND learnings.md DOES NOT FIX THE DIGEST. Measured.](#2026-08-20-trimming-statemd-and-learningsmd-does-not-fix-the-digest-measured)
+- [2026-08-20 — RELAXING A FILTER CAN MAKE THE OUTPUT WORSE. Selection matters as much as…](#2026-08-20-relaxing-a-filter-can-make-the-output-worse-selection-matters-as-much-as-the-match)
+- [2026-08-20 — A WORKTREE COMMIT LEAVES THE SHARED TREE STALE, AND STALE IS A REVERT WAIT…](#2026-08-20-a-worktree-commit-leaves-the-shared-tree-stale-and-stale-is-a-revert-waiting)
+- [2026-08-20 — OVERTURNED: a genuinely BRACKETED grid-search optimum (not an edge artifac…](#2026-08-20-overturned-a-genuinely-bracketed-grid-search-optimum-not-an-edge-artifact-still-failed-held-out-validation)
+- [2026-08-20 — A STALE-BASE PUSH DOES NOT LOSE WORK ONCE; IT POISONS THE BASE](#2026-08-20-a-stale-base-push-does-not-lose-work-once-it-poisons-the-base)
+- [2026-08-20 — A MUTATION TEST THAT MUTATES A COMMENT PROVES THE OPPOSITE OF WHAT IT LOOK…](#2026-08-20-a-mutation-test-that-mutates-a-comment-proves-the-opposite-of-what-it-looks-like)
+- [2026-08-20 — AN EDIT THAT REPORTS SUCCESS IS NOT EVIDENCE THE EDIT LANDED](#2026-08-20-an-edit-that-reports-success-is-not-evidence-the-edit-landed)
+- [2026-08-20 -- a fix's data can be correct while its raw diagnostic API still shows noth…](#2026-08-20----a-fixs-data-can-be-correct-while-its-raw-diagnostic-api-still-shows-nothing-verify-against-the-served-surface-not-the-one-that-found-the-bug)
+- [2026-08-20 -- A READING OF SHARED MUTABLE STATE EXPIRES AT THE INSTANT IT IS TAKEN](#2026-08-20----a-reading-of-shared-mutable-state-expires-at-the-instant-it-is-taken)
+- [2026-08-20 — A MUTATION TEST THAT MUTATES THE WRONG MODULE READS AS "VACUOUS SUITE"](#2026-08-20-a-mutation-test-that-mutates-the-wrong-module-reads-as-vacuous-suite)
+- [2026-08-20 A SAMPLE THAT CONTAINS ONLY ONE STATE CANNOT DIAGNOSE A STATE MACHINE](#2026-08-20-a-sample-that-contains-only-one-state-cannot-diagnose-a-state-machine)
+- [2026-08-20 A DOCSTRING THAT NAMES ITS OWN PRECONDITION IS A CHECKABLE CLAIM](#2026-08-20-a-docstring-that-names-its-own-precondition-is-a-checkable-claim)
+- [2026-08-20 A LOCAL VARIABLE NAMED FOR THE PARENT OF WHAT IT HOLDS](#2026-08-20-a-local-variable-named-for-the-parent-of-what-it-holds)
+- [2026-08-20 THE EDIT TOOL REPORTED SUCCESS ON A WRITE THAT NEVER REACHED DISK](#2026-08-20-the-edit-tool-reported-success-on-a-write-that-never-reached-disk)
+- [2026-08-20 A POST-DEPLOY VERIFICATION READ ONCE CAN BE AN ARTIFACT OF TIMING, NOT A PRO…](#2026-08-20-a-post-deploy-verification-read-once-can-be-an-artifact-of-timing-not-a-property-of-the-system)
+- [2026-08-20 A CORRECT REFUSAL ON STALE INPUT IS INDISTINGUISHABLE FROM A BROKEN FEATURE](#2026-08-20-a-correct-refusal-on-stale-input-is-indistinguishable-from-a-broken-feature)
+- [CORRECTION, same session — collection was NOT the cause, and the fix I gave was backwar…](#correction-same-session-collection-was-not-the-cause-and-the-fix-i-gave-was-backwards)
+- [2026-08-20 — A TIMEOUT WROTE `none` AND I DIVIDED BY IT. Four false diagnoses, one root…](#2026-08-20-a-timeout-wrote-none-and-i-divided-by-it-four-false-diagnoses-one-root-habit)
+- [2026-08-20 — an mtime that PREDATES the write it describes is `copy2` from the checkout…](#2026-08-20-an-mtime-that-predates-the-write-it-describes-is-copy2-from-the-checkout-not-a-publish-it-is-the-only-signal-that-a-boot-time-sync-clobbered-a-live-artifact)
+- [2026-08-20 — taking the blame is not the same as finding the cause, and a self-critical…](#2026-08-20-taking-the-blame-is-not-the-same-as-finding-the-cause-and-a-self-critical-wrong-answer-stops-the-search-just-as-dead-as-a-self-serving-one)
+- [2026-08-20 — a lock's STORAGE must not outlive its SCOPE. An age-based "stale lock" che…](#2026-08-20-a-locks-storage-must-not-outlive-its-scope-an-age-based-stale-lock-check-does-not-make-one-self-healing)
+- [2026-08-20 A CENSUS THAT CANNOT READ UNHEALTHY IS NOT A VERIFICATION — the slate can re…](#2026-08-20-a-census-that-cannot-read-unhealthy-is-not-a-verification-the-slate-can-retire-your-test-case-between-diagnosis-and-deploy)
+- [2026-08-20 — A PLATEAU IS NOT A FREEZE. A monotonic counter read ONCE cannot tell "stop…](#2026-08-20-a-plateau-is-not-a-freeze-a-monotonic-counter-read-once-cannot-tell-stopped-from-between-events)
+- [2026-08-20 — A ONE-REVISION PRESENCE CHECK CANNOT TELL "ALREADY UPSTREAM" FROM "ONLY IN…](#2026-08-20-a-one-revision-presence-check-cannot-tell-already-upstream-from-only-in-my-own-abandoned-commit)
+- [2026-08-20 — OVERTURNED: a loose threshold is a SYMPTOM. Ask what it compensates for be…](#2026-08-20-overturned-a-loose-threshold-is-a-symptom-ask-what-it-compensates-for-before-tuning-it)
+- [2026-08-20 — OVERTURNED: "N of N" is worth nothing until you know the sample COULD have…](#2026-08-20-overturned-n-of-n-is-worth-nothing-until-you-know-the-sample-could-have-contained-a-counterexample)
+- [2026-08-21 — A GITIGNORED FILE CANNOT BE A MODEL INPUT. Allowlisting it does not help,…](#2026-08-21-a-gitignored-file-cannot-be-a-model-input-allowlisting-it-does-not-help-and-the-result-is-a-feature-that-is-live-tested-deployed-and-does-nothing)
+- [2026-08-21 — A REACHABILITY PROBE SAMPLED FROM REAL DATA CAN BE DEGENERATE, and then it…](#2026-08-21-a-reachability-probe-sampled-from-real-data-can-be-degenerate-and-then-it-reports-a-live-mechanism-as-dead)
+- [2026-08-21 — A DOCUMENTED "acceptable for v1" LIMITATION IS A LIVE DEFECT THE MOMENT DA…](#2026-08-21-a-documented-acceptable-for-v1-limitation-is-a-live-defect-the-moment-data-arrives-to-exercise-it)
+- [2026-08-21 — OPENING A LANE IN THE PRIMARY TREE AND THEN OPENING A WORKTREE SILENTLY DR…](#2026-08-21-opening-a-lane-in-the-primary-tree-and-then-opening-a-worktree-silently-drops-the-lane-block)
+- [2026-08-21 — A HEALTHY LOG LINE CAN LOOK LIKE THE BUG (`written=0` was correct)](#2026-08-21-a-healthy-log-line-can-look-like-the-bug-written0-was-correct)
+- [2026-08-21 — ABSENT IS NOT None, AND THE DIFFERENCE NAMES THE PRODUCER](#2026-08-21-absent-is-not-none-and-the-difference-names-the-producer)
+- [2026-08-21 — "UNAVAILABLE" IN A LEDGER ENTRY MEANS "NOT RETAINED", NOT "UNOBTAINABLE"](#2026-08-21-unavailable-in-a-ledger-entry-means-not-retained-not-unobtainable)
+- [2026-08-21 — I DERIVED SERVICE OWNERSHIP FROM CODE AND SHIPPED TO THE WRONG WORKER. The…](#2026-08-21-i-derived-service-ownership-from-code-and-shipped-to-the-wrong-worker-the-env-gate-runs-first)
+- [2026-08-21 — A 403 FROM WEB IS A ROUTE RESTRICTION, NOT AN ABSENT FILE](#2026-08-21-a-403-from-web-is-a-route-restriction-not-an-absent-file)
+- [2026-08-21 — AN APOSTROPHE IS INTRA-WORD; A HYPHEN SEPARATES WORDS](#2026-08-21-an-apostrophe-is-intra-word-a-hyphen-separates-words)
+- [2026-08-21 — THE DEPLOY CLAIM IS NOT A GLOBAL LOCK ONCE SESSIONS USE WORKTREES](#2026-08-21-the-deploy-claim-is-not-a-global-lock-once-sessions-use-worktrees)
+- [2026-08-21 A `max(timestamp)` INSIDE A SEASON-SCOPED ARTIFACT IS A HINDSIGHT LEAK, AND…](#2026-08-21-a-maxtimestamp-inside-a-season-scoped-artifact-is-a-hindsight-leak-and-it-flatters)
+- [2026-08-21 THE PRIMARY SHARED TREE IS NOT A NARRATOR OF `main`, AND `reset --hard` ON I…](#2026-08-21-the-primary-shared-tree-is-not-a-narrator-of-main-and-reset---hard-on-it-destroys-other-sessions-work)
+- [2026-08-21 — AN UNCHANGED VALUE ACROSS A DEPLOY IS STALE DATA UNTIL PROVEN OTHERWISE](#2026-08-21-an-unchanged-value-across-a-deploy-is-stale-data-until-proven-otherwise)
+- [2026-08-21 — A SUCCESS-ONLY EMITTER MAKES ZERO INVISIBLE](#2026-08-21-a-success-only-emitter-makes-zero-invisible)
+- [2026-08-21 — A CONDITIONAL LOCAL IMPORT SHADOWS FOR THE WHOLE FUNCTION](#2026-08-21-a-conditional-local-import-shadows-for-the-whole-function)
+- [2026-08-21 — A NULL RESULT NEEDS A NEGATIVE CONTROL BEFORE IT IS EVIDENCE](#2026-08-21-a-null-result-needs-a-negative-control-before-it-is-evidence)
+- [2026-08-21 — A DOCSTRING DESCRIBES INTENT; THE CODE DESCRIBES BEHAVIOUR](#2026-08-21-a-docstring-describes-intent-the-code-describes-behaviour)
+- [2026-08-21 — READ THE TTL BEFORE BREAKING A LOCK. The force bought 12 minutes.](#2026-08-21-read-the-ttl-before-breaking-a-lock-the-force-bought-12-minutes)
+- [2026-08-21 — Reasoning off an invented clock, and querying a window in the future](#2026-08-21-reasoning-off-an-invented-clock-and-querying-a-window-in-the-future)
+- [2026-08-21 — A poll that matched its own instrument](#2026-08-21-a-poll-that-matched-its-own-instrument)
+- [2026-08-21 — The preview pane CANNOT verify a CSS edit. It caches the parsed stylesheet.](#2026-08-21-the-preview-pane-cannot-verify-a-css-edit-it-caches-the-parsed-stylesheet)
+- [2026-08-21 — A tooltip is not a reading surface, and the data was already there](#2026-08-21-a-tooltip-is-not-a-reading-surface-and-the-data-was-already-there)
+- [2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will…](#2026-08-22-an-absent-log-line-is-not-an-absent-event-and-a-stale-ledger-figure-will-out-argue-a-fresh-measurement)
+- [2026-08-22 — the retraction was as wrong as the claim. "It ran once" is not "it runs"](#2026-08-22-the-retraction-was-as-wrong-as-the-claim-it-ran-once-is-not-it-runs)
+- [2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not…](#2026-08-22-rule-tail--n-on-a-backgrounded-command-truncates-the-output-file-not-just-the-display)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

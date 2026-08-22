@@ -1170,54 +1170,26 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   change moves an expensive job earlier in the tick chain.
 - Blocked by: none.
 
-### render-web-request-path — OPEN — opened 2026-08-22 — session 726ef4ff-981a-593c-b89f-d31ee630b92d
-- Goal: web stops being SIGTERM'd during live MLB slates — no ~90s restart cadence, no ~15s no-listener 502 windows.
-- Files: `syndicate/blueprints/home.py`, `syndicate/features/mlb/cards.py`,
-  `tests/test_home_mlb_feed_live_single_flight.py`, `tests/test_mlb_cards_context_cache_bounds.py`,
-  `tests/_cache_isolation.py`, `tests/conftest.py`.
-- Hypothesis: the 502s are NOT slow cold boots (boot-to-listening measured 2.7s). They are
-  `/healthz` starvation: `_apply_mlb_live_scores` makes up to 15 live statsapi calls per home
-  request because `raw/statsapi/feed_live/**` is in none of the 175 `HOT_ARTIFACT_PATTERNS`,
-  so all 8 request slots (2 workers x 4 threads) block and the health check times out at 5s.
-- Falsification test: if `apply_live_scores` were cheap, or if terms correlated with deploys
-  rather than with unanswered health checks, the hypothesis is dead. Measured 2026-08-22:
-  `apply_live_scores` 3318/7991/8400/5498/3494ms (8400 > the 8000ms budget = network);
-  terms at 17:14:08 / 17:15:38 / 17:17:38 on container `-2mdsk`, new gunicorn master pid each,
-  no deploy after 17:12:59; healthz unanswered 17:16:34 -> 17:17:58 (84s).
-- Verification: **NOT DISCHARGED — nothing is deployed.** Two readings, both post-deploy:
-  (1) zero unexplained `Handling signal: term` on web across a full live MLB slate, and
-  (2) memory-over-uptime staying off the 2,147,483,600 B ceiling (baseline to beat:
-  369 MB at boot -> 2,026,717,200 B after ~7.5h, 2026-08-22). Secondary instrument:
-  `CONTEXT_CACHE_EVICTED ... web=True` should become RARE; unchanged rate means the idle
-  bound is not working. Code-level: 24 new tests pass, and the load-bearing one is
-  falsified against the old path (second concurrent request blocked 8.00s, 4 fetches
-  started; new path returns in <1s with 1 fetch).
-- Blocked by: none. Deploy not taken — no claim acquired, `render.yaml` untouched.
-- **UPDATE 2026-08-22: the statsapi fan-out is now GONE from the request path, and
-  NOT by allowlisting `feed_live`.** That was the plan and it was a regression:
-  `_mlb_feed_live_payload` takes the file if it EXISTS with no freshness check, so
-  publishing it would have frozen every game at capture time — the defect `#413`
-  measured on 2026-08-13 (MIL @ SD `live / TOP 9` against a lens reading Final).
-  `vendor/mlb_bettingv2/tools/daily_update.py` says the same of its own files:
-  prior-day reconciliation re-fetches because the cache is "a stale pregame cache
-  entry". Instead `_apply_mlb_live_scores` reads `live_lens_report_<date>.json`,
-  already allowlisted and already republished ~60s, which carries score, status AND
-  `gameLens[].progress.{inning,half,outs}` — so the card's status line is
-  reconstructed, not degraded. Measured end to end on the real 2026-06-01 report
-  restamped to now: **9/9 games resolved, 0 statsapi calls**, game 822974 ->
-  `In Progress | Bottom 9th | 2 outs`, score 10-9. Stale/absent report -> `{}` ->
-  falls through to the (single-flighted) network path, i.e. today's behaviour.
-  Regression check: the `-k "mlb or home or cards or cache or board"` sweep fails
-  18 tests both WITH and WITHOUT this change — `comm` on the two sorted lists is
-  empty in both directions, so all 18 are pre-existing and there are no regressions.
-- **DEPLOYED AND MEASURED 2026-08-22 19:09Z, web `8149e51d` (contains `c02b07e6`).**
+### render-web-request-path — **OPEN, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — **SHIPPED AND MEASURED; ONE ITEM OWED**
+- Goal: web stops being SIGTERM'd during live MLB slates. **Changes 1 and 2 MET.**
+- **Claims: NONE held.** Released deliberately at archive time so no future session
+  is blocked on `home.py` / `mlb/cards.py` by a dead owner — the orphan failure the
+  2026-08-18 sweep had to clean up across 8 lanes.
+- **VERIFIED** (web `8149e51d` 19:09:35Z, still live under peer `3ada3512`):
   `apply_live_scores` **3318-8400ms -> 0-93ms** on `games=15`, 14 samples across two
-  instances and two deploys. Zero `term`, zero `Traceback` since. **Changes 1 and 2 are
-  PROVEN; change 3 (memory idle bound) is NOT** — peers redeploy web every ~20-30 min so
-  no instance lives long enough to show the ratchet, which took ~7.5h to reach 2.03 GB.
-  Claim released. Full working in `deploys.md`. **Lane stays OPEN on change 3 alone.**
-  Next bottleneck now visible: `build_cards_page_context` 1803-2402ms on a cache miss.
-
+  instances and two deploys. Zero `Handling signal: term` since, against 3 in 4 min
+  before. Cold boot exonerated at 2.7s boot-to-listening.
+- **OWED, THE ONLY OPEN ITEM:** the card-cache idle bound is **NOT** verified.
+  Baseline to beat: 369 MB -> 2,026,717,200 B over ~7.5h, ceiling 2,147,483,600 B.
+  Post-deploy numbers are directionally better at comparable ages and that is not
+  proof. **Blocked in practice** — peers redeploy web every 20-30 min so no instance
+  lives long enough. Instrument: memory-over-uptime + the rate of
+  `CONTEXT_CACHE_EVICTED ... web=True` falling.
+- **DO NOT allowlist `raw/statsapi/feed_live`** — it freezes live scores (`#413`) and
+  buys no speed. Full reasoning in `state.md [web-request-path-latency]`.
+- Narrative + evidence: `log/2026-08-22.md` (session `726ef4ff`). Deploy record and
+  the stated preflight deviation: `deploys.md` 2026-08-22 19:03Z.
+- Next bottleneck, now visible: `build_cards_page_context` 1803-2402ms on a miss.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
