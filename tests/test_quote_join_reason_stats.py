@@ -46,7 +46,7 @@ class ReasonSplit(unittest.TestCase):
         obq.reset_quote_join_stats()
 
     def _call(self, **kwargs):
-        """`#510`. Patches `read_book_quotes_LATEST`, not `read_book_quotes`.
+        """`#517`. Patches `read_book_quotes_LATEST`, not `read_book_quotes`.
 
         `#435` changed `quote_ref_for_bet` to read latest-per-key -- holding
         every superseded snapshot is what made one end-of-day MLB shard cost

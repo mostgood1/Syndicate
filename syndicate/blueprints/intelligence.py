@@ -2833,6 +2833,14 @@ def board_layer2_shortlist_api():
                 # while the filter was live and dropping rows.
                 "min_value_pct": shortlist.get("min_value_pct"),
                 "rows_below_value_floor": shortlist.get("rows_below_value_floor"),
+                # `2026-08-22`. The mirror of the rejection above: rows the
+                # BLENDED score admitted that raw EV would have cut. Added at
+                # this hop in the SAME commit as the builder, because the four
+                # comments below this one all record the same failure -- a
+                # counter that existed at the builder and was invisible here,
+                # three times costing an investigation. Zero means the sim is
+                # admitting nothing and the scoring change is inert.
+                "rows_admitted_by_blend": shortlist.get("rows_admitted_by_blend"),
                 # `#381`. The builder has written this since the per-sport floor
                 # shipped; the endpoint's explicit key list dropped it, so the
                 # only readable number was a board-wide `rows_below_value_floor`
@@ -3133,10 +3141,111 @@ def portfolio_summary_api():
     return _no_cache_response(jsonify({"ok": True, **summary}))
 
 
+@intelligence_bp.get("/api/portfolio/settings")
+def portfolio_settings_api():
+    """The bankroll and the knobs that spend it.
+
+    A pure read of a stored setting -- no compute, so it belongs on web.
+    `sources` says per field whether the value is the user's, the
+    environment's, or the built-in default, which is the difference between
+    "you set $1,000" and "the store lost your edit and you are seeing the
+    default". On a 256MB `allkeys-lru` keyvalue at 96% occupancy that is not a
+    theoretical distinction.
+    """
+    from syndicate.features.shared.portfolio_settings import resolve_settings
+
+    return _no_cache_response(jsonify({"ok": True, "settings": resolve_settings().as_dict()}))
+
+
+@intelligence_bp.post("/api/portfolio/settings")
+def portfolio_settings_update_api():
+    """Partial edit. Unknown or out-of-range fields are rejected BY NAME.
+
+    Returns 400 when nothing was accepted, so a client cannot read a wholly
+    rejected edit as a successful save -- but 200 with a populated `rejected`
+    when some fields landed, because a partial success is not a failure and
+    silently discarding the good half would be worse.
+    """
+    from syndicate.features.shared.portfolio_settings import update_settings
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not payload:
+        response = jsonify({"ok": False, "error": "a JSON object with at least one field is required."})
+        response.status_code = 400
+        return _no_cache_response(response)
+
+    settings, rejected = update_settings(payload)
+    accepted = [key for key in payload if key not in rejected]
+    body = {
+        "ok": bool(accepted),
+        "settings": settings.as_dict(),
+        "accepted": accepted,
+        "rejected": rejected,
+    }
+    response = jsonify(body)
+    if not accepted:
+        response.status_code = 400
+    return _no_cache_response(response)
+
+
+@intelligence_bp.post("/portfolio/settings")
+def portfolio_settings_form():
+    # Plain page-form action, matching /portfolio/bets/<id>/delete above:
+    # /portfolio is server-rendered with no client-side JS, so a form POST fits
+    # its existing style rather than introducing a fetch flow for one field.
+    from syndicate.features.shared.portfolio_settings import EDITABLE_FIELDS, update_settings
+
+    changes = {name: request.form.get(name) for name in EDITABLE_FIELDS if request.form.get(name) not in (None, "")}
+    if changes:
+        update_settings(changes)
+    return redirect("/portfolio", code=303)
+
+
+@intelligence_bp.get("/api/portfolio/plan")
+def portfolio_plan_api():
+    """Stage A's committed plan for a date, read from the worker's artifact.
+
+    A PURE READ, for the same reason `/api/board/layer2-shortlist` is one: a
+    portfolio computed per request cannot be settled, and Stage C's CLV gate
+    needs a record of what was committed and at what price.
+
+    An absent plan is a real and distinguishable state, not an error -- the job
+    is dark by default, so "never ran" is the expected answer today and must not
+    read as "committed nothing".
+    """
+    from pipeline.portfolio_commit import portfolio_commit_enabled, read_portfolio_plan
+
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    try:
+        plan = read_portfolio_plan(selected_date)
+    except Exception:
+        _LOGGER.exception("PORTFOLIO_PLAN_READ_FAILURE date=%s", selected_date)
+        plan = None
+    if not isinstance(plan, dict):
+        return _no_cache_response(
+            jsonify(
+                {
+                    "ok": True,
+                    "date": selected_date,
+                    "plan_present": False,
+                    "reason": "commit_job_disabled" if not portfolio_commit_enabled() else "no_plan_artifact",
+                    "positions": [],
+                }
+            )
+        )
+    return _no_cache_response(jsonify({"ok": True, "date": selected_date, "plan_present": True, **plan}))
+
+
 @intelligence_bp.get("/portfolio")
 def portfolio_home():
+    from syndicate.features.shared.portfolio_settings import resolve_settings
+
     summary = build_portfolio_summary(limit=100)
-    return render_template("portfolio.html", portfolio_summary=summary)
+    return render_template(
+        "portfolio.html",
+        portfolio_summary=summary,
+        portfolio_settings=resolve_settings().as_dict(),
+    )
 
 
 @intelligence_bp.post("/portfolio/bets/<prediction_id>/delete")

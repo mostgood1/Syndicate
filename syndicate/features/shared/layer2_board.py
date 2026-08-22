@@ -131,7 +131,44 @@ _IDENTITY_FIELDS = (
 # `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES` bounded count while the caller needed
 # bytes, and that was invisible for three weeks. The writer logs the bytes it
 # actually persisted so the real constraint stays observable.
-SHORTLIST_ROWS_PER_SPORT = 100
+def _shortlist_rows_per_sport() -> int:
+    """How many rows per sport reach the persisted board. Env-overridable.
+
+    RAISED 100 -> 400 `[user decision, 2026-08-22: "we should let everything
+    flow"]`, and NOT removed, because removing it breaks the board outright.
+
+    THE BINDING CONSTRAINT IS THE KEYVALUE WRITE, NOT READABILITY. The original
+    comment sized this as "a readability bound, not a memory bound" against a
+    2.4MB state. The real ceiling is `refresh_state_store._keyvalue_max_bytes`
+    = **8MB**, and that number is itself measured rather than chosen: an
+    intelligence state at 8.9MB reproducibly gets "Connection closed by server".
+
+    So the arithmetic, at the ~1.0 KB/row measured on production 2026-08-07:
+
+        100/sport x 4 active   ~0.4 MB    (today)
+        400/sport x 4 active   ~1.6 MB    (this change)
+        400/sport x 8 active   ~3.2 MB    (a full winter slate)
+        UNCAPPED               soccer ALONE is 20,025 grid rows, ~20 MB
+
+    Uncapped is not a bigger board, it is a board that fails to persist and
+    therefore serves nothing. 400 keeps a full eight-sport slate under half the
+    ceiling while quadrupling what a reader sees.
+
+    `persisted_bytes` is already reported on every build and is now checked
+    against the ceiling below, so the next raise can be made on a reading
+    instead of on this arithmetic.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_ROWS_PER_SPORT") or "").strip()
+    try:
+        value = int(raw) if raw else 400
+    except ValueError:
+        value = 400
+    # Floor of 1: a zero or negative override would empty the board silently,
+    # which is the failure mode every other bound in this file guards against.
+    return max(1, value)
+
+
+SHORTLIST_ROWS_PER_SPORT = _shortlist_rows_per_sport()
 
 # Each kind is guaranteed this many slots before merit takes over.
 #
@@ -574,11 +611,55 @@ def _env_float(name: str, default: float) -> float:
 
 
 def _row_value_pct(row: Mapping[str, Any]) -> float | None:
-    value = _as_float(row.get("ev_pct"))
-    if value is not None:
-        return value
+    """The value this row is ADMITTED on, in EV points.
+
+    **Prefers the BLENDED value, not raw `ev_pct`** `[changed 2026-08-22, user
+    decision]`. This used to read `ev_pct` first and fall back to
+    `score.value_pct` only when EV was absent -- and `ev_pct` is present on
+    essentially every scored row, so the fallback almost never fired. The
+    consequence was that the simulation could REORDER the board (`_score_of`
+    ranks on `score.score`) but could never get a row ONTO it: admission was
+    decided by price alone, upstream of anything the sim had to say.
+
+    `score.value_pct` is `ev_pct` + the capped sim term + the capped movement
+    term, all three in EV points, so it is unit-comparable with the
+    hold-derived floor it is tested against -- which is the only reason this
+    substitution is legitimate rather than a category error.
+
+    **What this can and cannot do is bounded by the same cap as everything
+    else.** The sim may carry a row across the value floor by at most
+    `_SCORE_SIM_CAP_PCT` (1.5 EV points), so it can rescue a row that was
+    marginally below and can never rescue a materially bad price. That bound is
+    the whole reason admission can be handed to the blend at all: an uncapped
+    sim term here would let an unvalidated model admit arbitrarily bad prices,
+    which is the 2026-08-08 failure with a wider blast radius than ranking.
+
+    Falls back to `ev_pct` when there is no score block, so a row that was never
+    scored is judged exactly as before.
+    """
     score = row.get("score")
-    return _as_float(score.get("value_pct")) if isinstance(score, Mapping) else None
+    if isinstance(score, Mapping):
+        blended = _as_float(score.get("value_pct"))
+        if blended is not None:
+            return blended
+    return _as_float(row.get("ev_pct"))
+
+
+def _row_admitted_by_blend(row: Mapping[str, Any], floor: float) -> bool:
+    """True when the blend cleared the floor and raw EV would not have.
+
+    Counted and reported, because a rule that changes what reaches the board
+    silently is one nobody can tell apart from a different slate -- this file's
+    own repeated lesson (`rows_implausible_book`, `rows_uninformative_ev`,
+    `#373`, `#381`, `#397`). It is also the direct measure of the change the
+    2026-08-22 scoring re-evaluation was made for: how many rows the simulation
+    actually put on the board.
+    """
+    raw_ev = _as_float(row.get("ev_pct"))
+    if raw_ev is None or raw_ev >= floor:
+        return False
+    blended = _row_value_pct(row)
+    return blended is not None and blended >= floor
 
 
 def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
@@ -2412,6 +2493,10 @@ def select_shortlist(
     beyond_game_cap = 0
     excluded_market = 0
     below_value_floor = 0
+    # Rows the BLEND put on the board that raw EV would have rejected. The
+    # direct measure of the 2026-08-22 scoring change; zero here means the sim
+    # is admitting nothing and the change is inert.
+    admitted_by_blend = 0
     beyond_quote_age = 0
     implausible_book = 0
     stale_kickoff = 0
@@ -2533,6 +2618,8 @@ def select_shortlist(
             if value_pct is not None and value_pct < row_floor:
                 below_value_floor += 1
                 continue
+            if _row_admitted_by_blend(row, row_floor):
+                admitted_by_blend += 1
             kept.append(row)
         rows = kept
 
@@ -2628,6 +2715,31 @@ def select_shortlist(
         }
 
     selected.sort(key=_score_of, reverse=True)
+    persisted_bytes = len(json.dumps(selected, default=str))
+    # Read from the store rather than hardcoded: if someone raises
+    # SYNDICATE_KEYVALUE_MAX_BYTES, this percentage must move with it or it
+    # becomes a second, silently-stale copy of the same limit.
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        _keyvalue_ceiling = int(_keyvalue_max_bytes())
+    except Exception:
+        _keyvalue_ceiling = 0
+    # NO WARNING IS RAISED HERE, DELIBERATELY. This function can only see
+    # `selected` — the ROWS — and the artifact that actually gets persisted also
+    # carries `per_sport`, `cards`, `openings_records`, `clv_openings` and every
+    # coverage payload. A guard on the rows fired silent while the real artifact
+    # sat at 4,434,665 B (53% of the 8 MB ceiling), measured 2026-08-22
+    # 20:56:30Z right after the cap went 100 -> 400. An all-clear from a
+    # subset-measuring guard is worse than no guard at all.
+    #
+    # The warning now lives at the only place the whole payload exists:
+    # `intelligence_state._warn_if_shortlist_near_keyvalue_ceiling`, called from
+    # `write_layer2_shortlist` BEFORE the write.
+    #
+    # The two numbers below are kept because they are honest as long as they are
+    # named for what they measure: `persisted_bytes` is the ROWS' contribution,
+    # not the artifact's size, and the pct is derived from it.
     return {
         "rows": selected,
         "per_sport": per_sport_report,
@@ -2648,6 +2760,11 @@ def select_shortlist(
         # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
         "rows_below_value_floor": below_value_floor,
+        # Reported beside the rejection it is the mirror of. `#397`'s
+        # discipline: the counter ships in the SAME commit as the rule that
+        # produces it, because a filter whose effect cannot be read is one
+        # nobody can tell apart from a thin slate.
+        "rows_admitted_by_blend": admitted_by_blend,
         # `#391`. Reported beside the other rejections for the reason `#373`
         # added `rows_implausible_book`: a rule that trims silently is a rule
         # nobody can tell apart from a thin slate.
@@ -2674,5 +2791,16 @@ def select_shortlist(
         "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_stale_kickoff": stale_kickoff,
-        "persisted_bytes": len(json.dumps(selected, default=str)),
+        # THE ROWS' CONTRIBUTION, not the artifact's size. Renamed from the
+        # bare `persisted_bytes` it shipped as, because that name is what made a
+        # subset read as the whole: the persisted artifact was 4.43 MB while
+        # this number was comfortably under half the ceiling.
+        "rows_bytes": persisted_bytes,
+        # Kept under the old key so nothing downstream breaks, and its meaning
+        # is now stated rather than implied.
+        "persisted_bytes": persisted_bytes,
+        "persisted_bytes_note": "rows only; the written artifact is larger -- see SHORTLIST_PERSIST_LARGE",
+        "rows_pct_of_keyvalue_max": round(100.0 * persisted_bytes / _keyvalue_ceiling, 1)
+        if _keyvalue_ceiling
+        else None,
     }

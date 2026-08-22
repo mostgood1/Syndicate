@@ -36,6 +36,41 @@
 
 ---
 
+### 2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the same store without saying which surface. A 4-minute refresh-worker outage came from that ambiguity
+
+**What happened.** A recommendation to change the eviction policy on the
+keyvalue store was written as *"`allkeys_lru` → `volatile_lru` on
+`syndicate-refresh-state`"*. There are TWO settable things whose names both
+point at that store: the Key Value instance's `maxmemoryPolicy` (Redis's own
+eviction rule) and the services' `SYNDICATE_REFRESH_STATE_BACKEND` env var
+(which backend the APP routes to). The value went into the env var.
+
+**Measured.** `refresh-worker` crash-looped 2026-08-22T19:31:36Z → 19:35:31Z:
+
+    REFRESH_STATE_BACKEND = volatile_lru
+    RuntimeError: Local state backend not allowed in multi-service deployment
+                  for refresh-worker: volatile_lru
+
+Recovery on a new instance at 19:35:31.931Z, `BACKGROUND_LOOP_START`
+19:35:33.035Z, then `PUBLISH_OK` ×2, `MLB_LINEUP_STATE games=15 posted=5`,
+`OVERVIEW_SPORT_BEGIN sport=mlb`. Web and live-odds-worker were never affected
+(0 matches for the same error text; web's `PUBLISH_OK` proves it was up).
+
+**THE RULE.** When recommending a change to a hosted resource, name the SURFACE
+as well as the resource: *"the Key Value instance's own settings page"* vs
+*"the service's Environment tab"*. A resource name alone is not an address when
+two surfaces answer to it.
+
+**WHY IT WAS ONLY 4 MINUTES, and this is the part to keep.**
+`_state_backend_kind()` maps any unrecognised value to `"filesystem"` — so
+`volatile_lru` did not error, it silently meant "use the local disk". On Render
+that is three separate disks, i.e. `#502`'s failure applied to the entire board,
+and it would have run HAPPILY while every cross-service artifact went private,
+discoverable days later. `assert_refresh_state_backend_ready` refuses at startup
+BEFORE any state is touched, which converted a silent multi-day corruption into
+a loud four-minute outage. **A permissive parse plus a strict startup assert is
+the pattern**: the assert is doing the work the `.get(key, default)` cannot.
+
 ### 2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT quantity, however well-documented the real one is
 - What we believed: the Layer 2 board's `Win%` column showed a win probability,
   and `model_probability` was the model's number for the row being recommended.
@@ -5204,6 +5239,105 @@ promising numbers died this session -- 40.2%, xG +0.1028, xG-over-count,
 la_liga 80-84', 40-48' peak -- and all five were read off a tail or a bug
 before a control existed. The control was always the cheap part.
 
+## 08-22 REVERSAL: there IS a signal. I had spent the whole day testing at the WRONG TIMESCALE.
+
+The cell sweep's negative was real about its own cells and WRONG as a general
+claim. A pooled model over all ~380k samples, clock as a 24-way one-hot
+baseline (the strongest clock-only predictor), holdout AUC:
+
+    window   60s  dAUC +0.0238        window 300s  +0.0081
+             120s       +0.0189               600s  +0.0088   <-- EVERY earlier test
+             180s       +0.0143               900s  +0.0058
+
+Monotonic in window. **Every analysis today used a 600s window and a 900s
+half-life. The signal lives at 60-120s with a 60s half-life.** Football momentum
+decays in about a minute; I smeared it across fifteen and then concluded five
+times that it was not there. That was a design assumption I never tested, not a
+property of the game.
+
+**CORRECTED NULL (the first one was wrong).** `rng.shuffle(yperm)` globally
+permutes TRAINING labels, which trains BOTH arms on noise and makes the
+increment ~0 by construction -- far too lenient, and the docstring claimed
+within-match. Correct null permutes FEATURE ROWS within time band, leaving
+clock and labels intact so only the feature link breaks:
+    real +0.0181   null -0.0022, +0.0002, +0.0018, -0.0057
+Ten times the null's best run.
+
+**THE DRIVER IS FOTMOB'S OWN MOMENTUM, and nothing else.**
+    solo (added to clock)      leave-one-out
+      vmom_abs  +0.0098          +0.0118   <-- unique, irreplaceable
+      xg        +0.0046          -0.0002
+      inbox     +0.0045          -0.0001
+Every shot feature is redundant; dropping any costs nothing. This REVERSES
+"FotMob has not earned a dependency" -- it has, for MOMENTUM, not for xG.
+
+**BUT MOMENTUM IS MOSTLY REACTIVE, and that is the honest headline.**
+    AUC predicting FUTURE goals 0.5242   AUC predicting PAST goals 0.6050
+It rises AFTER attacks and goals, far more than it anticipates them. And its
+per-minute stamp can overlap the label window, so it was re-tested lagged:
+    lag   0s  dAUC +0.0181 (vmom +0.0098)
+         60s        +0.0138 (vmom +0.0076)   <-- the defensible number
+        120s        +0.0098 (vmom +0.0046)
+76% of the effect survives a strict 60s lag, so it is not a bucket artifact --
+but it decays fast, which is what a genuinely short-lived signal looks like.
+
+**ECONOMICS, and the reason this is still not a green light.** At a 120s window
+the base rate is 0.0581, so the 2-1/3-1 bars from the 10-minute work DO NOT
+APPLY. Lagged, top 2% of predicted risk hits 0.0946 [0.085,0.105], lift 1.63x,
+needing better than ~9.6-1. Whether that is exploitable depends entirely on how
+books price live goal markets -- and they price them with their own shot and
+pressure models, which see the same 1.63x. NOT MEASURED. That is a test against
+live odds, which is a different question from this one.
+
+**THE METHOD LESSON.** "No signal" is only ever a claim about the test you ran.
+Five negatives at one timescale said nothing about other timescales, and the
+one-line fix (sweep the window) was available from the start. A negative result
+needs its power characterised before it is trusted, exactly as a positive needs
+a null.
+
+## 08-22 LIVE ODDS PILOT: plumbing works, answer is 1.8 match-days away
+
+**WE DO HAVE LIVE ODDS HISTORY, but it effectively STARTED TODAY** -- the 60s
+live-odds work deployed this evening is what produced it. Coverage by date:
+
+    2026-08-22  2300 markets, 1523 live, 370 live TOTALS, 36 events, 31 MB
+    2026-08-21  live-totals events 0
+    2026-08-19  8 events, none with >=10 snapshots
+    2026-08-14  163 markets, 5 capture passes, live h2h stamped 08-10 (STALE)
+
+Do not read "58 odds_history dates" as 58 usable dates. One is usable.
+
+**RESOLUTION IS THE BINDING CONSTRAINT.** Snapshots arrive every ~333s median.
+That gap is OURS, not the books': 69% of consecutive pairs carry IDENTICAL odds
+and 92% are labelled `flat`, so history is POLL-triggered, not change-triggered.
+The signal has a ~60s half-life, so a spike is usually over before the next
+price exists. We shipped "60-second live refresh" today and the observed floor
+is 160s. Worth knowing before anyone trusts the cadence claim.
+
+**THE PILOT ASKED THE CHEAP QUESTION.** "Does my signal beat the book at
+predicting goals" needs GOALS -- ~30 positives at this sample, which resolves
+nothing. "Does the book's PRICE move with momentum" needs no goals at all, so it
+has far more power per match. Result, de-vigged Over prob vs vmom_abs,
+residualised on clock+clock^2+score:
+
+    raw corr      +0.0692
+    PARTIAL corr  +0.1446   1 SE 0.0990   n=106   -> 1.46 SE, NOT resolved
+
+**THE USEFUL OUTPUT IS THE POWER CALCULATION, not the correlation.** To resolve
++0.1446 at 2 SE needs n >= 195 in-play observations. Today gave 106 from 11
+joined matches. **That is 1.8 more match-days.** Two more Saturdays of capture
+answers a question that has been open all session -- and the pipeline now exists
+to answer it automatically.
+
+Sign is positive, i.e. books probably DO track sustained pressure, which is the
+unsurprising direction. Note what this design can and cannot see: at 333s
+sampling it tests whether books track SUSTAINED pressure. It CANNOT see whether
+they miss brief spikes -- which is precisely where an edge would live.
+
+**Clock alignment is by FotMob kickoff time, never by assuming the first live
+snapshot is kickoff** -- books quote in-play markets before the whistle, so that
+assumption would shift every match by an unknown offset.
+
 ## 08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES
 
 Running the full pytest suite (`python -m pytest tests/`) leaves the working
@@ -5228,7 +5362,7 @@ did not was not.
 **COROLLARY, and it is the part that nearly hid this: `.gitignore` cannot save
 you here.** Several of these byproducts are legitimately TRACKED files that the
 suite rewrites, so there is no ignore rule that makes `-A` safe. Earlier in this
-same session I gitignored four *untracked* byproducts (`#508`) and that was
+same session I gitignored four *untracked* byproducts (`#515`) and that was
 correct — but it addresses a different half of the problem and must not be
 mistaken for having solved this one.
 
@@ -5239,7 +5373,7 @@ unshared branch — never on someone else's).
 
 ## 08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A worktree shares site-packages
 
-I reported `#510` as "76 failures across 26 files on clean `origin/main`", and
+I reported `#517` as "76 failures across 26 files on clean `origin/main`", and
 backed it by re-running three sampled files in a detached worktree at
 `origin/main`, getting identical counts. That check was real and it was not
 sufficient. **`git worktree` gives you a different CODE tree and the SAME Python
@@ -5272,3 +5406,34 @@ and I ran the whole 27-minute suite with it.
 `--force-reinstall` on a single package.** It resolves that package against
 nothing and silently strands its dependencies. Reinstall from the requirements
 file and let the resolver see the whole graph.
+
+## 08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checking is not reserving
+
+`CLAUDE.md` says ids are stable and never reused, and says to check both
+`todo.md` and `todo_closed.md` before taking a number. I did. **It collided
+twice in one session anyway**, because concurrent sessions can all pass the
+same check against a shared counter and then all take the same numbers:
+
+    took #502-#505  ->  main had independently used #502-#505  ->  moved to #507-#510
+    took #507-#510  ->  main had independently used #507-#513  ->  moved to #514-#517
+
+Nothing was wrong with the check. The gap is between checking and MERGING: on a
+branch that lives for hours while other sessions land on `main`, the number you
+reserved is only as good as the moment you read it.
+
+**RULE: renumber at MERGE time, not at file-creation time.** Re-read the max
+immediately before the merge commit and move your block then; the collision
+window shrinks from hours to seconds. Expect it to happen and make the move
+cheap rather than trying to pick a number that will survive.
+
+**RULE: renumber by LINE RANGE, never globally.** By the second collision the
+merged `todo.md` contained main's `#507-#513` AND mine, and `learnings.md` and
+`lanes.md` each carried main's references to ITS `#502-#505`. A global
+search-and-replace would have silently rewritten another lane's history into
+nonsense. Scope every substitution to the line span of your own block, and
+verify the other side's headers survived before committing.
+
+**COROLLARY: a numeric id is the wrong identity for a long-lived branch.** The
+work is findable by lane slug and by scope-doc filename, neither of which can
+collide. The number is a convenience for `todo.md` ordering and should be
+assigned as late as possible.

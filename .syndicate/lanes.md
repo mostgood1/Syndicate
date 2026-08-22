@@ -1198,8 +1198,238 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the stated preflight deviation: `deploys.md` 2026-08-22 19:03Z.
 - Next bottleneck, now visible: `build_cards_page_context` 1803-2402ms on a miss.
 
+### portfolio-decision-and-execution — OPEN — opened 2026-08-22 — session 9324a3e5-364e-5fb4-9b4a-b0568019e37f
+- Goal: a staged, gated path from the Layer 2 shortlist to a COMMITTED
+  portfolio (a closed list of N bets at M dollars, not a ranked board with
+  suggestions attached) and then to automated placement — with each stage's
+  acceptance stated as a READING, and real money gated on a CLV result rather
+  than on the previous stage having shipped.
+- Plan: `.syndicate/plan_2026-08-22_portfolio_execution.md` (stages A-D +
+  precondition). **STAGE A IS NOW BUILT IN CODE, DARK, AND NOT DEPLOYED.**
+- **BANKROLL = $1,000** `[user decision 2026-08-22]`, and user-editable:
+  `portfolio_settings.py`, a form on `/portfolio`, `GET`/`POST
+  /api/portfolio/settings`. Precedence stored > env > default; **every read is
+  fail-safe toward the default**, because a bankroll resolving to 0 on an
+  evicted key would size every bet at $0 and read as a quiet slate. The settings
+  path carries **no date token** — a dated one takes the store's 10-day TTL and
+  the bankroll would silently expire (pinned by a test).
+- **TWO INERT-FEATURE DEFECTS, both caught by
+  `scripts/portfolio_commit_input_checklist.py` on its FIRST run and by nothing
+  else — no test would have failed:**
+  1. **`_attach_board_stakes` does not reach the Layer 2 shortlist.** It runs on
+     Layer 1's `global_pool`; `build_layer2_shortlist` builds a separate set of
+     rows carrying **no sizing fields at all**. The obvious implementation
+     (`compute_bet_size(row)`) returns `model_probability 0.5`,
+     `implied_probability 0.5`, `edge 0`, **`$0` for every position** — no
+     exception, no log line — so the portfolio would have been empty and
+     indistinguishable from a thin slate. Stage A DERIVES its inputs instead
+     (inverting `expected_value_pct` for the market probability, then adding
+     `model_edge_pct`) and refuses by name, never on a default.
+  2. **`confidence` is structurally inert in `compute_board_stake`.** Measured:
+     `kelly_fraction 0.0241 -> stake 0.00151`, `cap_fraction 0.0446`. The raw
+     kelly fraction is what gets shrunk; `confidence` feeds only the cap, which
+     sits ~30x above the stake and never binds. Trust weight 0.82 -> 0.32 moved
+     the cap 0.0446 -> 0.0296 and the stake **not at all**. **This is a
+     `bankroll_manager` property, so it is equally true of `_attach_board_stakes`
+     on the Layer 1 pool: `confidence` does not move the served stake.** That
+     file is read-only for this lane — recorded, NOT fixed.
+- **STORAGE RESOLVED `[measured 2026-08-22T19:0xZ, Render API]` — the ledger's
+  own figure was two weeks stale and reversed the decision.** The keyvalue
+  `red-d88bvljbc2fs73epfhhg` is at **36.6%** (98.2MB / 268.4MB), 24h range
+  83.5–118.1MB, **~170MB headroom** — not the 96% / 34,529-evicted that
+  `refresh_state_store.py:139-205` records from 2026-07-31. `#324` reclaimed it.
+  Also newly recorded: `persistenceMode: journal_snapshot` (**not a pure
+  cache** — it journals AND snapshots), `maxmemoryPolicy: allkeys_lru` which is
+  **NOT in `render.yaml`** (so changeable without a `blueprint_sync`, and
+  resettable BY one), and **no Postgres exists in the account**. **Therefore
+  Stage B does not need Postgres and the plan no longer carries a
+  three-service sync.** Recommended and NOT taken (production change, user's
+  call): `allkeys_lru` → `volatile_lru`, which makes no-TTL keys — the
+  bankroll, the Stage B ledger, `#502`'s `prediction_ledger.json` —
+  structurally un-evictable. STILL UNVERIFIED: `evicted_keys`/`keyspace_misses`;
+  the metrics API exposes memory, not Redis INFO. Full working: `todo.md #508`.
+- **SIM ROLE MEASURED, and the premise "the board is EV only" needed
+  correcting: it is true of RANKING and false of SIZING.** On a representative
+  row the sim owns **57.6%** of the stake (0.003132 vs 0.001328 with
+  `model_edge_pct` zeroed), and it is what **picks the side** — at
+  `_SCORE_SIM_WEIGHT = 0.0` `blended_score` reduces to `ev_pct`, which is
+  identical for every side of a market, so the shortlist cannot discriminate and
+  Stage A's `zero_kelly_stake` refusal does it instead. **Deliberately did NOT
+  raise the weight** (`opportunity_signals.py` is unclaimed, so this lane
+  could have): the constant's own comment is right that no value works, because
+  the missing input is `settled > 0`, not a coefficient. Shipped instead the
+  thing that comment says *"nobody has been able to supply"* — per-bet CLV
+  decomposition by component (`stake_attribution`: `stake_fraction_ev_only`,
+  signed `stake_fraction_sim_delta`, `sim_share_of_stake`, `side_picked_by`,
+  plus plan totals). The delta is NOT clamped at zero, because a small negative
+  sim edge can legitimately shrink a position and clamping would credit the sim
+  only where it helps. Full working: `todo.md #509`.
+- **CORRECTION `[user-flagged 2026-08-22]`: "the board is running at 0% sim" is
+  RIGHT, and 57.6% was NOT about the board** — it is Stage A's sizing on a
+  SYNTHETIC row in undeployed code, and describes nothing running. **Do not
+  quote it as production.** The board's 0% is structurally guaranteed:
+  `sim_component = _SCORE_SIM_WEIGHT * value_sim` is `0.0` where a sim view
+  EXISTS and `None` where it does not, so it can never be non-zero and says
+  nothing about whether the sim produced anything. **It did** — production
+  refresh-worker 2026-08-22T19:20:09Z (`rows=323 considered=17205`): mlb
+  2,279/2,656 projected (86%), wnba 374/391 (96%), nfl 1,010/1,309 (77%),
+  soccer 10,686/20,016 with `with_prob=9,896`. **The sim is attaching
+  projections to most of the board and the ranker multiplies all of it by
+  zero** — deliberately unused, not missing or starved. UNMEASURABLE THIS
+  SESSION: the sim's stake share on REAL rows; the agent proxy 403s
+  `syndicate-an21.onrender.com`, so no served artifact was readable. Stage A now
+  emits `sim_coverage` so the first production commit answers it as a number.
+- **SCORING RE-EVALUATED `[user decision 2026-08-22]` — `_SCORE_SIM_WEIGHT`
+  0.0 → 0.125 WITH A HARD CAP `_SCORE_SIM_CAP_PCT = 1.5`. THE FIX IS THE CAP,
+  NOT THE COEFFICIENT.** The file's prior argument — *"there is NO value of this
+  constant that produces a credible board"* — is correct **for a bare weight**,
+  which scales with the edge so a large enough disagreement always wins
+  eventually (0.25 fails like 0.5, later). But this module already solved that
+  once, for the movement term, and said so in its own comment: *"a cap is the
+  STRUCTURAL fix for it rather than a smaller number that fails the same way
+  later."* The sim term never got that treatment. **Measured by
+  `scripts/score_sim_weight_impact.py`, which REPLAYS the 2026-08-08
+  distribution that caused the zeroing** (286/300 negative-EV, median edge
+  10.36/10.80/12.49/11.99):
+
+      configuration                negative-EV rows promoted   side-picking
+      0.5 uncapped (2026-08-08)              286/286              yes
+      0.0 (the state replaced)                 0/286              NO
+      0.125 capped at 1.5                      0/286              yes
+
+  The pathological row worked: `ev -5, edge +12` → at 0.5 `-5 + 6.00 = +1.00`
+  (ranks, the failure); at 0.125-capped `-5 + 1.50 = -3.50` (does not rank).
+  **THE POINT OF THE CHANGE:** at 0.0 the board provably **could not pick a
+  side** — EV against a proportional de-vig is `1/overround - 1`, identical for
+  every side — so it ordered by hold and broke ties arbitrarily. Any non-zero
+  contribution makes the sim the entire tiebreak. Both constants are
+  env-overridable (`SYNDICATE_SCORE_SIM_WEIGHT`, `SYNDICATE_SCORE_SIM_CAP_PCT`;
+  cap 0.0 restores the old behaviour exactly), so this is reversible in seconds
+  without a deploy. **STILL A SCREEN, NOT A VALIDATION** — it proves the weight
+  cannot repeat the 2026-08-08 arithmetic failure, NOT that the sim is right;
+  that still needs `settled > 0` + Stage A's per-bet component decomposition.
+- **DEPLOY BLOCKER CLEARED `[user directed 2026-08-22]`.** The stale disclosure
+  was flagged as cross-lane and NOT edited; the user then directed the change
+  directly, so `intelligence.html` and `layer2_board.py` are claimed **NARROWLY**
+  from `layer2-sim-view-and-live-projection` — the same narrow-claim pattern
+  that lane itself used on `soccer_projections.py`/`team_aliases.py` on
+  2026-08-22. **Taken: the scoring disclosure, the `sim disagrees` tooltip, and
+  `_row_value_pct`/`_row_admitted_by_blend` only.** Nothing about the sim view,
+  live projection, joins or board rendering was touched.
+  **TWO stale user-facing claims found, not one.** The known disclosure, plus
+  `intelligence.html:2674` — the `sim disagrees` chip's tooltip read *"It
+  carries no weight in the score"*, which the weight change also falsified.
+  Found by rendering the page and grepping the SERVED body, not by reading the
+  file; the second one was not on any list. Both now describe the cap.
+- **SCORE NOW GATES ADMISSION, NOT JUST ORDERING `[user decision 2026-08-22]`.**
+  `_row_value_pct` read `ev_pct` FIRST and fell back to `score.value_pct` only
+  when EV was absent — which on a scored row it never is. So the sim could
+  REORDER the board (`_score_of` ranks on `score.score`) but could never put a
+  row ON it: admission ran on price alone, upstream of anything the sim had to
+  say. It now prefers the blended `value_pct` (ev + capped sim + capped
+  movement, all in EV points, so it is unit-comparable with the hold-derived
+  floor) and falls back to `ev_pct` when there is no score block.
+  **Bounded by the same cap:** the sim can carry a row across the floor by at
+  most 1.5 EV points, so it rescues a marginal price and never a materially bad
+  one — which is the only reason handing admission to the blend is defensible,
+  since an uncapped term here would let an unvalidated model admit arbitrarily
+  bad prices (the 2026-08-08 failure with a wider blast radius than ranking).
+  **New counter `rows_admitted_by_blend`**, shipped at the builder AND the
+  endpoint in the same commit — `#373`/`#381`/`#391`/`#397` each record a
+  counter that existed at the builder and was invisible at that hop, three of
+  them costing an investigation. **Zero means the change is inert.**
+- **STAGE B BUILT — execution ledger, paper mode, dark behind
+  `SYNDICATE_EXECUTION_ENABLED`.** Paper and live are the SAME code with one
+  boolean between them (a test asserts identical field sets, differing only in
+  `mode`). Idempotency is the load-bearing property: write-ahead (the record is
+  on disk as `submitted` at the moment `submit` runs — pinned), a deterministic
+  key that is an IDENTITY and **excludes the price** so a re-priced slate is the
+  same bets, and refusal-not-overwrite so `submit` is never reached twice. Two
+  independent switches for real money, both checked immediately before each
+  submit; **any unrecognised mode resolves to `paper`**, the direction that
+  spends nothing — the explicit lesson of the same day's backend incident. Live
+  is blocked while any order is unreconciled. Storage per `#508`: keyvalue, **no
+  date token**, bounded (lean fields, 5k cap with loud trimming, 2MB warning),
+  and an unreadable ledger RAISES rather than reading as empty. **Measured end
+  to end locally:** 3 rows → 2 positions ($5.19, 40.3% sim-attributed) → 2 paper
+  fills → **replay placed=0, duplicates=2**. 41 tests. Full working:
+  `todo.md #512`.
+- **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
+  CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
+  `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
+  2500, `source` flips `default` -> `stored`); 60 lane tests and 344 related
+  tests pass. **No production slate has been committed — do not report Stage A
+  as working.**
+- Files:
+  `.syndicate/plan_2026-08-22_portfolio_execution.md`,
+  `syndicate/features/shared/portfolio_settings.py`,
+  `syndicate/features/shared/portfolio_commit.py`,
+  `syndicate/features/shared/execution_ledger.py`,
+  `pipeline/portfolio_commit.py`,
+  `scripts/portfolio_commit_input_checklist.py`,
+  `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`,
+  `syndicate/features/shared/opportunity_signals.py`,
+  `scripts/score_sim_weight_impact.py`,
+  `tests/test_layer2_blend_admission.py`,
+  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
+  `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
+  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
+- Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
+  `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
+  intelligence_state (reads `read_layer2_shortlist`).
+- Collision check run against every OPEN lane before opening, and re-run with
+  the guard's own Files-block parse before claiming the two EXISTING files
+  above — `blueprints/intelligence.py` and `templates/portfolio.html` are held
+  by no OPEN lane (`layer2_board.py:2634`'s comment naming intelligence.py as
+  "held by another lane" refers to one since released). **Two lanes hold files
+  this work touches conceptually and I took none of them:**
+  `portfolio-ledger-service-split` holds `prediction_ledger.py`;
+  `layer2-sim-view-and-live-projection` holds `layer2_board.py`,
+  `pipeline/layer2_shortlist.py`, `blueprints/ops.py`, `intelligence.html`.
+- Hypothesis (diagnostic half, stated before testing): the DECISION layer is
+  substantially built and merely unassembled, while the EXECUTION layer does
+  not exist at all and is blocked by something other than code.
+- Falsification test: if any sportsbook credential, order call or account
+  integration existed anywhere in the tree, the "execution layer does not
+  exist" half would be wrong. Grepped for `draftkings|fanduel|pinnacle|
+  prophetx|novig|sporttrade|betfair|kalshi|polymarket` across all `*.py` and
+  for every outbound `POST`/`urlopen`: **every book name is an OddsAPI feed
+  identifier only; every outbound write goes to Render artifact publishing.**
+  Hypothesis holds on both halves — `compute_board_stake` and
+  `apply_exposure_budgets` are already WIRED (`intelligence_state.py:4250`,
+  `:4857`), and nothing places anything.
+- **FINDING, checked not assumed — there is nowhere durable to put a money
+  ledger.** `render.yaml` declares NO Postgres and no database: three services,
+  three separate 50GB disks, one shared 256MB `keyvalue` on the starter plan
+  which `refresh_state_store.py:139-205` documents at **96% memory, 34,529
+  LRU-evicted keys, 44% keyspace miss** (2026-07-31; 38,865 evicted by
+  2026-08-10). Two consequences: (1) `_default_keyvalue_ttl_seconds` gives any
+  DATE-TOKENED path a **10-day TTL**, so an `execution_ledger_<date>.json`
+  would silently expire — the ledger path must carry no date token; (2)
+  `allkeys-lru` evicts keys that carry no TTL too, so **`prediction_ledger.json`
+  is LRU-evictable** on a 96%-full instance. (2) is
+  `portfolio-ledger-service-split`'s file — **surfaced, not edited.**
+  UNVERIFIED: no Redis reading taken today; the percentages are the store's own
+  dated comments. Take one before Stage B picks its storage.
+- **Verification OWED, and it is a one-read production check.** Stage A is
+  gated by `SYNDICATE_PORTFOLIO_COMMIT_ENABLED` (absent = off) and the deploy is
+  a plain `.py` push — free, no `render.yaml`, no `blueprint_sync`. The reading
+  is `off != on` on ONE date via `/api/portfolio/plan?date=<d>`: `plan_present:
+  false, reason: commit_job_disabled` with the flag unset, and a plan whose
+  positions sum exactly to the declared exposure with the flag set. Asserted
+  locally in both directions already; **a local pass is not the reading.**
+- Blocked by: none for stages A-C. **Stage D is blocked on
+  `portfolio-ledger-service-split`'s outstanding verify** —
+  `settled_count > 0` on `/api/portfolio/summary`. Every stake on the board is
+  currently 1/16th Kelly by construction (`_DEFAULT_KELLY_MULTIPLIER` 0.25 ×
+  `_MIN_SAMPLE_CREDIBILITY` 0.25) because settled sample is zero everywhere,
+  and `_SCORE_SIM_WEIGHT` is 0.0 — so no edge on this board has been scored
+  against an outcome yet. Real money before that reading is `learnings.md`
+  2026-08-20's "validating against a PROXY" at its most expensive.
+
 ### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
-- Goal: Phase A of `#507` — a shared causal-decay core and a basketball pressure-event
+- Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
   no reader, no card, no wiring.** Scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 - Files:
@@ -1214,23 +1444,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `scripts/poll_basketball_momentum.py` (NEW),
     `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
-  - **ADDED FOR `#508` 2026-08-22** (user asked for the fix; collision-checked,
+  - **ADDED FOR `#515` 2026-08-22** (user asked for the fix; collision-checked,
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
     which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
     `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
     `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
     was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
-  - **ADDED FOR `#509` 2026-08-22** (user asked for the fix; both unclaimed):
+  - **ADDED FOR `#516` 2026-08-22** (user asked for the fix; both unclaimed):
     `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
     `wnba/cards.py` and `wnba/live_lens.py` are claimed by other lanes and were
     NOT edited — every one of the six failures was a stale TEST target, and both
     source files are the correct side.
-  - **ADDED FOR `#510` 2026-08-22** (user asked for the no-new-failures gate;
+  - **ADDED FOR `#517` 2026-08-22** (user asked for the no-new-failures gate;
     all unclaimed): `scripts/pytest_baseline.py` (NEW),
     `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
     `requirements-dev.txt`.
-  - **ADDED FOR `#510` TEST FIXES 2026-08-22** (user asked for the top three
+  - **ADDED FOR `#517` TEST FIXES 2026-08-22** (user asked for the top three
     files; all unclaimed): `tests/test_refresh_state_store.py`,
     `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
     `syndicate/blueprints/ask_the_syndicate_adapter.py` (ONE-LINE source fix:
@@ -1242,7 +1472,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
     `syndicate/features/shared/live_lens_loop.py` is claimed by
     `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
-    the conflict was surfaced, so `#507`'s momentum capture is now wired into
+    the conflict was surfaced, so `#514`'s momentum capture is now wired into
     `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
     (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
     before the builder, touching no soccer or MLB path. It deliberately imports

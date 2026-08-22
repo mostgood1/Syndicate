@@ -73,7 +73,7 @@ class LiveProjectionJoinTests(unittest.TestCase):
         self.assertEqual(coverage["miss_player_not_live"], 1)
         self.assertEqual(coverage["miss_no_market_alias"], 0)
 
-        # THE INVARIANT THIS TEST IS NAMED FOR, added by `#510` alongside the
+        # THE INVARIANT THIS TEST IS NAMED FOR, added by `#517` alongside the
         # bucket assertion above. Both branches reached the same fix for the
         # bucket independently; this is the part only one had. It pins the
         # claim in the test's NAME -- every considered row lands in exactly one

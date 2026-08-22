@@ -231,7 +231,7 @@ class BuildWnbaGameLensTests(unittest.TestCase):
 
 
 class WnbaGameLensMarketsTests(unittest.TestCase):
-    """`#509`. These five called `_wnba_game_lens_markets(..., pace_total=...)`
+    """`#516`. These five called `_wnba_game_lens_markets(..., pace_total=...)`
     and had done since `99e56561` -- **the same commit that renamed the
     parameter**, which updated the function and not these call sites. Every one
     raised `TypeError: unexpected keyword argument 'pace_total'` on clean
@@ -248,7 +248,7 @@ class WnbaGameLensMarketsTests(unittest.TestCase):
     `projected_total` plus the new argument.
 
     They were invisible because CI runs `tests.test_archives` under unittest
-    and never executes this file -- see `#509`.
+    and never executes this file -- see `#516`.
     """
 
     def test_no_markets_when_betting_dict_is_empty(self) -> None:

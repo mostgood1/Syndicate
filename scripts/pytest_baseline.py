@@ -1,11 +1,11 @@
 """No-new-failures gate for the pytest suite.
 
-**WHY A BASELINE AND NOT A GREEN GATE.** `#510`, measured 2026-08-22: the full
+**WHY A BASELINE AND NOT A GREEN GATE.** `#517`, measured 2026-08-22: the full
 suite is `76 failed, 9245 passed` on clean `origin/main`, across 26 files, and
 every sampled failure reproduces standalone. CI runs
 `python -m unittest tests.test_archives` (383 tests) and nothing else, so those
 76 can sit there indefinitely while CI shows green -- and the six stale test
-targets of `#509` did exactly that.
+targets of `#516` did exactly that.
 
 Turning the suite on as a plain gate lands red on the first run.
 `.github/workflows/ci.yml` already argues why that is worse than nothing: *"a

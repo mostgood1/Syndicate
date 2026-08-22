@@ -14,7 +14,7 @@ projection must not acquire a null one: the props pipeline treats "no
 projection" and "a projection of 0" as different facts, and a null would make a
 market look modelled-and-worthless rather than unmodelled.
 
-**AMENDED `#510`, 2026-08-22: `projection` IS A MAPPING, NOT A SCALAR.** These
+**AMENDED `#517`, 2026-08-22: `projection` IS A MAPPING, NOT A SCALAR.** These
 fixtures passed `projection=21.4` and every one of them failed, because
 `_model_edge_for` (`layer2_board.py:829`) returns None for anything that is not
 a Mapping -- so the row scored None and the opportunities filter dropped it
@@ -74,7 +74,7 @@ def test_projection_reaches_the_candidate():
 
 
 def test_absent_projection_stays_absent_rather_than_null():
-    """`#510`. Re-aimed, and the reason matters more than the assertion.
+    """`#517`. Re-aimed, and the reason matters more than the assertion.
 
     Originally this built a candidate with no projection and asserted the key
     was ABSENT rather than null. Under the current board that state cannot

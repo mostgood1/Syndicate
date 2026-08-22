@@ -255,31 +255,127 @@ def test_blended_score_weights_the_sim_edge_by_the_constant():
     assert sim_only["score"] == pytest.approx(ev_only["score"] * _SCORE_SIM_WEIGHT)
 
 
-def test_the_sim_weight_is_zero_until_settlement_validates_the_model():
-    """Pins the CURRENT value with its reason, so raising it is deliberate.
+# The measured production distribution from 2026-08-08, family by family
+# (`opportunity_signals.py:326-356`). `negative` counts REAL negative-EV rows.
+_MEASURED_FAMILIES = [
+    ("spreads", 48, 10.36, 40),
+    ("totals", 35, 10.80, 32),
+    ("h2h", 24, 12.49, 23),
+    ("props", 193, 11.99, 191),
+]
 
-    MEASURED 2026-08-08 across all four MLB families, after two real projection
-    faults were fixed: 286 of 300 rows were negative-EV, every family with a
-    median model edge of 10-12. Four independent families cannot each have
-    their own arithmetic bug producing one signature -- what they shared was
-    this weight. At 0.5, with ev ~ -5 and model_edge ~ +12, the score was
-    dominated by the model term, so the board selected rows where an
-    UNVALIDATED model most disagreed with the market.
 
-    Raising it requires S6: settled > 0 and CLV decomposed BY COMPONENT, so the
-    EV and sim terms can be compared on outcomes rather than on taste.
+def test_the_sim_term_cannot_promote_a_negative_ev_row_at_any_measured_edge():
+    """REPLACES a test that pinned `_SCORE_SIM_WEIGHT == 0.0`.
+
+    That test guarded a PROXY. The thing worth protecting was never the value
+    of the coefficient -- it was the behaviour the coefficient was chosen to
+    prevent: the sim lifting negative-EV rows onto the board, measured across
+    all four MLB families on 2026-08-08 (286 of 300 rows negative-EV, median
+    model edge 10-12, and at weight 0.5 the score went positive and
+    model-dominated).
+
+    Pinning the constant would pass a change that raised the CAP instead, and
+    fail a change that left behaviour identical. This asserts the objective, so
+    it is strictly stronger than what it replaces -- `learnings.md` 2026-08-20,
+    "validating against a PROXY, not the objective".
     """
-    from syndicate.features.shared.opportunity_signals import _SCORE_SIM_WEIGHT
+    for family, _n, median_edge, _negative in _MEASURED_FAMILIES:
+        scored = blended_score(
+            ev_pct=-5.0, model_edge=median_edge, books_quoting=7, book_age_seconds=60
+        )
+        assert scored is not None, family
+        assert scored["score"] < 0, f"{family}: sim promoted a negative-EV row"
 
-    assert _SCORE_SIM_WEIGHT == 0.0
+
+def test_the_sim_term_cannot_promote_a_negative_ev_row_at_any_edge_at_all():
+    """Not just the measured medians -- the cap must hold at the input bound
+    (`_MODEL_EDGE_MAX_POINTS = 15.0`) and beyond it, since the bound is a guard
+    that could be relaxed. A bare weight fails this; a capped one cannot."""
+    for edge in (15.0, 40.0, 500.0):
+        scored = blended_score(
+            ev_pct=-5.0, model_edge=edge, books_quoting=7, book_age_seconds=60
+        )
+        assert scored is not None
+        assert scored["score"] < 0, f"edge {edge} rescued a -5 EV row"
 
 
-def test_with_the_weight_at_zero_a_model_edge_cannot_rescue_a_negative_ev_row():
-    """The failure this change exists to stop: a -5 EV row scoring positive
-    because the model liked it by +12."""
-    scored = blended_score(ev_pct=-5.0, model_edge=12.0, books_quoting=7, book_age_seconds=60)
+def test_a_bare_weight_would_fail_that_guard():
+    """The control. Without the cap the same inputs DO promote the row -- which
+    is what makes the two tests above meaningful rather than vacuously true."""
+    from syndicate.features.shared import opportunity_signals as signals
+
+    assert -5.0 + (0.5 * 12.0) > 0  # the 2026-08-08 arithmetic, uncapped
+    assert -5.0 + min(signals._SCORE_SIM_CAP_PCT, 0.125 * 12.0) < 0
+
+
+def test_the_sim_term_can_separate_two_sides_of_one_market():
+    """THE REASON FOR THE CHANGE. EV against a proportional de-vig is
+    `1/overround - 1`, identical for every side of a market, so at weight 0 the
+    board provably could not pick a side -- it ordered by hold and broke ties
+    arbitrarily. The sim is the entire tiebreak."""
+    home = blended_score(ev_pct=8.64, model_edge=6.0, books_quoting=7, book_age_seconds=60)
+    away = blended_score(ev_pct=8.64, model_edge=-6.0, books_quoting=7, book_age_seconds=60)
+    assert home is not None and away is not None
+    assert home["score"] > away["score"]
+
+
+def test_the_sim_contribution_is_bounded_by_the_cap():
+    from syndicate.features.shared import opportunity_signals as signals
+
+    huge = blended_score(ev_pct=4.0, model_edge=400.0, books_quoting=7, book_age_seconds=60)
+    assert huge is not None
+    assert huge["sim_component"] == pytest.approx(signals._SCORE_SIM_CAP_PCT)
+    assert huge["sim_capped"] is True
+
+
+def test_a_saturating_edge_and_a_far_larger_one_contribute_the_same():
+    """The cap's whole point: a row whose model disagrees by 40 points earns no
+    more than one that disagrees by 12."""
+    moderate = blended_score(ev_pct=4.0, model_edge=12.0, books_quoting=7, book_age_seconds=60)
+    extreme = blended_score(ev_pct=4.0, model_edge=40.0, books_quoting=7, book_age_seconds=60)
+    assert moderate is not None and extreme is not None
+    assert moderate["sim_component"] == pytest.approx(extreme["sim_component"])
+
+
+def test_sim_component_publishes_the_capped_contribution_not_the_raw_weight():
+    """Publishing `weight * edge` under this name would overstate the sim's
+    influence on every capped row -- the same class of error as naming a field
+    for a quantity it does not carry (`learnings.md` 2026-08-21, FORBIDDEN)."""
+    from syndicate.features.shared import opportunity_signals as signals
+
+    scored = blended_score(ev_pct=4.0, model_edge=100.0, books_quoting=7, book_age_seconds=60)
     assert scored is not None
-    assert scored["score"] < 0
+    raw = signals._SCORE_SIM_WEIGHT * 100.0
+    assert scored["sim_component"] < raw
+    assert scored["value_pct"] == pytest.approx(4.0 + scored["sim_component"])
+
+
+def test_an_uncapped_row_is_not_flagged_as_capped():
+    scored = blended_score(ev_pct=4.0, model_edge=1.0, books_quoting=7, book_age_seconds=60)
+    assert scored is not None
+    assert scored["sim_capped"] is False
+
+
+def test_the_sim_term_can_be_switched_off_entirely_by_setting_the_cap_to_zero():
+    """The revert path, and it must restore the previous behaviour EXACTLY --
+    a contested constant needs a way back that does not require a deploy."""
+    import importlib
+
+    from syndicate.features.shared import opportunity_signals as signals
+
+    original = signals._SCORE_SIM_CAP_PCT
+    try:
+        signals._SCORE_SIM_CAP_PCT = 0.0
+        scored = signals.blended_score(
+            ev_pct=4.0, model_edge=12.0, books_quoting=7, book_age_seconds=60
+        )
+        assert scored is not None
+        assert scored["sim_component"] == pytest.approx(0.0)
+        assert scored["score"] == pytest.approx(4.0)
+    finally:
+        signals._SCORE_SIM_CAP_PCT = original
+        importlib.reload(signals)
 
 
 def test_blended_score_treats_unknown_book_age_as_not_fresh():

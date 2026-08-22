@@ -85,7 +85,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # it, not just a path-naming fix.
     "*_source/source_artifacts/data/live_lens/live_lens_projections_*.jsonl",
     "*_source/source_artifacts/data/live_lens/live_lens_signals_*.jsonl",
-    # `#507` Phase B: basketball attack momentum, appended per live tick by
+    # `#514` Phase B: basketball attack momentum, appended per live tick by
     # `scripts/poll_basketball_momentum.py`. Same directory and the same twin
     # shape as the two entries above, so it inherits their transfer path rather
     # than inventing one.
@@ -248,7 +248,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/live_lens/render_sync/*.json",
     "*_source/data/live_lens/live_lens_projections_*.jsonl",
     "*_source/data/live_lens/live_lens_signals_*.jsonl",
-    # `#507`'s twin of the entry in the block above. Both depths are needed:
+    # `#514`'s twin of the entry in the block above. Both depths are needed:
     # the two live_lens families immediately above are declared at both, and a
     # sport whose root resolves to the shallow layout would otherwise transfer
     # its projections and silently drop its momentum.

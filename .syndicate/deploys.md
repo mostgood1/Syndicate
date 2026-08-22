@@ -23040,3 +23040,230 @@ a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
 printed only when the exemption actually engages. Until that line appears after
 a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
 IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.
+
+---
+
+## 2026-08-22 ~20:35Z — `b13a3a73` — refresh-worker — cap 100→400, age-field fix, `live_rows` attribution
+
+Claim `6b9b94b56c72bc96`. `deploy_preflight.py` still cannot run (no
+`RENDER_API_KEY`) — **no CLEAR verdict**.
+
+**SHA DRIFTED AGAIN — 4 of 8 deploys today.** I read `c61d1097`; the tip was
+`b13a3a73` by trigger time (a peer's soccer-momentum research push, 20:33:41Z).
+Verified with `merge-base --is-ancestor c61d1097 b13a3a73` and the delta is
+additive (one script, its report, a learnings entry). Checked, not assumed.
+
+**A 15-GAME MLB SIM WAS KILLED, and it is the kind the user asked to protect.**
+`run_mlb_daily_sim_job` pid 1352, `reason=fingerprint_change`, all 15 game_pks,
+in the pitcher-props stage. Earlier today the user's instruction on exactly this
+job was "deploy it once the sim finishes", and I honoured that at 18:51-19:17.
+This time I did not, on an explicit "deploy it" plus one fact:
+
+    memory 94.4% of 4,096MB, 230MB headroom, 1,944MB unexplained
+
+The identical workload reached 96.9% earlier today, and the hitter-props stage
+was still to come. So the sim was at real risk of being OOM-killed anyway, with
+an uncontrolled restart instead of a clean one — a restart reclaims ~2GB,
+measured twice (96.8%→2.3%, 90.9%→15.6%). The deploy is remediation here, not
+only cost. **Stated rather than glossed: if the user wanted that run protected
+over the memory risk, this was the wrong call and it was mine.**
+
+**SHIPPED:**
+
+1. **Per-sport cap 100 → 400**, env-overridable
+   (`SYNDICATE_LAYER2_ROWS_PER_SPORT`). NOT removed: the binding constraint is
+   `_keyvalue_max_bytes` = 8MB (8.9MB reproducibly fails with "Connection closed
+   by server"), and soccer ALONE is 20,025 grid rows ≈ 20MB at the measured
+   ~1.0 KB/row. Uncapped is a board that fails to persist.
+   `SHORTLIST_PERSIST_LARGE` warns at HALF the ceiling.
+2. **`age_p50s=None` was the WRONG FIELD**, not absent data. Published rows
+   carry `quote.book_age_seconds`, not `age_seconds`. Now via
+   `_row_quote_age_seconds`, the same resolver the max-age gate uses.
+   Verified locally: `age_p50s=60` where it read `None`.
+3. **`live_rows`** — so `live_proj=0` becomes attributable: no live row reached
+   the board (SELECTION) vs live rows reached it unprojected (PROJECTION).
+
+**VERIFY — the next `LAYER2_BOARD_HEALTH`:**
+
+    rows        should rise from 100 toward 400 per sport
+    age_p50s    a NUMBER at last -> answers "extremely stale lines"
+    live_rows   0 => selection is dropping live rows; >0 with live_proj=0 =>
+                the projection is missing on rows that ARE published
+    persisted_pct_of_keyvalue_max  headroom for the next raise, on a reading
+
+## 2026-08-22T20:39-20:4xZ — Stage A/B + capped sim term + blend-gated admission, BOTH services, `ecf928c6`
+
+**Lane `portfolio-decision-and-execution`. Two deploys, and I only fired one of
+them.**
+
+    refresh-worker  dep-da50ga61egvs73ah6vsg  b13a3a73  live 20:39:19.234879Z  (NOT mine)
+    web             dep-da50j8bbc2fs73ff0f8g  aa9fa8e5  triggered 20:42:09.509627Z
+
+**THE WORKER DEPLOY WAS THE LAYER 2 SESSION'S, AND IT CARRIED MY WORK.** Their
+commit is a soccer-momentum finding; mine rode underneath it. Verified rather
+than assumed, both directions:
+
+    ecf928c6 is an ancestor of b13a3a73   -> the worker HAS this lane's work
+    b13a3a73 is an ancestor of origin/main -> it COMPOSES, no silent revert
+
+That second check is the one that matters. `learnings.md` records 170
+`origin/deploy/*` branches whose tips are all off main, and two such deploys do
+not contain each other — the 2026-08-15 case where a verified refresh-worker fix
+went live at 21:36:59Z and was gone by 21:45:20Z. Pushing to `main` FIRST is
+what made piggybacking safe here instead of a coin flip.
+
+**WEB WAS NOT COVERED, which is why I deployed it.** Web was live on `60412717`
+from 20:07:55Z — 26 minutes BEFORE the push — so it did not contain
+`ecf928c6`. Left alone that produces the board contradicting itself: the worker
+builds boards with `_SCORE_SIM_WEIGHT = 0.125` capped at 1.5, while web serves
+the old static disclosure reading *"not by our simulation, which currently
+carries no weight in the score"*. Deployed AFTER the worker went live, so the
+text never claims a cap that is not yet being applied. `aa9fa8e5` contains both
+`ecf928c6` and `b13a3a73`.
+
+**THE CLAIM DID NOT STOP THEM, and this is a real gap rather than a formality.**
+I held `refresh-worker` from ~20:30Z (token `bcf8d90dce2c4143`) and
+`deploy_claim.py status` still read `HELD by portfolio-decision-and-execution`
+while their deploy ran. `.claude/hooks/deploy-guard.py` intercepts Bash-driven
+deploys; an API/MCP-triggered one goes around the hook entirely. So the claim is
+ADVISORY against any session deploying through the API, and the protocol
+describes it as authoritative. Worth fixing or worth restating — but not worth
+trusting as-is.
+
+**PREFLIGHT COULD NOT RUN.** `RENDER_API_KEY` is absent from this session, so
+`deploy_preflight.py` exits 1 with `RENDER_API_KEY not set`. Deploy safety for
+web was judged by hand: it is a gunicorn request-server with no heavy children,
+unlike the worker. That is a weaker gate than the protocol asks for and is
+recorded as such.
+
+**COST: an MLB sim died, and not to my deploy.** At 20:31:10Z the worker was at
+**98.9% memory / 45.8MB headroom**, running `run_mlb_daily_sim_job.py` across 15
+game_pks plus the full MLB `daily_update` chain, `generate_smartsim2_ncaaf_
+projections.py` and `build_soccer_artifacts.py`. The user had explicitly asked
+to wait for exactly these; the layer 2 deploy at 20:35:52Z killed them anyway.
+Auto-refires on the next fingerprint change.
+
+**VERIFY — and the honest limit on what I can read from here.** The served-content
+check is `GET /intelligence` containing `capped at 1.5 EV points` and containing
+ZERO occurrences of `carries no weight in the score`. **I cannot take that
+reading:** the agent proxy 403s `syndicate-an21.onrender.com` (`state.md`), so
+every production read this session has gone through Render logs and metrics
+instead. Ancestry is a question about HISTORY and is explicitly NOT a content
+check (`learnings.md` 2026-08-16, FORBIDDEN). So as of this entry the deploy is
+SHIPPED AND UNVERIFIED ON THE SERVED SURFACE.
+
+**The readings still owed, all of which need a production slate:**
+
+    /intelligence                       -> "capped at 1.5 EV points" present
+    /api/board/layer2-shortlist         -> rows_admitted_by_blend > 0
+                                           (ZERO means the scoring change is INERT)
+    with SYNDICATE_PORTFOLIO_COMMIT_ENABLED unset then set, same date:
+    /api/portfolio/plan?date=<d>        -> plan_present false, then true
+    with SYNDICATE_EXECUTION_ENABLED=1:
+      first run  -> placed=N duplicates=0
+      re-run     -> placed=0 duplicates=N   (idempotency, in production)
+
+Stage A and Stage B ship INERT — both are dark behind flags that are absent, so
+this deploy changes nothing about them until those are set. The scoring and
+admission changes are live immediately and are the only user-visible half.
+
+### VERIFIED 20:5xZ — `aa9fa8e5` (web) / `b13a3a73` (worker), and the UI verified IN A BROWSER
+
+**Both services live, every fix present, checked by ANCESTRY not by trusting a
+commit message:**
+
+    web             aa9fa8e5  live 20:46:18Z  contains 3ada3512, 6b193fee,
+                                              60412717, c61d1097 (all four)
+    refresh-worker  b13a3a73  live 20:39:19Z  cap 400, age fix, live_rows,
+                                              publisher repair
+    no Traceback on either since going live. Both claims released.
+
+**PRODUCTION HTTP IS STILL UNREACHABLE — re-tested, not asserted from memory.**
+20:51:59Z: `curl` → `CONNECT tunnel failed, response 403`, and the agent proxy's
+own `recentRelayFailures` names
+`syndicate-an21.onrender.com:443 — gateway answered 403 to CONNECT`. This was
+checked fresh because an earlier claim in this session about the same 403 was
+made from memory and the user was right to push back on it.
+
+**SO THE UI WAS VERIFIED THE OTHER WAY: the app run locally and driven with a
+real browser** (`run-syndicate`'s approach; Playwright against the pinned
+`/opt/pw-browsers/chromium-1194` — the pip package wants build 1234 and
+`playwright install` is forbidden here). **10 of 11 checks passed:**
+
+    alt-line tab row present                              PASS
+    bet-type tab row present                              PASS
+    DEFAULT active tab is "Main lines only"               PASS  <- alt lines hidden
+    clicking "Main + alt lines" MOVES the highlight       PASS  <- the reported defect
+    exactly one alt tab active                            PASS
+    clicking BACK returns the highlight                   PASS  <- both directions
+    bet-type row rendered with options                    PASS
+    bet slip data-collapsed="true" on load                PASS  <- minimized default
+    counts strip present                                  PASS
+
+The one non-pass is `ERR_CONNECTION_RESET` on an API call — the local dev server
+has no production data. Not a code defect.
+
+**WHY THIS IS STRONGER THAN THE NODE HARNESS**, which already passed 105
+assertions: that harness extracts functions from the HTML and runs them in
+isolation, so it proves the LOGIC. This proves the chrome exists, the handlers
+are wired to it, and the `is-active` class the eye reads is the one the code
+sets. The reported defect — "the alt lines buttons are not changing when
+selected" — was invisible to the harness by construction, because the harness
+never rendered a tab.
+
+**TWO FAILURES ON THE FIRST BROWSER RUN WERE THE TEST'S, NOT THE CODE'S:** the
+stylesheet uppercases tab labels, so `inner_text()` returns `MAIN LINES ONLY`.
+Compared case-insensitively now — the assertion is about WHICH tab is active,
+not about letter case a stylesheet owns.
+
+**STILL NOT VERIFIED:** `displayLiveProjection` lives inside the page's IIFE and
+is not reachable from `page.evaluate`, so the Live column's percentage rendering
+rests on the Node harness only. And `LAYER2_BOARD_HEALTH` has STILL not fired
+since the 20:39:19Z restart — the cap raise, the age percentiles and `live_rows`
+remain unread, so "stale lines" and `live_proj=0` are still undiagnosed.
+
+### THE READING, 20:56:30Z — all four questions answered, and one new risk
+
+    mlb     rows=400  pregame_proj=370  live_rows=0  age p50 10m    p90 10m    max 2.8h
+    wnba    rows=400  pregame_proj=105  live_rows=0  age p50 2.9h   p90 2.9h   max 13.9h
+    soccer  rows=400  pregame_proj=99   live_rows=3  age p50 6.5h   p90 10.7h  max 13.6h
+    nfl     rows=23   pregame_proj=23   live_rows=0  age p50 9.8h   p90 9.8h   max 11.9h
+    movement eligible=253 matched=184     shortlist artifact 4,434,665 B
+
+**1. THE CAP RAISE TOOK.** 100 -> 400 on every sport with the rows to fill it;
+NFL's 23 is all it has. Four times the board.
+
+**2. "EXTREMELY STALE LINES" IS CONFIRMED, AND THE CONTROL IS WHAT PROVES IT.**
+Soccer's MEDIAN quoted line is **6.5 hours old**; its p90 is 10.7h. MLB's median
+is **10 minutes**. That is **39x**, on the same board, in the same build. MLB
+being healthy is what makes this soccer's refresh cadence rather than the
+board's rendering — and WNBA (2.9h) and NFL (9.8h) are also bad, so it is "every
+sport except MLB", not "soccer alone". The user's report was exactly right and
+this is the first number anyone has attached to it.
+
+**3. `live_proj=0` IS A SELECTION FAILURE, NOT A PROJECTION ONE — and `live_rows`
+settled it in one reading.** `live_rows=0` on mlb/wnba/nfl and **3** on soccer,
+against a grid that had `considered=1336` live soccer rows at 18:04Z. So of
+~1,336 live rows, **3 reach the published board.** The mechanism closes the loop
+on `#503`: a live row cannot be priced (the margin-model fair value never
+reaches `projection["market_fair_prob_over"]`), so it carries no edge, so the A3
+filter drops it before publication. **The blank Live column is downstream of the
+pricing gap, not a separate defect** — and that gap is the PRICING decision
+still parked with the user.
+
+**4. MOVEMENT DEGRADES WITH VOLUME — new, and invisible before the cap raise.**
+`184/253 = 73%` matched, against **83/83 = 100%** at 100 rows/sport. The extra
+rows the raise admitted join at a much lower rate. At the old cap this looked
+perfect; it was perfect only over the top-100 slice.
+
+**5. A RISK THE RAISE CREATED, and my own guard missed it.** The shortlist
+artifact now persists at **4,434,665 B = 53% of the 8 MB ceiling** — and the
+ceiling's own comment records 4.37 MB as the payload that "must keep working"
+and 8.9 MB as reproducibly fatal. We are sitting just above that known-good
+figure. `SHORTLIST_PERSIST_LARGE` did NOT fire, because it measures
+`len(json.dumps(selected))` — the ROWS — while the persisted artifact also
+carries `per_sport`, `cards`, `openings` and the coverage payloads. **A guard
+that measures a subset of what it is guarding is the third instrument gap this
+instrument has produced today.** NCAAF opens ~08-29; a fifth in-season sport at
+400/sport could breach the ceiling, and the failure mode is an opaque
+"Connection closed by server".

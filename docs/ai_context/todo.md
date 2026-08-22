@@ -1,5 +1,482 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
+
+**Not to be confused with `unsupported_market=40`, which prompted the look and
+is CORRECT.** `_UNSUPPORTED_MARKETS = {"player_double_double",
+"player_triple_double"}` (`wnba_projections.py:84`): the WNBA model ships
+per-stat MEANS, and a double-double is a joint threshold across several stats
+that a mean cannot express. Refused by name rather than projected with a wrong
+number. Covering those 40 needs a joint distribution, not a counter change.
+
+**The real defect.** `attach_wnba_projections`'s loop has exactly three terminal
+paths per counted row, so the invariant is
+`rows_considered == rows_with_projection + unmatched_player_rows + unsupported_market_rows`.
+Production never satisfies it:
+
+    considered   proj+unmatched+unsupported   delta
+        396              418                   +22
+        391              416                   +25
+        176              196                   +20
+
+**Cause** — `board_enrichment.py` `_attach_projections_by_sport`, wnba branch:
+
+    return {
+        **prop_coverage,                       # rows_considered = PROPS ONLY
+        "rows_with_projection": prop + game,   # PROPS + GAME ROWS
+        ...
+    }
+
+WNBA runs two independent joins (`attach_wnba_game_projections` and
+`attach_wnba_projections`). The merge SUMS `rows_with_projection` across both
+while `rows_considered` comes from `**prop_coverage`, and the prop join counts
+only `kind == "prop"`. The 20–25 row overshoot is the game lines.
+
+**Two consequences.** (1) The line OVERSTATES prop coverage — 375/396 reads as
+95% of props projected, but part of that numerator is game rows; the real prop
+figure is `396 - 40 - 3 = 353`. (2) `pct_projected` is computed INSIDE the prop
+join on prop-only numbers and the merge overwrites `rows_with_projection`
+without recomputing it, so three fields in one payload disagree.
+
+**Same class as `#364`**, whose comment sits directly above this code: WNBA once
+ran "36.4% coverage with 0.0% of it on game rows". That fix correctly made the
+two joins independent; the merge that stitched them back together re-introduced
+a denominator mismatch one level up.
+
+**FIX (small, not taken).** Keep `rows_considered` and `rows_with_projection`
+from the same population — either report game coverage under its own key or add
+a `rows_considered` spanning both. Both halves already ride along as
+`prop_coverage` / `game_coverage` sub-dicts, so nothing is lost either way. Add
+a test pinning the sum invariant so it cannot drift back.
+
+**NOT FIXED, and deliberately.** `board_enrichment.py` is claimed by TWO open
+lanes — `soccer-board-mlb-parity` and `layer2-sim-view-and-live-projection`, the
+latter actively deploying when this was found. `wnba_projections.py` is
+unclaimed. User decision 2026-08-22: leave it. **It is a reporting defect, not a
+board defect** — no price, edge or stake is wrong because of it; only the
+diagnostic reads high.
+
+
+### `#512` — **Stage B BUILT: the execution ledger, running on paper. Idempotent, write-ahead, two switches for real money. NOT DEPLOYED, dark by default.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+`syndicate/features/shared/execution_ledger.py` + `pipeline/execute_portfolio.py`,
+behind `SYNDICATE_EXECUTION_ENABLED` (absent = off).
+
+**PAPER AND LIVE ARE THE SAME CODE WITH ONE BOOLEAN BETWEEN THEM.** A paper
+harness that differs structurally from the live one proves nothing about the
+live one, so going live is a flag flip rather than a rewrite. Pinned by a test
+asserting a paper record and a live record have identical field sets and differ
+only in `mode`.
+
+**IDEMPOTENCY IS THE LOAD-BEARING PROPERTY.** The placer must never run inside
+`refresh-worker` (110 OOM kills on 2026-08-07; it restarts mid-job), and a
+restart between submit and record double-places real money. Three defences:
+
+1. **Write-ahead** — the record is persisted as `submitted` BEFORE the submit
+   call. A test asserts the record is already on disk in that state *at the
+   moment `submit` runs*. A crash therefore leaves a reconcilable order; a
+   crash after an unrecorded submit leaves nothing.
+2. **A deterministic key that is an IDENTITY, not a label** — position key +
+   date + venue + market + side + line + player. **The PRICE is deliberately
+   excluded**, so a re-priced slate is the same set of bets; otherwise every
+   quote refresh would place the book again (pinned by a test).
+3. **Refusal, not overwrite** — `record_order` returns the EXISTING record, and
+   `submit` is never reached for a known key. A retry is a no-op by
+   construction rather than by the caller remembering to check.
+
+**TWO INDEPENDENT SWITCHES FOR REAL MONEY**, both checked immediately before
+each submit rather than at startup so the kill switch can stop an in-flight
+slate: `SYNDICATE_EXECUTION_MODE=live` AND `SYNDICATE_EXECUTION_LIVE_ARMED`.
+**Any unrecognised mode resolves to `paper`** — the direction that spends
+nothing. That fallback direction is the explicit lesson of the same day's
+`SYNDICATE_REFRESH_STATE_BACKEND` incident, where an unrecognised value silently
+meant something else entirely. `--force` skips the enablement flag ONLY; a
+convenience flag that can reach real money is not a convenience.
+
+**LIVE IS BLOCKED WHILE ANY ORDER SITS UNRECONCILED** — an order sent with an
+unknown result must not have a fresh slate stacked on it. Paper is not blocked
+(it cannot double-spend) but still reports the count.
+
+**STORAGE, resolved on `#508`'s measurement.** Keyvalue, **no date token** — a
+dated path takes the store's 10-day TTL and a record of money placed must not
+expire (pinned by a test). No Postgres, so no `blueprint_sync`. Because that
+makes it one growing document — the shape behind the 4.9GB-chunk incident —
+three bounds are enforced in the module rather than trusted to callers: **lean
+records only** (a test asserts the persisted field set), a **hard 5,000-record
+cap with LOUD trimming**, and a **size warning at 2MB** against the store's 8MB
+refusal ceiling. An **unreadable ledger RAISES** rather than reading as empty:
+an empty read would make every existing order look unplaced and invite a
+duplicate of the whole slate. That is the one place the module refuses instead
+of degrading.
+
+**MEASURED END TO END, local:** shortlist (3 rows) → commit (2 positions,
+$5.19, 40.3% sim-attributed) → paper orders (2 filled, $5.19) → **replay:
+placed=0, duplicates=2**. That last number is the one that proves idempotency
+outside a unit test, and `run_execution` returns it every run.
+
+Tests: `tests/test_execution_ledger.py` (32) + `tests/test_execute_portfolio.py`
+(9). **NOT DEPLOYED.** Owed production reading is `off != on` plus
+`duplicates == positions` on a second run of the same slate.
+
+**NEXT IS STAGE C**, and it needs no new mechanism: run this on paper over a
+real dated window, then join CLV against Stage A's per-bet `attribution` to get
+the by-component decomposition `#509`/`#510` both point at. Stage D (real money)
+stays gated on that plus `#502`'s `settled_count > 0`.
+
+
+### `#510` — **`_SCORE_SIM_WEIGHT` 0.0 → 0.125 WITH A HARD CAP. The fix is the CAP, not the coefficient — the same structural fix the movement term already had. Measured against the distribution that caused the zeroing. NOT DEPLOYED, and blocked cross-lane by a UI disclosure this makes false.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+
+**THE USER ASKED FOR THIS DIRECTLY** after being told the sim contributes 0 to
+ranking. The prior gate (`settled > 0` before raising the weight) was a
+documented decision; this overrides it deliberately and says so.
+
+**WHY A BARE WEIGHT WAS NEVER THE ANSWER, and the old comment is right about
+that.** *"There is NO value of this constant that produces a credible board"* is
+correct **for a bare weight**: it scales with the edge, so a large enough model
+disagreement always wins eventually — 0.25 fails exactly like 0.5, just later.
+That is why the previous answer was 0.0, and it was the right answer to the
+question being asked.
+
+**BUT THIS MODULE ALREADY SOLVED THIS ONCE AND SAID SO.** The movement term
+directly below carries: *"The failure mode that killed the sim term was
+domination (ev ~ -5 against model_edge ~ +12), and A CAP IS THE STRUCTURAL FIX
+for it rather than a smaller number that fails the same way later."* Movement
+got a weight AND `_SCORE_MOVEMENT_CAP_PCT`. The sim term never got the cap. It
+has one now: `_SCORE_SIM_CAP_PCT = 1.5`, saturating at 12 points of model edge —
+the median of the measured production distribution — so a TYPICAL sim view earns
+nearly the whole allowance and an extreme one earns no more.
+
+**MEASURED, by a harness that REPLAYS the 2026-08-08 distribution rather than
+asserting against it** (`scripts/score_sim_weight_impact.py`; families 48/35/24/193,
+median edges 10.36/10.80/12.49/11.99, 286 of 300 rows negative-EV):
+
+    configuration                  negative-EV rows promoted   side-picking
+    0.5 uncapped (2026-08-08)                286/286              yes
+    0.0 (the state replaced)                   0/286              NO
+    0.125 capped at 1.5                        0/286              yes
+
+The pathological row worked: `ev -5, model_edge +12` → at 0.5 `-5 + 6.00 =
++1.00`, positive and model-dominated, which was the failure; at 0.125-capped
+`-5 + 1.50 = -3.50`, still negative, does not rank.
+
+**WHAT THE CHANGE ACTUALLY BUYS.** At 0.0 the board **could not pick a side at
+all** — `blended_score` reduces to `ev_pct`, and EV against a proportional
+de-vig is `1/overround - 1`, IDENTICAL for every side of a market, so it ordered
+markets by hold and broke ties arbitrarily (Famalicao/Estoril: draw -750, home
++4500, away +6000, all `ev 8.6383`). Any non-zero contribution makes the sim the
+**entire** tiebreak between sides. That is the largest behavioural change here
+and it is not a matter of degree.
+
+**REVERSIBLE WITHOUT A DEPLOY.** Both constants are env-overridable —
+`SYNDICATE_SCORE_SIM_WEIGHT`, `SYNDICATE_SCORE_SIM_CAP_PCT`. Setting the cap to
+`0.0` restores the previous behaviour EXACTLY (pinned by a test). A malformed
+env value falls back to the default rather than to zero, deliberately: silently
+disabling a scoring term on a typo is the same class of failure as the same
+day's `SYNDICATE_REFRESH_STATE_BACKEND` incident.
+
+**A TEST WAS REPLACED, NOT DELETED.**
+`test_the_sim_weight_is_zero_until_settlement_validates_the_model` pinned
+`_SCORE_SIM_WEIGHT == 0.0` — a PROXY. What deserved protection was the behaviour
+the constant was chosen to prevent. It is now
+`test_the_sim_term_cannot_promote_a_negative_ev_row_at_any_measured_edge`
+(all four families) plus an unbounded-edge version and a **control** asserting a
+bare weight WOULD fail the same guard, so the tests are not vacuously true.
+Strictly stronger: the old test would have passed a change that raised the cap
+and failed one that left behaviour identical. `learnings.md` 2026-08-20.
+
+**STILL A SCREEN, NOT A VALIDATION.** This proves the weight cannot repeat the
+2026-08-08 *arithmetic* failure. It does NOT prove the sim is RIGHT — that needs
+`settled > 0` and CLV decomposed by component, which `#509` now emits per bet.
+Until then the honest description is **"price-led, sim-breaks-ties"**, NOT "our
+model found these".
+
+**DEPLOY BLOCKER CLEARED `[user directed 2026-08-22]`.** Flagged as cross-lane
+and left unedited; the user then directed the change, so `intelligence.html` and
+`layer2_board.py` are claimed **NARROWLY** from
+`layer2-sim-view-and-live-projection` — the same pattern that lane used on
+`soccer_projections.py`/`team_aliases.py` the same day. Taken: the disclosure,
+the `sim disagrees` tooltip, and `_row_value_pct`/`_row_admitted_by_blend`.
+Nothing about the sim view, live projection, joins or rendering.
+
+**TWO stale user-facing claims, not one.** Besides the known disclosure,
+`intelligence.html:2674` — the `sim disagrees` chip tooltip — read *"It carries
+no weight in the score"*, equally falsified and **on no list**. Found by
+rendering the page and grepping the SERVED body rather than by reading the file.
+Both now state the cap. Verified: 0 occurrences of the stale claim in the served
+HTML, and the disclosure and tooltip both name the 1.5-point bound.
+
+### `#511` — **The blended score now gates ADMISSION, not just ordering. The sim could reorder the board but never put a row on it.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+
+`_row_value_pct` read `ev_pct` FIRST and fell back to `score.value_pct` only
+when EV was absent — which on a scored row it never is, so the fallback was
+effectively dead. Admission (`rows_below_value_floor`) therefore ran on **price
+alone**, upstream of anything the simulation had to say, while `_score_of`
+ranked on the blend. **The sim could reorder what EV had already admitted and
+could not admit anything.**
+
+Now prefers the blended `value_pct` — `ev_pct` + capped sim + capped movement,
+all three in EV points, so it is unit-comparable with the hold-derived floor it
+is tested against. That unit match is the only reason the substitution is
+legitimate rather than a category error. Falls back to `ev_pct` when there is no
+score block, so an unscored row is judged exactly as before.
+
+**BOUNDED BY THE SAME CAP.** The sim can carry a row across the floor by at most
+`_SCORE_SIM_CAP_PCT` (1.5 EV points) — it rescues a marginal price and never a
+materially bad one. That bound is the only reason handing admission to the blend
+is defensible: an uncapped sim term *here* would let an unvalidated model admit
+arbitrarily bad prices, which is the 2026-08-08 failure with a wider blast
+radius than ranking ever had. Pinned by
+`test_the_sim_cannot_rescue_a_materially_bad_price` (edge 400 on a -6.0 EV row
+is still refused).
+
+**NEW COUNTER `rows_admitted_by_blend`** — rows the blend admitted that raw EV
+would have cut. Shipped at the builder AND at
+`/api/board/layer2-shortlist` in the SAME commit, because `#373`, `#381`, `#391`
+and `#397` each record a counter that existed at the builder and was invisible
+at that hop, three of them costing an investigation. A test pins the round-trip.
+**Zero means the scoring change is inert** — that is the production reading owed.
+
+Tests: `tests/test_layer2_blend_admission.py` (10), including a **control**
+asserting the old behaviour would have returned the raw EV, so the main
+assertion is not vacuously true. 975 passed across the
+`layer2|opportunity|score|market_board` selection; the 5 failures there are
+PRE-EXISTING, verified by stashing and re-running.
+
+
+### `#508` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**Measured 2026-08-22T19:0xZ via the Render API**, 24h at 1h resolution on
+`red-d88bvljbc2fs73epfhhg` (`syndicate-refresh-state`):
+
+    memory      98.2 MB of 268.4 MB = 36.6%
+    24h range   83.5 - 118.1 MB  (31 - 44%)
+    headroom    ~170 MB
+
+`refresh_state_store.py:139-205` records 96% memory, 34,529 LRU-evicted keys and
+a 44% keyspace miss rate. **Those are 2026-07-31 and 2026-08-10 figures and have
+not held for two weeks** — `#324`'s `migration_runs/` exclusion reclaimed the
+211 MB backlog and the store has stayed in the low-40s since. The stale figure
+was about to drive a Postgres decision whose only delivery mechanism is a
+`render.yaml` push, i.e. a `blueprint_sync` across all three services (`#284`).
+
+**Read off the live instance and not previously recorded anywhere:**
+
+- `persistenceMode: journal_snapshot` — **this store is not a pure cache.** It
+  journals AND snapshots to disk. Materially different durability from what
+  "it's a Redis cache" implies, and nothing in the repo said so.
+- `maxmemoryPolicy: allkeys_lru`, Redis 8.1.4, plan `starter`.
+- **`maxmemoryPolicy` is NOT declared in `render.yaml`** — so changing it is a
+  dashboard/API edit and NOT a sync. It cuts both ways: a future sync could
+  reset it, because the blueprint does not pin it.
+- **No Postgres instance exists in the account** (`list_postgres_instances` →
+  none), confirming the blueprint read.
+
+**RECOMMENDED, and it is a production change so it is the user's call:**
+`allkeys_lru` → **`volatile_lru`** — **on the KEY VALUE INSTANCE's own settings
+page (`red-d88bvljbc2fs73epfhhg`), NOT any service's Environment tab.** Naming
+the store without naming the surface cost a 4-minute `refresh-worker` outage on
+2026-08-22 (19:31:36Z → 19:35:31Z) when the value went into
+`SYNDICATE_REFRESH_STATE_BACKEND` instead; `_state_backend_kind()` maps any
+unrecognised value to `"filesystem"`, so it would have silently routed all
+cross-service state to per-service disks had `assert_refresh_state_backend_ready`
+not refused at startup. `learnings.md` 2026-08-22. **AS OF 19:3xZ THE POLICY IS
+STILL `allkeys_lru`** — verified via `get_key_value`, `updatedAt` unchanged
+since the instance was created 2026-05-22. One setting, no deploy, no sync, no code.
+It aligns eviction with the TTL discipline the code already has — date-scoped
+keys carry TTLs and stay evictable, while keys with NO TTL (the bankroll, the
+Stage B execution ledger, and `#502`'s `prediction_ledger.json`) become
+**structurally un-evictable** instead of merely un-evicted at today's usage.
+Render supports the value. Pinning it in `render.yaml` afterwards is itself a
+sync, so either do both deliberately together or re-check the policy after any
+future sync.
+
+**STILL UNVERIFIED:** actual `evicted_keys` / `keyspace_misses`. The metrics API
+exposes memory, not Redis INFO, so "nothing is being evicted" is an inference
+from 37% occupancy against maxmemory — sound, but an inference, not a reading.
+
+**ALSO SHIPPED against this:** `update_settings` now READS BACK what it wrote and
+reports `write_not_durable` instead of returning "saved". A write that raises is
+easy; a write that returns cleanly and does not land is the one that costs you,
+and on this backend (payload guard + eviction policy) that is a real shape.
+
+### `#509` — **The sim is ALREADY 57.6% of a committed stake and is what picks the side — while contributing 0.0 to the ranking. Stage A now records the per-bet decomposition `_SCORE_SIM_WEIGHT`'s own comment says nobody could supply.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**"The board is EV only" is true of RANKING and false of SIZING.** Measured
+2026-08-22 on a representative row (`ev_pct 4.5`, `model_edge_pct 3.2`, -110,
+reliability 0.82):
+
+    stake with the sim's edge      0.003132   ($3.13 of a $1,000 bankroll)
+    stake with the sim's edge = 0  0.001328   ($1.33) -- pure de-vig price edge
+    sim's share of the stake       57.6%
+
+**And the sim is what picks the side, because the ranking provably cannot.**
+`opportunity_signals.py:352-390`: at weight 0.0 `blended_score` reduces to
+`ev_pct`, and EV against a proportional de-vig is `1/overround - 1` — identical
+for every side of a market. The shortlist orders markets by hold and breaks ties
+arbitrarily. What chooses a side is Stage A's refusals: the wrong side sizes to
+zero Kelly and drops as `zero_kelly_stake`.
+
+**NOT FIXED BY RAISING THE WEIGHT, and this lane deliberately did not.**
+`opportunity_signals.py` is unclaimed and could have been edited. The constant's
+own comment is right that no value works — it was zeroed because at 0.5 the sim
+term DOMINATED (`ev ~ -5` vs `model_edge ~ +12`, 286 of 300 rows across four
+market families), selecting rows where an unvalidated model most disagrees with
+the market. Nothing about the evidence has changed.
+
+**WHAT SHIPPED INSTEAD — the stated unlock condition.** The comment names it
+once: *"S6: `settled > 0` and CLV decomposed BY COMPONENT ... what nobody has
+been able to supply."* Decomposing CLV by component needs to know, per bet,
+which component put the money there — and nothing recorded that, so the
+condition could never be met however long settlement ran.
+`stake_attribution` now emits, per committed position:
+`stake_fraction_ev_only` (the identical row re-sized with `model_edge_pct = 0`),
+`stake_fraction_sim_delta` (SIGNED), `sim_share_of_stake`, and `side_picked_by`
+— plus plan totals `staked_dollars_sim_attributed`, `sim_share_of_staked`,
+`positions_where_sim_picked_the_side`. The counterfactual is exact, not
+estimated.
+
+**The delta is deliberately NOT clamped at zero:** a small negative sim edge
+still clears Kelly on a good enough price, so the sim can legitimately SHRINK a
+position without vetoing it, and clamping would credit the sim only where it
+helps. Two tests pin both directions; a third pins a rounding regression where a
+5dp committed fraction differenced against a 6dp counterfactual reported 2e-06
+as a 0.15% sim contribution on a row whose sim edge was exactly zero.
+
+**A NUANCE FOR THE SURFACE:** the comment insists the Layer 2 board must not be
+presented as "our model found these" at weight 0.0. That stays true of the
+SHORTLIST. It is NOT true of the PORTFOLIO — a committed position is sim-sized
+and sim-sided, and `sim_share_of_stake` says by how much, per bet.
+
+**CORRECTION, user-flagged 2026-08-22: "the board is running at 0% sim" is
+RIGHT, and the 57.6% above is NOT about the board.** It is Stage A's sizing, on
+a SYNTHETIC row, in code that is not deployed. It describes nothing running.
+The board's 0% is also **structurally guaranteed rather than a data outage**:
+`sim_component = _SCORE_SIM_WEIGHT * value_sim` is `0.0` for every row that HAS
+a sim view and `None` for every row that does not, so it can never be non-zero
+and says nothing about whether the sim produced anything.
+
+**It did.** Production refresh-worker logs, build 2026-08-22T19:20:09Z
+(`LAYER2_SHORTLIST date=2026-08-22 rows=323 considered=17205`):
+mlb 2,279 projected of 2,656 (86%); wnba 374 of 391 (96%); nfl 1,010 of 1,309
+(77%); soccer 10,686 of 20,016 with `with_prob=9,896` (49%). **The sim is
+attaching projections to most of the board and the ranker multiplies all of it
+by zero.** Not missing, not broken, not starved — deliberately unused.
+
+**UNMEASURED and unmeasurable this session:** the sim's stake share on REAL
+rows. That needs the served shortlist and the agent proxy 403s
+`syndicate-an21.onrender.com` (`state.md`). **Do not quote 57.6% as
+production.** Stage A now emits `sim_coverage` (`rows_with_sim_edge`,
+`rows_without_sim_edge`, `share_with_sim_edge`) so the first production commit
+answers it as a number.
+
+
+### `#507` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**The user asked whether the Layer 2 board / intelligence layer can be connected
+into the app to make portfolio decisions and actually place bets.** Answer, from
+a read of the code: **the decision half is substantially built and merely
+unassembled; the execution half does not exist and is blocked by something other
+than code.** Full staged plan (A-D + precondition):
+`.syndicate/plan_2026-08-22_portfolio_execution.md`.
+
+**Already wired, contrary to how the plan docs read:** `compute_board_stake`
+(`bankroll_manager.py:192`) is attached to every candidate at
+`intelligence_state.py:4250`, and `apply_exposure_budgets`
+(`bankroll_manager.py:249`, 5% per-game cap, 0.5 correlated-leg decay) runs at
+`intelligence_state.py:4857`. What does NOT exist is a commit step — no bankroll
+figure anywhere in the system, no slate-level ceiling, no cut line, no closed
+list.
+
+**Execution: grepped, not assumed.** Every book name in the tree
+(`draftkings|fanduel|pinnacle|prophetx|novig|sporttrade|betfair|kalshi`) is an
+OddsAPI feed identifier only; every outbound `POST`/`urlopen` goes to Render
+artifact publishing. No credential, no order call, no account integration.
+
+**FINDING — there is nowhere durable to put a money ledger.** `render.yaml`
+declares **no Postgres and no database at all**: three services, three separate
+50GB disks, one shared 256MB `keyvalue` on the starter plan which
+`refresh_state_store.py:139-205` records at 96% memory / 34,529 LRU-evicted keys
+/ 44% keyspace miss (2026-07-31; 38,865 evicted by 2026-08-10). Two consequences:
+(1) `_default_keyvalue_ttl_seconds` gives any DATE-TOKENED path a **10-day
+TTL** — an `execution_ledger_<date>.json` would silently expire, so the ledger
+path must carry no date token; (2) `allkeys-lru` evicts no-TTL keys too, so
+**`prediction_ledger.json` is LRU-evictable**. (2) is `#502`'s file —
+**surfaced, not edited.** UNVERIFIED: no Redis reading taken today.
+
+**WHY STAGE D IS GATED, in three readings that all say the same thing:**
+`_SCORE_SIM_WEIGHT = 0.0` (`opportunity_signals.py:390`); `sim_component`
+non-zero on 0 of 65 served rows (2026-08-16); `settled_count: 0` on
+`/api/portfolio/summary` (`#502`), and `#504` measured **zero** settled records
+written in production. Every stake on the board is therefore **1/16th Kelly by
+construction** — `_DEFAULT_KELLY_MULTIPLIER` 0.25 x `_MIN_SAMPLE_CREDIBILITY`
+0.25 — because settled sample is zero in every market
+(`_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50`). The sizing already does not believe
+itself. Automating placement on top of that is `learnings.md` 2026-08-20's
+"validating against a PROXY, not the objective" with money attached.
+
+**A LIMIT ON THE CEILING, stated now so it is not discovered at Stage D:** the
+only US-legal venues with real order APIs are exchanges and prediction markets
+(Kalshi, Sporttrade, ProphetX, Novig), and they are mostly moneyline/spread/
+total on major games — while `layer2_board.py`'s own header says props are where
+the sim differentiates and where **95.5% of the OddsAPI spend** goes. **The
+markets that can be legally automated are largely not the ones this board is
+best at.** Retail-book automation is ruled out on account-risk grounds (no API;
+driving the client breaches terms; detection means limiting, closure, frozen
+balance). Whether Stage D is worth building at all should be answered from Stage
+C's per-market CLV output, not in advance.
+
+**BANKROLL ANSWERED: $1,000**, user decision 2026-08-22, and **user-editable** —
+`portfolio_settings.py` (`DEFAULT_BANKROLL_UNITS`), a form on `/portfolio`, and
+`GET`/`POST /api/portfolio/settings`. Precedence stored > env > default; **every
+read is fail-safe toward the default** because the keyvalue store is a 256MB
+`allkeys-lru` instance that evicts, and a bankroll resolving to 0 would size
+every bet at $0 and look exactly like a quiet slate. `sources` reports which
+layer won per field. The settings path carries **no date token** — a dated one
+would take the store's 10-day TTL and the bankroll would silently expire (test
+pins this).
+
+**TWO INERT-FEATURE DEFECTS, both caught by `scripts/portfolio_commit_input_checklist.py`
+on its first run, neither by any test:**
+
+1. **`_attach_board_stakes` does not reach the Layer 2 shortlist.** It runs on
+   Layer 1's `global_pool`; `build_layer2_shortlist` builds a separate set of row
+   objects that carry **no sizing fields at all**. Handing one to
+   `compute_bet_size` — the obvious implementation — yields
+   `model_probability 0.5`, `implied_probability 0.5`, `edge 0`, **`$0` for every
+   position**, with no exception and no log line. The portfolio would have been
+   empty and indistinguishable from a quiet slate. `portfolio_commit` therefore
+   DERIVES its inputs (inverting `expected_value_pct` to recover the market
+   probability, then adding `model_edge_pct`) and refuses by name — `no_ev_pct`,
+   `no_model_edge_pct`, `no_quote_price`, `unusable_price`,
+   `no_price_reliability` — never on a neutral default.
+   `tests/test_portfolio_commit.py::test_sizing_a_raw_layer2_row_would_have_produced_a_zero_stake`
+   pins the naive path at 0.
+
+2. **`confidence` is structurally inert in `compute_board_stake`.** Measured:
+   `kelly_fraction 0.0241 -> stake 0.00151` against `cap_fraction 0.0446`.
+   `compute_board_stake` shrinks the RAW kelly fraction and uses `cap_fraction`
+   only as a ceiling — which sits ~30x above the stake and never binds. Moving
+   the trust weight 0.82 -> 0.32 moved the cap 0.0446 -> 0.0296 and moved the
+   stake **not at all**. **This is a property of `bankroll_manager`, so it is
+   equally true of `_attach_board_stakes` on the Layer 1 pool: whatever
+   `confidence` a board candidate carries, it does not move the served stake.**
+   That file is read-only for this lane — recorded, not fixed. Stage A applies
+   the reliability discount as its own named multiplier instead.
+
+**SHIPPED IN CODE (not deployed):** `portfolio_settings.py`,
+`portfolio_commit.py`, `pipeline/portfolio_commit.py` (dark behind
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED`), the checklist, four endpoints, a
+`/portfolio` editor, and 50 tests. Local: checklist PASSES (4/4 fields populated
+AND consumed, 4/4 refusals named); 50 new tests pass; 334 related tests pass;
+`/portfolio` renders 200 and a form POST persists a new bankroll.
+
+**NEXT:** deploy is a plain `.py` push (free — no `render.yaml`), then the
+production reading is `off != on` on ONE date: plan artifact ABSENT with
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED` unset, PRESENT with it set, via
+`/api/portfolio/plan?date=<d>`. **Do not report Stage A as working on the local
+run** — no production slate has been committed. Stages B-C do not wait on
+`#502`; Stage D does.
+
 ### `#506` — **Web's intermittent 502s were `/healthz` starvation, not slow cold boots. Home made 15 live statsapi calls per request. FIXED, DEPLOYED AND MEASURED (3318-8400ms → 0-93ms); ONE SUB-ITEM UNVERIFIED.** — lane `render-web-request-path`, 2026-08-22
 
 **Cold boot was never the problem — 2.7s boot-to-listening.** Web was being
@@ -125,6 +602,7 @@ records, because the evaluation ledger is worker-local and not in
 returning `by_identity` large and `matched_by_identity: 0` means the mapping is
 wrong, and `unkeyable_bet` counts how many bets cannot key at all. That is the
 reading to take first, before any further tuning.
+
 
 ### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED
 
@@ -472,13 +950,13 @@ in `state.md` (`poll_soccer_live_state.py` writing per-league files with a raw
 `write_text()` that neither the filesystem nor the key resolves) — which was
 found independently, a day earlier, in a different subsystem.
 
-### `#510` — **CORRECTED: the "76 failures" figure was WRONG — at least 25 were a broken environment in the measuring container, not the repo.** Gate shipped; the three biggest files fixed. — lane `basketball-live-momentum`, 2026-08-22
+### `#517` — **CORRECTED: the "76 failures" figure was WRONG — at least 25 were a broken environment in the measuring container, not the repo.** Gate shipped; the three biggest files fixed. — lane `basketball-live-momentum`, 2026-08-22
 
 `python -m pytest tests/` on this branch, 26m58s:
 
     76 failed, 9245 passed, 66 skipped, 2 xfailed, 373 subtests passed
 
-## `#510` CORRECTION `[2026-08-22, same session]` — READ THIS BEFORE THE NUMBERS BELOW
+## `#517` CORRECTION `[2026-08-22, same session]` — READ THIS BEFORE THE NUMBERS BELOW
 
 **The 76 figure is retracted.** `cffi` was absent from the measuring
 container — collateral from this session's own
@@ -546,7 +1024,7 @@ count as fresh history is a production behaviour decision, not a test fix.
 one was built on the broken measurement and would have reported ~25 phantom
 "fixed" tests on the first CI run.
 
-## `#510` PROGRESS `[2026-08-22, final for this session]` — **19 failing of 9,391**
+## `#517` PROGRESS `[2026-08-22, final for this session]` — **19 failing of 9,391**
 
     76 (broken env)  ->  ~51 real  ->  35  ->  19
 
@@ -565,14 +1043,14 @@ mismatch.
 
 **REMAINING 19, and one of them is a NEW kind of problem:**
 `test_layer2_movement_live_segment.py` passes 27/27 in isolation and fails 1 in
-the full run — **order-dependent, i.e. cross-file pollution of the `#508`
+the full run — **order-dependent, i.e. cross-file pollution of the `#515`
 class, in a file that is otherwise clean.** Worth taking before the singles:
 pollution makes every other number in this list less trustworthy.
 
 The other 18 are singles across 15 files, plus the 2 in
 `test_wnba_refresh_runner` deliberately left to `wnba-live-odds-capture-gap`.
 
-**NOT caused by `#507`/`#508`/`#509`, and not test pollution.** Zero failures
+**NOT caused by `#514`/`#515`/`#516`, and not test pollution.** Zero failures
 are in any momentum file. Three files were sampled IN ISOLATION and then re-run
 in a detached worktree at **clean `origin/main`** — identical counts in all
 three places, so these reproduce standalone and are genuinely on main:
@@ -627,7 +1105,7 @@ decoration.
 declared first. That is a real (small) part of why the suite has never run in CI.
 
 **RESOLVED AS A NO-NEW-FAILURES GATE 2026-08-22** (user decision), which
-closes `#509`'s CI half without pretending the debt is gone:
+closes `#516`'s CI half without pretending the debt is gone:
 
 - `scripts/pytest_baseline.py` — `--update` records the failing set;
   bare invocation fails when the set GROWS. **It also fails when a baselined
@@ -659,10 +1137,10 @@ number growing; it does not shrink it. Fix the top three files first
 (`test_refresh_state_store.py` 18, `test_ask_headline_from_board.py` 11,
 `test_wnba_refresh_runner.py` 6 = 46% of all failures), then `--update`.
 
-### `#509` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
+### `#516` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
 
 Confirmed in a **detached worktree at `origin/main`**, run in isolation, so
-this is neither test pollution nor anything from `#507`/`#508`:
+this is neither test pollution nor anything from `#514`/`#515`:
 
     tests/test_wnba_live_lens_game_shape.py::WnbaGameLensMarketsTests
       test_moneyline_omitted_without_live_win_prob
@@ -680,7 +1158,7 @@ this is neither test pollution nor anything from `#507`/`#508`:
 six are in the pytest suite that CI never executes, so `main` can carry
 deterministic failures indefinitely and still look green.
 
-Deterministic, so `#508`'s reproducibility fix does NOT hide them — after it,
+Deterministic, so `#515`'s reproducibility fix does NOT hide them — after it,
 two consecutive runs of the 219-test `live_lens` group produce exactly this
 set both times.
 
@@ -718,18 +1196,18 @@ one; the red test beside it is the only reason anyone looked.
 mock. Falsified — restoring the stale target fails BOTH, where before it failed
 only the non-vacuous one.
 
-## `#509` OWED — the CI-visibility half, NOT fixed — **BLOCKED, see `#510`**
+## `#516` OWED — the CI-visibility half, NOT fixed — **BLOCKED, see `#517`**
 
 `.github/workflows/ci.yml:37` runs `python -m unittest tests.test_archives` and
 nothing else, so `main` can carry deterministic pytest failures indefinitely
 and still show green. Fixing the six tests does not change that; the next
 stale patch target will sit exactly as long. Wiring pytest into CI is only
 safe once the full suite is green, and **it is not**: measured 2026-08-22,
-**76 failures across 26 files** on clean `origin/main` (`#510`). Turning CI on
+**76 failures across 26 files** on clean `origin/main` (`#517`). Turning CI on
 today would land red on the first run, which `ci.yml`'s own comments argue is
 worse than no check at all.
 
-### `#508` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
+### `#515` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
 
 `PublishWatermarkTests::test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`.
 Measured, two consecutive runs of the SAME single test, nothing else changed:
@@ -791,7 +1269,7 @@ tree clean.
 `memory_high_water.json`, so every test run leaves an untracked file that trips
 commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
 
-### `#507` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED** on `claude/live-lens-momentum-basketball-3hlx7g`, lane `basketball-live-momentum`; NOT DEPLOYED and NOTHING CALLS THE PRODUCER
+### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED** on `claude/live-lens-momentum-basketball-3hlx7g`, lane `basketball-live-momentum`; NOT DEPLOYED and NOTHING CALLS THE PRODUCER
 
 Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 

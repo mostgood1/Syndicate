@@ -247,3 +247,7 @@ reports/soccer_backtest/fotmob_2y.json
 reports/soccer_backtest/fotmob_2y_shotsonly.json
 reports/soccer_backtest/fotmob_xg_fresh.json
 reports/soccer_backtest/fotmob_xg_cache.json
+
+# Test fallout: a literal Windows path used as a filename on Linux.
+# Committed by accident 2026-08-22 via `git add -A`; untracked again the same day.
+Z:\\*

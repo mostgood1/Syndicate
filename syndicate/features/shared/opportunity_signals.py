@@ -335,6 +335,27 @@ def is_low_hold(prices: Iterable[Any], *, threshold_pct: float = 2.0) -> bool:
     return hold is not None and 0.0 <= hold < threshold_pct
 
 
+def _env_float(name: str, default: float) -> float:
+    """Module constant with an env override, so a contested weight is
+    reversible without a deploy. A malformed value falls back to the default
+    rather than to zero -- silently disabling a scoring term because someone
+    typo'd a number is the same class of failure as the 2026-08-22
+    `SYNDICATE_REFRESH_STATE_BACKEND` incident, where an unrecognised value
+    silently meant something else entirely."""
+    import os as _os
+
+    raw = str(_os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return default
+    if parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return default
+    return parsed
+
+
 # Blended-score weights (#243). PROVISIONAL, and labelled as such on purpose:
 # nothing here is measured yet. #213 records the quote struck at bet time and
 # #214 derives closes, so the honest way to set these is to compare each
@@ -387,7 +408,68 @@ def is_low_hold(prices: Iterable[Any], *, threshold_pct: float = 2.0) -> bool:
 # / line-shopping board and must NOT be presented as "our model found these".
 # If the page cannot say that, keep it off the main board rather than raising
 # this number to make it look like a model board.
-_SCORE_SIM_WEIGHT = 0.0          # was 0.5; see above -- gated on S6, not taste
+# RE-EVALUATED 2026-08-22 [user decision]. Was 0.0; before that 0.5.
+#
+# **THE FIX IS THE CAP, NOT THE COEFFICIENT.** Everything above stays true: at
+# 0.5 the sim term DOMINATED, and the argument that "there is NO value of this
+# constant that produces a credible board" is correct *for a bare weight*. A
+# bare weight scales with the edge, so a large enough model disagreement always
+# wins eventually -- 0.25 fails the same way as 0.5, just later. That is why the
+# previous answer was 0.0.
+#
+# But this module already solved this exact problem once, for the movement term
+# directly below, and said so: *"The failure mode that killed the sim term was
+# domination (ev ~ -5 against model_edge ~ +12), and A CAP IS THE STRUCTURAL FIX
+# for it rather than a smaller number that fails the same way later."* The sim
+# term never got that treatment. It gets it now.
+#
+# WEIGHT x EDGE, THEN HARD-BOUNDED, exactly as movement is. The cap saturates at
+# 12 points of model edge -- the median of the measured production distribution
+# above (10.36 / 10.80 / 12.49 / 11.99) -- so a TYPICAL sim view earns nearly
+# the whole allowance and an extreme one earns no more than that. A row whose
+# model disagrees by 40 points contributes the same 1.5 as one that disagrees by
+# 12, which is the point.
+#
+# MEASURED against the distribution that caused the zeroing
+# (`scripts/score_sim_weight_impact.py`, which replays it):
+#
+#     configuration                  negative-EV rows promoted   side-picking
+#     0.5 uncapped (2026-08-08)                286/286            yes
+#     0.0 (the state this replaces)              0/286            NO
+#     0.125 capped at 1.5                        0/286            yes
+#
+# The pathological row, worked: `ev -5, model_edge +12`.
+#     at 0.5    -> -5 + 6.00 = +1.00   POSITIVE. Ranks. This was the failure.
+#     at 0.125c -> -5 + 1.50 = -3.50   negative. Does not rank.
+#
+# WHAT THIS BUYS, and it is the whole reason for the change: at 0.0 the board
+# **cannot pick a side at all**. `blended_score` reduces to `ev_pct`, and EV
+# against a proportional de-vig is `1/overround - 1`, IDENTICAL for every side
+# of a market -- so the board ordered markets by hold and broke ties
+# arbitrarily. Any non-zero contribution makes the sim the entire tiebreak
+# between two sides. That is the single largest behavioural change here and it
+# is not a matter of degree.
+#
+# WHAT IT DOES NOT BUY. This is a SCREEN, not a validation: it proves the weight
+# cannot repeat the 2026-08-08 arithmetic failure. It does NOT prove the sim is
+# RIGHT, which still needs `settled > 0` and CLV decomposed by component. Stage
+# A's `stake_attribution` now emits that decomposition per bet (`todo.md #509`),
+# so for the first time the follow-up measurement is possible. Until it lands,
+# the honest description of the board is "price-led, sim-broken-ties", NOT "our
+# model found these" -- and the surface must still say so.
+#
+# BOTH ARE ENV-OVERRIDABLE so this is reversible in seconds without a deploy,
+# which is the only reason it is defensible to change a constant this contested.
+_SCORE_SIM_WEIGHT = _env_float("SYNDICATE_SCORE_SIM_WEIGHT", 0.125)
+
+# Hard bound on the sim's contribution, in EV points -- the same role
+# `_SCORE_MOVEMENT_CAP_PCT` plays for movement. Set to 0.0 to disable the sim
+# term entirely and restore the previous behaviour exactly.
+_SCORE_SIM_CAP_PCT = _env_float("SYNDICATE_SCORE_SIM_CAP_PCT", 1.5)
+
+# Referenced by the impact harness so it reports against the real input bound
+# rather than a copy of it.
+_MODEL_EDGE_MAX_POINTS_HINT = 15.0
 
 # MOVEMENT SINCE WE PUBLISHED THE ROW, folded into value at a CAPPED weight.
 #
@@ -565,7 +647,15 @@ def blended_score(
     if move:
         raw = _SCORE_MOVEMENT_WEIGHT * move
         value_move = max(-_SCORE_MOVEMENT_CAP_PCT, min(_SCORE_MOVEMENT_CAP_PCT, raw))
-    value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0) + value_move
+    # The sim term is CAPPED, not merely weighted -- see `_SCORE_SIM_CAP_PCT`.
+    # A bare weight scales with the edge, so a large enough model disagreement
+    # always wins eventually; the cap is what makes domination structurally
+    # impossible rather than merely less likely at this coefficient.
+    value_sim_contribution = 0.0
+    if value_sim is not None:
+        raw_sim = _SCORE_SIM_WEIGHT * value_sim
+        value_sim_contribution = max(-_SCORE_SIM_CAP_PCT, min(_SCORE_SIM_CAP_PCT, raw_sim))
+    value = (value_ev or 0.0) + value_sim_contribution + value_move
     confidence = _book_confidence(books_quoting)
     freshness = _freshness_factor(book_age_seconds, quote_seen_age_seconds)
     # Third multiplicative reliability term, alongside book breadth and
@@ -604,7 +694,15 @@ def blended_score(
         "score": round(min(value, discounted), 4),
         "value_pct": round(value, 4),
         "ev_component": None if value_ev is None else round(value_ev, 4),
-        "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
+        # The CAPPED contribution, matching `movement_component` below: what
+        # actually entered the score, not what the weight would have produced.
+        # Publishing the uncapped number under this name would overstate the
+        # sim's influence on every capped row.
+        "sim_component": None if value_sim is None else round(value_sim_contribution, 4),
+        "sim_capped": (
+            value_sim is not None
+            and abs(_SCORE_SIM_WEIGHT * value_sim) > _SCORE_SIM_CAP_PCT + 1e-12
+        ),
         # Emitted whenever a move was supplied, INCLUDING zero -- "we compared
         # against our opening and it had not moved" is a different fact from
         # "we had no opening to compare against", and a single absent key

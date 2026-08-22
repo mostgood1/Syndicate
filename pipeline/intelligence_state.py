@@ -1956,8 +1956,58 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     payload = dict(shortlist or {})
     payload["selected_date"] = normalized_date
     payload["written_at"] = _utc_now()
+    _warn_if_shortlist_near_keyvalue_ceiling(payload)
     write_json_file(_layer2_shortlist_path(normalized_date), payload)
     return payload
+
+
+def _warn_if_shortlist_near_keyvalue_ceiling(payload: Mapping[str, Any]) -> None:
+    """Warn on the size of what is ACTUALLY WRITTEN, before writing it.
+
+    `layer2_board.select_shortlist` already had a guard, and it measured the
+    wrong thing: `len(json.dumps(selected))` — the ROWS. The persisted artifact
+    also carries `per_sport`, `cards`, `openings_records`, `clv_openings` and
+    every coverage payload. Measured 2026-08-22 20:56:30Z immediately after the
+    per-sport cap went 100 -> 400:
+
+        rows-only guard   under its half-ceiling trigger, silent
+        ACTUAL artifact   4,434,665 B = 53% of the 8 MB ceiling
+
+    So the guard reported comfort while the real payload sat just above the
+    4.37 MB the ceiling's own comment records as the largest known-good state.
+    A guard that measures a SUBSET of what it guards is worse than none: it is
+    an all-clear nobody has reason to doubt.
+
+    Placed here because this is the only place the whole payload exists. The
+    store's own `KEYVALUE_WRITE_LARGE` does see the true size, but it warns at
+    1 MB — which every board payload exceeds — so it is noise at exactly the
+    moment it would need to be signal, and it fires AFTER the write.
+
+    Never raises: an instrument that can break the write it measures is worse
+    than no instrument.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        ceiling = int(_keyvalue_max_bytes())
+        size = len(json.dumps(payload, default=str))
+    except Exception:
+        return
+    if not ceiling or size <= ceiling // 2:
+        return
+    rows = payload.get("rows")
+    print(
+        f"[intelligence_state] SHORTLIST_PERSIST_LARGE bytes={size} "
+        f"ceiling={ceiling} pct={round(100.0 * size / ceiling, 1)} "
+        f"rows={len(rows) if isinstance(rows, list) else None} "
+        f"per_sport_limit={payload.get('per_sport_limit')} "
+        # NAMED, because a warning that does not say what to turn is a warning
+        # that gets read and not acted on. The failure at the ceiling is an
+        # opaque "Connection closed by server", so this must fire early enough
+        # to be useful.
+        f"-- lower SYNDICATE_LAYER2_ROWS_PER_SPORT before this reaches {ceiling}",
+        flush=True,
+    )
 
 
 def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
@@ -4891,6 +4941,21 @@ class IntelligenceStateService:
                 f"[intelligence_state] LAYER2_SHORTLIST date={selected_date} "
                 f"rows={len(layer2_shortlist.get('rows') or [])} "
                 f"considered={layer2_shortlist.get('opportunities_considered')} "
+                # THE ADMISSION PAIR, and they are only interpretable TOGETHER --
+                # this file's own rule (`rows_implausible_book`, `#373`, `#381`,
+                # `#397`): a count without the rule that produced it cannot be
+                # judged. `admitted_by_blend` is rows the blended score put on
+                # the board that raw EV would have cut, so **zero means the
+                # 2026-08-22 scoring change is INERT**.
+                #
+                # Logged here rather than only on the artifact because the
+                # artifact and `/api/board/layer2-shortlist` are both
+                # unreachable from a session without HTTP access to the web
+                # host, which is the state every read tonight was taken in. An
+                # instrument nobody can reach is the same failure `#373` fixed
+                # one hop earlier, and it cost three investigations there.
+                f"below_floor={layer2_shortlist.get('rows_below_value_floor')} "
+                f"admitted_by_blend={layer2_shortlist.get('rows_admitted_by_blend')} "
                 f"sports={layer2_shortlist.get('active_sports')}",
                 flush=True,
             )

@@ -1323,7 +1323,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["snapshot_rows"]), 1)
 
     def test_player_logs_preflight_accepts_local_boxscores(self) -> None:
-        """`#510`. **DATES ARE RELATIVE TO TODAY, and they have to be.**
+        """`#517`. **DATES ARE RELATIVE TO TODAY, and they have to be.**
 
         This wrote a fixture whose newest game was hardcoded `2026-05-21` and
         asserted the preflight accepted it. `_ensure_player_logs_for_props_refresh`
@@ -3631,7 +3631,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"counts": {"games": 1, "picks": 1}, "per_game": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            # `#510`. `force_refresh` was added to `_export_cards_props_snapshot`
+            # `#517`. `force_refresh` was added to `_export_cards_props_snapshot`
             # on 2026-08-16 -- deliberately, to stop it being the odd one out of a
             # trio where both siblings already honoured the bypass. The fake was not
             # updated, so the real call raised TypeError. `_fake_top_by_game_artifact`

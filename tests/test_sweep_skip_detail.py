@@ -55,7 +55,7 @@ def pub(monkeypatch, tmp_path):
     return mod
 
 
-# `#510`. **THE "FRESH" SLATE DATE MUST BE TODAY'S, NOT A LITERAL.**
+# `#517`. **THE "FRESH" SLATE DATE MUST BE TODAY'S, NOT A LITERAL.**
 #
 # These fixtures hardcoded `book_grid_2026-08-12.json` as the file that should
 # be skipped for being TOO LARGE. `sweep_changed_hot_artifacts` also skips

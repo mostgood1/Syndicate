@@ -93,12 +93,12 @@ jobs:
           python .claude/hooks/test_ledger_postwrite_check.py
           python .claude/hooks/test_lane_guard_hyphen.py
 
-  # `#510`. THE FULL PYTEST SUITE, GATED ON NO NEW FAILURES -- not on green.
+  # `#517`. THE FULL PYTEST SUITE, GATED ON NO NEW FAILURES -- not on green.
   #
   # Measured 2026-08-22 on clean `origin/main`: `76 failed, 9245 passed` across
   # 26 files, every sampled one reproducing standalone. The `test` job above
   # runs `tests.test_archives` (383 cases) and nothing else, so those 76 sit
-  # there indefinitely while CI shows green -- which is exactly how `#509`'s six
+  # there indefinitely while CI shows green -- which is exactly how `#516`'s six
   # stale test targets survived, one of them a test passing VACUOUSLY.
   #
   # A plain green gate lands red on the first run, and this file already argues

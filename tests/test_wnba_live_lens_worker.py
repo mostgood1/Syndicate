@@ -49,7 +49,7 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         }
         live_lines_payload = {"games": [{"event_id": f"evt-{index}", "lines": {"total": 151.5}} for index in range(55)]}
 
-        # `#509`. Patches `build_cards_page_context_if_cached`, NOT
+        # `#516`. Patches `build_cards_page_context_if_cached`, NOT
         # `build_cards_page_context`. `build_live_lens_snapshot` stopped calling
         # the latter when it became CONSUME-DO-NOT-REBUILD (`live_lens.py:460`):
         # a rebuild inside the tick cost +1,062MB in one step on a 2Gi service
@@ -58,7 +58,7 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         # builder fell through to a cold context, and the assertion read
         # `0 != 50`.
         #
-        # An INERT PATCH IS THE SAME DEFECT AS `#508`'s, in the opposite
+        # An INERT PATCH IS THE SAME DEFECT AS `#515`'s, in the opposite
         # direction: there one made a write look isolated when it was not; here
         # one makes a fixture look injected when it is not. Both are silent, and
         # both are only visible by checking what the code actually calls.
@@ -82,7 +82,7 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards") and len(snapshot["api_payload"]["rank_cards"]), 50)
 
     def test_snapshot_builder_returns_safe_empty_board_when_cards_are_missing(self) -> None:
-        """`#509`. **This test was PASSING VACUOUSLY and that is worth more than
+        """`#516`. **This test was PASSING VACUOUSLY and that is worth more than
         the failure next door.** It patched `build_cards_page_context` to raise,
         which this code path no longer calls, so nothing raised -- the builder
         simply found no cached and no published context and returned the empty

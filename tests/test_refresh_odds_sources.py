@@ -463,7 +463,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn("--markets", wnba_steps[0].command)
         self.assertIn(wnba_markets, wnba_steps[0].command)
 
-    # `#510`. `/opt/render/project/data`, NOT `C:\render\data`.
+    # `#517`. `/opt/render/project/data`, NOT `C:\render\data`.
     #
     # These two hardcoded a Windows drive path, which on Linux is a RELATIVE
     # path -- so the helper resolved it under the repo and the assertion read
@@ -855,7 +855,7 @@ class NflStepsPreseasonGatingTests(unittest.TestCase):
         self.assertEqual(preseason_step.cwd, module.REPO_ROOT)
 
     def test_preseason_step_excluded_when_no_target_week(self) -> None:
-        """`#510`. Asserts the PRESEASON step's absence, not the whole list.
+        """`#517`. Asserts the PRESEASON step's absence, not the whole list.
 
         This used `assertEqual(names, ["nfl_oddsapi_refresh"])`, so when
         `nfl_schedule_refresh` was added to the NFL steps (`99e56561`) the
