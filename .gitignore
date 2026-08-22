@@ -192,6 +192,8 @@ reports/live_refresh_loop/mlb_sim_coldstart_progress.json
 reports/schedule_adapter/
 reports/odds_control_plane/odds_history/
 reports/refresh_status/latest/hot_artifact_pull_watermark.json
+reports/mlb_odds_diag/
+reports/live_refresh_loop/mlb_statcast_refresh.log
 
 # Test-run pollution: #72 already removed the production prediction-ledger
 # write path, so any growth here is local pytest runs, not real usage
