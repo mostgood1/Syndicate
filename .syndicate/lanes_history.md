@@ -11851,3 +11851,45 @@ lost no protection and no open lane left the session-start digest.
 **THE ENGINE DELIBERATELY DOES NOT USE smartsim2** — `state.md [football-smartsim2]` measured it strictly dominated by the close (w = -0.028, 751 OOS games). Environment comes from posted lines: 112 of 272 2026 games carry one, all 32 teams in 6-9 of them.
 
 **OWED:** nothing is on Render. If deployed, usage/news/input-report artifacts must be built ON THE WORKER (`load_season_usage` otherwise parses 100 MB of pbp in a request handler); set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so that fails loudly. A new usage FIELD needs `build_nfl_fantasy_usage.py --force`, not just a deploy.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-22
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### soccer-layer2-dates — OWED PROOF PARTIALLY DISCHARGED 2026-08-21 21:2xZ (scheduled verification, read-only; nothing deployed, no claim taken)
+
+The end-to-end proof owed by this lane since it closed 2026-08-18 was measured
+against a slate that actually had matches in play. Full evidence in
+`.syndicate/deploys.md`, entry `2026-08-21 — soccer live lens verified on a LIVE slate`.
+
+- **Worker half — DISCHARGED.** live-odds-worker, 18:45Z–21:00Z, 635 tick-writes:
+  the four leagues with a live fixture (ligue_1 Marseille v Strasbourg,
+  belgian_pro_league Standard Liege v RAAL, epl Arsenal v Coventry, la_liga
+  Betis v Sociedad) each wrote `(1 live games)` on **every tick inside their
+  in-play interval**; the six leagues with no fixture wrote `(0 live games)` on
+  **all 384** of theirs. `6bdc50de` works, and the reading discriminates.
+- **Served-board half — STILL OWED.** All four matches were `post` by fetch time,
+  so `/soccer/<lg>/api/live-lens` correctly serves the `0 / No data` payload —
+  which post-match is indistinguishable from the 08-17 failure. Needs a fetch
+  DURING live play. **Next window: Sat 2026-08-22 09:00–10:50 CT, seven leagues
+  in play at once.**
+- Narrowing, not a substitute for that reading: cross-service transport IS proven —
+  the web service's `/api/ops/artifacts/stream` copy of ligue_1's live_state is
+  stamped `21:18:07.019Z` against the worker's write log at `21:18:07.032Z`
+  (sub-second), `match_box` populated. With `live_lens.py:129-134` mapping
+  `rank_cards` 1:1 over `payload["games"]`, the untested link is now the pure
+  function `_rank_card`, not the serve path.
+- **`LEAGUE_POLL_FAILED` FIRED — 5 times, 1.99% of live-league ticks, and ONLY on
+  leagues with a live match** (4× `SystemError: Objects/tupleobject.c:927`, a
+  CPython-internal signature the poller does not itself raise; 1× ESPN
+  ReadTimeout). Transient — surrounding ticks wrote N>0, so it did not cost the
+  verification — but a real defect on the live path. NOT root-caused; open.
+- `[LIVE_LENS_TICK_DIAG] sport=soccer` **absent** on all healthy ticks — soccer passes.
+  The 12 diagnostics that did fire are all `sport=mlb`, `ok=False`,
+  `UnboundLocalError: cannot access local variable 'write_json_file'`, on 12/12
+  MLB ticks sampled. **Live MLB fault, unrelated to soccer, unowned** — surfaced
+  here because it is failing continuously in production right now.

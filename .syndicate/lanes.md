@@ -1113,105 +1113,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### soccer-layer2-dates — OWED PROOF PARTIALLY DISCHARGED 2026-08-21 21:2xZ (scheduled verification, read-only; nothing deployed, no claim taken)
-
-The end-to-end proof owed by this lane since it closed 2026-08-18 was measured
-against a slate that actually had matches in play. Full evidence in
-`.syndicate/deploys.md`, entry `2026-08-21 — soccer live lens verified on a LIVE slate`.
-
-- **Worker half — DISCHARGED.** live-odds-worker, 18:45Z–21:00Z, 635 tick-writes:
-  the four leagues with a live fixture (ligue_1 Marseille v Strasbourg,
-  belgian_pro_league Standard Liege v RAAL, epl Arsenal v Coventry, la_liga
-  Betis v Sociedad) each wrote `(1 live games)` on **every tick inside their
-  in-play interval**; the six leagues with no fixture wrote `(0 live games)` on
-  **all 384** of theirs. `6bdc50de` works, and the reading discriminates.
-- **Served-board half — STILL OWED.** All four matches were `post` by fetch time,
-  so `/soccer/<lg>/api/live-lens` correctly serves the `0 / No data` payload —
-  which post-match is indistinguishable from the 08-17 failure. Needs a fetch
-  DURING live play. **Next window: Sat 2026-08-22 09:00–10:50 CT, seven leagues
-  in play at once.**
-- Narrowing, not a substitute for that reading: cross-service transport IS proven —
-  the web service's `/api/ops/artifacts/stream` copy of ligue_1's live_state is
-  stamped `21:18:07.019Z` against the worker's write log at `21:18:07.032Z`
-  (sub-second), `match_box` populated. With `live_lens.py:129-134` mapping
-  `rank_cards` 1:1 over `payload["games"]`, the untested link is now the pure
-  function `_rank_card`, not the serve path.
-- **`LEAGUE_POLL_FAILED` FIRED — 5 times, 1.99% of live-league ticks, and ONLY on
-  leagues with a live match** (4× `SystemError: Objects/tupleobject.c:927`, a
-  CPython-internal signature the poller does not itself raise; 1× ESPN
-  ReadTimeout). Transient — surrounding ticks wrote N>0, so it did not cost the
-  verification — but a real defect on the live path. NOT root-caused; open.
-- `[LIVE_LENS_TICK_DIAG] sport=soccer` **absent** on all healthy ticks — soccer passes.
-  The 12 diagnostics that did fire are all `sport=mlb`, `ok=False`,
-  `UnboundLocalError: cannot access local variable 'write_json_file'`, on 12/12
-  MLB ticks sampled. **Live MLB fault, unrelated to soccer, unowned** — surfaced
-  here because it is failing continuously in production right now.
-
-### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720
-- Goal: the Layer 2 board never shows a number attributed to the sim that is
-  about a different side, a different quantity, or a different thing entirely.
-  **Testable outcome:** on the served board, (a) `model_probability` equals the
-  model's probability for THAT ROW'S OWN side, (b) the `Win%` column either
-  shows a real win probability or is renamed to what it actually is, (c) no
-  LIVE row shows a blank `Projected`/`Live` while a live re-sim exists for it,
-  and (d) a live row whose LIVE sim dissents says so.
-- Files: `syndicate/features/shared/layer2_board.py`,
-  `syndicate/features/shared/prop_projections.py`,
-  `syndicate/templates/intelligence.html`,
-  `syndicate/static/shared/board_cards.css`,
-  `pipeline/layer2_shortlist.py`,
-  `syndicate/blueprints/ops.py`,
-  `syndicate/features/wnba/live_lens.py`,
-  `tests/test_wnba_live_prop_line_source.py` (new),
-  `tests/test_layer2_sim_view_sides.py` (new),
-  `tests/test_layer2_score_flatten.py`.
-  - **`syndicate/features/shared/soccer_projections.py` ADDED 2026-08-22
-    ~17:0xZ**, on the user's report that no soccer sim data reaches the board.
-    **CONFLICT SURFACED AND RESOLVED IN THE OPEN:** that file is listed in
-    `soccer-board-parity` (line ~805), which is OPEN but **UNOWNED** — its
-    session checkpointed and released 2026-08-20. Nothing active holds it, so it
-    is claimed NARROWLY here (attribution counters only; no join, alias or
-    pricing behaviour touched). `board_enrichment.py` is on that lane's list too
-    and was deliberately NOT touched.
-  - `syndicate/features/shared/live_projection_join.py` and
-    `tests/test_live_prop_miss_attribution.py` ADDED to this lane 2026-08-21
-    ~23:5xZ, after the first production reading of `LIVE_PROJECTION_JOIN`
-    returned `miss_market=428 of 901` on MLB and the user asked for that gap
-    closed. (Its earlier exclusion note was correct at the time: the live
-    verdict was already right and merely unlabelled.)
-- Hypothesis: four independent defects, all of the same SHAPE — a number
-  computed in one frame and displayed in another, with nothing on the surface
-  saying which frame:
-  1. `layer2_board.py:2031` publishes `projection["model_prob_over"]` as
-     `model_probability` with NO side awareness. `model_prob_over` is always
-     the OVER/HOME framing (proved by the same file at `:871`, which maps
-     `"home": model_prob_over`). `sim_view` IS correctly side-adjusted via
-     `_model_edge_for`, so away/draw rows render a coherent badge beside an
-     incoherent probability.
-  2. `layer2_board.py:2036` publishes `score["book_confidence"]` as
-     `confidence`, which `intelligence.html:2180` renders as **`Win%`**.
-     `book_confidence` is `_book_confidence(books_quoting)` — a books-quoting
-     RELIABILITY MULTIPLIER (`(1,0.5),(2,0.7),(4,0.85)`, else `1.0`) — not a
-     win probability. "Win% 100%" means "≥5 books quote this".
-  3. LIVE rows render a blank `Projected` because `_layer2_board_columns` only
-     populates it from `projection["projected"]`, and the h2h fallback in
-     `displayProjection()` is gated to moneyline, so live PROP rows with a live
-     re-sim still show an em dash.
-  4. There is no LIVE analogue of `sim_view`: `live_model_probability` is
-     published but nothing compares it to the market, so a live row cannot say
-     the LIVE sim dissents even when it does.
-- Falsification test: for (1), build a row whose projection is framed on `home`
-  and read `model_probability` on the `away` candidate — if it already differs
-  from the home value, the hypothesis is wrong. For (2), if the five distinct
-  `Win%` values on the user's 2026-08-21 capture do NOT map 1:1 onto the
-  book-count ladder, it is not `book_confidence` and the diagnosis is wrong.
-- Verification: unit tests that FAIL on the current code and pass after (the
-  `off != on` discipline), plus a read of the SERVED board — `boardContract.cards`,
-  not the raw shortlist row shape, per `state.md [layer2_board_display]`'s own
-  note that checking only the raw rows is not sufficient for this class of fix.
-- Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
-  `main` ships nothing until someone takes a claim and deploys it.
-
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **ALL FOUR ORIGINAL DEFECTS SHIPPED AND LIVE. Two later user asks (odds-range filter, alt-line filter) SHIPPED. Soccer join instrumented and 13 aliases shipped — THE ALIASES ARE NOT YET OBSERVED IN PRODUCTION, and that is the one open verification.**
+- Goal (met, except where noted): the Layer 2 board never shows a number
+  attributed to the sim that is about a different side, a different quantity, or
+  a different thing entirely.
+- **Testable outcomes (a)-(d) — side-correct `model_probability`, honest `Win%`,
+  no blank live `Projected`, live-sim dissent badge — ALL DONE**, verified in
+  tests and backend reads. **The SERVED-board read (`boardContract.cards`) was
+  never taken**: the agent proxy 403s `syndicate-an21.onrender.com` (`state.md`).
+- **OPEN, in priority order:**
+  1. **Verify the 13 soccer aliases in production.** Deployed `4eeffb5c`
+     18:18:05Z; no shortlist has completed since. Baseline to beat:
+     `unmatched_fixtures 12`, `unmatched_match 2587`,
+     `unmatched_by_league {belgian 5, epl 510, la_liga 972, ligue_1 240,
+     mls 247, primeira 6, serie_a 607}`. primeira_liga's two fixtures and the
+     PSG-home ligue_1 fixture have NO sim counterpart — fixture absence, not a
+     name problem; do not score them against the aliases.
+  2. **`unmatched_player: 5138`** — the largest soccer bucket, untouched.
+  3. **The one-sided fair value never reaching the live edge** (`todo.md #503`).
+     A PRICING decision, not a bug fix — deliberately not taken.
+  4. Release the refresh-worker deploy claim `188efafc1f8177ba` once (1) is read.
+- Files: `syndicate/features/shared/{layer2_board,prop_projections,live_projection_join,soccer_projections,team_aliases}.py`, `pipeline/layer2_shortlist.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/board_cards.css`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases}.py`, `tests/js/board_sim_view_display.test.mjs`.
+  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY 2026-08-22 from
+    `soccer-board-parity` (OPEN but UNOWNED since 2026-08-20). Attribution
+    counters and alias entries only; no join, pricing or board behaviour taken.
+    `board_enrichment.py`, also on that lane's list, deliberately untouched.
+- **Cross-lane, unowned, NOT fixed by me:**
+  `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
+  is RED on `main`. It is stale fallout from `28e55d86`, which deliberately made
+  `in -> post` possible; that session is active, so surfaced rather than edited.
+- Narrative, evidence and dead ends: `.syndicate/log/2026-08-22.md`.
+- Blocked by: none.
 ### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
 - Goal: a bet logged on the WEB service can be settled by the reconciliation
   autorun that runs on REFRESH-WORKER, so `/portfolio` stops reading every

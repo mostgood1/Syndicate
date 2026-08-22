@@ -4727,3 +4727,58 @@ up -- so it is recorded as a hypothesis for a fresh slice, not a result.
 panel of who is on top, which is what the user reads it for manually, and the
 sign convention is verified correct against live scorelines. It is a narrator.
 It is not a timing signal, and nothing should price off it.
+
+---
+
+## 2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will out-argue a fresh measurement
+
+Three related errors in one session, all the same shape: **treating a
+description of the system as the system.**
+
+**1. I diagnosed for two hours on a number the ledger had, and production
+didn't.** `state.md` said the soccer projection join served
+`rows_with_projection: 4` of 1,142. I quoted it forward as current, built a
+mechanism around it, wrote a `todo.md` item on it, and shipped instrumentation
+to explain it. The first real reading was **9,598 of 20,014 (48%)** — the join
+had been working since `#379`'s window fix actually ran. The figure predated
+that deploy and nobody had re-measured.
+
+**RULE: a number in `state.md` is a RECORD OF A MEASUREMENT, with a date and a
+deploy behind it. Before building on one, ask what would have changed it since —
+and if the answer is "a fix that has landed", re-measure first.** `state.md`'s
+own header says it is "current, verified system state"; that phrasing is what
+makes a stale row so persuasive. This is the third time this file has recorded a
+variant of *literally true and materially misleading* (see the `autoDeploy = no`
+entry). Mark the row SUPERSEDED with the new reading rather than deleting it, so
+the next reader can see the correction happened.
+
+**2. I read the absence of an instrument as the absence of the thing.** I
+claimed the Layer 2 shortlist "completed once in 34 minutes" and called it
+systemic starvation. The window I counted over **began before the log line
+existed** — it was deployed mid-window. Measured properly: 10-19 min from a cold
+boot, then every 4-6. I nearly wrote a second wrong figure into the ledger while
+correcting the first.
+
+**RULE: before concluding "X did not happen" from a log query, establish that
+the line COULD have been emitted over the whole window** — the code was deployed
+and the emitting path was reachable. A zero from a query whose instrument was
+half-deployed is not a zero.
+
+**3. My own instrument shipped useless and its first reading proved it.** The
+soccer coverage sampled the sim side by sorting every indexed fixture
+alphabetically and taking 12. It reliably returned the three leagues with almost
+no misses and dropped every league that actually had them — the board side named
+12 fixtures and the sim side could pair with **one**.
+
+**RULE: a sample must be drawn from the population the QUESTION is about, not
+from whatever a stable sort puts first.** An instrument that reliably samples
+the cases with nothing to report is worse than no instrument: it looks like an
+answer. Scoping it to the failing leagues made all twelve pairable in one
+reading and yielded 13 verified aliases within the hour.
+
+**AND THE COUNTERWEIGHT, because this session also got one right by design:**
+the `no_market_fair_value` split was built to CONFIRM the hypothesis that live
+`edged=0` was downstream of the pregame join. It read
+`{'no_fair_value_devig_failed': 133}` — 133 of 133 rows HAVE a pregame
+projection — and refuted it. An instrument built so that it CAN return the
+answer you do not want is the only kind worth deploying.
