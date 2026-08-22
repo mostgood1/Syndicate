@@ -23,6 +23,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.portfolio_commit import commit_portfolio
+from syndicate.features.shared.clv_position_join import (
+    join_positions_to_openings,
+    join_report_line,
+)
 from syndicate.features.shared.portfolio_settings import resolve_settings
 from syndicate.features.shared.refresh_state_store import (
     read_json_file,
@@ -133,6 +137,32 @@ def run_portfolio_commit(
         settled_sample_size_by_sport=settled_sample_size_by_sport,
     )
 
+    # Run the CLV join BEFORE the write, so its summary lands in the artifact the
+    # web service reads. Web must not compute -- `/portfolio/paper` would
+    # otherwise have to load ~3k opening records per request to show a match
+    # rate, which is exactly the recompute-in-a-request-handler the architecture
+    # forbids. The worker joins once; web reads the answer.
+    #
+    # `rows` is deliberately DROPPED from what gets stored: it duplicates every
+    # position and would roughly double an artifact that has an 8MB keyvalue
+    # refusal ceiling. The counters are what anybody reads.
+    clv_join = None
+    try:
+        report = join_positions_to_openings(plan.get("positions") or [], date=normalized)
+        print(join_report_line(report), flush=True)
+        for example in report.get("disagreement_examples") or []:
+            # A count says the derivation is wrong; an example says which field.
+            print(
+                f"[portfolio_commit] CLV_KEY_DISAGREEMENT position={example.get('position_key')} "
+                f"stamped={example.get('stamped')} derived={example.get('derived')}",
+                flush=True,
+            )
+        clv_join = {key: value for key, value in report.items() if key != "rows"}
+        plan["clv_join"] = clv_join
+    except Exception as exc:
+        # A DIAGNOSTIC must never cost a slate. The plan is complete either way.
+        print(f"[portfolio_commit] CLV_JOIN_FAILED date={normalized} error={exc}", flush=True)
+
     try:
         write_json_file(portfolio_plan_path(normalized), plan)
     except Exception as exc:
@@ -149,7 +179,7 @@ def run_portfolio_commit(
         f"refusals={plan.get('refusals')}",
         flush=True,
     )
-    return {"status": "ok", "date": normalized, "plan": plan}
+    return {"status": "ok", "date": normalized, "plan": plan, "clv_join": clv_join}
 
 
 def main() -> int:

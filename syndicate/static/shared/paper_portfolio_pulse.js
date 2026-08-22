@@ -102,6 +102,30 @@ window.SyndicatePaperPortfolioPulse = (function () {
     if (text) text.textContent = data.ledger_error || "";
   }
 
+  // Mirrors portfolio_paper.html's CLV tile exactly, including the precedence
+  // of its three meta lines: a key mismatch is reported ahead of a missing
+  // opening, because a derivation that drifted makes every CLV number suspect
+  // while a missing opening only loses that one row.
+  function clvTile(clv) {
+    if (clv.positions === null || clv.positions === undefined) {
+      return { label: "CLV openings", value: "—", meta: "plan predates the join" };
+    }
+    const matched = clv.matched || 0;
+    const positions = clv.positions || 0;
+    let meta = "joined to an opening price";
+    if ((clv.derivation_disagrees || 0) > 0) {
+      meta = `${clv.derivation_disagrees} key mismatch — CLV unsafe`;
+    } else if ((clv.no_key_match || 0) > 0) {
+      meta = `${clv.no_key_match} with no recorded opening`;
+    }
+    return {
+      label: "CLV openings",
+      value: `${matched}/${positions}`,
+      meta,
+      valueClass: matched < positions ? " warn" : "",
+    };
+  }
+
   function renderTiles(data) {
     const container = document.getElementById("paper-tiles");
     if (!container) return;
@@ -132,6 +156,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
         valueClass: unreconciled > 0 ? " warn" : "",
       },
       { label: "Filled stake", value: usd(ledger.filled_stake_dollars), meta: "at simulated fill price" },
+      clvTile(data.clv_join || {}),
       {
         label: "Sim coverage",
         value: pct0OrDash(coverage.share_with_sim_edge),

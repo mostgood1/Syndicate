@@ -204,6 +204,7 @@
 {% set ledger = p.ledger or {} %}
 {% set by_status = ledger.by_status or {} %}
 {% set coverage = p.sim_coverage or {} %}
+{% set clv = p.clv_join or {} %}
 {% set rows = p.rows or [] %}
 {% set bankroll = p.bankroll_units or 0 %}
 
@@ -287,6 +288,24 @@
       <div class="paper-tile__label">Filled stake</div>
       <div class="paper-tile__value">${{ "%.2f"|format(ledger.filled_stake_dollars or 0) }}</div>
       <div class="paper-tile__meta">at simulated fill price</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">CLV openings</div>
+      {% if clv.positions is not none %}
+        <div class="paper-tile__value{% if (clv.matched or 0) < (clv.positions or 0) %} warn{% endif %}">{{ clv.matched or 0 }}/{{ clv.positions or 0 }}</div>
+        <div class="paper-tile__meta">
+          {% if (clv.derivation_disagrees or 0) > 0 %}
+            {{ clv.derivation_disagrees }} key mismatch — CLV unsafe
+          {% elif (clv.no_key_match or 0) > 0 %}
+            {{ clv.no_key_match }} with no recorded opening
+          {% else %}
+            joined to an opening price
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">plan predates the join</div>
+      {% endif %}
     </div>
     <div class="paper-tile">
       <div class="paper-tile__label">Sim coverage</div>

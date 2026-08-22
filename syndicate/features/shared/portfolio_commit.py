@@ -115,6 +115,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from syndicate.features.bankroll_manager import apply_exposure_budgets, compute_board_stake
+from syndicate.features.shared.clv_position_join import opening_key_for_row
 from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
@@ -421,6 +422,17 @@ def commit_portfolio(
         position.update(
             {
                 "position_key": position_key(row),
+                # STAMPED FROM THE SAME ROW, IN THE SAME RUN. `record_openings`
+                # wrote this row's opening moments earlier in
+                # `layer2_shortlist.py`, from this same row -- so computing the
+                # ledger's key here is exact by construction rather than a
+                # reconstruction that has to be trusted. Stage C's whole gate is
+                # a CLV number, and a CLV number needs the opening this bet was
+                # taken against; `#505` is what a join keyed on a reconstruction
+                # costs (4,560 `no_key_match` of 8,276). `None` when the row
+                # cannot be keyed at all, which is the ledger's own rule applied
+                # by the ledger's own code.
+                "opening_key": opening_key_for_row(row),
                 "side": row.get("side"),
                 "line": row.get("line"),
                 "book": quote.get("bookmaker"),

@@ -3301,6 +3301,12 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "totals": (plan or {}).get("totals") or {},
         "refusals": (plan or {}).get("refusals") or {},
         "sim_coverage": (plan or {}).get("sim_coverage") or {},
+        # Stage C's precondition, reported every slate rather than discovered at
+        # the end of the window. Computed by the WORKER and read here -- web
+        # joining ~3k opening records per request would be a recompute in a
+        # request handler. Absent on plans committed before the join existed,
+        # which is why the page distinguishes "no join" from "matched nothing".
+        "clv_join": (plan or {}).get("clv_join") or {},
         "rows": rows,
         "orphan_orders": [
             order
