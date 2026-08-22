@@ -97,6 +97,10 @@ data/nfl_source/tracking/
 
 # Accidental/tooling virtualenvs outside the standard .venv/ name.
 vendor/mlb_bettingv2/.venv_x64/
+# A session needing to RUN the suite has to build one (this container ships no
+# Flask), and `.venv/` above does not match a suffixed name. 225 MB of vendored
+# binaries reached `git status` as untracked on 2026-08-22 for exactly that gap.
+.venv-*/
 
 # Ad hoc local test-run output, not source.
 /test_stdout.log
@@ -226,6 +230,13 @@ reports/sim_runs/
 # refresh_worker_status.json) which a directory rule would shadow.
 reports/refresh_status/latest/retention_cursor_local.json
 reports/refresh_status/latest/worker_drain_state_*.json
+
+# 2-year FotMob research cache: the 46MB RAW json is regenerable from the
+# committed .gz (scripts/soccer_fotmob_harvest_2y.py --help). Commit the gz.
+reports/soccer_backtest/fotmob_2y.json
+reports/soccer_backtest/fotmob_2y_shotsonly.json
+reports/soccer_backtest/fotmob_xg_fresh.json
+reports/soccer_backtest/fotmob_xg_cache.json
 
 # Test fallout: a literal Windows path used as a filename on Linux.
 # Committed by accident 2026-08-22 via `git add -A`; untracked again the same day.

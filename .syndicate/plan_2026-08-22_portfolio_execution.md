@@ -358,7 +358,7 @@ section argued against, though, and the distinction is the whole point:
 
 **Everything below still holds about what this does NOT establish.** It is a
 screen against an arithmetic failure, not evidence the sim is right. Full
-working: `todo.md #508`.
+working: `todo.md #510`.
 
 ### The original argument, kept because it is still the reason the cap is needed
 

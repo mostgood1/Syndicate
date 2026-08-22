@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#510` — **Stage B BUILT: the execution ledger, running on paper. Idempotent, write-ahead, two switches for real money. NOT DEPLOYED, dark by default.** — lane `portfolio-decision-and-execution`, 2026-08-22
+### `#512` — **Stage B BUILT: the execution ledger, running on paper. Idempotent, write-ahead, two switches for real money. NOT DEPLOYED, dark by default.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 `syndicate/features/shared/execution_ledger.py` + `pipeline/execute_portfolio.py`,
 behind `SYNDICATE_EXECUTION_ENABLED` (absent = off).
@@ -40,7 +40,7 @@ convenience flag that can reach real money is not a convenience.
 unknown result must not have a fresh slate stacked on it. Paper is not blocked
 (it cannot double-spend) but still reports the count.
 
-**STORAGE, resolved on `#506`'s measurement.** Keyvalue, **no date token** — a
+**STORAGE, resolved on `#508`'s measurement.** Keyvalue, **no date token** — a
 dated path takes the store's 10-day TTL and a record of money placed must not
 expire (pinned by a test). No Postgres, so no `blueprint_sync`. Because that
 makes it one growing document — the shape behind the 4.9GB-chunk incident —
@@ -63,11 +63,11 @@ Tests: `tests/test_execution_ledger.py` (32) + `tests/test_execute_portfolio.py`
 
 **NEXT IS STAGE C**, and it needs no new mechanism: run this on paper over a
 real dated window, then join CLV against Stage A's per-bet `attribution` to get
-the by-component decomposition `#507`/`#508` both point at. Stage D (real money)
+the by-component decomposition `#509`/`#510` both point at. Stage D (real money)
 stays gated on that plus `#502`'s `settled_count > 0`.
 
 
-### `#508` — **`_SCORE_SIM_WEIGHT` 0.0 → 0.125 WITH A HARD CAP. The fix is the CAP, not the coefficient — the same structural fix the movement term already had. Measured against the distribution that caused the zeroing. NOT DEPLOYED, and blocked cross-lane by a UI disclosure this makes false.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+### `#510` — **`_SCORE_SIM_WEIGHT` 0.0 → 0.125 WITH A HARD CAP. The fix is the CAP, not the coefficient — the same structural fix the movement term already had. Measured against the distribution that caused the zeroing. NOT DEPLOYED, and blocked cross-lane by a UI disclosure this makes false.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
 
 **THE USER ASKED FOR THIS DIRECTLY** after being told the sim contributes 0 to
 ranking. The prior gate (`settled > 0` before raising the weight) was a
@@ -129,7 +129,7 @@ and failed one that left behaviour identical. `learnings.md` 2026-08-20.
 
 **STILL A SCREEN, NOT A VALIDATION.** This proves the weight cannot repeat the
 2026-08-08 *arithmetic* failure. It does NOT prove the sim is RIGHT — that needs
-`settled > 0` and CLV decomposed by component, which `#507` now emits per bet.
+`settled > 0` and CLV decomposed by component, which `#509` now emits per bet.
 Until then the honest description is **"price-led, sim-breaks-ties"**, NOT "our
 model found these".
 
@@ -148,7 +148,7 @@ rendering the page and grepping the SERVED body rather than by reading the file.
 Both now state the cap. Verified: 0 occurrences of the stale claim in the served
 HTML, and the disclosure and tooltip both name the 1.5-point bound.
 
-### `#509` — **The blended score now gates ADMISSION, not just ordering. The sim could reorder the board but never put a row on it.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+### `#511` — **The blended score now gates ADMISSION, not just ordering. The sim could reorder the board but never put a row on it.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
 
 `_row_value_pct` read `ev_pct` FIRST and fell back to `score.value_pct` only
 when EV was absent — which on a scored row it never is, so the fallback was
@@ -186,7 +186,7 @@ assertion is not vacuously true. 975 passed across the
 PRE-EXISTING, verified by stashing and re-running.
 
 
-### `#506` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22
+### `#508` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **Measured 2026-08-22T19:0xZ via the Render API**, 24h at 1h resolution on
 `red-d88bvljbc2fs73epfhhg` (`syndicate-refresh-state`):
@@ -242,7 +242,7 @@ reports `write_not_durable` instead of returning "saved". A write that raises is
 easy; a write that returns cleanly and does not land is the one that costs you,
 and on this backend (payload guard + eviction policy) that is a real shape.
 
-### `#507` — **The sim is ALREADY 57.6% of a committed stake and is what picks the side — while contributing 0.0 to the ranking. Stage A now records the per-bet decomposition `_SCORE_SIM_WEIGHT`'s own comment says nobody could supply.** — lane `portfolio-decision-and-execution`, 2026-08-22
+### `#509` — **The sim is ALREADY 57.6% of a committed stake and is what picks the side — while contributing 0.0 to the ranking. Stage A now records the per-bet decomposition `_SCORE_SIM_WEIGHT`'s own comment says nobody could supply.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **"The board is EV only" is true of RANKING and false of SIZING.** Measured
 2026-08-22 on a representative row (`ev_pct 4.5`, `model_edge_pct 3.2`, -110,
@@ -313,7 +313,7 @@ production.** Stage A now emits `sim_coverage` (`rows_with_sim_edge`,
 answers it as a number.
 
 
-### `#505` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
+### `#507` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **The user asked whether the Layer 2 board / intelligence layer can be connected
 into the app to make portfolio decisions and actually place bets.** Answer, from
@@ -419,6 +419,132 @@ production reading is `off != on` on ONE date: plan artifact ABSENT with
 `/api/portfolio/plan?date=<d>`. **Do not report Stage A as working on the local
 run** — no production slate has been committed. Stages B-C do not wait on
 `#502`; Stage D does.
+
+### `#506` — **Web's intermittent 502s were `/healthz` starvation, not slow cold boots. Home made 15 live statsapi calls per request. FIXED, DEPLOYED AND MEASURED (3318-8400ms → 0-93ms); ONE SUB-ITEM UNVERIFIED.** — lane `render-web-request-path`, 2026-08-22
+
+**Cold boot was never the problem — 2.7s boot-to-listening.** Web was being
+SIGTERM'd every ~90s during live MLB slates with ~15s of no listener after each.
+Container `-2mdsk`, booted 17:12:55, **no deploy after 17:12:59**: terms at
+17:14:08 / 17:15:38 / 17:17:38, new gunicorn master pid each; healthz unanswered
+**84s** (17:16:34 → 17:17:58). `WORKER TIMEOUT`: zero in three days, so
+`GUNICORN_TIMEOUT=60` is EXONERATED.
+
+**Cause:** `_mlb_feed_live_payload` fell through to statsapi for every game
+because `raw/statsapi/feed_live/**` matches none of the 175
+`HOT_ARTIFACT_PATTERNS`. 15 uncached HTTPS calls per home request against 8
+request slots (`WEB_CONCURRENCY=2` × `GUNICORN_THREADS=4`).
+
+**SHIPPED (web `8149e51d`, 19:09:35Z), `apply_live_scores` on `games=15`:**
+
+    BEFORE  3318 / 7991 / 8400 / 5498 / 3494 / 3802 / 3694 ms
+    AFTER   0-93 ms (max 93, 14 samples, two instances, two deploys)
+
+Scores now come from `live_lens_report_<date>.json` — already allowlisted,
+republished ~60s, and it carries `gameLens[].progress.{inning,half,outs}` so the
+card's status line is reconstructed, not degraded. The residual statsapi path is
+single-flighted: at most one request thread can ever block on it.
+
+**DO NOT "FIX" THIS BY ALLOWLISTING `feed_live`.** It was the plan and it is a
+regression — `_mlb_feed_live_payload` gates on EXISTENCE, not freshness, so
+publishing it freezes every game at capture time (`#413`, measured 2026-08-13).
+It buys no speed either: those files are refreshed **prior-day only**.
+
+**OPEN — the only unverified half.** The `_MLB_CARDS_CONTEXT_CACHE` /
+`_MLB_TODAY_CACHE` idle bound (300s / 120s) targets a ratchet measured at
+369 MB → 2,026,717,200 B over ~7.5h, ceiling 2,147,483,600 B. Post-deploy numbers
+are directionally better at comparable ages and **that is not proof**. Blocked in
+practice: peers redeploy web every 20-30 min so no instance lives long enough.
+Instrument: memory-over-uptime + the rate of `CONTEXT_CACHE_EVICTED ... web=True`
+falling.
+
+**NEXT BOTTLENECK, now visible:** `build_cards_page_context` at 1803-2402 ms on a
+cache miss — the live-lens-mtime cache-key hypothesis in
+`.syndicate/scope_2026-08-21_home_request_path_compute.md`, still unaddressed.
+
+Detail: `state.md [web-request-path-latency]`, `log/2026-08-22.md`, `deploys.md`
+19:03Z.
+
+### `#505` — **The settlement join matched on an id that changes every time the price moves. That is the `matched: 0` / `4,560 no_key_match`, and it is why `/portfolio` never settles.** — lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
+
+**`recommendation_id` is not an identity, it is a snapshot hash.**
+`record_recommendation` mints it as `_stable_id("rec", {...})` over
+`prediction_id` + the **whole recommendation payload** + `artifact_metadata`.
+`pipeline/intelligence_state.py:2028` already says the consequence out loud:
+those ids come "from a content hash of the full recommendation payload (incl.
+live odds/edge/probability)", so a rebuild "would mint a fresh 'new' pending row
+almost every cycle purely from ordinary price drift".
+
+The board re-records **150 recommendations per rebuild**
+(`BOARD_STATE_LEDGER_RECORDED`, live today). So:
+
+    user clicks a bet  -> stores the id on screen at that instant
+    price drifts       -> board mints a NEW id for the SAME wager
+    settlement decides -> settles the LATER snapshot, under the later id
+    the bridge joins   -> the two ids never meet
+
+That is the whole defect. It also explains the chunk sizes nobody liked
+(95-332MB/day): the same opportunities re-recorded under fresh ids all day.
+
+**This was mis-scoped for most of a session, mine included.** `#502` (the
+service split), `#503`'s window, `#504` (chain position) and the lookback widen
+are all real and all necessary — and none of them could ever have moved
+`parlays_settled` off 0, because the join underneath was matching on a value
+that does not survive a price tick. Chasing the schedule was chasing the wrong
+layer.
+
+**THE FIX — a second tier, not a replacement.**
+`ledger_bridge._settlement_identity()`: a stable, content-addressed key modelled
+on `clv_opening_ledger._opening_key`, which solves the same problem and reports
+`unkeyable=0` on 1,538 real rows today. Two differences from it, one chosen and
+one forced:
+
+- **bookmaker REMOVED, deliberately.** An outcome is book-independent; a price
+  is not. Keeping it would split one settled result across every book quoting it.
+- **segment REMOVED, forced.** The bet slip captures exactly
+  `recommendation_id, pick, line, event_id, game_date`. Segment is not among
+  them, so an identity carrying it could never match a portfolio bet at all.
+
+**AND THE REFUSAL THAT GOES WITH IT.** Dropping `segment` collapses a first-half
+and a full-game bet onto one key. `learnings.md` 2026-08-15 is explicit — *never
+treat equality of a LABEL as identity of a BET* — so `_outcome_by_identity`
+marks a key whose settled records DISAGREE as `_AMBIGUOUS` and **refuses to
+settle from it**, counted as `identity_ambiguous`. Records that AGREE are the
+normal case (one wager, many drifting ids) and collapse cleanly.
+
+Tier 1 (exact `recommendation_id`) is kept and tried first: when it matches
+there is no inference in it, and it costs nothing.
+
+**THE INSTRUMENT, which is half the value.** The old summary was
+`straight_settled / parlays_settled / skipped`, and `skipped: 25131` on
+2026-08-22 could not distinguish "the window held nothing settled" from "the ids
+drift". This repo's own note on the settlement join says the same thing —
+*"4,560 `no_key_match` of 8,276 with no per-reason breakdown deeper than the
+name"*. Now reported: `matched_by_id`, `matched_by_identity`, `index_sizes`
+(`by_id` / `by_identity` / `ambiguous`), and `skip_reasons`
+(`no_settled_match` / `unkeyable_bet` / `identity_ambiguous` /
+`parlay_legs_undecided`).
+
+**A SILENT NO-OP CAUGHT BEFORE IT SHIPPED.** The worker accumulated the bridge
+summary with `if isinstance(value, (int, float))`, which drops nested dicts on
+the floor — the entire breakdown would have been computed every run and reached
+**no log**. Fixed to merge one level deep, and the print truncation raised
+400 -> 1200 (a truncated JSON summary reads as valid while losing the counters
+that say why).
+
+Tests: `tests/test_ledger_bridge_identity_join.py` (15). **13 of 15 fail on the
+pre-fix code**; the 2 that pass either way assert unchanged behaviour (exact-id
+tier still wins; the parlay signature stays backward compatible). The existing
+`test_ledger_bridge.py` (11) passes untouched — this is additive.
+
+**NOT DEPLOYED, and the field mapping is a HYPOTHESIS until a real run reports
+on it.** `entity` is taken as the first of
+`player_name / player / name / team / selection` on both sides; that mapping is
+reasoned from the bet slip's own comments, not measured against production
+records, because the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`. **The breakdown above is what will falsify it**: a run
+returning `by_identity` large and `matched_by_identity: 0` means the mapping is
+wrong, and `unkeyable_bet` counts how many bets cannot key at all. That is the
+reading to take first, before any further tuning.
 
 
 ### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED

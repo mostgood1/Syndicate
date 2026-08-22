@@ -453,7 +453,7 @@ def _env_float(name: str, default: float) -> float:
 # WHAT IT DOES NOT BUY. This is a SCREEN, not a validation: it proves the weight
 # cannot repeat the 2026-08-08 arithmetic failure. It does NOT prove the sim is
 # RIGHT, which still needs `settled > 0` and CLV decomposed by component. Stage
-# A's `stake_attribution` now emits that decomposition per bet (`todo.md #507`),
+# A's `stake_attribution` now emits that decomposition per bet (`todo.md #509`),
 # so for the first time the follow-up measurement is possible. Until it lands,
 # the honest description of the board is "price-led, sim-broken-ties", NOT "our
 # model found these" -- and the surface must still say so.

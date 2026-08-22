@@ -22748,3 +22748,295 @@ default closed (the main line of every market survives, so the board stays
 populated and the omission is named and recoverable). Both rules are asserted in
 `tests/js/board_sim_view_display.test.mjs` so a later change cannot swap which
 control gets which rule.
+
+## 2026-08-22T18:46:34Z — `#505` recommendation_id identity join, refresh-worker, `a1e89ff3`
+
+`dep-da4ut2ijobas73d0p030`. refresh-worker ONLY — `ledger_bridge` is called from
+`run_refresh_worker.py` and nowhere web or live-odds executes.
+
+**BEFORE:** live `4eeffb5c` (18:18:05Z). Composition checked both directions:
+`a1e89ff3` contains `4eeffb5c` (no revert) and contains `#505`. Verified BY
+CONTENT on the deploying tree, not by ancestry alone — 10 occurrences of
+`_settlement_identity`/`_AMBIGUOUS` in `ledger_bridge.py`, 3 of the accumulator
+fix in `run_refresh_worker.py`. Nothing substantial in flight at trigger time:
+one process, no MLB sim, no soccer subprocess, 63.1% memory.
+
+**`deploy_preflight.py` STILL COULD NOT RUN** — no `RENDER_API_KEY` in this
+session. No CLEAR verdict for this SHA. Claim held; on-main verified with git.
+
+**WHAT THIS CHANGES THAT THE OTHERS DID NOT: it writes to the portfolio.**
+`#502`/`#504` moved data and scheduling; this decides OUTCOMES on user bets. So
+the failure mode worth naming is a FALSE settle, not a missed one.
+
+**Why a false settle is unlikely BY CONSTRUCTION, not by hope.** The collapsed
+key (segment dropped) can only merge records that share
+`event_id|market|entity|side|line`. If those records DISAGREE on outcome the
+index marks `_AMBIGUOUS` and refuses. If they AGREE, settling from the merged
+key gives the same answer either constituent would have — so the collapse is
+safe precisely where it is lossy. The residual risk is a wrong `entity` mapping
+producing a match against a DIFFERENT wager, and `event_id`+`market`+`side`+
+`line` all agreeing by coincidence is a narrow target.
+
+**VERIFY — the reading, and what would FALSIFY the fix.** Next `[ledger_bridge]`
+line, now carrying a per-reason breakdown:
+
+    matched_by_identity > 0                      -> the join works
+    index_sizes.by_identity large + matched 0    -> the ENTITY MAPPING IS WRONG
+    skip_reasons.unkeyable_bet high              -> bets cannot key at all
+    skip_reasons.identity_ambiguous > 0          -> the segment collapse is biting
+
+**The entity mapping (`player_name/player/name/team/selection`) is a HYPOTHESIS.**
+It is reasoned from the bet slip's own comments, NOT measured against production
+records — the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`, so it cannot be read from any service with an API. The
+breakdown above is the instrument that settles it. Do not tune anything until
+that reading exists.
+
+**Timing: the daily gate still holds.** Settlement ran 17:28Z, so this does not
+run again until 2026-08-23 after 06:00 CT. It should now get a PROMPT tick
+(`#504`), rather than waiting on a soccer spacing-gate coincidence.
+
+---
+
+## 2026-08-22 19:03Z — web `8149e51d` — home's statsapi fan-out and the card-cache retention buffer
+
+**Lane:** `render-web-request-path`. **Claim:** web, held by that lane, token
+`ab6c087b…`. **Contains** `c02b07e6` (my merge to main), verified by CONTENT not
+just ancestry: 14 `home.py` symbol hits, 6 `cards.py`. Render deployed the branch
+tip `8149e51d` rather than the `commitId` passed, because a peer pushed to main
+in the 40s between my push and the trigger — checked rather than assumed.
+
+**WHAT SHIPPED** (three changes, one theme):
+1. home no longer calls statsapi per game — live scores come from
+   `live_lens_report_<date>.json`, already allowlisted and already on web's disk.
+2. the residual statsapi path is SINGLE-FLIGHTED: at most one request thread can
+   ever block on it.
+3. the two MLB card caches gain an IDLE bound (not age-since-insert), so a hot
+   key is never dropped and dead generations are.
+
+**NOT DONE, DELIBERATELY:** allowlisting `raw/statsapi/feed_live`. It was the
+plan and it was a regression — `_mlb_feed_live_payload` takes the file if it
+EXISTS with no freshness check, so publishing it freezes every game at capture
+time (`#413`, measured 2026-08-13). It would also have bought no speed: the
+vendor pipeline only refreshes those files prior-day, calling its own cache "a
+stale pregame cache entry".
+
+**DEVIATION, STATED:** `deploy_preflight.py` was NOT run to CLEAR. It needs
+`RENDER_API_KEY`, absent here, and would have returned UNKNOWN regardless —
+**zero `ALL_PROCESS_MEMORY` lines on web in the preceding 2 hours**, confirming
+`state.md [web-preflight-dead-sample]` is still live (dead since 2026-08-14).
+The other three gates were checked by hand and pass: target on `origin/main`,
+claim mine, not redundant against live `28b2c706`. The gate's purpose — jobs in
+flight a deploy would kill — does not apply to web, which runs none by design.
+
+**BEFORE (the numbers this must beat):**
+
+    restarts        3 unexplained `Handling signal: term` in 4 min on one
+                    container (`-2mdsk` 17:14:08 / 17:15:38 / 17:17:38), new
+                    gunicorn master pid each, ~15s no listener after each
+    healthz         unanswered 84s (17:16:34 -> 17:17:58)
+    apply_live_scores  3318 / 7991 / 8400 / 5498 / 3494 ms  (8400 > the 8000ms
+                    budget, i.e. the wall clock was exhausted)
+    p95 latency     0.8-1.5s baseline, spiking 11.9 -> 18.4 -> 26.5 -> 30.5s
+    memory          instance `-hpvr8`, booted 18:43:  405 MB @2min ->
+                    1014 MB @7min -> 1048 MB @12min, ceiling 2,147,483,600 B
+
+**VERIFY — MEASUREMENT PENDING, nothing here is proven yet.** Two readings, and
+they are INDEPENDENT so a null on one is still attributable:
+  (a) `apply_live_scores` < 50ms and zero unexplained `term` across a live slate
+      -> changes 1 and 2 work. Same numbers unchanged -> they do not.
+  (b) memory at ~60 min post-boot materially under the 18:43 curve above
+      -> change 3 works. `CONTEXT_CACHE_EVICTED ... web=True` should also become
+      RARE; unchanged rate means the idle purge is not firing.
+
+**Rollback:** `trigger_deploy` with `28b2c706d55faa4377b90194a13198192eaeca47`
+(verified an ancestor of origin/main, so a clean target).
+
+**READING — 2026-08-22 19:26Z. CHANGES 1 AND 2 ARE PROVEN. CHANGE 3 IS NOT.**
+
+**`apply_live_scores`, the number this deploy existed to move, on `games=15`:**
+
+    BEFORE   3318 / 7991 / 8400 / 5498 / 3494 / 3802 / 3694 ms
+    AFTER      10 /    0 /   10 /    0 /    0 /   61 /   64 /    0 /
+                0 /    0 /   11 /    0 /    0 /   93 ms
+
+**0-93 ms against 3318-8400 ms — ~100x, max 93ms over 14 samples.** Held across
+TWO instances and TWO deploys (`-ml2r8` 19:09, `-79r7g` 19:21), so it is not a
+warm-cache artifact of one boot. Predicted "<50ms"; actual max 93ms — the
+prediction was slightly optimistic and is recorded as stated, not adjusted after
+the fact.
+
+**The lens IS resolving in production, by inference and it is a sound one:** a
+missing or stale report returns `{}`, which sends all 15 games to the statsapi
+path, where the single-flight HOLDER still pays the full fetch. Not one sample
+shows seconds. If the lens were not resolving, the holder's cost would appear.
+
+**No restarts, no errors:** zero `Handling signal: term`, zero `Booting worker`,
+zero `Traceback` on `-ml2r8` between 19:09:35 and its replacement, and none on
+`-79r7g` since. Against 3 unexplained terms in 4 minutes pre-deploy.
+
+**CHANGE 3 (the memory idle bound) IS NOT ESTABLISHED, and may not be today.**
+
+    baseline `-hpvr8`  405 MB @+2min   1014 MB @+7min   1048 MB @+12min
+    after    `-ml2r8`  844 MB @+5min    950 MB @+10min
+    after    `-79r7g`  818 MB @+3min
+
+Directionally better at comparable ages, but these windows are FAR too short:
+the failure being fixed is a ratchet to 2,026,717,200 B over ~7.5 hours. **The
+obstacle is structural — peer sessions are deploying web every ~20-30 minutes
+(18:39, 19:03 mine, 19:18), so no instance survives long enough to produce the
+reading.** Do not record change 3 as working on the numbers above. The
+instrument remains memory-over-uptime plus a drop in the rate of
+`CONTEXT_CACHE_EVICTED ... web=True`.
+
+**NEXT BOTTLENECK, now visible because the old one is gone:**
+`build_cards_page_context` is the dominant term at 1803 / 2402 / 1909 / 2294 ms
+on a cache miss. That is the live-lens-mtime cache-key hypothesis from
+`scope_2026-08-21_home_request_path_compute.md`, still unaddressed. Not fixed
+here and not claimed.
+
+**A PEER DEPLOYED WEB AT 19:18 WHILE THIS LANE HELD THE CLAIM** (`3ada3512`,
+another session's `tmp-land` merge). Recorded as fact, not blame — the claim
+tool showed web HELD by `render-web-request-path` at acquire time. **My work
+survived it**, verified BY CONTENT and not by ancestry alone: 14 `home.py`
+symbol hits and 6 `cards.py` hits in `3ada3512`, and `apply_live_scores` still
+0-93ms on `-79r7g` afterwards. This is exactly the 2026-08-15 silent-revert
+check, run rather than assumed — it came back clean because their branch had
+merged `origin/main` after mine landed.
+## 2026-08-22 ~19:19Z — `3ada3512` — WEB + refresh-worker — four of five reported board defects
+
+Lane `layer2-sim-view-and-live-projection`. Claims `de7fb84df009c4ce` (web),
+`b201b54a07da1fe4` (worker). Both deploys carry exactly `3ada3512` — the SHA
+read before triggering, no drift, verified on each.
+`deploy_preflight.py` still cannot run (no `RENDER_API_KEY`): **no CLEAR
+verdict**; on-main checked with git, in-flight jobs by hand.
+
+**WHAT WAS KILLED, and the judgement behind it.** The user's condition was
+"deploy it once the sim finishes", meaning the 15-game `props_now_available`
+run. **That one completed** (gone from `processes[]` by 19:17:10Z, ~26 min).
+What the worker deploy DID kill was a *different* job that started after it: a
+5-game `fingerprint_change` re-sim (pid 680), ~1 minute into its vendor chain,
+plus a `serie_a` artifact build and a season-manifest build. Judged acceptable
+and stated rather than glossed:
+
+- `fingerprint_change` sims re-fire automatically on the next odds change; this
+  one was a minute old.
+- Waiting for "no sim at all" is unbounded — three fired in the 2.5 hours
+  before this (17:02 2-game, 18:51 15-game, 19:16 5-game).
+- **Memory was at 96.8% of 4,096 MB with 132 MB headroom** and 2,019 MB
+  "unexplained". A restart reclaims that (measured today: 90.9% → 15.6%), so the
+  deploy relieves a real risk rather than only costing one.
+
+**SHIPPED — four of the five defects the user reported at ~19:1xZ:**
+
+1. **The alt-line filter did not work on soccer.** v1 tested the market name for
+   a `_alt` suffix; soccer has no such market (`DEFAULT_GAME_MARKETS` is
+   `h2h/totals/spreads`) and expresses alts as several rows of ONE market at
+   different lines. Now: `_alt` suffix OR not the primary line of its
+   (event, market, segment, player) group. Primary = most books quoting, ties to
+   median then lower line, deterministic across renders.
+2. **Bet slip defaults minimized**, persisted; only a literal `"false"` opens it.
+3. **`LAYER2_BOARD_HEALTH`** per sport, over published rows.
+4. **Player-miss attribution** (`player_no_roster` vs `player_name_miss`).
+
+**NOT FIXED — and the deploy must not be read as fixing them.** Stale lines,
+blank projections and absent movement are now MEASURABLE, not repaired. They
+were the three reports that could only be checked by eyeballing the page.
+
+**VERIFY — two log reads and four page reads.**
+
+Logs (mine to take):
+
+    LAYER2_BOARD_HEALTH sport=soccer
+      no_proj / live_proj / edged   -> "projections all blank"
+      age_p50s / p90s / maxs        -> "extremely stale lines"
+      all_movement_eligible vs matched -> "line movement non-existent"
+    PREGAME_PROJECTION_JOIN sport=soccer
+      player_no_roster vs player_name_miss -> who owns the 6,056
+
+Page (the user's — the proxy 403s the host from this container):
+
+    (a) clicking an alt-line tab highlights it
+    (b) default load shows NO soccer alt lines AND the board is not empty
+    (c) bet slip opens minimized
+    (d) counts strip moves with filters
+
+A LEAD ALREADY IN HAND for the staleness report, not yet confirmed as the cause:
+`soccer_source/data/book_grid/book_grid_2026-08-22.json` is **14.3 MB, above the
+publish sweep's repair limit**, and appears in `SWEEP_SKIPPED_DETAIL` on every
+cycle. Direct stream publishes succeed; if one misses, nothing repairs it and
+the board keeps serving the last copy. The health line's age percentiles will
+confirm or kill this.
+
+### LIVE — `3ada3512` on both services, and the memory question answered
+
+    web             live 19:21:49Z  (dep-da4vbr2jobas73d278ug)
+    refresh-worker  live 19:23:21Z  -> superseded 19:29:37Z by
+                    dep-da4vh5fqj5pc73bbhtag, trigger `service_updated`,
+                    SAME COMMIT `3ada3512`. Someone changed a service setting;
+                    the redeploy carries the identical SHA, so the
+                    instrumentation is live either way. Checked rather than
+                    assumed — a `deactivated` status on my own deploy id looked
+                    at first like the work had been rolled back.
+
+**MEMORY — measured, and it settles the "unexplained" question.**
+
+    before deploy  19:18:15Z   3,963 MB   96.8%   unexplained 2,019 MB
+    after restart  19:33:08Z      93 MB    2.3%   unexplained     2.9 MB
+
+A 42x drop, and the unexplained pool went to essentially nothing. Consistent
+with the 90.9% -> 15.6% reading earlier today. **The accumulation is
+uptime-driven and a restart fully reclaims it** — it is not a leak that survives
+a process, and it is not any single job's working set. That is now measured
+twice on the same day rather than inferred once.
+
+Both claims released (`de7fb84df009c4ce`, `b201b54a07da1fe4`).
+
+**STILL UNREAD:** `LAYER2_BOARD_HEALTH` has never appeared — the worker
+restarted at 19:29:37Z and the first shortlist of a cold boot is 10-19 minutes
+out. The three user reports it exists to answer (stale lines, blank projections,
+absent movement) remain UNDIAGNOSED. Nothing below or above should be read as
+having explained them.
+
+---
+
+## 2026-08-22 ~19:39Z — `ffa8e4df` — BOTH WORKERS — the publisher repair path (`6b193fee`)
+
+Claims `579afff01cbf6043` (refresh-worker), `015337abad508f7c` (live-odds-worker).
+Deployed `ffa8e4df`; `merge-base --is-ancestor 6b193fee ffa8e4df` verified before
+claiming it shipped. `deploy_preflight.py` still cannot run (no
+`RENDER_API_KEY`) — **no CLEAR verdict**.
+
+**WEB DELIBERATELY NOT DEPLOYED.** The fix is in the SWEEP, which runs on the
+workers (`live_lens_loop.py`, `live_refresh_loop.py`, `run_queued_refresh_job.py`,
+`run_mlb_daily_sim_job.py`). Web is the RECEIVER. A web deploy costs a
+user-visible ~90s of 502s at cutover — measured 18:43-18:44Z on the user's own
+browser — and spending that for a change web does not execute would be a cost
+with no benefit. Web stays on `3ada3512`, which already carries every
+user-facing fix.
+
+**live-odds-worker included after checking, not assumed.** `grep` for the sweep
+entrypoints put them in `live_refresh_loop`/`live_lens_loop`, and
+`render.yaml:748` runs `run_live_odds_refresh_worker.py` — so it sweeps too and
+had the same missing retry path.
+
+**KILLED:** a 4-game `fingerprint_change` MLB re-sim (pid 66) and a
+`build_season_betting_cards_manifest` run. Auto-refiring; memory was healthy
+(35%) so this deploy was NOT relieving pressure the way 19:20Z's was — the only
+justification here is the user's explicit "deploy it".
+
+**A COST WORTH NAMING:** this restarts the worker again, so the FIRST-EVER
+`LAYER2_BOARD_HEALTH` reading — already pushed back by the 19:29:37Z
+`service_updated` redeploy — moves out another 10-19 minutes. The three user
+reports it exists to answer are still undiagnosed, and this deploy delays that
+answer rather than advancing it.
+
+**VERIFY — and note it CANNOT be verified by absence.** The repair path only
+fires when a direct publish fails, and soccer's have been succeeding all day. So
+a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
+
+    [artifact_publisher] SWEEP_REPAIRING path=<...> reason=direct_publish_failed bytes=<...>
+
+printed only when the exemption actually engages. Until that line appears after
+a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
+IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.

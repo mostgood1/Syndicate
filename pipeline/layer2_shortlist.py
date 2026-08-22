@@ -419,6 +419,14 @@ def build_layer2_shortlist(
                         f"matches_in_source={proj_stats.get('matches_in_source')} "
                         f"unmatched_match={proj_stats.get('unmatched_match_rows')} "
                         f"unmatched_player={proj_stats.get('unmatched_player_rows')} "
+                        # The player bucket is now the LARGEST and had no
+                        # attribution at all -- same contract the league split
+                        # already meets one level up.
+                        f"player_no_roster={proj_stats.get('player_miss_no_roster')} "
+                        f"player_name_miss={proj_stats.get('player_miss_name')} "
+                        f"matches_with_players={proj_stats.get('matches_with_players')} "
+                        f"board_players={proj_stats.get('unmatched_player_sample')} "
+                        f"sim_players={proj_stats.get('sim_roster_sample')} "
                         f"unsupported_market={proj_stats.get('unsupported_market_rows')} "
                         f"reason={proj_stats.get('reason')} "
                         f"error={proj_stats.get('error')} "
@@ -687,6 +695,71 @@ def build_layer2_shortlist(
         shortlist["movement_rows_matched"] = -1
     if openings_error:
         shortlist["openings_error"] = openings_error
+
+    # PER-SPORT HEALTH OF THE ROWS ACTUALLY PUBLISHED (`#505`).
+    #
+    # Every counter above describes a STAGE — the join, the ledger, the grid.
+    # None of them describes THE BOARD, and three separate user reports on
+    # 2026-08-22 were about the board: stale lines, blank projections, no
+    # movement. Each was answerable only by eyeballing the served page, which
+    # is the position `#296` exists to prevent.
+    #
+    # Counted over `shortlist["rows"]` — what a reader actually sees — and split
+    # per sport, because soccer's answer and MLB's are different and a combined
+    # number hides both.
+    try:
+        published_rows = shortlist.get("rows") or []
+        health: dict[str, dict[str, object]] = {}
+        ages_by_sport: dict[str, list[float]] = {}
+        for row in published_rows:
+            slug = str(row.get("sport") or "?").strip().lower() or "?"
+            bucket = health.setdefault(
+                slug,
+                {"rows": 0, "pregame_proj": 0, "live_proj": 0, "no_proj": 0, "edged": 0},
+            )
+            bucket["rows"] = int(bucket["rows"]) + 1  # type: ignore[call-overload]
+            projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else None
+            basis = str((projection or {}).get("basis") or "").strip()
+            if not projection:
+                bucket["no_proj"] = int(bucket["no_proj"]) + 1  # type: ignore[call-overload]
+            elif basis == "live_resim":
+                bucket["live_proj"] = int(bucket["live_proj"]) + 1  # type: ignore[call-overload]
+            else:
+                bucket["pregame_proj"] = int(bucket["pregame_proj"]) + 1  # type: ignore[call-overload]
+            if (projection or {}).get("edge_vs_market_pct") is not None:
+                bucket["edged"] = int(bucket["edged"]) + 1  # type: ignore[call-overload]
+            age = row.get("age_seconds")
+            if isinstance(age, (int, float)):
+                ages_by_sport.setdefault(slug, []).append(float(age))
+        for slug, bucket in health.items():
+            ages = sorted(ages_by_sport.get(slug) or [])
+            if ages:
+                # p50/p90/max rather than a mean: one dead line among fresh ones
+                # barely moves a mean, and a dead line is exactly the complaint.
+                bucket["age_p50_s"] = int(ages[len(ages) // 2])
+                bucket["age_p90_s"] = int(ages[min(len(ages) - 1, int(len(ages) * 0.9))])
+                bucket["age_max_s"] = int(ages[-1])
+        for slug, bucket in sorted(health.items()):
+            print(
+                f"[layer2_shortlist] LAYER2_BOARD_HEALTH sport={slug} "
+                f"rows={bucket.get('rows')} "
+                f"pregame_proj={bucket.get('pregame_proj')} "
+                f"live_proj={bucket.get('live_proj')} "
+                f"no_proj={bucket.get('no_proj')} "
+                f"edged={bucket.get('edged')} "
+                f"age_p50s={bucket.get('age_p50_s')} "
+                f"age_p90s={bucket.get('age_p90_s')} "
+                f"age_maxs={bucket.get('age_max_s')} "
+                # Cross-sport, stated as such so nobody reads them as this
+                # sport's: they are computed once over the whole shortlist.
+                f"all_openings_loaded={shortlist.get('openings_loaded')} "
+                f"all_movement_eligible={shortlist.get('movement_eligible_rows')} "
+                f"all_movement_matched={shortlist.get('movement_rows_matched')}",
+                flush=True,
+            )
+        shortlist["board_health_by_sport"] = health
+    except Exception:
+        pass
 
     # RECORD THE OPENING PRICE OF EVERY ROW WE ARE ABOUT TO PUBLISH (audit §7 #1).
     #

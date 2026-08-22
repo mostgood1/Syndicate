@@ -1450,12 +1450,40 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     gameline = row.get("live_gameline") if isinstance(row.get("live_gameline"), Mapping) else {}
     out: dict[str, Any] = {}
 
+    # A GAME-LINE `live_projected` IS A PROBABILITY, NOT A COUNT — and it was
+    # being published as both `live_projection` and `live_total`.
+    #
+    # `live_gameline_join._apply_verdict` is called with
+    # `live_projected=verdict["model_prob"]` for EVERY game market (h2h, totals
+    # AND spreads, `live_gameline_join.py:876`), so the value is 0..1. The board
+    # then rendered it through `displayLiveProjection`'s `toFixed(1)`: a live
+    # moneyline at 19% read **"0.2"** in the Live column, and a totals row
+    # claimed a live projected total of 0.2 goals. That is worse than the blank
+    # it replaced — an em dash says "we do not know", "0.2" says something false
+    # about the match.
+    #
+    # `live_total` was the sharper error of the two: the name asserts a goal/run
+    # total outright, and `displayLiveProjection` falls back to it for game rows
+    # specifically.
+    #
+    # So a probability now goes ONLY to `live_model_probability` (below), which
+    # is what it is, and the template renders that as a percentage for game
+    # markets — mirroring what `displayProjection` already does for the pregame
+    # column, which learned this same lesson on 2026-08-20 ("109 of 114 h2h rows
+    # were blank here for exactly that reason").
+    #
+    # A PROP's `live_projected` is a genuine count (shots, points) and is
+    # unaffected: it comes from `live_projection_join`, not from the gameline
+    # block, and that path is left exactly as it was.
     live_value = _as_float(projection.get("live_projected"))
-    if live_value is None:
-        live_value = _as_float(gameline.get("live_projected") or gameline.get("projected"))
-    if live_value is not None:
+    if live_value is not None and not gameline:
         out["live_projection"] = live_value
         out["live_total"] = live_value
+    elif gameline:
+        # The one number on the gameline block that IS a count.
+        total_mean = _as_float(gameline.get("total_mean"))
+        if total_mean is not None:
+            out["live_total"] = total_mean
 
     live_prob = _as_float(
         projection.get("live_model_prob_over")

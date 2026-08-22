@@ -381,9 +381,83 @@
     return [{ value: "all", label: "All bet types" }, ...tabs];
   }
 
+  // WHAT MAKES A ROW AN ALT LINE — and the first version of this got it wrong
+  // for the sport that needed it most.
+  //
+  // v1 tested the MARKET NAME for a `_alt` suffix, because MLB and NFL quote
+  // `totals_alt` / `spreads_alt` as distinct markets. **Soccer has no such
+  // market**: `fetch_soccer_oddsapi_odds_local.DEFAULT_GAME_MARKETS` is exactly
+  // `["h2h", "totals", "spreads"]`. It expresses the same concept as SEVERAL
+  // ROWS OF ONE MARKET at different lines — totals at 1.5, 2.5, 3.5 — so the
+  // suffix test matched nothing at all and "Main lines only" left every soccer
+  // alt line on the board. Reported by the user, correctly.
+  //
+  // So a row is an alt line if EITHER holds:
+  //   * its market is explicitly an alt market (`_alt` suffix), or
+  //   * it is not the PRIMARY line of its (event, market, segment) group.
+  //
+  // PRIMARY = most books quoting, because that is what "the" line means to a
+  // book. Ties break toward the line closer to the group median, then on the
+  // line value itself so the choice is deterministic across renders — an
+  // unstable primary would make rows flicker in and out on every refresh.
+  //
+  // Groups are computed once per render (`altGroupPrimary`) rather than per
+  // row: this runs inside a filter over every item, and a per-row scan would be
+  // O(n^2) on a 20,000-row slate.
+  let altPrimaryByGroup = new Map();
+
+  function altGroupKey(item) {
+    return [
+      String(item.event_id || item.game_pk || ""),
+      String(item.market || item.market_key || "").trim().toLowerCase(),
+      String(item.segment || "full"),
+      // Player props are per-player ladders; one player's 0.5/1.5/2.5 must not
+      // be judged against another's.
+      String(item.player_name || ""),
+    ].join("|");
+  }
+
+  function rebuildAltGroups(items) {
+    const groups = new Map();
+    for (const item of items) {
+      const line = numericValue(item.line);
+      if (line === null) continue;            // no line: cannot be an alt of anything
+      const key = altGroupKey(item);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({
+        line,
+        books: Number((item.quote && item.quote.books_quoting) || item.books_quoting || 0) || 0,
+      });
+    }
+    const primary = new Map();
+    for (const [key, rows] of groups) {
+      const lines = [...new Set(rows.map((r) => r.line))].sort((a, b) => a - b);
+      if (lines.length <= 1) continue;        // a single line is never "alt"
+      const median = lines[Math.floor(lines.length / 2)];
+      const byLine = new Map();
+      for (const r of rows) byLine.set(r.line, Math.max(byLine.get(r.line) || 0, r.books));
+      let best = null;
+      for (const line of lines) {
+        const cand = { line, books: byLine.get(line) || 0 };
+        if (
+          best === null
+          || cand.books > best.books
+          || (cand.books === best.books && Math.abs(cand.line - median) < Math.abs(best.line - median))
+          || (cand.books === best.books && Math.abs(cand.line - median) === Math.abs(best.line - median) && cand.line < best.line)
+        ) best = cand;
+      }
+      primary.set(key, best.line);
+    }
+    altPrimaryByGroup = primary;
+  }
+
   function isAltLine(item) {
     const market = String((item && (item.market || item.market_key)) || "").trim().toLowerCase();
-    return market.endsWith("_alt");
+    if (market.endsWith("_alt")) return true;
+    const key = altGroupKey(item);
+    if (!altPrimaryByGroup.has(key)) return false;   // single-line group
+    const line = numericValue(item.line);
+    return line !== null && line !== altPrimaryByGroup.get(key);
   }
   const VIEW_TABS = [
     { value: "cards", label: "Cards" },
@@ -1021,9 +1095,32 @@
     const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
     const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
     const projection = isProp ? item.live_projection : (item.live_projection ?? item.live_total);
-    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
-    const numeric = Number(projection);
-    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
+      const numeric = Number(projection);
+      return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    }
+    // THE SAME GAP `displayProjection` CLOSED FOR THE PREGAME COLUMN, still
+    // open here. A game line has no natural live COUNT — there is no
+    // "projected margin so far" — so the live re-sim's output for h2h/spreads
+    // is a PROBABILITY, published as `live_model_probability`
+    // (`layer2_board._live_projection_columns`). Until now this function read
+    // only `live_projection`/`live_total`, so every live game-line row rendered
+    // an em dash while the backend held a live number for it.
+    //
+    // Worse, before the backend fix that accompanies this: the probability WAS
+    // being written into `live_projection`, so the cell showed "0.2" for a 19%
+    // live win probability. Blank was the better of those two failures; a
+    // percentage is better than both.
+    //
+    // Scoped to game markets and to a real 0..1, for the reason
+    // `layer2_board.py` states about its own columns: "an invented projection
+    // on a betting board is worse than an empty cell." A prop with no live
+    // count still renders blank — its live number is a count and we do not
+    // have one.
+    if (isProp) return null;
+    const prob = Number(item.live_model_probability);
+    if (!Number.isFinite(prob) || prob <= 0 || prob > 1) return null;
+    return `${(prob * 100).toFixed(1)}%`;
   }
 
   // The real box-score/current-game-state value right now -- distinct from
@@ -2825,6 +2922,10 @@
     // calls see the same date-filtered item list, so this warm-up and
     // renderGameCards' own internal derivation stay consistent.
     const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    // BEFORE any filtering: `isAltLine` reads these groups, and a group built
+    // from an already-alt-filtered list would only ever contain the primary and
+    // conclude nothing is alt.
+    rebuildAltGroups(dateFiltered);
     deriveGameCards(dateFiltered);
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
     renderGameCards(dateFiltered);

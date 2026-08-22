@@ -1867,11 +1867,30 @@ def _launch_autorun_evaluation_settlement(
             date_summary = bridge_settled_results(evaluation_records=date_records) or {}
             bridged_dates += 1
             for key, value in date_summary.items():
+                if isinstance(value, bool):
+                    continue
                 if isinstance(value, (int, float)):
                     bridge_totals[key] = bridge_totals.get(key, 0) + int(value)
+                elif isinstance(value, Mapping):
+                    # `#505`: MERGE ONE LEVEL DEEP. The bridge now reports
+                    # `skip_reasons` and `index_sizes` as nested counters, and
+                    # the flat isinstance check above dropped them on the floor
+                    # -- the breakdown would have been computed on every run and
+                    # reached no log, which is the silent-no-op shape this repo
+                    # keeps getting bitten by. Bounded to one level on purpose:
+                    # these are counter dicts, not arbitrary payloads.
+                    bucket = bridge_totals.setdefault(key, {})
+                    if isinstance(bucket, dict):
+                        for inner_key, inner_value in value.items():
+                            if isinstance(inner_value, bool) or not isinstance(inner_value, (int, float)):
+                                continue
+                            bucket[inner_key] = bucket.get(inner_key, 0) + int(inner_value)
             del date_records
         bridge_summary = {**bridge_totals, "dates_bridged": bridged_dates}
-        print(f"[ledger_bridge] {json.dumps(bridge_summary, default=str)[:400]}", flush=True)
+        # Raised 400 -> 1200: the per-reason breakdown roughly triples this
+        # line, and a truncated JSON summary is worse than a long one -- it
+        # reads as valid and silently loses the counters that say WHY.
+        print(f"[ledger_bridge] {json.dumps(bridge_summary, default=str)[:1200]}", flush=True)
     except Exception as exc:  # noqa: BLE001
         bridge_summary = {"error": f"{type(exc).__name__}: {exc}"}
         print(f"[ledger_bridge] FAILED {bridge_summary['error']}", flush=True)

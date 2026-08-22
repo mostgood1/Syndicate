@@ -1113,71 +1113,90 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **ALL FOUR ORIGINAL DEFECTS SHIPPED AND LIVE. Two later user asks (odds-range filter, alt-line filter) SHIPPED. Soccer join instrumented and 13 aliases shipped — THE ALIASES ARE NOT YET OBSERVED IN PRODUCTION, and that is the one open verification.**
-- Goal (met, except where noted): the Layer 2 board never shows a number
-  attributed to the sim that is about a different side, a different quantity, or
-  a different thing entirely.
-- **Testable outcomes (a)-(d) — side-correct `model_probability`, honest `Win%`,
-  no blank live `Projected`, live-sim dissent badge — ALL DONE**, verified in
-  tests and backend reads. **The SERVED-board read (`boardContract.cards`) was
-  never taken**: the agent proxy 403s `syndicate-an21.onrender.com` (`state.md`).
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **ORIGINAL GOAL MET AND VERIFIED. Soccer team-name join FIXED IN PRODUCTION (2,587 -> 87 unmatched). Now carrying five later user-reported board defects: 2 fixed, 3 INSTRUMENTED BUT UNDIAGNOSED — and the instrument that answers them has never once been read.**
+- Goal (met): the Layer 2 board never shows a number attributed to the sim that
+  is about a different side, quantity or thing. Outcomes (a)-(d) all done and
+  unit-tested. **The SERVED-board read was never taken** — the agent proxy 403s
+  `syndicate-an21.onrender.com` from a Claude session (`state.md`).
 - **OPEN, in priority order:**
-  1. **Verify the 13 soccer aliases in production.** Deployed `4eeffb5c`
-     18:18:05Z; no shortlist has completed since. Baseline to beat:
-     `unmatched_fixtures 12`, `unmatched_match 2587`,
-     `unmatched_by_league {belgian 5, epl 510, la_liga 972, ligue_1 240,
-     mls 247, primeira 6, serie_a 607}`. primeira_liga's two fixtures and the
-     PSG-home ligue_1 fixture have NO sim counterpart — fixture absence, not a
-     name problem; do not score them against the aliases.
-  2. **`unmatched_player: 5138`** — the largest soccer bucket, untouched.
+  1. **READ `LAYER2_BOARD_HEALTH`.** Never observed; three worker restarts in a
+     row reset the cold-boot clock. It answers three live user reports —
+     stale lines / blank projections / no movement — which are **UNDIAGNOSED**,
+     not fixed. Read `sport=mlb` as the control.
+  2. **`unmatched_player: ~6,056`** — largest soccer bucket. The
+     `player_no_roster` vs `player_name_miss` split is deployed and unread; it
+     decides whether this is the alias map's problem or the sim producer's.
   3. **The one-sided fair value never reaching the live edge** (`todo.md #503`).
-     A PRICING decision, not a bug fix — deliberately not taken.
-  4. Release the refresh-worker deploy claim `188efafc1f8177ba` once (1) is read.
-- Files: `syndicate/features/shared/{layer2_board,prop_projections,live_projection_join,soccer_projections,team_aliases}.py`, `pipeline/layer2_shortlist.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/board_cards.css`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases}.py`, `tests/js/board_sim_view_display.test.mjs`.
-  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY 2026-08-22 from
-    `soccer-board-parity` (OPEN but UNOWNED since 2026-08-20). Attribution
-    counters and alias entries only; no join, pricing or board behaviour taken.
-    `board_enrichment.py`, also on that lane's list, deliberately untouched.
+     A PRICING decision, not a bug fix. Deliberately not taken.
+  4. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Only fires on
+     a direct-publish failure; a quiet log is expected and proves nothing.
+     Affirmative token `SWEEP_REPAIRING`.
+  5. Four board UI behaviours tested but never seen on the served page.
+- Files: `syndicate/features/shared/{layer2_board,prop_projections,live_projection_join,soccer_projections,team_aliases,artifact_publisher}.py`, `pipeline/layer2_shortlist.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,artifact_publish_repair_over_ceiling}.py`, `tests/js/board_sim_view_display.test.mjs`.
+  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
+    `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
+    `artifact_publisher.py` claimed 2026-08-22 for the sweep repair path.
+    `board_enrichment.py` deliberately untouched.
 - **Cross-lane, unowned, NOT fixed by me:**
   `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
-  is RED on `main`. It is stale fallout from `28e55d86`, which deliberately made
-  `in -> post` possible; that session is active, so surfaced rather than edited.
-- Narrative, evidence and dead ends: `.syndicate/log/2026-08-22.md`.
+  is RED on `main` — stale fallout from `28e55d86`, whose session was active.
+- Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` (two blocks).
 - Blocked by: none.
 ### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
-- Goal: a bet logged on the WEB service can be settled by the reconciliation
-  autorun that runs on REFRESH-WORKER, so `/portfolio` stops reading every
-  position as pending.
+- Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
+  `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
-  `tests/test_prediction_ledger_shared_store.py`
-- Hypothesis (stated before fixing): the settlement machinery is not broken and
-  never was. `data/prediction_ledger.json` is read and written with raw
-  `path.read_text()` / `path.write_text()` under `data_root()`, and all three
-  Render services set `SYNDICATE_DATA_ROOT=/opt/render/project/data` while each
-  owns a SEPARATE 50GB disk (`dsk-d8bi8prbc2fs73en7dig` web,
-  `dsk-d91f7ggk1i2s73ar37a0` refresh-worker). The bet slip writes on web; the
-  reconciliation autorun reads on refresh-worker. Two different files behind one
-  path string, so reconciliation settles an empty ledger and web serves an
-  unsettled one.
-- Falsification test: if `prediction_ledger.json` matched any entry in
-  `HOT_ARTIFACT_PATTERNS`, the publisher would carry it across the boundary and
-  the hypothesis would be wrong. Checked mechanically against all 151 patterns
-  with `fnmatch` — NO MATCH, in either direction.
-- Verification: unit tests that FAIL on the current code and pass after —
-  specifically a two-service simulation (write under one data root, read under
-  another) which is the exact thing the current code cannot do. Production
-  verification is `settled_count > 0` on `/api/portfolio/summary`, and that
-  needs a deploy of BOTH web and refresh-worker.
+  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `scripts/backfill_portfolio_settlement.py`,
+  `tests/test_prediction_ledger_shared_store.py`,
+  `tests/test_evaluation_settlement_autorun_ordering.py`,
+  `tests/test_ledger_bridge_identity_join.py`,
+  `tests/test_backfill_portfolio_settlement.py`
+- **Status: three defects found, all FIXED AND DEPLOYED. The goal is NOT met —
+  nothing has settled yet.** Narrative and evidence: `log/2026-08-22.md`.
+  Subject facts: `state.md [portfolio-settlement]`.
+  - `#502` ledger crosses the service boundary — live both services `2aa1df54`
+  - `#504` settlement 13th -> 2nd in the chain — live `4eeffb5c`, VERIFIED 1.3ms
+  - `#505` join on a stable identity — live `a1e89ff3`, refresh-worker only
+- **Unverified and load-bearing:** `#505`'s `entity` field mapping was never
+  measured against real evaluation records (worker-local, not in
+  `HOT_ARTIFACT_PATTERNS`).
+- Backfill tool BUILT and NOT RUN against production:
+  `scripts/backfill_portfolio_settlement.py`, preview-by-default. Ran in preview
+  in-session; it proved the tool works and nothing about production (no local
+  portfolio ledger; the one local evaluation chunk holds a single
+  `record_type: prediction` row, not a wager).
+- Verification still owed: the next `[ledger_bridge]` line, 2026-08-23 after
+  06:00 CT. `matched_by_identity > 0` = the join works; `by_identity` large with
+  `matched_by_identity: 0` = the entity mapping is wrong. **That same line also
+  gates the backfill** — do not run it with `--commit` before that reading.
+- Session `74a0966a` ARCHIVED 2026-08-22. All four deploy claims free at exit.
+- **NOTE for whoever owns `refresh-worker-oom-recurrence`:** this lane edited
+  `scripts/run_refresh_worker.py`, which your lane nominally holds. Your block is
+  no longer in `lanes.md` so `lane-guard` saw no claim. Flagged because the
+  change moves an expensive job earlier in the tick chain.
 - Blocked by: none.
-- **DEPLOYED 2026-08-22T17:00Z to BOTH services on user instruction**, SHA
-  `2aa1df54` (on `origin/main`; composition verified — every live SHA is an
-  ancestor, so nothing was reverted). Full record including what could NOT be
-  verified (`deploy_preflight.py` unrunnable — no `RENDER_API_KEY` in session)
-  is in `deploys.md`.
-- **STILL OPEN because the VERIFY is outstanding.** `settled_count > 0` on
-  `/api/portfolio/summary` is the reading that proves it; reconciliation is
-  daily-gated and last ran 06:57:03Z, so the first pass under the new code has
-  not happened yet. Deploying is not verifying — do not close on the deploy.
+
+### render-web-request-path — **OPEN, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — **SHIPPED AND MEASURED; ONE ITEM OWED**
+- Goal: web stops being SIGTERM'd during live MLB slates. **Changes 1 and 2 MET.**
+- **Claims: NONE held.** Released deliberately at archive time so no future session
+  is blocked on `home.py` / `mlb/cards.py` by a dead owner — the orphan failure the
+  2026-08-18 sweep had to clean up across 8 lanes.
+- **VERIFIED** (web `8149e51d` 19:09:35Z, still live under peer `3ada3512`):
+  `apply_live_scores` **3318-8400ms -> 0-93ms** on `games=15`, 14 samples across two
+  instances and two deploys. Zero `Handling signal: term` since, against 3 in 4 min
+  before. Cold boot exonerated at 2.7s boot-to-listening.
+- **OWED, THE ONLY OPEN ITEM:** the card-cache idle bound is **NOT** verified.
+  Baseline to beat: 369 MB -> 2,026,717,200 B over ~7.5h, ceiling 2,147,483,600 B.
+  Post-deploy numbers are directionally better at comparable ages and that is not
+  proof. **Blocked in practice** — peers redeploy web every 20-30 min so no instance
+  lives long enough. Instrument: memory-over-uptime + the rate of
+  `CONTEXT_CACHE_EVICTED ... web=True` falling.
+- **DO NOT allowlist `raw/statsapi/feed_live`** — it freezes live scores (`#413`) and
+  buys no speed. Full reasoning in `state.md [web-request-path-latency]`.
+- Narrative + evidence: `log/2026-08-22.md` (session `726ef4ff`). Deploy record and
+  the stated preflight deviation: `deploys.md` 2026-08-22 19:03Z.
+- Next bottleneck, now visible: `build_cards_page_context` 1803-2402ms on a miss.
 
 ### portfolio-decision-and-execution — OPEN — opened 2026-08-22 — session 9324a3e5-364e-5fb4-9b4a-b0568019e37f
 - Goal: a staged, gated path from the Layer 2 shortlist to a COMMITTED
@@ -1228,7 +1247,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   call): `allkeys_lru` → `volatile_lru`, which makes no-TTL keys — the
   bankroll, the Stage B ledger, `#502`'s `prediction_ledger.json` —
   structurally un-evictable. STILL UNVERIFIED: `evicted_keys`/`keyspace_misses`;
-  the metrics API exposes memory, not Redis INFO. Full working: `todo.md #506`.
+  the metrics API exposes memory, not Redis INFO. Full working: `todo.md #508`.
 - **SIM ROLE MEASURED, and the premise "the board is EV only" needed
   correcting: it is true of RANKING and false of SIZING.** On a representative
   row the sim owns **57.6%** of the stake (0.003132 vs 0.001328 with
@@ -1244,7 +1263,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   signed `stake_fraction_sim_delta`, `sim_share_of_stake`, `side_picked_by`,
   plus plan totals). The delta is NOT clamped at zero, because a small negative
   sim edge can legitimately shrink a position and clamping would credit the sim
-  only where it helps. Full working: `todo.md #507`.
+  only where it helps. Full working: `todo.md #509`.
 - **CORRECTION `[user-flagged 2026-08-22]`: "the board is running at 0% sim" is
   RIGHT, and 57.6% was NOT about the board** — it is Stage A's sizing on a
   SYNTHETIC row in undeployed code, and describes nothing running. **Do not
@@ -1329,12 +1348,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   independent switches for real money, both checked immediately before each
   submit; **any unrecognised mode resolves to `paper`**, the direction that
   spends nothing — the explicit lesson of the same day's backend incident. Live
-  is blocked while any order is unreconciled. Storage per `#506`: keyvalue, **no
+  is blocked while any order is unreconciled. Storage per `#508`: keyvalue, **no
   date token**, bounded (lean fields, 5k cap with loud trimming, 2MB warning),
   and an unreadable ledger RAISES rather than reading as empty. **Measured end
   to end locally:** 3 rows → 2 positions ($5.19, 40.3% sim-attributed) → 2 paper
   fills → **replay placed=0, duplicates=2**. 41 tests. Full working:
-  `todo.md #510`.
+  `todo.md #512`.
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->

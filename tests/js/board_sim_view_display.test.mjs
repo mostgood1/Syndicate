@@ -188,7 +188,19 @@ for (const price of [-1000, -110, 100, 250, 6000]) {
 // game can put a whole ladder on the board. This is the reader's control over
 // how much of it shows -- and, like the odds range, its DEFAULT must hide
 // nothing.
-const isAltLine = (new Function(`${extract('isAltLine')}\nreturn isAltLine;`))();
+// `isAltLine` now depends on a per-render group map, so it cannot be extracted
+// alone -- the whole trio comes out together and the tests drive it the way the
+// renderer does (rebuild groups, then classify).
+const altApi = (new Function(
+  `let altPrimaryByGroup = new Map();
+   const numericValue = (v) => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+   ${[extract('altGroupKey'), extract('rebuildAltGroups'), extract('isAltLine')].join('\n')}
+   return { rebuildAltGroups, isAltLine, groups: () => altPrimaryByGroup };`
+))();
+// Single-line inputs: no group has more than one line, so nothing is classified
+// alt by GROUP and these assertions isolate the market-name rule.
+altApi.rebuildAltGroups([]);
+const isAltLine = (item) => altApi.isAltLine(item);
 
 console.log('\n--- an alt line is named by its MARKET, not guessed from its number ---');
 eq('totals_alt is alt', isAltLine({ market: 'totals_alt' }), true);
@@ -295,6 +307,132 @@ eq('totals_alt selects only itself', betAllows('totals_alt', { market: 'totals_a
 eq('market_key is honoured when market is absent', betAllows('h2h', { market_key: 'h2h' }), true);
 eq('a row with no market is dropped by a specific selection',
   betAllows('h2h', {}), false);
+
+// --- alt lines, v2: the multi-line group -----------------------------------
+//
+// V1 SHIPPED WRONG AND THE USER FOUND IT. It tested the MARKET NAME for a
+// `_alt` suffix, which is how MLB and NFL quote alternates. **Soccer has no
+// such market** -- `fetch_soccer_oddsapi_odds_local.DEFAULT_GAME_MARKETS` is
+// exactly ["h2h","totals","spreads"] -- so soccer expresses the same concept as
+// SEVERAL ROWS OF ONE MARKET at different lines. The suffix test matched
+// nothing, and "Main lines only" left every soccer alt line on the board.
+//
+// The lesson, and it is the same one this file already records for
+// `totals`/`totals_alt`: a rule written from ONE sport's vocabulary is a rule
+// about that sport, not about the concept.
+const row = (market, line, books, extra) => Object.assign(
+  { event_id: 'E1', market, line, segment: 'full', quote: { books_quoting: books } },
+  extra || {},
+);
+
+console.log('\n--- a soccer totals ladder: only the primary line is "main" ---');
+// The real shape: one `totals` market, several lines, the main one quoted by
+// the most books.
+const ladder = [row('totals', 1.5, 2), row('totals', 2.5, 11), row('totals', 3.5, 3)];
+altApi.rebuildAltGroups(ladder);
+eq('the most-quoted line is NOT alt', altApi.isAltLine(row('totals', 2.5, 11)), false);
+eq('a thinner line IS alt', altApi.isAltLine(row('totals', 1.5, 2)), true);
+eq('the other thin line is alt too', altApi.isAltLine(row('totals', 3.5, 3)), true);
+
+console.log('\n--- a single-line market is never alt ---');
+altApi.rebuildAltGroups([row('h2h', null, 9), row('spreads', -0.5, 8)]);
+eq('the only spread is main', altApi.isAltLine(row('spreads', -0.5, 8)), false);
+eq('a moneyline with no line is main', altApi.isAltLine(row('h2h', null, 9)), false);
+
+console.log('\n--- the v1 rule still holds where it was right ---');
+altApi.rebuildAltGroups([row('totals_alt', 8.5, 4)]);
+eq('an explicit _alt market is alt even as a lone line',
+  altApi.isAltLine(row('totals_alt', 8.5, 4)), true);
+
+console.log('\n--- groups do not bleed across event, market or player ---');
+altApi.rebuildAltGroups([
+  row('totals', 2.5, 9), row('totals', 3.5, 1),
+  Object.assign(row('totals', 3.5, 9), { event_id: 'E2' }),
+  Object.assign(row('player_shots', 0.5, 9), { player_name: 'A' }),
+  Object.assign(row('player_shots', 1.5, 1), { player_name: 'A' }),
+  Object.assign(row('player_shots', 1.5, 9), { player_name: 'B' }),
+]);
+eq('another EVENT\'s 3.5 is its own primary',
+  altApi.isAltLine(Object.assign(row('totals', 3.5, 9), { event_id: 'E2' })), false);
+eq('player B\'s only line is primary even though A\'s 1.5 is alt',
+  altApi.isAltLine(Object.assign(row('player_shots', 1.5, 9), { player_name: 'B' })), false);
+eq('player A\'s thin 1.5 is alt',
+  altApi.isAltLine(Object.assign(row('player_shots', 1.5, 1), { player_name: 'A' })), true);
+
+console.log('\n--- the primary is DETERMINISTIC, or rows flicker between renders ---');
+// Equal book counts: the tie must break the same way every time. Without a
+// stable rule the "main" line changes on each refresh and rows appear and
+// disappear at random.
+const tied = [row('totals', 1.5, 5), row('totals', 2.5, 5), row('totals', 3.5, 5)];
+altApi.rebuildAltGroups(tied);
+const firstPass = tied.map((r) => altApi.isAltLine(r));
+altApi.rebuildAltGroups([...tied].reverse());
+const secondPass = tied.map((r) => altApi.isAltLine(r));
+eq('input order does not change the answer', JSON.stringify(firstPass), JSON.stringify(secondPass));
+eq('exactly one line of a tied group is primary',
+  firstPass.filter((v) => v === false).length, 1);
+eq('the tie resolves to the MEDIAN line, not the first seen',
+  altApi.isAltLine(row('totals', 2.5, 5)), false);
+
+// --- the LIVE column -------------------------------------------------------
+//
+// Reported by the user: "all the projections (sim pregame, sim live, actual
+// live) are blank", then "livedata is the major blank". Two defects, and the
+// second was worse than the blank it caused:
+//
+//   1. A GAME LINE'S `live_projected` IS A PROBABILITY. `_apply_verdict` is
+//      called with `live_projected=verdict["model_prob"]` for h2h AND totals
+//      AND spreads (`live_gameline_join.py:876`), and
+//      `_live_projection_columns` copied it into `live_projection` AND
+//      `live_total`. `toFixed(1)` then rendered a 19% live win probability as
+//      **"0.2"**, and a totals row as a live projected total of 0.2 goals.
+//   2. With that removed the cell goes blank — because this function only ever
+//      read `live_projection`/`live_total`, while the backend publishes
+//      `live_model_probability` for exactly these rows.
+//
+// `displayProjection` closed the identical gap for the PREGAME column on
+// 2026-08-20 ("109 of 114 h2h rows were blank here for exactly that reason").
+// The live column never got it. Same bug, same shape, one column over.
+const displayLiveProjection = (new Function(`${extract('displayLiveProjection')}\nreturn displayLiveProjection;`))();
+
+console.log('\n--- a live PROP shows its live count ---');
+eq('a prop count renders', displayLiveProjection({ candidate_type: 'prop', live_projection: 2.4 }), '2.4');
+eq('a real live zero renders as 0, not blank',
+  displayLiveProjection({ candidate_type: 'prop', live_projection: 0 }), '0');
+// A prop's live number is a COUNT. If we do not have one, we do not invent one
+// from a probability -- that is the "invented projection" the backend forbids.
+eq('a prop with only a probability stays blank',
+  displayLiveProjection({ candidate_type: 'prop', live_model_probability: 0.62 }), null);
+eq('player_name alone marks it a prop',
+  displayLiveProjection({ player_name: 'A. Player', live_model_probability: 0.62 }), null);
+
+console.log('\n--- a live GAME LINE shows the live PROBABILITY, not a fake count ---');
+eq('a live moneyline renders its probability',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 0.19 }), '19.0%');
+eq('a live spread does too',
+  displayLiveProjection({ market: 'spreads', live_model_probability: 0.55 }), '55.0%');
+eq('no live number at all stays blank',
+  displayLiveProjection({ market: 'h2h' }), null);
+
+console.log('\n--- and it never typesets a probability as a count ---');
+// The exact regression: 0.19 must NOT come back as "0.2".
+const shown = displayLiveProjection({ market: 'h2h', live_model_probability: 0.19 });
+eq('19% is not rendered as "0.2"', shown === '0.2', false);
+eq('19% is rendered as a percentage', shown, '19.0%');
+// Out-of-range guards: a value that is not a probability is refused rather
+// than multiplied by 100 into nonsense.
+eq('a probability of 0 is refused (nothing to claim)',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 0 }), null);
+eq('a value above 1 is refused',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 62 }), null);
+eq('garbage is refused',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 'soon' }), null);
+
+console.log('\n--- a real live TOTAL still wins over the probability ---');
+// `live_total` now carries `total_mean` from the gameline block, which IS a
+// count. It must take precedence: a projected 2.7 goals is more informative
+// than the cover probability.
+eq('a game row prefers its live total', displayLiveProjection({ market: 'totals', live_total: 2.7, live_model_probability: 0.55 }), '2.7');
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
