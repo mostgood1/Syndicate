@@ -59,6 +59,21 @@ WEIGHTED_TYPES = (
     "shot-off-target",
     "corner-awarded",
     "offside",
+    # STATE-CHANGING EVENTS, added 2026-08-22. The first sweep used volume
+    # events only and was a coin flip held out. These change the REGIME rather
+    # than adding volume: a red card, a penalty, a VAR check, an attacking
+    # substitution. If a timing signal exists, it is more plausibly here than
+    # in another re-weighting of shot counts.
+    "penalty-won",
+    "penalty-goal",
+    "penalty-missed",
+    "red-card",
+    "yellow-red-card",
+    "yellow-card",
+    "substitution",
+    "handball",
+    "var---referee-decision-cancelled",
+    "free-kick-won",
 )
 _GOAL_PREFIX = "goal"
 _FULL_MATCH = 5400.0
@@ -111,7 +126,11 @@ def harvest(leagues: list[str], windows: list[str], limit: int, out: Path) -> di
                     # second pass over the network.
                     goals.append({"t": secs, "home": team == home})
                 continue
-            if tk in WEIGHTED_TYPES and team:
+            # Harvest EVERY typed event, not just the currently-weighted ones.
+            # The first cache stored only the weight table's own keys, so adding
+            # an event type meant re-fetching 200 matches. Storage is cheap;
+            # a network pass is not.
+            if tk and team:
                 events.append({
                     "t": secs,
                     "type": tk,
@@ -173,6 +192,56 @@ def _auc(pairs: list[tuple[float, int]]) -> float | None:
     return (rsum - n1 * (n1 + 1) / 2.0) / (n1 * n0)
 
 
+def lift_table(samples: list[dict], feature: str, *, buckets: int = 10) -> list[dict]:
+    """Hit rate by feature decile -- THE metric that matches how this is used.
+
+    AUC weights every threshold equally and is the wrong lens for a bet you only
+    place at the extreme. At 3-1 the break-even is 25%, at 2-1 it is 33%, and
+    the base rate here is ~24.7% -- so what matters is whether a TOP SLICE
+    clears those, not whether the whole ranking is good. A feature can be near
+    0.5 AUC and still carry a usable tail, and the first sweep could not have
+    seen that.
+    """
+    rows = sorted(samples, key=lambda x: x[feature])
+    if not rows:
+        return []
+    n = len(rows)
+    out = []
+    for b in range(buckets):
+        lo, hi = n * b // buckets, n * (b + 1) // buckets
+        chunk = rows[lo:hi]
+        if not chunk:
+            continue
+        hit = sum(x["label"] for x in chunk) / len(chunk)
+        out.append({
+            "decile": b + 1,
+            "n": len(chunk),
+            "hit_rate": round(hit, 4),
+            "feature_min": round(chunk[0][feature], 3),
+            "feature_max": round(chunk[-1][feature], 3),
+        })
+    return out
+
+
+def print_lift(title: str, samples: list[dict], feature: str) -> list[dict]:
+    tbl = lift_table(samples, feature)
+    if not tbl:
+        return []
+    base = statistics.mean([x["label"] for x in samples])
+    print()
+    print(f"  {title}  (base rate {base:.4f})")
+    print(f"    {'decile':>7}{'n':>7}{'hit':>9}{'lift':>8}   {'break-even':>10}")
+    for r in tbl:
+        lift = r["hit_rate"] / base if base else 0.0
+        # 3-1 pays at 25%, 2-1 at 33.3%
+        mark = ""
+        if r["hit_rate"] >= 0.333:
+            mark = "  clears 2-1"
+        elif r["hit_rate"] >= 0.25:
+            mark = "  clears 3-1"
+        print(f"    {r['decile']:>7}{r['n']:>7}{r['hit_rate']:>9.4f}{lift:>8.2f}{mark:>12}")
+    return tbl
+
 def build_samples(matches: list[dict], *, half_life: float, weights: dict[str, float],
                   window: float, step: float, start: float, end: float) -> list[dict]:
     out: list[dict] = []
@@ -183,7 +252,14 @@ def build_samples(matches: list[dict], *, half_life: float, weights: dict[str, f
             signed, pressure = _momentum_at(ev, t, half_life, weights)
             nxt = [g for g in goals if t < g["t"] <= t + window]
             label = 1 if nxt else 0
+            # TIME IN HALF. Goals cluster late in halves (measured 2026-08-21:
+            # ~62% of goals fall in the second half, and the last bucket of each
+            # half is the densest). Momentum alone ignores the clock entirely,
+            # so this is carried as its own feature and as an interaction.
+            in_half = t if t < 2700 else (t - 2700)
             out.append({"t": t, "signed": signed, "pressure": pressure,
+                        "time_in_half": in_half,
+                        "pressure_x_late": pressure * (in_half / 2700.0),
                         "abs_signed": abs(signed), "label": label,
                         # WHO scored the FIRST goal in the window. None where no
                         # goal fell in it -- those samples answer the WHEN
@@ -290,6 +366,24 @@ def main() -> int:
         print()
         print(f"BEST WHO ON FIT: {b['weights']} @ {b['half_life']:.0f}s  fit {b['auc_fit']:.4f}"
               f"  HOLDOUT {b['auc_hold']}")
+
+    # --- LIFT AT THE TAIL, which is what a 2-1/3-1 bet actually needs ---
+    # Best-on-fit parameters, then the tail examined ON THE HOLDOUT.
+    if rows:
+        bf = max([r for r in rows if r["fit"]["auc"] is not None],
+                 key=lambda r: r["fit"]["auc"], default=None)
+        if bf:
+            wsel = dict(next(w for n, w in variants if n == bf["weights"]))
+            sh = build_samples(hold, half_life=bf["half_life"], weights=wsel,
+                               window=args.goal_window, step=args.step,
+                               start=300.0, end=5100.0)
+            print()
+            print(f"=== TAIL ANALYSIS (holdout), {bf['weights']} @ {bf['half_life']:.0f}s ===")
+            print("    break-even: 25.0% at 3-1, 33.3% at 2-1")
+            for feat, title in (("pressure", "by PRESSURE"),
+                                ("time_in_half", "by TIME IN HALF (momentum ignored)"),
+                                ("pressure_x_late", "by PRESSURE x LATE-IN-HALF")):
+                print_lift(title, sh, feat)
 
     scored = [r for r in rows if r["fit"]["auc"] is not None]
     best_fit = max(scored, key=lambda r: r["fit"]["auc"]) if scored else None
