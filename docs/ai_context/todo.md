@@ -1,5 +1,87 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#505` — **The settlement join matched on an id that changes every time the price moves. That is the `matched: 0` / `4,560 no_key_match`, and it is why `/portfolio` never settles.** — lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
+
+**`recommendation_id` is not an identity, it is a snapshot hash.**
+`record_recommendation` mints it as `_stable_id("rec", {...})` over
+`prediction_id` + the **whole recommendation payload** + `artifact_metadata`.
+`pipeline/intelligence_state.py:2028` already says the consequence out loud:
+those ids come "from a content hash of the full recommendation payload (incl.
+live odds/edge/probability)", so a rebuild "would mint a fresh 'new' pending row
+almost every cycle purely from ordinary price drift".
+
+The board re-records **150 recommendations per rebuild**
+(`BOARD_STATE_LEDGER_RECORDED`, live today). So:
+
+    user clicks a bet  -> stores the id on screen at that instant
+    price drifts       -> board mints a NEW id for the SAME wager
+    settlement decides -> settles the LATER snapshot, under the later id
+    the bridge joins   -> the two ids never meet
+
+That is the whole defect. It also explains the chunk sizes nobody liked
+(95-332MB/day): the same opportunities re-recorded under fresh ids all day.
+
+**This was mis-scoped for most of a session, mine included.** `#502` (the
+service split), `#503`'s window, `#504` (chain position) and the lookback widen
+are all real and all necessary — and none of them could ever have moved
+`parlays_settled` off 0, because the join underneath was matching on a value
+that does not survive a price tick. Chasing the schedule was chasing the wrong
+layer.
+
+**THE FIX — a second tier, not a replacement.**
+`ledger_bridge._settlement_identity()`: a stable, content-addressed key modelled
+on `clv_opening_ledger._opening_key`, which solves the same problem and reports
+`unkeyable=0` on 1,538 real rows today. Two differences from it, one chosen and
+one forced:
+
+- **bookmaker REMOVED, deliberately.** An outcome is book-independent; a price
+  is not. Keeping it would split one settled result across every book quoting it.
+- **segment REMOVED, forced.** The bet slip captures exactly
+  `recommendation_id, pick, line, event_id, game_date`. Segment is not among
+  them, so an identity carrying it could never match a portfolio bet at all.
+
+**AND THE REFUSAL THAT GOES WITH IT.** Dropping `segment` collapses a first-half
+and a full-game bet onto one key. `learnings.md` 2026-08-15 is explicit — *never
+treat equality of a LABEL as identity of a BET* — so `_outcome_by_identity`
+marks a key whose settled records DISAGREE as `_AMBIGUOUS` and **refuses to
+settle from it**, counted as `identity_ambiguous`. Records that AGREE are the
+normal case (one wager, many drifting ids) and collapse cleanly.
+
+Tier 1 (exact `recommendation_id`) is kept and tried first: when it matches
+there is no inference in it, and it costs nothing.
+
+**THE INSTRUMENT, which is half the value.** The old summary was
+`straight_settled / parlays_settled / skipped`, and `skipped: 25131` on
+2026-08-22 could not distinguish "the window held nothing settled" from "the ids
+drift". This repo's own note on the settlement join says the same thing —
+*"4,560 `no_key_match` of 8,276 with no per-reason breakdown deeper than the
+name"*. Now reported: `matched_by_id`, `matched_by_identity`, `index_sizes`
+(`by_id` / `by_identity` / `ambiguous`), and `skip_reasons`
+(`no_settled_match` / `unkeyable_bet` / `identity_ambiguous` /
+`parlay_legs_undecided`).
+
+**A SILENT NO-OP CAUGHT BEFORE IT SHIPPED.** The worker accumulated the bridge
+summary with `if isinstance(value, (int, float))`, which drops nested dicts on
+the floor — the entire breakdown would have been computed every run and reached
+**no log**. Fixed to merge one level deep, and the print truncation raised
+400 -> 1200 (a truncated JSON summary reads as valid while losing the counters
+that say why).
+
+Tests: `tests/test_ledger_bridge_identity_join.py` (15). **13 of 15 fail on the
+pre-fix code**; the 2 that pass either way assert unchanged behaviour (exact-id
+tier still wins; the parlay signature stays backward compatible). The existing
+`test_ledger_bridge.py` (11) passes untouched — this is additive.
+
+**NOT DEPLOYED, and the field mapping is a HYPOTHESIS until a real run reports
+on it.** `entity` is taken as the first of
+`player_name / player / name / team / selection` on both sides; that mapping is
+reasoned from the bet slip's own comments, not measured against production
+records, because the evaluation ledger is worker-local and not in
+`HOT_ARTIFACT_PATTERNS`. **The breakdown above is what will falsify it**: a run
+returning `by_identity` large and `matched_by_identity: 0` means the mapping is
+wrong, and `unkeyable_bet` counts how many bets cannot key at all. That is the
+reading to take first, before any further tuning.
+
 ### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED
 
 `#341` moved `_launch_autorun_reconciliation` to the front of the exclusive
