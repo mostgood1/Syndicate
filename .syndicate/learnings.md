@@ -4822,3 +4822,42 @@ the `no_market_fair_value` split was built to CONFIRM the hypothesis that live
 `{'no_fair_value_devig_failed': 133}` — 133 of 133 rows HAVE a pregame
 projection — and refuted it. An instrument built so that it CAN return the
 answer you do not want is the only kind worth deploying.
+
+## 08-22 THE BEST GOAL WINDOW WAS HIDDEN BY MY OWN SAMPLING CUTOFF
+
+Every momentum sweep sampled `start=300, end=5100` -- so **80-95' was never a
+decision point**. The densest scoring period in football was excluded by a
+constant I chose and never questioned. Sampling the full match (to 5700s):
+
+    clock    n     hit     lift   window available
+    80-84   848   0.3455   1.48        8.5 min     <<< best in the match
+    36-40   848   0.2889   1.24       10.0 min
+    84-88   846   0.2636   1.13        4.5 min
+    88-92   211   0.2275   0.98        2.0 min
+     8-16         0.1722   0.74       10.0 min     (quietest)
+
+**80-84' clears the 2-1 break-even (33.3%) on the CLOCK ALONE**, base rate
+0.2331. And the `window available` column is why later is not better: by 88'
+only 2 minutes of a 10-minute window remain, so the rate keeps climbing while
+the bet stops existing. 80-84' is where rate and runway overlap.
+
+**EVENTS, TESTED INDIVIDUALLY FOR THE FIRST TIME.** Earlier sweeps moved four
+shot families together, so no single type could be seen:
+
+    corner-awarded    1.19      shot-ON-target   0.97   <- BELOW base
+    shot-off-target   1.19      handball         0.88
+    shot-blocked      1.17      "all types"      1.03   <- dilutes
+
+**Shots ON target predict goals WORSE than shots off target.** Goals are
+excluded from the feature, so a remaining on-target shot is a SAVED one -- the
+chance is spent. Off-target and blocked shots mean pressure still building.
+Anyone hand-weighting these would have ranked them the other way round; I did,
+in the shipped chart (`shot-on-target: 3.0` vs `shot-off-target: 1.5`).
+
+Crossed against time, the best feature adds +0.02 at the money bucket and flips
+sign across others (+0.054 at 16-20', -0.050 at 8-12'). Noise-shaped.
+
+**RULE: a sampling range is a modelling assumption. State it and test its
+edges.** `end=5100` was written once, carried through four analyses, and hid the
+only result that clears a real break-even. No amount of feature engineering
+inside the window could have recovered what the window excluded.
