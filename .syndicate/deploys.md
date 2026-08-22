@@ -22439,3 +22439,45 @@ settled / already_resolved counts). It is on WEB over HTTP, and this session's
 egress to `syndicate-an21.onrender.com` is 403'd by policy. **Read that endpoint
 before widening the lookback** — widening is the right move only under cause (1),
 and under cause (2) it is expense for nothing.
+
+### 17:45:20Z — lookback widened 3 -> 7 on user instruction. IT WILL NOT RUN AGAIN TODAY.
+
+`EVALUATION_SETTLEMENT_LOOKBACK_DAYS=7` (env API, merge). Deploy
+`dep-da4u0c0u01pc73dbkgtg` on `be6f816b`; ledger fix verified present by
+ancestry. Concern about widening before reading the ops status endpoint was
+raised, the user reaffirmed, so it is their call and it is done.
+
+**THE DAILY GATE MAKES THIS A TOMORROW CHANGE, and that is not obvious.**
+Settlement RAN today at 17:28-17:29Z, so the status epoch now carries today's
+CENTRAL date. `_evaluation_settlement_should_run_now` hits
+`if now_central.date() == last_central_date: return False` for the rest of
+2026-08-22 CT. The restart does NOT reset this -- the status lives in keyvalue,
+not on the ephemeral disk. **Next run: 2026-08-23 CT once the hour is >= 6.**
+Widening the window today changes what tomorrow's run sweeps; it does not
+produce a second run tonight.
+
+**THE UNTESTED PATH THIS OPENS, stated before it runs rather than after.** A
+7-day window is 2026-08-16..08-22, which pulls in the **332MB `2026-08-16`
+chunk** -- the largest measured, and the one the 4.05-4.19x coefficient was
+taken against. Two different risks, and the second is the one to watch:
+
+- MEMORY: probably fine. The 3-day pass added ~40MB with a 185MB largest chunk.
+  Even scaling naively by bytes, 332MB suggests ~72MB. Nowhere near the ~570MB
+  headroom.
+- **TIME AND I/O: genuinely untested.** The 3-day pass settled ZERO records, so
+  it never exercised the WRITE path. `_replace_ledger_line` rewrites the WHOLE
+  chunk once per settled record. If 08-16 has settleable records, each one is
+  ~332MB of I/O, and settlement runs INLINE in the tick loop. 100 records would
+  be ~33GB of I/O in one inline pass. Nothing has ever measured this in
+  production, because the autorun has never settled anything.
+
+**Why this is still survivable:** `#256` claims the run BEFORE the work, so a
+death mid-pass advances the epoch and it does not re-run in a hot loop. That is
+the specific defect behind the 110 OOM kills of 2026-08-07, and it is fixed.
+Worst case is one bad pass and a restart, not an eleven-hour outage.
+
+**What to read tomorrow, in order:** the `[ledger_bridge]` line (does
+`parlays_settled` move off 0), then `/api/ops/evaluation-settlement/status` for
+`summaries` -- which is what actually distinguishes "the parlay was outside the
+window" from "settlement settles nothing at all". The second question is still
+open and widening does not answer it.
