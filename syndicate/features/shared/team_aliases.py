@@ -198,6 +198,28 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # MLS has exactly one New York Red Bulls and the identity is not in doubt;
     # a similarity threshold is a filter for candidates, not the decision.
     "new york red bulls": "red bull new york",
+    # `#503`. SIX MORE, and unlike `#374`'s five these were not found by hand --
+    # `PREGAME_PROJECTION_JOIN` prints the board-side and sim-side spelling of
+    # the same unmatched fixture on one line, so each pair below is quoted from
+    # a single production reading (refresh-worker 2026-08-22 17:36:42Z and
+    # 17:39:37Z) rather than reconstructed.
+    #
+    # Every one was checked BOTH ways before being written: `canonical_team`
+    # returns None for the board spelling and a real club for the sim spelling,
+    # which is precisely the shape this map repairs. Pairs where the board and
+    # sim spellings ALREADY matched (TSG Hoffenheim, Borussia Dortmund,
+    # Eintracht Frankfurt, Genk/Racing Genk) are deliberately absent -- adding a
+    # working pair buys nothing and hides which entries are load-bearing.
+    #
+    # Note `Genk`: the fixture `Royal Antwerp v Genk` missed even though Genk
+    # matches fine, because `match_for` requires BOTH sides. One bad name costs
+    # the whole fixture, which is why a single alias can recover 500+ rows.
+    "royal antwerp": "Antwerp",
+    "1. fc köln": "FC Cologne",
+    "hamburger sv": "Hamburg SV",
+    "fsv mainz 05": "Mainz",
+    "sc paderborn": "SC Paderborn 07",
+    "union berlin": "1. FC Union Berlin",
 }
 
 
