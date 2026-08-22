@@ -22795,3 +22795,70 @@ that reading exists.
 **Timing: the daily gate still holds.** Settlement ran 17:28Z, so this does not
 run again until 2026-08-23 after 06:00 CT. It should now get a PROMPT tick
 (`#504`), rather than waiting on a soccer spacing-gate coincidence.
+
+---
+
+## 2026-08-22 ~19:19Z — `3ada3512` — WEB + refresh-worker — four of five reported board defects
+
+Lane `layer2-sim-view-and-live-projection`. Claims `de7fb84df009c4ce` (web),
+`b201b54a07da1fe4` (worker). Both deploys carry exactly `3ada3512` — the SHA
+read before triggering, no drift, verified on each.
+`deploy_preflight.py` still cannot run (no `RENDER_API_KEY`): **no CLEAR
+verdict**; on-main checked with git, in-flight jobs by hand.
+
+**WHAT WAS KILLED, and the judgement behind it.** The user's condition was
+"deploy it once the sim finishes", meaning the 15-game `props_now_available`
+run. **That one completed** (gone from `processes[]` by 19:17:10Z, ~26 min).
+What the worker deploy DID kill was a *different* job that started after it: a
+5-game `fingerprint_change` re-sim (pid 680), ~1 minute into its vendor chain,
+plus a `serie_a` artifact build and a season-manifest build. Judged acceptable
+and stated rather than glossed:
+
+- `fingerprint_change` sims re-fire automatically on the next odds change; this
+  one was a minute old.
+- Waiting for "no sim at all" is unbounded — three fired in the 2.5 hours
+  before this (17:02 2-game, 18:51 15-game, 19:16 5-game).
+- **Memory was at 96.8% of 4,096 MB with 132 MB headroom** and 2,019 MB
+  "unexplained". A restart reclaims that (measured today: 90.9% → 15.6%), so the
+  deploy relieves a real risk rather than only costing one.
+
+**SHIPPED — four of the five defects the user reported at ~19:1xZ:**
+
+1. **The alt-line filter did not work on soccer.** v1 tested the market name for
+   a `_alt` suffix; soccer has no such market (`DEFAULT_GAME_MARKETS` is
+   `h2h/totals/spreads`) and expresses alts as several rows of ONE market at
+   different lines. Now: `_alt` suffix OR not the primary line of its
+   (event, market, segment, player) group. Primary = most books quoting, ties to
+   median then lower line, deterministic across renders.
+2. **Bet slip defaults minimized**, persisted; only a literal `"false"` opens it.
+3. **`LAYER2_BOARD_HEALTH`** per sport, over published rows.
+4. **Player-miss attribution** (`player_no_roster` vs `player_name_miss`).
+
+**NOT FIXED — and the deploy must not be read as fixing them.** Stale lines,
+blank projections and absent movement are now MEASURABLE, not repaired. They
+were the three reports that could only be checked by eyeballing the page.
+
+**VERIFY — two log reads and four page reads.**
+
+Logs (mine to take):
+
+    LAYER2_BOARD_HEALTH sport=soccer
+      no_proj / live_proj / edged   -> "projections all blank"
+      age_p50s / p90s / maxs        -> "extremely stale lines"
+      all_movement_eligible vs matched -> "line movement non-existent"
+    PREGAME_PROJECTION_JOIN sport=soccer
+      player_no_roster vs player_name_miss -> who owns the 6,056
+
+Page (the user's — the proxy 403s the host from this container):
+
+    (a) clicking an alt-line tab highlights it
+    (b) default load shows NO soccer alt lines AND the board is not empty
+    (c) bet slip opens minimized
+    (d) counts strip moves with filters
+
+A LEAD ALREADY IN HAND for the staleness report, not yet confirmed as the cause:
+`soccer_source/data/book_grid/book_grid_2026-08-22.json` is **14.3 MB, above the
+publish sweep's repair limit**, and appears in `SWEEP_SKIPPED_DETAIL` on every
+cycle. Direct stream publishes succeed; if one misses, nothing repairs it and
+the board keeps serving the last copy. The health line's age percentiles will
+confirm or kill this.
