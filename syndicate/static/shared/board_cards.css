@@ -29,6 +29,16 @@ body.syndicate-body .cards-shell {
   gap: 6px;
 }
 
+/* The bet-type row is built from the markets PRESENT, so its length is the
+   slate's, not a designer's -- MLB alone can put a dozen prop markets here. The
+   base .board-tabs already wraps; this only stops a long row from pushing every
+   other control out of view, and scrolls instead. */
+.board-tabs--wrap {
+  max-height: 5.6rem;
+  overflow-y: auto;
+  align-content: flex-start;
+}
+
 .board-date-input {
   min-height: 36px;
   padding: 0 12px;
