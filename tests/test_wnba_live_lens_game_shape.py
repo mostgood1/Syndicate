@@ -231,28 +231,48 @@ class BuildWnbaGameLensTests(unittest.TestCase):
 
 
 class WnbaGameLensMarketsTests(unittest.TestCase):
+    """`#504`. These five called `_wnba_game_lens_markets(..., pace_total=...)`
+    and had done since `99e56561` -- **the same commit that renamed the
+    parameter**, which updated the function and not these call sites. Every one
+    raised `TypeError: unexpected keyword argument 'pace_total'` on clean
+    `origin/main` for as long as that commit has been in.
+
+    The SOURCE is the correct side and was not touched. `#475` records
+    `pace_total` as the defect being removed: a naive
+    `current_total / elapsed_fraction` extrapolation off a 5% floor, which
+    turned 12 points scored two minutes in into a 240-point projected final --
+    a 75-point error against a 165 line, published as the number an over/under
+    probability was then derived from. It was replaced by `projected_total`
+    (points already scored plus a blended-rate estimate of the rest) and a
+    separate `elapsed_min`, so the rename here is `pace_total` ->
+    `projected_total` plus the new argument.
+
+    They were invisible because CI runs `tests.test_archives` under unittest
+    and never executes this file -- see `#504`.
+    """
+
     def test_no_markets_when_betting_dict_is_empty(self) -> None:
-        markets = _wnba_game_lens_markets({}, live_home_win_prob=0.6, live_margin=5.0, pace_total=150.0)
+        markets = _wnba_game_lens_markets({}, live_home_win_prob=0.6, live_margin=5.0, projected_total=150.0, elapsed_min=20.0)
         self.assertEqual(markets, {})
 
     def test_moneyline_omitted_without_live_win_prob(self) -> None:
-        markets = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=None, live_margin=5.0, pace_total=150.0)
+        markets = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=None, live_margin=5.0, projected_total=150.0, elapsed_min=20.0)
         self.assertNotIn("moneyline", markets)
 
     def test_moneyline_picks_favored_side(self) -> None:
-        home_favored = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=0.7, live_margin=None, pace_total=None)
+        home_favored = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=0.7, live_margin=None, projected_total=None, elapsed_min=None)
         self.assertEqual(home_favored["moneyline"]["pick"], "Home ML")
         self.assertEqual(home_favored["moneyline"]["selection"], "home")
-        away_favored = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=0.3, live_margin=None, pace_total=None)
+        away_favored = _wnba_game_lens_markets({"home_ml": -150, "away_ml": 130}, live_home_win_prob=0.3, live_margin=None, projected_total=None, elapsed_min=None)
         self.assertEqual(away_favored["moneyline"]["pick"], "Away ML")
         self.assertEqual(away_favored["moneyline"]["selection"], "away")
 
     def test_spread_omitted_without_live_margin(self) -> None:
-        markets = _wnba_game_lens_markets({"home_spread": -4.5}, live_home_win_prob=0.6, live_margin=None, pace_total=None)
+        markets = _wnba_game_lens_markets({"home_spread": -4.5}, live_home_win_prob=0.6, live_margin=None, projected_total=None, elapsed_min=None)
         self.assertNotIn("spread", markets)
 
     def test_total_omitted_without_line(self) -> None:
-        markets = _wnba_game_lens_markets({}, live_home_win_prob=0.6, live_margin=5.0, pace_total=150.0)
+        markets = _wnba_game_lens_markets({}, live_home_win_prob=0.6, live_margin=5.0, projected_total=150.0, elapsed_min=20.0)
         self.assertNotIn("total", markets)
 
 

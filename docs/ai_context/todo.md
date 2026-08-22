@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#504` — **6 tests fail on clean `origin/main`, and CI cannot see them because CI runs only the archive suite.** — found by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+### `#504` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
 
 Confirmed in a **detached worktree at `origin/main`**, run in isolation, so
 this is neither test pollution nor anything from `#502`/`#503`:
@@ -23,8 +23,49 @@ deterministic failures indefinitely and still look green.
 
 Deterministic, so `#503`'s reproducibility fix does NOT hide them — after it,
 two consecutive runs of the 219-test `live_lens` group produce exactly this
-set both times. Not investigated; `syndicate/features/wnba/live_lens.py` is
-claimed by `layer2-sim-view-and-live-projection`.
+set both times.
+
+**ROOT CAUSE, BOTH GROUPS: the tests named things the code stopped calling.
+NO SOURCE FILE WAS WRONG, AND NONE WAS EDITED** — which also means the two
+claimed files (`wnba/live_lens.py`, `wnba/cards.py`) were never in play.
+
+**Group 1 (5 tests), `_wnba_game_lens_markets(..., pace_total=...)`.** Raised
+`TypeError: unexpected keyword argument`. The parameter was renamed in
+`99e56561` — **the same commit that last touched the test file** — which
+updated the function and not these five call sites. The source is the correct
+side: `#475` records `pace_total` as the DEFECT being removed, a naive
+`current_total / elapsed_fraction` off a 5% floor that turned 12 points scored
+two minutes in into a 240-point projected final, a 75-point error against a 165
+line, published as the number an over/under probability was derived from. Now
+`projected_total` + `elapsed_min`.
+
+**Group 2 (1 test), an INERT PATCH.** It patched
+`live_lens.build_cards_page_context`, which `build_live_lens_snapshot` stopped
+calling when it became consume-do-not-rebuild (`live_lens.py:460`, after a
+rebuild inside the tick cost +1,062MB in one step and crash-looped a 2Gi
+service). The fixture was never delivered, the builder fell through to a cold
+context, and the assertion read `0 != 50`. Now patches
+`build_cards_page_context_if_cached`.
+
+**THE MORE IMPORTANT FIND, in the same file: `test_snapshot_builder_returns_
+safe_empty_board_when_cards_are_missing` WAS PASSING VACUOUSLY.** It patched the
+same dead target with `side_effect=RuntimeError`, so nothing ever raised — the
+builder just took the ordinary cold path and returned an empty board. Every
+assertion held for a reason the test does not describe, and the error handling
+it names was never executed. A green test asserting nothing is worse than a red
+one; the red test beside it is the only reason anyone looked.
+
+**GUARD ADDED for the whole class:** both tests now `assert_called()` on the
+mock. Falsified — restoring the stale target fails BOTH, where before it failed
+only the non-vacuous one.
+
+## `#504` OWED — the CI-visibility half, NOT fixed
+
+`.github/workflows/ci.yml:37` runs `python -m unittest tests.test_archives` and
+nothing else, so `main` can carry deterministic pytest failures indefinitely
+and still show green. Fixing the six tests does not change that; the next
+stale patch target will sit exactly as long. Wiring pytest into CI is only
+safe once the full suite is green and is a decision for whoever owns CI.
 
 ### `#503` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
 

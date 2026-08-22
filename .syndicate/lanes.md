@@ -1227,6 +1227,11 @@ against a slate that actually had matches in play. Full evidence in
     `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
     was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
+  - **ADDED FOR `#504` 2026-08-22** (user asked for the fix; both unclaimed):
+    `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
+    `wnba/cards.py` and `wnba/live_lens.py` are claimed by other lanes and were
+    NOT edited — every one of the six failures was a stale TEST target, and both
+    source files are the correct side.
 - **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
   `syndicate/features/wnba/live_lens.py` is claimed by
   `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by
