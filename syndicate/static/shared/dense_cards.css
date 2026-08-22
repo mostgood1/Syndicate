@@ -1249,3 +1249,80 @@ a.cards-head-team-name:focus-visible {
 }
 .cards-momentum-key--home { color: #d64545; }
 .cards-momentum-key--away { color: #3b82c4; }
+
+/* --- Live stacked scoreline head, momentum status, and chart furniture ---
+   The horizontal "A @ B" head answers "who is playing"; a LIVE card has to
+   answer "what is the score, who is on top, and how long is left". */
+.cards-strip-head--live {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cards-live-scoreline { flex: 1 1 auto; min-width: 0; }
+.cards-live-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.35;
+}
+.cards-live-crest { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; }
+.cards-live-crest--text {
+  font-size: 11px; font-weight: 700; width: 18px; text-align: center;
+  color: var(--cards-muted, rgba(255,255,255,0.62));
+}
+.cards-live-team {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; font-weight: 600;
+}
+/* Tabular figures so 1-0 and 11-0 do not shift the column. */
+.cards-live-score {
+  flex: 0 0 auto;
+  font-size: 17px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.4em; text-align: right;
+}
+.cards-live-clock {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.cards-live-clock-time { font-size: 13px; font-weight: 700; color: #7ddc8f; }
+.cards-live-clock-period {
+  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cards-muted, rgba(255,255,255,0.62));
+}
+.cards-live-momentum {
+  display: flex; align-items: center; gap: 6px; margin-top: 5px;
+}
+.cards-live-momentum-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.32);
+}
+.cards-live-momentum-dot.is-home { background: #d64545; }
+.cards-live-momentum-dot.is-away { background: #3b82c4; }
+.cards-live-momentum-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--cards-muted, rgba(255,255,255,0.72));
+}
+/* Half-time tick and the "now" marker: both structural, both muted so they
+   never compete with the trace itself. */
+.cards-momentum-tick {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1; vector-effect: non-scaling-stroke;
+}
+.cards-momentum-now {
+  stroke: rgba(125, 220, 143, 0.75);
+  stroke-width: 1; stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+/* Goals sit on the scorer's side of the axis. */
+.cards-momentum-goal { fill: #f4f4f5; stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.5; }
+.cards-momentum-goal.is-own { fill: #9aa0a6; }
+.cards-momentum-axis-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; letter-spacing: 0.04em;
+  color: var(--cards-muted, rgba(255,255,255,0.5));
+  margin-top: 2px;
+}
