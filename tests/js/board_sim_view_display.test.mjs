@@ -182,5 +182,55 @@ for (const price of [-1000, -110, 100, 250, 6000]) {
   eq(`a ${price > 0 ? '+' : ''}${price} row survives the default`, inRange(price, defMin, defMax), true);
 }
 
+// --- the alt-line filter -------------------------------------------------
+//
+// The feed quotes `totals_alt` / `spreads_alt` beside the main number, so one
+// game can put a whole ladder on the board. This is the reader's control over
+// how much of it shows -- and, like the odds range, its DEFAULT must hide
+// nothing.
+const isAltLine = (new Function(`${extract('isAltLine')}\nreturn isAltLine;`))();
+
+console.log('\n--- an alt line is named by its MARKET, not guessed from its number ---');
+eq('totals_alt is alt', isAltLine({ market: 'totals_alt' }), true);
+eq('spreads_alt is alt', isAltLine({ market: 'spreads_alt' }), true);
+// The trap `layer2_board._movement_is_tracked` documents from the other side:
+// `totals_alt` STARTS WITH `totals`, so a prefix test sweeps the main market in
+// with the alts and "Main lines only" would show nothing at all.
+eq('totals is NOT alt (a prefix test would get this wrong)', isAltLine({ market: 'totals' }), false);
+eq('spreads is NOT alt', isAltLine({ market: 'spreads' }), false);
+eq('h2h is NOT alt', isAltLine({ market: 'h2h' }), false);
+eq('a prop is NOT alt', isAltLine({ market: 'batter_runs_scored' }), false);
+eq('market_key is honoured when market is absent', isAltLine({ market_key: 'totals_alt' }), true);
+eq('a row with no market is not alt (absence is never a classification)', isAltLine({}), false);
+eq('case does not decide it', isAltLine({ market: 'TOTALS_ALT' }), true);
+
+// Mirror of matchesClientFilters' alt branch.
+function altAllows(mode, item) {
+  if (mode === 'all') return true;
+  const alt = isAltLine(item);
+  if (mode === 'main' && alt) return false;
+  if (mode === 'alt' && !alt) return false;
+  return true;
+}
+
+console.log('\n--- the three modes ---');
+eq('default shows the main line', altAllows('all', { market: 'totals' }), true);
+eq('default shows the alt line too', altAllows('all', { market: 'totals_alt' }), true);
+eq('main-only keeps the main line', altAllows('main', { market: 'totals' }), true);
+eq('main-only drops the alt ladder', altAllows('main', { market: 'totals_alt' }), false);
+eq('alt-only keeps the alt line', altAllows('alt', { market: 'totals_alt' }), true);
+eq('alt-only drops the main line', altAllows('alt', { market: 'totals' }), false);
+eq('main-only keeps props (they are not an alt ladder)',
+  altAllows('main', { market: 'player_shots' }), true);
+
+console.log('\n--- and the DEFAULT hides nothing, same rule the odds range shipped broken ---');
+const defaultAlt = ['main', 'alt'].includes(String(new URLSearchParams('').get('alt_lines') || ''))
+  ? new URLSearchParams('').get('alt_lines')
+  : 'all';
+eq('an absent url param resolves to "all", not to a mode', defaultAlt, 'all');
+for (const market of ['h2h', 'totals', 'totals_alt', 'spreads', 'spreads_alt', 'player_shots']) {
+  eq(`a ${market} row survives the default`, altAllows(defaultAlt, { market }), true);
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

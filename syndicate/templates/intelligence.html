@@ -48,6 +48,7 @@
           <div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div>
           <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
           <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+          <div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div>
           <div class="board-odds-filter" id="board-odds-filter">
             <div class="board-odds-filter__head">
               <span class="board-odds-filter__label">Odds range</span>
@@ -293,6 +294,32 @@
     { value: "all", label: "All opportunities" },
     { value: "steam", label: "⚡ Steam moves only" },
   ];
+  // ALTERNATE LINES. The feed quotes `totals_alt` and `spreads_alt` alongside
+  // the main number, and one game can contribute a dozen of them -- a ladder of
+  // 6.5/7.5/8.5/9.5 totals where the board is really only asking about one bet.
+  // They are legitimate rows and are not hidden by default; this is the
+  // reader's control over how much of the ladder reaches their eyes, the same
+  // role the odds range plays for longshots.
+  const ALT_LINE_TABS = [
+    { value: "all", label: "Main + alt lines" },
+    { value: "main", label: "Main lines only" },
+    { value: "alt", label: "Alt lines only" },
+  ];
+
+  // WHAT MAKES A ROW AN ALT LINE, and it is the MARKET NAME rather than a guess
+  // about which number is "the" line.
+  //
+  // The alternative would be comparing each row's line against the consensus
+  // for its event+market and calling the outliers alt -- which invents a fact
+  // the feed already states, and gets it wrong the moment two books disagree on
+  // the main number. `_movement_is_tracked` in `layer2_board.py` makes the same
+  // distinction from the other side and warns about the same trap: `totals_alt`
+  // and `spreads_alt` START WITH a tracked market name, so a prefix test would
+  // sweep the main markets in with them. Suffix, not prefix.
+  function isAltLine(item) {
+    const market = String((item && (item.market || item.market_key)) || "").trim().toLowerCase();
+    return market.endsWith("_alt");
+  }
   const VIEW_TABS = [
     { value: "cards", label: "Cards" },
     { value: "blotter", label: "Blotter" },
@@ -472,6 +499,10 @@
       ? urlParams.get("lane")
       : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
+    // Default "all" -- the board renders exactly as it does today unless the
+    // reader asks otherwise. A filter that hides rows on a normal visit is how
+    // the odds range shipped blank on 2026-08-22.
+    altLines: ["main", "alt"].includes(String(urlParams.get("alt_lines") || "")) ? urlParams.get("alt_lines") : "all",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
     // shareable board configuration like sport/date/filters are). null
@@ -544,6 +575,7 @@
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
+    if (state.altLines !== "all") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -639,6 +671,12 @@
       renderFilterTabs();
       renderBoardBody();
     });
+    renderTabs("board-alt-tabs", ALT_LINE_TABS, state.altLines, (value) => {
+      state.altLines = value;
+      syncUrlState();
+      updateFilterDisclosure();
+      renderBoardBody();
+    });
     renderTabs("board-steam-tabs", STEAM_TABS, state.steamOnly ? "steam" : "all", (value) => {
       state.steamOnly = value === "steam";
       syncUrlState();
@@ -659,6 +697,7 @@
     if (state.minEdge > 0) active.push("edge");
     if (oddsFilterIsNarrowed()) active.push("odds");
     if (state.steamOnly) active.push("steam");
+    if (state.altLines !== "all") active.push("alt");
     return active;
   }
 
@@ -684,6 +723,7 @@
     state.oddsMin = ODDS_LADDER_MIN_DEFAULT;
     state.oddsMax = ODDS_LADDER_MAX_DEFAULT;
     state.steamOnly = false;
+    state.altLines = "all";
     syncUrlState();
     renderFilterTabs();
     renderBoardBody();
@@ -1318,6 +1358,11 @@
     // +6000 steam longshot is exactly what this filter exists to remove.
     if (!matchesOddsRange(item)) return false;
     if (state.steamOnly && !isSteamCandidate(item)) return false;
+    if (state.altLines !== "all") {
+      const alt = isAltLine(item);
+      if (state.altLines === "main" && alt) return false;
+      if (state.altLines === "alt" && !alt) return false;
+    }
     if (state.marketFamily !== "all") {
       const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
       const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
