@@ -6,6 +6,8 @@ import json
 import os
 import sys
 import tempfile
+from datetime import date
+from datetime import timedelta
 import types
 import unittest
 from pathlib import Path
@@ -1321,26 +1323,62 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["snapshot_rows"]), 1)
 
     def test_player_logs_preflight_accepts_local_boxscores(self) -> None:
+        """`#517`. **DATES ARE RELATIVE TO TODAY, and they have to be.**
+
+        This wrote a fixture whose newest game was hardcoded `2026-05-21` and
+        asserted the preflight accepted it. `_ensure_player_logs_for_props_refresh`
+        gained a STALENESS BOUND on that fallback -- deliberately, after
+        `boxscores_history` was observed 3+ weeks behind while bare existence
+        kept the branch returning True (`#469` pt3) -- and
+        `boxscore_history_is_stale` measures age against `pd.Timestamp.now()`
+        with `REFRESH_PLAYER_LOGS_FALLBACK_MAX_AGE_DAYS` defaulting to 5.
+
+        So this test PASSED for five days after it was written and has failed
+        every day since. It is a time bomb, not a regression: nothing about the
+        behaviour it names has broken. Once past the window the preflight falls
+        through to the network bootstrap, which cannot reach ESPN from CI or
+        from a sandbox, so the failure also looks like a connectivity problem
+        rather than an expiry.
+
+        The behaviour under test is "a CURRENT local boxscores file satisfies
+        the preflight". Anchoring the fixture to today states exactly that, and
+        cannot expire.
+        """
         module = self._load_module()
+
+        today = date.today()
+        game_day = today - timedelta(days=1)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             processed_root = source_root / "data" / "processed"
             processed_root.mkdir(parents=True, exist_ok=True)
-            (processed_root / "boxscores_2026-05-22.csv").write_text(
+            # `boxscores_history.csv`, NOT `boxscores_<date>.csv`. The original
+            # fixture used a per-date file, which `_active_player_logs_fallback_paths`
+            # DOES find (it globs `boxscores_*.csv`) -- but the staleness gate
+            # behind it, `boxscore_history_max_date`, reads ONLY
+            # `boxscores_history.{parquet,csv}`. A per-date file is therefore
+            # found and then unconditionally judged stale (max date None), so it
+            # can never satisfy this preflight no matter how fresh it is.
+            #
+            # That mismatch between what the finder accepts and what the gate
+            # measures is a REAL source inconsistency, filed rather than fixed
+            # here: changing which files count as fresh history is a production
+            # behaviour decision, not a test fix.
+            (processed_root / "boxscores_history.csv").write_text(
                 "date,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,FG3M\n"
-                "2026-05-21,NYL,1,Test Player,30,20,5,6,3\n",
+                f"{game_day.isoformat()},NYL,1,Test Player,30,20,5,6,3\n",
                 encoding="utf-8",
             )
 
             ready, reason = module._ensure_player_logs_for_props_refresh(
                 source_root=source_root,
-                date_str="2026-05-22",
+                date_str=today.isoformat(),
                 log_file=Path(tmp_dir) / "refresh.log",
                 heartbeat_cb=lambda *_args, **_kwargs: None,
             )
 
-        self.assertTrue(ready)
+        self.assertTrue(ready, reason)
         self.assertIsNone(reason)
 
     def test_player_logs_preflight_bootstraps_local_history_when_missing(self) -> None:
@@ -3593,7 +3631,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"counts": {"games": 1, "picks": 1}, "per_game": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_cards_props_snapshot_artifact(*, source_root, date_str, processed_root):
+            # `#517`. `force_refresh` was added to `_export_cards_props_snapshot`
+            # on 2026-08-16 -- deliberately, to stop it being the odd one out of a
+            # trio where both siblings already honoured the bypass. The fake was not
+            # updated, so the real call raised TypeError. `_fake_top_by_game_artifact`
+            # below already carries the same parameter.
+            def _fake_cards_props_snapshot_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)

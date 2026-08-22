@@ -72,6 +72,16 @@ class LiveProjectionJoinTests(unittest.TestCase):
         # the player case.
         self.assertEqual(coverage["miss_player_not_live"], 1)
         self.assertEqual(coverage["miss_no_market_alias"], 0)
+
+        # THE INVARIANT THIS TEST IS NAMED FOR, added by `#517` alongside the
+        # bucket assertion above. Both branches reached the same fix for the
+        # bucket independently; this is the part only one had. It pins the
+        # claim in the test's NAME -- every considered row lands in exactly one
+        # reason -- rather than one bucket's value, so it survives the next
+        # split of the kind `#296` just made, which is precisely what broke the
+        # old assertion.
+        miss_total = sum(value for key, value in coverage.items() if key.startswith("miss_"))
+        self.assertEqual(miss_total + coverage["rows_live_projected"], coverage["rows_live_considered"])
         self.assertTrue(coverage["unmatched_samples"])
         self.assertIn("tried", coverage["unmatched_samples"][0])
 

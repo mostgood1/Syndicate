@@ -14,6 +14,8 @@ rows fetched 2026-08-15, including the side/projection-side mismatch that makes
 """
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 
 from syndicate.blueprints import ask_the_syndicate_adapter as adapter
@@ -92,14 +94,39 @@ def test_model_bearing_rows_outrank_ev_only_rows():
 
 
 def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
-    rows = [_row(model_edge_pct=e) for e in (1.2, 6.35, -4.0, 3.1)]
+    """`#517`. Two contract changes this had to catch up with, and the second
+    makes the test stronger than it was.
+
+    1. The call returns `(rows, excluded_count)`, so `top` had to be
+       destructured -- iterating the tuple raised `TypeError: list indices must
+       be integers or slices, not str`.
+    2. `_has_positive_edge` is now a VETO over EVERY edge term the row carries,
+       not just the one it is ranked on. The default fixture is a real board row
+       carrying `ev_pct=-2.8895`, so under the current rule every row here is
+       ineligible and the old expected list -- which ENDED in `-4.0` -- was
+       asserting that a bad bet gets published. `ev_pct` is now positive so the
+       rows are eligible on merit, and `-4.0` is expected to be vetoed rather
+       than ranked last.
+    """
+    rows = [_row(model_edge_pct=e, ev_pct=2.0) for e in (1.2, 6.35, -4.0, 3.1)]
     _patch_shortlist(monkeypatch, {"rows": rows})
-    top = adapter._board_top_opportunities({}, {"selected_date": "2026-08-15"})
-    assert [item["edge"] for item in top] == [6.35, 3.1, 1.2, -4.0]
+    top, excluded = adapter._board_top_opportunities({}, {"selected_date": "2026-08-15"})
+    assert [item["edge"] for item in top] == [6.35, 3.1, 1.2]
+    assert excluded == 1, "the -4.0 row must be vetoed, not ranked last"
     assert all(item["source"] == "layer2_shortlist" for item in top)
 
 
 # --- the fallbacks, so an answer never gets worse than before -----------------
+#
+# `#517`. These assert `== (None, 0)`, not `is None`. `_board_top_opportunities`
+# returns `(rows_or_None, excluded_count)` -- the second term is how many rows
+# the positive-edge veto removed, which the caller needs in order to say "1 row
+# with a non-positive edge was left out" rather than a bare "nothing found".
+# The tests were written against the older scalar contract and every one of
+# them raised `assert (None, 0) is None`.
+#
+# The SOURCE is the correct side here and the sole caller
+# (`ask_the_syndicate_adapter.py:1360`) already destructures a 2-tuple.
 
 @pytest.mark.parametrize(
     "payload",
@@ -108,17 +135,34 @@ def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
 )
 def test_absent_artifact_falls_back_rather_than_emptying_the_headline(monkeypatch, payload):
     _patch_shortlist(monkeypatch, payload)
-    assert adapter._board_top_opportunities({}, {}) is None
+    assert adapter._board_top_opportunities({}, {}) == (None, 0)
 
 
 def test_sport_filter_that_matches_nothing_falls_back(monkeypatch):
     _patch_shortlist(monkeypatch, {"rows": [_row(sport="nfl")]})
-    assert adapter._board_top_opportunities({"sport": "nhl"}, {}) is None
+    assert adapter._board_top_opportunities({"sport": "nhl"}, {}) == (None, 0)
 
 
 def test_sport_filter_is_exact_so_nba_does_not_match_wnba(monkeypatch):
     _patch_shortlist(monkeypatch, {"rows": [_row(sport="wnba")]})
-    assert adapter._board_top_opportunities({"sport": "nba"}, {}) is None
+    assert adapter._board_top_opportunities({"sport": "nba"}, {}) == (None, 0)
+
+
+def test_an_unimportable_reader_degrades_instead_of_raising_typeerror(monkeypatch):
+    """`#517`. The import-failure branch returned a BARE `None` while every
+    other branch -- and the sole caller, which destructures -- uses a 2-tuple.
+    So the one path written to DEGRADE an answer raised `TypeError: cannot
+    unpack non-sequence NoneType` instead, turning a soft failure hard.
+
+    Untested until now because the other degradation path (`read_layer2_
+    shortlist` raising) returns the tuple correctly, so the two read as one
+    case. They are not: this one fires when the MODULE cannot be imported at
+    all, which is what a broken environment produces.
+    """
+    import sys
+
+    with mock.patch.dict(sys.modules, {"pipeline.intelligence_state": None}):
+        assert adapter._board_top_opportunities({}, {}) == (None, 0)
 
 
 def test_a_raising_reader_degrades_instead_of_failing_the_answer(monkeypatch):
@@ -128,13 +172,13 @@ def test_a_raising_reader_degrades_instead_of_failing_the_answer(monkeypatch):
         raise RuntimeError("artifact store unavailable")
 
     monkeypatch.setattr(state, "read_layer2_shortlist", _boom, raising=False)
-    assert adapter._board_top_opportunities({}, {}) is None
+    assert adapter._board_top_opportunities({}, {}) == (None, 0)
 
 
 # --- the schema actually prefers the board -----------------------------------
 
 def test_market_summary_prefers_the_board_over_the_snapshot(monkeypatch):
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
     snapshot = {"recommendations": [{"selection": "SNAPSHOT ROW", "edge": 13.59}]}
     schema = adapter._market_summary_schema(snapshot, question="biggest edges?", context={})
     edges = [item["edge"] for item in schema["top_opportunities"]]
@@ -152,7 +196,7 @@ def test_an_empty_snapshot_is_a_refusal_and_the_board_must_not_fill_it(monkeypat
     tomorrow's game" with five unrelated NFL totals (refusal 4/8 -> 3/8 against
     a same-slate control). The board may REPLACE a pool, never create one.
     """
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
     schema = adapter._market_summary_schema(
         {"recommendations": []}, question="Ohtani's exact stats for tomorrow?", context={}
     )
@@ -166,7 +210,7 @@ def test_summary_reports_a_board_edge_as_a_percent_not_635(monkeypatch):
     Snapshot rows carry `edge` as a fraction, board rows as a percent, and the
     sentence multiplied by 100 unconditionally.
     """
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
     schema = adapter._market_summary_schema(
         {"recommendations": [{"selection": "x", "edge": 0.1}]}, question="biggest edges?", context={}
     )
@@ -201,7 +245,11 @@ def test_regression_divergence_predicate_holds(monkeypatch):
     `max(edge)` over `structured_response.top_opportunities`; the harness fails
     the case when they differ by more than 0.5.
     """
-    board_rows = [_row(model_edge_pct=e) for e in (1.2, 6.35, -4.0, 3.1, 5.9)]
+    # `ev_pct` positive: `_has_positive_edge` vetoes on EVERY edge term, and the
+    # default fixture's real `ev_pct` is -2.8895, which emptied the pool and
+    # made this fail on `max()` of an empty sequence rather than on the
+    # divergence it exists to check.
+    board_rows = [_row(model_edge_pct=e, ev_pct=2.0) for e in (1.2, 6.35, -4.0, 3.1, 5.9)]
     _patch_shortlist(monkeypatch, {"rows": board_rows})
 
     board_top = max(r["model_edge_pct"] for r in board_rows)

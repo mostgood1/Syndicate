@@ -92,3 +92,56 @@ jobs:
           python .claude/hooks/test_ledger_append_guard.py
           python .claude/hooks/test_ledger_postwrite_check.py
           python .claude/hooks/test_lane_guard_hyphen.py
+
+  # `#517`. THE FULL PYTEST SUITE, GATED ON NO NEW FAILURES -- not on green.
+  #
+  # Measured 2026-08-22 on clean `origin/main`: `76 failed, 9245 passed` across
+  # 26 files, every sampled one reproducing standalone. The `test` job above
+  # runs `tests.test_archives` (383 cases) and nothing else, so those 76 sit
+  # there indefinitely while CI shows green -- which is exactly how `#516`'s six
+  # stale test targets survived, one of them a test passing VACUOUSLY.
+  #
+  # A plain green gate lands red on the first run, and this file already argues
+  # why that is worse than nothing ("a check that is red on arrival is a check
+  # people learn to ignore ... it looks like coverage"). `continue-on-error`
+  # would be that decoration in one line. So the DERIVATIVE is gated instead:
+  # the known-failing set is recorded in `tests/pytest_baseline.json`, and this
+  # fails when the set GROWS. Regressions are caught from today; the debt stays
+  # visible as a number in a tracked file rather than a red check nobody reads.
+  #
+  # It also fails when a baselined test starts PASSING, with the remedy printed.
+  # That is deliberate: a baseline that never shrinks stops describing reality,
+  # and "no new failures" quietly becomes "no information".
+  #
+  # SEPARATE JOB, not a step, so the ~27-minute suite never delays the fast
+  # feedback from `test`. Both must pass for the workflow to.
+  #
+  # THE INSTALL IS DELIBERATELY NARROW: `requirements.txt` plus pytest, and NOT
+  # `requirements-dev.txt`. That file carries psutil, whose PRESENCE CHANGES
+  # BEHAVIOUR -- `memory_observability` picks a psutil backend over its procfs
+  # one, and two of the baselined failures are memory tests. The baseline was
+  # generated on Python 3.11 with psutil and playwright ABSENT; an install that
+  # does not match it reports phantom regressions on the first run. The pytest
+  # pin is read out of requirements-dev.txt rather than repeated here, so there
+  # is one source for it.
+  pytest-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "$(grep -E '^pytest' requirements-dev.txt)"
+
+      - name: Full pytest suite (enforced -- no NEW failures vs the baseline)
+        run: python scripts/pytest_baseline.py --runnable

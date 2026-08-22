@@ -950,6 +950,359 @@ in `state.md` (`poll_soccer_live_state.py` writing per-league files with a raw
 `write_text()` that neither the filesystem nor the key resolves) — which was
 found independently, a day earlier, in a different subsystem.
 
+### `#517` — **CORRECTED: the "76 failures" figure was WRONG — at least 25 were a broken environment in the measuring container, not the repo.** Gate shipped; the three biggest files fixed. — lane `basketball-live-momentum`, 2026-08-22
+
+`python -m pytest tests/` on this branch, 26m58s:
+
+    76 failed, 9245 passed, 66 skipped, 2 xfailed, 373 subtests passed
+
+## `#517` CORRECTION `[2026-08-22, same session]` — READ THIS BEFORE THE NUMBERS BELOW
+
+**The 76 figure is retracted.** `cffi` was absent from the measuring
+container — collateral from this session's own
+`pip install --ignore-installed` / `--force-reinstall` juggling — so
+`cryptography` could not import and everything importing it failed. Installing
+one package moved four files at once:
+
+    test_refresh_state_store.py      18 failed -> 1 failed
+    test_wnba_refresh_runner.py       6 failed -> 4 failed
+    test_nba_cards_keyvalue_backend   3 failed -> 3 PASSED
+    test_wnba_cards_keyvalue_backend  3 failed -> 7 PASSED
+
+**The verification that failed to catch this is the point.** The failures were
+re-run in a detached worktree at clean `origin/main` and reproduced identically
+— which proved the CODE was not the cause and said nothing about the
+environment, because **a worktree shares site-packages**. `python -m pip check`
+was reporting a broken requirement the whole time. Rule recorded in
+`learnings.md`.
+
+**FIXED IN THE SAME PASS (the three biggest files, 35 failures -> 2):**
+
+- `test_refresh_state_store.py` **18 -> 0.** 17 were the cffi breakage. The
+  1 real one: the test built its probe at `<tmp>/probe.py`, and
+  `repo_root_from` is `parents[3]` — only three parents exist under Linux
+  `/tmp`, so it raised `IndexError` before reaching the `RuntimeError` it
+  asserts. It passed on macOS/Windows (deep temp paths) and failed on Linux,
+  i.e. on CI and production. Fixture now nests to a representative depth.
+- `test_ask_headline_from_board.py` **11 -> 0.** All stale contract: the
+  function returns `(rows, excluded_count)` and the tests asserted `is None`;
+  and `_has_positive_edge` became a VETO over EVERY edge term, so the realistic
+  fixture (`model_edge_pct` +6.35, `ev_pct` -2.89) is now correctly ineligible.
+  The old expected list literally ended in `-4.0` — it was asserting that a bad
+  bet gets published.
+  **Plus a REAL SOURCE BUG found there:** the import-failure branch returned a
+  bare `None` while every other branch and the sole caller use a 2-tuple, so
+  the one path written to DEGRADE an answer raised
+  `TypeError: cannot unpack non-sequence NoneType`. Reachable in exactly the
+  situation it exists for — a broken environment, which is how it was found.
+  Fixed, with the first test to cover that branch.
+- `test_wnba_refresh_runner.py` **6 -> 2.** A fake missing the `force_refresh`
+  kwarg its sibling already had; and a TIME BOMB — a fixture hardcoded to
+  `2026-05-21` asserted against a staleness bound of 5 days, so it passed for
+  five days after it was written and has failed every day since. Now anchored
+  to `date.today()`.
+
+**THE 2 REMAINING ARE DELIBERATELY NOT FIXED.**
+`test_main_prefers_existing_refresh_outputs_before_source_job` and
+`test_main_refreshes_live_snapshots_even_when_reusing_existing_outputs` both
+fail because `DECISION=will_fetch`: the input-hash refresh-decision gate fires
+BEFORE the reuse-existing-outputs branch is consulted, and a fresh temp dir has
+no recorded prior hash. **That gate is the active subject of the OPEN lane
+`wnba-live-odds-capture-gap`**, whose own finding is "THE FIX BELONGS IN THE
+GUARD, NOT THE AUTORUN". Encoding an expectation about semantics another lane
+is rewriting would be editing across lanes and would likely encode the wrong
+one.
+
+**A SOURCE INCONSISTENCY FOUND AND FILED, NOT FIXED:**
+`_active_player_logs_fallback_paths` globs `boxscores_*.csv` (per-date files),
+but the staleness gate behind it, `boxscore_history_max_date`, reads ONLY
+`boxscores_history.{parquet,csv}`. So a per-date boxscores file is FOUND and
+then unconditionally judged stale, however fresh it is. Changing which files
+count as fresh history is a production behaviour decision, not a test fix.
+
+**The baseline was regenerated on the repaired environment** — the committed
+one was built on the broken measurement and would have reported ~25 phantom
+"fixed" tests on the first CI run.
+
+## `#517` PROGRESS `[2026-08-22, final for this session]` — **19 failing of 9,391**
+
+    76 (broken env)  ->  ~51 real  ->  35  ->  19
+
+**33 fixed across two passes, and NOT ONE WAS A PRODUCT BUG.** Every failure
+was a test describing a contract the code had moved past, and in several cases
+the source change was a documented fix with a production incident behind it.
+The suite had drifted; the system had not. Patterns, all recurring:
+inert patch targets, a scalar->mapping contract change, a Windows path on
+Linux, two date time bombs, a positional index into a rendered table, and a
+finer error bucket misread as a regression.
+
+**Two real source bugs surfaced only by reading the failures** (both filed or
+fixed above): the bare-`None` degrade branch in `ask_the_syndicate_adapter`,
+and the `_active_player_logs_fallback_paths` / `boxscore_history_max_date`
+mismatch.
+
+**REMAINING 19, and one of them is a NEW kind of problem:**
+`test_layer2_movement_live_segment.py` passes 27/27 in isolation and fails 1 in
+the full run — **order-dependent, i.e. cross-file pollution of the `#515`
+class, in a file that is otherwise clean.** Worth taking before the singles:
+pollution makes every other number in this list less trustworthy.
+
+The other 18 are singles across 15 files, plus the 2 in
+`test_wnba_refresh_runner` deliberately left to `wnba-live-odds-capture-gap`.
+
+**NOT caused by `#514`/`#515`/`#516`, and not test pollution.** Zero failures
+are in any momentum file. Three files were sampled IN ISOLATION and then re-run
+in a detached worktree at **clean `origin/main`** — identical counts in all
+three places, so these reproduce standalone and are genuinely on main:
+
+    test_ask_headline_from_board.py     11 failed, 8 passed   (isolation AND origin/main)
+    test_layer2_projection_carry.py      4 failed             (isolation AND origin/main)
+    test_nba_cards_keyvalue_backend.py   3 failed             (isolation AND origin/main)
+
+Distribution — the top two files are a third of the total, so this is likely a
+handful of causes rather than 76:
+
+```
+     18 tests/test_refresh_state_store.py
+     11 tests/test_ask_headline_from_board.py
+      6 tests/test_wnba_refresh_runner.py
+      5 tests/test_quote_join_reason_stats.py
+      4 tests/test_layer2_projection_carry.py
+      3 tests/test_wnba_cards_keyvalue_backend.py
+      3 tests/test_refresh_odds_sources.py
+      3 tests/test_nba_cards_keyvalue_backend.py
+      2 tests/test_sweep_skip_detail.py
+      2 tests/test_ops.py
+      2 tests/test_nfl_injuries_fetch_autorun.py
+      2 tests/test_intelligence_state.py
+      2 tests/test_generate_smartsim2_nfl_projections.py
+      1 tests/test_slate_date_timezone_discipline.py
+      1 tests/test_refresh_worker.py
+      1 tests/test_probability_differential.py
+      1 tests/test_odds_control_plane.py
+      1 tests/test_nfl_roster_depth_autorun.py
+      1 tests/test_nba_refresh_runner.py
+      1 tests/test_mlb_sim_run_reconcile.py
+      1 tests/test_memory_watchdog.py
+      1 tests/test_memory_observability.py
+      1 tests/test_live_projection_join.py
+      1 tests/test_layer2_movement_live_segment.py
+      1 tests/test_generate_smartsim2_nfl_preseason_projections.py
+      1 tests/test_ask_board_candidates.py
+```
+
+**WHY CI CANNOT SIMPLY BE SWITCHED ON.** `ci.yml` runs
+`python -m unittest tests.test_archives` (383 tests, green) and nothing else.
+Adding a pytest step today lands red on the first run, and `ci.yml`'s own
+comments already argue against exactly that: *"a check that is red on arrival
+is a check people learn to ignore, and then it is worth less than nothing — it
+looks like coverage"*, and *"a permanently-tolerated failure is how a gate
+becomes decoration."* Adding it behind `continue-on-error` would be that
+decoration.
+
+**Also note pytest is in NEITHER `requirements.txt` NOR `requirements-dev.txt`**
+— CI installs only `requirements.txt`, so a pytest step needs the dependency
+declared first. That is a real (small) part of why the suite has never run in CI.
+
+**RESOLVED AS A NO-NEW-FAILURES GATE 2026-08-22** (user decision), which
+closes `#516`'s CI half without pretending the debt is gone:
+
+- `scripts/pytest_baseline.py` — `--update` records the failing set;
+  bare invocation fails when the set GROWS. **It also fails when a baselined
+  test starts PASSING**, with the remedy printed: a baseline that never shrinks
+  stops describing reality, and "no new failures" quietly becomes "no
+  information".
+- `tests/pytest_baseline.json` — the recorded set.
+- `ci.yml` job `pytest-baseline`, ENFORCED, never `continue-on-error`. A
+  SEPARATE job so the ~27-minute suite does not delay the fast `test` job.
+- `pytest` declared in `requirements-dev.txt` (it was in no requirements file
+  at all).
+
+**Test identity is the junit `classname::name` pair, not a pytest node id.**
+Node ids must be reconstructed from a dotted classname whose module/class
+boundary is ambiguous, and scraping them from `-q` stdout is worse — a
+parametrised id can contain spaces and ` - `. The junit pair needs no parsing.
+
+**THE BASELINE IS ENVIRONMENT-SENSITIVE, and the CI install is narrow on
+purpose.** It was generated on Python 3.11 with **psutil and playwright
+ABSENT**. `requirements-dev.txt` carries psutil, whose PRESENCE CHANGES
+BEHAVIOUR — `memory_observability` selects a psutil backend over its procfs
+one, and two baselined failures are memory tests. So CI installs
+`requirements.txt` + pytest only. If the first CI run reports phantom
+regressions, that is an environment mismatch, not a code regression: compare
+the two installs before touching any test.
+
+**Still owed, and unchanged by this:** the 76 themselves. The gate stops the
+number growing; it does not shrink it. Fix the top three files first
+(`test_refresh_state_store.py` 18, `test_ask_headline_from_board.py` 11,
+`test_wnba_refresh_runner.py` 6 = 46% of all failures), then `--update`.
+
+### `#516` — **TESTS FIXED 2026-08-22. All six were STALE PATCH/CALL TARGETS, and one of them was a test passing VACUOUSLY.** The CI-visibility half is still open — see OWED. — lane `basketball-live-momentum`
+
+Confirmed in a **detached worktree at `origin/main`**, run in isolation, so
+this is neither test pollution nor anything from `#514`/`#515`:
+
+    tests/test_wnba_live_lens_game_shape.py::WnbaGameLensMarketsTests
+      test_moneyline_omitted_without_live_win_prob
+      test_moneyline_picks_favored_side
+      test_no_markets_when_betting_dict_is_empty
+      test_spread_omitted_without_live_margin
+      test_total_omitted_without_line
+    tests/test_wnba_live_lens_worker.py::WnbaLiveLensWorkerTests
+      test_snapshot_builder_limits_rank_cards_to_fifty
+
+    6 failed, 29 passed
+
+**Why nobody has noticed:** `CLAUDE.md` records that CI runs
+`python -m unittest tests.test_archives` only — 383 tests, all passing. These
+six are in the pytest suite that CI never executes, so `main` can carry
+deterministic failures indefinitely and still look green.
+
+Deterministic, so `#515`'s reproducibility fix does NOT hide them — after it,
+two consecutive runs of the 219-test `live_lens` group produce exactly this
+set both times.
+
+**ROOT CAUSE, BOTH GROUPS: the tests named things the code stopped calling.
+NO SOURCE FILE WAS WRONG, AND NONE WAS EDITED** — which also means the two
+claimed files (`wnba/live_lens.py`, `wnba/cards.py`) were never in play.
+
+**Group 1 (5 tests), `_wnba_game_lens_markets(..., pace_total=...)`.** Raised
+`TypeError: unexpected keyword argument`. The parameter was renamed in
+`99e56561` — **the same commit that last touched the test file** — which
+updated the function and not these five call sites. The source is the correct
+side: `#475` records `pace_total` as the DEFECT being removed, a naive
+`current_total / elapsed_fraction` off a 5% floor that turned 12 points scored
+two minutes in into a 240-point projected final, a 75-point error against a 165
+line, published as the number an over/under probability was derived from. Now
+`projected_total` + `elapsed_min`.
+
+**Group 2 (1 test), an INERT PATCH.** It patched
+`live_lens.build_cards_page_context`, which `build_live_lens_snapshot` stopped
+calling when it became consume-do-not-rebuild (`live_lens.py:460`, after a
+rebuild inside the tick cost +1,062MB in one step and crash-looped a 2Gi
+service). The fixture was never delivered, the builder fell through to a cold
+context, and the assertion read `0 != 50`. Now patches
+`build_cards_page_context_if_cached`.
+
+**THE MORE IMPORTANT FIND, in the same file: `test_snapshot_builder_returns_
+safe_empty_board_when_cards_are_missing` WAS PASSING VACUOUSLY.** It patched the
+same dead target with `side_effect=RuntimeError`, so nothing ever raised — the
+builder just took the ordinary cold path and returned an empty board. Every
+assertion held for a reason the test does not describe, and the error handling
+it names was never executed. A green test asserting nothing is worse than a red
+one; the red test beside it is the only reason anyone looked.
+
+**GUARD ADDED for the whole class:** both tests now `assert_called()` on the
+mock. Falsified — restoring the stale target fails BOTH, where before it failed
+only the non-vacuous one.
+
+## `#516` OWED — the CI-visibility half, NOT fixed — **BLOCKED, see `#517`**
+
+`.github/workflows/ci.yml:37` runs `python -m unittest tests.test_archives` and
+nothing else, so `main` can carry deterministic pytest failures indefinitely
+and still show green. Fixing the six tests does not change that; the next
+stale patch target will sit exactly as long. Wiring pytest into CI is only
+safe once the full suite is green, and **it is not**: measured 2026-08-22,
+**76 failures across 26 files** on clean `origin/main` (`#517`). Turning CI on
+today would land red on the first run, which `ci.yml`'s own comments argue is
+worse than no check at all.
+
+### `#515` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
+
+`PublishWatermarkTests::test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`.
+Measured, two consecutive runs of the SAME single test, nothing else changed:
+
+    rm reports/refresh_status/latest/live_lens_publish_watermark.json
+    run 1 -> 1 passed          (and WRITES {"epoch": 9.0} to that real path)
+    run 2 -> AssertionError: [9.0, 3.0, 6.0] != [1.0, 3.0, 6.0]
+
+**The first element is exactly the epoch the previous run left on disk** — 9.0
+after a single-test run, 13.0 after a longer one. Cycles 2 and 3 are correct in
+both runs, which is what makes it look like a logic bug and is why the shape
+matters: only the FIRST cycle reads the stale file.
+
+**It passes on a clean checkout and fails on any machine that has run it
+before**, which is why CI is green and nobody has hit it. That asymmetry is the
+whole defect: the suite is not reproducible locally, and the failure appears
+attached to whatever change a session happens to be making at the time. This
+session nearly attributed it to an unrelated `artifact_publisher.py` edit and
+only ruled that out by stashing.
+
+**RESOLVED WITHOUT TOUCHING `live_lens_loop.py`.** Both test files patch
+`_live_lens_publish_watermark_path` to a tmp path. That target matters: BOTH the
+read and the write go through it, whereas `_record_live_lens_publish_watermark`
+(`live_lens_loop.py:229`) re-imports `write_json_file` INSIDE the function, so
+it escapes a module-attribute patch. The old `patch.object(live_lens_loop,
+"write_json_file")` was not inert — it caught the loop's three OTHER write
+sites and missed this one. Three of four captured is exactly the shape that
+reads as isolation and is not.
+
+**THE SECOND DEFECT, only visible once the first was fixed.** The test asserted
+`windows == [1.0, 3.0, 6.0]`, derived from a table assuming exactly three
+`time.time()` reads per cycle. The in-sweep memory sampler reads the clock a
+VARIABLE number of times, so the same test yields `[1, 3, 6]` alone and
+`[1, 3, 7]` when `test_live_lens_loop_publish_instrumentation.py` runs first.
+Now asserts the invariant — each window equals the PREVIOUS publish start,
+compared against publish instants captured during the run — which is strictly
+tighter (it still catches the cycle-start bug, which shifts every window one
+read earlier) and immune to how often anything else reads the clock.
+
+**A THIRD WRITER was found by scanning every `live_lens` test file:**
+`test_live_lens_loop_publish_instrumentation.py` wrote a real wall-clock epoch
+into the tree and survived the first fix. Isolated the same way. And the first
+version of the regression guard compared `path.exists()` before/after, which
+PASSED while that file was still rewriting the real one — content, not
+existence, is what the guard now compares.
+
+VERIFIED: watermark file alone 6/6 green; the polluting pair 5/5 green with the
+real path never written; the whole `live_lens` group (219 tests) run twice
+end-to-end produced **identical failure sets**. Falsified by disabling the
+isolation — 2 failures, deterministically.
+
+Also fixed, the secondary item below: `.gitignore` now covers
+`memory_high_water.json`, `retention_cursor_local.json`,
+`reports/opportunity_contract/` and `data/live/`. A `pytest` run now leaves the
+tree clean.
+
+**Related, same class, cheap:** `.gitignore` covers
+`reports/live_refresh_loop/memory_diagnostics.json` and `last_*.json` but NOT
+`memory_high_water.json`, so every test run leaves an untracked file that trips
+commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
+
+### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED** on `claude/live-lens-momentum-basketball-3hlx7g`, lane `basketball-live-momentum`; NOT DEPLOYED and NOTHING CALLS THE PRODUCER
+
+Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
+
+**The gap in one line:** `live_pbp_stats_<date>.jsonl` persists only AGGREGATES
+(`pbp_attempts`, `pbp_possessions`, `pbp_recent`); the per-play stream is built
+in-process on the vendor app and discarded. Momentum needs a per-event,
+timestamped, team-signed artifact and nothing writes one.
+
+**Already solved, do not rebuild:** the SVG chart renders for any sport that
+sets `game["shared_momentum"]` (`_game_card_generic.html:190-245`, rendered by
+every sport's board); the clock model is `game_shape.py:483`
+`basketball_elapsed_minutes`, test-pinned against WNBA's copy; NBA and WNBA
+already tick on the worker via `live_lens_loop.py:150`.
+
+**Measured off the tracked mirror 2026-08-22** (61 files, 126 game records):
+`pointsAttempted` IS present in ESPN's basketball plays — 2,778 attempts across
+19 populated records, **0 in `UNKNOWN`**, so team attribution is clean. But the
+buckets are keyed by TRICODE and `pbp_attempts["home"]`/`["away"]` are ZERO on
+every record — the same trap `game_shape.py:459` already records for
+`pbp_possessions`. Coverage of those 19 records is **one date (2026-06-27)**,
+13 games, 17 WNBA / 2 NBA.
+
+**Blocking decisions (scope §7), all before code:** seconds vs possessions for
+the decay axis; whether the narrator (`scoring`) series is published at all;
+whether momentum may ever become a sim input (if yes,
+`model_engine_standard.md` binds in full, including a re-fit).
+
+**Sequencing note:** validation needs a live slate, and **WNBA is the only
+basketball league in season on 2026-08-22** — NBA is out, NCAAB not until
+November. `soccer-board-mlb-parity` (OPEN) owns `soccer/cards.py` and
+`_game_card_generic.html`, so the shared-chart extraction must wait for it;
+build basketball's own copy first.
+
 ### `#501` — **The WNBA live-lens went to ZERO ~00:20Z DURING LIVE PLAY and did not come back, while capture kept writing players. Both `#498` and `#499` lost their measurement window to it.** — found by lane `wnba-live-props-data`, 2026-08-21, NOT FIXED, CAUSE UNKNOWN
 
 **Corrects this item's own first framing.** It was filed as "the halftime state

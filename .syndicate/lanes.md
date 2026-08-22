@@ -1428,6 +1428,98 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   against an outcome yet. Real money before that reading is `learnings.md`
   2026-08-20's "validating against a PROXY" at its most expensive.
 
+### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
+- Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
+  builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
+  no reader, no card, no wiring.** Scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
+- Files:
+  - `syndicate/features/shared/momentum_core.py` (NEW)
+  - `syndicate/features/shared/basketball_momentum.py` (NEW)
+  - `tests/test_momentum_core.py` (NEW)
+  - `tests/test_basketball_momentum.py` (NEW)
+  - READ-ONLY, deliberately: `syndicate/features/soccer/features/momentum.py`,
+    `syndicate/features/shared/game_shape.py`
+  - **ADDED FOR PHASE B 2026-08-22** (collision-checked at add time, all unclaimed):
+    `syndicate/features/shared/basketball_momentum_artifacts.py` (NEW),
+    `scripts/poll_basketball_momentum.py` (NEW),
+    `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
+    `tests/test_basketball_momentum_artifacts.py` (NEW)
+  - **ADDED FOR `#515` 2026-08-22** (user asked for the fix; collision-checked,
+    both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
+    which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
+    `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
+    `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
+    was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
+    the tests instead, which covers both the read and the write.
+  - **ADDED FOR `#516` 2026-08-22** (user asked for the fix; both unclaimed):
+    `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
+    `wnba/cards.py` and `wnba/live_lens.py` are claimed by other lanes and were
+    NOT edited — every one of the six failures was a stale TEST target, and both
+    source files are the correct side.
+  - **ADDED FOR `#517` 2026-08-22** (user asked for the no-new-failures gate;
+    all unclaimed): `scripts/pytest_baseline.py` (NEW),
+    `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
+    `requirements-dev.txt`.
+  - **ADDED FOR `#517` TEST FIXES 2026-08-22** (user asked for the top three
+    files; all unclaimed): `tests/test_refresh_state_store.py`,
+    `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
+    `syndicate/blueprints/ask_the_syndicate_adapter.py` (ONE-LINE source fix:
+    an except-branch returned a bare `None` where the sole caller destructures
+    a 2-tuple).
+  - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
+    failures turn on the input-hash refresh-decision gate, which
+    `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
+  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
+    `syndicate/features/shared/live_lens_loop.py` is claimed by
+    `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
+    the conflict was surfaced, so `#514`'s momentum capture is now wired into
+    `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
+    (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
+    before the builder, touching no soccer or MLB path. It deliberately imports
+    NO name that already exists at module scope -- the block immediately above
+    it records a production UnboundLocalError from exactly that mistake.
+    `tests/test_basketball_momentum_wiring.py` (NEW, unclaimed) proves both
+    directions: basketball ticks call the poller, mlb/soccer do not.
+    Verified: `tests.test_archives` 383 OK, 118 across the momentum and
+    live_lens_loop suites.
+- **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
+  `syndicate/features/wnba/live_lens.py` is claimed by
+  `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by
+  `soccer-board-mlb-parity`. Neither is editable from here, and WNBA is the only
+  basketball league in season. So the producer is a SCRIPT plus a shared module —
+  soccer's own shape, since `scripts/poll_soccer_live_state.py` is a script the
+  loop imports rather than code inside `features/soccer/`. **NOTHING CALLS IT.**
+  Wiring it into the tick is a one-line change in a claimed file and belongs to
+  the deploy step, which the user has deferred. Phase B ships capture
+  CAPABILITY, not capture — `#208` in a second guise.
+- **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
+  The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
+  `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
+  and claims `tests/test_soccer_*`, and it still OWES "momentum on a live card" in
+  production. Refactoring soccer's module while its own verification is outstanding
+  would muddy that measurement, and the test file would collide outright.
+  **So: `momentum_core.py` is written NEW and soccer is NOT edited. A test pins the
+  core against soccer's implementation instead.** This is not an improvisation — it is
+  exactly what `game_shape.py:503` did for `basketball_elapsed_minutes` and recorded the
+  reason for: "The consolidation (having `cards.py` delegate here) needs that file,
+  which is held by another lane; until then the test is the guard." Having soccer
+  import the core is a follow-up for when that lane closes.
+- Hypothesis: n/a — this is construction, not diagnosis. The lane's empirical questions
+  (weights, half-life, whether pressure LEADS scoring) belong to Phase C and are
+  deliberately NOT answered here. Nothing this lane produces may be read as evidence
+  that basketball momentum has predictive content.
+- Falsification test: the pin test (`test_momentum_core.py`) must FAIL if the core's
+  decay diverges from soccer's `momentum_at` on the same event rows. A pin that cannot
+  fail is not a guard. Assert it fails against a deliberately perturbed half-life before
+  claiming it passes.
+- Verification: `python -m pytest tests/test_momentum_core.py tests/test_basketball_momentum.py`
+  green, INCLUDING (a) the pin above, (b) a strict-causality test — an event at t+1 must
+  not move the value at t — and (c) an elapsed-seconds test proving the builder keys off
+  `basketball_elapsed_minutes` and not the raw display clock, exercised across a
+  quarter boundary and into OT.
+- Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
+  Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
