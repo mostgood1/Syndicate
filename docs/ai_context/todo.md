@@ -1,6 +1,32 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#503` — **`test_live_lens_loop_publish_watermark` POISONS ITS OWN NEXT RUN: it writes the watermark into the REAL `reports/` tree, then reads it back.** — found by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED (outside that lane's files)
+### `#504` — **6 tests fail on clean `origin/main`, and CI cannot see them because CI runs only the archive suite.** — found by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+
+Confirmed in a **detached worktree at `origin/main`**, run in isolation, so
+this is neither test pollution nor anything from `#502`/`#503`:
+
+    tests/test_wnba_live_lens_game_shape.py::WnbaGameLensMarketsTests
+      test_moneyline_omitted_without_live_win_prob
+      test_moneyline_picks_favored_side
+      test_no_markets_when_betting_dict_is_empty
+      test_spread_omitted_without_live_margin
+      test_total_omitted_without_line
+    tests/test_wnba_live_lens_worker.py::WnbaLiveLensWorkerTests
+      test_snapshot_builder_limits_rank_cards_to_fifty
+
+    6 failed, 29 passed
+
+**Why nobody has noticed:** `CLAUDE.md` records that CI runs
+`python -m unittest tests.test_archives` only — 383 tests, all passing. These
+six are in the pytest suite that CI never executes, so `main` can carry
+deterministic failures indefinitely and still look green.
+
+Deterministic, so `#503`'s reproducibility fix does NOT hide them — after it,
+two consecutive runs of the 219-test `live_lens` group produce exactly this
+set both times. Not investigated; `syndicate/features/wnba/live_lens.py` is
+claimed by `layer2-sim-view-and-live-projection`.
+
+### `#503` — **FIXED 2026-08-22, and it was TWO defects, not one.** The watermark tests wrote into the REAL `reports/` tree AND asserted a clock tick table that is not deterministic. — lane `basketball-live-momentum`
 
 `PublishWatermarkTests::test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`.
 Measured, two consecutive runs of the SAME single test, nothing else changed:
@@ -21,10 +47,41 @@ attached to whatever change a session happens to be making at the time. This
 session nearly attributed it to an unrelated `artifact_publisher.py` edit and
 only ruled that out by stashing.
 
-Fix is presumably to point the watermark at a tmp path (or clear it in
-setUp), in `tests/test_live_lens_loop_publish_watermark.py` and/or
-`_live_lens_publish_watermark_path()` — `syndicate/features/shared/live_lens_loop.py`
-is claimed by `soccer-board-mlb-parity`, so this needs that lane or a fresh one.
+**RESOLVED WITHOUT TOUCHING `live_lens_loop.py`.** Both test files patch
+`_live_lens_publish_watermark_path` to a tmp path. That target matters: BOTH the
+read and the write go through it, whereas `_record_live_lens_publish_watermark`
+(`live_lens_loop.py:229`) re-imports `write_json_file` INSIDE the function, so
+it escapes a module-attribute patch. The old `patch.object(live_lens_loop,
+"write_json_file")` was not inert — it caught the loop's three OTHER write
+sites and missed this one. Three of four captured is exactly the shape that
+reads as isolation and is not.
+
+**THE SECOND DEFECT, only visible once the first was fixed.** The test asserted
+`windows == [1.0, 3.0, 6.0]`, derived from a table assuming exactly three
+`time.time()` reads per cycle. The in-sweep memory sampler reads the clock a
+VARIABLE number of times, so the same test yields `[1, 3, 6]` alone and
+`[1, 3, 7]` when `test_live_lens_loop_publish_instrumentation.py` runs first.
+Now asserts the invariant — each window equals the PREVIOUS publish start,
+compared against publish instants captured during the run — which is strictly
+tighter (it still catches the cycle-start bug, which shifts every window one
+read earlier) and immune to how often anything else reads the clock.
+
+**A THIRD WRITER was found by scanning every `live_lens` test file:**
+`test_live_lens_loop_publish_instrumentation.py` wrote a real wall-clock epoch
+into the tree and survived the first fix. Isolated the same way. And the first
+version of the regression guard compared `path.exists()` before/after, which
+PASSED while that file was still rewriting the real one — content, not
+existence, is what the guard now compares.
+
+VERIFIED: watermark file alone 6/6 green; the polluting pair 5/5 green with the
+real path never written; the whole `live_lens` group (219 tests) run twice
+end-to-end produced **identical failure sets**. Falsified by disabling the
+isolation — 2 failures, deterministically.
+
+Also fixed, the secondary item below: `.gitignore` now covers
+`memory_high_water.json`, `retention_cursor_local.json`,
+`reports/opportunity_contract/` and `data/live/`. A `pytest` run now leaves the
+tree clean.
 
 **Related, same class, cheap:** `.gitignore` covers
 `reports/live_refresh_loop/memory_diagnostics.json` and `last_*.json` but NOT

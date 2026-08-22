@@ -1220,6 +1220,13 @@ against a slate that actually had matches in play. Full evidence in
     `scripts/poll_basketball_momentum.py` (NEW),
     `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
+  - **ADDED FOR `#503` 2026-08-22** (user asked for the fix; collision-checked,
+    both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
+    which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
+    `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
+    `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
+    was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
+    the tests instead, which covers both the read and the write.
 - **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
   `syndicate/features/wnba/live_lens.py` is claimed by
   `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by

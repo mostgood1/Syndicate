@@ -168,6 +168,16 @@ reports/intelligence/live_pipeline_last_successful.json
 reports/live_refresh_loop/mlb_sim_runs/
 reports/live_refresh_loop/last_*.json
 reports/live_refresh_loop/memory_diagnostics.json
+# `#503`. Test-run byproducts that were NOT ignored while their siblings were,
+# so every `pytest` left untracked files and tripped commit hooks. None has
+# ever been tracked. `data/live/` is the RUNTIME live-lens path
+# (`live_lens_snapshot_path()`); committing it would put worker state into the
+# git mirror, which is the confusion CLAUDE.md's "data/** is a lossy mirror"
+# section exists to prevent.
+reports/live_refresh_loop/memory_high_water.json
+reports/refresh_status/latest/retention_cursor_local.json
+reports/opportunity_contract/
+data/live/
 reports/live_refresh_loop/mlb_sim_coldstart_progress.json
 reports/schedule_adapter/
 reports/odds_control_plane/odds_history/
