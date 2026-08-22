@@ -1289,15 +1289,36 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   without a deploy. **STILL A SCREEN, NOT A VALIDATION** — it proves the weight
   cannot repeat the 2026-08-08 arithmetic failure, NOT that the sim is right;
   that still needs `settled > 0` + Stage A's per-bet component decomposition.
-- **DEPLOY BLOCKER, CROSS-LANE, NOT MINE TO FIX.**
-  `syndicate/templates/intelligence.html:84-89` carries a STATIC disclosure
-  reading *"the sim contributed to the ranking of NONE of them (`sim_component`
-  non-zero on 0)"*. **This change makes that text FALSE.** The file is held by
-  `layer2-sim-view-and-live-projection`, so it is surfaced, not edited. Shipping
-  the scoring change without updating it means the board tells the user the
-  opposite of what it is doing. `layer2_board.py:39`'s comment goes stale the
-  same way (same lane). **Do not deploy this scoring change until that lane
-  updates both.**
+- **DEPLOY BLOCKER CLEARED `[user directed 2026-08-22]`.** The stale disclosure
+  was flagged as cross-lane and NOT edited; the user then directed the change
+  directly, so `intelligence.html` and `layer2_board.py` are claimed **NARROWLY**
+  from `layer2-sim-view-and-live-projection` — the same narrow-claim pattern
+  that lane itself used on `soccer_projections.py`/`team_aliases.py` on
+  2026-08-22. **Taken: the scoring disclosure, the `sim disagrees` tooltip, and
+  `_row_value_pct`/`_row_admitted_by_blend` only.** Nothing about the sim view,
+  live projection, joins or board rendering was touched.
+  **TWO stale user-facing claims found, not one.** The known disclosure, plus
+  `intelligence.html:2674` — the `sim disagrees` chip's tooltip read *"It
+  carries no weight in the score"*, which the weight change also falsified.
+  Found by rendering the page and grepping the SERVED body, not by reading the
+  file; the second one was not on any list. Both now describe the cap.
+- **SCORE NOW GATES ADMISSION, NOT JUST ORDERING `[user decision 2026-08-22]`.**
+  `_row_value_pct` read `ev_pct` FIRST and fell back to `score.value_pct` only
+  when EV was absent — which on a scored row it never is. So the sim could
+  REORDER the board (`_score_of` ranks on `score.score`) but could never put a
+  row ON it: admission ran on price alone, upstream of anything the sim had to
+  say. It now prefers the blended `value_pct` (ev + capped sim + capped
+  movement, all in EV points, so it is unit-comparable with the hold-derived
+  floor) and falls back to `ev_pct` when there is no score block.
+  **Bounded by the same cap:** the sim can carry a row across the floor by at
+  most 1.5 EV points, so it rescues a marginal price and never a materially bad
+  one — which is the only reason handing admission to the blend is defensible,
+  since an uncapped term here would let an unvalidated model admit arbitrarily
+  bad prices (the 2026-08-08 failure with a wider blast radius than ranking).
+  **New counter `rows_admitted_by_blend`**, shipped at the builder AND the
+  endpoint in the same commit — `#373`/`#381`/`#391`/`#397` each record a
+  counter that existed at the builder and was invisible at that hop, three of
+  them costing an investigation. **Zero means the change is inert.**
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
@@ -1315,6 +1336,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/templates/portfolio.html`,
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
+  `tests/test_layer2_blend_admission.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
   `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls

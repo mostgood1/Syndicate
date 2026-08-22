@@ -76,31 +76,48 @@
   {#
     SAY WHAT THIS BOARD ACTUALLY IS.
 
-    `opportunity_signals.py:386` states the condition in the code itself:
-    "THE SURFACE MUST SAY WHAT IT IS: with this at 0, L2-A is a low-hold /
-    line-shopping board and must NOT be presented as 'our model found these'.
-    If the page cannot say that, keep it off the main board rather than raising
-    this number to make it look like a model board."
+    `opportunity_signals.py` states the condition in the code itself:
+    "THE SURFACE MUST SAY WHAT IT IS ... must NOT be presented as 'our model
+    found these'. If the page cannot say that, keep it off the main board
+    rather than raising this number to make it look like a model board."
 
-    `_SCORE_SIM_WEIGHT` has been 0.0 since it was gated on S6, and the board
-    said nothing -- while rendering a PROJECTED column, which is exactly the
-    thing that reads as "our model found these". Measured 2026-08-16 on the
-    served shortlist: 65 of 108 rows carried a `model_edge_pct` and the sim
-    contributed to the ranking of NONE of them (`sim_component` non-zero on 0).
+    REWRITTEN 2026-08-22 IN THE SAME COMMIT AS THE WEIGHT CHANGE, which is
+    exactly what the previous version of this block demanded of whoever changed
+    it. The sim term is no longer zero: `_SCORE_SIM_WEIGHT = 0.125` bounded by
+    `_SCORE_SIM_CAP_PCT = 1.5` EV points. The old text ("carries no weight in
+    the score", "the sim contributed to the ranking of NONE of them") is now
+    FALSE, and left standing the board would have told the reader the opposite
+    of what it does.
 
-    Static text, not a computed banner: it describes how the ranking is built,
-    which is a property of the code, and a banner that could silently stop
-    rendering would put us back where we started. If the weight is ever raised,
-    this block changes in the same commit.
+    THE CAP IS THE PART THE TEXT HAS TO CARRY, not the weight. A bare weight
+    scales with the edge, so a large enough model disagreement always wins
+    eventually; the bound is what keeps this a price-led board the sim breaks
+    ties on rather than a model board. Measured against the distribution that
+    caused the weight to be zeroed (`scripts/score_sim_weight_impact.py`): at
+    0.5 uncapped the sim promoted 286 of 286 negative-EV rows; capped it
+    promotes 0 and still separates the two sides of a market.
+
+    Still static text, not a computed banner, for the original reason: it
+    describes how the ranking is built, which is a property of the code, and a
+    banner that could silently stop rendering would put us back where we
+    started. If the weight or the cap changes again, this block changes in the
+    same commit.
   #}
   <p class="board-disclosure">
-    <strong>How this board ranks.</strong> Rows are ordered by expected value
-    against the no-vig market price and by how much of that value survives
-    price shopping — <em>not</em> by our simulation, which currently carries no
-    weight in the score. Projections are shown where we have them, and the
-    <span class="board-disclosure__chip">sim disagrees</span> tag marks rows our
-    own model rates worse than the price implies. Neither has been graded
-    against outcomes yet.
+    <strong>How this board ranks.</strong> Rows are scored on expected value
+    against the no-vig market price, plus how much of that value survives price
+    shopping. Our simulation contributes as well, but it is
+    <strong>capped at 1.5 EV points</strong> — enough to order rows that are
+    otherwise close, and to decide which <em>side</em> of a market we prefer,
+    and it can carry a row across our value floor onto the board — but only by
+    that much, so it can rescue a marginal price and never a materially bad
+    one. A row our model loves by 40 points earns no more than one it likes by
+    12. So this is a price-led board that the simulation breaks ties on and
+    nudges the margins of, <em>not</em> a list of bets our model picked. The <span class="board-disclosure__chip">sim disagrees</span>
+    tag marks rows our own model rates worse than the price implies.
+    <strong>Nothing here has been graded against outcomes yet</strong> — the
+    weights are a stated prior, not a measured finding, and the Score column
+    takes itself apart on hover so you can disagree with it.
   </p>
 
   <section>
@@ -2654,7 +2671,7 @@
               const simBadge = simDissents
                 ? `<span class="board-badge board-badge--sim-disagrees${simIsLive ? " board-badge--sim-disagrees-live" : ""}" title="${simIsLive
                     ? `The LIVE re-sim, using the current game state, rates this side ${simPct}% worse than the live market price implies.`
-                    : `Our pregame simulation rates this side ${simPct}% worse than the market price implies.`} It carries no weight in the score and has not been graded against outcomes.">${simIsLive ? "live sim disagrees" : "sim disagrees"}</span>`
+                    : `Our pregame simulation rates this side ${simPct}% worse than the market price implies.`} That disagreement lowers this row's score, capped at 1.5 EV points, and has not been graded against outcomes.">${simIsLive ? "live sim disagrees" : "sim disagrees"}</span>`
                 : "";
               return `
                 <tr ${rowAttrs}>

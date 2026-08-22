@@ -2833,6 +2833,14 @@ def board_layer2_shortlist_api():
                 # while the filter was live and dropping rows.
                 "min_value_pct": shortlist.get("min_value_pct"),
                 "rows_below_value_floor": shortlist.get("rows_below_value_floor"),
+                # `2026-08-22`. The mirror of the rejection above: rows the
+                # BLENDED score admitted that raw EV would have cut. Added at
+                # this hop in the SAME commit as the builder, because the four
+                # comments below this one all record the same failure -- a
+                # counter that existed at the builder and was invisible here,
+                # three times costing an investigation. Zero means the sim is
+                # admitting nothing and the scoring change is inert.
+                "rows_admitted_by_blend": shortlist.get("rows_admitted_by_blend"),
                 # `#381`. The builder has written this since the per-sport floor
                 # shipped; the endpoint's explicit key list dropped it, so the
                 # only readable number was a board-wide `rows_below_value_floor`

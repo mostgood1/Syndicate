@@ -66,14 +66,57 @@ and failed one that left behaviour identical. `learnings.md` 2026-08-20.
 Until then the honest description is **"price-led, sim-breaks-ties"**, NOT "our
 model found these".
 
-**DEPLOY BLOCKER, CROSS-LANE, NOT FIXED HERE.**
-`syndicate/templates/intelligence.html:84-89` is a STATIC disclosure reading
-*"the sim contributed to the ranking of NONE of them (`sim_component` non-zero
-on 0)"*. **This change makes that text false**, and the file is held by
-`layer2-sim-view-and-live-projection` — surfaced, not edited, per the lane rule.
-`layer2_board.py:39` goes stale the same way, same lane. **Do not deploy the
-scoring change until that lane updates both**, or the board will tell the user
-the opposite of what it is doing.
+**DEPLOY BLOCKER CLEARED `[user directed 2026-08-22]`.** Flagged as cross-lane
+and left unedited; the user then directed the change, so `intelligence.html` and
+`layer2_board.py` are claimed **NARROWLY** from
+`layer2-sim-view-and-live-projection` — the same pattern that lane used on
+`soccer_projections.py`/`team_aliases.py` the same day. Taken: the disclosure,
+the `sim disagrees` tooltip, and `_row_value_pct`/`_row_admitted_by_blend`.
+Nothing about the sim view, live projection, joins or rendering.
+
+**TWO stale user-facing claims, not one.** Besides the known disclosure,
+`intelligence.html:2674` — the `sim disagrees` chip tooltip — read *"It carries
+no weight in the score"*, equally falsified and **on no list**. Found by
+rendering the page and grepping the SERVED body rather than by reading the file.
+Both now state the cap. Verified: 0 occurrences of the stale claim in the served
+HTML, and the disclosure and tooltip both name the 1.5-point bound.
+
+### `#509` — **The blended score now gates ADMISSION, not just ordering. The sim could reorder the board but never put a row on it.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
+
+`_row_value_pct` read `ev_pct` FIRST and fell back to `score.value_pct` only
+when EV was absent — which on a scored row it never is, so the fallback was
+effectively dead. Admission (`rows_below_value_floor`) therefore ran on **price
+alone**, upstream of anything the simulation had to say, while `_score_of`
+ranked on the blend. **The sim could reorder what EV had already admitted and
+could not admit anything.**
+
+Now prefers the blended `value_pct` — `ev_pct` + capped sim + capped movement,
+all three in EV points, so it is unit-comparable with the hold-derived floor it
+is tested against. That unit match is the only reason the substitution is
+legitimate rather than a category error. Falls back to `ev_pct` when there is no
+score block, so an unscored row is judged exactly as before.
+
+**BOUNDED BY THE SAME CAP.** The sim can carry a row across the floor by at most
+`_SCORE_SIM_CAP_PCT` (1.5 EV points) — it rescues a marginal price and never a
+materially bad one. That bound is the only reason handing admission to the blend
+is defensible: an uncapped sim term *here* would let an unvalidated model admit
+arbitrarily bad prices, which is the 2026-08-08 failure with a wider blast
+radius than ranking ever had. Pinned by
+`test_the_sim_cannot_rescue_a_materially_bad_price` (edge 400 on a -6.0 EV row
+is still refused).
+
+**NEW COUNTER `rows_admitted_by_blend`** — rows the blend admitted that raw EV
+would have cut. Shipped at the builder AND at
+`/api/board/layer2-shortlist` in the SAME commit, because `#373`, `#381`, `#391`
+and `#397` each record a counter that existed at the builder and was invisible
+at that hop, three of them costing an investigation. A test pins the round-trip.
+**Zero means the scoring change is inert** — that is the production reading owed.
+
+Tests: `tests/test_layer2_blend_admission.py` (10), including a **control**
+asserting the old behaviour would have returned the raw EV, so the main
+assertion is not vacuously true. 975 passed across the
+`layer2|opportunity|score|market_board` selection; the 5 failures there are
+PRE-EXISTING, verified by stashing and re-running.
 
 
 ### `#506` — **The keyvalue store is at 36.6%, NOT the 96% the code's own comments say. That reverses the Stage B storage decision and removes a `blueprint_sync` from the plan.** — lane `portfolio-decision-and-execution`, 2026-08-22

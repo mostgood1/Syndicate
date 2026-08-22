@@ -574,11 +574,55 @@ def _env_float(name: str, default: float) -> float:
 
 
 def _row_value_pct(row: Mapping[str, Any]) -> float | None:
-    value = _as_float(row.get("ev_pct"))
-    if value is not None:
-        return value
+    """The value this row is ADMITTED on, in EV points.
+
+    **Prefers the BLENDED value, not raw `ev_pct`** `[changed 2026-08-22, user
+    decision]`. This used to read `ev_pct` first and fall back to
+    `score.value_pct` only when EV was absent -- and `ev_pct` is present on
+    essentially every scored row, so the fallback almost never fired. The
+    consequence was that the simulation could REORDER the board (`_score_of`
+    ranks on `score.score`) but could never get a row ONTO it: admission was
+    decided by price alone, upstream of anything the sim had to say.
+
+    `score.value_pct` is `ev_pct` + the capped sim term + the capped movement
+    term, all three in EV points, so it is unit-comparable with the
+    hold-derived floor it is tested against -- which is the only reason this
+    substitution is legitimate rather than a category error.
+
+    **What this can and cannot do is bounded by the same cap as everything
+    else.** The sim may carry a row across the value floor by at most
+    `_SCORE_SIM_CAP_PCT` (1.5 EV points), so it can rescue a row that was
+    marginally below and can never rescue a materially bad price. That bound is
+    the whole reason admission can be handed to the blend at all: an uncapped
+    sim term here would let an unvalidated model admit arbitrarily bad prices,
+    which is the 2026-08-08 failure with a wider blast radius than ranking.
+
+    Falls back to `ev_pct` when there is no score block, so a row that was never
+    scored is judged exactly as before.
+    """
     score = row.get("score")
-    return _as_float(score.get("value_pct")) if isinstance(score, Mapping) else None
+    if isinstance(score, Mapping):
+        blended = _as_float(score.get("value_pct"))
+        if blended is not None:
+            return blended
+    return _as_float(row.get("ev_pct"))
+
+
+def _row_admitted_by_blend(row: Mapping[str, Any], floor: float) -> bool:
+    """True when the blend cleared the floor and raw EV would not have.
+
+    Counted and reported, because a rule that changes what reaches the board
+    silently is one nobody can tell apart from a different slate -- this file's
+    own repeated lesson (`rows_implausible_book`, `rows_uninformative_ev`,
+    `#373`, `#381`, `#397`). It is also the direct measure of the change the
+    2026-08-22 scoring re-evaluation was made for: how many rows the simulation
+    actually put on the board.
+    """
+    raw_ev = _as_float(row.get("ev_pct"))
+    if raw_ev is None or raw_ev >= floor:
+        return False
+    blended = _row_value_pct(row)
+    return blended is not None and blended >= floor
 
 
 def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
@@ -2384,6 +2428,10 @@ def select_shortlist(
     beyond_game_cap = 0
     excluded_market = 0
     below_value_floor = 0
+    # Rows the BLEND put on the board that raw EV would have rejected. The
+    # direct measure of the 2026-08-22 scoring change; zero here means the sim
+    # is admitting nothing and the change is inert.
+    admitted_by_blend = 0
     beyond_quote_age = 0
     implausible_book = 0
     stale_kickoff = 0
@@ -2505,6 +2553,8 @@ def select_shortlist(
             if value_pct is not None and value_pct < row_floor:
                 below_value_floor += 1
                 continue
+            if _row_admitted_by_blend(row, row_floor):
+                admitted_by_blend += 1
             kept.append(row)
         rows = kept
 
@@ -2620,6 +2670,11 @@ def select_shortlist(
         # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
         "rows_below_value_floor": below_value_floor,
+        # Reported beside the rejection it is the mirror of. `#397`'s
+        # discipline: the counter ships in the SAME commit as the rule that
+        # produces it, because a filter whose effect cannot be read is one
+        # nobody can tell apart from a thin slate.
+        "rows_admitted_by_blend": admitted_by_blend,
         # `#391`. Reported beside the other rejections for the reason `#373`
         # added `rows_implausible_book`: a rule that trims silently is a rule
         # nobody can tell apart from a thin slate.
