@@ -55,11 +55,11 @@
             </div>
             <label class="board-odds-filter__row">
               <span>Shortest</span>
-              <input type="range" id="board-odds-min" min="0" step="1" aria-label="Shortest odds to show">
+              <input type="range" id="board-odds-min" min="0" max="29" step="1" value="0" aria-label="Shortest odds to show">
             </label>
             <label class="board-odds-filter__row">
               <span>Longest</span>
-              <input type="range" id="board-odds-max" min="0" step="1" aria-label="Longest odds to show">
+              <input type="range" id="board-odds-max" min="0" max="29" step="1" value="29" aria-label="Longest odds to show">
             </label>
             <p class="board-odds-filter__note">Hides prices outside the range. Rows with no posted price are never hidden by this filter &mdash; an unpriced row is not a longshot.</p>
           </div>
@@ -204,9 +204,24 @@
   const ODDS_LADDER_MAX_DEFAULT = ODDS_LADDER.length - 1;
 
   function clampOddsIndex(raw, fallback) {
-    const n = Number(raw);
+    // ABSENT IS NOT ZERO, and conflating them shipped a BLANK BOARD.
+    //
+    // `urlParams.get("odds_max")` returns `null` when the parameter is not
+    // there, and `Number(null)` is `0` -- a finite number -- so the
+    // `Number.isFinite` guard accepted it and the fallback never ran. With no
+    // URL params at all (i.e. every normal visit) `oddsMax` came out 0 instead
+    // of 29, both handles pinned to the low sentinel, and the visible range
+    // collapsed to [-100000, -100000]. Every row on the board failed it.
+    //
+    // `Number("")` is 0 too, so an empty parameter had the same effect.
+    // Checked as a STRING first for that reason: only a non-empty string is a
+    // value the caller actually supplied.
+    if (raw === null || raw === undefined) return fallback;
+    const text = String(raw).trim();
+    if (!text) return fallback;
+    const n = Number(text);
     if (!Number.isFinite(n)) return fallback;
-    return Math.min(29, Math.max(0, Math.round(n)));
+    return Math.min(ODDS_LADDER_MAX_DEFAULT, Math.max(0, Math.round(n)));
   }
 
   function oddsFilterIsNarrowed() {
