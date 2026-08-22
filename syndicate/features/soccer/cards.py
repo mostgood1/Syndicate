@@ -1463,6 +1463,68 @@ def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abb
     }
 
 
+def _momentum_chart(
+    momentum: dict[str, Any] | None,
+    *,
+    away_abbr: str,
+    home_abbr: str,
+) -> dict[str, Any] | None:
+    """Momentum as CHART DATA, not a pre-rendered string.
+
+    The first version emitted a Unicode block sparkline inside a label/value
+    table row, which rendered as text in the box grid far down the card. That
+    is the wrong shape twice over: momentum is a SHAPE (the whole reason it is
+    readable at a glance on FotMob/AiScore), and a table row cannot carry one.
+
+    Emits normalised points so the template draws an inline SVG area -- home
+    above the axis, away below, matching the panel the user reads manually.
+    `y` is already scaled to [-1, 1] against the match's own peak, so the
+    template does no arithmetic and the curve is comparable within a match
+    rather than against an arbitrary absolute scale.
+    """
+    if not isinstance(momentum, dict) or momentum.get("supported") is not True:
+        return None
+    series = momentum.get("series")
+    current = momentum.get("current")
+    if not isinstance(series, list) or not series or current is None:
+        return None
+
+    pts = [
+        (float(p.get("t") or 0.0), float(p.get("v") or 0.0))
+        for p in series
+        if isinstance(p, dict)
+    ]
+    if not pts:
+        return None
+    peak = max(1e-6, max(abs(v) for _, v in pts))
+    span = max(1.0, pts[-1][0] or 1.0)
+
+    side = home_abbr if float(current) > 0 else (away_abbr if float(current) < 0 else None)
+    strength = abs(float(current))
+    if strength < 1.0:
+        label = "Balanced"
+    elif strength < 2.5:
+        label = f"{side} edging it"
+    elif strength < 5.0:
+        label = f"{side} on top"
+    else:
+        label = f"{side} pressing hard"
+
+    return {
+        "label": label,
+        "home_abbr": home_abbr,
+        "away_abbr": away_abbr,
+        "events": momentum.get("events") or 0,
+        # x in [0,100], y in [-1,1] (positive = home). The template maps y to
+        # pixels; keeping the sign here means the template never has to know
+        # which way is up.
+        "points": [
+            {"x": round(100.0 * t / span, 2), "y": round(v / peak, 4)}
+            for t, v in pts
+        ],
+    }
+
+
 def _momentum_section(
     momentum: dict[str, Any] | None,
     *,
@@ -1820,6 +1882,14 @@ def _match_to_game(
         # `game_board_contract` preserves a non-empty incoming list.
         "shared_headline_section": _scoreline_section(
             match.get("scoreline_probabilities"),
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+        ),
+        # CHART DATA for the live panel. Kept separate from the box sections
+        # below: those are tables, and a shape rendered as a table row is what
+        # made this invisible in the first place.
+        "shared_momentum": _momentum_chart(
+            live_game.get("momentum") if isinstance(live_game, dict) else None,
             away_abbr=_abbr(away_team, league),
             home_abbr=_abbr(home_team, league),
         ),

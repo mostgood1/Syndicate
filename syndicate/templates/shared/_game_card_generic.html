@@ -133,7 +133,13 @@
   {% endif %}
 
   <div class="cards-market-row">
-    {% for tile in game.market_tiles[:4] if game.market_tiles is defined and game.market_tiles %}
+    {#- WAS `[:4]`. Soccer emits SIX tiles -- BTTS and corners are 5 and 6, so
+        both were built correctly and then truncated here, invisible on the
+        card. This is the SAME truncation `soccer/cards.py::_market_tiles`
+        already blames in its own docstring for dropping BTTS from the generic
+        `metrics[:4]` fallback; fixing it there left this copy in place.
+        Uncapped: a sport emits the tiles it has, and the row wraps. -#}
+    {% for tile in game.market_tiles if game.market_tiles is defined and game.market_tiles %}
       <div class="cards-market-tile">
         <div class="cards-market-label">{{ tile.label }}</div>
         <div class="cards-market-main">{{ tile.title }}</div>
@@ -183,6 +189,57 @@
   </div>
 
   <section class="cards-panel is-active" data-panel-id="game" id="panel-{{ card_dom_id }}-game" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-game" tabindex="0">
+    {#- ATTACK MOMENTUM, drawn rather than tabulated. Home above the axis,
+        away below -- the shape the same panel has on FotMob/AiScore, which is
+        what makes "a goal may be coming" readable at a glance. An earlier
+        version emitted a Unicode-block sparkline into a label/value row in the
+        box grid: correct data, buried and flat. Only rendered for a match in
+        play; `shared_momentum` is None otherwise, by construction. -#}
+    {% set mom = game.shared_momentum if game.shared_momentum is defined else none %}
+    {#- Own id, not `card_dom_id`: that is set at line ~166 from `game.gamePk`,
+        AFTER this block in template order, so referencing it here yields an
+        EMPTY suffix. Measured: every card rendered `clipPath id="mom-up-"`,
+        so on a 44-fixture board every chart would clip against the FIRST
+        card's path. Derived from the event/game id directly, with a constant
+        fallback that is still stable per card. -#}
+    {% set mom_uid = game.event_id or game.gamePk or 'x' %}
+    {% if mom and mom.points %}
+      <div class="cards-panel-card cards-momentum-card">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>Attack momentum</strong></div>
+          <span class="cards-overview-badge">{{ mom.label }}</span>
+        </div>
+        <svg class="cards-momentum-svg" viewBox="0 0 100 44" preserveAspectRatio="none"
+             role="img" aria-label="Attack momentum. {{ mom.label }}. {{ mom.home_abbr }} above the line, {{ mom.away_abbr }} below.">
+          {#- y maps [-1,1] -> [2,42], so +1 (home) is the TOP of the box.
+
+              ONE CONTINUOUS TRACE, CLIPPED INTO TWO COLOURS. Splitting the
+              points into a home list and an away list left a VISIBLE GAP at
+              every zero crossing -- the segment joining the last positive
+              point to the first negative one belonged to neither list. A
+              momentum curve is continuous by construction, and a broken one
+              misreads as missing data. Both polylines carry every point; a
+              clip rectangle shows each only on its own side of the axis. -#}
+          {%- set ns = namespace(all='') -%}
+          {%- for pt in mom.points -%}
+            {%- set y = 22 - (pt.y * 20) -%}
+            {%- set ns.all = ns.all ~ ' ' ~ pt.x ~ ',' ~ y -%}
+          {%- endfor -%}
+          <defs>
+            <clipPath id="mom-up-{{ mom_uid }}"><rect x="0" y="0" width="100" height="22" /></clipPath>
+            <clipPath id="mom-dn-{{ mom_uid }}"><rect x="0" y="22" width="100" height="22" /></clipPath>
+          </defs>
+          <polyline class="cards-momentum-home" points="{{ ns.all }}" fill="none" clip-path="url(#mom-up-{{ mom_uid }})" />
+          <polyline class="cards-momentum-away" points="{{ ns.all }}" fill="none" clip-path="url(#mom-dn-{{ mom_uid }})" />
+          <line class="cards-momentum-axis" x1="0" y1="22" x2="100" y2="22" />
+        </svg>
+        <div class="cards-momentum-legend">
+          <span class="cards-momentum-key cards-momentum-key--home">{{ mom.home_abbr }}</span>
+          <span class="cards-mini-copy">{{ mom.events }} pressure events</span>
+          <span class="cards-momentum-key cards-momentum-key--away">{{ mom.away_abbr }}</span>
+        </div>
+      </div>
+    {% endif %}
     <div class="cards-overview-grid{% if not lens_rows %} cards-overview-grid--single{% endif %}">
       {% if lens_rows %}
       <div class="cards-panel-card cards-panel-card--overview-main">

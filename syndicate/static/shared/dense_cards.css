@@ -1206,3 +1206,46 @@ a.cards-head-team-name:focus-visible {
   opacity: 0.55;
   font-weight: 500;
 }
+
+/* ATTACK MOMENTUM -- a drawn shape, not a table row.
+   Home above the axis, away below, mirroring the panel this is modelled on.
+   The SVG uses a non-uniform viewBox (preserveAspectRatio="none") so the
+   curve fills the card width at any breakpoint; stroke width is therefore
+   set in the scaled user space, not px. */
+.cards-momentum-card {
+  margin-bottom: 10px;
+}
+.cards-momentum-svg {
+  display: block;
+  width: 100%;
+  height: 74px;
+  overflow: visible;
+}
+.cards-momentum-home,
+.cards-momentum-away {
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cards-momentum-home { stroke: #d64545; }
+.cards-momentum-away { stroke: #3b82c4; }
+.cards-momentum-axis {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.cards-momentum-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.cards-momentum-key {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cards-momentum-key--home { color: #d64545; }
+.cards-momentum-key--away { color: #3b82c4; }
