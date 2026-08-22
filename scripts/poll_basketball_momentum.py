@@ -113,6 +113,23 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
         print("[basketball_momentum] DRY RUN -- nothing written", flush=True)
         return payload
 
+    if not payload.get("with_series"):
+        # REFUSE TO STORE AN EMPTY CAPTURE. This appends once per live tick, so
+        # a quiet slate would otherwise write a row every few minutes all day
+        # and the backtest would have to learn to ignore them. The sibling
+        # WNBA live-box capture in `live_lens_loop.py` takes the same position
+        # for the same reason.
+        #
+        # `with_series`, not `count`: a slate we fetched but could not read is
+        # also nothing worth storing, and it is the case that most needs
+        # saying out loud rather than being written as a row of nulls.
+        print(
+            f"[basketball_momentum] NOTHING TO STORE league={league} date={date_str} "
+            f"games={payload['count']} with_series=0 -- not appended",
+            flush=True,
+        )
+        return payload
+
     path = momentum_artifact_path(out_root, league_code=league, date_str=date_str)
     append_momentum_artifact(payload, path=path)
     print(f"[basketball_momentum] appended {path}", flush=True)

@@ -1245,6 +1245,19 @@ against a slate that actually had matches in play. Full evidence in
   - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
     failures turn on the input-hash refresh-decision gate, which
     `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
+  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
+    `syndicate/features/shared/live_lens_loop.py` is claimed by
+    `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
+    the conflict was surfaced, so `#502`'s momentum capture is now wired into
+    `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
+    (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
+    before the builder, touching no soccer or MLB path. It deliberately imports
+    NO name that already exists at module scope -- the block immediately above
+    it records a production UnboundLocalError from exactly that mistake.
+    `tests/test_basketball_momentum_wiring.py` (NEW, unclaimed) proves both
+    directions: basketball ticks call the poller, mlb/soccer do not.
+    Verified: `tests.test_archives` 383 OK, 118 across the momentum and
+    live_lens_loop suites.
 - **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
   `syndicate/features/wnba/live_lens.py` is claimed by
   `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by

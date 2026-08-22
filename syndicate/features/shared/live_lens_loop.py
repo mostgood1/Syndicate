@@ -639,6 +639,55 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 			except Exception as exc:
 				print(f"[live_lens_loop] WNBA_LIVE_BOX_FAILED date={date_str} "
 				      f"{type(exc).__name__}: {exc}", flush=True)
+		if sport in ("nba", "wnba"):
+			# `#502` Phase B: ATTACK MOMENTUM CAPTURE, basketball's analogue of the
+			# soccer `momentum` block that `poll_soccer_live_state` writes into
+			# `live_state_<date>.json`.
+			#
+			# HERE, not inside the sport builders, for two reasons. The builders for
+			# both basketball sports are CONSUMERS -- `wnba/live_lens.py:460` was
+			# deliberately turned into consume-do-not-rebuild after a rebuild inside
+			# the tick cost +1,062MB in one step and crash-looped a 2Gi container --
+			# so a fetch belongs at the producer position the WNBA live-box capture
+			# above already occupies, not behind a builder. And `wnba/live_lens.py`
+			# is claimed by another open lane.
+			#
+			# Placed AFTER the WNBA headroom gate for the same reason that gate
+			# precedes the box capture: a tick about to skip the build should not
+			# spend HTTP calls first.
+			#
+			# NEVER FATAL, and it must not be: this is capture, nothing reads it yet,
+			# and a momentum failure taking down the live-lens tick would trade a
+			# feature nobody consumes for one every sport depends on.
+			#
+			# NO `from ... import write_json_file` HERE. The block above records what
+			# that costs: a function-local rebinding of a module-level name made the
+			# snapshot write raise UnboundLocalError for EVERY sport in production
+			# (2026-08-21 18:49Z). Every name below is new to this function.
+			try:
+				from scripts.poll_basketball_momentum import poll as _momentum_poll
+				from syndicate.features.shared.refresh_state_store import (
+					data_root as _momentum_data_root,
+				)
+
+				_momentum_payload = _momentum_poll(
+					sport, date_str, out_root=_momentum_data_root(), dry_run=False
+				)
+				# `with_series` alongside `count`, because a slate with no live games
+				# and a slate we fetched but could not read are both "0 charts" and
+				# only one of them is a defect.
+				print(
+					f"[live_lens_loop] BASKETBALL_MOMENTUM sport={sport} date={date_str} "
+					f"games={_momentum_payload.get('count')} "
+					f"with_series={_momentum_payload.get('with_series')}",
+					flush=True,
+				)
+			except Exception as exc:
+				print(
+					f"[live_lens_loop] BASKETBALL_MOMENTUM_FAILED sport={sport} "
+					f"date={date_str} {type(exc).__name__}: {exc}",
+					flush=True,
+				)
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
