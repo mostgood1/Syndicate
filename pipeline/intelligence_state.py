@@ -4891,6 +4891,21 @@ class IntelligenceStateService:
                 f"[intelligence_state] LAYER2_SHORTLIST date={selected_date} "
                 f"rows={len(layer2_shortlist.get('rows') or [])} "
                 f"considered={layer2_shortlist.get('opportunities_considered')} "
+                # THE ADMISSION PAIR, and they are only interpretable TOGETHER --
+                # this file's own rule (`rows_implausible_book`, `#373`, `#381`,
+                # `#397`): a count without the rule that produced it cannot be
+                # judged. `admitted_by_blend` is rows the blended score put on
+                # the board that raw EV would have cut, so **zero means the
+                # 2026-08-22 scoring change is INERT**.
+                #
+                # Logged here rather than only on the artifact because the
+                # artifact and `/api/board/layer2-shortlist` are both
+                # unreachable from a session without HTTP access to the web
+                # host, which is the state every read tonight was taken in. An
+                # instrument nobody can reach is the same failure `#373` fixed
+                # one hop earlier, and it cost three investigations there.
+                f"below_floor={layer2_shortlist.get('rows_below_value_floor')} "
+                f"admitted_by_blend={layer2_shortlist.get('rows_admitted_by_blend')} "
                 f"sports={layer2_shortlist.get('active_sports')}",
                 flush=True,
             )

@@ -109,3 +109,22 @@ def test_the_admission_counter_survives_the_endpoint_hop():
     assert body["rows_admitted_by_blend"] == 3
     # Its mirror must still be there too -- they are only interpretable together.
     assert body["rows_below_value_floor"] == 7
+
+
+def test_the_admission_counters_reach_the_log_line():
+    """Both counters must appear in `LAYER2_SHORTLIST`, because the artifact and
+    the endpoint are unreachable from a session without HTTP access to the web
+    host -- which is the state every production read on 2026-08-22 was taken in.
+
+    Asserted as a PAIR: `admitted_by_blend` without `below_floor` is a number
+    nobody can judge, which is the failure `#373`/`#381`/`#397` each record one
+    hop earlier."""
+    import inspect
+
+    import pipeline.intelligence_state as state
+
+    source = inspect.getsource(state)
+    marker = source.index("LAYER2_SHORTLIST date=")
+    window = source[marker : marker + 1600]
+    assert "admitted_by_blend=" in window
+    assert "below_floor=" in window
