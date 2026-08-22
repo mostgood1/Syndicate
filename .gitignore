@@ -151,6 +151,12 @@ data/*_source/manifests/mirror_refresh*.json
 # Keep the evaluation ledger local; it is generated data and too large for GitHub history.
 reports/intelligence/evaluation_ledger.jsonl
 reports/intelligence/evaluation_ledger_chunks/
+# Same class as the chunks above: a per-date JSONL ledger the shortlist WRITES
+# at runtime (`clv_openings`/`openings_records` in its payload). In production
+# it lives on Render's disk; the only copies that ever appear in a checkout are
+# test byproduct -- the one that prompted this rule held 7 rows of `event_id:
+# evt-1` against real team names, which is worse than useless in a CLV ledger.
+reports/intelligence/clv_openings/
 reports/intelligence/archive/
 reports/intelligence/board_snapshot*.json
 reports/intelligence/query_state_cache.json
