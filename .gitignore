@@ -195,6 +195,8 @@ reports/refresh_status/latest/hot_artifact_pull_watermark.json
 reports/mlb_odds_diag/
 reports/live_refresh_loop/mlb_statcast_refresh.log
 reports/refresh_status/latest/worker_shutdown_*.json
+reports/refresh_status/latest/wnba_refresh_decision_*.json
+reports/win_prob_null/
 
 # Test-run pollution: #72 already removed the production prediction-ledger
 # write path, so any growth here is local pytest runs, not real usage

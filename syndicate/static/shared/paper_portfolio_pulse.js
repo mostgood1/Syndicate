@@ -228,7 +228,10 @@ window.SyndicatePaperPortfolioPulse = (function () {
         <span class="paper-table__sub">${move}</span>`;
     }
     if (mark.reason === "book_no_longer_quoting") {
-      return `<span class="paper-table__sub">book pulled</span>`;
+      return `<span class="paper-table__sub">${escapeHtml(mark.taken_book || "our book")} pulled</span>`;
+    }
+    if (mark.reason === "market_not_on_board") {
+      return `<span class="paper-table__sub">off board</span>`;
     }
     if (mark.reason === "unkeyable") {
       return `<span class="paper-table__sub">not re-priceable</span>`;

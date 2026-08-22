@@ -23850,6 +23850,102 @@ Last pre-deploy plan for reference, so the post-deploy numbers have something to
 sit against: `date=2026-08-22 rows_in=1481 sized=12 positions=7 staked=$29.47
 sim_share=0.8314`.
 
+## 2026-08-22 23:23-23:26Z — refresh-worker `1e48e08e` — the third service, on the MLB slate
+
+`lane layer2-sim-view-and-live-projection`, claim `4c083b3d03ea6dca`. User asked for
+it with the bulk of the MLB schedule starting. `dep-da52up2jobas73dcgdm0` live
+23:26:49Z. `trigger_deploy` shipped main's TIP (`1e48e08e`, a peer's merge), not a
+SHA I named — verified `5304523e` is an ancestor of it before firing, which is the
+only thing that makes tip-shipping safe.
+
+**WHAT THIS DEPLOY INTERRUPTED, and what it deliberately did not.** At 23:06 an MLB
+sim was in flight with `--reason tip_off_window` over 8 game pks — the sim for the
+games the user was waiting on. Deploying then would have killed exactly the thing
+the request was meant to serve, and this deploy buys MLB nothing: its content is
+`refresh_odds_sources.py` fixes 3/4 (soccer-scoped) plus peers' commits, while MLB's
+live-odds path runs on live-odds-worker and shipped at 22:50. Waited 17 minutes. By
+23:17 that sim had COMPLETED and a different one had started — `--date 2026-08-23
+--reason evening_next_day_sim`, whole-slate, no game-pk scope, the ~45-minute
+variety. Killed that one instead: it is tomorrow's look-ahead, it re-triggers, and
+holding the deploy for it would have left refresh-worker behind for the evening.
+
+**verify: BOARD HEALTH, 23:41:54Z, all three services on the fixes.**
+
+    sport   rows  live_rows  live_proj  age_p50s      vs 21:06 baseline
+    mlb      400        276        138       620   live_rows 37 -> 276, live_proj 21 -> 138
+    nfl      275        252          0       603   rows 23 -> 275, age 36,478s -> 603s (60x)
+    wnba     400        155          0       139   live_rows 0 -> 155, age 581s -> 139s
+    soccer   400          0          0     3,378   age 23,941s -> 3,378s (7x)
+
+The live tier is populated on three of four sports where it was populated on ONE.
+NFL is the clearest: 23 frozen rows on a 10-hour-old price became 275 rows with 252
+live on a 10-minute price.
+
+Worker memory also came back with the restart: 91.3% / 357MB headroom before,
+68.0% / 1,310MB after — consistent with the uptime-driven accumulation already on
+record, not evidence about this change.
+
+**SOCCER `live_rows` IS STILL 0 — third reading, same answer, and it is structural.**
+Its price is now 7x fresher and not one row publishes as live. `game_state_of` must
+return `live`, and `_unsimulated_game` (`soccer/cards.py`) defaults `status_state` to
+`"pre"` for every league the sim does not cover — which is nine of ten. Fresh prices
+were necessary and are not sufficient. Untouched by any of the four fixes; needs its
+own change.
+
+**A REGRESSION IN A RATE, NOT A COUNT, AND IT IS THE THING TO LOOK AT NEXT.** NFL
+`no_proj` went 0 of 23 -> 248 of 275, and `edged` 18 -> 7. The refresh added 252 rows
+that are almost all unprojected and unpriced, so NFL projection coverage fell from
+100% to 10% and the board now shows mostly rows with no model view. Nothing was
+broken — those rows did not exist before — but "more live rows" and "more usable
+live rows" are different claims and only the first is supported here.
+
+
+## 2026-08-22 23:57:12Z -- refresh-worker `56481569` -- the live-mark join fix
+
+what: `d5014346b` — `mark_orders_to_board` joins at MARKET level and re-narrows
+to our own book via `quote.book_prices`, instead of joining on a key carrying
+the bookmaker. Plus `a59c3b238` (conftest state isolation) and gitignore
+cleanups. Full context: `docs/ai_context/todo.md` #522.
+
+**WHY: production said what local tests could not.** The first version measured
+`LIVE_MARKS orders=21 marked=0 toward=0 against=0 avg_clv_pct=None
+reasons={'book_no_longer_quoting': 21}` at 23:41:55Z. Twenty-one of twenty-one,
+one reason — a broken join, not twenty-one books pulling a line. An opening is
+recorded per (market, book); a BOARD row is one row per market carrying
+whichever book is best at that moment, so a bookmaker-bearing key stops matching
+the instant the best book rotates. Every mark test passed the whole time,
+because every test built its board row at the same book it took the order at.
+
+claim: acquired 23:51Z, token 511e51a1025e6a61, **held through the wait this
+time** with `target=d5014346` visible in `deploy_claim.py status`. That is the
+correction from the 23:23Z entry above, where a 25-minute hold protected nothing
+because the claim was released between checks.
+
+**DEPLOYED INTO AN IN-FLIGHT SIM, ON AN EXPLICIT USER INSTRUCTION ("just deploy
+now").** `run_mlb_daily_sim_job.py --reason tip_off_window --only-game-pks
+824316,825044` was running at 23:49:37Z along with an EPL odds refresh,
+container 88.1%. That sim dies in the restart. Recorded because the cost is
+real and the decision was the owner's, not a preflight pass — preflight still
+cannot run here (no `RENDER_API_KEY`).
+
+- **No rollback:** live was `1e48e08e`; `git merge-base --is-ancestor 1e48e08e
+  origin/main` → TRUE, so `56481569` strictly contains it.
+- `render.yaml` untouched → no `blueprint_sync`.
+
+deploy: dep-da53em3bc2fs73fmqda0, commit `5648156981d054e55d7e17561f54df3f93ca5817`.
+
+verify: OWED — `[position_marks] LIVE_MARKS ... marked=N` with **N > 0** on
+instance-after-23:57Z. `marked=0` with a single dominant reason means the fix
+did not work and the next thing to check is whether board rows actually carry
+`quote.book_prices` in production, which is asserted from `book_shortlist.py:124`
+and has NOT been read off a live artifact.
+
+Already confirmed good and NOT re-owed: the CLV half, `CLV_POSITION_JOIN
+date=2026-08-22 positions=8 openings=4884 matched=8 no_key_match=0 unkeyable=0
+match_rate=1.0 stamped=8 stamped_matched=8 derived_matched=8
+derivation_agrees=8 derivation_disagrees=0` at 23:41:55Z. That is Stage C's
+precondition holding, and it is the reading `#522` was built to take.
+
 ## 2026-08-22 23:53:53Z — live-odds-worker `56481569` — `#514` the SHAPE diagnostic
 
 - **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da53d48u01pc73ds5r90`
