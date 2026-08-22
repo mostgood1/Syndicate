@@ -4620,6 +4620,44 @@ against current lines AND current game state. **Retires the vendor import.**
 
 ## [soccer-live-tier] SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT
 
+**BTTS AND CORNERS ARE CAPTURABLE, AND THE 07-21 "unavailable" NOTE WAS WRONG**
+`[verified 2026-08-22 00:2xZ, live API probe, lane soccer-board-mlb-parity]`.
+They are served from the **PER-EVENT** endpoint (the one the props fetcher
+already calls), NOT the bulk one, so capture costs **no additional API calls**.
+The Odds API's `INVALID_MARKET` carries two messages and only
+`"Invalid markets: X"` means the key does not exist; `"not supported by this
+endpoint"` means it does. Measured coverage, EPL MUN @ HUL:
+`us` btts 7 / corners 7 (CHOSEN, user decision, 2 units/event) ·
+`uk` 11/4 · `eu` 4/1 · all four regions 29/18.
+
+**The full BTTS/corners path is BUILT AND TESTED, NOT IN PRODUCTION.** Capture,
+de-vig (raw implied 1.0096 -> `p_btts_yes` 0.4903, below raw, correct
+direction), main-line selection (9.5) and tiles all verified on real captured
+data: `BTTS YES 55.5% | Model 55.5% | Market 49.0% | Edge +6.5 pts`. But
+**`refresh-worker` executes the refresh and is on `49e4cef2`**, which predates
+the capture — so no `game_markets_<date>.csv` exists in production and the
+tiles correctly still read "no market captured".
+
+**MOMENTUM IS NOT LIVE, FOR THE SAME REASON.** Soccer live_state is written by
+**refresh-worker** (`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN`, scoped in
+`render.yaml` to "the sim and live_state") — not by live-odds-worker. And the
+live-lens loop runs on BOTH workers writing the same aggregate, so a partial
+deploy makes momentum **flicker** rather than be absent: whichever ticks last
+wins. Publisher is on `06babca2`; refresh-worker is not.
+
+**RETRACTED: "soccer box sections render 0 rows".** That 08-21 UI-audit finding
+was a MEASUREMENT ERROR — table sections carry `table_rows` and set
+`"rows": []` by design. Verified on production 2026-08-21 23:29Z: Goals 3/2/3/1
+rows, Match stats 12 rows on all four fixtures, ARS squad 23. The cards were
+always rendering. Two commits (`0aaf71f0`, `94a53639`) were shipped against a
+symptom that never existed; neither is reverted (both are defensible in
+isolation) but neither was needed.
+
+**Home's cost is a CACHE MISS, not per-game compute** `[measured 2026-08-21
+23:2xZ]`: 22.8s miss vs 1.03s hit on the same route, minutes apart.
+`MLB_GAMES_STAGE_MS` stage timing is deployed (`8a7b2407`) and UNREAD.
+
+
 **Live gates 1/2/3 work.** `[measured 2026-08-21 19:23Z, lane
 soccer-board-mlb-parity]` Four live matches, on a board built AFTER the deploy
 (checked, not assumed). Gate 2: 1144 rows considered, 58 live-projected,

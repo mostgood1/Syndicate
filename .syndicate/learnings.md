@@ -4613,3 +4613,75 @@ surface hiding a live gap.
 **When adding a UI affordance for stored data, print the FIELD LIST of what is
 stored and ask which fields the surface can physically show.** Here that is one
 command and it would have named `description` on day one.
+
+## 08-22 `INVALID_MARKET` MEANS TWO DIFFERENT THINGS, AND A STATUS CODE CANNOT TELL THEM APART
+
+`fetch_soccer_oddsapi_odds_local.py` carried, since 2026-07-21:
+
+    # btts/draw_no_bet/double_chance confirmed unavailable (HTTP 422) against
+    # the live API on the current plan/region -- not attempted here.
+
+**It was wrong, and it cost a month of two markets nobody knew we could have.**
+The Odds API returns `INVALID_MARKET` with two distinct messages:
+
+    "Markets NOT SUPPORTED BY THIS ENDPOINT: btts"   <- VALID key, wrong endpoint
+    "INVALID markets: both_teams_to_score"           <- no such key
+
+Read as a bare 422 they are identical. `btts` and `alternate_totals_corners`
+are served from the PER-EVENT endpoint -- the one the props fetcher ALREADY
+calls -- so capturing them costs no additional API calls at all.
+
+**RULE: when an API refuses, READ THE MESSAGE, not the status code.** And a
+dated "confirmed unavailable" comment is a measurement with an expiry, not a
+fact: plans, regions and endpoints all move.
+
+**SECOND FAILURE IN THE SAME PROBE, and the more general one:** the first
+region tried was `eu` (btts 4 books, corners 1) and that was nearly written up
+as the market's depth. Actual coverage: us 7/7, uk 11/4, all four regions
+29/18. **A single-parameter probe measures that parameter, not the world.**
+Before reporting a capability as thin, vary the one knob most likely to explain
+thinness.
+
+## 08-22 A COUNT OF ZERO IS A CLAIM ABOUT YOUR QUERY FIRST
+
+Card sections come in two shapes: list sections carry `rows`, TABLE sections
+carry `table_rows` and set `"rows": []` BY DESIGN. Goals, Match stats and squad
+projections are all table sections.
+
+Counting `len(section["rows"])` produced 0 for every one of them, which was
+filed as a UI-audit defect ("box sections render 0 rows on all 4 games"). The
+same production payload, read with the right key: Goals 3 rows (15' Havertz,
+23' Saka, 49' Odegaard), Match stats 12, ARS squad 23.
+
+**COST: two commits fixing a non-problem, a web deploy, a rollback, a 502
+misattributed to my own change, and a second wrong attribution after that.**
+Every later "still 0 rows" LOOKED like confirmation the fix had failed, so the
+bad metric kept generating hypotheses instead of being questioned.
+
+**RULE: before reporting a zero as a defect, print the container's KEYS.** One
+`sorted(section.keys())` ends it at the first reading.
+**COROLLARY: when a fix does not move a metric, suspect the METRIC before
+writing the next fix.** The read path was diagnosed twice -- because that is
+where the PREVIOUS bug was -- rather than testing whether the measurement was
+sound.
+
+## 08-22 VERIFY THE SHA OF THE SERVICE THAT EXECUTES, NOT THE ONE YOU DEPLOYED
+
+A soccer refresh was fired to exercise new capture code, after explicitly
+checking that `live-odds-worker` was live on it. The job produced nothing:
+`launch_mode: manifest_only` routes onto **refresh-worker's** claim loop, and
+refresh-worker was three commits behind. That routing was written down in this
+session's own commit message an hour earlier.
+
+The same shape governs whether a FEATURE is live at all: soccer live_state --
+and therefore momentum -- is written by refresh-worker
+(`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN`, scoped in `render.yaml` to
+"the sim and live_state"), NOT by the worker whose name suggests live data.
+
+**Worse than absent: the live-lens loop runs on BOTH workers writing the same
+aggregate, so a partial deploy makes a feature FLICKER -- whichever service
+ticks last wins.** A clean zero is easier to diagnose than intermittent truth.
+
+**RULE: a sequencing check is only worth the service it points at.** Before
+claiming a feature is live, resolve which service executes it -- from env and
+routing, not from the name -- and check THAT SHA.
