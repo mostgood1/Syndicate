@@ -1204,6 +1204,45 @@ against a slate that actually had matches in play. Full evidence in
 - Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
   `main` ships nothing until someone takes a claim and deploys it.
 
+### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
+- Goal: Phase A of `#502` — a shared causal-decay core and a basketball pressure-event
+  builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
+  no reader, no card, no wiring.** Scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
+- Files:
+  - `syndicate/features/shared/momentum_core.py` (NEW)
+  - `syndicate/features/shared/basketball_momentum.py` (NEW)
+  - `tests/test_momentum_core.py` (NEW)
+  - `tests/test_basketball_momentum.py` (NEW)
+  - READ-ONLY, deliberately: `syndicate/features/soccer/features/momentum.py`,
+    `syndicate/features/shared/game_shape.py`
+- **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
+  The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
+  `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
+  and claims `tests/test_soccer_*`, and it still OWES "momentum on a live card" in
+  production. Refactoring soccer's module while its own verification is outstanding
+  would muddy that measurement, and the test file would collide outright.
+  **So: `momentum_core.py` is written NEW and soccer is NOT edited. A test pins the
+  core against soccer's implementation instead.** This is not an improvisation — it is
+  exactly what `game_shape.py:503` did for `basketball_elapsed_minutes` and recorded the
+  reason for: "The consolidation (having `cards.py` delegate here) needs that file,
+  which is held by another lane; until then the test is the guard." Having soccer
+  import the core is a follow-up for when that lane closes.
+- Hypothesis: n/a — this is construction, not diagnosis. The lane's empirical questions
+  (weights, half-life, whether pressure LEADS scoring) belong to Phase C and are
+  deliberately NOT answered here. Nothing this lane produces may be read as evidence
+  that basketball momentum has predictive content.
+- Falsification test: the pin test (`test_momentum_core.py`) must FAIL if the core's
+  decay diverges from soccer's `momentum_at` on the same event rows. A pin that cannot
+  fail is not a guard. Assert it fails against a deliberately perturbed half-life before
+  claiming it passes.
+- Verification: `python -m pytest tests/test_momentum_core.py tests/test_basketball_momentum.py`
+  green, INCLUDING (a) the pin above, (b) a strict-causality test — an event at t+1 must
+  not move the value at t — and (c) an elapsed-seconds test proving the builder keys off
+  `basketball_elapsed_minutes` and not the raw display clock, exercised across a
+  quarter boundary and into OT.
+- Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
+  Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
