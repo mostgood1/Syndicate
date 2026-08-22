@@ -22481,3 +22481,56 @@ Worst case is one bad pass and a restart, not an eleven-hour outage.
 `summaries` -- which is what actually distinguishes "the parlay was outside the
 window" from "settlement settles nothing at all". The second question is still
 open and widening does not answer it.
+---
+
+## 2026-08-22 ~17:38Z — `bb709247` — refresh-worker — instrument CORRECTIONS after the first reading
+
+Lane `layer2-sim-view-and-live-projection`, claim `e76b7a33f528275d` (mine,
+acquired 17:02Z, still held). Deployed `bb709247`, verified equal to
+`origin/main` at trigger time. `deploy_preflight.py` STILL CANNOT RUN here — no
+`RENDER_API_KEY` — so again **no CLEAR verdict**; on-main checked with git,
+in-flight jobs checked by hand.
+
+**KILLED:** a ligue_1 `refresh_odds_sources` + `build_soccer_artifacts` pair
+(pids 706/707/724). No MLB sim was running. Both re-fire on the next 2-minute
+tick, which is why this was judged low-cost rather than waived by anyone.
+
+**WHAT THE PREVIOUS DEPLOY'S READING SAID — and it refuted the premise twice.**
+
+`PREGAME_PROJECTION_JOIN sport=soccer`, 17:30:32Z, the first one ever emitted:
+
+    considered=20013  projected=9598 (48%)  with_prob=8922
+    matches_in_source=95   ambiguous_keys=0
+    leagues_indexed=all 10   dates_read=[08-22..08-28]
+    unmatched_player=5138   unsupported_market=2691   unmatched_match=2586
+
+The soccer pregame join WORKS. `state.md`'s "4 of 1,142" was stale — written
+before `#379`'s widening ran in production — and I carried it forward as current
+and diagnosed on top of it. That row is now marked SUPERSEDED. And the gap is
+not where it pointed: `unmatched_match` is 2,586 rows across only 12 distinct
+fixtures, while `unmatched_player` (5,138) is the dominant bucket and a
+different subsystem.
+
+`LIVE_PROJECTION_JOIN sport=soccer`: `edge_withheld=100
+edge_why={'no_market_fair_value': 100}` — the `#503` hypothesis confirmed 100 of
+100. All 100 are player-prop rows with `player_in_lens: false`, the same
+population as the 5,138. So the live symptom is downstream of the PLAYER join,
+not the team-name join I had named.
+
+**MY OWN INSTRUMENT WAS INDICTED BY ITS FIRST READING, and that is what this
+deploy fixes.** `indexed_fixture_sample` sorted alphabetically and took 12, so
+it answered about belgian_pro_league / bundesliga / championship while every
+league with real misses fell off the end — 11 of 12 board-side fixtures had no
+sim-side counterpart to pair against. Now scoped to leagues that actually miss,
+per-league quota, and empty on a clean join. Also split
+`no_market_fair_value` into `no_fair_value_no_pregame_projection` vs
+`no_fair_value_devig_failed`, on a `basis` snapshot taken at entry because the
+live tier overwrites `basis` and reading it later would classify every row the
+same way.
+
+**VERIFY — a log read, not a green deploy.** Next `PREGAME_PROJECTION_JOIN
+sport=soccer` must carry `sim_names` entries for epl / la_liga / ligue_1 / mls /
+serie_a (the leagues in `unmatched_by_league`), pairable against the 12
+`board_names`. And `edge_why` must resolve into the two new keys. Neither has
+been observed. One pair is already confirmed from the OLD reading and still not
+applied: board `Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
