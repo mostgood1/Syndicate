@@ -1241,7 +1241,17 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list
         from pipeline.intelligence_state import read_layer2_shortlist
         from syndicate.features.shared.timezone import central_today_iso
     except Exception:
-        return None
+        # `#505`: `return None, 0`, NOT `return None`. This is the only branch
+        # in the function that returned a bare None, and the sole caller
+        # (`:1360`) destructures a 2-tuple -- so the one path meant to DEGRADE
+        # an answer raised `TypeError: cannot unpack non-sequence NoneType`
+        # instead, turning a soft failure into a hard one.
+        #
+        # Reachable in exactly the situation it is written for: an import that
+        # fails because the environment is broken. Found while fixing `#505`,
+        # in a container where a missing `_cffi_backend` was breaking imports
+        # across the suite.
+        return None, 0
 
     selected_date = (
         str(_result_value(result, "selected_date", "") or "").strip()

@@ -4718,3 +4718,39 @@ Recovery, for the next person: `git reset --soft HEAD~1 && git reset`, then
 `git checkout --` the tracked byproducts and `git clean -fd -- reports/ data/`
 the untracked ones, re-stage by name, and force-push (safe only on your own
 unshared branch — never on someone else's).
+
+## 08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A worktree shares site-packages
+
+I reported `#505` as "76 failures across 26 files on clean `origin/main`", and
+backed it by re-running three sampled files in a detached worktree at
+`origin/main`, getting identical counts. That check was real and it was not
+sufficient. **`git worktree` gives you a different CODE tree and the SAME Python
+environment.** It controls for the diff and controls for nothing else.
+
+The environment was broken. `cffi` was absent — collateral from my own earlier
+`pip install --ignore-installed` / `--force-reinstall` juggling to fix a
+numpy/pandas mismatch — so `cryptography` could not import, and everything
+importing it failed. Installing one package:
+
+    test_refresh_state_store.py      18 failed -> 1 failed
+    test_wnba_refresh_runner.py       6 failed -> 4 failed
+    test_nba_cards_keyvalue_backend   3 failed -> 3 PASSED
+    test_wnba_cards_keyvalue_backend  3 failed -> 7 PASSED
+
+**At least 25 of the 76 were mine, not the repo's**, and I had already written
+the 76 into `todo.md` and committed a baseline built on it.
+
+**RULE: before attributing failures to the code, prove the ENVIRONMENT is
+sound.** `python -m pip check` is one command and would have said so — it
+reported a broken requirement the whole time. Then re-run
+`pip install -r requirements.txt` clean and re-measure.
+
+**COROLLARY: a `ModuleNotFoundError` for a C-extension or transitive dependency
+(`_cffi_backend`, `_ssl`, `_lzma`) is an environment claim, never a code claim.**
+Read the actual error before counting failures; `--tb=no` hides exactly this,
+and I ran the whole 27-minute suite with it.
+
+**COROLLARY: never repair a dependency with `--ignore-installed` or
+`--force-reinstall` on a single package.** It resolves that package against
+nothing and silently strands its dependencies. Reinstall from the requirements
+file and let the resolver see the whole graph.

@@ -96,7 +96,24 @@ class RefreshStateStoreTests(unittest.TestCase):
                 refresh_state_store.reports_root()
 
         with TemporaryDirectory() as tmp_dir:
-            probe_file = Path(tmp_dir) / "probe.py"
+            # `#505`. NESTED THREE DEEP, NOT AT THE TEMP ROOT. `repo_root_from`
+            # is `Path(file).resolve().parents[3]`, and every real caller passes
+            # a module `__file__` under `syndicate/features/<area>/`, where
+            # `parents[3]` is the repo root. A probe at `<tmp>/probe.py` has
+            # only three parents on Linux (`/tmp/tmpXXXX`, `/tmp`, `/`), so the
+            # index raised `IndexError: 3` BEFORE the `RuntimeError` this test
+            # asserts could ever be reached.
+            #
+            # It therefore passed on macOS and Windows -- whose temp dirs are
+            # several levels deep (`/var/folders/xx/yy/T/...`,
+            # `C:\Users\me\AppData\Local\Temp\...`) -- and failed on Linux,
+            # which is what CI and production both are. A test that depends on
+            # the shape of the host's temp path is not testing the thing it
+            # names; this makes the fixture representative of every real call
+            # site instead.
+            probe_dir = Path(tmp_dir) / "repo" / "syndicate" / "features" / "shared"
+            probe_dir.mkdir(parents=True)
+            probe_file = probe_dir / "probe.py"
             probe_file.write_text("", encoding="utf-8")
             with patch.dict(
                 os.environ,

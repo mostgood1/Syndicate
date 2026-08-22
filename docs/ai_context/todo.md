@@ -1,10 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#505` — **THE FULL PYTEST SUITE IS NOT GREEN ON `main`: 76 failures across 26 files, 9,245 passing. This is what blocks putting pytest in CI (`#504`'s owed half).** — measured by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+### `#505` — **CORRECTED: the "76 failures" figure was WRONG — at least 25 were a broken environment in the measuring container, not the repo.** Gate shipped; the three biggest files fixed. — lane `basketball-live-momentum`, 2026-08-22
 
 `python -m pytest tests/` on this branch, 26m58s:
 
     76 failed, 9245 passed, 66 skipped, 2 xfailed, 373 subtests passed
+
+## `#505` CORRECTION `[2026-08-22, same session]` — READ THIS BEFORE THE NUMBERS BELOW
+
+**The 76 figure is retracted.** `cffi` was absent from the measuring
+container — collateral from this session's own
+`pip install --ignore-installed` / `--force-reinstall` juggling — so
+`cryptography` could not import and everything importing it failed. Installing
+one package moved four files at once:
+
+    test_refresh_state_store.py      18 failed -> 1 failed
+    test_wnba_refresh_runner.py       6 failed -> 4 failed
+    test_nba_cards_keyvalue_backend   3 failed -> 3 PASSED
+    test_wnba_cards_keyvalue_backend  3 failed -> 7 PASSED
+
+**The verification that failed to catch this is the point.** The failures were
+re-run in a detached worktree at clean `origin/main` and reproduced identically
+— which proved the CODE was not the cause and said nothing about the
+environment, because **a worktree shares site-packages**. `python -m pip check`
+was reporting a broken requirement the whole time. Rule recorded in
+`learnings.md`.
+
+**FIXED IN THE SAME PASS (the three biggest files, 35 failures -> 2):**
+
+- `test_refresh_state_store.py` **18 -> 0.** 17 were the cffi breakage. The
+  1 real one: the test built its probe at `<tmp>/probe.py`, and
+  `repo_root_from` is `parents[3]` — only three parents exist under Linux
+  `/tmp`, so it raised `IndexError` before reaching the `RuntimeError` it
+  asserts. It passed on macOS/Windows (deep temp paths) and failed on Linux,
+  i.e. on CI and production. Fixture now nests to a representative depth.
+- `test_ask_headline_from_board.py` **11 -> 0.** All stale contract: the
+  function returns `(rows, excluded_count)` and the tests asserted `is None`;
+  and `_has_positive_edge` became a VETO over EVERY edge term, so the realistic
+  fixture (`model_edge_pct` +6.35, `ev_pct` -2.89) is now correctly ineligible.
+  The old expected list literally ended in `-4.0` — it was asserting that a bad
+  bet gets published.
+  **Plus a REAL SOURCE BUG found there:** the import-failure branch returned a
+  bare `None` while every other branch and the sole caller use a 2-tuple, so
+  the one path written to DEGRADE an answer raised
+  `TypeError: cannot unpack non-sequence NoneType`. Reachable in exactly the
+  situation it exists for — a broken environment, which is how it was found.
+  Fixed, with the first test to cover that branch.
+- `test_wnba_refresh_runner.py` **6 -> 2.** A fake missing the `force_refresh`
+  kwarg its sibling already had; and a TIME BOMB — a fixture hardcoded to
+  `2026-05-21` asserted against a staleness bound of 5 days, so it passed for
+  five days after it was written and has failed every day since. Now anchored
+  to `date.today()`.
+
+**THE 2 REMAINING ARE DELIBERATELY NOT FIXED.**
+`test_main_prefers_existing_refresh_outputs_before_source_job` and
+`test_main_refreshes_live_snapshots_even_when_reusing_existing_outputs` both
+fail because `DECISION=will_fetch`: the input-hash refresh-decision gate fires
+BEFORE the reuse-existing-outputs branch is consulted, and a fresh temp dir has
+no recorded prior hash. **That gate is the active subject of the OPEN lane
+`wnba-live-odds-capture-gap`**, whose own finding is "THE FIX BELONGS IN THE
+GUARD, NOT THE AUTORUN". Encoding an expectation about semantics another lane
+is rewriting would be editing across lanes and would likely encode the wrong
+one.
+
+**A SOURCE INCONSISTENCY FOUND AND FILED, NOT FIXED:**
+`_active_player_logs_fallback_paths` globs `boxscores_*.csv` (per-date files),
+but the staleness gate behind it, `boxscore_history_max_date`, reads ONLY
+`boxscores_history.{parquet,csv}`. So a per-date boxscores file is FOUND and
+then unconditionally judged stale, however fresh it is. Changing which files
+count as fresh history is a production behaviour decision, not a test fix.
+
+**The baseline was regenerated on the repaired environment** — the committed
+one was built on the broken measurement and would have reported ~25 phantom
+"fixed" tests on the first CI run.
 
 **NOT caused by `#502`/`#503`/`#504`, and not test pollution.** Zero failures
 are in any momentum file. Three files were sampled IN ISOLATION and then re-run

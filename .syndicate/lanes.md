@@ -1236,6 +1236,15 @@ against a slate that actually had matches in play. Full evidence in
     all unclaimed): `scripts/pytest_baseline.py` (NEW),
     `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
     `requirements-dev.txt`.
+  - **ADDED FOR `#505` TEST FIXES 2026-08-22** (user asked for the top three
+    files; all unclaimed): `tests/test_refresh_state_store.py`,
+    `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
+    `syndicate/blueprints/ask_the_syndicate_adapter.py` (ONE-LINE source fix:
+    an except-branch returned a bare `None` where the sole caller destructures
+    a 2-tuple).
+  - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
+    failures turn on the input-hash refresh-decision gate, which
+    `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
 - **PHASE B IS SHAPED BY A LANE COLLISION, not by preference.**
   `syndicate/features/wnba/live_lens.py` is claimed by
   `layer2-sim-view-and-live-projection`; `live_lens_loop.py` by
