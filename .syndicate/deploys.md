@@ -22095,3 +22095,82 @@ rationalised afterwards:**
 Also observed and NOT mine: the build logged `BOARD_BUILD_FORCED_DESPITE_SIM
 env_override=SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM` — a standing env override
 forcing board builds past the sim gate. Flagged for whoever set it.
+## 2026-08-21 — `#499` and `#498` paid against a live WNBA slate (read-only, no deploy)
+
+Reading window 19:15–19:35 CDT (`2026-08-22T00:15–00:35Z`). ESPN live: `MIN @ WSH`
+Halftime, `GS @ CHI` 2:59 2nd Quarter. The 9:00 PM CT game had not tipped. No
+deploy claim taken and nothing deployed — both checks are HTTP reads.
+
+### `#499` live totals pricing — REACHABLE, proven by a reason string the verifier does not look for
+
+`scripts/verify_wnba_totals_pricing.py` exits **3 (INCONCLUSIVE)**, and that exit
+is not "nothing to measure" — 430 rows were considered. Reading at 00:15Z:
+
+    index_size 2 | considered 430 | projected 230 | priceable 3 | withheld 427
+    withheld_by_reason:
+      223  analytic_probability_is_only_valid_at_its_own_line
+      200  segment_is_not_full_game
+        4  no_two_sided_market_price
+    analytic_estimator_never_backtested_for_this_market : 0
+    prob_interval_swamps_edge                           : 0
+
+**The proof is the ORDER of the gates, not the presence of `prob_interval_swamps_edge`.**
+In `origin/main:syndicate/features/shared/live_gameline_join.py`,
+`price_analytic_line_market()` looks up
+`ANALYTIC_LIVE_STD_ERR_BY_MARKET.get((sport_key, "totals"))` at :609 and returns
+`REASON_ANALYTIC_UNCALIBRATED` at :612 **strictly before** the line-match test
+that returns `REASON_ANALYTIC_LINE_MISMATCH` at :624. So a TOTALS row carrying
+`analytic_probability_is_only_valid_at_its_own_line` can only have got there with
+`totals_sigma` non-None — i.e. `sport_key == "wnba"` resolved and the `0.150`
+entry was found. Sampled rows confirm it directly: `('totals','full')` line 154.5
+and `('totals_alt','full')` line 150.5 both carry that reason.
+**`8d5d6edf`'s `sport` plumbing is LIVE and REACHED; the INERT state of `d06a70d4` is gone.**
+
+**NOT proven, and stated so it is not banked:** the sigma=0.150 interval has never
+been observed APPLIED to a totals row. 0 of 65 totals/totals_alt rows in the
+300-row slice matched their lens line, so none reached `price_moneyline`. The
+board carries a dense ladder (144.5 … 179.5) straddling `total_mean` 146.4 / 171.3,
+so a match is possible in principle — it just did not occur in any sample. The 3
+`priceable` rows were **h2h**, not totals: `priceable true, std_err_basis
+analytic_calibration, prob_std_err 0.054, edge_pp -23.29`. `priceable`(3) stayed
+well under `withheld`(427), which is the correct shape, not the bug signal.
+
+Stale comment worth retiring: `live_gameline_join.py:283` still reads "Carried
+ONLY so the totals refusal can name itself; never priced" — untrue since `#499`.
+
+### `#498` live props capture and projection — SEEN NON-EMPTY for the first time, then it decayed at halftime
+
+**2a capture** (`live-odds-worker`, the service that owns the tick):
+
+    23:02–23:31Z  WNBA_LIVE_BOX_EMPTY date=2026-08-21 games=3 players=0   (repeated)
+                  WNBA_LIVE_BOX_FAILED ... HTTP Error 502: Bad Gateway    (4x)
+    23:34:05Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=2 players=20   <-- first ever
+    23:55:44Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=2 players=37
+    00:16:27Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=1 players=19
+    00:18:31Z     WNBA_LIVE_BOX_CAPTURED date=2026-08-21 games=1 players=21
+
+Non-zero player counts, sustained ~45 minutes. PASS.
+
+**2b projection** (served board, 00:15Z): `rows_live_projected: 5`,
+`rows_live_edged: 5`, `rows_live_considered: 376`, `snapshot_rows_seen/indexed: 8`,
+`snapshot_live_prob_seen/indexed: 8`, `snapshot_skipped_no_live_projection: 0`,
+and the pre-tip `reason` string **gone**. PASS on the stated criterion.
+
+**The regression, recorded because it is NOT a pass.** By 00:30Z both games sat at
+Halftime and the board reverted to the pre-tip shape, while capture was STILL
+logging `players=21`:
+
+    live_projections : rows_live_projected 0
+                       reason "live-lens snapshot for wnba carries no liveProps (producer not wired)"
+    live_gamelines   : considered 206 -> 0, priceable 0
+                       no_live_gameline_projection 117 | segment_is_not_full_game 89
+
+Whether the lens SHOULD carry live projections through a break is unmeasured. What
+is plainly wrong is the message: the halftime state emits the **same string as the
+never-worked state**, so a reader cannot tell "on a break" from "producer not
+wired" — the exact ambiguity `#498` existed to remove.
+
+Two further gaps visible even in the WORKING reading: `live_games_in_snapshot: 0`
+and `snapshot_by_game_state: {"unknown": ...}` (game-state stamping unpopulated),
+and only 8 of 37 captured players reached the index — `miss_player_not_live: 247`,
+`miss_no_market_alias: 90`.
