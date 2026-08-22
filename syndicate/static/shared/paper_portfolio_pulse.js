@@ -80,6 +80,12 @@ window.SyndicatePaperPortfolioPulse = (function () {
         ? "Simulated fills only. No money moves, no book is contacted, nothing here is a real wager."
         : "LIVE execution mode is selected. Orders on this page correspond to real submissions.";
     }
+    // Say WHOSE flag state this is. Reading web's own env on a page showing the
+    // worker's output is how it came to report "off" beside filled orders.
+    const commitLabel = document.querySelector('[data-flag-label="commit"]');
+    if (commitLabel) {
+      commitLabel.textContent = data.job_state_source === "worker" ? "Commit job" : "Commit job (web env)";
+    }
     const commit = document.getElementById("paper-flag-commit");
     if (commit) {
       commit.textContent = data.commit_enabled ? "on" : "off";
@@ -106,6 +112,19 @@ window.SyndicatePaperPortfolioPulse = (function () {
   // of its three meta lines: a key mismatch is reported ahead of a missing
   // opening, because a derivation that drifted makes every CLV number suspect
   // while a missing opening only loses that one row.
+  function movementTile(marks) {
+    if (!marks.marked) {
+      return { label: "Line movement", value: "—", meta: "no order re-priced yet" };
+    }
+    const avg = marks.avg_clv_pct;
+    return {
+      label: "Line movement",
+      value: isNum(avg) ? `${signed2OrDash(avg)} pts` : "—",
+      meta: `${marks.moved_toward || 0} toward · ${marks.moved_against || 0} against, of ${marks.marked} marked`,
+      valueClass: isNum(avg) && avg > 0 ? " mark-pos" : (isNum(avg) && avg < 0 ? " mark-neg" : ""),
+    };
+  }
+
   function clvTile(clv) {
     if (clv.positions === null || clv.positions === undefined) {
       return { label: "CLV openings", value: "—", meta: "plan predates the join" };
@@ -156,6 +175,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
         valueClass: unreconciled > 0 ? " warn" : "",
       },
       { label: "Filled stake", value: usd(ledger.filled_stake_dollars), meta: "at simulated fill price" },
+      movementTile(data.live_marks || {}),
       clvTile(data.clv_join || {}),
       {
         label: "Sim coverage",
@@ -192,6 +212,43 @@ window.SyndicatePaperPortfolioPulse = (function () {
       The plan ran and committed <strong>zero</strong> positions. That is a decision, not a gap — see the refusal
       counts below for which gate each candidate hit.
     </div>`;
+  }
+
+  // Mirrors portfolio_paper.html's `mark_cell` macro exactly. Movement is always
+  // probability points from clv_pct_from_prices -- American odds are not linear,
+  // so a raw price difference would be wrong in both directions at once.
+  function markCell(mark) {
+    if (!mark) return `<span class="paper-table__sub">—</span>`;
+    if (mark.reason === "marked") {
+      const cls = isNum(mark.clv_pct) && mark.clv_pct > 0
+        ? "mark-pos"
+        : (isNum(mark.clv_pct) && mark.clv_pct < 0 ? "mark-neg" : "");
+      const move = isNum(mark.clv_pct) ? `${signed2OrDash(mark.clv_pct)} pts` : "no move";
+      return `<span class="${cls}">${americanOrDash(mark.current_price)}</span>
+        <span class="paper-table__sub">${move}</span>`;
+    }
+    if (mark.reason === "book_no_longer_quoting") {
+      return `<span class="paper-table__sub">book pulled</span>`;
+    }
+    if (mark.reason === "unkeyable") {
+      return `<span class="paper-table__sub">not re-priceable</span>`;
+    }
+    return `<span class="paper-table__sub">${escapeHtml(mark.reason || "")}</span>`;
+  }
+
+  // The orphan table's own selection cell. Same shape as the positions table's,
+  // built from the LEDGER's fields rather than the plan's -- an orphan has no
+  // position left to read from, which is the whole reason the ledger carries
+  // player_name, line and the matchup itself.
+  function orderSelectionCell(order) {
+    let sub = escapeHtml(order.market || "—");
+    if (order.line !== null && order.line !== undefined) sub += ` ${escapeHtml(String(order.line))}`;
+    if (order.player_name) sub += `· ${escapeHtml(order.side || "")}`;
+    if (order.away_team || order.home_team) {
+      sub += `· ${escapeHtml(order.away_team || "?")} @ ${escapeHtml(order.home_team || "?")}`;
+    }
+    return `${escapeHtml(order.player_name || order.side || "—")}
+      <span class="paper-table__sub">${sub}</span>`;
   }
 
   function selectionCell(row) {
@@ -250,6 +307,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
           <td>${escapeHtml(attribution.side_picked_by || "—")}</td>
           <td>${orderCell}</td>
           <td>${fillCell(order)}</td>
+          <td>${markCell(row.mark)}</td>
         </tr>
       `;
     }).join("");
@@ -259,7 +317,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
           <thead>
             <tr>
               <th>Sport</th><th>Selection</th><th>Book</th><th>Price</th><th>Stake</th><th>% BR</th>
-              <th>EV%</th><th>Sim edge</th><th>Score</th><th>Sim $</th><th>Side by</th><th>Order</th><th>Fill</th>
+              <th>EV%</th><th>Sim edge</th><th>Score</th><th>Sim $</th><th>Side by</th><th>Order</th><th>Fill</th><th>Now</th>
             </tr>
           </thead>
           <tbody>${body}</tbody>
@@ -292,12 +350,12 @@ window.SyndicatePaperPortfolioPulse = (function () {
       <tr>
         <td>${escapeHtml(order.submitted_at || "—")}</td>
         <td class="primary">${escapeHtml(String(order.sport || "—").toUpperCase())}</td>
-        <td>${escapeHtml(order.market || "—")}</td>
-        <td>${escapeHtml(order.side || "—")}</td>
+        <td class="primary">${orderSelectionCell(order)}</td>
         <td>${escapeHtml(order.book || "—")}</td>
         <td>${americanOrDash(order.requested_price)}</td>
         <td>${usd(order.requested_stake_dollars)}</td>
         <td><span class="paper-pill paper-pill--${escapeHtml(String(order.status || ""))}">${escapeHtml(order.status || "")}</span></td>
+        <td>${markCell(order.mark)}</td>
       </tr>
     `).join("");
   }
