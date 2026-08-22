@@ -1,0 +1,474 @@
+"""Stage A -- turn the Layer 2 shortlist into a COMMITTED portfolio.
+
+A ranked board says "here are 108 rows, best first". A portfolio says "these
+nine, at these dollars, totalling this". This module is the step between, and
+it is the first thing in the system that converts a fraction into money.
+
+**WORKER-SIDE. It must not be called from a request path**, and
+`commit_portfolio` refuses if it is. That is CLAUDE.md's load-bearing rule, and
+`layer2_board.py`'s header states the second, stronger reason: *a board computed
+per request cannot be settled.* A portfolio computed per request cannot be
+settled either, which would make Stage C's CLV gate impossible -- so the refusal
+is protecting the measurement, not just the web dyno.
+
+--------------------------------------------------------------------------
+THE DEFECT THIS MODULE WAS WRITTEN AROUND, measured 2026-08-22
+--------------------------------------------------------------------------
+
+`_attach_board_stakes` (`intelligence_state.py:4216`) attaches `stake` to
+`global_pool` -- the LAYER 1 pool. The Layer 2 shortlist is built separately by
+`build_layer2_shortlist` from the market grid and is a different set of row
+objects. **Layer 2 rows carry no `stake`, and never have.** Verified by reading
+every `candidate["..."]` assignment in `layer2_board.py`: a shortlist row
+carries `side`, `line`, `quote`, `game`, `projection`, `movement`, `ev_pct`,
+`model_edge_pct`, `score`, `board_lane` -- and nothing else.
+
+That matters far more than it looks, because of what `compute_bet_size` does
+with a row that lacks its inputs (`bankroll_manager.py:115-127`):
+
+    model_probability   absent -> defaults to 0.5
+    implied_probability absent -> derived from `odds`, also absent -> 0.5
+    edge = 0.5 - 0.5    = 0.0
+    kelly_fraction      = 0.0
+    stake               = $0
+
+**Every position would be sized at exactly zero, silently, with no exception
+and no log line** -- a portfolio that is empty because it was never fed,
+presented identically to a portfolio that is empty because the model found
+nothing. That is the exact failure `docs/ai_context/model_engine_standard.md`
+exists for ("26 input fields the simulation reads and nothing feeds ... a
+neutral default makes an unfed field indistinguishable from a working
+feature").
+
+So this module does three things instead of calling `compute_bet_size` on a raw
+row:
+
+1. **Derives the sizing inputs explicitly** (`sizing_inputs_from_row`), by
+   inverting the board's own arithmetic rather than guessing.
+2. **Refuses by name when an input is missing.** No neutral defaults. A row
+   that cannot be sized is counted under a reason a person can read, so a small
+   portfolio is always attributable.
+3. **Is gated by an input checklist** (`scripts/portfolio_commit_input_checklist.py`)
+   that walks `dataclasses.fields(SizingInputs)` -- never a name grep -- and
+   exits non-zero if any field is unpopulated or unconsumed.
+
+--------------------------------------------------------------------------
+THE DERIVATION, and why it is exact rather than approximate
+--------------------------------------------------------------------------
+
+`ev_pct` on a shortlist row is `expected_value_pct(price, fair)`:
+
+    ev/100 = p*profit - (1 - p)          [opportunity_signals.py:293]
+
+which inverts exactly, given the same price the row was scored at:
+
+    p_fair = (ev/100 + 1) / (profit + 1)
+
+and `model_edge_pct` is `(model_prob - fair) * 100` in probability POINTS
+(`prop_projections.py:978`, bounded by `_MODEL_EDGE_MAX_POINTS = 15.0`), so:
+
+    p_model = p_fair + model_edge_pct/100
+
+Both come off the row; neither is assumed.
+
+**`odds` is passed to the sizer and `implied_probability` deliberately is NOT.**
+`compute_bet_size` computes `edge / (decimal - 1)`, which equals textbook Kelly
+`(p(b+1) - 1)/b` only when the subtracted probability is the price's OWN
+implied probability including vig -- not the de-vigged consensus fair. Passing
+`p_fair` there would look more sophisticated and would silently compute a
+different, larger number. So the price goes in and the sizer derives its own
+implied probability, exactly as its arithmetic assumes.
+
+**`price_reliability` is applied HERE, explicitly, and not by handing it to the
+sizer as `confidence`.** That was the first implementation and the input
+checklist caught it as inert on the first run. Measured 2026-08-22:
+
+    kelly_fraction 0.0241 -> stake 0.00151   (x0.25 Kelly, x0.25 credibility)
+    cap_fraction   0.0446                    (0.02 + 0.03 x confidence)
+
+`compute_board_stake` shrinks the RAW `kelly_fraction` and then applies
+`cap_fraction` as a ceiling -- and `confidence` feeds only that ceiling, which
+sits ~30x above the stake and therefore never binds. Dropping the trust weight
+from 0.82 to 0.32 moved the cap 0.0446 -> 0.0296 and moved the stake **not at
+all**. So `confidence` is structurally inert in this path, and passing
+reliability through it would have looked wired and done nothing -- the exact
+failure `model_engine_standard.md` was written for.
+
+**This is a property of `bankroll_manager`, not of this adapter**, so it is also
+true of `_attach_board_stakes` on the Layer 1 pool: whatever `confidence` a
+board candidate carries, it does not move the served stake. `bankroll_manager.py`
+is read-only for this lane -- recorded here and in `lanes.md`, not fixed.
+
+`confidence` is still passed, because the cap should be right on the rare row
+where it does bind. But the trust discount is applied as its own named
+multiplier, and both the factor and the pre-discount fraction ride on the
+position so the number can be argued with. They remain different quantities and
+neither is ever published under the other's name (`learnings.md` 2026-08-21,
+FORBIDDEN).
+"""
+
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass, fields as dataclass_fields
+from datetime import datetime, timezone
+from typing import Any, Mapping
+
+from syndicate.features.bankroll_manager import apply_exposure_budgets, compute_board_stake
+from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
+from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+# Carried onto every position so a committed bet can be found again -- in the
+# shortlist it came from, in the ledger it lands in, and at the venue that
+# fills it.
+_POSITION_IDENTITY_FIELDS = (
+    "sport",
+    "event_id",
+    "kind",
+    "market",
+    "segment",
+    "player_name",
+    "home_team",
+    "away_team",
+    "commence_time",
+)
+
+
+@dataclass(frozen=True)
+class SizingInputs:
+    """Everything the sizer needs, stated explicitly.
+
+    One field per quantity, no optionals: a `SizingInputs` that exists is
+    complete by construction, so "could not size this row" is expressed by
+    returning None WITH a reason and never by a half-populated object. The
+    checklist walks these fields, so adding one here forces it to be both
+    populated and consumed or the gate fails.
+    """
+
+    american_price: float
+    market_fair_probability: float
+    model_probability: float
+    price_reliability: float
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return None
+    return parsed
+
+
+def _net_profit_per_unit(american: float) -> float | None:
+    """Decimal odds minus one -- what a winning unit returns as profit."""
+    if american == 0:
+        return None
+    return (american / 100.0) if american > 0 else (100.0 / abs(american))
+
+
+def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None, str | None]:
+    """Derive sizing inputs from a Layer 2 shortlist row, or say why not.
+
+    Returns `(inputs, None)` or `(None, reason)`. Never returns a partially
+    populated object and never substitutes a neutral default -- see the module
+    docstring for what a neutral default costs here.
+    """
+    if not isinstance(row, Mapping):
+        return None, "row_not_a_mapping"
+
+    quote = row.get("quote")
+    price = _as_float(quote.get("price")) if isinstance(quote, Mapping) else None
+    if price is None:
+        return None, "no_quote_price"
+    profit = _net_profit_per_unit(price)
+    if profit is None:
+        return None, "unusable_price"
+
+    ev_pct = _as_float(row.get("ev_pct"))
+    if ev_pct is None:
+        # The row was ranked on something other than EV, or had no fair price to
+        # score against. Either way there is no market probability to recover.
+        return None, "no_ev_pct"
+
+    fair = (ev_pct / 100.0 + 1.0) / (profit + 1.0)
+    if not (0.0 < fair < 1.0):
+        return None, "derived_fair_probability_out_of_range"
+
+    model_edge_pct = _as_float(row.get("model_edge_pct"))
+    if model_edge_pct is None:
+        # Roughly 40% of the served board: 65 of 108 rows carried
+        # `model_edge_pct` when measured 2026-08-16. Those rows rank on market
+        # EV and price shopping alone, which is a legitimate way to RANK and not
+        # a basis on which to SIZE -- without a model view, `model_probability`
+        # would equal `fair` and Kelly would be exactly zero anyway. Refused by
+        # name so the board's unsizable half is visible rather than inferred.
+        return None, "no_model_edge_pct"
+
+    model_probability = fair + (model_edge_pct / 100.0)
+    if not (0.0 < model_probability < 1.0):
+        return None, "derived_model_probability_out_of_range"
+
+    score = row.get("score")
+    price_reliability = _as_float(score.get("price_reliability")) if isinstance(score, Mapping) else None
+    if price_reliability is None:
+        return None, "no_price_reliability"
+
+    return (
+        SizingInputs(
+            american_price=price,
+            market_fair_probability=fair,
+            model_probability=model_probability,
+            price_reliability=price_reliability,
+        ),
+        None,
+    )
+
+
+def sizing_candidate(row: Mapping[str, Any], inputs: SizingInputs) -> dict[str, Any]:
+    """The mapping `compute_board_stake` actually reads, built explicitly.
+
+    Deliberately NOT `{**row, ...}`. Splatting the row would let any future
+    field on a shortlist row start steering the sizer by name collision --
+    `bankroll_manager` reads `adjusted_edge`, `edge`, `confidence`,
+    `volatility_score` and `odds` off whatever mapping it is handed. Listing the
+    keys here means the sizer's inputs are exactly the four derived above plus
+    the identity needed to group exposure, and adding a fifth is a visible edit.
+    """
+    return {
+        # `implied_probability` is deliberately absent; the sizer derives it
+        # from `odds`. See the module docstring.
+        "odds": inputs.american_price,
+        "model_probability": inputs.model_probability,
+        # Feeds `cap_fraction` only, which almost never binds -- see the
+        # module docstring. The real trust discount is applied by
+        # `apply_price_reliability` below, not here.
+        "confidence": inputs.price_reliability,
+        # Read by `_exposure_group_key` so correlated legs on one game are
+        # budgeted together rather than treated as independent.
+        "sport": row.get("sport"),
+        "sport_slug": row.get("sport"),
+        "event_id": row.get("event_id"),
+        # Read by `apply_exposure_budgets` to decide which leg in a game keeps
+        # its full stake. The board's own blended score is the right ordering.
+        "adjusted_score": _score_value(row),
+    }
+
+
+def _score_value(row: Mapping[str, Any]) -> float | None:
+    score = row.get("score")
+    if isinstance(score, Mapping):
+        return _as_float(score.get("score"))
+    return None
+
+
+def position_key(row: Mapping[str, Any]) -> str:
+    """A stable identity for one committed bet.
+
+    Hashed over the identity tuple PLUS the side, the line and the book, because
+    those three are what make it a different bet rather than a different view of
+    the same market. `learnings.md` is explicit that a wrongly resolved identity
+    "prices a projection against a different human being, which is worse at any
+    stake than no bet" -- and this key is what Stage B's idempotency and Stage
+    C's settlement join will both hang off, so it is an identity or it is
+    nothing.
+    """
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    parts = [str(row.get(field) or "") for field in _POSITION_IDENTITY_FIELDS]
+    parts.append(str(row.get("side") or ""))
+    parts.append(str(row.get("line") if row.get("line") is not None else ""))
+    parts.append(str(quote.get("bookmaker") or ""))
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def commit_portfolio(
+    rows: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
+    *,
+    selected_date: str,
+    settings: PortfolioSettings | None = None,
+    settled_sample_size_by_sport: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    """Rank -> size -> budget -> cut. Returns the committed plan.
+
+    Every row that does not make it is counted under a named reason, and the
+    reasons sum to `rows_in`. That is not bookkeeping for its own sake: a plan
+    with zero positions is a routine outcome (a thin slate, a strict floor) and
+    an alarming one (nothing is being fed) and the only thing that tells them
+    apart is which reason the rows landed under.
+    """
+    refuse_if_compute_in_request_path("commit_portfolio")
+
+    resolved = settings or resolve_settings()
+    samples = dict(settled_sample_size_by_sport or {})
+    refusals: dict[str, int] = {}
+    rows_in = 0
+
+    def refuse(reason: str) -> None:
+        refusals[reason] = refusals.get(reason, 0) + 1
+
+    priced: list[dict[str, Any]] = []
+    for row in rows or ():
+        rows_in += 1
+        if not isinstance(row, Mapping):
+            refuse("row_not_a_mapping")
+            continue
+        inputs, reason = sizing_inputs_from_row(row)
+        if inputs is None:
+            refuse(reason or "unknown")
+            continue
+
+        ev_pct = _as_float(row.get("ev_pct"))
+        if ev_pct is None or ev_pct < resolved.min_ev_pct:
+            refuse("below_min_ev_pct")
+            continue
+
+        sport = str(row.get("sport") or "").strip().lower()
+        candidate = sizing_candidate(row, inputs)
+        try:
+            candidate["stake"] = compute_board_stake(
+                candidate, settled_sample_size=samples.get(sport, 0)
+            )
+        except Exception:
+            refuse("sizing_failed")
+            continue
+        if (_as_float(candidate["stake"].get("stake_fraction")) or 0.0) <= 0.0:
+            refuse("zero_kelly_stake")
+            continue
+        apply_price_reliability(candidate, inputs)
+        priced.append({"row": row, "inputs": inputs, "candidate": candidate})
+
+    # Exposure budgeting BEFORE the count cut, so the per-game cap sees every
+    # correlated leg rather than only the ones that survived truncation --
+    # trimming first would let two legs of a three-leg group look independent.
+    exposure = apply_exposure_budgets([item["candidate"] for item in priced])
+
+    priced.sort(key=lambda item: _score_value(item["row"]) or float("-inf"), reverse=True)
+    if len(priced) > resolved.max_positions:
+        for _ in priced[resolved.max_positions :]:
+            refuse("beyond_max_positions")
+        priced = priced[: resolved.max_positions]
+
+    # The slate ceiling. Scaled proportionally rather than truncated: Kelly
+    # fractions are meaningful relative to each other, so shrinking the whole
+    # book preserves the portfolio's composition where dropping its tail would
+    # change which bets are in it. The factor is reported so the reduction is
+    # never silent.
+    total_fraction = sum(
+        _as_float((item["candidate"].get("stake") or {}).get("stake_fraction")) or 0.0
+        for item in priced
+    )
+    ceiling = resolved.max_slate_exposure_fraction
+    slate_scale = 1.0
+    if total_fraction > ceiling and total_fraction > 0:
+        slate_scale = ceiling / total_fraction
+
+    positions: list[dict[str, Any]] = []
+    for item in priced:
+        row, inputs, candidate = item["row"], item["inputs"], item["candidate"]
+        stake = dict(candidate.get("stake") or {})
+        fraction = (_as_float(stake.get("stake_fraction")) or 0.0) * slate_scale
+        dollars = round(fraction * resolved.bankroll_units, 2)
+        if dollars < resolved.min_stake_units:
+            # Not rounded up. A position too small to place is not a position,
+            # and inflating it to the minimum would silently overbet the row
+            # the sizer just said to bet least on.
+            refuse("below_min_stake")
+            continue
+        quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+        position = {field: row.get(field) for field in _POSITION_IDENTITY_FIELDS}
+        position.update(
+            {
+                "position_key": position_key(row),
+                "side": row.get("side"),
+                "line": row.get("line"),
+                "book": quote.get("bookmaker"),
+                # American odds, the price this was committed at. Stage B's
+                # ledger records it again at submit time; a difference between
+                # the two IS the slippage and must stay visible.
+                "price": inputs.american_price,
+                # DOLLARS. Named so it can never be confused with
+                # bankroll_manager's `stake_units`, which is percent-of-bankroll
+                # x 100 and is a different quantity entirely.
+                "stake_dollars": dollars,
+                "stake_fraction": round(fraction, 6),
+                "ev_pct": _as_float(row.get("ev_pct")),
+                "model_edge_pct": _as_float(row.get("model_edge_pct")),
+                "model_probability": round(inputs.model_probability, 5),
+                "market_fair_probability": round(inputs.market_fair_probability, 5),
+                "price_reliability": round(inputs.price_reliability, 5),
+                "board_score": _score_value(row),
+                # The full breadcrumb, so the number is inspectable rather than
+                # trusted: which Kelly fraction, shrunk by how much, on what
+                # settled evidence.
+                "sizing": {
+                    "kelly_fraction": stake.get("kelly_fraction"),
+                    "kelly_multiplier": stake.get("kelly_multiplier"),
+                    "sample_credibility": stake.get("sample_credibility"),
+                    "settled_sample_size": stake.get("settled_sample_size"),
+                    "cap_fraction": stake.get("cap_fraction"),
+                    "price_reliability_factor": stake.get("price_reliability_factor"),
+                    "stake_fraction_pre_reliability": stake.get("stake_fraction_pre_reliability"),
+                    "stake_fraction_pre_exposure": stake.get("stake_fraction_pre_exposure"),
+                    "exposure_capped": stake.get("exposure_capped"),
+                    "exposure_group_size": stake.get("exposure_group_size"),
+                    "slate_scale_factor": round(slate_scale, 6),
+                },
+            }
+        )
+        positions.append(position)
+
+    staked_dollars = round(sum(item["stake_dollars"] for item in positions), 2)
+    return {
+        "selected_date": selected_date,
+        "generated_at": _utc_now(),
+        "bankroll_units": resolved.bankroll_units,
+        "settings": resolved.as_dict(),
+        "positions": positions,
+        "totals": {
+            "positions": len(positions),
+            "staked_dollars": staked_dollars,
+            "staked_fraction": round(
+                (staked_dollars / resolved.bankroll_units) if resolved.bankroll_units else 0.0, 6
+            ),
+            "slate_scale_factor": round(slate_scale, 6),
+            "slate_exposure_ceiling_dollars": round(resolved.max_slate_exposure_units(), 2),
+        },
+        "rows_in": rows_in,
+        "sized": len(priced),
+        # Sums to `rows_in` together with `len(positions)`. A plan that cannot
+        # account for every row it was given is not a plan.
+        "refusals": dict(sorted(refusals.items())),
+        "exposure": exposure,
+    }
+
+
+def apply_price_reliability(candidate: dict[str, Any], inputs: SizingInputs) -> None:
+    """Discount the stake by how much the PRICE can be trusted.
+
+    Mutates `candidate["stake"]` in place, before `apply_exposure_budgets`,
+    which reads the same `stake_fraction`. Records both the factor and the
+    pre-discount value: a shrunk stake that cannot be un-shrunk on paper is a
+    number nobody can check.
+
+    Exists as its own step because `compute_board_stake` cannot do it -- see the
+    module docstring for the measurement.
+    """
+    stake = dict(candidate.get("stake") or {})
+    before = _as_float(stake.get("stake_fraction")) or 0.0
+    factor = max(0.0, min(1.0, inputs.price_reliability))
+    stake["stake_fraction_pre_reliability"] = round(before, 6)
+    stake["price_reliability_factor"] = round(factor, 5)
+    stake["stake_fraction"] = round(before * factor, 6)
+    candidate["stake"] = stake
+
+
+def sizing_input_field_names() -> tuple[str, ...]:
+    """For the checklist. `dataclasses.fields`, never a name grep."""
+    return tuple(f.name for f in dataclass_fields(SizingInputs))

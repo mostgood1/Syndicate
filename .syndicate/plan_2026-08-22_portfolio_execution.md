@@ -126,22 +126,67 @@ there is no bankroll figure, no slate-level exposure ceiling, no cut line, and
 no closed list. The board says "here are 108 rows, each with a suggested
 fraction." A portfolio says "these 9, at these dollars, totalling this."
 
+### TWO CORRECTIONS TO THIS PLAN, both found while building Stage A
+
+**1. `_attach_board_stakes` does NOT reach the Layer 2 shortlist.** This
+document originally said Stage A "consumes `stake`, `stake_fraction` … already
+on each row". That is true of Layer 1's `global_pool` and **false of the Layer 2
+shortlist**, which `build_layer2_shortlist` builds separately from the market
+grid as a different set of row objects. Verified by reading every
+`candidate["…"]` assignment in `layer2_board.py`: a shortlist row carries
+`side`, `line`, `quote`, `game`, `projection`, `movement`, `ev_pct`,
+`model_edge_pct`, `score`, `board_lane` — and no sizing fields at all.
+
+Left unhandled that is not a small bug. `compute_bet_size` answers a row it
+cannot read with `model_probability 0.5`, `implied_probability 0.5`, `edge 0`,
+**`stake $0` for every position** — no exception, no log line — so the portfolio
+would have been empty and would have looked exactly like a quiet slate. Stage A
+therefore derives its sizing inputs explicitly (inverting `expected_value_pct`
+to recover the market probability, then adding `model_edge_pct`), refuses by
+name when an input is absent, and is gated by
+`scripts/portfolio_commit_input_checklist.py`.
+
+**2. `confidence` is structurally inert in `compute_board_stake`, so the price
+reliability discount had to be applied separately.** The first implementation
+passed the row's `price_reliability` in as the sizer's `confidence`. The
+checklist caught it as unconsumed on its first run. Measured 2026-08-22:
+
+    kelly_fraction 0.0241 -> stake 0.00151   (x0.25 Kelly, x0.25 credibility)
+    cap_fraction   0.0446                    (0.02 + 0.03 x confidence)
+
+`compute_board_stake` shrinks the RAW `kelly_fraction` and applies
+`cap_fraction` only as a ceiling — and that ceiling sits ~30x above the stake,
+so it never binds. Moving the trust weight 0.82 → 0.32 moved the cap
+0.0446 → 0.0296 and moved the stake **not at all**.
+
+**This is a property of `bankroll_manager`, not of the adapter**, so it is
+equally true of `_attach_board_stakes` on the Layer 1 pool: whatever
+`confidence` a board candidate carries, it does not move the served stake.
+`bankroll_manager.py` is read-only for this lane — recorded, not fixed. Stage A
+applies the discount as its own named multiplier and records both the factor and
+the pre-discount fraction on every position.
+
+**The general lesson, and why both are recorded here rather than only in the
+code:** the checklist found in one run what a passing test suite would not have.
+Two features, each plausibly wired, each inert — and the second was introduced
+by me while fixing the first.
+
 **Build:** `syndicate/features/shared/portfolio_commit.py`, worker-side, plus
 `pipeline/portfolio_commit.py` as its runner.
 
 - Input: `read_layer2_shortlist(selected_date)` (`pipeline/intelligence_state.py`),
   which is a pure `read_json_file` — no compute, per the note at
   `ask_the_syndicate_data.py:3448`.
-- Consumes `stake`, `stake_fraction`, `sample_credibility` and the exposure
-  group key already on each row. **Reads `bankroll_manager.py`; does not edit
-  it.**
-- Adds what does not exist: `SYNDICATE_BANKROLL_UNITS` (one number, absolute),
-  a slate-level total-exposure ceiling, a minimum-EV cut line, and a hard
-  max-positions count.
+- **Derives** its four sizing inputs per row (see correction 1) rather than
+  reading them off it. **Reads `bankroll_manager.py`; does not edit it.**
+- Adds what does not exist: a bankroll (**$1,000**, user decision 2026-08-22,
+  editable on `/portfolio`), a slate-level total-exposure ceiling, a minimum-EV
+  cut line, a max-positions count, and a minimum placeable stake.
 - Output: `portfolio_plan_{date}.json` — a closed list, each entry carrying
-  `candidate_id`, side, line, book, price at decision time, dollars, and the
-  full sizing breadcrumb (`kelly_multiplier`, `sample_credibility`,
-  `settled_sample_size`) so the number is inspectable rather than trusted.
+  `position_key`, side, line, book, price at decision time, `stake_dollars`,
+  and the full sizing breadcrumb (`kelly_multiplier`, `sample_credibility`,
+  `settled_sample_size`, `price_reliability_factor`, `slate_scale_factor`) so
+  the number is inspectable rather than trusted.
 - **Request-path refusal is mandatory**: `refuse_if_compute_in_request_path`,
   same as `_build_candidate_pool`. Two reasons, and `layer2_board.py`'s header
   states the stronger one — *a board computed per request cannot be settled*.
@@ -282,8 +327,14 @@ rather than in advance.
 
 ## Open questions — need a decision, not an assumption
 
-1. **Bankroll.** One absolute number. Everything in Stage A is a fraction of
-   it and there is currently no such number anywhere in the system.
+1. ~~**Bankroll.**~~ **ANSWERED 2026-08-22: $1,000**, user decision, and
+   user-editable — `DEFAULT_BANKROLL_UNITS` in `portfolio_settings.py`, a form
+   on `/portfolio`, and `GET`/`POST /api/portfolio/settings`. Precedence is
+   stored > env > default, and **every read is fail-safe toward the default**:
+   the store is a 256MB `allkeys-lru` instance that evicts, and a bankroll
+   resolving to 0 would size every bet at $0 and look exactly like a quiet
+   slate. `sources` reports per field which layer won, so "you set this" and
+   "the store lost your edit" stay distinguishable.
 2. **Storage for the execution ledger** — the three candidates above. (iii)
    Postgres is the only durable one and costs a `blueprint_sync` against all
    three services.

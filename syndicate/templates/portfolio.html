@@ -69,6 +69,69 @@
     margin: 0 0 8px;
   }
 
+  .portfolio-bankroll {
+    border: 1px solid var(--cards-line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+
+  .portfolio-bankroll__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+  }
+
+  .portfolio-bankroll__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .portfolio-bankroll__field label {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-bankroll__field input {
+    width: 120px;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--cards-text);
+    background: transparent;
+    border: 1px solid var(--cards-line);
+    border-radius: 6px;
+  }
+
+  .portfolio-bankroll__save {
+    padding: 7px 14px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--cards-text);
+    background: transparent;
+    border: 1px solid var(--cards-line);
+    border-radius: 6px;
+  }
+
+  .portfolio-bankroll__save:hover { border-color: var(--cards-text-dim); }
+
+  .portfolio-bankroll__meta {
+    font-size: 11.5px;
+    color: var(--cards-text-dim);
+    margin-top: 10px;
+  }
+
+  .portfolio-bankroll__warn {
+    font-size: 11.5px;
+    color: #e6a23c;
+    margin-top: 6px;
+  }
+
   .portfolio-sport-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -258,6 +321,8 @@
 </style>
 
 {% set summary = portfolio_summary or {} %}
+{% set psettings = portfolio_settings or {} %}
+{% set psources = psettings.sources or {} %}
 
 <main class="portfolio-page">
   <div class="portfolio-pulse" id="portfolio-pulse" role="status" aria-live="polite">
@@ -266,6 +331,57 @@
   </div>
 
   <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
+
+  <div class="portfolio-bankroll">
+    <h2 class="portfolio-section-title">Bankroll &amp; staking policy</h2>
+    <form method="post" action="/portfolio/settings" class="portfolio-bankroll__row">
+      <div class="portfolio-bankroll__field">
+        <label for="bankroll_units">Bankroll ($)</label>
+        <input type="number" id="bankroll_units" name="bankroll_units" step="1" min="1"
+               value="{{ "%.2f"|format(psettings.bankroll_units or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_slate_exposure_fraction">Max slate risk</label>
+        <input type="number" id="max_slate_exposure_fraction" name="max_slate_exposure_fraction"
+               step="0.01" min="0.001" max="1"
+               value="{{ "%.3f"|format(psettings.max_slate_exposure_fraction or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="min_ev_pct">Min EV %</label>
+        <input type="number" id="min_ev_pct" name="min_ev_pct" step="0.1"
+               value="{{ "%.1f"|format(psettings.min_ev_pct or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_positions">Max positions</label>
+        <input type="number" id="max_positions" name="max_positions" step="1" min="1"
+               value="{{ psettings.max_positions or 0 }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="min_stake_units">Min stake ($)</label>
+        <input type="number" id="min_stake_units" name="min_stake_units" step="0.5" min="0"
+               value="{{ "%.2f"|format(psettings.min_stake_units or 0) }}">
+      </div>
+      <button type="submit" class="portfolio-bankroll__save">Save</button>
+    </form>
+    <div class="portfolio-bankroll__meta">
+      At ${{ "%.0f"|format(psettings.bankroll_units or 0) }}, one slate may risk at most
+      <strong>${{ "%.2f"|format((psettings.bankroll_units or 0) * (psettings.max_slate_exposure_fraction or 0)) }}</strong>
+      across at most {{ psettings.max_positions or 0 }} positions.
+      {# `sources` distinguishes "you set this" from "the store lost your edit and
+         this is the default" -- see portfolio_settings.py on LRU eviction. #}
+      Bankroll source: <strong>{{ psources.bankroll_units or "default" }}</strong>{% if psettings.updated_at %}, last saved {{ psettings.updated_at }}{% endif %}.
+    </div>
+    {% if psettings.store_error %}
+    <div class="portfolio-bankroll__warn">
+      Saved settings could not be read ({{ psettings.store_error }}) -- the values above are defaults, not your edits.
+    </div>
+    {% endif %}
+    <div class="portfolio-bankroll__meta">
+      Stakes are quarter-Kelly, shrunk again by how much settled evidence each market has.
+      With nothing settled yet every market sits at the 0.25 credibility floor, so sizing
+      is deliberately about 1/16th of full Kelly.
+    </div>
+  </div>
 
   <div class="portfolio-tiles" id="portfolio-tiles">
     <div class="portfolio-tile">

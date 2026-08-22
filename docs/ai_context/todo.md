@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#505` — **Staged plan written for portfolio commitment + automated execution. PLAN ONLY, no engine code. Stage D is gated on `#502`'s outstanding verify.** — lane `portfolio-decision-and-execution`, 2026-08-22
+### `#505` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
 **The user asked whether the Layer 2 board / intelligence layer can be connected
 into the app to make portfolio decisions and actually place bets.** Answer, from
@@ -55,9 +55,57 @@ driving the client breaches terms; detection means limiting, closure, frozen
 balance). Whether Stage D is worth building at all should be answered from Stage
 C's per-market CLV output, not in advance.
 
-**NEXT:** Stage A (`portfolio_commit.py`) is low-cost and needs no deploy beyond
-a worker job — but it needs **one decision that is not mine: the bankroll
-number.** Stages A-C do not wait on `#502`; Stage D does.
+**BANKROLL ANSWERED: $1,000**, user decision 2026-08-22, and **user-editable** —
+`portfolio_settings.py` (`DEFAULT_BANKROLL_UNITS`), a form on `/portfolio`, and
+`GET`/`POST /api/portfolio/settings`. Precedence stored > env > default; **every
+read is fail-safe toward the default** because the keyvalue store is a 256MB
+`allkeys-lru` instance that evicts, and a bankroll resolving to 0 would size
+every bet at $0 and look exactly like a quiet slate. `sources` reports which
+layer won per field. The settings path carries **no date token** — a dated one
+would take the store's 10-day TTL and the bankroll would silently expire (test
+pins this).
+
+**TWO INERT-FEATURE DEFECTS, both caught by `scripts/portfolio_commit_input_checklist.py`
+on its first run, neither by any test:**
+
+1. **`_attach_board_stakes` does not reach the Layer 2 shortlist.** It runs on
+   Layer 1's `global_pool`; `build_layer2_shortlist` builds a separate set of row
+   objects that carry **no sizing fields at all**. Handing one to
+   `compute_bet_size` — the obvious implementation — yields
+   `model_probability 0.5`, `implied_probability 0.5`, `edge 0`, **`$0` for every
+   position**, with no exception and no log line. The portfolio would have been
+   empty and indistinguishable from a quiet slate. `portfolio_commit` therefore
+   DERIVES its inputs (inverting `expected_value_pct` to recover the market
+   probability, then adding `model_edge_pct`) and refuses by name — `no_ev_pct`,
+   `no_model_edge_pct`, `no_quote_price`, `unusable_price`,
+   `no_price_reliability` — never on a neutral default.
+   `tests/test_portfolio_commit.py::test_sizing_a_raw_layer2_row_would_have_produced_a_zero_stake`
+   pins the naive path at 0.
+
+2. **`confidence` is structurally inert in `compute_board_stake`.** Measured:
+   `kelly_fraction 0.0241 -> stake 0.00151` against `cap_fraction 0.0446`.
+   `compute_board_stake` shrinks the RAW kelly fraction and uses `cap_fraction`
+   only as a ceiling — which sits ~30x above the stake and never binds. Moving
+   the trust weight 0.82 -> 0.32 moved the cap 0.0446 -> 0.0296 and moved the
+   stake **not at all**. **This is a property of `bankroll_manager`, so it is
+   equally true of `_attach_board_stakes` on the Layer 1 pool: whatever
+   `confidence` a board candidate carries, it does not move the served stake.**
+   That file is read-only for this lane — recorded, not fixed. Stage A applies
+   the reliability discount as its own named multiplier instead.
+
+**SHIPPED IN CODE (not deployed):** `portfolio_settings.py`,
+`portfolio_commit.py`, `pipeline/portfolio_commit.py` (dark behind
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED`), the checklist, four endpoints, a
+`/portfolio` editor, and 50 tests. Local: checklist PASSES (4/4 fields populated
+AND consumed, 4/4 refusals named); 50 new tests pass; 334 related tests pass;
+`/portfolio` renders 200 and a form POST persists a new bankroll.
+
+**NEXT:** deploy is a plain `.py` push (free — no `render.yaml`), then the
+production reading is `off != on` on ONE date: plan artifact ABSENT with
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED` unset, PRESENT with it set, via
+`/api/portfolio/plan?date=<d>`. **Do not report Stage A as working on the local
+run** — no production slate has been committed. Stages B-C do not wait on
+`#502`; Stage D does.
 
 
 ### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED

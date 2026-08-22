@@ -1186,21 +1186,62 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   acceptance stated as a READING, and real money gated on a CLV result rather
   than on the previous stage having shipped.
 - Plan: `.syndicate/plan_2026-08-22_portfolio_execution.md` (stages A-D +
-  precondition). **This session produced the PLAN ONLY — no engine code.**
-- Files (claimed; all NEW paths, nothing existing taken from another lane):
+  precondition). **STAGE A IS NOW BUILT IN CODE, DARK, AND NOT DEPLOYED.**
+- **BANKROLL = $1,000** `[user decision 2026-08-22]`, and user-editable:
+  `portfolio_settings.py`, a form on `/portfolio`, `GET`/`POST
+  /api/portfolio/settings`. Precedence stored > env > default; **every read is
+  fail-safe toward the default**, because a bankroll resolving to 0 on an
+  evicted key would size every bet at $0 and read as a quiet slate. The settings
+  path carries **no date token** — a dated one takes the store's 10-day TTL and
+  the bankroll would silently expire (pinned by a test).
+- **TWO INERT-FEATURE DEFECTS, both caught by
+  `scripts/portfolio_commit_input_checklist.py` on its FIRST run and by nothing
+  else — no test would have failed:**
+  1. **`_attach_board_stakes` does not reach the Layer 2 shortlist.** It runs on
+     Layer 1's `global_pool`; `build_layer2_shortlist` builds a separate set of
+     rows carrying **no sizing fields at all**. The obvious implementation
+     (`compute_bet_size(row)`) returns `model_probability 0.5`,
+     `implied_probability 0.5`, `edge 0`, **`$0` for every position** — no
+     exception, no log line — so the portfolio would have been empty and
+     indistinguishable from a thin slate. Stage A DERIVES its inputs instead
+     (inverting `expected_value_pct` for the market probability, then adding
+     `model_edge_pct`) and refuses by name, never on a default.
+  2. **`confidence` is structurally inert in `compute_board_stake`.** Measured:
+     `kelly_fraction 0.0241 -> stake 0.00151`, `cap_fraction 0.0446`. The raw
+     kelly fraction is what gets shrunk; `confidence` feeds only the cap, which
+     sits ~30x above the stake and never binds. Trust weight 0.82 -> 0.32 moved
+     the cap 0.0446 -> 0.0296 and the stake **not at all**. **This is a
+     `bankroll_manager` property, so it is equally true of `_attach_board_stakes`
+     on the Layer 1 pool: `confidence` does not move the served stake.** That
+     file is read-only for this lane — recorded, NOT fixed.
+- **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
+  CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
+  `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
+  2500, `source` flips `default` -> `stored`). **No production slate has been
+  committed — do not report Stage A as working.**
+- Files:
   `.syndicate/plan_2026-08-22_portfolio_execution.md`,
+  `syndicate/features/shared/portfolio_settings.py`,
   `syndicate/features/shared/portfolio_commit.py`,
   `syndicate/features/shared/execution_ledger.py`,
   `pipeline/portfolio_commit.py`,
-  `tests/test_portfolio_commit.py`, `tests/test_execution_ledger.py`
-  - READ-ONLY, deliberately NOT claimed: `bankroll_manager.py` (Stage A
-    consumes `compute_board_stake` / `apply_exposure_budgets`, edits neither),
-    `pipeline/intelligence_state.py` (reads `read_layer2_shortlist`).
-  - Collision check run against every OPEN lane before opening. **Two lanes
-    hold files this work touches conceptually and I took none of them:**
-    `portfolio-ledger-service-split` holds `prediction_ledger.py`;
-    `layer2-sim-view-and-live-projection` holds `layer2_board.py`,
-    `pipeline/layer2_shortlist.py`, `blueprints/ops.py`, `intelligence.html`.
+  `scripts/portfolio_commit_input_checklist.py`,
+  `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`,
+  `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
+  `tests/test_execution_ledger.py`
+- Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
+  `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
+  intelligence_state (reads `read_layer2_shortlist`).
+- Collision check run against every OPEN lane before opening, and re-run with
+  the guard's own Files-block parse before claiming the two EXISTING files
+  above — `blueprints/intelligence.py` and `templates/portfolio.html` are held
+  by no OPEN lane (`layer2_board.py:2634`'s comment naming intelligence.py as
+  "held by another lane" refers to one since released). **Two lanes hold files
+  this work touches conceptually and I took none of them:**
+  `portfolio-ledger-service-split` holds `prediction_ledger.py`;
+  `layer2-sim-view-and-live-projection` holds `layer2_board.py`,
+  `pipeline/layer2_shortlist.py`, `blueprints/ops.py`, `intelligence.html`.
 - Hypothesis (diagnostic half, stated before testing): the DECISION layer is
   substantially built and merely unassembled, while the EXECUTION layer does
   not exist at all and is blocked by something other than code.
@@ -1226,12 +1267,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `portfolio-ledger-service-split`'s file — **surfaced, not edited.**
   UNVERIFIED: no Redis reading taken today; the percentages are the store's own
   dated comments. Take one before Stage B picks its storage.
-- Verification (this lane's current stage): the plan doc exists and its
-  precondition, stage gates and file boundaries are stated as readings rather
-  than as tasks. **Stage A's own verification, when built:**
-  `portfolio_plan_{date}.json` ABSENT with the job disabled and PRESENT with it
-  enabled on the same date (`off != on`), entries summing exactly to the
-  declared exposure, and a named reason for every dropped shortlist row.
+- **Verification OWED, and it is a one-read production check.** Stage A is
+  gated by `SYNDICATE_PORTFOLIO_COMMIT_ENABLED` (absent = off) and the deploy is
+  a plain `.py` push — free, no `render.yaml`, no `blueprint_sync`. The reading
+  is `off != on` on ONE date via `/api/portfolio/plan?date=<d>`: `plan_present:
+  false, reason: commit_job_disabled` with the flag unset, and a plan whose
+  positions sum exactly to the declared exposure with the flag set. Asserted
+  locally in both directions already; **a local pass is not the reading.**
 - Blocked by: none for stages A-C. **Stage D is blocked on
   `portfolio-ledger-service-split`'s outstanding verify** —
   `settled_count > 0` on `/api/portfolio/summary`. Every stake on the board is
