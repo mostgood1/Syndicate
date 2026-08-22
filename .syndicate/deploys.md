@@ -23267,3 +23267,57 @@ that measures a subset of what it is guarding is the third instrument gap this
 instrument has produced today.** NCAAF opens ~08-29; a fifth in-season sport at
 400/sport could breach the ceiling, and the failure mode is an opaque
 "Connection closed by server".
+
+## 2026-08-22T21:16:34Z — VERIFIED ON THE SERVED SURFACE: `rows_admitted_by_blend = 159`
+
+**Lane `portfolio-decision-and-execution`. The reading the 20:39/20:46 deploy
+was waiting on, taken from `/api/board/layer2-shortlist` by the user** (the
+agent proxy 403s that host, which is why every prior reading this session came
+from Render logs and metrics).
+
+    rows_admitted_by_blend   159
+    rows_below_value_floor  1212
+    total_rows              1223      -> 13.0% of the served board
+
+**NOT ZERO, so the scoring change is NOT inert.** 159 rows are on the board
+because the BLENDED score cleared the family value floor where raw `ev_pct`
+would not have. Before 2026-08-22 `_row_value_pct` returned `ev_pct` first and
+the `score.value_pct` fallback was dead code, so every one of those 159 rows was
+being cut by price alone, upstream of anything the simulation had to say.
+
+**THE SERVED ROW ALSO CONFIRMS THE CAPPED SIM TERM BY CONTENT**, which ancestry
+could not: the sample row's `score` block carries **`sim_capped: false`** — a
+field that exists only in the 2026-08-22 change. `sim_component: null` on that
+row is correct, not a fault: its `model_edge_pct` is `null`, so there is no sim
+term to contribute, and `value_pct 4.7034 == ev_component 4.7034` closes the
+arithmetic.
+
+**THE SIM'S REACH IS FAR WORSE THAN THE SHORTLIST SUGGESTED, and this is the
+finding worth carrying forward.** `LAYER2_BOARD_HEALTH` reported `edged` 94/100
+mlb and 28/100 soccer, but that is measured AFTER selection and is biased upward
+by it. At the GRID level, `rows_with_model_edge / grid_rows`:
+
+    mlb       2372 /   2922   81.2%
+    nfl        682 /   1309   52.1%
+    wnba       186 /    982   18.9%
+    soccer     210 /  20039    1.0%     <- twenty thousand rows, two hundred edges
+
+So the capped sim term is a real signal on MLB, half a signal on NFL, and
+**arithmetically almost absent on soccer** — the board there is price shopping
+with a rounding error of model on top. Raising the weight or the cap would not
+change that; the constraint is coverage, not coefficient. `soccer`'s own
+`projections` block names the cause: `unmatched_player_rows 6059`,
+`player_miss_name 5716`, `unsupported_market_rows 3188` against
+`rows_considered 20039`.
+
+**A SECOND DEPLOY IS IN FLIGHT AND IS NOW OPTIONAL**,
+`dep-da512h0u01pc73dktveg` on `6cd980b4`, triggered 21:14:44Z at the user's
+instruction and `update_in_progress` at 21:17:15Z. It adds `admitted_by_blend=`
+to the `LAYER2_SHORTLIST` LOG line. **The counter was already on the endpoint**
+(it shipped in `ecf928c6`, which the running `b13a3a73` contains), so this
+deploy buys log-readability for sessions without HTTP access to the web host —
+not the number itself. Cost: a 2-game MLB `fingerprint_change` sim, against 15
+games had it been fired an hour earlier.
+
+**Claim `b3a38f31d57ab2f2` held on refresh-worker for this deploy; release after
+it lands.**
