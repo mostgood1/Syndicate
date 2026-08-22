@@ -4685,3 +4685,45 @@ ticks last wins.** A clean zero is easier to diagnose than intermittent truth.
 **RULE: a sequencing check is only worth the service it points at.** Before
 claiming a feature is live, resolve which service executes it -- from env and
 routing, not from the name -- and check THAT SHA.
+
+## 08-22 MOMENTUM DOES NOT PREDICT *WHEN* A GOAL IS COMING — and the earlier positive result did not imply it would
+
+Swept 5 weight variants x 6 half-lives (90s-900s) over 200 completed matches
+from last season, held out by match-id hash, target = "does a goal land in the
+next 10 minutes", feature = ABSOLUTE pressure (a goal happening is about
+pressure on either side; signed momentum answers WHO, not WHETHER):
+
+    BEST ON FIT : on-target-heavy @ 600s   AUC 0.5403
+    ITS HOLDOUT :                          AUC 0.5107   (base rate 0.2471)
+    every variant x half-life: holdout AUC 0.49 - 0.54
+
+**0.5107 is a coin flip. Not usable for timing.** WHO, conditional on a goal
+having happened, is no better: best fit `shots-only @ 900s` 0.5961 -> holdout
+**0.5224** on n=1221.
+
+**THE TRAP, AND IT IS THE WHOLE LESSON.** The 08-21 lead/lag test found
+momentum elevated before goals: +1.141 vs 0.000 control, Cohen's d = +0.397,
+and that result was sound. It answered: *given a goal happened, was momentum
+elevated 2 min before, versus a control instant?* -- retrospective, and
+oriented to the side that scored.
+
+The question worth acting on is: *at an ARBITRARY instant, is a goal coming?*
+The signal does not survive the translation. **"Separates from control" and
+"predicts the event" are different claims**, and only the first was earned. The
+phrase "momentum LEADS goals" -- written into a commit message and a state.md
+section -- reads as the second.
+
+**RULE: a retrospective separation result is a HYPOTHESIS about prediction, not
+evidence of it.** Before building on one, restate it as the forward question
+(at time T, with only information available at T, what happens next?) and score
+it held out against the base rate. The two differ by ~0.04 AUC here, which is
+the difference between a feature and nothing.
+
+**ALSO: the best HOLDOUT row was not the best FIT row** (`corners-heavy @ 900s`,
+0.5426). Selecting it would be fitting the holdout -- the same error one level
+up -- so it is recorded as a hypothesis for a fresh slice, not a result.
+
+**WHAT THIS DOES NOT RETRACT:** the chart itself. It is an honest DESCRIPTIVE
+panel of who is on top, which is what the user reads it for manually, and the
+sign convention is verified correct against live scorelines. It is a narrator.
+It is not a timing signal, and nothing should price off it.

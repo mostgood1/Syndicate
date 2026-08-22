@@ -1,0 +1,641 @@
+{
+  "goal_window": 600.0,
+  "step": 60.0,
+  "matches": 200,
+  "fit": 139,
+  "holdout": 61,
+  "rows": [
+    {
+      "weights": "shipped",
+      "half_life": 90.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5138
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5027
+      }
+    },
+    {
+      "weights": "shipped",
+      "half_life": 150.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5208
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5043
+      }
+    },
+    {
+      "weights": "shipped",
+      "half_life": 300.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5324
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5102
+      }
+    },
+    {
+      "weights": "shipped",
+      "half_life": 450.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5369
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5154
+      }
+    },
+    {
+      "weights": "shipped",
+      "half_life": 600.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5376
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5191
+      }
+    },
+    {
+      "weights": "shipped",
+      "half_life": 900.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5356
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.525
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 90.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5105
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5167
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 150.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.516
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5238
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 300.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5249
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5352
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 450.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.529
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5405
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 600.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5302
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5446
+      }
+    },
+    {
+      "weights": "flat",
+      "half_life": 900.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5295
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5496
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 90.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.515
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4988
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 150.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5228
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4988
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 300.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5349
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5019
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 450.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5395
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5062
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 600.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5403
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5107
+      }
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 900.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5385
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5172
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 90.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5132
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4897
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 150.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5202
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4877
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 300.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5322
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4893
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 450.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5373
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4933
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 600.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5386
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.4977
+      }
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 900.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5375
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5053
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 90.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5168
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5122
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 150.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.523
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5168
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 300.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5321
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5255
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 450.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5351
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5311
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 600.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.535
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5358
+      }
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 900.0,
+      "fit": {
+        "n": 11259,
+        "base_rate": 0.23901,
+        "auc": 0.5325
+      },
+      "holdout": {
+        "n": 4941,
+        "base_rate": 0.24712,
+        "auc": 0.5426
+      }
+    }
+  ],
+  "who_rows": [
+    {
+      "weights": "shipped",
+      "half_life": 90.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5707717793802378,
+      "auc_hold": 0.5153106449273416
+    },
+    {
+      "weights": "shipped",
+      "half_life": 150.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5813511707547958,
+      "auc_hold": 0.5235542184855891
+    },
+    {
+      "weights": "shipped",
+      "half_life": 300.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5879925940362503,
+      "auc_hold": 0.5281877031346531
+    },
+    {
+      "weights": "shipped",
+      "half_life": 450.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5886646991675252,
+      "auc_hold": 0.5293185419968305
+    },
+    {
+      "weights": "shipped",
+      "half_life": 600.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5904749839908678,
+      "auc_hold": 0.5297751752665932
+    },
+    {
+      "weights": "shipped",
+      "half_life": 900.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5944652949856614,
+      "auc_hold": 0.5275806494936743
+    },
+    {
+      "weights": "flat",
+      "half_life": 90.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5690745329509703,
+      "auc_hold": 0.5164468559456338
+    },
+    {
+      "weights": "flat",
+      "half_life": 150.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5783943536486901,
+      "auc_hold": 0.525528485857799
+    },
+    {
+      "weights": "flat",
+      "half_life": 300.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5829721301890469,
+      "auc_hold": 0.5325525799779741
+    },
+    {
+      "weights": "flat",
+      "half_life": 450.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5835479021076371,
+      "auc_hold": 0.5339171076311477
+    },
+    {
+      "weights": "flat",
+      "half_life": 600.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5837600579112955,
+      "auc_hold": 0.5331650057750679
+    },
+    {
+      "weights": "flat",
+      "half_life": 900.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5852117381741236,
+      "auc_hold": 0.5343227054178195
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 90.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5728203914580839,
+      "auc_hold": 0.514566601305434
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 150.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5826636411727038,
+      "auc_hold": 0.5202288538504929
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 300.0,
+      "n_hold": 1221,
+      "auc_fit": 0.586122170559902,
+      "auc_hold": 0.5266458943296892
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 450.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5861088064147897,
+      "auc_hold": 0.5276370571328802
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 600.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5869557591112844,
+      "auc_hold": 0.5262644712455344
+    },
+    {
+      "weights": "on-target-heavy",
+      "half_life": 900.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5879853551243144,
+      "auc_hold": 0.5262859598699938
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 90.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5733001085836791,
+      "auc_hold": 0.5182895054930297
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 150.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5828198346187042,
+      "auc_hold": 0.5264014612264633
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 300.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5875925049419495,
+      "auc_hold": 0.529184238093959
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 450.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5904106690425147,
+      "auc_hold": 0.5280883182465282
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 600.0,
+      "n_hold": 1221,
+      "auc_fit": 0.593640337444664,
+      "auc_hold": 0.5262295522307878
+    },
+    {
+      "weights": "shots-only",
+      "half_life": 900.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5960971127878164,
+      "auc_hold": 0.5223642859061485
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 90.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5676880028955648,
+      "auc_hold": 0.5107389400735985
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 150.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5753712726564023,
+      "auc_hold": 0.5163823900722555
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 300.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5834148174958933,
+      "auc_hold": 0.5148566977356362
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 450.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5848993512821227,
+      "auc_hold": 0.5142335276263128
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 600.0,
+      "n_hold": 1221,
+      "auc_fit": 0.585889968538575,
+      "auc_hold": 0.5145289962126299
+    },
+    {
+      "weights": "corners-heavy",
+      "half_life": 900.0,
+      "n_hold": 1221,
+      "auc_fit": 0.5872107915471783,
+      "auc_hold": 0.5156732654650944
+    }
+  ]
+}

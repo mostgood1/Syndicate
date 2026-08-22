@@ -95,10 +95,17 @@ live probability, and not one is priced. That is `LIVE_PROJECTION_JOIN`'s own
 third case — "joined, and declined to price" — and it has a different fix from a
 broken join.
 
-**THE TWO ARE ONE DEFECT — NOW MEASURED, 100 of 100.** The live line at
-17:30:32Z read `edge_withheld=100 edge_why={'no_market_fair_value': 100}`:
-every soccer live row that joins is refused for want of a fair value, none for
-any other reason. The mechanism:
+**~~THE TWO ARE ONE DEFECT~~ — REFUTED BY THE SPLIT I BUILT TO CONFIRM IT.**
+
+18:04:56Z: `edge_withheld=133 edge_why={'no_fair_value_devig_failed': 133}`.
+**133 of 133 in the de-vig bucket, ZERO in the no-pregame-projection bucket.**
+
+I predicted the opposite. The hypothesis was that these rows carried no pregame
+projection, so `_price_against_market` never ran and no fair value was ever
+computed — making the live symptom downstream of the pregame join. Every one of
+those 133 rows HAS a pregame projection. The pregame join is not involved at
+all. The reasoning below is kept because it is sound about the MECHANISM and
+wrong about which branch fires:
 
   * `market_fair_prob_over` is written in exactly one place for soccer,
     `soccer_projections._price_against_market` (line ~638).
@@ -110,10 +117,32 @@ any other reason. The mechanism:
 So a row the PREGAME join missed can never carry a live edge, whatever the live
 re-sim does.
 
-**BUT THE CULPRIT IS THE PLAYER JOIN, NOT THE MATCH JOIN.** All 100 live rows
-are `player_shots` / `player_shots_on_target` with `player_in_lens: False` —
-the same population as `unmatched_player: 5138`. My earlier framing ("fix the
-team-name join and both symptoms go") was wrong about which join.
+**THE ACTUAL CAUSE: THE FAIR VALUE EXISTS AND THE LIVE JOIN CANNOT SEE IT.**
+
+Soccer player-prop markets are quoted one-sided (over only), so
+`_no_vig_over_probability` — which needs both legs — returns None, and
+`market_fair_prob_over` is never set. That is expected and already handled:
+`attach_margin_model` fills one-sided rows from the book's measured margin.
+
+But the two halves write to different containers:
+
+    attach_margin_model      -> quote["fair_probability"] / quote["fair_method"]
+                                (`layer2_board.py:1097`, `"book_margin_model"`)
+    live_projection_join     -> reads projection["market_fair_prob_over"]
+                                (`live_projection_join.py:718`)
+
+`market_fair_prob_over` is written in exactly three places platform-wide
+(`prop_projections:952`, `soccer_projections:638`, `nfl_game_projections:416`),
+all from `_no_vig_over_probability`. The margin model's answer never reaches
+the field the live edge reads. One number, two homes, and they do not meet.
+
+**NOT FIXED HERE, DELIBERATELY.** Making the live join fall back to the quote's
+`book_margin_model` fair value is a PRICING change, not an instrument one, and
+`layer2_board.py:587-604` already carries deliberate policy treating that value
+as an ESTIMATE rather than a measured fair — a 4.5% moneyline hold vs 12% on
+props, per `book_margin_model`'s own docstring. Wiring it through without
+honouring that distinction would publish estimate-derived edges as though they
+were measured. Needs its own decision.
 
 **STILL AMBIGUOUS, and instrumented in the follow-up:** `no_market_fair_value`
 covers two states with different owners — a row with NO pregame projection
@@ -180,12 +209,14 @@ unmatched rows across 4 fixtures on the 08-23 window and 4 of those are these.
 
 **STILL OPEN, in priority order:**
 
-1. `unmatched_player: 5138` — the biggest bucket, untouched, and the one the
-   live tier's `edged=0` actually traces to. Not yet known whether it is a name
-   problem or a coverage problem.
-2. epl / la_liga / ligue_1 / mls / serie_a team names — still unpaired. The
-   scoped sample (`bb709247`) is live but no shortlist has completed on it yet.
-3. `edge_why` has not yet been observed resolving into the two new keys.
+1. **The one-sided fair value never reaching the live edge** (above). This is
+   what `edged=0` actually is, and it is a decision, not a diagnosis.
+2. `unmatched_player: 5138` — still the biggest pregame bucket and still
+   untouched. NOTE: no longer believed to be the cause of `edged=0`.
+3. **DONE** — epl / la_liga / ligue_1 / mls / serie_a names paired and shipped
+   (`2e3265d7`, 7 aliases, 0/13 -> 13/13). Thirteen aliases total across two
+   rounds. Not yet observed in production: the aliases post-date the running
+   worker.
 
 **WHAT SLOWED THE READINGS — measured, and smaller than it first looked.** The
 Layer 2 shortlist runs at the END of a full intelligence-state cycle. From a
