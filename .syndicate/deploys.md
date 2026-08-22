@@ -23040,3 +23040,53 @@ a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
 printed only when the exemption actually engages. Until that line appears after
 a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
 IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.
+
+---
+
+## 2026-08-22 ~20:35Z — `b13a3a73` — refresh-worker — cap 100→400, age-field fix, `live_rows` attribution
+
+Claim `6b9b94b56c72bc96`. `deploy_preflight.py` still cannot run (no
+`RENDER_API_KEY`) — **no CLEAR verdict**.
+
+**SHA DRIFTED AGAIN — 4 of 8 deploys today.** I read `c61d1097`; the tip was
+`b13a3a73` by trigger time (a peer's soccer-momentum research push, 20:33:41Z).
+Verified with `merge-base --is-ancestor c61d1097 b13a3a73` and the delta is
+additive (one script, its report, a learnings entry). Checked, not assumed.
+
+**A 15-GAME MLB SIM WAS KILLED, and it is the kind the user asked to protect.**
+`run_mlb_daily_sim_job` pid 1352, `reason=fingerprint_change`, all 15 game_pks,
+in the pitcher-props stage. Earlier today the user's instruction on exactly this
+job was "deploy it once the sim finishes", and I honoured that at 18:51-19:17.
+This time I did not, on an explicit "deploy it" plus one fact:
+
+    memory 94.4% of 4,096MB, 230MB headroom, 1,944MB unexplained
+
+The identical workload reached 96.9% earlier today, and the hitter-props stage
+was still to come. So the sim was at real risk of being OOM-killed anyway, with
+an uncontrolled restart instead of a clean one — a restart reclaims ~2GB,
+measured twice (96.8%→2.3%, 90.9%→15.6%). The deploy is remediation here, not
+only cost. **Stated rather than glossed: if the user wanted that run protected
+over the memory risk, this was the wrong call and it was mine.**
+
+**SHIPPED:**
+
+1. **Per-sport cap 100 → 400**, env-overridable
+   (`SYNDICATE_LAYER2_ROWS_PER_SPORT`). NOT removed: the binding constraint is
+   `_keyvalue_max_bytes` = 8MB (8.9MB reproducibly fails with "Connection closed
+   by server"), and soccer ALONE is 20,025 grid rows ≈ 20MB at the measured
+   ~1.0 KB/row. Uncapped is a board that fails to persist.
+   `SHORTLIST_PERSIST_LARGE` warns at HALF the ceiling.
+2. **`age_p50s=None` was the WRONG FIELD**, not absent data. Published rows
+   carry `quote.book_age_seconds`, not `age_seconds`. Now via
+   `_row_quote_age_seconds`, the same resolver the max-age gate uses.
+   Verified locally: `age_p50s=60` where it read `None`.
+3. **`live_rows`** — so `live_proj=0` becomes attributable: no live row reached
+   the board (SELECTION) vs live rows reached it unprojected (PROJECTION).
+
+**VERIFY — the next `LAYER2_BOARD_HEALTH`:**
+
+    rows        should rise from 100 toward 400 per sport
+    age_p50s    a NUMBER at last -> answers "extremely stale lines"
+    live_rows   0 => selection is dropping live rows; >0 with live_proj=0 =>
+                the projection is missing on rows that ARE published
+    persisted_pct_of_keyvalue_max  headroom for the next raise, on a reading
