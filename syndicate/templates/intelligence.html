@@ -1787,6 +1787,30 @@
   // always share ids).
   let gameChipsById = new Map();
   let gameChipsByMatchup = new Map();
+  let gameChipsByMatchupLoose = new Map();
+
+  // Strip what the two providers disagree about and nothing else: accents, and
+  // the club-type words that one side spells and the other omits. Deliberately
+  // NOT a general slugifier -- dropping a token like "united" or "city" would
+  // collapse real distinctions (Manchester United / Manchester City), so only
+  // affix-style tokens are removed, and only from the ends of the name where
+  // they act as club-type markers rather than as part of it.
+  const CLUB_AFFIXES = new Set(["fc", "cf", "sc", "afc", "ac", "as", "ss", "ssc", "cd", "sd", "ud", "rc", "sv", "bk", "if", "club", "de", "the"]);
+
+  function normalizeClubName(value) {
+    let text = String(value == null ? "" : value).toLowerCase();
+    // NFD + combining-mark strip: "montréal" -> "montreal".
+    try {
+      text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    } catch (e) {
+      /* older engine -- the rest of the normalisation still applies */
+    }
+    text = text.replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+    let parts = text.split(" ").filter(Boolean);
+    while (parts.length > 1 && CLUB_AFFIXES.has(parts[0])) parts = parts.slice(1);
+    while (parts.length > 1 && CLUB_AFFIXES.has(parts[parts.length - 1])) parts = parts.slice(0, -1);
+    return parts.join(" ");
+  }
   // `layer2-board-chip-race`. The FIRST call to `renderGameCards` almost
   // always lands before this fetch resolves -- `initialIntelligenceResponse`
   // (server-rendered) triggers a synchronous `renderIntelligence` on page
@@ -1828,6 +1852,8 @@
       const chips = Array.isArray(json.chips) ? json.chips : [];
       const byId = new Map();
       const byMatchup = new Map();
+      const byMatchupLoose = new Map();
+      const looseCollisions = new Set();
       for (const chip of chips) {
         const sport = String(chip.sport || "").toLowerCase();
         const key = String(chip.game_key || "").trim();
@@ -1849,9 +1875,36 @@
         const awayName = String((chip.away || {}).name || "").trim().toLowerCase();
         const homeName = String((chip.home || {}).name || "").trim().toLowerCase();
         if (awayName && homeName) byMatchup.set(`${sport}|${awayName} @ ${homeName}`, chip);
+        // A THIRD INDEX, NORMALIZED, because the two above are both EXACT and
+        // soccer is the sport where exact never holds. Chip names come from the
+        // league's own card builder ("CF Montréal", "Atlanta United FC"); a
+        // Layer 2 row's matchup comes from OddsAPI, which spells the same clubs
+        // without the accent and without the club-type suffix. Neither exact
+        // index matches, `chipForGame` returns null, and the card falls through
+        // to the chip-less branch -- which prints `game.matchup` verbatim. That
+        // is the reported symptom: MLS compact cards showing full club names
+        // where every other sport shows a tri-code, because for those cards
+        // there is no chip and therefore no `abbr` to show.
+        //
+        // Built as a SEPARATE map consulted only after both exact lookups miss,
+        // and only when the normalized key is UNIQUE -- normalisation trades
+        // precision for recall, and a collision here would attach one game's
+        // live score to another game's card, which is worse than the full name
+        // it replaces. Collisions are recorded and then removed rather than
+        // resolved arbitrarily.
+        if (awayName && homeName) {
+          const loose = `${sport}|${normalizeClubName(awayName)} @ ${normalizeClubName(homeName)}`;
+          if (byMatchupLoose.has(loose)) {
+            looseCollisions.add(loose);
+          } else {
+            byMatchupLoose.set(loose, chip);
+          }
+        }
       }
+      for (const key of looseCollisions) byMatchupLoose.delete(key);
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
+      gameChipsByMatchupLoose = byMatchupLoose;
       gameChipsLoadedOnce = true;
       renderBoardBody();
     } catch (err) {
@@ -1863,11 +1916,45 @@
     }
   }
 
+  // The chip-less card's matchup, shortened. Every OTHER card in this strip
+  // shows a tri-code, because `chipTeamRow` renders `chip.abbr`; this branch
+  // has no chip and printed `game.matchup` verbatim, so an MLS row arrived as
+  // "Inter Miami CF @ Minnesota United FC" in a card sized for "MIA / MIN".
+  //
+  // SUFFIXES ARE DROPPED, ABBREVIATIONS ARE NOT INVENTED. Deriving "MIA" from
+  // "Inter Miami CF" client-side means guessing, and a guessed tri-code is
+  // indistinguishable from a real one while being wrong -- and wrong in the
+  // one place a reader uses to tell two games apart. Removing a club-type
+  // affix changes no claim: it is the same name, shorter. Games that join a
+  // chip (the normalized index above exists to make that most of them) get the
+  // provider's real abbreviation and never reach this.
+  function compactMatchup(matchup) {
+    const text = String(matchup == null ? "" : matchup);
+    const sides = text.split(" @ ");
+    if (sides.length !== 2) return text;
+    return sides.map(trimClubAffixes).join(" @ ");
+  }
+
+  function trimClubAffixes(name) {
+    const raw = String(name == null ? "" : name).trim();
+    let parts = raw.split(/\s+/).filter(Boolean);
+    while (parts.length > 1 && CLUB_AFFIXES.has(parts[0].toLowerCase().replace(/[^a-z0-9]/g, ""))) parts = parts.slice(1);
+    while (parts.length > 1 && CLUB_AFFIXES.has(parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, ""))) parts = parts.slice(0, -1);
+    return parts.join(" ") || raw;
+  }
+
   function chipForGame(group) {
     if (gameChipsById.has(group.key)) return gameChipsById.get(group.key);
     const sport = String(group.sport || "").toLowerCase();
     const matchup = String(group.matchup || "").trim().toLowerCase();
-    return gameChipsByMatchup.get(`${sport}|${matchup}`) || null;
+    const exact = gameChipsByMatchup.get(`${sport}|${matchup}`);
+    if (exact) return exact;
+    // Last resort only. See the normalized index in `loadGameChips` for why it
+    // exists and why it is consulted after both exact lookups rather than
+    // instead of them.
+    const sides = matchup.split(" @ ");
+    if (sides.length !== 2) return null;
+    return gameChipsByMatchupLoose.get(`${sport}|${normalizeClubName(sides[0])} @ ${normalizeClubName(sides[1])}`) || null;
   }
 
   function chipTeamRow(side, chip) {
@@ -2375,7 +2462,7 @@
           return `
             <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
               <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
-              <div class="game-mini-card__matchup">${escapeHtml(game.matchup)}</div>
+              <div class="game-mini-card__matchup">${escapeHtml(compactMatchup(game.matchup))}</div>
               <div class="game-mini-card__meta">${game.count} opportunit${game.count === 1 ? "y" : "ies"}</div>
             </button>
           `;
