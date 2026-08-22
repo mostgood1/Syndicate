@@ -374,6 +374,14 @@ def build_layer2_shortlist(
                         # distinguish from a line mismatch.
                         f"miss_line_match={live_stats.get('miss_no_line_match')} "
                         f"miss_not_live={live_stats.get('miss_player_not_live')} "
+                        # `projected > 0, edged == 0` is the case this line
+                        # could name but not explain -- measured on soccer
+                        # 2026-08-22 16:46Z: 114 projected, 0 edged, 0
+                        # prob_withheld. The withhold count and its per-reason
+                        # split are where that answer lives, and neither was
+                        # printed.
+                        f"edge_withheld={live_stats.get('rows_live_edge_withheld')} "
+                        f"edge_why={live_stats.get('edge_withheld_by_reason')} "
                         f"sample={live_stats.get('unmatched_samples')} "
                         # The soccer live path returns EARLY with a stated
                         # reason and none of the counters above, so every field
