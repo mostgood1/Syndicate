@@ -220,6 +220,32 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     "fsv mainz 05": "Mainz",
     "sc paderborn": "SC Paderborn 07",
     "union berlin": "1. FC Union Berlin",
+    # SEVEN MORE, from the first reading taken with the sim-side sample SCOPED
+    # to the leagues that actually miss (refresh-worker 2026-08-22 18:04:56Z).
+    # The unscoped version could only ever answer about alphabetically-early
+    # leagues; with it fixed, all twelve unmatched fixtures became pairable at
+    # once and these are the seven that needed help.
+    "brighton and hove albion": "Brighton & Hove Albion",
+    "athletic bilbao": "Athletic Club",
+    "rennes": "Stade Rennais",
+    "los angeles fc": "LAFC",
+    "atalanta bc": "Atalanta",
+    "inter milan": "Internazionale",
+    # THIS ONE RUNS THE OTHER WAY, and it is why the map is not named
+    # "board_name -> sim_name". Here the BOARD spelling resolves
+    # (`deportivo la coruña` is the artifact name) and the SIM's short
+    # `Deportivo` does not -- so the unresolvable side is the sim's. The map's
+    # actual contract is "spelling nothing can resolve" -> "spelling the
+    # artifacts know", whichever feed happens to hold which.
+    #
+    # `Deportivo` alone is the kind of generic club word that should be
+    # suspected of colliding, so it was checked rather than assumed: across all
+    # ten configured leagues exactly ONE canonical name contains "deportivo"
+    # (`deportivo la coruña`); Alavés is `alavés`, not `deportivo alavés`. If a
+    # second Deportivo ever enters the configured set this entry must go --
+    # `_soccer_alias_to_name` drops ambiguous DERIVED keys but cannot police a
+    # hand-written one.
+    "deportivo": "Deportivo La Coruña",
 }
 
 

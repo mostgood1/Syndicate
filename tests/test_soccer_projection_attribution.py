@@ -34,6 +34,14 @@ from syndicate.features.shared.soccer_projections import (
     load_soccer_projections,
 )
 
+# CLUBS THAT DO NOT EXIST, on purpose. These tests need a pair the name join
+# genuinely cannot resolve, and every REAL pair that fits is a bug waiting to be
+# fixed -- this file first used `Inter Milan`/`Internazionale`, which became a
+# verified alias two hours later (`#503`) and turned four tests red. A synthetic
+# pair cannot be repaired out from under the test.
+_BOARD_UNKNOWN = "Rovers Athletic"
+_SIM_UNKNOWN = "Wanderers United"
+
 DATE = "2026-08-22"
 
 
@@ -76,12 +84,12 @@ def _row(league: str, home: str, away: str, event_id: str) -> dict:
 
 def test_per_league_counts_separate_an_unrun_league_from_a_name_miss(tmp_path: Path) -> None:
     """The two causes that need completely different fixes, told apart."""
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     grid = [
         # serie_a IS indexed; this row misses on the club's spelling.
-        _row("serie_a", "Inter Milan", "Monza", "oddsapi-1"),
+        _row("serie_a", "Rovers Athletic", "Monza", "oddsapi-1"),
         # epl is not in the index at all -- nothing was simulated for it.
         _row("epl", "Arsenal", "Chelsea", "oddsapi-2"),
         _row("epl", "Everton", "Fulham", "oddsapi-3"),
@@ -98,14 +106,14 @@ def test_per_league_counts_separate_an_unrun_league_from_a_name_miss(tmp_path: P
 
 def test_the_sample_carries_both_spellings_of_the_same_fixture(tmp_path: Path) -> None:
     """An alias cannot be written from the board's name alone."""
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     coverage = attach_soccer_projections(
-        [_row("serie_a", "Inter Milan", "Monza", "oddsapi-1")], index
+        [_row("serie_a", "Rovers Athletic", "Monza", "oddsapi-1")], index
     )
-    assert coverage["unmatched_fixture_sample"] == ["serie_a|Inter Milan v Monza"]
-    assert coverage["indexed_fixture_sample"] == ["serie_a|Internazionale v Monza"]
+    assert coverage["unmatched_fixture_sample"] == ["serie_a|Rovers Athletic v Monza"]
+    assert coverage["indexed_fixture_sample"] == ["serie_a|Wanderers United v Monza"]
 
 
 def test_a_missed_fixture_contributes_one_sample_not_one_per_row(tmp_path: Path) -> None:
@@ -115,24 +123,24 @@ def test_a_missed_fixture_contributes_one_sample_not_one_per_row(tmp_path: Path)
     which is the failure mode the live tier's `unmatched_samples` was capped
     against for the same reason.
     """
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
-    grid = [_row("serie_a", "Inter Milan", "Monza", f"oddsapi-{i}") for i in range(300)]
+    grid = [_row("serie_a", "Rovers Athletic", "Monza", f"oddsapi-{i}") for i in range(300)]
     coverage = attach_soccer_projections(grid, index)
 
     assert coverage["unmatched_match_rows"] == 300
     assert coverage["unmatched_fixtures_count"] == 1
-    assert coverage["unmatched_fixture_sample"] == ["serie_a|Inter Milan v Monza"]
+    assert coverage["unmatched_fixture_sample"] == ["serie_a|Rovers Athletic v Monza"]
 
 
 def test_a_row_that_joins_is_absent_from_every_unmatched_counter(tmp_path: Path) -> None:
     """The instrument must not report a defect where there is none."""
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     coverage = attach_soccer_projections(
-        [_row("serie_a", "Internazionale", "Monza", "oddsapi-1")], index
+        [_row("serie_a", "Wanderers United", "Monza", "oddsapi-1")], index
     )
     assert coverage["rows_with_projection"] == 1
     assert coverage["unmatched_match_rows"] == 0
@@ -144,12 +152,12 @@ def test_a_row_that_joins_is_absent_from_every_unmatched_counter(tmp_path: Path)
 
 
 def test_dates_read_is_reported_so_an_unread_date_is_not_read_as_a_name_miss(tmp_path: Path) -> None:
-    _write(tmp_path, "serie_a", "2026-08-24", [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", "2026-08-24", [("Wanderers United", "Monza")])
     window = [DATE, "2026-08-23", "2026-08-24"]
     index = load_soccer_projections([tmp_path], DATE, window_dates=window)
 
     coverage = attach_soccer_projections(
-        [_row("serie_a", "Internazionale", "Monza", "oddsapi-1")], index
+        [_row("serie_a", "Wanderers United", "Monza", "oddsapi-1")], index
     )
     assert coverage["dates_read"] == window
     assert coverage["rows_with_projection"] == 1
@@ -161,10 +169,10 @@ def test_a_row_with_no_league_is_bucketed_rather_than_dropped(tmp_path: Path) ->
     Silently skipping those rows would make the per-league counts stop summing
     to the total, and a counter that does not reconcile is worse than none.
     """
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
-    grid = [_row("serie_a", "Inter Milan", "Monza", "oddsapi-1")]
+    grid = [_row("serie_a", "Rovers Athletic", "Monza", "oddsapi-1")]
     grid[0]["league"] = None
     coverage = attach_soccer_projections(grid, index)
 
@@ -191,17 +199,17 @@ def test_the_sim_side_sample_covers_the_leagues_that_actually_MISS(tmp_path: Pat
     # Alphabetic for the same reason as above -- `_norm_name` strips digits.
     _write(tmp_path, "belgian_pro_league", DATE, [(f"Belg {c} Home", f"Belg {c} Away") for c in "ABCDEFGHIJKL"])
     _write(tmp_path, "bundesliga", DATE, [(f"Bund {c} Home", f"Bund {c} Away") for c in "ABCDEFGHIJKL"])
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     coverage = attach_soccer_projections(
-        [_row("serie_a", "Inter Milan", "Monza", "oddsapi-1")], index
+        [_row("serie_a", "Rovers Athletic", "Monza", "oddsapi-1")], index
     )
 
     assert coverage["unmatched_by_league"] == {"serie_a": 1}
     sample = coverage["indexed_fixture_sample"]
     # The sim side must answer about serie_a, the league that missed...
-    assert "serie_a|Internazionale v Monza" in sample
+    assert "serie_a|Wanderers United v Monza" in sample
     # ...and must not be crowded out by leagues with nothing to report.
     assert not any(entry.startswith("belgian_pro_league|") for entry in sample)
     assert not any(entry.startswith("bundesliga|") for entry in sample)
@@ -230,10 +238,10 @@ def test_every_missing_league_gets_its_own_quota(tmp_path: Path) -> None:
 
 def test_nothing_unmatched_means_no_sim_side_noise(tmp_path: Path) -> None:
     """A clean join must not emit a sample at all -- there is no question to answer."""
-    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    _write(tmp_path, "serie_a", DATE, [("Wanderers United", "Monza")])
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
     coverage = attach_soccer_projections(
-        [_row("serie_a", "Internazionale", "Monza", "oddsapi-1")], index
+        [_row("serie_a", "Wanderers United", "Monza", "oddsapi-1")], index
     )
     assert coverage["unmatched_by_league"] == {}
     assert coverage["indexed_fixture_sample"] == []
