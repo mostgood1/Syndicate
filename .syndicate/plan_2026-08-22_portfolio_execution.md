@@ -287,6 +287,54 @@ production state: Famalicao/Estoril at `ev 8.6383` on draw -750, home +4500 and
 away +6000 alike). What actually chooses a side is Stage A's refusals: the wrong
 side sizes to zero Kelly and is dropped as `zero_kelly_stake`.
 
+### CORRECTION — "the board is running at 0% sim" is RIGHT, and my 57.6% was not about the board
+
+**Flagged by the user 2026-08-22. The 57.6% above is a property of Stage A's
+sizing, on a SYNTHETIC row, in code that is NOT DEPLOYED.** It describes nothing
+that is running. The board is at 0% sim and that is correct.
+
+It is also **structurally guaranteed, not a data outage**, which is the part
+worth being precise about. `blended_score` emits
+`sim_component = _SCORE_SIM_WEIGHT * value_sim` (`opportunity_signals.py:607`).
+With the weight at 0.0 that is `0.0` for every row that HAS a sim view and
+`None` for every row that does not:
+
+    value_sim  12.0  -> sim_component  0.0
+    value_sim  -5.0  -> sim_component -0.0
+    value_sim  None  -> sim_component  None
+
+It can never be non-zero. So "0% sim" is true, permanent under this constant,
+and **says nothing about whether the sim produced anything.**
+
+**It did.** Production `refresh-worker` logs, build 2026-08-22T19:20:09Z,
+`LAYER2_SHORTLIST date=2026-08-22 rows=323 considered=17205 sports=[mlb, nfl,
+soccer, wnba]`:
+
+    PREGAME_PROJECTION_JOIN  mlb      considered  2,656   projected  2,279  (86%)
+    PREGAME_PROJECTION_JOIN  wnba     considered    391   projected    374  (96%)
+    PREGAME_PROJECTION_JOIN  nfl      considered  1,309   projected  1,010  (77%)
+    PREGAME_PROJECTION_JOIN  soccer   considered 20,016   projected 10,686
+                                                          with_prob  9,896  (49%)
+
+So the simulation is attaching projections to most of the board. **The ranker
+multiplies all of it by zero.** The sim is not missing, not broken, and not
+starved — it is deliberately unused, which is a different problem with a
+different fix.
+
+The closest thing to a served-row measurement remains the ledger's
+2026-08-16 reading: **65 of 108 rows carried `model_edge_pct`, and
+`sim_component` was non-zero on 0 of them.** Those two numbers together are the
+whole story.
+
+**UNMEASURED, and I could not measure it this session:** the sim's share of a
+stake on REAL rows. That needs the served shortlist, and the agent proxy 403s
+`syndicate-an21.onrender.com` (as `state.md` records), so no production artifact
+was readable. The 57.6% is a synthetic row and must not be quoted as production.
+**Stage A now reports `sim_coverage` on every run** — `rows_with_sim_edge`,
+`rows_without_sim_edge`, `share_with_sim_edge` — so the first production commit
+answers it as a number instead of an inference, alongside the per-position
+attribution.
+
 ### Why the answer is NOT to raise the weight
 
 That constant's own comment already argues this, and it is right:

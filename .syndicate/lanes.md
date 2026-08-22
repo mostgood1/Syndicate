@@ -1245,6 +1245,21 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   plus plan totals). The delta is NOT clamped at zero, because a small negative
   sim edge can legitimately shrink a position and clamping would credit the sim
   only where it helps. Full working: `todo.md #507`.
+- **CORRECTION `[user-flagged 2026-08-22]`: "the board is running at 0% sim" is
+  RIGHT, and 57.6% was NOT about the board** — it is Stage A's sizing on a
+  SYNTHETIC row in undeployed code, and describes nothing running. **Do not
+  quote it as production.** The board's 0% is structurally guaranteed:
+  `sim_component = _SCORE_SIM_WEIGHT * value_sim` is `0.0` where a sim view
+  EXISTS and `None` where it does not, so it can never be non-zero and says
+  nothing about whether the sim produced anything. **It did** — production
+  refresh-worker 2026-08-22T19:20:09Z (`rows=323 considered=17205`): mlb
+  2,279/2,656 projected (86%), wnba 374/391 (96%), nfl 1,010/1,309 (77%),
+  soccer 10,686/20,016 with `with_prob=9,896`. **The sim is attaching
+  projections to most of the board and the ranker multiplies all of it by
+  zero** — deliberately unused, not missing or starved. UNMEASURABLE THIS
+  SESSION: the sim's stake share on REAL rows; the agent proxy 403s
+  `syndicate-an21.onrender.com`, so no served artifact was readable. Stage A now
+  emits `sim_coverage` so the first production commit answers it as a number.
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->

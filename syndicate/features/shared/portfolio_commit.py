@@ -488,6 +488,30 @@ def commit_portfolio(
                 1 for item in positions if item["attribution"]["side_picked_by"] == "simulation"
             ),
         },
+        # THE SIM'S ACTUAL REACH, as a first-class number rather than something
+        # to infer from the refusal counts.
+        #
+        # WHY IT IS REPORTED HERE AND NOWHERE ELSE. The board's own
+        # `sim_component` cannot answer this: it is
+        # `_SCORE_SIM_WEIGHT * value_sim` with the weight at 0.0, so it is
+        # **structurally** `0.0` for every row that HAS a sim view and `None`
+        # for every row that does not. It can never be non-zero, which makes
+        # "the board is 0% sim" true and also uninformative -- it says nothing
+        # about whether the sim produced anything.
+        #
+        # `rows_with_sim_edge` is the honest version: how many rows carried a
+        # probability-space `model_edge_pct` at all. Measured on the served
+        # shortlist 2026-08-16, that was 65 of 108. This counts it every run.
+        "sim_coverage": {
+            "rows_in": rows_in,
+            "rows_with_sim_edge": rows_in - refusals.get("no_model_edge_pct", 0),
+            "rows_without_sim_edge": refusals.get("no_model_edge_pct", 0),
+            "share_with_sim_edge": (
+                round((rows_in - refusals.get("no_model_edge_pct", 0)) / rows_in, 4)
+                if rows_in
+                else None
+            ),
+        },
         "rows_in": rows_in,
         "sized": len(priced),
         # Sums to `rows_in` together with `len(positions)`. A plan that cannot

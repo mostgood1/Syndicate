@@ -462,3 +462,21 @@ def test_a_zero_sim_edge_attributes_exactly_zero_not_a_rounding_artifact():
     attribution = _plan([_row(model_edge_pct=0.0)])["positions"][0]["attribution"]
     assert attribution["stake_fraction_sim_delta"] == 0.0
     assert attribution["sim_share_of_stake"] == 0.0
+
+
+def test_sim_coverage_counts_rows_that_carried_a_probability_edge():
+    """The board's own `sim_component` cannot answer this: at weight 0.0 it is
+    structurally 0.0 for rows that HAVE a sim view and None for rows that do
+    not, so it can never distinguish "the sim said nothing" from "the sim said
+    something and the ranker discarded it"."""
+    rows = [
+        _row(event_id="e1", model_edge_pct=3.2),
+        _row(event_id="e2", model_edge_pct=1.0),
+        _row(event_id="e3", model_edge_pct=None),
+        _row(event_id="e4", model_edge_pct=None),
+    ]
+    coverage = _plan(rows)["sim_coverage"]
+    assert coverage["rows_in"] == 4
+    assert coverage["rows_with_sim_edge"] == 2
+    assert coverage["rows_without_sim_edge"] == 2
+    assert coverage["share_with_sim_edge"] == 0.5

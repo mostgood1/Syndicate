@@ -95,6 +95,28 @@ presented as "our model found these" at weight 0.0. That stays true of the
 SHORTLIST. It is NOT true of the PORTFOLIO — a committed position is sim-sized
 and sim-sided, and `sim_share_of_stake` says by how much, per bet.
 
+**CORRECTION, user-flagged 2026-08-22: "the board is running at 0% sim" is
+RIGHT, and the 57.6% above is NOT about the board.** It is Stage A's sizing, on
+a SYNTHETIC row, in code that is not deployed. It describes nothing running.
+The board's 0% is also **structurally guaranteed rather than a data outage**:
+`sim_component = _SCORE_SIM_WEIGHT * value_sim` is `0.0` for every row that HAS
+a sim view and `None` for every row that does not, so it can never be non-zero
+and says nothing about whether the sim produced anything.
+
+**It did.** Production refresh-worker logs, build 2026-08-22T19:20:09Z
+(`LAYER2_SHORTLIST date=2026-08-22 rows=323 considered=17205`):
+mlb 2,279 projected of 2,656 (86%); wnba 374 of 391 (96%); nfl 1,010 of 1,309
+(77%); soccer 10,686 of 20,016 with `with_prob=9,896` (49%). **The sim is
+attaching projections to most of the board and the ranker multiplies all of it
+by zero.** Not missing, not broken, not starved — deliberately unused.
+
+**UNMEASURED and unmeasurable this session:** the sim's stake share on REAL
+rows. That needs the served shortlist and the agent proxy 403s
+`syndicate-an21.onrender.com` (`state.md`). **Do not quote 57.6% as
+production.** Stage A now emits `sim_coverage` (`rows_with_sim_edge`,
+`rows_without_sim_edge`, `share_with_sim_edge`) so the first production commit
+answers it as a number.
+
 
 ### `#505` — **Stage A BUILT (bankroll $1,000, user-editable; `portfolio_commit` sizes the Layer 2 shortlist into a committed plan). NOT DEPLOYED, dark by default. Two inert-feature defects found by the input checklist. Stage D still gated on `#502`.** — lane `portfolio-decision-and-execution`, 2026-08-22
 
