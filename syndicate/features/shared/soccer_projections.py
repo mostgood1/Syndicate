@@ -722,6 +722,14 @@ def _scorer_race_for(index: "SoccerProjectionIndex", match_id: str, match: Mappi
     return result
 
 
+# How many SIM-side fixtures to show per league that has unmatched rows. Enough
+# to spot the club under a different spelling (a league's slate is ~10 fixtures
+# and a missed one is usually adjacent to its match in sorted order), small
+# enough that ten leagues cannot push the log line past what a collector will
+# keep on one row.
+_SIM_FIXTURES_PER_LEAGUE = 12
+
+
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
 ) -> dict[str, Any]:
@@ -907,16 +915,38 @@ def attach_soccer_projections(
 
     # THE INDEX SIDE OF THE SAME PAIRING. Without it the unmatched samples say
     # what the BOARD calls a fixture and nothing about what the SIM calls it,
-    # which is exactly half of a name-join question. Capped, and one entry per
-    # indexed fixture.
-    indexed_fixtures: list[str] = []
+    # which is exactly half of a name-join question.
+    #
+    # SCOPED TO THE LEAGUES THAT ACTUALLY MISS, and that is a CORRECTION rather
+    # than a refinement. The first cut sorted every indexed fixture
+    # alphabetically and took the first 12 -- so the production reading at
+    # 17:30:32Z returned belgian_pro_league, bundesliga and championship, while
+    # every league with real misses (epl 510, la_liga 972, serie_a 606,
+    # ligue_1 240, mls 247) fell off the end. The board side named 12 fixtures
+    # and the sim side answered about none of them. An instrument that reliably
+    # samples the leagues with nothing to report is worse than no sample: it
+    # looks like an answer.
+    #
+    # Per-league quota rather than one global cap, for the same reason -- one
+    # busy league would otherwise crowd out the rest.
+    # NOTHING UNMATCHED MEANS NO SAMPLE. The first guard here read
+    # `if missing_leagues and league not in missing_leagues`, which on a clean
+    # join short-circuits to false and dumps EVERY indexed fixture onto the log
+    # line -- the largest output in the case with nothing to investigate.
+    missing_leagues = set(unmatched_by_league)
+    by_league_fixtures: dict[str, list[str]] = {}
     for (index_home, index_away), match in index.by_teams.items():
-        matchup = match.get("matchup") or {}
         league = str(match.get("league") or "").strip() or "?"
-        indexed_fixtures.append(
+        if league not in missing_leagues:
+            continue
+        matchup = match.get("matchup") or {}
+        by_league_fixtures.setdefault(league, []).append(
             f"{league}|{matchup.get('home_team') or index_home} v "
             f"{matchup.get('away_team') or index_away}"
         )
+    indexed_fixtures: list[str] = []
+    for league in sorted(by_league_fixtures):
+        indexed_fixtures.extend(sorted(by_league_fixtures[league])[:_SIM_FIXTURES_PER_LEAGUE])
 
     return {
         "supported": True,
@@ -930,7 +960,7 @@ def attach_soccer_projections(
         "unmatched_by_league": dict(sorted(unmatched_by_league.items())),
         "unmatched_fixtures_count": len(unmatched_fixtures),
         "unmatched_fixture_sample": sorted(unmatched_fixtures)[:12],
-        "indexed_fixture_sample": sorted(indexed_fixtures)[:12],
+        "indexed_fixture_sample": indexed_fixtures,
         # `match_for` returns None for these BY DESIGN (a wrong projection is
         # worse than a blank one), so they are unmatched rows with a cause that
         # is not a name failure and must not be read as one.

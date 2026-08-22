@@ -170,3 +170,70 @@ def test_a_row_with_no_league_is_bucketed_rather_than_dropped(tmp_path: Path) ->
 
     assert coverage["rows_by_league"] == {"?": 1}
     assert sum(coverage["unmatched_by_league"].values()) == coverage["unmatched_match_rows"]
+
+
+def test_the_sim_side_sample_covers_the_leagues_that_actually_MISS(tmp_path: Path) -> None:
+    """SHIPPED WRONG, and this is the regression test for it.
+
+    The first cut sorted every indexed fixture alphabetically and took the first
+    12. Measured on production 2026-08-22 17:30:32Z, the board side named 12
+    unmatched fixtures across epl (510 rows), la_liga (972), serie_a (606),
+    ligue_1 (240) and mls (247) -- and the sim side came back
+    belgian_pro_league, bundesliga, championship: three leagues with almost no
+    misses, chosen purely because they sort first. The pairing the sample exists
+    to enable was impossible for 11 of the 12 fixtures.
+
+    An instrument that reliably samples the leagues with nothing to report is
+    worse than no sample, because it looks like an answer.
+    """
+    # Two leagues sort BEFORE the one with the miss, and each has more fixtures
+    # than a global cap would leave room for.
+    # Alphabetic for the same reason as above -- `_norm_name` strips digits.
+    _write(tmp_path, "belgian_pro_league", DATE, [(f"Belg {c} Home", f"Belg {c} Away") for c in "ABCDEFGHIJKL"])
+    _write(tmp_path, "bundesliga", DATE, [(f"Bund {c} Home", f"Bund {c} Away") for c in "ABCDEFGHIJKL"])
+    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    coverage = attach_soccer_projections(
+        [_row("serie_a", "Inter Milan", "Monza", "oddsapi-1")], index
+    )
+
+    assert coverage["unmatched_by_league"] == {"serie_a": 1}
+    sample = coverage["indexed_fixture_sample"]
+    # The sim side must answer about serie_a, the league that missed...
+    assert "serie_a|Internazionale v Monza" in sample
+    # ...and must not be crowded out by leagues with nothing to report.
+    assert not any(entry.startswith("belgian_pro_league|") for entry in sample)
+    assert not any(entry.startswith("bundesliga|") for entry in sample)
+
+
+def test_every_missing_league_gets_its_own_quota(tmp_path: Path) -> None:
+    """One busy league must not crowd out the others -- per-league, not global."""
+    # Alphabetic, not "E0/E1/...": `_norm_name` STRIPS DIGITS, so numbered
+    # fixture names all normalise to one key and get dropped as ambiguous --
+    # which silently empties the league this test is about.
+    _write(tmp_path, "epl", DATE, [(f"Club {c} Home", f"Club {c} Away") for c in "ABCDEFGHIJKLMNOPQRST"])
+    _write(tmp_path, "mls", DATE, [("Los Angeles Football Club", "Portland Timbers")])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    grid = [
+        _row("epl", "Brighton and Hove Albion", "Aston Villa", "oddsapi-1"),
+        _row("mls", "Los Angeles FC", "Portland Timbers", "oddsapi-2"),
+    ]
+    coverage = attach_soccer_projections(grid, index)
+
+    sample = coverage["indexed_fixture_sample"]
+    assert any(entry.startswith("epl|") for entry in sample)
+    # The 20-fixture league does not squeeze out the 1-fixture one.
+    assert "mls|Los Angeles Football Club v Portland Timbers" in sample
+
+
+def test_nothing_unmatched_means_no_sim_side_noise(tmp_path: Path) -> None:
+    """A clean join must not emit a sample at all -- there is no question to answer."""
+    _write(tmp_path, "serie_a", DATE, [("Internazionale", "Monza")])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+    coverage = attach_soccer_projections(
+        [_row("serie_a", "Internazionale", "Monza", "oddsapi-1")], index
+    )
+    assert coverage["unmatched_by_league"] == {}
+    assert coverage["indexed_fixture_sample"] == []
