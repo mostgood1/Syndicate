@@ -1360,6 +1360,22 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2500, `source` flips `default` -> `stored`); 60 lane tests and 344 related
   tests pass. **No production slate has been committed — do not report Stage A
   as working.**
+- **Stage B read surface shipped (`/portfolio/paper`).** The plan and the
+  ledger both crossed the service boundary already (`_keyvalue_backed` True for
+  `execution_ledger.json` and `portfolio_plan_<date>.json`), but nothing
+  rendered them, so the only way to see a committed position was to read JSON.
+  `/portfolio/paper` + `/api/portfolio/paper` join the ledger onto the plan by
+  `position_key` and poll every 45s. **Kept off `/portfolio` deliberately** —
+  that page is the user's own bets and `portfolio_summary._is_user_placed_bet`
+  exists precisely because auto-tracked model rows once flooded it with 1000+
+  "tracked plays" nobody had bet; simulated positions beside real ones would
+  rebuild that confusion with better formatting. Four absence states stay
+  DISTINCT (job off / no artifact / empty plan / orders never placed) and a
+  ledger that cannot be read says so rather than rendering an empty table —
+  "no bets" and "cannot see the bets" look identical and only one is safe.
+  Orders whose position left the plan are surfaced as orphans, never dropped.
+  12 tests. **Local only — no production render taken; production HTTP is
+  unreachable from a Claude session (`state.md:2811`).**
 - Files:
   `.syndicate/plan_2026-08-22_portfolio_execution.md`,
   `syndicate/features/shared/portfolio_settings.py`,
@@ -1374,7 +1390,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_layer2_blend_admission.py`,
   `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
-  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
+  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
+  `syndicate/templates/portfolio_paper.html`,
+  `syndicate/static/shared/paper_portfolio_pulse.js`,
+  `tests/test_portfolio_paper_page.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

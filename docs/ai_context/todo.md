@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#518` — **The paper portfolio had no read surface: two artifacts crossed the service boundary and nothing rendered them. `/portfolio/paper` ships. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
+
+Stage A (`#507`) and Stage B (`#512`) both ran in production on 2026-08-22 —
+`PORTFOLIO_COMMIT` 9 positions/$30.27/sim_share 0.7906, then `PORTFOLIO_EXECUTED
+placed=5 duplicates=0` followed by `placed=0 duplicates=5`. Both artifacts were
+already `_keyvalue_backed`, so web could see them. **Nothing displayed either
+one.** The only way to read a committed position was to fetch JSON, which is not
+a way to track a portfolio in real time.
+
+`GET /portfolio/paper` + `GET /api/portfolio/paper`
+(`syndicate/blueprints/intelligence.py`, `templates/portfolio_paper.html`,
+`static/shared/paper_portfolio_pulse.js`). A pure read of the plan and the
+ledger, joined by `position_key`, polling every 45s on the established
+`portfolio_pulse.js` contract (server-renders first paint, JS re-renders the
+same blocks in place with the same format strings).
+
+**IT IS A SEPARATE PAGE ON PURPOSE, and this is the load-bearing decision.**
+`/portfolio` is the user's OWN logged bets. `portfolio_summary._is_user_placed_bet`
+exists precisely because auto-tracked model rows once flooded that page with
+1000+ "tracked plays" nobody had bet. Rendering simulated positions beside real
+ones would rebuild exactly that confusion with better formatting, and on a page
+about money the failure mode is someone believing a simulated fill was theirs.
+Each page links to the other and says which is which.
+
+**THE FOUR ABSENCE STATES STAY DISTINCT** — commit job off / no plan artifact /
+a plan that committed zero positions / positions whose orders were never placed.
+They have four different fixes and one shared "nothing here" would read as the
+first when it is usually the third. The zero-position case is labelled a
+decision, not a gap, and the refusal counts are shown beside it.
+
+**A LEDGER THAT CANNOT BE READ SAYS SO.** `execution_ledger._load()` RAISES
+rather than reading empty (`#512`); the page surfaces that as an explicit banner
+instead of an empty table, because "no bets" and "cannot see the bets" render
+identically and only one of them is safe. Orders whose position has since left
+the plan are shown as orphans rather than dropped — an order that was submitted
+must never disappear to make a page tidy.
+
+Also surfaced per position: `board_score`, the signed `stake_dollars_sim_delta`
+and `side_picked_by` from `#509`'s attribution, and plan-level
+`sim_share_of_staked` + `sim_coverage`. That is the decomposition `#509`/`#510`
+need to be readable at a glance rather than reconstructed from JSON.
+
+12 tests (`tests/test_portfolio_paper_page.py`), all four absence states plus
+the orphan and unreadable-ledger paths. **Local render only — production HTTP is
+unreachable from a Claude session (`state.md:2811`), so the deployed reading is
+owed: `/portfolio/paper` renders 200 with a non-empty positions table on a date
+where `PORTFOLIO_COMMIT` logged positions > 0.**
+
 ### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
 
 **Not to be confused with `unsupported_market=40`, which prompted the look and
