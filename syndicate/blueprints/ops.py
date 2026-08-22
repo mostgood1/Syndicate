@@ -529,6 +529,12 @@ def api_ops_live_lens_snapshot_index() -> Any:
             # here would be a different measurement wearing the same name.
             "prop_status_text": _prop_status_text(game),
             "live_prop_count": len(game.get("liveProps") or []) if isinstance(game.get("liveProps"), list) else 0,
+            # THE PRODUCER'S OWN FUNNEL. `build_live_prop_rows` has always
+            # returned players_seen / players_matched / players_unmatched /
+            # withheld_by_reason / unpriced_by_reason; the lens stamped a subset
+            # on the game and nothing surfaced any of it. So "the lens wrote 6
+            # rows" was readable and "why 6" was not.
+            "live_props_coverage": game.get("livePropsCoverage"),
             "archived_prop_count": len(game.get("archivedLiveProps") or []) if isinstance(game.get("archivedLiveProps"), list) else 0,
             # THE PROP KEY NAMES THE LENS ACTUALLY EMITS. `_MARKET_ALIASES` is
             # MLB-only, so a basketball market joins only if both sides happen to
