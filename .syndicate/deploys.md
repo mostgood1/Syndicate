@@ -23369,3 +23369,55 @@ reading stays `placed=N duplicates=0`, then `placed=0 duplicates=N` on the
 following build.
 
 **Claim `bf4e370da185fd16` released after this reading.**
+
+## 2026-08-22T22:07-22:12Z — STAGE B VERIFIED IN PRODUCTION. Idempotency holds across board rebuilds
+
+**Lane `portfolio-decision-and-execution`. `SYNDICATE_EXECUTION_ENABLED` set by
+the user; restart `dep-da51n2jbc2fs73fhu7cg` live 21:58:58Z carrying
+`471cbac9d`** — the wiring commit, so unlike the 21:33 flag this one had the
+code it gates. Verified BEFORE waiting, with the rule written an hour earlier.
+
+    22:07:48  LAYER2_SHORTLIST rows=1223 below_floor=1311 admitted_by_blend=137
+              PLAN_WRITTEN positions=5 staked=$15.07 bankroll=$1000.0
+              PORTFOLIO_COMMIT positions=5 staked=$15.07 sim_share=0.8374
+              EXECUTED mode=paper venue=paper armed=False
+                       positions=5 placed=5 duplicates=0 skipped=0
+                       summary={orders: 5, by_status: {filled: 5},
+                                filled_stake_dollars: 15.07, modes: ['paper'],
+                                unreconciled: 0}
+
+    22:10:34  EXECUTED positions=5 placed=0 duplicates=5 skipped=0
+                       summary={orders: 5, filled_stake_dollars: 15.07,
+                                unreconciled: 0}
+
+**THE SECOND LINE IS THE ACCEPTANCE READING, and it is clean.** The plan did not
+shift between those two builds, so all five came back as duplicates, the ledger
+stayed at 5 orders / $15.07, and **not one order duplicated across a rebuild.**
+That property is load-bearing rather than nice: this fires on EVERY board build,
+every few minutes, so without it the ledger would grow by five phantom bets per
+cycle. Proven in production, not only in a unit test.
+
+**A CASE I DID NOT DESIGN FOR, and it behaved correctly:** at 22:12:51 the
+2026-08-23 board ran with `positions=0 placed=0 duplicates=0`, reporting an
+empty plan rather than erroring or writing an empty ledger entry.
+
+**BOTH SAFETY SWITCHES HELD.** `armed=False` and `modes: ['paper']` on every
+line — nothing could have reached a venue even had one been configured, and
+`inline=True` would have refused live regardless.
+
+**`sim_share = 0.8374`**, against 0.7906 on the 21:52 build. 79–84% of committed
+money attributable to the simulation across two independent production builds.
+
+**A NUANCE STATED BEFORE THE DATA ARRIVED, and worth keeping.** The plan had
+shifted 9 positions/$30.27 (21:52) -> 5/$15.07 (22:07) as games went live and
+final, so `placed=0` was NOT guaranteed to be the right reading. The correct
+criterion is narrower: **a position that repeats must return as a duplicate and
+never re-place; genuinely new positions SHOULD place.** This build happened to
+be the clean case. A future mixed reading (`placed>0` alongside `duplicates>0`)
+is correct behaviour, not a leak — the leak signature is the same
+`position_key` filling twice, which `orders` and `filled_stake_dollars` would
+show.
+
+**STAGE A AND STAGE B ARE BOTH LIVE AND MEASURED.** What remains is Stage C,
+which needs paper slates to accumulate and then a CLV join against each
+position's `attribution` — no further code to deploy for it.
