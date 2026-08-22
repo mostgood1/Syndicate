@@ -245,3 +245,140 @@ def test_nothing_unmatched_means_no_sim_side_noise(tmp_path: Path) -> None:
     )
     assert coverage["unmatched_by_league"] == {}
     assert coverage["indexed_fixture_sample"] == []
+
+
+# --- the player bucket, which is now the largest -------------------------
+#
+# `unmatched_player` reached 6,057 rows at 18:31:07Z and GREW when the
+# team-name join was fixed — more rows now reach the player stage instead of
+# being rejected at the match stage. It had no attribution at all, and it
+# covers the same two states the league split covers one level up:
+#
+#   the sim published NO players for the match  -> producer gap
+#   it published players and this name is absent -> a name join problem, the
+#                                                   player-level twin of the 13
+#                                                   team aliases
+#
+# Those have different owners and, until now, one identical counter.
+
+def _player_row(league: str, home: str, away: str, player: str, market: str = "player_shots") -> dict:
+    return {
+        "sport": "soccer",
+        "kind": "prop",
+        "market": market,
+        "league": league,
+        "event_id": "oddsapi-p1",
+        "home_team": home,
+        "away_team": away,
+        "player_name": player,
+        "line": 1.5,
+    }
+
+
+def _write_with_players(root: Path, league: str, date: str, home: str, away: str, players: list[str]) -> None:
+    path = root / league / "api" / "recommendations" / f"recommendations_{date}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "league": league,
+                "generated_at": "2026-08-22T10:00:00",
+                "matches": [
+                    {
+                        "match_id": f"{league}-0",
+                        "event_id": f"espn-{league}-0",
+                        "league": league,
+                        "matchup": {"home_team": home, "away_team": away},
+                        "win_probability": {"home": 0.5, "draw": 0.25, "away": 0.25},
+                    }
+                ],
+                "player_props": [
+                    {
+                        "match_id": f"{league}-0",
+                        "player_name": name,
+                        "expected_shots": 2.1,
+                    }
+                    for name in players
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_a_match_with_no_roster_is_named_as_a_PRODUCER_gap(tmp_path: Path) -> None:
+    """No players published for the fixture at all — nothing a name alias fixes."""
+    _write_with_players(tmp_path, "epl", DATE, "Arsenal", "Chelsea", [])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    coverage = attach_soccer_projections(
+        [_player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka")], index
+    )
+    assert coverage["unmatched_player_rows"] == 1
+    assert coverage["player_miss_no_roster"] == 1
+    assert coverage["player_miss_name"] == 0
+    # No sample: there is no sim-side name to pair against, and emitting an
+    # empty pairing would imply the roster was read and came back short.
+    assert coverage["unmatched_player_sample"] == []
+
+
+def test_a_name_absent_from_a_REAL_roster_is_named_as_a_name_miss(tmp_path: Path) -> None:
+    _write_with_players(
+        tmp_path, "epl", DATE, "Arsenal", "Chelsea", ["B. Saka", "Martin Ødegaard"]
+    )
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    coverage = attach_soccer_projections(
+        [_player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka")], index
+    )
+    assert coverage["player_miss_name"] == 1
+    assert coverage["player_miss_no_roster"] == 0
+    # BOTH SIDES, so an alias can actually be written from the log line.
+    assert coverage["unmatched_player_sample"] == ["epl|Bukayo Saka"]
+    assert "B. Saka" in coverage["sim_roster_sample"]
+
+
+def test_one_player_contributes_one_sample_not_one_per_prop_row(tmp_path: Path) -> None:
+    """A player carries a dozen prop rows and they all miss identically."""
+    _write_with_players(tmp_path, "epl", DATE, "Arsenal", "Chelsea", ["B. Saka"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    grid = [
+        _player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka", market=m)
+        for m in ("player_shots", "player_shots_on_target", "player_shots", "player_shots_on_target")
+    ]
+    coverage = attach_soccer_projections(grid, index)
+    assert coverage["unmatched_player_rows"] == 4
+    assert coverage["unmatched_player_sample"] == ["epl|Bukayo Saka"]
+
+
+def test_the_player_split_reconciles_with_the_total(tmp_path: Path) -> None:
+    """A breakdown that does not sum to its total is worse than none."""
+    _write_with_players(tmp_path, "epl", DATE, "Arsenal", "Chelsea", ["B. Saka"])
+    _write_with_players(tmp_path, "mls", DATE, "LAFC", "Portland Timbers", [])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    grid = [
+        _player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka"),
+        _player_row("mls", "LAFC", "Portland Timbers", "Denis Bouanga"),
+    ]
+    coverage = attach_soccer_projections(grid, index)
+    assert (
+        coverage["player_miss_no_roster"] + coverage["player_miss_name"]
+        == coverage["unmatched_player_rows"]
+    )
+    assert coverage["player_miss_no_roster"] == 1
+    assert coverage["player_miss_name"] == 1
+
+
+def test_a_player_that_MATCHES_is_absent_from_every_miss_counter(tmp_path: Path) -> None:
+    _write_with_players(tmp_path, "epl", DATE, "Arsenal", "Chelsea", ["Bukayo Saka"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    coverage = attach_soccer_projections(
+        [_player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka")], index
+    )
+    assert coverage["unmatched_player_rows"] == 0
+    assert coverage["player_miss_name"] == 0
+    assert coverage["player_miss_no_roster"] == 0
+    assert coverage["unmatched_player_sample"] == []
