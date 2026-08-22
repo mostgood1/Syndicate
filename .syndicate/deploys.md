@@ -23321,3 +23321,51 @@ games had it been fired an hour earlier.
 
 **Claim `b3a38f31d57ab2f2` held on refresh-worker for this deploy; release after
 it lands.**
+
+## 2026-08-22T21:52:19Z — STAGE A IS LIVE AND PRODUCING. First real portfolio: 9 positions, $30.27, 79% sim-attributed
+
+**Lane `portfolio-decision-and-execution`. Deploy `dep-da51bu3bc2fs73fh0hig`,
+`471cbac9d`, live 21:38:15.820603Z. First post-boot shortlist 21:52:18Z.**
+
+    [intelligence_state] LAYER2_SHORTLIST date=2026-08-22 rows=1223 considered=17096
+                         below_floor=1127 admitted_by_blend=145
+    [portfolio_commit]   PLAN_WRITTEN rows_in=1223 sized=12 positions=9
+                         staked=$30.27 bankroll=$1000.0 scale=1.0
+                         refusals={'below_min_ev_pct': 391, 'below_min_stake': 3,
+                                   'beyond_max_positions': 6,
+                                   'no_model_edge_pct': 779, 'zero_kelly_stake': 35}
+    [intelligence_state] PORTFOLIO_COMMIT date=2026-08-22 positions=9
+                         staked=$30.27 sim_share=0.7906
+
+**THREE FIRSTS IN ONE LINE-GROUP.**
+
+1. **`admitted_by_blend=145` IS IN THE LOGS**, which is what the 21:34 deploy
+   was for. It reconciles with the 159 read off `/api/board/layer2-shortlist`
+   at 21:16 — different build, same magnitude — so the counter and the endpoint
+   agree and neither needs the other.
+2. **A REAL COMMITTED PORTFOLIO: 9 positions, $30.27 of $1,000 = 3.0% of
+   bankroll at risk.** That is the intended conservatism, not a fault: quarter
+   Kelly (`_DEFAULT_KELLY_MULTIPLIER` 0.25) shrunk again by
+   `_MIN_SAMPLE_CREDIBILITY` 0.25 because `settled_sample_size` is still zero
+   everywhere. 1/16th Kelly by construction.
+3. **`sim_share = 0.7906` ON REAL ROWS.** 79% of the committed money is
+   attributable to the simulation rather than to price shopping. **This is the
+   per-bet component decomposition `_SCORE_SIM_WEIGHT`'s own comment names as
+   the unlock condition and calls "what nobody has been able to supply."** It
+   now exists, per position, every build. NOTE the earlier 57.6% figure was a
+   SYNTHETIC row and was retracted; this one is production.
+
+**EVERY ROW IS ACCOUNTED FOR**, which is the contract `commit_portfolio` was
+built to keep: 1223 rows in, 9 committed, and the five named refusals sum to the
+rest. The largest by far is **`no_model_edge_pct: 779`** — 64% of the board
+cannot be sized because the sim has no probability view on it. That is the
+coverage gap from `deploys.md` 21:16 arriving in dollars: soccer's 210 edges
+across 20,039 grid rows is why two thirds of the board is unsizable, and no
+scoring coefficient changes it.
+
+**STAGE B IS STILL DARK.** `SYNDICATE_EXECUTION_ENABLED` is unset, so the commit
+ran alone this cycle — deliberately, one reading at a time. The owed Stage B
+reading stays `placed=N duplicates=0`, then `placed=0 duplicates=N` on the
+following build.
+
+**Claim `bf4e370da185fd16` released after this reading.**
