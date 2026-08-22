@@ -22712,3 +22712,39 @@ to be judged on player and market. The buckets did not grow; the population
 reaching them did.
 
 Claim `188efafc1f8177ba` **released**.
+
+---
+
+## 2026-08-22 ~18:39Z — `28b2c706` — WEB — alt-tab fix, alt default flip, bet-type filter, filter-aware counts bar
+
+Lane `layer2-sim-view-and-live-projection`, claim `8baea61799086948`. Deployed
+SHA equals the one pushed — first time this session the tip did not move under
+the trigger. `deploy_preflight.py` still cannot run (no `RENDER_API_KEY`): **no
+CLEAR verdict**; on-main verified with git.
+
+Web-only (template + CSS + a JS test). No worker path touched, no join, no
+pricing.
+
+**VERIFY — four separate reads on the served board, none of which a green deploy
+substitutes for:**
+
+1. Click an alt-line tab → **the clicked button becomes the highlighted one.**
+   This is the actual reported defect: the filter worked and the tab never moved,
+   because the handler mutated state without re-rendering the tab row.
+2. Load `/intelligence` with no query string → **no `totals_alt` or
+   `spreads_alt` rows**, and the main line of every market still present. The
+   board must NOT be empty; if it is, this is the odds-range failure again in a
+   new place and should be reverted rather than tuned.
+3. The bet-type row lists markets **with counts**, and selecting one leaves the
+   others selectable (the option list is built ignoring the bet-type filter
+   itself — otherwise it collapses to one entry with no way back).
+4. The counts strip changes when a filter changes, shows "N of M" only when they
+   differ, and shows "N hidden by K filters" only when N > 0.
+
+**A DEFAULT WAS REVERSED HERE AND THE REASONING IS ON RECORD**, because
+reversing one this morning's commit argued for looks like drift: the odds range
+must default open (its broken default rendered a BLANK board); the alt filter may
+default closed (the main line of every market survives, so the board stays
+populated and the omission is named and recoverable). Both rules are asserted in
+`tests/js/board_sim_view_display.test.mjs` so a later change cannot swap which
+control gets which rule.
