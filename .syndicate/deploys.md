@@ -23655,3 +23655,34 @@ does not touch it. Do not read "soccer p50 751s" as "soccer live bets work".
 `pregame_proj=23 no_proj=0` when it had 23 rows; the 92 rows the refresh added are
 almost all unprojected. Not a regression — these rows did not exist before — but
 NFL projection coverage is now 25%, and nobody has looked at why.
+
+
+## 2026-08-22 23:08:55Z -- web `a1dc1e9a` -- soccer compact cards: pregame redesign + final reconciliation
+
+what: `_scoreboard_strip_soccer.html` pregame branch redesigned (date/time
+top line, away/home rows with sim-projected totals, BTTS/goals/corners/top-
+sim-score facts grid); new `elif game.live_state.final` branch preserves the
+old final layout AND adds a reconciliation grid grading those same four
+facts against the real result (`_compact_final_reconciliation`, cards.py).
+Full context: user request in-session, no todo item (UI-only, no research
+claim attached).
+
+claim: acquired 23:04:17Z, preflight CLEAR immediately (no in-flight jobs on
+web), deployed as a separate command per protocol. Released 23:09Z.
+
+deploy: dep-da52m23bc2fs73fkkfng, live 23:08:55Z, confirmed via
+`deploys?limit=1` returning `live a1dc1e9a`. Health check 200 immediately
+after.
+
+verify: fetched `/soccer/cards?date=2026-08-23` (pregame slate) and
+`/soccer/cards?date=2026-08-22` (today, mixed) directly from production.
+2026-08-23: 24/24 cards render `.cards-strip-pregame-rows` +
+`.cards-strip-pregame-facts`. 2026-08-22: 44 cards, 6 still pregame, 38
+finals rendering `.cards-strip-recon-score` with real hit/miss counts (19
+hit / 62 miss across all graded facts). Spot-checked one card (Man Utd vs
+Hull City): BTTS projected Yes, actual No -> red miss, correct; Goals and
+Corners had no captured market line and correctly rendered "X proj · Y
+total" with NO hit/miss mark rather than a fabricated grade -- the rule the
+tests pin (`test_soccer_final_reconciliation.py::
+test_model_only_goals_projection_reports_but_does_not_grade`) held on real
+data, not just in the test suite.
