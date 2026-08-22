@@ -23506,3 +23506,43 @@ not assumed). **OWED: read `soccer_source/mls/api/live_state/live_state_2026-08-
 after that kickoff and confirm at least one game's `momentum.source == "fotmob"` with
 a real `fotmob_match_id`, not `supported: False`.** A silent 0% resolve rate looks
 identical to a quiet slate from the outside -- this is the check that tells them apart.
+
+
+## 2026-08-22 22:40:08Z -- web `f7797765` -- `/portfolio/paper`, the Stage B read surface
+
+what: `GET /portfolio/paper` + `GET /api/portfolio/paper` — a pure read of the
+portfolio plan and the execution ledger, joined by `position_key`, polling every
+45s. Stage A and Stage B were both already running in production and neither had
+a UI; the only way to see a committed position was to fetch JSON. Full context:
+`docs/ai_context/todo.md` #519.
+
+claim: acquired 22:38Z by `portfolio-decision-and-execution`, token 442a74633d6b2f5f.
+
+**PREFLIGHT COULD NOT RUN, and this deploy went ahead anyway on an explicit user
+instruction ("deploy it").** `deploy_preflight.py` exits 1 with `RENDER_API_KEY not
+set in the environment or .env` — there is no key in this container, and preflight's
+own rule 1 is *unknown is not clear*. So the substance was established by hand
+instead, and it is recorded here because the marker on disk does not exist:
+
+- **No rollback.** Live web was `aa9fa8e5` (deployed 20:42Z by
+  `layer2-odds-refresh`, a `tmp-land` merge). `git merge-base --is-ancestor
+  aa9fa8e5 origin/main` → TRUE, so `f7797765` strictly contains it. This is the
+  check `learnings.md` 2026-08-16 says the deploy tool will not do for you.
+- **Right branch.** `get_service` reports `branch: main`, so `trigger_deploy`
+  takes the `main` tip and not the `tmp-land` commit the last four API deploys
+  carried. Verified BEFORE firing — a service pointed at another branch would have
+  redeployed `aa9fa8e5` and looked like a successful deploy of this change.
+- **Nothing in flight to kill.** web runs gunicorn (3 procs) + portdetector and no
+  batch job by design; peers deployed it 4x in the preceding 2 hours.
+
+`render.yaml` untouched → no `blueprint_sync`.
+
+deploy: dep-da52ai2jobas73dao6dg, commit `f779776503ea9a08c14bb069f96e36db19b8bc44`.
+
+verify: OWED. `/portfolio/paper` returning 200 with a NON-EMPTY positions table on
+a date where `PORTFOLIO_COMMIT` logged positions > 0. Production HTTP is
+unreachable from a Claude session (`state.md:2811`), so the reading must come from
+Render request logs (`path=/portfolio/paper`, `statusCode=200`) or from the user's
+own browser. **A 200 on an EMPTY page is not the reading** — the page renders 200
+in all four of its absence states, so status alone cannot distinguish "the plan is
+displayed" from "the plan is missing and the empty state is displayed".
