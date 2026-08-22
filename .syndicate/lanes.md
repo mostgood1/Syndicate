@@ -1165,6 +1165,14 @@ against a slate that actually had matches in play. Full evidence in
   `tests/test_wnba_live_prop_line_source.py` (new),
   `tests/test_layer2_sim_view_sides.py` (new),
   `tests/test_layer2_score_flatten.py`.
+  - **`syndicate/features/shared/soccer_projections.py` ADDED 2026-08-22
+    ~17:0xZ**, on the user's report that no soccer sim data reaches the board.
+    **CONFLICT SURFACED AND RESOLVED IN THE OPEN:** that file is listed in
+    `soccer-board-parity` (line ~805), which is OPEN but **UNOWNED** — its
+    session checkpointed and released 2026-08-20. Nothing active holds it, so it
+    is claimed NARROWLY here (attribution counters only; no join, alias or
+    pricing behaviour touched). `board_enrichment.py` is on that lane's list too
+    and was deliberately NOT touched.
   - `syndicate/features/shared/live_projection_join.py` and
     `tests/test_live_prop_miss_attribution.py` ADDED to this lane 2026-08-21
     ~23:5xZ, after the first production reading of `LIVE_PROJECTION_JOIN`

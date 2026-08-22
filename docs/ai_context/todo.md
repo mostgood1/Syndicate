@@ -1,5 +1,67 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#503` — **Soccer's pregame projection join misses ~99.6% of the board, AND that one failure is also what makes every soccer LIVE row unpriceable. The report's live half was FALSE.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, INSTRUMENTED AND DEPLOYED (`e6002cdc`), CAUSE NOT YET NAMED
+
+**Reported as:** "none of the soccer data from sims (pregame or live) is joining
+with the board."
+
+**The pregame half is true.** `rows_with_projection: 4` of ~1,142
+(`state.md`: "READ FIXED, JOIN NOT" — `#379`'s window widening took
+`matches_in_source` 3 -> 99 and moved the joined count by nothing).
+
+**The live half is false, and production said so before anything was changed:**
+
+    16:46:32Z  soccer considered=2714 projected=114 edged=0 prob_withheld=0
+    16:56:03Z  soccer considered=1076 projected=122 edged=0 prob_withheld=0
+
+The live re-sim reaches the board. 114-122 rows join per tick, every one holds a
+live probability, and not one is priced. That is `LIVE_PROJECTION_JOIN`'s own
+third case — "joined, and declined to price" — and it has a different fix from a
+broken join.
+
+**THE TWO ARE ONE DEFECT, and this is the part worth keeping.** Traced through
+the code, not measured yet:
+
+  * `market_fair_prob_over` is written in exactly one place for soccer,
+    `soccer_projections._price_against_market` (line ~638).
+  * That is called ONLY after `attach_soccer_projections` produced a projection
+    — `if projection is None: continue` sits directly above it.
+  * `live_projection_join` reads `projection = dict(row.get("projection") or {})`
+    (line 549) and refuses the edge when `market_fair_prob_over` is absent.
+
+So a row the PREGAME join missed can never carry a live edge, whatever the live
+re-sim does. 1,138 rows with no pregame projection is also 1,138 rows with no
+fair value for the live tier to price against. **Fix the name join and both
+symptoms go.** The reading that confirms it is `edge_why` on the live log line
+coming back dominated by `no_market_fair_value`.
+
+**SHIPPED (`e6002cdc`, refresh-worker live 17:09:28Z) — instruments only, no
+join behaviour touched:**
+
+  * `PREGAME_PROJECTION_JOIN`, which did not exist for ANY sport. The coverage
+    payload went into the artifact and nowhere else.
+  * Soccer attribution splitting `unmatched_match_rows` — a bare total over
+    three causes with three owners — into `unmatched_by_league` (the sim never
+    ran this league vs. the names missed), `leagues_indexed`, `dates_read`,
+    `ambiguous_team_keys`, and PAIRED name samples from the board side and the
+    sim side.
+  * `edge_withheld_by_reason` on the live join, printed beside the total.
+
+**NO ALIAS WAS ADDED, deliberately.** Reproducing the join against the git
+mirror showed board `Inter Milan` vs sim `Internazionale`, `ACF Fiorentina` vs
+`Fiorentina`, `Parma Calcio 1913` vs `Parma` — but those board-side spellings
+are a RECONSTRUCTION of OddsAPI, not a measurement: `data/soccer_source` carries
+no quote side at all. `#374` added five vendor aliases and its note is explicit
+that each was verified against a real fixture. Writing aliases off a guess would
+be the same mistake with a worse audit trail.
+
+**NEXT ACTION:** read the two log lines from refresh-worker, then either add
+verified entries to `_SOCCER_VENDOR_NAME_ALIASES` (name-miss case) or take it to
+the producer (league-not-simulated case). `unmatched_by_league` decides which.
+
+**Cross-lane note:** `soccer_projections.py` is listed in `soccer-board-parity`,
+which is OPEN but UNOWNED. Claimed narrowly and recorded in `lanes.md`.
+
 ### `#502` — **`/portfolio` shows every position pending because the portfolio ledger is stored the one way that CANNOT cross a service boundary. Settlement was never broken.** — found by lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
 
 **The user report: "portfolio isn't showing any settlement, everything still
