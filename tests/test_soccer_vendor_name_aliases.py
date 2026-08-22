@@ -44,6 +44,17 @@ DATE = "2026-08-23"
 # (league, board spelling, sim spelling) -- both quoted from the same log line.
 REPAIRED = [
     ("belgian_pro_league", "Royal Antwerp", "Antwerp"),
+    # From the 18:04:56Z reading -- the first taken with the sim-side sample
+    # SCOPED to the leagues that actually miss. The unscoped version could only
+    # answer about alphabetically-early leagues; scoping it made all twelve
+    # unmatched fixtures pairable in one line.
+    ("epl", "Brighton and Hove Albion", "Brighton & Hove Albion"),
+    ("la_liga", "Athletic Bilbao", "Athletic Club"),
+    ("la_liga", "Deportivo La Coruña", "Deportivo"),
+    ("ligue_1", "Rennes", "Stade Rennais"),
+    ("mls", "Los Angeles FC", "LAFC"),
+    ("serie_a", "Atalanta BC", "Atalanta"),
+    ("serie_a", "Inter Milan", "Internazionale"),
     ("bundesliga", "1. FC Köln", "FC Cologne"),
     ("bundesliga", "Hamburger SV", "Hamburg SV"),
     ("bundesliga", "FSV Mainz 05", "Mainz"),
@@ -55,6 +66,11 @@ REPAIRED = [
 # a future change that "fixes" them by adding map entries is visibly redundant.
 ALREADY_MATCHED = [
     ("bundesliga", "TSG Hoffenheim", "TSG Hoffenheim"),
+    # `Paris Saint Germain` vs `Paris Saint-Germain`: the hyphen is removed by
+    # normalisation, so no entry is needed. Asserted because it LOOKS like the
+    # same class of problem as the seven above and is not.
+    ("ligue_1", "Paris Saint Germain", "Paris Saint-Germain"),
+    ("la_liga", "Málaga", "Málaga"),
     ("bundesliga", "Borussia Dortmund", "Borussia Dortmund"),
     ("bundesliga", "Eintracht Frankfurt", "Eintracht Frankfurt"),
     # Matches on the shared-suffix heuristic, with no map entry.
@@ -64,6 +80,14 @@ ALREADY_MATCHED = [
 # The five fixtures production named, spelled as each feed spells them.
 FIXTURES = [
     ("belgian_pro_league", ("Royal Antwerp", "Genk"), ("Antwerp", "Racing Genk")),
+    ("epl", ("Brighton and Hove Albion", "Aston Villa"), ("Brighton & Hove Albion", "Aston Villa")),
+    ("la_liga", ("Athletic Bilbao", "Sevilla"), ("Athletic Club", "Sevilla")),
+    ("la_liga", ("Barcelona", "Athletic Bilbao"), ("Barcelona", "Athletic Club")),
+    ("la_liga", ("Málaga", "Deportivo La Coruña"), ("Málaga", "Deportivo")),
+    ("ligue_1", ("Rennes", "Paris Saint Germain"), ("Stade Rennais", "Paris Saint-Germain")),
+    ("mls", ("Los Angeles FC", "Portland Timbers"), ("LAFC", "Portland Timbers")),
+    ("serie_a", ("Atalanta BC", "Sassuolo"), ("Atalanta", "Sassuolo")),
+    ("serie_a", ("Inter Milan", "Monza"), ("Internazionale", "Monza")),
     ("bundesliga", ("1. FC Köln", "TSG Hoffenheim"), ("FC Cologne", "TSG Hoffenheim")),
     ("bundesliga", ("Borussia Dortmund", "Hamburger SV"), ("Borussia Dortmund", "Hamburg SV")),
     ("bundesliga", ("FSV Mainz 05", "SC Paderborn"), ("Mainz", "SC Paderborn 07")),
@@ -154,7 +178,7 @@ def test_one_bad_name_costs_the_WHOLE_fixture() -> None:
 
 def test_all_five_production_fixtures_join(tmp_path: Path) -> None:
     coverage = attach_soccer_projections(_grid(), _index(tmp_path))
-    assert coverage["rows_with_projection"] == 5, coverage["unmatched_fixture_sample"]
+    assert coverage["rows_with_projection"] == len(FIXTURES), coverage["unmatched_fixture_sample"]
     assert coverage["unmatched_match_rows"] == 0
     assert coverage["unmatched_fixture_sample"] == []
 
@@ -172,15 +196,22 @@ def test_REACHABILITY_without_the_map_entries_none_of_them_join(tmp_path: Path, 
     aliases._soccer_alias_to_name.cache_clear()
     try:
         coverage = attach_soccer_projections(_grid(), _index(tmp_path))
+        # `Paris Saint Germain`/`Paris Saint-Germain` normalises without the
+        # map, so the ligue_1 fixture still joins on the AWAY side -- but
+        # `Rennes`/`Stade Rennais` does not, and `match_for` needs both. Every
+        # fixture here is lost without the map.
         assert coverage["rows_with_projection"] == 0
-        assert coverage["unmatched_match_rows"] == 5
-        assert coverage["unmatched_fixture_sample"] == [
-            "belgian_pro_league|Royal Antwerp v Genk",
-            "bundesliga|1. FC Köln v TSG Hoffenheim",
-            "bundesliga|Borussia Dortmund v Hamburger SV",
-            "bundesliga|FSV Mainz 05 v SC Paderborn",
-            "bundesliga|Union Berlin v Eintracht Frankfurt",
-        ]
+        assert coverage["unmatched_match_rows"] == len(FIXTURES)
+        # THE COUNT, not the sample, is the total. The board-side sample is
+        # capped at 12 and there are 13 fixtures here, so `Inter Milan v Monza`
+        # (last in sort order) is truncated away -- which briefly read as "that
+        # one joined without the map" while writing this test. It did not.
+        # Asserting the count first is what makes the cap visible instead of
+        # silently subtracting from the evidence.
+        assert coverage["unmatched_fixtures_count"] == len(FIXTURES)
+        expected = sorted(f"{lg}|{b[0]} v {b[1]}" for lg, b, _s in FIXTURES)
+        assert coverage["unmatched_fixture_sample"] == expected[:12]
+        assert "serie_a|Inter Milan v Monza" in expected
     finally:
         # The map is `lru_cache`d, so a stale empty build would poison every
         # later test in the process.
