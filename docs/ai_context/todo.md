@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#510` — **Stage B BUILT: the execution ledger, running on paper. Idempotent, write-ahead, two switches for real money. NOT DEPLOYED, dark by default.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+`syndicate/features/shared/execution_ledger.py` + `pipeline/execute_portfolio.py`,
+behind `SYNDICATE_EXECUTION_ENABLED` (absent = off).
+
+**PAPER AND LIVE ARE THE SAME CODE WITH ONE BOOLEAN BETWEEN THEM.** A paper
+harness that differs structurally from the live one proves nothing about the
+live one, so going live is a flag flip rather than a rewrite. Pinned by a test
+asserting a paper record and a live record have identical field sets and differ
+only in `mode`.
+
+**IDEMPOTENCY IS THE LOAD-BEARING PROPERTY.** The placer must never run inside
+`refresh-worker` (110 OOM kills on 2026-08-07; it restarts mid-job), and a
+restart between submit and record double-places real money. Three defences:
+
+1. **Write-ahead** — the record is persisted as `submitted` BEFORE the submit
+   call. A test asserts the record is already on disk in that state *at the
+   moment `submit` runs*. A crash therefore leaves a reconcilable order; a
+   crash after an unrecorded submit leaves nothing.
+2. **A deterministic key that is an IDENTITY, not a label** — position key +
+   date + venue + market + side + line + player. **The PRICE is deliberately
+   excluded**, so a re-priced slate is the same set of bets; otherwise every
+   quote refresh would place the book again (pinned by a test).
+3. **Refusal, not overwrite** — `record_order` returns the EXISTING record, and
+   `submit` is never reached for a known key. A retry is a no-op by
+   construction rather than by the caller remembering to check.
+
+**TWO INDEPENDENT SWITCHES FOR REAL MONEY**, both checked immediately before
+each submit rather than at startup so the kill switch can stop an in-flight
+slate: `SYNDICATE_EXECUTION_MODE=live` AND `SYNDICATE_EXECUTION_LIVE_ARMED`.
+**Any unrecognised mode resolves to `paper`** — the direction that spends
+nothing. That fallback direction is the explicit lesson of the same day's
+`SYNDICATE_REFRESH_STATE_BACKEND` incident, where an unrecognised value silently
+meant something else entirely. `--force` skips the enablement flag ONLY; a
+convenience flag that can reach real money is not a convenience.
+
+**LIVE IS BLOCKED WHILE ANY ORDER SITS UNRECONCILED** — an order sent with an
+unknown result must not have a fresh slate stacked on it. Paper is not blocked
+(it cannot double-spend) but still reports the count.
+
+**STORAGE, resolved on `#506`'s measurement.** Keyvalue, **no date token** — a
+dated path takes the store's 10-day TTL and a record of money placed must not
+expire (pinned by a test). No Postgres, so no `blueprint_sync`. Because that
+makes it one growing document — the shape behind the 4.9GB-chunk incident —
+three bounds are enforced in the module rather than trusted to callers: **lean
+records only** (a test asserts the persisted field set), a **hard 5,000-record
+cap with LOUD trimming**, and a **size warning at 2MB** against the store's 8MB
+refusal ceiling. An **unreadable ledger RAISES** rather than reading as empty:
+an empty read would make every existing order look unplaced and invite a
+duplicate of the whole slate. That is the one place the module refuses instead
+of degrading.
+
+**MEASURED END TO END, local:** shortlist (3 rows) → commit (2 positions,
+$5.19, 40.3% sim-attributed) → paper orders (2 filled, $5.19) → **replay:
+placed=0, duplicates=2**. That last number is the one that proves idempotency
+outside a unit test, and `run_execution` returns it every run.
+
+Tests: `tests/test_execution_ledger.py` (32) + `tests/test_execute_portfolio.py`
+(9). **NOT DEPLOYED.** Owed production reading is `off != on` plus
+`duplicates == positions` on a second run of the same slate.
+
+**NEXT IS STAGE C**, and it needs no new mechanism: run this on paper over a
+real dated window, then join CLV against Stage A's per-bet `attribution` to get
+the by-component decomposition `#507`/`#508` both point at. Stage D (real money)
+stays gated on that plus `#502`'s `settled_count > 0`.
+
+
 ### `#508` — **`_SCORE_SIM_WEIGHT` 0.0 → 0.125 WITH A HARD CAP. The fix is the CAP, not the coefficient — the same structural fix the movement term already had. Measured against the distribution that caused the zeroing. NOT DEPLOYED, and blocked cross-lane by a UI disclosure this makes false.** — lane `portfolio-decision-and-execution`, 2026-08-22, user decision
 
 **THE USER ASKED FOR THIS DIRECTLY** after being told the sim contributes 0 to

@@ -1319,6 +1319,22 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   endpoint in the same commit — `#373`/`#381`/`#391`/`#397` each record a
   counter that existed at the builder and was invisible at that hop, three of
   them costing an investigation. **Zero means the change is inert.**
+- **STAGE B BUILT — execution ledger, paper mode, dark behind
+  `SYNDICATE_EXECUTION_ENABLED`.** Paper and live are the SAME code with one
+  boolean between them (a test asserts identical field sets, differing only in
+  `mode`). Idempotency is the load-bearing property: write-ahead (the record is
+  on disk as `submitted` at the moment `submit` runs — pinned), a deterministic
+  key that is an IDENTITY and **excludes the price** so a re-priced slate is the
+  same bets, and refusal-not-overwrite so `submit` is never reached twice. Two
+  independent switches for real money, both checked immediately before each
+  submit; **any unrecognised mode resolves to `paper`**, the direction that
+  spends nothing — the explicit lesson of the same day's backend incident. Live
+  is blocked while any order is unreconciled. Storage per `#506`: keyvalue, **no
+  date token**, bounded (lean fields, 5k cap with loud trimming, 2MB warning),
+  and an unreadable ledger RAISES rather than reading as empty. **Measured end
+  to end locally:** 3 rows → 2 positions ($5.19, 40.3% sim-attributed) → 2 paper
+  fills → **replay placed=0, duplicates=2**. 41 tests. Full working:
+  `todo.md #510`.
 - **Local evidence (NOT production):** checklist PASSES 4/4 fields POPULATED and
   CONSUMED plus 4/4 named refusals; 50 new tests pass; 334 related tests pass;
   `/portfolio` renders 200 and a form POST persists a new bankroll (1000 ->
@@ -1337,6 +1353,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
   `tests/test_layer2_blend_admission.py`,
+  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
   `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
