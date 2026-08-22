@@ -5471,3 +5471,58 @@ verify the other side's headers survived before committing.
 work is findable by lane slug and by scope-doc filename, neither of which can
 collide. The number is a convenience for `todo.md` ordering and should be
 assigned as late as possible.
+## 08-22 DEEP DIVE VERDICT: MOMENTUM IS DIRECTIONAL. It says WHICH TEAM -- not whether, how many, or when.
+
+5,552 matches, holdout-only, every baseline = the live state a book already
+knows (clock, score diff, goals so far). Signals added on top. dAUC:
+
+    WHICH TEAM                                   WHETHER / HOW MANY / WHEN
+    next team to score      +0.0707  (AUC .577)  any goal in 15m      +0.0007
+    home scores in 15m      +0.0332               goals remaining >=1  +0.0003
+    away scores in 15m      +0.0286               goals remaining >=2  +0.0001
+    match winner (away)     +0.0101               BTTS                 -0.0009
+    match winner (home)     +0.0069               goal before half-end +0.0001
+    winner at 0-15'         +0.0393               goal before 75'      +0.0002
+                                                  corners in 5/10m     -0.010 / -0.006 (ESPN, 699 m)
+
+Same signal, same matches: +0.03 on "home scores in 15m", +0.0007 on "any goal
+in 15m". The information is almost entirely in the SIGN. Signed vendor momentum
+alone carries +0.0710 of the +0.0707 direction effect; signed xG +0.0203, signed
+count +0.0362 -- momentum dominates and the rest is redundant.
+
+**DIRECTION IS A SLOW SIGNAL, unlike "whether".** Lagged 60s it keeps 94%, lagged
+300s it keeps 88%. The 2-minute "whether" signal lost 24% at 60s. Being on top
+PERSISTS; a goal arriving does not. That is why direction maps onto quotable
+markets (next team to score has no time limit) and "whether" does not.
+
+**CORRECTION to my earlier "momentum is largely reactive" caveat.** Stripping
+every sample with a goal in the prior 600s leaves dAUC +0.0152 vs +0.0152
+unstripped, momentum-only +0.0134 vs +0.0116. The post-goal reaction is REAL
+(AUC .605 on past goals) but it does not cannibalise the forward signal. I
+reported the reactive finding as the honest headline; it was a true fact that
+did not bear on the decision.
+
+**CALIBRATED.** ECE 0.0026; top decile predicted 8.17% observed 8.26%. Direction
+decile 10 predicted .664 observed .653. Model outputs can be set against book
+implied probabilities directly.
+
+**CONTEXT.** Signal is 4x stronger with a 2+ goal lead (+0.041) than level
+(+0.010); strongest 60-75' (+0.071); near-zero 0-15' for "whether" but STRONGEST
+0-15' for WINNER (+0.039) -- early, before the score has separated outcomes.
+Winner signal decays to +0.004 by 75-90' as the scoreboard takes over. Belgian
+(-0.008, n small) and MLS (+0.006) carry nothing; Primeira (+0.035), Bundesliga
+(+0.029) carry most.
+
+**ECONOMICS, 120s window.** Top 0.5%: hit 13.2% [11.0,15.8], lift 2.27x, ROI
++95% against a NAIVE book (clock rate + 8% vig), -vig against a SHARP book. Fires
+0.46x per match. At 600s the lift collapses to 1.2x and naive ROI to ~0. LULLS:
+bottom decile 0.98x of clock -- the model does NOT find quiet spells; "no goal"
+is not a market here.
+
+**WHAT A READING MEANS.** |momentum| <40: no information (0.93-0.99x). 60-80:
+1.19x. 80+: 1.23x. The card should not colour anything below 40.
+
+**PRODUCTION GAP.** momentum.py DEFAULT_HALF_LIFE_SECONDS = 300.0; the data says
+60s. The card shows a 5x over-smoothed series. And production momentum is
+ESPN-commentary-derived; the signal that carries is FotMob's series, which is
+not wired.
