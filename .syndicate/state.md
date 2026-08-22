@@ -2728,7 +2728,7 @@ One line per item. Where a thing is live, the SHA is the one that carries it, no
 | odds-sweep ownership gate (`20025cc4`) | **HALF-WORKING** — fires on live-odds-worker (`kept=mlb,wnba,soccer dropped=nfl,ncaaf`), NOT reached on refresh-worker. `#129` reads OPEN again. |
 | WNBA phase-2 autorun | **INERT** — launcher fires, `launched=ok runStamp=None artifactsDir=None`, `MAIN_ENTRY` never appears. Reproduced across two boots. |
 | soccer live lens (`6bdc50de`) | **FIXED** — 7 leagues → 10; the three that vanished were exactly the three with matches in play |
-| soccer projection window (`6aaa11af`+`b4d82364`) | **READ FIXED, JOIN NOT** — 30 artifacts across six dates, `matches_in_source` 3 → 99, but `rows_with_projection` still 4 of 1,142; 1,138 unmatched |
+| soccer projection window (`6aaa11af`+`b4d82364`) | **SUPERSEDED — DO NOT USE THE 4-of-1,142 FIGURE.** Re-measured 2026-08-22 17:30:32Z on refresh-worker (`PREGAME_PROJECTION_JOIN`): `considered 20,013`, `projected 9,598` (48%), `with_prob 8,922`, `matches_in_source 95`, all 10 leagues indexed, `ambiguous_keys 0`. The join WORKS. Remaining gap is `unmatched_player 5,138` > `unsupported_market 2,691` > `unmatched_match 2,586` (only 12 distinct fixtures) — so it is a PLAYER-identity problem, not the team-name problem the old row implies. See `todo.md #503`. |
 | soccer live-lens observability (`461774cb`+`481de91d`) | live both workers; **emits only on failure**, so no reading yet |
 | monotone props seal (`bafb4fb2`) | **ROLLED BACK** at its requester's sequencing objection; 08-19 cadence read is unconfounded |
 | MLB live game-line model | **SCORED — the model LOSES to the market** on every population |

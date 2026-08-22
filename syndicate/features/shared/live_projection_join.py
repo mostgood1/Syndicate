@@ -547,6 +547,14 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             continue
 
         projection = dict(row.get("projection") or {})
+        # SNAPSHOT THE PREGAME BASIS BEFORE ANYTHING BELOW OVERWRITES IT.
+        # `projection["basis"]` becomes "live_resim" a few lines down, so by the
+        # time the edge is decided there is no longer any way to ask whether a
+        # PREGAME projection existed for this row -- and that question is what
+        # separates a de-vig gap from a pregame-join miss when the edge is
+        # refused for want of a fair value. Read once, here, while it is still
+        # true.
+        pregame_basis = str(projection.get("basis") or "").strip()
         # KEEP THE PREGAME NUMBER RATHER THAN OVERWRITING IT (`#412`). The three
         # numbers a live row needs are the live projection, the pregame sim's
         # projection, and what has ACTUALLY happened so far -- and this used to
@@ -725,14 +733,43 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                     "nothing honest to price against it",
                 )
             else:
-                # THE ONE THE SOCCER READING POINTS AT. A live probability that
-                # arrived and has nothing to price against is a de-vig gap on
-                # the QUOTE side, not a failure of the re-sim -- and until now
-                # it was indistinguishable from the re-sim producing nothing.
+                # THE ONE THE SOCCER READING POINTS AT -- 100 of 100 withheld
+                # here, measured 2026-08-22 17:30:32Z. A live probability that
+                # arrived and has nothing to price against is a QUOTE-side gap,
+                # not a failure of the re-sim.
+                #
+                # SPLIT AGAIN, because "no fair value" still covers two states
+                # that need different owners, and the first reading could not
+                # tell them apart:
+                #
+                #   the row has NO PREGAME PROJECTION AT ALL. `market_fair_prob_over`
+                #     is written only by the pregame join's `_price_against_market`
+                #     (`soccer_projections.py`), which runs only after a projection
+                #     was produced -- so a row the pregame join missed can never
+                #     carry a live edge, whatever the re-sim does. Owner: the
+                #     pregame join (soccer's `unmatched_player` is 5,138).
+                #
+                #   the row HAS a pregame projection and the DE-VIG still could
+                #     not answer -- a one-sided market, which soccer player props
+                #     routinely are. Owner: the fair-value/margin model.
+                #
+                # `basis` is the discriminator: every projection the pregame join
+                # produces stamps one, and this function has already overwritten
+                # it with "live_resim" above -- so `sim_basis`, preserved from the
+                # pregame value at entry, is what says whether a pregame
+                # projection existed. Read from the ENTRY snapshot rather than
+                # the mutated dict for exactly that reason.
+                had_pregame = bool(pregame_basis)
                 _withhold(
                     projection,
-                    "no_market_fair_value",
-                    "no market fair value to price the live projection against",
+                    "no_fair_value_devig_failed" if had_pregame else "no_fair_value_no_pregame_projection",
+                    "no market fair value to price the live projection against"
+                    + (
+                        " (the market is one-sided, so de-vig has no answer)"
+                        if had_pregame
+                        else " (this row carried no pregame projection, so no fair"
+                        " value was ever computed for it)"
+                    ),
                 )
             continue
         try:

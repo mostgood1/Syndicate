@@ -5,9 +5,22 @@
 **Reported as:** "none of the soccer data from sims (pregame or live) is joining
 with the board."
 
-**The pregame half is true.** `rows_with_projection: 4` of ~1,142
-(`state.md`: "READ FIXED, JOIN NOT" — `#379`'s window widening took
-`matches_in_source` 3 -> 99 and moved the joined count by nothing).
+**THE PREGAME HALF IS ALSO FALSE, and the number I opened this on was stale.**
+First `PREGAME_PROJECTION_JOIN` reading, refresh-worker 2026-08-22 17:30:32Z:
+
+    considered=20013  projected=9598 (48%)  with_prob=8922
+    matches_in_source=95   ambiguous_keys=0
+    dates_read=[08-22..08-28]   leagues_indexed=all 10
+    unmatched_player=5138   unsupported_market=2691   unmatched_match=2586
+
+`state.md`'s "rows_with_projection still 4 of 1,142" was written before `#379`'s
+window widening actually ran in production. I carried it forward as current and
+built a diagnosis on it. **Corrected in `state.md`; do not reuse that figure.**
+
+**AND THE GAP IS NOT WHERE THE OLD ROW SAYS.** `unmatched_match` is 2,586 rows
+across only **12 distinct fixtures** — a team-name problem, but a small one.
+The dominant bucket is `unmatched_player: 5,138`, a PLAYER-identity problem on
+the scorer/shots markets. Those are different subsystems.
 
 **The live half is false, and production said so before anything was changed:**
 
@@ -19,8 +32,10 @@ live probability, and not one is priced. That is `LIVE_PROJECTION_JOIN`'s own
 third case — "joined, and declined to price" — and it has a different fix from a
 broken join.
 
-**THE TWO ARE ONE DEFECT, and this is the part worth keeping.** Traced through
-the code, not measured yet:
+**THE TWO ARE ONE DEFECT — NOW MEASURED, 100 of 100.** The live line at
+17:30:32Z read `edge_withheld=100 edge_why={'no_market_fair_value': 100}`:
+every soccer live row that joins is refused for want of a fair value, none for
+any other reason. The mechanism:
 
   * `market_fair_prob_over` is written in exactly one place for soccer,
     `soccer_projections._price_against_market` (line ~638).
@@ -30,10 +45,21 @@ the code, not measured yet:
     (line 549) and refuses the edge when `market_fair_prob_over` is absent.
 
 So a row the PREGAME join missed can never carry a live edge, whatever the live
-re-sim does. 1,138 rows with no pregame projection is also 1,138 rows with no
-fair value for the live tier to price against. **Fix the name join and both
-symptoms go.** The reading that confirms it is `edge_why` on the live log line
-coming back dominated by `no_market_fair_value`.
+re-sim does.
+
+**BUT THE CULPRIT IS THE PLAYER JOIN, NOT THE MATCH JOIN.** All 100 live rows
+are `player_shots` / `player_shots_on_target` with `player_in_lens: False` —
+the same population as `unmatched_player: 5138`. My earlier framing ("fix the
+team-name join and both symptoms go") was wrong about which join.
+
+**STILL AMBIGUOUS, and instrumented in the follow-up:** `no_market_fair_value`
+covers two states with different owners — a row with NO pregame projection
+(`_price_against_market` never ran) versus a row WITH one whose market is
+one-sided so de-vig has no answer. Split into
+`no_fair_value_no_pregame_projection` and `no_fair_value_devig_failed`,
+discriminated on the pregame `basis` snapshotted at entry (the live tier
+overwrites `basis` with `live_resim`, so reading it later would classify every
+row as "had a pregame projection" — stable and wrong).
 
 **SHIPPED (`e6002cdc`, refresh-worker live 17:09:28Z) — instruments only, no
 join behaviour touched:**
@@ -55,9 +81,19 @@ no quote side at all. `#374` added five vendor aliases and its note is explicit
 that each was verified against a real fixture. Writing aliases off a guess would
 be the same mistake with a worse audit trail.
 
-**NEXT ACTION:** read the two log lines from refresh-worker, then either add
-verified entries to `_SOCCER_VENDOR_NAME_ALIASES` (name-miss case) or take it to
-the producer (league-not-simulated case). `unmatched_by_league` decides which.
+**THE SIM-SIDE SAMPLE SHIPPED USELESS AND IS FIXED.** It sorted every indexed
+fixture alphabetically and took 12, so the first reading answered about
+belgian_pro_league / bundesliga / championship while every league with real
+misses (epl 510, la_liga 972, serie_a 606, ligue_1 240, mls 247) fell off the
+end — 11 of the 12 board-side fixtures had no sim-side counterpart to pair
+against. Now scoped to the leagues that actually miss, with a per-league quota.
+One pair WAS fully visible and is confirmed: board
+`belgian_pro_league|Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
+
+**NEXT ACTION:** take the next reading with the scoped sample, pair all 12
+fixtures, and add only aliases where BOTH spellings are in evidence. Then decide
+whether `unmatched_player: 5138` is a name problem or a coverage problem — that
+is the bucket that actually matters, and it is untouched.
 
 **Cross-lane note:** `soccer_projections.py` is listed in `soccer-board-parity`,
 which is OPEN but UNOWNED. Claimed narrowly and recorded in `lanes.md`.
