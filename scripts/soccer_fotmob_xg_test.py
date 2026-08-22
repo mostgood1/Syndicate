@@ -31,15 +31,26 @@ def harvest(dates: list[str], limit: int, out: Path) -> None:
         except Exception as exc:
             print(f"  date {d} failed: {type(exc).__name__}", flush=True)
             continue
+        tried = kept = 0
         for f in fixtures:
             if len(got) >= limit:
                 break
+            tried += 1
             row = shots_for_match(f["match_id"])
             if row and row["shots"]:
+                # league AND date travel with the match. Without them a cache
+                # cannot be split by competition or checked for overlap with
+                # another sample -- both of which turned out to matter more
+                # than any modelling choice in this analysis.
                 row["league"] = f["league"]
+                row["date"] = d
                 got.append(row)
-            if len(got) % 25 == 0 and got:
-                print(f"  harvested {len(got)}/{limit}", flush=True)
+                kept += 1
+        # Report per DATE, and report the MISS rate. The old print fired on
+        # `len(got) % 25 == 0`, which re-printed the same total for every
+        # failed match once the counter parked on a multiple of 25 -- a stalled
+        # harvest and a fast one produced identical-looking output.
+        print(f"  {d}: {kept}/{tried} had shotmaps   total {len(got)}/{limit}", flush=True)
         if len(got) >= limit:
             break
     out.parent.mkdir(parents=True, exist_ok=True)
