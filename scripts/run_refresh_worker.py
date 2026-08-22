@@ -4423,6 +4423,50 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
+        elif _launch_autorun_evaluation_settlement(
+            # DIRECTLY BEHIND RECONCILIATION (`#504`), moved up from 13th of 14.
+            #
+            # `#341` rescued reconciliation from exactly this position and left
+            # settlement in it, while seven NFL branches were later inserted
+            # ABOVE settlement. So the job `#341` was ultimately trying to make
+            # work -- the one that puts outcomes on the portfolio -- ended up
+            # further back than the job it fixed.
+            #
+            # MEASURED 2026-08-22, which is why this is not a guess. Settlement
+            # was enabled at 17:13Z and reached branch 13 exactly ONCE in 45
+            # minutes, at 17:28:34.610Z -- 0.65ms after
+            # `SOCCER_AUTORUN_SKIPPED reason=spacing_gate`. It got that tick by
+            # coincidence. At 18:00:16.855Z the same chain stopped at branch 12:
+            #
+            #     SOCCER_UNIT_LAUNCHED league=la_liga unit=1/44 due=12 spacing_seconds=300
+            #
+            # 44 queued units at one per 300s, plus `mlb_refresh` (10th) which
+            # this file already documents as winning "nearly every tick during a
+            # slate". A forced 20-minute interval produced ZERO runs in ten
+            # minutes, because the interval gate was never the blocker -- chain
+            # position was. That attempt cost two restarts and bought nothing.
+            #
+            # SAFE THIS HIGH, on `#341`'s own two properties rather than on hope:
+            # it is DAILY GATED (`_evaluation_settlement_should_run_now`, once
+            # per Central day after 06:00), so it wins at most ONE tick per 24h;
+            # and it runs INLINE rather than launching a job, so it never holds
+            # a job slot the refresh branches are waiting for.
+            #
+            # WHERE IT DIFFERS FROM `#341`, and this is the honest caveat:
+            # reconciliation is cheap, settlement is NOT. One tick a day it can
+            # now block the loop during a slate while it reads ledger chunks
+            # (95-332MB) and, if records actually settle, rewrites a whole chunk
+            # per record. The 2026-08-22 pass cost ~40MB and 71s -- but it
+            # settled ZERO records, so it never exercised the write path. The
+            # bound that makes this acceptable is `EVALUATION_SETTLEMENT_LOOKBACK_DAYS`,
+            # and `#256`'s claim-before-work means a death mid-pass advances the
+            # epoch instead of hot-looping.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_nfl_pbp_fetch(
             # SECOND, DIRECTLY BEHIND RECONCILIATION, and `#341` is why.
             #
@@ -4535,13 +4579,6 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_soccer_weekly_refresh(
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_evaluation_settlement(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

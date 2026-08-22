@@ -70,10 +70,35 @@ class NotStarvedByTheElifChain(unittest.TestCase):
         ]
         self.assertIn("_launch_autorun_nfl_pbp_fetch", order)
         index = order.index("_launch_autorun_nfl_pbp_fetch")
+        # Bound raised 1 -> 2 by `#504`, which inserted
+        # `_launch_autorun_evaluation_settlement` directly behind
+        # reconciliation. That is the ONE permitted insertion and it does not
+        # starve this branch: settlement is daily gated
+        # (`_evaluation_settlement_should_run_now`, once per Central day), so it
+        # takes at most ONE tick per 24h. Losing one tick a day is not the
+        # hazard this test exists for -- being behind `mlb_refresh`, which wins
+        # nearly every tick during a slate, is.
         self.assertLessEqual(
-            index, 1,
+            index, 2,
             f"pbp fetch must stay near the front of the chain; found at {index} in {order}",
         )
+        # The invariant the index is a proxy FOR, asserted directly so this test
+        # keeps its teeth if the chain is reshuffled again. Strictly stronger
+        # than the bound above: a positional number drifts every time anything
+        # is inserted, whereas "ahead of the branches that win most ticks" is
+        # the actual property.
+        for high_frequency in (
+            "_launch_autorun_mlb_refresh",
+            "_launch_autorun_weekly_sports_refresh",
+            "_launch_autorun_soccer_weekly_refresh",
+        ):
+            self.assertIn(high_frequency, order)
+            self.assertLess(
+                index, order.index(high_frequency),
+                f"{high_frequency} precedes the pbp fetch; an elif chain means "
+                "pbp only runs on a tick where it declines, which is the "
+                "starvation #341 measured",
+            )
 
     def test_every_decline_path_logs_a_reason(self):
         """`#443` in my own code: the first version had three silent returns.

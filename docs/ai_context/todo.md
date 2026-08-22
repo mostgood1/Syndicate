@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED
+
+`#341` moved `_launch_autorun_reconciliation` to the front of the exclusive
+`elif` chain, on the argument that a **daily-gated INLINE** job wins at most one
+tick per 24h and so costs the refresh branches almost nothing. It left
+`_launch_autorun_evaluation_settlement` at the back, and seven NFL autoruns were
+later inserted ABOVE it. So the job that actually puts outcomes on `/portfolio`
+ended up **13th of 14 — further back than the job `#341` fixed.**
+
+**MEASURED 2026-08-22, which is why this is not a guess.** Settlement was enabled
+at 17:13Z and reached its branch **exactly once in 45 minutes**, at
+17:28:34.610Z — 0.65ms after `SOCCER_AUTORUN_SKIPPED reason=spacing_gate`. It got
+that tick by coincidence. At 18:00:16.855Z the chain stopped one branch short:
+
+    SOCCER_UNIT_LAUNCHED league=la_liga unit=1/44 due=12 spacing_seconds=300
+
+44 queued soccer units at one per 300s, plus `mlb_refresh` (9th) which this file
+already documents as winning "nearly every tick during a slate".
+
+**A DEAD END WORTH RECORDING: forcing it by interval does not work.**
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1200` was set and produced
+**ZERO** runs in ten minutes, then removed. The interval gate was never the
+blocker — chain position was. Cost: 2 restarts, 0 runs, 0 information.
+
+**MY OWN RECORD, CORRECTED TWICE.** I claimed starvation, retracted it on seeing
+the 17:28 run, and the truth is in between: settlement is **REACHABLE but
+CONTENDED**. "It ran once" and "it runs when needed" are different claims and I
+conflated them when I retracted. The retraction was as wrong as the original
+claim.
+
+**THE FIX:** settlement moved to directly behind reconciliation. It now precedes
+`mlb_refresh`, both weekly refreshes, and all seven NFL branches. The two
+adjacent branches are the two daily-gated inline evaluation jobs, in the order
+that matters — reconciliation emits `closing_lines_{date}.csv`, settlement and
+the bridge consume it.
+
+**WHERE THIS DIFFERS FROM `#341`, and it is a real caveat, not a formality:**
+reconciliation is cheap; settlement is not. One tick a day it can now block the
+loop during a slate while reading 95–332MB ledger chunks and, if records settle,
+rewriting a whole chunk per record. **The 2026-08-22 pass cost ~40MB / 71s but
+settled ZERO records, so the write path is STILL UNEXERCISED in production.**
+What bounds it: `EVALUATION_SETTLEMENT_LOOKBACK_DAYS` (now 7), and `#256`'s
+claim-before-work, which means a death mid-pass advances the epoch instead of
+hot-looping — the defect behind the 110 OOM kills of 2026-08-07.
+
+Tests: `tests/test_evaluation_settlement_autorun_ordering.py` (7). **3 of 7 fail
+on the pre-move code**, per the `off != on` rule; the 4 that pass either way
+assert invariants that must hold regardless (in-chain, no duplicate/dropped
+branch, daily-gated + inline + claim-before-work still true).
+
+One existing test needed its bound moved: `test_pbp_fetch_sits_high_in_the_chain`
+pinned `index <= 1`, now `<= 2` for the one permitted insertion — and
+**strengthened** while there, asserting directly that pbp precedes the
+high-frequency branches, which is the invariant the index was only a proxy for.
+The other 4 failures in that area are **PRE-EXISTING** — verified by running them
+against the pre-move code, where the same 4 fail.
+
+**NOT DEPLOYED.** It also lands in `scripts/run_refresh_worker.py`, which the
+ledger records as nominally belonging to lane `refresh-worker-oom-recurrence` —
+whose block is no longer in `lanes.md`, so no enforceable claim exists and
+`lane-guard` sees nothing. Flagged rather than ignored, because that lane's
+subject is refresh-worker OOM and this change moves an expensive job earlier.
+
 ### `#503` — **Soccer's pregame projection join misses ~99.6% of the board, AND that one failure is also what makes every soccer LIVE row unpriceable. The report's live half was FALSE.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, INSTRUMENTED AND DEPLOYED (`e6002cdc`), CAUSE NOT YET NAMED
 
 **Reported as:** "none of the soccer data from sims (pregame or live) is joining
