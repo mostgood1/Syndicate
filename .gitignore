@@ -220,3 +220,9 @@ data/live/
 reports/opportunity_contract/
 reports/intelligence/layer2_shortlist_*.json
 reports/live_refresh_loop/memory_high_water.json
+reports/sim_runs/
+# NARROW entries, not `reports/refresh_status/latest/` -- that directory carries
+# two genuinely tracked files (refresh_status_latest.json,
+# refresh_worker_status.json) which a directory rule would shadow.
+reports/refresh_status/latest/retention_cursor_local.json
+reports/refresh_status/latest/worker_drain_state_*.json
