@@ -49,6 +49,7 @@
           <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
           <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
           <div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div>
+          <div class="board-tabs cards-tabs board-tabs--wrap" id="board-bettype-tabs" role="tablist" aria-label="Bet type filter"></div>
           <div class="board-odds-filter" id="board-odds-filter">
             <div class="board-odds-filter__head">
               <span class="board-odds-filter__label">Odds range</span>
@@ -316,6 +317,53 @@
   // distinction from the other side and warns about the same trap: `totals_alt`
   // and `spreads_alt` START WITH a tracked market name, so a prefix test would
   // sweep the main markets in with them. Suffix, not prefix.
+  // BET TYPE — the specific market, not the game/prop family `MARKET_TABS`
+  // already covers. Labels only where the raw token is not self-explanatory;
+  // anything unmapped is title-cased rather than hidden, so a market the feed
+  // adds tomorrow still appears with a readable name instead of vanishing from
+  // a hardcoded list.
+  const BET_TYPE_LABELS = {
+    h2h: "Moneyline",
+    h2h_3_way: "Moneyline (3-way)",
+    h2h_lay: "Moneyline (lay)",
+    spreads: "Spread",
+    spreads_alt: "Spread (alt)",
+    totals: "Total",
+    totals_alt: "Total (alt)",
+  };
+
+  function betTypeLabel(market) {
+    const key = String(market || "").trim().toLowerCase();
+    if (!key) return "";
+    if (BET_TYPE_LABELS[key]) return BET_TYPE_LABELS[key];
+    return key.replace(/^player_|^batter_|^pitcher_/, "").replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  // BUILT FROM THE DATA, and from the rows that survive every OTHER filter --
+  // so the options describe what selecting one would actually show. A static
+  // list would offer bet types this slate does not have, and every one of those
+  // is a click that empties the board for no stated reason.
+  function betTypeTabs() {
+    const counts = new Map();
+    for (const item of lastRenderItems) {
+      if (!matchesFilters(item) || !matchesLane(item)) continue;
+      if (!matchesClientFilters(item, { ignoreBetType: true })) continue;
+      const key = String(item.market || item.market_key || "").trim().toLowerCase();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const tabs = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([key, n]) => ({ value: key, label: `${betTypeLabel(key)} (${n})` }));
+    // The current selection is kept even at zero, so a filter combination that
+    // empties it does not silently reset to "All" and hide why the board is
+    // blank.
+    if (state.betType !== "all" && !counts.has(state.betType)) {
+      tabs.unshift({ value: state.betType, label: `${betTypeLabel(state.betType)} (0)` });
+    }
+    return [{ value: "all", label: "All bet types" }, ...tabs];
+  }
+
   function isAltLine(item) {
     const market = String((item && (item.market || item.market_key)) || "").trim().toLowerCase();
     return market.endsWith("_alt");
@@ -499,10 +547,18 @@
       ? urlParams.get("lane")
       : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
-    // Default "all" -- the board renders exactly as it does today unless the
-    // reader asks otherwise. A filter that hides rows on a normal visit is how
-    // the odds range shipped blank on 2026-08-22.
-    altLines: ["main", "alt"].includes(String(urlParams.get("alt_lines") || "")) ? urlParams.get("alt_lines") : "all",
+    // DEFAULT "main" -- alt lines are hidden until asked for `[user decision,
+    // 2026-08-22]`. This is the opposite of the odds range's default, and the
+    // difference is that hiding alt lines LEAVES A POPULATED BOARD: the main
+    // line of every market survives. The odds range shipped blank because its
+    // broken default hid EVERYTHING, which is a different failure. A default
+    // that hides a known, named subset is a product choice; one that can empty
+    // the board is a bug.
+    altLines: ["main", "alt", "all"].includes(String(urlParams.get("alt_lines") || "")) ? urlParams.get("alt_lines") : "main",
+    // Specific market, e.g. `h2h` / `totals` / `player_points`. Distinct from
+    // `marketFamily`, which is only the game-vs-prop split. Options are built
+    // from the markets actually present, so it can never offer an empty slice.
+    betType: urlParams.get("bet_type") || "all",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
     // shareable board configuration like sport/date/filters are). null
@@ -575,7 +631,11 @@
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
-    if (state.altLines !== "all") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
+    // "main" is the DEFAULT now, so "all" and "alt" are the states worth
+    // putting in the URL. Writing the default would make every shared link
+    // carry a parameter that changes nothing.
+    if (state.altLines !== "main") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
+    if (state.betType !== "all") url.searchParams.set("bet_type", state.betType); else url.searchParams.delete("bet_type");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -674,7 +734,19 @@
     renderTabs("board-alt-tabs", ALT_LINE_TABS, state.altLines, (value) => {
       state.altLines = value;
       syncUrlState();
-      updateFilterDisclosure();
+      // `renderFilterTabs()`, NOT `updateFilterDisclosure()`. The tab row's
+      // active state is baked in at render time by `renderTabs`, so a handler
+      // that mutates state without re-rendering leaves the old button
+      // highlighted forever -- the filter WORKED and looked broken, which is
+      // worse than not working. Every other handler in this function calls it;
+      // this one did not.
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-bettype-tabs", betTypeTabs(), state.betType, (value) => {
+      state.betType = value;
+      syncUrlState();
+      renderFilterTabs();
       renderBoardBody();
     });
     renderTabs("board-steam-tabs", STEAM_TABS, state.steamOnly ? "steam" : "all", (value) => {
@@ -697,7 +769,8 @@
     if (state.minEdge > 0) active.push("edge");
     if (oddsFilterIsNarrowed()) active.push("odds");
     if (state.steamOnly) active.push("steam");
-    if (state.altLines !== "all") active.push("alt");
+    if (state.altLines !== "main") active.push("alt");
+    if (state.betType !== "all") active.push("bet_type");
     return active;
   }
 
@@ -723,7 +796,8 @@
     state.oddsMin = ODDS_LADDER_MIN_DEFAULT;
     state.oddsMax = ODDS_LADDER_MAX_DEFAULT;
     state.steamOnly = false;
-    state.altLines = "all";
+    state.altLines = "main";
+    state.betType = "all";
     syncUrlState();
     renderFilterTabs();
     renderBoardBody();
@@ -1344,7 +1418,12 @@
     return String(item.candidate_type || item.type || "").trim().toLowerCase() === "steam";
   }
 
-  function matchesClientFilters(item) {
+  function matchesClientFilters(item, options) {
+    // `ignoreBetType` lets the bet-type option list count rows under every
+    // OTHER active filter without excluding them by the very selection being
+    // offered -- otherwise picking one bet type would collapse the list to
+    // that one option and there would be no way back except Clear.
+    const ignoreBetType = Boolean(options && options.ignoreBetType);
     // A steam move carries no "edge" (it's a movement signal, not a
     // model-vs-price gap) -- edgeValue() defaults it to 0, so a nonzero
     // min-edge filter would silently hide every steam row, including under
@@ -1362,6 +1441,10 @@
       const alt = isAltLine(item);
       if (state.altLines === "main" && alt) return false;
       if (state.altLines === "alt" && !alt) return false;
+    }
+    if (!ignoreBetType && state.betType !== "all") {
+      const market = String(item.market || item.market_key || "").trim().toLowerCase();
+      if (market !== state.betType) return false;
     }
     if (state.marketFamily !== "all") {
       const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
@@ -2733,6 +2816,9 @@
     // filter has it hidden from view.
     window.SyndicateWatchlist.checkForAlerts(dateFiltered);
     renderTopStrip(clientFiltered);
+    // The strip is filter-aware now, so it must follow every filter change --
+    // it used to render only on fetch.
+    renderSummaryStrip(null);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
     } else {
@@ -2861,18 +2947,50 @@
     `).join("");
   }
 
+  // THE STRIP DESCRIBED THE SLATE, NOT THE VIEW. `lane_counts` comes from the
+  // server and never moved when a filter did, so "12 live · 88 pregame" sat
+  // above a board narrowed to nine rows and quietly contradicted it. A reader
+  // cannot tell a filter that hid 90 rows from a slate that only had ten.
+  //
+  // Now it reports BOTH, and only says "of N" when the two differ -- an
+  // unfiltered board should not grow noise to state that nothing is hidden.
+  let lastSummaryData = null;
+
   function renderSummaryStrip(data) {
+    if (data) lastSummaryData = data;
+    const payload = lastSummaryData;
     const container = document.getElementById("board-summary-strip");
-    if (!container) return;
-    const boardContract = data.boardContract || {};
+    if (!container || !payload) return;
+    const boardContract = payload.boardContract || {};
     const laneCounts = boardContract.lane_counts || {};
     const parts = [];
     if (boardContract.board_summary && boardContract.board_summary.headline) {
       parts.push(boardContract.board_summary.headline);
     }
-    if (laneCounts.live !== undefined) parts.push(`${laneCounts.live} live`);
-    if (laneCounts.pregame !== undefined) parts.push(`${laneCounts.pregame} pregame`);
-    if (data.parlays && data.parlays.length) parts.push(`${data.parlays.length} parlays`);
+
+    // Counted over the SAME pipeline the board renders, so the numbers cannot
+    // drift from what is on screen.
+    const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    const shown = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
+    const liveShown = shown.filter((item) => itemMarketState(item) === "live").length;
+    const pregameShown = shown.length - liveShown;
+
+    const withTotal = (label, visible, total) => (
+      typeof total === "number" && total !== visible
+        ? `${visible} of ${total} ${label}`
+        : `${visible} ${label}`
+    );
+    parts.push(withTotal("live", liveShown, laneCounts.live));
+    parts.push(withTotal("pregame", pregameShown, laneCounts.pregame));
+
+    // The one number that says a filter is doing something. Shown only when it
+    // is, and it names the CAUSE rather than leaving the reader to infer it.
+    const hidden = dateFiltered.length - shown.length;
+    if (hidden > 0) {
+      const active = activeRefinements();
+      parts.push(`${hidden} hidden by ${active.length} filter${active.length === 1 ? "" : "s"}`);
+    }
+    if (payload.parlays && payload.parlays.length) parts.push(`${payload.parlays.length} parlays`);
     if (!parts.length) {
       container.hidden = true;
       return;
