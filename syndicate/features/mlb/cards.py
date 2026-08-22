@@ -61,9 +61,9 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 _MLB_TODAY_CACHE_TTL_SECONDS = 60
-_MLB_TODAY_CACHE: "OrderedDict[tuple[str, str, int, int], dict[str, Any]]" = OrderedDict()
+_MLB_TODAY_CACHE: "OrderedDict[tuple[str, str, int, int], tuple[float, dict[str, Any]]]" = OrderedDict()
 _MLB_TODAY_CACHE_MAX_ENTRIES = 64
-_MLB_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+_MLB_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], tuple[float, dict[str, Any]]]" = OrderedDict()
 _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
 
 # #253. Both caches above are bounded by ENTRY COUNT and nothing else -- not by
@@ -89,13 +89,62 @@ _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
 # the wrong unit; 32/64 are web-shaped numbers, where many requests genuinely
 # do share a 60-second bucket.
 #
-# The web service keeps its existing limits -- there the hit rate is real. The
+# The web service keeps its existing COUNT limits (see the idle bound below,
+# which is what #253's "there the hit rate is real" turned out to miss). The
 # worker gets 2 (the selected date plus the next-day rollover pool, which is
 # every distinct context it ever asks for) and skips the today cache entirely:
 # #251 put a 300s minimum rebuild interval on the hydrated overview, so a
 # 60-second bucket key can never be re-requested there. Its hit rate on the
 # worker is mathematically zero.
 _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES_WORKER = 2
+
+# #253 bounded these by ENTRY COUNT and fixed the worker. It left web at 32/64
+# on the reasoning that "there the hit rate is real", and that is true of the
+# CURRENT generation and false of the other 31.
+#
+# Web reads the same live-lens report the worker does, and `st_mtime_ns` is in
+# the context key, so web also produces a fresh key roughly every 60 seconds --
+# `[mlb_cards] CONTEXT_CACHE_EVICTED ... web=True` is in production logs for
+# 2026-08-20 and 2026-08-22, and that line only fires once 32 DISTINCT keys have
+# accumulated. So web retains 32 generations of a full MLB cards-page context
+# per gunicorn worker (x WEB_CONCURRENCY=2), plus 64 today-cache entries whose
+# key carries `int(time.time() // 60)` and therefore cannot recur after 60s.
+# Measured on web 2026-08-22: 369 MB at boot -> 2,026,717,200 B after ~7.5h
+# uptime, against a 2,147,483,600 B (2.0 GiB) ceiling. 94.4%.
+#
+# THE BOUND IS ON IDLE TIME, NOT AGE SINCE INSERT, and the distinction is the
+# whole point. A generation nobody comes back for is dead by construction and
+# gets dropped; a key that is still being requested has its clock reset on every
+# hit and is NEVER dropped. So this removes retention without making one single
+# real request slower -- which age-since-insert would not have done, since it
+# would expire the hot current generation every N seconds too.
+#
+# Instrument: `CONTEXT_CACHE_EVICTED ... web=True` should become RARE, because
+# idle entries are now purged before the count cap is ever reached. If it keeps
+# firing at the pre-change rate, this is not working. The measurement that
+# settles it is memory-over-uptime on web after a deploy, NOT this comment.
+#
+# The today cache's key holds a 60-second bucket, so anything idle past that is
+# already unreachable; 120s is 2x that, a margin against bucket-edge effects
+# rather than a tuning choice. The context cache's key is a content signature,
+# so a past-date entry stays legitimately reusable for as long as someone keeps
+# asking for it -- 300s is how long it survives after they stop.
+_MLB_TODAY_CACHE_MAX_IDLE_SECONDS = 120.0
+_MLB_CARDS_CONTEXT_CACHE_MAX_IDLE_SECONDS = 300.0
+
+
+def _purge_idle(
+    cache: "OrderedDict[Any, tuple[float, dict[str, Any]]]",
+    max_idle_seconds: float,
+) -> int:
+    """Drop entries not READ within `max_idle_seconds`. Returns how many."""
+    if not cache:
+        return 0
+    cutoff = time.time() - max_idle_seconds
+    stale = [key for key, (last_used, _payload) in cache.items() if last_used < cutoff]
+    for key in stale:
+        cache.pop(key, None)
+    return len(stale)
 
 
 def _cards_cache_limit() -> int:
@@ -107,10 +156,17 @@ def _cards_cache_limit() -> int:
 
 
 def _today_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
-    cached = _MLB_TODAY_CACHE.get(cache_key)
-    if cached is not None:
-        _MLB_TODAY_CACHE.move_to_end(cache_key)
-    return cached
+    entry = _MLB_TODAY_CACHE.get(cache_key)
+    if entry is None:
+        return None
+    _, payload = entry
+    # Reading REFRESHES the idle clock -- see the note above
+    # `_MLB_TODAY_CACHE_MAX_IDLE_SECONDS`. Returned by reference, not copied:
+    # `test_web_caches_must_not_alias_each_other` pins that, and it is why the
+    # web path still deepcopies into the context cache.
+    _MLB_TODAY_CACHE[cache_key] = (time.time(), payload)
+    _MLB_TODAY_CACHE.move_to_end(cache_key)
+    return payload
 
 
 def _today_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
@@ -119,22 +175,29 @@ def _today_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None
     # retention of a full page context.
     if not _render_web_dyno():
         return
-    _MLB_TODAY_CACHE[cache_key] = result
+    _MLB_TODAY_CACHE[cache_key] = (time.time(), result)
     _MLB_TODAY_CACHE.move_to_end(cache_key)
+    _purge_idle(_MLB_TODAY_CACHE, _MLB_TODAY_CACHE_MAX_IDLE_SECONDS)
     while len(_MLB_TODAY_CACHE) > _MLB_TODAY_CACHE_MAX_ENTRIES:
         _MLB_TODAY_CACHE.popitem(last=False)
 
 
 def _cards_context_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
-    cached = _MLB_CARDS_CONTEXT_CACHE.get(cache_key)
-    if cached is not None:
-        _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
-    return cached
+    entry = _MLB_CARDS_CONTEXT_CACHE.get(cache_key)
+    if entry is None:
+        return None
+    _, payload = entry
+    # Reading REFRESHES the idle clock, so a key still being requested is never
+    # purged and no real request pays for this bound.
+    _MLB_CARDS_CONTEXT_CACHE[cache_key] = (time.time(), payload)
+    _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    return payload
 
 
 def _cards_context_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
-    _MLB_CARDS_CONTEXT_CACHE[cache_key] = result
+    _MLB_CARDS_CONTEXT_CACHE[cache_key] = (time.time(), result)
     _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    _purge_idle(_MLB_CARDS_CONTEXT_CACHE, _MLB_CARDS_CONTEXT_CACHE_MAX_IDLE_SECONDS)
     limit = _cards_cache_limit()
     evicted = 0
     while len(_MLB_CARDS_CONTEXT_CACHE) > limit:
