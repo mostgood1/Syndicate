@@ -22248,3 +22248,43 @@ reconciliation is daily-gated and last ran 06:57:03Z, so the first settlement
 pass under the new code is the next one. A green deploy is NOT evidence the fix
 works — it is only evidence the code is live. Do not close `#502` on the deploy.
 
+
+### LIVE 17:04:3xZ — both services, verified by CONTENT not just by status
+
+    web             2aa1df54  live 17:04:29Z
+    refresh-worker  2aa1df54  live 17:04:33Z   new instance -fdczn (was -z6m99)
+
+**Positive marker, not absence-of-error** (per `learnings.md`: a check must gate
+on an AFFIRMATIVE token). The worker's loop is running on the new code and has
+already picked work back up:
+
+    17:05:09Z  MLB_SIM_TICK mlbDailySim ok=true pid=65 reason=tip_off_window
+               run_mlb_daily_sim_job.py --only-game-pks 823509
+
+No `Traceback`, no `ImportError`, no `SHARED_WRITE_FAILED` on either service
+since 17:04. (The `psutil_unavailable:ImportError` lines are PRE-EXISTING — they
+appear in logs hours before this deploy and are unrelated.)
+
+**Side effect worth recording:** refresh-worker memory fell 90.9% -> **15.6%**
+(3,722MB -> 640MB), because the restart discarded ~2.2GB of "unexplained"
+non-process memory. Not a fix — it will re-accumulate — but it dates the
+accumulation to uptime rather than to any single job.
+
+**Confirms the kill was real:** the pre-deploy run covered 15 game_pks; the
+post-deploy one covers 1 (`823509`, `tip_off_window`). The 15-game 16:47 run was
+lost, as the user accepted.
+
+### STILL NOT VERIFIED, and one thing this fix does NOT reach
+
+`settled_count > 0` on `/api/portfolio/summary` remains the verify, and cannot be
+read until reconciliation next runs — gated at 86400s from 06:57:03Z, so
+~06:57Z on 2026-08-23.
+
+**Scope limit, stated so nobody reads more into `#502` than it earns:** this
+unblocks the RECONCILIATION path, which is enabled. It does NOT settle parlays.
+`ledger_bridge.py`'s own docstring is explicit that reconciliation structurally
+cannot resolve one — no single market for `_match_result_row` to match — and the
+bridge that CAN is inside the evaluation-settlement autorun, still
+`autorun_enabled=False` for `#275`'s measured memory cost. So a parlay in the
+ledger will still read pending after this fix, correctly and for a different
+reason.
