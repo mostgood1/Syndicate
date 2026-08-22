@@ -1,5 +1,81 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#502` — **`/portfolio` shows every position pending because the portfolio ledger is stored the one way that CANNOT cross a service boundary. Settlement was never broken.** — found by lane `portfolio-ledger-service-split`, 2026-08-22, FIXED IN CODE, NOT DEPLOYED
+
+**The user report: "portfolio isn't showing any settlement, everything still
+pending."** `/api/portfolio/summary` has read `settled_count: 0, avg_clv: null`
+for weeks, and `#214`, `#216` and `#341` each diagnosed a different cause and
+each fixed something real. None of them moved the number, because all three were
+on the wrong side of this:
+
+- The bet slip (`POST /api/portfolio/bets`) writes `prediction_ledger.json` on
+  the **web** service.
+- `_launch_autorun_reconciliation`, the only thing that settles it, runs on
+  **refresh-worker**.
+- `prediction_ledger.py` read and wrote that file with raw `path.read_text()` /
+  `path.write_text()` under `data_root()`.
+
+All three services set `SYNDICATE_DATA_ROOT=/opt/render/project/data`, so the
+path string is identical — and **Render gives each service its own disk** (web
+`dsk-d8bi8prbc2fs73en7dig`, refresh-worker `dsk-d91f7ggk1i2s73ar37a0`). One path,
+two files. Reconciliation settled an empty ledger; web served the real one as
+pending, forever.
+
+**Measured 2026-08-22, and note WHICH readings settle it:**
+
+    RECONCILIATION_AUTORUN_RUNNING last_epoch_age_sec=86449   06:57:03Z  <- it RUNS, daily, correctly
+    [evaluation_settlement] LEDGER_INDEX_SIZE ... autorun_enabled=False  <- every tick, 7 days
+    [ledger_bridge] ...                                       ZERO lines in 7 days
+
+The bridge (`#216`) was written to fix exactly this symptom and has never
+executed once: it lives INSIDE `_launch_autorun_evaluation_settlement`, after
+that function's enabled check, and that autorun is deliberately off for the
+`#275` cost reasons. So the fix for the split was itself behind the disabled
+gate.
+
+**Falsification I ran before believing it:** if `prediction_ledger.json` matched
+any `HOT_ARTIFACT_PATTERNS` entry, the publisher would carry it across and the
+diagnosis would be wrong. Checked mechanically with `fnmatch` against all 151
+patterns — **no match**, in either direction. The publisher's own comment says
+the same thing in prose: *"Settlement itself runs on refresh-worker against its
+LOCAL copies."*
+
+**THE FIX** (`syndicate/features/prediction_ledger.py`): `_read_payload` /
+`_write_payload` now route through the keyvalue store, which is what CLAUDE.md's
+worker-split rule already requires of shared mutable state. Two choices worth
+keeping:
+
+- **Disk stays the durable copy and is written FIRST.** The shared Redis is a
+  256MB starter measured at 96% with 34,529 LRU-evicted keys; keyvalue-only
+  storage would let an eviction destroy a user's bet history. Disk is the
+  backstop, keyvalue is the channel, and an evicted key self-heals from disk.
+- **Promotion is UPWARD ONLY.** A pre-existing disk ledger is promoted into the
+  shared key, but only if it actually holds predictions. Otherwise the worker —
+  which ticks constantly, against an empty ledger, while a user opens
+  `/portfolio` rarely — would define the shared key first and the user's bets
+  would vanish from the page.
+
+Tests: `tests/test_prediction_ledger_shared_store.py` (9). Falsified per
+`learnings.md`'s `off != on` rule — **6 of 9 FAIL on the pre-fix code**, and
+the end-to-end one fails with literally the reported symptom ("the position must
+not still read as pending"). The 3 that pass on both assert unchanged behaviour
+(disk durability, filesystem backend) and are supposed to.
+
+**NOT DEPLOYED, and it needs BOTH web and refresh-worker** — a one-sided deploy
+leaves the two halves disagreeing about where the ledger lives. Production
+verification is `settled_count > 0` on `/api/portfolio/summary`; nothing here is
+verified against production yet, and this entry should not be read as if it were.
+
+**The durable lesson, which is `#502`'s real value:** three sessions in a row
+diagnosed this as a settlement bug because every component of settlement was
+genuinely imperfect and each fix was genuinely correct. **An identical path
+string on two services is not shared state, and nothing in the code says so at
+the point of use.** `data_root()` reads as "the persistent disk" and is; it is
+just not the SAME persistent disk. Same shape as the soccer live-state finding
+in `state.md` (`poll_soccer_live_state.py` writing per-league files with a raw
+`write_text()` that neither the filesystem nor the key resolves) — which was
+found independently, a day earlier, in a different subsystem.
+
 ### `#501` — **The WNBA live-lens went to ZERO ~00:20Z DURING LIVE PLAY and did not come back, while capture kept writing players. Both `#498` and `#499` lost their measurement window to it.** — found by lane `wnba-live-props-data`, 2026-08-21, NOT FIXED, CAUSE UNKNOWN
 
 **Corrects this item's own first framing.** It was filed as "the halftime state

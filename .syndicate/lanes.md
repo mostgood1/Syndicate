@@ -1204,6 +1204,33 @@ against a slate that actually had matches in play. Full evidence in
 - Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
   `main` ships nothing until someone takes a claim and deploys it.
 
+### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
+- Goal: a bet logged on the WEB service can be settled by the reconciliation
+  autorun that runs on REFRESH-WORKER, so `/portfolio` stops reading every
+  position as pending.
+- Files: `syndicate/features/prediction_ledger.py`,
+  `tests/test_prediction_ledger_shared_store.py`
+- Hypothesis (stated before fixing): the settlement machinery is not broken and
+  never was. `data/prediction_ledger.json` is read and written with raw
+  `path.read_text()` / `path.write_text()` under `data_root()`, and all three
+  Render services set `SYNDICATE_DATA_ROOT=/opt/render/project/data` while each
+  owns a SEPARATE 50GB disk (`dsk-d8bi8prbc2fs73en7dig` web,
+  `dsk-d91f7ggk1i2s73ar37a0` refresh-worker). The bet slip writes on web; the
+  reconciliation autorun reads on refresh-worker. Two different files behind one
+  path string, so reconciliation settles an empty ledger and web serves an
+  unsettled one.
+- Falsification test: if `prediction_ledger.json` matched any entry in
+  `HOT_ARTIFACT_PATTERNS`, the publisher would carry it across the boundary and
+  the hypothesis would be wrong. Checked mechanically against all 151 patterns
+  with `fnmatch` — NO MATCH, in either direction.
+- Verification: unit tests that FAIL on the current code and pass after —
+  specifically a two-service simulation (write under one data root, read under
+  another) which is the exact thing the current code cannot do. Production
+  verification is `settled_count > 0` on `/api/portfolio/summary`, and that
+  needs a deploy of BOTH web and refresh-worker.
+- Blocked by: none. NOT a deploy request — `autoDeploy = no`, so landing this on
+  `main` ships nothing until someone takes a claim and deploys it.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

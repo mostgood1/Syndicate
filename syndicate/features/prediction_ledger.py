@@ -8,7 +8,10 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Mapping
 
+from syndicate.features.shared.refresh_state_store import _keyvalue_backed
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.refresh_state_store import read_text_file_result
+from syndicate.features.shared.refresh_state_store import write_text_file
 
 
 SCHEMA_VERSION = 1
@@ -69,15 +72,47 @@ def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _read_payload(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {"schema_version": SCHEMA_VERSION, "predictions": [], "results": []}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {"schema_version": SCHEMA_VERSION, "predictions": [], "results": []}
+# THE PORTFOLIO LEDGER IS SHARED MUTABLE STATE ACROSS TWO SERVICES, and until
+# `#502` it was stored the one way that cannot be (`#502`).
+#
+# The bet slip (POST /api/portfolio/bets) writes this file on the WEB service.
+# The only thing that settles it -- `_launch_autorun_reconciliation` in
+# scripts/run_refresh_worker.py, which calls record_result() below -- runs on
+# REFRESH-WORKER. Both resolve `data_root()` to `/opt/render/project/data`,
+# because all three services set the same `SYNDICATE_DATA_ROOT`. **Render gives
+# each service its OWN disk** (web `dsk-d8bi8prbc2fs73en7dig`, refresh-worker
+# `dsk-d91f7ggk1i2s73ar37a0`), so that one path string named two different
+# files, and `prediction_ledger.json` matches none of the 151
+# HOT_ARTIFACT_PATTERNS, so the publisher never carried it across either.
+#
+# Measured consequence: reconciliation ran daily and correctly (verified live
+# 2026-08-22, `RECONCILIATION_AUTORUN_RUNNING` at 06:57:03Z) against a ledger
+# that had no bets in it, while web served the bets it did have as pending
+# forever. `/api/portfolio/summary` read `settled_count: 0` for weeks and three
+# separate fixes (`#214` starved inputs, `#216` the ledger bridge, `#341` the
+# autorun's chain position) all landed on the wrong side of this boundary.
+#
+# So route IO through the keyvalue store, which is what CLAUDE.md's worker-split
+# rule already requires of shared mutable state. Two deliberate choices:
+#
+# 1. **Disk stays the durable copy and is written FIRST.** The shared Redis is
+#    a 256MB starter instance that has been measured at 96% with 34,529
+#    LRU-evicted keys. Keyvalue-only storage would make an eviction silently
+#    destroy the user's bet history. Disk is the backstop; keyvalue is the
+#    channel.
+# 2. **Raw text, not `write_json_file`.** That helper runs
+#    `normalize_timestamped_payload`, which rewrites `timestamp`/`updated_at`
+#    into Central time -- and `_prediction_date()` slices `timestamp[:10]` to
+#    decide which dates reconciliation retries. Normalising on the keyvalue
+#    path only would let a prediction's date differ by a day depending on which
+#    backend served the read. Text keeps the payload byte-identical on both.
+def _blank_payload() -> dict[str, Any]:
+    return {"schema_version": SCHEMA_VERSION, "predictions": [], "results": []}
+
+
+def _coerce_payload(payload: Any) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
-        return {"schema_version": SCHEMA_VERSION, "predictions": [], "results": []}
+        return None
     payload.setdefault("schema_version", SCHEMA_VERSION)
     payload.setdefault("predictions", [])
     payload.setdefault("results", [])
@@ -88,9 +123,69 @@ def _read_payload(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _serialize_payload(payload: Mapping[str, Any]) -> str:
+    return json.dumps(dict(payload), indent=2, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _read_disk_payload(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        return _coerce_payload(json.loads(path.read_text(encoding="utf-8")))
+    except Exception:
+        return None
+
+
+def _publish_shared_payload(path: Path, payload: Mapping[str, Any]) -> None:
+    """Mirror the ledger into the cross-service store. Never raises.
+
+    A keyvalue hiccup must not fail a user's bet write -- the disk write has
+    already succeeded by the time this is called, so the worst case is that the
+    other service reads a stale copy until the next write, not a lost bet.
+    Printed rather than logged: `logger.info` does not reach Render's collector.
+    """
+    if not _keyvalue_backed(path):
+        return
+    try:
+        write_text_file(path, _serialize_payload(payload))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[prediction_ledger] SHARED_WRITE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _read_payload(path: Path) -> dict[str, Any]:
+    if not _keyvalue_backed(path):
+        return _read_disk_payload(path) or _blank_payload()
+
+    shared_text, read_ok = read_text_file_result(path)
+    if shared_text:
+        try:
+            shared_payload = _coerce_payload(json.loads(str(shared_text)))
+        except Exception:
+            shared_payload = None
+        if shared_payload is not None:
+            return shared_payload
+
+    disk_payload = _read_disk_payload(path)
+    if disk_payload is None:
+        return _blank_payload()
+
+    # PROMOTE, BUT ONLY UPWARD. On first run after this ships, the real ledger
+    # is on the web disk and the worker's copy is absent or empty; whichever
+    # service reads first would otherwise define the shared key, and the worker
+    # ticks constantly while a user opens /portfolio rarely. Promoting only a
+    # ledger that actually holds predictions makes it impossible for the
+    # worker's empty file to shadow the user's real bets. `read_ok` gates on a
+    # CONFIRMED absence -- a backend error reads as None too, and promoting on
+    # one would overwrite a good key with a stale disk copy.
+    if read_ok and not shared_text and disk_payload.get("predictions"):
+        _publish_shared_payload(path, disk_payload)
+    return disk_payload
+
+
 def _write_payload(path: Path, payload: Mapping[str, Any]) -> None:
     _ensure_parent(path)
-    path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True, ensure_ascii=False, default=str), encoding="utf-8")
+    path.write_text(_serialize_payload(payload), encoding="utf-8")
+    _publish_shared_payload(path, payload)
 
 
 def _normalize_text(value: Any) -> str:
