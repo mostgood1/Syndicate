@@ -1078,9 +1078,32 @@
     const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
     const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
     const projection = isProp ? item.live_projection : (item.live_projection ?? item.live_total);
-    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
-    const numeric = Number(projection);
-    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
+      const numeric = Number(projection);
+      return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+    }
+    // THE SAME GAP `displayProjection` CLOSED FOR THE PREGAME COLUMN, still
+    // open here. A game line has no natural live COUNT — there is no
+    // "projected margin so far" — so the live re-sim's output for h2h/spreads
+    // is a PROBABILITY, published as `live_model_probability`
+    // (`layer2_board._live_projection_columns`). Until now this function read
+    // only `live_projection`/`live_total`, so every live game-line row rendered
+    // an em dash while the backend held a live number for it.
+    //
+    // Worse, before the backend fix that accompanies this: the probability WAS
+    // being written into `live_projection`, so the cell showed "0.2" for a 19%
+    // live win probability. Blank was the better of those two failures; a
+    // percentage is better than both.
+    //
+    // Scoped to game markets and to a real 0..1, for the reason
+    // `layer2_board.py` states about its own columns: "an invented projection
+    // on a betting board is worse than an empty cell." A prop with no live
+    // count still renders blank — its live number is a count and we do not
+    // have one.
+    if (isProp) return null;
+    const prob = Number(item.live_model_probability);
+    if (!Number.isFinite(prob) || prob <= 0 || prob > 1) return null;
+    return `${(prob * 100).toFixed(1)}%`;
   }
 
   // The real box-score/current-game-state value right now -- distinct from

@@ -374,5 +374,65 @@ eq('exactly one line of a tied group is primary',
 eq('the tie resolves to the MEDIAN line, not the first seen',
   altApi.isAltLine(row('totals', 2.5, 5)), false);
 
+// --- the LIVE column -------------------------------------------------------
+//
+// Reported by the user: "all the projections (sim pregame, sim live, actual
+// live) are blank", then "livedata is the major blank". Two defects, and the
+// second was worse than the blank it caused:
+//
+//   1. A GAME LINE'S `live_projected` IS A PROBABILITY. `_apply_verdict` is
+//      called with `live_projected=verdict["model_prob"]` for h2h AND totals
+//      AND spreads (`live_gameline_join.py:876`), and
+//      `_live_projection_columns` copied it into `live_projection` AND
+//      `live_total`. `toFixed(1)` then rendered a 19% live win probability as
+//      **"0.2"**, and a totals row as a live projected total of 0.2 goals.
+//   2. With that removed the cell goes blank — because this function only ever
+//      read `live_projection`/`live_total`, while the backend publishes
+//      `live_model_probability` for exactly these rows.
+//
+// `displayProjection` closed the identical gap for the PREGAME column on
+// 2026-08-20 ("109 of 114 h2h rows were blank here for exactly that reason").
+// The live column never got it. Same bug, same shape, one column over.
+const displayLiveProjection = (new Function(`${extract('displayLiveProjection')}\nreturn displayLiveProjection;`))();
+
+console.log('\n--- a live PROP shows its live count ---');
+eq('a prop count renders', displayLiveProjection({ candidate_type: 'prop', live_projection: 2.4 }), '2.4');
+eq('a real live zero renders as 0, not blank',
+  displayLiveProjection({ candidate_type: 'prop', live_projection: 0 }), '0');
+// A prop's live number is a COUNT. If we do not have one, we do not invent one
+// from a probability -- that is the "invented projection" the backend forbids.
+eq('a prop with only a probability stays blank',
+  displayLiveProjection({ candidate_type: 'prop', live_model_probability: 0.62 }), null);
+eq('player_name alone marks it a prop',
+  displayLiveProjection({ player_name: 'A. Player', live_model_probability: 0.62 }), null);
+
+console.log('\n--- a live GAME LINE shows the live PROBABILITY, not a fake count ---');
+eq('a live moneyline renders its probability',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 0.19 }), '19.0%');
+eq('a live spread does too',
+  displayLiveProjection({ market: 'spreads', live_model_probability: 0.55 }), '55.0%');
+eq('no live number at all stays blank',
+  displayLiveProjection({ market: 'h2h' }), null);
+
+console.log('\n--- and it never typesets a probability as a count ---');
+// The exact regression: 0.19 must NOT come back as "0.2".
+const shown = displayLiveProjection({ market: 'h2h', live_model_probability: 0.19 });
+eq('19% is not rendered as "0.2"', shown === '0.2', false);
+eq('19% is rendered as a percentage', shown, '19.0%');
+// Out-of-range guards: a value that is not a probability is refused rather
+// than multiplied by 100 into nonsense.
+eq('a probability of 0 is refused (nothing to claim)',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 0 }), null);
+eq('a value above 1 is refused',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 62 }), null);
+eq('garbage is refused',
+  displayLiveProjection({ market: 'h2h', live_model_probability: 'soon' }), null);
+
+console.log('\n--- a real live TOTAL still wins over the probability ---');
+// `live_total` now carries `total_mean` from the gameline block, which IS a
+// count. It must take precedence: a projected 2.7 goals is more informative
+// than the cover probability.
+eq('a game row prefers its live total', displayLiveProjection({ market: 'totals', live_total: 2.7, live_model_probability: 0.55 }), '2.7');
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
