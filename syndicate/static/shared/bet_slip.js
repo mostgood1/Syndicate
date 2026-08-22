@@ -18,10 +18,20 @@ window.SyndicateBetSlip = (function () {
 
   const BET_SLIP_STORAGE_KEY = "syndicate_bet_slip_v1";
   const BET_SLIP_MODE_STORAGE_KEY = "syndicate_bet_slip_mode_v1";
+  const BET_SLIP_COLLAPSED_STORAGE_KEY = "syndicate_bet_slip_collapsed_v1";
   const DEFAULT_SLIP_STAKE = 10;
 
   let betSlip = loadBetSlip();
-  let betSlipCollapsed = false;
+  // MINIMIZED BY DEFAULT `[user decision, 2026-08-22]`. The slip is a
+  // companion to the board, not the subject of it -- opening expanded costs
+  // vertical space on every visit to show a panel that is usually empty.
+  //
+  // Persisted like `betSlipMode` rather than reset each load: a reader who
+  // expands it is making a choice about how they work, and re-collapsing it on
+  // the next page load would silently undo that every time. Default-collapsed
+  // and remembered-if-changed are different claims, and only the first was
+  // asked for -- so the DEFAULT is collapsed and the OVERRIDE sticks.
+  let betSlipCollapsed = loadBetSlipCollapsed();
   // "straight" (default) or "parlay" -- a slip-level toggle, matching how
   // sportsbook slips typically work: a mixed slip either stays straight or
   // becomes one combined parlay ticket.
@@ -58,6 +68,26 @@ window.SyndicateBetSlip = (function () {
     } catch (error) {
       // Storage unavailable (private browsing, quota) -- slip still works
       // for this page load, just won't survive a refresh.
+    }
+  }
+
+  function loadBetSlipCollapsed() {
+    try {
+      // Only an explicit "false" opens it. An absent key, a storage failure and
+      // a garbage value all mean collapsed, which is the default being asked
+      // for -- the inverse (treating anything non-"true" as expanded) is how a
+      // default silently stops applying the moment storage misbehaves.
+      return window.localStorage.getItem(BET_SLIP_COLLAPSED_STORAGE_KEY) !== "false";
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function saveBetSlipCollapsed() {
+    try {
+      window.localStorage.setItem(BET_SLIP_COLLAPSED_STORAGE_KEY, betSlipCollapsed ? "true" : "false");
+    } catch (error) {
+      // Storage unavailable -- the toggle still works for this page load.
     }
   }
 
@@ -272,6 +302,7 @@ window.SyndicateBetSlip = (function () {
         if (event.target.closest(".bet-slip__header") && !betSlip.length) return;
         if (event.target.closest(".bet-slip__header")) {
           betSlipCollapsed = !betSlipCollapsed;
+          saveBetSlipCollapsed();
           renderBetSlip();
         }
       });
