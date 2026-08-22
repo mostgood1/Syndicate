@@ -49,10 +49,32 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         }
         live_lines_payload = {"games": [{"event_id": f"evt-{index}", "lines": {"total": 151.5}} for index in range(55)]}
 
-        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", return_value=cards_context), patch(
+        # `#516`. Patches `build_cards_page_context_if_cached`, NOT
+        # `build_cards_page_context`. `build_live_lens_snapshot` stopped calling
+        # the latter when it became CONSUME-DO-NOT-REBUILD (`live_lens.py:460`):
+        # a rebuild inside the tick cost +1,062MB in one step on a 2Gi service
+        # and crash-looped it. The old patch went on naming a function this code
+        # path no longer reaches, so the fixture below was never delivered, the
+        # builder fell through to a cold context, and the assertion read
+        # `0 != 50`.
+        #
+        # An INERT PATCH IS THE SAME DEFECT AS `#515`'s, in the opposite
+        # direction: there one made a write look isolated when it was not; here
+        # one makes a fixture look injected when it is not. Both are silent, and
+        # both are only visible by checking what the code actually calls.
+        with patch(
+            "syndicate.features.wnba.live_lens.build_cards_page_context_if_cached",
+            return_value=cards_context,
+        ) as mocked_context, patch(
             "syndicate.features.wnba.live_lens.build_live_lines_payload", return_value=live_lines_payload
         ):
             snapshot = build_live_lens_snapshot("2026-06-19")
+
+        # **THE GUARD AGAINST THE WHOLE CLASS.** Assert the patch was actually
+        # reached. Without it, a patch naming a function the code no longer
+        # calls is indistinguishable from a working one until some downstream
+        # number happens to look wrong -- which is exactly how this sat broken.
+        mocked_context.assert_called()
 
         self.assertEqual(len(snapshot.get("rank_cards") or []), 50)
         self.assertEqual(len(snapshot.get("cards") or []), 50)
@@ -60,8 +82,27 @@ class WnbaLiveLensWorkerTests(unittest.TestCase):
         self.assertEqual((snapshot.get("api_payload") or {}).get("rank_cards") and len(snapshot["api_payload"]["rank_cards"]), 50)
 
     def test_snapshot_builder_returns_safe_empty_board_when_cards_are_missing(self) -> None:
-        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", side_effect=RuntimeError("boom")):
+        """`#516`. **This test was PASSING VACUOUSLY and that is worth more than
+        the failure next door.** It patched `build_cards_page_context` to raise,
+        which this code path no longer calls, so nothing raised -- the builder
+        simply found no cached and no published context and returned the empty
+        board on the ordinary cold path. Every assertion held for a reason the
+        test does not describe, and the error handling it names was never
+        executed.
+
+        A green test asserting nothing is worse than a red one: the red test
+        next door is what led anyone to look here at all.
+        """
+        with patch(
+            "syndicate.features.wnba.live_lens.build_cards_page_context_if_cached",
+            side_effect=RuntimeError("boom"),
+        ) as mocked_context:
             snapshot = build_live_lens_snapshot("2026-06-19")
+
+        # Same guard. This assertion is the difference between "the builder
+        # survived an exception" and "no exception was ever raised", which is
+        # the state this test was silently in.
+        mocked_context.assert_called()
 
         self.assertEqual(snapshot.get("date"), "2026-06-19")
         self.assertEqual(snapshot.get("rank_cards"), [])

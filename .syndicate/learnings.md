@@ -5337,3 +5337,103 @@ they miss brief spikes -- which is precisely where an edge would live.
 **Clock alignment is by FotMob kickoff time, never by assuming the first live
 snapshot is kickoff** -- books quote in-play markets before the whistle, so that
 assumption would shift every match by an unknown offset.
+
+## 08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES
+
+Running the full pytest suite (`python -m pytest tests/`) leaves the working
+tree dirty in two ways at once: it MODIFIES tracked files —
+`reports/manifests/*.json` (all 8 sports), `reports/refresh_state.json`,
+`reports/intelligence/intelligence_state.json`,
+`data/mlb_source/.../live_lens_2026_06_02.jsonl` — and it CREATES untracked
+ones, including `reports/sim_runs/`, `reports/win_prob_null/`,
+`reports/mlb_odds_diag/`, and a literal
+`Z:\definitely\does\not\exist\perf.jsonl` from a Windows-path test.
+
+`git add -A && git commit` after that run committed **38 files and ~10,500
+insertions when exactly ONE file was intended**, including a 10,049-line diff
+to `intelligence_state.json`. It was pushed before I read the stat. The `git
+status --porcelain` that would have shown it ran in the same command, ABOVE the
+add — so the evidence was printed and the commit happened anyway.
+
+**RULE: stage explicitly. `git add <path> [<path>...]`, never `-A`, never `.`**
+Every commit in this session that did name its paths was clean; the one that
+did not was not.
+
+**COROLLARY, and it is the part that nearly hid this: `.gitignore` cannot save
+you here.** Several of these byproducts are legitimately TRACKED files that the
+suite rewrites, so there is no ignore rule that makes `-A` safe. Earlier in this
+same session I gitignored four *untracked* byproducts (`#515`) and that was
+correct — but it addresses a different half of the problem and must not be
+mistaken for having solved this one.
+
+Recovery, for the next person: `git reset --soft HEAD~1 && git reset`, then
+`git checkout --` the tracked byproducts and `git clean -fd -- reports/ data/`
+the untracked ones, re-stage by name, and force-push (safe only on your own
+unshared branch — never on someone else's).
+
+## 08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A worktree shares site-packages
+
+I reported `#517` as "76 failures across 26 files on clean `origin/main`", and
+backed it by re-running three sampled files in a detached worktree at
+`origin/main`, getting identical counts. That check was real and it was not
+sufficient. **`git worktree` gives you a different CODE tree and the SAME Python
+environment.** It controls for the diff and controls for nothing else.
+
+The environment was broken. `cffi` was absent — collateral from my own earlier
+`pip install --ignore-installed` / `--force-reinstall` juggling to fix a
+numpy/pandas mismatch — so `cryptography` could not import, and everything
+importing it failed. Installing one package:
+
+    test_refresh_state_store.py      18 failed -> 1 failed
+    test_wnba_refresh_runner.py       6 failed -> 4 failed
+    test_nba_cards_keyvalue_backend   3 failed -> 3 PASSED
+    test_wnba_cards_keyvalue_backend  3 failed -> 7 PASSED
+
+**At least 25 of the 76 were mine, not the repo's**, and I had already written
+the 76 into `todo.md` and committed a baseline built on it.
+
+**RULE: before attributing failures to the code, prove the ENVIRONMENT is
+sound.** `python -m pip check` is one command and would have said so — it
+reported a broken requirement the whole time. Then re-run
+`pip install -r requirements.txt` clean and re-measure.
+
+**COROLLARY: a `ModuleNotFoundError` for a C-extension or transitive dependency
+(`_cffi_backend`, `_ssl`, `_lzma`) is an environment claim, never a code claim.**
+Read the actual error before counting failures; `--tb=no` hides exactly this,
+and I ran the whole 27-minute suite with it.
+
+**COROLLARY: never repair a dependency with `--ignore-installed` or
+`--force-reinstall` on a single package.** It resolves that package against
+nothing and silently strands its dependencies. Reinstall from the requirements
+file and let the resolver see the whole graph.
+
+## 08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checking is not reserving
+
+`CLAUDE.md` says ids are stable and never reused, and says to check both
+`todo.md` and `todo_closed.md` before taking a number. I did. **It collided
+twice in one session anyway**, because concurrent sessions can all pass the
+same check against a shared counter and then all take the same numbers:
+
+    took #502-#505  ->  main had independently used #502-#505  ->  moved to #507-#510
+    took #507-#510  ->  main had independently used #507-#513  ->  moved to #514-#517
+
+Nothing was wrong with the check. The gap is between checking and MERGING: on a
+branch that lives for hours while other sessions land on `main`, the number you
+reserved is only as good as the moment you read it.
+
+**RULE: renumber at MERGE time, not at file-creation time.** Re-read the max
+immediately before the merge commit and move your block then; the collision
+window shrinks from hours to seconds. Expect it to happen and make the move
+cheap rather than trying to pick a number that will survive.
+
+**RULE: renumber by LINE RANGE, never globally.** By the second collision the
+merged `todo.md` contained main's `#507-#513` AND mine, and `learnings.md` and
+`lanes.md` each carried main's references to ITS `#502-#505`. A global
+search-and-replace would have silently rewritten another lane's history into
+nonsense. Scope every substitution to the line span of your own block, and
+verify the other side's headers survived before committing.
+
+**COROLLARY: a numeric id is the wrong identity for a long-lived branch.** The
+work is findable by lane slug and by scope-doc filename, neither of which can
+collide. The number is a convenience for `todo.md` ordering and should be
+assigned as late as possible.

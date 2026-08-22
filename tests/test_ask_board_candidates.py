@@ -145,8 +145,24 @@ class BoardCandidatesTests(unittest.TestCase):
         self.assertLess(last_modelled, first_unmodelled)
 
     def test_a_row_without_a_model_says_so_rather_than_showing_a_number(self) -> None:
+        """`#517`. Resolves the column BY NAME, not by position.
+
+        This read `row[4]`, which was the model-edge column until a `Price`
+        column was added ahead of it. The columns are now
+        `[Sport, Market, Selection, Price, EV, Model edge]`, so index 4 is EV --
+        every cell a percentage, and the assertion failed with
+        `'no model' not found in ['+3.10%', ...]`. That reads as "the no-model
+        wording is gone" when the wording was fine and the column had moved.
+
+        Positional indexing into a rendered table is the fragile part, so the
+        index is now derived from the header. The failure it guards against --
+        an unmodelled row showing a NUMBER instead of saying it has no model --
+        is unchanged.
+        """
         result = _fetch("rank every opportunity on the board")
-        cells = [row[4] for row in result["tables"][0]["rows"]]
+        table = result["tables"][0]
+        column = table["columns"].index("Model edge")
+        cells = [row[column] for row in table["rows"]]
         self.assertIn("no model", cells)
 
     def test_sport_scoping_is_exact_not_substring(self) -> None:

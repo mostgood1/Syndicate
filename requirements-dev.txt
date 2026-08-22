@@ -1,3 +1,10 @@
+# The test runner itself. `CLAUDE.md` records that "pytest is used day-to-day;
+# CI only runs the archive suite via unittest" -- and pytest was declared in NO
+# requirements file at all, which is a real (small) part of why the suite has
+# never run in CI. `#505`. Pinned loosely: the baseline gate parses junit XML,
+# whose `<testcase classname= name=>` shape has been stable across 7.x and 8.x.
+pytest>=7.4,<10.0
+
 playwright>=1.45,<2.0
 
 # Process enumeration for LOCAL diagnostics on Windows.

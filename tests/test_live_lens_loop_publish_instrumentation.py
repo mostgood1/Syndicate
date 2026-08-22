@@ -105,7 +105,37 @@ def _run_one_cycle(*, publish_raises: bool = False, pull_enabled: bool = True, i
     return samples
 
 
-class PublishSweepInstrumentationTests(unittest.TestCase):
+class _IsolatedWatermarkTestCase(unittest.TestCase):
+    """`#515`. Redirect the publish watermark away from the REAL repo tree.
+
+    This file drives `_live_lens_background_loop`, which persists its watermark
+    through `_record_live_lens_publish_watermark` -> the real
+    `reports/refresh_status/latest/live_lens_publish_watermark.json`. It then
+    poisons `test_live_lens_loop_publish_watermark.py`, which reads that file
+    back and fails -- but only when the two run in the same session, and only
+    on a machine where one of them has run before. Measured 2026-08-22: this
+    file was the writer that survived fixing the watermark file's own
+    isolation.
+
+    Patched at `_live_lens_publish_watermark_path` because BOTH the read and
+    the write go through it, so the redirect is immune to which import binding
+    wins -- `_record_live_lens_publish_watermark` re-imports `write_json_file`
+    inside the function and so escapes a module-attribute patch.
+    """
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        patcher = patch.object(
+            live_lens_loop,
+            "_live_lens_publish_watermark_path",
+            return_value=Path(tmp.name) / "live_lens_publish_watermark.json",
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class PublishSweepInstrumentationTests(_IsolatedWatermarkTestCase):
     def tearDown(self) -> None:
         live_lens_loop._LIVE_LENS_LOOP_STOP.set()
 
@@ -186,7 +216,7 @@ class PublishSweepInstrumentationTests(unittest.TestCase):
         self.assertIn("live_lens_publish_after", stages)
 
 
-class InSweepSamplingTests(unittest.TestCase):
+class InSweepSamplingTests(_IsolatedWatermarkTestCase):
     """`#327`: the endpoints are blind to a transient INSIDE the sweep.
 
     Measured in production 2026-08-10 and the reason the fifth elimination was

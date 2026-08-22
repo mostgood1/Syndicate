@@ -85,6 +85,18 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # it, not just a path-naming fix.
     "*_source/source_artifacts/data/live_lens/live_lens_projections_*.jsonl",
     "*_source/source_artifacts/data/live_lens/live_lens_signals_*.jsonl",
+    # `#514` Phase B: basketball attack momentum, appended per live tick by
+    # `scripts/poll_basketball_momentum.py`. Same directory and the same twin
+    # shape as the two entries above, so it inherits their transfer path rather
+    # than inventing one.
+    #
+    # **ALLOWLISTED BEFORE ANYTHING WRITES IT, AND THAT IS NOT THE SAME AS
+    # WIRED.** `#208`: allowlisting PERMITS a transfer, it does not make one
+    # happen -- and nothing schedules that script yet. A pattern here with no
+    # producer running is the state this comment exists to keep legible, since
+    # the export endpoint returning `paths: []` for it means "never captured",
+    # not "capture is broken".
+    "*_source/source_artifacts/data/live_lens/live_momentum_*.jsonl",
     "*_source/source_artifacts/data/processed/recommendations*.json",
     "*_source/source_artifacts/data/processed/recommendations*.csv",
     "*_source/source_artifacts/data/processed/props_recommendations*.json",
@@ -236,6 +248,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/live_lens/render_sync/*.json",
     "*_source/data/live_lens/live_lens_projections_*.jsonl",
     "*_source/data/live_lens/live_lens_signals_*.jsonl",
+    # `#514`'s twin of the entry in the block above. Both depths are needed:
+    # the two live_lens families immediately above are declared at both, and a
+    # sport whose root resolves to the shallow layout would otherwise transfer
+    # its projections and silently drop its momentum.
+    "*_source/data/live_lens/live_momentum_*.jsonl",
     "*_source/data/processed/recommendations*.json",
     "*_source/data/processed/recommendations*.csv",
     "*_source/data/processed/props_recommendations*.json",
