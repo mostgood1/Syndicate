@@ -23686,3 +23686,44 @@ total" with NO hit/miss mark rather than a fabricated grade -- the rule the
 tests pin (`test_soccer_final_reconciliation.py::
 test_model_only_goals_projection_reports_but_does_not_grade`) held on real
 data, not just in the test suite.
+
+## 2026-08-22 22:30:40Z — live-odds-worker `f7797765` — `#514` NO_SERIES diagnostic, shipped AHEAD of the slate
+
+- **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da52642jobas73daben0`
+- **holder:** lane `basketball-live-momentum`, claim token `f92f6c1de3e4b083`
+- **live at:** 22:34:19Z (3m39s). Contains `6ea96ac8` — verified by
+  `git merge-base --is-ancestor` before waiting on the build, not assumed.
+- **verify:** loop still firing post-restart — `[live_lens_loop]
+  BASKETBALL_MOMENTUM sport=wnba date=2026-08-22 games=0 with_series=0` at
+  22:35:26Z on the new instance (`t8cm9`).
+
+**WHY THIS SHIPPED MID-EVENING.** `with_series=0` was ambiguous between "no
+live games" and "live games we could not parse". Every test of this taxonomy
+has run on hand-built fixtures (ESPN is 403 from a Claude Code sandbox), so
+tonight's tip is the FIRST real payload and also the first chance for
+`_team_index` or `_classify` to be wrong about the feed's shape. WNBA is the
+only basketball league in season; a slate lost to an undiagnosable zero costs
+until the NBA returns. The new per-game line separates the three possible
+causes — header parse, absent play feed, taxonomy mismatch.
+
+### I KILLED A RUNNING `build_soccer_artifacts.py` TO DO IT, DELIBERATELY
+
+`build_soccer_artifacts.py --league mls --week 21` (pid 112) had been running
+~8 minutes when I triggered, under the 22:19:36 refresh. That is the
+kill-risk class `deploy_preflight.py` exists to protect, and I killed it
+anyway. The reasoning, so it can be judged rather than guessed at:
+
+- the soccer refresh relaunches on a ~13 min cadence (observed 22:06:03,
+  22:19:36) and is idempotent, so the cost is ONE cycle of MLS artifacts;
+- tip was ~30 min out and the deploy needed ~4;
+- the WNBA window does not recur until autumn.
+
+I waited ~4 minutes first to see whether it would finish on its own; it did
+not. **If MLS artifacts look stale for one cycle around 22:30Z, this is why.**
+
+Preflight itself still could not run — `RENDER_API_KEY` remains unset — so
+this deploy carries the same substitution caveat as the 22:01Z one, and the
+same MCP-bypasses-`deploy-guard.py` note.
+
+**STILL NOT MEASURED: `with_series > 0`.** Nothing about the taxonomy is
+verified on real data yet. Two check-ins are armed (22:48Z, 23:35Z).
