@@ -1734,12 +1734,31 @@ def _effective_state_with_box(status_state: Any, kickoff: Any, match_box: dict[s
     invent a state for one.
     """
     state = _effective_status_state(status_state, kickoff)
-    if state in {"in", "post"}:
+    # FINAL IS TERMINAL. A match the artifact already calls finished is never
+    # moved back to live, whatever any other source says -- the same rule
+    # `board_enrichment.attach_live_game_state` states for MLB. Final only ever
+    # becomes wrong in one direction.
+    if state == "post":
         return state
     if not isinstance(match_box, dict):
         return state
     box_state = str(match_box.get("status_state") or "").strip().lower()
     if box_state not in {"in", "post"}:
+        return state
+    # `in` -> `post` IS ALLOWED, and its absence was a real defect.
+    #
+    # This used to return immediately for BOTH `in` and `post`, so a match the
+    # artifact still called live could never be corrected once it ended.
+    # Measured on production 2026-08-22 16:5xZ: **8 of 15 cards showing a LIVE
+    # head were finished matches** -- WAT@WXM, CHA@WHU, SHU@SWA, STK@SOU and
+    # others, each carrying `match_box.final: true`, `status_state: "post"`,
+    # clock frozen at `90'+7'`. The poller was right (it had already moved them
+    # out of `games[]`); the card was stale and rendered a live scoreline and a
+    # running clock on a match that had ended.
+    #
+    # `in` -> `post` is the match ENDING, not a downgrade. The guard that
+    # matters is the one above: `post` never goes back to `in`.
+    if state == "in" and box_state != "post":
         return state
     upgraded = _effective_status_state(box_state, kickoff)
     if upgraded != state:
