@@ -1366,3 +1366,71 @@ a.cards-head-team-name:focus-visible {
   color: var(--cards-muted, rgba(255,255,255,0.68));
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* --- Compact (scoreboard strip) PREGAME card ---
+   Same row shape as the live card above (crest / team / trailing number) so
+   the strip does not relearn its own layout between a match that has not
+   kicked off and one that has -- only the trailing number's MEANING changes,
+   from a live score to a sim-projected total, and the accent colour marks
+   that difference rather than the layout. */
+.cards-strip-pregame-head {
+  font-size: 11px; font-weight: 600;
+  color: var(--cards-muted, rgba(255,255,255,0.62));
+  margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cards-strip-pregame-rows { display: flex; flex-direction: column; gap: 2px; }
+.cards-strip-pregame-row { display: flex; align-items: center; gap: 6px; }
+.cards-strip-pregame-crest { width: 15px; height: 15px; object-fit: contain; flex: 0 0 auto; }
+.cards-strip-pregame-crest--text {
+  width: 15px; text-align: center; font-size: 9px; font-weight: 700;
+  color: var(--cards-muted, rgba(255,255,255,0.6));
+}
+.cards-strip-pregame-team {
+  flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Accent colour (not the live score's plain white) -- this number is a
+   projection, not a result, and should never be mistaken for one at a glance. */
+.cards-strip-pregame-total {
+  flex: 0 0 auto; font-size: 14px; font-weight: 700;
+  font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right;
+  color: var(--cards-accent-strong);
+}
+/* Two-up grid: BTTS/Goals on row one, Corners/Top-sim-score on row two,
+   matching the layout worked out for the card (the score fact runs long, so
+   it alone is allowed to span both columns rather than force every cell to
+   the width of the longest one). */
+.cards-strip-pregame-facts {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 3px 10px; margin-top: 5px;
+}
+.cards-strip-pregame-fact {
+  font-size: 11px; font-weight: 600;
+  color: var(--cards-text, rgba(255,255,255,0.88));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cards-strip-pregame-fact--score { grid-column: 1 / -1; }
+.cards-strip-pregame-fact-label {
+  font-weight: 500; color: var(--cards-muted, rgba(255,255,255,0.6));
+}
+.cards-strip-pregame-fact-pct {
+  font-variant-numeric: tabular-nums; color: var(--cards-accent-strong);
+}
+
+/* --- FINAL card reconciliation --- how the pregame read (above) played out.
+   Same win/loss hues as `.cards-starter-ladder-badge` (MLB's reference), kept
+   to text rather than a full badge -- these sit inline in the facts grid, not
+   as a standalone pill. */
+.cards-strip-recon-score {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--cards-muted, rgba(255,255,255,0.62));
+  margin-top: 4px; margin-bottom: 1px;
+}
+.cards-strip-recon-mark { margin-left: 4px; }
+.cards-strip-pregame-fact.is-hit .cards-strip-recon-mark { color: #56c989; font-weight: 700; }
+.cards-strip-pregame-fact.is-miss .cards-strip-recon-mark { color: #e86868; font-weight: 700; }
+.cards-strip-recon-actual {
+  color: var(--cards-muted, rgba(255,255,255,0.58));
+  font-weight: 500;
+}

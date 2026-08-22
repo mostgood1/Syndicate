@@ -23,6 +23,15 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.portfolio_commit import commit_portfolio
+from syndicate.features.shared.position_marks import (
+    mark_orders_to_board,
+    marks_report_line,
+)
+from syndicate.features.shared.clv_position_join import (
+    join_positions_to_openings,
+    join_report_line,
+)
+from syndicate.features.shared.execution_ledger import execution_mode
 from syndicate.features.shared.portfolio_settings import resolve_settings
 from syndicate.features.shared.refresh_state_store import (
     read_json_file,
@@ -55,6 +64,19 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
         return None
     payload = read_json_file(portfolio_plan_path(normalized))
     return payload if isinstance(payload, dict) else None
+
+
+def _execution_enabled() -> bool:
+    """Imported inside the call: `execute_portfolio` imports this module."""
+    from pipeline.execute_portfolio import execution_enabled
+
+    return execution_enabled()
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def run_portfolio_commit(
@@ -133,6 +155,63 @@ def run_portfolio_commit(
         settled_sample_size_by_sport=settled_sample_size_by_sport,
     )
 
+    # Run the CLV join BEFORE the write, so its summary lands in the artifact the
+    # web service reads. Web must not compute -- `/portfolio/paper` would
+    # otherwise have to load ~3k opening records per request to show a match
+    # rate, which is exactly the recompute-in-a-request-handler the architecture
+    # forbids. The worker joins once; web reads the answer.
+    #
+    # `rows` is deliberately DROPPED from what gets stored: it duplicates every
+    # position and would roughly double an artifact that has an 8MB keyvalue
+    # refusal ceiling. The counters are what anybody reads.
+    # WHERE THE JOBS ACTUALLY RUN, stamped by the process that runs them.
+    # `/portfolio/paper` read these flags from its OWN environment and reported
+    # "COMMIT JOB off / EXECUTION JOB off" on a page full of committed positions
+    # and filled orders -- true of the web service, useless to a reader, and
+    # exactly backwards as a status line. The flags are worker-side facts, so
+    # the worker records them.
+    plan["job_state"] = {
+        "commit_enabled": True,
+        "execution_enabled": _execution_enabled(),
+        "execution_mode": execution_mode(),
+        "recorded_by": "refresh-worker",
+        "recorded_at": _utc_now_iso(),
+    }
+
+    # LIVE MARKS -- every order for this date re-priced against the board that
+    # was just built. Covers orphans too: a bet whose position left the plan is
+    # still a bet, and is usually the one you most want to look at.
+    try:
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger
+
+        todays_orders = [
+            order
+            for order in (_load_ledger().get("orders") or [])
+            if order.get("selected_date") == normalized
+        ]
+        marks = mark_orders_to_board(todays_orders, rows)
+        print(marks_report_line(marks), flush=True)
+        plan["live_marks"] = marks
+    except Exception as exc:
+        print(f"[portfolio_commit] LIVE_MARKS_FAILED date={normalized} error={exc}", flush=True)
+
+    clv_join = None
+    try:
+        report = join_positions_to_openings(plan.get("positions") or [], date=normalized)
+        print(join_report_line(report), flush=True)
+        for example in report.get("disagreement_examples") or []:
+            # A count says the derivation is wrong; an example says which field.
+            print(
+                f"[portfolio_commit] CLV_KEY_DISAGREEMENT position={example.get('position_key')} "
+                f"stamped={example.get('stamped')} derived={example.get('derived')}",
+                flush=True,
+            )
+        clv_join = {key: value for key, value in report.items() if key != "rows"}
+        plan["clv_join"] = clv_join
+    except Exception as exc:
+        # A DIAGNOSTIC must never cost a slate. The plan is complete either way.
+        print(f"[portfolio_commit] CLV_JOIN_FAILED date={normalized} error={exc}", flush=True)
+
     try:
         write_json_file(portfolio_plan_path(normalized), plan)
     except Exception as exc:
@@ -149,7 +228,7 @@ def run_portfolio_commit(
         f"refusals={plan.get('refusals')}",
         flush=True,
     )
-    return {"status": "ok", "date": normalized, "plan": plan}
+    return {"status": "ok", "date": normalized, "plan": plan, "clv_join": clv_join}
 
 
 def main() -> int:

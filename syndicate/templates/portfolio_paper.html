@@ -1,0 +1,500 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Paper Portfolio{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+{% endblock %}
+
+{% block content %}
+<style>
+  body.syndicate-body .cards-shell { max-width: 1320px; }
+
+  .paper-page { padding-bottom: 40px; }
+
+  .paper-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    border: 1px solid rgba(241, 196, 15, 0.35);
+    background: rgba(241, 196, 15, 0.08);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--cards-text-soft);
+  }
+
+  .paper-badge {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.5);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+
+  .paper-badge--live {
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.6);
+  }
+
+  .paper-flag { display: inline-flex; gap: 6px; align-items: baseline; }
+  .paper-flag__label { color: var(--cards-text-dim); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+  .paper-flag__value { color: var(--cards-text); font-variant-numeric: tabular-nums; }
+  .paper-flag__value.on { color: #2ecc71; }
+  .paper-flag__value.off { color: #e67e22; }
+
+  .paper-error {
+    border: 1px solid rgba(231, 76, 60, 0.45);
+    background: rgba(231, 76, 60, 0.10);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: #f5b7b1;
+  }
+
+  .paper-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .paper-tile {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(8, 18, 30, 0.72);
+    padding: 12px 14px;
+  }
+
+  .paper-tile__label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  .paper-tile__value {
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 4px;
+    color: var(--cards-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .paper-tile__value.warn { color: #e67e22; }
+
+  .paper-tile__meta {
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    margin-top: 3px;
+  }
+
+  .paper-section { margin-bottom: 18px; }
+
+  .paper-section-title {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+    margin: 0 0 8px;
+  }
+
+  .paper-table-wrap { overflow-x: auto; }
+
+  .paper-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .paper-table th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+    border-bottom: 1px solid var(--cards-line);
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+
+  .paper-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid rgba(132, 166, 196, 0.08);
+    color: var(--cards-text-soft);
+    font-variant-numeric: tabular-nums;
+    vertical-align: top;
+  }
+
+  .paper-table td.primary { color: var(--cards-text); }
+  .mark-pos { color: #2ecc71; }
+  .mark-neg { color: #e74c3c; }
+  .paper-table td.pos { color: #2ecc71; }
+  .paper-table td.neg { color: #e74c3c; }
+  .paper-table__sub { display: block; color: var(--cards-text-dim); font-size: 11px; }
+
+  .paper-pill {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid var(--cards-line-strong);
+    color: var(--cards-text-soft);
+  }
+
+  .paper-pill--filled { border-color: rgba(46, 204, 113, 0.5); color: #2ecc71; }
+  .paper-pill--submitted { border-color: rgba(241, 196, 15, 0.5); color: #f1c40f; }
+  .paper-pill--rejected, .paper-pill--failed { border-color: rgba(231, 76, 60, 0.5); color: #e74c3c; }
+  .paper-pill--none { border-color: rgba(132, 166, 196, 0.25); color: var(--cards-text-dim); }
+
+  .paper-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .paper-chip {
+    border: 1px solid var(--cards-line);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--cards-text-soft);
+    background: rgba(8, 18, 30, 0.6);
+  }
+
+  .paper-chip strong { color: var(--cards-text); font-variant-numeric: tabular-nums; }
+
+  .paper-empty {
+    border: 1px dashed var(--cards-line-strong);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 12px;
+    color: var(--cards-text-dim);
+  }
+
+  .paper-pulse {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    margin-bottom: 12px;
+  }
+
+  .paper-pulse__dot {
+    width: 7px; height: 7px; border-radius: 999px;
+    background: #2ecc71;
+    animation: paper-pulse-blink 2s ease-in-out infinite;
+  }
+
+  .paper-pulse[data-state="error"] .paper-pulse__dot { background: #e74c3c; animation: none; }
+
+  @keyframes paper-pulse-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .paper-links { font-size: 11px; color: var(--cards-text-dim); margin-left: auto; }
+  .paper-links a { color: var(--cards-accent); text-decoration: none; }
+  .paper-links a:hover { text-decoration: underline; }
+</style>
+
+{% set p = paper or {} %}
+{% set totals = p.totals or {} %}
+{% set ledger = p.ledger or {} %}
+{% set by_status = ledger.by_status or {} %}
+{% set coverage = p.sim_coverage or {} %}
+{% set clv = p.clv_join or {} %}
+{% set marks = p.live_marks or {} %}
+
+{# One renderer for the live mark, shared by the positions table and the orphan
+   table. Movement is ALWAYS probability points from `clv_pct_from_prices` --
+   American odds are not linear, so a raw price difference would be wrong in
+   both directions at once. A named absence beats a blank cell: "book gone" and
+   "we never priced it" are different facts. #}
+{% macro mark_cell(mark) -%}
+  {%- if not mark -%}
+    <span class="paper-table__sub">—</span>
+  {%- elif mark.reason == 'marked' -%}
+    <span class="{{ 'mark-pos' if (mark.clv_pct or 0) > 0 else ('mark-neg' if (mark.clv_pct or 0) < 0 else '') }}">
+      {{ "%+d"|format(mark.current_price|int) }}
+    </span>
+    <span class="paper-table__sub">{% if mark.clv_pct is not none %}{{ "%+.2f"|format(mark.clv_pct) }} pts{% else %}no move{% endif %}</span>
+  {%- elif mark.reason == 'book_no_longer_quoting' -%}
+    <span class="paper-table__sub">book pulled</span>
+  {%- elif mark.reason == 'unkeyable' -%}
+    <span class="paper-table__sub">not re-priceable</span>
+  {%- else -%}
+    <span class="paper-table__sub">{{ mark.reason }}</span>
+  {%- endif -%}
+{%- endmacro %}
+{% set rows = p.rows or [] %}
+{% set bankroll = p.bankroll_units or 0 %}
+
+<main class="paper-page">
+  <div class="paper-pulse" id="paper-pulse" role="status" aria-live="polite">
+    <span class="paper-pulse__dot"></span>
+    <span id="paper-pulse-text">Live</span>
+  </div>
+
+  <div class="paper-banner" id="paper-banner" data-mode="{{ p.execution_mode or 'paper' }}">
+    <span class="paper-badge{% if (p.execution_mode or 'paper') != 'paper' %} paper-badge--live{% endif %}" id="paper-mode-badge">
+      {{ (p.execution_mode or 'paper')|upper }}
+    </span>
+    <span id="paper-banner-text">
+      {% if (p.execution_mode or 'paper') == 'paper' %}
+        Simulated fills only. No money moves, no book is contacted, nothing here is a real wager.
+      {% else %}
+        LIVE execution mode is selected. Orders on this page correspond to real submissions.
+      {% endif %}
+    </span>
+    <span class="paper-flag">
+      <span class="paper-flag__label" data-flag-label="commit">Commit job{% if p.job_state_source != 'worker' %} (web env){% endif %}</span>
+      <span class="paper-flag__value {{ 'on' if p.commit_enabled else 'off' }}" id="paper-flag-commit">{{ 'on' if p.commit_enabled else 'off' }}</span>
+    </span>
+    <span class="paper-flag">
+      <span class="paper-flag__label">Execution job</span>
+      <span class="paper-flag__value {{ 'on' if p.execution_enabled else 'off' }}" id="paper-flag-exec">{{ 'on' if p.execution_enabled else 'off' }}</span>
+    </span>
+    <span class="paper-flag">
+      <span class="paper-flag__label">Date</span>
+      <span class="paper-flag__value">{{ p.date or '—' }}</span>
+    </span>
+    <span class="paper-flag">
+      <span class="paper-flag__label">Plan built</span>
+      <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at or '—' }}</span>
+    </span>
+    <span class="paper-links">
+      <a href="/portfolio">Your tracked bets</a> ·
+      <a href="/api/portfolio/paper?date={{ p.date }}">JSON</a>
+    </span>
+  </div>
+
+  <div class="paper-error" id="paper-ledger-error" {% if not p.ledger_error %}hidden{% endif %}>
+    Execution ledger could not be read: <code id="paper-ledger-error-text">{{ p.ledger_error or '' }}</code>.
+    Order status below is unknown — this is not the same as "no orders".
+  </div>
+
+  <div class="paper-tiles" id="paper-tiles">
+    {# Server-rendered first paint. paper_pulse.js re-renders this same block. #}
+    <div class="paper-tile">
+      <div class="paper-tile__label">Bankroll</div>
+      <div class="paper-tile__value">${{ "%.2f"|format(bankroll) }}</div>
+      <div class="paper-tile__meta">editable on /portfolio</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Positions</div>
+      <div class="paper-tile__value">{{ totals.positions or 0 }}</div>
+      <div class="paper-tile__meta">committed for {{ p.date or '—' }}</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Staked</div>
+      <div class="paper-tile__value">${{ "%.2f"|format(totals.staked_dollars or 0) }}</div>
+      <div class="paper-tile__meta">{{ "%.2f"|format((totals.staked_fraction or 0) * 100) }}% of bankroll</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Sim share of stake</div>
+      <div class="paper-tile__value">{% if totals.sim_share_of_staked is not none %}{{ "%+.1f"|format((totals.sim_share_of_staked or 0) * 100) }}%{% else %}—{% endif %}</div>
+      <div class="paper-tile__meta">{{ totals.positions_where_sim_picked_the_side or 0 }} side{{ '' if (totals.positions_where_sim_picked_the_side or 0) == 1 else 's' }} picked by sim</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Orders</div>
+      <div class="paper-tile__value">{{ ledger.orders or 0 }}</div>
+      <div class="paper-tile__meta">{{ by_status.filled or 0 }} filled · {{ by_status.rejected or 0 }} rejected</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Unreconciled</div>
+      <div class="paper-tile__value{% if (ledger.unreconciled or 0) > 0 %} warn{% endif %}">{{ ledger.unreconciled or 0 }}</div>
+      <div class="paper-tile__meta">submitted, never completed</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Filled stake</div>
+      <div class="paper-tile__value">${{ "%.2f"|format(ledger.filled_stake_dollars or 0) }}</div>
+      <div class="paper-tile__meta">at simulated fill price</div>
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Line movement</div>
+      {% if marks.marked %}
+        <div class="paper-tile__value{{ ' mark-pos' if (marks.avg_clv_pct or 0) > 0 else (' mark-neg' if (marks.avg_clv_pct or 0) < 0 else '') }}">
+          {% if marks.avg_clv_pct is not none %}{{ "%+.2f"|format(marks.avg_clv_pct) }} pts{% else %}—{% endif %}
+        </div>
+        <div class="paper-tile__meta">{{ marks.moved_toward or 0 }} toward · {{ marks.moved_against or 0 }} against, of {{ marks.marked }} marked</div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">no order re-priced yet</div>
+      {% endif %}
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">CLV openings</div>
+      {% if clv.positions is not none %}
+        <div class="paper-tile__value{% if (clv.matched or 0) < (clv.positions or 0) %} warn{% endif %}">{{ clv.matched or 0 }}/{{ clv.positions or 0 }}</div>
+        <div class="paper-tile__meta">
+          {% if (clv.derivation_disagrees or 0) > 0 %}
+            {{ clv.derivation_disagrees }} key mismatch — CLV unsafe
+          {% elif (clv.no_key_match or 0) > 0 %}
+            {{ clv.no_key_match }} with no recorded opening
+          {% else %}
+            joined to an opening price
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">plan predates the join</div>
+      {% endif %}
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Sim coverage</div>
+      <div class="paper-tile__value">{% if coverage.share_with_sim_edge is not none %}{{ "%.0f"|format((coverage.share_with_sim_edge or 0) * 100) }}%{% else %}—{% endif %}</div>
+      <div class="paper-tile__meta">{{ coverage.rows_with_sim_edge or 0 }}/{{ coverage.rows_in or 0 }} candidates had a sim edge</div>
+    </div>
+  </div>
+
+  <div class="paper-section">
+    <h2 class="paper-section-title">Positions &amp; paper orders</h2>
+    <div id="paper-positions">
+      {% if not p.commit_enabled %}
+        <div class="paper-empty">
+          The portfolio commit job is <strong>off</strong>. Nothing is being sized, so there is no plan to show.
+          Set <code>SYNDICATE_PORTFOLIO_COMMIT_ENABLED=1</code> on the refresh worker.
+        </div>
+      {% elif not p.plan_present %}
+        <div class="paper-empty">
+          No plan artifact for {{ p.date or 'this date' }} yet. The plan is written by the refresh worker right after the
+          Layer&nbsp;2 shortlist rebuilds — if the shortlist has not run today, this is expected.
+        </div>
+      {% elif not rows %}
+        <div class="paper-empty">
+          The plan ran and committed <strong>zero</strong> positions. That is a decision, not a gap — see the refusal
+          counts below for which gate each candidate hit.
+        </div>
+      {% else %}
+      <div class="paper-table-wrap">
+        <table class="paper-table">
+          <thead>
+            <tr>
+              <th>Sport</th>
+              <th>Selection</th>
+              <th>Book</th>
+              <th>Price</th>
+              <th>Stake</th>
+              <th>% BR</th>
+              <th>EV%</th>
+              <th>Sim edge</th>
+              <th>Score</th>
+              <th>Sim $</th>
+              <th>Side by</th>
+              <th>Order</th>
+              <th>Fill</th>
+              <th>Now</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              {% set attribution = row.attribution or {} %}
+              {% set order = row.order %}
+              {% set status = (order.status if order else '') %}
+              <tr>
+                <td class="primary">{{ (row.sport or '—')|upper }}</td>
+                <td class="primary">
+                  {{ row.player_name or row.side or '—' }}
+                  <span class="paper-table__sub">
+                    {{ row.market or '—' }}{% if row.line is not none %} {{ row.line }}{% endif %}
+                    {% if row.player_name %}· {{ row.side or '' }}{% endif %}
+                    {% if row.away_team or row.home_team %}· {{ row.away_team or '?' }} @ {{ row.home_team or '?' }}{% endif %}
+                  </span>
+                </td>
+                <td>{{ row.book or '—' }}</td>
+                <td>{% if row.price is not none %}{{ "%+d"|format(row.price|int) }}{% else %}—{% endif %}</td>
+                <td class="primary">${{ "%.2f"|format(row.stake_dollars or 0) }}</td>
+                <td>{{ "%.2f"|format((row.stake_fraction or 0) * 100) }}%</td>
+                <td class="{{ 'pos' if (row.ev_pct or 0) > 0 else ('neg' if (row.ev_pct or 0) < 0 else '') }}">
+                  {% if row.ev_pct is not none %}{{ "%+.2f"|format(row.ev_pct) }}{% else %}—{% endif %}
+                </td>
+                <td class="{{ 'pos' if (row.model_edge_pct or 0) > 0 else ('neg' if (row.model_edge_pct or 0) < 0 else '') }}">
+                  {% if row.model_edge_pct is not none %}{{ "%+.2f"|format(row.model_edge_pct) }}{% else %}—{% endif %}
+                </td>
+                <td>{% if row.board_score is not none %}{{ "%.2f"|format(row.board_score) }}{% else %}—{% endif %}</td>
+                <td class="{{ 'pos' if (attribution.stake_dollars_sim_delta or 0) > 0 else ('neg' if (attribution.stake_dollars_sim_delta or 0) < 0 else '') }}">
+                  {% if attribution.stake_dollars_sim_delta is not none %}{{ "%+.2f"|format(attribution.stake_dollars_sim_delta) }}{% else %}—{% endif %}
+                </td>
+                <td>{{ attribution.side_picked_by or '—' }}</td>
+                <td>
+                  {% if order %}
+                    <span class="paper-pill paper-pill--{{ status }}">{{ status }}</span>
+                  {% else %}
+                    <span class="paper-pill paper-pill--none">not placed</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if order and order.fill_price is not none %}
+                    {{ "%+d"|format(order.fill_price|int) }}
+                    <span class="paper-table__sub">${{ "%.2f"|format(order.fill_stake_dollars or 0) }}</span>
+                  {% elif order and order.error %}
+                    <span class="paper-table__sub">{{ order.error }}</span>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>{{ mark_cell(row.mark) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="paper-section" id="paper-refusals-section" {% if not p.refusals %}hidden{% endif %}>
+    <h2 class="paper-section-title">Why the other candidates were refused</h2>
+    <div class="paper-chips" id="paper-refusals">
+      {% for reason, count in (p.refusals or {}).items() %}
+        <span class="paper-chip">{{ reason }} <strong>{{ count }}</strong></span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="paper-section" id="paper-orphans-section" {% if not p.orphan_orders %}hidden{% endif %}>
+    <h2 class="paper-section-title">Orders with no position in today's plan</h2>
+    <div class="paper-empty" style="border-style: solid;">
+      These were placed against an earlier version of the plan — the board rebuilt and the position is no longer
+      committed. They are kept because an order that was submitted must never be deleted to make a page tidy.
+    </div>
+    <div class="paper-table-wrap" style="margin-top: 8px;">
+      <table class="paper-table">
+        <thead>
+          <tr><th>Submitted</th><th>Sport</th><th>Selection</th><th>Book</th><th>Price</th><th>Stake</th><th>Status</th><th>Now</th></tr>
+        </thead>
+        <tbody id="paper-orphans">
+          {% for order in (p.orphan_orders or []) %}
+            <tr>
+              <td>{{ order.submitted_at or '—' }}</td>
+              <td class="primary">{{ (order.sport or '—')|upper }}</td>
+              <td class="primary">
+                {{ order.player_name or order.side or '—' }}
+                <span class="paper-table__sub">
+                  {{ order.market or '—' }}{% if order.line is not none %} {{ order.line }}{% endif %}
+                  {% if order.player_name %}· {{ order.side or '' }}{% endif %}
+                  {% if order.away_team or order.home_team %}· {{ order.away_team or '?' }} @ {{ order.home_team or '?' }}{% endif %}
+                </span>
+              </td>
+              <td>{{ order.book or '—' }}</td>
+              <td>{% if order.requested_price is not none %}{{ "%+d"|format(order.requested_price|int) }}{% else %}—{% endif %}</td>
+              <td>${{ "%.2f"|format(order.requested_stake_dollars or 0) }}</td>
+              <td><span class="paper-pill paper-pill--{{ order.status }}">{{ order.status }}</span></td>
+              <td>{{ mark_cell(order.mark) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='shared/paper_portfolio_pulse.js') }}"></script>
+<script>window.SyndicatePaperPortfolioPulse.init({{ (paper.date or '')|tojson }});</script>
+{% endblock %}

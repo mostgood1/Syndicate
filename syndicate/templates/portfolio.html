@@ -292,6 +292,19 @@
     background: rgba(231, 76, 60, 0.12);
   }
 
+  .portfolio-paper-link {
+    border: 1px solid var(--cards-line);
+    border-radius: 12px;
+    background: rgba(8, 18, 30, 0.6);
+    padding: 9px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-paper-link a { color: var(--cards-accent); text-decoration: none; }
+  .portfolio-paper-link a:hover { text-decoration: underline; }
+
   .portfolio-pulse {
     display: inline-flex;
     align-items: center;
@@ -328,6 +341,12 @@
   <div class="portfolio-pulse" id="portfolio-pulse" role="status" aria-live="polite">
     <span class="portfolio-pulse__dot"></span>
     <span id="portfolio-pulse-text">Live</span>
+  </div>
+
+  <div class="portfolio-paper-link">
+    This page is <strong>your</strong> logged bets. The model's own sized, simulated portfolio lives on
+    <a href="/portfolio/paper">the paper portfolio</a> — kept separate so simulated positions can never be
+    mistaken for wagers you placed.
   </div>
 
   <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>

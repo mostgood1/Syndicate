@@ -786,29 +786,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups=GSV-MIN`. Unowned as far as this lane knows.
 - Blocked by: none.
 
-### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-22 02:4xZ) — **SECOND WAVE IS LIVE AND CAPTURING. The "one deploy" blocker resolved itself via a peer ridealong.** All three services carry the work: web/live-odds `06babca2`, refresh-worker `5e99fdcb` (contains all five commits). **BTTS/CORNERS CAPTURING IN PRODUCTION** `[verified 02:4xZ]`: 10 leagues, 118 fixtures, 4,562 rows (btts 720/9 books, corners 3,842/8 books), **0 duplicates** — the collapse guard holds. Earlier VERIFIED: gates 1/2/3 on four live matches; lineups reached the sim (Marseille 9/11); three-way `model_edge_pct` negation fixed; Layer 2 today 4/100 → 16/16; de-vig correct (1.0096 → 0.4903); momentum LEADS goals (d=0.397); home cost is a CACHE MISS (22.8s vs 1.03s). **RETRACTED: "box sections render 0 rows"** — measurement error (`table_rows`, not `rows`). **OWED (all need a LIVE MATCH, ~11:30Z slate — no deploy outstanding):** (1) tiles reading real Market/Edge on a served pregame card; (2) momentum on a live card; (3) gate 3 PRICING rather than withholding; (4) `MLB_GAMES_STAGE_MS` deployed and unread; (5) WNBA has NO game-lines step. Narrative: `log/2026-08-21.md` + `log/2026-08-22.md` (incl. the 02:4xZ correction). — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
+### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-22 22:3xZ) — **`#518` FOTMOB MOMENTUM BUILT, TESTED, DEPLOYED — live-odds-worker `94a16efe`, live 22:18:35Z. The event-signal sweep (momentum/xG/shot pressure) was killed by a null control (23 real vs 16.4 mean null); a pooled 60-120s model DOES carry signal, driven by FotMob's own momentum series, and it is DIRECTIONAL (which team scores next, dAUC +0.071) not whether/how-many/when (+0.0007). Production's ESPN-commentary momentum proxy carries NO signal at any half-life 30s-1800s — retired, not fixed. 5,552-match dataset committed (`reports/soccer_backtest/fotmob_2y.json.gz`).** OWED: the FotMob match-id join has never resolved a real fixture — next window is 6 MLS kickoffs 2026-08-23T01:30Z, check documented in `deploys.md`. Full detail: `state.md [soccer-live-momentum]`, `log/2026-08-22.md` 22:0x-22:3xZ entry. — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
 - Goal (unchanged): `/soccer` serves a date-scoped board whose cards carry the
   same information classes MLB's do, and whose live tier updates during a match.
 - **OWED, and not claimed as done:**
-  1. **gate 3 has never been observed PRICING a live edge** — only withholding
+  1. **Verify the FotMob join against a real fixture** — MLS kickoff 2026-08-23T01:30Z.
+  2. **gate 3 has never been observed PRICING a live edge** — only withholding
      by name. Needs a live soccer market quoted two-sided.
-  2. **The live totals lens is unproven**: harness ran n=1 with NEUTRAL ratings.
+  3. **The live totals lens is unproven**: harness ran n=1 with NEUTRAL ratings.
      Multi-match aggregation is the next action.
-  3. **Per-side lineups shipped but never observed changing a build** — landed
-     after tonight's rebuilds.
   4. **Two fair bases on one market**: home rows use `soccer_projections`'
      de-vig, away/draw use layer2's `quote.fair_probability`. Residual median
      0.47 / max 1.38 pts.
   5. Inherited and still open: five of six ESPN-join collision pairs (incl.
      Manchester City ↔ Manchester United, 0.812) fixed BY CONSTRUCTION and never
      rebuilt in production; only la_liga was.
+  6. The live-odds market-pricing pilot (does the book already price momentum?)
+     sits at 1.46 SE, n=106 — needs ~2 more match-days of capture to resolve.
 - Files: `syndicate/features/shared/{board_enrichment,soccer_live_gameline_source,soccer_projections,layer2_board,publication_adapter,live_lens_loop}.py`,
-  `syndicate/features/soccer/{cards.py,features/live_lens.py,features/lineups.py}`,
-  `scripts/{build_soccer_artifacts,backtest_soccer_live_totals}.py`, `tests/test_soccer_*`.
+  `syndicate/features/soccer/{cards.py,features/live_lens.py,features/lineups.py,ingestion/fotmob_*.py}`,
+  `scripts/{build_soccer_artifacts,backtest_soccer_live_totals,poll_soccer_live_state,soccer_*}.py`,
+  `tests/test_soccer_*`, `tests/test_fotmob_*`.
 - **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, adapters,
   ratings — held by `soccer-model-dispersion`.
-- Scope for next: `.syndicate/scope_2026-08-21_fotmob_xg_enrichment.md` (live
-  tier only; the argument AGAINST is in §6 and should be answered first).
 - Blocked by: none.
 
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
@@ -1360,6 +1360,22 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2500, `source` flips `default` -> `stored`); 60 lane tests and 344 related
   tests pass. **No production slate has been committed — do not report Stage A
   as working.**
+- **Stage B read surface shipped (`/portfolio/paper`).** The plan and the
+  ledger both crossed the service boundary already (`_keyvalue_backed` True for
+  `execution_ledger.json` and `portfolio_plan_<date>.json`), but nothing
+  rendered them, so the only way to see a committed position was to read JSON.
+  `/portfolio/paper` + `/api/portfolio/paper` join the ledger onto the plan by
+  `position_key` and poll every 45s. **Kept off `/portfolio` deliberately** —
+  that page is the user's own bets and `portfolio_summary._is_user_placed_bet`
+  exists precisely because auto-tracked model rows once flooded it with 1000+
+  "tracked plays" nobody had bet; simulated positions beside real ones would
+  rebuild that confusion with better formatting. Four absence states stay
+  DISTINCT (job off / no artifact / empty plan / orders never placed) and a
+  ledger that cannot be read says so rather than rendering an empty table —
+  "no bets" and "cannot see the bets" look identical and only one is safe.
+  Orders whose position left the plan are surfaced as orphans, never dropped.
+  12 tests. **Local only — no production render taken; production HTTP is
+  unreachable from a Claude session (`state.md:2811`).**
 - Files:
   `.syndicate/plan_2026-08-22_portfolio_execution.md`,
   `syndicate/features/shared/portfolio_settings.py`,
@@ -1374,7 +1390,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_layer2_blend_admission.py`,
   `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
-  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`
+  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
+  `syndicate/templates/portfolio_paper.html`,
+  `syndicate/static/shared/paper_portfolio_pulse.js`,
+  `tests/test_portfolio_paper_page.py`
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

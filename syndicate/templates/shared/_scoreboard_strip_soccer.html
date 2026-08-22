@@ -42,7 +42,11 @@
                 <span class="cards-strip-momentum-label">{{ c_mom.label }}</span>
               </div>
             {% endif %}
-          {% else %}
+          {% elif game.live_state and game.live_state.final %}
+            {#- FINAL. Unchanged from before: a result, not a projection --
+                the redesigned block below is for matches that have not been
+                played yet, and a final score under "SIM PROJ TOTAL" would be
+                a demotion, not an upgrade. -#}
             <div class="cards-strip-head">
               <span class="cards-status-badge">{{ game.status }}</span>
               <span data-role="strip-detail">{{ game.detail }}</span>
@@ -73,6 +77,85 @@
               </div>
             </div>
             {% if game.compact_box_line %}
+              <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
+            {% endif %}
+            {%- set c_recon = game.shared_final_reconciliation if game.shared_final_reconciliation is defined else none -%}
+            {% if c_recon and c_recon.facts %}
+              {#- RECONCILIATION. How the pregame read actually played out --
+                  the fact this card can uniquely show once the match is over,
+                  since the pregame projection and the real result now both
+                  exist. A HIT needs no more than its own projected value +
+                  a mark; a MISS earns the actual number, because "wrong" is
+                  not useful on its own. -#}
+              <div class="cards-strip-recon-score" title="{{ c_recon.hits }} of {{ c_recon.graded }} graded reads hit">{{ c_recon.hits }}/{{ c_recon.graded }} hit</div>
+              <div class="cards-strip-pregame-facts">
+                {% for f in c_recon.facts %}
+                  <span class="cards-strip-pregame-fact{% if f.label == 'Top sim score' %} cards-strip-pregame-fact--score{% endif %}{% if f.hit == true %} is-hit{% elif f.hit == false %} is-miss{% endif %}">
+                    <span class="cards-strip-pregame-fact-label">{{ f.label }}</span>
+                    {{ f.projected }}
+                    {%- if f.hit == true %}<span class="cards-strip-recon-mark">✓</span>
+                    {%- elif f.hit == false %}<span class="cards-strip-recon-mark">✗</span> <span class="cards-strip-recon-actual">{{ f.actual }}</span>
+                    {%- else %}<span class="cards-strip-recon-actual">· {{ f.actual }}</span>
+                    {%- endif %}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% else %}
+            {%- set c_pre = game.shared_compact_pregame if game.shared_compact_pregame is defined else none -%}
+            {#- PREGAME COMPACT CARD. Date/time on its own top line (the
+                league name that used to sit there is one tap away on the
+                full card and told a scanning reader nothing a kickoff time
+                doesn't), away then home with each side's own sim-projected
+                total where the live card puts the live score, then the four
+                facts a bettor actually opens a soccer card for: BTTS, the
+                goals line, the corners line, and the single most likely
+                scoreline. Same two-column shape as the live card's rows, so
+                a reader's eye does not have to relearn the strip between a
+                match that hasn't started and one that has. -#}
+            <div class="cards-strip-pregame-head">{{ game.status }}</div>
+            <div class="cards-strip-pregame-rows">
+              <div class="cards-strip-pregame-row">
+                {% if game.away.logo_url %}
+                  <img class="cards-strip-pregame-crest" src="{{ game.away.logo_url }}" alt="" loading="lazy" />
+                {% else %}
+                  <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.away.abbr }}</span>
+                {% endif %}
+                <span class="cards-strip-pregame-team">{{ game.away.abbr }}</span>
+                {% if c_pre and c_pre.away_total %}
+                  <span class="cards-strip-pregame-total">{{ c_pre.away_total }}</span>
+                {% endif %}
+              </div>
+              <div class="cards-strip-pregame-row">
+                {% if game.home.logo_url %}
+                  <img class="cards-strip-pregame-crest" src="{{ game.home.logo_url }}" alt="" loading="lazy" />
+                {% else %}
+                  <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.home.abbr }}</span>
+                {% endif %}
+                <span class="cards-strip-pregame-team">{{ game.home.abbr }}</span>
+                {% if c_pre and c_pre.home_total %}
+                  <span class="cards-strip-pregame-total">{{ c_pre.home_total }}</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if c_pre %}
+              <div class="cards-strip-pregame-facts">
+                {% if c_pre.btts %}
+                  <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">BTTS</span> {{ c_pre.btts }}</span>
+                {% endif %}
+                {% if c_pre.goals %}
+                  <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Goals</span> {{ c_pre.goals }}</span>
+                {% endif %}
+                {% if c_pre.corners %}
+                  <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Corners</span> {{ c_pre.corners }}</span>
+                {% endif %}
+                {% if c_pre.top_score %}
+                  <span class="cards-strip-pregame-fact cards-strip-pregame-fact--score"><span class="cards-strip-pregame-fact-label">Top sim score</span> {{ c_pre.top_score.text }} <span class="cards-strip-pregame-fact-pct">{{ c_pre.top_score.pct }}</span></span>
+                {% endif %}
+              </div>
+            {% elif game.compact_box_line %}
+              {#- Nothing simulated yet: the old one-line summary beats a
+                  blank card. -#}
               <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
             {% endif %}
           {% endif %}

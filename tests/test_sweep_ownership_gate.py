@@ -54,6 +54,7 @@ def _clean_env(monkeypatch):
         "SYNDICATE_MLB_REFRESH_TICK_OWNER",
         "WEEKLY_SPORTS_REFRESH_TICK_OWNER",
         "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS",
+        "SYNDICATE_SWEEP_ACTIVE_SPORTS_STRICT",
     ):
         monkeypatch.delenv(key, raising=False)
     yield
@@ -63,6 +64,16 @@ def _effective(monkeypatch, capsys, **env):
     # Drive through the configured override so the season calendar is not part
     # of the test -- this is about the ownership gate, not about who is in season.
     monkeypatch.setenv("SYNDICATE_LIVE_ODDS_REFRESH_SPORTS", env.pop("_sports"))
+    # `#520`. The weekly carve-out consults the real schedule adapter, whose answer
+    # would otherwise depend on the calendar the suite happens to run on -- the
+    # exact wall-clock time-bomb `test_layer2_shortlist_wiring.py` warns about.
+    # Pinned per test. `None` means "do not patch", for the tests that predate the
+    # carve-out and must keep exercising the unpatched path.
+    claimed = env.pop("_claimed", None)
+    if claimed is not None:
+        monkeypatch.setattr(
+            loop, "_weekly_sport_claimed_by_fast_tick", lambda sport, date: sport in claimed
+        )
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     out = loop._live_refresh_loop_effective_sports("2026-08-17")
@@ -92,7 +103,40 @@ def test_refresh_workers_real_env_keeps_only_the_weekly_sports_on_the_tick(monke
         assert sport in printed, f"{sport} was dropped without saying so"
 
 
-def test_live_odds_workers_real_env_lets_it_sweep_the_three_it_owns(monkeypatch, capsys):
+def test_live_odds_workers_real_env_sweeps_its_three_plus_a_weekly_sport_with_games(monkeypatch, capsys):
+    """`#520` CORRECTED THIS TEST. Its old form asserted `nfl not in kept`.
+
+    That assertion was true of the code and false of the system. On a day NFL has
+    games, refresh-worker's `_active_weekly_sports_for_date` DROPS nfl -- on the
+    same `_weekly_sport_claimed_by_fast_tick` predicate -- precisely because the
+    fast tick is supposed to claim it. ACTIVE_SPORTS then dropped it here too, so
+    the yield happened and the claim did not, and NFL had no owner at all.
+
+    Measured 2026-08-22, with NFL games in progress: `book_grid_2026-08-22.json`
+    republished `PUBLISH_SKIPPED_UNCHANGED` with the identical checksum a minute
+    apart, board quote age p50 36,478s (10.1h) against MLB's 487s, and every live
+    NFL row deleted by `opportunity_gate`'s 900s `LIVE_MARKET_MAX_AGE_SECONDS`.
+
+    The old comment -- "nfl belongs to refresh-worker's weekly autorun" -- is only
+    true on a day NFL has NO games. That case is the next test.
+    """
+    kept, printed = _effective(
+        monkeypatch,
+        capsys,
+        _sports="mlb,nfl,soccer,wnba",
+        SYNDICATE_ACTIVE_SPORTS="mlb,wnba,soccer",
+        SYNDICATE_MLB_REFRESH_TICK_OWNER="true",
+        WEEKLY_SPORTS_REFRESH_TICK_OWNER="false",
+        _claimed={"nfl"},
+    )
+    assert kept == ["mlb", "nfl", "soccer", "wnba"]
+    assert "SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl" in printed, "an override must announce itself"
+
+
+def test_a_weekly_sport_with_no_games_stays_excluded_by_active_sports(monkeypatch, capsys):
+    """The carve-out is scoped to the claim, not to the sport. No games, no claim,
+    no override -- ACTIVE_SPORTS applies exactly as it did before `#520`, and the
+    sport stays with refresh-worker's 6-hourly autorun, which does still own it."""
     kept, _ = _effective(
         monkeypatch,
         capsys,
@@ -100,28 +144,67 @@ def test_live_odds_workers_real_env_lets_it_sweep_the_three_it_owns(monkeypatch,
         SYNDICATE_ACTIVE_SPORTS="mlb,wnba,soccer",
         SYNDICATE_MLB_REFRESH_TICK_OWNER="true",
         WEEKLY_SPORTS_REFRESH_TICK_OWNER="false",
+        _claimed=set(),
     )
     assert kept == ["mlb", "soccer", "wnba"]
-    assert "nfl" not in kept, "nfl belongs to refresh-worker's weekly autorun"
 
 
-def test_the_two_services_partition_the_sports_with_no_overlap_and_no_gap(monkeypatch, capsys):
-    """The property that actually matters: every sport swept exactly once."""
-    slate = "mlb,nfl,soccer,wnba"
-    rw, _ = _effective(
-        monkeypatch, capsys, _sports=slate,
-        SYNDICATE_ACTIVE_SPORTS="nfl",
-        SYNDICATE_MLB_REFRESH_TICK_OWNER="false",
-        WEEKLY_SPORTS_REFRESH_TICK_OWNER="true",
-    )
-    lo, _ = _effective(
-        monkeypatch, capsys, _sports=slate,
-        SYNDICATE_ACTIVE_SPORTS="mlb,wnba,soccer",
+def test_strict_mode_restores_the_absolute_reading_of_active_sports(monkeypatch, capsys):
+    """The off switch. An operator who means "never touch nfl here" can say so."""
+    kept, _ = _effective(
+        monkeypatch,
+        capsys,
+        _sports="mlb,nfl",
+        SYNDICATE_ACTIVE_SPORTS="mlb",
         SYNDICATE_MLB_REFRESH_TICK_OWNER="true",
-        WEEKLY_SPORTS_REFRESH_TICK_OWNER="false",
+        SYNDICATE_SWEEP_ACTIVE_SPORTS_STRICT="1",
+        _claimed={"nfl"},
     )
-    assert set(rw) & set(lo) == set(), "no sport may be swept twice"
-    assert set(rw) | set(lo) == set(slate.split(",")), "no sport may be dropped by both"
+    assert kept == ["mlb"]
+
+
+@pytest.mark.parametrize("nfl_has_games", [True, False])
+def test_exactly_one_owner_writes_nfl_whether_or_not_it_has_games(monkeypatch, nfl_has_games):
+    """`#520` REPLACED THE OLD PARTITION TEST, which measured the wrong thing.
+
+    The old version compared `_live_refresh_loop_effective_sports` under each
+    service's env and asserted the two lists were disjoint and covering. But this
+    file's own docstring records that refresh-worker "does not run
+    `_run_live_refresh_tick` at all" -- so for refresh-worker that function's
+    output is not what it executes, and the test asserted a partition between one
+    real list and one hypothetical one. `nfl` was in the hypothetical half and in
+    nobody's real half, which is exactly how a sport went 10 hours without a
+    price while a test said the partition held.
+
+    So compare the two paths each service ACTUALLY runs:
+
+      live-odds-worker  `_live_refresh_loop_effective_sports`  (the fast tick)
+      refresh-worker    `_active_weekly_sports_for_date`       (the weekly autorun)
+
+    Both consult `_weekly_sport_claimed_by_fast_tick`, so patching that one
+    predicate moves ownership across the boundary and the count must stay 1.
+    """
+    from scripts import run_refresh_worker as rw_mod
+
+    monkeypatch.setattr(loop, "_weekly_sport_claimed_by_fast_tick", lambda sport, date: nfl_has_games)
+    monkeypatch.setenv("SYNDICATE_LIVE_ODDS_REFRESH_SPORTS", "mlb,nfl,soccer,wnba")
+    monkeypatch.setenv("SYNDICATE_ACTIVE_SPORTS", "mlb,wnba,soccer")
+    monkeypatch.setenv("SYNDICATE_MLB_REFRESH_TICK_OWNER", "true")
+    fast_tick = loop._live_refresh_loop_effective_sports("2026-09-14")
+
+    monkeypatch.setattr(rw_mod, "_active_sports_for_date", lambda date: "mlb,nfl,soccer,wnba")
+    weekly_autorun = [
+        piece for piece in rw_mod._active_weekly_sports_for_date("2026-09-14").split(",") if piece
+    ]
+
+    owners = ("nfl" in fast_tick) + ("nfl" in weekly_autorun)
+    assert owners == 1, (
+        f"nfl must have exactly one owner; fast_tick={fast_tick} weekly_autorun={weekly_autorun}"
+    )
+    if nfl_has_games:
+        assert "nfl" in fast_tick, "a game day belongs to the 60s tick -- that is the whole point"
+    else:
+        assert "nfl" in weekly_autorun, "a quiet week belongs to the 6-hourly autorun"
 
 
 # --------------------------------------------------------------------------
@@ -184,13 +267,18 @@ def test_weekly_sports_are_deliberately_NOT_gated_here(monkeypatch, capsys, spor
     assert sport in kept, "weekly ownership is resolved by the tick, not by this gate"
 
 
-def test_active_sports_still_excludes_a_weekly_sport(monkeypatch, capsys):
-    """ACTIVE_SPORTS is a different statement from the weekly owner flag: it
-    says the service does not handle that sport at all. It still applies."""
+def test_active_sports_still_excludes_an_UNCLAIMED_weekly_sport(monkeypatch, capsys):
+    """ACTIVE_SPORTS is a different statement from the weekly owner flag: it says
+    the service does not handle that sport at all. It still applies -- to every
+    sport, and to a weekly sport too whenever the fast tick has not claimed it.
+
+    `#520` narrowed this from "always" to "unless claimed", and nothing wider.
+    """
     kept, _ = _effective(
         monkeypatch, capsys, _sports="nfl,mlb",
         SYNDICATE_ACTIVE_SPORTS="mlb",
         SYNDICATE_MLB_REFRESH_TICK_OWNER="true",
+        _claimed=set(),
     )
     assert kept == ["mlb"]
 
@@ -219,6 +307,7 @@ def test_every_dropped_sport_carries_a_reason(monkeypatch, capsys):
         monkeypatch, capsys, _sports="mlb,nfl,wnba",
         SYNDICATE_ACTIVE_SPORTS="mlb,wnba",
         SYNDICATE_MLB_REFRESH_TICK_OWNER="false",
+        _claimed=set(),
     )
     line = next(l for l in printed.splitlines() if "SWEEP_OWNERSHIP_EXCLUDED" in l)
     assert "nfl:not_in_SYNDICATE_ACTIVE_SPORTS" in line

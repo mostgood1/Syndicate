@@ -3236,6 +3236,133 @@ def portfolio_plan_api():
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "plan_present": True, **plan}))
 
 
+def _paper_portfolio_payload(selected_date: str) -> dict:
+    """Today's committed plan plus the paper orders placed against it.
+
+    A PURE READ of two artifacts the worker wrote. Both cross the service
+    boundary through `refresh_state_store`, which is the only reason web can
+    see them at all -- `#502` is what happens when a ledger is written the one
+    way that cannot cross.
+
+    Absences are DISTINGUISHED rather than collapsed to an empty page: no plan,
+    a plan with no positions, and a plan whose orders have not been placed are
+    three different states with three different fixes, and a bare "nothing here"
+    would read as the first when it is usually the third.
+    """
+    from pipeline.portfolio_commit import portfolio_commit_enabled, read_portfolio_plan
+    from syndicate.features.shared.execution_ledger import (
+        execution_mode,
+        ledger_summary,
+        _load,
+    )
+    from pipeline.execute_portfolio import execution_enabled
+
+    try:
+        plan = read_portfolio_plan(selected_date)
+    except Exception:
+        _LOGGER.exception("PAPER_PLAN_READ_FAILURE date=%s", selected_date)
+        plan = None
+
+    orders: list = []
+    summary: dict = {}
+    ledger_error = None
+    try:
+        summary = ledger_summary(selected_date)
+        orders = [
+            order
+            for order in (_load().get("orders") or [])
+            if order.get("selected_date") == selected_date
+        ]
+        orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+    except Exception as exc:
+        # The ledger REFUSES rather than reading empty when it cannot be read;
+        # surfacing that is the whole point, since an empty page would
+        # otherwise look like "no bets" instead of "cannot see the bets".
+        _LOGGER.exception("PAPER_LEDGER_READ_FAILURE date=%s", selected_date)
+        ledger_error = f"{type(exc).__name__}: {exc}"
+
+    job_state = (plan or {}).get("job_state") or {}
+    positions = (plan or {}).get("positions") or []
+    # Join the ledger onto the plan by `position_key`, so a row shows both what
+    # was decided and what happened to it.
+    by_key = {str(order.get("position_key") or ""): order for order in orders}
+    # Live marks are computed by the WORKER against the board it just built and
+    # ride in the plan artifact; this only looks them up. Keyed by
+    # `idempotency_key` because that is the identity of an ORDER, and marks
+    # cover orphans whose position is no longer in the plan.
+    live_marks = (plan or {}).get("live_marks") or {}
+    marks_by_order = {
+        str(mark.get("idempotency_key") or ""): mark
+        for mark in (live_marks.get("marks") or [])
+    }
+    rows = []
+    for position in positions:
+        order = by_key.get(str(position.get("position_key") or ""))
+        rows.append(
+            {
+                **position,
+                "order": order,
+                "mark": marks_by_order.get(str((order or {}).get("idempotency_key") or "")),
+            }
+        )
+
+    return {
+        "date": selected_date,
+        # THE WORKER'S FLAG STATE, NOT THIS PROCESS'S. The jobs run on
+        # refresh-worker; reading the env here reported "off" on a page full of
+        # committed positions and filled orders, which is true of the web
+        # service and worthless to a reader. The worker stamps `job_state` into
+        # the plan; these fall back to the local env only when no plan has been
+        # written yet, and `job_state_source` says which one you are looking at.
+        "commit_enabled": bool(job_state.get("commit_enabled", portfolio_commit_enabled())),
+        "execution_enabled": bool(job_state.get("execution_enabled", execution_enabled())),
+        "execution_mode": str(job_state.get("execution_mode") or execution_mode()),
+        "job_state_source": "worker" if job_state else "web_env",
+        "live_marks": live_marks,
+        "plan_present": isinstance(plan, dict),
+        "generated_at": (plan or {}).get("generated_at"),
+        "bankroll_units": (plan or {}).get("bankroll_units"),
+        "totals": (plan or {}).get("totals") or {},
+        "refusals": (plan or {}).get("refusals") or {},
+        "sim_coverage": (plan or {}).get("sim_coverage") or {},
+        # Stage C's precondition, reported every slate rather than discovered at
+        # the end of the window. Computed by the WORKER and read here -- web
+        # joining ~3k opening records per request would be a recompute in a
+        # request handler. Absent on plans committed before the join existed,
+        # which is why the page distinguishes "no join" from "matched nothing".
+        "clv_join": (plan or {}).get("clv_join") or {},
+        "rows": rows,
+        "orphan_orders": [
+            {**order, "mark": marks_by_order.get(str(order.get("idempotency_key") or ""))}
+            for order in orders
+            if str(order.get("position_key") or "")
+            not in {str(p.get("position_key") or "") for p in positions}
+        ],
+        "ledger": summary,
+        "ledger_error": ledger_error,
+    }
+
+
+@intelligence_bp.get("/api/portfolio/paper")
+def portfolio_paper_api():
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
+
+
+@intelligence_bp.get("/portfolio/paper")
+def portfolio_paper_home():
+    """The model's PAPER portfolio, kept on its own page.
+
+    Deliberately NOT merged into `/portfolio`. That page is the user's own
+    logged bets, and `portfolio_summary._is_user_placed_bet` exists precisely
+    because auto-tracked model rows once flooded it with 1000+ "tracked plays"
+    nobody had bet. Showing simulated positions beside real ones would rebuild
+    that confusion with better formatting.
+    """
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return render_template("portfolio_paper.html", paper=_paper_portfolio_payload(selected_date))
+
+
 @intelligence_bp.get("/portfolio")
 def portfolio_home():
     from syndicate.features.shared.portfolio_settings import resolve_settings

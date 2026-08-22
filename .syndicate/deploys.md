@@ -23479,6 +23479,214 @@ blockers were surfaced.
 `render.yaml` untouched → no `blueprint_sync`, so nothing outside this service
 changed.
 
+
+## 2026-08-22 22:18:35Z -- live-odds-worker `94a16efe` -- soccer #518 FotMob momentum wiring
+
+what: `fotmob_match_id.py` + `fotmob_momentum.py` wired into `poll_soccer_live_state.py`
+in place of the ESPN-commentary momentum proxy; `cards.py` strength bands retuned to
+FotMob's 0-100 scale. Full context: `docs/ai_context/todo.md` #518.
+
+claim: acquired 22:07:50Z, held through preflight HOLD (3 jobs in flight: soccer odds
+refresh + MLS artifact build), preflight CLEARED 22:14:43Z, deployed as a SEPARATE
+command per protocol (guard evaluates at submit time). Released 22:22Z.
+
+deploy: dep-da51upn40ujc73ae4u10, build 22:15:10-22:17:34Z, live 22:18:35Z, confirmed
+via `deploys?limit=1` returning `live 94a16efe`.
+
+verify: `generated_at` in `soccer_source/epl/.../live_state_2026-08-22.json` read
+22:19:42Z (post-deploy, code is running the new path each 60s tick per
+`SYNDICATE_LIVE_LENS_INTERVAL_SECONDS=60`).
+
+**NOT YET VERIFIED: the FotMob join has never resolved a REAL fixture.** Every EPL/
+LaLiga/Ligue1/SerieA match live-checked was already `count: 0` (today's European
+slate finished before 22:18Z) -- the code path that calls `resolve_fotmob_match_id`
+against a live match has not executed once in production. Next real window: 6 MLS
+fixtures kick off 2026-08-23T01:30Z (checked live via FotMob's own `matches_for_date`,
+not assumed). **OWED: read `soccer_source/mls/api/live_state/live_state_2026-08-23.json`
+after that kickoff and confirm at least one game's `momentum.source == "fotmob"` with
+a real `fotmob_match_id`, not `supported: False`.** A silent 0% resolve rate looks
+identical to a quiet slate from the outside -- this is the check that tells them apart.
+
+
+## 2026-08-22 22:40:08Z -- web `f7797765` -- `/portfolio/paper`, the Stage B read surface
+
+what: `GET /portfolio/paper` + `GET /api/portfolio/paper` — a pure read of the
+portfolio plan and the execution ledger, joined by `position_key`, polling every
+45s. Stage A and Stage B were both already running in production and neither had
+a UI; the only way to see a committed position was to fetch JSON. Full context:
+`docs/ai_context/todo.md` #519.
+
+claim: acquired 22:38Z by `portfolio-decision-and-execution`, token 442a74633d6b2f5f.
+
+**PREFLIGHT COULD NOT RUN, and this deploy went ahead anyway on an explicit user
+instruction ("deploy it").** `deploy_preflight.py` exits 1 with `RENDER_API_KEY not
+set in the environment or .env` — there is no key in this container, and preflight's
+own rule 1 is *unknown is not clear*. So the substance was established by hand
+instead, and it is recorded here because the marker on disk does not exist:
+
+- **No rollback.** Live web was `aa9fa8e5` (deployed 20:42Z by
+  `layer2-odds-refresh`, a `tmp-land` merge). `git merge-base --is-ancestor
+  aa9fa8e5 origin/main` → TRUE, so `f7797765` strictly contains it. This is the
+  check `learnings.md` 2026-08-16 says the deploy tool will not do for you.
+- **Right branch.** `get_service` reports `branch: main`, so `trigger_deploy`
+  takes the `main` tip and not the `tmp-land` commit the last four API deploys
+  carried. Verified BEFORE firing — a service pointed at another branch would have
+  redeployed `aa9fa8e5` and looked like a successful deploy of this change.
+- **Nothing in flight to kill.** web runs gunicorn (3 procs) + portdetector and no
+  batch job by design; peers deployed it 4x in the preceding 2 hours.
+
+`render.yaml` untouched → no `blueprint_sync`.
+
+deploy: dep-da52ai2jobas73dao6dg, commit `f779776503ea9a08c14bb069f96e36db19b8bc44`.
+
+verify: **SATISFIED 22:5xZ by the page owner's own read** — deploy went live
+22:44:21Z and the user loaded `/portfolio/paper` and reported it renders with
+content ("looks good"). Recorded as a USER REPORT, not a log reading: nobody
+counted the rows, so the strength of this reading is "the page is not broken and
+is not empty", which is what it was deployed to establish. Claim released 22:5xZ.
+
+The ORIGINAL owed reading, kept because it is the stronger one and still
+uncollected: `/portfolio/paper` returning 200 with a NON-EMPTY positions table on
+a date where `PORTFOLIO_COMMIT` logged positions > 0. Production HTTP is
+unreachable from a Claude session (`state.md:2811`), so the reading must come from
+Render request logs (`path=/portfolio/paper`, `statusCode=200`) or from the user's
+own browser. **A 200 on an EMPTY page is not the reading** — the page renders 200
+in all four of its absence states, so status alone cannot distinguish "the plan is
+displayed" from "the plan is missing and the empty state is displayed".
+
+## 2026-08-22 22:46-22:53Z — live-odds-worker + web `bf7a52ca` — `#520`/`#521` live-refresh scoping — SCOPE FIXES VERIFIED, OUTCOME PENDING
+
+`lane layer2-sim-view-and-live-projection`. Claims held on all three; refresh-worker
+RELEASED UNDEPLOYED (below). Preflight COULD NOT RUN — `RENDER_API_KEY` absent in
+this container — so its substance was done by hand: SHA confirmed on `origin/main`,
+`render.yaml` untouched (so no `blueprint_sync`), and in-flight jobs checked per
+service before each trigger. Say so rather than imply the script passed.
+
+    live-odds-worker  dep-da52dnvqj5pc73bjkpi0  live 22:50:24Z
+    syndicate (web)   dep-da52ds0u01pc73dp2lqg  live 22:51:00Z
+    both carried bf7a52ca — the SHA intended, no branch-tip drift this time
+
+**verify: NFL IS IN THE SWEEP AGAIN, and the launch line says so, not an absence.**
+
+    before   SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer
+                                      dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS
+                                              ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+    after    SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl kept=true
+                 reason=claimed_by_fast_tick_despite_SYNDICATE_ACTIVE_SPORTS
+             SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,nfl,soccer
+                                      dropped=ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+             ODDS_SWEEP_LAUNCHED sports=mlb,nfl,soccer count=3   (22:51:36Z, 22:53:04Z)
+
+`ODDS_SWEEP_LAUNCHED` is the load-bearing line: the ownership gate keeping nfl is
+only a decision, the launch is the command actually issued. ncaaf STAYS dropped and
+that is correct — its season opens ~08-29, so it has no games in the horizon and the
+carve-out is scoped to the claim, not to the sport.
+
+**verify: THE SOCCER SCOPE NOW CONTAINS THE LEAGUES THAT ARE PLAYING.**
+
+    before   refresh_odds_sources.py ... --soccer-leagues mls
+             (while primeira_liga's own live_state_2026-08-22.json said 1 live game)
+    after    FIXTURE_CADENCE sport=soccer league=primeira_liga due:live_now
+             FIXTURE_CADENCE sport=soccer league=la_liga       due:live_now
+             FIXTURE_CADENCE sport=soccer scope=league due=la_liga,mls,primeira_liga of=9
+
+Two leagues added, both with the new `due:live_now` reason, and the other six still
+skipping on their own tier (`skip:mid:17h_out:age=14296s<28800s`). So the fix ADDS
+without disabling the cadence gate — which is what the paired test asserts and what
+would otherwise have turned a scope fix into a call-volume regression.
+
+**NOT YET MEASURED — the outcome, as opposed to the mechanism.** Every reading above
+is the SCOPE. The thing the user asked for is a fresh price, and that shows up one
+layer later, in `LAYER2_BOARD_HEALTH`:
+
+    nfl     age_p50s 36,478 (10.1h)  ->  must fall to minutes
+    soccer  age_p50s 23,941 (6.7h)   ->  must fall for la_liga/primeira_liga rows
+    soccer  live_rows 0-3 of 400     ->  must exceed 3 while a match is on
+
+That lag is real and not a hedge: the shortlist is built by refresh-worker, which is
+still on the OLD code, from a `book_grid` live-odds-worker has only just started
+refreshing. A scope that is correct and a price that is fresh are different claims
+and this entry only supports the first.
+
+**refresh-worker NOT DEPLOYED, deliberately.** A 10-game MLB sim (pid 647,
+`--only-game-pks 823100,823261,...,824798`) started there at ~22:45Z. Two sims were
+already killed today by deploys at 21:34 and 21:58. It needs `refresh_odds_sources.py`
+for fixes 3 and 4 (live captures first, sim rebuild dropped for in-play leagues) but
+NOT for the two verified above, which live in the tick and the tick runs only on
+live-odds-worker. Claim released rather than held, so the 45-min TTL cannot wedge the
+service for another session.
+
+**web carried the UI fixes** (rail collapsed by default, MLS chip join) — those are
+reader-visible and unverified from here; the proxy 403s the Render host from this
+container, so they need a human look or a later browser check.
+
+### OUTCOME MEASURED 22:57:59Z — the prices are fresh. `LAYER2_BOARD_HEALTH`, same line, before and after.
+
+    sport   metric        before (21:06-21:14Z)   after (22:57:59Z)
+    nfl     rows                             23           115      5.0x
+    nfl     live_rows                         0            65
+    nfl     age_p50s             36,478 (10.1h)      307 (5m)    119x
+    soccer  age_p50s              23,941 (6.7h)   751 (12.5m)     32x
+    mlb     live_rows                        37           248
+    mlb     live_proj                        21            31
+
+NFL is the clean result: a board that was 23 frozen rows republishing an
+unchanged `book_grid` checksum is now 115 rows, 65 of them live, on a five-minute
+median quote. It was never a board defect — nothing was refreshing the price, and
+`opportunity_gate` was correctly deleting what it was given.
+
+Soccer's p50 fell 32x. Its p90 (30,652s) and max (48,888s) did NOT, and that is
+expected rather than a shortfall: those are the six leagues NOT playing, which
+still ride their own tier, plus the global-phase defect recorded as unfixed in
+`#521` — while ANY sport is live the whole tick runs `--phase live`, so a quiet
+soccer league's pregame capture never runs at all. The fix deployed here moves
+the leagues that are in play; nothing here moves the ones that are not.
+
+**SOCCER `live_rows` IS STILL 0, AND THAT TARGET WAS NOT MET.** Fresh prices were
+necessary and are not sufficient. A row reaches the live tier only if
+`game_state_of` returns `live`, and for nine of the ten soccer leagues the board
+never carries a real status: `_unsimulated_game` in `soccer/cards.py` defaults
+`status_state` to `"pre"`, and only the SIMULATED path stamps a real one — the sim
+runs for MLS alone. So soccer rows are structurally `pregame` no matter how fresh
+their price is. That is a different defect in a different file and this deploy
+does not touch it. Do not read "soccer p50 751s" as "soccer live bets work".
+
+**A NEW NUMBER WORTH WATCHING:** nfl `no_proj=86` of 115 rows. NFL had
+`pregame_proj=23 no_proj=0` when it had 23 rows; the 92 rows the refresh added are
+almost all unprojected. Not a regression — these rows did not exist before — but
+NFL projection coverage is now 25%, and nobody has looked at why.
+
+
+## 2026-08-22 23:08:55Z -- web `a1dc1e9a` -- soccer compact cards: pregame redesign + final reconciliation
+
+what: `_scoreboard_strip_soccer.html` pregame branch redesigned (date/time
+top line, away/home rows with sim-projected totals, BTTS/goals/corners/top-
+sim-score facts grid); new `elif game.live_state.final` branch preserves the
+old final layout AND adds a reconciliation grid grading those same four
+facts against the real result (`_compact_final_reconciliation`, cards.py).
+Full context: user request in-session, no todo item (UI-only, no research
+claim attached).
+
+claim: acquired 23:04:17Z, preflight CLEAR immediately (no in-flight jobs on
+web), deployed as a separate command per protocol. Released 23:09Z.
+
+deploy: dep-da52m23bc2fs73fkkfng, live 23:08:55Z, confirmed via
+`deploys?limit=1` returning `live a1dc1e9a`. Health check 200 immediately
+after.
+
+verify: fetched `/soccer/cards?date=2026-08-23` (pregame slate) and
+`/soccer/cards?date=2026-08-22` (today, mixed) directly from production.
+2026-08-23: 24/24 cards render `.cards-strip-pregame-rows` +
+`.cards-strip-pregame-facts`. 2026-08-22: 44 cards, 6 still pregame, 38
+finals rendering `.cards-strip-recon-score` with real hit/miss counts (19
+hit / 62 miss across all graded facts). Spot-checked one card (Man Utd vs
+Hull City): BTTS projected Yes, actual No -> red miss, correct; Goals and
+Corners had no captured market line and correctly rendered "X proj · Y
+total" with NO hit/miss mark rather than a fabricated grade -- the rule the
+tests pin (`test_soccer_final_reconciliation.py::
+test_model_only_goals_projection_reports_but_does_not_grade`) held on real
+data, not just in the test suite.
+
 ## 2026-08-22 22:30:40Z — live-odds-worker `f7797765` — `#514` NO_SERIES diagnostic, shipped AHEAD of the slate
 
 - **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da52642jobas73daben0`

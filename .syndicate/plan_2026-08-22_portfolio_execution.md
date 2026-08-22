@@ -477,6 +477,40 @@ key, and a deliberately re-run job produces **zero** additional orders. That
 last one is the test that matters and it must be written to fail on the
 pre-fix code.
 
+### STAGE B READ SURFACE — added 2026-08-22 on user request, after both jobs ran in production
+
+Both jobs ran and both artifacts crossed the service boundary, and **nothing
+rendered either one**. The stage was complete by its own acceptance criteria and
+still unusable: the only way to see a committed position was to fetch JSON.
+
+`GET /portfolio/paper` + `GET /api/portfolio/paper` — a pure read of the plan
+and the ledger joined by `position_key`, polling every 45s.
+
+**It is a SEPARATE page from `/portfolio`, and that is the load-bearing
+decision, not a layout preference.** `/portfolio` is the user's own logged bets.
+`portfolio_summary._is_user_placed_bet` exists because auto-tracked model rows
+once flooded that page with 1000+ "tracked plays" nobody had bet. Putting
+simulated positions beside real ones rebuilds that confusion with better
+formatting, and the failure mode on a money page is someone believing a
+simulated fill was theirs. A page that merges them cannot be un-merged by a
+label.
+
+**The four absence states stay distinct** — job off / no plan artifact / a plan
+that committed zero positions / positions whose orders were never placed. Four
+different fixes; one shared "nothing here" reads as the first when it is usually
+the third. **A ledger that cannot be read says so**, because `_load()` raises
+rather than reading empty and an empty table would otherwise mean "no bets"
+when it means "cannot see the bets". **Orphan orders are shown, never dropped**
+— an order that was submitted does not disappear to make a page tidy.
+
+Per position it surfaces `board_score`, the signed `stake_dollars_sim_delta`
+and `side_picked_by`; per plan, `sim_share_of_staked` and `sim_coverage`. That
+is Stage C's decomposition made readable before Stage C needs to consume it.
+
+**Acceptance:** `/portfolio/paper` renders 200 with a non-empty positions table
+on a production date where `PORTFOLIO_COMMIT` logged positions > 0. Local render
+is not the reading — production HTTP is unreachable from a Claude session.
+
 ---
 
 ## STAGE C — the acceptance gate: CLV, not ROI
