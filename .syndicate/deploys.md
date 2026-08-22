@@ -22892,3 +22892,46 @@ restarted at 19:29:37Z and the first shortlist of a cold boot is 10-19 minutes
 out. The three user reports it exists to answer (stale lines, blank projections,
 absent movement) remain UNDIAGNOSED. Nothing below or above should be read as
 having explained them.
+
+---
+
+## 2026-08-22 ~19:39Z — `ffa8e4df` — BOTH WORKERS — the publisher repair path (`6b193fee`)
+
+Claims `579afff01cbf6043` (refresh-worker), `015337abad508f7c` (live-odds-worker).
+Deployed `ffa8e4df`; `merge-base --is-ancestor 6b193fee ffa8e4df` verified before
+claiming it shipped. `deploy_preflight.py` still cannot run (no
+`RENDER_API_KEY`) — **no CLEAR verdict**.
+
+**WEB DELIBERATELY NOT DEPLOYED.** The fix is in the SWEEP, which runs on the
+workers (`live_lens_loop.py`, `live_refresh_loop.py`, `run_queued_refresh_job.py`,
+`run_mlb_daily_sim_job.py`). Web is the RECEIVER. A web deploy costs a
+user-visible ~90s of 502s at cutover — measured 18:43-18:44Z on the user's own
+browser — and spending that for a change web does not execute would be a cost
+with no benefit. Web stays on `3ada3512`, which already carries every
+user-facing fix.
+
+**live-odds-worker included after checking, not assumed.** `grep` for the sweep
+entrypoints put them in `live_refresh_loop`/`live_lens_loop`, and
+`render.yaml:748` runs `run_live_odds_refresh_worker.py` — so it sweeps too and
+had the same missing retry path.
+
+**KILLED:** a 4-game `fingerprint_change` MLB re-sim (pid 66) and a
+`build_season_betting_cards_manifest` run. Auto-refiring; memory was healthy
+(35%) so this deploy was NOT relieving pressure the way 19:20Z's was — the only
+justification here is the user's explicit "deploy it".
+
+**A COST WORTH NAMING:** this restarts the worker again, so the FIRST-EVER
+`LAYER2_BOARD_HEALTH` reading — already pushed back by the 19:29:37Z
+`service_updated` redeploy — moves out another 10-19 minutes. The three user
+reports it exists to answer are still undiagnosed, and this deploy delays that
+answer rather than advancing it.
+
+**VERIFY — and note it CANNOT be verified by absence.** The repair path only
+fires when a direct publish fails, and soccer's have been succeeding all day. So
+a quiet log is the EXPECTED result and proves nothing. The affirmative token is:
+
+    [artifact_publisher] SWEEP_REPAIRING path=<...> reason=direct_publish_failed bytes=<...>
+
+printed only when the exemption actually engages. Until that line appears after
+a real `PUBLISH_FAILED` on an oversized file, this fix is SHIPPED AND UNPROVEN
+IN THE FIELD — the same standing as `#488`'s guard, and recorded the same way.
