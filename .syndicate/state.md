@@ -215,6 +215,42 @@ Three facts worth not rediscovering:
   `live_state_{date}.json` (already allowlisted), covering `in` AND `post`,
   separate from `games` so a finished match never reads as live.
 
+## [soccer-live-momentum] FotMob momentum is production's signal now; the ESPN proxy carries none (2026-08-22)
+
+**A 5,552-match dataset (2024-08-09..2026-08-22, the 10 leagues tracked)
+established that FotMob's own per-minute momentum series predicts DIRECTION
+(which team scores next: dAUC +0.0707, AUC .577, calibrated) and carries
+near-zero signal for WHETHER/HOW MANY/WHEN a goal happens (any-goal-in-15min
+dAUC +0.0007).** Dataset committed: `reports/soccer_backtest/fotmob_2y.json.gz`
+(4.7MB), loader `scripts/soccer_load_2y.py::load_2y()`. Full breakdown:
+`reports/soccer_backtest/signal_decision_deepdive.json`.
+
+**The production ESPN-commentary momentum proxy (`syndicate/features/soccer/
+features/momentum.py`) was tested directly against its own weighting scheme
+(699 matches, holdout, half-lives 30s-1800s) and carries NO measured
+goal-timing signal at any setting** (dAUC -0.0006 to +0.0002, monotonically
+worse as half-life grows). It is retired from production use, code and its
+own docstring left intact.
+
+**Deployed 2026-08-22 22:18:35Z to live-odds-worker, SHA `94a16efe`**
+(confirmed via Render API): `poll_soccer_live_state.py` now sources momentum
+from `syndicate/features/soccer/ingestion/fotmob_momentum.py` (resolves the
+match via `fotmob_match_id.py`, by league+date+team-name, league ids pinned by
+name AND country). `cards.py` `_momentum_chart` strength bands retuned to
+FotMob's measured 0-100 scale (40/60/80, was 1.0/2.5/5.0 on the old proxy's
+unbounded scale). No fallback to the ESPN proxy on a join/fetch miss --
+`supported: False` hides the panel instead.
+
+**NOT YET VERIFIED: the FotMob match-id join has never resolved a real
+production fixture.** Confirmed the deploy is live and the new code path runs
+each 60s tick (`generated_at` on the live-state artifact postdates the
+deploy), but every league checked had zero live matches at verification time.
+First real test: 6 MLS fixtures kick off 2026-08-23T01:30Z. Read
+`soccer_source/mls/api/live_state/live_state_2026-08-23.json` after and check
+for `momentum.source == "fotmob"` with a real match id on at least one game --
+a silent 0% resolve rate looks identical to a quiet slate. Full detail:
+`.syndicate/deploys.md` 2026-08-22 22:18:35Z entry.
+
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.
