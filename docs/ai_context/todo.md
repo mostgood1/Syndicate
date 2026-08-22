@@ -966,14 +966,26 @@ goals-remaining +0.0003, BTTS -0.0009, period timing +0.0001, corners -0.010 (ES
 Winner market: +0.039 at 0-15', +0.004 by 75-90'. Scripts: `scripts/soccer_signal_decision_deepdive.py`,
 `scripts/soccer_outcome_markets_test.py`. Data: `reports/soccer_backtest/fotmob_2y.json.gz` (committed).
 
+**CORRECTION `[2026-08-22, same session, before any code shipped]`:** items 1-2 below as first written
+were WRONG and were caught before shipping, not after. "Half-life 300→60" transferred a finding from
+FotMob's OWN momentum series onto `momentum.py`'s ESPN-event-weighted proxy, which computes something
+structurally different. Tested directly against the production weighting scheme (`_EVENT_WEIGHTS`, ESPN
+commentary, 699 matches, holdout): dAUC is **-0.0006 to +0.0002 at every half-life from 30s to 1800s**,
+monotonically WORSE as half-life grows — the signature of no effect, not underpowered noise. Changing the
+constant would have been a no-op dressed as a fix. The |40| threshold is worse than a no-op: it is
+calibrated to FotMob's bounded 0-100 momentum scale, and the ESPN proxy outputs an unbounded weighted sum
+with no such scale — applying it would be meaningless on the actual production output.
+**Net: the ESPN-derived momentum this card currently ships has no measured goal-timing signal in 699
+matches at any tested half-life. Item 3 (ingest FotMob's real series) is not next in line, it is the only
+path to shipping anything real — building the card threshold or fixing the half-life on the ESPN proxy is
+wasted work until that lands.**
+
 **Do, in order:**
-1. `syndicate/features/soccer/features/momentum.py` `DEFAULT_HALF_LIFE_SECONDS = 300.0` → **60**. The
-   card ships a 5x over-smoothed series. Display-only, no deploy risk beyond the card.
-2. Card indicator: colour NOTHING below |momentum| 40 (goal rate 0.93-0.99x of clock there); 60-80 = 1.19x,
-   80+ = 1.23x. The compact card's "who has momentum" status should be blank for most of the match.
-3. Ingest FotMob momentum into production (`ingestion/fotmob_shots.py` already reads it; the ESPN↔FotMob
-   match-id join is the missing piece). Production's ESPN-commentary momentum is a different proxy, untested
-   directionally.
+1. Ingest FotMob momentum into production (`ingestion/fotmob_shots.py` already reads it; the ESPN↔FotMob
+   match-id join is the missing piece). This IS the signal — `momentum.py`'s ESPN proxy is not, per the
+   correction above.
+2. Once FotMob's series is live: card indicator colours NOTHING below |momentum| 40 on FotMob's 0-100 scale
+   (goal rate 0.93-0.99x of clock there); 60-80 = 1.19x, 80+ = 1.23x. Does not apply to the ESPN proxy.
 4. A next-team-to-score model on the live card: logistic on signed FotMob momentum (60s), score diff, clock,
    home flag; surface P(home next)/P(away next) and edge vs next-goal / team-in-15 markets where quoted.
    EXCLUDE mls (AUC .509) and belgian_pro_league (.520) until fitted per league.
