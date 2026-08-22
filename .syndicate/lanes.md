@@ -1160,6 +1160,7 @@ against a slate that actually had matches in play. Full evidence in
   `syndicate/templates/intelligence.html`,
   `syndicate/static/shared/board_cards.css`,
   `pipeline/layer2_shortlist.py`,
+  `syndicate/blueprints/ops.py`,
   `tests/test_layer2_sim_view_sides.py` (new),
   `tests/test_layer2_score_flatten.py`.
   - `syndicate/features/shared/live_projection_join.py` and

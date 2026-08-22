@@ -414,6 +414,18 @@ def api_ops_live_lens_status() -> Any:
     return jsonify(payload)
 
 
+def _prop_status_text(game: Any) -> str:
+    """Exactly what `build_live_prop_index` composes to decide live vs final.
+
+    Duplicated rather than imported because that logic is inline in the loop
+    there, and the point of this endpoint is to report what THAT code concludes.
+    If the two ever drift, this endpoint is lying -- so it is written to match
+    character for character rather than to be tidier.
+    """
+    status = game.get("status") if isinstance(game, dict) and isinstance(game.get("status"), dict) else {}
+    return f"{status.get('abstract') or ''} {status.get('detailed') or ''}".strip().lower()
+
+
 @ops_bp.get("/api/ops/live-lens/snapshot-index")
 def api_ops_live_lens_snapshot_index() -> Any:
     """What `build_live_gameline_index` ACTUALLY sees in the lens snapshot.
@@ -492,9 +504,74 @@ def api_ops_live_lens_snapshot_index() -> Any:
             "join_accepts": projection is not None,
             "home_win_prob": (projection or {}).get("home_win_prob"),
             "has_analytic_markets": bool((projection or {}).get("analytic_markets")),
+            # THE PROP SIDE, per game. This endpoint answered the GAMELINE
+            # question and nothing else: it reads `gameLens` and the player-prop
+            # join reads `liveProps`, so "is the lens carrying live props" was
+            # still unanswerable from outside the worker. Measured 2026-08-22
+            # 00:35Z, WNBA: the board reported `lens_live_games=0` with
+            # `lens_indexed=6` against 137 rows it had itself marked live -- two
+            # readings that cannot both be right, and no way to read the bytes
+            # that decide it.
+            #
+            # `status_text` is reproduced EXACTLY as `build_live_prop_index`
+            # composes it (abstract + detailed, lowered), because the whole
+            # question is what THAT function concludes -- a prettier status
+            # here would be a different measurement wearing the same name.
+            "prop_status_text": _prop_status_text(game),
+            "live_prop_count": len(game.get("liveProps") or []) if isinstance(game.get("liveProps"), list) else 0,
+            "archived_prop_count": len(game.get("archivedLiveProps") or []) if isinstance(game.get("archivedLiveProps"), list) else 0,
+            # THE PROP KEY NAMES THE LENS ACTUALLY EMITS. `_MARKET_ALIASES` is
+            # MLB-only, so a basketball market joins only if both sides happen to
+            # spell it identically -- and there is no way to add an alias without
+            # first reading the producer's own vocabulary. Guessing a name is how
+            # `strikeouts_batter` got into that table and never matched anything.
+            "sample_prop_keys": sorted(
+                {
+                    str(prop.get("prop") or prop.get("market") or "")
+                    for prop in (game.get("liveProps") or [])[:60]
+                    if isinstance(prop, dict)
+                }
+            )[:12],
+            "sample_prop_rows": [
+                {
+                    "playerName": prop.get("playerName"),
+                    "prop": prop.get("prop"),
+                    "market": prop.get("market"),
+                    "line": prop.get("line"),
+                    "liveProjection": prop.get("liveProjection"),
+                    "liveModelProbOver": prop.get("liveModelProbOver"),
+                }
+                for prop in (game.get("liveProps") or [])[:3]
+                if isinstance(prop, dict)
+            ],
         })
 
     index = build_live_gameline_index(snapshot, sources=sources)
+    # THE PROP INDEX, through the SAME function the board's join calls. The
+    # gameline index above cannot stand in for it: they read different keys and,
+    # on 2026-08-21, disagreed.
+    try:
+        from syndicate.features.shared.live_projection_join import build_live_prop_index
+
+        prop_indexed = build_live_prop_index(snapshot)
+        prop_summary = {
+            key: prop_indexed.get(key)
+            for key in (
+                "live_games", "rows_seen", "rows_indexed",
+                "skipped_no_live_projection", "skipped_no_key",
+                "rows_with_live_prop_seen", "rows_with_live_prob_seen",
+                "rows_with_live_prob_indexed", "sample_prop_keys", "by_game_state",
+            )
+            if key in prop_indexed
+        }
+        # The join's own key shape, which is what a miss is measured against.
+        prop_summary["prop_index_size"] = len(prop_indexed.get("index") or {})
+        prop_summary["prop_indexed_keys"] = [
+            list(k) for k in list((prop_indexed.get("index") or {}).keys())[:20]
+        ]
+    except Exception as exc:  # never let a diagnostic break the diagnostic
+        prop_summary = {"error": f"{type(exc).__name__}: {exc}"}
+
     return jsonify({
         "ok": True, "sport": sport, "path": str(path), "snapshot_present": True,
         "accepted_lens_sources": list(sources),
@@ -503,6 +580,7 @@ def api_ops_live_lens_snapshot_index() -> Any:
         "snapshot_game_count": len(snapshot.get("games") or []),
         "index_size": len(index),
         "indexed_keys": [list(k) for k in index],
+        "prop_index": prop_summary,
         "games": games_out,
     })
 
