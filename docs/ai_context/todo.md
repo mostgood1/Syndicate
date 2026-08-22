@@ -1,5 +1,65 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#505` — **Staged plan written for portfolio commitment + automated execution. PLAN ONLY, no engine code. Stage D is gated on `#502`'s outstanding verify.** — lane `portfolio-decision-and-execution`, 2026-08-22
+
+**The user asked whether the Layer 2 board / intelligence layer can be connected
+into the app to make portfolio decisions and actually place bets.** Answer, from
+a read of the code: **the decision half is substantially built and merely
+unassembled; the execution half does not exist and is blocked by something other
+than code.** Full staged plan (A-D + precondition):
+`.syndicate/plan_2026-08-22_portfolio_execution.md`.
+
+**Already wired, contrary to how the plan docs read:** `compute_board_stake`
+(`bankroll_manager.py:192`) is attached to every candidate at
+`intelligence_state.py:4250`, and `apply_exposure_budgets`
+(`bankroll_manager.py:249`, 5% per-game cap, 0.5 correlated-leg decay) runs at
+`intelligence_state.py:4857`. What does NOT exist is a commit step — no bankroll
+figure anywhere in the system, no slate-level ceiling, no cut line, no closed
+list.
+
+**Execution: grepped, not assumed.** Every book name in the tree
+(`draftkings|fanduel|pinnacle|prophetx|novig|sporttrade|betfair|kalshi`) is an
+OddsAPI feed identifier only; every outbound `POST`/`urlopen` goes to Render
+artifact publishing. No credential, no order call, no account integration.
+
+**FINDING — there is nowhere durable to put a money ledger.** `render.yaml`
+declares **no Postgres and no database at all**: three services, three separate
+50GB disks, one shared 256MB `keyvalue` on the starter plan which
+`refresh_state_store.py:139-205` records at 96% memory / 34,529 LRU-evicted keys
+/ 44% keyspace miss (2026-07-31; 38,865 evicted by 2026-08-10). Two consequences:
+(1) `_default_keyvalue_ttl_seconds` gives any DATE-TOKENED path a **10-day
+TTL** — an `execution_ledger_<date>.json` would silently expire, so the ledger
+path must carry no date token; (2) `allkeys-lru` evicts no-TTL keys too, so
+**`prediction_ledger.json` is LRU-evictable**. (2) is `#502`'s file —
+**surfaced, not edited.** UNVERIFIED: no Redis reading taken today.
+
+**WHY STAGE D IS GATED, in three readings that all say the same thing:**
+`_SCORE_SIM_WEIGHT = 0.0` (`opportunity_signals.py:390`); `sim_component`
+non-zero on 0 of 65 served rows (2026-08-16); `settled_count: 0` on
+`/api/portfolio/summary` (`#502`), and `#504` measured **zero** settled records
+written in production. Every stake on the board is therefore **1/16th Kelly by
+construction** — `_DEFAULT_KELLY_MULTIPLIER` 0.25 x `_MIN_SAMPLE_CREDIBILITY`
+0.25 — because settled sample is zero in every market
+(`_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50`). The sizing already does not believe
+itself. Automating placement on top of that is `learnings.md` 2026-08-20's
+"validating against a PROXY, not the objective" with money attached.
+
+**A LIMIT ON THE CEILING, stated now so it is not discovered at Stage D:** the
+only US-legal venues with real order APIs are exchanges and prediction markets
+(Kalshi, Sporttrade, ProphetX, Novig), and they are mostly moneyline/spread/
+total on major games — while `layer2_board.py`'s own header says props are where
+the sim differentiates and where **95.5% of the OddsAPI spend** goes. **The
+markets that can be legally automated are largely not the ones this board is
+best at.** Retail-book automation is ruled out on account-risk grounds (no API;
+driving the client breaches terms; detection means limiting, closure, frozen
+balance). Whether Stage D is worth building at all should be answered from Stage
+C's per-market CLV output, not in advance.
+
+**NEXT:** Stage A (`portfolio_commit.py`) is low-cost and needs no deploy beyond
+a worker job — but it needs **one decision that is not mine: the bankroll
+number.** Stages A-C do not wait on `#502`; Stage D does.
+
+
 ### `#504` — **Settlement was left in the exact chain position `#341` rescued reconciliation FROM, and then seven NFL branches were inserted above it.** — lane `portfolio-ledger-service-split`, 2026-08-22, MOVED IN CODE, NOT DEPLOYED
 
 `#341` moved `_launch_autorun_reconciliation` to the front of the exclusive

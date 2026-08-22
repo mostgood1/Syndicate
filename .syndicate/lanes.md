@@ -1179,6 +1179,68 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   daily-gated and last ran 06:57:03Z, so the first pass under the new code has
   not happened yet. Deploying is not verifying — do not close on the deploy.
 
+### portfolio-decision-and-execution — OPEN — opened 2026-08-22 — session 9324a3e5-364e-5fb4-9b4a-b0568019e37f
+- Goal: a staged, gated path from the Layer 2 shortlist to a COMMITTED
+  portfolio (a closed list of N bets at M dollars, not a ranked board with
+  suggestions attached) and then to automated placement — with each stage's
+  acceptance stated as a READING, and real money gated on a CLV result rather
+  than on the previous stage having shipped.
+- Plan: `.syndicate/plan_2026-08-22_portfolio_execution.md` (stages A-D +
+  precondition). **This session produced the PLAN ONLY — no engine code.**
+- Files (claimed; all NEW paths, nothing existing taken from another lane):
+  `.syndicate/plan_2026-08-22_portfolio_execution.md`,
+  `syndicate/features/shared/portfolio_commit.py`,
+  `syndicate/features/shared/execution_ledger.py`,
+  `pipeline/portfolio_commit.py`,
+  `tests/test_portfolio_commit.py`, `tests/test_execution_ledger.py`
+  - READ-ONLY, deliberately NOT claimed: `bankroll_manager.py` (Stage A
+    consumes `compute_board_stake` / `apply_exposure_budgets`, edits neither),
+    `pipeline/intelligence_state.py` (reads `read_layer2_shortlist`).
+  - Collision check run against every OPEN lane before opening. **Two lanes
+    hold files this work touches conceptually and I took none of them:**
+    `portfolio-ledger-service-split` holds `prediction_ledger.py`;
+    `layer2-sim-view-and-live-projection` holds `layer2_board.py`,
+    `pipeline/layer2_shortlist.py`, `blueprints/ops.py`, `intelligence.html`.
+- Hypothesis (diagnostic half, stated before testing): the DECISION layer is
+  substantially built and merely unassembled, while the EXECUTION layer does
+  not exist at all and is blocked by something other than code.
+- Falsification test: if any sportsbook credential, order call or account
+  integration existed anywhere in the tree, the "execution layer does not
+  exist" half would be wrong. Grepped for `draftkings|fanduel|pinnacle|
+  prophetx|novig|sporttrade|betfair|kalshi|polymarket` across all `*.py` and
+  for every outbound `POST`/`urlopen`: **every book name is an OddsAPI feed
+  identifier only; every outbound write goes to Render artifact publishing.**
+  Hypothesis holds on both halves — `compute_board_stake` and
+  `apply_exposure_budgets` are already WIRED (`intelligence_state.py:4250`,
+  `:4857`), and nothing places anything.
+- **FINDING, checked not assumed — there is nowhere durable to put a money
+  ledger.** `render.yaml` declares NO Postgres and no database: three services,
+  three separate 50GB disks, one shared 256MB `keyvalue` on the starter plan
+  which `refresh_state_store.py:139-205` documents at **96% memory, 34,529
+  LRU-evicted keys, 44% keyspace miss** (2026-07-31; 38,865 evicted by
+  2026-08-10). Two consequences: (1) `_default_keyvalue_ttl_seconds` gives any
+  DATE-TOKENED path a **10-day TTL**, so an `execution_ledger_<date>.json`
+  would silently expire — the ledger path must carry no date token; (2)
+  `allkeys-lru` evicts keys that carry no TTL too, so **`prediction_ledger.json`
+  is LRU-evictable** on a 96%-full instance. (2) is
+  `portfolio-ledger-service-split`'s file — **surfaced, not edited.**
+  UNVERIFIED: no Redis reading taken today; the percentages are the store's own
+  dated comments. Take one before Stage B picks its storage.
+- Verification (this lane's current stage): the plan doc exists and its
+  precondition, stage gates and file boundaries are stated as readings rather
+  than as tasks. **Stage A's own verification, when built:**
+  `portfolio_plan_{date}.json` ABSENT with the job disabled and PRESENT with it
+  enabled on the same date (`off != on`), entries summing exactly to the
+  declared exposure, and a named reason for every dropped shortlist row.
+- Blocked by: none for stages A-C. **Stage D is blocked on
+  `portfolio-ledger-service-split`'s outstanding verify** —
+  `settled_count > 0` on `/api/portfolio/summary`. Every stake on the board is
+  currently 1/16th Kelly by construction (`_DEFAULT_KELLY_MULTIPLIER` 0.25 ×
+  `_MIN_SAMPLE_CREDIBILITY` 0.25) because settled sample is zero everywhere,
+  and `_SCORE_SIM_WEIGHT` is 0.0 — so no edge on this board has been scored
+  against an outcome yet. Real money before that reading is `learnings.md`
+  2026-08-20's "validating against a PROXY" at its most expensive.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
