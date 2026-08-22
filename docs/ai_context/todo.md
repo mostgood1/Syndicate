@@ -90,10 +90,48 @@ against. Now scoped to the leagues that actually miss, with a per-league quota.
 One pair WAS fully visible and is confirmed: board
 `belgian_pro_league|Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
 
-**NEXT ACTION:** take the next reading with the scoped sample, pair all 12
-fixtures, and add only aliases where BOTH spellings are in evidence. Then decide
-whether `unmatched_player: 5138` is a name problem or a coverage problem — that
-is the bucket that actually matters, and it is untouched.
+**SIX ALIASES SHIPPED (`2b0b708b`), each quoted off a production line.** The
+17:36:42Z reading was for the **08-23** window, and its (still alphabetical)
+sample happened to include `bundesliga` — so board and sim spellings for a
+second league were pairable without waiting for the scoped sample:
+
+    board                 sim                    league
+    Royal Antwerp         Antwerp                belgian_pro_league
+    1. FC Köln            FC Cologne             bundesliga
+    Hamburger SV          Hamburg SV             bundesliga
+    FSV Mainz 05          Mainz                  bundesliga
+    SC Paderborn          SC Paderborn 07        bundesliga
+    Union Berlin          1. FC Union Berlin     bundesliga
+
+REACHABILITY MEASURED FIRST: **0 of 5 fixtures join without these entries, 5 of
+5 with them**, and the off-run reproduces the five production fixture strings
+character for character. TSG Hoffenheim / Borussia Dortmund / Eintracht
+Frankfurt / Genk↔Racing Genk sit in the same broken fixtures, already match, and
+are deliberately NOT in the map — a working entry buys nothing and hides which
+ones are load-bearing.
+
+`Royal Antwerp v Genk` is the worked example of why one alias is worth hundreds
+of rows: Genk matched fine, but `match_for` requires BOTH sides, so the whole
+fixture was lost. Fixtures are the unit of loss, not clubs. bundesliga was 401
+unmatched rows across 4 fixtures on the 08-23 window and 4 of those are these.
+
+**STILL OPEN, in priority order:**
+
+1. `unmatched_player: 5138` — the biggest bucket, untouched, and the one the
+   live tier's `edged=0` actually traces to. Not yet known whether it is a name
+   problem or a coverage problem.
+2. epl / la_liga / ligue_1 / mls / serie_a team names — still unpaired. The
+   scoped sample (`bb709247`) is live but no shortlist has completed on it yet.
+3. `edge_why` has not yet been observed resolving into the two new keys.
+
+**AND A SYSTEMIC OBSTACLE WORTH ITS OWN LOOK:** the Layer 2 shortlist runs at
+the END of a full intelligence-state cycle, which from a cold boot takes ~10
+minutes. Peer sessions have been deploying refresh-worker roughly that often
+(17:09:28, 17:17:30, 17:42:09, 17:52:07), and every deploy SIGTERMs the worker
+and restarts that cycle from zero. Between 17:02:31Z and 17:36:42Z — 34 minutes
+— the shortlist completed **once**. If that cadence is normal during active
+hours, the board's own ranking artifact is being rebuilt far less often than the
+2-minute `BOOK_GRID_TICK` suggests, and nobody is measuring it.
 
 **Cross-lane note:** `soccer_projections.py` is listed in `soccer-board-parity`,
 which is OPEN but UNOWNED. Claimed narrowly and recorded in `lanes.md`.
