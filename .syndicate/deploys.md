@@ -23421,3 +23421,88 @@ show.
 **STAGE A AND STAGE B ARE BOTH LIVE AND MEASURED.** What remains is Stage C,
 which needs paper slates to accumulate and then a CLV join against each
 position's `attribution` — no further code to deploy for it.
+
+## 2026-08-22 22:01:23Z — live-odds-worker `e807a489` — `#514` basketball momentum capture
+
+- **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da51ocv40ujc73adkrbg`
+- **holder:** lane `basketball-live-momentum`, claim token `95852c3fcfc3c2f8`
+- **live at:** 22:05:05Z (3m41s build)
+- **verify:** `[live_lens_loop] BASKETBALL_MOMENTUM sport=wnba date=2026-08-22
+  games=0 with_series=0` on FOUR consecutive ticks — 22:06:18, 22:07:49,
+  22:09:29, 22:11:13 — each immediately after its own
+  `live_lens_tick_before_wnba` stage line, with the producer's three lines
+  (`live_events=0`, `fetched=0 games=0 with_series=0`, `NOTHING TO STORE ...
+  not appended`) in between. That is the whole chain: gate opens, producer
+  runs, empty capture correctly refused, loop reports.
+
+**WHAT IS PROVEN: reachability, not a series.** The block executes on every
+WNBA tick and ESPN answers from Render's egress (`live_events=0` is a real
+answer — the same call returns HTTP 403 from a Claude Code sandbox, so this
+also confirms the browser-UA fetch works from the datacenter IP). **NO
+MOMENTUM SERIES HAS BEEN BUILT.** `with_series` is 0 because no WNBA game is
+in play. Until a live tip-off produces `with_series > 0`, nothing here is
+evidence that the taxonomy, the clock derivation, or either decay axis works
+on real data. Do not read these four lines as more than "wired and running".
+
+**NBA never appears**, correctly: it is out of season and not in the tick's
+active sports.
+
+### Preflight was SUBSTITUTED, not run, and that is a caveat on this deploy
+
+`deploy_preflight.py` exits at `RENDER_API_KEY not set in the environment or
+.env` — the key is absent from this session, so the sanctioned gate could not
+run. The claim WAS taken normally (it is a local lock and needs no API key).
+In place of preflight, two of its checks were made by hand through the Render
+MCP:
+
+1. **Off-main containment.** The live SHA was `ffa8e4df`, whose commit message
+   says `tmp-land` — exactly the off-main shape `CLAUDE.md` records as causing
+   a silent revert (a verified fix live at 21:36:59Z, gone by 21:45:20Z).
+   Checked: `git merge-base --is-ancestor ffa8e4df origin/main` → **true**, so
+   deploying main is strictly cumulative and reverts nothing.
+2. **In-flight work.** Logs at 22:00 showed a routine live-lens tick only —
+   no `daily_update`, no `generate_smartsim2`, no `build_soccer_artifacts`,
+   which are the kill-risk jobs preflight exists to catch. Memory 1618/2048MB
+   (79%), steady state.
+
+**This is weaker than preflight and should be treated as such.** Preflight
+samples the service directly; two hand checks over a log window can miss a job
+that started between the reading and the trigger. Set `RENDER_API_KEY` before
+the next deploy from a session like this one.
+
+**Deployed from the Render MCP, which bypasses `.claude/hooks/deploy-guard.py`
+entirely.** The guard gates Bash, not MCP calls. Recorded here because a future
+reader checking why the guard shows no record of this deploy deserves the
+answer rather than a mystery. User authorised the deploy explicitly after the
+blockers were surfaced.
+
+`render.yaml` untouched → no `blueprint_sync`, so nothing outside this service
+changed.
+
+
+## 2026-08-22 22:18:35Z -- live-odds-worker `94a16efe` -- soccer #518 FotMob momentum wiring
+
+what: `fotmob_match_id.py` + `fotmob_momentum.py` wired into `poll_soccer_live_state.py`
+in place of the ESPN-commentary momentum proxy; `cards.py` strength bands retuned to
+FotMob's 0-100 scale. Full context: `docs/ai_context/todo.md` #518.
+
+claim: acquired 22:07:50Z, held through preflight HOLD (3 jobs in flight: soccer odds
+refresh + MLS artifact build), preflight CLEARED 22:14:43Z, deployed as a SEPARATE
+command per protocol (guard evaluates at submit time). Released 22:22Z.
+
+deploy: dep-da51upn40ujc73ae4u10, build 22:15:10-22:17:34Z, live 22:18:35Z, confirmed
+via `deploys?limit=1` returning `live 94a16efe`.
+
+verify: `generated_at` in `soccer_source/epl/.../live_state_2026-08-22.json` read
+22:19:42Z (post-deploy, code is running the new path each 60s tick per
+`SYNDICATE_LIVE_LENS_INTERVAL_SECONDS=60`).
+
+**NOT YET VERIFIED: the FotMob join has never resolved a REAL fixture.** Every EPL/
+LaLiga/Ligue1/SerieA match live-checked was already `count: 0` (today's European
+slate finished before 22:18Z) -- the code path that calls `resolve_fotmob_match_id`
+against a live match has not executed once in production. Next real window: 6 MLS
+fixtures kick off 2026-08-23T01:30Z (checked live via FotMob's own `matches_for_date`,
+not assumed). **OWED: read `soccer_source/mls/api/live_state/live_state_2026-08-23.json`
+after that kickoff and confirm at least one game's `momentum.source == "fotmob"` with
+a real `fotmob_match_id`, not `supported: False`.** A silent 0% resolve rate looks
+identical to a quiet slate from the outside -- this is the check that tells them apart.

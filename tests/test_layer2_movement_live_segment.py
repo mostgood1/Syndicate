@@ -232,8 +232,35 @@ def test_no_actual_key_when_actual_so_far_is_absent():
 
 
 def test_the_gameline_block_is_a_fallback_source():
-    got = _live_projection_columns({"live_gameline": {"live_projected": 4.4}})
-    assert got["live_projection"] == 4.4 and got["live_aware"] is True
+    """`#517`. The gameline block is still a source -- but NOT for
+    `live_projection`, and this test used to assert the bug.
+
+    `live_gameline_join._apply_verdict` passes `live_projected=model_prob` for
+    EVERY game market, so the value is 0..1. Publishing it as `live_projection`
+    sent it through the template's `toFixed(1)` and a live moneyline at 19%
+    rendered **"0.2"** in the Live column -- worse than the em dash it
+    replaced, because a dash says "we do not know" and "0.2" says something
+    false about the match. The old assertion (`live_projection == 4.4` from a
+    gameline block) is exactly that path, with a fixture value that could not
+    be a probability in the first place.
+
+    What the block legitimately contributes now: `live_aware`, and `live_total`
+    from `total_mean` -- the one number on it that IS a count.
+    """
+    got = _live_projection_columns({"live_gameline": {"live_projected": 0.19}})
+    assert got["live_aware"] is True
+    assert "live_projection" not in got, (
+        "a gameline live_projected is a PROBABILITY; publishing it as a "
+        "projection is the 19%-reads-as-0.2 defect"
+    )
+    assert "live_total" not in got, "and it is not a total either"
+
+    # `total_mean` IS a count, and is what the block may fill Live total from.
+    with_total = _live_projection_columns(
+        {"live_gameline": {"live_projected": 0.19, "total_mean": 8.6}}
+    )
+    assert with_total["live_total"] == 8.6
+    assert "live_projection" not in with_total
 
 
 # --------------------------------------------------------------------------

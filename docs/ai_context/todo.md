@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#518` — **The paper portfolio had no read surface: two artifacts crossed the service boundary and nothing rendered them. `/portfolio/paper` ships. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
+### `#519` — **The paper portfolio had no read surface: two artifacts crossed the service boundary and nothing rendered them. `/portfolio/paper` ships. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
 
 Stage A (`#507`) and Stage B (`#512`) both ran in production on 2026-08-22 —
 `PORTFOLIO_COMMIT` 9 positions/$30.27/sim_share 0.7906, then `PORTFOLIO_EXECUTED
@@ -47,6 +47,57 @@ the orphan and unreadable-ledger paths. **Local render only — production HTTP 
 unreachable from a Claude session (`state.md:2811`), so the deployed reading is
 owed: `/portfolio/paper` renders 200 with a non-empty positions table on a date
 where `PORTFOLIO_COMMIT` logged positions > 0.**
+
+### `#518` — **The remaining pytest failures are a DIFFERENT KIND from the 34 already fixed: guards that are RIGHT, firing on real drift in production code.** — categorised by lane `basketball-live-momentum`, 2026-08-22, NOT FIXED
+
+`#517` fixed 34 failures and every one was a stale TEST — a test describing a
+contract the code had moved past. **The ~20 that remain are mostly the
+opposite**, and treating them the same way would mean deleting real signal.
+
+Categorised, so the next session does not have to rediscover which is which:
+
+**(a) GUARDS CORRECTLY REPORTING DRIFT — the test is right, the code moved.**
+Fixing these means changing production behaviour, and none of it is this lane's
+to decide:
+
+- `test_nfl_injuries_fetch_autorun` (2) — asserts the injuries fetch sits at
+  position <= 2 and directly behind the pbp fetch in the autorun dispatch
+  chain. It is now at 5: `nfl_fantasy_artifact` and `nfl_news_capture` were
+  inserted between them. Either the ordering guarantee still matters (restore
+  the order) or it does not (relax the guard) — a real call about what must run
+  before what on refresh-worker.
+- `test_slate_date_timezone_discipline` (1) — a repo-wide guard listing files
+  making timezone-ambiguous date calls. **4 new files** now do, among them
+  `syndicate/features/nfl/fantasy_news.py`. This is the guard doing exactly its
+  job; the fix is in those four files' date handling.
+- `test_probability_differential` (1) — registry-completeness. **6**
+  converter-shaped functions are neither in `REGISTRY` nor excused in
+  `NOT_A_SCALAR_CONVERTER`, including `scripts/soccer_market_prices_momentum.py:
+  american_to_prob`. Each needs a per-function judgement about whether it is a
+  scalar converter.
+
+**(b) A GENUINE SOURCE INCONSISTENCY, found while triaging.**
+`test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking`
+— `odds_history_paths_for_sport` returns `[shared, artifact, tracking]` and that
+assertion PASSES, but `load_odds_history_payload_for_sport` then returns
+`{"source": "tracking"}`. **The loader does not follow its own sibling's
+precedence.** Not investigated further; it is a one-line contradiction between
+two functions in `odds_control_plane.py`.
+
+**(c) STALE TESTS, the `#517` pattern, still worth taking.** The remaining
+singles across `test_generate_smartsim2_nfl_*`, `test_intelligence_state`,
+`test_memory_*`, `test_mlb_sim_run_reconcile`, `test_nba_refresh_runner`,
+`test_ops`, `test_refresh_worker` are undiagnosed but are the population `#517`
+kept finding.
+
+**(d) DELIBERATELY LEFT.** `test_wnba_refresh_runner` (2) — both turn on the
+input-hash refresh-decision gate that `wnba-live-odds-capture-gap` is rewriting.
+
+**WHY THIS MATTERS MORE THAN THE COUNT:** the baseline gate cannot tell (a)
+from (c). A guard firing on real drift and a test describing a dead contract
+are both "one more failing test", and only one of them should ever be made to
+pass by editing the test. Anyone driving the number to zero without this split
+will quietly delete the guards.
 
 ### `#513` — **WNBA `PREGAME_PROJECTION_JOIN` counters cannot be reconciled: `projected` counts a population `considered` never counted. REPORTING ONLY — no bet is mispriced. NOT FIXED, user decision to leave it.** — found by lane `portfolio-decision-and-execution`, 2026-08-22
 
