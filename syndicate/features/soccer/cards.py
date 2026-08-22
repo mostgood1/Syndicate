@@ -1337,6 +1337,107 @@ def _market_tiles(
     ]
 
 
+def _compact_pregame_facts(
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    team_projection: dict,
+    total_distribution: dict,
+    volume_projection: dict | None,
+    betting: dict,
+    scoreline_probabilities: Any,
+) -> dict[str, Any] | None:
+    """The four facts the PREGAME compact strip card shows below the team
+    rows: BTTS, the goals line, the corners line, and the top simulated
+    scoreline. All four are already computed for the full card's tiles
+    (`_market_tiles`) and headline section (`_scoreline_section`) -- this is
+    a SHORTER read of the same fields, not a second computation, so the
+    compact card can never disagree with the full one it links to.
+
+    Returns None (not a dict of dashes) when nothing is simulated yet, so the
+    template can omit the whole block rather than render four empty facts.
+    """
+    away_total = _safe_float(team_projection.get("away_mean"))
+    home_total = _safe_float(team_projection.get("home_mean"))
+    if away_total is None and home_total is None:
+        return None
+
+    # --- BTTS: market price if captured, else the model's own read. Same
+    # preference order as the tile, so the compact card and the full card
+    # never show opposite answers for the same match. ---
+    btts_p = _safe_float((betting or {}).get("p_btts_yes"))
+    if btts_p is None:
+        btts_p = _safe_float((total_distribution or {}).get("both_teams_scored_probability"))
+    btts_text = ("Yes" if btts_p >= 0.5 else "No") if btts_p is not None else None
+
+    # --- Goals: the market's own total line, sided by whichever way the
+    # model leans. Mirrors tile 2's selection exactly. No market line means
+    # no "o"/"u" -- a line this card did not capture must not look captured.
+    total_line = _safe_float(betting.get("total"))
+    model_total = _safe_float(team_projection.get("total_mean"))
+    if total_line is not None:
+        side = "o" if (model_total is not None and model_total > total_line) else "u"
+        goals_text = f"{side}{total_line:g}"
+    elif model_total is not None:
+        goals_text = f"{_fmt_num(model_total, 1)} proj"
+    else:
+        goals_text = None
+
+    # --- Corners: same pattern, reading `volume_projection` (NOT
+    # `team_projection` -- see `_market_tiles`'s corners tile for the bug this
+    # avoided: corners silently never rendered when read from the wrong dict). ---
+    vp = volume_projection or {}
+    vp_home, vp_away = _safe_float(vp.get("home_corners")), _safe_float(vp.get("away_corners"))
+    corners_total = (vp_home + vp_away) if (vp_home is not None and vp_away is not None) else None
+    corners_line = _safe_float((betting or {}).get("corners_total"))
+    if corners_line is not None:
+        side = "o" if (corners_total is not None and corners_total > corners_line) else "u"
+        corners_text = f"{side}{corners_line:g}"
+    elif corners_total is not None:
+        corners_text = f"{_fmt_num(corners_total, 1)} proj"
+    else:
+        corners_text = None
+
+    # --- Top sim score: the single most likely exact scoreline, away-first
+    # to match the card's own header order (see `_scoreline_section`). ---
+    top_score = None
+    if isinstance(scoreline_probabilities, dict) and scoreline_probabilities:
+        ranked = sorted(
+            ((str(k), _safe_float(v)) for k, v in scoreline_probabilities.items()),
+            key=lambda item: item[1] or 0.0,
+            reverse=True,
+        )
+        for key, prob in ranked:
+            if prob is None or "-" not in key:
+                continue
+            home_goals, _, away_goals = key.partition("-")
+            home_goals, away_goals = home_goals.strip(), away_goals.strip()
+            # Both sides must actually be goal counts. `key.partition("-")`
+            # splits on the FIRST hyphen, so a key with more than one (never
+            # produced by the sim, but this reads whatever the payload sends)
+            # silently parsed as a scoreline instead of being rejected --
+            # caught by a test using a deliberately adversarial key.
+            if not (home_goals.isdigit() and away_goals.isdigit()):
+                continue
+            top_score = {
+                "text": f"{away_abbr} {away_goals} - {home_abbr} {home_goals}",
+                "pct": _fmt_pct(prob),
+            }
+            break
+
+    if btts_text is None and goals_text is None and corners_text is None and top_score is None:
+        return None
+
+    return {
+        "away_total": _fmt_num(away_total, 1) if away_total is not None else None,
+        "home_total": _fmt_num(home_total, 1) if home_total is not None else None,
+        "btts": btts_text,
+        "goals": goals_text,
+        "corners": corners_text,
+        "top_score": top_score,
+    }
+
+
 def _squad_box_sections(
     *,
     squad_props: list,
@@ -1444,9 +1545,16 @@ def _scoreline_section(scoreline_probabilities: Any, *, away_abbr: str, home_abb
         if prob is None or "-" not in key:
             continue
         home_goals, _, away_goals = key.partition("-")
+        home_goals, away_goals = home_goals.strip(), away_goals.strip()
+        # Both sides must be goal counts -- see the identical guard in
+        # `_compact_pregame_facts`, added the same session after a test with
+        # a deliberately adversarial key exposed the unguarded version
+        # silently "parsing" the first hyphen of an unrelated string.
+        if not (home_goals.isdigit() and away_goals.isdigit()):
+            continue
         table_rows.append(
             [
-                f"{away_abbr} {away_goals.strip()} - {home_abbr} {home_goals.strip()}",
+                f"{away_abbr} {away_goals} - {home_abbr} {home_goals}",
                 _fmt_pct(prob),
             ]
         )
@@ -1955,6 +2063,18 @@ def _match_to_game(
             match.get("scoreline_probabilities"),
             away_abbr=_abbr(away_team, league),
             home_abbr=_abbr(home_team, league),
+        ),
+        # PREGAME COMPACT CARD facts (BTTS / goals / corners / top score).
+        # Read by `_scoreboard_strip_soccer.html`'s non-live branch only --
+        # `shared_momentum` above is the live branch's equivalent slot.
+        "shared_compact_pregame": _compact_pregame_facts(
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+            team_projection=team_projection,
+            total_distribution=total_distribution,
+            volume_projection=volume,
+            betting=betting,
+            scoreline_probabilities=match.get("scoreline_probabilities"),
         ),
         # CHART DATA for the live panel. Kept separate from the box sections
         # below: those are tables, and a shape rendered as a table row is what
