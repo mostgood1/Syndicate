@@ -23539,7 +23539,14 @@ instead, and it is recorded here because the marker on disk does not exist:
 
 deploy: dep-da52ai2jobas73dao6dg, commit `f779776503ea9a08c14bb069f96e36db19b8bc44`.
 
-verify: OWED. `/portfolio/paper` returning 200 with a NON-EMPTY positions table on
+verify: **SATISFIED 22:5xZ by the page owner's own read** — deploy went live
+22:44:21Z and the user loaded `/portfolio/paper` and reported it renders with
+content ("looks good"). Recorded as a USER REPORT, not a log reading: nobody
+counted the rows, so the strength of this reading is "the page is not broken and
+is not empty", which is what it was deployed to establish. Claim released 22:5xZ.
+
+The ORIGINAL owed reading, kept because it is the stronger one and still
+uncollected: `/portfolio/paper` returning 200 with a NON-EMPTY positions table on
 a date where `PORTFOLIO_COMMIT` logged positions > 0. Production HTTP is
 unreachable from a Claude session (`state.md:2811`), so the reading must come from
 Render request logs (`path=/portfolio/paper`, `statusCode=200`) or from the user's
