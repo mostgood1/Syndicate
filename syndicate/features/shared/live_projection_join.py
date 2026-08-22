@@ -226,6 +226,46 @@ def _norm_side(value: Any) -> str:
     return text
 
 
+def _status_text(status: Mapping[str, Any]) -> str:
+    """Both status vocabularies, because the lens speaks two of them.
+
+    MLB's lens carries StatsAPI's `abstract`/`detailed`. **WNBA's carries
+    `status`/`detail`** -- `features/wnba/live_lens.py:_game_status_text` reads
+    exactly those two keys, and its own docstring shows the shape:
+    `{'clock': '', 'detail': 'Final', 'final': True, ...}`.
+
+    This function read only the MLB pair, so **a live WNBA game produced an
+    EMPTY status string** and fell through every branch to `unknown`:
+
+        MLB  {'abstract': 'Live', 'detailed': 'In Progress'} -> 'live in progress' -> live_games 1
+        WNBA {'status': 'In Progress', 'detail': 'Q3 04:12'} -> ''                 -> live_games 0
+
+    So `live_games` was structurally 0 for WNBA no matter how many games were in
+    play, and every game landed in the `unknown` bucket of `by_game_state`.
+    CONFIRMED IN PRODUCTION 2026-08-22 with two WNBA games live (CHI@GSV,
+    WSH@MIN, both being polled by the lens at the time): the board reported
+    `lens_live_games=0`.
+
+    THE COST WAS DIAGNOSTIC AND IT WAS EXPENSIVE. Rows still indexed -- nothing
+    gates on this counter -- so the join kept working while its own instrument
+    said there was nothing to join to. Every WNBA reading therefore looked like
+    "no live games", which is indistinguishable from the honest overnight state,
+    and I read it that way myself before being corrected.
+
+    Both vocabularies, tried in order, matching the pattern
+    `basketball_market_board.py:172` and `game_chip_scoreboard.py:119` already
+    use. Not a merged mapping: the two dicts are read independently so neither
+    sport's spelling can mask the other's absence.
+    """
+    parts = [
+        status.get("abstract"),
+        status.get("detailed"),
+        status.get("status"),
+        status.get("detail"),
+    ]
+    return " ".join(str(part).strip() for part in parts if part).strip().lower()
+
+
 def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     """Index the published live-lens snapshot by (player, market, line).
 
@@ -285,7 +325,7 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
             continue
         games_seen += 1
         status = game.get("status") if isinstance(game.get("status"), Mapping) else {}
-        status_text = f"{status.get('abstract') or ''} {status.get('detailed') or ''}".strip().lower()
+        status_text = _status_text(status)
         # FINAL IS CHECKED FIRST. A completed game's detailed state can still
         # carry live-ish wording, and mislabelling one final game as live is
         # exactly what would put a guaranteed-null row into the only bucket that
