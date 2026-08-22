@@ -223,7 +223,9 @@
     </span>
     <span class="paper-table__sub">{% if mark.clv_pct is not none %}{{ "%+.2f"|format(mark.clv_pct) }} pts{% else %}no move{% endif %}</span>
   {%- elif mark.reason == 'book_no_longer_quoting' -%}
-    <span class="paper-table__sub">book pulled</span>
+    <span class="paper-table__sub">{{ mark.taken_book or 'our book' }} pulled</span>
+  {%- elif mark.reason == 'market_not_on_board' -%}
+    <span class="paper-table__sub">off board</span>
   {%- elif mark.reason == 'unkeyable' -%}
     <span class="paper-table__sub">not re-priceable</span>
   {%- else -%}

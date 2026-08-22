@@ -58,9 +58,39 @@ from typing import Any
 __all__ = [
     "opening_key_for_row",
     "opening_key_for_position",
+    "market_key",
     "join_positions_to_openings",
     "join_report_line",
 ]
+
+# `_opening_key` always ends with the bookmaker component. Splitting there is
+# what keeps `market_key` in lockstep with it: if the key's shape ever changes,
+# the market variant follows automatically instead of drifting into a second,
+# subtly different identity. A hand-rebuilt market key is how you get two
+# functions that agree on every row you tested and disagree on the one you did
+# not.
+_BOOKMAKER_COMPONENT = "|bookmaker="
+
+
+def market_key(full_key: str | None) -> str | None:
+    """The same identity WITHOUT the bookmaker -- one market, all books.
+
+    Needed because the two things being joined disagree about what a bookmaker
+    means. An opening is recorded per (market, book). A BOARD row is one row per
+    market carrying whichever book is best AT THAT MOMENT, with every book's
+    price in `quote.book_prices`. So joining a placed order to a board row on a
+    key containing the bookmaker fails the instant the best book rotates -- and
+    it measured exactly that: `LIVE_MARKS orders=21 marked=0
+    reasons={'book_no_longer_quoting': 21}` on 2026-08-22T23:41:55Z. Twenty-one
+    identical reasons is a broken join, not twenty-one books pulling a line.
+
+    The caller re-narrows to our own book through `book_prices`, so this widens
+    the JOIN without widening the COMPARISON.
+    """
+    if not full_key:
+        return None
+    head, _, _ = full_key.partition(_BOOKMAKER_COMPONENT)
+    return head or None
 
 
 def opening_key_for_row(row: Mapping[str, Any]) -> str | None:
