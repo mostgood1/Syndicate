@@ -1468,6 +1468,8 @@ def _momentum_chart(
     *,
     away_abbr: str,
     home_abbr: str,
+    match_box: dict[str, Any] | None = None,
+    home_team: str = "",
 ) -> dict[str, Any] | None:
     """Momentum as CHART DATA, not a pre-rendered string.
 
@@ -1497,7 +1499,36 @@ def _momentum_chart(
     if not pts:
         return None
     peak = max(1e-6, max(abs(v) for _, v in pts))
-    span = max(1.0, pts[-1][0] or 1.0)
+    # FIXED 0-90 AXIS, not "stretch to the last sample".
+    #
+    # `span = pts[-1][0]` normalised x to whatever the latest sample was, so a
+    # chart at the 15th minute filled the full width exactly like one at the
+    # 85th. The trace was readable and told you NOTHING about where in the
+    # match you were -- which is half of what the panel is for. 5400s is
+    # nominal full time; stoppage runs past 100 and is clamped so a 90+7 sample
+    # sits at the right edge rather than off the canvas.
+    _FULL_MATCH_SECONDS = 5400.0
+
+    # GOAL MARKS. `clock_seconds` is on every goal record, so these sit on the
+    # same axis as the trace rather than being evenly spaced decoration. A goal
+    # is the event the momentum build-up is supposed to precede, so showing
+    # both together is what makes the panel checkable by eye.
+    goal_marks: list[dict[str, Any]] = []
+    box = match_box if isinstance(match_box, dict) else {}
+    for goal in (box.get("goals") if isinstance(box.get("goals"), list) else []):
+        if not isinstance(goal, dict):
+            continue
+        secs = _safe_float(goal.get("clock_seconds"))
+        if secs is None:
+            continue
+        scored_by_home = str(goal.get("team") or "").strip() == str(home_team).strip()
+        goal_marks.append({
+            "x": round(min(100.0, 100.0 * secs / 5400.0), 2),
+            "home": scored_by_home,
+            "clock": str(goal.get("clock") or "").strip(),
+            "scorer": str(goal.get("scorer") or "").strip(),
+            "own_goal": bool(goal.get("own_goal")),
+        })
 
     side = home_abbr if float(current) > 0 else (away_abbr if float(current) < 0 else None)
     strength = abs(float(current))
@@ -1512,6 +1543,11 @@ def _momentum_chart(
 
     return {
         "label": label,
+        # Booleans, not a string the template has to compare against an abbr.
+        # The head colours a dot by side, and re-deriving "is this the home
+        # team" from `label` would mean parsing a sentence.
+        "side_is_home": side == home_abbr,
+        "side_is_away": side == away_abbr,
         "home_abbr": home_abbr,
         "away_abbr": away_abbr,
         "events": momentum.get("events") or 0,
@@ -1519,9 +1555,15 @@ def _momentum_chart(
         # pixels; keeping the sign here means the template never has to know
         # which way is up.
         "points": [
-            {"x": round(100.0 * t / span, 2), "y": round(v / peak, 4)}
+            {"x": round(min(100.0, 100.0 * t / _FULL_MATCH_SECONDS), 2), "y": round(v / peak, 4)}
             for t, v in pts
         ],
+        # Where "now" is on that axis, so the trace ending mid-canvas reads as
+        # a match in progress rather than as truncated data.
+        "now_x": round(min(100.0, 100.0 * (pts[-1][0] or 0.0) / _FULL_MATCH_SECONDS), 2),
+        # Half-time, as a tick the eye can anchor on.
+        "half_x": 50.0,
+        "goals": goal_marks,
     }
 
 
@@ -1892,6 +1934,11 @@ def _match_to_game(
             live_game.get("momentum") if isinstance(live_game, dict) else None,
             away_abbr=_abbr(away_team, league),
             home_abbr=_abbr(home_team, league),
+            # Goals ride the same axis as the trace. `home_team` is the FULL
+            # name because that is what the goal record carries -- the abbr
+            # would never match and every goal would silently render as away.
+            match_box=match_box,
+            home_team=home_team,
         ),
         "shared_box_sections": [
             section

@@ -149,5 +149,38 @@ console.log('\n--- and it never hides an absence ---');
 eq('a row with no price survives a narrowed filter', inRange(NaN, 0, LONGSHOT_CAP), true);
 eq('null price survives too', inRange(Number(null ?? undefined), 0, LONGSHOT_CAP), true);
 
+// --- the default position must show EVERYTHING ---------------------------
+//
+// SHIPPED BROKEN, and this is the regression test for it. `clampOddsIndex`
+// guarded with `Number.isFinite`, but `urlParams.get("odds_max")` returns
+// `null` when the parameter is absent and `Number(null)` is `0` -- finite --
+// so the fallback never ran. On every normal visit (no URL params) oddsMax
+// came out 0 instead of 29, both handles pinned to the low sentinel, the
+// visible range collapsed to [-100000, -100000], and THE BOARD RENDERED BLANK.
+const clampSrc = extract('clampOddsIndex');
+const clampOddsIndex = (new Function(
+  `const ODDS_LADDER_MAX_DEFAULT = ${LADDER.length - 1};\n${clampSrc}\nreturn clampOddsIndex;`
+))();
+
+console.log('\n--- an ABSENT url param falls back, it does not read as index 0 ---');
+const noParams = new URLSearchParams('');
+eq('absent odds_max falls back to the open end',
+  clampOddsIndex(noParams.get('odds_max'), LADDER.length - 1), LADDER.length - 1);
+eq('absent odds_min falls back to the open end',
+  clampOddsIndex(noParams.get('odds_min'), 0), 0);
+eq('an EMPTY param falls back too (Number("") is also 0)',
+  clampOddsIndex(new URLSearchParams('odds_max=').get('odds_max'), LADDER.length - 1), LADDER.length - 1);
+eq('a real value is still honoured', clampOddsIndex('11', 0), 11);
+eq('garbage falls back rather than clamping to 0', clampOddsIndex('abc', LADDER.length - 1), LADDER.length - 1);
+eq('out-of-range clamps into the ladder', clampOddsIndex('999', 0), LADDER.length - 1);
+
+console.log('\n--- and the default position hides NOTHING ---');
+const defMin = clampOddsIndex(noParams.get('odds_min'), 0);
+const defMax = clampOddsIndex(noParams.get('odds_max'), LADDER.length - 1);
+eq('default range is the full ladder', `${defMin}..${defMax}`, `0..${LADDER.length - 1}`);
+for (const price of [-1000, -110, 100, 250, 6000]) {
+  eq(`a ${price > 0 ? '+' : ''}${price} row survives the default`, inRange(price, defMin, defMax), true);
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

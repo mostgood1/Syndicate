@@ -358,8 +358,11 @@ def _lines_from_cards(game: dict[str, Any]) -> dict[tuple[str, str], float]:
 def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
     """Stamp `liveProps` on each game from the captured live player box."""
     from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+    from collections.abc import Mapping
+
     from syndicate.features.shared.wnba_live_prop_rows import (
         build_live_prop_rows,
+        normalize_name,
         to_snapshot_live_props,
     )
 
@@ -417,6 +420,35 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
         # -- the producer already collected it and nothing published it, which
         # is why 6 rows looked like a mystery for an evening. Capped at 12 names
         # because this rides on every game in the snapshot.
+        # DOES THE LINE KEY REACH A PLAYER WE ACTUALLY HAVE?
+        #
+        # `to_snapshot_live_props` DROPS any row whose `line` is None, so lines
+        # are a hard gate on the published rows -- and the line is looked up by
+        # `(normalize_name(live-box player), market)`. That makes this a NAME
+        # JOIN between two independent feeds: the odds CSV writes the book's
+        # spelling, the live box writes ESPN's. `_lines_from_odds_csv` is proven
+        # to return 27 lines for a real event, so if rows stay thin with lines
+        # present, THIS is the number that says why.
+        #
+        # Three counters because two of them are ambiguous alone: lines with no
+        # live player, live players with no line, and the intersection that can
+        # actually produce a priced row.
+        try:
+            line_players = {key[0] for key in lines}
+            box_players = {
+                normalize_name(entry.get("player"))
+                for entry in players
+                if isinstance(entry, Mapping)
+            }
+            box_players.discard("")
+            game["livePropsCoverage"].update({
+                "line_players": len(line_players),
+                "box_players": len(box_players),
+                "line_players_in_box": len(line_players & box_players),
+                "line_players_not_in_box_sample": sorted(line_players - box_players)[:8],
+            })
+        except Exception:
+            pass
         game["livePropsCoverage"].update({
             "lines_available": len(lines),
             "lines_from_odds_csv": wide_line_count,
