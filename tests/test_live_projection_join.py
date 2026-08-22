@@ -64,7 +64,23 @@ class LiveProjectionJoinTests(unittest.TestCase):
                  "line": 1.5, "game": {"state": "live"}}]
         coverage = attach_live_projections(grid, build_live_prop_index(_snapshot()))
         self.assertEqual(coverage["rows_live_projected"], 0)
-        self.assertEqual(coverage["miss_no_market_alias"], 1)
+
+        # `#505`. The reason is `miss_player_not_live`, not
+        # `miss_no_market_alias`. A finer bucket was added since this was
+        # written, and it is the CORRECT one for this fixture: "Nobody Here" is
+        # absent from the lens entirely, so the join never gets as far as
+        # trying market aliases. Asserting the old bucket made a more precise
+        # attribution look like a regression.
+        self.assertEqual(coverage["miss_player_not_live"], 1)
+        self.assertEqual(coverage["miss_no_market_alias"], 0)
+
+        # THE INVARIANT THIS TEST IS NAMED FOR, pinned directly rather than via
+        # one bucket: every considered row lands in exactly one reason. That
+        # survives new buckets being added, which is what broke the assertion
+        # above, and it is the thing that would actually catch a silent drop.
+        miss_total = sum(value for key, value in coverage.items() if key.startswith("miss_"))
+        self.assertEqual(miss_total + coverage["rows_live_projected"], coverage["rows_live_considered"])
+
         self.assertTrue(coverage["unmatched_samples"])
         self.assertIn("tried", coverage["unmatched_samples"][0])
 

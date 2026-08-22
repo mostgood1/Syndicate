@@ -46,8 +46,27 @@ class ReasonSplit(unittest.TestCase):
         obq.reset_quote_join_stats()
 
     def _call(self, **kwargs):
-        with patch.object(obq, "read_book_quotes", lambda *a, **k: _rows()):
-            return obq.quote_ref_for_bet(sport="mlb", date_str="2026-08-13", **kwargs)
+        """`#505`. Patches `read_book_quotes_LATEST`, not `read_book_quotes`.
+
+        `#435` changed `quote_ref_for_bet` to read latest-per-key -- holding
+        every superseded snapshot is what made one end-of-day MLB shard cost
+        ~1,162MB resident -- and the patch here was never re-aimed. It named a
+        function this code path no longer calls, so the real reader ran, found
+        no shard on disk, and `quote_ref_for_bet` returned None at its
+        `if not rows` guard: BEFORE any `_bump`. Every assertion then read
+        `None != 1` against an empty stats dict, which looks like broken
+        counting and was actually an inert patch.
+
+        `assert_called()` below is the guard against that recurring: a patch
+        naming a function the code no longer reaches is otherwise
+        indistinguishable from a working one.
+        """
+        with patch.object(
+            obq, "read_book_quotes_latest", side_effect=lambda *a, **k: _rows()
+        ) as mocked_reader:
+            result = obq.quote_ref_for_bet(sport="mlb", date_str="2026-08-13", **kwargs)
+        mocked_reader.assert_called()
+        return result
 
     def test_cheap_event_key_is_counted_as_by_event(self) -> None:
         self._call(event_id="evt-1", market="moneyline", selection="home")

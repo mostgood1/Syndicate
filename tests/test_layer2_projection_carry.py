@@ -13,6 +13,20 @@ The distinction these tests pin is between ABSENT and NULL. A market with no
 projection must not acquire a null one: the props pipeline treats "no
 projection" and "a projection of 0" as different facts, and a null would make a
 market look modelled-and-worthless rather than unmodelled.
+
+**AMENDED `#505`, 2026-08-22: `projection` IS A MAPPING, NOT A SCALAR.** These
+fixtures passed `projection=21.4` and every one of them failed, because
+`_model_edge_for` (`layer2_board.py:829`) returns None for anything that is not
+a Mapping -- so the row scored None and the opportunities filter dropped it
+before the carry could be observed at all. What the producers actually stamp is
+a dict carrying `edge_vs_market_pct` / `edge_vs_line` /
+`edge_unavailable_reason` (`prop_projections.py:1027`).
+
+The `#270` carry mechanism itself was never broken; only these fixtures were.
+One consequence is recorded in `test_absent_projection_stays_absent_rather_
+than_null`: with a model view now REQUIRED to score, a projection-less row
+cannot reach `opportunities` at all, so the null failure mode is structurally
+unreachable there rather than merely untested.
 """
 from __future__ import annotations
 
@@ -51,29 +65,56 @@ def _candidates(row):
 
 
 def test_projection_reaches_the_candidate():
-    rows = _candidates(_grid_row(projection=21.4))
+    rows = _candidates(_grid_row(projection={"edge_vs_market_pct": 6.0, "mean": 21.4}))
     assert rows, "fixture must produce at least one candidate"
-    assert all(r.get("projection") == 21.4 for r in rows), (
+    assert all(r.get("projection") == {"edge_vs_market_pct": 6.0, "mean": 21.4} for r in rows), (
         "the projection stamped on the grid row must be carried onto every "
         "candidate built from it -- this is the #270 join"
     )
 
 
 def test_absent_projection_stays_absent_rather_than_null():
-    rows = _candidates(_grid_row())
-    assert rows, "fixture must produce at least one candidate"
-    for r in rows:
-        assert "projection" not in r, (
-            "an unmodelled market must not acquire a null projection -- absent "
-            "means unknown, whereas null reads as 'modelled, and it is nothing'"
-        )
+    """`#505`. Re-aimed, and the reason matters more than the assertion.
+
+    Originally this built a candidate with no projection and asserted the key
+    was ABSENT rather than null. Under the current board that state cannot
+    reach `opportunities` at all: `_model_edge_for` requires a `projection`
+    MAPPING carrying a numeric `edge_vs_market_pct`, `blended_score` returns
+    None without a model view, and the opportunities filter drops every
+    candidate whose score is None. Measured: a row with no projection yields
+    `candidates=2, scored=0, opportunities=0`.
+
+    So the null failure mode is now structurally unreachable here rather than
+    merely untested -- and asserting a bare `rows == []` would pass for a dozen
+    unrelated reasons. What is still worth pinning, and is pinned below, is
+    that the row is dropped by the SCORING gate specifically, with the
+    candidate built and no fabricated projection anywhere in it.
+    """
+    result = build_layer2_rows([_grid_row()])
+    assert result["candidates"] == 2, "the candidate must still be BUILT"
+    assert result["scored"] == 0, "and dropped for having no model view, not for being malformed"
+    assert list(result.get("opportunities") or []) == []
+
+
+def test_a_projection_without_a_market_edge_does_not_become_an_opportunity():
+    """The other half of absent-vs-null: a projection dict that carries a
+    mean but no `edge_vs_market_pct` is a real projection in the wrong UNITS
+    (`edge_vs_line` is in rebounds/goals, not probability points). It must not
+    be scored as though it were a probability view."""
+    result = build_layer2_rows([_grid_row(projection={"edge_vs_market_pct": None, "edge_vs_line": 2.0})])
+    assert result["candidates"] == 2
+    assert result["scored"] == 0
+    assert list(result.get("opportunities") or []) == []
 
 
 @pytest.mark.parametrize("value", [0, 0.0])
 def test_zero_projection_is_carried_not_dropped(value):
-    """The falsy-but-real case. A truthiness check here would silently drop a
-    genuine projection of zero, which is a meaningful prediction for a prop."""
-    rows = _candidates(_grid_row(projection=value))
+    """The falsy-but-real case, and the sharpest surviving form of the original
+    intent. A truthiness check anywhere on this path would silently drop a
+    genuine model edge of zero -- "the market is exactly right" is a
+    prediction, not a missing one."""
+    projection = {"edge_vs_market_pct": value}
+    rows = _candidates(_grid_row(projection=projection))
     assert rows, "fixture must produce at least one candidate"
-    assert all(r.get("projection") == value for r in rows)
+    assert all(r.get("projection") == projection for r in rows)
     assert all("projection" in r for r in rows)

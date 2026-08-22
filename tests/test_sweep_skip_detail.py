@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import importlib
 
+from datetime import date
+
 import pytest
 
 MODULE = "syndicate.features.shared.artifact_publisher"
@@ -53,6 +55,23 @@ def pub(monkeypatch, tmp_path):
     return mod
 
 
+# `#505`. **THE "FRESH" SLATE DATE MUST BE TODAY'S, NOT A LITERAL.**
+#
+# These fixtures hardcoded `book_grid_2026-08-12.json` as the file that should
+# be skipped for being TOO LARGE. `sweep_changed_hot_artifacts` also skips
+# stale slates, and that check runs first -- so once 2026-08-12 aged past the
+# staleness bound the file was reported as `stale_slate` and the size path was
+# never reached. The assertions then read `too_large=[` missing from a line
+# that said `stale_slate=[...]`, which looks like the size reporting broke and
+# is really the fixture expiring.
+#
+# Same shape as the WNBA player-logs preflight bomb fixed in this pass: a test
+# written with today's date, correct for a few days, wrong every day after.
+# `2000-01-01` below stays a literal ON PURPOSE -- it is the genuinely stale
+# one, and it must never become fresh.
+_FRESH_SLATE = date.today().isoformat()
+
+
 def _make(tmp_path, rel: str, size: int):
     path = tmp_path / rel
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +80,7 @@ def _make(tmp_path, rel: str, size: int):
 
 
 def test_the_detail_names_the_oversized_file_and_its_size(pub, tmp_path, monkeypatch, capsys):
-    rel = "mlb_source/data/book_grid/book_grid_2026-08-12.json"
+    rel = f"mlb_source/data/book_grid/book_grid_{_FRESH_SLATE}.json"
     _make(tmp_path, rel, pub._PUBLISH_MAX_BYTES + 1000)
     monkeypatch.setattr(pub, "HOT_ARTIFACT_PATTERNS", (rel,), raising=False)
 
@@ -69,7 +88,7 @@ def test_the_detail_names_the_oversized_file_and_its_size(pub, tmp_path, monkeyp
     out = capsys.readouterr().out
     assert "SWEEP_SKIPPED {'too_large': 1}" in out, "the original line must stay byte-identical"
     detail = next(l for l in out.splitlines() if "SWEEP_SKIPPED_DETAIL" in l)
-    assert "book_grid_2026-08-12.json" in detail, "the file must be named -- this is the whole point"
+    assert f"book_grid_{_FRESH_SLATE}.json" in detail, "the file must be named -- this is the whole point"
     assert str(pub._PUBLISH_MAX_BYTES + 1000) in detail, "the size discriminates a 12MB grid from a 51MB shard"
 
 
@@ -115,7 +134,7 @@ def test_nothing_is_printed_when_nothing_is_skipped(pub, tmp_path, monkeypatch, 
 def test_distinct_reasons_are_reported_separately(pub, tmp_path, monkeypatch, capsys):
     # too_large and stale_slate are different problems with different fixes;
     # collapsing them would rebuild the ambiguity being removed.
-    _make(tmp_path, "mlb_source/data/book_grid/book_grid_2026-08-12.json", pub._PUBLISH_MAX_BYTES + 1)
+    _make(tmp_path, f"mlb_source/data/book_grid/book_grid_{_FRESH_SLATE}.json", pub._PUBLISH_MAX_BYTES + 1)
     _make(tmp_path, "mlb_source/data/book_grid/book_grid_2000-01-01.json", 64)
     monkeypatch.setattr(pub, "HOT_ARTIFACT_PATTERNS", ("mlb_source/data/book_grid/*.json",), raising=False)
     pub.sweep_changed_hot_artifacts(0.0)
