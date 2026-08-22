@@ -63,7 +63,7 @@ whose block is no longer in `lanes.md`, so no enforceable claim exists and
 `lane-guard` sees nothing. Flagged rather than ignored, because that lane's
 subject is refresh-worker OOM and this change moves an expensive job earlier.
 
-### `#503` — **Soccer's pregame projection join misses ~99.6% of the board, AND that one failure is also what makes every soccer LIVE row unpriceable. The report's live half was FALSE.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, INSTRUMENTED AND DEPLOYED (`e6002cdc`), CAUSE NOT YET NAMED
+### `#503` — **Soccer team-name join: FIXED AND VERIFIED IN PRODUCTION (2,587 → 87 unmatched rows). The live `edged=0` is a SEPARATE plumbing gap and remains open, as does `unmatched_player`.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22
 
 **Reported as:** "none of the soccer data from sims (pregame or live) is joining
 with the board."
@@ -182,6 +182,37 @@ against. Now scoped to the leagues that actually miss, with a per-league quota.
 One pair WAS fully visible and is confirmed: board
 `belgian_pro_league|Royal Antwerp v Genk` <-> sim `Antwerp v Racing Genk`.
 
+## VERIFIED 18:31:07Z — before and after, same log line, 26 minutes apart
+
+| metric | before | after |
+|---|---|---|
+| `rows_with_projection` | 9,598 / 20,014 (48.0%) | **10,684 / 20,028 (53.3%)** |
+| `rows_with_true_probability` | 8,922 | **9,905** |
+| `unmatched_match_rows` | 2,587 | **87** (−96.6%) |
+| `unmatched_fixtures` | 12 | **3** |
+| `unmatched_by_league` | belgian 5, epl 510, la_liga 972, ligue_1 240, mls 247, primeira 6, serie_a 607 | **ligue_1 81, primeira_liga 6** |
+
+**+1,086 rows projected; five leagues to exactly zero.** `matches_in_source`
+(95) and `ambiguous_keys` (0) unchanged, so the index did not move underneath
+the measurement.
+
+**The three survivors were PRE-REGISTERED as not-name-problems** before the
+reading, so the result could not be rationalised afterwards:
+
+- `ligue_1|Paris Saint Germain v Rennes` (81 rows) — the board carries BOTH
+  directions of this fixture; the sim has only `Stade Rennais v
+  Paris Saint-Germain` (Rennes home). **An odds-side data question**, and the
+  one genuinely new finding from this reading.
+- `primeira_liga|CF Estrela v Braga`, `Moreirense FC v Benfica` (6 rows) —
+  neither club appears in the sim's primeira_liga slate at all. Producer gap.
+
+**LOOKS LIKE A REGRESSION AND IS NOT:** `unmatched_player` 5,138 → 6,057 and
+`unsupported_market` 2,691 → 3,200. Both sit DOWNSTREAM of the match join — rows
+formerly rejected at the match stage now reach the player and market stages. The
+buckets did not grow; the population reaching them did.
+
+---
+
 **SIX ALIASES SHIPPED (`2b0b708b`), each quoted off a production line.** The
 17:36:42Z reading was for the **08-23** window, and its (still alphabetical)
 sample happened to include `bundesliga` — so board and sim spellings for a
@@ -211,12 +242,12 @@ unmatched rows across 4 fixtures on the 08-23 window and 4 of those are these.
 
 1. **The one-sided fair value never reaching the live edge** (above). This is
    what `edged=0` actually is, and it is a decision, not a diagnosis.
-2. `unmatched_player: 5138` — still the biggest pregame bucket and still
-   untouched. NOTE: no longer believed to be the cause of `edged=0`.
-3. **DONE** — epl / la_liga / ligue_1 / mls / serie_a names paired and shipped
-   (`2e3265d7`, 7 aliases, 0/13 -> 13/13). Thirteen aliases total across two
-   rounds. Not yet observed in production: the aliases post-date the running
-   worker.
+2. **`unmatched_player: 6,057`** — now unambiguously the largest bucket, and it
+   GREW because the match join got better. Untouched. Not the cause of
+   `edged=0`.
+3. **The board carries both directions of `PSG v Rennes`** (81 rows). New,
+   small, and an odds-side question rather than a projection one.
+4. **DONE AND VERIFIED** — 13 aliases, `unmatched_match` 2,587 → 87.
 
 **WHAT SLOWED THE READINGS — measured, and smaller than it first looked.** The
 Layer 2 shortlist runs at the END of a full intelligence-state cycle. From a

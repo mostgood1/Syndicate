@@ -22630,3 +22630,40 @@ lands in `quote["fair_probability"]` while the live join reads
 see it. **Deliberately NOT fixed in this deploy** — bridging them is a PRICING
 change and `layer2_board:587-604` already treats a `book_margin_model` fair as
 an ESTIMATE (4.5% moneyline hold vs 12% on props). These aliases do not touch it.
+
+### VERIFIED 18:31:07Z — `4eeffb5c` — the 13 aliases, measured before and after
+
+`PREGAME_PROJECTION_JOIN sport=soccer`, same log line, same slate, 26 minutes
+apart across the deploy:
+
+| metric | 18:04:56Z (before) | 18:31:07Z (after) |
+|---|---|---|
+| `rows_with_projection` | 9,598 / 20,014 (48.0%) | **10,684 / 20,028 (53.3%)** |
+| `rows_with_true_probability` | 8,922 | **9,905** |
+| `unmatched_match_rows` | 2,587 | **87** (−96.6%) |
+| `unmatched_fixtures` | 12 | **3** |
+| `unmatched_by_league` | belgian 5, epl 510, la_liga 972, ligue_1 240, mls 247, primeira 6, serie_a 607 | **ligue_1 81, primeira_liga 6** |
+
+**+1,086 rows now carry a projection**, and five leagues went to exactly zero
+unmatched. `matches_in_source` (95) and `ambiguous_keys` (0) are unchanged, so
+this is the join improving and not the index changing underneath it.
+
+**THE THREE SURVIVORS ARE THE THREE I PRE-REGISTERED AS *NOT* NAME PROBLEMS**,
+written into the check-in BEFORE this reading so the result could not be
+rationalised afterwards:
+
+- `ligue_1|Paris Saint Germain v Rennes` (81 rows) — the sim has
+  `Stade Rennais v Paris Saint-Germain`, i.e. Rennes at HOME. The board carries
+  **both directions of the same fixture**; only one exists in the sim. That is
+  an odds-side data question, not an alias.
+- `primeira_liga|CF Estrela v Braga`, `primeira_liga|Moreirense FC v Benfica`
+  (6 rows) — neither Braga nor Benfica appears anywhere in the sim's
+  primeira_liga slate. Fixture absence; the producer's problem.
+
+**NOT A REGRESSION, and it will look like one:** `unmatched_player` rose
+5,138 → 6,057 and `unsupported_market` 2,691 → 3,200. Both are DOWNSTREAM of the
+match join — rows that used to be rejected at the match stage now get far enough
+to be judged on player and market. The buckets did not grow; the population
+reaching them did.
+
+Claim `188efafc1f8177ba` **released**.
