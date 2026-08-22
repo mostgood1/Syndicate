@@ -2725,17 +2725,21 @@ def select_shortlist(
         _keyvalue_ceiling = int(_keyvalue_max_bytes())
     except Exception:
         _keyvalue_ceiling = 0
-    if _keyvalue_ceiling and persisted_bytes > _keyvalue_ceiling // 2:
-        # LOUD BEFORE IT BREAKS. The write fails at the ceiling with an opaque
-        # "Connection closed by server" (measured at 8.9MB), so a warning that
-        # only fires AT the limit fires too late to be actionable.
-        print(
-            f"[layer2_board] SHORTLIST_PERSIST_LARGE bytes={persisted_bytes} "
-            f"ceiling={_keyvalue_ceiling} rows={len(selected)} "
-            f"per_sport={int(per_sport)} "
-            f"-- lower SYNDICATE_LAYER2_ROWS_PER_SPORT if this approaches the ceiling",
-            flush=True,
-        )
+    # NO WARNING IS RAISED HERE, DELIBERATELY. This function can only see
+    # `selected` — the ROWS — and the artifact that actually gets persisted also
+    # carries `per_sport`, `cards`, `openings_records`, `clv_openings` and every
+    # coverage payload. A guard on the rows fired silent while the real artifact
+    # sat at 4,434,665 B (53% of the 8 MB ceiling), measured 2026-08-22
+    # 20:56:30Z right after the cap went 100 -> 400. An all-clear from a
+    # subset-measuring guard is worse than no guard at all.
+    #
+    # The warning now lives at the only place the whole payload exists:
+    # `intelligence_state._warn_if_shortlist_near_keyvalue_ceiling`, called from
+    # `write_layer2_shortlist` BEFORE the write.
+    #
+    # The two numbers below are kept because they are honest as long as they are
+    # named for what they measure: `persisted_bytes` is the ROWS' contribution,
+    # not the artifact's size, and the pct is derived from it.
     return {
         "rows": selected,
         "per_sport": per_sport_report,
@@ -2787,13 +2791,16 @@ def select_shortlist(
         "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_stale_kickoff": stale_kickoff,
+        # THE ROWS' CONTRIBUTION, not the artifact's size. Renamed from the
+        # bare `persisted_bytes` it shipped as, because that name is what made a
+        # subset read as the whole: the persisted artifact was 4.43 MB while
+        # this number was comfortably under half the ceiling.
+        "rows_bytes": persisted_bytes,
+        # Kept under the old key so nothing downstream breaks, and its meaning
+        # is now stated rather than implied.
         "persisted_bytes": persisted_bytes,
-        # THE HEADROOM, so the next raise is made on a reading rather than on
-        # the arithmetic in `_shortlist_rows_per_sport`'s docstring. The board
-        # is only PART of the intelligence-state payload, so the shortlist's own
-        # share reaching the ceiling is not the failure point -- it is the point
-        # at which the ceiling stops being comfortably far away.
-        "persisted_pct_of_keyvalue_max": round(100.0 * persisted_bytes / _keyvalue_ceiling, 1)
+        "persisted_bytes_note": "rows only; the written artifact is larger -- see SHORTLIST_PERSIST_LARGE",
+        "rows_pct_of_keyvalue_max": round(100.0 * persisted_bytes / _keyvalue_ceiling, 1)
         if _keyvalue_ceiling
         else None,
     }

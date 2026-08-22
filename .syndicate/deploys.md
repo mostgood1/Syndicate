@@ -23221,3 +23221,49 @@ is not reachable from `page.evaluate`, so the Live column's percentage rendering
 rests on the Node harness only. And `LAYER2_BOARD_HEALTH` has STILL not fired
 since the 20:39:19Z restart — the cap raise, the age percentiles and `live_rows`
 remain unread, so "stale lines" and `live_proj=0` are still undiagnosed.
+
+### THE READING, 20:56:30Z — all four questions answered, and one new risk
+
+    mlb     rows=400  pregame_proj=370  live_rows=0  age p50 10m    p90 10m    max 2.8h
+    wnba    rows=400  pregame_proj=105  live_rows=0  age p50 2.9h   p90 2.9h   max 13.9h
+    soccer  rows=400  pregame_proj=99   live_rows=3  age p50 6.5h   p90 10.7h  max 13.6h
+    nfl     rows=23   pregame_proj=23   live_rows=0  age p50 9.8h   p90 9.8h   max 11.9h
+    movement eligible=253 matched=184     shortlist artifact 4,434,665 B
+
+**1. THE CAP RAISE TOOK.** 100 -> 400 on every sport with the rows to fill it;
+NFL's 23 is all it has. Four times the board.
+
+**2. "EXTREMELY STALE LINES" IS CONFIRMED, AND THE CONTROL IS WHAT PROVES IT.**
+Soccer's MEDIAN quoted line is **6.5 hours old**; its p90 is 10.7h. MLB's median
+is **10 minutes**. That is **39x**, on the same board, in the same build. MLB
+being healthy is what makes this soccer's refresh cadence rather than the
+board's rendering — and WNBA (2.9h) and NFL (9.8h) are also bad, so it is "every
+sport except MLB", not "soccer alone". The user's report was exactly right and
+this is the first number anyone has attached to it.
+
+**3. `live_proj=0` IS A SELECTION FAILURE, NOT A PROJECTION ONE — and `live_rows`
+settled it in one reading.** `live_rows=0` on mlb/wnba/nfl and **3** on soccer,
+against a grid that had `considered=1336` live soccer rows at 18:04Z. So of
+~1,336 live rows, **3 reach the published board.** The mechanism closes the loop
+on `#503`: a live row cannot be priced (the margin-model fair value never
+reaches `projection["market_fair_prob_over"]`), so it carries no edge, so the A3
+filter drops it before publication. **The blank Live column is downstream of the
+pricing gap, not a separate defect** — and that gap is the PRICING decision
+still parked with the user.
+
+**4. MOVEMENT DEGRADES WITH VOLUME — new, and invisible before the cap raise.**
+`184/253 = 73%` matched, against **83/83 = 100%** at 100 rows/sport. The extra
+rows the raise admitted join at a much lower rate. At the old cap this looked
+perfect; it was perfect only over the top-100 slice.
+
+**5. A RISK THE RAISE CREATED, and my own guard missed it.** The shortlist
+artifact now persists at **4,434,665 B = 53% of the 8 MB ceiling** — and the
+ceiling's own comment records 4.37 MB as the payload that "must keep working"
+and 8.9 MB as reproducibly fatal. We are sitting just above that known-good
+figure. `SHORTLIST_PERSIST_LARGE` did NOT fire, because it measures
+`len(json.dumps(selected))` — the ROWS — while the persisted artifact also
+carries `per_sport`, `cards`, `openings` and the coverage payloads. **A guard
+that measures a subset of what it is guarding is the third instrument gap this
+instrument has produced today.** NCAAF opens ~08-29; a fifth in-season sport at
+400/sport could breach the ceiling, and the failure mode is an opaque
+"Connection closed by server".
