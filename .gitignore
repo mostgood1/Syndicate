@@ -97,6 +97,10 @@ data/nfl_source/tracking/
 
 # Accidental/tooling virtualenvs outside the standard .venv/ name.
 vendor/mlb_bettingv2/.venv_x64/
+# A session needing to RUN the suite has to build one (this container ships no
+# Flask), and `.venv/` above does not match a suffixed name. 225 MB of vendored
+# binaries reached `git status` as untracked on 2026-08-22 for exactly that gap.
+.venv-*/
 
 # Ad hoc local test-run output, not source.
 /test_stdout.log
