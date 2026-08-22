@@ -463,22 +463,43 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn("--markets", wnba_steps[0].command)
         self.assertIn(wnba_markets, wnba_steps[0].command)
 
+    # `#517`. `/opt/render/project/data`, NOT `C:\render\data`.
+    #
+    # These two hardcoded a Windows drive path, which on Linux is a RELATIVE
+    # path -- so the helper resolved it under the repo and the assertion read
+    # `PosixPath('/home/user/Syndicate/C:\render\data/nfl_source') !=
+    # PosixPath('C:\render\data\nfl_source')`. They passed only on a Windows
+    # dev machine and failed on CI and in any Linux sandbox.
+    #
+    # Worse than non-portable, it was never REPRESENTATIVE: Render runs Linux
+    # and the real mounted disk is `/opt/render/project/data` (see
+    # `artifact_publisher.py`'s own SKIP_NOT_ALLOWLISTED paths). So the fixture
+    # now uses the production shape, and every expectation is BUILT with
+    # `Path` rather than written as a literal, so the separator is whatever the
+    # running platform uses instead of one baked in.
+    _RENDER_DISK = "/opt/render/project/data"
+
     def test_source_root_helpers_prefer_render_disk(self) -> None:
         module = self._load_module()
 
-        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": r"C:\render\data"}, clear=False):
-            self.assertEqual(module._source_repo_root("nfl", "NFL-Betting"), Path(r"C:\render\data\nfl_source"))
-            self.assertEqual(module._basketball_source_root("nba", "nba_betting_repo"), Path(r"C:\render\data\nba_source"))
+        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": self._RENDER_DISK}, clear=False):
+            self.assertEqual(
+                module._source_repo_root("nfl", "NFL-Betting"), Path(self._RENDER_DISK) / "nfl_source"
+            )
+            self.assertEqual(
+                module._basketball_source_root("nba", "nba_betting_repo"),
+                Path(self._RENDER_DISK) / "nba_source",
+            )
 
     def test_validate_source_root_reports_missing_render_disk(self) -> None:
         module = self._load_module()
 
-        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": r"C:\render\data"}, clear=False):
+        with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": self._RENDER_DISK}, clear=False):
             message = module._validate_source_root(module.REGISTRY["mlb"])
 
         self.assertIsInstance(message, str)
         self.assertIn("Render data disk is missing", message)
-        self.assertIn(r"C:\render\data\mlb_source", message)
+        self.assertIn(str(Path(self._RENDER_DISK) / "mlb_source"), message)
 
     def test_sport_artifact_paths_include_bundle_file_outputs(self) -> None:
         module = self._load_module()
@@ -834,12 +855,28 @@ class NflStepsPreseasonGatingTests(unittest.TestCase):
         self.assertEqual(preseason_step.cwd, module.REPO_ROOT)
 
     def test_preseason_step_excluded_when_no_target_week(self) -> None:
+        """`#517`. Asserts the PRESEASON step's absence, not the whole list.
+
+        This used `assertEqual(names, ["nfl_oddsapi_refresh"])`, so when
+        `nfl_schedule_refresh` was added to the NFL steps (`99e56561`) the
+        failure read `['nfl_schedule_refresh', 'nfl_oddsapi_refresh'] !=
+        ['nfl_oddsapi_refresh']` -- i.e. "preseason gating is broken" about a
+        change that has nothing to do with preseason gating. A misdirected
+        failure costs more than a missing one: it sends the next reader into
+        the wrong function.
+
+        The claim this test exists for is that the preseason step is absent
+        without a target week. That is now what it says, matching the sibling
+        `test_preseason_step_included_when_target_week_present`, which already
+        used membership rather than list equality.
+        """
         module = self._load_module()
         with patch.object(module, "nfl_preseason_target_week", return_value=None):
             steps = module._build_nfl_steps(self._make_args())
 
         names = [step.name for step in steps]
-        self.assertEqual(names, ["nfl_oddsapi_refresh"])
+        self.assertNotIn("nfl_preseason_oddsapi_refresh", names)
+        self.assertIn("nfl_oddsapi_refresh", names)
 
 
 class SoccerLeagueScopeTests(unittest.TestCase):

@@ -36,6 +36,40 @@
 
 ---
 
+### 2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-var change RESTARTS the service on the commit it is already running
+
+**Measured twice in one evening, the second time after I had already been
+caught by the first shape.**
+
+Render redeploys on an env-var change, and with `autoDeploy: no` that redeploy
+carries **the commit the service is already on** — it does not pull the branch
+tip. So setting a feature flag ships the flag and NOT the code the flag gates.
+
+    dep-da51b13bc2fs73fgu5n0  trigger=service_updated  live 21:33:18Z
+      carried 6cd980b4  <- the same commit it was already running
+      origin/main was 471cbac9d, one commit ahead, holding the wiring
+
+`SYNDICATE_PORTFOLIO_COMMIT_ENABLED=1` went live against a binary with no
+caller for the job it enables. Second time tonight the config landed and the
+code did not: an hour earlier `admitted_by_blend=` was committed 18 minutes
+AFTER the worker deployed, so the counter could never appear either.
+
+**THE RULE.** Enabling a flag is TWO changes, not one: the env var, and a code
+deploy of a SHA that contains what the flag gates. Verify the second with
+`git merge-base --is-ancestor <feature-sha> <live-sha>` — the deploy list's
+`commit.id` is the live SHA and is the only thing that answers it. A
+`service_updated` entry in the deploy history is a RESTART, and reading it as an
+update is the same category error as reading a green deploy status as a content
+check.
+
+**AND THE DEEPER ONE, which is why this rates a FORBIDDEN rather than a note:**
+a flag whose gated code is absent behaves EXACTLY like a flag that is off. There
+is no error, no log line, and no failing test — the same signature as
+`model_engine_standard.md`'s unfed input, and as a counter that exists at the
+builder and never reaches the endpoint. **Whenever a flag is turned on, the
+acceptance reading is the feature's own affirmative token** (here
+`PORTFOLIO_COMMIT date=… positions=…`), never the absence of an error.
+
 ### 2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the same store without saying which surface. A 4-minute refresh-worker outage came from that ambiguity
 
 **What happened.** A recommendation to change the eviction policy on the
@@ -5337,3 +5371,158 @@ they miss brief spikes -- which is precisely where an edge would live.
 **Clock alignment is by FotMob kickoff time, never by assuming the first live
 snapshot is kickoff** -- books quote in-play markets before the whistle, so that
 assumption would shift every match by an unknown offset.
+
+## 08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES
+
+Running the full pytest suite (`python -m pytest tests/`) leaves the working
+tree dirty in two ways at once: it MODIFIES tracked files —
+`reports/manifests/*.json` (all 8 sports), `reports/refresh_state.json`,
+`reports/intelligence/intelligence_state.json`,
+`data/mlb_source/.../live_lens_2026_06_02.jsonl` — and it CREATES untracked
+ones, including `reports/sim_runs/`, `reports/win_prob_null/`,
+`reports/mlb_odds_diag/`, and a literal
+`Z:\definitely\does\not\exist\perf.jsonl` from a Windows-path test.
+
+`git add -A && git commit` after that run committed **38 files and ~10,500
+insertions when exactly ONE file was intended**, including a 10,049-line diff
+to `intelligence_state.json`. It was pushed before I read the stat. The `git
+status --porcelain` that would have shown it ran in the same command, ABOVE the
+add — so the evidence was printed and the commit happened anyway.
+
+**RULE: stage explicitly. `git add <path> [<path>...]`, never `-A`, never `.`**
+Every commit in this session that did name its paths was clean; the one that
+did not was not.
+
+**COROLLARY, and it is the part that nearly hid this: `.gitignore` cannot save
+you here.** Several of these byproducts are legitimately TRACKED files that the
+suite rewrites, so there is no ignore rule that makes `-A` safe. Earlier in this
+same session I gitignored four *untracked* byproducts (`#515`) and that was
+correct — but it addresses a different half of the problem and must not be
+mistaken for having solved this one.
+
+Recovery, for the next person: `git reset --soft HEAD~1 && git reset`, then
+`git checkout --` the tracked byproducts and `git clean -fd -- reports/ data/`
+the untracked ones, re-stage by name, and force-push (safe only on your own
+unshared branch — never on someone else's).
+
+## 08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A worktree shares site-packages
+
+I reported `#517` as "76 failures across 26 files on clean `origin/main`", and
+backed it by re-running three sampled files in a detached worktree at
+`origin/main`, getting identical counts. That check was real and it was not
+sufficient. **`git worktree` gives you a different CODE tree and the SAME Python
+environment.** It controls for the diff and controls for nothing else.
+
+The environment was broken. `cffi` was absent — collateral from my own earlier
+`pip install --ignore-installed` / `--force-reinstall` juggling to fix a
+numpy/pandas mismatch — so `cryptography` could not import, and everything
+importing it failed. Installing one package:
+
+    test_refresh_state_store.py      18 failed -> 1 failed
+    test_wnba_refresh_runner.py       6 failed -> 4 failed
+    test_nba_cards_keyvalue_backend   3 failed -> 3 PASSED
+    test_wnba_cards_keyvalue_backend  3 failed -> 7 PASSED
+
+**At least 25 of the 76 were mine, not the repo's**, and I had already written
+the 76 into `todo.md` and committed a baseline built on it.
+
+**RULE: before attributing failures to the code, prove the ENVIRONMENT is
+sound.** `python -m pip check` is one command and would have said so — it
+reported a broken requirement the whole time. Then re-run
+`pip install -r requirements.txt` clean and re-measure.
+
+**COROLLARY: a `ModuleNotFoundError` for a C-extension or transitive dependency
+(`_cffi_backend`, `_ssl`, `_lzma`) is an environment claim, never a code claim.**
+Read the actual error before counting failures; `--tb=no` hides exactly this,
+and I ran the whole 27-minute suite with it.
+
+**COROLLARY: never repair a dependency with `--ignore-installed` or
+`--force-reinstall` on a single package.** It resolves that package against
+nothing and silently strands its dependencies. Reinstall from the requirements
+file and let the resolver see the whole graph.
+
+## 08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checking is not reserving
+
+`CLAUDE.md` says ids are stable and never reused, and says to check both
+`todo.md` and `todo_closed.md` before taking a number. I did. **It collided
+twice in one session anyway**, because concurrent sessions can all pass the
+same check against a shared counter and then all take the same numbers:
+
+    took #502-#505  ->  main had independently used #502-#505  ->  moved to #507-#510
+    took #507-#510  ->  main had independently used #507-#513  ->  moved to #514-#517
+
+Nothing was wrong with the check. The gap is between checking and MERGING: on a
+branch that lives for hours while other sessions land on `main`, the number you
+reserved is only as good as the moment you read it.
+
+**RULE: renumber at MERGE time, not at file-creation time.** Re-read the max
+immediately before the merge commit and move your block then; the collision
+window shrinks from hours to seconds. Expect it to happen and make the move
+cheap rather than trying to pick a number that will survive.
+
+**RULE: renumber by LINE RANGE, never globally.** By the second collision the
+merged `todo.md` contained main's `#507-#513` AND mine, and `learnings.md` and
+`lanes.md` each carried main's references to ITS `#502-#505`. A global
+search-and-replace would have silently rewritten another lane's history into
+nonsense. Scope every substitution to the line span of your own block, and
+verify the other side's headers survived before committing.
+
+**COROLLARY: a numeric id is the wrong identity for a long-lived branch.** The
+work is findable by lane slug and by scope-doc filename, neither of which can
+collide. The number is a convenience for `todo.md` ordering and should be
+assigned as late as possible.
+## 08-22 DEEP DIVE VERDICT: MOMENTUM IS DIRECTIONAL. It says WHICH TEAM -- not whether, how many, or when.
+
+5,552 matches, holdout-only, every baseline = the live state a book already
+knows (clock, score diff, goals so far). Signals added on top. dAUC:
+
+    WHICH TEAM                                   WHETHER / HOW MANY / WHEN
+    next team to score      +0.0707  (AUC .577)  any goal in 15m      +0.0007
+    home scores in 15m      +0.0332               goals remaining >=1  +0.0003
+    away scores in 15m      +0.0286               goals remaining >=2  +0.0001
+    match winner (away)     +0.0101               BTTS                 -0.0009
+    match winner (home)     +0.0069               goal before half-end +0.0001
+    winner at 0-15'         +0.0393               goal before 75'      +0.0002
+                                                  corners in 5/10m     -0.010 / -0.006 (ESPN, 699 m)
+
+Same signal, same matches: +0.03 on "home scores in 15m", +0.0007 on "any goal
+in 15m". The information is almost entirely in the SIGN. Signed vendor momentum
+alone carries +0.0710 of the +0.0707 direction effect; signed xG +0.0203, signed
+count +0.0362 -- momentum dominates and the rest is redundant.
+
+**DIRECTION IS A SLOW SIGNAL, unlike "whether".** Lagged 60s it keeps 94%, lagged
+300s it keeps 88%. The 2-minute "whether" signal lost 24% at 60s. Being on top
+PERSISTS; a goal arriving does not. That is why direction maps onto quotable
+markets (next team to score has no time limit) and "whether" does not.
+
+**CORRECTION to my earlier "momentum is largely reactive" caveat.** Stripping
+every sample with a goal in the prior 600s leaves dAUC +0.0152 vs +0.0152
+unstripped, momentum-only +0.0134 vs +0.0116. The post-goal reaction is REAL
+(AUC .605 on past goals) but it does not cannibalise the forward signal. I
+reported the reactive finding as the honest headline; it was a true fact that
+did not bear on the decision.
+
+**CALIBRATED.** ECE 0.0026; top decile predicted 8.17% observed 8.26%. Direction
+decile 10 predicted .664 observed .653. Model outputs can be set against book
+implied probabilities directly.
+
+**CONTEXT.** Signal is 4x stronger with a 2+ goal lead (+0.041) than level
+(+0.010); strongest 60-75' (+0.071); near-zero 0-15' for "whether" but STRONGEST
+0-15' for WINNER (+0.039) -- early, before the score has separated outcomes.
+Winner signal decays to +0.004 by 75-90' as the scoreboard takes over. Belgian
+(-0.008, n small) and MLS (+0.006) carry nothing; Primeira (+0.035), Bundesliga
+(+0.029) carry most.
+
+**ECONOMICS, 120s window.** Top 0.5%: hit 13.2% [11.0,15.8], lift 2.27x, ROI
++95% against a NAIVE book (clock rate + 8% vig), -vig against a SHARP book. Fires
+0.46x per match. At 600s the lift collapses to 1.2x and naive ROI to ~0. LULLS:
+bottom decile 0.98x of clock -- the model does NOT find quiet spells; "no goal"
+is not a market here.
+
+**WHAT A READING MEANS.** |momentum| <40: no information (0.93-0.99x). 60-80:
+1.19x. 80+: 1.23x. The card should not colour anything below 40.
+
+**PRODUCTION GAP.** momentum.py DEFAULT_HALF_LIFE_SECONDS = 300.0; the data says
+60s. The card shows a 5x over-smoothed series. And production momentum is
+ESPN-commentary-derived; the signal that carries is FotMob's series, which is
+not wired.

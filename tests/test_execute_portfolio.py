@@ -236,3 +236,94 @@ def test_force_does_not_bypass_the_live_arm(monkeypatch):
     # Every order rejected for want of the arm; nothing filled.
     assert result["placed"] == 0
     assert ledger_summary("2026-08-22")["by_status"].get("rejected") == 1
+
+
+# --------------------------------------------------------------------------
+# The inline refusal -- live money must not run inside refresh-worker
+# --------------------------------------------------------------------------
+
+
+def test_inline_refuses_live_mode_structurally(monkeypatch):
+    """`execution_ledger`'s contract says the placer must never run inside
+    refresh-worker (110 OOM kills, restarts mid-job). The intelligence-state
+    caller passes `inline=True`, and the refusal lives HERE rather than in
+    configuration -- "set the env var correctly" is the guarantee that failed
+    on 2026-08-22."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22", inline=True)
+    assert result["status"] == "skipped"
+    assert result["reason"] == "live_mode_refused_inline"
+    assert ledger_summary()["orders"] == 0
+
+
+def test_inline_still_runs_paper(monkeypatch):
+    """The refusal is on LIVE only -- paper cannot double-spend, and it is the
+    harness that generates Stage C's evidence."""
+    _write_plan(monkeypatch, [_row(), _row(event_id="evt-2")])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22", inline=True)
+    assert result["status"] == "ok"
+    assert result["mode"] == "paper"
+    assert result["placed"] == 2
+
+
+def test_the_non_inline_path_is_unchanged(monkeypatch):
+    """A standalone run (its own service, or the CLI) keeps full live capability
+    -- the refusal must not leak into the path that is allowed to place."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    assert result["status"] == "ok"
+    assert result["mode"] == "live"
+    # Rejected for want of the arm, NOT refused for being inline.
+    assert ledger_summary("2026-08-22")["by_status"].get("rejected") == 1
+
+
+def test_the_commit_and_execution_jobs_have_a_CALLER():
+    """THE REGRESSION THIS FILE EXISTS TO PREVENT, and it shipped once already.
+
+    Both runners were built as standalone entrypoints and were never wired to
+    anything, so `SYNDICATE_PORTFOLIO_COMMIT_ENABLED=1` on refresh-worker was a
+    no-op: the flag gated a function nobody called. A flag without a caller is
+    indistinguishable from a feature that is off, which is the same class as an
+    input nobody feeds.
+
+    Pinned against `intelligence_state` because that is where the shortlist
+    these derive from is written -- deliberately NOT the `run_refresh_worker`
+    autorun chain, whose exclusive `elif` starved settlement to one tick in 45
+    minutes (`#504`).
+    """
+    import inspect
+
+    import pipeline.intelligence_state as state
+
+    source = inspect.getsource(state)
+    assert "from pipeline.portfolio_commit import run_portfolio_commit" in source
+    assert "from pipeline.execute_portfolio import run_execution" in source
+    # And the inline guard must be passed, or live money could reach the worker.
+    assert "run_execution(str(selected_date or \"\"), inline=True)" in source
+
+
+def test_the_commit_runs_after_the_shortlist_it_derives_from():
+    """Order matters: the commit reads the artifact the shortlist write
+    produces. Called before it, it would size yesterday's board."""
+    import inspect
+
+    import pipeline.intelligence_state as state
+
+    source = inspect.getsource(state)
+    assert source.index("write_layer2_shortlist(str(selected_date") < source.index(
+        "from pipeline.portfolio_commit import run_portfolio_commit"
+    )

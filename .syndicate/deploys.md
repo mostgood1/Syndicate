@@ -23267,3 +23267,105 @@ that measures a subset of what it is guarding is the third instrument gap this
 instrument has produced today.** NCAAF opens ~08-29; a fifth in-season sport at
 400/sport could breach the ceiling, and the failure mode is an opaque
 "Connection closed by server".
+
+## 2026-08-22T21:16:34Z — VERIFIED ON THE SERVED SURFACE: `rows_admitted_by_blend = 159`
+
+**Lane `portfolio-decision-and-execution`. The reading the 20:39/20:46 deploy
+was waiting on, taken from `/api/board/layer2-shortlist` by the user** (the
+agent proxy 403s that host, which is why every prior reading this session came
+from Render logs and metrics).
+
+    rows_admitted_by_blend   159
+    rows_below_value_floor  1212
+    total_rows              1223      -> 13.0% of the served board
+
+**NOT ZERO, so the scoring change is NOT inert.** 159 rows are on the board
+because the BLENDED score cleared the family value floor where raw `ev_pct`
+would not have. Before 2026-08-22 `_row_value_pct` returned `ev_pct` first and
+the `score.value_pct` fallback was dead code, so every one of those 159 rows was
+being cut by price alone, upstream of anything the simulation had to say.
+
+**THE SERVED ROW ALSO CONFIRMS THE CAPPED SIM TERM BY CONTENT**, which ancestry
+could not: the sample row's `score` block carries **`sim_capped: false`** — a
+field that exists only in the 2026-08-22 change. `sim_component: null` on that
+row is correct, not a fault: its `model_edge_pct` is `null`, so there is no sim
+term to contribute, and `value_pct 4.7034 == ev_component 4.7034` closes the
+arithmetic.
+
+**THE SIM'S REACH IS FAR WORSE THAN THE SHORTLIST SUGGESTED, and this is the
+finding worth carrying forward.** `LAYER2_BOARD_HEALTH` reported `edged` 94/100
+mlb and 28/100 soccer, but that is measured AFTER selection and is biased upward
+by it. At the GRID level, `rows_with_model_edge / grid_rows`:
+
+    mlb       2372 /   2922   81.2%
+    nfl        682 /   1309   52.1%
+    wnba       186 /    982   18.9%
+    soccer     210 /  20039    1.0%     <- twenty thousand rows, two hundred edges
+
+So the capped sim term is a real signal on MLB, half a signal on NFL, and
+**arithmetically almost absent on soccer** — the board there is price shopping
+with a rounding error of model on top. Raising the weight or the cap would not
+change that; the constraint is coverage, not coefficient. `soccer`'s own
+`projections` block names the cause: `unmatched_player_rows 6059`,
+`player_miss_name 5716`, `unsupported_market_rows 3188` against
+`rows_considered 20039`.
+
+**A SECOND DEPLOY IS IN FLIGHT AND IS NOW OPTIONAL**,
+`dep-da512h0u01pc73dktveg` on `6cd980b4`, triggered 21:14:44Z at the user's
+instruction and `update_in_progress` at 21:17:15Z. It adds `admitted_by_blend=`
+to the `LAYER2_SHORTLIST` LOG line. **The counter was already on the endpoint**
+(it shipped in `ecf928c6`, which the running `b13a3a73` contains), so this
+deploy buys log-readability for sessions without HTTP access to the web host —
+not the number itself. Cost: a 2-game MLB `fingerprint_change` sim, against 15
+games had it been fired an hour earlier.
+
+**Claim `b3a38f31d57ab2f2` held on refresh-worker for this deploy; release after
+it lands.**
+
+## 2026-08-22T21:52:19Z — STAGE A IS LIVE AND PRODUCING. First real portfolio: 9 positions, $30.27, 79% sim-attributed
+
+**Lane `portfolio-decision-and-execution`. Deploy `dep-da51bu3bc2fs73fh0hig`,
+`471cbac9d`, live 21:38:15.820603Z. First post-boot shortlist 21:52:18Z.**
+
+    [intelligence_state] LAYER2_SHORTLIST date=2026-08-22 rows=1223 considered=17096
+                         below_floor=1127 admitted_by_blend=145
+    [portfolio_commit]   PLAN_WRITTEN rows_in=1223 sized=12 positions=9
+                         staked=$30.27 bankroll=$1000.0 scale=1.0
+                         refusals={'below_min_ev_pct': 391, 'below_min_stake': 3,
+                                   'beyond_max_positions': 6,
+                                   'no_model_edge_pct': 779, 'zero_kelly_stake': 35}
+    [intelligence_state] PORTFOLIO_COMMIT date=2026-08-22 positions=9
+                         staked=$30.27 sim_share=0.7906
+
+**THREE FIRSTS IN ONE LINE-GROUP.**
+
+1. **`admitted_by_blend=145` IS IN THE LOGS**, which is what the 21:34 deploy
+   was for. It reconciles with the 159 read off `/api/board/layer2-shortlist`
+   at 21:16 — different build, same magnitude — so the counter and the endpoint
+   agree and neither needs the other.
+2. **A REAL COMMITTED PORTFOLIO: 9 positions, $30.27 of $1,000 = 3.0% of
+   bankroll at risk.** That is the intended conservatism, not a fault: quarter
+   Kelly (`_DEFAULT_KELLY_MULTIPLIER` 0.25) shrunk again by
+   `_MIN_SAMPLE_CREDIBILITY` 0.25 because `settled_sample_size` is still zero
+   everywhere. 1/16th Kelly by construction.
+3. **`sim_share = 0.7906` ON REAL ROWS.** 79% of the committed money is
+   attributable to the simulation rather than to price shopping. **This is the
+   per-bet component decomposition `_SCORE_SIM_WEIGHT`'s own comment names as
+   the unlock condition and calls "what nobody has been able to supply."** It
+   now exists, per position, every build. NOTE the earlier 57.6% figure was a
+   SYNTHETIC row and was retracted; this one is production.
+
+**EVERY ROW IS ACCOUNTED FOR**, which is the contract `commit_portfolio` was
+built to keep: 1223 rows in, 9 committed, and the five named refusals sum to the
+rest. The largest by far is **`no_model_edge_pct: 779`** — 64% of the board
+cannot be sized because the sim has no probability view on it. That is the
+coverage gap from `deploys.md` 21:16 arriving in dollars: soccer's 210 edges
+across 20,039 grid rows is why two thirds of the board is unsizable, and no
+scoring coefficient changes it.
+
+**STAGE B IS STILL DARK.** `SYNDICATE_EXECUTION_ENABLED` is unset, so the commit
+ran alone this cycle — deliberately, one reading at a time. The owed Stage B
+reading stays `placed=N duplicates=0`, then `placed=0 duplicates=N` on the
+following build.
+
+**Claim `bf4e370da185fd16` released after this reading.**
