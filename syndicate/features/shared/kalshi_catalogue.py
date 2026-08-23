@@ -67,6 +67,16 @@ SERIES_SPORT: dict[str, str] = {
     "KXMLBOUTS": "mlb",
     # seen 2026-08-23, "Pete Crow-Armstrong: 2+ home runs?"
     "KXMLBHR": "mlb",
+    # seen 2026-08-23T23:28:49Z in the signed series catalogue, titled
+    # "Women's Pro Basketball Player Rebounds". The ONLY WNBA player-prop
+    # series in the 91 Kalshi lists -- every other one is a game line
+    # (quarter/half winners, spreads, totals) or a future (MVP, ROY, draft),
+    # and those need an event_ticker mapping that does not exist.
+    #
+    # `market_keys` resolves "rebounds" -> `player_rebounds` for wnba, and
+    # `bet_status_wnba` reads `reb` off the live box, so this one line makes the
+    # market priceable, joinable AND gradeable.
+    "KXWNBAREB": "wnba",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop

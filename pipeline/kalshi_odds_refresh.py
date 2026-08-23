@@ -333,6 +333,24 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         return {"status": "empty", "markets": [], "per_series": fetched}
 
     if fetching:
+        # SAMPLE TITLES from what was just fetched, one per series. The title
+        # grammar is the last unverified assumption in the chain: `parse_prop_title`
+        # reads "Player: N+ stat?" and REFUSES anything else rather than
+        # guessing, so a series whose titles are worded differently prices
+        # nothing and says so only as a refusal count. One printed title turns
+        # that into a one-line fix.
+        _seen: set[str] = set()
+        for _market in all_markets:
+            _series = str(_market.get("series") or "")
+            if _series in _seen:
+                continue
+            _seen.add(_series)
+            print(
+                f"[kalshi_odds] TITLE {_series} :: {str(_market.get('title'))[:80]!r}"
+                f" ticker={_market.get('ticker')}",
+                flush=True,
+            )
+
         # Only record history when something was actually re-fetched. Recording
         # on every tick would append the same merged snapshot ~30 times an hour
         # and the "price moved" test would still be doing the real work -- but
