@@ -760,9 +760,24 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 # projection existed. Read from the ENTRY snapshot rather than
                 # the mutated dict for exactly that reason.
                 had_pregame = bool(pregame_basis)
+                # `#532`. NARROWED WHERE THE PRODUCER SAID WHY. `#530` fixed the
+                # ordering that was starving this of a fair value and `edged`
+                # stayed 0 at `no_fair_value_devig_failed: 45` -- one label over
+                # "the row was quoted one-sided" (nothing downstream can fix it)
+                # and "both sides are there and the de-vig still failed" (ours).
+                # The producer stamps `market_fair_unavailable_reason` before its
+                # own live early-return precisely so it survives to here; absent,
+                # this falls back to the flat name rather than guessing.
+                devig_detail = str(projection.get("market_fair_unavailable_reason") or "").strip()
+                if had_pregame and devig_detail:
+                    withheld_key = f"no_fair_value_{devig_detail}"
+                elif had_pregame:
+                    withheld_key = "no_fair_value_devig_failed"
+                else:
+                    withheld_key = "no_fair_value_no_pregame_projection"
                 _withhold(
                     projection,
-                    "no_fair_value_devig_failed" if had_pregame else "no_fair_value_no_pregame_projection",
+                    withheld_key,
                     "no market fair value to price the live projection against"
                     + (
                         " (the market is one-sided, so de-vig has no answer)"

@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#532` — **`#530` fixed the ordering and `edged` stayed 0. `no_fair_value_devig_failed` is ONE NAME OVER TWO STATES, again — now split. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+`#530` shipped and the post-deploy reading (18:32:21Z / 18:35:53Z) is:
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=627 projected=54 edged=0
+      miss_player=0 miss_market=0 miss_line=271 miss_line_match=3 miss_not_live=299
+      edge_why={'no_fair_value_devig_failed': 45,
+                'no_fair_value_no_pregame_projection': 9}
+
+**`#531` IS VERIFIED BY THIS SAME LINE.** The miss counters went from
+`miss_player=0 miss_market=620 miss_line_match=0` — everything in the catch-all —
+to `miss_market=0, miss_line_match=3, miss_not_live=299`. `miss_not_live` was
+structurally impossible before and is now the dominant cause, and `miss_market`
+is **zero**: the vocabulary/alias gap the old number pointed at does not exist.
+Anyone who had chased it would have found nothing.
+
+**`#530` DID NOT PRODUCE EDGES, and the reason is again a name covering two
+states.** `no_fair_value_devig_failed` means either:
+
+  * the row was quoted ONE-SIDED, so no de-vig is possible and nothing
+    downstream can fix it — a producer/coverage question; or
+  * both sides ARE quoted and `_no_vig_over_probability` returned None anyway —
+    an unparseable or missing consensus price, which is **ours**.
+
+Those have different owners and the flat name cannot tell them apart. This is the
+third time in one day that a single label over two states has cost this lane a
+diagnosis, and the second time on this exact counter.
+
+The pregame branch already distinguishes them; the live path returns before
+reaching it. So the producer now stamps `market_fair_unavailable_reason` right
+where the de-vig runs — before its own live early-return — and the join reports
+`no_fair_value_one_sided_quote` or
+`no_fair_value_consensus_present_devig_returned_none`. Absent (MLB, WNBA — they
+do not stamp it), it falls back to the flat name rather than emitting an empty
+suffix nobody owns.
+
+**Do NOT read `#530` as wrong.** It is provably correct in isolation — a live row
+with two consensus sides now gets a fair value, and 4 of the ordering tests fail
+against the pre-fix file. Whether it also unblocked production edges is
+**unproven**, because the remaining 45 may be genuinely one-sided. That is what
+this split will say, and it is the only thing that will.
+
+**Verify after deploy:** `edge_why` must stop containing
+`no_fair_value_devig_failed` for soccer. If it becomes
+`no_fair_value_one_sided_quote`, the producer/coverage owner is next and `#530`
+is done. If `no_fair_value_consensus_present_devig_returned_none` is non-trivial,
+that count is ours and the de-vig is the next thing to read.
+
 ### `#530` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
 > **RENUMBERED from `#527`/`#528` — the SIXTH and SEVENTH id collisions today.**

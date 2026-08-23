@@ -653,6 +653,31 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
 
     fair = _no_vig_over_probability(row)
     projection["market_fair_prob_over"] = fair
+    # WHY THE DE-VIG CAME BACK EMPTY, STAMPED HERE SO IT SURVIVES THE LIVE
+    # EARLY-RETURN BELOW (`#532`).
+    #
+    # `#530` fixed the ORDER and `edged` stayed 0, with
+    # `edge_why={'no_fair_value_devig_failed': 45}`. That name is once again one
+    # label over two states, and the ambiguity has now cost this lane twice in a
+    # day:
+    #
+    #   the row was quoted ONE-SIDED, so no de-vig is possible and nothing
+    #     downstream can fix it -- a producer/coverage question;
+    #   the row HAS both sides and `_no_vig_over_probability` still returned
+    #     None -- an unparseable or missing consensus price, which is ours.
+    #
+    # The pregame branch below already distinguishes these; the live path returns
+    # before reaching it, so the live reader saw one flat name. Stamping it on
+    # the projection is what carries the distinction across the return.
+    if fair is None:
+        _consensus = row.get("consensus") if isinstance(row.get("consensus"), Mapping) else {}
+        _sides = [str(side).strip().lower() for side in (row.get("sides") or [])]
+        _priced = [side for side in _sides if _consensus.get(side) is not None]
+        projection["market_fair_unavailable_reason"] = (
+            "one_sided_quote" if len(_priced) < 2 else "consensus_present_devig_returned_none"
+        )
+    else:
+        projection.pop("market_fair_unavailable_reason", None)
 
     # `#340`: shared with MLB and WNBA via `live_edge_policy` rather than kept
     # per-sport. This file and `prop_projections` had matching copies; WNBA had

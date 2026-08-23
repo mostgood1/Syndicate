@@ -188,3 +188,60 @@ def test_the_attribution_keys_are_the_right_shape():
     for key, lines in report["lines_by_player_market"].items():
         assert isinstance(key, tuple) and len(key) == 2, key
         assert isinstance(lines, set), lines
+
+
+# ---------------------------------------------------------------------------
+# `#532` — WHY the de-vig came back empty, carried across the live return
+# ---------------------------------------------------------------------------
+
+
+def test_a_one_sided_live_row_is_named_as_one_sided():
+    """`#530` fixed the ordering and `edged` stayed 0 at
+    `no_fair_value_devig_failed: 45`. That name covers two states with different
+    owners: a one-sided quote nothing downstream can fix, and a two-sided quote
+    whose de-vig failed anyway, which is ours."""
+    projection = _project(
+        game={"state": "live"},
+        sides=["over"],
+        consensus={"over": -110},
+    )
+    assert projection.get("market_fair_prob_over") is None
+    assert projection.get("market_fair_unavailable_reason") == "one_sided_quote"
+
+
+def test_a_two_sided_row_whose_devig_fails_is_named_differently():
+    """Both sides quoted and still no fair value -- an unparseable price. This is
+    the half we own, and it must not hide inside the one-sided count."""
+    projection = _project(
+        game={"state": "live"},
+        sides=["over", "under"],
+        consensus={"over": "not-a-price", "under": "also-not"},
+    )
+    assert projection.get("market_fair_prob_over") is None
+    assert projection.get("market_fair_unavailable_reason") == "consensus_present_devig_returned_none"
+
+
+def test_a_successful_devig_clears_the_reason():
+    """A stale reason left beside a real fair value would be read as a failure."""
+    projection = _project(game={"state": "live"})
+    assert projection.get("market_fair_prob_over") is not None
+    assert "market_fair_unavailable_reason" not in projection
+
+
+def test_the_live_join_reports_the_narrowed_reason():
+    """The producer stamps it before its own early-return so it survives to the
+    live join; the join must actually USE it rather than keep the flat name."""
+    from syndicate.features.shared import live_projection_join as join
+
+    src = inspect.getsource(join)
+    assert 'projection.get("market_fair_unavailable_reason")' in src
+    assert 'f"no_fair_value_{devig_detail}"' in src
+
+
+def test_the_join_falls_back_when_the_producer_said_nothing():
+    """WNBA and MLB do not stamp it. An absent detail must give the flat name,
+    not an empty suffix -- `no_fair_value_` would be a new bucket nobody owns."""
+    from syndicate.features.shared import live_projection_join as join
+
+    src = inspect.getsource(join)
+    assert 'withheld_key = "no_fair_value_devig_failed"' in src
