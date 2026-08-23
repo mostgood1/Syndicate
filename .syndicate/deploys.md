@@ -24126,3 +24126,37 @@ stopped moving, which is why this runs over the ledger and not over today's
 positions. `resolved=0` with `reasons={'no_close_for_market': N}` on a date whose
 games finished hours ago would mean the odds-history shard is not reaching this
 service, NOT that the grader is wrong.
+
+## 2026-08-23 00:45-00:49Z — refresh-worker `33bd5150` — `#523` soccer live-state join + `#525` row budget — DEPLOYED, OUTCOME NOT YET MEASURED
+
+`lane layer2-sim-view-and-live-projection`, claim `32799d0dcab084c1` (taken with
+`--force`: my own earlier claim was still held at 38.6 min and this is the same
+lane re-entering, not a break-in on another session). `dep-da545hou01pc73du9i70`
+live 00:49:21Z.
+
+**`#523` IS CONFIRMED LIVE, by lineage rather than by effect.** My earlier deploy
+of it (`dep-da53o7ajobas73deqkt0`, live 00:23:42Z) was `deactivated` at 00:28:57Z
+— superseded by a peer's `473f55fa`, NOT rolled back. Checked rather than assumed:
+`git merge-base --is-ancestor 6952bb9d 473f55fa` passes, so the fix survived the
+supersession, and this deploy carries it too.
+
+**WHAT IS NOT MEASURED, and I am not going to imply otherwise.** No
+`LAYER2_BOARD_HEALTH` line has been emitted in the 24 minutes since this went
+live. The worker is alive and doing real work — instance `wl6f8`, no traceback,
+no OOM, no `WORKER_SHUTDOWN` — but it is grinding through the 2026-08-23 card
+build (`resolved_date: 2026-08-23`, `cards_context_*` stages, memory 87.1% with
+`climb_mb_per_s: 39.1`). The day rollover is expensive and it is holding the
+shortlist. So all three readings this deploy exists to produce are still pending:
+
+    #523   LIVE_PROJECTION_JOIN sport=soccer considered=   must exceed 0
+                                                            (was 0 with
+                                                             lens_live_games=6)
+           LAYER2_BOARD_HEALTH sport=soccer live_rows=      must exceed 3
+    #525   KEYVALUE_WRITE_LARGE size_bytes=                 must stay ~5.7MB
+           SHORTLIST_SHED_TO_FIT                            must NOT appear
+
+**24 minutes without a shortlist is itself worth a second look** — the cold-boot
+window recorded in this ledger is 10-19 minutes. It may be nothing more than the
+rollover, and this is the first rollover observed at 400 rows/sport with four
+sports live. If the next check still shows none, that is a finding in its own
+right and not a slow build.
