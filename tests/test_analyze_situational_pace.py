@@ -81,7 +81,8 @@ def test_it_reports_flat_when_there_is_no_effect(tmp_path, capsys) -> None:
 def test_team_shooting_profile_recovers_the_injected_three_share(tmp_path, capsys) -> None:
     out = _run(_write(tmp_path, close_late_multiplier=1.0), capsys)
     shares = [float(line.split("three_share=")[1].split()[0])
-              for line in out.splitlines() if "three_share=" in line]
+              for line in out.splitlines()
+              if "] TEAM " in line and "three_share=" in line]
     assert shares, "team profiles must be emitted"
     for share in shares:
         assert 0.30 < share < 0.40, f"injected 0.35 must be recovered, got {share}"
@@ -160,3 +161,61 @@ def test_cells_report_which_seconds_left_values_populated_them(tmp_path, capsys)
         vals = line.split("left_vals=")[1].strip()
         assert vals == "[300, 360, 420, 480, 540]", (
             f"the wide cell IS swept across its range, got {vals}")
+
+
+def _one_team_game(streaky: bool, possessions: int = 440) -> dict:
+    """IND takes every shot; possessions alternate so the even-split possession
+    convention gives IND exactly `possessions / 2` of them.
+
+    Both variants score the SAME total. Only the distribution differs:
+      steady  -- 2 points on every IND possession;
+      streaky -- 4 points on half of them, 0 on the rest.
+    """
+    pressure, scoring = [], []
+    step = 2400.0 / possessions
+    for i in range(possessions):
+        t = i * step
+        pressure.append({"clock_seconds": t, "possession_index": float(i + 1),
+                         "sign": 1.0, "weight": 1.0,
+                         "type": "shot_attempt_3" if i % 2 else "shot_attempt_2",
+                         "team": "IND"})
+        if i % 2 == 0:                      # IND scores on the even possessions
+            pts = (4.0 if (i // 2) % 2 == 0 else 0.0) if streaky else 2.0
+            if pts:
+                scoring.append({"clock_seconds": t, "possession_index": float(i + 1),
+                                "team": "IND", "sign": 1.0, "weight": pts})
+    return {"pressure": pressure, "narrator": scoring,
+            "home_tri": "IND", "away_tri": "NYL"}
+
+
+def _team_line(out: str, team: str) -> str:
+    for line in out.splitlines():
+        if f"] TEAM {team} " in line:
+            return line
+    raise AssertionError(f"no TEAM line for {team} in:\n{out}")
+
+
+def test_points_per_possession_variance_separates_steady_from_streaky(tmp_path, capsys) -> None:
+    """**THE MEAN IS NOT THE PARAMETER AN INTERVAL TOTAL IS PRICED OFF.** Two
+    teams scoring identically per possession, one in twos and one in bursts,
+    have the same expected quarter total and very different tails. If the
+    profile cannot tell them apart it cannot inform a total, so pin that it can
+    -- same ppp to three decimals, different ppp_sd."""
+    lines = {}
+    for name, streaky in (("steady", False), ("streaky", True)):
+        root = tmp_path / name
+        path = momentum_events_path(root, league_code="wnba", date_str="2026-05-01")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"games": {"g0": _one_team_game(streaky)}}))
+        lines[name] = _team_line(_run(root, capsys), "IND")
+
+    def _field(line: str, key: str) -> float:
+        return float(line.split(f"{key}=")[1].split()[0])
+
+    assert _field(lines["steady"], "ppp") == pytest.approx(2.0, abs=1e-3)
+    assert _field(lines["streaky"], "ppp") == pytest.approx(2.0, abs=1e-3), (
+        "the fixtures are built to score identically; if this drifts the test "
+        "is comparing two different things and proves nothing about variance")
+
+    assert _field(lines["steady"], "ppp_sd") == pytest.approx(0.0, abs=1e-3)
+    assert _field(lines["streaky"], "ppp_sd") == pytest.approx(2.0, abs=1e-3)
