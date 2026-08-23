@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#532` — **Live bet status NEVER ONCE RAN: a name bound twenty lines below its use, swallowed by the block's own `except` every cycle since it was written. FIXED, TESTED AGAINST THE REAL PATH.** — lane `portfolio-decision-and-execution`, 2026-08-23
+
+**Measured 2026-08-23T17:12:31Z**, every cycle:
+
+```
+[portfolio_commit] BET_STATUS_FAILED date=2026-08-23
+  error=cannot access local variable '_load_ledger_for_clv'
+        where it is not associated with a value
+```
+
+The block called `_load_ledger_for_clv()`; that name is bound by a
+`from ... import ... as` **twenty lines further down**, in the ORDER_CLV block.
+Python treats a name assigned anywhere in a function as local for the whole
+function, so the read raised `UnboundLocalError` **on every run since the day it
+was written**.
+
+**This is why the user's report survived a correct fix.** `#522`-era work
+threaded `game_pk` through to this block precisely because "I don't see anything
+indicating status of the bet" — and the block was not executing. Diagnosis
+right, fix right, and neither could ever show.
+
+**The shape is the lesson.** A broad `except` + a `FAILED` log line + a page
+column that renders a plausible blank is indistinguishable from "installed and
+quiet". Nothing was red. The suite was green — because every test for
+`bet_status` exercised `statuses_for_orders` directly and none ran the commit
+path that calls it.
+
+**The test now runs the real path**, and it was verified by REINTRODUCING the
+bug and watching it fail. A green test that has never been seen red is a claim,
+not evidence.
+
+**Also shipped:** `unmapped_market` is now reported with the market NAMES beside
+it (`UNMAPPED_MARKETS` line). Fifteen ungraded MLB bets is a number nobody can
+act on; the names are the difference between "add five mappings" and guessing at
+which five.
+
+**Deliberately NOT fixed:** the five likely mappings (singles, doubles, walks,
+strikeouts, stolen bases) need `box_score_stats._HITTER_STAT_FIELDS` extended
+too — it carries only hits/runs/rbi/home_runs/total_bases — and that reader is
+shared with settlement and `build_mlb_actuals`. Extending it on a guess about
+StatsAPI field names is the unverified-schema mistake this integration has
+already paid for twice. One production line will name the fifteen.
+
+
 ### `#529` — **The grader could not IDENTIFY a bet: `game_pk` on every order is the OddsAPI hash, not StatsAPI's numeric id. Recovered from the matchup, no backfill. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, follows `#528`
 
 **Measured 2026-08-23T16:00:06Z**, the first run of `#528`'s grader:
