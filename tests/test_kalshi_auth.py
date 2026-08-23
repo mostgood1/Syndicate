@@ -143,4 +143,53 @@ def test_probe_auth_reports_the_missing_credential_without_calling_out(monkeypat
         "status": "unavailable",
         "reason": "no_api_key_id",
         "detail": None,
+        # None rather than absent: a caller reading `key_shape` must not have to
+        # test whether the key exists before testing what it says.
+        "key_shape": None,
     }
+
+
+def test_an_unreadable_key_reports_its_SHAPE_so_the_cause_is_actionable(monkeypatch):
+    """`detail=ValueError` was the whole answer in production and is unusable.
+
+    It does not distinguish a flattened PEM from a truncated one from an ssh key
+    pasted by mistake — three different fixes. Length, header and line count
+    separate them and none of them is key material.
+    """
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv(
+        "KALSHI_PRIVATE_KEY",
+        "-----BEGIN PRIVATE KEY-----MIIEvQIBADANBg-----END PRIVATE KEY-----",
+    )
+    shape = kalshi_auth.load_credentials()["key_shape"]
+
+    assert shape["header"] == "-----BEGIN PRIVATE KEY-----"
+    assert shape["has_end_marker"] is True
+    # The giveaway: a PEM with no newlines cannot be parsed by anything.
+    assert shape["has_real_newlines"] is False
+    assert shape["lines"] == 1
+
+
+def test_the_shape_never_contains_the_key_body(monkeypatch):
+    secret = "SUPERSECRETBASE64BODY"
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", f"-----BEGIN PRIVATE KEY-----{secret}-----END PRIVATE KEY-----")
+    result = kalshi_auth.load_credentials()
+    # The base64 body is never read, sliced or echoed.
+    assert secret not in str(result)
+
+
+def test_an_encrypted_key_is_named_as_such(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "-----BEGIN ENCRYPTED PRIVATE KEY-----\nx\n-----END ENCRYPTED PRIVATE KEY-----")
+    shape = kalshi_auth.load_credentials()["key_shape"]
+    # We load with password=None, so a passphrase-protected key can never open.
+    assert shape["header"] == "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+
+
+def test_something_that_is_not_a_pem_says_so(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "just-some-token")
+    shape = kalshi_auth.load_credentials()["key_shape"]
+    # "Not a PEM at all" and "the wrong KIND of PEM" need different fixes.
+    assert shape["header"] == "<unrecognized>"

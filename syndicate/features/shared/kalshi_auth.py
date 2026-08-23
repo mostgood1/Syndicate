@@ -95,6 +95,38 @@ def _private_key_pem() -> str:
     return raw.replace("\\n", "\n").strip()
 
 
+# PEM headers we can name without revealing anything. The BODY is never touched.
+_PEM_HEADERS = (
+    "-----BEGIN PRIVATE KEY-----",            # PKCS#8, unencrypted -- what we want
+    "-----BEGIN RSA PRIVATE KEY-----",        # PKCS#1, also fine
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",  # passphrase-protected -- we cannot open it
+    "-----BEGIN OPENSSH PRIVATE KEY-----",    # ssh-keygen output, NOT a PEM key pair
+)
+
+
+def _pem_shape(pem: str) -> dict[str, Any]:
+    """Structural facts about the configured value. NEVER any of its content.
+
+    Length, header and line count are enough to tell a flattened PEM from a
+    truncated one from an ssh key pasted by mistake, and none of them is
+    material. The base64 body is never read, sliced or echoed.
+    """
+    text = str(pem or "")
+    header = next((h for h in _PEM_HEADERS if text.startswith(h)), None)
+    return {
+        "chars": len(text),
+        "lines": text.count("\n") + 1 if text else 0,
+        # Named header, or a bounded description of what it starts with instead
+        # -- "not a PEM at all" and "the wrong KIND of PEM" need different fixes.
+        "header": header or ("<unrecognized>" if text else "<empty>"),
+        "has_end_marker": "-----END" in text,
+        # A dashboard field often flattens newlines. If BOTH are false the value
+        # is one long line and no parser will read it.
+        "has_real_newlines": "\n" in text,
+        "had_escaped_newlines": "\\n" in (os.environ.get("KALSHI_PRIVATE_KEY") or ""),
+    }
+
+
 def load_credentials() -> dict[str, Any]:
     """The signer, or a NAMED reason there isn't one.
 
@@ -130,10 +162,19 @@ def load_credentials() -> dict[str, Any]:
     except Exception as exc:
         # The EXCEPTION TYPE only -- the message from a key parser can echo key
         # material, and this string reaches logs.
+        #
+        # But a bare type name is not actionable: `ValueError` was the whole
+        # answer on 2026-08-23T19:28:53Z and it does not distinguish a flattened
+        # PEM from a truncated one from the wrong format entirely. So the SHAPE
+        # of the value is reported alongside it -- length, which header it
+        # carries, how many lines it has. None of that is key material and all
+        # of it separates the causes. Same choice `probe()` made for the market
+        # schema, which is what caught the 100x price error.
         return {
             "status": "unavailable",
             "reason": "unreadable_private_key",
             "detail": type(exc).__name__,
+            "key_shape": _pem_shape(pem),
         }
 
     return {"status": "ok", "key_id": key_id, "private_key": private_key}
@@ -260,7 +301,12 @@ def probe_auth() -> dict[str, Any]:
     """
     creds = load_credentials()
     if creds.get("status") != "ok":
-        return {"status": "unavailable", "reason": creds.get("reason"), "detail": creds.get("detail")}
+        return {
+            "status": "unavailable",
+            "reason": creds.get("reason"),
+            "detail": creds.get("detail"),
+            "key_shape": creds.get("key_shape"),
+        }
 
     url = f"{_base_url()}/portfolio/balance"
     try:
