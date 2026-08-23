@@ -1,5 +1,98 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#527` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+**THE READING** (refresh-worker, three consecutive builds 16:41:16 / 16:47:15 /
+16:49:33Z, after `#523`):
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=1585 projected=188 edged=0
+                         lens_indexed=1008 lens_live_games=7
+                         edge_withheld=188 edge_why={'no_fair_value_devig_failed': 188}
+
+`considered` 0 -> **1585** and `projected` 0 -> **188** confirm `#523` end to end.
+Then every single projected row is withheld, for one reason, **188 of 188**.
+
+**100% ON ONE NAMED REASON IS A BUG, NOT A DISTRIBUTION.** The reason string says
+"the market is one-sided, so de-vig has no answer" — a real thing that happens to
+SOME soccer props and cannot happen to all of them. Reading the RATE rather than
+the reason is the whole diagnosis; the string had been sitting there for a day
+being believed.
+
+**THE CAUSE.** `soccer_projections._price_against_market` computed
+`market_fair_prob_over` BELOW its `live_edge_unavailable_reason` early-return:
+
+    live_reason = live_edge_unavailable_reason(row)
+    if live_reason:
+        projection["edge_vs_market_pct"] = None
+        ...
+        return                                    # <-- here
+    fair = _no_vig_over_probability(row)
+    projection["market_fair_prob_over"] = fair    # <-- never reached, live game
+
+So on a live game soccer never got a fair value AT ALL, and
+`live_projection_join` — holding a genuine LIVE probability from the re-sim,
+which `live_edge_policy`'s own docstring calls "precisely the thing worth
+ranking" — had nothing to price it against.
+
+**THE TWO CLAIMS THE ORDER CONFLATED.** The refusal says a PREGAME MODEL must not
+be priced against a re-priced market. True, and the edge must stay suppressed.
+The fair value is not the model: it is a de-vig of the quote in front of us, a
+property of the MARKET, and it stays valid when the game goes live. Withholding
+it discarded the one input that was still good.
+
+**`prop_projections.py:951` HAS ALWAYS DONE IT IN THE RIGHT ORDER** — fair value
+first, live guard second. That is why MLB's live tier works (`live_proj=252` on
+the same board) and soccer's did not. One rule, two implementations, and only one
+of them right — the same shape as `#523`, one file over.
+
+**Fixed** by hoisting the de-vig above the refusal, after the unknown-leg-set
+refusal (which correctly returns without a fair value, because nothing there can
+confirm a many-legged market's quoted set is complete).
+
+**I HAD THIS WRONG IN WRITING, TWICE.** `#520` and the lane block both recorded
+`#503` as "a PRICING decision, not a bug fix. Deliberately not taken." It is a
+misplaced `return`. What made the difference was `edge_why`, the split I added
+earlier the same day — the correction came from my own instrument, not from
+re-reading the code, and it would not have come at all if the counter had stayed
+a single `no_market_fair_value` total.
+
+**Verify after deploy:** `LIVE_PROJECTION_JOIN sport=soccer edged=` must exceed 0,
+and `edge_why` must stop being `{'no_fair_value_devig_failed': N}` for all N.
+Then `LAYER2_BOARD_HEALTH sport=soccer live_proj=` should follow.
+
+### `#528` — **Soccer's live-prop miss attribution was INERT: three counters and two sample fields were structurally constant. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+Found while reading `#527`'s line. Soccer reported:
+
+    miss_player=0  miss_market=620  miss_line_match=0
+    sample: all 8 rows `player_in_lens: False`, `lens_lines_available: []`
+
+`miss_player=0` and `player_in_lens: False` cannot both be findings, and that
+contradiction is what exposed it. `live_projection_join._has_attribution`
+(`:435`) tests for the PRESENCE of `players_seen` and `lines_by_player_market` on
+the indexed payload; `soccer_live_prop_index` returned neither. So the fallback
+branch fired for every row: everything to the `miss_no_market_alias` catch-all,
+`miss_player` and `miss_line_match` pinned at zero, and both sample fields read
+off empty structures.
+
+**Nothing failed.** The fallback is correct and deliberate — it refuses to invent
+a cause on a legacy payload. The counters simply stopped meaning anything, and
+`miss_market=620` reads as "620 markets we cannot name" while meaning "620 misses
+we could not attribute". Anyone chasing the remaining 1,397 unmatched soccer rows
+would have gone to the alias map for a cause that may be entirely elsewhere.
+
+MLB's builder (`live_projection_join.py:400`) has always emitted both, which is
+why the split works there. Soccer's now does too: `players_seen` recorded BEFORE
+the market loop (presence in the lens is a fact about the PLAYER — recording it
+only on a successful index write would re-merge "never saw this player" with "saw
+them and priced no market"), and `lines_by_player_market` on each indexed line.
+
+**Verify after deploy:** the three counters must stop being `0 / N / 0`, and the
+sample's `player_in_lens` must show BOTH values across a batch. If `miss_player`
+is still exactly 0 with a non-zero `miss_market`, the keys are present and the
+join is genuinely a vocabulary gap — which is then a real finding for the first
+time.
+
 ### `#526` — **The blotter had no mobile layout at all: a 880px table panned sideways on a 390px phone. Now a labelled card per row. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user report
 
 `table.board-blotter` carries `min-width: 880px` inside an `overflow-x: auto`

@@ -273,8 +273,34 @@ def soccer_live_prop_index(
     from syndicate.features.shared.live_projection_join import _norm_name
 
     index: dict[tuple[str, str, float], dict[str, Any]] = {}
+    # `#528`. THE MISS ATTRIBUTION IS OFF FOR SOCCER UNLESS THESE TWO ARE HERE.
+    #
+    # `live_projection_join._has_attribution` tests for the PRESENCE of
+    # `players_seen` and `lines_by_player_market` on this payload
+    # (`live_projection_join.py:435`) and, absent them, routes every miss to the
+    # `miss_no_market_alias` catch-all while leaving `miss_player` and
+    # `miss_line_match` structurally zero. It also makes the diagnostic sample's
+    # `player_in_lens` always False and `lens_lines_available` always empty --
+    # they read those same two structures.
+    #
+    # Measured 2026-08-23 16:41-16:49Z: soccer reported `miss_player=0
+    # miss_market=620 miss_line_match=0` with all eight sample rows showing
+    # `player_in_lens: False, lens_lines_available: []`. Those look like findings
+    # and are constants. `miss_market=620` reads as "620 markets we cannot name"
+    # and actually means "620 misses we could not attribute" -- which would send
+    # the next reader to the alias map for a cause that may be entirely
+    # elsewhere.
+    #
+    # MLB's builder (`live_projection_join.py:400`) has always emitted both,
+    # which is why the split works there and was inert here. The fallback branch
+    # is correct and deliberate -- it refuses to invent a cause on a legacy
+    # payload -- so nothing failed; the counters just stopped meaning anything.
+    players_seen: set[str] = set()
+    lines_by_player_market: dict[tuple[str, str], set[float]] = {}
     report: dict[str, Any] = {
         "index": index,
+        "players_seen": players_seen,
+        "lines_by_player_market": lines_by_player_market,
         "games_seen": 0,
         "live_games": 0,
         "rows_seen": 0,
@@ -301,6 +327,12 @@ def soccer_live_prop_index(
             if not player:
                 report["skipped_no_key"] += 1
                 continue
+            # BEFORE the market loop: presence in the lens is a fact about the
+            # PLAYER, and recording it only on a successful index write would
+            # make "the re-sim never saw this player" and "it saw them and
+            # priced no market" the same observation -- the exact conflation the
+            # split exists to undo.
+            players_seen.add(player)
             banked_by_market = {
                 "player_shots": prop.get("shots_so_far"),
                 "player_shots_on_target": prop.get("shots_on_target_so_far"),
@@ -338,6 +370,7 @@ def soccer_live_prop_index(
                         "live_edge_hint": None,
                         "side": "over",
                     }
+                    lines_by_player_market.setdefault((player, market), set()).add(line)
                     report["rows_indexed"] += 1
                     indexed_any = True
             if not indexed_any:
