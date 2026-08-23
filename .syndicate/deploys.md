@@ -24292,3 +24292,54 @@ busy, so this may be a bad evening rather than a standing property. Either way i
 should be measured before the next round of deploys, because it is the reason
 tonight produced fixes that are shipped and unproven rather than shipped and
 verified.
+
+
+## 2026-08-23 01:18:24Z -- refresh-worker `fb39476c` -- paper2 + attribution split (PEER-DEPLOYED)
+
+Deployed by a peer at 01:14:57Z; carried `f7ad80900` (no_close split), `46797f08f`
+(paper2), `4992ba40d` (paper2 page), `141551790` (venue split) -- all four verified
+ancestors. Third time tonight a peer shipped this lane's work; the claim was held
+and does not bind MCP deploys.
+
+### THE STAGE D ANSWER, and it is decisive
+
+    VENUE_SCOPE venue=kalshi rows_in=1227 scoped=47 coverage=0.0383
+      refusals={'venue_not_quoting': 1180}
+
+    PAPER2_PLAN_WRITTEN date=2026-08-22 venue=kalshi rows_in=47 positions=0 staked=$0
+      vs_unrestricted_positions=1 vs_unrestricted_staked=$6.41
+      refusals={'no_model_edge_pct': 35, 'below_min_ev_pct': 11, 'zero_kelly_stake': 1}
+
+**Kalshi quotes 3.8% of the board** -- 47 of 1,227. The plan's stated catch was
+right and understated: not "mostly moneyline/spread/total", but 3.8%.
+
+**The finding underneath it is `no_model_edge_pct: 35`.** The sim has no view on
+35 of the 47 markets Kalshi quotes, so the overlap between *Kalshi trades it* and
+*our model has an opinion* is **12 rows of 1,227** -- and none of those 12 cleared
+the EV gate at Kalshi's prices. That is not fixable by tracking more books:
+**Kalshi trades what this sim does not model.**
+
+CAVEAT, so this is not over-read: one slate, late at night, and the unrestricted
+book committed only 1 position itself. The COVERAGE number is structural (1,227
+rows is a full board); the "0 positions" is one night.
+
+### MY MARKET-FAMILIES THEORY WAS MOSTLY WRONG
+
+    no_close={'opening_not_in_resolver': 21, 'no_market_in_history': 11,
+              'close_precedes_open': 5, 'no_pregame_observation': 2}
+
+I theorised the CLV misses were untracked families (`totals_alt`, `h2h_3_way`)
+landing in the period-lines artifact rather than the history shard. That is **11
+of 39 -- 28%**. The largest bucket is `opening_not_in_resolver: 21` (54%): our
+book is absent from the odds-history shard for those markets. Book coverage, not
+artifact wiring -- a different problem with a different fix.
+
+**The process point is the one worth keeping.** I built the theory from greps,
+said so, and refused to edit the odds-capture path until this line existed. Had I
+built it, I would have shipped a fix for 28% of the problem and reported it as
+solved. `no_close` was only splittable at all because the attribution the earlier
+version discarded got carried through.
+
+verify: SATISFIED for `#522` (marks), `#524` (order CLV) and paper2 coverage.
+`ORDER_CLV resolved=5 same_book_n=5 same_book_avg_clv_pct=2.5358 beat=4` -- n=5,
+NOT a result. `paper2=[]` is correct: 0 positions committed, so nothing placed.
