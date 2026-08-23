@@ -346,7 +346,8 @@
   <div class="portfolio-paper-link">
     This page is <strong>your</strong> logged bets. The model's own sized, simulated portfolio lives on
     <a href="/portfolio/paper">the paper portfolio</a> — kept separate so simulated positions can never be
-    mistaken for wagers you placed.
+    mistaken for wagers you placed. Real-money submissions are on
+    <a href="/portfolio/live">the live book</a>, separate again for the same reason in reverse.
   </div>
 
   <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>

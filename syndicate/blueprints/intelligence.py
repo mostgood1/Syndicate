@@ -3256,6 +3256,8 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         read_portfolio_plan_for_venue,
     )
     from syndicate.features.shared.execution_ledger import (
+        LIVE,
+        PAPER,
         execution_mode,
         ledger_summary,
         _load,
@@ -3278,7 +3280,17 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # computed from this one -- reusing the filtered list would have
         # produced a figure labelled "all dates" that was the selected day's,
         # which is worse than not showing it at all.
-        all_orders = list(_load().get("orders") or [])
+        # PAPER ORDERS ONLY, and this filter is load-bearing rather than tidy.
+        # This page's banner says "Simulated fills only. No money moves, no book
+        # is contacted, nothing here is a real wager." A live order rendered
+        # under that sentence is a real position wearing a disclaimer that it is
+        # not one -- the single most dangerous thing this surface could show.
+        # Live orders have their own page: `/portfolio/live`.
+        all_orders = [
+            order
+            for order in (_load().get("orders") or [])
+            if str(order.get("mode") or PAPER) != LIVE
+        ]
         orders = [
             order
             for order in all_orders
@@ -3481,6 +3493,96 @@ def _paper_date_nav(selected_date: str) -> dict[str, Any]:
 def portfolio_paper_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
+
+
+def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
+    """Real money only. The mirror image of `_paper_portfolio_payload`.
+
+    A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
+    same questions about different things, and the whole reason `/portfolio` and
+    `/portfolio/paper` are separate is that simulated positions shown beside
+    real ones get mistaken for bets somebody placed. Adding a toggle would
+    rebuild that confusion with better formatting.
+
+    Everything here is `mode=live`, across ALL dates rather than one: a real
+    position is not interesting only on the day it was opened, and a page that
+    hides yesterday's open bet behind a date picker is a page that will one day
+    let one expire unwatched.
+    """
+    from syndicate.features.shared.execution_ledger import (
+        LIVE,
+        STATUS_SUBMITTED,
+        execution_mode,
+        live_execution_armed,
+        _load,
+    )
+    from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
+    from syndicate.features.shared.paper_settlement import settlement_summary
+    from pipeline.execute_portfolio import execution_enabled
+
+    orders: list = []
+    ledger_error = None
+    try:
+        orders = [
+            order
+            for order in (_load().get("orders") or [])
+            if str(order.get("mode") or "") == LIVE
+        ]
+        orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+    except Exception as exc:
+        # An unreadable ledger must never render as "no live positions". That
+        # is the one absence this page cannot afford to get wrong.
+        ledger_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("LIVE_LEDGER_READ_FAILURE")
+
+    settlement = None
+    settlement_error = None
+    try:
+        settlement = settlement_summary(None, orders=orders)
+    except Exception as exc:
+        settlement_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")
+
+    # SENT, OR POSSIBLY SENT, WITH AN UNKNOWN RESULT. A restart between submit
+    # and record produces exactly these, and they are the rows a person needs to
+    # see first -- they must be checked against the venue rather than retried.
+    unreconciled = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+
+    switch = {}
+    try:
+        switch = kill_switch_engaged()
+    except Exception as exc:
+        switch = {"engaged": True, "source": "read_failed", "detail": type(exc).__name__}
+
+    return {
+        "date": selected_date,
+        "orders": orders,
+        "ledger_error": ledger_error,
+        "settlement": settlement,
+        "settlement_error": settlement_error,
+        "unreconciled": unreconciled,
+        # The four switches that decide whether anything can be placed, read
+        # HERE rather than assumed -- this is the web process, so they describe
+        # the web's env and say so on the page.
+        "execution_mode": execution_mode(),
+        "live_armed": live_execution_armed(),
+        "execution_enabled": execution_enabled(),
+        "kill_switch": switch,
+        "limits": limits(LIVE),
+    }
+
+
+@intelligence_bp.get("/api/portfolio/live")
+def api_portfolio_live():
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date)))
+
+
+@intelligence_bp.get("/portfolio/live")
+def portfolio_live_page():
+    """Real positions. Deliberately its own page, not a tab on the paper one."""
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return render_template("portfolio_live.html", live=_live_portfolio_payload(selected_date))
 
 
 @intelligence_bp.get("/portfolio/paper")

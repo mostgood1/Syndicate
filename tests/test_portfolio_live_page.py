@@ -1,0 +1,291 @@
+"""`/portfolio/live` -- the real-money book, and the wall between it and paper.
+
+Two things are worth testing here and they are both about CONFUSION, not
+arithmetic:
+
+1. A live order must never render on `/portfolio/paper`. That page's banner
+   says "Simulated fills only. No money moves, no book is contacted, nothing
+   here is a real wager." A real position under that sentence is the single
+   most dangerous thing either surface could show, and until 2026-08-23 the
+   paper payload had no mode filter at all -- the first live order would have
+   appeared there.
+2. An unreadable ledger must never render as "no live positions". "We cannot
+   see the money" and "there is no money at risk" are opposite facts that an
+   empty table renders identically.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from syndicate.app import app as flask_app
+from syndicate.blueprints import intelligence as intelligence_bp
+
+
+DATE = "2026-08-23"
+
+
+@pytest.fixture
+def app_client():
+    return flask_app.test_client()
+
+
+def _order(**overrides):
+    order = {
+        "idempotency_key": "k-live-1",
+        "position_key": "pos-1",
+        "selected_date": DATE,
+        "mode": "live",
+        "sport": "wnba",
+        "market": "player_points",
+        "player_name": "Test Guard",
+        "side": "Over",
+        "line": 17.5,
+        "home_team": "LAS",
+        "away_team": "SEA",
+        "book": "kalshi",
+        "venue": "kalshi",
+        "venue_ticker": "KXWNBAPTS-25AUG23-TG-17.5",
+        "requested_price": -110.0,
+        "requested_stake_dollars": 5.0,
+        "submitted_at": "2026-08-23T23:10:05Z",
+        "status": "filled",
+        "fill_price": -115.0,
+        "fill_stake_dollars": 5.0,
+        "error": None,
+    }
+    order.update(overrides)
+    return order
+
+
+@pytest.fixture
+def live_env(monkeypatch):
+    """Inject the ledger rather than reading disk.
+
+    `data/` in this checkout is a lossy mirror, so a test that read it would
+    pass or fail on mirror vintage instead of on this code.
+    """
+    state = {
+        "orders": [],
+        "raise_on_load": None,
+        "mode": "live",
+        "armed": True,
+        "execution": True,
+        "kill_switch": {"engaged": False, "source": "env"},
+    }
+
+    import pipeline.execute_portfolio as exec_mod
+    import pipeline.portfolio_commit as commit_mod
+    import syndicate.features.shared.execution_guard as guard_mod
+    import syndicate.features.shared.execution_ledger as ledger_mod
+
+    def fake_load():
+        if state["raise_on_load"] is not None:
+            raise state["raise_on_load"]
+        return {"orders": list(state["orders"])}
+
+    monkeypatch.setattr(ledger_mod, "_load", fake_load)
+    monkeypatch.setattr(ledger_mod, "execution_mode", lambda: state["mode"])
+    monkeypatch.setattr(ledger_mod, "live_execution_armed", lambda: state["armed"])
+    monkeypatch.setattr(exec_mod, "execution_enabled", lambda: state["execution"])
+    monkeypatch.setattr(guard_mod, "kill_switch_engaged", lambda: state["kill_switch"])
+    # The paper page reads these too; a live-only test must not depend on
+    # whatever plan happens to be on disk.
+    monkeypatch.setattr(commit_mod, "read_portfolio_plan", lambda date: None)
+    monkeypatch.setattr(commit_mod, "paper2_venues", lambda: ())
+    return state
+
+
+def _payload(_live_env):
+    return intelligence_bp._live_portfolio_payload(DATE)
+
+
+# --------------------------------------------------------------------------
+# The wall
+# --------------------------------------------------------------------------
+
+
+def test_a_live_order_is_not_on_the_paper_page(live_env):
+    """The defect this page was built around.
+
+    `_paper_portfolio_payload` filtered by DATE and by nothing else, so the
+    first real Kalshi fill would have rendered under a banner promising no
+    money moves.
+    """
+    live_env["orders"] = [_order()]
+    paper = intelligence_bp._paper_portfolio_payload(DATE)
+    # No plan is injected, so a paper order on this date would land in
+    # `orphan_orders` -- which is exactly where a live one must NOT.
+    assert paper["orphan_orders"] == []
+    assert paper["rows"] == []
+
+
+def test_a_live_order_does_not_reach_the_rendered_paper_page(app_client, live_env):
+    live_env["orders"] = [_order()]
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    assert "Test Guard" not in body
+
+
+def test_a_live_order_is_excluded_from_the_paper_all_dates_record(live_env):
+    """The all-dates rollup is computed from the unfiltered list, so it is the
+    one place the mode filter is easy to forget."""
+    live_env["orders"] = [
+        _order(outcome="won", pnl_dollars=4.35, fill_stake_dollars=5.0),
+    ]
+    paper = intelligence_bp._paper_portfolio_payload(DATE)
+    assert paper["settlement_all_time"]["total"]["settled"] == 0
+
+
+def test_an_order_with_no_mode_is_treated_as_paper(live_env):
+    """Absent mode predates the field. It must default to the SAFE reading --
+    paper -- rather than to live."""
+    live_env["orders"] = [_order(mode=None)]
+    assert _payload(live_env)["orders"] == []
+    assert len(intelligence_bp._paper_portfolio_payload(DATE)["orphan_orders"]) == 1
+
+
+def test_the_live_page_shows_only_live_orders(live_env):
+    live_env["orders"] = [_order(), _order(idempotency_key="k-paper", mode="paper")]
+    payload = _payload(live_env)
+    assert [o["idempotency_key"] for o in payload["orders"]] == ["k-live-1"]
+
+
+# --------------------------------------------------------------------------
+# Absence vs failure
+# --------------------------------------------------------------------------
+
+
+def test_an_unreadable_ledger_is_never_rendered_as_no_positions(app_client, live_env):
+    live_env["raise_on_load"] = RuntimeError("keyvalue unreachable")
+    payload = _payload(live_env)
+    assert "keyvalue unreachable" in payload["ledger_error"]
+
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "not claiming there are no positions" in body
+    assert "No live positions have ever been placed" not in body
+
+
+def test_no_positions_says_so_plainly(app_client, live_env):
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "No live positions have ever been placed" in body
+
+
+def test_nothing_settled_is_not_a_zero_pnl(app_client, live_env):
+    live_env["orders"] = [_order(outcome=None, pnl_dollars=None)]
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    # "+0.00" on nothing decided and "+0.00" on fifty decided are the same
+    # string, and only one of them means the book is flat.
+    assert "nothing settled yet" in body
+
+
+# --------------------------------------------------------------------------
+# Positions carry all dates, not the selected one
+# --------------------------------------------------------------------------
+
+
+def test_yesterdays_open_position_is_still_shown(live_env):
+    """A real position is not interesting only on the day it was opened. A page
+    that hides yesterday's open bet behind a date picker will one day let one
+    expire unwatched."""
+    live_env["orders"] = [_order(selected_date="2026-08-22")]
+    assert len(_payload(live_env)["orders"]) == 1
+
+
+# --------------------------------------------------------------------------
+# The arming badge is DERIVED, never a label
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "off",
+    ["execution", "mode", "armed", "kill"],
+)
+def test_any_one_switch_off_means_the_badge_is_not_real_money(app_client, live_env, off):
+    if off == "execution":
+        live_env["execution"] = False
+    elif off == "mode":
+        live_env["mode"] = "paper"
+    elif off == "armed":
+        live_env["armed"] = False
+    else:
+        live_env["kill_switch"] = {"engaged": True, "source": "env"}
+
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "LIVE MODE OFF" in body
+    assert "LIVE — REAL MONEY" not in body
+
+
+def test_all_four_on_is_the_only_state_that_says_real_money(app_client, live_env):
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "LIVE — REAL MONEY" in body
+    assert "real submissions to a real venue" in body
+
+
+def test_a_kill_switch_read_failure_reads_as_engaged(live_env, monkeypatch):
+    """Fail CLOSED. A switch we cannot read is a switch we must assume is on."""
+    import syndicate.features.shared.execution_guard as guard_mod
+
+    def boom():
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(guard_mod, "kill_switch_engaged", boom)
+    payload = _payload(live_env)
+    assert payload["kill_switch"]["engaged"] is True
+    assert payload["kill_switch"]["source"] == "read_failed"
+
+
+# --------------------------------------------------------------------------
+# The rows a person has to look at first
+# --------------------------------------------------------------------------
+
+
+def test_a_submitted_order_is_flagged_as_unreconciled(app_client, live_env):
+    """Sent, or possibly sent, with an unknown result. A restart between submit
+    and record produces exactly these, and the answer is to check the venue --
+    never to re-submit."""
+    live_env["orders"] = [_order(status="submitted", fill_price=None, fill_stake_dollars=None)]
+    payload = _payload(live_env)
+    assert len(payload["unreconciled"]) == 1
+
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "unknown result" in body
+    assert "do not re-submit" in body
+
+
+def test_a_filled_order_is_not_flagged_as_unreconciled(live_env):
+    live_env["orders"] = [_order(status="filled")]
+    assert _payload(live_env)["unreconciled"] == []
+
+
+def test_the_page_shows_the_venue_ticker_and_the_slippage(app_client, live_env):
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "KXWNBAPTS-25AUG23-TG-17.5" in body
+    # Requested -110, filled -115: the gap is what a person checks first after
+    # a real submit, so both numbers have to be on the row.
+    assert "-110" in body
+    assert "-115" in body
+
+
+def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "5")
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "$5" in body
+
+
+# --------------------------------------------------------------------------
+# Reachability -- a page nobody can navigate to is a page nobody watches
+# --------------------------------------------------------------------------
+
+
+def test_the_paper_page_links_to_the_live_book(app_client, live_env):
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    assert 'href="/portfolio/live"' in body
+
+
+def test_the_api_and_the_page_read_the_same_payload(app_client, live_env):
+    live_env["orders"] = [_order()]
+    data = app_client.get(f"/api/portfolio/live?date={DATE}").get_json()
+    assert data["execution_mode"] == "live"
+    assert data["live_armed"] is True
+    assert len(data["orders"]) == 1
