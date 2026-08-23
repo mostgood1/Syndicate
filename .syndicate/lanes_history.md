@@ -11893,3 +11893,35 @@ against a slate that actually had matches in play. Full evidence in
   `UnboundLocalError: cannot access local variable 'write_json_file'`, on 12/12
   MLB ticks sampled. **Live MLB fault, unrelated to soccer, unowned** — surfaced
   here because it is failing continuously in production right now.
+
+#### layer2-sim-view-and-live-projection — SUPERSEDED 2026-08-23 by the checkpoint of session e47e1b67. Moved VERBATIM; its status is now the single block in `lanes.md`, its narrative in `log/2026-08-22.md` + `log/2026-08-23.md`. Kept because its OPEN list is the record of what was believed before `LAYER2_BOARD_HEALTH` was finally read.
+
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **ORIGINAL GOAL MET AND VERIFIED. Soccer team-name join FIXED IN PRODUCTION (2,587 -> 87 unmatched). Now carrying five later user-reported board defects: 2 fixed, 3 INSTRUMENTED BUT UNDIAGNOSED — and the instrument that answers them has never once been read.**
+- Goal (met): the Layer 2 board never shows a number attributed to the sim that
+  is about a different side, quantity or thing. Outcomes (a)-(d) all done and
+  unit-tested. **The SERVED-board read was never taken** — the agent proxy 403s
+  `syndicate-an21.onrender.com` from a Claude session (`state.md`).
+- **OPEN, in priority order:**
+  1. **READ `LAYER2_BOARD_HEALTH`.** Never observed; three worker restarts in a
+     row reset the cold-boot clock. It answers three live user reports —
+     stale lines / blank projections / no movement — which are **UNDIAGNOSED**,
+     not fixed. Read `sport=mlb` as the control.
+  2. **`unmatched_player: ~6,056`** — largest soccer bucket. The
+     `player_no_roster` vs `player_name_miss` split is deployed and unread; it
+     decides whether this is the alias map's problem or the sim producer's.
+  3. **The one-sided fair value never reaching the live edge** (`todo.md #503`).
+     A PRICING decision, not a bug fix. Deliberately not taken.
+  4. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Only fires on
+     a direct-publish failure; a quiet log is expected and proves nothing.
+     Affirmative token `SWEEP_REPAIRING`.
+  5. Four board UI behaviours tested but never seen on the served page.
+- Files: `syndicate/features/shared/{layer2_board,prop_projections,live_projection_join,soccer_projections,team_aliases,artifact_publisher}.py`, `pipeline/layer2_shortlist.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,artifact_publish_repair_over_ceiling}.py`, `tests/js/board_sim_view_display.test.mjs`.
+  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
+    `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
+    `artifact_publisher.py` claimed 2026-08-22 for the sweep repair path.
+    `board_enrichment.py` deliberately untouched.
+- **Cross-lane, unowned, NOT fixed by me:**
+  `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
+  is RED on `main` — stale fallout from `28e55d86`, whose session was active.
+- Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` (two blocks).
+- Blocked by: none.
