@@ -14,8 +14,17 @@ end.
   league_rate   remaining possessions x a LEAGUE-WIDE points-per-possession,
                 ignoring this game's efficiency entirely.
   game_pace     remaining possessions x THIS GAME's points-per-possession.
-  league_late   league rates, but with the FINAL MINUTE of a period priced
+  league_flat   LEAGUE pace x LEAGUE points-per-possession. The control.
+  league_late   the same, but with the FINAL MINUTE of a period priced
                 separately -- see below.
+
+`league_rate` uses THIS GAME's pace for the possession count and only borrows
+the league's efficiency. `league_late` uses neither. Comparing those two moves
+BOTH knobs at once, so `league_flat` sits between them and isolates each:
+`league_flat` vs `league_rate` says whether league pace beats game pace, and
+`league_late` vs `league_flat` says whether the final-minute binary adds
+anything on top. Without that control a win could be entirely the pace source --
+which is live, since `game_pace` already loses to `league_rate` by 0.37 points.
 
 `game_pace` beating `league_rate` is the only evidence that per-game state adds
 anything. It does not: measured -0.43 points over 282 WNBA games.
@@ -146,11 +155,26 @@ def _fit_rates(league: str, games) -> dict[str, float]:
     div = lambda a, b: (a / b) if b > 0 else 0.0
     return {
         "league_ppp": div(acc["all_pts"], acc["all_poss"]),
+        # Blended pace over normal AND late time -- what a single-rate model
+        # would use, and what `pace_normal` deliberately is not.
+        "pace_all": div(acc["norm_poss"] + acc["late_poss"],
+                        (acc["norm_sec"] + acc["late_sec"]) / 60.0),
         "pace_normal": div(acc["norm_poss"], acc["norm_sec"] / 60.0),
         "ppp_normal": div(acc["norm_pts"], acc["norm_poss"]),
         "pace_late": div(acc["late_poss"], acc["late_sec"] / 60.0),
         "ppp_late": div(acc["late_pts"], acc["late_poss"]),
     }
+
+
+def _league_flat_projection(left: float, rates: dict[str, float]) -> float:
+    """Points in the rest of the period at ONE league pace and efficiency.
+
+    The control for `_league_late_projection`. Uses the same league constants
+    with the late window folded back in, so the only difference between the two
+    is the mechanism under test.
+    """
+    poss = rates["pace_all"] * (left / 60.0)
+    return poss * rates["league_ppp"]
 
 
 def _league_late_projection(left: float, rates: dict[str, float]) -> float:
@@ -224,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[interval] FITTED_RATES late_window={LATE_WINDOW:.0f}s "
           f"pace_normal={rates['pace_normal']:.3f} ppp_normal={rates['ppp_normal']:.4f} "
           f"pace_late={rates['pace_late']:.3f} ppp_late={rates['ppp_late']:.4f} "
+          f"pace_all={rates['pace_all']:.3f} "
           f"pace_lift={rates['pace_late']/max(rates['pace_normal'], 1e-9):.3f}x", flush=True)
 
     errors: dict[tuple, dict[str, list[float]]] = {}
@@ -242,10 +267,12 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             truth = row["true_rest_total"]
             bucket = errors.setdefault(key, {"naive_zero": [], "league_rate": [],
-                                             "game_pace": [], "league_late": []})
+                                             "game_pace": [], "league_flat": [],
+                                             "league_late": []})
             bucket["naive_zero"].append(abs(0.0 - truth))
             bucket["league_rate"].append(abs(row["state_possessions_left_est"] * league_ppp - truth))
             bucket["game_pace"].append(abs(row["proj_rest_total"] - truth))
+            bucket["league_flat"].append(abs(_league_flat_projection(left, rates) - truth))
             bucket["league_late"].append(abs(_league_late_projection(left, rates) - truth))
 
     print("[interval] MEDIAN ABSOLUTE ERROR in points, on the REST of the period", flush=True)
@@ -256,13 +283,14 @@ def main(argv: list[str] | None = None) -> int:
         z = statistics.median(bucket["naive_zero"])
         l = statistics.median(bucket["league_rate"])
         g = statistics.median(bucket["game_pace"])
+        f = statistics.median(bucket["league_flat"])
         t = statistics.median(bucket["league_late"])
         n = len(bucket["game_pace"])
-        best = min((z, "naive_zero"), (l, "league_rate"),
-                   (g, "game_pace"), (t, "league_late"))[1]
+        best = min((z, "naive_zero"), (l, "league_rate"), (g, "game_pace"),
+                   (f, "league_flat"), (t, "league_late"))[1]
         print(f"[interval] BUCKET left={key[0]}-{key[1]}s n={n} "
               f"naive_zero={z:.2f} league_rate={l:.2f} game_pace={g:.2f} "
-              f"league_late={t:.2f} best={best}", flush=True)
+              f"league_flat={f:.2f} league_late={t:.2f} best={best}", flush=True)
 
     # **DOES THIS GAME'S PACE BEAT THE LEAGUE'S?** The only question that says
     # whether per-game state is worth tracking at all.
@@ -279,14 +307,32 @@ def main(argv: list[str] | None = None) -> int:
     # **DOES PRICING THE FINAL MINUTE SEPARATELY BEAT PRICING IT LIKE ANY OTHER?**
     # The situational table says the final minute is different. This says whether
     # knowing that is worth anything on held-out games.
+    all_f = [v for b in errors.values() for v in b["league_flat"]]
     all_t = [v for b in errors.values() for v in b["league_late"]]
-    if all_l and all_t:
-        ml, mt = statistics.median(all_l), statistics.median(all_t)
-        delta = ml - mt
-        print(f"[interval] LATE_SPLIT_VS_LEAGUE median_league={ml:.3f} "
+
+    # KNOB 1: the possession count's source. Game pace or a league constant?
+    if all_l and all_f:
+        ml, mf = statistics.median(all_l), statistics.median(all_f)
+        print(f"[interval] PACE_SOURCE median_game_pace_possessions={ml:.3f} "
+              f"median_league_pace_possessions={mf:.3f} improvement={ml - mf:+.3f} points "
+              f"{'-- league pace beats game pace' if ml > mf else '-- game pace beats league pace'}",
+              flush=True)
+
+    # KNOB 2: the mechanism, against a control that differs ONLY by it.
+    if all_f and all_t:
+        mf, mt = statistics.median(all_f), statistics.median(all_t)
+        delta = mf - mt
+        print(f"[interval] LATE_SPLIT_VS_FLAT median_flat={mf:.3f} "
               f"median_late_split={mt:.3f} improvement={delta:+.3f} points "
               f"{'-- the final-minute split helps' if delta > 0 else '-- the final-minute split does NOT help'}",
               flush=True)
+
+    # Kept for continuity with the earlier runs, and labelled as the CONFOUNDED
+    # comparison it is -- it moves the pace source and the mechanism together.
+    if all_l and all_t:
+        ml, mt = statistics.median(all_l), statistics.median(all_t)
+        print(f"[interval] LATE_SPLIT_VS_LEAGUE_RATE_CONFOUNDED median_league_rate={ml:.3f} "
+              f"median_late_split={mt:.3f} improvement={ml - mt:+.3f} points", flush=True)
     return 0
 
 

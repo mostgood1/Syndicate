@@ -25068,3 +25068,63 @@ cause that does not exist.
 **Not measured:** whether `edged` ever exceeds 0 for soccer. That needs a live
 match whose prop quote is two-sided, and the European Sunday slate was closing as
 this landed. Deferred by the calendar, not by a gap in the instrument.
+
+## 2026-08-23 22:42Z — live-odds-worker — the final-minute split, on a held-out split
+
+lane: `basketball-live-momentum`
+service: `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`)
+deploy: `dep-da5neee417fc7382de70` on `a5ad9d33` (= PR #22 merge, so the SHA IS
+the change this time rather than a tip that happens to contain it)
+env set: `SYNDICATE_WNBA_INTERVAL_PROJECTION=2026-05-01..2026-08-22`,
+`SYNDICATE_WNBA_SITUATIONAL_PACE=2026-05-01..2026-08-23` (both new specs, so both
+one-shot sentinels are fresh)
+
+**TWO PROCESS VIOLATIONS, BOTH MINE, BOTH STATED BEFORE THE RESULT.**
+
+1. **The claim had EXPIRED.** `deploy_claim.py status` at 22:42:14Z:
+   `live-odds-worker EXPIRED ... 219.3 min`. I acquired it at ~19:23Z, worked,
+   and fired the deploy at 22:42Z without re-checking. Re-acquired immediately
+   after (`3f1126851d9f393b`) — which orders any FUTURE deploy but did nothing
+   for this one.
+2. **The in-flight check was three hours stale.** I read `live_events=0` at
+   19:35Z and deployed at 22:42Z on the strength of it. That is exactly the
+   carelessness I wrote into this ledger about the second `refresh-worker`
+   deploy ninety minutes earlier, repeated with a bigger gap.
+
+**No capture was lost** — `live_events=0` continuously through 22:40:47Z, the
+tick before the deploy. That is the outcome, not the process: I checked
+afterwards, and had a game been live I would have killed its capture mid-slate.
+
+### A SEPARATE FINDING THE SAME LOGS SURFACED
+
+Today's WNBA slate logged `SCOREBOARD league=wnba events_total=4` with
+`live_events=0` on **every tick from 18:46Z to 22:42Z** — 2:46pm to 6:42pm ET.
+Four games cannot all avoid that window, so one of three things is true:
+
+  - all four finished before 18:46Z (possible, unverified);
+  - none had tipped by 22:42Z (implausible);
+  - the scoreboard's `status.type.state` never reads `in`.
+
+**I cannot tell which, and neither could the log.** `events_total=N
+live_events=0` renders identically for all three, and they have three different
+owners: wait, nothing wrong, and a bug. ESPN is unreachable from this session
+(**403 at CONNECT**, organization proxy policy — the same denial that blocks the
+ops export endpoint), so this is not diagnosable here.
+
+Shipped the instrument instead of a guess: `SCOREBOARD_STATES ... pre=N in=N
+post=N`, with a missing state bucketing as `ABSENT` rather than folding into
+`pre`. Same move as `events_total` itself, which was added to separate "none
+tipped" from "the call returned nothing" and thereby surfaced a silent 403.
+`live_event_ids` had no tests; it has seven now, one mutation-checked on the
+`ABSENT` bucket. **NOT in this deploy** (`da90b278` postdates `a5ad9d33`) — it
+rides the next one.
+
+verify: PENDING, two readings, both from this deploy's logs —
+  - `[interval] FITTED_RATES ... pace_lift=` and `LATE_SPLIT_VS_LEAGUE`, on
+    HELD-OUT dates. **Pre-registered:** the situational table says the final
+    minute is ~17% faster; if pricing it separately does not beat pricing it
+    flat on games it was not fitted on, the binary is not worth carrying either
+    and the league constant wins outright.
+  - `[situational] TEAM_SPREAD`, on whether three-point share spreads wider than
+    points per possession — i.e. whether team identity belongs in an interval
+    total's VARIANCE rather than its centre.

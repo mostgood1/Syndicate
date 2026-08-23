@@ -131,15 +131,32 @@ def live_event_ids(league: str, date_str: str) -> list[str]:
         flush=True,
     )
     out: list[str] = []
+    # **`events_total` vs `live_events` STILL LEAVES ONE AMBIGUITY, and it is
+    # the one that matters on a slate that captured nothing.** `events_total=4
+    # live_events=0` reads identically for "none have tipped yet", "all four
+    # have finished", and "ESPN never advanced the state off `pre`" -- three
+    # situations with three different owners: wait, nothing wrong, and a bug.
+    # Counting the states separates them, in the same way `events_total`
+    # separated "none tipped" from "the call returned nothing" and thereby
+    # surfaced the 403.
+    states: dict[str, int] = {}
     for event in events or []:
         if not isinstance(event, dict):
             continue
         status = ((event.get("status") or {}).get("type") or {})
-        if str(status.get("state") or "").strip().lower() != "in":
+        state = str(status.get("state") or "").strip().lower() or "ABSENT"
+        states[state] = states.get(state, 0) + 1
+        if state != "in":
             continue
         event_id = str(event.get("id") or "").strip()
         if event_id:
             out.append(event_id)
+    if events:
+        print(
+            f"[basketball_momentum] SCOREBOARD_STATES league={league} date={date_str} "
+            + " ".join(f"{k}={v}" for k, v in sorted(states.items())),
+            flush=True,
+        )
     return out
 
 
