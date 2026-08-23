@@ -4071,6 +4071,46 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     }
 
 
+def _kalshi_auth_probe_at_boot() -> None:
+    """One signed READ-ONLY call, at process boot, before anything long runs.
+
+    It used to ride along inside `kalshi_discovery`, which is called from the
+    intelligence-state board build -- i.e. at the TAIL of a cycle currently
+    taking ~15 minutes. "Once per boot" was true and useless: the answer to
+    "does our signing work" arrived a quarter of an hour after the deploy that
+    was meant to answer it.
+
+    Boot is the right place because the question has nothing to do with a board.
+    It needs a credential and a network, both of which exist here.
+
+    READ-ONLY: `probe_auth` asks for the account balance. Nothing in this
+    function or the module it calls can place an order, and with no credential
+    configured it makes no HTTP call at all.
+    """
+    try:
+        from syndicate.features.shared.kalshi_auth import probe_auth
+
+        result = probe_auth()
+        print(
+            "[refresh_worker] KALSHI_AUTH_PROBE"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" detail={result.get('detail')}"
+            # KEYS, never values. A balance is not a secret but it has no
+            # business in a line whose only job is to confirm a signature.
+            f" keys={result.get('keys')}"
+            f" balance_present={result.get('balance_present')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # Boot must not die on a diagnostic. Named so a silent absence and a
+        # crashed probe cannot be confused.
+        print(
+            f"[refresh_worker] KALSHI_AUTH_PROBE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
@@ -4186,6 +4226,7 @@ def main() -> int:
         print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
+    _kalshi_auth_probe_at_boot()
     _bootstrap_soccer_player_seed_files()
     _bootstrap_soccer_schedule_seed_files()
     _bootstrap_soccer_history_seed_files()

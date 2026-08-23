@@ -53,48 +53,11 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         return {"status": "skipped", "reason": "already_ran_this_boot"}
     _ALREADY_RAN = True
 
-    # FIRST, and before the unauthenticated schema probe -- which has its own
-    # early `return` and on 2026-08-23T19:21:07Z took this whole function down
-    # with `http_429` on both public hosts. The auth probe never ran, because I
-    # had placed it behind a gate it has nothing to do with.
-    #
-    # Third time today that an unrelated check hid the measurement behind it
-    # (the Kalshi date guard, then feed-before-market in the grader). The rule
-    # that keeps falling out: a thing you are trying to MEASURE must not sit
-    # downstream of a thing that can fail for its own reasons.
-    # AUTHENTICATED READ, once per boot, and READ-ONLY BY CONSTRUCTION.
-    # `probe_auth` asks for the account balance; there is no argument to it that
-    # places anything, and nothing in this module can trade.
-    #
-    # Here rather than in a one-off script because signing has never once
-    # executed against Kalshi -- the agent proxy 403s CONNECT from a dev
-    # container -- so the worker is the only place that can answer whether it
-    # works. It reports the response KEYS, never the values: a balance is not a
-    # secret but it has no business in a line whose job is to confirm a
-    # signature verified.
-    #
-    # No credential means a NAMED skip and no HTTP call at all, so this is inert
-    # until someone deliberately configures one.
-    try:
-        from syndicate.features.shared.kalshi_auth import probe_auth
-
-        auth = probe_auth()
-        print(
-            "[kalshi_discovery] AUTH_PROBE"
-            f" status={auth.get('status')}"
-            f" reason={auth.get('reason')}"
-            f" detail={auth.get('detail')}"
-            f" keys={auth.get('keys')}"
-            f" balance_present={auth.get('balance_present')}",
-            flush=True,
-        )
-    except Exception as exc:
-        # Non-fatal: a signing failure must not cost the read-only discovery
-        # that runs beside it and needs no credential at all.
-        print(f"[kalshi_discovery] AUTH_PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
-
-
-    from syndicate.features.shared.kalshi_client import KalshiError, discover, probe
+    # THE AUTH PROBE LIVES AT WORKER BOOT, not here. See
+    # `run_refresh_worker._kalshi_auth_probe_at_boot`. This function is called
+    # from the intelligence-state board build, so anything inside it answers a
+    # quarter of an hour after the deploy that asked the question -- and "does
+    # our signing work" has nothing to do with a board being built.
 
     # SCHEMA FIRST, and reported separately from the data. The field names in
     # `kalshi_client` were written without ever calling the API (the agent proxy
