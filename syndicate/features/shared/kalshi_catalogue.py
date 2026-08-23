@@ -81,6 +81,22 @@ SERIES_SPORT: dict[str, str] = {
     # `bet_status_wnba` reads `reb` off the live box, so this one line makes the
     # market priceable, joinable AND gradeable.
     "KXWNBAREB": "wnba",
+    # The other three WNBA player props, seen in the same catalogue read:
+    # "Women's Pro Basketball Player Points" / "Player Assists" /
+    # "Player Threes". `market_keys` resolves all three for wnba and
+    # `bet_status_wnba` reads pts / ast / threes_made off the live box.
+    #
+    # HAND-REGISTERED even though `auto_series_from_catalogue` finds all four,
+    # and the duplication is deliberate. Discovery is PER-PROCESS state
+    # populated at boot: if the catalogue read fails once -- a 429, a restart
+    # mid-outage -- that process prices nothing but the hand-written entries for
+    # its whole life, silently. Naming the ones that matter tonight makes them
+    # independent of a network call succeeding at the right moment.
+    # `register_discovered` never overwrites these, so discovery finding them
+    # again is a no-op rather than a conflict.
+    "KXWNBAPTS": "wnba",
+    "KXWNBAAST": "wnba",
+    "KXWNBA3PT": "wnba",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop
