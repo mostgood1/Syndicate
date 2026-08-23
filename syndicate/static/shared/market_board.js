@@ -518,6 +518,51 @@
     `;
   }
 
+  // ONE DEFINITION FOR THE HEADER AND THE CELLS (`#526`).
+  //
+  // These were two hand-maintained parallel lists -- twelve `<th>` in
+  // `renderBlotterView` and twelve `<td>` here -- with nothing tying them
+  // together. Inserting a column in one and not the other shifts every heading
+  // right of it onto the wrong data, and the page still renders.
+  //
+  // The mobile layout is what forced the issue: a stacked card needs each cell
+  // to carry its own label, and duplicating the header text a THIRD time would
+  // have made the drift worse. So the columns are declared once and both the
+  // header and the row are generated from them.
+  const BLOTTER_COLUMNS = [
+    { key: "state", label: "State", cell: (c) => `<span class="board-badge board-badge--${gameStateBadgeClass(c.normalized)}">${escapeHtml(gameStateLabel(c.normalized))}</span>` },
+    {
+      key: "entity",
+      label: "Player / Market",
+      cell: (c) => `<div class="board-blotter__primary">${c.headshot}${escapeHtml(c.title)}</div>`
+        + `<div class="board-blotter__meta">${escapeHtml(c.game.matchup || "")}</div>`,
+    },
+    { key: "pick", label: "Pick", cell: (c) => (c.propLine ? escapeHtml(c.propLine) : "") },
+    { key: "odds", label: "Odds", cell: (c) => (c.oddsText ? escapeHtml(c.oddsText) : "") },
+    { key: "projected", label: "Projected", cell: (c) => (c.projectedValue !== null ? escapeHtml(c.projectedValue) : "") },
+    { key: "line_move", label: "Line move", cell: (c) => (c.lineMovementValue !== null ? escapeHtml(c.lineMovementValue) : "") },
+    { key: "odds_move", label: "Odds move", cell: (c) => (c.oddsMovementValue !== null ? escapeHtml(c.oddsMovementValue) : "") },
+    { key: "closing", label: "Closing", cell: (c) => (c.closingLineValue !== null ? escapeHtml(c.closingLineValue) : "") },
+    {
+      key: "model",
+      label: "Model",
+      className: (c) => (rowIsModelFavored(c.row) ? "board-blotter__model-cell--favored" : ""),
+      cell: (c) => (c.modelValue ? escapeHtml(c.modelValue) : "")
+        + (rowIsModelFavored(c.row) ? ' <span class="board-badge board-badge--model-favored" title="The sim favors this side">Model</span>' : ""),
+    },
+    { key: "live", label: "Live", cell: (c) => (c.liveText ? escapeHtml(c.liveText) : "") },
+    { key: "status", label: "Status", cell: (c) => badgeForJoinStatus(c.row.join_status, c.row.join_note) },
+    {
+      key: "slip",
+      label: "",
+      cell: () => '<button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">&#127917;</button>',
+    },
+  ];
+
+  function renderBlotterHeader() {
+    return BLOTTER_COLUMNS.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
+  }
+
   function renderBlotterRow(row, game) {
     const normalized = normalizeGameState(game.game_state);
     const oddsText = row.odds !== null && row.odds !== undefined ? String(row.odds) : "";
@@ -543,27 +588,33 @@
     const headshot = row.headshot_url
       ? `<img class="board-blotter__headshot" src="${escapeHtml(row.headshot_url)}" alt="" loading="lazy" />`
       : "";
-    return `
-      <tr ${rowAttrs}>
-        <td><span class="board-badge board-badge--${gameStateBadgeClass(normalized)}">${escapeHtml(gameStateLabel(normalized))}</span></td>
-        <td>
-          <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
-          <div class="board-blotter__meta">${escapeHtml(game.matchup || "")}</div>
-        </td>
-        <td>${escapeHtml(propLine || "-")}</td>
-        <td>${oddsText ? escapeHtml(oddsText) : "&mdash;"}</td>
-        <td>${projectedValue !== null ? escapeHtml(projectedValue) : "&mdash;"}</td>
-        <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
-        <td>${oddsMovementValue !== null ? escapeHtml(oddsMovementValue) : "&mdash;"}</td>
-        <td>${closingLineValue !== null ? escapeHtml(closingLineValue) : "&mdash;"}</td>
-        <td class="${rowIsModelFavored(row) ? "board-blotter__model-cell--favored" : ""}">${modelValue ? escapeHtml(modelValue) : "&mdash;"}${rowIsModelFavored(row) ? ' <span class="board-badge board-badge--model-favored" title="The sim favors this side">Model</span>' : ""}</td>
-        <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
-        <td>${badgeForJoinStatus(row.join_status, row.join_note)}</td>
-        <td>
-          <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">&#127917;</button>
-        </td>
-      </tr>
-    `;
+
+    const ctx = {
+      row, game, normalized, oddsText, lineText, modelValue, projectedValue,
+      liveText, lineMovementValue, oddsMovementValue, closingLineValue,
+      title, propLine, headshot,
+    };
+
+    const cells = BLOTTER_COLUMNS.map((col) => {
+      const content = col.cell(ctx);
+      // EMPTY IS MARKED, NOT RENDERED AS AN EM-DASH AND FORGOTTEN. On desktop a
+      // blank cell still needs the dash so the grid reads as a grid. On a phone
+      // each cell becomes its own labelled line, and a card of nine "Closing —"
+      // rows is worse than no card -- so the mobile rules hide these, and they
+      // can only be hidden if they are identifiable.
+      const empty = !content;
+      const classes = [
+        `board-blotter__cell board-blotter__cell--${col.key}`,
+        empty ? "board-blotter__cell--empty" : "",
+        typeof col.className === "function" ? col.className(ctx) : (col.className || ""),
+      ].filter(Boolean).join(" ");
+      // `data-label` is what the mobile card shows beside the value. Carried on
+      // every cell rather than injected by CSS `nth-child`, which silently
+      // relabels everything the moment a column moves.
+      return `<td class="${classes}" data-label="${escapeHtml(col.label)}">${empty ? "&mdash;" : content}</td>`;
+    }).join("");
+
+    return `<tr ${rowAttrs}>${cells}</tr>`;
   }
 
   function renderCardsView(container) {
@@ -588,7 +639,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Odds move</th><th>Closing</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
+            <tr>${renderBlotterHeader()}</tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
         </table>

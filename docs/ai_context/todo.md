@@ -1,5 +1,60 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#526` — **The blotter had no mobile layout at all: a 880px table panned sideways on a 390px phone. Now a labelled card per row. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user report
+
+`table.board-blotter` carries `min-width: 880px` inside an `overflow-x: auto`
+wrapper, and there was **no `@media` rule for it anywhere**. On a 390px viewport
+that is a table 2.25x the screen: every row has to be panned sideways to read,
+and the columns a reader actually wants — odds, model, edge — start off the right
+edge.
+
+**WHY IT NEVER READ AS BROKEN.** The horizontal scroll made every column
+*reachable*, so the view was never empty, never errored and never looked
+obviously wrong in a screenshot. It was simply unusable one-handed, which is the
+only way anyone reads a board standing up. Reachable is not usable, and a
+wrapper with `overflow-x: auto` is exactly the thing that hides the difference.
+
+**THE FIX.** Below 720px the table stops being a table: each row becomes a card,
+each cell a labelled line. Semantics are untouched — still a real `<table>` with
+real headers, so sorting, the slip buttons and assistive tech keep working, and
+`thead` is CLIPPED rather than `display: none` so the header semantics survive.
+
+Three things the card needs that the grid did not, all of them measured choices:
+
+- **Empty cells are hidden.** Most rows carry a value for two or three of the ten
+  data columns. As labelled lines the placeholders would triple the card's height
+  to say nothing — the harness measured a row at **362px** before and **150px**
+  after. An em-dash earns its place in a grid, where the column has to line up;
+  in a card it does not. CSS cannot detect an em-dash, so the emptiness is
+  class-marked at render.
+- **`entity` is exempt from that rule**, because it is the only thing that says
+  WHICH bet the card is.
+- **`state` and `slip` are not label/value pairs** — a badge and a button, both on
+  the card's top line.
+
+**A LATENT BUG FIXED ON THE WAY.** The twelve `<th>` and the twelve `<td>` were
+two hand-maintained parallel lists with nothing tying them together: insert a
+column in one and every heading right of it sits over the wrong data, and the
+page still renders. The mobile card needed the label a THIRD time, which would
+have made the drift worse — so the columns are now declared once
+(`BLOTTER_COLUMNS`) and the header and the row are both generated from them.
+
+**MEASURED** (Chromium, real `board_cards.css`):
+
+    390px   before  page_overflows=True   12/12 dash-cells visible   row 362px
+            after   page_overflows=False   0/12 dash-cells visible   row 150px
+    1440px  before  and after IDENTICAL: td display table-cell, dashes retained,
+            row 45px, min-width:880px still in force
+
+**NOT MEASURED ON THE REAL PAGE, and that is a real gap.** The local mirror has
+no blotter rows, so `/mlb` renders no table at all here and the numbers above come
+from a harness that loads the real stylesheet against hand-built markup. The
+direction is solid and desktop is provably unchanged; the exact pixel figures are
+indicative. `tests/js/blotter_mobile_contract.test.mjs` (20 assertions, 17 fail
+against the pre-change files) exists to cover what the harness cannot: that the
+JS actually emits the classes and `data-label` the stylesheet selects on. Nothing
+in a browser fails loudly if those drift — the card just renders unlabelled.
+
 ### `#525` — **The board's row budget is now the WHOLE board's, and a payload that will not fit sheds its worst rows instead of freezing. The NCAAF cliff is removed by construction. FIXED IN CODE, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user request
 
 > **RENUMBERED from `#524`, the FIFTH id collision today.** A peer took 524

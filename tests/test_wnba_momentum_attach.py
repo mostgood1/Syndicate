@@ -110,6 +110,35 @@ def test_an_artifact_form_id_still_joins_by_matchup(artifact_root) -> None:
     assert games[0]["shared_momentum"]["label"] == "NYL pressure"
 
 
+def test_espn_LA_joins_the_cards_LAS(artifact_root) -> None:
+    """**THE SECOND PRODUCTION MISS, pinned.** Measured 01:49:50Z:
+
+        card_away_home  = [('IND','NYL'), ('ATL','PHX'), ('CON','LAS')]
+        block_away_home = [('-','-'),                    ('CON','LA')]
+
+    ESPN says `LA` for the Los Angeles Sparks; this module's own vocabulary
+    says `LAS`. Away matched, home did not -- a vocabulary mismatch, not a
+    semantics one. `_canonical_wnba_tri` already existed for exactly this and
+    the join simply was not using it.
+    """
+    block = _block(-2.5, home_tri="LA", away_tri="CON")     # ESPN spelling
+    root = artifact_root([{"games": {"401857165": block}}])
+    games = [_game("CON@LAS", away="CON", home="LAS")]      # card spelling
+    assert _attach(games, root) == 1
+    assert games[0]["shared_momentum"]["label"] == "CON pressure"
+
+
+def test_normalising_never_swaps_which_side_is_home(artifact_root) -> None:
+    """Normalising maps two spellings of ONE team onto each other. It must not
+    become an unordered match, which would find a block whose home is the
+    card's away and draw the chart mirrored."""
+    block = _block(-2.5, home_tri="LA", away_tri="CON")
+    root = artifact_root([{"games": {"401857165": block}}])
+    reversed_card = [_game("LAS@CON", away="LAS", home="CON")]
+    assert _attach(reversed_card, root) == 0               # fails closed
+    assert "shared_momentum" not in reversed_card[0]
+
+
 def test_the_event_id_still_wins_over_the_matchup(artifact_root) -> None:
     """The id is exact; the matchup assumes one meeting per date. Order matters
     and the fallback must never shadow a real key."""
