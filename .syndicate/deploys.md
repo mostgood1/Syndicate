@@ -24196,3 +24196,38 @@ window recorded in this ledger is 10-19 minutes. It may be nothing more than the
 rollover, and this is the first rollover observed at 400 rows/sport with four
 sports live. If the next check still shows none, that is a finding in its own
 right and not a slow build.
+
+### FOLLOW-UP 01:23Z — the missing measurement is a RESTART RATE problem, not a slow build
+
+Still no `LAYER2_BOARD_HEALTH` 34 minutes after `33bd5150` went live, and the
+reason is visible in the instance id rather than in any error. refresh-worker
+instances tonight, in order:
+
+    k9x6c -> g94l9 -> 76gjr -> sxsww -> fw947 -> wl6f8 -> mvkzn
+
+**Seven instances.** Between mine and peers', refresh-worker was replaced roughly
+every 20 minutes all evening. The cold-boot shortlist cadence recorded in this
+ledger is **10-19 minutes**, so restarts have been arriving on the same order as
+the time the worker needs to produce its first shortlist. Each one resets the
+clock, and the build that was 26 minutes in at 01:15Z (`cards_context_end`,
+memory 92.3%) was thrown away before it reached the shortlist.
+
+So the pending readings for `#523` and `#525` are pending because the worker has
+not been allowed to finish a cycle, not because the fixes did nothing and not
+because it is wedged: at 01:23Z the new instance is healthy (65.7% memory, down
+from 92.3%) and already rebuilding the soccer board contract.
+
+**THIS IS THE OPERATIONAL FINDING, and it outranks either fix for the next
+session.** A worker whose first useful output takes 10-19 minutes cannot be
+deployed every 20 and still be measured — and tonight *every* verification in
+this file had to wait on a window that kept being cut short. Deploy verification
+and deploy frequency are in direct tension here, and nothing currently arbitrates
+them: the claim serialises deploys but says nothing about leaving room for the
+thing the previous deploy was supposed to prove.
+
+Cheapest next step is to check whether that cadence is inherent or incidental --
+the 2026-08-23 rollover build is genuinely expensive and tonight was unusually
+busy, so this may be a bad evening rather than a standing property. Either way it
+should be measured before the next round of deploys, because it is the reason
+tonight produced fixes that are shipped and unproven rather than shipped and
+verified.
