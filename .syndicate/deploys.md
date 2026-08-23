@@ -23994,14 +23994,50 @@ That disagreement was a property of the toy, not the design; on 105 events and
 axes measure the same underlying quantity** — which is exactly what Phase C's
 sweep is supposed to exploit.
 
-### STILL NOT PROVEN BY THIS LINE
+### CHECK #2, 00:04:07Z — THE SERIES ADVANCES, AND IT RETIRES THE CLOCK RISK
 
-The **tenths-format clock path** (`_normalize_clock`, for ESPN's `"48.6"` under
-1:00). 105 events across two quarters must have traversed the last minute of
-Q1, and nothing crashed — but a silent drop looks identical to an absence of
-events there, which is the whole failure mode that function exists to prevent.
-`events=105` has no baseline to be compared against. Unproven, not disproven;
-it needs a row-level read of the jsonl, which is Phase C's first act.
+      SHAPE event=401857164 events=117 as_of_s=1198.0 as_of_poss=83.32
+        sec_pts=20 sec_now=-3.0349 poss_pts=42 poss_now=-2.6352
+        narrator=yes narrator_events=57
+
+A single reading cannot show a series ADVANCING; this one does, on every axis,
+over 304s of wall clock: events 105 → 117, `as_of_s` +55s of game clock,
+`as_of_poss` +4.64, narrator 53 → 57. Both sample counts re-derive exactly at
+the new values (`floor(1198/60)+1 = 20`, `floor(83.32/2)+1 = 42`). Nothing is
+frozen, nothing is recomputed from scratch wrongly.
+
+**The two axes moved together: `sec_now` ×4.54, `poss_now` ×5.00.** The away
+side went on a run and both axes registered it at nearly the same relative
+magnitude. Combined with their sign agreement in check #1, that is now two
+independent observations that the seconds and possessions axes track the same
+underlying quantity.
+
+**AND `as_of_s=1198.0` RETIRES THE FINAL-MINUTE RISK.** WNBA quarters are 10
+minutes, so Q2 ends at 1200s: an event at 1198.0 is an event with **0:02 left
+in the half**. The failure mode `_normalize_clock` exists to prevent — every
+event inside the last minute of a period silently dropped, leaving a
+plausible-looking series with a hole exactly where pressure matters most — is
+therefore NOT happening. Final-minute events are being captured.
+
+**A CORRECTION TO WHAT I WROTE AN HOUR AGO.** The 23:59Z entry said the tenths
+path was "unproven"; I then went looking to prove it and found the question was
+posed wrongly. `as_of_s=1198.0` is consistent with BOTH `_normalize_clock`
+converting a tenths string `"2.0"` AND with ESPN having sent `"0:02"` with a
+colon, which `basketball_elapsed_minutes` parses unaided. The reading cannot
+distinguish the two paths — but it does not need to, because the risk was never
+"which branch runs", it was "are these events lost". They are not.
+
+What remains is a code-coverage curiosity, not a data-integrity one, and it is
+DOWNGRADED from a Phase C blocker to a note.
+
+**Also worth recording: the tenths premise has no measurement behind it in this
+repo.** `_normalize_clock`'s docstring asserts ESPN switches format under 1:00.
+Nothing else in the codebase corroborates it, and the tracked mirror cannot:
+`live_pbp_stats_*.jsonl` persists only aggregates under a single `payload` key —
+**0 clock values across 37 files** — which is the very gap `#514` was filed to
+close. The premise came from general knowledge of the feed, not from data here.
+The function is harmless either way (a colon string passes straight through),
+but the docstring should not read as though it were measured.
 
 **WHY THIS SHIPPED MID-GAME.** The artifact has been capturing since 23:19:54Z
 and nothing has read its CONTENT. `with_series=1` proves a series was built,
