@@ -607,23 +607,13 @@ def _scheduled_status_line(game: dict[str, Any], fallback: str) -> str:
 
 
 def _looks_terminal_status_text(text: str) -> bool:
-    lowered = str(text or "").strip().lower()
-    if not lowered:
-        return False
-    return any(
-        token in lowered
-        for token in (
-            "final",
-            "finished",
-            "complete",
-            "full time",
-            "ft",
-            "postponed",
-            "cancelled",
-            "canceled",
-            "suspended",
-        )
-    )
+    """Substring matching here made `"ft"` match `"hal[ft]ime"` — see
+    `shared/status_text.py`. A halftime game read as terminal on the home
+    board for exactly the same reason it did on the WNBA card."""
+    from syndicate.features.shared.status_text import TERMINAL_TOKENS
+    from syndicate.features.shared.status_text import looks_terminal_status_text
+
+    return looks_terminal_status_text(text, tokens=TERMINAL_TOKENS)
 
 
 def _nba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
