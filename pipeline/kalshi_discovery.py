@@ -116,6 +116,33 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
     for series, example in list((report.get("series_examples") or {}).items())[:15]:
         print(f"[kalshi_discovery] SERIES {series} :: {example}", flush=True)
 
+    # THE WORK QUEUE FOR COVERING MORE SPORTS, and the reason this whole call is
+    # worth making. `LISTED` says what Kalshi has; this says what of it we
+    # cannot price yet AND WHY, which are different jobs: `unmapped_series`
+    # means add a `kalshi_catalogue` registry line, while
+    # `stat_not_in_market_vocabulary` means add a `market_keys` entry. Series we
+    # have already decided not to cover are excluded, or the queue drowns in
+    # Japanese baseball every single day and stops being read.
+    try:
+        from syndicate.features.shared.kalshi_catalogue import unmapped_series
+
+        gaps = unmapped_series(report.get("markets") or [])
+        print(f"[kalshi_discovery] COVERAGE_GAPS series={len(gaps)}", flush=True)
+        for series, info in list(gaps.items())[:12]:
+            print(
+                "[kalshi_discovery] GAP"
+                f" series={series}"
+                f" count={info.get('count')}"
+                f" reason={info.get('reason')}"
+                f" detail={info.get('detail')}"
+                f" sample={info.get('sample_title')!r}",
+                flush=True,
+            )
+    except Exception as exc:
+        # Non-fatal: the queue is a convenience and must not cost the discovery
+        # report that is already in hand.
+        print(f"[kalshi_discovery] GAPS_FAILED {type(exc).__name__}: {exc}", flush=True)
+
     # TRUE COUNTS PER SERIES. The unfiltered listing truncates before it reaches
     # most single markets, so its per-series numbers are floors, not counts.
     # Asking for each series by name is the only way to know what Kalshi really

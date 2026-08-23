@@ -398,3 +398,113 @@ def test_the_run_states_the_limits_it_applied(monkeypatch):
     result = runner.run_execution("2026-08-22")
     assert result["limits"]["mode"] == "paper"
     assert result["spent"]["orders"] == 1
+
+
+# --------------------------------------------------------------------------
+# The commit's live bet-status block -- which never once ran
+# --------------------------------------------------------------------------
+
+
+def test_the_commit_populates_live_bet_status(monkeypatch, capsys):
+    """MEASURED 2026-08-23T17:12:31Z, every cycle:
+
+        [portfolio_commit] BET_STATUS_FAILED date=2026-08-23
+          error=cannot access local variable '_load_ledger_for_clv'
+                where it is not associated with a value
+
+    The block called a name bound by a `from ... import ... as` TWENTY LINES
+    BELOW it. Python treats a name assigned anywhere in a function as local for
+    the whole function, so the read raised `UnboundLocalError` on every run --
+    swallowed by the block's own `except`, printed as a FAILED line nobody was
+    grepping for, and rendered on the page as an honest-looking blank.
+
+    A feature that looks installed and has never executed is the failure mode
+    this repo keeps rediscovering, so this test runs the real code path.
+    """
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    runner.run_execution("2026-08-22")
+
+    from pipeline import portfolio_commit as commit
+
+    capsys.readouterr()
+    result = commit.run_portfolio_commit("2026-08-22")
+    printed = capsys.readouterr().out
+
+    assert "BET_STATUS_FAILED" not in printed, printed
+    # Present, and reached far enough to have counted the orders it was given.
+    assert "bet_status" in (result.get("plan") or {})
+
+
+# --------------------------------------------------------------------------
+# The live adapter -- the seam money goes through
+# --------------------------------------------------------------------------
+
+
+def test_live_mode_against_a_venue_with_no_adapter_stops_with_a_reason(monkeypatch):
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "draftkings")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    # Falling through to a paper fill wearing a live `mode` would put a record
+    # in the ledger claiming money moved when none did.
+    assert result["status"] == "skipped"
+    assert result["reason"] == "no_adapter_for_venue:draftkings"
+    assert ledger_summary("2026-08-22")["orders"] == 0
+
+
+def test_paper_mode_never_builds_a_submitter(monkeypatch):
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    def explode(_venue):
+        raise AssertionError("paper mode built a venue submitter")
+
+    monkeypatch.setattr(runner, "_venue_submitter", explode)
+    # Paper and live must not differ in the one seam that matters, and the way
+    # to guarantee that is for paper to have no adapter at all.
+    assert runner.run_execution("2026-08-22")["placed"] == 1
+
+
+def test_the_order_carries_the_contract_the_position_was_priced_on(monkeypatch):
+    position = {
+        "position_key": "p1",
+        "sport": "mlb",
+        "event_id": "e1",
+        "market": "strikeouts",
+        "side": "over",
+        "price": -110.0,
+        "stake_dollars": 5.0,
+        "venue_ticker": "KXMLBKS-26AUG24ABBOTT-7",
+    }
+    from pipeline.execute_portfolio import _order_from_position
+
+    request = _order_from_position(position, "2026-08-24", "kalshi")
+    assert request.venue_ticker == "KXMLBKS-26AUG24ABBOTT-7"
+
+
+def test_a_position_with_no_contract_yields_an_order_the_adapter_refuses(monkeypatch):
+    from pipeline.execute_portfolio import _order_from_position
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, order_body
+
+    request = _order_from_position(
+        {
+            "position_key": "p1", "sport": "mlb", "event_id": "e1",
+            "market": "strikeouts", "side": "over", "price": -110.0, "stake_dollars": 5.0,
+        },
+        "2026-08-24",
+        "kalshi",
+    )
+    assert request.venue_ticker is None
+    # Refused by name rather than resolved at submit time from a catalogue that
+    # may have moved since we priced.
+    with pytest.raises(OrderBuildError) as excinfo:
+        order_body(request, price_dollars=0.62)
+    assert "no_venue_ticker" in str(excinfo.value)

@@ -87,6 +87,14 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         game_pk=(str(position.get("game_pk")).strip() or None)
         if position.get("game_pk") is not None
         else None,
+        # THE EXCHANGE CONTRACT, stamped by `venue_scope` at decision time from
+        # the same match that supplied the price. None on an unrestricted row --
+        # there is no single contract when the price came from an aggregator's
+        # best-of-many, which is exactly why the Kalshi adapter refuses without
+        # one rather than picking a plausible ticker at submit time.
+        venue_ticker=(str(position.get("venue_ticker")).strip() or None)
+        if position.get("venue_ticker")
+        else None,
     )
 
 
@@ -194,7 +202,30 @@ def run_execution(
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 
-    from syndicate.features.shared.execution_guard import check_order, limits, spent_today
+    from syndicate.features.shared.execution_guard import (
+        check_order,
+        guarded_submit,
+        limits,
+        spent_today,
+    )
+
+    # THE VENUE ADAPTER. `None` in paper mode -- `place_order` never calls it
+    # there, and passing one would make paper and live differ in the one seam
+    # that must not differ.
+    #
+    # Wrapped in `guarded_submit` so the kill switch is re-checked with nothing
+    # between the check and the call: a switch pulled during a twelve-order loop
+    # has to stop order four, not order one.
+    submitter = None
+    if mode == LIVE:
+        submitter = _venue_submitter(venue)
+        if submitter is None:
+            return {
+                "status": "skipped",
+                "reason": f"no_adapter_for_venue:{venue}",
+                "date": normalized,
+            }
+        submitter = guarded_submit(submitter)
 
     caps = limits(mode)
     # Seeded ONCE from the ledger and then incremented per placement. Seeded
@@ -239,7 +270,7 @@ def run_execution(
                 skipped += 1
                 continue
 
-        record = place_order(request)
+        record = place_order(request, submit=submitter)
         if before is not None:
             duplicates += 1
             continue
@@ -280,6 +311,53 @@ def run_execution(
         "limits": caps,
         "summary": summary,
     }
+
+
+def _venue_submitter(venue: str):
+    """The adapter that actually places an order at `venue`, or None.
+
+    NAMED PER VENUE and refused when absent, rather than defaulting to
+    something. A live run against a venue with no adapter must stop with a
+    reason, not fall through to a paper fill wearing a live `mode` -- that would
+    put a record in the ledger claiming money moved when none did, which is
+    worse than either outcome on its own.
+    """
+    name = str(venue or "").strip().lower()
+    # `paper:kalshi` and friends never reach here: `place_order` only calls a
+    # submitter in LIVE mode, and those venues exist only in paper.
+    if name == "kalshi":
+        from syndicate.features.shared.kalshi_orders import kalshi_submitter
+
+        return kalshi_submitter(_kalshi_price_for)
+    return None
+
+
+def _kalshi_price_for(request) -> float | None:
+    """The CURRENT Kalshi ask for this contract, in dollars.
+
+    Re-read at submit time rather than taken from the plan, and that is
+    deliberate even though the plan's price is what the EV was computed from:
+    the limit price we send has to be one Kalshi is actually showing, or the
+    order rests unfilled. The gap between the two IS the slippage, and
+    `execution_ledger` records both so it stays visible.
+    """
+    from syndicate.features.shared.kalshi_client import dollars_to_probability
+    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+    ticker = str(getattr(request, "venue_ticker", "") or "").strip()
+    if not ticker:
+        return None
+    try:
+        payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json") or {}
+    except Exception:
+        return None
+    for market in payload.get("markets") or []:
+        if str(market.get("ticker") or "") != ticker:
+            continue
+        side = str(getattr(request, "side", "") or "").strip().lower()
+        key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
+        return dollars_to_probability(market.get(key))
+    return None
 
 
 def _status_of(request: OrderRequest) -> str | None:

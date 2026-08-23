@@ -5228,7 +5228,36 @@ class IntelligenceStateService:
                             f"venue={venue_scope} error={exc}",
                             flush=True,
                         )
-            elif commit_result.get("reason") not in {"disabled", "no_shortlist"}:
+            # GRADE WHAT IS ALREADY DECIDED. Runs regardless of whether a commit
+            # happened this cycle -- yesterday's bets settle long after
+            # yesterday's plan stopped being written, and gating grading on a
+            # fresh commit is how `settled_count` stays 0 forever.
+            #
+            # TODAY AND YESTERDAY, because a night game finishes after midnight
+            # UTC and its orders are filed under the previous slate date
+            # (`#370`, again). Cheap to repeat: a graded order is skipped before
+            # the resolver is asked, so a re-run costs no feed lookups.
+            try:
+                from datetime import date as _date
+                from datetime import timedelta as _timedelta
+
+                from syndicate.features.shared.paper_settlement import settle_orders
+
+                _today = str(selected_date or "").strip()
+                _dates = [_today]
+                try:
+                    _dates.append(
+                        (_date.fromisoformat(_today) - _timedelta(days=1)).isoformat()
+                    )
+                except ValueError:
+                    pass
+                for _settle_date in _dates:
+                    if _settle_date:
+                        settle_orders(_settle_date)
+            except Exception as exc:
+                print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
+
+            if commit_result.get("reason") not in {"disabled", "no_shortlist"} and commit_result.get("status") != "ok":
                 # `disabled` and `no_shortlist` are the expected quiet states and
                 # would be pure noise every cycle. Anything else is a real
                 # refusal and must be readable.

@@ -133,6 +133,15 @@ _LEAN_FIELDS = (
     # from a catalogue that may have moved -- so the thing we priced and the
     # thing we buy could differ with nothing recording that they did.
     "venue_ticker",
+    # HOW THE BET ACTUALLY WENT. Distinct from `status` (what the ORDER did at
+    # the venue) and from `settled_at` (when the ORDER reached a terminal state,
+    # stamped seconds after a paper fill and hours before the game ends).
+    # Conflating those two is the reason `settled_count` read 0 while orders
+    # were filling normally: nothing had ever graded a WAGER.
+    "outcome",
+    "pnl_dollars",
+    "settled_value",
+    "graded_at",
     "requested_price",
     "requested_stake_dollars",
     "submitted_at",
@@ -322,6 +331,13 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "opening_key": request.opening_key,
         "game_pk": request.game_pk,
         "venue_ticker": request.venue_ticker,
+        # Ungraded until something grades it. `None` rather than absent so the
+        # field is present on every record and a summary cannot mistake "no such
+        # key" for "not settled yet".
+        "outcome": None,
+        "pnl_dollars": None,
+        "settled_value": None,
+        "graded_at": None,
         "requested_price": request.requested_price,
         "requested_stake_dollars": request.requested_stake_dollars,
         "submitted_at": _utc_now(),

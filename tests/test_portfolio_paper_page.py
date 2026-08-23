@@ -581,3 +581,94 @@ def test_the_commit_carries_the_venue_scope_fields_onto_the_position():
     # show the price cost of the venue restriction.
     for field in ("unrestricted_price", "unrestricted_ev_pct", "unrestricted_bookmaker"):
         assert f'"{field}": ' in source, f"{field} is not carried onto the position"
+
+
+# --------------------------------------------------------------------------
+# Settled performance -- the number `settled_count = 0` was hiding
+# --------------------------------------------------------------------------
+
+
+def test_the_payload_carries_a_settlement_summary(paper_env):
+    payload = _payload(paper_env)
+    assert "settlement" in payload
+    assert payload["settlement_error"] is None
+
+
+def test_nothing_settled_shows_no_record_rather_than_a_zero_zero_one(app_client, paper_env):
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    # A 0-0 record and "nothing has settled" are different claims, and only one
+    # of them is true here.
+    assert "nothing has settled yet" in body
+
+
+def test_a_graded_order_reaches_the_page(app_client, paper_env):
+    paper_env["plan"] = _plan(positions=[_position()])
+    paper_env["orders"] = [_order(outcome="won", pnl_dollars=9.09, fill_stake_dollars=10.0)]
+
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    assert "Settled record" in body
+    assert "+9.09" in body
+
+
+def test_an_unreadable_grade_is_never_rendered_as_a_zero_zero_record(app_client, paper_env, monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("ledger unreadable")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.paper_settlement.settlement_summary", boom
+    )
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    # "We cannot see the record" must not look like "the record is 0-0".
+    assert "grades unreadable" in body
+
+
+# --------------------------------------------------------------------------
+# Date navigation -- the route always accepted ?date=, nothing could click it
+# --------------------------------------------------------------------------
+
+
+def test_the_page_offers_a_way_to_reach_yesterday(app_client, paper_env):
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    # Without a control the page could only ever show today, so yesterday's
+    # settled bets were unreachable from the UI that exists to show them.
+    assert 'href="/portfolio/paper?date=2026-08-21"' in body
+    assert 'type="date"' in body
+
+
+def test_there_is_no_forward_link_on_today(app_client, paper_env):
+    from syndicate.blueprints.intelligence import central_today_iso
+
+    payload = intelligence_bp._paper_portfolio_payload(central_today_iso())
+    assert payload["is_today"] is True
+    # A control that navigates to a day which cannot have data teaches the
+    # reader the page is broken.
+    assert payload["next_date"] is None
+
+
+def test_a_past_date_can_step_forward_but_not_past_today(paper_env, monkeypatch):
+    payload = intelligence_bp._paper_portfolio_payload(DATE)
+    assert payload["prev_date"] == "2026-08-21"
+    assert payload["next_date"] == "2026-08-23"
+    assert payload["is_today"] is False
+
+
+def test_an_unparseable_date_still_renders_without_arrows(paper_env):
+    payload = intelligence_bp._paper_portfolio_payload("not-a-date")
+    assert payload["prev_date"] is None
+    assert payload["next_date"] is None
+
+
+def test_the_all_dates_record_spans_every_slate(paper_env):
+    paper_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-21", outcome="won",
+               pnl_dollars=9.0, fill_stake_dollars=10.0),
+        _order(idempotency_key="k2", selected_date=DATE, outcome="lost",
+               pnl_dollars=-10.0, fill_stake_dollars=10.0),
+    ]
+    payload = _payload(paper_env)
+
+    # The day's figure answers "how did Saturday go"; it cannot answer "is this
+    # working", and adding days up by eye is a chore that produces a guess.
+    assert payload["settlement"]["total"]["settled"] == 1
+    assert payload["settlement_all_time"]["total"]["settled"] == 2
+    assert payload["settlement_all_time"]["total"]["pnl_dollars"] == -1.0

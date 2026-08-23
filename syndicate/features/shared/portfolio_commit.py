@@ -439,6 +439,14 @@ def commit_portfolio(
                 # be looked up at all, which is what stopped `bet_status` from
                 # having a resolver. Copied from whichever field the row
                 # carries -- `gamePk` on MLB/NFL rows, `game_id` elsewhere.
+                # DELIBERATELY NOT `row.get("game_pk")`, which the board sets
+                # from `event_id` -- the OddsAPI hash, a different id space from
+                # StatsAPI's numeric gamePk (`intelligence_contracts` documents
+                # the split). Stamping it would produce a field that LOOKS
+                # populated and is the wrong id, which is worse than None:
+                # `bet_status_mlb` can recover a real gamePk from the matchup,
+                # but only if it is not handed a plausible-looking wrong one
+                # first. Leave this None when the row has no native id.
                 "game_pk": row.get("gamePk") or row.get("game_id") or None,
                 "side": row.get("side"),
                 "line": row.get("line"),
@@ -472,6 +480,10 @@ def commit_portfolio(
                 "unrestricted_bookmaker": row.get("unrestricted_bookmaker"),
                 "venue": row.get("venue"),
                 "price_source": row.get("price_source"),
+                # The exchange contract this position would be placed on. None
+                # on an unrestricted row -- there is no single contract when the
+                # price came from an aggregator's best-of-many.
+                "venue_ticker": row.get("venue_ticker"),
                 "model_probability": round(inputs.model_probability, 5),
                 "market_fair_probability": round(inputs.market_fair_probability, 5),
                 "price_reliability": round(inputs.price_reliability, 5),

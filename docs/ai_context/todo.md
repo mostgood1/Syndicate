@@ -1,5 +1,254 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#532` — **Live bet status NEVER ONCE RAN: a name bound twenty lines below its use, swallowed by the block's own `except` every cycle since it was written. FIXED, TESTED AGAINST THE REAL PATH.** — lane `portfolio-decision-and-execution`, 2026-08-23
+
+**Measured 2026-08-23T17:12:31Z**, every cycle:
+
+```
+[portfolio_commit] BET_STATUS_FAILED date=2026-08-23
+  error=cannot access local variable '_load_ledger_for_clv'
+        where it is not associated with a value
+```
+
+The block called `_load_ledger_for_clv()`; that name is bound by a
+`from ... import ... as` **twenty lines further down**, in the ORDER_CLV block.
+Python treats a name assigned anywhere in a function as local for the whole
+function, so the read raised `UnboundLocalError` **on every run since the day it
+was written**.
+
+**This is why the user's report survived a correct fix.** `#522`-era work
+threaded `game_pk` through to this block precisely because "I don't see anything
+indicating status of the bet" — and the block was not executing. Diagnosis
+right, fix right, and neither could ever show.
+
+**The shape is the lesson.** A broad `except` + a `FAILED` log line + a page
+column that renders a plausible blank is indistinguishable from "installed and
+quiet". Nothing was red. The suite was green — because every test for
+`bet_status` exercised `statuses_for_orders` directly and none ran the commit
+path that calls it.
+
+**The test now runs the real path**, and it was verified by REINTRODUCING the
+bug and watching it fail. A green test that has never been seen red is a claim,
+not evidence.
+
+**Also shipped:** `unmapped_market` is now reported with the market NAMES beside
+it (`UNMAPPED_MARKETS` line). Fifteen ungraded MLB bets is a number nobody can
+act on; the names are the difference between "add five mappings" and guessing at
+which five.
+
+**Deliberately NOT fixed:** the five likely mappings (singles, doubles, walks,
+strikeouts, stolen bases) need `box_score_stats._HITTER_STAT_FIELDS` extended
+too — it carries only hits/runs/rbi/home_runs/total_bases — and that reader is
+shared with settlement and `build_mlb_actuals`. Extending it on a guess about
+StatsAPI field names is the unverified-schema mistake this integration has
+already paid for twice. One production line will name the fifteen.
+
+
+### `#530` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+> **RENUMBERED from `#527`/`#528` — the SIXTH and SEVENTH id collisions today.**
+> A peer took 527, 528 and 529 while this was being written. `learnings.md`
+> already records that two sessions appending to the top of one file cannot
+> allocate ids by reading it; this is the third time it has cost a rename in
+> one session. Code comments and tests renumbered with these entries.
+
+**THE READING** (refresh-worker, three consecutive builds 16:41:16 / 16:47:15 /
+16:49:33Z, after `#523`):
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=1585 projected=188 edged=0
+                         lens_indexed=1008 lens_live_games=7
+                         edge_withheld=188 edge_why={'no_fair_value_devig_failed': 188}
+
+`considered` 0 -> **1585** and `projected` 0 -> **188** confirm `#523` end to end.
+Then every single projected row is withheld, for one reason, **188 of 188**.
+
+**100% ON ONE NAMED REASON IS A BUG, NOT A DISTRIBUTION.** The reason string says
+"the market is one-sided, so de-vig has no answer" — a real thing that happens to
+SOME soccer props and cannot happen to all of them. Reading the RATE rather than
+the reason is the whole diagnosis; the string had been sitting there for a day
+being believed.
+
+**THE CAUSE.** `soccer_projections._price_against_market` computed
+`market_fair_prob_over` BELOW its `live_edge_unavailable_reason` early-return:
+
+    live_reason = live_edge_unavailable_reason(row)
+    if live_reason:
+        projection["edge_vs_market_pct"] = None
+        ...
+        return                                    # <-- here
+    fair = _no_vig_over_probability(row)
+    projection["market_fair_prob_over"] = fair    # <-- never reached, live game
+
+So on a live game soccer never got a fair value AT ALL, and
+`live_projection_join` — holding a genuine LIVE probability from the re-sim,
+which `live_edge_policy`'s own docstring calls "precisely the thing worth
+ranking" — had nothing to price it against.
+
+**THE TWO CLAIMS THE ORDER CONFLATED.** The refusal says a PREGAME MODEL must not
+be priced against a re-priced market. True, and the edge must stay suppressed.
+The fair value is not the model: it is a de-vig of the quote in front of us, a
+property of the MARKET, and it stays valid when the game goes live. Withholding
+it discarded the one input that was still good.
+
+**`prop_projections.py:951` HAS ALWAYS DONE IT IN THE RIGHT ORDER** — fair value
+first, live guard second. That is why MLB's live tier works (`live_proj=252` on
+the same board) and soccer's did not. One rule, two implementations, and only one
+of them right — the same shape as `#523`, one file over.
+
+**Fixed** by hoisting the de-vig above the refusal, after the unknown-leg-set
+refusal (which correctly returns without a fair value, because nothing there can
+confirm a many-legged market's quoted set is complete).
+
+**I HAD THIS WRONG IN WRITING, TWICE.** `#520` and the lane block both recorded
+`#503` as "a PRICING decision, not a bug fix. Deliberately not taken." It is a
+misplaced `return`. What made the difference was `edge_why`, the split I added
+earlier the same day — the correction came from my own instrument, not from
+re-reading the code, and it would not have come at all if the counter had stayed
+a single `no_market_fair_value` total.
+
+**Verify after deploy:** `LIVE_PROJECTION_JOIN sport=soccer edged=` must exceed 0,
+and `edge_why` must stop being `{'no_fair_value_devig_failed': N}` for all N.
+Then `LAYER2_BOARD_HEALTH sport=soccer live_proj=` should follow.
+
+### `#531` — **Soccer's live-prop miss attribution was INERT: three counters and two sample fields were structurally constant. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+Found while reading `#530`'s line. Soccer reported:
+
+    miss_player=0  miss_market=620  miss_line_match=0
+    sample: all 8 rows `player_in_lens: False`, `lens_lines_available: []`
+
+`miss_player=0` and `player_in_lens: False` cannot both be findings, and that
+contradiction is what exposed it. `live_projection_join._has_attribution`
+(`:435`) tests for the PRESENCE of `players_seen` and `lines_by_player_market` on
+the indexed payload; `soccer_live_prop_index` returned neither. So the fallback
+branch fired for every row: everything to the `miss_no_market_alias` catch-all,
+`miss_player` and `miss_line_match` pinned at zero, and both sample fields read
+off empty structures.
+
+**Nothing failed.** The fallback is correct and deliberate — it refuses to invent
+a cause on a legacy payload. The counters simply stopped meaning anything, and
+`miss_market=620` reads as "620 markets we cannot name" while meaning "620 misses
+we could not attribute". Anyone chasing the remaining 1,397 unmatched soccer rows
+would have gone to the alias map for a cause that may be entirely elsewhere.
+
+MLB's builder (`live_projection_join.py:400`) has always emitted both, which is
+why the split works there. Soccer's now does too: `players_seen` recorded BEFORE
+the market loop (presence in the lens is a fact about the PLAYER — recording it
+only on a successful index write would re-merge "never saw this player" with "saw
+them and priced no market"), and `lines_by_player_market` on each indexed line.
+
+**Verify after deploy:** the three counters must stop being `0 / N / 0`, and the
+sample's `player_in_lens` must show BOTH values across a batch. If `miss_player`
+is still exactly 0 with a non-zero `miss_market`, the keys are present and the
+join is genuinely a vocabulary gap — which is then a real finding for the first
+time.
+### `#529` — **The grader could not IDENTIFY a bet: `game_pk` on every order is the OddsAPI hash, not StatsAPI's numeric id. Recovered from the matchup, no backfill. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, follows `#528`
+
+**Measured 2026-08-23T16:00:06Z**, the first run of `#528`'s grader:
+
+```
+SETTLED date=2026-08-22 orders=58 graded=0 ungraded={'no_game_pk': 58}
+SETTLED date=2026-08-23 orders=45 graded=0 ungraded={'no_game_pk': 45}
+```
+
+**100% on both days.** The grading logic was correct and the resolver worked;
+neither could say WHICH GAME a bet was on. `layer2_board.py:1792` sets
+`"game_pk": row.get("event_id")` — the **OddsAPI hash**. StatsAPI's `gamePk` is
+a numeric id in a different space, and `intelligence_contracts` has documented
+the split all along: *"MLB board rows carry a StatsAPI gamePk while quotes carry
+an OddsAPI hash."* `int()` cannot parse a hash, so every bet was unidentifiable.
+
+**The fix recovers from the MATCHUP**, which is the path that same dataclass
+names: the ledger carries `home_team`, `away_team` and `commence_time` on every
+record, so a bet can be found on StatsAPI's own slate. **This fixes the 103
+orders already written**, not just future ones — no backfill, no migration.
+
+- Team names go through `team_aliases.canonical_team`. **Four separate
+  market-name tables drifted apart in this codebase on 2026-08-23 alone**
+  (`#527`, `#528`); a fifth private map for team names would be the same
+  mistake in the same shape.
+- **Doubleheaders are refused, not guessed.** Two games, same teams, same day,
+  and they routinely disagree. Split by start time; an order with no start time,
+  or one matching neither half within an hour, is `ambiguous_doubleheader`.
+- Refusals that look alike are split: `no_matchup_on_order` (record too thin —
+  written before `home_team` joined `_LEAN_FIELDS`) vs `matchup_not_on_schedule`
+  (names or slate disagree) vs `no_schedule_for_date` (artifact missing). Three
+  different jobs, and lumping them would hide how much of the backlog is
+  recoverable.
+- Schedule indexed **once per resolver**: 58 orders must not mean 58 file reads.
+- `mlb.cards` imported **inside** the guard — a 5,700-line module whose import
+  failure must degrade to `no_schedule_for_date`, not kill grading for the run.
+
+**`portfolio_commit` still stamps `None` rather than the row's `game_pk`, and
+now says why.** A field that looks populated and holds the wrong id is WORSE
+than an absent one: the matchup recovery only runs when it is not handed a
+plausible-looking wrong answer first. That comment exists to stop the obvious
+"fix".
+
+**NOT YET MEASURED.** Read the next `[paper_settlement] SETTLED` line. The
+remaining risk is that yesterday's orders predate `home_team` in `_LEAN_FIELDS`,
+which would show as `no_matchup_on_order` — recoverable only for orders written
+after that change. The split reasons exist precisely to answer that question in
+one reading.
+
+
+### `#528` — **`settled_count = 0` was never a data problem: nothing had ever graded a WAGER. Grader built, plus the vocabulary drift that had silently disabled monotone early-decision for every MLB pitcher prop. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, user report ("the paper endpoint didnt reconcile any of the bets that were placed - i want to see how it performed for yestrday")
+
+**The trap that hid it for weeks.** `execution_ledger` stamps `settled_at` in
+`complete_order` — the instant a paper fill is written, **seconds after the bet
+is placed and hours before the game ends**. It means *the ORDER reached a
+terminal state at the venue*, not *the BET was decided*. Every record had one.
+So the ledger looked settled while nothing had ever asked whether a bet won, and
+`#502`'s `settled_count = 0` read as a broken pipeline for as long as it has been
+reported. **Nothing was broken. Nobody had written the grader.** The new field is
+`graded_at` precisely so the two clocks can never be confused again.
+
+**What now exists** (`syndicate/features/shared/paper_settlement.py`):
+
+- Grades only what is DECIDED — a final game, or a monotone market already past
+  its line — and leaves the rest ungraded **with a named reason**. "Not graded
+  yet" and "lost" are the two facts a performance number must never blur.
+- **Grades once, immutably.** A later feed read can differ (a stat correction, a
+  cache miss returning nothing). A ledger that changes its mind about a settled
+  bet is not a record; the immutability is what makes the number quotable.
+- **A push is not a loss.** `resolve_bet_status` reports a final tie as
+  `live_tied` with `decided=True`. Folding that into losses would have
+  understated every figure this produces.
+- **P&L from `fill_price`/`fill_stake_dollars`, never the requested ones.** The
+  difference is slippage; grading against the request credits the strategy with a
+  price it did not get.
+- ROI on **settled stake only** — pending stake would dilute it with bets that
+  have not happened. `None` rather than `0.0` when nothing has settled: 0.0% on
+  zero bets and 0.0% on fifty are the same string and opposite facts.
+
+**THE BUG FOUND WHILE WIRING IT, which is the more important half.**
+`bet_status._MONOTONE_MARKETS` listed `pitcher_strikeouts` and `pitcher_outs`.
+`market_keys` canonicalises those to **`strikeouts`** and **`outs`** (`#224`),
+and the board emits the canonical form — so `is_monotone_market("strikeouts")`
+was **False**. The early-decision mechanism, the entire reason that module
+exists, **has been switched off for every MLB pitcher prop**: silent, tests
+passing, reporting `live_behind` on bets that were already mathematically won.
+
+That is the **third** place this same vocabulary drift appeared in one day
+(`#527` fixed it in the join and in the price resolver). The pattern is now
+explicit: **any module holding its own list of market names will drift from
+`market_keys`.** `test_every_monotone_name_is_the_one_the_board_emits` ties the
+set to `market_keys` so it cannot happen a fourth time. Prefer canonicalising on
+lookup where a sport is available; where it is not (this function takes none),
+hold both spellings AND a test that derives one from the other.
+
+**Wiring:** settlement runs on the worker for **today and yesterday**,
+regardless of whether a commit happened that cycle — yesterday's bets settle long
+after yesterday's plan stops being written, and a night game finishes after
+midnight UTC under the previous slate date (`#370`). Re-running is free.
+
+**NOT YET MEASURED IN PRODUCTION.** Whether yesterday actually grades depends on
+cached final feeds (`fetch_if_missing=False`) and it is **MLB-only** — a
+non-MLB order returns `unmapped_market`. Both are visible in the `ungraded`
+counts rather than as a small number with no explanation. Read
+`[paper_settlement] SETTLED` after the deploy.
+
+
 ### `#527` — **A Kalshi-native board with its own hourly clock, and openings recorded from LOOKAHEAD markets — the first CLV reference that is genuinely early. IN CODE, TESTED, NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request ("this should begin a regular cadence specific to kalshi since we are limited by oddsapi calls. we can even get lookahead lines so we get true opening lines for clv")
 
 **Two problems, one shape.** `#526`-era Kalshi work joined Kalshi's prices to the

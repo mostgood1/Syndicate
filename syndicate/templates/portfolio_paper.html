@@ -198,6 +198,17 @@
 
   @keyframes paper-pulse-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+  .paper-alltime { margin-top: 3px; padding-top: 3px; border-top: 1px dotted var(--cards-border, #384152); }
+  .paper-date { display: inline-flex; align-items: center; gap: 4px; }
+  .paper-date__form { display: inline; margin: 0; }
+  .paper-date__input {
+    font: inherit; font-size: 11px; padding: 1px 4px; border-radius: 4px;
+    border: 1px solid var(--cards-border, #384152);
+    background: var(--cards-surface, #11151d); color: var(--cards-text, #e6e9ef);
+  }
+  .paper-date__arrow { color: var(--cards-accent); text-decoration: none; font-size: 10px; padding: 0 2px; }
+  .paper-date__arrow--off { color: var(--cards-text-dim); opacity: 0.35; }
+  .paper-date__today { font-size: 10px; color: var(--cards-accent); text-decoration: none; }
   .paper-links { font-size: 11px; color: var(--cards-text-dim); margin-left: auto; }
   .paper-links a { color: var(--cards-accent); text-decoration: none; }
   .paper-links a:hover { text-decoration: underline; }
@@ -212,6 +223,9 @@
 {% set marks = p.live_marks or {} %}
 {% set bs = p.bet_status or {} %}
 {% set p2list = p.paper2 or [] %}
+{% set settlement = p.settlement or {} %}
+{% set settlement_error = p.settlement_error %}
+{% set alltime = (p.settlement_all_time or {}).get('total') or {} %}
 
 {# One renderer for the live mark, shared by the positions table and the orphan
    table. Movement is ALWAYS probability points from `clv_pct_from_prices` --
@@ -292,9 +306,30 @@
       <span class="paper-flag__label">Execution job</span>
       <span class="paper-flag__value {{ 'on' if p.execution_enabled else 'off' }}" id="paper-flag-exec">{{ 'on' if p.execution_enabled else 'off' }}</span>
     </span>
-    <span class="paper-flag">
+    {# A DATE CONTROL, not a label. The route has always accepted ?date=, but
+       with nothing to click the page could only ever show today -- so yesterday's
+       settled bets were unreachable from the UI that exists to show them. #}
+    <span class="paper-flag paper-date">
       <span class="paper-flag__label">Date</span>
-      <span class="paper-flag__value">{{ p.date or '—' }}</span>
+      {% if p.prev_date %}
+        <a class="paper-date__arrow" href="/portfolio/paper?date={{ p.prev_date }}"
+           title="Previous slate" aria-label="Previous slate">&#9664;</a>
+      {% endif %}
+      <form class="paper-date__form" method="get" action="/portfolio/paper">
+        <input class="paper-date__input" type="date" name="date" value="{{ p.date or '' }}"
+               max="{{ p.today_date }}" onchange="this.form.submit()" aria-label="Slate date">
+      </form>
+      {% if p.next_date %}
+        <a class="paper-date__arrow" href="/portfolio/paper?date={{ p.next_date }}"
+           title="Next slate" aria-label="Next slate">&#9654;</a>
+      {% else %}
+        {# No forward link on today. A control that navigates to a day which
+           cannot have data teaches the reader the page is broken. #}
+        <span class="paper-date__arrow paper-date__arrow--off" aria-hidden="true">&#9654;</span>
+      {% endif %}
+      {% if not p.is_today %}
+        <a class="paper-date__today" href="/portfolio/paper">today</a>
+      {% endif %}
     </span>
     <span class="paper-flag">
       <span class="paper-flag__label">Plan built</span>
@@ -347,6 +382,62 @@
       <div class="paper-tile__label">Filled stake</div>
       <div class="paper-tile__value">${{ "%.2f"|format(ledger.filled_stake_dollars or 0) }}</div>
       <div class="paper-tile__meta">at simulated fill price</div>
+    </div>
+    {# SETTLED PERFORMANCE. Deliberately beside "Bets standing" rather than
+       replacing it: one is where open bets stand right now, the other is what
+       finished bets actually returned, and they answer different questions. #}
+    <div class="paper-tile">
+      <div class="paper-tile__label">Settled record</div>
+      {% set st = settlement.get('total') or {} %}
+      {% if settlement_error %}
+        <div class="paper-tile__value warn">—</div>
+        {# "We cannot see the record" must never render as a 0-0 record. #}
+        <div class="paper-tile__meta">grades unreadable: {{ settlement_error }}</div>
+      {% elif st.get('settled') %}
+        <div class="paper-tile__value">
+          <span class="bet-won">{{ st.get('won', 0) }}W</span> ·
+          <span class="bet-lost">{{ st.get('lost', 0) }}L</span>{% if st.get('push') %} · {{ st.get('push') }}P{% endif %}
+        </div>
+        <div class="paper-tile__meta">
+          {% if st.get('win_pct') is not none %}{{ "%.1f"|format(st.get('win_pct')) }}% · {% endif %}
+          {{ st.get('pending', 0) }} still pending
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">
+          {{ st.get('pending', 0) }} filled bet{{ '' if st.get('pending', 0) == 1 else 's' }} not yet decided
+        </div>
+      {% endif %}
+      {# ACROSS EVERY DATE. A per-day figure answers "how did Saturday go" and
+         cannot answer "is this working" -- and adding days up by eye while
+         clicking through them is a chore that produces a guess. Rendered under
+         the day's record rather than beside it, so the two are never confused
+         for one number. #}
+      {% if alltime.get('settled') %}
+        <div class="paper-tile__meta paper-alltime">
+          all dates: {{ alltime.get('won', 0) }}W-{{ alltime.get('lost', 0) }}L{% if alltime.get('push') %}-{{ alltime.get('push') }}P{% endif %}
+          · <span class="{{ 'pos' if (alltime.get('pnl_dollars') or 0) > 0 else ('neg' if (alltime.get('pnl_dollars') or 0) < 0 else '') }}">{{ "%+.2f"|format(alltime.get('pnl_dollars') or 0) }}</span>
+          {% if alltime.get('roi_pct') is not none %} · {{ "%+.2f"|format(alltime.get('roi_pct')) }}% ROI{% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Profit / loss</div>
+      {% set st = settlement.get('total') or {} %}
+      {% if st.get('settled') %}
+        <div class="paper-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
+          {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}
+        </div>
+        <div class="paper-tile__meta">
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% ROI on{% endif %}
+          ${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        {# A 0.0% ROI on zero settled bets and 0.0% on fifty are the same string
+           and opposite facts, so nothing is shown until something settles. #}
+        <div class="paper-tile__meta">nothing has settled yet</div>
+      {% endif %}
     </div>
     <div class="paper-tile">
       <div class="paper-tile__label">Bets standing</div>

@@ -553,6 +553,54 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 - A handoff carried, as its single next action, a fix whose justification was one OOM: eight sports hydrated at once, "peak = SUM is sufficient on its own to cross 4GiB", "the floor plays no part". I deployed it, then measured two pre-deploy passes of the IDENTICAL shape from the same evening: 8 sports hydrated, peaks 804MB and 613MB, 15-20% of the ceiling, no death.
 - *(evidence in `learnings_evidence.md`)*
 
+## 2026-08-23 — FORBIDDEN: claiming a feature works when no test runs the path that CALLS it
+
+- **The rule going forward:** a feature whose failure mode is `except` + a log
+  line MUST have a test that executes the real call path end to end. Testing the
+  callee directly proves the callee works and says NOTHING about whether anything
+  invokes it. And verify the test by reintroducing the bug: a green test that has
+  never been seen red is a claim, not evidence.
+- **Measured 2026-08-23T17:12:31Z.** `portfolio_commit`'s live bet-status block
+  called a name bound by a `from ... import ... as` twenty lines BELOW it —
+  Python scopes that name local to the whole function, so it raised
+  `UnboundLocalError` on every cycle since the day it was written. Caught by its
+  own `except`, printed as `BET_STATUS_FAILED`, rendered as a plausible blank
+  column. The suite was green throughout: every `bet_status` test called
+  `statuses_for_orders` directly and none ran the commit.
+- **Why it is expensive:** a user reported the symptom, a correct diagnosis was
+  made and a correct fix shipped — into a block that never executed. Both were
+  right and neither could show.
+
+## 2026-08-23 — FORBIDDEN: a module may not hold its own list of market names. It WILL drift from `market_keys`, silently
+
+- **The rule going forward:** market names have exactly one authority,
+  `market_keys.canonical_market_key` (`#224`). Canonicalise on lookup wherever a
+  sport is in hand. Where the function takes no sport and cannot, hold BOTH
+  spellings **and** a test that derives one set from the other — a private list
+  with no such test is a silent time bomb, not a mapping.
+- **Measured 2026-08-23, three separate places in one day.** The board emits the
+  canonical `strikeouts`/`outs`; three modules had been written against
+  `pitcher_strikeouts`/`pitcher_outs`. `kalshi_board_join` matched 0 rows;
+  `_resolver_from_markets` priced none; and worst,
+  `bet_status._MONOTONE_MARKETS` returned False for `strikeouts`, which switched
+  the **entire monotone early-decision mechanism off for every MLB pitcher
+  prop** — silently, with a full green suite, reporting `live_behind` on bets
+  that were already mathematically won.
+- **Why it survives review:** every one of these looks correct in isolation and
+  produces a plausible number rather than an error. The join reports a refusal
+  count; the monotone check reports a live status. Nothing throws.
+
+## 2026-08-23 — FORBIDDEN: never read `settled_at` on an order as "the bet was decided"
+
+- **The rule going forward:** `settled_at` is the ORDER's clock — `complete_order`
+  stamps it when the order reaches a terminal state at the VENUE, seconds after
+  a paper fill and hours before the game ends. The WAGER's clock is `graded_at`,
+  written by `paper_settlement`. Two clocks, two fields, never one.
+- **Measured 2026-08-23.** `#502`'s `settled_count = 0` was read as a broken
+  settlement pipeline for weeks. There was no pipeline: every order carried a
+  `settled_at`, so the ledger *looked* settled, and nothing had ever asked
+  whether a bet won. A missing feature wearing a data problem's clothes.
+
 ## 2026-08-15 — FORBIDDEN: never treat equality of a LABEL as identity of a BET
 
 - **The rule going forward:** every memory number carries a SCOPE — container, process, or thread — and only same-scope numbers may be subtracted. Write the scope next to the figure. `memory.current`/`anon` and `oomKilled` are container; `smaps`, `PYMALLOC_STATS`, `HEAP_CENSUS`, `mallinfo` and `getsizeof` are process; a container with children makes them differ by hundreds of MB.

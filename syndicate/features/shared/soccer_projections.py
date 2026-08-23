@@ -615,6 +615,45 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
         )
         return
 
+    # THE FAIR VALUE IS COMPUTED BEFORE THE LIVE REFUSAL, AND THE ORDER IS THE
+    # WHOLE FIX (`#530`).
+    #
+    # It used to sit below the `live_reason` early-return, so on a LIVE game
+    # `market_fair_prob_over` was never written at all. That is a different
+    # claim from the one the refusal is making. The refusal says a PREGAME MODEL
+    # must not be priced against a re-priced market -- true, and it suppresses
+    # the edge. The fair value is not the model: it is a de-vig of the quote
+    # sitting in front of us right now, a property of the MARKET. Withholding it
+    # threw away the one input that was still valid.
+    #
+    # What that cost, measured 2026-08-23 16:41-16:49Z, three consecutive builds:
+    #
+    #     LIVE_PROJECTION_JOIN sport=soccer considered=1585 projected=188 edged=0
+    #                          edge_why={'no_fair_value_devig_failed': 188}
+    #
+    # 188 of 188. `live_projection_join` had a genuine LIVE probability from the
+    # re-sim -- exactly the signal `live_edge_policy`'s own docstring says is
+    # "precisely the thing worth ranking" -- and nothing to price it against,
+    # because this function had returned before stamping it.
+    #
+    # 100% ON ONE NAMED REASON IS A BUG, NOT A DISTRIBUTION. The reason string
+    # said "the market is one-sided, so de-vig has no answer", which is a real
+    # thing that happens to SOME soccer props; it cannot happen to all 188, and
+    # reading the rate rather than the reason is what turned a nine-hour
+    # "pricing decision" into a misplaced `return`.
+    #
+    # `prop_projections.py:951` has always done it in this order, which is why
+    # MLB's live tier works (`live_proj=252` on the same board) and soccer's did
+    # not. Two implementations of one rule, and only one of them was right.
+    #
+    # Deliberately AFTER the unknown-leg-set refusal above: that one returns
+    # without a fair value on purpose, because nothing here can confirm the
+    # quoted set is complete.
+    from syndicate.features.shared.prop_projections import _no_vig_over_probability
+
+    fair = _no_vig_over_probability(row)
+    projection["market_fair_prob_over"] = fair
+
     # `#340`: shared with MLB and WNBA via `live_edge_policy` rather than kept
     # per-sport. This file and `prop_projections` had matching copies; WNBA had
     # none and shipped 128 live edges on 2026-08-10 as a result.
@@ -632,10 +671,6 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
             projection["edge_vs_line"] = None
         return
 
-    from syndicate.features.shared.prop_projections import _no_vig_over_probability
-
-    fair = _no_vig_over_probability(row)
-    projection["market_fair_prob_over"] = fair
     if fair is None:
         projection["edge_vs_market_pct"] = None
         # Say WHICH leg is missing. Now that three-way markets reach this

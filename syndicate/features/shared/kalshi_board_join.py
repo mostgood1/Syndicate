@@ -49,47 +49,39 @@ from typing import Any
 
 __all__ = [
     "normalize_person",
-    "parse_prop_title",
-    "series_to_market",
-    "threshold_to_line",
     "join_kalshi_to_board",
     "kalshi_price_resolver",
+    "kalshi_ticker_resolver",
 ]
-
-# Kalshi series -> the board's market vocabulary. Each series maps to a TUPLE
-# of accepted board names, tried in order, because the two feeds disagree and
-# the disagreement is the whole join.
-#
-# MEASURED 2026-08-23T14:1xZ, once the board finally carried MLB. Kalshi's
-# `KXMLBKS` titles parse to `pitcher_strikeouts`; the board's own key sample the
-# same second read `strikeouts|jake bennett|4.5` and `outs|cal quantrill|15.5`.
-# Cal Quantrill was on BOTH sides of that log line under two different market
-# names -- which is as close to a labelled answer as this ever gets.
-#
-# The `pitcher_*` spellings are KEPT rather than replaced. They were what this
-# module was written against, other sports' feeds use the prefixed form, and
-# dropping a name because one slate did not use it is guessing in the opposite
-# direction. A tuple costs one dict lookup per miss.
-_SERIES_TO_MARKETS: dict[str, tuple[str, ...]] = {
-    "KXMLBKS": ("strikeouts", "pitcher_strikeouts"),
-    "KXMLBOUTS": ("outs", "pitcher_outs"),
-}
 
 # "Andrew Abbott: 7+ strikeouts?" / "Andrew Abbott: 17+ Outs Recorded?"
 _PROP_TITLE = re.compile(
     r"^\s*(?P<player>[^:]+?)\s*:\s*(?P<threshold>\d+)\s*\+\s*(?P<stat>.+?)\s*\??\s*$"
 )
 
-REASON_UNPARSEABLE_TITLE = "unparseable_title"
+# THE CATALOGUE'S NAMES, re-exported rather than restated. Two modules with
+# their own spelling of the same refusal is how a log line and a test end up
+# disagreeing about what happened.
+from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
+    REASON_COMBINATORIAL,
+    REASON_OUT_OF_SCOPE,
+    REASON_UNMAPPED_SERIES,
+    REASON_UNMAPPED_STAT,
+    REASON_UNREADABLE_TITLE,
+)
+
 REASON_WRONG_DATE = "market_closes_on_another_date"
 # Split out from the above: this one means the player, market and line all
 # matched a board row and ONLY the date disagreed. Same refusal, opposite
 # diagnosis -- one says Kalshi is quoting a slate we are not looking at, the
 # other says our date field is wrong.
 REASON_WOULD_MATCH_WRONG_DATE = "would_match_but_wrong_date"
-REASON_UNMAPPED_SERIES = "unmapped_series"
 REASON_NO_BOARD_ROW = "no_matching_board_row"
 REASON_NO_PRICE = "no_kalshi_price"
+# A market whose title does not say which game it is. Distinct from every other
+# refusal: these are markets we CAN read and CANNOT yet place, so the number is
+# the size of the game-lines gap rather than a defect.
+REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
 
 
 def normalize_person(value: Any) -> str:
@@ -104,63 +96,24 @@ def normalize_person(value: Any) -> str:
     return re.sub(r"[^a-z0-9 ]", "", stripped).strip()
 
 
-def parse_prop_title(title: Any) -> dict[str, Any] | None:
-    """`"Andrew Abbott: 7+ strikeouts?"` -> player, threshold, stat text.
-
-    Returns None rather than a partial parse: a title this cannot read is a
-    market we must not guess at, and a half-parsed player name would match the
-    wrong human -- `learnings.md`'s "worse at any stake than no bet".
-    """
-    match = _PROP_TITLE.match(str(title or ""))
-    if not match:
-        return None
-    try:
-        threshold = int(match.group("threshold"))
-    except (TypeError, ValueError):
-        return None
-    player = match.group("player").strip()
-    if not player:
-        return None
-    return {
-        "player_name": player,
-        "player_key": normalize_person(player),
-        "threshold": threshold,
-        "stat_text": match.group("stat").strip(),
-    }
-
-
-def series_to_markets(series: Any) -> tuple[str, ...]:
-    """Every board market name this series could be called. Empty if unknown.
-
-    Explicit table, never a prefix rule -- an unknown series is refused rather
-    than guessed at from its ticker.
-    """
-    return _SERIES_TO_MARKETS.get(str(series or "").strip().upper(), ())
-
-
-def series_to_market(series: Any) -> str | None:
-    """The PRIMARY board name for a series, or None. Kept for callers that want
-    one label rather than the set of aliases the join tries."""
-    names = series_to_markets(series)
-    return names[0] if names else None
-
-
-def threshold_to_line(threshold: Any) -> float | None:
-    """Kalshi "N+" -> the board's half-point line. 7+ -> 6.5.
-
-    The single most mismatch-prone number in this module. See the module
-    docstring: matching 7+ against a line of 7.0 finds nothing, and matching it
-    against 7.5 finds a different bet and prices it confidently.
-    """
-    try:
-        value = int(threshold)
-    except (TypeError, ValueError):
-        return None
-    return float(value) - 0.5
-
-
 def _board_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
-    market = str(row.get("market") or "").strip().lower()
+    """The board row's identity, in the CANONICAL market vocabulary.
+
+    Canonicalised here rather than matched against a list of aliases, because
+    `market_keys` already knows that `pitcher_strikeouts` and `strikeouts` are
+    the same market (`#224`). Both sides of the join therefore speak one
+    vocabulary and the aliases live in the module that owns them -- an alias
+    tuple in this file was a second place for the two to drift apart, which is
+    the whole failure this join exists to avoid.
+
+    Falls back to the raw name when the vocabulary does not know it: an
+    unrecognised market keys on itself rather than being dropped, so a market we
+    have no entry for can still match one Kalshi spells identically.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    raw = str(row.get("market") or "").strip().lower()
+    market = canonical_market_key(row.get("sport"), raw) or raw
     player = normalize_person(row.get("player_name"))
     try:
         line = float(row.get("line"))
@@ -177,6 +130,69 @@ def _as_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return None if parsed != parsed else parsed
+
+
+def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+    """The identity the join matched on. Shared by both resolvers ON PURPOSE.
+
+    Two resolvers keyed by two slightly different tuples would pair a row with
+    one venue's price and another venue's contract -- a bet placed at a price
+    that was never quoted for it.
+    """
+    try:
+        line = float(match.get("line"))
+    except (TypeError, ValueError):
+        return None
+    return (
+        str(match.get("market") or "").strip().lower(),
+        normalize_person(match.get("player_name")),
+        line,
+        str(match.get("board_side") or "").strip().lower(),
+    )
+
+
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    try:
+        line = float(row.get("line"))
+    except (TypeError, ValueError):
+        return None
+    raw = str(row.get("market") or "").strip().lower()
+    return (
+        canonical_market_key(row.get("sport"), raw) or raw,
+        normalize_person(row.get("player_name")),
+        line,
+        str(row.get("side") or "").strip().lower(),
+    )
+
+
+def kalshi_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
+    """Board row -> the Kalshi CONTRACT to buy, or None.
+
+    Separate from the price resolver rather than folded into its return type: a
+    function that returns either a float or a dict is a function every caller
+    has to test the shape of, and the one caller that forgets places an order
+    priced by a dict.
+
+    THE TICKER IS THE THING MONEY IS SPENT ON. It is stamped at decision time
+    and carried on the order, so the contract we priced and the contract we buy
+    are recorded as the same object rather than re-derived later from a
+    catalogue that may have moved.
+    """
+    index: dict[tuple[str, str, float, str], str] = {}
+    for match in matches:
+        key = _match_key(match)
+        ticker = str(match.get("ticker") or "").strip()
+        if key is None or not ticker:
+            continue
+        index[key] = ticker
+
+    def resolve(row: Mapping[str, Any]) -> str | None:
+        key = _row_key(row)
+        return index.get(key) if key else None
+
+    return resolve
 
 
 def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
@@ -227,6 +243,12 @@ def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
     return resolve
 
 
+def _classify(market):
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    return classify_market(market)
+
+
 def join_kalshi_to_board(
     kalshi_markets: Sequence[Mapping[str, Any]],
     board_rows: Sequence[Mapping[str, Any]],
@@ -266,27 +288,30 @@ def join_kalshi_to_board(
 
     wanted_date = str(selected_date or "").strip()[:10]
     for market in kalshi_markets:
-        series = market.get("series")
-        candidate_markets = series_to_markets(series)
-        if not candidate_markets:
-            _refuse(REASON_UNMAPPED_SERIES)
-            continue
-        parsed = parse_prop_title(market.get("title"))
-        if parsed is None:
-            _refuse(REASON_UNPARSEABLE_TITLE)
-            continue
-        line = threshold_to_line(parsed["threshold"])
-        if line is None:
-            _refuse(REASON_UNPARSEABLE_TITLE)
+        # THE CATALOGUE DECIDES WHAT THIS MARKET IS, for every sport at once.
+        # This used to be a two-entry series table plus a private title parser,
+        # which is a mapping that works for two series and stops at three.
+        verdict = _classify(market)
+        if verdict.get("status") != "ok":
+            _refuse(str(verdict.get("reason")))
             continue
 
-        board_market = None
-        rows = None
-        for name in candidate_markets:
-            found = by_key.get((name, parsed["player_key"], line))
-            if found:
-                board_market, rows = name, found
-                break
+        if verdict.get("needs_event_identity"):
+            # A player prop names a human, and a human plays one game a day, so
+            # (player, market, line) is a complete identity. A total names
+            # neither team -- pairing it needs `event_ticker` mapped to our
+            # event id, which does not exist yet. REFUSED rather than attempted:
+            # a total joined to the wrong game is a confidently-priced bet on
+            # strangers.
+            _refuse(REASON_NEEDS_EVENT_MAPPING)
+            continue
+
+        series = verdict.get("series")
+        board_market = verdict["market"]
+        line = verdict["line"]
+        player_key = normalize_person(verdict.get("subject"))
+        parsed = {"player_name": verdict.get("subject"), "player_key": player_key}
+        rows = by_key.get((board_market, player_key, line))
 
         # THE DATE CHECK RUNS AFTER THE KEY LOOKUP, not before it. Ordering it
         # first is cheaper and it is what this module shipped with -- and it
@@ -358,20 +383,21 @@ def join_kalshi_to_board(
     # side is what turns that into a fixable observation.
     kalshi_keys: list[str] = []
     for market in kalshi_markets:
-        parsed = parse_prop_title(market.get("title"))
-        if not parsed:
+        verdict = _classify(market)
+        if verdict.get("status") != "ok":
             continue
-        line = threshold_to_line(parsed["threshold"])
-        # EVERY alias, not just the primary. Printing one name while the join
-        # tries two would make a sample that cannot be compared to the board
-        # keys beside it -- which is the one job this line has.
-        for name in series_to_markets(market.get("series")):
-            kalshi_keys.append(f"{name}|{parsed['player_key']}|{line}")
+        # Built by the SAME code path the join uses, so the sample cannot say
+        # one thing while the join does another -- which would make this line
+        # actively misleading rather than merely unhelpful.
+        kalshi_keys.append(
+            f"{verdict['market']}|{normalize_person(verdict.get('subject'))}|{verdict['line']}"
+        )
         if len(kalshi_keys) >= 6:
             break
     board_keys = [f"{k[0]}|{k[1]}|{k[2]}" for k in list(by_key)[:5]]
-    # The board's market vocabulary, counted -- if `pitcher_strikeouts` is not
-    # in it, the mapping table is simply wrong and that is visible at a glance.
+    # The board's market vocabulary, counted -- if the market the catalogue
+    # resolved is not in it, the mapping is simply wrong and that is visible at
+    # a glance.
     board_markets: dict[str, int] = {}
     for row in board_rows:
         name = str(row.get("market") or "").strip().lower()
