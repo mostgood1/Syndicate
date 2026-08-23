@@ -3600,6 +3600,7 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
             return 0
 
         attached = 0
+        matched = 0
         for game in rows:
             if not isinstance(game, dict):
                 continue
@@ -3617,6 +3618,13 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
                     break
             if block is None:
                 continue
+            # **`matched` SEPARATE FROM `attached`.** The first version counted
+            # only `attached`, and the first production reading was
+            # `blocks=2 attached=0` -- which cannot say whether NO id joined or
+            # an id joined and the chart came back None. Two different bugs, one
+            # number. Exactly the ambiguity the `blocks`/`attached` pair was
+            # added to remove, reintroduced one level down.
+            matched += 1
             chart = basketball_momentum_chart(
                 block,
                 league_code="wnba",
@@ -3631,9 +3639,19 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
         # cannot tell them apart.
         print(
             f"[wnba_cards] MOMENTUM_ATTACHED date={date_str} games={len(rows)} "
-            f"blocks={len(blocks)} attached={attached}",
+            f"blocks={len(blocks)} matched={matched} attached={attached}",
             flush=True,
         )
+        if matched == 0 and blocks:
+            # THE IDS FROM BOTH SIDES, because a join that fails is a join whose
+            # keys nobody has looked at. Capped and id-only -- no scores, no
+            # names, nothing that turns a diagnostic into a data dump.
+            card_ids = [str(g.get("event_id") or "") for g in rows if isinstance(g, dict)][:6]
+            print(
+                f"[wnba_cards] MOMENTUM_NO_JOIN date={date_str} "
+                f"card_event_ids={card_ids} block_keys={sorted(blocks)[:6]}",
+                flush=True,
+            )
         return attached
     except Exception as exc:  # pragma: no cover - never fatal to a board build
         print(f"[wnba_cards] MOMENTUM_ATTACH_FAILED date={date_str} "
