@@ -1042,6 +1042,93 @@ unsaved anywhere.
 ---
 
 
+## [live-refresh-ownership] LIVE ODDS REFRESH — WHO OWNS WHAT, and the three defects that made "live bets" scarce `[verified 2026-08-22/23, lane layer2-sim-view-and-live-projection, supersedes nothing — this was never written down]`
+
+**The live-odds tick runs on ONE service.** `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`
+is `true` on live-odds-worker only (`render.yaml:857`); `false` on web (`:147`)
+and on refresh-worker (`:501`). refresh-worker still LAUNCHES soccer refreshes by
+other paths, which is what makes this easy to misread from a process list.
+
+**`SYNDICATE_ACTIVE_SPORTS` is live-only drift — it is in no service block in
+`render.yaml`.** live-odds-worker carries `mlb,wnba,soccer`; refresh-worker
+carries `nfl`. That partition plus the loop being off on refresh-worker is how
+NFL ended up with **no owner at all**: refresh-worker's
+`_active_weekly_sports_for_date` YIELDS nfl to the fast tick on a game day, and
+the fast tick was dropping it on `ACTIVE_SPORTS`. Both sides consulted the same
+predicate and both stepped back. Fixed in code (`#520`), not in config.
+
+**Measured before and after, `LAYER2_BOARD_HEALTH`, 21:06Z -> 22:57Z:**
+
+    nfl     rows 23 -> 275   live_rows 0 -> 252   quote age p50 36,478s -> 603s
+    mlb                      live_rows 37 -> 276  live_proj 21 -> 138
+    wnba                     live_rows 0 -> 155   quote age p50 581s -> 139s
+    soccer                                        quote age p50 23,941s -> 751s
+
+**The 60s tick was notional on a busy slate.** 20:31-21:33Z: `LIVE ODDS REFRESH
+TICK` True **5**, False **47** — 9.6%, every skip reporting an already-active
+run, against a configured 60s interval. Observed launch cadence ~12 minutes. It
+went all-True once the MLB sim finished, so this is a busy-slate number.
+
+**Two counters that mean different things, and the difference is the diagnosis.**
+`attach_live_gamelines` increments `considered` only AFTER
+`game.state in {live, in_progress}` (`live_gameline_join.py:807`). So
+`considered=0` with `lens_live_games=6` is a join **no row reached**, not a join
+that priced nothing. That single distinction is what found `#523`.
+
+**Two paths stamp `game.state` and they are not the same chain.**
+`book_grid_artifact.py` runs `attach_game_state` then
+`attach_live_game_state_from_lens`; `pipeline/layer2_shortlist.py` ran only the
+first until `#523`. **MLB masks this permanently** — its chips are
+StatsAPI-derived and already carry a live status, so the correction is redundant
+there. Soccer's chips come from `_unsimulated_game`, which defaults
+`status_state` to `"pre"` for the nine of ten leagues the sim does not cover.
+After the fix, soccer `live_rows` 0,0,0 -> **12** (01:14:18Z) and **5**
+(01:35:11Z) — first non-zero. `live_proj` is still 0: SEEN is not PRICED.
+
+**NFL cannot produce a live projection, by design.** `nfl_game_projections.py`
+applies `live_edge_policy` at the stamp point because there is no NFL live
+re-sim — "a pregame full-game total priced against a market that has already
+watched 55 minutes of football is not an edge, it is the score." It fires ~248
+times a build. **NFL live rows with no model view are the guard working.** Do not
+read that as a coverage regression; the grid join is healthy at
+`considered=1427 projected=1021` (71.5%).
+
+**Live-projection registries, for reference** (`board_enrichment.py:176,1128,1130`):
+
+    _LIVE_GAME_STATE_SPORTS = {mlb, soccer}
+    _LIVE_PROP_SPORTS       = {mlb, wnba, soccer}
+    _LIVE_GAMELINE_SPORTS   = {mlb, wnba, soccer}
+
+nfl/nba/nhl/ncaaf/ncaab are in none of them.
+
+## [shortlist-payload-budget] THE PERSISTED SHORTLIST IS ONE KEYVALUE WRITE, and the cliff was on the calendar `[verified 2026-08-23, lane layer2-sim-view-and-live-projection]`
+
+    4 sports at the 400/sport cap   rows=1600   5,747,257 B   68.5% of 8 MB
+    after the total budget (#525)   rows=1600   4,550,297 B   54.2%
+
+**3,592 bytes/row** at that size. Before `#525` the headroom was ~735 rows —
+**less than two more sports at cap** — and `per_sport` could not prevent the
+breach because it scales the payload with the number of sports IN SEASON, which
+nobody sets. NCAAF ~08-29 projected ~7.19 MB (86%); NCAAB in November, over.
+
+**The failure mode above the ceiling is a SILENT BOARD FREEZE, not an error.**
+`write_json_file` raises `KeyValuePayloadTooLarge`; both call sites of
+`write_layer2_shortlist` (`intelligence_state.py:3609`, `:4970`) catch it and
+return. The worker keeps rebuilding, the board serves its last successful copy
+indefinitely, and the only symptom is one log line. A crash restarts; a caught
+refusal does not.
+
+Now: a **total** budget (`SYNDICATE_LAYER2_ROWS_TOTAL`, default 1600 = the
+measured four-sport board, so a no-op until a fifth sport arrives) allocated by
+water-filling, with `per_sport` retained as the ceiling that stops soccer's
+20,025 grid rows owning the board. Plus a shed that drops the lowest-ranked rows
+rather than freezing. **`SHORTLIST_SHED_TO_FIT` was ABSENT on the verified
+build** — the budget held it and the rescue path is a backstop, not load-bearing.
+
+**Still uncovered:** `cards`, `openings_records`, `clv_openings` and the coverage
+payloads are a fixed cost no row budget touches. Moving them to their own keys is
+what would make the shed unreachable rather than merely rare.
+
 ## [odds-cadence] ODDS CADENCE AND CAPTURE
 
 - **MLB quote capture has THREE regimes, not one beat. `[measured 08-15 02:5xZ,

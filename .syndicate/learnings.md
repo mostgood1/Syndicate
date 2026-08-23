@@ -5561,3 +5561,71 @@ minutes earlier could not catch this: it ran only after summaries were fetched,
 and the failure was one hop upstream. **Instrument the FIRST hop, not the
 interesting one.**
 
+
+---
+
+## 2026-08-23 — a measurement that matches your CHANGE instead of the COMPLAINT is not verification `[lane layer2-sim-view-and-live-projection]`
+
+I changed `bet_slip.js` so the slip opens minimized, then verified by reading
+`data-collapsed="true"` off the slip element. The assertion was TRUE. It was also
+not the question: the user said "the side rail", and `.board-rail` is a second,
+independent default in a different file (`board_rail_toggle.js` returned
+`"expanded"` for anything ≥1080px). Collapsing the slip inside an expanded rail
+still leaves a full second column open, which is what a reader sees. I reported
+it fixed and it came back.
+
+**RULE: verify against the WORDS OF THE COMPLAINT, not against the diff.** Ask
+"what would the reporter look at?" and measure that. Reading back the field your
+own change writes proves the edit landed, which was never in doubt.
+
+**COROLLARY, and it is the part that generalises: when a symptom has two
+independent causes in two files, fixing one and measuring it produces a
+CONFIDENT WRONG ALL-CLEAR.** Before declaring a UI defect fixed, grep for other
+places that set the same visual state. The rail and the slip had no reference to
+each other.
+
+## 2026-08-23 — a counter's POSITION relative to its gate decides which question it answers
+
+`LIVE_PROJECTION_JOIN sport=soccer considered=0 projected=0 lens_indexed=864
+lens_live_games=6`. Six live matches indexed, zero rows considered. Because
+`attach_live_gamelines` increments `considered` only AFTER
+`game.state in {live, in_progress}` (`live_gameline_join.py:807`), that zero
+means **no row reached the join** — not "the join priced nothing". Those have
+different causes and opposite fixes, and the whole of `#523` fell out of the
+distinction in about two minutes after three sessions of guessing.
+
+**RULE: when you add a counter, state whether it sits BEFORE or AFTER the gate,
+and prefer before.** A denominator measured past the filter cannot distinguish
+"nothing was eligible" from "nothing qualified". `record()`'s own docstring in
+that file says `considered` exists so `edged / considered` is "a rate with a real
+denominator" — it is, for rows that got in, and the rows that did not are the
+ones you are usually looking for.
+
+## 2026-08-23 — a guard firing 248 times looks exactly like a coverage regression
+
+I reported NFL projection coverage "fell 100% → 10%" as the next thing to fix.
+It had not fallen. Nothing was displaced (275 rows against a 400 cap), the grid
+join was healthy at 71.5%, and the unprojected rows were LIVE rows that
+`live_edge_policy` deliberately blanks because NFL has no live re-sim — "a
+pregame full-game total priced against a market that has already watched 55
+minutes of football is not an edge, it is the score."
+
+**RULE: before reporting a coverage drop, check the DENOMINATOR and check for a
+guard.** A rate can fall because the numerator broke or because the population
+grew, and the two need opposite responses. Here the population grew *because of
+my own fix*, and reporting it as a regression would have sent the next session to
+delete a safety feature.
+
+## 2026-08-23 — `trim_lane_blocks.py` is now exhausted, and `lanes.md` is over cap anyway
+
+`lanes.md` is **146,270 B against the 120,000 cap** and the trim tool reports
+`nothing to move -- every block is claim-bearing or reads OPEN`. The documented
+remedy has no remaining slack: the file is over budget on *live* lanes, not on
+superseded ones.
+
+**RULE: "run the trim tool" is no longer a complete answer to LEDGER OVER
+BUDGET.** The next reduction has to come from CLOSING lanes or from shrinking
+live blocks, both of which are owner decisions. Editing in place still prevents
+growth; it cannot reverse it. The session-start digest truncates OPEN LANES to
+600 bytes, so an over-cap file arrives lossy — which is the opposite of what the
+ledger is for.
