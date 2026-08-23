@@ -99,11 +99,27 @@ _MONOTONE_MARKETS = frozenset(
         "batter_strikeouts",
         "batter_stolen_bases",
         "batter_hits_runs_rbis",
-        # MLB pitcher counting stats.
+        # MLB pitcher counting stats. BOTH SPELLINGS, and that is the point:
+        # `market_keys` canonicalises `pitcher_strikeouts` to `strikeouts` and
+        # `pitcher_outs` to `outs` (`#224`), and the board emits the canonical
+        # form -- so the prefixed names alone matched nothing the board
+        # produces. MEASURED 2026-08-23: `is_monotone_market("strikeouts")` was
+        # False, which silently switched the early-decision mechanism OFF for
+        # every MLB pitcher prop. Not a missing feature: an inert one, with
+        # passing tests, reporting `live_behind` on bets that were already won.
+        #
+        # This function takes no sport, so it cannot canonicalise on lookup.
+        # `test_every_monotone_name_is_the_one_the_board_emits` is what stops
+        # the two vocabularies drifting apart again.
+        "strikeouts",
         "pitcher_strikeouts",
+        "hits_allowed",
         "pitcher_hits_allowed",
+        "earned_runs",
         "pitcher_earned_runs",
+        "walks_allowed",
         "pitcher_walks",
+        "outs",
         "pitcher_outs",
         # Basketball counting stats.
         "player_points",

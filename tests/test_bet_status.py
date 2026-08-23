@@ -207,3 +207,28 @@ def test_report_line_names_the_counters_worth_acting_on():
     assert "BET_STATUS" in line
     for token in ("orders=", "resolved=", "decided=", "won=", "lost=", "reasons="):
         assert token in line, token
+
+
+def test_every_monotone_name_is_the_one_the_board_emits():
+    """The drift that switched this whole mechanism off for MLB pitcher props.
+
+    `_MONOTONE_MARKETS` listed `pitcher_strikeouts` and `pitcher_outs`, but
+    `market_keys` canonicalises those to `strikeouts` and `outs` (`#224`) and the
+    board emits the canonical form. So `is_monotone_market("strikeouts")` was
+    False and the early-decision path never ran for the markets it was written
+    for -- inert, with passing tests, reporting `live_behind` on bets that were
+    already won.
+
+    `is_monotone_market` takes no sport, so it cannot canonicalise on lookup.
+    This is what keeps the two vocabularies together instead.
+    """
+    from syndicate.features.shared.bet_status import _MONOTONE_MARKETS, is_monotone_market
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    missing = []
+    for name in _MONOTONE_MARKETS:
+        for sport in ("mlb", "nba", "wnba"):
+            canonical = canonical_market_key(sport, name)
+            if canonical and not is_monotone_market(canonical):
+                missing.append((name, sport, canonical))
+    assert not missing, f"canonical spellings absent from the monotone set: {missing}"

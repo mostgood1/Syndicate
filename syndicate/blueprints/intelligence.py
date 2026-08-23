@@ -3330,6 +3330,17 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
             }
         )
 
+    settlement = None
+    settlement_error = None
+    try:
+        from syndicate.features.shared.paper_settlement import settlement_summary
+
+        settlement = settlement_summary(selected_date, orders=orders)
+    except Exception as exc:
+        # Named, never swallowed into an empty record.
+        settlement_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("SETTLEMENT_SUMMARY_FAILURE date=%s", selected_date)
+
     job_state = (plan or {}).get("job_state") or {}
     positions = (plan or {}).get("positions") or []
     # Join the ledger onto the plan by `position_key`, so a row shows both what
@@ -3414,6 +3425,13 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         ],
         "ledger": summary,
         "ledger_error": ledger_error,
+        # HOW THE BOOK ACTUALLY DID. Read-only, from the grades the worker
+        # already wrote -- `settle_orders` runs on the worker, never here, per
+        # the web/worker split. An unreadable ledger degrades to None rather
+        # than to a zeroed record, because a 0-0 record and "we cannot see the
+        # record" are the two things this page exists to keep apart.
+        "settlement": settlement,
+        "settlement_error": settlement_error,
     }
 
 

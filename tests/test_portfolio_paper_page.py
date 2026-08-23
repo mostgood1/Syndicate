@@ -581,3 +581,42 @@ def test_the_commit_carries_the_venue_scope_fields_onto_the_position():
     # show the price cost of the venue restriction.
     for field in ("unrestricted_price", "unrestricted_ev_pct", "unrestricted_bookmaker"):
         assert f'"{field}": ' in source, f"{field} is not carried onto the position"
+
+
+# --------------------------------------------------------------------------
+# Settled performance -- the number `settled_count = 0` was hiding
+# --------------------------------------------------------------------------
+
+
+def test_the_payload_carries_a_settlement_summary(paper_env):
+    payload = _payload(paper_env)
+    assert "settlement" in payload
+    assert payload["settlement_error"] is None
+
+
+def test_nothing_settled_shows_no_record_rather_than_a_zero_zero_one(app_client, paper_env):
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    # A 0-0 record and "nothing has settled" are different claims, and only one
+    # of them is true here.
+    assert "nothing has settled yet" in body
+
+
+def test_a_graded_order_reaches_the_page(app_client, paper_env):
+    paper_env["plan"] = _plan(positions=[_position()])
+    paper_env["orders"] = [_order(outcome="won", pnl_dollars=9.09, fill_stake_dollars=10.0)]
+
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    assert "Settled record" in body
+    assert "+9.09" in body
+
+
+def test_an_unreadable_grade_is_never_rendered_as_a_zero_zero_record(app_client, paper_env, monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("ledger unreadable")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.paper_settlement.settlement_summary", boom
+    )
+    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
+    # "We cannot see the record" must not look like "the record is 0-0".
+    assert "grades unreadable" in body

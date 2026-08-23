@@ -212,6 +212,8 @@
 {% set marks = p.live_marks or {} %}
 {% set bs = p.bet_status or {} %}
 {% set p2list = p.paper2 or [] %}
+{% set settlement = p.settlement or {} %}
+{% set settlement_error = p.settlement_error %}
 
 {# One renderer for the live mark, shared by the positions table and the orphan
    table. Movement is ALWAYS probability points from `clv_pct_from_prices` --
@@ -347,6 +349,50 @@
       <div class="paper-tile__label">Filled stake</div>
       <div class="paper-tile__value">${{ "%.2f"|format(ledger.filled_stake_dollars or 0) }}</div>
       <div class="paper-tile__meta">at simulated fill price</div>
+    </div>
+    {# SETTLED PERFORMANCE. Deliberately beside "Bets standing" rather than
+       replacing it: one is where open bets stand right now, the other is what
+       finished bets actually returned, and they answer different questions. #}
+    <div class="paper-tile">
+      <div class="paper-tile__label">Settled record</div>
+      {% set st = settlement.get('total') or {} %}
+      {% if settlement_error %}
+        <div class="paper-tile__value warn">—</div>
+        {# "We cannot see the record" must never render as a 0-0 record. #}
+        <div class="paper-tile__meta">grades unreadable: {{ settlement_error }}</div>
+      {% elif st.get('settled') %}
+        <div class="paper-tile__value">
+          <span class="bet-won">{{ st.get('won', 0) }}W</span> ·
+          <span class="bet-lost">{{ st.get('lost', 0) }}L</span>{% if st.get('push') %} · {{ st.get('push') }}P{% endif %}
+        </div>
+        <div class="paper-tile__meta">
+          {% if st.get('win_pct') is not none %}{{ "%.1f"|format(st.get('win_pct')) }}% · {% endif %}
+          {{ st.get('pending', 0) }} still pending
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">
+          {{ st.get('pending', 0) }} filled bet{{ '' if st.get('pending', 0) == 1 else 's' }} not yet decided
+        </div>
+      {% endif %}
+    </div>
+    <div class="paper-tile">
+      <div class="paper-tile__label">Profit / loss</div>
+      {% set st = settlement.get('total') or {} %}
+      {% if st.get('settled') %}
+        <div class="paper-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
+          {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}
+        </div>
+        <div class="paper-tile__meta">
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% ROI on{% endif %}
+          ${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        {# A 0.0% ROI on zero settled bets and 0.0% on fifty are the same string
+           and opposite facts, so nothing is shown until something settles. #}
+        <div class="paper-tile__meta">nothing has settled yet</div>
+      {% endif %}
     </div>
     <div class="paper-tile">
       <div class="paper-tile__label">Bets standing</div>
