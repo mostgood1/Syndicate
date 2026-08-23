@@ -232,3 +232,30 @@ def test_every_monotone_name_is_the_one_the_board_emits():
             if canonical and not is_monotone_market(canonical):
                 missing.append((name, sport, canonical))
     assert not missing, f"canonical spellings absent from the monotone set: {missing}"
+
+
+def test_the_mlb_stat_table_absorbs_both_market_spellings():
+    """The fourth instance of the same drift, found in one day.
+
+    This table read `pitcher_strikeouts` while the board emits `strikeouts`
+    (`#224`), so every MLB pitcher prop resolved to `unmapped_market` and could
+    never be graded -- which would have made the settlement figures quietly
+    hitter-only rather than visibly incomplete.
+    """
+    from syndicate.features.shared.bet_status_mlb import _MARKET_TO_STAT, _stat_for_market
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    for spelling in ("strikeouts", "pitcher_strikeouts", "outs", "pitcher_outs"):
+        assert _stat_for_market(spelling) is not None, spelling
+
+    # And the table's own keys are the canonical ones, so it cannot drift back.
+    for key in _MARKET_TO_STAT:
+        assert canonical_market_key("mlb", key) in (key, None), f"{key} is not canonical"
+
+
+def test_an_unmapped_market_is_still_refused_rather_than_guessed():
+    from syndicate.features.shared.bet_status_mlb import _stat_for_market
+
+    # A wrong stat produces a confident wrong verdict.
+    assert _stat_for_market("spreads") is None
+    assert _stat_for_market("h2h") is None

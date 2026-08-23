@@ -39,6 +39,17 @@ REASON_UNMAPPED_MARKET = "unmapped_market"
 REASON_NO_STAT = "stat_not_in_feed"
 
 # board market -> (group, box-score stat name)
+# KEYED ON THE CANONICAL MARKET NAME, and looked up through
+# `market_keys.canonical_market_key` -- never on the raw string.
+#
+# This table read `pitcher_strikeouts` and `pitcher_outs` until 2026-08-23. The
+# board emits `strikeouts` and `outs` (`#224`), so every MLB PITCHER PROP
+# resolved to `unmapped_market` and could never be graded at all -- the fourth
+# instance of the same vocabulary drift found in one day, and the one that would
+# have made the settlement figures quietly hitter-only.
+#
+# `canonical_market_key` accepts both spellings, so the lookup below absorbs
+# whichever the caller has. That is the fix; a longer list would not have been.
 _MARKET_TO_STAT: dict[str, tuple[str, str]] = {
     "batter_hits": ("hitter", "hits"),
     "batter_total_bases": ("hitter", "total_bases"),
@@ -46,12 +57,20 @@ _MARKET_TO_STAT: dict[str, tuple[str, str]] = {
     "batter_rbis": ("hitter", "rbi"),
     "batter_runs_scored": ("hitter", "runs"),
     "batter_hits_runs_rbis": ("hitter", "hits_runs_rbis"),
-    "pitcher_strikeouts": ("pitcher", "strikeouts"),
-    "pitcher_hits_allowed": ("pitcher", "hits_allowed"),
-    "pitcher_earned_runs": ("pitcher", "earned_runs"),
-    "pitcher_walks": ("pitcher", "walks_allowed"),
-    "pitcher_outs": ("pitcher", "outs"),
+    "strikeouts": ("pitcher", "strikeouts"),
+    "hits_allowed": ("pitcher", "hits_allowed"),
+    "earned_runs": ("pitcher", "earned_runs"),
+    "walks_allowed": ("pitcher", "walks_allowed"),
+    "outs": ("pitcher", "outs"),
 }
+
+
+def _stat_for_market(market: str) -> tuple[str, str] | None:
+    """The box-score stat for a board market, in either spelling."""
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    canonical = canonical_market_key("mlb", market) or market
+    return _MARKET_TO_STAT.get(canonical)
 
 # Markets resolved from the SCOREBOARD rather than a player's line.
 _GAME_TOTAL_MARKETS = frozenset({"totals", "totals_alt"})
@@ -135,7 +154,7 @@ def mlb_status_resolver(selected_date: str):
                 return {"unavailable_reason": REASON_NO_STAT}
             return {"current_value": total, "is_final": is_final, "started": started}
 
-        mapped = _MARKET_TO_STAT.get(market)
+        mapped = _stat_for_market(market)
         if mapped is None:
             # Spreads, moneylines and every prop family not listed. Named rather
             # than guessed -- a wrong stat produces a confident wrong verdict.
