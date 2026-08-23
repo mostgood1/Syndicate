@@ -23945,3 +23945,131 @@ date=2026-08-22 positions=8 openings=4884 matched=8 no_key_match=0 unkeyable=0
 match_rate=1.0 stamped=8 stamped_matched=8 derived_matched=8
 derivation_agrees=8 derivation_disagrees=0` at 23:41:55Z. That is Stage C's
 precondition holding, and it is the reading `#522` was built to take.
+
+## 2026-08-22 23:53:53Z — live-odds-worker `56481569` — `#514` the SHAPE diagnostic
+
+- **service:** live-odds-worker (`srv-d91dpertqb8s73co8lt0`), deploy `dep-da53d48u01pc73ds5r90`
+- **holder:** lane `basketball-live-momentum`, token `2d9941c1c011e151`
+- **commit:** `5648156981d054e55d7e17561f54df3f93ca5817`, verified `--is-ancestor`
+  of `origin/main` AND verified to contain my merge `5f160a19` (PR #5) before
+  triggering. Main's tip had moved twice while the PR was open, so the SHA I
+  deployed is NOT the one I checked five minutes earlier — checking the SHA
+  Render actually picked, rather than the one I merged, is the step that made
+  that harmless.
+- **live at:** 23:57:26Z (instance `-fshq2`)
+- **verify:** **23:59:03.907Z, and the content check PASSES.**
+
+      [basketball_momentum] SHAPE event=401857164 events=105
+        as_of_s=1143.0 as_of_poss=78.68
+        sec_pts=20 sec_now=-0.6679 poss_pts=40 poss_now=-0.5268
+        narrator=yes narrator_events=53
+
+### WHAT THAT LINE ACTUALLY PROVES
+
+**`#514` has claimed since Phase A that this taxonomy works. Until 23:59:03Z
+every test of it ran on hand-built fixtures**, because ESPN is 403 from a Claude
+Code sandbox. This is the first reading off real data, and each field is a check
+that could have failed:
+
+| reading | expected | got | verdict |
+|---|---|---|---|
+| elapsed clock | ~19 min of game in ~59 min of wall clock (basketball runs ~3x) | `as_of_s=1143.0` = 19.05 min | **the clock tracks the real game** |
+| seconds samples | `floor(1143/60)+1 = 20` | `sec_pts=20` | exact |
+| possession samples | `floor(78.68/2)+1 = 40` | `poss_pts=40` | exact |
+| possession PACE | ~160 combined per 40 min -> 76.2 at 47.6% elapsed | `as_of_poss=78.68`, ratio **1.033** | **within 3.3% of real WNBA pace** |
+| narrator | present, under its own name | `narrator=yes narrator_events=53` of 105 | named correctly, ~50% subset |
+
+**The pace check is the one that matters most.** `poss_est = FGA + TOV +
+0.44*FTA - OREB` is computed by US from the play stream, specifically to avoid
+the thin `live_pbp_stats` family (19 of 126 records, one date). Nothing forced
+it to be right. Landing within 3.3% of published WNBA pace says the estimator is
+measuring possessions and not an artifact of the parser.
+
+**AND THE TWO AXES AGREE IN SIGN.** `sec_now=-0.6679`, `poss_now=-0.5268` —
+same direction, comparable magnitude. On the 6-event synthetic fixture used
+during development they had OPPOSITE signs (a 4-possession window against an
+8-possession half-life is nearly an unweighted sum, so early events dominate).
+That disagreement was a property of the toy, not the design; on 105 events and
+78 possessions the axes converge. **This is the first evidence the two decay
+axes measure the same underlying quantity** — which is exactly what Phase C's
+sweep is supposed to exploit.
+
+### CHECK #2, 00:04:07Z — THE SERIES ADVANCES, AND IT RETIRES THE CLOCK RISK
+
+      SHAPE event=401857164 events=117 as_of_s=1198.0 as_of_poss=83.32
+        sec_pts=20 sec_now=-3.0349 poss_pts=42 poss_now=-2.6352
+        narrator=yes narrator_events=57
+
+A single reading cannot show a series ADVANCING; this one does, on every axis,
+over 304s of wall clock: events 105 → 117, `as_of_s` +55s of game clock,
+`as_of_poss` +4.64, narrator 53 → 57. Both sample counts re-derive exactly at
+the new values (`floor(1198/60)+1 = 20`, `floor(83.32/2)+1 = 42`). Nothing is
+frozen, nothing is recomputed from scratch wrongly.
+
+**The two axes moved together: `sec_now` ×4.54, `poss_now` ×5.00.** The away
+side went on a run and both axes registered it at nearly the same relative
+magnitude. Combined with their sign agreement in check #1, that is now two
+independent observations that the seconds and possessions axes track the same
+underlying quantity.
+
+**AND `as_of_s=1198.0` RETIRES THE FINAL-MINUTE RISK.** WNBA quarters are 10
+minutes, so Q2 ends at 1200s: an event at 1198.0 is an event with **0:02 left
+in the half**. The failure mode `_normalize_clock` exists to prevent — every
+event inside the last minute of a period silently dropped, leaving a
+plausible-looking series with a hole exactly where pressure matters most — is
+therefore NOT happening. Final-minute events are being captured.
+
+**A CORRECTION TO WHAT I WROTE AN HOUR AGO.** The 23:59Z entry said the tenths
+path was "unproven"; I then went looking to prove it and found the question was
+posed wrongly. `as_of_s=1198.0` is consistent with BOTH `_normalize_clock`
+converting a tenths string `"2.0"` AND with ESPN having sent `"0:02"` with a
+colon, which `basketball_elapsed_minutes` parses unaided. The reading cannot
+distinguish the two paths — but it does not need to, because the risk was never
+"which branch runs", it was "are these events lost". They are not.
+
+What remains is a code-coverage curiosity, not a data-integrity one, and it is
+DOWNGRADED from a Phase C blocker to a note.
+
+**Also worth recording: the tenths premise has no measurement behind it in this
+repo.** `_normalize_clock`'s docstring asserts ESPN switches format under 1:00.
+Nothing else in the codebase corroborates it, and the tracked mirror cannot:
+`live_pbp_stats_*.jsonl` persists only aggregates under a single `payload` key —
+**0 clock values across 37 files** — which is the very gap `#514` was filed to
+close. The premise came from general knowledge of the feed, not from data here.
+The function is harmless either way (a colon string passes straight through),
+but the docstring should not read as though it were measured.
+
+**WHY THIS SHIPPED MID-GAME.** The artifact has been capturing since 23:19:54Z
+and nothing has read its CONTENT. `with_series=1` proves a series was built,
+not that its numbers are right. `/api/ops/artifacts/export` is **403 at CONNECT**
+through the agent proxy — an org policy denial, not auth; the `ADMIN_TOKEN` the
+user supplied does not change it. Logs are the only channel that reaches out, so
+the check had to ship as a log line while a game was still live.
+
+### THE TRADE I MADE SILENTLY, AND SHOULD NOT HAVE
+
+`build_soccer_artifacts.py --league mls --week 21` (pid 1280) **was running when
+I triggered this deploy**, and a deploy restarts the container. I checked the
+process table AFTER triggering, not before. The documented rule is to flag that
+trade rather than make it silently, and I made it silently.
+
+Cost is small and that is luck, not judgement: `--horizon-days 1` inside the
+live-phase `refresh_odds_sources.py` loop, which re-runs on its own cycle, so
+one cycle of MLS artifacts is lost rather than a night's work. **The expensive
+case — an in-flight MLB sim — was not running.** Had it been, this would have
+been the second time that cost was paid for a diagnostic.
+
+Order the checks BEFORE the trigger, not after: `ALL_PROCESS_MEMORY`'s process
+list is the reading, and it is free.
+
+### CAPTURE CADENCE IS NOT UNIFORM — Phase C must not assume it is
+
+Momentum captures ran ~2.5 min apart from 23:19:54 to 23:41:58, then **one
+9.5-minute gap** to 23:51:27. Explained by the same process table: the tick loop
+was busy with `refresh_odds_sources.py` (launched 23:41:06) and its soccer
+child, container at 87-92% of 2048MB throughout.
+
+So the jsonl is a **non-uniformly sampled** series. A lead/lag test that treats
+consecutive rows as equally spaced will be wrong by a factor of ~4 across that
+gap. Phase C reads `as_of_seconds` off each row and works in game time; row
+index is not a clock.

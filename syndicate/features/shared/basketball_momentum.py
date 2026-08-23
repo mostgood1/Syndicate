@@ -126,12 +126,27 @@ _TURNOVER_FLIPS_SIGN = True
 def _normalize_clock(display_clock: Any) -> str | None:
     """ESPN's clock to the strict `M:SS` `basketball_elapsed_minutes` demands.
 
-    **THIS EXISTS BECAUSE OF THE LAST MINUTE OF EVERY PERIOD.** ESPN switches
-    to a tenths format under 1:00 -- `"48.6"`, no colon. `basketball_elapsed_
-    minutes` splits on `":"` and returns None for anything that is not exactly
-    two parts, so every event inside the final minute would be DROPPED. That is
-    the stretch of a period where pressure matters most, and the loss would be
-    silent: fewer events, a plausible-looking series, no error anywhere.
+    **THIS EXISTS BECAUSE OF THE LAST MINUTE OF EVERY PERIOD.** ESPN is
+    understood to switch to a tenths format under 1:00 -- `"48.6"`, no colon.
+    `basketball_elapsed_minutes` splits on `":"` and returns None for anything
+    that is not exactly two parts, so every event inside the final minute would
+    be DROPPED. That is the stretch of a period where pressure matters most, and
+    the loss would be silent: fewer events, a plausible-looking series, no error
+    anywhere.
+
+    **THAT PREMISE IS NOT MEASURED IN THIS REPO, and this docstring used to read
+    as though it were.** Nothing else in the codebase corroborates the tenths
+    format, and the tracked mirror cannot: `live_pbp_stats_*.jsonl` persists
+    only aggregates under a single `payload` key -- 0 clock values across 37
+    files -- which is the exact gap `#514` exists to close. It came from general
+    knowledge of the feed.
+
+    The function is safe either way: a string that already contains `":"` is
+    returned untouched, so if ESPN never sends tenths this is simply inert. What
+    IS measured (2026-08-23 00:04:07Z, live WNBA) is the outcome that matters --
+    `as_of_seconds=1198.0` against a 1200s half is an event with 0:02 left, so
+    final-minute events are reaching the series. Which branch carried them is
+    not distinguishable from that reading and does not need to be.
 
     The fix belongs HERE, not there. That function is byte-for-byte pinned to
     `wnba/cards.py:_wnba_elapsed_minutes` by

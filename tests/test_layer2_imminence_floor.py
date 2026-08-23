@@ -35,11 +35,32 @@ def _row(idx, *, days_out, ev, event=None):
     }
 
 
+# THE POOL MUST OUTNUMBER THE CAP OR THIS FILE TESTS NOTHING (`#521`).
+#
+# It was written against a hard 100 rows/sport with a 150-row tomorrow pool, so
+# tomorrow genuinely crowded today out. `SHORTLIST_ROWS_PER_SPORT` became the
+# configurable `_shortlist_rows_per_sport()` at 400 the same day the cap was
+# raised, and 160 rows then fit inside the budget with room to spare -- so
+# everything was selected, today included, and the starvation these tests exist
+# to reproduce simply stopped happening.
+#
+# `test_without_the_floor_today_is_crowded_out` says it in its own docstring:
+# "If this ever stops showing starvation the fixture no longer models the bug."
+# It did, and the test failed loudly rather than passing vacuously, which is the
+# only reason this was caught -- the two sibling files broken by the same cap
+# raise had to be found by reading.
+#
+# Sized off the limit rather than pinned to a new number, so the next change to
+# the cap cannot quietly repeat this.
+def _limit():
+    return int(layer2_board._shortlist_rows_per_sport())
+
+
 def _pool():
     """Today's rows are genuinely WORSE on merit -- that is the real situation,
     and the reason a pure ranking excludes them."""
     rows = [_row(i, days_out=0, ev=0.2, event=f"today{i}") for i in range(10)]
-    rows += [_row(100 + i, days_out=1, ev=5.0, event=f"tmw{i}") for i in range(150)]
+    rows += [_row(100 + i, days_out=1, ev=5.0, event=f"tmw{i}") for i in range(_limit() + 50)]
     return rows
 
 
@@ -71,19 +92,19 @@ def test_floor_is_a_floor_not_a_takeover():
     for being today."""
     result = _run(imminence_floor=25)
     soccer = result["per_sport"]["soccer"]
-    assert soccer["selected"] == 100
+    assert soccer["selected"] == _limit()
     assert soccer["selected_today"] < soccer["selected"]
 
 
 def test_unused_floor_is_not_wasted():
     """A sport with nothing today must still fill its budget."""
-    rows = [_row(100 + i, days_out=1, ev=5.0, event=f"tmw{i}") for i in range(150)]
+    rows = [_row(100 + i, days_out=1, ev=5.0, event=f"tmw{i}") for i in range(_limit() + 50)]
     result = layer2_board.select_shortlist(
         rows, now=NOW, horizon_days=7, min_value_pct=-100.0, imminence_floor=25
     )
     soccer = result["per_sport"]["soccer"]
     assert soccer["available_today"] == 0
-    assert soccer["selected"] == 100
+    assert soccer["selected"] == _limit()
 
 
 def test_row_without_a_start_time_is_not_treated_as_today():
