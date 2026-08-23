@@ -1963,7 +1963,7 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
 
 
 def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
-    """Drop the lowest-ranked rows until the payload fits. `#524`.
+    """Drop the lowest-ranked rows until the payload fits. `#525`.
 
     WHAT THIS REPLACES, and why it is not merely nicer. Above
     `_keyvalue_max_bytes` (8 MB) `write_json_file` raises
@@ -1980,7 +1980,7 @@ def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
 
     A SMALLER BOARD IS ALWAYS BETTER THAN A FROZEN ONE. The rows are already
     ranked, so shedding from the tail costs the least valuable rows first and
-    keeps the board fresh and honest. `#524`'s total budget should mean this
+    keeps the board fresh and honest. `#525`'s total budget should mean this
     never fires; it exists because "should" is not a guarantee and the calendar
     is not under our control.
 

@@ -174,7 +174,7 @@ SHORTLIST_ROWS_PER_SPORT = _shortlist_rows_per_sport()
 def _shortlist_rows_total() -> int:
     """The WHOLE board's row budget, across every sport. Env-overridable.
 
-    WHY A TOTAL AS WELL AS A PER-SPORT CAP (`#524`). The binding constraint is
+    WHY A TOTAL AS WELL AS A PER-SPORT CAP (`#525`). The binding constraint is
     one keyvalue write, and that write does not care how the rows are divided --
     but `per_sport` scales the payload with the number of sports IN SEASON,
     which is a calendar fact nobody sets and nobody reviews.
@@ -2696,7 +2696,7 @@ def select_shortlist(
     per_sport_report: dict[str, dict[str, Any]] = {}
     floor_report: dict[str, dict[str, Any]] = {}
 
-    # `#524`. THE BUDGET IS THE WHOLE BOARD'S, NOT EACH SPORT'S.
+    # `#525`. THE BUDGET IS THE WHOLE BOARD'S, NOT EACH SPORT'S.
     #
     # `per_sport` alone scales the persisted payload with the number of sports
     # in season -- a calendar fact nobody sets. Measured 2026-08-23 at four
@@ -2794,7 +2794,7 @@ def select_shortlist(
         floor = max(0, int(kind_floor))
         # The allocator's answer, never above the per-sport ceiling. `.get` with
         # the ceiling as default rather than 0: an unallocated sport must fall
-        # back to the pre-`#524` behaviour, not to an empty board.
+        # back to the pre-`#525` behaviour, not to an empty board.
         limit = max(0, min(int(per_sport), int(budget.get(sport, per_sport))))
         picked: list[Mapping[str, Any]] = []
         picked.extend(game[:floor])
@@ -2876,7 +2876,7 @@ def select_shortlist(
         # Only sports with a slate consume budget; the rest contribute nothing.
         "active_sports": sorted(per_sport_report.keys()),
         "per_sport_limit": int(per_sport),
-        # `#524`. BOTH numbers, because they answer different questions and the
+        # `#525`. BOTH numbers, because they answer different questions and the
         # ceiling alone stopped being the binding one the moment a total existed.
         # A board that shrank because a fifth sport came into season must not
         # look like a board that shrank because its pool did.

@@ -23,6 +23,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.portfolio_commit import commit_portfolio
+from syndicate.features.shared.order_clv import (
+    clv_for_orders,
+    order_clv_report_line,
+)
 from syndicate.features.shared.position_marks import (
     mark_orders_to_board,
     marks_report_line,
@@ -194,6 +198,32 @@ def run_portfolio_commit(
         plan["live_marks"] = marks
     except Exception as exc:
         print(f"[portfolio_commit] LIVE_MARKS_FAILED date={normalized} error={exc}", flush=True)
+
+    # STAGE C'S GATE INPUT: what our placed orders got against the CLOSE.
+    # Distinct from the join below, which is orders -> OPENING. A close only
+    # exists once a market has stopped moving, so most of the day this resolves
+    # nothing for today and everything for yesterday -- which is why it runs
+    # over the ledger rather than over today's positions, and why an unresolved
+    # row is named rather than dropped.
+    try:
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger_for_clv
+
+        dated_orders = [
+            order
+            for order in (_load_ledger_for_clv().get("orders") or [])
+            if order.get("selected_date") == normalized
+        ]
+        if dated_orders:
+            order_clv = clv_for_orders(dated_orders, date=normalized)
+            print(order_clv_report_line(order_clv), flush=True)
+            # `rows` dropped from the artifact for the same reason as the join
+            # below: it duplicates every order against an 8MB ceiling. The
+            # per-market aggregates are what a reader needs, and they carry `n`.
+            plan["order_clv"] = {
+                key: value for key, value in order_clv.items() if key != "rows"
+            }
+    except Exception as exc:
+        print(f"[portfolio_commit] ORDER_CLV_FAILED date={normalized} error={exc}", flush=True)
 
     clv_join = None
     try:

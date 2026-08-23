@@ -1,4 +1,4 @@
-"""`#524`. The board's row budget is the WHOLE board's, and a payload that will
+"""`#525`. The board's row budget is the WHOLE board's, and a payload that will
 not fit sheds rows instead of freezing.
 
 WHY THIS EXISTS. Two failures share one cause -- the persisted shortlist is a
