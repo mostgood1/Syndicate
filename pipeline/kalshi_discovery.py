@@ -53,7 +53,11 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         return {"status": "skipped", "reason": "already_ran_this_boot"}
     _ALREADY_RAN = True
 
-    from syndicate.features.shared.kalshi_client import KalshiError, discover, probe
+    # THE AUTH PROBE LIVES AT WORKER BOOT, not here. See
+    # `run_refresh_worker._kalshi_auth_probe_at_boot`. This function is called
+    # from the intelligence-state board build, so anything inside it answers a
+    # quarter of an hour after the deploy that asked the question -- and "does
+    # our signing work" has nothing to do with a board being built.
 
     # SCHEMA FIRST, and reported separately from the data. The field names in
     # `kalshi_client` were written without ever calling the API (the agent proxy
