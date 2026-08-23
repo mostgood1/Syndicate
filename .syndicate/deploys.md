@@ -24073,3 +24073,56 @@ So the jsonl is a **non-uniformly sampled** series. A lead/lag test that treats
 consecutive rows as equally spaced will be wrong by a factor of ~4 across that
 gap. Phase C reads `as_of_seconds` off each row and works in game time; row
 index is not a clock.
+
+
+## 2026-08-23 00:25:16Z -- refresh-worker `473f55fa` -- #524 order->close CLV grader
+
+what: `syndicate/features/shared/order_clv.py` wired into `run_portfolio_commit`,
+printing `[order_clv] ORDER_CLV ...` every slate. Grades placed orders against
+the CLOSE -- Stage C's literal gate input, which nothing could compute before.
+
+claim: held by this lane throughout, `target=d5014346`, 35 min at deploy time.
+live was `71d518a4` (a peer's, live 00:23:42Z); `merge-base --is-ancestor` TRUE,
+so cumulative. Waited for their deploy to settle rather than stacking on an
+`update_in_progress`.
+
+cost: near-zero, and by luck rather than planning -- the worker had just
+restarted, 3 processes at **29.1%** memory, one single-game `tip_off_window` sim
+(pk 823261). Cheapest window of the night.
+
+### THE MARK FIX IS CONFIRMED -- the reading `#522` owed
+
+    LIVE_MARKS 00:21:51Z orders=35 marked=8 toward=5 against=1
+      avg_clv_pct=10.3277 reasons={'marked': 8, 'market_not_on_board': 27}
+
+Against the pre-fix baseline of `marked=0` (23:41:55Z, `book_no_longer_quoting:
+21`) and `marked=1-2 of 29` (23:52-23:58). **`book_no_longer_quoting` is now
+ZERO**: the residual 27 are `market_not_on_board`, i.e. games that started. That
+split is the proof -- when the market is on the board, our book is quoting it and
+it marks. The defect was the join, exactly as diagnosed.
+
+**THE NUMBER IS NOT A RESULT AND MUST NOT BE QUOTED AS ONE.** `avg_clv_pct
+=10.3277` is n=8, taken at 00:21 against a FINISHED slate, so whatever remains
+quotable may be stale or settling rather than a live line. The join being
+correct says nothing about whether an 8-sample tail-end average means anything.
+**Owed: a MID-SLATE reading before anyone reads anything into the value.**
+
+### CORRECTION TO THE 23:23Z ENTRY -- the claim did not protect anything
+
+That entry concluded "a hold is exactly when to hold the claim". I then held it
+for 35 minutes with `target=` set, and a peer deployed refresh-worker anyway at
+00:17:33Z. **The claim is ADVISORY for MCP deploys, not binding.**
+`.claude/settings.json` matches `deploy-guard.py` on `"Bash|PowerShell"`, so an
+MCP `trigger_deploy` never consults `deploy_claim` at all.
+
+Holding it is still right -- it is the only state another session can read, and
+it does bind Bash-driven deploys -- but I stated it as protection and it is not.
+If binding coverage is wanted, the guard needs a matcher for the Render MCP tool
+names; that is a settings change and nobody's lane tonight.
+
+verify: OWED -- `[order_clv] ORDER_CLV ... resolved=N` with N > 0. Expect N=0 for
+today and non-zero for the PRIOR date: a close only exists once a market has
+stopped moving, which is why this runs over the ledger and not over today's
+positions. `resolved=0` with `reasons={'no_close_for_market': N}` on a date whose
+games finished hours ago would mean the odds-history shard is not reaching this
+service, NOT that the grader is wrong.
