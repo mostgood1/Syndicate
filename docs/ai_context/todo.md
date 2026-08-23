@@ -2165,6 +2165,36 @@ total (a 14-2 window and a 26-14 window have identical margin). Added
 actually takes — 600s (quarter) and 1200s (half), from the market keys the live
 slate discovered (`spreads_q4`, `totals_h2`, ...).
 
+**2026-08-23 — THE WORK MOVED FROM MOMENTUM TO THE STREAM UNDERNEATH IT.**
+
+Two artifacts now, and they are not interchangeable:
+`momentum_events_<date>.json` is OVERWRITTEN with the complete cumulative feed
+(ESPN is cumulative, so appending costs 20x for no extra completeness) and is
+the SWEEP's input; `live_momentum_<date>.jsonl` stays append-only and is the
+CAUSAL record of what a card showed at instant `t`. Phase C now runs with NO
+NETWORK — proven by pointing `fetch_summary` at a function that raises.
+
+**SEASON BACKFILL RUNNING** (`SYNDICATE_WNBA_MOMENTUM_BACKFILL`, live-odds-worker
+`26d67b8b`, 2026-05-01..2026-08-21). There is NO play-level history in this repo
+— `live_pbp_stats_*.jsonl` holds 0 clock values across 37 files — but ESPN's
+summary endpoint is retrospectively complete, so a season is ~1.8 min of
+fetching for ~1,144 quarter outcomes. That is ~70 nights of live capture.
+
+**`basketball_projection_rows` is the substrate**: STATE at `t` (margin, total,
+possessions, pace, pace x time-remaining) -> OUTCOME after `t`. Its load-bearing
+test is LEAKAGE — rows built from a truncated feed must match rows built from
+the full one at every shared probe. Mutation-tested.
+
+**WHY INTERVALS, NOT FULL GAMES.** `live-game-line-projection` reads brier
+0.28706 vs market 0.24700 and is bounded at `games_with_outcome: 3`; its n=985
+is repeated snapshots of the same three games. A full-game win probability is
+limited by GAMES (~25 nights to 100 at four a night). Quarter outcomes arrive 4x
+faster and are far less correlated within a game.
+
+**RULES RECORDED BEFORE ANY NUMBER IS QUOTED:** the train/test split must be
+TEMPORAL, never random; and seasons are not exchangeable (pace drifts, and `GSV`
+did not exist in earlier seasons).
+
 **BEFORE IT FEEDS A PRICE:** `model_engine_standard.md` requires re-fitting the
 rates a new mechanism displaces, and records two mechanisms together producing a
 NEGATIVE interaction in 4 of 4 markets. What shipped is a chart, not a model

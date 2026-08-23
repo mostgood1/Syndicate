@@ -179,3 +179,31 @@ def test_a_malformed_spec_is_refused_and_named(tmp_path, monkeypatch, capsys) ->
     monkeypatch.setenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", "2026-05-01")   # no range
     assert mod.maybe_start_backfill("wnba", tmp_path) is False
     assert "BACKFILL_BAD_SPEC" in capsys.readouterr().out
+
+
+def test_the_scoreboard_url_has_exactly_one_sports_segment() -> None:
+    """**THE 400 THAT KILLED THE FIRST SEASON PULL.**
+
+    `_SPORT_PATH` already contains `sports/`. The backfill originally retyped
+    the URL and prefixed it again, producing
+    `.../v2/sports/sports/basketball/wnba/scoreboard` -- HTTP 400 on every date,
+    measured 2026-08-23 16:04Z across the whole range.
+
+    Both callers now share one builder, and this pins the shape so a future
+    retype cannot reintroduce it.
+    """
+    from scripts.poll_basketball_momentum import scoreboard_url
+
+    for league in ("wnba", "nba", "ncaab"):
+        url = scoreboard_url(league, "2026-06-19")
+        assert url.count("/sports/") == 1, url
+        assert url.endswith("/scoreboard?dates=20260619"), url
+
+
+def test_the_backfill_and_the_poller_build_the_same_url() -> None:
+    """Two callers, one construction -- the property that makes the bug above
+    impossible rather than merely fixed."""
+    import scripts.backfill_basketball_momentum_history as backfill
+    from scripts.poll_basketball_momentum import scoreboard_url
+
+    assert backfill.scoreboard_url is scoreboard_url
