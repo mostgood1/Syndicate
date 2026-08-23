@@ -123,7 +123,15 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
     from syndicate.features.shared.kalshi_client import KalshiError as _KErr
     from syndicate.features.shared.kalshi_client import fetch_series
 
-    for series in list(singles):
+    # BOUNDED AND PACED. The first run fired one request per discovered series
+    # with no gap and earned http_429 on most of them -- my bug, not a Kalshi
+    # limitation. Ten series is enough to characterise the catalogue, and a
+    # rate-limited probe reports a venue as empty when it is not.
+    import time as _time
+
+    for index, series in enumerate(list(singles)[:10]):
+        if index:
+            _time.sleep(0.5)
         try:
             one = fetch_series(series)
             print(

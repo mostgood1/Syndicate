@@ -141,4 +141,15 @@ def join_to_board(markets: list[dict[str, Any]], rows: list[dict[str, Any]]) -> 
         f" reasons={report.get('reasons')}",
         flush=True,
     )
+    # On a zero-match join, print BOTH SIDES' keys. A count of failures with no
+    # way to see the mismatch is the `#505` report, and it took weeks to resolve
+    # precisely because nobody could see which field disagreed.
+    if not report.get("matched"):
+        print(
+            "[kalshi_odds] JOIN_KEYS"
+            f" kalshi={report.get('kalshi_key_sample')}"
+            f" board={report.get('board_key_sample')}"
+            f" board_markets={report.get('board_market_vocabulary')}",
+            flush=True,
+        )
     return report

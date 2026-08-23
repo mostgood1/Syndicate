@@ -284,10 +284,37 @@ def join_kalshi_to_board(
                 }
             )
 
+    # SAMPLES FROM BOTH SIDES, so a zero-match join says WHICH FIELD disagrees.
+    # `no_matching_board_row: 132` alone is exactly the `#505` report -- a count
+    # of failures with no way to see the mismatch. Keys from each side side by
+    # side is what turns that into a fixable observation.
+    kalshi_keys: list[str] = []
+    for market in kalshi_markets:
+        board_market = series_to_market(market.get("series"))
+        parsed = parse_prop_title(market.get("title"))
+        if board_market and parsed:
+            line = threshold_to_line(parsed["threshold"])
+            kalshi_keys.append(f"{board_market}|{parsed['player_key']}|{line}")
+        if len(kalshi_keys) >= 5:
+            break
+    board_keys = [f"{k[0]}|{k[1]}|{k[2]}" for k in list(by_key)[:5]]
+    # The board's market vocabulary, counted -- if `pitcher_strikeouts` is not
+    # in it, the mapping table is simply wrong and that is visible at a glance.
+    board_markets: dict[str, int] = {}
+    for row in board_rows:
+        name = str(row.get("market") or "").strip().lower()
+        if name:
+            board_markets[name] = board_markets.get(name, 0) + 1
+
     return {
         "kalshi_markets": len(kalshi_markets),
         "board_rows": len(board_rows),
         "matched": len(matches),
         "reasons": dict(sorted(reasons.items())),
+        "kalshi_key_sample": kalshi_keys,
+        "board_key_sample": board_keys,
+        "board_market_vocabulary": dict(
+            sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]
+        ),
         "matches": matches,
     }
