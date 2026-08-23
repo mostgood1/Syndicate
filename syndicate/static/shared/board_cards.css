@@ -1155,6 +1155,153 @@ table.board-blotter tbody tr:last-child td {
   }
 }
 
+/* THE BLOTTER ON A PHONE (`#526`).
+   
+   `table.board-blotter` has `min-width: 880px` inside an `overflow-x: auto`
+   wrapper, and there was no mobile rule of any kind. On a 390px viewport that
+   is a table 2.25x the screen: every row has to be panned sideways to read,
+   and the columns a reader actually wants -- odds, edge, model -- sit off the
+   right edge on arrival. The horizontal scroll made it *reachable*, which is
+   why it never read as broken; it was never usable.
+
+   So below 720px the table stops being a table. Each row becomes a card and
+   each cell a labelled line, which is the standard answer for a wide data
+   table on a narrow screen and the only one that keeps all twelve columns
+   without a horizontal pan.
+
+   Semantics are untouched -- it stays a real <table> with real headers, so
+   sorting, the slip buttons and assistive tech all keep working. Only the
+   display changes. */
+@media (max-width: 720px) {
+  .board-blotter-wrap {
+    /* The pan is what we are removing; leaving it would keep a stray 1-2px
+       horizontal scroll on a layout that no longer overflows. */
+    overflow-x: visible;
+    border: none;
+    border-radius: 0;
+    background: none;
+  }
+
+  table.board-blotter,
+  table.board-blotter tbody,
+  table.board-blotter tr,
+  table.board-blotter td {
+    display: block;
+    width: auto;
+  }
+
+  table.board-blotter {
+    /* The whole point: no more 880px floor. */
+    min-width: 0;
+  }
+
+  /* The headings live on each cell now (`data-label`). Hidden accessibly
+     rather than removed, so the table keeps its header semantics. */
+  table.board-blotter thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  table.board-blotter tr {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(8, 18, 30, 0.72);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    /* The state badge and the slip button are positioned against this. */
+    position: relative;
+  }
+
+  table.board-blotter td {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--cards-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+
+  table.board-blotter td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  table.board-blotter tr td:last-child,
+  table.board-blotter tbody tr td:last-child {
+    border-bottom: none;
+  }
+
+  /* A CARD OF NINE "CLOSING —" LINES IS WORSE THAN NO CARD. Most rows carry a
+     value for two or three of the ten data columns; rendered as labelled lines
+     the placeholders would trible the card's height to say nothing. The dash
+     earns its place in a grid, where the column has to line up. Here it does
+     not. */
+  table.board-blotter td.board-blotter__cell--empty {
+    display: none;
+  }
+
+  /* The two columns that are not label/value pairs. State is a badge and the
+     slip is a button; both belong on the card's top line, not in the list. */
+  table.board-blotter td.board-blotter__cell--state,
+  table.board-blotter td.board-blotter__cell--slip {
+    display: inline-flex;
+    border-bottom: none;
+    padding: 0;
+  }
+
+  table.board-blotter td.board-blotter__cell--state::before,
+  table.board-blotter td.board-blotter__cell--slip::before {
+    content: none;
+  }
+
+  table.board-blotter td.board-blotter__cell--slip {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+  }
+
+  /* The row's identity leads the card, full width, with no label -- "Player /
+     Market" beside a player's name is noise. Padded right so a long name does
+     not run under the slip button. */
+  table.board-blotter td.board-blotter__cell--entity {
+    display: block;
+    text-align: left;
+    padding-right: 52px;
+    padding-top: 6px;
+  }
+
+  table.board-blotter td.board-blotter__cell--entity::before {
+    content: none;
+  }
+
+  /* Never hidden, even with no matchup text: it is the only thing that says
+     WHICH bet this card is. */
+  table.board-blotter td.board-blotter__cell--entity.board-blotter__cell--empty {
+    display: block;
+  }
+
+  table.board-blotter .board-blotter__primary {
+    font-size: 14px;
+  }
+
+  /* One-handed target, matching the rule the action buttons already follow. */
+  table.board-blotter .board-action-button--slip {
+    min-height: 34px;
+    min-width: 40px;
+  }
+}
+
 /* Line/odds movement sparkline. Colour carries direction, matching the
    arrow that precedes it, so the shape and the text agree at a glance. */
 .board-sparkline {
