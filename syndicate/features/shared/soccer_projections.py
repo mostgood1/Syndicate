@@ -654,7 +654,7 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     fair = _no_vig_over_probability(row)
     projection["market_fair_prob_over"] = fair
     # WHY THE DE-VIG CAME BACK EMPTY, STAMPED HERE SO IT SURVIVES THE LIVE
-    # EARLY-RETURN BELOW (`#532`).
+    # EARLY-RETURN BELOW (`#536`).
     #
     # `#530` fixed the ORDER and `edged` stayed 0, with
     # `edge_why={'no_fair_value_devig_failed': 45}`. That name is once again one

@@ -51,6 +51,7 @@ __all__ = [
     "normalize_person",
     "join_kalshi_to_board",
     "kalshi_price_resolver",
+    "kalshi_ticker_resolver",
 ]
 
 # "Andrew Abbott: 7+ strikeouts?" / "Andrew Abbott: 17+ Outs Recorded?"
@@ -129,6 +130,69 @@ def _as_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return None if parsed != parsed else parsed
+
+
+def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+    """The identity the join matched on. Shared by both resolvers ON PURPOSE.
+
+    Two resolvers keyed by two slightly different tuples would pair a row with
+    one venue's price and another venue's contract -- a bet placed at a price
+    that was never quoted for it.
+    """
+    try:
+        line = float(match.get("line"))
+    except (TypeError, ValueError):
+        return None
+    return (
+        str(match.get("market") or "").strip().lower(),
+        normalize_person(match.get("player_name")),
+        line,
+        str(match.get("board_side") or "").strip().lower(),
+    )
+
+
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    try:
+        line = float(row.get("line"))
+    except (TypeError, ValueError):
+        return None
+    raw = str(row.get("market") or "").strip().lower()
+    return (
+        canonical_market_key(row.get("sport"), raw) or raw,
+        normalize_person(row.get("player_name")),
+        line,
+        str(row.get("side") or "").strip().lower(),
+    )
+
+
+def kalshi_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
+    """Board row -> the Kalshi CONTRACT to buy, or None.
+
+    Separate from the price resolver rather than folded into its return type: a
+    function that returns either a float or a dict is a function every caller
+    has to test the shape of, and the one caller that forgets places an order
+    priced by a dict.
+
+    THE TICKER IS THE THING MONEY IS SPENT ON. It is stamped at decision time
+    and carried on the order, so the contract we priced and the contract we buy
+    are recorded as the same object rather than re-derived later from a
+    catalogue that may have moved.
+    """
+    index: dict[tuple[str, str, float, str], str] = {}
+    for match in matches:
+        key = _match_key(match)
+        ticker = str(match.get("ticker") or "").strip()
+        if key is None or not ticker:
+            continue
+        index[key] = ticker
+
+    def resolve(row: Mapping[str, Any]) -> str | None:
+        key = _row_key(row)
+        return index.get(key) if key else None
+
+    return resolve
 
 
 def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):

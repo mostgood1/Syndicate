@@ -191,7 +191,7 @@ def test_the_attribution_keys_are_the_right_shape():
 
 
 # ---------------------------------------------------------------------------
-# `#532` — WHY the de-vig came back empty, carried across the live return
+# `#536` — WHY the de-vig came back empty, carried across the live return
 # ---------------------------------------------------------------------------
 
 

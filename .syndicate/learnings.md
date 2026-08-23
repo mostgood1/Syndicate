@@ -553,6 +553,24 @@ payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
 - A handoff carried, as its single next action, a fix whose justification was one OOM: eight sports hydrated at once, "peak = SUM is sufficient on its own to cross 4GiB", "the floor plays no part". I deployed it, then measured two pre-deploy passes of the IDENTICAL shape from the same evening: 8 sports hydrated, peaks 804MB and 613MB, 15-20% of the ceiling, no death.
 - *(evidence in `learnings_evidence.md`)*
 
+## 2026-08-23 — FORBIDDEN: claiming a feature works when no test runs the path that CALLS it
+
+- **The rule going forward:** a feature whose failure mode is `except` + a log
+  line MUST have a test that executes the real call path end to end. Testing the
+  callee directly proves the callee works and says NOTHING about whether anything
+  invokes it. And verify the test by reintroducing the bug: a green test that has
+  never been seen red is a claim, not evidence.
+- **Measured 2026-08-23T17:12:31Z.** `portfolio_commit`'s live bet-status block
+  called a name bound by a `from ... import ... as` twenty lines BELOW it —
+  Python scopes that name local to the whole function, so it raised
+  `UnboundLocalError` on every cycle since the day it was written. Caught by its
+  own `except`, printed as `BET_STATUS_FAILED`, rendered as a plausible blank
+  column. The suite was green throughout: every `bet_status` test called
+  `statuses_for_orders` directly and none ran the commit.
+- **Why it is expensive:** a user reported the symptom, a correct diagnosis was
+  made and a correct fix shipped — into a block that never executed. Both were
+  right and neither could show.
+
 ## 2026-08-23 — FORBIDDEN: a module may not hold its own list of market names. It WILL drift from `market_keys`, silently
 
 - **The rule going forward:** market names have exactly one authority,

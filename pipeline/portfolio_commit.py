@@ -147,7 +147,15 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
 
 
 def _venue_price_resolver(venue: str):
-    """Price rows from the VENUE's own feed, or None to fall back to OddsAPI.
+    """`(price_resolver, ticker_resolver)` for a venue, or `(None, None)`.
+
+    BOTH ARE BUILT FROM ONE SET OF MATCHES. Building them separately would let
+    the price come from one pairing and the contract id from another -- an order
+    placed on a ticker at a price that was never quoted for it, which is the
+    single most expensive shape of mismatch available in this file.
+
+    Price rows from the VENUE's own feed, or `(None, None)` to fall back to
+    OddsAPI.
 
     Kalshi only for now, and deliberately quiet about it: a venue with no direct
     feed keeps behaving exactly as before rather than erroring, and the
@@ -160,27 +168,30 @@ def _venue_price_resolver(venue: str):
     arrow-of-time check exists to catch, in a new costume.
     """
     if str(venue or "").strip().lower() != "kalshi":
-        return None
+        return (None, None)
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
         markets = (payload or {}).get("markets") or []
         if not markets:
-            return None
-        return _resolver_from_markets(markets)
+            return (None, None)
+        return _resolvers_from_markets(markets)
     except Exception as exc:
         # Named, and returns None so the venue silently reverts to the
         # aggregator rather than losing its book entirely.
         print(f"[portfolio_commit] KALSHI_RESOLVER_FAILED venue={venue} error={exc}", flush=True)
-        return None
+        return (None, None)
 
 
-def _resolver_from_markets(markets):
-    """Turn fetched Kalshi markets into a (market, player, line, side) resolver.
+def _resolvers_from_markets(markets):
+    """Fetched Kalshi markets -> `(price_resolver, ticker_resolver)`.
 
     Classified by the CATALOGUE, so every sport it knows is priced here without
-    this function naming any of them.
+    this function naming any of them. One match list feeds both resolvers.
     """
-    from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
+    from syndicate.features.shared.kalshi_board_join import (
+        kalshi_price_resolver,
+        kalshi_ticker_resolver,
+    )
     from syndicate.features.shared.kalshi_catalogue import classify_market
 
     matches = []
@@ -205,9 +216,11 @@ def _resolver_from_markets(markets):
                     "line": verdict["line"],
                     "board_side": side,
                     "kalshi_american": price,
+                    # Carried so the ticker resolver keys off the SAME match.
+                    "ticker": verdict.get("ticker"),
                 }
             )
-    return kalshi_price_resolver(matches)
+    return kalshi_price_resolver(matches), kalshi_ticker_resolver(matches)
 
 
 def _execution_enabled() -> bool:
@@ -463,8 +476,12 @@ def run_portfolio_commit(
             # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
             # direct feed today; every other venue falls back to the aggregator,
             # and `price_source` on each scoped row records which was used.
+            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue)
             scoped, scope_refusals = scope_rows_to_venue(
-                rows, venue, price_resolver=_venue_price_resolver(venue)
+                rows,
+                venue,
+                price_resolver=venue_price_resolver,
+                ticker_resolver=venue_ticker_resolver,
             )
             print(
                 venue_scope_report_line(venue, len(rows), len(scoped), scope_refusals),

@@ -1,6 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#532` — **`#530` fixed the ordering and `edged` stayed 0. `no_fair_value_devig_failed` is ONE NAME OVER TWO STATES, again — now split. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+### `#537` — **TODO ids were allocated by a read-then-write race. Eight collisions in one session. Now atomic. FIXED, tooling only.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+Ids were allocated by reading `todo.md`, taking the largest and adding one. The
+read and the write are not atomic, so two sessions looking at the same moment
+pick the same number — and the loser finds out at `git merge`, after the entry,
+the code comments and the tests are written and have to be renamed together. A
+stale `#N` in a comment is worse than none: it resolves to somebody else's item
+and reads as deliberate.
+
+**Measured today, eight times, across at least three sessions:**
+
+    514/515 -> 520/521      522 -> 523      524 -> 525
+    527/528 -> 530/531      532 -> 536
+
+`scripts/todo_id_alloc.py` claims the next number with `O_CREAT|O_EXCL` before
+anyone writes an entry — the mechanism `deploy_claim.py` already uses, whose own
+docstring explains why coordination by MESSAGE cannot substitute for a lock: a
+cross-session message waits for the target's turn to end. Nobody announces an id
+at all, so it is worse here.
+
+    python scripts/todo_id_alloc.py --holder <lane>     # take one
+    python scripts/todo_id_alloc.py --show              # high-water mark
+
+**Claims count toward the high-water mark**, which is the part a ledger scan
+cannot do: an id taken a minute ago is not in `todo.md` yet because the entry is
+still being written, and ignoring it hands the same number to the next caller —
+the bug itself. It reads BOTH ledgers and all three historical id formats (header,
+table row, bullet), because an id closed and archived is still issued.
+
+**Claims never expire**, unlike a deploy claim. A deploy claim expires because
+holding one wedges a service; an id claim expires into a COLLISION. An abandoned
+id is a gap in the sequence, and gaps are already legal — `todo.md`'s rule is that
+ids are stable and never reused.
+
+**Verified under a real race**, not just sequentially: 20 concurrent allocations
+returned 20 distinct ids, zero duplicates. 9 unit tests.
+
+Sibling of `todo_id_reconcile.py`, which answers the other question — every id
+ever issued lives in exactly one of the two files. That one audits after the
+fact; this prevents the collision.
+
+### `#536` — **`#530` fixed the ordering and `edged` stayed 0. `no_fair_value_devig_failed` is ONE NAME OVER TWO STATES, again — now split. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
 `#530` shipped and the post-deploy reading (18:32:21Z / 18:35:53Z) is:
 
@@ -47,6 +88,49 @@ this split will say, and it is the only thing that will.
 `no_fair_value_one_sided_quote`, the producer/coverage owner is next and `#530`
 is done. If `no_fair_value_consensus_present_devig_returned_none` is non-trivial,
 that count is ours and the de-vig is the next thing to read.
+### `#532` — **Live bet status NEVER ONCE RAN: a name bound twenty lines below its use, swallowed by the block's own `except` every cycle since it was written. FIXED, TESTED AGAINST THE REAL PATH.** — lane `portfolio-decision-and-execution`, 2026-08-23
+
+**Measured 2026-08-23T17:12:31Z**, every cycle:
+
+```
+[portfolio_commit] BET_STATUS_FAILED date=2026-08-23
+  error=cannot access local variable '_load_ledger_for_clv'
+        where it is not associated with a value
+```
+
+The block called `_load_ledger_for_clv()`; that name is bound by a
+`from ... import ... as` **twenty lines further down**, in the ORDER_CLV block.
+Python treats a name assigned anywhere in a function as local for the whole
+function, so the read raised `UnboundLocalError` **on every run since the day it
+was written**.
+
+**This is why the user's report survived a correct fix.** `#522`-era work
+threaded `game_pk` through to this block precisely because "I don't see anything
+indicating status of the bet" — and the block was not executing. Diagnosis
+right, fix right, and neither could ever show.
+
+**The shape is the lesson.** A broad `except` + a `FAILED` log line + a page
+column that renders a plausible blank is indistinguishable from "installed and
+quiet". Nothing was red. The suite was green — because every test for
+`bet_status` exercised `statuses_for_orders` directly and none ran the commit
+path that calls it.
+
+**The test now runs the real path**, and it was verified by REINTRODUCING the
+bug and watching it fail. A green test that has never been seen red is a claim,
+not evidence.
+
+**Also shipped:** `unmapped_market` is now reported with the market NAMES beside
+it (`UNMAPPED_MARKETS` line). Fifteen ungraded MLB bets is a number nobody can
+act on; the names are the difference between "add five mappings" and guessing at
+which five.
+
+**Deliberately NOT fixed:** the five likely mappings (singles, doubles, walks,
+strikeouts, stolen bases) need `box_score_stats._HITTER_STAT_FIELDS` extended
+too — it carries only hits/runs/rbi/home_runs/total_bases — and that reader is
+shared with settlement and `build_mlb_actuals`. Extending it on a guess about
+StatsAPI field names is the unverified-schema mistake this integration has
+already paid for twice. One production line will name the fifteen.
+
 
 ### `#530` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
@@ -2315,6 +2399,55 @@ tree clean.
 `reports/live_refresh_loop/memory_diagnostics.json` and `last_*.json` but NOT
 `memory_high_water.json`, so every test run leaves an untracked file that trips
 commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
+
+### `#535` — **Interval-final score projection for live basketball betting. MOMENTUM IS DEAD; THE ARITHMETIC IS ALIVE.** — measured 2026-08-23, lane `basketball-live-momentum`
+
+**Id may need renumbering at merge — main held up to `#532` when this was
+written, and six collisions happened today.** Checking an id is free is not
+reserving it.
+
+**`#514`'s QUESTION IS ANSWERED AND THE ANSWER IS NO.** Pooled over 282 WNBA
+games: 120 correlations across 40 cells and 3 outcome measures, largest **0.0613**
+against a **pre-registered** noise floor of 0.082 median / 0.111 p95. Zero of 120
+clear even the median. Soccer reached the same verdict independently a day
+earlier. **Momentum must not feed a price** — that is measured, not cautious.
+The card chart stays: descriptive, direction-only label, `scale:
+uncalibrated_relative_to_game_peak` already declared.
+
+**WHAT REPLACED IT, AND WHY IT IS BETTER FOUNDED.** Projecting an interval's
+FINAL score from inside it is mostly ARITHMETIC — points remaining are bounded
+by possessions remaining, bounded by the clock. Measured error on the rest of
+the period, 282 games:
+
+    seconds left   0-60   60-120  120-240  240-420  420-600
+    naive_zero     2.00     6.00    13.00    23.00    37.00
+    league_rate    1.76     2.10     2.98     3.99     5.43
+    game_pace      1.59     2.11     3.14     4.37     6.50
+
+**The curve is the product.** 5.43 -> 1.76 points as the buzzer nears. A quarter
+total moves in half-points, so sub-2-point accuracy inside the final minute is
+potentially tradeable **if the market is slower** — UNTESTED, needs the live line.
+
+**GAME-TO-DATE PACE MAKES IT WORSE** (4 of 5 buckets, -0.43 overall). Small-sample
+overfitting: a game's PPP rests on ~150 possessions and estimates something
+largely league-constant (league PPP **1.1271**).
+
+**THAT REFUTES THE NAIVE LAYER, NOT THE PROPOSED ONE.** A TEAM's season profile
+is ~40 games of evidence; SITUATIONAL pace conditions on (margin x time left)
+which a game average smooths away. Correct structure: **shrink toward the league
+mean, with team and situation as adjustments** — partial pooling, not
+replacement.
+
+**NEXT:** `analyze_situational_pace` (merged, running) says whether the
+(margin x time) cells are flat. If flat, the league constant wins and this gets
+SIMPLER. Then per-team season profiles. Then, and only then, a market join —
+nothing here has been compared to a price, and `model_engine_standard.md` binds
+before it is.
+
+**INFRASTRUCTURE THIS LEAVES BEHIND:** 282 games / 66,688 rows of the first
+play-level history this repo has held; a leakage-guarded projection substrate
+(0 of 12,429 probe comparisons leaked); a season backfill that does NBA/NCAAB
+identically; and five one-shot analysis gates.
 
 ### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED AND DEPLOYED, CAPTURING ON A LIVE WNBA SLATE**; lane `basketball-live-momentum`
 

@@ -24761,3 +24761,146 @@ exists per row; the fit must use it.
 the lane was opened to answer. Deliberately NOT chained to the verify passing:
 a sweep that only runs on a clean check has an ambiguous absence, unable to
 distinguish "clean but unrun" from "blocked". Two flags, two readings.
+
+## 2026-08-23 ~17:56Z — HOW TO READ THE POOLED SWEEP, WRITTEN BEFORE IT RETURNS
+
+Recorded ahead of the result deliberately. Choosing a threshold after seeing 40
+correlations is how a noise grid becomes a discovery.
+
+### 1. THE REPORTED `n` IS NOT THE EVIDENCE
+
+Probes sit on a 30s grid, so at a 600s horizon they overlap 20-fold. ~15,000
+probes across 282 games is **~846 independent quarter windows** and **~282
+independent half windows**. Any significance judged on the probe count is
+judged on an overlap artefact — the same error `live-game-line-projection`
+makes reporting n=985 on `games_with_outcome: 3`.
+
+### 2. THE NOISE FLOOR FOR 40 CELLS, SIMULATED
+
+The strongest of 40 correlations is not one correlation. Under PURE NOISE
+(400 trials):
+
+    effective n = 846   median strongest |r| = 0.082   95th pct = 0.111
+    effective n = 282   median strongest |r| = 0.142   95th pct = 0.184
+
+**So a best cell below ~0.11 at the quarter horizon, or ~0.18 at the half, is
+indistinguishable from chance.** That is the bar, set before the data.
+
+### 3. A RAW CORRELATION CANNOT SEPARATE PREDICTION FROM MECHANISM
+
+Pressure deliberately EXCLUDES points — that is what the two-series split is
+for. But it still counts shot ATTEMPTS, and a team attempting more shots both
+scores more pressure AND has more chances to score. Some of any `r_margin` is
+therefore mechanical rather than predictive.
+
+The clean question is whether momentum adds anything BEYOND the current scoring
+rate, which is a partial correlation and **the grid does not compute one**. So
+a positive result here is a reason to run that test, not a result in itself.
+A negative result is more informative: if the raw correlation is already at the
+noise floor, the partial one cannot rescue it.
+
+## 2026-08-23 18:01:46Z — **THE ANSWER: BASKETBALL MOMENTUM CARRIES NO SIGNAL**
+
+    [momentum_phase_c] POOLED games=282 probes=65084 cells=40
+    [momentum_phase_c] STRONGEST_MARGIN axis=seconds hl=60.0 horizon=60.0
+                       r=-0.0327 n=20501 games=282
+
+**282 games. 40 cells. 3 outcome measures. 120 correlations. NOT ONE clears the
+noise floor.**
+
+    r_margin      max |r| = 0.0327   (seconds, hl 60s, horizon 60s)
+    r_total       max |r| = 0.0453   (seconds, hl 600s, horizon 1200s)
+    r_total_abs   max |r| = 0.0613   (possessions, hl 12, horizon 600s)
+
+    LARGEST ANYWHERE                = 0.0613
+    PRE-REGISTERED NOISE FLOOR      = 0.082 median, 0.111 p95
+
+    cells of 120 above the median floor: 0
+    cells of 120 above the p95 floor:    0
+
+**The strongest thing in the entire grid is WEAKER than what pure noise across
+40 cells typically produces.** The bar was written down BEFORE the run — see the
+pre-registration entry above — precisely so this could not be reinterpreted
+afterwards.
+
+### THIS IS THE SAME ANSWER SOCCER GOT
+
+`soccer-board-mlb-parity`, 2026-08-22: *"Production's ESPN-commentary momentum
+proxy carries NO signal at any half-life 30s-1800s — retired, not fixed."*
+
+Two sports, two independent taxonomies, two independent measurements, same
+result. That is no longer a quirk of one implementation.
+
+### WHAT IS AND IS NOT RULED OUT
+
+**RULED OUT:** decayed pressure momentum, as constructed here, predicting
+interval margin or totals — at half-lives 60-600s and 4-40 possessions, on both
+axes, over horizons of 60s to a full half. That covers every knob this design
+has.
+
+**NOT RULED OUT:** that FotMob-style momentum (a vendor's own fitted series,
+which soccer measured as directional at dAUC +0.071) would do better; that a
+partial correlation controlling for current scoring rate would surface something
+the raw one hides — though with the raw values this far below noise, there is
+almost nothing for a partial to rescue.
+
+### WHAT THIS SAVES, WHICH IS THE POINT
+
+Momentum was about to become an input to live ML/spread/total pricing. That
+would have required re-fitting the rates it displaced (`model_engine_standard.md`
+records two mechanisms together producing a NEGATIVE interaction in 4 of 4
+markets), and it would have been re-fitting a calibrated engine around noise.
+
+**The chart on the WNBA card stays** — it is descriptive, its label states
+DIRECTION only, and its payload already declares
+`scale: uncalibrated_relative_to_game_peak`. Every one of those choices was made
+on the assumption this number might come back at zero. It did.
+
+**IT MUST NOT FEED A PRICE.** That is now a measured constraint, not caution.
+
+## 2026-08-23 18:17:35Z — INTERVAL PROJECTION: THE CURVE IS REAL, AND GAME-PACE HURTS
+
+    [interval] SEASON games=282 league_ppp=1.1271
+    left=0-60s    n=1128  naive_zero= 2.00  league_rate=1.76  game_pace=1.59  <- game_pace
+    left=60-120s  n=2256  naive_zero= 6.00  league_rate=2.10  game_pace=2.11
+    left=120-240s n=4512  naive_zero=13.00  league_rate=2.98  game_pace=3.14
+    left=240-420s n=6768  naive_zero=23.00  league_rate=3.99  game_pace=4.37
+    left=420-600s n=6768  naive_zero=37.00  league_rate=5.43  game_pace=6.50
+    GAME_PACE_VS_LEAGUE improvement=-0.430 points -- game pace does NOT help
+
+### 1. THE ERROR CURVE IS REAL AND STEEP
+
+Median absolute error on the rest of the period falls **5.43 -> 1.76 points** as
+the buzzer approaches. That is the arithmetic tightening exactly as predicted,
+and it is the actionable shape: a quarter-total line moves in half-point
+increments, so sub-2-point accuracy inside the final minute is potentially
+tradeable IF the market is slower than that. **That comparison has not been made
+— it needs the live line.**
+
+### 2. TRACKING THIS GAME'S PACE MAKES THE PROJECTION WORSE
+
+`game_pace` loses to `league_rate` in **4 of 5 buckets**, by up to 1.07 points,
+and by 0.43 points overall. It wins only inside the final minute.
+
+**This is small-sample overfitting, not a bug.** A game's points-per-possession
+to date is estimated from ~150 possessions and is a noisy read of something that
+is largely league-constant (measured league PPP = 1.1271). Using that noisy
+estimate instead of the stable league value imports the noise.
+
+### 3. IT SHARPENS THE USER'S POINT RATHER THAN REFUTING IT
+
+The request was for "shooting trends of TEAMS and their actual pace based on
+GAME SITUATIONS". What was measured and lost is neither of those — it is
+GAME-TO-DATE averaging, the naive version.
+
+  - a TEAM's season profile is ~40 games of evidence, not 150 possessions;
+  - SITUATIONAL pace conditions on (margin x time left), which a game average
+    deliberately smooths away.
+
+So the correct reading is: **the naive per-game layer is refuted; the proposed
+per-team and per-situation layers are untested and now better motivated.** The
+right shrinkage target is the league mean, with team and situation as
+adjustments to it — not a per-game average replacing it.
+
+`analyze_situational_pace` measures whether the situational half of that is real
+before anything is modelled.

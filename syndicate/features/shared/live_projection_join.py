@@ -760,7 +760,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 # projection existed. Read from the ENTRY snapshot rather than
                 # the mutated dict for exactly that reason.
                 had_pregame = bool(pregame_basis)
-                # `#532`. NARROWED WHERE THE PRODUCER SAID WHY. `#530` fixed the
+                # `#536`. NARROWED WHERE THE PRODUCER SAID WHY. `#530` fixed the
                 # ordering that was starving this of a fair value and `edged`
                 # stayed 0 at `no_fair_value_devig_failed: 45` -- one label over
                 # "the row was quoted one-sided" (nothing downstream can fix it)

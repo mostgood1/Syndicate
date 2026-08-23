@@ -180,9 +180,13 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
 _BACKFILL_ENV = "SYNDICATE_WNBA_MOMENTUM_BACKFILL"
 _VERIFY_ENV = "SYNDICATE_WNBA_MOMENTUM_VERIFY"
 _SWEEP_ENV = "SYNDICATE_WNBA_MOMENTUM_SWEEP"
+_INTERVAL_ENV = "SYNDICATE_WNBA_INTERVAL_PROJECTION"
+_SITUATIONAL_ENV = "SYNDICATE_WNBA_SITUATIONAL_PACE"
 _backfill_started = False
 _verify_started = False
 _sweep_started = False
+_interval_started = False
+_situational_started = False
 
 
 def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
@@ -349,12 +353,120 @@ def maybe_start_sweep(league: str, out_root: Path) -> bool:
 
 
 
+def maybe_start_interval(league: str, out_root: Path) -> bool:
+    """Interval-final projection error, bucketed by time remaining. Once.
+
+    A different question from the momentum sweep, and a better-founded one:
+    projecting a quarter's final score from inside it is mostly ARITHMETIC, and
+    the useful output is WHERE ON THE CLOCK the error becomes small enough that
+    a stale line is beatable.
+    """
+    global _interval_started
+    spec = str(os.environ.get(_INTERVAL_ENV) or "").strip()
+    if not spec or _interval_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] INTERVAL_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"interval_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] INTERVAL_ALREADY_DONE spec={spec}", flush=True)
+        _interval_started = True
+        return False
+    _interval_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] INTERVAL_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.analyze_interval_projection import main as _interval_main
+
+            code = _interval_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] INTERVAL_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] INTERVAL_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-interval-projection", daemon=True).start()
+    return True
+
+
+
+def maybe_start_situational(league: str, out_root: Path) -> bool:
+    """Measure whether pace and efficiency MOVE with game situation. Once.
+
+    The interval projection multiplies remaining minutes by a game-to-date pace
+    and PPP -- both whole-game averages, and both wrong in exactly the states a
+    live bettor cares about: trailing teams speed up and foul, leading teams
+    milk the clock, blowouts empty benches. A flat model is not merely imprecise
+    there, it is BIASED, and biased hardest in close late games where the
+    interval markets actually trade.
+
+    This measures the effect before anyone models it. If the cells are flat, the
+    simpler model wins and the layer is not built.
+    """
+    global _situational_started
+    spec = str(os.environ.get(_SITUATIONAL_ENV) or "").strip()
+    if not spec or _situational_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] SITUATIONAL_BAD_SPEC {spec!r} -- want <start>..<end>",
+              flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"situational_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] SITUATIONAL_ALREADY_DONE spec={spec}", flush=True)
+        _situational_started = True
+        return False
+    _situational_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] SITUATIONAL_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.analyze_situational_pace import main as _situational_main
+
+            code = _situational_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] SITUATIONAL_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] SITUATIONAL_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-situational-pace", daemon=True).start()
+    return True
+
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     # Fires at most once per process, and returns immediately -- the work runs
     # on a daemon thread so a live slate is never waiting on history.
     maybe_start_backfill(league, out_root)
     maybe_start_verify(league, out_root)
     maybe_start_sweep(league, out_root)
+    maybe_start_interval(league, out_root)
+    maybe_start_situational(league, out_root)
 
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
