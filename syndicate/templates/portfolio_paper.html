@@ -134,6 +134,8 @@
   }
 
   .paper-table td.primary { color: var(--cards-text); }
+  .bet-won { color: #2ecc71; font-weight: 700; letter-spacing: 0.04em; }
+  .bet-lost { color: #e74c3c; font-weight: 700; letter-spacing: 0.04em; }
   .mark-pos { color: #2ecc71; }
   .mark-neg { color: #e74c3c; }
   .paper-table td.pos { color: #2ecc71; }
@@ -208,6 +210,7 @@
 {% set coverage = p.sim_coverage or {} %}
 {% set clv = p.clv_join or {} %}
 {% set marks = p.live_marks or {} %}
+{% set bs = p.bet_status or {} %}
 {% set p2list = p.paper2 or [] %}
 
 {# One renderer for the live mark, shared by the positions table and the orphan
@@ -215,6 +218,34 @@
    American odds are not linear, so a raw price difference would be wrong in
    both directions at once. A named absence beats a blank cell: "book gone" and
    "we never priced it" are different facts. #}
+{# Where the bet stands against the GAME. A DECIDED bet reads differently from
+   one still in play -- Over 1.5 at 2 total bases is won and cannot be undone,
+   while Under 1.5 at 0 is merely still alive. Colour follows decided-ness, not
+   just direction, or the two render the same. #}
+{% macro status_cell(bs) -%}
+  {%- if not bs -%}
+    <span class="paper-table__sub">—</span>
+  {%- elif bs.unavailable_reason -%}
+    <span class="paper-table__sub">{{ bs.unavailable_reason }}</span>
+  {%- elif bs.status == 'won' -%}
+    <span class="bet-won">WON</span>
+    <span class="paper-table__sub">{{ bs.current_value }} vs {{ bs.line }}</span>
+  {%- elif bs.status == 'lost' -%}
+    <span class="bet-lost">LOST</span>
+    <span class="paper-table__sub">{{ bs.current_value }} vs {{ bs.line }}</span>
+  {%- elif bs.status == 'live_ahead' -%}
+    <span class="mark-pos">ahead</span>
+    <span class="paper-table__sub">{{ bs.current_value }} vs {{ bs.line }}{% if bs.monotone %} · undecided{% endif %}</span>
+  {%- elif bs.status == 'live_behind' -%}
+    <span class="mark-neg">behind</span>
+    <span class="paper-table__sub">{{ bs.current_value }} vs {{ bs.line }}</span>
+  {%- elif bs.status == 'not_started' -%}
+    <span class="paper-table__sub">not started</span>
+  {%- else -%}
+    <span class="paper-table__sub">{{ bs.status }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro mark_cell(mark) -%}
   {%- if not mark -%}
     <span class="paper-table__sub">—</span>
@@ -318,6 +349,22 @@
       <div class="paper-tile__meta">at simulated fill price</div>
     </div>
     <div class="paper-tile">
+      <div class="paper-tile__label">Bets standing</div>
+      {% if bs.resolved %}
+        <div class="paper-tile__value">
+          <span class="bet-won">{{ (bs.counts or {}).get('won', 0) }}W</span> ·
+          <span class="bet-lost">{{ (bs.counts or {}).get('lost', 0) }}L</span>
+        </div>
+        <div class="paper-tile__meta">
+          {{ (bs.counts or {}).get('live_ahead', 0) }} ahead · {{ (bs.counts or {}).get('live_behind', 0) }} behind
+          · {{ bs.decided or 0 }} of {{ bs.resolved }} decided
+        </div>
+      {% else %}
+        <div class="paper-tile__value">—</div>
+        <div class="paper-tile__meta">no bet resolved against a live game yet</div>
+      {% endif %}
+    </div>
+    <div class="paper-tile">
       <div class="paper-tile__label">Line movement</div>
       {% if marks.marked %}
         <div class="paper-tile__value{{ ' mark-pos' if (marks.avg_clv_pct or 0) > 0 else (' mark-neg' if (marks.avg_clv_pct or 0) < 0 else '') }}">
@@ -390,7 +437,8 @@
               <th>Side by</th>
               <th>Order</th>
               <th>Fill</th>
-              <th>Now</th>
+              <th>Status</th>
+              <th>Line now</th>
             </tr>
           </thead>
           <tbody>
@@ -440,6 +488,7 @@
                     —
                   {% endif %}
                 </td>
+                <td>{{ status_cell(row.bet_status) }}</td>
                 <td>{{ mark_cell(row.mark) }}</td>
               </tr>
             {% endfor %}
@@ -562,7 +611,7 @@
     <div class="paper-table-wrap" style="margin-top: 8px;">
       <table class="paper-table">
         <thead>
-          <tr><th>Submitted</th><th>Sport</th><th>Selection</th><th>Book</th><th>Price</th><th>Stake</th><th>Status</th><th>Now</th></tr>
+          <tr><th>Submitted</th><th>Sport</th><th>Selection</th><th>Book</th><th>Price</th><th>Stake</th><th>Order</th><th>Status</th><th>Line now</th></tr>
         </thead>
         <tbody id="paper-orphans">
           {% for order in (p.orphan_orders or []) %}
@@ -581,6 +630,7 @@
               <td>{% if order.requested_price is not none %}{{ "%+d"|format(order.requested_price|int) }}{% else %}—{% endif %}</td>
               <td>${{ "%.2f"|format(order.requested_stake_dollars or 0) }}</td>
               <td><span class="paper-pill paper-pill--{{ order.status }}">{{ order.status }}</span></td>
+              <td>{{ status_cell(order.bet_status) }}</td>
               <td>{{ mark_cell(order.mark) }}</td>
             </tr>
           {% endfor %}

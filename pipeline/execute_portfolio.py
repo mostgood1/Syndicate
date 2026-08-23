@@ -84,6 +84,9 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         away_team=position.get("away_team"),
         commence_time=position.get("commence_time"),
         opening_key=position.get("opening_key"),
+        game_pk=(str(position.get("game_pk")).strip() or None)
+        if position.get("game_pk") is not None
+        else None,
     )
 
 

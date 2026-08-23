@@ -3340,6 +3340,13 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
     # `idempotency_key` because that is the identity of an ORDER, and marks
     # cover orphans whose position is no longer in the plan.
     live_marks = (plan or {}).get("live_marks") or {}
+    # Where each bet stands against the GAME. Computed by the worker (it needs
+    # the live feed); this only looks it up, keyed by order identity.
+    bet_status = (plan or {}).get("bet_status") or {}
+    status_by_order = {
+        str(row.get("idempotency_key") or ""): row
+        for row in (bet_status.get("rows") or [])
+    }
     marks_by_order = {
         str(mark.get("idempotency_key") or ""): mark
         for mark in (live_marks.get("marks") or [])
@@ -3352,6 +3359,9 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
                 **position,
                 "order": order,
                 "mark": marks_by_order.get(str((order or {}).get("idempotency_key") or "")),
+                "bet_status": status_by_order.get(
+                    str((order or {}).get("idempotency_key") or "")
+                ),
             }
         )
 
@@ -3368,6 +3378,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "execution_mode": str(job_state.get("execution_mode") or execution_mode()),
         "job_state_source": "worker" if job_state else "web_env",
         "live_marks": live_marks,
+        "bet_status": bet_status,
         "plan_present": isinstance(plan, dict),
         "generated_at": (plan or {}).get("generated_at"),
         "bankroll_units": (plan or {}).get("bankroll_units"),
@@ -3392,7 +3403,11 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "paper2": paper2,
         "rows": rows,
         "orphan_orders": [
-            {**order, "mark": marks_by_order.get(str(order.get("idempotency_key") or ""))}
+            {
+                **order,
+                "mark": marks_by_order.get(str(order.get("idempotency_key") or "")),
+                "bet_status": status_by_order.get(str(order.get("idempotency_key") or "")),
+            }
             for order in orders
             if str(order.get("position_key") or "")
             not in {str(p.get("position_key") or "") for p in positions}

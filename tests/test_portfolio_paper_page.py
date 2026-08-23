@@ -460,3 +460,68 @@ def test_paper2_rows_show_the_price_cost_of_the_restriction(app_client, paper2_e
     assert "-130" in body
     assert "-110" in body
     assert "draftkings" in body
+
+
+# --- the live bet status ---------------------------------------------------
+
+
+def test_bet_status_is_joined_onto_positions_and_orphans(paper_env):
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        bet_status={
+            "resolved": 1,
+            "decided": 1,
+            "counts": {"won": 1},
+            "rows": [{"idempotency_key": "k1", "status": "won", "current_value": 2,
+                      "line": 1.5, "decided": True, "monotone": True}],
+        },
+    )
+    paper_env["orders"] = [_order()]
+    payload = _payload(paper_env)
+    assert payload["rows"][0]["bet_status"]["status"] == "won"
+    assert payload["bet_status"]["counts"]["won"] == 1
+
+
+def test_a_won_bet_renders_as_WON_on_the_page(app_client, paper_env):
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        bet_status={
+            "resolved": 1, "decided": 1, "counts": {"won": 1},
+            "rows": [{"idempotency_key": "k1", "status": "won", "current_value": 2,
+                      "line": 1.5, "decided": True, "monotone": True}],
+        },
+    )
+    paper_env["orders"] = [_order()]
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "WON" in body
+    assert "2 vs 1.5" in body
+
+
+def test_an_undecided_monotone_bet_says_undecided_not_won(app_client, paper_env):
+    """Under 1.5 at 0 total bases is ALIVE, not won. Rendering it as a win is
+    the failure the engine exists to prevent."""
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        bet_status={
+            "resolved": 1, "decided": 0, "counts": {"live_ahead": 1},
+            "rows": [{"idempotency_key": "k1", "status": "live_ahead", "current_value": 0,
+                      "line": 1.5, "decided": False, "monotone": True}],
+        },
+    )
+    paper_env["orders"] = [_order()]
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "undecided" in body
+    assert ">WON<" not in body
+
+
+def test_a_sport_with_no_resolver_shows_the_reason_not_a_blank(app_client, paper_env):
+    paper_env["plan"] = _plan(
+        positions=[_position()],
+        bet_status={
+            "resolved": 0, "decided": 0, "counts": {},
+            "rows": [{"idempotency_key": "k1", "unavailable_reason": "no_resolver_for_wnba"}],
+        },
+    )
+    paper_env["orders"] = [_order()]
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "no_resolver_for_wnba" in body

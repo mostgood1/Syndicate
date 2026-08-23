@@ -275,6 +275,40 @@ def run_portfolio_commit(
     except Exception as exc:
         print(f"[portfolio_commit] LIVE_MARKS_FAILED date={normalized} error={exc}", flush=True)
 
+    # LIVE BET STATUS -- where each placed bet stands against the GAME, not
+    # against the line. `position_marks` answers "has the market moved toward
+    # us"; this answers "is it winning". Different questions, and the second is
+    # the one a person watching a slate actually wants.
+    #
+    # Resolvers are per sport and only MLB has one today, so every other sport's
+    # orders come back with a named reason rather than a blank -- which is the
+    # honest rendering of "not built yet" and is visible on the page as such.
+    try:
+        from syndicate.features.shared.bet_status import (
+            bet_status_report_line,
+            statuses_for_orders,
+        )
+        from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
+
+        status_orders = [
+            order
+            for order in (_load_ledger_for_clv().get("orders") or [])
+            if order.get("selected_date") == normalized
+        ]
+        if status_orders:
+            mlb_resolve = mlb_status_resolver(normalized)
+
+            def _resolve(order):
+                if str(order.get("sport") or "").strip().lower() == "mlb":
+                    return mlb_resolve(order)
+                return {"unavailable_reason": f"no_resolver_for_{order.get('sport')}"}
+
+            statuses = statuses_for_orders(status_orders, resolver=_resolve)
+            print(bet_status_report_line(statuses), flush=True)
+            plan["bet_status"] = statuses
+    except Exception as exc:
+        print(f"[portfolio_commit] BET_STATUS_FAILED date={normalized} error={exc}", flush=True)
+
     # STAGE C'S GATE INPUT: what our placed orders got against the CLOSE.
     # Distinct from the join below, which is orders -> OPENING. A close only
     # exists once a market has stopped moving, so most of the day this resolves
