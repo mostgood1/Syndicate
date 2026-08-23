@@ -49,7 +49,40 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=200)
     parser.add_argument("--max-pages", type=int, default=20)
     parser.add_argument("--out", default=None, help="write the fetch result to this path")
+    parser.add_argument(
+        "--auth",
+        action="store_true",
+        help="READ-ONLY signed call to /portfolio/balance. Places nothing.",
+    )
     args = parser.parse_args()
+
+    if args.auth:
+        # THE FIRST STEP OF A LIVE TEST, and the only one that costs nothing.
+        # Signing has never once executed against Kalshi -- the agent proxy 403s
+        # CONNECT from a dev container -- and `kalshi_client`'s first live run
+        # corrected TEN OF SEVENTEEN field names plus a 100x price error. Assume
+        # the same rate here, and find out on a read rather than on an order.
+        #
+        # `/portfolio/balance` is authenticated and READ-ONLY. There is no
+        # argument to this script that places anything.
+        from syndicate.features.shared.kalshi_auth import probe_auth
+
+        result = probe_auth()
+        print(
+            "[kalshi_auth] PROBE"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" detail={result.get('detail')}"
+            f" url={result.get('url')}"
+            # KEYS, not values. A balance is not a secret but there is no reason
+            # for it to be in a log line whose job is to confirm a signature.
+            f" keys={result.get('keys')}"
+            f" balance_present={result.get('balance_present')}",
+            flush=True,
+        )
+        # Non-zero on anything but success, so a wrapper cannot read a failed
+        # probe as a green light.
+        return 0 if result.get("status") == "ok" else 1
 
     if args.probe:
         report = probe()
