@@ -19,6 +19,7 @@ from scripts.analyze_basketball_momentum import causality_check
 from scripts.analyze_basketball_momentum import forward_margin
 from scripts.analyze_basketball_momentum import forward_total
 from scripts.analyze_basketball_momentum import sweep_game
+from scripts.analyze_basketball_momentum import sweep_season
 from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload
 
 HOME_ID, HOME_TRI = "16", "PHX"
@@ -274,3 +275,56 @@ def test_sweep_reports_margin_and_total_separately() -> None:
             assert key in cell, f"every cell needs {key}"
             r = cell[key]
             assert r is None or -1.0 <= r <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Season-scale pooling
+# ---------------------------------------------------------------------------
+
+def _season_game(seed: int, n: int = 220) -> dict[str, Any]:
+    pressure, scoring = [], []
+    for i in range(n):
+        t = i * 11.0
+        sign = 1.0 if ((i + seed) // 4) % 2 == 0 else -1.0
+        pressure.append({"clock_seconds": t, "possession_index": i * 0.72,
+                         "sign": sign, "weight": 1.0})
+        if i % 3 == 0:
+            scoring.append({"clock_seconds": t, "possession_index": i * 0.72,
+                            "sign": sign, "weight": 2.0})
+    return {"pressure": pressure, "narrator": scoring}
+
+
+def test_pooling_grows_the_sample_and_not_the_output() -> None:
+    """**282 games x 40 cells is 11,280 log lines nobody reads**, and a
+    correlation from ~50 probes of one game is noise. Pooling must multiply n
+    while the grid stays one grid."""
+    one = sweep_season([_season_game(0)])
+    many = sweep_season([_season_game(k) for k in range(20)])
+
+    assert len(one["grid"]) == len(many["grid"]), "the grid must not grow with games"
+    assert many["games"] == 20
+    cell_one = {(c["axis"], c["half_life"], c["horizon_seconds"]): c for c in one["grid"]}
+    for cell in many["grid"]:
+        key = (cell["axis"], cell["half_life"], cell["horizon_seconds"])
+        assert cell["n"] > cell_one[key]["n"] * 10, "pooling must actually pool"
+
+
+def test_pooled_cells_report_games_beside_probes() -> None:
+    """Probes within a game overlap; games do not. Quoting probe count alone
+    overstates the evidence, which is the error the existing live model's
+    n=985-on-3-games makes."""
+    out = sweep_season([_season_game(k) for k in range(5)])
+    assert out["games"] == 5
+    assert out["probes"] > out["games"]
+
+
+def test_a_season_with_no_usable_games_is_not_ok() -> None:
+    assert sweep_season([])["ok"] is False
+    assert sweep_season([{"pressure": [], "narrator": []}])["ok"] is False
+
+
+def test_every_pooled_cell_carries_all_three_coefficients() -> None:
+    for cell in sweep_season([_season_game(k) for k in range(3)])["grid"]:
+        for key in ("r_margin", "r_total", "r_total_abs"):
+            assert key in cell
+            assert cell[key] is None or -1.0 <= cell[key] <= 1.0

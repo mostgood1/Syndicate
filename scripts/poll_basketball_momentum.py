@@ -179,8 +179,10 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
 #     and there is no reason to go faster.
 _BACKFILL_ENV = "SYNDICATE_WNBA_MOMENTUM_BACKFILL"
 _VERIFY_ENV = "SYNDICATE_WNBA_MOMENTUM_VERIFY"
+_SWEEP_ENV = "SYNDICATE_WNBA_MOMENTUM_SWEEP"
 _backfill_started = False
 _verify_started = False
+_sweep_started = False
 
 
 def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
@@ -294,11 +296,65 @@ def maybe_start_verify(league: str, out_root: Path) -> bool:
 
 
 
+def maybe_start_sweep(league: str, out_root: Path) -> bool:
+    """The pooled momentum sweep over a captured range, once.
+
+    **THIS IS THE QUESTION THE WHOLE LANE WAS OPENED TO ANSWER**: does momentum
+    lead scoring, at what half-life, on which axis, over the intervals that are
+    actually traded. It has never been run on real data.
+
+    Gated separately from the verify rather than chained to it, deliberately: a
+    sweep that only runs when a check passes is a sweep whose absence is
+    ambiguous between "clean but unrun" and "blocked". Two flags, two readings.
+    """
+    global _sweep_started
+    spec = str(os.environ.get(_SWEEP_ENV) or "").strip()
+    if not spec or _sweep_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] SWEEP_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"sweep_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] SWEEP_ALREADY_DONE spec={spec}", flush=True)
+        _sweep_started = True
+        return False
+    _sweep_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] SWEEP_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.analyze_basketball_momentum import season_main
+
+            code = season_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] SWEEP_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] SWEEP_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-sweep", daemon=True).start()
+    return True
+
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     # Fires at most once per process, and returns immediately -- the work runs
     # on a daemon thread so a live slate is never waiting on history.
     maybe_start_backfill(league, out_root)
     maybe_start_verify(league, out_root)
+    maybe_start_sweep(league, out_root)
 
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
