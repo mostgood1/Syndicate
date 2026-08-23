@@ -24857,3 +24857,50 @@ DIRECTION only, and its payload already declares
 on the assumption this number might come back at zero. It did.
 
 **IT MUST NOT FEED A PRICE.** That is now a measured constraint, not caution.
+
+## 2026-08-23 18:17:35Z — INTERVAL PROJECTION: THE CURVE IS REAL, AND GAME-PACE HURTS
+
+    [interval] SEASON games=282 league_ppp=1.1271
+    left=0-60s    n=1128  naive_zero= 2.00  league_rate=1.76  game_pace=1.59  <- game_pace
+    left=60-120s  n=2256  naive_zero= 6.00  league_rate=2.10  game_pace=2.11
+    left=120-240s n=4512  naive_zero=13.00  league_rate=2.98  game_pace=3.14
+    left=240-420s n=6768  naive_zero=23.00  league_rate=3.99  game_pace=4.37
+    left=420-600s n=6768  naive_zero=37.00  league_rate=5.43  game_pace=6.50
+    GAME_PACE_VS_LEAGUE improvement=-0.430 points -- game pace does NOT help
+
+### 1. THE ERROR CURVE IS REAL AND STEEP
+
+Median absolute error on the rest of the period falls **5.43 -> 1.76 points** as
+the buzzer approaches. That is the arithmetic tightening exactly as predicted,
+and it is the actionable shape: a quarter-total line moves in half-point
+increments, so sub-2-point accuracy inside the final minute is potentially
+tradeable IF the market is slower than that. **That comparison has not been made
+— it needs the live line.**
+
+### 2. TRACKING THIS GAME'S PACE MAKES THE PROJECTION WORSE
+
+`game_pace` loses to `league_rate` in **4 of 5 buckets**, by up to 1.07 points,
+and by 0.43 points overall. It wins only inside the final minute.
+
+**This is small-sample overfitting, not a bug.** A game's points-per-possession
+to date is estimated from ~150 possessions and is a noisy read of something that
+is largely league-constant (measured league PPP = 1.1271). Using that noisy
+estimate instead of the stable league value imports the noise.
+
+### 3. IT SHARPENS THE USER'S POINT RATHER THAN REFUTING IT
+
+The request was for "shooting trends of TEAMS and their actual pace based on
+GAME SITUATIONS". What was measured and lost is neither of those — it is
+GAME-TO-DATE averaging, the naive version.
+
+  - a TEAM's season profile is ~40 games of evidence, not 150 possessions;
+  - SITUATIONAL pace conditions on (margin x time left), which a game average
+    deliberately smooths away.
+
+So the correct reading is: **the naive per-game layer is refuted; the proposed
+per-team and per-situation layers are untested and now better motivated.** The
+right shrinkage target is the league mean, with team and situation as
+adjustments to it — not a per-game average replacing it.
+
+`analyze_situational_pace` measures whether the situational half of that is real
+before anything is modelled.

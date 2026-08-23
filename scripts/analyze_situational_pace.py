@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import sys
 from collections import defaultdict
 from datetime import date, timedelta
@@ -58,6 +57,22 @@ MARGIN_BUCKETS = ((0, 5), (5, 10), (10, 20), (20, 999))
 # Seconds left in the period.
 LEFT_BUCKETS = ((0, 120), (120, 300), (300, 600))
 WINDOW = 60.0          # measure pace over a rolling minute
+MIN_WINDOWS = 30       # don't report a cell thinner than this
+
+
+def _pace(cell: dict[str, float]) -> float:
+    """Possessions per minute, pooled over the cell's windows."""
+    return cell["poss"] / max(cell["windows"], 1.0)
+
+
+def _ppp(cell: dict[str, float]) -> float:
+    """Points per possession, pooled -- total points over total possessions."""
+    return cell["points"] / max(cell["poss"], 1e-9)
+
+
+def _ft_share(cell: dict[str, float]) -> float:
+    """Free throws as a share of all shooting events, pooled."""
+    return cell["ft"] / max(cell["ft"] + cell["fga"], 1e-9)
 
 
 def _bucket(value: float, buckets) -> tuple[int, int] | None:
@@ -81,9 +96,20 @@ def main(argv: list[str] | None = None) -> int:
         from syndicate.features.shared.refresh_state_store import data_root
         root = data_root()
 
-    # (margin bucket, left bucket) -> [pace samples], [ppp samples]
-    cells: dict[tuple, dict[str, list[float]]] = defaultdict(
-        lambda: {"pace": [], "ppp": [], "ft_share": []})
+    # (margin bucket, left bucket) -> POOLED totals.
+    #
+    # **NOT a median of per-window ratios.** A 60s window holds ~4 possessions,
+    # so points/poss lands on a coarse lattice (4/4, 5/4, ...) and its median
+    # snaps to a lattice point -- three unrelated cells reported ppp=1.031 and
+    # every late cell reported ft_share=0.286 (=2/7) in the first run, which
+    # reads as a measured agreement and is an artifact of the statistic. Free
+    # throws are worse: most windows have zero, so the median is 0.000 until
+    # the zero share crosses one half and then jumps discontinuously.
+    #
+    # Pooling totals across the cell gives the ratio estimator a model would
+    # actually use, and removes both failure modes.
+    cells: dict[tuple, dict[str, float]] = defaultdict(
+        lambda: {"windows": 0.0, "poss": 0.0, "points": 0.0, "ft": 0.0, "fga": 0.0})
     team_shots: dict[str, dict[str, float]] = defaultdict(
         lambda: {"fg2": 0.0, "fg3": 0.0, "ft": 0.0, "tov": 0.0, "poss": 0.0})
     games = 0
@@ -156,13 +182,14 @@ def main(argv: list[str] | None = None) -> int:
 
                 if poss > 0:
                     cell = cells[(mkey, lkey)]
-                    cell["pace"].append(poss)              # possessions per minute
-                    cell["ppp"].append(points / poss)
-                    fts = sum(1 for r in window_rows if str(r.get("type")) == "free_throw")
-                    shots = sum(1 for r in window_rows
-                                if str(r.get("type")) in ("shot_attempt_2", "shot_attempt_3"))
-                    if shots + fts > 0:
-                        cell["ft_share"].append(fts / (shots + fts))
+                    cell["windows"] += 1.0
+                    cell["poss"] += poss
+                    cell["points"] += points
+                    cell["ft"] += sum(1 for r in window_rows
+                                      if str(r.get("type")) == "free_throw")
+                    cell["fga"] += sum(1 for r in window_rows
+                                       if str(r.get("type")) in ("shot_attempt_2",
+                                                                 "shot_attempt_3"))
                 t += WINDOW
 
     if not games:
@@ -174,20 +201,20 @@ def main(argv: list[str] | None = None) -> int:
     for mkey in MARGIN_BUCKETS:
         for lkey in LEFT_BUCKETS:
             cell = cells.get((mkey, lkey))
-            if not cell or len(cell["pace"]) < 30:
+            if not cell or cell["windows"] < MIN_WINDOWS:
                 continue
             print(f"[situational] CELL margin={mkey[0]}-{mkey[1]} left={lkey[0]}-{lkey[1]}s "
-                  f"n={len(cell['pace'])} "
-                  f"pace={statistics.median(cell['pace']):.2f} "
-                  f"ppp={statistics.median(cell['ppp']):.3f} "
-                  f"ft_share={statistics.median(cell['ft_share']) if cell['ft_share'] else 0:.3f}",
+                  f"n={int(cell['windows'])} "
+                  f"pace={_pace(cell):.2f} "
+                  f"ppp={_ppp(cell):.3f} "
+                  f"ft_share={_ft_share(cell):.3f}",
                   flush=True)
 
     # **THE HEADLINE: does the situation move pace at all?** If the spread
     # across cells is trivial, the flat model is fine and this layer is not
     # worth building.
-    paces = [statistics.median(c["pace"]) for c in cells.values() if len(c["pace"]) >= 30]
-    ppps = [statistics.median(c["ppp"]) for c in cells.values() if len(c["ppp"]) >= 30]
+    paces = [_pace(c) for c in cells.values() if c["windows"] >= MIN_WINDOWS]
+    ppps = [_ppp(c) for c in cells.values() if c["windows"] >= MIN_WINDOWS]
     if paces:
         print(f"[situational] PACE_SPREAD min={min(paces):.2f} max={max(paces):.2f} "
               f"ratio={max(paces)/max(min(paces), 1e-6):.2f}x", flush=True)
