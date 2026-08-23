@@ -134,3 +134,49 @@ def test_paging_stops_and_reports_truncation(monkeypatch):
     assert report["pages"] == 3
     assert report["truncated"] is True
     assert report["count"] == 3
+
+
+# --- discovery -------------------------------------------------------------
+
+
+def test_discover_groups_by_series_from_kalshis_own_tickers(monkeypatch):
+    """UNFILTERED on purpose. Fetching by series_ticker needs the ticker, and a
+    guessed one that does not exist returns an empty page indistinguishable from
+    a venue listing nothing -- the exact false negative this module exists to
+    avoid. Grouping an unfiltered pull takes the tickers from Kalshi instead."""
+    import syndicate.features.shared.kalshi_client as mod
+
+    monkeypatch.setattr(mod, "_get", lambda url, **kw: {"markets": [
+        {"ticker": "A", "series_ticker": "KXMLBGAME", "title": "Yankees win?", "yes_ask": 62},
+        {"ticker": "B", "series_ticker": "KXMLBGAME", "title": "Sox win?", "yes_ask": 45},
+        {"ticker": "C", "series_ticker": "KXNBAPTS", "title": "Over 20.5 pts?", "yes_ask": 51},
+    ], "cursor": None})
+    report = mod.discover()
+    assert report["series_count"] == 2
+    assert report["by_series"]["KXMLBGAME"] == 2
+    assert report["series_examples"]["KXNBAPTS"] == "Over 20.5 pts?"
+
+
+def test_discover_orders_series_by_volume():
+    """The biggest series first, because the question is what Kalshi mostly
+    lists, not what it lists alphabetically."""
+    import syndicate.features.shared.kalshi_client as mod
+
+    original = mod._get
+    mod._get = lambda url, **kw: {"markets": [
+        {"series_ticker": "SMALL", "yes_ask": 50},
+        {"series_ticker": "BIG", "yes_ask": 50},
+        {"series_ticker": "BIG", "yes_ask": 50},
+    ], "cursor": None}
+    try:
+        assert list(mod.discover()["by_series"]) == ["BIG", "SMALL"]
+    finally:
+        mod._get = original
+
+
+def test_a_market_with_no_series_is_labelled_not_dropped(monkeypatch):
+    import syndicate.features.shared.kalshi_client as mod
+
+    monkeypatch.setattr(mod, "_get", lambda url, **kw: {
+        "markets": [{"ticker": "A", "yes_ask": 50}], "cursor": None})
+    assert mod.discover()["by_series"]["<absent>"] == 1

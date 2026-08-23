@@ -5110,6 +5110,15 @@ class IntelligenceStateService:
         # also why it is wrapped — a sizing failure must never take down the
         # board build that just succeeded.
         try:
+            # ONE HTTP CALL PER BOOT, guarded and non-fatal. Answers what
+            # Kalshi actually lists, which OddsAPI's game-lines-only feed cannot.
+            try:
+                from pipeline.kalshi_discovery import run_kalshi_discovery
+
+                run_kalshi_discovery()
+            except Exception as exc:
+                print(f"[intelligence_state] KALSHI_DISCOVERY_FAILED error={exc}", flush=True)
+
             from pipeline.portfolio_commit import run_portfolio_commit
 
             commit_result = run_portfolio_commit(str(selected_date or ""))

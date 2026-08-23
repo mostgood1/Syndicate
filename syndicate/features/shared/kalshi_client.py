@@ -55,6 +55,7 @@ __all__ = [
     "cents_to_american",
     "normalize_market",
     "fetch_markets",
+    "discover",
     "probe",
     "KalshiError",
 ]
@@ -245,6 +246,35 @@ def fetch_markets(
         "host_errors": errors,
         "authenticated": _api_key() is not None,
     }
+
+
+def discover(*, limit: int = 200, max_pages: int = 10) -> dict[str, Any]:
+    """What does Kalshi actually list right now, grouped by series?
+
+    THE DISCOVERY CALL, and deliberately UNFILTERED. Fetching by
+    `series_ticker` requires knowing the ticker, and guessing one that does not
+    exist returns an empty page that looks exactly like a venue listing nothing
+    -- the same false negative this whole module exists to avoid. Pulling open
+    markets and grouping by `series_ticker` inverts that: the tickers come from
+    Kalshi rather than from my memory of their naming.
+
+    `by_series` is the answer to the question the OddsAPI numbers could not
+    reach: whether Kalshi lists player props at all, and at what volume.
+    """
+    report = fetch_markets(status="open", limit=limit, max_pages=max_pages)
+    by_series: dict[str, int] = {}
+    titled: dict[str, str] = {}
+    for market in report.get("markets") or ():
+        series = str(market.get("series_ticker") or "") or "<absent>"
+        by_series[series] = by_series.get(series, 0) + 1
+        # One example title per series, so a ticker like KXMLBGAME is readable
+        # without a second lookup.
+        if series not in titled and market.get("title"):
+            titled[series] = str(market.get("title"))[:80]
+    report["by_series"] = dict(sorted(by_series.items(), key=lambda kv: -kv[1]))
+    report["series_examples"] = titled
+    report["series_count"] = len(by_series)
+    return report
 
 
 def probe(*, limit: int = 5) -> dict[str, Any]:
