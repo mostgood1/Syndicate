@@ -53,35 +53,15 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         return {"status": "skipped", "reason": "already_ran_this_boot"}
     _ALREADY_RAN = True
 
-    from syndicate.features.shared.kalshi_client import KalshiError, discover, probe
-
-    # SCHEMA FIRST, and reported separately from the data. The field names in
-    # `kalshi_client` were written without ever calling the API (the agent proxy
-    # denies the host from a Claude session), so this line is what turns them
-    # from an assumption into a checked fact -- or names the ones that are wrong.
-    try:
-        shape = probe()
-        attempt = next((a for a in shape.get("attempts") or [] if a.get("ok")), None)
-        if attempt is None:
-            errors = "; ".join(
-                str(a.get("error")) for a in (shape.get("attempts") or [])
-            )
-            print(f"[kalshi_discovery] PROBE_FAILED {errors}", flush=True)
-            return {"status": "error", "reason": "probe_failed", "detail": errors}
-        print(
-            "[kalshi_discovery] PROBE_OK"
-            f" base={attempt.get('base')}"
-            f" market_keys={attempt.get('market_keys')}"
-            # Non-empty on either side means my field names are wrong, and says
-            # exactly which -- the whole point of probing before parsing.
-            f" expected_but_absent={attempt.get('expected_but_absent')}"
-            f" present_but_unexpected={attempt.get('present_but_unexpected')}",
-            flush=True,
-        )
-    except Exception as exc:
-        print(f"[kalshi_discovery] PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
-        return {"status": "error", "reason": f"probe_error: {exc}"}
-
+    # FIRST, and before the unauthenticated schema probe -- which has its own
+    # early `return` and on 2026-08-23T19:21:07Z took this whole function down
+    # with `http_429` on both public hosts. The auth probe never ran, because I
+    # had placed it behind a gate it has nothing to do with.
+    #
+    # Third time today that an unrelated check hid the measurement behind it
+    # (the Kalshi date guard, then feed-before-market in the grader). The rule
+    # that keeps falling out: a thing you are trying to MEASURE must not sit
+    # downstream of a thing that can fail for its own reasons.
     # AUTHENTICATED READ, once per boot, and READ-ONLY BY CONSTRUCTION.
     # `probe_auth` asks for the account balance; there is no argument to it that
     # places anything, and nothing in this module can trade.
@@ -112,6 +92,36 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         # Non-fatal: a signing failure must not cost the read-only discovery
         # that runs beside it and needs no credential at all.
         print(f"[kalshi_discovery] AUTH_PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+
+    from syndicate.features.shared.kalshi_client import KalshiError, discover, probe
+
+    # SCHEMA FIRST, and reported separately from the data. The field names in
+    # `kalshi_client` were written without ever calling the API (the agent proxy
+    # denies the host from a Claude session), so this line is what turns them
+    # from an assumption into a checked fact -- or names the ones that are wrong.
+    try:
+        shape = probe()
+        attempt = next((a for a in shape.get("attempts") or [] if a.get("ok")), None)
+        if attempt is None:
+            errors = "; ".join(
+                str(a.get("error")) for a in (shape.get("attempts") or [])
+            )
+            print(f"[kalshi_discovery] PROBE_FAILED {errors}", flush=True)
+            return {"status": "error", "reason": "probe_failed", "detail": errors}
+        print(
+            "[kalshi_discovery] PROBE_OK"
+            f" base={attempt.get('base')}"
+            f" market_keys={attempt.get('market_keys')}"
+            # Non-empty on either side means my field names are wrong, and says
+            # exactly which -- the whole point of probing before parsing.
+            f" expected_but_absent={attempt.get('expected_but_absent')}"
+            f" present_but_unexpected={attempt.get('present_but_unexpected')}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(f"[kalshi_discovery] PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
+        return {"status": "error", "reason": f"probe_error: {exc}"}
 
     try:
         report = discover()
