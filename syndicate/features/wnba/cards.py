@@ -3609,12 +3609,23 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
         # The blocks now carry `home_tri`/`away_tri`, so the same
         # `(away, home)` pair the rest of this module already joins on works
         # here too. Tried only AFTER the id, which stays the exact key.
+        # **BOTH SIDES THROUGH `_canonical_wnba_tri`.** ESPN says `LA` for the
+        # Los Angeles Sparks and this module's own vocabulary says `LAS`, which
+        # is why the first fallback still missed: measured 01:49:50Z, the card
+        # read `('CON', 'LAS')` and the block `('CON', 'LA')` -- away matched,
+        # home did not. A vocabulary mismatch, not a semantics one.
+        #
+        # The normaliser was already here (`_canonical_wnba_tri`, :284) and its
+        # own comment at :314 names this exact ESPN-vs-canonical difference. The
+        # join simply was not using it. Normalising is safe in a way that an
+        # unordered match is not: it maps two spellings of ONE team onto each
+        # other without ever swapping which side is home.
         by_matchup: dict[tuple[str, str], Any] = {}
         for candidate in blocks.values():
             if not isinstance(candidate, dict):
                 continue
-            home_tri = str(candidate.get("home_tri") or "").strip().upper()
-            away_tri = str(candidate.get("away_tri") or "").strip().upper()
+            home_tri = _canonical_wnba_tri(str(candidate.get("home_tri") or "").strip().upper())
+            away_tri = _canonical_wnba_tri(str(candidate.get("away_tri") or "").strip().upper())
             if home_tri and away_tri:
                 by_matchup[(away_tri, home_tri)] = candidate
 
@@ -3640,8 +3651,8 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
                 # match assumes one meeting of these two teams per date. True
                 # for a WNBA slate, and the id is always preferred.
                 block = by_matchup.get((
-                    str((game.get("away") or {}).get("abbr") or "").strip().upper(),
-                    str((game.get("home") or {}).get("abbr") or "").strip().upper(),
+                    _canonical_wnba_tri(str((game.get("away") or {}).get("abbr") or "").strip().upper()),
+                    _canonical_wnba_tri(str((game.get("home") or {}).get("abbr") or "").strip().upper()),
                 ))
             if block is None:
                 continue
