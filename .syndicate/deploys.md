@@ -25128,3 +25128,136 @@ verify: PENDING, two readings, both from this deploy's logs —
   - `[situational] TEAM_SPREAD`, on whether three-point share spreads wider than
     points per possession — i.e. whether team identity belongs in an interval
     total's VARIANCE rather than its centre.
+
+### verify for `dep-da5neee417fc7382de70` — 22:46:50Z — HELD-OUT, and the answer needs a caveat
+
+    [interval] SEASON games=282 train_games=193 test_games=89 train_days=69/99
+               league_ppp=1.1169
+    [interval] FITTED_RATES late_window=60s pace_normal=3.756 ppp_normal=1.1181
+               pace_late=4.681 ppp_late=1.1078 pace_lift=1.246x
+
+    BUCKET left=0-60s    n=356  naive_zero=2.00  league_rate=1.82 game_pace=1.68 league_late=1.59 best=league_late
+    BUCKET left=60-120s  n=712  naive_zero=6.00  league_rate=2.13 game_pace=2.15 league_late=2.19 best=league_rate
+    BUCKET left=120-240s n=1424 naive_zero=13.00 league_rate=2.88 game_pace=3.25 league_late=2.65 best=league_late
+    BUCKET left=240-420s n=2136 naive_zero=24.00 league_rate=4.03 game_pace=4.48 league_late=3.98 best=league_late
+    BUCKET left=420-600s n=2136 naive_zero=38.00 league_rate=5.73 game_pace=6.79 league_late=5.12 best=league_late
+
+    GAME_PACE_VS_LEAGUE  improvement=-0.373 -- game pace does NOT help
+    LATE_SPLIT_VS_LEAGUE improvement=+0.177 -- the final-minute split helps
+
+**THE PRE-REGISTERED CRITERION IS MET AND I AM NOT CLAIMING THE MECHANISM.**
+`league_late` wins 4 of 5 buckets and +0.177 points on dates it was not fitted
+on. But it differs from `league_rate` in TWO ways — `league_rate` uses THIS
+GAME's pace for the possession count and only borrows league efficiency, while
+`league_late` uses neither — so the win is not attributable.
+
+Two readings say the pace source is doing most of it:
+- the LARGEST absolute gain is at `left=420-600s` (5.73 -> 5.12), where at most
+  60 of 600 seconds are late and the mechanism can barely apply;
+- `left=60-120s` got WORSE (2.13 -> 2.19), which a real final-minute effect
+  should not do.
+
+`league_flat` (blended league pace, league PPP, no split) shipped in PR #23 as
+the matched control, reported as `PACE_SOURCE` and `LATE_SPLIT_VS_FLAT`. The old
+line is renamed `..._CONFOUNDED` so it cannot be quoted as evidence.
+
+**CORRECTION TO A NUMBER I GAVE.** I reported the final minute as "~17% faster"
+from the situational table (4.52/3.87). The clean fit — where `pace_normal`
+excludes the late windows entirely rather than averaging bucket medians — says
+**1.246x, ~25%**. The larger figure is the better-founded one.
+
+### and the TEAM question, answered against my own stated prior
+
+    [situational] TEAM_SPREAD teams=15 three_share=0.279-0.449 (1.61x)
+                  ppp=1.039-1.204 (1.16x) ppp_sd=0.993-1.102 (1.11x)
+
+I predicted three-point share would be a VARIANCE parameter — a 3 at ~33% and a
+2 at ~47% are worth nearly the same per attempt, so share should move the tail
+and not the centre. **Measured, it is the other way round.** Team scoring MEAN
+spreads 1.16x (1.039 to 1.204 points per possession) while team scoring SD
+spreads only 1.11x (0.993 to 1.102). The mean moves more than the tail.
+
+That is a cleaner result than the hypothesis would have been: **team identity
+belongs in the CENTRE of an interval total, not its uncertainty.** 0.165 points
+per possession across ~20 possessions per team per quarter is ~3.3 points of
+quarter total between the league's extremes — material against a line that moves
+in half-points.
+
+### and a contamination the new diagnostic caught on its first run
+
+    CELL margin=0-5    left=0-120s left_vals=[0, 60]
+    CELL margin=5-10   left=0-120s left_vals=[0, 60]
+    CELL margin=10-20  left=0-120s left_vals=[60]
+    CELL margin=20-999 left=0-120s left_vals=[60]
+
+`left=0` is OVERTIME — `period_bounds` folds OT into the last regulation period
+and returns left=0.0, which buckets as `0-120s`. It appears in exactly the two
+CLOSE cells because only close games reach overtime, so the contamination was
+correlated with the axis being measured. Excluded and counted in PR #23.
+
+**The `left_vals` line was added an hour earlier for a different reason** — to
+stop `left=0-120s` being read as a swept range when it is one sampled point. It
+found a bug it was not looking for, on its first production run. Cheap
+diagnostics that state what a number IS keep paying out.
+
+## 2026-08-23 22:52Z — live-odds-worker — the CONTROLLED comparison, and I was wrong about which knob mattered
+
+lane: `basketball-live-momentum`, claim `3f1126851d9f393b` HELD (9.3 min at fire,
+re-checked), `live_events=0` at 22:51:32Z — 18 seconds before the deploy, not
+three hours.
+deploy: `dep-da5nj7uk1f9s73964udg` on `8bf0d9c2` (= PR #23 merge)
+specs bumped a day to clear the one-shot sentinels: `..._INTERVAL_PROJECTION=
+2026-05-02..2026-08-22`, `..._SITUATIONAL_PACE=2026-05-02..2026-08-23`. Costs one
+date, so `games=281` and `test_games=86` here versus 282/89 before — the run is
+not bit-comparable with the previous one and is not being compared to it.
+
+**verify, 22:57:20Z:**
+
+    FITTED_RATES pace_normal=3.757 ppp_normal=1.1201 pace_late=4.677
+                 ppp_late=1.1076 pace_all=3.846 pace_lift=1.245x
+
+    BUCKET left=0-60s    n=344  flat=1.85 late=1.59   (-14.1%)
+    BUCKET left=60-120s  n=688  flat=2.30 late=2.18   ( -5.2%)
+    BUCKET left=120-240s n=1376 flat=2.94 late=2.61   (-11.2%)
+    BUCKET left=240-420s n=2064 flat=4.00 late=3.91   ( -2.2%)
+    BUCKET left=420-600s n=2064 flat=5.11 late=5.05   ( -1.2%)
+
+    PACE_SOURCE        +0.108 -- league pace beats game pace
+    LATE_SPLIT_VS_FLAT +0.106 -- the final-minute split helps
+    ..._CONFOUNDED     +0.214
+
+**I PREDICTED THE PACE SOURCE WAS DOING MOST OF THE WORK. IT IS DOING HALF.**
++0.108 and +0.106, summing to +0.214 with no interaction. The mechanism survives
+a control that differs from it by the mechanism alone, which is the standard
+`model_engine_standard.md` sets, and it survives it on held-out dates.
+
+The structural half of my reading WAS right and is worth separating from the
+wrong half: the `left=420-600s` gain really was the pace source (`rate->flat`
+-0.59 there, versus +0.01 at 0-60s where the pace source does nothing). What I
+got wrong was generalising that one bucket to the pooled number.
+
+**AND THE ANOMALY WAS AN ARTIFACT OF THE CONFOUNDED BASELINE.** `left=60-120s`
+previously read as the mechanism making things WORSE (2.13 -> 2.19). Against the
+matched control it improves like every other bucket (2.30 -> 2.18). It was never
+the mechanism failing; it was `league_rate`'s game-pace possession count doing
+unusually well in that one bucket. **Against the right control the split now
+wins 5 of 5.**
+
+### WHAT IS NOT ESTABLISHED, AND IT IS THE SIZE
+
++0.106 points on a pooled median of 3.51 is a **3% improvement**, and the
+effective sample is **86 held-out GAMES**, not 6,536 probes — probes inside one
+game overlap heavily and are nowhere near independent. No confidence interval has
+been computed. 5-of-5 agreement in direction is real evidence, but the buckets
+share those same 86 games, so it is not five independent trials either.
+
+**The sobering framing for the market join:** at `left=0-60s`, `naive_zero=2.00`
+and `league_late=1.59`. Assuming NOTHING more is scored in the final minute is
+within 0.41 points of the best model here. Whatever edge exists at the sharp end
+of the curve is small in absolute points, and a half-point line is the unit it
+has to beat.
+
+verify: **CLEAR.** Best model on held-out dates is `league_late` — pure league
+constants, final minute priced apart. Bucket curve 1.59 / 2.18 / 2.61 / 3.91 /
+5.05. `game_pace` is best in NO bucket. `league_rate` still edges `league_late`
+at 60-120s (2.13 vs 2.18, n=688) — noted, not modelled around.
