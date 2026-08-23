@@ -24120,7 +24120,43 @@ it does bind Bash-driven deploys -- but I stated it as protection and it is not.
 If binding coverage is wanted, the guard needs a matcher for the Render MCP tool
 names; that is a settings change and nobody's lane tonight.
 
-verify: OWED -- `[order_clv] ORDER_CLV ... resolved=N` with N > 0. Expect N=0 for
+verify: **SATISFIED 00:48:00Z, instance `-jbwkx`:**
+
+    [order_clv] ORDER_CLV date=2026-08-22 orders=39 resolved=4 markets=3
+      same_book_n=4 same_book_avg_clv_pct=2.1573 same_book_beat=3
+      reasons={'no_close_for_market': 35, 'resolved': 4}
+
+The grader works end to end, and all 4 pairs are SAME-BOOK -- better than
+`clv_join`'s own 150-opening measurement, which recorded `same_book n=0`. So a
+placed order carries enough identity to make the unbiased comparison, which is
+the one Stage C's headline requires. **n=4 is not a result and the +2.1573 must
+not be quoted as one.**
+
+**THE FINDING IS THE 35, AND IT REFRAMES STAGE C.** The pre-registered failure
+mode was `resolved=0` meaning the odds-history shard was not reaching this
+service. It is 4, not 0, so the shard arrives. This is instead the capture-side
+gap `compute_clv_for_date` already documents: of 78 openings, 32 missed because
+the market was in history but OUR BOOK was not, and 18 because the family is
+absent from history entirely (`h2h_lay`, `totals_alt`, `h2h_3_way`,
+`spreads_alt`). Tonight's orders are full of exactly those families.
+
+So the Stage C constraint I reported earlier -- "7-8 positions/night makes
+per-market n=50 take months" -- was the wrong constraint. **The binding one is
+that odds history does not capture the market families the portfolio bets in.**
+At 4 graded bets per slate across 3 markets the gate is not months away, it is
+unreachable on the current capture, and widening the slate would not fix it.
+
+**AND I FLATTENED THE ATTRIBUTION I HAD.** `order_clv`'s own comment says
+`compute_clv_for_date` counts WHY each opening went unresolved and that the
+detail is "preserved there rather than flattened into this one name" -- then the
+code keeps only `rows` and discards `unresolved`. So `no_close_for_market: 35`
+is a number without the split that already exists one layer down. Same shape as
+the bug the named reasons caught in `position_marks`. **NEXT: carry `unresolved`
+through, so 35 splits into our-book-absent vs family-untracked -- different
+problems with different remedies (book coverage vs capturing those families or
+excluding them from the gate).**
+
+superseded OWED line, kept for the record: `resolved=N` with N > 0. Expect N=0 for
 today and non-zero for the PRIOR date: a close only exists once a market has
 stopped moving, which is why this runs over the ledger and not over today's
 positions. `resolved=0` with `reasons={'no_close_for_market': N}` on a date whose
