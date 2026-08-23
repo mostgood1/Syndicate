@@ -360,7 +360,8 @@ def paper2_env(paper_env, monkeypatch):
     import pipeline.portfolio_commit as commit_mod
 
     state = {"venue": "kalshi", "plan": None}
-    monkeypatch.setattr(commit_mod, "paper2_venue", lambda: state["venue"])
+    monkeypatch.setattr(commit_mod, "paper2_venues", lambda: tuple(
+        v for v in [state["venue"]] if v))
     monkeypatch.setattr(
         commit_mod, "read_portfolio_plan_for_venue", lambda date, venue: state["plan"]
     )
@@ -384,14 +385,14 @@ def _venue_plan(positions=None, **overrides):
 def test_paper2_coverage_is_derived_from_the_refusals(paper2_env):
     """Derived, not stored, so it can never disagree with the counts beside it."""
     paper2_env["plan"] = _venue_plan()
-    p2 = _payload(paper2_env)["paper2"]
+    p2 = _payload(paper2_env)["paper2"][0]
     # 40 scoped of (40 + 1460) considered.
     assert p2["coverage"] == pytest.approx(40 / 1500, abs=1e-4)
     assert p2["venue_not_quoting"] == 1460
 
 
 def test_paper2_absent_degrades_to_not_running(paper2_env):
-    p2 = _payload(paper2_env)["paper2"]
+    p2 = _payload(paper2_env)["paper2"][0]
     assert p2["plan_present"] is False
     assert p2["rows"] == []
     assert p2["coverage"] is None
@@ -399,9 +400,7 @@ def test_paper2_absent_degrades_to_not_running(paper2_env):
 
 def test_paper2_disabled_reports_no_venue(paper2_env):
     paper2_env["venue"] = ""
-    p2 = _payload(paper2_env)["paper2"]
-    assert p2["venue"] is None
-    assert p2["plan_present"] is False
+    assert _payload(paper2_env)["paper2"] == []
 
 
 def test_a_paper2_read_failure_does_not_take_down_the_main_portfolio(paper2_env, monkeypatch):
@@ -414,16 +413,36 @@ def test_a_paper2_read_failure_does_not_take_down_the_main_portfolio(paper2_env,
     monkeypatch.setattr(commit_mod, "read_portfolio_plan_for_venue", boom)
     paper2_env["plan"] = _venue_plan()
     payload = _payload(paper2_env)
-    assert payload["paper2"]["plan_present"] is False
+    assert payload["paper2"][0]["plan_present"] is False
     # The unrestricted side is untouched.
     assert payload["commit_enabled"] is True
 
 
 def test_zero_paper2_positions_is_an_answer_not_a_gap(app_client, paper2_env):
-    """40 quoted and none clearing the gates IS the Stage D answer."""
+    """40 quoted and none clearing the gates IS the Stage D answer, so the row
+    shows WHY rather than rendering as an empty cell."""
     paper2_env["plan"] = _venue_plan(positions=[])
     body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
-    assert "none</strong> cleared the gates" in body
+    assert "an answer, not a gap" in body
+    # The refusal that explains the zero is on the row itself.
+    assert "below_min_ev_pct" in body
+
+
+def test_sim_view_on_is_reported_beside_coverage(paper2_env):
+    """Coverage alone is not the constraint. Kalshi quoted 47 rows and the model
+    had a view on 12; a venue quoting plenty of markets the sim has no opinion
+    about is not a venue this system can trade."""
+    paper2_env["plan"] = _venue_plan(
+        positions=[], rows_in=47, refusals={"no_model_edge_pct": 35, "below_min_ev_pct": 11}
+    )
+    p2 = _payload(paper2_env)["paper2"][0]
+    assert p2["rows_in"] == 47
+    assert p2["sim_view_on"] == 12
+
+
+def test_sim_view_on_never_goes_negative(paper2_env):
+    paper2_env["plan"] = _venue_plan(positions=[], rows_in=2, refusals={"no_model_edge_pct": 9})
+    assert _payload(paper2_env)["paper2"][0]["sim_view_on"] == 0
 
 
 def test_paper2_rows_show_the_price_cost_of_the_restriction(app_client, paper2_env):

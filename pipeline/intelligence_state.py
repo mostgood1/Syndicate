@@ -5152,8 +5152,12 @@ class IntelligenceStateService:
                 # Placed SECOND and in its own try/except: the unrestricted
                 # portfolio is the one that matters, and a comparison must never
                 # be able to break the thing it is comparing against.
-                venue_scope = commit_result.get("venue")
-                if venue_scope and (commit_result.get("venue_plan") or {}).get("positions"):
+                for venue_scope, venue_plan in (commit_result.get("venue_plans") or {}).items():
+                    if not (venue_plan or {}).get("positions"):
+                        # Nothing cleared the gates at this venue's prices. That
+                        # is an ANSWER (see VENUE_SCOPE / PAPER2_PLAN_WRITTEN),
+                        # not a failure, and it needs no order.
+                        continue
                     try:
                         paper2_result = run_execution(
                             str(selected_date or ""), inline=True, venue_scope=venue_scope
@@ -5170,13 +5174,16 @@ class IntelligenceStateService:
                         elif paper2_result.get("reason") not in {"disabled", "no_plan"}:
                             print(
                                 f"[intelligence_state] PAPER2_EXECUTE_SKIPPED "
-                                f"status={paper2_result.get('status')} "
+                                f"venue={venue_scope} status={paper2_result.get('status')} "
                                 f"reason={paper2_result.get('reason')}",
                                 flush=True,
                             )
                     except Exception as exc:
+                        # Per venue, so one venue's failure cannot cost the
+                        # others' orders.
                         print(
-                            f"[intelligence_state] PAPER2_EXECUTE_FAILED error={exc}",
+                            f"[intelligence_state] PAPER2_EXECUTE_FAILED "
+                            f"venue={venue_scope} error={exc}",
                             flush=True,
                         )
             elif commit_result.get("reason") not in {"disabled", "no_shortlist"}:

@@ -208,7 +208,7 @@
 {% set coverage = p.sim_coverage or {} %}
 {% set clv = p.clv_join or {} %}
 {% set marks = p.live_marks or {} %}
-{% set p2 = p.paper2 or {} %}
+{% set p2list = p.paper2 or [] %}
 
 {# One renderer for the live mark, shared by the positions table and the orphan
    table. Movement is ALWAYS probability points from `clv_pct_from_prices` --
@@ -450,59 +450,71 @@
     </div>
   </div>
 
-  {# PAPER2 -- the venue-restricted book, beside the unrestricted one because
-     the COMPARISON is the deliverable. Reading them off two pages invites
-     pairing the wrong two runs. #}
-  <div class="paper-section" id="paper2-section" {% if not p2.venue %}hidden{% endif %}>
+  {# PAPER2 -- one book per automatable venue, in ONE table.
+     The comparison ACROSS venues is the deliverable: Kalshi's 3.8% coverage
+     only means something next to the others', and four separate cards would
+     make the reader do the comparison by memory. #}
+  <div class="paper-section" id="paper2-section" {% if not p2list %}hidden{% endif %}>
     <h2 class="paper-section-title">
-      paper2 — {{ (p2.venue or '')|upper }} only
+      paper2 — exchanges with an order API
       <span style="text-transform:none;letter-spacing:0;color:var(--cards-text-dim);font-size:11px;">
-        · the same board priced at one venue, to decide whether an automated placer is worth building
+        · the same board priced at each venue, to decide whether an automated placer is worth building
       </span>
     </h2>
-    {% if not p2.plan_present %}
-      <div class="paper-empty">
-        No {{ p2.venue }} plan for {{ p.date or 'this date' }} yet. It is written in the same pass as the
-        unrestricted plan, so if that one exists and this does not, the scoping step refused every row —
-        check <code>VENUE_SCOPE</code> on the worker.
-      </div>
-    {% else %}
-      <div class="paper-tiles">
-        <div class="paper-tile">
-          <div class="paper-tile__label">{{ (p2.venue or '')|upper }} coverage</div>
-          <div class="paper-tile__value{% if (p2.coverage or 0) < 0.25 %} warn{% endif %}">
-            {% if p2.coverage is not none %}{{ "%.0f"|format((p2.coverage or 0) * 100) }}%{% else %}—{% endif %}
-          </div>
-          <div class="paper-tile__meta">{{ p2.rows_in or 0 }} of {{ (p2.rows_in or 0) + (p2.venue_not_quoting or 0) }} candidates quoted</div>
-        </div>
-        <div class="paper-tile">
-          <div class="paper-tile__label">Positions</div>
-          <div class="paper-tile__value">{{ p2.positions or 0 }}</div>
-          <div class="paper-tile__meta">vs {{ totals.positions or 0 }} unrestricted</div>
-        </div>
-        <div class="paper-tile">
-          <div class="paper-tile__label">Staked</div>
-          <div class="paper-tile__value">${{ "%.2f"|format(p2.staked_dollars or 0) }}</div>
-          <div class="paper-tile__meta">vs ${{ "%.2f"|format(totals.staked_dollars or 0) }} unrestricted</div>
-        </div>
-        <div class="paper-tile">
-          <div class="paper-tile__label">Sim share of stake</div>
-          <div class="paper-tile__value">{% if p2.sim_share_of_staked is not none %}{{ "%+.1f"|format((p2.sim_share_of_staked or 0) * 100) }}%{% else %}—{% endif %}</div>
-          <div class="paper-tile__meta">vs {% if totals.sim_share_of_staked is not none %}{{ "%+.1f"|format((totals.sim_share_of_staked or 0) * 100) }}%{% else %}—{% endif %} unrestricted</div>
-        </div>
-      </div>
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead>
+          <tr>
+            <th>Venue</th><th>Coverage</th><th>Quoted</th><th>Sim has a view</th>
+            <th>Positions</th><th>Staked</th><th>Why none cleared</th>
+          </tr>
+        </thead>
+        <tbody id="paper2-rows">
+          {% for v in p2list %}
+            <tr>
+              <td class="primary">{{ (v.venue or '')|upper }}</td>
+              <td class="{{ 'neg' if (v.coverage or 0) < 0.10 else '' }}">
+                {% if v.coverage is not none %}{{ "%.1f"|format((v.coverage or 0) * 100) }}%{% else %}—{% endif %}
+              </td>
+              <td>{{ v.rows_in or 0 }}</td>
+              {# Coverage alone is not the constraint: a venue can quote plenty
+                 of markets the model has no opinion about. #}
+              <td class="{{ 'neg' if (v.sim_view_on or 0) == 0 else '' }}">{{ v.sim_view_on or 0 }}</td>
+              <td class="primary">{{ v.positions or 0 }}</td>
+              <td>${{ "%.2f"|format(v.staked_dollars or 0) }}</td>
+              <td>
+                {% if not v.plan_present %}
+                  <span class="paper-table__sub">no plan yet</span>
+                {% elif v.positions %}
+                  <span class="paper-table__sub">—</span>
+                {% else %}
+                  <span class="paper-table__sub">
+                    {% for reason, count in (v.refusals or {}).items() %}{{ reason }} {{ count }}{{ ", " if not loop.last }}{% endfor %}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="paper-empty" style="margin-top:10px;">
+      <strong>Unrestricted, for comparison:</strong> {{ totals.positions or 0 }} position{{ '' if (totals.positions or 0) == 1 else 's' }},
+      ${{ "%.2f"|format(totals.staked_dollars or 0) }} across every book the board shops.
+      A venue row showing 0 positions is an answer, not a gap — either it quotes too little of the board,
+      or the model has no view on what it does quote.
+    </div>
 
-      {% if p2.rows %}
+    {% for v in p2list if v.rows %}
+      <h2 class="paper-section-title" style="margin-top:16px;">{{ (v.venue or '')|upper }} positions</h2>
       <div class="paper-table-wrap">
         <table class="paper-table">
           <thead>
-            <tr>
-              <th>Sport</th><th>Selection</th><th>{{ (p2.venue or '')|upper }} price</th>
-              <th>Best book</th><th>Stake</th><th>EV%</th><th>Sim edge</th><th>Side by</th>
-            </tr>
+            <tr><th>Sport</th><th>Selection</th><th>{{ (v.venue or '')|upper }}</th><th>Best book</th>
+                <th>Stake</th><th>EV%</th><th>Sim edge</th></tr>
           </thead>
           <tbody>
-            {% for row in p2.rows %}
+            {% for row in v.rows %}
               <tr>
                 <td class="primary">{{ (row.sport or '—')|upper }}</td>
                 <td class="primary">
@@ -513,7 +525,6 @@
                   </span>
                 </td>
                 <td class="primary">{% if row.price is not none %}{{ "%+d"|format(row.price|int) }}{% else %}—{% endif %}</td>
-                {# The price cost of the restriction, made readable rather than inferred. #}
                 <td>
                   {% if row.unrestricted_price is not none %}{{ "%+d"|format(row.unrestricted_price|int) }}{% else %}—{% endif %}
                   <span class="paper-table__sub">{{ row.unrestricted_bookmaker or '' }}</span>
@@ -525,29 +536,12 @@
                 <td class="{{ 'pos' if (row.model_edge_pct or 0) > 0 else ('neg' if (row.model_edge_pct or 0) < 0 else '') }}">
                   {% if row.model_edge_pct is not none %}{{ "%+.2f"|format(row.model_edge_pct) }}{% else %}—{% endif %}
                 </td>
-                <td>{{ (row.attribution or {}).side_picked_by or '—' }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      {% else %}
-        <div class="paper-empty">
-          {{ p2.rows_in or 0 }} candidate{{ '' if (p2.rows_in or 0) == 1 else 's' }} were quoted by {{ p2.venue }} and
-          <strong>none</strong> cleared the gates at {{ p2.venue }}'s prices. That is the answer to the Stage D
-          question, not a gap — see the refusals below.
-        </div>
-      {% endif %}
-
-      <div class="paper-chips" style="margin-top: 10px;">
-        {% for reason, count in (p2.scope_refusals or {}).items() %}
-          <span class="paper-chip">{{ reason }} <strong>{{ count }}</strong></span>
-        {% endfor %}
-        {% for reason, count in (p2.refusals or {}).items() %}
-          <span class="paper-chip">{{ reason }} <strong>{{ count }}</strong></span>
-        {% endfor %}
-      </div>
-    {% endif %}
+    {% endfor %}
   </div>
 
   <div class="paper-section" id="paper-refusals-section" {% if not p.refusals %}hidden{% endif %}>

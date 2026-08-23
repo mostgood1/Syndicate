@@ -363,50 +363,38 @@ window.SyndicatePaperPortfolioPulse = (function () {
     `).join("");
   }
 
-  // Mirrors portfolio_paper.html's paper2 section. Only the tiles and the
-  // empty-state are re-rendered live; the positions table is server-rendered
-  // and changes at most once per board build, which the pulse already reloads
-  // the rest of the page against.
+  // Mirrors portfolio_paper.html's paper2 comparison table. One row per venue,
+  // because the comparison ACROSS venues is the deliverable -- Kalshi's 3.8%
+  // only means something next to the others'.
   function renderPaper2(data) {
     const section = document.getElementById("paper2-section");
-    if (!section) return;
-    const p2 = data.paper2 || {};
-    section.hidden = !p2.venue;
-    if (!p2.venue) return;
-    const tiles = section.querySelector(".paper-tiles");
-    if (!tiles || !p2.plan_present) return;
-    const totals = data.totals || {};
-    const quoted = (p2.rows_in || 0) + (p2.venue_not_quoting || 0);
-    const spec = [
-      {
-        label: `${String(p2.venue).toUpperCase()} coverage`,
-        value: pct0OrDash(p2.coverage),
-        meta: `${p2.rows_in || 0} of ${quoted} candidates quoted`,
-        valueClass: isNum(p2.coverage) && p2.coverage < 0.25 ? " warn" : "",
-      },
-      {
-        label: "Positions",
-        value: String(p2.positions || 0),
-        meta: `vs ${totals.positions || 0} unrestricted`,
-      },
-      {
-        label: "Staked",
-        value: usd(p2.staked_dollars),
-        meta: `vs ${usd(totals.staked_dollars)} unrestricted`,
-      },
-      {
-        label: "Sim share of stake",
-        value: pctSigned1OrDash(p2.sim_share_of_staked),
-        meta: `vs ${pctSigned1OrDash(totals.sim_share_of_staked)} unrestricted`,
-      },
-    ];
-    tiles.innerHTML = spec.map((tile) => `
-      <div class="paper-tile">
-        <div class="paper-tile__label">${escapeHtml(tile.label)}</div>
-        <div class="paper-tile__value${tile.valueClass || ""}">${escapeHtml(tile.value)}</div>
-        <div class="paper-tile__meta">${escapeHtml(tile.meta)}</div>
-      </div>
-    `).join("");
+    const body = document.getElementById("paper2-rows");
+    if (!section || !body) return;
+    const venues = Array.isArray(data.paper2) ? data.paper2 : [];
+    section.hidden = venues.length === 0;
+    if (!venues.length) return;
+    body.innerHTML = venues.map((v) => {
+      let why = `<span class="paper-table__sub">—</span>`;
+      if (!v.plan_present) {
+        why = `<span class="paper-table__sub">no plan yet</span>`;
+      } else if (!v.positions) {
+        const reasons = Object.entries(v.refusals || {})
+          .map(([r, c]) => `${escapeHtml(r)} ${escapeHtml(String(c))}`).join(", ");
+        why = `<span class="paper-table__sub">${reasons}</span>`;
+      }
+      const cov = isNum(v.coverage) ? `${(v.coverage * 100).toFixed(1)}%` : "—";
+      return `
+        <tr>
+          <td class="primary">${escapeHtml(String(v.venue || "").toUpperCase())}</td>
+          <td class="${isNum(v.coverage) && v.coverage < 0.10 ? "neg" : ""}">${cov}</td>
+          <td>${escapeHtml(String(v.rows_in || 0))}</td>
+          <td class="${(v.sim_view_on || 0) === 0 ? "neg" : ""}">${escapeHtml(String(v.sim_view_on || 0))}</td>
+          <td class="primary">${escapeHtml(String(v.positions || 0))}</td>
+          <td>${usd(v.staked_dollars)}</td>
+          <td>${why}</td>
+        </tr>
+      `;
+    }).join("");
   }
 
   function renderAll(data) {

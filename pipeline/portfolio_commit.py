@@ -90,20 +90,52 @@ def read_portfolio_plan_for_venue(
     return payload if isinstance(payload, dict) else None
 
 
-def paper2_venue() -> str:
-    """The venue `paper2` scopes to. Default `kalshi`, empty disables.
+# The venues `paper2` runs a book for. EXCHANGES AND PREDICTION MARKETS ONLY --
+# the venue class that has a real order API and does not limit an account for
+# winning. Traditional sportsbooks (draftkings, fanduel, betmgm, betrivers,
+# fanatics, williamhill_us) are deliberately absent: no public betting API, and
+# automated placement is against their terms. `pinnacle` is excluded too --
+# its API exists only through partner/agent arrangements, which is a different
+# kind of thing to arrange and not comparable on price alone.
+#
+# Measuring FOUR rather than one because Kalshi's coverage came in at 3.8% of
+# the board (47 of 1,227, 2026-08-23T01:35Z) and a Stage D go/no-go taken on
+# one venue's number would be a decision made on a fifth of the evidence
+# sitting in `book_prices` already.
+_DEFAULT_PAPER2_VENUES = ("kalshi", "novig", "prophetx", "polymarket")
+
+
+def paper2_venues() -> tuple[str, ...]:
+    """The venues `paper2` scopes to. Comma-separated; empty disables.
 
     Defaults ON rather than dark, and the reasoning differs from a normal new
     job: this places nothing by itself (the execution flag still gates that),
-    writes one small artifact, and its ENTIRE value is a comparison that only
+    writes small artifacts, and its ENTIRE value is a comparison that only
     accrues with elapsed time. A flag defaulting off would mean it silently
     collects nothing while looking installed -- `#284`'s "absent is not off"
     read in the direction that costs data rather than money.
+
+    `SYNDICATE_PAPER2_VENUES` wins; `SYNDICATE_PAPER2_VENUE` (singular) is still
+    read so an existing deployment's setting keeps working rather than silently
+    reverting to the default list.
     """
-    raw = os.environ.get("SYNDICATE_PAPER2_VENUE")
+    raw = os.environ.get("SYNDICATE_PAPER2_VENUES")
     if raw is None:
-        return "kalshi"
-    return str(raw).strip().lower()
+        raw = os.environ.get("SYNDICATE_PAPER2_VENUE")
+    if raw is None:
+        return _DEFAULT_PAPER2_VENUES
+    seen: list[str] = []
+    for token in str(raw).split(","):
+        name = token.strip().lower()
+        if name and name not in seen:
+            seen.append(name)
+    return tuple(seen)
+
+
+def paper2_venue() -> str:
+    """Back-compat shim: the FIRST configured venue, or empty when disabled."""
+    venues = paper2_venues()
+    return venues[0] if venues else ""
 
 
 def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
@@ -311,9 +343,11 @@ def run_portfolio_commit(
     #
     # Runs AFTER the main plan is on disk, and wrapped, so the comparison can
     # never cost the portfolio it is being compared against.
-    venue_plan = None
-    venue = paper2_venue()
-    if venue:
+    venue_plans: dict[str, Any] = {}
+    main_totals = plan.get("totals") or {}
+    for venue in paper2_venues():
+        # Each venue in its OWN try: one venue's failure must not cost the
+        # others' measurements, and the whole point is comparing across them.
         try:
             scoped, scope_refusals = scope_rows_to_venue(rows, venue)
             print(
@@ -331,19 +365,25 @@ def run_portfolio_commit(
             venue_plan["job_state"] = dict(plan.get("job_state") or {})
             write_json_file(portfolio_plan_path_for_venue(normalized, venue), venue_plan)
             venue_totals = venue_plan.get("totals") or {}
-            main_totals = plan.get("totals") or {}
+            venue_refusals = venue_plan.get("refusals") or {}
             print(
                 f"[portfolio_commit] PAPER2_PLAN_WRITTEN date={normalized} venue={venue} "
                 f"rows_in={len(scoped)} positions={venue_totals.get('positions')} "
                 f"staked=${venue_totals.get('staked_dollars')} "
+                # THE NUMBER THAT DECIDES STAGE D, on the line rather than
+                # inferred: how many of the venue's own quoted rows the model
+                # has any view on at all. Kalshi measured 12 of 47.
+                f"sim_view_on={len(scoped) - int(venue_refusals.get('no_model_edge_pct', 0) or 0)}"
+                f"/{len(scoped)} "
                 # Side by side on ONE line, because the comparison IS the
                 # deliverable and reading it off two lines invites pairing the
                 # wrong two runs.
                 f"vs_unrestricted_positions={main_totals.get('positions')} "
                 f"vs_unrestricted_staked=${main_totals.get('staked_dollars')} "
-                f"refusals={venue_plan.get('refusals')}",
+                f"refusals={venue_refusals}",
                 flush=True,
             )
+            venue_plans[venue] = venue_plan
         except Exception as exc:
             print(
                 f"[portfolio_commit] PAPER2_FAILED date={normalized} venue={venue} error={exc}",
@@ -355,8 +395,8 @@ def run_portfolio_commit(
         "date": normalized,
         "plan": plan,
         "clv_join": clv_join,
-        "venue_plan": venue_plan,
-        "venue": venue or None,
+        "venue_plans": venue_plans,
+        "venues": sorted(venue_plans),
     }
 
 
