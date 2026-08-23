@@ -55,6 +55,7 @@ if str(_REPO_ROOT) not in sys.path:
 from syndicate.features.shared.basketball_momentum import basketball_pressure_events
 from syndicate.features.shared.basketball_momentum import basketball_scoring_events
 from syndicate.features.shared.basketball_momentum_artifacts import momentum_artifact_path
+from syndicate.features.shared.basketball_momentum_artifacts import momentum_events_path
 from syndicate.features.shared.momentum_core import momentum_at
 
 # The sweep grid. Seconds are the axis soccer chose; possessions are the axis
@@ -195,7 +196,14 @@ def sweep_game(
             "ok": False,
             "reason": f"pressure={len(pressure)} scoring={len(scoring)} -- need both",
         }
+    return _sweep_from_rows(pressure, scoring)
 
+
+def _sweep_from_rows(
+    pressure: list[dict[str, Any]], scoring: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """The grid itself. Shared by the captured-rows and re-fetched paths so the
+    two can never compute a different answer from the same events."""
     last_seconds = max(float(r["clock_seconds"]) for r in pressure)
     last_poss = max(float(r["possession_index"]) for r in pressure)
 
@@ -282,6 +290,32 @@ def sweep_game(
     }
 
 
+def sweep_rows(
+    pressure: Sequence[Mapping[str, Any]],
+    scoring: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """`sweep_game`, but from ALREADY-EXTRACTED rows.
+
+    The taxonomy step (summary -> rows) is exactly what the captured event dump
+    has already done, so re-running it from a re-fetched summary would be work
+    AND a reproducibility risk: ESPN may not return the same feed later.
+    """
+    if not pressure or not scoring:
+        return {"ok": False,
+                "reason": f"pressure={len(pressure)} scoring={len(scoring)} -- need both"}
+    return _sweep_from_rows(list(pressure), list(scoring))
+
+
+def causality_check_rows(
+    rows: Iterable[Mapping[str, Any]],
+    pressure: Sequence[Mapping[str, Any]],
+    *,
+    event_id: str,
+) -> dict[str, Any]:
+    """`causality_check` against captured rows rather than a re-fetched feed."""
+    return _causality_from_pressure(rows, list(pressure), event_id=event_id)
+
+
 def causality_check(
     rows: Iterable[Mapping[str, Any]],
     summary: Mapping[str, Any],
@@ -305,6 +339,17 @@ def causality_check(
     pressure = basketball_pressure_events(summary, league_code=league_code)
     if not pressure:
         return {"ok": False, "reason": "no pressure rows in the retrospective feed"}
+    return _causality_from_pressure(rows, pressure, event_id=event_id)
+
+
+def _causality_from_pressure(
+    rows: Iterable[Mapping[str, Any]],
+    pressure: list[dict[str, Any]],
+    *,
+    event_id: str,
+) -> dict[str, Any]:
+    if not pressure:
+        return {"ok": False, "reason": "no pressure rows available"}
 
     compared = 0
     distinct_as_of: set[float] = set()
@@ -375,6 +420,33 @@ def _report(label: str, payload: Mapping[str, Any]) -> None:
     print(f"[momentum_phase_c] {label} {json.dumps(payload, sort_keys=True)}", flush=True)
 
 
+def _emit_sweep(event_id: str, swept: Mapping[str, Any]) -> None:
+    """One printer for both input paths -- a second copy is a second format."""
+    if not swept.get("ok"):
+        _report(f"SWEEP_SKIPPED event={event_id}", swept)
+        return
+    print(
+        f"[momentum_phase_c] SWEEP event={event_id} "
+        f"pressure={swept['pressure_events']} scoring={swept['scoring_events']} "
+        f"last_s={swept['last_seconds']} last_poss={swept['last_possessions']}",
+        flush=True,
+    )
+
+    def _fmt(value: Any) -> str:
+        return "NA" if value is None else f"{value:+.4f}"
+
+    for cell in swept["grid"]:
+        print(
+            f"[momentum_phase_c] CELL event={event_id} axis={cell['axis']} "
+            f"hl={cell['half_life']} horizon={cell['horizon_seconds']} "
+            f"n={cell['n']} "
+            f"r_margin={_fmt(cell['r_margin'])} "
+            f"r_total={_fmt(cell['r_total'])} "
+            f"r_total_abs={_fmt(cell['r_total_abs'])}",
+            flush=True,
+        )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", default="wnba")
@@ -403,10 +475,46 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event_ids.append(event_id)
     print(f"[momentum_phase_c] games={len(event_ids)} ids={','.join(event_ids)}", flush=True)
 
+    # **PREFER THE CAPTURED EVENT DUMP OVER RE-FETCHING ESPN.**
+    #
+    # `momentum_events_<date>.json` holds the raw pressure and narrator rows,
+    # overwritten each tick with the complete cumulative feed. Reading it means
+    # the sweep needs no network at all -- which matters twice over: ESPN is 403
+    # from a Claude Code sandbox, so a fetch-only analyser could ONLY ever run
+    # on the worker; and a re-fetch weeks later may not return the same feed,
+    # making a backtest silently unreproducible.
+    #
+    # The ESPN path stays as the fallback for dates captured before the dump
+    # existed.
+    events_path = momentum_events_path(root, league_code=args.league, date_str=args.date)
+    captured: dict[str, Any] = {}
+    if events_path.exists():
+        try:
+            captured = (json.loads(events_path.read_text(encoding="utf-8")) or {}).get("games") or {}
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[momentum_phase_c] EVENTS_UNREADABLE {type(exc).__name__}: {exc}", flush=True)
+    print(
+        f"[momentum_phase_c] events_dump={'present' if captured else 'ABSENT'} "
+        f"games={len(captured)} path={events_path}",
+        flush=True,
+    )
+
     from scripts.poll_basketball_momentum import fetch_summary
 
     exit_code = 0
     for event_id in event_ids:
+        rows_for_event = captured.get(event_id) or {}
+        pressure_rows = rows_for_event.get("pressure") or []
+        narrator_rows = rows_for_event.get("narrator") or []
+        if pressure_rows and narrator_rows:
+            swept = sweep_rows(pressure_rows, narrator_rows)
+            causal = causality_check_rows(rows, pressure_rows, event_id=event_id)
+            _report(f"CAUSALITY event={event_id}", causal)
+            _emit_sweep(event_id, swept)
+            if causal.get("mismatches"):
+                exit_code = max(exit_code, 5)
+            continue
+
         if args.skip_fetch:
             continue
         summary = fetch_summary(args.league, event_id)
@@ -432,29 +540,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             # sets the exit code even though the sweep may still print.
             exit_code = max(exit_code, 5)
 
-        swept = sweep_game(summary, league_code=args.league)
-        if not swept.get("ok"):
-            _report(f"SWEEP_SKIPPED event={event_id}", swept)
-            continue
-        print(
-            f"[momentum_phase_c] SWEEP event={event_id} "
-            f"pressure={swept['pressure_events']} scoring={swept['scoring_events']} "
-            f"last_s={swept['last_seconds']} last_poss={swept['last_possessions']}",
-            flush=True,
-        )
-        def _fmt(value: float | None) -> str:
-            return "NA" if value is None else f"{value:+.4f}"
-
-        for cell in swept["grid"]:
-            print(
-                f"[momentum_phase_c] CELL event={event_id} axis={cell['axis']} "
-                f"hl={cell['half_life']} horizon={cell['horizon_seconds']} "
-                f"n={cell['n']} "
-                f"r_margin={_fmt(cell['r_margin'])} "
-                f"r_total={_fmt(cell['r_total'])} "
-                f"r_total_abs={_fmt(cell['r_total_abs'])}",
-                flush=True,
-            )
+        _emit_sweep(event_id, sweep_game(summary, league_code=args.league))
     return exit_code
 
 
