@@ -170,6 +170,111 @@ def _shortlist_rows_per_sport() -> int:
 
 SHORTLIST_ROWS_PER_SPORT = _shortlist_rows_per_sport()
 
+
+def _shortlist_rows_total() -> int:
+    """The WHOLE board's row budget, across every sport. Env-overridable.
+
+    WHY A TOTAL AS WELL AS A PER-SPORT CAP (`#524`). The binding constraint is
+    one keyvalue write, and that write does not care how the rows are divided --
+    but `per_sport` scales the payload with the number of sports IN SEASON,
+    which is a calendar fact nobody sets and nobody reviews.
+
+    Measured on production 2026-08-23T00:0xZ, four sports at the 400 cap:
+
+        LAYER2_SHORTLIST rows=1600
+        KEYVALUE_WRITE_LARGE size_bytes=5,747,257  max_bytes=8,388,608   68.5%
+
+    That is 3,592 bytes/row and ~735 rows of headroom -- less than two more
+    sports at cap. NCAAF opens ~08-29 (-> ~7.19MB, 86%) and NCAAB in November
+    (-> breach). The cliff is on the CALENDAR, so it arrives whether or not
+    anyone touches this file, and it arrives as a silent board freeze: the
+    write raises, both call sites catch it, and the board serves its last good
+    copy forever.
+
+    A total budget removes the cliff by construction -- a fifth in-season sport
+    redistributes the same 1,600 rows instead of adding 400 more. Default is
+    exactly today's measured board so this change is a NO-OP on a four-sport
+    slate and only ever binds when a fifth arrives.
+
+    `per_sport` stays and stays a CEILING: it is what stops one sport with
+    20,025 grid rows from taking the whole budget on a quiet day.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_ROWS_TOTAL") or "").strip()
+    try:
+        value = int(raw) if raw else 1600
+    except ValueError:
+        value = 1600
+    # Same reasoning as the per-sport floor: a zero would empty the board.
+    return max(1, value)
+
+
+SHORTLIST_ROWS_TOTAL = _shortlist_rows_total()
+
+
+def allocate_row_budget(
+    available: Mapping[str, int], *, total: int, per_sport: int, minimum: int = 0
+) -> dict[str, int]:
+    """Split `total` across sports by water-filling. Pure, so it is testable.
+
+    THE NAIVE SPLIT WASTES THE BUDGET. `total // n` gives every sport the same
+    allowance whether it has 2,000 rows to offer or 23 -- measured tonight, NFL
+    held 275 of a 400 allowance while soccer had 20,025 grid rows and was capped.
+    A fifth sport would then shrink the four that can fill their share in order
+    to hand slots to one that cannot.
+
+    So: give every sport the smaller of its fair share and what it actually has,
+    then re-divide what the small sports could not use among the ones still
+    asking. Repeat until nothing moves. Converges in at most one round per sport
+    because each round either exhausts the budget or satisfies a sport for good.
+
+    `per_sport` is a hard ceiling per sport and `minimum` a floor, both applied
+    inside the loop so redistribution can never push a sport past either.
+    """
+    slugs = [str(slug) for slug in available]
+    if not slugs:
+        return {}
+    ceiling = max(0, int(per_sport))
+    floor = max(0, int(minimum))
+    remaining = max(0, int(total))
+    allocation: dict[str, int] = {slug: 0 for slug in slugs}
+    # Sorted for determinism: the remainder of an uneven split has to land
+    # somewhere, and it must land in the same place on every build or two
+    # identical pools would produce two different boards.
+    open_slugs = sorted(slugs)
+
+    while open_slugs and remaining > 0:
+        share = remaining // len(open_slugs)
+        if share <= 0:
+            # Fewer rows left than sports still asking. Hand them out one each,
+            # in the same deterministic order, rather than dropping them.
+            for slug in open_slugs[:remaining]:
+                want = min(int(available.get(slug, 0)), ceiling)
+                if allocation[slug] < want:
+                    allocation[slug] += 1
+                    remaining -= 1
+            break
+        still_open: list[str] = []
+        for slug in open_slugs:
+            want = min(int(available.get(slug, 0)), ceiling)
+            grant = min(share, max(0, want - allocation[slug]))
+            allocation[slug] += grant
+            remaining -= grant
+            if allocation[slug] < want:
+                still_open.append(slug)
+        if still_open == open_slugs and share == 0:
+            break
+        if not still_open:
+            break
+        if len(still_open) == len(open_slugs) and remaining <= 0:
+            break
+        open_slugs = still_open
+
+    if floor:
+        for slug in slugs:
+            want = min(int(available.get(slug, 0)), ceiling)
+            allocation[slug] = max(allocation[slug], min(floor, want))
+    return allocation
+
 # Each kind is guaranteed this many slots before merit takes over.
 #
 # A pure score ranking would not mix: MLB carries 1,221 prop rows against 229
@@ -2426,6 +2531,7 @@ def select_shortlist(
     opportunities: Iterable[Mapping[str, Any]],
     *,
     per_sport: int = SHORTLIST_ROWS_PER_SPORT,
+    rows_total: int | None = None,
     kind_floor: int = SHORTLIST_KIND_FLOOR,
     imminence_floor: int | None = None,
     horizon_days: int | None = SHORTLIST_HORIZON_DAYS,
@@ -2590,6 +2696,27 @@ def select_shortlist(
     per_sport_report: dict[str, dict[str, Any]] = {}
     floor_report: dict[str, dict[str, Any]] = {}
 
+    # `#524`. THE BUDGET IS THE WHOLE BOARD'S, NOT EACH SPORT'S.
+    #
+    # `per_sport` alone scales the persisted payload with the number of sports
+    # in season -- a calendar fact nobody sets. Measured 2026-08-23 at four
+    # sports: 1,600 rows, 5,747,257 bytes, 68.5% of the 8MB keyvalue ceiling,
+    # with NCAAF opening ~08-29. See `_shortlist_rows_total`.
+    #
+    # Allocated off the PRE-FILTER counts, deliberately. Doing it after each
+    # sport's value floor would make one sport's allowance depend on another
+    # sport's hold measurement, which is both surprising and unstable between
+    # builds. Over-granting a sport that then filters down is harmless -- the
+    # slots simply go unused, exactly as they did before this existed.
+    budget = allocate_row_budget(
+        {slug: len(pool) for slug, pool in by_sport.items()},
+        total=int(rows_total) if rows_total is not None else _shortlist_rows_total(),
+        per_sport=int(per_sport),
+        # Never starve a sport below its two kind floors: a board that shows a
+        # sport at all should show enough of it to be worth the tab.
+        minimum=max(0, int(kind_floor)) * 2,
+    )
+
     for sport, rows in by_sport.items():
         # PER-SPORT VALUE FLOOR, calibrated from this sport's own pool.
         #
@@ -2665,7 +2792,10 @@ def select_shortlist(
         other = [row for row in ranked if str(row.get("kind") or "") not in {"game", "prop"}]
 
         floor = max(0, int(kind_floor))
-        limit = max(0, int(per_sport))
+        # The allocator's answer, never above the per-sport ceiling. `.get` with
+        # the ceiling as default rather than 0: an unallocated sport must fall
+        # back to the pre-`#524` behaviour, not to an empty board.
+        limit = max(0, min(int(per_sport), int(budget.get(sport, per_sport))))
         picked: list[Mapping[str, Any]] = []
         picked.extend(game[:floor])
         picked.extend(prop[:floor])
@@ -2746,6 +2876,12 @@ def select_shortlist(
         # Only sports with a slate consume budget; the rest contribute nothing.
         "active_sports": sorted(per_sport_report.keys()),
         "per_sport_limit": int(per_sport),
+        # `#524`. BOTH numbers, because they answer different questions and the
+        # ceiling alone stopped being the binding one the moment a total existed.
+        # A board that shrank because a fifth sport came into season must not
+        # look like a board that shrank because its pool did.
+        "rows_total_budget": int(rows_total) if rows_total is not None else int(_shortlist_rows_total()),
+        "rows_allocated_by_sport": dict(budget),
         "kind_floor": int(kind_floor),
         "imminence_floor": int(imminence_floor_value),
         "horizon_days": horizon_days,

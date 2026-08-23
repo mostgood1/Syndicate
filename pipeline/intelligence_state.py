@@ -1957,8 +1957,110 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     payload["selected_date"] = normalized_date
     payload["written_at"] = _utc_now()
     _warn_if_shortlist_near_keyvalue_ceiling(payload)
+    payload = _shed_rows_to_fit_keyvalue(payload)
     write_json_file(_layer2_shortlist_path(normalized_date), payload)
     return payload
+
+
+def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop the lowest-ranked rows until the payload fits. `#524`.
+
+    WHAT THIS REPLACES, and why it is not merely nicer. Above
+    `_keyvalue_max_bytes` (8 MB) `write_json_file` raises
+    `KeyValuePayloadTooLarge`, and BOTH call sites of `write_layer2_shortlist`
+    catch it and return (`intelligence_state.py:3609`, `:4970`). So the worker
+    keeps running, keeps rebuilding, keeps failing to persist -- and the board
+    serves its LAST SUCCESSFUL shortlist indefinitely, growing staler every
+    cycle, with one log line as the only symptom.
+
+    That is the worst available failure for this system. A crash restarts; a
+    refusal that is caught does not. And it presents as "the board is stale",
+    which is the same symptom as a dozen unrelated causes -- the shape that cost
+    this repo weeks before.
+
+    A SMALLER BOARD IS ALWAYS BETTER THAN A FROZEN ONE. The rows are already
+    ranked, so shedding from the tail costs the least valuable rows first and
+    keeps the board fresh and honest. `#524`'s total budget should mean this
+    never fires; it exists because "should" is not a guarantee and the calendar
+    is not under our control.
+
+    NEVER SILENT. What was dropped is stamped onto the payload, so a reader and
+    the API see a shed board as a shed board rather than as a thin slate.
+
+    Never raises: if anything here fails, hand back the original payload and let
+    the store's own refusal stand -- degrading the degradation path into a hard
+    failure would be strictly worse than the bug it fixes.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        ceiling = int(_keyvalue_max_bytes())
+        rows = payload.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return payload
+        size = len(json.dumps(payload, default=str))
+        if size < ceiling:
+            return payload
+
+        original = len(rows)
+        # Headroom, not the exact ceiling: the store measures its own encoding
+        # and a payload that fits by ten bytes here is a payload that fails
+        # there. 5% buys the difference without costing a meaningful number of
+        # rows at this size.
+        target = int(ceiling * 0.95)
+        # Everything except the rows. Measured once rather than re-serialised
+        # per step: `cards`, `openings` and the coverage payloads are a large
+        # fixed cost and re-encoding them inside a loop is how a rescue path
+        # becomes the reason the tick times out.
+        without = dict(payload)
+        without["rows"] = []
+        base = len(json.dumps(without, default=str))
+        per_row = max(1, (size - base) // max(1, original))
+        keep = max(0, (target - base) // per_row)
+
+        # `base >= target`, NOT `keep >= original`. The first cut used the latter
+        # and a test caught it immediately: with a 5,035-byte fixed cost against
+        # a 950-byte target, `keep` computes to 0, `0 >= 1` is False, and the
+        # rescue path shed the board to ZERO ROWS -- turning "frozen but
+        # populated" into "fresh and empty", which is worse and is the exact
+        # silently-empty failure this file guards against everywhere else.
+        if base >= target or keep >= original:
+            # The fixed cost alone is over the ceiling, so no number of rows
+            # helps. Say that explicitly -- it needs a different fix (move
+            # `cards`/`openings` to their own keys) and must not read as a
+            # shed that did not work.
+            print(
+                f"[intelligence_state] SHORTLIST_SHED_IMPOSSIBLE size_bytes={size} "
+                f"ceiling={ceiling} non_row_bytes={base} rows={original} "
+                f"-- the payload is over the ceiling WITHOUT any rows; shedding cannot help",
+                flush=True,
+            )
+            return payload
+
+        payload = dict(payload)
+        payload["rows"] = rows[:keep]
+        payload["rows_shed_for_keyvalue"] = {
+            "dropped": original - keep,
+            "kept": keep,
+            "original": original,
+            "measured_bytes": size,
+            "ceiling_bytes": ceiling,
+            "target_bytes": target,
+            "bytes_per_row": per_row,
+        }
+        print(
+            f"[intelligence_state] SHORTLIST_SHED_TO_FIT original={original} kept={keep} "
+            f"dropped={original - keep} size_bytes={size} ceiling={ceiling} "
+            f"bytes_per_row={per_row} -- a smaller board beats a frozen one",
+            flush=True,
+        )
+        return payload
+    except Exception as exc:  # noqa: BLE001 - see the docstring's last paragraph
+        print(
+            f"[intelligence_state] SHORTLIST_SHED_FAILED error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return payload
 
 
 def _warn_if_shortlist_near_keyvalue_ceiling(payload: Mapping[str, Any]) -> None:
