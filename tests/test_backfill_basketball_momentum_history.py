@@ -191,13 +191,34 @@ def test_the_scoreboard_url_has_exactly_one_sports_segment() -> None:
 
     Both callers now share one builder, and this pins the shape so a future
     retype cannot reintroduce it.
+
+    **AND THE FIRST VERSION OF THIS TEST WAS VACUOUS.** It asserted
+    `url.count("/sports/") == 1`, which is TRUE OF THE BROKEN URL TOO:
+    `str.count` finds non-overlapping matches, so `/sports/sports/` consumes the
+    trailing slash and the second occurrence is never seen. The guard would have
+    passed on the exact bug it was written for.
+
+    Checked against the literal broken string below, so it cannot be vacuous
+    again -- a regression test that cannot fail on the regression is worse than
+    none, because it also reports success.
     """
     from scripts.poll_basketball_momentum import scoreboard_url
 
+    BROKEN = ("https://site.api.espn.com/apis/site/v2/sports/sports/basketball"
+              "/wnba/scoreboard?dates=20260619")
+
     for league in ("wnba", "nba", "ncaab"):
         url = scoreboard_url(league, "2026-06-19")
-        assert url.count("/sports/") == 1, url
+        assert "/sports/sports/" not in url, url
+        assert url.count("sports") == 1, url
         assert url.endswith("/scoreboard?dates=20260619"), url
+
+    # The discriminator, stated: these checks must REJECT the shape that 400'd.
+    assert "/sports/sports/" in BROKEN
+    assert BROKEN.count("sports") == 2
+    assert BROKEN.count("/sports/") == 1, (
+        "the original assertion could not tell these apart -- that is the point"
+    )
 
 
 def test_the_backfill_and_the_poller_build_the_same_url() -> None:

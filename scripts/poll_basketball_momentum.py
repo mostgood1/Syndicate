@@ -178,7 +178,9 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
 #   - RATE-LIMITED at 0.25s between ESPN calls -- a WNBA season is ~286 requests
 #     and there is no reason to go faster.
 _BACKFILL_ENV = "SYNDICATE_WNBA_MOMENTUM_BACKFILL"
+_VERIFY_ENV = "SYNDICATE_WNBA_MOMENTUM_VERIFY"
 _backfill_started = False
+_verify_started = False
 
 
 def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
@@ -239,10 +241,64 @@ def maybe_start_backfill(league: str, out_root: Path) -> bool:
     return True
 
 
+def maybe_start_verify(league: str, out_root: Path) -> bool:
+    """Run the projection-substrate check over a captured range, once.
+
+    **THE LEAKAGE GUARD HAS ONLY EVER RUN ON FIXTURES**, which proved the logic
+    and not the feed. This points it at real games before anything is fitted.
+    Same one-shot shape as the backfill -- daemon-threaded, sentinel-guarded --
+    but no sentinel is written on FAILURE, so a leak is re-reported on every
+    restart rather than silently marked done.
+    """
+    global _verify_started
+    spec = str(os.environ.get(_VERIFY_ENV) or "").strip()
+    if not spec or _verify_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] VERIFY_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"verify_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] VERIFY_ALREADY_DONE spec={spec}", flush=True)
+        _verify_started = True
+        return False
+    _verify_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] VERIFY_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.verify_momentum_projection_rows import main as _verify_main
+
+            code = _verify_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] VERIFY_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            # ONLY on a clean pass. A leak that gets marked done is a leak that
+            # stops being reported, and this check exists to be noisy.
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] VERIFY_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-verify", daemon=True).start()
+    return True
+
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     # Fires at most once per process, and returns immediately -- the work runs
     # on a daemon thread so a live slate is never waiting on history.
     maybe_start_backfill(league, out_root)
+    maybe_start_verify(league, out_root)
 
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
