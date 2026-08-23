@@ -25332,3 +25332,72 @@ follow-up on `#539` rather than closed. Nothing about the four refusals changes
 — the modelled number must stay distinguishable from a de-vig — so the consumer
 has to accept it as its OWN labelled term, not by widening
 `_model_edge_for`'s name check.
+
+## 2026-08-23 23:42-23:53Z — web `60ca2486` — PR #24, NFL fantasy Buzz dedupe — deployed, verified by content and by live status
+
+Lane `nfl-fantasy-endpoint-issue-37mqx4` (task session, no `.syndicate` lane
+opened — a scoped GitHub-issue fix, not a standing work lane). Claim
+`e40fa7a969f6db03` acquired on `web`, released clean after landing.
+
+**WHAT SHIPPED.** `recent_news_by_player()` (NFL fantasy `/nfl/fantasy` Buzz
+popup) attached one archive row PER DAY a story stayed on ESPN's feed instead
+of once per distinct story — `capture_news_snapshot` polls the same live feed
+every refresh-worker run, so a headline surviving a few days in the "recent"
+window was duplicated into a player's Buzz list that many times, crowding out
+real distinct coverage under the `[:6]` cap. Fixed to dedupe by the article's
+own `id` (headline fallback). Also fixed `recent_news_by_player`'s
+`date.today()` (timezone-ambiguous, flagged by `test_slate_date_timezone_discipline.py`
+`#518`) to `datetime.now(timezone.utc).date()`, matching the UTC stamp the
+archive files are actually named from. And fixed stale "Hover the badge" help
+text to "Click" — the badge has been a click-to-open dialog, not a tooltip,
+since a prior session's fix; the popup already renders each article's stored
+`description`, nothing there was reverted.
+
+**PREFLIGHT WAS NOT RUN AS THE SCRIPT — RENDER_API_KEY absent from this
+session's environment, no `.env` anywhere on disk.** `deploy_preflight.py`
+hard-requires it at the top of `main()` for every service, including `web`
+(used for `live_deploy`/`fleet_live_commits`, ahead of the service-specific
+process sample). Could not produce a literal CLEAR receipt. **Substituted a
+manual-equivalent check via the Render MCP connector** (a different,
+already-authenticated credential path): `get_service` showed `web` live and
+idle, last deploy (`84ea3b77`) finished ~6.5h earlier with nothing since;
+`list_deploys` showed no `build_in_progress`/`update_in_progress` entry;
+`list_logs` (app, last ~20 lines) showed only Render healthchecks and normal
+read-path artifact export/publish/stream traffic from the workers, nothing
+resembling a job in flight. Judged CLEAR on that basis, with the user's
+explicit sign-off (asked via AskUserQuestion after disclosing the gap) to
+proceed this way rather than wait on the credential. Target commit `60ca2486`
+confirmed on `origin/main` (merged via PR #24, squash) before triggering —
+the `OFF_MAIN` check the script would have run.
+
+**RISK WAS LOW BY ARCHITECTURE, not just by this reading.** `web` does no
+heavy computation (CLAUDE.md's own runtime-execution-model rule) —
+`recent_news_by_player` is explicitly a request-path-only reader per its own
+docstring, so this class of change carries none of the "deploy kills an
+in-flight sim" risk that motivates the process-liveness check for the
+workers.
+
+**verify, 23:53:42Z:** Render `get_deploy` on `dep-da5oe8e417fc73857jm0` —
+`status: live`, `commit.id: 60ca2486b84ac6658ff91d12398711358b5df6d4` (exact
+PR #24 merge commit). Content verify: the merge commit IS the diff reviewed
+in PR #24 (byte-identical to what was pushed and tested locally — 4 new
+tests in `tests/test_nfl_fantasy_news.py`, `pytest` clean on the touched
+files pre-merge). Not independently re-fetched from the live site post-deploy
+— the outbound proxy denies `CONNECT` to `syndicate-an21.onrender.com`
+(policy denial, confirmed via `/__agentproxy/status`, not retried per that
+tool's own instruction) — so "live" here means Render's own deploy record
+plus the pre-verified diff, not a fresh HTTP read of the rendered page.
+
+**CI note, unrelated to this fix, left as found:** `pytest-baseline` (the
+repo's "no NEW failures vs baseline" gate) was RED on this PR and is
+independently RED on `main` itself at the same timestamp (checked: `main`
+push `6cf93202`, same 3 "new" failures — `test_odds_refresh_memory_headroom_snapshot_...`,
+`test_memory_headroom_snapshot_...`, `test_the_live_refusal_is_not_bypassed`,
+none touching NFL/fantasy). Pre-existing baseline drift, not introduced or
+fixed here; not investigated further as out of this task's scope.
+
+**Owed, if anyone picks up preflight tooling:** `deploy_preflight.py` could
+read Render access via an alternate path (or accept a pre-authenticated
+client) the way this session's Render MCP connector does, so a missing raw
+`RENDER_API_KEY` doesn't force every future session into this same manual
+substitution.
