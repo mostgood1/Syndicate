@@ -184,3 +184,20 @@ def test_every_market_is_accounted_for():
     markets = [_kalshi(), _kalshi(series="KXMVECROSSCATEGORY"), _kalshi(title="junk")]
     report = join_kalshi_to_board(markets, [_row()])
     assert report["matched"] + sum(report["reasons"].values()) == len(markets)
+
+
+def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
+    """A resolver looser than the join would silently reintroduce exactly the
+    mismatches the join refuses."""
+    from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
+
+    resolve = kalshi_price_resolver([{
+        "market": "pitcher_strikeouts", "player_name": "Andrew Abbott",
+        "line": 6.5, "board_side": "over", "kalshi_american": -120,
+    }])
+    assert resolve(_row(side="Over", line=6.5)) == -120
+    # Every one of these is a different bet and must not resolve.
+    assert resolve(_row(side="Under", line=6.5)) is None
+    assert resolve(_row(side="Over", line=7.5)) is None
+    assert resolve(_row(side="Over", line=6.5, player="Shane Baz")) is None
+    assert resolve(_row(side="Over", line=6.5, market="pitcher_outs")) is None

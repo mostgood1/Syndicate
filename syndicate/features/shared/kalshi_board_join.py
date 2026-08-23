@@ -53,6 +53,7 @@ __all__ = [
     "series_to_market",
     "threshold_to_line",
     "join_kalshi_to_board",
+    "kalshi_price_resolver",
 ]
 
 # Kalshi series -> the board's market vocabulary. VERIFIED from the live
@@ -148,6 +149,54 @@ def _as_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return None if parsed != parsed else parsed
+
+
+def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
+    """A resolver `venue_scope` can price from: board row -> Kalshi's own price.
+
+    THE SEAM THAT MAKES PAPER2 REAL. Until now paper2 priced Kalshi from
+    `quote.book_prices["kalshi"]`, which is OddsAPI's view -- game lines only,
+    and the reason every coverage figure in this thread was about the aggregator
+    rather than the venue. This prices from what Kalshi is actually quoting.
+
+    Keyed on (market, player, line, side): the same identity the join matched
+    on, so a resolver cannot pair a row with a price for a different bet. A
+    lookup that is looser than the join would silently reintroduce exactly the
+    mismatches the join refuses.
+    """
+    index: dict[tuple[str, str, float, str], float] = {}
+    for match in matches:
+        try:
+            line = float(match.get("line"))
+        except (TypeError, ValueError):
+            continue
+        price = match.get("kalshi_american")
+        if price is None:
+            continue
+        key = (
+            str(match.get("market") or "").strip().lower(),
+            normalize_person(match.get("player_name")),
+            line,
+            str(match.get("board_side") or "").strip().lower(),
+        )
+        index[key] = float(price)
+
+    def resolve(row: Mapping[str, Any]) -> float | None:
+        try:
+            line = float(row.get("line"))
+        except (TypeError, ValueError):
+            return None
+        return index.get(
+            (
+                str(row.get("market") or "").strip().lower(),
+                normalize_person(row.get("player_name")),
+                line,
+                str(row.get("side") or "").strip().lower(),
+            )
+        )
+
+    resolve.market_count = len(index)  # type: ignore[attr-defined]
+    return resolve
 
 
 def join_kalshi_to_board(
