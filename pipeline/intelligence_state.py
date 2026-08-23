@@ -5119,6 +5119,27 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] KALSHI_DISCOVERY_FAILED error={exc}", flush=True)
 
+            # KALSHI'S OWN PRICES, refreshed every board build rather than once
+            # per boot: a price reused for hours is a memory, not a quote. Then
+            # joined to the shortlist to produce the first Kalshi coverage
+            # number that is actually about Kalshi.
+            kalshi_markets: list = []
+            try:
+                from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
+
+                odds = run_kalshi_odds_refresh()
+                kalshi_markets = odds.get("markets") or []
+                # `layer2_shortlist["rows"]`, NOT a bare `rows` -- there is no
+                # such name here, and the NameError would have been swallowed by
+                # the except below and printed as KALSHI_ODDS_FAILED. My bug
+                # wearing Kalshi's name is exactly the confusion this whole
+                # thread has been untangling.
+                shortlist_rows = (layer2_shortlist or {}).get("rows") or []
+                if kalshi_markets and shortlist_rows:
+                    join_to_board(kalshi_markets, list(shortlist_rows))
+            except Exception as exc:
+                print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
+
             from pipeline.portfolio_commit import run_portfolio_commit
 
             commit_result = run_portfolio_commit(str(selected_date or ""))
