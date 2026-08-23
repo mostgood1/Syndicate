@@ -480,6 +480,10 @@ def commit_portfolio(
                 "unrestricted_bookmaker": row.get("unrestricted_bookmaker"),
                 "venue": row.get("venue"),
                 "price_source": row.get("price_source"),
+                # The exchange contract this position would be placed on. None
+                # on an unrestricted row -- there is no single contract when the
+                # price came from an aggregator's best-of-many.
+                "venue_ticker": row.get("venue_ticker"),
                 "model_probability": round(inputs.model_probability, 5),
                 "market_fair_probability": round(inputs.market_fair_probability, 5),
                 "price_reliability": round(inputs.price_reliability, 5),

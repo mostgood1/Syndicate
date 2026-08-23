@@ -83,6 +83,7 @@ def scope_rows_to_venue(
     venue: str,
     *,
     price_resolver: Any = None,
+    ticker_resolver: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Rewrite each row at `venue`'s price, or refuse it by name.
 
@@ -179,6 +180,20 @@ def scope_rows_to_venue(
         scoped_row["unrestricted_bookmaker"] = quote.get("bookmaker")
         scoped_row["venue"] = str(venue).strip().lower()
         scoped_row["price_source"] = price_source
+        if ticker_resolver is not None:
+            # THE VENUE'S CONTRACT ID, stamped beside the venue's price and from
+            # the same match. An order needs both, and deriving the ticker later
+            # would derive it from a catalogue that may have moved since we
+            # priced -- so the thing we priced and the thing we buy could differ
+            # with nothing recording that they did.
+            try:
+                scoped_row["venue_ticker"] = ticker_resolver(row)
+            except Exception:
+                # A ticker we cannot resolve leaves the row PRICED and
+                # UNPLACEABLE, which the order builder refuses by name. Better
+                # than dropping the row: the paper book still records what the
+                # strategy would have done.
+                scoped_row["venue_ticker"] = None
         scoped.append(scoped_row)
         _refuse(REASON_SCOPED)
 
