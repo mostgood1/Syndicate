@@ -54,6 +54,11 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from syndicate.features.shared.book_margin_model import (
+    EDGE_FIELD as MODELLED_EDGE_FIELD,
+    modelled_fair_edge,
+)
+
 
 # Board market key -> the live lens' own market family. The board speaks
 # OddsAPI; the live lens speaks the sim's vocabulary. Kept explicit rather than
@@ -444,6 +449,10 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
 
     matched = 0
     edged = 0
+    # `#539`. SEPARATE FROM `edged`, never folded into it. A two-sided de-vig and
+    # a modelled hold are different strengths of evidence; a single total would
+    # let the weaker one inflate the number the board is judged on.
+    edged_modelled = 0
     edge_blocked = 0
     # WHICH refusal, not just how many. `rows_live_edge_withheld` is a single
     # total over three unrelated causes, and soccer has been sitting at
@@ -769,6 +778,70 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 # own live early-return precisely so it survives to here; absent,
                 # this falls back to the flat name rather than guessing.
                 devig_detail = str(projection.get("market_fair_unavailable_reason") or "").strip()
+
+                # `#539` `[USER DECISION 2026-08-23]`. A ONE-SIDED MARKET WITH A
+                # LIVE-AWARE PROJECTION IS PRICED AGAINST THE MODELLED FAIR.
+                #
+                # `#538` established the one-sidedness is real in the vendor data
+                # — MLS props, Shots 2,544 rows with **0** under prices, ruled out
+                # as a parse bug and as a clobber. So a de-vig can never answer
+                # here, and soccer's live tier would otherwise carry no number at
+                # all, permanently.
+                #
+                # `soccer_projections._price_against_market` already prices
+                # one-sided markets this way for PREGAME rows
+                # (`[USER DECISION 2026-08-17, audit recommendation 4]`), and its
+                # comment says the path is deliberately NOT wired into the live
+                # branch because "a modelled fair does not make a live PREGAME
+                # projection priceable". That is correct and it is not this case:
+                # the probability used here comes from the LIVE RE-SIM, which is
+                # the distinction `live_edge_policy`'s own docstring draws —
+                # "the predicate is the projection's BASIS, not the game's state…
+                # a projection that itself knows the score… is precisely the thing
+                # worth ranking".
+                #
+                # FOUR THINGS THIS DOES NOT DO, each load-bearing:
+                #
+                #  1. It never writes `edge_vs_market_pct`. `modelled_fair_edge`
+                #     returns its own field, and `book_margin_model` forbids the
+                #     two being mixed — one is a two-sided de-vig, the other is
+                #     one book's measured hold. A reader must be able to tell
+                #     which claim they are looking at.
+                #  2. It fires ONLY for `one_sided_quote`. A de-vig that failed
+                #     for any other reason is still a withhold: this is a
+                #     substitute for a fair value that cannot exist, not a
+                #     fallback for one that went wrong.
+                #  3. It uses the LIVE probability, never the pregame one. If the
+                #     re-sim produced nothing we are already in the
+                #     `no_live_probability` branch above and never reach here.
+                #  4. Final and already-decided rows never arrive — both refuse
+                #     upstream in this same loop, and `modelled_fair_edge` itself
+                #     refuses anything whose `fair_method` is not
+                #     `book_margin_model`.
+                #
+                # Counted separately from `edged` so the board's two edge
+                # populations can never be summed by accident.
+                if had_pregame and devig_detail == "one_sided_quote":
+                    modelled = modelled_fair_edge(
+                        row,
+                        model_prob=live_prob,
+                        side=projection.get("side") or hit.get("side"),
+                    )
+                    if modelled:
+                        projection.update(modelled)
+                        projection["live_prob_over"] = live_prob
+                        # `edge_vs_market_pct` stays absent-and-explained rather
+                        # than blank: the de-vig genuinely has no answer, and the
+                        # modelled number is a different, weaker claim that must
+                        # not be read as it.
+                        projection["edge_vs_market_pct"] = None
+                        projection["edge_unavailable_reason"] = (
+                            "one-sided market, so no two-sided fair exists; priced "
+                            f"against the modelled fair instead (see {MODELLED_EDGE_FIELD})"
+                        )
+                        edged_modelled += 1
+                        continue
+
                 if had_pregame and devig_detail:
                     withheld_key = f"no_fair_value_{devig_detail}"
                 elif had_pregame:
@@ -811,6 +884,12 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # attached, so "we chose not to price this" never again reads the same
         # as "the join failed".
         "rows_live_edged": edged,
+        # `#539`. REPORTED IN THE SAME COMMIT THAT ADDED THE RULE, and reported
+        # HERE rather than only counted — `#444` is the standing lesson that a
+        # producer returning a new key does not make it visible, because the
+        # payload assemblers are explicit key lists. A modelled edge nobody can
+        # count is indistinguishable from the zero it replaced.
+        "rows_live_edged_modelled": edged_modelled,
         # THE DISPLAY HALF, counted separately from the edge half. A row can
         # carry an honest live projection and no live probability, and that is
         # now a stated act rather than a silently inherited pregame number.

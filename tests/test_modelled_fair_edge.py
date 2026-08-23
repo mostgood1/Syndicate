@@ -161,17 +161,63 @@ def test_both_producers_import_the_same_helper():
 
 
 def test_the_live_refusal_is_not_bypassed():
-    """A modelled fair does NOT make a live pregame projection priceable.
+    """A modelled fair does NOT make a live PREGAME projection priceable.
 
-    Wiring this into the live branch would reintroduce the exact leak `#340`
-    fixed across three sports, so the source must not call it there.
+    Wiring this into `_price_against_market`'s live branch would reintroduce the
+    exact leak `#340` fixed across three sports, so that branch must not call it.
+
+    THE SLICE WAS REWRITTEN (`#539`) AFTER IT BROKE ON A REFACTOR IT WAS NOT
+    ABOUT. It used to read:
+
+        src.split("live_reason = ")[1].split("fair = _no_vig_over_probability")[0]
+
+    `#530` moved the de-vig ABOVE `live_reason`, so the closing marker no longer
+    appeared after the split point, the "live block" swallowed the rest of the
+    function -- including the PREGAME one-sided branch, which legitimately calls
+    `modelled_fair_edge` -- and this failed while the invariant it defends was
+    perfectly intact.
+
+    It is now anchored on the branch's own `return`, which is what actually bounds
+    it, instead of on whatever statement happened to follow.
     """
     import inspect
 
     from syndicate.features.shared import soccer_projections
 
-    src = inspect.getsource(soccer_projections._price_against_market)
-    live_block = src.split("live_reason = ")[1].split("fair = _no_vig_over_probability")[0]
+    lines = inspect.getsource(soccer_projections._price_against_market).split("\n")
+    start = next(n for n, l in enumerate(lines) if "live_reason = live_edge_unavailable_reason" in l)
+    end = next(n for n in range(start, len(lines)) if lines[n].strip() == "return")
+    live_block = "\n".join(lines[start : end + 1])
     assert "modelled_fair_edge" not in live_block, (
-        "the live branch must not price against a modelled fair"
+        "the live branch of _price_against_market must not price against a "
+        "modelled fair -- a PREGAME model against a re-priced market is the score, "
+        "not an edge"
     )
+    # Guard the guard: if the slice ever fails to find the branch it would pass
+    # vacuously, which is how this test spent a refactor asserting nothing.
+    assert "live_reason" in live_block and "return" in live_block
+    assert end - start < 25, "the slice grew past the branch; re-anchor it"
+
+
+def test_the_LIVE_JOIN_may_price_a_one_sided_market_and_the_producer_still_may_not():
+    """`#539` `[USER DECISION 2026-08-23]`. The two rules coexist and the
+    distinction is the projection's BASIS, not the game's state.
+
+    `_price_against_market` runs in the PREGAME join, so its projection is pregame
+    and must stay refused. `live_projection_join` holds a probability from the
+    live re-sim -- which `live_edge_policy`'s own docstring calls "precisely the
+    thing worth ranking" -- and for a market with only one side quoted
+    (`#538`: MLS Shots, 2,544 rows, 0 under prices) the modelled fair is the only
+    fair that can exist.
+    """
+    import inspect
+
+    from syndicate.features.shared import live_projection_join
+
+    src = inspect.getsource(live_projection_join)
+    assert "modelled_fair_edge(" in src, "the live join no longer prices one-sided markets"
+    assert 'devig_detail == "one_sided_quote"' in src, (
+        "the modelled path must be scoped to a one-sided market -- it is a "
+        "substitute for a fair that cannot exist, not a fallback for one that broke"
+    )
+    assert "rows_live_edged_modelled" in src, "the modelled edges are not counted separately"

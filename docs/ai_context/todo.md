@@ -1,5 +1,64 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#539` — **A one-sided LIVE soccer market is now priced against the MODELLED fair. `[USER DECISION 2026-08-23]` — the pregame refusal stands, and the distinction is the projection's BASIS.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+`#538` closed the diagnosis and left one decision. The user took it, endorsing the
+FOR case: it is the only way soccer's live tier ever carries a number, the
+mechanism exists and is already approved for pregame, and the projection genuinely
+knows the score.
+
+**WIRED IN `live_projection_join`, NOT IN THE PRODUCER, and that is the whole
+design.** `soccer_projections._price_against_market` runs in the PREGAME join, so
+its projection is pregame and its live refusal must stand — wiring it there would
+reintroduce the `#340` leak. `live_projection_join` holds a probability from the
+live RE-SIM, which is exactly the case `live_edge_policy`'s docstring carves out:
+"the predicate is the projection's BASIS, not the game's state… a projection that
+itself knows the score… is precisely the thing worth ranking".
+
+**FOUR REFUSALS KEPT, each load-bearing:**
+
+  * never writes `edge_vs_market_pct` — `book_margin_model` forbids mixing a
+    measured hold with a two-sided de-vig, and a reader must be able to tell which
+    claim they are seeing;
+  * fires ONLY on `one_sided_quote` — a substitute for a fair that cannot exist,
+    not a fallback for one that broke;
+  * uses the LIVE probability, never the pregame one;
+  * final and already-decided rows refuse upstream and never arrive.
+
+Counted as `rows_live_edged_modelled`, **separate from `edged`** and printed
+beside it (`edged_modelled=`) — one total would let the weaker evidence inflate
+the number the board is judged on. Printed even at zero, so "live and matched
+nothing" cannot look like "not deployed".
+
+**A GUARD BROKE ON A REFACTOR IT WAS NOT ABOUT, and it was nearly missed.**
+`test_the_live_refusal_is_not_bypassed` sliced the source as
+`split("live_reason = ")[1].split("fair = _no_vig_over_probability")[0]`. `#530`
+moved the de-vig above `live_reason`, so the closing marker vanished from the
+slice, the "live block" swallowed the rest of the function including the PREGAME
+branch that legitimately calls `modelled_fair_edge`, and it failed while the
+invariant was intact. Re-anchored on the branch's own `return`, plus two
+assertions that the slice actually found a branch — it had spent a refactor able
+to pass vacuously.
+
+**It did not fail when `#530` landed** because my `-k` filter that run did not
+include "modelled". A test guarding the exact rule I was changing, missed by my
+own selector.
+
+**PROVED IT STILL CATCHES A REAL BYPASS** by injecting `modelled_fair_edge` into
+the live branch: the guard fails. My first attempt at that check silently
+injected NOTHING (the target string did not match the real indentation) and
+"passed" — a discrimination check that discriminated nothing, caught only because
+a guard passing against a deliberate bypass is implausible.
+
+**Tests:** `tests/test_live_modelled_fair_edge.py` (11 — 5 positive, discriminating;
+6 refusals, which hold both ways and guard a future widening rather than this
+change). Plus 2 in `test_modelled_fair_edge.py`.
+
+**Verify after deploy:** `LIVE_PROJECTION_JOIN sport=soccer edged_modelled=` must
+exceed 0 while `edged=` stays 0 — that pairing is the signature of the rule firing
+on exactly the population it was scoped to. Then `LAYER2_BOARD_HEALTH
+sport=soccer` should show live rows carrying a number for the first time.
+
 ### `#538` — **The soccer live edge is closed as a DIAGNOSIS: the one-sidedness is real in the vendor data, 0 of 2,544. What remains is a PRICING DECISION and it is the user's.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
 `#536` measured 110 of 125 live soccer rows withheld as `one_sided_quote`. This
