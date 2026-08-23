@@ -175,28 +175,22 @@ def _venue_price_resolver(venue: str):
 
 
 def _resolver_from_markets(markets):
-    """Turn fetched Kalshi markets into a (market, player, line, side) resolver."""
-    from syndicate.features.shared.kalshi_board_join import (
-        kalshi_price_resolver,
-        parse_prop_title,
-        series_to_markets,
-        threshold_to_line,
-    )
+    """Turn fetched Kalshi markets into a (market, player, line, side) resolver.
+
+    Classified by the CATALOGUE, so every sport it knows is priced here without
+    this function naming any of them.
+    """
+    from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
+    from syndicate.features.shared.kalshi_catalogue import classify_market
 
     matches = []
     for market in markets:
-        # EVERY alias gets an entry. The resolver is keyed by the BOARD's market
-        # name, and which of `strikeouts` / `pitcher_strikeouts` that is comes
-        # from the board, not from here -- registering only the primary would
-        # leave the venue scope refusing rows the join can pair.
-        board_markets = series_to_markets(market.get("series"))
-        parsed = parse_prop_title(market.get("title"))
-        if not board_markets or parsed is None:
-            # Unmapped series and unreadable titles are skipped here rather than
-            # guessed -- the join module already refuses them by name.
-            continue
-        line = threshold_to_line(parsed["threshold"])
-        if line is None:
+        verdict = classify_market(market)
+        # Unmapped series, unreadable titles and game lines with no event
+        # mapping are all skipped here rather than guessed -- the catalogue
+        # already refuses each of them by its own name, and `report_catalogue_gaps`
+        # is where those numbers are meant to be read.
+        if verdict.get("status") != "ok" or verdict.get("needs_event_identity"):
             continue
         # Each side takes its OWN quote: yes and no are separately priced and
         # the gap between them is the spread.
@@ -204,16 +198,15 @@ def _resolver_from_markets(markets):
             price = market.get(price_key)
             if price is None:
                 continue
-            for board_market in board_markets:
-                matches.append(
-                    {
-                        "market": board_market,
-                        "player_name": parsed["player_name"],
-                        "line": line,
-                        "board_side": side,
-                        "kalshi_american": price,
-                    }
-                )
+            matches.append(
+                {
+                    "market": verdict["market"],
+                    "player_name": verdict["subject"],
+                    "line": verdict["line"],
+                    "board_side": side,
+                    "kalshi_american": price,
+                }
+            )
     return kalshi_price_resolver(matches)
 
 

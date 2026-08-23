@@ -12,58 +12,15 @@ import pytest
 
 from syndicate.features.shared.kalshi_board_join import (
     REASON_NO_BOARD_ROW,
+    REASON_COMBINATORIAL,
     REASON_UNMAPPED_SERIES,
-    REASON_UNPARSEABLE_TITLE,
+    REASON_UNREADABLE_TITLE,
     join_kalshi_to_board,
     normalize_person,
-    parse_prop_title,
-    series_to_market,
-    threshold_to_line,
 )
 
 
 # --- the half-point convention --------------------------------------------
-
-
-def test_seven_plus_is_over_six_point_five():
-    """THE CONVENTION THAT WOULD MISMATCH EVERY LINE. Kalshi says "at least N";
-    the board says "over N-0.5". Both pay at 7 or more."""
-    assert threshold_to_line(7) == 6.5
-
-
-def test_matching_a_threshold_against_its_own_integer_finds_nothing():
-    """7+ against a line of 7.0 is not the same bet, and must not match."""
-    assert threshold_to_line(7) != 7.0
-
-
-def test_off_by_a_half_would_be_a_different_bet():
-    """7+ is Over 6.5, NOT Over 7.5. Matching the latter would price a
-    different bet confidently -- worse than no match."""
-    assert threshold_to_line(7) != 7.5
-    assert threshold_to_line(8) == 7.5
-
-
-# --- title parsing ---------------------------------------------------------
-
-
-def test_a_strikeout_title_parses():
-    parsed = parse_prop_title("Andrew Abbott: 7+ strikeouts?")
-    assert parsed["player_name"] == "Andrew Abbott"
-    assert parsed["threshold"] == 7
-
-
-def test_an_outs_title_parses():
-    parsed = parse_prop_title("Andrew Abbott: 17+ Outs Recorded?")
-    assert parsed["threshold"] == 17
-    assert parsed["stat_text"] == "Outs Recorded"
-
-
-@pytest.mark.parametrize("title", ["", None, "yes Cruz Azul", "Will over 8.5 goals be scored?",
-                                   "Andrew Abbott strikeouts", "Abbott: many+ strikeouts?"])
-def test_an_unreadable_title_returns_None_not_a_partial_parse(title):
-    """A half-parsed player name would match the WRONG HUMAN — learnings.md's
-    'worse at any stake than no bet'."""
-    assert parse_prop_title(title) is None
 
 
 def test_names_normalise_across_accents_and_punctuation():
@@ -71,40 +28,6 @@ def test_names_normalise_across_accents_and_punctuation():
     a bet matches."""
     assert normalize_person("José Ramírez") == normalize_person("Jose Ramirez")
     assert normalize_person("Ronald Acuña Jr.") == normalize_person("Ronald Acuna Jr")
-
-
-def test_series_mapping_is_explicit_and_refuses_the_unknown():
-    from syndicate.features.shared.kalshi_board_join import series_to_markets
-
-    # MEASURED 2026-08-23T14:1xZ: the board's own key sample read
-    # `strikeouts|jake bennett|4.5` and `outs|cal quantrill|15.5` while Kalshi's
-    # titles parsed to `pitcher_strikeouts`. The primary is now the board's name.
-    assert series_to_market("KXMLBKS") == "strikeouts"
-    assert series_to_market("KXMLBOUTS") == "outs"
-    # Parlay series and anything unrecognised must never be guessed into a market.
-    assert series_to_market("KXMVECROSSCATEGORY") is None
-    assert series_to_market("KXNEWTHING") is None
-    assert series_to_markets("KXNEWTHING") == ()
-
-
-def test_both_spellings_of_a_market_are_accepted():
-    """The prefixed names are KEPT, not replaced.
-
-    They were what this module was written against and other feeds use them;
-    dropping a name because one slate did not use it is guessing in the opposite
-    direction.
-    """
-    from syndicate.features.shared.kalshi_board_join import series_to_markets
-
-    assert series_to_markets("KXMLBKS") == ("strikeouts", "pitcher_strikeouts")
-
-    market = _kalshi(title="Andrew Abbott: 7+ strikeouts?")
-    for name in ("strikeouts", "pitcher_strikeouts"):
-        report = join_kalshi_to_board([market], [_row(market=name)])
-        assert report["matched"] == 1, name
-
-
-# --- the join --------------------------------------------------------------
 
 
 def _kalshi(title="Andrew Abbott: 7+ strikeouts?", series="KXMLBKS", **kw):
@@ -183,14 +106,14 @@ def test_parlay_markets_are_refused_by_name():
         [_kalshi(series="KXMVECROSSCATEGORY", title="yes Tampa Bay,yes Shane Baz: 2+")],
         [_row()],
     )
-    assert report["reasons"][REASON_UNMAPPED_SERIES] == 1
+    assert report["reasons"][REASON_COMBINATORIAL] == 1
 
 
 def test_an_unparseable_title_is_named_separately_from_a_missing_row():
     """'We could not read this market' and 'Kalshi has nothing we bet' are
     different facts and must not share a counter."""
     report = join_kalshi_to_board([_kalshi(title="Will over 8.5 goals be scored?")], [_row()])
-    assert report["reasons"][REASON_UNPARSEABLE_TITLE] == 1
+    assert report["reasons"][REASON_UNREADABLE_TITLE] == 1
     assert REASON_NO_BOARD_ROW not in report["reasons"]
 
 
@@ -294,3 +217,52 @@ def test_a_market_with_no_close_time_is_not_dropped_by_the_date_check():
     assert join_kalshi_to_board(
         [market], [_row(player="Lake Bachar", line=5.5)], selected_date="2026-08-24"
     )["matched"] == 1
+
+
+# --- multi-sport, via the catalogue ----------------------------------------
+
+
+def test_a_board_row_spelled_the_old_way_still_joins():
+    """`market_keys` knows `pitcher_strikeouts` IS `strikeouts` (#224).
+
+    Canonicalising the board row means the aliases live in the module that owns
+    them. An alias tuple in the join was a second place for the two vocabularies
+    to drift apart -- which is the exact failure this join exists to avoid.
+    """
+    market = _kalshi(title="Andrew Abbott: 7+ strikeouts?")
+    for spelling in ("strikeouts", "pitcher_strikeouts"):
+        report = join_kalshi_to_board([market], [_row(market=spelling)])
+        assert report["matched"] == 1, spelling
+
+
+def test_a_home_run_market_joins_without_this_module_naming_the_sport():
+    """The point of routing through the catalogue: one registry line per series,
+    and the market vocabulary comes from `market_keys`."""
+    market = _kalshi(
+        series="KXMLBHR",
+        title="Pete Crow-Armstrong: 2+ home runs?",
+        ticker="KXMLBHR-26AUG24PCA-2",
+    )
+    report = join_kalshi_to_board(
+        [market], [_row(market="batter_home_runs", player="Pete Crow-Armstrong", line=1.5)]
+    )
+    assert report["matched"] == 1
+
+
+def test_a_game_line_is_refused_because_its_title_names_no_game():
+    """A player prop names a human, and a human plays one game a day. A total
+    names neither team, so pairing it needs `event_ticker` mapped to our event
+    id -- which does not exist. A total joined to the wrong game is a
+    confidently-priced bet on strangers."""
+    from syndicate.features.shared import kalshi_catalogue as cat
+    from syndicate.features.shared.kalshi_board_join import REASON_NEEDS_EVENT_MAPPING
+
+    cat.SERIES_SPORT["KXTESTTOTAL"] = "mlb"
+    try:
+        market = _kalshi(series="KXTESTTOTAL", title="Over 7.5 runs scored?")
+        report = join_kalshi_to_board([market], [_row()])
+        assert report["matched"] == 0
+        # Counted separately: this is the SIZE OF THE GAP, not a defect.
+        assert report["reasons"][REASON_NEEDS_EVENT_MAPPING] == 1
+    finally:
+        del cat.SERIES_SPORT["KXTESTTOTAL"]

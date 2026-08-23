@@ -49,34 +49,37 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from collections.abc import Mapping
 from typing import Any
 
-# The single-market sports series found in the live listing, mapped by
-# `kalshi_board_join`. Listed explicitly: a series this cannot map is a series
-# whose prices nothing could use.
-DEFAULT_SPORTS_SERIES = ("KXMLBKS", "KXMLBOUTS")
+def default_sports_series() -> tuple[str, ...]:
+    """Which series to price, from the CATALOGUE rather than a list here.
+
+    Adding a sport is then one registry line in one file, and the fetch, the
+    join and the venue scope all pick it up at once. A list maintained here as
+    well would be a second place to forget.
+    """
+    from syndicate.features.shared.kalshi_catalogue import SERIES_SPORT
+
+    return tuple(sorted(SERIES_SPORT))
 
 
 def sports_series() -> tuple[str, ...]:
-    """Which series to price. Overridable WITHOUT a deploy.
+    """The series to price. Overridable WITHOUT a deploy.
 
-    `discover()` finds new series at runtime, and the useful response to that is
-    to start pricing them -- which should not need a code change, because the
-    history a new series accumulates only starts when we first ask for it.
-    A dashboard env var costs nothing; a `render.yaml` edit fires
-    `blueprint_sync` and rewrites every key on every service.
+    `discover()` finds new series at runtime, and the useful response is to
+    start pricing them -- which should not need a code change, because the
+    history a new series accumulates only starts when we first ask for it. A
+    dashboard env var costs nothing; a `render.yaml` edit fires `blueprint_sync`
+    and rewrites every key on every service (`#284`).
     """
     raw = str(os.environ.get("SYNDICATE_KALSHI_SERIES") or "").strip()
     if not raw:
-        return DEFAULT_SPORTS_SERIES
+        return default_sports_series()
     parsed = tuple(part.strip().upper() for part in raw.split(",") if part.strip())
     # An override that parses to nothing is a typo, not an instruction to price
     # nothing. Falling through to an empty tuple would silently stop the feed.
-    return parsed or DEFAULT_SPORTS_SERIES
-
-
-# Kept as a module attribute for callers and tests that read the default set.
-SPORTS_SERIES = DEFAULT_SPORTS_SERIES
+    return parsed or default_sports_series()
 
 
 def kalshi_odds_enabled() -> bool:
@@ -159,12 +162,89 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     }
 
 
-def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
-    """Fetch each sports series on Kalshi's own cadence, record, write.
+DEFAULT_SERIES_PER_TICK = 6
 
-    `force=True` bypasses BOTH the enable flag and the interval gate -- that is
-    what a manual probe wants, and what the hourly cron would want if the
-    interval were ever raised above the cron period.
+# Total markets kept in the artifact. The keyvalue store refuses at 8MB and
+# `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded
+# multi-sport catalogue is a write that starts failing silently one sport from
+# now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
+MAX_STORED_MARKETS = 6000
+
+
+def series_per_tick() -> int:
+    """How many series may be fetched in ONE call to this function.
+
+    NOT a rate limit and not the cadence -- `refresh_interval_seconds` is the
+    cadence, per series. This only stops thirty HTTP calls leaving in one
+    second, which is what produced the 2026-08-23 `http_429`s. The board build
+    runs every ~2 minutes, so a due queue of any realistic size still drains
+    inside one interval; this just spreads it out.
+    """
+    raw = os.environ.get("SYNDICATE_KALSHI_SERIES_PER_TICK")
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_SERIES_PER_TICK
+    return parsed if parsed > 0 else DEFAULT_SERIES_PER_TICK
+
+
+def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -> list[str]:
+    """Which series have not been fetched within `interval`, oldest first.
+
+    PER SERIES, which is the whole economy of this design. A single whole-fetch
+    clock means the cost of adding a sport is a bigger burst on the same
+    schedule; a per-series clock means the cost is exactly one more call per
+    interval, and the per-tick cap decides only how bursty that is.
+
+    Oldest first so a series that has been waiting cannot be starved by one that
+    was just added -- with a cap and no ordering, the alphabetically-first N
+    would refresh forever and the rest never would.
+    """
+    per_series = state.get("series") or {}
+    due: list[tuple[float, str]] = []
+    for series in wanted:
+        entry = per_series.get(series) or {}
+        age = _seconds_since(entry.get("fetched_at"))
+        if age is None:
+            # Never fetched. Sorts ahead of everything -- a series with no
+            # prices at all is worth more than a refresh of one that has them.
+            due.append((float("inf"), series))
+        elif age >= interval:
+            due.append((age, series))
+    due.sort(key=lambda item: -item[0])
+    return [series for _age, series in due]
+
+
+def _backing_off(entry: Mapping[str, Any], interval: int) -> bool:
+    """Did this series' LAST ATTEMPT fail, recently enough to wait?
+
+    A failure is `attempted_at` moving without `fetched_at` moving with it --
+    the two stamps are equal on success, so "the last attempt failed" is exactly
+    "they disagree". Stated this way rather than as a chain of conditions
+    because the chain it replaced was unreadable and I could not convince myself
+    it was right.
+
+    Failures back off on their own shorter clock. Ungated, a series that is
+    403ing or rate-limiting us is retried every board build -- every ~2 minutes
+    -- which is how the 2026-08-23 429s happened.
+    """
+    attempted = entry.get("attempted_at")
+    if not attempted or attempted == entry.get("fetched_at"):
+        return False
+    since = _seconds_since(attempted)
+    return since is not None and since < min(interval, FAILED_RETRY_SECONDS)
+
+
+def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
+    """Refresh whichever series are due, merge, record, write.
+
+    Returns EVERY series' markets, not just the ones fetched this call. With a
+    per-series clock the alternative is that three quarters of the board's
+    Kalshi prices vanish on every tick -- the merge is not an optimisation, it
+    is what makes a staggered fetch usable at all.
+
+    `force=True` bypasses the enable flag, the per-series clock and the
+    per-tick cap: that is what a manual probe wants.
     """
     if not (force or kalshi_odds_enabled()):
         return {"status": "skipped", "reason": "disabled"}
@@ -173,120 +253,137 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
 
     path = markets_artifact_path()
     try:
-        cached = read_json_file(path) or {}
+        state = read_json_file(path) or {}
     except Exception:
-        cached = {}
+        state = {}
+    per_series: dict[str, Any] = dict(state.get("series") or {})
 
+    wanted = sports_series()
     interval = refresh_interval_seconds()
-    age = _seconds_since(cached.get("fetched_at"))
+    due = wanted if force else _due_series(state, wanted, interval)
 
-    # A FAILED fetch gets its own, shorter clock. It cannot use `fetched_at`,
-    # because stamping that would blank the board for an hour; but it must not
-    # be ungated either, or a venue that is 403ing or rate-limiting us gets
-    # retried every board build -- every ~3 minutes -- which is how the
-    # 2026-08-23 `http_429`s happened in the first place. So failures record
-    # `attempted_at` and back off on that.
-    if not force and interval > 0:
-        since_attempt = _seconds_since(cached.get("attempted_at"))
-        retry_after = min(interval, FAILED_RETRY_SECONDS)
-        if since_attempt is not None and since_attempt < retry_after and (
-            age is None or age >= interval
-        ):
-            print(
-                "[kalshi_odds] BACKOFF"
-                f" since_failed_s={int(since_attempt)}"
-                f" retry_after_s={retry_after}"
-                f" cached_markets={len(cached.get('markets') or [])}",
-                flush=True,
-            )
-            return {
-                "status": "backoff",
-                "markets": cached.get("markets") or [],
-                "per_series": cached.get("per_series") or {},
-            }
+    # A failed series backs off on its OWN shorter clock. Without this a venue
+    # that is 403ing or rate-limiting us is retried every board build -- every
+    # ~2 minutes -- which is how the 2026-08-23 429s happened.
+    if not force:
+        due = [s for s in due if not _backing_off(per_series.get(s) or {}, interval)]
 
-    if not force and interval > 0 and age is not None and age < interval:
-        cached_markets = cached.get("markets") or []
-        # CACHED, not skipped, and it says so. The board still gets prices; what
-        # it does not get is a fresh HTTP call. Reporting this as a skip would
-        # make a working gate look like a broken fetch.
-        print(
-            "[kalshi_odds] CACHED"
-            f" markets={len(cached_markets)}"
-            f" age_s={int(age)}"
-            f" interval_s={interval}",
-            flush=True,
-        )
-        return {
-            "status": "cached",
-            "markets": cached_markets,
-            "per_series": cached.get("per_series") or {},
-            "age_seconds": int(age),
-        }
+    cap = series_per_tick()
+    fetching = due if force else due[:cap]
 
-    per_series: dict[str, Any] = {}
-    all_markets: list[dict[str, Any]] = []
-    for series in sports_series():
+    fetched: dict[str, Any] = {}
+    for series in fetching:
         result = fetch_series_markets(series)
-        per_series[series] = {
-            "count": len(result.get("markets") or []),
-            "strategy": result.get("strategy"),
-            "reason": result.get("reason"),
-        }
-        all_markets.extend(result.get("markets") or [])
+        markets = result.get("markets") or []
+        entry = dict(per_series.get(series) or {})
+        entry["attempted_at"] = _now_stamp()
+        entry["strategy"] = result.get("strategy")
+        entry["reason"] = result.get("reason")
+        if markets:
+            entry["markets"] = markets
+            entry["count"] = len(markets)
+            # `fetched_at` moves ONLY on a fetch that returned something. A
+            # failure that stamped it would blank this series for an interval
+            # AND start its clock, so the next hour would serve zero markets
+            # from an artifact that looks fresh.
+            entry["fetched_at"] = entry["attempted_at"]
+        per_series[series] = entry
+        fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
+
+    # MERGE. Every series' last good markets, whether or not it was fetched now.
+    all_markets: list[dict[str, Any]] = []
+    staleness: dict[str, int] = {}
+    for series in wanted:
+        entry = per_series.get(series) or {}
+        all_markets.extend(entry.get("markets") or [])
+        age = _seconds_since(entry.get("fetched_at"))
+        if age is not None:
+            staleness[series] = int(age)
+
+    trimmed = 0
+    if len(all_markets) > MAX_STORED_MARKETS:
+        trimmed = len(all_markets) - MAX_STORED_MARKETS
+        all_markets = all_markets[:MAX_STORED_MARKETS]
 
     print(
-        "[kalshi_odds] FETCHED"
-        f" markets={len(all_markets)}"
+        "[kalshi_odds] TICK"
+        f" series_wanted={len(wanted)}"
+        f" due={len(due)}"
+        f" fetched={len(fetching)}"
+        f" cap={cap}"
         f" interval_s={interval}"
-        f" prev_age_s={int(age) if age is not None else None}"
+        f" markets={len(all_markets)}"
         # Per series, with the STRATEGY beside each count -- a zero from a
         # working filter and a zero from an ignored one are different facts.
-        f" per_series={ {k: (v['count'], v['strategy']) for k, v in per_series.items()} }",
+        f" this_tick={ {k: (v['count'], v['strategy']) for k, v in fetched.items()} }"
+        # How old the OLDEST price in the merged set is. A merged artifact hides
+        # staleness by construction unless it is stated.
+        f" oldest_s={max(staleness.values()) if staleness else None}"
+        f" trimmed={trimmed}",
         flush=True,
     )
 
     if not all_markets:
-        # DO NOT stamp `fetched_at` on a fetch that returned nothing, and do not
-        # overwrite the cached markets with an empty list. A failed call would
-        # otherwise both blank the board AND start the clock, so the next 59
-        # minutes would serve zero markets from a "fresh" artifact.
-        print(
-            "[kalshi_odds] EMPTY_FETCH"
-            f" keeping_cached={len(cached.get('markets') or [])}"
-            f" retry_after_s={min(interval, FAILED_RETRY_SECONDS) if interval > 0 else 0}",
-            flush=True,
-        )
-        failed = dict(cached)
-        failed["attempted_at"] = _now_stamp()
-        failed["last_failure_per_series"] = per_series
+        print("[kalshi_odds] EMPTY no series has any markets yet", flush=True)
+        state["series"] = per_series
         try:
-            write_json_file(path, failed)
+            write_json_file(path, state)
         except Exception as exc:
-            print(f"[kalshi_odds] BACKOFF_WRITE_FAILED error={exc}", flush=True)
-        return {
-            "status": "empty",
-            "markets": cached.get("markets") or [],
-            "per_series": per_series,
-        }
+            print(f"[kalshi_odds] WRITE_FAILED error={exc}", flush=True)
+        return {"status": "empty", "markets": [], "per_series": fetched}
 
-    record_and_report(all_markets)
+    if fetching:
+        # Only record history when something was actually re-fetched. Recording
+        # on every tick would append the same merged snapshot ~30 times an hour
+        # and the "price moved" test would still be doing the real work -- but
+        # the `unchanged` counter would stop meaning anything.
+        record_and_report(all_markets)
+        report_catalogue_gaps(all_markets)
 
-    payload = {
-        "markets": all_markets,
-        "per_series": per_series,
-        "count": len(all_markets),
-        "fetched_at": _now_stamp(),
-        # `attempted_at` tracks `fetched_at` on success, so a past failure's
-        # backoff cannot outlive the failure that caused it.
-        "attempted_at": _now_stamp(),
-    }
+    state["series"] = per_series
+    state["markets"] = all_markets
+    state["count"] = len(all_markets)
+    state["fetched_at"] = _now_stamp()
+    state["staleness_seconds"] = staleness
     try:
-        write_json_file(path, payload)
+        write_json_file(path, state)
     except Exception as exc:
         print(f"[kalshi_odds] WRITE_FAILED error={exc}", flush=True)
 
-    return {"status": "ok", "markets": all_markets, "per_series": per_series}
+    return {
+        "status": "ok" if fetching else "cached",
+        "markets": all_markets,
+        "per_series": fetched,
+        "staleness_seconds": staleness,
+    }
+
+
+def report_catalogue_gaps(markets: list[dict[str, Any]]) -> dict[str, Any]:
+    """What Kalshi lists that we cannot price yet, by series, with an example.
+
+    THE WORK QUEUE for covering more sports, and the reason this runs at all: a
+    count of unmapped markets says nothing actionable, while a series name
+    beside a sample title says exactly which registry line to add.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market, unmapped_series
+
+    priced = sum(1 for m in markets if classify_market(m).get("status") == "ok")
+    gaps = unmapped_series(markets)
+    print(
+        f"[kalshi_odds] CATALOGUE priced={priced} of {len(markets)} gaps={len(gaps)}",
+        flush=True,
+    )
+    for series, info in list(gaps.items())[:5]:
+        print(
+            "[kalshi_odds] GAP"
+            f" series={series}"
+            f" count={info.get('count')}"
+            f" reason={info.get('reason')}"
+            f" detail={info.get('detail')}"
+            f" sample={info.get('sample_title')!r}",
+            flush=True,
+        )
+    return gaps
 
 
 def _now_stamp() -> str:
