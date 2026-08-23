@@ -127,6 +127,12 @@ _LEAN_FIELDS = (
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
     "game_pk",
+    # THE VENUE'S OWN IDENTIFIER for the contract, stamped at decision time
+    # rather than resolved at submit time. An exchange order names a ticker, and
+    # re-deriving that ticker seconds before sending money means re-deriving it
+    # from a catalogue that may have moved -- so the thing we priced and the
+    # thing we buy could differ with nothing recording that they did.
+    "venue_ticker",
     "requested_price",
     "requested_stake_dollars",
     "submitted_at",
@@ -169,6 +175,10 @@ class OrderRequest:
     commence_time: str | None = None
     opening_key: str | None = None
     game_pk: str | None = None
+    # The venue's contract id (a Kalshi ticker). Optional because every order
+    # placed so far is on paper against an aggregator, where there is no such
+    # thing; required by the Kalshi adapter, which refuses by name without it.
+    venue_ticker: str | None = None
 
 
 def execution_mode() -> str:
@@ -311,6 +321,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "commence_time": request.commence_time,
         "opening_key": request.opening_key,
         "game_pk": request.game_pk,
+        "venue_ticker": request.venue_ticker,
         "requested_price": request.requested_price,
         "requested_stake_dollars": request.requested_stake_dollars,
         "submitted_at": _utc_now(),

@@ -35,3 +35,8 @@ pypdf==3.16.0
 # falling back to snapshot-only responses.
 anthropic>=0.116.0
 
+# Kalshi authenticates every trading request with an RSA-PSS signature
+# (syndicate/features/shared/kalshi_auth.py), so signing is a hard dependency of
+# order placement. It was previously present only transitively, which is a
+# dependency that can disappear without anything in this file changing.
+cryptography>=42.0,<46.0

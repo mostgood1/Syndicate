@@ -1,0 +1,277 @@
+"""Signed requests to Kalshi -- the prerequisite for placing an order.
+
+Everything Syndicate reads from Kalshi today is public and unauthenticated.
+Placing an order is not: Kalshi authenticates with an API key ID plus an
+RSA-PSS signature over each individual request, so there is no "log in once"
+step and no bearer token to hold. Every call is signed or it is rejected.
+
+--------------------------------------------------------------------------
+THIS MODULE CAN CREATE POSITIONS. IT DEFAULTS TO BEING UNABLE TO.
+--------------------------------------------------------------------------
+
+The read-only client can be wrong and cost us a bad number. This one can be
+wrong and cost money. So the safety is structural rather than procedural:
+
+- **No credential, no client.** `load_credentials()` returns a NAMED refusal --
+  `no_api_key_id`, `no_private_key`, `unreadable_private_key`, `no_cryptography`
+  -- never a half-configured object. A signer that exists but cannot sign would
+  fail at the submit call, which is the worst possible place to discover it.
+- **The signature and the URL are produced TOGETHER** by `signed_request`, and
+  the path is derived from the URL rather than passed alongside it. The classic
+  failure of this scheme is signing one path and sending another: the server
+  returns a bare 401 and every plausible cause -- clock skew, wrong key, wrong
+  host -- looks identical from the outside.
+- **Nothing here places an order.** This module signs and sends; the decision to
+  send anything that creates a position lives behind `kalshi_execution`'s caps
+  and kill switch. Separated so that reading account state can never be one
+  typo'd argument away from writing to it.
+
+--------------------------------------------------------------------------
+UNVERIFIED, AND SHAPED AROUND THAT -- AGAIN
+--------------------------------------------------------------------------
+
+The agent proxy 403s CONNECT to every Kalshi host, so this was written without
+calling the API, exactly like `kalshi_client` was. That module's first live run
+corrected 10 of 17 field names and a 100x price error, so the assumptions here
+are again in ONE place (`_TIMESTAMP_UNIT`, `_SIGNED_PATH_INCLUDES_PREFIX`,
+`_HEADER_*`) and `probe_auth()` reports what came back instead of parsing it.
+
+The parts that do NOT depend on the endpoint -- that a signature verifies
+against its public key, that the signed string is built from the path actually
+requested, that a query string is excluded -- are unit-tested against a
+generated keypair and are true regardless of what Kalshi returns.
+
+--------------------------------------------------------------------------
+CREDENTIALS
+--------------------------------------------------------------------------
+
+`KALSHI_API_KEY_ID` and `KALSHI_PRIVATE_KEY` (the PEM, newlines allowed as
+literal `\\n`) belong in the Render dashboard. Not in `render.yaml` -- that
+would put a private key in git AND fire `blueprint_sync` (`#284`). Not in chat.
+
+The key ID pasted into a session transcript on 2026-08-23 should be treated as
+disclosed and rotated before this module is ever pointed at a funded account.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any
+
+__all__ = [
+    "load_credentials",
+    "signing_string",
+    "sign",
+    "auth_headers",
+    "signed_request",
+    "probe_auth",
+    "KalshiAuthError",
+]
+
+# ASSUMPTIONS, in one place so a live run can correct them the way it corrected
+# `_MARKET_FIELDS`.
+_TIMESTAMP_UNIT_MS = True          # Kalshi documents milliseconds, not seconds.
+_SIGNED_PATH_INCLUDES_PREFIX = True  # i.e. "/trade-api/v2/portfolio/balance".
+_SIGNED_PATH_INCLUDES_QUERY = False  # The query string is excluded.
+_HEADER_KEY = "KALSHI-ACCESS-KEY"
+_HEADER_SIGNATURE = "KALSHI-ACCESS-SIGNATURE"
+_HEADER_TIMESTAMP = "KALSHI-ACCESS-TIMESTAMP"
+
+
+class KalshiAuthError(RuntimeError):
+    """A signed call that cannot be trusted. Never swallowed into a falsy result."""
+
+
+def _private_key_pem() -> str:
+    raw = os.environ.get("KALSHI_PRIVATE_KEY") or ""
+    # A PEM pasted into a dashboard field arrives with literal backslash-n. Both
+    # forms are accepted; neither is logged.
+    return raw.replace("\\n", "\n").strip()
+
+
+def load_credentials() -> dict[str, Any]:
+    """The signer, or a NAMED reason there isn't one.
+
+    Returns `{"status": "ok", "key_id": ..., "private_key": <object>}` or
+    `{"status": "unavailable", "reason": ...}`. Never raises, never returns a
+    partially configured signer: "configured but unable to sign" would surface
+    at the submit call, which is the one place a surprise is unaffordable.
+    """
+    key_id = (os.environ.get("KALSHI_API_KEY_ID") or "").strip()
+    if not key_id:
+        return {"status": "unavailable", "reason": "no_api_key_id"}
+
+    pem = _private_key_pem()
+    if not pem:
+        return {"status": "unavailable", "reason": "no_private_key"}
+
+    try:
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    except BaseException:  # noqa: BLE001 -- see below, this is deliberate
+        # `cryptography` is a declared dependency, but an import failure here
+        # must read as "cannot sign" rather than taking down the worker that
+        # imports this module for its read-only side.
+        #
+        # BaseException, NOT Exception, and MEASURED rather than defensive: a
+        # broken install (`cryptography` present, `_cffi_backend` missing --
+        # exactly what this container had on 2026-08-23) raises pyo3's
+        # `PanicException`, which inherits from BaseException. `except
+        # Exception` let it straight through and the process died on an import.
+        return {"status": "unavailable", "reason": "no_cryptography"}
+
+    try:
+        private_key = load_pem_private_key(pem.encode("utf-8"), password=None)
+    except Exception as exc:
+        # The EXCEPTION TYPE only -- the message from a key parser can echo key
+        # material, and this string reaches logs.
+        return {
+            "status": "unavailable",
+            "reason": "unreadable_private_key",
+            "detail": type(exc).__name__,
+        }
+
+    return {"status": "ok", "key_id": key_id, "private_key": private_key}
+
+
+def _timestamp_ms(now: float | None = None) -> str:
+    seconds = time.time() if now is None else now
+    return str(int(seconds * 1000)) if _TIMESTAMP_UNIT_MS else str(int(seconds))
+
+
+def signed_path(url: str) -> str:
+    """The path portion of `url`, as it must appear in the signed string.
+
+    DERIVED FROM THE URL, never passed beside it. Signing one path and sending
+    another produces a bare 401 in which clock skew, a wrong key and a wrong
+    host are indistinguishable -- so the two cannot be allowed to disagree.
+    """
+    parsed = urllib.parse.urlsplit(url)
+    path = parsed.path or "/"
+    if _SIGNED_PATH_INCLUDES_QUERY and parsed.query:
+        return f"{path}?{parsed.query}"
+    return path
+
+
+def signing_string(timestamp: str, method: str, url: str) -> str:
+    """`timestamp + METHOD + path`, concatenated with no separators."""
+    return f"{timestamp}{method.upper()}{signed_path(url)}"
+
+
+def sign(private_key: Any, message: str) -> str:
+    """RSA-PSS over SHA-256, MGF1-SHA256, salt length = digest length."""
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    signature = private_key.sign(
+        message.encode("utf-8"),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=hashes.SHA256.digest_size,
+        ),
+        hashes.SHA256(),
+    )
+    return base64.b64encode(signature).decode("ascii")
+
+
+def auth_headers(
+    method: str, url: str, *, credentials: dict[str, Any] | None = None, now: float | None = None
+) -> dict[str, str]:
+    """Headers for one signed call. Raises rather than returning unsigned ones.
+
+    An unsigned request to a trading endpoint is a 401, and a 401 on a submit is
+    ambiguous in the most expensive way -- it does not tell you whether the order
+    was rejected or the auth was. Refusing here keeps that ambiguity out.
+    """
+    creds = credentials or load_credentials()
+    if creds.get("status") != "ok":
+        raise KalshiAuthError(f"cannot_sign: {creds.get('reason')}")
+
+    timestamp = _timestamp_ms(now)
+    signature = sign(creds["private_key"], signing_string(timestamp, method, url))
+    return {
+        _HEADER_KEY: str(creds["key_id"]),
+        _HEADER_SIGNATURE: signature,
+        _HEADER_TIMESTAMP: timestamp,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "syndicate/1.0",
+    }
+
+
+def signed_request(
+    method: str,
+    url: str,
+    *,
+    body: dict[str, Any] | None = None,
+    credentials: dict[str, Any] | None = None,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    """One signed call. Returns the decoded object, or raises `KalshiAuthError`.
+
+    The headers are built from the SAME `url` that is sent -- the whole reason
+    this is one function rather than a header helper plus a caller's urlopen.
+    """
+    headers = auth_headers(method, url, credentials=credentials)
+    payload = None if body is None else json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            decoded = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8")[:400]
+        except Exception:
+            detail = "<unreadable>"
+        # 401 gets a hint rather than a guess. Clock skew is the most common
+        # cause and the least obvious one, and it is the only one the caller can
+        # check without Kalshi's help.
+        hint = " (check container clock skew, key id, and that the key is live)" if exc.code == 401 else ""
+        raise KalshiAuthError(f"http_{exc.code}: {url}{hint}: {detail}") from exc
+    except Exception as exc:
+        raise KalshiAuthError(f"{type(exc).__name__}: {exc}") from exc
+    if not isinstance(decoded, dict):
+        raise KalshiAuthError(f"payload_not_an_object: {type(decoded).__name__}")
+    return decoded
+
+
+def _base_url() -> str:
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    override = (os.environ.get("KALSHI_API_BASE") or "").strip()
+    return override or _BASE_URLS[0]
+
+
+def probe_auth() -> dict[str, Any]:
+    """Does the credential work, and what does an authenticated read look like?
+
+    Reports the SHAPE that came back rather than parsing it -- the same choice
+    `kalshi_client.probe()` made, which is what caught the 100x price error and
+    the ten wrong field names before either could ship.
+
+    Read-only by construction: it asks for the balance. There is no argument
+    that turns this into a write.
+    """
+    creds = load_credentials()
+    if creds.get("status") != "ok":
+        return {"status": "unavailable", "reason": creds.get("reason"), "detail": creds.get("detail")}
+
+    url = f"{_base_url()}/portfolio/balance"
+    try:
+        payload = signed_request("GET", url, credentials=creds)
+    except KalshiAuthError as exc:
+        return {"status": "error", "reason": str(exc), "url": url}
+    return {
+        "status": "ok",
+        "url": url,
+        # Keys, not values: a balance is not a secret but there is no reason for
+        # it to be in a log line whose job is to confirm the signature worked.
+        "keys": sorted(payload.keys()),
+        "balance_present": "balance" in payload,
+    }
