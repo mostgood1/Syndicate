@@ -59,6 +59,10 @@ from syndicate.features.shared.source_roots import repo_root_from as _repo_root_
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.status_text import BASKETBALL_LIVE_TOKENS
+from syndicate.features.shared.status_text import TERMINAL_TOKENS
+from syndicate.features.shared.status_text import looks_live_status_text as _shared_looks_live
+from syndicate.features.shared.status_text import looks_terminal_status_text as _shared_looks_terminal
 
 
 _WNBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
@@ -729,31 +733,38 @@ def _parse_utc_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _looks_live_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+def _looks_break_status_text(*values: Any) -> bool:
+    """A BETWEEN-PERIODS state: halftime, or the end of a quarter.
+
+    These are live (play resumes) but they are not play, and the two need
+    different labels. Word-boundary matched for the same reason everything else
+    here now is -- see `shared/status_text.py`.
+    """
+    from syndicate.features.shared.status_text import matches_any_token
+
+    text = " ".join(
+        str(value or "").strip().lower() for value in values if str(value or "").strip()
+    )
     if not text:
         return False
-    return any(token in text for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
+    if matches_any_token(text, ("halftime", "intermission")):
+        return True
+    return bool(re.search(r"\bend of\b", text))
+
+
+def _looks_live_status_text(*values: Any) -> bool:
+    return _shared_looks_live(*values, tokens=BASKETBALL_LIVE_TOKENS)
 
 
 def _looks_terminal_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
-    if not text:
-        return False
-    return any(
-        token in text
-        for token in (
-            "final",
-            "finished",
-            "complete",
-            "full time",
-            "ft",
-            "postponed",
-            "cancelled",
-            "canceled",
-            "suspended",
-        )
-    )
+    """**`"ft"` USED TO MATCH `"hal[ft]ime"`, so a halftime game read as Final.**
+
+    Measured on a live WNBA slate 2026-08-23. These were substring tests, and
+    `token in text` makes every short token a landmine inside ordinary prose.
+    The token lists were never wrong; the matching was. Boundary matching lives
+    in `shared/status_text.py` with the full chain written out.
+    """
+    return _shared_looks_terminal(*values, tokens=TERMINAL_TOKENS)
 
 
 def _normalized_game_status(
@@ -4160,8 +4171,19 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         home_pts = _safe_float(home_row.get("score"))
         status = event.get("status") if isinstance(event.get("status"), dict) else {}
         status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
-        period = int(_safe_float(status_type.get("period")) or 0) or None
-        clock = str(status_type.get("displayClock") or "").strip()
+        # **READ `period`/`displayClock` OFF `status`, NOT `status.type`.**
+        # ESPN's scoreboard puts both directly on `status`; `status.type` carries
+        # only id/name/state/completed/description/detail/shortDetail. Reading
+        # the nested copy therefore returned None/"" on EVERY event, which is why
+        # this module derives period and clock entirely from status PROSE via
+        # `_infer_period_clock_from_status_text` -- text parsing that only exists
+        # because the structured fields were being read from the wrong level.
+        #
+        # `shared/schedule_adapter.py:481-495` already had this right, and its
+        # comment names this very reader as the offender it was working around.
+        # Same order here: `status` first, `status.type` as the fallback.
+        period = int(_safe_float(status.get("period") or status_type.get("period")) or 0) or None
+        clock = str(status.get("displayClock") or status_type.get("displayClock") or "").strip()
         status_text = (
             str(status_type.get("shortDetail") or "").strip()
             or str(status_type.get("detail") or "").strip()
@@ -5675,6 +5697,15 @@ def _hydrate_live_player_lens_payload(
             status_text = str(game_status.get("status") or "").strip()
             if bool(game_status.get("final")):
                 status_label = "Final"
+            elif bool(game_status.get("in_progress")) and _looks_break_status_text(status_text):
+                # **A BREAK IS NOT `"Q2 0:00"`.** `_infer_period_clock_from_
+                # status_text` deliberately resolves "Halftime" to period 2,
+                # clock "0:00" so the elapsed-time maths works through the
+                # break. Rendering those two fields verbatim then reads as live
+                # play with no time left, which is a different (and wrong)
+                # claim about the game. ESPN's own word for the state is right
+                # there in the text -- use it.
+                status_label = status_text
             elif bool(game_status.get("in_progress")) and status_period is not None:
                 status_label = f"Q{status_period} {status_clock}".strip()
             elif bool(game_status.get("in_progress")):

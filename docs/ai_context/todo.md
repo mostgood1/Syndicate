@@ -1,5 +1,89 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#525` — **The board's row budget is now the WHOLE board's, and a payload that will not fit sheds its worst rows instead of freezing. The NCAAF cliff is removed by construction. FIXED IN CODE, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user request
+
+> **RENUMBERED from `#524`, the FIFTH id collision today.** A peer took 524
+> for Stage C order grading and pushed first; their own commit message records
+> having been renumbered off 523 by this entry's predecessor an hour earlier.
+> Two sessions appending to the top of one file cannot allocate ids by reading
+> it — the read and the write are not atomic, and today that raced five times.
+> Code comments and tests were renumbered with this entry.
+
+
+**THE READING.** Production, 2026-08-23T00:0xZ, four sports all at the 400/sport cap:
+
+    LAYER2_SHORTLIST rows=1600
+    KEYVALUE_WRITE_LARGE size_bytes=5,747,257 max_bytes=8,388,608     68.5%
+
+3,592 bytes/row. Headroom 2,641,351 B ≈ **735 rows — less than two more sports
+at cap.** It was 4,434,665 B (52.9%) at 20:56Z, so it grew 30% in three hours,
+and both drivers were mine: the 100 → 400 cap raise and the refresh fix that
+took NFL from 23 rows to 400.
+
+    now, 4 sports        1,600 rows   5.75 MB   68.5%
+    + ncaaf   ~08-29     2,000 rows   ~7.19 MB  86%
+    + ncaab   November   2,400 rows   ~8.62 MB  BREACH
+
+**The cliff is on the CALENDAR.** It arrives whether or not anyone edits this
+code, and `per_sport` alone cannot prevent it because it scales the payload with
+the number of sports in season — a fact nobody sets and nobody reviews.
+
+**AND IT ARRIVES AS THE WORST AVAILABLE FAILURE.** At `>= _keyvalue_max_bytes`
+`write_json_file` RAISES, and both call sites of `write_layer2_shortlist` catch
+it and return (`intelligence_state.py:3609`, `:4970`). The worker keeps running,
+keeps rebuilding, keeps failing to persist, and the board serves its LAST
+SUCCESSFUL shortlist indefinitely. A crash restarts; a caught refusal does not.
+It presents as "the board is stale", which is the same symptom as a dozen
+unrelated causes.
+
+**FIX 1 — a total budget, allocated by water-filling.** `SYNDICATE_LAYER2_ROWS_TOTAL`,
+default **1600 = exactly today's measured board**, so this is a NO-OP on a
+four-sport slate and only binds when a fifth arrives. `per_sport` stays, as a
+CEILING: it is what stops soccer's 20,025 grid rows owning the whole budget.
+
+Water-filling rather than `total // n`, because a flat share wastes the budget:
+NFL held 275 of a 400 allowance tonight while soccer had 20,025 to offer. Each
+sport gets the smaller of its fair share and what it actually has; what the small
+sports cannot use is re-divided among the ones still asking. Deterministic — the
+remainder of an uneven split lands in the same place every build, or two
+identical pools would produce two different boards.
+
+Under-spending the total is sometimes CORRECT and is tested as such: four sports
+with one holding 23 rows caps out at 1,223 against a 1,600 budget, because
+spending the rest would mean breaching the per-sport ceiling.
+
+**FIX 2 — shed, do not freeze.** Over the ceiling, drop the lowest-ranked rows
+until it fits (rows arrive ranked, so this costs the least valuable first),
+stamp `rows_shed_for_keyvalue` onto the payload, and log `SHORTLIST_SHED_TO_FIT`.
+A smaller board beats a frozen one, and a shed board declares itself rather than
+reading as a thin slate. Never raises: a rescue path that can throw is worse than
+the bug it rescues.
+
+**A BUG MY OWN TEST CAUGHT, worth recording because the first version shipped the
+failure it was written to prevent.** The impossible-case guard was
+`keep >= original`. With a 5,035-byte fixed cost against a 950-byte target,
+`keep` computes to 0, `0 >= 1` is False, and the rescue path shed the board to
+**zero rows** — turning "frozen but populated" into "fresh and empty", which is
+worse than the bug and is precisely the silently-empty failure this repo guards
+against everywhere else. The condition is `base >= target`: if `cards`/`openings`
+alone exceed the ceiling, no number of rows helps, and that needs a different fix
+(move them to their own keys) rather than a shed that cannot work.
+
+**Tests:** `tests/test_shortlist_row_budget.py` (18). Two of my assertions were
+wrong about the arithmetic and the allocator was right — recorded in the test
+bodies rather than quietly corrected, because "the test was wrong" is the more
+common outcome and pretending otherwise teaches the wrong lesson.
+
+**STILL OPEN, and it is the next lever if this is not enough:** the payload is
+not only rows. `cards`, `openings_records`, `clv_openings` and the coverage
+payloads are a large fixed cost that no row budget touches. Moving them to their
+own keyvalue keys is the second reduction and the one that would make the shed
+path unreachable rather than merely rare.
+
+**Verify after deploy:** `KEYVALUE_WRITE_LARGE size_bytes` must stay flat when
+NCAAF joins on ~08-29 — the number to watch is that it does NOT rise toward 7MB.
+`SHORTLIST_SHED_TO_FIT` must NOT appear; if it does, fix 1 failed and fix 2
+caught it.
 ### `#524` — **Stage C's gate input now exists: placed orders graded against the CLOSE, per market and per book-scope, with `n` on every aggregate. The chain was one hop short.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request
 
 `clv_opening_ledger` records an opening; `clv_join.compute_clv_for_date` pairs it

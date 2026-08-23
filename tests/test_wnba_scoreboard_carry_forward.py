@@ -168,14 +168,22 @@ class _R:
         # A genuinely live game must be UNTOUCHED.
         ("9.7 - 4th", "in", False, False, True),
         ("6:08P CT", "pre", False, False, False),
-        # KNOWN PRE-EXISTING BUG, SURFACED BY THIS TEST AND NOT FIXED HERE:
-        # `_looks_terminal_status_text` matches "final" as a SUBSTRING, so
-        # "Semifinal" reads as a finished game. My own ESPN-layer check uses
-        # `startswith` and is not the culprit; the shared helper is, and it is
-        # used by every sport. Marked xfail rather than silently dropped, and
-        # rather than patching a shared predicate blind at the end of a session.
-        pytest.param("Semifinal", "pre", False, False, False,
-                     marks=pytest.mark.xfail(reason="_looks_terminal_status_text matches 'final' inside 'Semifinal' (shared helper, pre-existing)", strict=True)),
+        # **FIXED 2026-08-23 — the xfail here was RIGHT, and its diagnosis was
+        # exactly right too.** This case was pinned as a known pre-existing bug:
+        # `_looks_terminal_status_text` matched "final" as a SUBSTRING, so
+        # "Semifinal" read as a finished game, and the note correctly said the
+        # shared helper was the culprit rather than the ESPN-layer check.
+        #
+        # The fix arrived from the other end. A user reported a WNBA game at
+        # HALFTIME displaying as Final; the cause was the same predicate
+        # matching "ft" inside "hal-ft-ime". Moving all four copies to
+        # word-boundary matching (`shared/status_text.py`) fixed this case as a
+        # side effect -- `\bfinal\b` does not match "semifinal".
+        #
+        # The strict marker is what reported it: it turned the unexpected PASS
+        # into a failure instead of letting a fixed bug sit silently marked as
+        # broken. Keep writing them strict.
+        ("Semifinal", "pre", False, False, False),
     ],
 )
 def test_final_text_corroborates_final_and_never_invents_live(
