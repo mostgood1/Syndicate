@@ -24395,3 +24395,54 @@ version discarded got carried through.
 verify: SATISFIED for `#522` (marks), `#524` (order CLV) and paper2 coverage.
 `ORDER_CLV resolved=5 same_book_n=5 same_book_avg_clv_pct=2.5358 beat=4` -- n=5,
 NOT a result. `paper2=[]` is correct: 0 positions committed, so nothing placed.
+
+## 2026-08-23 01:14-01:35Z — `#523` AND `#525` VERIFIED IN PRODUCTION (the readings the previous entry left pending)
+
+The worker got a clean run once the restart storm settled. Both fixes measured on
+`LAYER2_BOARD_HEALTH` and `KEYVALUE_WRITE_LARGE`, same lines as before.
+
+**`#523` — soccer's live tier is reached now. This is the one that was 0 three
+times in a row.**
+
+    soccer live_rows   0, 0, 0   ->   12  (01:14:18Z)   and   5  (01:35:11Z)
+
+Non-zero for the first time tonight, on the build that carries the missing
+`attach_live_game_state_from_lens`. The rows are being RECOGNISED as live, which
+was the whole claim.
+
+`soccer live_proj` is still 0, and that is the honest limit of this fix: the rows
+are now seen by the join and still not priced by it. That is the next hop and it
+is `#503`'s open pricing gap, not this one. Seen and priced are different claims;
+only the first is supported.
+
+MLB on the same build: `live_rows=400 live_proj=252` (was 276/138). WNBA
+`live_rows=172-217`. NFL fell to 27 rows because the slate rolled to 08-23 — a
+calendar fact, not a regression.
+
+**`#525` — the payload came down and the shed never fired.**
+
+    before   5,747,257 B   68.5% of the 8 MB ceiling
+    after    4,550,297 B   54.2%          (01:35:12Z)
+    SHORTLIST_SHED_TO_FIT   ABSENT, which is the correct outcome
+
+The total budget held the four-sport board under the ceiling with room, and the
+rescue path stayed unreached — the design intent exactly. The shed is now a
+backstop that has never been needed rather than a mechanism carrying the load.
+
+## 2026-08-23 01:45-01:49Z — web `34b3ec1b` — `#526` blotter mobile layout
+
+`dep-da551ljncjis73fqf030` live 01:49:48Z, claim `6307f3afb1662552`.
+
+**MY FIRST TRIGGER WAS CANCELED AND IT DID NOT MATTER.**
+`dep-da551j8u01pc73e13j1g` was canceled 10 seconds in by a second trigger 9
+seconds later — but that one carried the IDENTICAL commit `34b3ec1b`, so the
+change shipped regardless. Checked rather than assumed: a `canceled` status next
+to a `live` one on the same SHA is a duplicate trigger, not a lost deploy, and it
+is worth writing down because it looks exactly like the latter in the deploy list.
+
+**verify:** measured in Chromium against the real stylesheet before shipping —
+390px: `page_overflows` True -> False, dash-cells visible 12 -> 0, row height
+362px -> 150px; 1440px identical before and after (table-cell, dashes retained,
+45px rows, the 880px floor still in force). NOT measured on the live page: the
+local mirror has no blotter rows so `/mlb` renders no table here, and the proxy
+403s the Render host from this container. Needs a human look on a phone.
