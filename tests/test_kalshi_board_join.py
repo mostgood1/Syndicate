@@ -201,3 +201,45 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
     assert resolve(_row(side="Over", line=7.5)) is None
     assert resolve(_row(side="Over", line=6.5, player="Shane Baz")) is None
     assert resolve(_row(side="Over", line=6.5, market="pitcher_outs")) is None
+
+
+# --- the join must stay inside one slate -----------------------------------
+
+
+def test_a_market_closing_on_another_date_is_refused():
+    """MEASURED 2026-08-23T04:22Z: Kalshi was quoting tomorrow's MLB while the
+    board had rolled to European soccer. Nothing matched — correct, but only by
+    luck that the vocabularies did not overlap. A pitcher with the same line on
+    two different days WOULD have matched the wrong game."""
+    from syndicate.features.shared.kalshi_board_join import REASON_WRONG_DATE
+
+    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    row = _row(player="Lake Bachar", line=5.5)
+    assert join_kalshi_to_board([market], [row], selected_date="2026-08-24")["matched"] == 1
+    stale = join_kalshi_to_board([market], [row], selected_date="2026-08-22")
+    assert stale["matched"] == 0
+    assert stale["reasons"][REASON_WRONG_DATE] == 1
+
+
+def test_the_date_is_compared_on_the_DAY_not_the_timestamp():
+    """A night game closes after midnight UTC. An exact timestamp comparison
+    would drop precisely the games this board is mostly about (#370)."""
+    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    row = _row(player="Lake Bachar", line=5.5)
+    assert join_kalshi_to_board([market], [row], selected_date="2026-08-24")["matched"] == 1
+
+
+def test_no_selected_date_skips_the_check_rather_than_guessing():
+    """A caller that does not know the slate date gets the old behaviour, not a
+    silent filter."""
+    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    assert join_kalshi_to_board([market], [_row(player="Lake Bachar", line=5.5)])["matched"] == 1
+
+
+def test_a_market_with_no_close_time_is_not_dropped_by_the_date_check():
+    """Absent is not wrong-date. Refusing it would hide markets for a reason
+    that has nothing to do with the slate."""
+    market = _kalshi(title="Lake Bachar: 6+ strikeouts?")
+    assert join_kalshi_to_board(
+        [market], [_row(player="Lake Bachar", line=5.5)], selected_date="2026-08-24"
+    )["matched"] == 1

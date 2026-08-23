@@ -70,6 +70,7 @@ _PROP_TITLE = re.compile(
 )
 
 REASON_UNPARSEABLE_TITLE = "unparseable_title"
+REASON_WRONG_DATE = "market_closes_on_another_date"
 REASON_UNMAPPED_SERIES = "unmapped_series"
 REASON_NO_BOARD_ROW = "no_matching_board_row"
 REASON_NO_PRICE = "no_kalshi_price"
@@ -202,12 +203,27 @@ def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
 def join_kalshi_to_board(
     kalshi_markets: Sequence[Mapping[str, Any]],
     board_rows: Sequence[Mapping[str, Any]],
+    *,
+    selected_date: str | None = None,
 ) -> dict[str, Any]:
     """Pair each Kalshi market with the board row for the same bet.
 
     Returns matches plus a named reason for every market that did not pair, so
     "Kalshi has nothing we bet" and "our join is broken" can never share a
     number -- which is the failure mode that produced `#505`.
+
+    **`selected_date` KEEPS THE JOIN INSIDE ONE SLATE.** Kalshi's open markets
+    span several days ahead; the board is built for one date. Measured
+    2026-08-23T04:22Z: Kalshi was quoting tomorrow's MLB while the board had
+    rolled to European soccer, so the join saw 132 markets and 421 rows with
+    nothing in common -- correct, but only by luck of the vocabularies not
+    overlapping. A starting pitcher with the same strikeout line on two
+    different days WOULD have matched the wrong game and been priced
+    confidently. Same class as `clv_join`'s arrow-of-time check: a pairing that
+    looks well-formed and joins two unrelated instants.
+
+    Absent, the check is skipped rather than guessed at -- a caller that does
+    not know the slate date should get the old behaviour, not a silent filter.
     """
     by_key: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
     for row in board_rows:
@@ -221,7 +237,17 @@ def join_kalshi_to_board(
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
 
+    wanted_date = str(selected_date or "").strip()[:10]
     for market in kalshi_markets:
+        if wanted_date:
+            # `close_time` is when the contract stops trading, which for a game
+            # market is that game. Compared on the DATE only: a night game
+            # closes after midnight UTC, so an exact timestamp comparison would
+            # drop precisely the games this board is mostly about (`#370`).
+            close_date = str(market.get("close_time") or "")[:10]
+            if close_date and close_date != wanted_date:
+                _refuse(REASON_WRONG_DATE)
+                continue
         series = market.get("series")
         board_market = series_to_market(series)
         if board_market is None:

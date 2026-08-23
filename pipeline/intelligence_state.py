@@ -5136,7 +5136,11 @@ class IntelligenceStateService:
                 # thread has been untangling.
                 shortlist_rows = (layer2_shortlist or {}).get("rows") or []
                 if kalshi_markets and shortlist_rows:
-                    join_to_board(kalshi_markets, list(shortlist_rows))
+                    join_to_board(
+                        kalshi_markets,
+                        list(shortlist_rows),
+                        selected_date=str(selected_date or ""),
+                    )
             except Exception as exc:
                 print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
 

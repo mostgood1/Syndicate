@@ -121,7 +121,12 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     return {"status": "ok", "markets": all_markets, "per_series": per_series}
 
 
-def join_to_board(markets: list[dict[str, Any]], rows: list[dict[str, Any]]) -> dict[str, Any]:
+def join_to_board(
+    markets: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
+    *,
+    selected_date: str | None = None,
+) -> dict[str, Any]:
     """Pair Kalshi's real prices with the board, and report the coverage.
 
     THE NUMBER THIS WHOLE THREAD HAS BEEN CHASING. Every Kalshi coverage figure
@@ -130,7 +135,7 @@ def join_to_board(markets: list[dict[str, Any]], rows: list[dict[str, Any]]) -> 
     """
     from syndicate.features.shared.kalshi_board_join import join_kalshi_to_board
 
-    report = join_kalshi_to_board(markets, rows)
+    report = join_kalshi_to_board(markets, rows, selected_date=selected_date)
     print(
         "[kalshi_odds] BOARD_JOIN"
         f" kalshi_markets={report.get('kalshi_markets')}"
