@@ -4105,11 +4105,26 @@ def _kalshi_series_catalogue_at_boot() -> None:
             f" errors={report.get('errors')}",
             flush=True,
         )
+        if report.get("status") != "ok":
+            # DO NOT print per-sport lines on a failed catalogue. The first run
+            # of this code printed `KALSHI_SPORT WNBA series=[] n=0` after all
+            # three hosts returned 429 -- which reads as "Kalshi does not list
+            # WNBA" when the truth is "we could not ask". That is the exact
+            # absence-versus-failure confusion this integration exists to
+            # prevent, shipped by the very function meant to prevent it.
+            print(
+                "[refresh_worker] KALSHI_SPORT_UNKNOWN"
+                " reason=catalogue_unavailable"
+                f" sports={list(_KALSHI_SPORT_TOKENS)}",
+                flush=True,
+            )
+            return
+
         for token in _KALSHI_SPORT_TOKENS:
             found = series_matching([token], tickers)
-            # EVERY sport gets a line, including the empty ones. "We looked and
-            # Kalshi has none" and "we never looked" are different facts, and a
-            # log that only prints hits cannot tell them apart.
+            # EVERY sport gets a line, including the empty ones -- but ONLY when
+            # the catalogue actually answered. "We looked and Kalshi has none"
+            # and "we never looked" are different facts.
             print(
                 f"[refresh_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
                 flush=True,
