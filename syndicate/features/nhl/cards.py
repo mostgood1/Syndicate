@@ -68,29 +68,21 @@ def _has_explicit_start_time(value: Any) -> bool:
 
 
 def _looks_live_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
-    if not text:
-        return False
-    return any(token in text for token in ("live", "in progress", "1st", "2nd", "3rd", "ot", "so", "intermission"))
+    """Same substring defect as basketball's, different tokens: `"so"` matched
+    inside `"sea[so]n"` and `"ot"` inside `"sh[ot]"`. See
+    `shared/status_text.py`."""
+    from syndicate.features.shared.status_text import HOCKEY_LIVE_TOKENS
+    from syndicate.features.shared.status_text import looks_live_status_text
+
+    return looks_live_status_text(*values, tokens=HOCKEY_LIVE_TOKENS)
 
 
 def _looks_terminal_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
-    if not text:
-        return False
-    return any(
-        token in text
-        for token in (
-            "final",
-            "finished",
-            "complete",
-            "off",
-            "postponed",
-            "cancelled",
-            "canceled",
-            "suspended",
-        )
-    )
+    """`"off"` matched inside `"play[off]"`, so a playoff game read as over."""
+    from syndicate.features.shared.status_text import HOCKEY_TERMINAL_TOKENS
+    from syndicate.features.shared.status_text import looks_terminal_status_text
+
+    return looks_terminal_status_text(*values, tokens=HOCKEY_TERMINAL_TOKENS)
 
 
 def _normalized_game_status(
