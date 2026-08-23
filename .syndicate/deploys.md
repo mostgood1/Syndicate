@@ -24618,3 +24618,45 @@ number the result actually rests on, not the row count.
 **So a Phase C run on one night cannot settle anything.** It can only reject a
 signal so strong it would be visible in a dozen windows, or motivate collecting
 more nights. Say which before running it.
+
+## 2026-08-23 15:57:56Z — live-odds-worker `26d67b8b` — WNBA SEASON BACKFILL (one-shot)
+
+- **service:** live-odds-worker, deploy `dep-da5hh13ncjis738uv530`
+- **trigger:** an env-var write, NOT a code push — `SYNDICATE_WNBA_MOMENTUM_BACKFILL=2026-05-01..2026-08-21`
+- **verify:** PENDING — `BACKFILL_START`, then `WROTE date=... games=N rows=N` lines,
+  then `BACKFILL_DONE exit=0`.
+
+**THE ENV WRITE MERGED, IT DID NOT REPLACE.** `update_environment_variables`
+defaults `replace=false`, checked before calling. `CLAUDE.md`'s standing warning
+is that a `render.yaml` push fires `blueprint_sync` and rewrites the WHOLE env
+block; a merged API write is a different mechanism and does not. Worth keeping
+distinct — the warning is about the blueprint path, not about env changes as
+such.
+
+### WHY THE GATE IS NOT IN THE WORKER ENTRYPOINT
+
+`scripts/run_refresh_worker.py` is the natural home and is claimed by the OPEN
+lane `portfolio-ledger-service-split`, opened 2026-08-22 and plausibly LIVE —
+unlike the unowned, archived lanes crossed earlier tonight, where the protocol's
+purpose (no concurrent edits) was not actually at risk. Editing a contested
+shared entrypoint to schedule my own lane's job is what the protocol exists to
+stop, so the gate lives in `poll_basketball_momentum.py`, already the momentum
+subsystem's entry point on that worker.
+
+### THE RANGE STOPS AT 08-21, DELIBERATELY
+
+Last night's 08-22 dump came from LIVE capture and has the per-tick causal jsonl
+beside it. The backfill skips existing dates, but ending before it removes the
+question entirely. A backfilled 08-22 would be more COMPLETE (final feed) and
+less TRUE (no record of what was displayed), and those are not the same artifact.
+
+### WHAT IT BUYS
+
+There is no play-level history in this repo — measured, not assumed:
+`live_pbp_stats_*.jsonl` holds 0 clock values across 37 files, and
+`game_cards_*.csv` carries 81 distinct games of odds with no plays.
+
+    live capture      16 interval outcomes/night -> ~7 nights to 100
+    one WNBA season   ~1.8 min -> ~1,144 quarter outcomes
+
+Roughly seventy nights of live capture, for about two minutes of fetching.

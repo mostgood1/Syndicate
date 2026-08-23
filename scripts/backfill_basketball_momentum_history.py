@@ -67,7 +67,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from scripts.poll_basketball_momentum import _SPORT_PATH, fetch_summary
+from scripts.poll_basketball_momentum import _SPORT_PATH, fetch_summary, scoreboard_url
 from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_block
 from syndicate.features.shared.basketball_momentum_artifacts import momentum_events_path
 from syndicate.features.shared.basketball_momentum_artifacts import write_momentum_events
@@ -89,9 +89,7 @@ def all_event_ids(league: str, date_str: str) -> list[str]:
     slate before it was found. The sibling host `site.web.api.espn.com` used by
     `fetch_summary` has the OPPOSITE policy. Do not unify them.
     """
-    ymd = date_str.replace("-", "")
-    url = (f"https://site.api.espn.com/apis/site/v2/sports/{_SPORT_PATH[league]}"
-           f"/scoreboard?dates={ymd}")
+    url = scoreboard_url(league, date_str)
     try:
         with urllib.request.urlopen(url, timeout=25) as response:
             payload = json.loads(response.read().decode("utf-8"))
