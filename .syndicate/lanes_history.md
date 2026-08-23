@@ -11925,3 +11925,42 @@ against a slate that actually had matches in play. Full evidence in
   is RED on `main` — stale fallout from `28e55d86`, whose session was active.
 - Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` (two blocks).
 - Blocked by: none.
+
+#### layer2-sim-view-and-live-projection — SUPERSEDED 2026-08-23 (second checkpoint of session e47e1b67). Moved VERBATIM. Kept because its priority list is the record of what was believed BEFORE the one-sided-quote measurement: it carried `#503` as an open pricing decision and soccer's live tier as seen-not-priced with no owner named.
+
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **Live-odds refresh diagnosed and FIXED ACROSS THREE SERVICES, VERIFIED (NFL 10.1h -> 603s, soccer live_rows 0 -> 12, payload 68.5% -> 54.2%). Soccer is SEEN-not-PRICED; three UI reports fixed, two unverified on the live page.**
+- Narrative, evidence, dead ends, mistakes: `.syndicate/log/2026-08-22.md` and
+  `.syndicate/log/2026-08-23.md`. Subject facts: `state.md
+  [live-refresh-ownership]` and `[shortlist-payload-budget]`.
+- **VERIFIED AND DEPLOYED:** `#520`/`#521` (live-odds scoping, all 3 services),
+  `#523` (shortlist was missing `attach_live_game_state_from_lens`), `#525` (total
+  row budget + shed), bet-slip rail collapsed-by-default.
+- **DEPLOYED, NOT VERIFIED ON THE LIVE PAGE** — both blocked by the same thing,
+  no soccer/blotter rows in the local mirror and the proxy 403s the Render host:
+  `#526` blotter mobile layout, and the MLS compact-card chip join.
+- **OPEN, in priority order:**
+  1. **Soccer live rows are SEEN but not PRICED.** `live_rows` 12, `live_proj` 0.
+     Next hop is `todo.md #503` — a PRICING decision, not a bug fix, deliberately
+     not taken.
+  2. **`unmatched_player: ~6,056`** — largest soccer bucket. The
+     `player_no_roster` vs `player_name_miss` split is deployed and still unread.
+  3. **NFL has no live re-sim.** Its live rows rank on market signals alone
+     (`edged=7` of 275). A feature request, not a defect — `live_edge_policy` is
+     correctly withholding. Do not "fix the coverage".
+  4. **The shortlist's non-row payload** (`cards`, `openings_records`,
+     `clv_openings`) is a fixed cost no row budget touches. Moving it to its own
+     keys is what makes the shed unreachable.
+  5. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Affirmative
+     token `SWEEP_REPAIRING`; a quiet log proves nothing.
+- Files: `syndicate/features/shared/{layer2_board,live_refresh_loop,prop_projections,live_projection_join,soccer_projections,team_aliases,artifact_publisher}.py`, `pipeline/{layer2_shortlist,intelligence_state}.py`, `scripts/refresh_odds_sources.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js,board_rail_toggle.js,market_board.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,layer2_imminence_floor,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,artifact_publish_repair_over_ceiling,sweep_ownership_gate,live_league_scope_in_progress,soccer_live_step_order,shortlist_enrichment_parity,shortlist_row_budget}.py`, `tests/js/{board_sim_view_display,board_rail_default_state,game_chip_soccer_join,blotter_mobile_contract}.test.mjs`.
+  - `live_refresh_loop.py` + `scripts/refresh_odds_sources.py` edited 2026-08-22
+    **across lane `refresh-worker-oom-recurrence`**, which nominally holds them
+    and was flagged stale-40h on 2026-08-18. Surfaced, not hidden.
+  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
+    `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
+    `pipeline/intelligence_state.py` claimed 2026-08-23 for the shed.
+- **Cross-lane, unowned, NOT fixed by me:**
+  `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
+  RED on `main`. `#469` is duplicated across `todo.md` and `todo_closed.md` (a
+  peer's archive left the open copy behind).
+- Blocked by: none. All deploy claims released at exit.

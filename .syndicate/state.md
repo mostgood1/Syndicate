@@ -1083,7 +1083,39 @@ StatsAPI-derived and already carry a live status, so the correction is redundant
 there. Soccer's chips come from `_unsimulated_game`, which defaults
 `status_state` to `"pre"` for the nine of ten leagues the sim does not cover.
 After the fix, soccer `live_rows` 0,0,0 -> **12** (01:14:18Z) and **5**
-(01:35:11Z) — first non-zero. `live_proj` is still 0: SEEN is not PRICED.
+(01:35:11Z) — first non-zero.
+
+**AND THE REST OF THAT CHAIN IS NOW MEASURED `[verified 2026-08-23 19:21:05Z]`.**
+`considered` reached 1,269 and `projected` 125, and the withheld reason splits:
+
+    edge_why={'no_fair_value_one_sided_quote': 110, 'no_fair_value_devig_failed': 15}
+
+**110 of 125 (88%) of live soccer prop rows are quoted ONE-SIDED** — the book
+prices the over and nothing else, so no de-vig exists and no downstream work can
+produce an edge. `consensus_present_devig_returned_none` is **ZERO**: there is no
+broken-de-vig population.
+
+Two things this retires:
+
+  * **`#503` was never a pricing decision.** It was a misplaced `return` —
+    `soccer_projections._price_against_market` computed `market_fair_prob_over`
+    BELOW its `live_edge_unavailable_reason` early-return, so a live row never got
+    a fair value. `prop_projections.py:951` has always ordered it the other way,
+    which is why MLB's live tier works. Fixed; correct in isolation; it did NOT
+    raise `edged`, because of the 88% above. Both are true.
+  * **Soccer's live-prop MISS attribution was inert.** `_has_attribution`
+    (`live_projection_join.py:435`) requires `players_seen` and
+    `lines_by_player_market` on the indexed payload and `soccer_live_prop_index`
+    returned neither, so every miss took the catch-all and the sample's
+    `player_in_lens`/`lens_lines_available` were constants. The pre-fix
+    `miss_market=620` pointed at an alias gap **that does not exist** — post-fix
+    it is 0, with `miss_not_live=548` and `miss_line=583` carrying the population.
+
+**THE OPEN QUESTION MOVED OFF THE PROJECTION LAYER.** It is now: does the soccer
+prop fetch capture the UNDER side? `fetch_soccer_oddsapi_props_local.py` handles
+`over_price`/`under_price`, so the shape exists; whether OddsAPI returns an under
+for `player_shots` and whether it survives into `consensus` is UNMEASURED.
+`edged > 0` for soccer has still never been observed.
 
 **NFL cannot produce a live projection, by design.** `nfl_game_projections.py`
 applies `live_edge_policy` at the stamp point because there is no NFL live

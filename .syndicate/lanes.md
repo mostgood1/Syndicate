@@ -1114,41 +1114,50 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **Live-odds refresh diagnosed and FIXED ACROSS THREE SERVICES, VERIFIED (NFL 10.1h -> 603s, soccer live_rows 0 -> 12, payload 68.5% -> 54.2%). Soccer is SEEN-not-PRICED; three UI reports fixed, two unverified on the live page.**
-- Narrative, evidence, dead ends, mistakes: `.syndicate/log/2026-08-22.md` and
-  `.syndicate/log/2026-08-23.md`. Subject facts: `state.md
+### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **Soccer's live tier chased end to end and ANSWERED: 88% of live prop quotes are ONE-SIDED, so the edge cannot exist downstream. `#503` retired — it was a misplaced `return`, not a pricing call. The question is now the ODDS FETCH.**
+- Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` and
+  `log/2026-08-23.md` (two blocks). Subject facts: `state.md
   [live-refresh-ownership]` and `[shortlist-payload-budget]`.
-- **VERIFIED AND DEPLOYED:** `#520`/`#521` (live-odds scoping, all 3 services),
-  `#523` (shortlist was missing `attach_live_game_state_from_lens`), `#525` (total
-  row budget + shed), bet-slip rail collapsed-by-default.
-- **DEPLOYED, NOT VERIFIED ON THE LIVE PAGE** — both blocked by the same thing,
-  no soccer/blotter rows in the local mirror and the proxy 403s the Render host:
+- **VERIFIED AND DEPLOYED:** `#520`/`#521` live-odds scoping (3 services),
+  `#523` shortlist's missing `attach_live_game_state_from_lens`, `#525` total row
+  budget + shed, `#530` fair-value ordering, `#531` miss attribution,
+  `#536` the one-sided/de-vig-failed split, `#537` atomic todo-id allocation,
+  bet-slip rail collapsed-by-default.
+- **DEPLOYED, NOT VERIFIED ON THE LIVE PAGE** (both blocked the same way — no
+  soccer/blotter rows in the local mirror, proxy 403s the Render host):
   `#526` blotter mobile layout, and the MLS compact-card chip join.
 - **OPEN, in priority order:**
-  1. **Soccer live rows are SEEN but not PRICED.** `live_rows` 12, `live_proj` 0.
-     Next hop is `todo.md #503` — a PRICING decision, not a bug fix, deliberately
-     not taken.
-  2. **`unmatched_player: ~6,056`** — largest soccer bucket. The
-     `player_no_roster` vs `player_name_miss` split is deployed and still unread.
-  3. **NFL has no live re-sim.** Its live rows rank on market signals alone
-     (`edged=7` of 275). A feature request, not a defect — `live_edge_policy` is
-     correctly withholding. Do not "fix the coverage".
-  4. **The shortlist's non-row payload** (`cards`, `openings_records`,
-     `clv_openings`) is a fixed cost no row budget touches. Moving it to its own
-     keys is what makes the shed unreachable.
-  5. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Affirmative
+  1. **THE NEXT READ: does the soccer prop fetch capture the UNDER side?**
+     `scripts/fetch_soccer_oddsapi_props_local.py` handles
+     `over_price`/`under_price`, so the shape exists; whether OddsAPI returns an
+     under for `player_shots` and whether it survives into `consensus` is
+     UNMEASURED. 88% of live rows die here. **This is no longer a projection-layer
+     question** — do not re-open `#530`.
+  2. **`edged > 0` for soccer has never been observed.** Needs a live match with
+     a two-sided prop quote; the European Sunday slate closed as `#536` landed.
+  3. **The residual 15 flat `no_fair_value_devig_failed`** reach the join from a
+     path other than soccer's `_price_against_market`. Inferred, not traced.
+  4. **NFL has no live re-sim**, so its live rows rank on market signals alone.
+     `live_edge_policy` is correctly withholding — a feature request, not a
+     defect. Do not "fix the coverage".
+  5. **The shortlist's non-row payload** (`cards`, `openings_records`,
+     `clv_openings`) is a fixed cost no row budget touches; moving it to its own
+     keys makes the `#525` shed unreachable.
+  6. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Affirmative
      token `SWEEP_REPAIRING`; a quiet log proves nothing.
-- Files: `syndicate/features/shared/{layer2_board,live_refresh_loop,prop_projections,live_projection_join,soccer_projections,team_aliases,artifact_publisher}.py`, `pipeline/{layer2_shortlist,intelligence_state}.py`, `scripts/refresh_odds_sources.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js,board_rail_toggle.js,market_board.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,layer2_imminence_floor,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,artifact_publish_repair_over_ceiling,sweep_ownership_gate,live_league_scope_in_progress,soccer_live_step_order,shortlist_enrichment_parity,shortlist_row_budget}.py`, `tests/js/{board_sim_view_display,board_rail_default_state,game_chip_soccer_join,blotter_mobile_contract}.test.mjs`.
+- Files: `syndicate/features/shared/{layer2_board,live_refresh_loop,prop_projections,live_projection_join,soccer_projections,soccer_live_gameline_source,team_aliases,artifact_publisher}.py`, `pipeline/{layer2_shortlist,intelligence_state}.py`, `scripts/{refresh_odds_sources,todo_id_alloc}.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js,board_rail_toggle.js,market_board.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,layer2_imminence_floor,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,soccer_live_fair_value_ordering,artifact_publish_repair_over_ceiling,sweep_ownership_gate,live_league_scope_in_progress,soccer_live_step_order,shortlist_enrichment_parity,shortlist_row_budget,todo_id_alloc}.py`, `tests/js/{board_sim_view_display,board_rail_default_state,game_chip_soccer_join,blotter_mobile_contract}.test.mjs`.
   - `live_refresh_loop.py` + `scripts/refresh_odds_sources.py` edited 2026-08-22
     **across lane `refresh-worker-oom-recurrence`**, which nominally holds them
     and was flagged stale-40h on 2026-08-18. Surfaced, not hidden.
   - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
     `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
-    `pipeline/intelligence_state.py` claimed 2026-08-23 for the shed.
+    `pipeline/intelligence_state.py` and `soccer_live_gameline_source.py` claimed
+    2026-08-23.
 - **Cross-lane, unowned, NOT fixed by me:**
   `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
-  RED on `main`. `#469` is duplicated across `todo.md` and `todo_closed.md` (a
-  peer's archive left the open copy behind).
+  and `tests/test_refresh_worker.py::...autolaunches_soccer_weekly_refresh...` are
+  RED on `main` (verified pre-existing). `#469` is duplicated across `todo.md` and
+  `todo_closed.md` (a peer's archive left the open copy behind).
 - Blocked by: none. All deploy claims released at exit.
 ### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
 - Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so

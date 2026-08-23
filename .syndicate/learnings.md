@@ -5677,3 +5677,71 @@ live blocks, both of which are owner decisions. Editing in place still prevents
 growth; it cannot reverse it. The session-start digest truncates OPEN LANES to
 600 bytes, so an over-cap file arrives lossy — which is the opposite of what the
 ledger is for.
+
+---
+
+## 2026-08-23 — READ THE RATE, NOT THE REASON STRING `[lane layer2-sim-view-and-live-projection]`
+
+`LIVE_PROJECTION_JOIN sport=soccer` reported
+`edge_why={'no_fair_value_devig_failed': 188}` — **188 of 188**. The reason string
+attached to that counter says "the market is one-sided, so de-vig has no answer",
+which is a real thing that happens to some soccer props. I read the string, found
+it plausible, and recorded `#503` **twice in writing** — in a todo entry and in
+the lane block — as "a PRICING decision, not a bug fix. Deliberately not taken."
+
+It was a misplaced `return`. `_price_against_market` computed
+`market_fair_prob_over` below its `live_edge_unavailable_reason` early-return, so
+a live row never got a fair value at all.
+
+**RULE: a reason that accounts for 100% of a population is a bug, not a
+distribution.** Check the RATE before believing the string. A plausible
+explanation attached to a total failure is the most expensive kind of wrong,
+because it reads as already-diagnosed and stops the search.
+
+**COROLLARY: when one sport works and another does not, diff the two
+implementations before theorising.** `prop_projections.py:951` had always done
+the same two operations in the opposite order, which is exactly why MLB's live
+tier worked and soccer's did not. That comparison was available the whole time
+and would have taken a minute.
+
+**WHAT ACTUALLY BROKE THE DEADLOCK** was `edge_why` itself — a counter split I had
+added the same day. The correction came from my own instrument, not from
+re-reading the code. Splitting a counter is cheap; a wrong belief about why a
+number is zero is not.
+
+## 2026-08-23 — a counter whose inputs are absent reports CONSTANTS that look like findings
+
+Soccer's miss attribution read `miss_player=0 miss_market=620 miss_line_match=0`,
+with every diagnostic sample showing `player_in_lens: False` and
+`lens_lines_available: []`. Those two zeros and that `False` were not
+measurements: `live_projection_join._has_attribution` requires `players_seen` and
+`lines_by_player_market` on the indexed payload, `soccer_live_prop_index`
+returned neither, and the fallback routes everything to the catch-all.
+
+Nothing failed. The fallback is correct and deliberately refuses to invent a
+cause on a legacy payload. The counters just stopped meaning anything — and
+`miss_market=620` reads as "620 markets we cannot name" while meaning "620 misses
+we could not attribute". Post-fix it is **0**, with `miss_not_live=548` carrying
+the population. The alias gap it pointed at never existed.
+
+**RULE: `miss_player=0` and `player_in_lens: False` in the same line cannot both
+be findings.** When two counters contradict each other, suspect the FEEDER before
+either counter. The tell is free and it is the only reason this was caught.
+
+**COROLLARY: a graceful-degradation branch needs its own visible marker.** A
+fallback that silently produces well-formed zeros is indistinguishable from a
+working instrument reporting good news. If `_has_attribution` had printed
+`attribution=off` once per build, this would have been a five-second read.
+
+## 2026-08-23 — `git merge-base --is-ancestor` on an unfetched object exits 128, and `2>/dev/null` turns that into a clean "no"
+
+Checking whether a deploy carried my fix, I ran
+`git merge-base --is-ancestor <mine> <deployed> 2>/dev/null && echo yes || echo
+WARNING`. The deployed SHA was not in my clone, so git exited **128** — an error,
+not a false — and the `||` branch printed a confident WARNING that the deploy did
+not contain my work. It did.
+
+**RULE: never route an ancestry check's failure into a boolean.** Verify the
+object exists (`git cat-file -t`) first, and let the error surface. A tool that
+cannot answer must not be allowed to answer "no" — the two are different, and on
+a deploy check the wrong one triggers a needless redeploy or a revert war.
