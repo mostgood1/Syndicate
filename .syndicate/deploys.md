@@ -24660,3 +24660,59 @@ There is no play-level history in this repo — measured, not assumed:
     one WNBA season   ~1.8 min -> ~1,144 quarter outcomes
 
 Roughly seventy nights of live capture, for about two minutes of fetching.
+
+## 2026-08-23 16:47:55Z — live-odds-worker `0f58cf02` — season pull RETRY after a 400
+
+- **deploy:** `dep-da5i8eu417fc73fj0lr0`
+- **verify:** PENDING — `WROTE date=... games=N rows=N` in place of `SCOREBOARD_FAILED`.
+
+### THE FIRST ATTEMPT 400'd ON EVERY DATE, AND IT WAS A RETYPED URL
+
+    [backfill] SCOREBOARD_FAILED date=2026-06-19 HTTPError: HTTP Error 400
+
+...repeated across the whole range at 16:04Z. `_SPORT_PATH["wnba"]` is already
+`"sports/basketball/wnba"`; the backfill rewrote the scoreboard URL by hand and
+prefixed `sports/` a second time, so every request went to
+`.../v2/sports/sports/basketball/wnba/scoreboard`.
+
+**NOT the 403 UA trap this subsystem documents at length.** A plain 400, from a
+URL typed wrong ten lines from one that already worked. The lesson is narrower
+and more useful than "be careful with ESPN hosts": *a URL that is known to work
+is reused, not retyped.* There is now one `scoreboard_url()` and both callers
+share it — pinned by a test asserting they are the SAME FUNCTION OBJECT, so the
+divergence cannot come back.
+
+### THE FAILURE DESIGN EARNED ITS KEEP ON ITS FIRST REAL OUTING
+
+Every date failed FAST and was NAMED; nothing hung; no sentinel was written;
+and the run exited **3, not 0**.
+
+That last one is what mattered. Exiting 0 would have written the sentinel and
+marked the season permanently "done" having fetched nothing — the exact "silent
+empty run mistaken for an off-season" case the exit code was written for. It
+fired correctly the first time it was needed, which is more than most such
+guards ever get to prove.
+
+### VERIFIED 16:56:31Z — THE SEASON IS ON DISK
+
+    [backfill] DONE league=wnba 2026-05-01..2026-08-21 games=282 rows=66688 empty_dates=14
+    [basketball_momentum] BACKFILL_DONE spec=2026-05-01..2026-08-21 exit=0
+
+**282 games, 66,688 pressure rows, 3m38s.** 236 rows/game against a ~200
+estimate, so the 0.10 MB/night sizing holds. 1,128 quarter outcomes and 564
+half outcomes.
+
+**This is the first play-level history this repo has ever held.** Until today
+the answer to "what did a WNBA possession sequence look like in May" was: the
+vendor app built it in-process and threw it away. That is the gap `#514` was
+filed against, and it is closed for one season in under four minutes.
+
+For scale: 1,128 quarter outcomes is **~70 nights** of a four-game live slate,
+and `live-game-line-projection` is currently bounded at `games_with_outcome: 3`.
+
+**WHAT IS NOT YET TRUE, stated so the volume does not blur it:** no correlation
+has been measured, nothing has been fitted, and the leakage guard has only ever
+run on FIXTURES. Proving the substrate on synthetic rows proved the logic, not
+the feed. The next reading is that guard on real data, and a season is exactly
+the size of thing that embarrasses a design which looked fine on 300 synthetic
+rows.
