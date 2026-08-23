@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-08-23 — refresh-worker `43c8e5507`: Kalshi keeps its own clock, and 154 opening lines now exist
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da57i2ou01pc73e9btk0`, live `04:41:33Z`. Commit `43c8e5507`, on
+`origin/main`. Trigger `api` (MCP), so the claim was advisory — the deploy guard
+hook matches `Bash|PowerShell` only and does not see an MCP deploy. Stated
+rather than glossed: that is a real gap in the guard, not a claim I took.
+
+**verify:** `[kalshi_odds]` lines at `04:48:11Z`, first board build after the
+deploy:
+
+```
+FETCHED markets=154 interval_s=3600 prev_age_s=None
+        per_series={'KXMLBKS': (137,'series_filter'), 'KXMLBOUTS': (17,'series_filter')}
+HISTORY status=ok opened=154 appended=154 unchanged=0 tickers=154
+        trimmed_points=0 trimmed_tickers=0
+MOVES   tracked=154 moved=0 unmoved=0 too_new=154
+BY_GAME_DATE {'2026-08-26': {'KXMLBKS': 137, 'KXMLBOUTS': 17}}
+BOARD_JOIN kalshi_markets=154 board_rows=363 matched=0
+        reasons={'market_closes_on_another_date': 154}
+```
+
+**What this proves.** The price history exists and is being written: 154 tickers
+opened on the first run, which is the thing that did not exist before — every
+Kalshi price we had ever fetched was discarded on the next fetch, so "has this
+moved" was unanswerable no matter how often we asked. `too_new=154` is the
+counter earning its keep on its very first run: one observation each, reported
+as *not watched long enough* rather than as 154 markets that have not moved.
+
+**What this does NOT prove.** The hourly gate has not been observed holding —
+`prev_age_s=None` means this was the first fetch, and the `CACHED` line that
+would demonstrate the interval had not appeared by the time of this entry. Open
+obligation.
+
+**What it CORRECTED, and this is the useful part.** `BY_GAME_DATE` put all 154
+markets on a single date, `2026-08-26`. **137 different pitchers do not all
+pitch on one day**, so `close_time` is very likely a settlement deadline rather
+than first pitch — which means `board_by_game_date` is grouping by the wrong
+field, and the join's `market_closes_on_another_date: 154` is measuring my
+assumption rather than the calendar. The date guard shipped hours earlier as a
+fix for a zero-match join; it is now the most likely CAUSE of one.
+
+Not guessed at. `93cf07d9e` prints one market's `open_time` / `close_time` /
+`expiration_time` / `ticker` / `event_ticker` per series verbatim, so the next
+run says which field carries the game date. Same choice `probe()` made for the
+price fields, which is what caught the 100x error before it shipped.
+
+**Also measured, unrelated to this deploy:**
+
+```
+LIVE_MARKS orders=58 marked=0 reasons={'market_not_on_board': 58}
+           by_venue=[('paper',0,None), ('paper:kalshi',0,None), ('paper:novig',0,None)]
+VENUE_SCOPE venue=kalshi rows_in=363 scoped=0 coverage=0.0
+           refusals={'venue_not_quoting': 363}
+PAPER2_PLAN_WRITTEN date=2026-08-22 venue=kalshi rows_in=0 positions=0 staked=$0
+```
+
+All three are the same fact: at 04:48 the board was 363 rows of European soccer
+(`alternate_totals_corners` 223, `h2h` 53, `totals` 43, `btts` 39). Kalshi does
+not quote English football corners, so nothing scoped, nothing marked, and
+paper2 wrote an empty plan. Not a defect in any of the three — but it does mean
+**no Kalshi number in this session rests on a slate the two sources share**,
+and that remains true until the board carries MLB again.
+
+---
+
 ## 2026-08-19 — refresh-worker CLAIM FORCE-BROKEN AGAIN, SAME COLLISION — plus a self-correction on the test used
 
 **NO DEPLOY.** Claim hygiene, and a correction to this session's own
