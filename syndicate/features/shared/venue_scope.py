@@ -79,7 +79,10 @@ def _venue_price(book_prices: Mapping[str, Any] | None, venue: str) -> float | N
 
 
 def scope_rows_to_venue(
-    rows: Sequence[Mapping[str, Any]], venue: str
+    rows: Sequence[Mapping[str, Any]],
+    venue: str,
+    *,
+    price_resolver: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Rewrite each row at `venue`'s price, or refuse it by name.
 
@@ -87,6 +90,14 @@ def scope_rows_to_venue(
     not make it, so `len(scoped_rows) + sum(refusals.values()) == len(rows)` --
     a scoping pass that cannot account for every row it was given is not a
     measurement.
+
+    **`price_resolver` IS WHERE THE VENUE'S OWN PRICE COMES IN.** Without it the
+    price is read from `quote.book_prices[venue]`, which is the AGGREGATOR's
+    view -- and for these exchanges OddsAPI carries game lines only, which is
+    why every coverage number in this system was about OddsAPI rather than the
+    venue. Passing a resolver built from the venue's own feed makes the scoped
+    book real. The rest of the pipeline is unchanged either way: same gates,
+    same refusal names, same sizing.
     """
     from syndicate.features.shared.portfolio_commit import _net_profit_per_unit
 
@@ -105,7 +116,17 @@ def scope_rows_to_venue(
             _refuse(REASON_NO_BOOK_PRICES)
             continue
 
-        venue_price = _venue_price(quote.get("book_prices"), venue)
+        # The venue's own quote first, the aggregator's only as a fallback --
+        # and `price_source` records WHICH, because a coverage number built on
+        # the aggregator means something different from one built on the venue
+        # and the two must never be silently blended.
+        venue_price = None
+        price_source = "venue_feed"
+        if price_resolver is not None:
+            venue_price = _as_float(price_resolver(row))
+        if venue_price is None:
+            venue_price = _venue_price(quote.get("book_prices"), venue)
+            price_source = "aggregator"
         if venue_price is None:
             # THE HEADLINE NUMBER OF THIS WHOLE EXERCISE. How much of the board
             # the venue simply does not offer is the answer to "is Stage D worth
@@ -157,6 +178,7 @@ def scope_rows_to_venue(
         scoped_row["unrestricted_ev_pct"] = ev_pct
         scoped_row["unrestricted_bookmaker"] = quote.get("bookmaker")
         scoped_row["venue"] = str(venue).strip().lower()
+        scoped_row["price_source"] = price_source
         scoped.append(scoped_row)
         _refuse(REASON_SCOPED)
 

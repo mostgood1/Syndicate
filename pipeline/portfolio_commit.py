@@ -90,20 +90,52 @@ def read_portfolio_plan_for_venue(
     return payload if isinstance(payload, dict) else None
 
 
-def paper2_venue() -> str:
-    """The venue `paper2` scopes to. Default `kalshi`, empty disables.
+# The venues `paper2` runs a book for. EXCHANGES AND PREDICTION MARKETS ONLY --
+# the venue class that has a real order API and does not limit an account for
+# winning. Traditional sportsbooks (draftkings, fanduel, betmgm, betrivers,
+# fanatics, williamhill_us) are deliberately absent: no public betting API, and
+# automated placement is against their terms. `pinnacle` is excluded too --
+# its API exists only through partner/agent arrangements, which is a different
+# kind of thing to arrange and not comparable on price alone.
+#
+# Measuring FOUR rather than one because Kalshi's coverage came in at 3.8% of
+# the board (47 of 1,227, 2026-08-23T01:35Z) and a Stage D go/no-go taken on
+# one venue's number would be a decision made on a fifth of the evidence
+# sitting in `book_prices` already.
+_DEFAULT_PAPER2_VENUES = ("kalshi", "novig", "prophetx", "polymarket")
+
+
+def paper2_venues() -> tuple[str, ...]:
+    """The venues `paper2` scopes to. Comma-separated; empty disables.
 
     Defaults ON rather than dark, and the reasoning differs from a normal new
     job: this places nothing by itself (the execution flag still gates that),
-    writes one small artifact, and its ENTIRE value is a comparison that only
+    writes small artifacts, and its ENTIRE value is a comparison that only
     accrues with elapsed time. A flag defaulting off would mean it silently
     collects nothing while looking installed -- `#284`'s "absent is not off"
     read in the direction that costs data rather than money.
+
+    `SYNDICATE_PAPER2_VENUES` wins; `SYNDICATE_PAPER2_VENUE` (singular) is still
+    read so an existing deployment's setting keeps working rather than silently
+    reverting to the default list.
     """
-    raw = os.environ.get("SYNDICATE_PAPER2_VENUE")
+    raw = os.environ.get("SYNDICATE_PAPER2_VENUES")
     if raw is None:
-        return "kalshi"
-    return str(raw).strip().lower()
+        raw = os.environ.get("SYNDICATE_PAPER2_VENUE")
+    if raw is None:
+        return _DEFAULT_PAPER2_VENUES
+    seen: list[str] = []
+    for token in str(raw).split(","):
+        name = token.strip().lower()
+        if name and name not in seen:
+            seen.append(name)
+    return tuple(seen)
+
+
+def paper2_venue() -> str:
+    """Back-compat shim: the FIRST configured venue, or empty when disabled."""
+    venues = paper2_venues()
+    return venues[0] if venues else ""
 
 
 def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
@@ -112,6 +144,77 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
         return None
     payload = read_json_file(portfolio_plan_path(normalized))
     return payload if isinstance(payload, dict) else None
+
+
+def _venue_price_resolver(venue: str):
+    """Price rows from the VENUE's own feed, or None to fall back to OddsAPI.
+
+    Kalshi only for now, and deliberately quiet about it: a venue with no direct
+    feed keeps behaving exactly as before rather than erroring, and the
+    difference surfaces as `price_source` on the rows instead of as a special
+    case in the caller.
+
+    The join is rebuilt from the freshest fetched markets on every call. Carrying
+    a join made against an older board would pair tonight's rows with a pairing
+    computed from a different board -- the stale-pairing mistake `clv_join`'s
+    arrow-of-time check exists to catch, in a new costume.
+    """
+    if str(venue or "").strip().lower() != "kalshi":
+        return None
+    try:
+        payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
+        markets = (payload or {}).get("markets") or []
+        if not markets:
+            return None
+        return _resolver_from_markets(markets)
+    except Exception as exc:
+        # Named, and returns None so the venue silently reverts to the
+        # aggregator rather than losing its book entirely.
+        print(f"[portfolio_commit] KALSHI_RESOLVER_FAILED venue={venue} error={exc}", flush=True)
+        return None
+
+
+def _resolver_from_markets(markets):
+    """Turn fetched Kalshi markets into a (market, player, line, side) resolver."""
+    from syndicate.features.shared.kalshi_board_join import (
+        kalshi_price_resolver,
+        parse_prop_title,
+        series_to_markets,
+        threshold_to_line,
+    )
+
+    matches = []
+    for market in markets:
+        # EVERY alias gets an entry. The resolver is keyed by the BOARD's market
+        # name, and which of `strikeouts` / `pitcher_strikeouts` that is comes
+        # from the board, not from here -- registering only the primary would
+        # leave the venue scope refusing rows the join can pair.
+        board_markets = series_to_markets(market.get("series"))
+        parsed = parse_prop_title(market.get("title"))
+        if not board_markets or parsed is None:
+            # Unmapped series and unreadable titles are skipped here rather than
+            # guessed -- the join module already refuses them by name.
+            continue
+        line = threshold_to_line(parsed["threshold"])
+        if line is None:
+            continue
+        # Each side takes its OWN quote: yes and no are separately priced and
+        # the gap between them is the spread.
+        for side, price_key in (("over", "yes_american"), ("under", "no_american")):
+            price = market.get(price_key)
+            if price is None:
+                continue
+            for board_market in board_markets:
+                matches.append(
+                    {
+                        "market": board_market,
+                        "player_name": parsed["player_name"],
+                        "line": line,
+                        "board_side": side,
+                        "kalshi_american": price,
+                    }
+                )
+    return kalshi_price_resolver(matches)
 
 
 def _execution_enabled() -> bool:
@@ -243,6 +346,40 @@ def run_portfolio_commit(
     except Exception as exc:
         print(f"[portfolio_commit] LIVE_MARKS_FAILED date={normalized} error={exc}", flush=True)
 
+    # LIVE BET STATUS -- where each placed bet stands against the GAME, not
+    # against the line. `position_marks` answers "has the market moved toward
+    # us"; this answers "is it winning". Different questions, and the second is
+    # the one a person watching a slate actually wants.
+    #
+    # Resolvers are per sport and only MLB has one today, so every other sport's
+    # orders come back with a named reason rather than a blank -- which is the
+    # honest rendering of "not built yet" and is visible on the page as such.
+    try:
+        from syndicate.features.shared.bet_status import (
+            bet_status_report_line,
+            statuses_for_orders,
+        )
+        from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
+
+        status_orders = [
+            order
+            for order in (_load_ledger_for_clv().get("orders") or [])
+            if order.get("selected_date") == normalized
+        ]
+        if status_orders:
+            mlb_resolve = mlb_status_resolver(normalized)
+
+            def _resolve(order):
+                if str(order.get("sport") or "").strip().lower() == "mlb":
+                    return mlb_resolve(order)
+                return {"unavailable_reason": f"no_resolver_for_{order.get('sport')}"}
+
+            statuses = statuses_for_orders(status_orders, resolver=_resolve)
+            print(bet_status_report_line(statuses), flush=True)
+            plan["bet_status"] = statuses
+    except Exception as exc:
+        print(f"[portfolio_commit] BET_STATUS_FAILED date={normalized} error={exc}", flush=True)
+
     # STAGE C'S GATE INPUT: what our placed orders got against the CLOSE.
     # Distinct from the join below, which is orders -> OPENING. A close only
     # exists once a market has stopped moving, so most of the day this resolves
@@ -311,11 +448,18 @@ def run_portfolio_commit(
     #
     # Runs AFTER the main plan is on disk, and wrapped, so the comparison can
     # never cost the portfolio it is being compared against.
-    venue_plan = None
-    venue = paper2_venue()
-    if venue:
+    venue_plans: dict[str, Any] = {}
+    main_totals = plan.get("totals") or {}
+    for venue in paper2_venues():
+        # Each venue in its OWN try: one venue's failure must not cost the
+        # others' measurements, and the whole point is comparing across them.
         try:
-            scoped, scope_refusals = scope_rows_to_venue(rows, venue)
+            # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
+            # direct feed today; every other venue falls back to the aggregator,
+            # and `price_source` on each scoped row records which was used.
+            scoped, scope_refusals = scope_rows_to_venue(
+                rows, venue, price_resolver=_venue_price_resolver(venue)
+            )
             print(
                 venue_scope_report_line(venue, len(rows), len(scoped), scope_refusals),
                 flush=True,
@@ -331,19 +475,29 @@ def run_portfolio_commit(
             venue_plan["job_state"] = dict(plan.get("job_state") or {})
             write_json_file(portfolio_plan_path_for_venue(normalized, venue), venue_plan)
             venue_totals = venue_plan.get("totals") or {}
-            main_totals = plan.get("totals") or {}
+            venue_refusals = venue_plan.get("refusals") or {}
             print(
                 f"[portfolio_commit] PAPER2_PLAN_WRITTEN date={normalized} venue={venue} "
                 f"rows_in={len(scoped)} positions={venue_totals.get('positions')} "
                 f"staked=${venue_totals.get('staked_dollars')} "
+                # THE NUMBER THAT DECIDES STAGE D, on the line rather than
+                # inferred: how many of the venue's own quoted rows the model
+                # has any view on at all. Kalshi measured 12 of 47.
+                f"sim_view_on={len(scoped) - int(venue_refusals.get('no_model_edge_pct', 0) or 0)}"
+                f"/{len(scoped)} "
+                # How many rows were priced from the VENUE rather than the
+                # aggregator -- the difference between a real coverage number
+                # and OddsAPI's view of one.
+                f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
                 # Side by side on ONE line, because the comparison IS the
                 # deliverable and reading it off two lines invites pairing the
                 # wrong two runs.
                 f"vs_unrestricted_positions={main_totals.get('positions')} "
                 f"vs_unrestricted_staked=${main_totals.get('staked_dollars')} "
-                f"refusals={venue_plan.get('refusals')}",
+                f"refusals={venue_refusals}",
                 flush=True,
             )
+            venue_plans[venue] = venue_plan
         except Exception as exc:
             print(
                 f"[portfolio_commit] PAPER2_FAILED date={normalized} venue={venue} error={exc}",
@@ -355,8 +509,8 @@ def run_portfolio_commit(
         "date": normalized,
         "plan": plan,
         "clv_join": clv_join,
-        "venue_plan": venue_plan,
-        "venue": venue or None,
+        "venue_plans": venue_plans,
+        "venues": sorted(venue_plans),
     }
 
 

@@ -205,3 +205,48 @@ def test_a_scoped_row_sizes_through_the_unmodified_pipeline():
     assert positions, plan.get("refusals")
     assert positions[0]["book"] == "kalshi"
     assert positions[0]["price"] == -105
+
+
+# --- pricing from the VENUE's own feed ------------------------------------
+
+
+def test_a_venue_resolver_prices_a_row_the_aggregator_does_not_carry():
+    """THE POINT OF THE WHOLE KALSHI THREAD. OddsAPI carries game lines only for
+    these venues, so a pitcher prop reads as `venue_not_quoting` — while Kalshi
+    is in fact quoting it. The venue's own feed makes the row real."""
+    row = _row(book_prices={"draftkings": -110})  # no kalshi price at all
+    without, refusals = scope_rows_to_venue([row], "kalshi")
+    assert without == []
+    assert refusals[REASON_VENUE_NOT_QUOTING] == 1
+
+    with_feed, _ = scope_rows_to_venue([row], "kalshi", price_resolver=lambda r: -120)
+    assert len(with_feed) == 1
+    assert with_feed[0]["quote"]["price"] == -120
+    assert with_feed[0]["price_source"] == "venue_feed"
+
+
+def test_ev_is_recomputed_at_the_venues_own_price():
+    """A +4% row at -110 is not +4% at -120. Inheriting the EV would size a bet
+    at a price we did not get."""
+    row = _row(best=-110, ev_pct=4.0, book_prices={"draftkings": -110})
+    scoped, _ = scope_rows_to_venue([row], "kalshi", price_resolver=lambda r: -120)
+    assert scoped[0]["ev_pct"] < 4.0
+
+
+def test_the_aggregator_is_still_used_when_the_venue_feed_has_no_price():
+    """A resolver that returns None must fall back rather than refuse — most
+    venues have no direct feed and must keep working exactly as before."""
+    scoped, _ = scope_rows_to_venue([_row()], "kalshi", price_resolver=lambda r: None)
+    assert len(scoped) == 1
+    assert scoped[0]["price_source"] == "aggregator"
+
+
+def test_price_source_is_recorded_so_the_two_are_never_blended():
+    """A coverage number built on the aggregator means something different from
+    one built on the venue."""
+    rows = [_row(), _row(event_id="evt-2")]
+    scoped, _ = scope_rows_to_venue(
+        rows, "kalshi",
+        price_resolver=lambda r: -120 if r.get("event_id") == "evt-2" else None,
+    )
+    assert {r["price_source"] for r in scoped} == {"venue_feed", "aggregator"}

@@ -3250,7 +3250,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
     would read as the first when it is usually the third.
     """
     from pipeline.portfolio_commit import (
-        paper2_venue,
+        paper2_venues,
         portfolio_commit_enabled,
         read_portfolio_plan,
         read_portfolio_plan_for_venue,
@@ -3289,34 +3289,46 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
     # The venue-restricted book. Read the same way and just as fail-safe: a
     # missing paper2 must degrade to "not running" and never take down the
     # portfolio it is being compared against.
-    venue = paper2_venue()
-    venue_plan = None
-    if venue:
+    paper2 = []
+    for venue in paper2_venues():
+        venue_plan = None
         try:
             venue_plan = read_portfolio_plan_for_venue(selected_date, venue)
         except Exception:
-            _LOGGER.exception("PAPER2_PLAN_READ_FAILURE date=%s", selected_date)
+            # Per venue, so one unreadable plan cannot hide the other three.
+            _LOGGER.exception(
+                "PAPER2_PLAN_READ_FAILURE date=%s venue=%s", selected_date, venue
+            )
 
-    venue_totals = (venue_plan or {}).get("totals") or {}
-    scope_refusals = (venue_plan or {}).get("venue_scope_refusals") or {}
-    scoped_in = int((venue_plan or {}).get("rows_in", 0) or 0)
-    # Coverage is the Stage D number: what share of the board this venue quotes
-    # at all. DERIVED from the refusal counts rather than stored separately, so
-    # it can never disagree with them.
-    considered = scoped_in + sum(int(v or 0) for v in scope_refusals.values())
-    paper2 = {
-        "venue": venue or None,
-        "plan_present": isinstance(venue_plan, dict),
-        "positions": venue_totals.get("positions"),
-        "staked_dollars": venue_totals.get("staked_dollars"),
-        "sim_share_of_staked": venue_totals.get("sim_share_of_staked"),
-        "rows_in": scoped_in,
-        "venue_not_quoting": int(scope_refusals.get("venue_not_quoting", 0) or 0),
-        "coverage": round(scoped_in / considered, 4) if considered else None,
-        "scope_refusals": scope_refusals,
-        "refusals": (venue_plan or {}).get("refusals") or {},
-        "rows": (venue_plan or {}).get("positions") or [],
-    }
+        venue_totals = (venue_plan or {}).get("totals") or {}
+        scope_refusals = (venue_plan or {}).get("venue_scope_refusals") or {}
+        venue_refusals = (venue_plan or {}).get("refusals") or {}
+        scoped_in = int((venue_plan or {}).get("rows_in", 0) or 0)
+        # Coverage is the Stage D number: what share of the board this venue
+        # quotes at all. DERIVED from the refusal counts rather than stored
+        # separately, so it can never disagree with them.
+        considered = scoped_in + sum(int(v or 0) for v in scope_refusals.values())
+        no_view = int(venue_refusals.get("no_model_edge_pct", 0) or 0)
+        paper2.append(
+            {
+                "venue": venue,
+                "plan_present": isinstance(venue_plan, dict),
+                "positions": venue_totals.get("positions"),
+                "staked_dollars": venue_totals.get("staked_dollars"),
+                "sim_share_of_staked": venue_totals.get("sim_share_of_staked"),
+                "rows_in": scoped_in,
+                "venue_not_quoting": int(scope_refusals.get("venue_not_quoting", 0) or 0),
+                "coverage": round(scoped_in / considered, 4) if considered else None,
+                # THE SECOND NUMBER STAGE D TURNS ON. Coverage alone is not the
+                # constraint -- Kalshi quoted 47 rows and the model had a view on
+                # 12 of them. A venue that quotes plenty of markets the sim has
+                # no opinion about is not a venue this system can trade.
+                "sim_view_on": max(scoped_in - no_view, 0),
+                "scope_refusals": scope_refusals,
+                "refusals": venue_refusals,
+                "rows": (venue_plan or {}).get("positions") or [],
+            }
+        )
 
     job_state = (plan or {}).get("job_state") or {}
     positions = (plan or {}).get("positions") or []
@@ -3328,6 +3340,13 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
     # `idempotency_key` because that is the identity of an ORDER, and marks
     # cover orphans whose position is no longer in the plan.
     live_marks = (plan or {}).get("live_marks") or {}
+    # Where each bet stands against the GAME. Computed by the worker (it needs
+    # the live feed); this only looks it up, keyed by order identity.
+    bet_status = (plan or {}).get("bet_status") or {}
+    status_by_order = {
+        str(row.get("idempotency_key") or ""): row
+        for row in (bet_status.get("rows") or [])
+    }
     marks_by_order = {
         str(mark.get("idempotency_key") or ""): mark
         for mark in (live_marks.get("marks") or [])
@@ -3340,6 +3359,9 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
                 **position,
                 "order": order,
                 "mark": marks_by_order.get(str((order or {}).get("idempotency_key") or "")),
+                "bet_status": status_by_order.get(
+                    str((order or {}).get("idempotency_key") or "")
+                ),
             }
         )
 
@@ -3356,6 +3378,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "execution_mode": str(job_state.get("execution_mode") or execution_mode()),
         "job_state_source": "worker" if job_state else "web_env",
         "live_marks": live_marks,
+        "bet_status": bet_status,
         "plan_present": isinstance(plan, dict),
         "generated_at": (plan or {}).get("generated_at"),
         "bankroll_units": (plan or {}).get("bankroll_units"),
@@ -3380,7 +3403,11 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "paper2": paper2,
         "rows": rows,
         "orphan_orders": [
-            {**order, "mark": marks_by_order.get(str(order.get("idempotency_key") or ""))}
+            {
+                **order,
+                "mark": marks_by_order.get(str(order.get("idempotency_key") or "")),
+                "bet_status": status_by_order.get(str(order.get("idempotency_key") or "")),
+            }
             for order in orders
             if str(order.get("position_key") or "")
             not in {str(p.get("position_key") or "") for p in positions}

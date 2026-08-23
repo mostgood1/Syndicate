@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-08-23 — refresh-worker `43c8e5507`: Kalshi keeps its own clock, and 154 opening lines now exist
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da57i2ou01pc73e9btk0`, live `04:41:33Z`. Commit `43c8e5507`, on
+`origin/main`. Trigger `api` (MCP), so the claim was advisory — the deploy guard
+hook matches `Bash|PowerShell` only and does not see an MCP deploy. Stated
+rather than glossed: that is a real gap in the guard, not a claim I took.
+
+**verify:** `[kalshi_odds]` lines at `04:48:11Z`, first board build after the
+deploy:
+
+```
+FETCHED markets=154 interval_s=3600 prev_age_s=None
+        per_series={'KXMLBKS': (137,'series_filter'), 'KXMLBOUTS': (17,'series_filter')}
+HISTORY status=ok opened=154 appended=154 unchanged=0 tickers=154
+        trimmed_points=0 trimmed_tickers=0
+MOVES   tracked=154 moved=0 unmoved=0 too_new=154
+BY_GAME_DATE {'2026-08-26': {'KXMLBKS': 137, 'KXMLBOUTS': 17}}
+BOARD_JOIN kalshi_markets=154 board_rows=363 matched=0
+        reasons={'market_closes_on_another_date': 154}
+```
+
+**What this proves.** The price history exists and is being written: 154 tickers
+opened on the first run, which is the thing that did not exist before — every
+Kalshi price we had ever fetched was discarded on the next fetch, so "has this
+moved" was unanswerable no matter how often we asked. `too_new=154` is the
+counter earning its keep on its very first run: one observation each, reported
+as *not watched long enough* rather than as 154 markets that have not moved.
+
+**What this does NOT prove.** The hourly gate has not been observed holding —
+`prev_age_s=None` means this was the first fetch, and the `CACHED` line that
+would demonstrate the interval had not appeared by the time of this entry. Open
+obligation.
+
+**What it CORRECTED, and this is the useful part.** `BY_GAME_DATE` put all 154
+markets on a single date, `2026-08-26`. **137 different pitchers do not all
+pitch on one day**, so `close_time` is very likely a settlement deadline rather
+than first pitch — which means `board_by_game_date` is grouping by the wrong
+field, and the join's `market_closes_on_another_date: 154` is measuring my
+assumption rather than the calendar. The date guard shipped hours earlier as a
+fix for a zero-match join; it is now the most likely CAUSE of one.
+
+Not guessed at. `93cf07d9e` prints one market's `open_time` / `close_time` /
+`expiration_time` / `ticker` / `event_ticker` per series verbatim, so the next
+run says which field carries the game date. Same choice `probe()` made for the
+price fields, which is what caught the 100x error before it shipped.
+
+**Also measured, unrelated to this deploy:**
+
+```
+LIVE_MARKS orders=58 marked=0 reasons={'market_not_on_board': 58}
+           by_venue=[('paper',0,None), ('paper:kalshi',0,None), ('paper:novig',0,None)]
+VENUE_SCOPE venue=kalshi rows_in=363 scoped=0 coverage=0.0
+           refusals={'venue_not_quoting': 363}
+PAPER2_PLAN_WRITTEN date=2026-08-22 venue=kalshi rows_in=0 positions=0 staked=$0
+```
+
+All three are the same fact: at 04:48 the board was 363 rows of European soccer
+(`alternate_totals_corners` 223, `h2h` 53, `totals` 43, `btts` 39). Kalshi does
+not quote English football corners, so nothing scoped, nothing marked, and
+paper2 wrote an empty plan. Not a defect in any of the three — but it does mean
+**no Kalshi number in this session rests on a slate the two sources share**,
+and that remains true until the board carries MLB again.
+
+---
+
 ## 2026-08-19 — refresh-worker CLAIM FORCE-BROKEN AGAIN, SAME COLLISION — plus a self-correction on the test used
 
 **NO DEPLOY.** Claim hygiene, and a correction to this session's own
@@ -24344,6 +24410,108 @@ alone** before the fix so the instrument could not be confused with the guess.
 That ordering is also what caught the wrong diagnosis. Watching the counter
 across builds showed the flicker; shipping the guess alongside it would have
 "fixed" the problem and left the real cause unnamed.
+
+
+## 2026-08-23 01:18:24Z -- refresh-worker `fb39476c` -- paper2 + attribution split (PEER-DEPLOYED)
+
+Deployed by a peer at 01:14:57Z; carried `f7ad80900` (no_close split), `46797f08f`
+(paper2), `4992ba40d` (paper2 page), `141551790` (venue split) -- all four verified
+ancestors. Third time tonight a peer shipped this lane's work; the claim was held
+and does not bind MCP deploys.
+
+### THE STAGE D ANSWER, and it is decisive
+
+    VENUE_SCOPE venue=kalshi rows_in=1227 scoped=47 coverage=0.0383
+      refusals={'venue_not_quoting': 1180}
+
+    PAPER2_PLAN_WRITTEN date=2026-08-22 venue=kalshi rows_in=47 positions=0 staked=$0
+      vs_unrestricted_positions=1 vs_unrestricted_staked=$6.41
+      refusals={'no_model_edge_pct': 35, 'below_min_ev_pct': 11, 'zero_kelly_stake': 1}
+
+**Kalshi quotes 3.8% of the board** -- 47 of 1,227. The plan's stated catch was
+right and understated: not "mostly moneyline/spread/total", but 3.8%.
+
+**The finding underneath it is `no_model_edge_pct: 35`.** The sim has no view on
+35 of the 47 markets Kalshi quotes, so the overlap between *Kalshi trades it* and
+*our model has an opinion* is **12 rows of 1,227** -- and none of those 12 cleared
+the EV gate at Kalshi's prices. That is not fixable by tracking more books:
+**Kalshi trades what this sim does not model.**
+
+CAVEAT, so this is not over-read: one slate, late at night, and the unrestricted
+book committed only 1 position itself. The COVERAGE number is structural (1,227
+rows is a full board); the "0 positions" is one night.
+
+### MY MARKET-FAMILIES THEORY WAS MOSTLY WRONG
+
+    no_close={'opening_not_in_resolver': 21, 'no_market_in_history': 11,
+              'close_precedes_open': 5, 'no_pregame_observation': 2}
+
+I theorised the CLV misses were untracked families (`totals_alt`, `h2h_3_way`)
+landing in the period-lines artifact rather than the history shard. That is **11
+of 39 -- 28%**. The largest bucket is `opening_not_in_resolver: 21` (54%): our
+book is absent from the odds-history shard for those markets. Book coverage, not
+artifact wiring -- a different problem with a different fix.
+
+**The process point is the one worth keeping.** I built the theory from greps,
+said so, and refused to edit the odds-capture path until this line existed. Had I
+built it, I would have shipped a fix for 28% of the problem and reported it as
+solved. `no_close` was only splittable at all because the attribution the earlier
+version discarded got carried through.
+
+verify: SATISFIED for `#522` (marks), `#524` (order CLV) and paper2 coverage.
+`ORDER_CLV resolved=5 same_book_n=5 same_book_avg_clv_pct=2.5358 beat=4` -- n=5,
+NOT a result. `paper2=[]` is correct: 0 positions committed, so nothing placed.
+
+## 2026-08-23 01:14-01:35Z — `#523` AND `#525` VERIFIED IN PRODUCTION (the readings the previous entry left pending)
+
+The worker got a clean run once the restart storm settled. Both fixes measured on
+`LAYER2_BOARD_HEALTH` and `KEYVALUE_WRITE_LARGE`, same lines as before.
+
+**`#523` — soccer's live tier is reached now. This is the one that was 0 three
+times in a row.**
+
+    soccer live_rows   0, 0, 0   ->   12  (01:14:18Z)   and   5  (01:35:11Z)
+
+Non-zero for the first time tonight, on the build that carries the missing
+`attach_live_game_state_from_lens`. The rows are being RECOGNISED as live, which
+was the whole claim.
+
+`soccer live_proj` is still 0, and that is the honest limit of this fix: the rows
+are now seen by the join and still not priced by it. That is the next hop and it
+is `#503`'s open pricing gap, not this one. Seen and priced are different claims;
+only the first is supported.
+
+MLB on the same build: `live_rows=400 live_proj=252` (was 276/138). WNBA
+`live_rows=172-217`. NFL fell to 27 rows because the slate rolled to 08-23 — a
+calendar fact, not a regression.
+
+**`#525` — the payload came down and the shed never fired.**
+
+    before   5,747,257 B   68.5% of the 8 MB ceiling
+    after    4,550,297 B   54.2%          (01:35:12Z)
+    SHORTLIST_SHED_TO_FIT   ABSENT, which is the correct outcome
+
+The total budget held the four-sport board under the ceiling with room, and the
+rescue path stayed unreached — the design intent exactly. The shed is now a
+backstop that has never been needed rather than a mechanism carrying the load.
+
+## 2026-08-23 01:45-01:49Z — web `34b3ec1b` — `#526` blotter mobile layout
+
+`dep-da551ljncjis73fqf030` live 01:49:48Z, claim `6307f3afb1662552`.
+
+**MY FIRST TRIGGER WAS CANCELED AND IT DID NOT MATTER.**
+`dep-da551j8u01pc73e13j1g` was canceled 10 seconds in by a second trigger 9
+seconds later — but that one carried the IDENTICAL commit `34b3ec1b`, so the
+change shipped regardless. Checked rather than assumed: a `canceled` status next
+to a `live` one on the same SHA is a duplicate trigger, not a lost deploy, and it
+is worth writing down because it looks exactly like the latter in the deploy list.
+
+**verify:** measured in Chromium against the real stylesheet before shipping —
+390px: `page_overflows` True -> False, dash-cells visible 12 -> 0, row height
+362px -> 150px; 1440px identical before and after (table-cell, dashes retained,
+45px rows, the 880px floor still in force). NOT measured on the live page: the
+local mirror has no blotter rows so `/mlb` renders no table here, and the proxy
+403s the Render host from this container. Needs a human look on a phone.
 
 ## 2026-08-23 01:52:58Z — web `2f214e3a` — `#514` **MOMENTUM IS ON WNBA CARDS**
 

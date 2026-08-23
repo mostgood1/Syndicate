@@ -1,0 +1,146 @@
+"""Request signing: the parts that are true regardless of what Kalshi returns."""
+
+from __future__ import annotations
+
+import base64
+
+import pytest
+
+from syndicate.features.shared import kalshi_auth
+
+
+@pytest.fixture(scope="module")
+def keypair():
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+    )
+
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = private.private_bytes(
+        Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
+    ).decode("ascii")
+    return private, private.public_key(), pem
+
+
+@pytest.fixture
+def configured(monkeypatch, keypair):
+    _private, _public, pem = keypair
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "key-id-under-test")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", pem)
+    return pem
+
+
+def test_no_credential_is_a_named_refusal_not_a_crash(monkeypatch):
+    monkeypatch.delenv("KALSHI_API_KEY_ID", raising=False)
+    monkeypatch.delenv("KALSHI_PRIVATE_KEY", raising=False)
+    assert kalshi_auth.load_credentials() == {
+        "status": "unavailable",
+        "reason": "no_api_key_id",
+    }
+
+
+def test_a_key_id_without_a_private_key_is_named_separately(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.delenv("KALSHI_PRIVATE_KEY", raising=False)
+    # Half-configured must not read the same as unconfigured: one is "nobody set
+    # this up", the other is "somebody set up half of it".
+    assert kalshi_auth.load_credentials()["reason"] == "no_private_key"
+
+
+def test_an_unreadable_key_reports_the_type_and_never_the_material(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "-----BEGIN PRIVATE KEY-----\nnope\n-----END PRIVATE KEY-----")
+    result = kalshi_auth.load_credentials()
+    assert result["reason"] == "unreadable_private_key"
+    # The parser's message can echo key material, and this string reaches logs.
+    assert "nope" not in str(result)
+
+
+def test_a_pem_with_literal_backslash_n_is_accepted(monkeypatch, keypair):
+    _private, _public, pem = keypair
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", pem.replace("\n", "\\n"))
+    # This is how a PEM arrives from a dashboard field.
+    assert kalshi_auth.load_credentials()["status"] == "ok"
+
+
+def test_the_signature_verifies_against_the_public_key(configured, keypair):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    _private, public, _pem = keypair
+    url = "https://external-api.kalshi.com/trade-api/v2/portfolio/balance"
+    headers = kalshi_auth.auth_headers("GET", url, now=1_700_000_000.0)
+
+    message = kalshi_auth.signing_string(
+        headers["KALSHI-ACCESS-TIMESTAMP"], "GET", url
+    )
+    public.verify(
+        base64.b64decode(headers["KALSHI-ACCESS-SIGNATURE"]),
+        message.encode("utf-8"),
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=hashes.SHA256.digest_size),
+        hashes.SHA256(),
+    )
+
+
+def test_the_timestamp_is_milliseconds_not_seconds(configured):
+    headers = kalshi_auth.auth_headers(
+        "GET", "https://x/trade-api/v2/portfolio/balance", now=1_700_000_000.0
+    )
+    # Seconds would be 1700000000 and Kalshi rejects it as outside the window --
+    # a 401 that looks exactly like a wrong key.
+    assert headers["KALSHI-ACCESS-TIMESTAMP"] == "1700000000000"
+
+
+def test_the_signed_path_is_derived_from_the_url_and_keeps_the_api_prefix():
+    url = "https://external-api.kalshi.com/trade-api/v2/portfolio/positions"
+    assert kalshi_auth.signed_path(url) == "/trade-api/v2/portfolio/positions"
+
+
+def test_the_query_string_is_excluded_from_the_signature():
+    signed = kalshi_auth.signed_path(
+        "https://x/trade-api/v2/portfolio/fills?ticker=KXMLBKS-26AUG24&limit=100"
+    )
+    assert signed == "/trade-api/v2/portfolio/fills"
+    assert "?" not in signed
+
+
+def test_the_signing_string_is_timestamp_then_method_then_path():
+    assert (
+        kalshi_auth.signing_string("1700000000000", "post", "https://x/trade-api/v2/portfolio/orders")
+        == "1700000000000POST/trade-api/v2/portfolio/orders"
+    )
+
+
+def test_signing_refuses_rather_than_producing_unsigned_headers(monkeypatch):
+    monkeypatch.delenv("KALSHI_API_KEY_ID", raising=False)
+    monkeypatch.delenv("KALSHI_PRIVATE_KEY", raising=False)
+    # An unsigned request to a trading endpoint is a 401, and a 401 on a submit
+    # does not say whether the ORDER or the AUTH was rejected.
+    with pytest.raises(kalshi_auth.KalshiAuthError) as excinfo:
+        kalshi_auth.auth_headers("POST", "https://x/trade-api/v2/portfolio/orders")
+    assert "no_api_key_id" in str(excinfo.value)
+
+
+def test_two_calls_to_different_paths_do_not_share_a_signature(configured):
+    a = kalshi_auth.auth_headers("GET", "https://x/trade-api/v2/portfolio/balance", now=1.0)
+    b = kalshi_auth.auth_headers("GET", "https://x/trade-api/v2/portfolio/positions", now=1.0)
+    assert a["KALSHI-ACCESS-SIGNATURE"] != b["KALSHI-ACCESS-SIGNATURE"]
+
+
+def test_probe_auth_reports_the_missing_credential_without_calling_out(monkeypatch):
+    monkeypatch.delenv("KALSHI_API_KEY_ID", raising=False)
+    monkeypatch.delenv("KALSHI_PRIVATE_KEY", raising=False)
+
+    def explode(*_a, **_k):
+        raise AssertionError("probe_auth made a network call with no credential")
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", explode)
+    assert kalshi_auth.probe_auth() == {
+        "status": "unavailable",
+        "reason": "no_api_key_id",
+        "detail": None,
+    }
