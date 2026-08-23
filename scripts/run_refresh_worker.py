@@ -4071,6 +4071,56 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     }
 
 
+# Sports we would trade if Kalshi lists them. MATCHED against tickers Kalshi
+# returns, never fetched as a guess: `KXWNBA` typed from memory returns an empty
+# page that reads as "not listed", which is a confident wrong answer.
+_KALSHI_SPORT_TOKENS = ("WNBA", "NBA", "NFL", "NHL", "NCAAF", "NCAAB", "MLB")
+
+
+def _kalshi_series_catalogue_at_boot() -> None:
+    """Ask Kalshi directly which series it lists, and name the sports we want.
+
+    The market listing cannot answer this: 39,793 of the first 40,000 open
+    markets were parlay combinations and it TRUNCATED before reaching most
+    single markets, so a sport Kalshi genuinely carries can be invisible there.
+    Reading that absence as "not listed" is the false negative this whole
+    integration exists to avoid.
+
+    Read-only, unauthenticated, once per boot.
+    """
+    try:
+        from syndicate.features.shared.kalshi_client import discover_series, series_matching
+
+        report = discover_series()
+        tickers = report.get("tickers") or []
+        print(
+            "[refresh_worker] KALSHI_SERIES_CATALOGUE"
+            f" status={report.get('status')}"
+            f" count={report.get('count')}"
+            f" container={report.get('container_key')}"
+            # Payload and row keys, so a wrong container guess shows up as a
+            # wrong guess rather than as a venue that lists nothing.
+            f" payload_keys={report.get('payload_keys')}"
+            f" row_keys={report.get('row_keys')}"
+            f" errors={report.get('errors')}",
+            flush=True,
+        )
+        for token in _KALSHI_SPORT_TOKENS:
+            found = series_matching([token], tickers)
+            # EVERY sport gets a line, including the empty ones. "We looked and
+            # Kalshi has none" and "we never looked" are different facts, and a
+            # log that only prints hits cannot tell them apart.
+            print(
+                f"[refresh_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[refresh_worker] KALSHI_SERIES_CATALOGUE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _kalshi_auth_probe_at_boot() -> None:
     """One signed READ-ONLY call, at process boot, before anything long runs.
 
@@ -4228,6 +4278,7 @@ def main() -> int:
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _kalshi_auth_probe_at_boot()
+    _kalshi_series_catalogue_at_boot()
     _bootstrap_soccer_player_seed_files()
     _bootstrap_soccer_schedule_seed_files()
     _bootstrap_soccer_history_seed_files()
