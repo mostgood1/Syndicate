@@ -433,6 +433,13 @@ def commit_portfolio(
                 # cannot be keyed at all, which is the ledger's own rule applied
                 # by the ledger's own code.
                 "opening_key": opening_key_for_row(row),
+                # THE SPORT'S OWN GAME ID, carried because live win/loss needs
+                # it and `event_id` is not it. MLB's live feed is keyed by
+                # `gamePk`; an order holding only the OddsAPI event id cannot
+                # be looked up at all, which is what stopped `bet_status` from
+                # having a resolver. Copied from whichever field the row
+                # carries -- `gamePk` on MLB/NFL rows, `game_id` elsewhere.
+                "game_pk": row.get("gamePk") or row.get("game_id") or None,
                 "side": row.get("side"),
                 "line": row.get("line"),
                 "book": quote.get("bookmaker"),

@@ -112,6 +112,18 @@ window.SyndicatePaperPortfolioPulse = (function () {
   // of its three meta lines: a key mismatch is reported ahead of a missing
   // opening, because a derivation that drifted makes every CLV number suspect
   // while a missing opening only loses that one row.
+  function standingTile(bs) {
+    const counts = bs.counts || {};
+    if (!bs.resolved) {
+      return { label: "Bets standing", value: "—", meta: "no bet resolved against a live game yet" };
+    }
+    return {
+      label: "Bets standing",
+      value: `${counts.won || 0}W · ${counts.lost || 0}L`,
+      meta: `${counts.live_ahead || 0} ahead · ${counts.live_behind || 0} behind · ${bs.decided || 0} of ${bs.resolved} decided`,
+    };
+  }
+
   function movementTile(marks) {
     if (!marks.marked) {
       return { label: "Line movement", value: "—", meta: "no order re-priced yet" };
@@ -175,6 +187,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
         valueClass: unreconciled > 0 ? " warn" : "",
       },
       { label: "Filled stake", value: usd(ledger.filled_stake_dollars), meta: "at simulated fill price" },
+      standingTile(data.bet_status || {}),
       movementTile(data.live_marks || {}),
       clvTile(data.clv_join || {}),
       {
@@ -217,6 +230,28 @@ window.SyndicatePaperPortfolioPulse = (function () {
   // Mirrors portfolio_paper.html's `mark_cell` macro exactly. Movement is always
   // probability points from clv_pct_from_prices -- American odds are not linear,
   // so a raw price difference would be wrong in both directions at once.
+  // Mirrors portfolio_paper.html's status_cell macro. Colour follows
+  // DECIDED-ness, not just direction: Over 1.5 at 2 is won and cannot be
+  // undone, Under 1.5 at 0 is merely still alive, and rendering those the same
+  // is the failure the engine exists to avoid.
+  function statusCell(bs) {
+    if (!bs) return `<span class="paper-table__sub">—</span>`;
+    if (bs.unavailable_reason) {
+      return `<span class="paper-table__sub">${escapeHtml(bs.unavailable_reason)}</span>`;
+    }
+    const vs = `<span class="paper-table__sub">${escapeHtml(String(bs.current_value))} vs ${escapeHtml(String(bs.line))}</span>`;
+    if (bs.status === "won") return `<span class="bet-won">WON</span> ${vs}`;
+    if (bs.status === "lost") return `<span class="bet-lost">LOST</span> ${vs}`;
+    if (bs.status === "live_ahead") {
+      const undecided = bs.monotone ? " · undecided" : "";
+      return `<span class="mark-pos">ahead</span>
+        <span class="paper-table__sub">${escapeHtml(String(bs.current_value))} vs ${escapeHtml(String(bs.line))}${undecided}</span>`;
+    }
+    if (bs.status === "live_behind") return `<span class="mark-neg">behind</span> ${vs}`;
+    if (bs.status === "not_started") return `<span class="paper-table__sub">not started</span>`;
+    return `<span class="paper-table__sub">${escapeHtml(bs.status || "")}</span>`;
+  }
+
   function markCell(mark) {
     if (!mark) return `<span class="paper-table__sub">—</span>`;
     if (mark.reason === "marked") {
@@ -310,6 +345,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
           <td>${escapeHtml(attribution.side_picked_by || "—")}</td>
           <td>${orderCell}</td>
           <td>${fillCell(order)}</td>
+          <td>${statusCell(row.bet_status)}</td>
           <td>${markCell(row.mark)}</td>
         </tr>
       `;
@@ -320,7 +356,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
           <thead>
             <tr>
               <th>Sport</th><th>Selection</th><th>Book</th><th>Price</th><th>Stake</th><th>% BR</th>
-              <th>EV%</th><th>Sim edge</th><th>Score</th><th>Sim $</th><th>Side by</th><th>Order</th><th>Fill</th><th>Now</th>
+              <th>EV%</th><th>Sim edge</th><th>Score</th><th>Sim $</th><th>Side by</th><th>Order</th><th>Fill</th><th>Status</th><th>Line now</th>
             </tr>
           </thead>
           <tbody>${body}</tbody>
@@ -358,55 +394,44 @@ window.SyndicatePaperPortfolioPulse = (function () {
         <td>${americanOrDash(order.requested_price)}</td>
         <td>${usd(order.requested_stake_dollars)}</td>
         <td><span class="paper-pill paper-pill--${escapeHtml(String(order.status || ""))}">${escapeHtml(order.status || "")}</span></td>
+        <td>${statusCell(order.bet_status)}</td>
         <td>${markCell(order.mark)}</td>
       </tr>
     `).join("");
   }
 
-  // Mirrors portfolio_paper.html's paper2 section. Only the tiles and the
-  // empty-state are re-rendered live; the positions table is server-rendered
-  // and changes at most once per board build, which the pulse already reloads
-  // the rest of the page against.
+  // Mirrors portfolio_paper.html's paper2 comparison table. One row per venue,
+  // because the comparison ACROSS venues is the deliverable -- Kalshi's 3.8%
+  // only means something next to the others'.
   function renderPaper2(data) {
     const section = document.getElementById("paper2-section");
-    if (!section) return;
-    const p2 = data.paper2 || {};
-    section.hidden = !p2.venue;
-    if (!p2.venue) return;
-    const tiles = section.querySelector(".paper-tiles");
-    if (!tiles || !p2.plan_present) return;
-    const totals = data.totals || {};
-    const quoted = (p2.rows_in || 0) + (p2.venue_not_quoting || 0);
-    const spec = [
-      {
-        label: `${String(p2.venue).toUpperCase()} coverage`,
-        value: pct0OrDash(p2.coverage),
-        meta: `${p2.rows_in || 0} of ${quoted} candidates quoted`,
-        valueClass: isNum(p2.coverage) && p2.coverage < 0.25 ? " warn" : "",
-      },
-      {
-        label: "Positions",
-        value: String(p2.positions || 0),
-        meta: `vs ${totals.positions || 0} unrestricted`,
-      },
-      {
-        label: "Staked",
-        value: usd(p2.staked_dollars),
-        meta: `vs ${usd(totals.staked_dollars)} unrestricted`,
-      },
-      {
-        label: "Sim share of stake",
-        value: pctSigned1OrDash(p2.sim_share_of_staked),
-        meta: `vs ${pctSigned1OrDash(totals.sim_share_of_staked)} unrestricted`,
-      },
-    ];
-    tiles.innerHTML = spec.map((tile) => `
-      <div class="paper-tile">
-        <div class="paper-tile__label">${escapeHtml(tile.label)}</div>
-        <div class="paper-tile__value${tile.valueClass || ""}">${escapeHtml(tile.value)}</div>
-        <div class="paper-tile__meta">${escapeHtml(tile.meta)}</div>
-      </div>
-    `).join("");
+    const body = document.getElementById("paper2-rows");
+    if (!section || !body) return;
+    const venues = Array.isArray(data.paper2) ? data.paper2 : [];
+    section.hidden = venues.length === 0;
+    if (!venues.length) return;
+    body.innerHTML = venues.map((v) => {
+      let why = `<span class="paper-table__sub">—</span>`;
+      if (!v.plan_present) {
+        why = `<span class="paper-table__sub">no plan yet</span>`;
+      } else if (!v.positions) {
+        const reasons = Object.entries(v.refusals || {})
+          .map(([r, c]) => `${escapeHtml(r)} ${escapeHtml(String(c))}`).join(", ");
+        why = `<span class="paper-table__sub">${reasons}</span>`;
+      }
+      const cov = isNum(v.coverage) ? `${(v.coverage * 100).toFixed(1)}%` : "—";
+      return `
+        <tr>
+          <td class="primary">${escapeHtml(String(v.venue || "").toUpperCase())}</td>
+          <td class="${isNum(v.coverage) && v.coverage < 0.10 ? "neg" : ""}">${cov}</td>
+          <td>${escapeHtml(String(v.rows_in || 0))}</td>
+          <td class="${(v.sim_view_on || 0) === 0 ? "neg" : ""}">${escapeHtml(String(v.sim_view_on || 0))}</td>
+          <td class="primary">${escapeHtml(String(v.positions || 0))}</td>
+          <td>${usd(v.staked_dollars)}</td>
+          <td>${why}</td>
+        </tr>
+      `;
+    }).join("");
   }
 
   function renderAll(data) {

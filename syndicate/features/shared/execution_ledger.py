@@ -123,6 +123,10 @@ _LEAN_FIELDS = (
     # close later -- without reconstructing anything. `#505` is what
     # reconstruction costs: 4,560 `no_key_match` of 8,276.
     "opening_key",
+    # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
+    # answer "is this bet winning". `event_id` is the odds-feed id and is not
+    # interchangeable with it.
+    "game_pk",
     "requested_price",
     "requested_stake_dollars",
     "submitted_at",
@@ -164,6 +168,7 @@ class OrderRequest:
     away_team: str | None = None
     commence_time: str | None = None
     opening_key: str | None = None
+    game_pk: str | None = None
 
 
 def execution_mode() -> str:
@@ -305,6 +310,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "away_team": request.away_team,
         "commence_time": request.commence_time,
         "opening_key": request.opening_key,
+        "game_pk": request.game_pk,
         "requested_price": request.requested_price,
         "requested_stake_dollars": request.requested_stake_dollars,
         "submitted_at": _utc_now(),
