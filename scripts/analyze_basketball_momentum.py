@@ -525,6 +525,80 @@ def _emit_sweep(event_id: str, swept: Mapping[str, Any]) -> None:
         )
 
 
+def season_main(argv: Sequence[str] | None = None) -> int:
+    """Pooled sweep over a RANGE of captured dates. One grid, not one per game.
+
+    Reads only the captured event dumps -- no network, so it runs anywhere the
+    artifacts are, and a re-run weeks from now sees the same feed it saw today.
+    """
+    parser = argparse.ArgumentParser(description="Pooled season momentum sweep")
+    parser.add_argument("--league", default="wnba")
+    parser.add_argument("--start", required=True)
+    parser.add_argument("--end", required=True)
+    parser.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT"))
+    args = parser.parse_args(argv)
+
+    from datetime import date as _date, timedelta as _timedelta
+
+    root = Path(args.data_root) if args.data_root else _REPO_ROOT / "data"
+    a, b = _date.fromisoformat(args.start), _date.fromisoformat(args.end)
+
+    games: list[dict[str, Any]] = []
+    dates_seen = 0
+    while a <= b:
+        path = momentum_events_path(root, league_code=args.league, date_str=a.isoformat())
+        a += _timedelta(days=1)
+        if not path.exists():
+            continue
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        dates_seen += 1
+        for game in (doc.get("games") or {}).values():
+            if isinstance(game, dict):
+                games.append(game)
+
+    print(f"[momentum_phase_c] SEASON league={args.league} {args.start}..{args.end} "
+          f"dates={dates_seen} games={len(games)}", flush=True)
+    if not games:
+        # Not 0. A silent empty sweep reads exactly like "no signal found".
+        print("[momentum_phase_c] NO GAMES -- nothing captured for this range", flush=True)
+        return 3
+
+    swept = sweep_season(games)
+
+    def _fmt(value: Any) -> str:
+        return "NA" if value is None else f"{value:+.4f}"
+
+    print(f"[momentum_phase_c] POOLED games={swept['games']} probes={swept['probes']} "
+          f"cells={len(swept['grid'])}", flush=True)
+    for cell in swept["grid"]:
+        print(
+            f"[momentum_phase_c] POOLED_CELL axis={cell['axis']} "
+            f"hl={cell['half_life']} horizon={cell['horizon_seconds']} n={cell['n']} "
+            f"r_margin={_fmt(cell['r_margin'])} "
+            f"r_total={_fmt(cell['r_total'])} "
+            f"r_total_abs={_fmt(cell['r_total_abs'])}",
+            flush=True,
+        )
+
+    # THE HEADLINE, so nobody has to eyeball 40 rows to find it.
+    best = max(
+        (c for c in swept["grid"] if c["r_margin"] is not None),
+        key=lambda c: abs(c["r_margin"]), default=None,
+    )
+    if best is not None:
+        print(
+            f"[momentum_phase_c] STRONGEST_MARGIN axis={best['axis']} "
+            f"hl={best['half_life']} horizon={best['horizon_seconds']} "
+            f"r={best['r_margin']:+.4f} n={best['n']} games={swept['games']} "
+            f"-- CORRELATION ONLY, no fit, no edge claim",
+            flush=True,
+        )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", default="wnba")
