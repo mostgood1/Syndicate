@@ -22,12 +22,14 @@ DATE = "2026-08-22"
 EVENT = "401857164"
 
 
-def _block(current: float = -1.3478, *, supported: bool = True) -> dict[str, Any]:
+def _block(current: float = -1.3478, *, supported: bool = True,
+           home_tri: str = "IND", away_tri: str = "NYL") -> dict[str, Any]:
     vals = [0.5, -1.2, 2.1, 0.3, -3.0, 1.1, 4.2, -0.8, 2.2, -1.9,
             0.4, 3.3, -2.7, 1.5, -4.55, 0.9, 2.8, -1.1, 0.2, -3.4, current]
     series = [{"t": float(t), "v": v} for t, v in zip(range(0, 1260, 60), vals)]
     return {
         "schema": "basketball_momentum_v1", "supported": supported, "reason": None,
+        "home_tri": home_tri, "away_tri": away_tri,
         "events": 198, "as_of_seconds": 1200.0, "as_of_possessions": 148.84,
         "pressure": {
             "seconds": {"half_life": 120.0, "as_of": 1200.0,
@@ -87,6 +89,47 @@ def test_the_leading_zero_event_id_still_joins(artifact_root) -> None:
     games = [_game(f"0{EVENT}")]
     assert _attach(games, root) == 1
     assert games[0]["shared_momentum"] is not None
+
+
+def test_an_artifact_form_id_still_joins_by_matchup(artifact_root) -> None:
+    """**THE PRODUCTION FAILURE, pinned.** Measured 01:18:49Z on web:
+
+        [wnba_cards] MOMENTUM_ATTACHED date=2026-08-22 games=3 blocks=2 attached=0
+
+    Blocks existed and none joined. `_wnba_row_game_id` gives an
+    artifact-only card `"AWY@HOM"` or an opaque hash, and only
+    `_supplement_games_with_live_state` repairs it -- for live rows. So a card
+    can hold a captured block's game and have no key to find it with.
+
+    The block now carries its own tricodes, so the `(away, home)` pair the rest
+    of this module already joins on works here too.
+    """
+    root = artifact_root([{"games": {EVENT: _block()}}])
+    games = [_game("NYL@IND")]                  # no ESPN id anywhere on the card
+    assert _attach(games, root) == 1
+    assert games[0]["shared_momentum"]["label"] == "NYL pressure"
+
+
+def test_the_event_id_still_wins_over_the_matchup(artifact_root) -> None:
+    """The id is exact; the matchup assumes one meeting per date. Order matters
+    and the fallback must never shadow a real key."""
+    right = _block(-4.55, home_tri="IND", away_tri="NYL")
+    decoy = _block(4.55, home_tri="IND", away_tri="NYL")
+    root = artifact_root([{"games": {EVENT: right, "999999": decoy}}])
+    games = [_game(EVENT)]
+    _attach(games, root)
+    assert games[0]["shared_momentum"]["side_is_away"] is True   # from `right`
+
+
+def test_a_block_without_tricodes_does_not_break_the_matchup_index(artifact_root) -> None:
+    """Rows captured before the tricodes were added are still in tonight's
+    jsonl, so the index has to tolerate their absence rather than assume it."""
+    legacy = _block()
+    legacy.pop("home_tri")
+    legacy.pop("away_tri")
+    root = artifact_root([{"games": {EVENT: legacy}}])
+    assert _attach([_game(EVENT)], root) == 1          # id path unaffected
+    assert _attach([_game("NYL@IND")], root) == 0      # no matchup key to use
 
 
 def test_a_game_with_no_captured_block_is_left_alone(artifact_root) -> None:

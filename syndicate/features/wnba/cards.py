@@ -3599,6 +3599,25 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
         if not blocks:
             return 0
 
+        # **A MATCHUP INDEX, BECAUSE THE EVENT ID IS NOT ALWAYS THERE.**
+        # `_wnba_row_game_id` gives an artifact-only card `"AWY@HOM"` or an
+        # opaque hash, and only `_supplement_games_with_live_state` repairs it
+        # -- for live rows. So a card can hold a real captured block's game and
+        # have no key to find it with. Measured 01:18:49Z: `blocks=2
+        # attached=0`.
+        #
+        # The blocks now carry `home_tri`/`away_tri`, so the same
+        # `(away, home)` pair the rest of this module already joins on works
+        # here too. Tried only AFTER the id, which stays the exact key.
+        by_matchup: dict[tuple[str, str], Any] = {}
+        for candidate in blocks.values():
+            if not isinstance(candidate, dict):
+                continue
+            home_tri = str(candidate.get("home_tri") or "").strip().upper()
+            away_tri = str(candidate.get("away_tri") or "").strip().upper()
+            if home_tri and away_tri:
+                by_matchup[(away_tri, home_tri)] = candidate
+
         attached = 0
         matched = 0
         for game in rows:
@@ -3616,6 +3635,14 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
                 block = blocks.get(str(alias))
                 if block is not None:
                     break
+            if block is None:
+                # FALLBACK, not a replacement: an id match is exact, a matchup
+                # match assumes one meeting of these two teams per date. True
+                # for a WNBA slate, and the id is always preferred.
+                block = by_matchup.get((
+                    str((game.get("away") or {}).get("abbr") or "").strip().upper(),
+                    str((game.get("home") or {}).get("abbr") or "").strip().upper(),
+                ))
             if block is None:
                 continue
             # **`matched` SEPARATE FROM `attached`.** The first version counted
@@ -3647,9 +3674,31 @@ def _attach_wnba_momentum(games: Any, date_str: str) -> int:
             # keys nobody has looked at. Capped and id-only -- no scores, no
             # names, nothing that turns a diagnostic into a data dump.
             card_ids = [str(g.get("event_id") or "") for g in rows if isinstance(g, dict)][:6]
+            # **THE (away, home) PAIRS FROM BOTH SIDES.** The id keys are
+            # already known not to overlap; what is NOT known is whether the
+            # matchup fallback misses because the block has no tricodes (rows
+            # written before they were added) or because the two sources
+            # DISAGREE ABOUT WHICH TEAM IS HOME.
+            #
+            # That second case is why this join fails closed instead of
+            # matching on an unordered pair: an orientation flip would still
+            # find a block, and would then draw the chart with the sides
+            # reversed. A missing panel is a small bug; a confidently mirrored
+            # one is a wrong answer, and `#160`'s soccer precedent is exactly
+            # that failure.
+            card_pairs = [
+                (str((g.get("away") or {}).get("abbr") or ""),
+                 str((g.get("home") or {}).get("abbr") or ""))
+                for g in rows if isinstance(g, dict)
+            ][:6]
+            block_pairs = [
+                (str(b.get("away_tri") or "-"), str(b.get("home_tri") or "-"))
+                for b in blocks.values() if isinstance(b, dict)
+            ][:6]
             print(
                 f"[wnba_cards] MOMENTUM_NO_JOIN date={date_str} "
-                f"card_event_ids={card_ids} block_keys={sorted(blocks)[:6]}",
+                f"card_event_ids={card_ids} block_keys={sorted(blocks)[:6]} "
+                f"card_away_home={card_pairs} block_away_home={block_pairs}",
                 flush=True,
             )
         return attached

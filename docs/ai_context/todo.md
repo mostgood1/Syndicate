@@ -2024,9 +2024,33 @@ endpoint is **unreachable from a Claude Code session**: `syndicate-an21` answers
 `ADMIN_TOKEN` does not change. The workaround shipped in PR #5 is a per-game
 `SHAPE` log line; read it from `live-odds-worker` logs, not from a fetch.
 
-**Phase C cannot start until that content check passes**, and Phase D (reader +
-`game["shared_momentum"]` on the card) is deliberately behind Phase C — the card
-should not display a number nobody has validated.
+**CONTENT CHECK PASSED 2026-08-22 23:59:03Z and again 00:04:07Z.** Clock tracks
+the real game (1143.0s = 19.05 min), both series sample exactly as specified,
+the possession estimator lands **within 3.3% of real WNBA pace** (78.68 vs 76.2
+expected), and both decay axes agree in sign and move together (x4.54 / x5.00).
+Final-minute events are captured (`as_of_s=1198.0` against a 1200s half).
+
+**PHASE D SHIPPED 2026-08-23 01:25Z — momentum is on WNBA cards.** It had been
+captured to disk since 23:19Z and rendered nowhere: `soccer/cards.py:2215` was
+the ONLY setter of `shared_momentum` in the repo, and `live_lens_loop.py`
+assigned the poll's payload to a local it never read. First successful card
+attach 01:23:27Z. Soccer's 40/60/80 strength bands are deliberately NOT reused —
+they are FotMob's 0-100 scale and basketball's `current` is unbounded, so every
+real value (-0.67, -3.03, -4.55, -1.35) is below 40 and copying them renders
+"Balanced" forever. The label states DIRECTION only.
+
+**PHASE C IS NOW THE BLOCKER, AND ITS TARGET CHANGED.** The user states the goal
+is to inform **interval bets — ML, spread, over/under**. That makes it a betting
+input, so `forward_margin` alone was half the question: margin cannot answer a
+total (a 14-2 window and a 26-14 window have identical margin). Added
+`forward_total` and `r_total_abs`, and the horizons are now the intervals a book
+actually takes — 600s (quarter) and 1200s (half), from the market keys the live
+slate discovered (`spreads_q4`, `totals_h2`, ...).
+
+**BEFORE IT FEEDS A PRICE:** `model_engine_standard.md` requires re-fitting the
+rates a new mechanism displaces, and records two mechanisms together producing a
+NEGATIVE interaction in 4 of 4 markets. What shipped is a chart, not a model
+input, and the two must not be conflated.
 
 Full scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
 
