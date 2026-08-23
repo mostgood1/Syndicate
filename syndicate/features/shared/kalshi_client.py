@@ -54,8 +54,9 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 __all__ = [
@@ -70,6 +71,8 @@ __all__ = [
     "normalize_market",
     "fetch_markets",
     "discover",
+    "discover_series",
+    "series_matching",
     "probe",
     "KalshiError",
 ]
@@ -85,6 +88,14 @@ _BASE_URLS = (
     "https://trading-api.kalshi.com/trade-api/v2",
 )
 _MARKETS_PATH = "/markets"
+# The CATALOGUE endpoint. Listing markets to learn which series exist is the
+# wrong instrument: the first 40,000 open markets were 99.5% parlay
+# combinations and TRUNCATED before reaching most single markets, so a sport
+# Kalshi genuinely lists can be invisible in it. UNVERIFIED, like everything
+# else here was before its first live run -- `discover_series` reports what came
+# back rather than assuming, and falls back to the market listing when this path
+# is not there.
+_SERIES_PATH = "/series"
 
 # The fields this module reads. Named here so the whole schema assumption is one
 # object, and so `probe()` can diff it against what actually arrives.
@@ -341,6 +352,78 @@ def fetch_series(series_ticker: str, *, limit: int = 1000, max_pages: int = 10) 
     Asking per series is the only way to get a true count.
     """
     return fetch_markets(series_ticker=series_ticker, limit=limit, max_pages=max_pages)
+
+
+def discover_series(*, category: str | None = None) -> dict[str, Any]:
+    """What series does Kalshi list, asked DIRECTLY rather than inferred.
+
+    ANSWERS "does Kalshi carry sport X" without paging through parlays. The
+    market listing cannot answer it: 39,793 of the first 40,000 open markets
+    were multi-leg combinations and the page cap hit before most single markets
+    appeared, so a sport that IS listed can be absent from it entirely. Reading
+    that absence as "Kalshi does not carry it" is the false negative this whole
+    module exists to prevent, and it would be a confident wrong answer.
+
+    The endpoint is UNVERIFIED. So this reports the SHAPE that came back --
+    status, keys, count -- rather than parsing it into a confident empty list,
+    and a failure is named rather than returned as "no series". Same discipline
+    as `probe()`, which is what caught the 100x price error.
+    """
+    errors: list[str] = []
+    for base in _BASE_URLS:
+        url = f"{base}{_SERIES_PATH}"
+        if category:
+            url = f"{url}?category={urllib.parse.quote(str(category))}"
+        try:
+            payload = _get(url)
+        except KalshiError as exc:
+            errors.append(f"{base}: {exc}")
+            continue
+
+        # The container key is a guess; report which one was found rather than
+        # defaulting to an empty list under any of them.
+        container = None
+        for key in ("series", "series_list", "data"):
+            if isinstance(payload.get(key), list):
+                container = key
+                break
+        rows = payload.get(container) if container else []
+        tickers = [
+            str(row.get("ticker") or row.get("series_ticker") or "").strip()
+            for row in rows
+            if isinstance(row, Mapping)
+        ]
+        return {
+            "status": "ok",
+            "base_url": base,
+            "category": category,
+            "container_key": container,
+            # Top-level keys, so a wrong container guess is visible immediately
+            # rather than showing up as a venue that lists nothing.
+            "payload_keys": sorted(payload.keys()),
+            "count": len(rows),
+            "tickers": [t for t in tickers if t],
+            # One row's keys, to check the field names before anything parses
+            # them. `kalshi_client`'s first live run got 10 of 17 wrong.
+            "row_keys": sorted(rows[0].keys()) if rows and isinstance(rows[0], Mapping) else [],
+        }
+
+    return {"status": "error", "category": category, "errors": errors}
+
+
+def series_matching(tokens: Sequence[str], tickers: Sequence[str]) -> list[str]:
+    """Series whose ticker contains any of `tokens`, upper-cased.
+
+    A SEARCH over tickers Kalshi gave us, never a guess at one. `KXWNBA` typed
+    from memory and fetched is an empty page that reads as "not listed"; the
+    same string matched against a real catalogue is an answer either way.
+    """
+    wanted = [str(t).strip().upper() for t in tokens if str(t).strip()]
+    return [
+        ticker
+        for ticker in tickers
+        if any(token in str(ticker).strip().upper() for token in wanted)
+    ]
 
 
 def discover(*, limit: int = 1000, max_pages: int = 40) -> dict[str, Any]:
