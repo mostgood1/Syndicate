@@ -183,6 +183,84 @@ def forward_total(
     return total
 
 
+def sweep_season(
+    games: Any,
+    *,
+    regulation_seconds: float = 2400.0,
+) -> dict[str, Any]:
+    """ONE pooled grid across every captured game, not one grid per game.
+
+    **THE PER-GAME SWEEP DOES NOT SCALE AND ITS NUMBERS DO NOT MEAN MUCH.**
+    282 games x 40 cells is 11,280 log lines nobody reads, and a correlation
+    computed on ~50 probes from a single game is noise -- one run decides it.
+
+    Pooling is also the only way the question gets answered honestly: the claim
+    "momentum leads scoring" is a claim about BASKETBALL, not about one night in
+    May. So probe/outcome pairs are accumulated across all games per cell and
+    correlated once, with the number of contributing GAMES reported beside the
+    probe count -- because probes within a game overlap and games do not.
+    """
+    # cell -> (values, margins, totals)
+    buckets: dict[tuple, tuple[list, list, list]] = {}
+    games_seen = 0
+    probes_total = 0
+
+    for game in (games or []):
+        pressure = list(game.get("pressure") or [])
+        scoring = list(game.get("narrator") or [])
+        if not pressure or not scoring:
+            continue
+        games_seen += 1
+        last = max(float(r["clock_seconds"]) for r in pressure)
+
+        for horizon in HORIZONS_SECONDS:
+            probes = []
+            t = PROBE_WARMUP_SECONDS
+            while t + horizon <= last:
+                probes.append(t)
+                t += PROBE_STEP_SECONDS
+            if len(probes) < 3:
+                continue
+            margins = [forward_margin(scoring, p, horizon) for p in probes]
+            totals = [forward_total(scoring, p, horizon) for p in probes]
+            probes_total += len(probes)
+
+            poss_at = [
+                max((float(r["possession_index"]) for r in pressure
+                     if float(r["clock_seconds"]) <= p), default=0.0)
+                for p in probes
+            ]
+
+            for axis, half_lives, axis_key, probe_values in (
+                ("seconds", HALF_LIVES_SECONDS, "clock_seconds", probes),
+                ("possessions", HALF_LIVES_POSSESSIONS, "possession_index", poss_at),
+            ):
+                for half_life in half_lives:
+                    values = [
+                        momentum_at(pressure, pv, half_life_seconds=half_life,
+                                    axis_key=axis_key)
+                        for pv in probe_values
+                    ]
+                    key = (axis, half_life, horizon)
+                    v, m, tt = buckets.setdefault(key, ([], [], []))
+                    v.extend(values)
+                    m.extend(margins)
+                    tt.extend(totals)
+
+    grid = []
+    for (axis, half_life, horizon), (values, margins, totals) in sorted(buckets.items()):
+        grid.append({
+            "axis": axis,
+            "half_life": half_life,
+            "horizon_seconds": horizon,
+            "n": len(values),
+            "r_margin": _pearson(values, margins),
+            "r_total": _pearson(values, totals),
+            "r_total_abs": _pearson([abs(x) for x in values], totals),
+        })
+    return {"ok": bool(grid), "games": games_seen, "probes": probes_total, "grid": grid}
+
+
 def sweep_game(
     summary: Mapping[str, Any],
     *,
