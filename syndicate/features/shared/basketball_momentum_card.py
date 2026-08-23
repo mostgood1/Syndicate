@@ -44,9 +44,13 @@ readable annotation, it is a second, noisier chart drawn on top of the first.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.basketball_momentum import _LEAGUE_PERIODS
+from syndicate.features.shared.basketball_momentum_artifacts import (
+    momentum_artifact_path as _momentum_artifact_path,
+)
 
 # Below this share of the game's own peak, the sides are called level. This is a
 # RELATIVE reading -- "flat against this game's own range" -- not a claim that
@@ -169,3 +173,53 @@ def basketball_momentum_chart(
         # this first. Phase C has measured no bands for basketball.
         "scale": "uncalibrated_relative_to_game_peak",
     }
+
+
+def latest_momentum_blocks(
+    root: Path, *, league_code: str, date_str: str
+) -> dict[str, Any]:
+    """The MOST RECENT captured block per game, from the append-only jsonl.
+
+    The producer appends one payload per live tick, so the file holds the whole
+    evening and the card wants only the newest row that mentions each game.
+    Read forward and let later rows overwrite earlier ones: the file is small
+    (one row per ~2.5 min of play) and a reverse read would have to handle a
+    torn final line anyway.
+
+    **A TORN LAST LINE IS EXPECTED, NOT EXCEPTIONAL.** This is read while the
+    producer is appending to it, so the final line can be a partial write.
+    Skipping an unparseable line keeps every complete row before it; raising
+    would blank the chart on every card for the duration of one flush.
+
+    Returns `{}` when there is nothing to show. The caller renders no chart,
+    which is the honest state -- `basketball_momentum_chart` is what turns a
+    block into a drawing, and it returns None rather than a flat line for the
+    same reason.
+    """
+    import json
+
+    path = _momentum_artifact_path(root, league_code=league_code, date_str=date_str)
+    blocks: dict[str, Any] = {}
+    try:
+        if not path.exists():
+            return {}
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                games = row.get("games") if isinstance(row, dict) else None
+                if not isinstance(games, dict):
+                    continue
+                for event_id, block in games.items():
+                    key = str(event_id or "").strip()
+                    if key and isinstance(block, dict):
+                        blocks[key] = block
+    except OSError:
+        # A card must not fail to render because an artifact read did.
+        return {}
+    return blocks

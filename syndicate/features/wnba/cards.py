@@ -3567,6 +3567,80 @@ def _live_status_merge_enabled(allow_stored_date_fallback: bool, allow_live_stat
     return bool(allow_live_status_merge)
 
 
+def _attach_wnba_momentum(games: Any, date_str: str) -> int:
+    """Set `shared_momentum` on every game with a captured momentum block.
+
+    **THE ARTIFACT IS READ ONCE PER BOARD BUILD, NOT ONCE PER GAME.**
+    `_normalize_games` is already a named suspect in the refresh-worker OOM
+    (`game_board_contract._log_board_contract_memory`), and a per-game file read
+    on a 12-game slate is twelve opens of the same jsonl for one answer.
+
+    JOINED ON THE ESPN EVENT ID, which is only reliably present on the LIVE
+    paths -- an artifact/CSV-only card carries `"AWY@HOM"` or an opaque hash in
+    `event_id` (`_wnba_row_game_id`). That is exactly the right coverage rather
+    than a limitation: momentum only exists for games ESPN reports as `state ==
+    "in"`, and `_supplement_games_with_live_state` overwrites `event_id` with
+    the real ESPN id for precisely those games before this runs.
+
+    Never raises. A card that cannot render its chart is a card without a chart;
+    a card build that dies because an artifact read failed is a blank board.
+    """
+    try:
+        from syndicate.features.shared.basketball_momentum_card import (
+            basketball_momentum_chart,
+            latest_momentum_blocks,
+        )
+        from syndicate.features.shared.refresh_state_store import data_root
+
+        rows = list(games) if isinstance(games, list) else []
+        if not rows:
+            return 0
+        blocks = latest_momentum_blocks(data_root(), league_code="wnba", date_str=date_str)
+        if not blocks:
+            return 0
+
+        attached = 0
+        for game in rows:
+            if not isinstance(game, dict):
+                continue
+            event_id = str(game.get("event_id") or "").strip()
+            if not event_id:
+                continue
+            # The leading-zero form is real: `game_cards_*.csv` carries
+            # `0401856943` for ESPN's `401856943`. `_event_id_aliases` exists
+            # for this, and skipping it would silently drop every game whose id
+            # arrived from the artifact side.
+            block = None
+            for alias in _event_id_aliases(event_id):
+                block = blocks.get(str(alias))
+                if block is not None:
+                    break
+            if block is None:
+                continue
+            chart = basketball_momentum_chart(
+                block,
+                league_code="wnba",
+                home_abbr=str((game.get("home") or {}).get("abbr") or "HME"),
+                away_abbr=str((game.get("away") or {}).get("abbr") or "AWY"),
+            )
+            if chart is not None:
+                game["shared_momentum"] = chart
+                attached += 1
+        # `attached` alongside the block count, because "no games in play" and
+        # "blocks exist and none joined" are different defects and a bare zero
+        # cannot tell them apart.
+        print(
+            f"[wnba_cards] MOMENTUM_ATTACHED date={date_str} games={len(rows)} "
+            f"blocks={len(blocks)} attached={attached}",
+            flush=True,
+        )
+        return attached
+    except Exception as exc:  # pragma: no cover - never fatal to a board build
+        print(f"[wnba_cards] MOMENTUM_ATTACH_FAILED date={date_str} "
+              f"{type(exc).__name__}: {exc}", flush=True)
+        return 0
+
+
 def _build_cards_page_context_uncached(
     selected_date: str,
     *,
@@ -3646,6 +3720,13 @@ def _build_cards_page_context_uncached(
         # replacing the odds/sim/props data with bare scoreboard rows.
         public_games, public_source_path = _games_from_public_scoreboard(requested_date)
         if public_games:
+            # **THIS BRANCH RETURNS EARLY AND SKIPS THE ATTACH LOOP BELOW.**
+            # It is not a rare path -- it is the one taken on a live slate with
+            # no odds-rich artifacts yet, i.e. exactly when a momentum chart is
+            # most wanted. Wiring only the main loop would have left the chart
+            # missing precisely there, and it would have looked like the
+            # feature simply did not work.
+            _attach_wnba_momentum(public_games, requested_date)
             parsed_date = parse_iso_date(requested_date)
             prev_date = (parsed_date - timedelta(days=1)).isoformat()
             next_date = (parsed_date + timedelta(days=1)).isoformat()
@@ -3817,6 +3898,11 @@ def _build_cards_page_context_uncached(
     for game in games:
         if isinstance(game, dict):
             game["gameLens"] = _build_wnba_game_lens(game)
+
+    # Same place, same reason: `_supplement_games_with_live_state` has already
+    # run, so `event_id` is the real ESPN id on every in-play game -- which is
+    # the only kind momentum exists for.
+    _attach_wnba_momentum(games, resolved_date)
 
     scoreboard_items = [
         {
