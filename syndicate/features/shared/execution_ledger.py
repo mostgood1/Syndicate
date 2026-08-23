@@ -127,6 +127,21 @@ _LEAN_FIELDS = (
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
     "game_pk",
+    # THE VENUE'S OWN IDENTIFIER for the contract, stamped at decision time
+    # rather than resolved at submit time. An exchange order names a ticker, and
+    # re-deriving that ticker seconds before sending money means re-deriving it
+    # from a catalogue that may have moved -- so the thing we priced and the
+    # thing we buy could differ with nothing recording that they did.
+    "venue_ticker",
+    # HOW THE BET ACTUALLY WENT. Distinct from `status` (what the ORDER did at
+    # the venue) and from `settled_at` (when the ORDER reached a terminal state,
+    # stamped seconds after a paper fill and hours before the game ends).
+    # Conflating those two is the reason `settled_count` read 0 while orders
+    # were filling normally: nothing had ever graded a WAGER.
+    "outcome",
+    "pnl_dollars",
+    "settled_value",
+    "graded_at",
     "requested_price",
     "requested_stake_dollars",
     "submitted_at",
@@ -169,6 +184,10 @@ class OrderRequest:
     commence_time: str | None = None
     opening_key: str | None = None
     game_pk: str | None = None
+    # The venue's contract id (a Kalshi ticker). Optional because every order
+    # placed so far is on paper against an aggregator, where there is no such
+    # thing; required by the Kalshi adapter, which refuses by name without it.
+    venue_ticker: str | None = None
 
 
 def execution_mode() -> str:
@@ -311,6 +330,14 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "commence_time": request.commence_time,
         "opening_key": request.opening_key,
         "game_pk": request.game_pk,
+        "venue_ticker": request.venue_ticker,
+        # Ungraded until something grades it. `None` rather than absent so the
+        # field is present on every record and a summary cannot mistake "no such
+        # key" for "not settled yet".
+        "outcome": None,
+        "pnl_dollars": None,
+        "settled_value": None,
+        "graded_at": None,
         "requested_price": request.requested_price,
         "requested_stake_dollars": request.requested_stake_dollars,
         "submitted_at": _utc_now(),

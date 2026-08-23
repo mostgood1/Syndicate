@@ -273,7 +273,7 @@ def soccer_live_prop_index(
     from syndicate.features.shared.live_projection_join import _norm_name
 
     index: dict[tuple[str, str, float], dict[str, Any]] = {}
-    # `#528`. THE MISS ATTRIBUTION IS OFF FOR SOCCER UNLESS THESE TWO ARE HERE.
+    # `#531`. THE MISS ATTRIBUTION IS OFF FOR SOCCER UNLESS THESE TWO ARE HERE.
     #
     # `live_projection_join._has_attribution` tests for the PRESENCE of
     # `players_seen` and `lines_by_player_market` on this payload

@@ -439,6 +439,14 @@ def commit_portfolio(
                 # be looked up at all, which is what stopped `bet_status` from
                 # having a resolver. Copied from whichever field the row
                 # carries -- `gamePk` on MLB/NFL rows, `game_id` elsewhere.
+                # DELIBERATELY NOT `row.get("game_pk")`, which the board sets
+                # from `event_id` -- the OddsAPI hash, a different id space from
+                # StatsAPI's numeric gamePk (`intelligence_contracts` documents
+                # the split). Stamping it would produce a field that LOOKS
+                # populated and is the wrong id, which is worse than None:
+                # `bet_status_mlb` can recover a real gamePk from the matchup,
+                # but only if it is not handed a plausible-looking wrong one
+                # first. Leave this None when the row has no native id.
                 "game_pk": row.get("gamePk") or row.get("game_id") or None,
                 "side": row.get("side"),
                 "line": row.get("line"),
@@ -454,6 +462,24 @@ def commit_portfolio(
                 "stake_fraction": round(fraction, 6),
                 "ev_pct": _as_float(row.get("ev_pct")),
                 "model_edge_pct": _as_float(row.get("model_edge_pct")),
+                # THE PRICE COST OF BEING RESTRICTED TO THIS VENUE, carried
+                # through from `venue_scope`. On an unrestricted row these are
+                # absent and stay None -- there is no "best book elsewhere" when
+                # the row already took the best book.
+                #
+                # These were being DROPPED here: `venue_scope` set them on the
+                # scoped row, the position was built from an explicit field list
+                # that did not name them, and paper2's comparison table read them
+                # anyway. It rendered nothing for months because paper2 had zero
+                # positions; the first slate that produced one 500'd the page.
+                # Half of what the two-book comparison exists to show is exactly
+                # this gap, so carrying them is the fix and the template guard is
+                # only the seatbelt.
+                "unrestricted_price": _as_float(row.get("unrestricted_price")),
+                "unrestricted_ev_pct": _as_float(row.get("unrestricted_ev_pct")),
+                "unrestricted_bookmaker": row.get("unrestricted_bookmaker"),
+                "venue": row.get("venue"),
+                "price_source": row.get("price_source"),
                 "model_probability": round(inputs.model_probability, 5),
                 "market_fair_probability": round(inputs.market_fair_probability, 5),
                 "price_reliability": round(inputs.price_reliability, 5),

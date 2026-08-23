@@ -1,4 +1,4 @@
-"""`#527`. The market fair value must survive the live-edge refusal.
+"""`#530`. The market fair value must survive the live-edge refusal.
 
 WHY THIS EXISTS. `_price_against_market` computed `market_fair_prob_over` BELOW
 its `live_edge_unavailable_reason` early-return, so on a live game soccer never
@@ -70,7 +70,7 @@ def test_a_pregame_row_gets_a_fair_value():
 
 
 def test_a_LIVE_row_still_gets_a_fair_value():
-    """THE REGRESSION. Before `#527` this was None and 188 of 188 live soccer
+    """THE REGRESSION. Before `#530` this was None and 188 of 188 live soccer
     rows were withheld for the lack of it."""
     projection = _project(game={"state": "live"})
     assert projection.get("market_fair_prob_over") is not None, (
@@ -143,7 +143,7 @@ def test_soccer_and_the_prop_path_order_these_the_same_way():
 
 
 # ---------------------------------------------------------------------------
-# `#528` — the miss attribution was INERT for soccer
+# `#531` — the miss attribution was INERT for soccer
 # ---------------------------------------------------------------------------
 
 

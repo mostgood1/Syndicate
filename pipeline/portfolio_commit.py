@@ -146,6 +146,70 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _venue_price_resolver(venue: str):
+    """Price rows from the VENUE's own feed, or None to fall back to OddsAPI.
+
+    Kalshi only for now, and deliberately quiet about it: a venue with no direct
+    feed keeps behaving exactly as before rather than erroring, and the
+    difference surfaces as `price_source` on the rows instead of as a special
+    case in the caller.
+
+    The join is rebuilt from the freshest fetched markets on every call. Carrying
+    a join made against an older board would pair tonight's rows with a pairing
+    computed from a different board -- the stale-pairing mistake `clv_join`'s
+    arrow-of-time check exists to catch, in a new costume.
+    """
+    if str(venue or "").strip().lower() != "kalshi":
+        return None
+    try:
+        payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
+        markets = (payload or {}).get("markets") or []
+        if not markets:
+            return None
+        return _resolver_from_markets(markets)
+    except Exception as exc:
+        # Named, and returns None so the venue silently reverts to the
+        # aggregator rather than losing its book entirely.
+        print(f"[portfolio_commit] KALSHI_RESOLVER_FAILED venue={venue} error={exc}", flush=True)
+        return None
+
+
+def _resolver_from_markets(markets):
+    """Turn fetched Kalshi markets into a (market, player, line, side) resolver.
+
+    Classified by the CATALOGUE, so every sport it knows is priced here without
+    this function naming any of them.
+    """
+    from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    matches = []
+    for market in markets:
+        verdict = classify_market(market)
+        # Unmapped series, unreadable titles and game lines with no event
+        # mapping are all skipped here rather than guessed -- the catalogue
+        # already refuses each of them by its own name, and `report_catalogue_gaps`
+        # is where those numbers are meant to be read.
+        if verdict.get("status") != "ok" or verdict.get("needs_event_identity"):
+            continue
+        # Each side takes its OWN quote: yes and no are separately priced and
+        # the gap between them is the spread.
+        for side, price_key in (("over", "yes_american"), ("under", "no_american")):
+            price = market.get(price_key)
+            if price is None:
+                continue
+            matches.append(
+                {
+                    "market": verdict["market"],
+                    "player_name": verdict["subject"],
+                    "line": verdict["line"],
+                    "board_side": side,
+                    "kalshi_american": price,
+                }
+            )
+    return kalshi_price_resolver(matches)
+
+
 def _execution_enabled() -> bool:
     """Imported inside the call: `execute_portfolio` imports this module."""
     from pipeline.execute_portfolio import execution_enabled
@@ -290,9 +354,22 @@ def run_portfolio_commit(
         )
         from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
 
+        # ITS OWN IMPORT. This block used to call `_load_ledger_for_clv()`,
+        # which is bound by a `from ... import ... as` TWENTY LINES BELOW, in
+        # the ORDER_CLV block. Python sees an assignment anywhere in the
+        # function and treats the name as local for the whole of it, so this
+        # read raised `UnboundLocalError` on every single cycle -- caught by
+        # this block's own `except` and printed as BET_STATUS_FAILED.
+        #
+        # So live bet status NEVER ONCE WORKED from the day it was written, and
+        # it failed in the shape that is hardest to notice: a feature that looks
+        # installed, a log line nobody was grepping for, and a page column that
+        # renders an honest-looking blank. Measured 2026-08-23T17:12:31Z.
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger
+
         status_orders = [
             order
-            for order in (_load_ledger_for_clv().get("orders") or [])
+            for order in (_load_ledger().get("orders") or [])
             if order.get("selected_date") == normalized
         ]
         if status_orders:
@@ -383,7 +460,12 @@ def run_portfolio_commit(
         # Each venue in its OWN try: one venue's failure must not cost the
         # others' measurements, and the whole point is comparing across them.
         try:
-            scoped, scope_refusals = scope_rows_to_venue(rows, venue)
+            # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
+            # direct feed today; every other venue falls back to the aggregator,
+            # and `price_source` on each scoped row records which was used.
+            scoped, scope_refusals = scope_rows_to_venue(
+                rows, venue, price_resolver=_venue_price_resolver(venue)
+            )
             print(
                 venue_scope_report_line(venue, len(rows), len(scoped), scope_refusals),
                 flush=True,
@@ -409,6 +491,10 @@ def run_portfolio_commit(
                 # has any view on at all. Kalshi measured 12 of 47.
                 f"sim_view_on={len(scoped) - int(venue_refusals.get('no_model_edge_pct', 0) or 0)}"
                 f"/{len(scoped)} "
+                # How many rows were priced from the VENUE rather than the
+                # aggregator -- the difference between a real coverage number
+                # and OddsAPI's view of one.
+                f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
                 # Side by side on ONE line, because the comparison IS the
                 # deliverable and reading it off two lines invites pairing the
                 # wrong two runs.

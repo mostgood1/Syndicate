@@ -3269,13 +3269,19 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         plan = None
 
     orders: list = []
+    all_orders: list = []
     summary: dict = {}
     ledger_error = None
     try:
         summary = ledger_summary(selected_date)
+        # Kept UNFILTERED alongside the day's slice. The all-dates record is
+        # computed from this one -- reusing the filtered list would have
+        # produced a figure labelled "all dates" that was the selected day's,
+        # which is worse than not showing it at all.
+        all_orders = list(_load().get("orders") or [])
         orders = [
             order
-            for order in (_load().get("orders") or [])
+            for order in all_orders
             if order.get("selected_date") == selected_date
         ]
         orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
@@ -3329,6 +3335,24 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
                 "rows": (venue_plan or {}).get("positions") or [],
             }
         )
+
+    settlement = None
+    settlement_all_time = None
+    settlement_error = None
+    try:
+        from syndicate.features.shared.paper_settlement import settlement_summary
+
+        settlement = settlement_summary(selected_date, orders=orders)
+        # ACROSS EVERY DATE, from the same orders the ledger already returned.
+        # A per-day figure alone answers "how did Saturday go" and cannot answer
+        # "is this working", which is the question that actually matters -- and
+        # clicking through days one at a time to add them up by eye is not an
+        # answer, it is a chore that produces a guess.
+        settlement_all_time = settlement_summary(None, orders=all_orders)
+    except Exception as exc:
+        # Named, never swallowed into an empty record.
+        settlement_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("SETTLEMENT_SUMMARY_FAILURE date=%s", selected_date)
 
     job_state = (plan or {}).get("job_state") or {}
     positions = (plan or {}).get("positions") or []
@@ -3414,6 +3438,42 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         ],
         "ledger": summary,
         "ledger_error": ledger_error,
+        # HOW THE BOOK ACTUALLY DID. Read-only, from the grades the worker
+        # already wrote -- `settle_orders` runs on the worker, never here, per
+        # the web/worker split. An unreadable ledger degrades to None rather
+        # than to a zeroed record, because a 0-0 record and "we cannot see the
+        # record" are the two things this page exists to keep apart.
+        "settlement": settlement,
+        # Every date this ledger holds, not just the one being viewed.
+        "settlement_all_time": settlement_all_time,
+        "settlement_error": settlement_error,
+        # DATE NAVIGATION, computed here rather than in Jinja: date arithmetic
+        # in a template is where off-by-one-day bugs live, and this page is
+        # about a slate date whose boundary is already subtle (`#370`).
+        # `next_date` is None ON today rather than a link into the future --
+        # a control that navigates to a day that cannot have data is a control
+        # that teaches the reader the page is broken.
+        **_paper_date_nav(selected_date),
+    }
+
+
+def _paper_date_nav(selected_date: str) -> dict[str, Any]:
+    from datetime import date as _date
+    from datetime import timedelta as _timedelta
+
+    today = central_today_iso()
+    try:
+        current = _date.fromisoformat(str(selected_date))
+    except (TypeError, ValueError):
+        # An unparseable date still renders the page; it just gets no arrows.
+        return {"prev_date": None, "next_date": None, "today_date": today, "is_today": False}
+
+    nxt = (current + _timedelta(days=1)).isoformat()
+    return {
+        "prev_date": (current - _timedelta(days=1)).isoformat(),
+        "next_date": nxt if nxt <= today else None,
+        "today_date": today,
+        "is_today": str(selected_date) == today,
     }
 
 

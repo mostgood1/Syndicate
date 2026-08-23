@@ -1,6 +1,12 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#527` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+### `#530` — **`#503` was never a pricing decision. Soccer's live edge was blocked by a misplaced `return`, and the instrument I built to defend that reading is what disproved it. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+> **RENUMBERED from `#527`/`#528` — the SIXTH and SEVENTH id collisions today.**
+> A peer took 527, 528 and 529 while this was being written. `learnings.md`
+> already records that two sessions appending to the top of one file cannot
+> allocate ids by reading it; this is the third time it has cost a rename in
+> one session. Code comments and tests renumbered with these entries.
 
 **THE READING** (refresh-worker, three consecutive builds 16:41:16 / 16:47:15 /
 16:49:33Z, after `#523`):
@@ -60,9 +66,9 @@ a single `no_market_fair_value` total.
 and `edge_why` must stop being `{'no_fair_value_devig_failed': N}` for all N.
 Then `LAYER2_BOARD_HEALTH sport=soccer live_proj=` should follow.
 
-### `#528` — **Soccer's live-prop miss attribution was INERT: three counters and two sample fields were structurally constant. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+### `#531` — **Soccer's live-prop miss attribution was INERT: three counters and two sample fields were structurally constant. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
-Found while reading `#527`'s line. Soccer reported:
+Found while reading `#530`'s line. Soccer reported:
 
     miss_player=0  miss_market=620  miss_line_match=0
     sample: all 8 rows `player_in_lens: False`, `lens_lines_available: []`
@@ -92,6 +98,173 @@ sample's `player_in_lens` must show BOTH values across a batch. If `miss_player`
 is still exactly 0 with a non-zero `miss_market`, the keys are present and the
 join is genuinely a vocabulary gap — which is then a real finding for the first
 time.
+### `#529` — **The grader could not IDENTIFY a bet: `game_pk` on every order is the OddsAPI hash, not StatsAPI's numeric id. Recovered from the matchup, no backfill. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, follows `#528`
+
+**Measured 2026-08-23T16:00:06Z**, the first run of `#528`'s grader:
+
+```
+SETTLED date=2026-08-22 orders=58 graded=0 ungraded={'no_game_pk': 58}
+SETTLED date=2026-08-23 orders=45 graded=0 ungraded={'no_game_pk': 45}
+```
+
+**100% on both days.** The grading logic was correct and the resolver worked;
+neither could say WHICH GAME a bet was on. `layer2_board.py:1792` sets
+`"game_pk": row.get("event_id")` — the **OddsAPI hash**. StatsAPI's `gamePk` is
+a numeric id in a different space, and `intelligence_contracts` has documented
+the split all along: *"MLB board rows carry a StatsAPI gamePk while quotes carry
+an OddsAPI hash."* `int()` cannot parse a hash, so every bet was unidentifiable.
+
+**The fix recovers from the MATCHUP**, which is the path that same dataclass
+names: the ledger carries `home_team`, `away_team` and `commence_time` on every
+record, so a bet can be found on StatsAPI's own slate. **This fixes the 103
+orders already written**, not just future ones — no backfill, no migration.
+
+- Team names go through `team_aliases.canonical_team`. **Four separate
+  market-name tables drifted apart in this codebase on 2026-08-23 alone**
+  (`#527`, `#528`); a fifth private map for team names would be the same
+  mistake in the same shape.
+- **Doubleheaders are refused, not guessed.** Two games, same teams, same day,
+  and they routinely disagree. Split by start time; an order with no start time,
+  or one matching neither half within an hour, is `ambiguous_doubleheader`.
+- Refusals that look alike are split: `no_matchup_on_order` (record too thin —
+  written before `home_team` joined `_LEAN_FIELDS`) vs `matchup_not_on_schedule`
+  (names or slate disagree) vs `no_schedule_for_date` (artifact missing). Three
+  different jobs, and lumping them would hide how much of the backlog is
+  recoverable.
+- Schedule indexed **once per resolver**: 58 orders must not mean 58 file reads.
+- `mlb.cards` imported **inside** the guard — a 5,700-line module whose import
+  failure must degrade to `no_schedule_for_date`, not kill grading for the run.
+
+**`portfolio_commit` still stamps `None` rather than the row's `game_pk`, and
+now says why.** A field that looks populated and holds the wrong id is WORSE
+than an absent one: the matchup recovery only runs when it is not handed a
+plausible-looking wrong answer first. That comment exists to stop the obvious
+"fix".
+
+**NOT YET MEASURED.** Read the next `[paper_settlement] SETTLED` line. The
+remaining risk is that yesterday's orders predate `home_team` in `_LEAN_FIELDS`,
+which would show as `no_matchup_on_order` — recoverable only for orders written
+after that change. The split reasons exist precisely to answer that question in
+one reading.
+
+
+### `#528` — **`settled_count = 0` was never a data problem: nothing had ever graded a WAGER. Grader built, plus the vocabulary drift that had silently disabled monotone early-decision for every MLB pitcher prop. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, user report ("the paper endpoint didnt reconcile any of the bets that were placed - i want to see how it performed for yestrday")
+
+**The trap that hid it for weeks.** `execution_ledger` stamps `settled_at` in
+`complete_order` — the instant a paper fill is written, **seconds after the bet
+is placed and hours before the game ends**. It means *the ORDER reached a
+terminal state at the venue*, not *the BET was decided*. Every record had one.
+So the ledger looked settled while nothing had ever asked whether a bet won, and
+`#502`'s `settled_count = 0` read as a broken pipeline for as long as it has been
+reported. **Nothing was broken. Nobody had written the grader.** The new field is
+`graded_at` precisely so the two clocks can never be confused again.
+
+**What now exists** (`syndicate/features/shared/paper_settlement.py`):
+
+- Grades only what is DECIDED — a final game, or a monotone market already past
+  its line — and leaves the rest ungraded **with a named reason**. "Not graded
+  yet" and "lost" are the two facts a performance number must never blur.
+- **Grades once, immutably.** A later feed read can differ (a stat correction, a
+  cache miss returning nothing). A ledger that changes its mind about a settled
+  bet is not a record; the immutability is what makes the number quotable.
+- **A push is not a loss.** `resolve_bet_status` reports a final tie as
+  `live_tied` with `decided=True`. Folding that into losses would have
+  understated every figure this produces.
+- **P&L from `fill_price`/`fill_stake_dollars`, never the requested ones.** The
+  difference is slippage; grading against the request credits the strategy with a
+  price it did not get.
+- ROI on **settled stake only** — pending stake would dilute it with bets that
+  have not happened. `None` rather than `0.0` when nothing has settled: 0.0% on
+  zero bets and 0.0% on fifty are the same string and opposite facts.
+
+**THE BUG FOUND WHILE WIRING IT, which is the more important half.**
+`bet_status._MONOTONE_MARKETS` listed `pitcher_strikeouts` and `pitcher_outs`.
+`market_keys` canonicalises those to **`strikeouts`** and **`outs`** (`#224`),
+and the board emits the canonical form — so `is_monotone_market("strikeouts")`
+was **False**. The early-decision mechanism, the entire reason that module
+exists, **has been switched off for every MLB pitcher prop**: silent, tests
+passing, reporting `live_behind` on bets that were already mathematically won.
+
+That is the **third** place this same vocabulary drift appeared in one day
+(`#527` fixed it in the join and in the price resolver). The pattern is now
+explicit: **any module holding its own list of market names will drift from
+`market_keys`.** `test_every_monotone_name_is_the_one_the_board_emits` ties the
+set to `market_keys` so it cannot happen a fourth time. Prefer canonicalising on
+lookup where a sport is available; where it is not (this function takes none),
+hold both spellings AND a test that derives one from the other.
+
+**Wiring:** settlement runs on the worker for **today and yesterday**,
+regardless of whether a commit happened that cycle — yesterday's bets settle long
+after yesterday's plan stops being written, and a night game finishes after
+midnight UTC under the previous slate date (`#370`). Re-running is free.
+
+**NOT YET MEASURED IN PRODUCTION.** Whether yesterday actually grades depends on
+cached final feeds (`fetch_if_missing=False`) and it is **MLB-only** — a
+non-MLB order returns `unmapped_market`. Both are visible in the `ungraded`
+counts rather than as a small number with no explanation. Read
+`[paper_settlement] SETTLED` after the deploy.
+
+
+### `#527` — **A Kalshi-native board with its own hourly clock, and openings recorded from LOOKAHEAD markets — the first CLV reference that is genuinely early. IN CODE, TESTED, NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request ("this should begin a regular cadence specific to kalshi since we are limited by oddsapi calls. we can even get lookahead lines so we get true opening lines for clv")
+
+**Two problems, one shape.** `#526`-era Kalshi work joined Kalshi's prices to the
+Layer 2 board and got `matched=0` — not a join bug, a clock: at 04:22 the board
+had rolled to European soccer while Kalshi was already quoting the next MLB
+slate. And every Kalshi price we had ever fetched was discarded on the next
+fetch, so "has this line moved" was unanswerable no matter how often we asked.
+
+**What is now true:**
+
+- `syndicate/features/shared/kalshi_board.py` keeps a bounded per-ticker price
+  series and a Kalshi-native board grouped by close DAY (not close timestamp —
+  a night game closes after midnight UTC, `#370` in a new place). Tomorrow's
+  slate is visible from Kalshi now, without waiting for OddsAPI to carry it.
+- **The opening is an immutable field, not `points[0]`.** This is the whole
+  point of the file and the one thing in it that had to be designed rather than
+  written. Trimming is oldest-first and oldest-first IS the opening, so
+  measuring movement from the first surviving point would have silently
+  redefined every CLV number from "since the open" to "since some arbitrary
+  hour" once the window filled — with **no visible change in the output**.
+  `opening_yes`/`opened_at` are written once, on first sight.
+- **Lookahead is why this beats OddsAPI as a CLV reference.** OddsAPI's
+  "opening" is whenever we happened to poll. Kalshi lists markets days out, so a
+  first sight here really is near the open.
+- `too_new` is a separate counter from `unmoved`. One observation is a price,
+  not a movement; folding it into zero-movement puts "we have not watched long
+  enough" (wait) and "this has not moved" (conclude) in one bucket.
+- **Kalshi keeps its own clock.** `run_kalshi_odds_refresh` now owns the
+  interval (`SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS`, default 3600) against a
+  PERSISTED stamp, so a worker restart does not reset it. It used to run every
+  board build — a ~3min cadence set by OddsAPI's rate limit, which has no
+  business deciding how often we hit a different venue.
+- In between it returns **`cached`, not `skipped`** — the board still gets
+  prices, it just does not get an HTTP call.
+- **A failed fetch neither blanks the board nor starts the clock.** Stamping
+  `fetched_at` on a failure would serve zero markets from a "fresh" artifact for
+  an hour. Failures write `attempted_at` and back off on their own shorter clock
+  (`FAILED_RETRY_SECONDS = 600`) — ungated retries every 3min against a venue
+  that rate-limits us is how the 2026-08-23 `http_429`s happened.
+- `SYNDICATE_KALSHI_SERIES` widens the priced series **without a deploy**. A new
+  series' history only starts when we first ask for it, and a `render.yaml` edit
+  fires `blueprint_sync` (`#284`).
+
+**Tests:** `tests/test_kalshi_board.py` (10), `tests/test_kalshi_odds_cadence.py`
+(12). The load-bearing one is
+`test_the_opening_survives_the_window_filling`.
+
+**NOT VERIFIED IN PRODUCTION.** Kalshi is unreachable from this container — the
+agent proxy 403s CONNECT to all three hosts — so the live smoke returned
+`all_hosts_failed` and every Kalshi reading in this entry is from unit tests.
+The worker reaches Kalshi (that is where `FETCHED markets=132` came from). What
+to read after deploy: `[kalshi_odds] HISTORY`, `BY_GAME_DATE`, `MOVES`, and
+`CACHED` appearing between hourly `FETCHED` lines.
+
+**Still open:** the Kalshi↔board join has never matched on a live MLB slate
+(`#526`-era `matched=0` was the clock, and that is now guarded, but a positive
+match is still unmeasured). Auto-execution remains unbuilt — it needs RSA
+request signing, per-order/day caps, a kill switch, and daily reconciliation,
+and it stays gated on `settled_count > 0` (`#502`).
+
 
 ### `#526` — **The blotter had no mobile layout at all: a 880px table panned sideways on a 390px phone. Now a labelled card per row. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user report
 
@@ -2139,6 +2312,36 @@ total (a 14-2 window and a 26-14 window have identical margin). Added
 `forward_total` and `r_total_abs`, and the horizons are now the intervals a book
 actually takes — 600s (quarter) and 1200s (half), from the market keys the live
 slate discovered (`spreads_q4`, `totals_h2`, ...).
+
+**2026-08-23 — THE WORK MOVED FROM MOMENTUM TO THE STREAM UNDERNEATH IT.**
+
+Two artifacts now, and they are not interchangeable:
+`momentum_events_<date>.json` is OVERWRITTEN with the complete cumulative feed
+(ESPN is cumulative, so appending costs 20x for no extra completeness) and is
+the SWEEP's input; `live_momentum_<date>.jsonl` stays append-only and is the
+CAUSAL record of what a card showed at instant `t`. Phase C now runs with NO
+NETWORK — proven by pointing `fetch_summary` at a function that raises.
+
+**SEASON BACKFILL RUNNING** (`SYNDICATE_WNBA_MOMENTUM_BACKFILL`, live-odds-worker
+`26d67b8b`, 2026-05-01..2026-08-21). There is NO play-level history in this repo
+— `live_pbp_stats_*.jsonl` holds 0 clock values across 37 files — but ESPN's
+summary endpoint is retrospectively complete, so a season is ~1.8 min of
+fetching for ~1,144 quarter outcomes. That is ~70 nights of live capture.
+
+**`basketball_projection_rows` is the substrate**: STATE at `t` (margin, total,
+possessions, pace, pace x time-remaining) -> OUTCOME after `t`. Its load-bearing
+test is LEAKAGE — rows built from a truncated feed must match rows built from
+the full one at every shared probe. Mutation-tested.
+
+**WHY INTERVALS, NOT FULL GAMES.** `live-game-line-projection` reads brier
+0.28706 vs market 0.24700 and is bounded at `games_with_outcome: 3`; its n=985
+is repeated snapshots of the same three games. A full-game win probability is
+limited by GAMES (~25 nights to 100 at four a night). Quarter outcomes arrive 4x
+faster and are far less correlated within a game.
+
+**RULES RECORDED BEFORE ANY NUMBER IS QUOTED:** the train/test split must be
+TEMPORAL, never random; and seasons are not exchangeable (pace drifts, and `GSV`
+did not exist in earlier seasons).
 
 **BEFORE IT FEEDS A PRICE:** `model_engine_standard.md` requires re-fitting the
 rates a new mechanism displaces, and records two mechanisms together producing a

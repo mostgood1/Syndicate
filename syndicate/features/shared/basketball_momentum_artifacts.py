@@ -93,6 +93,7 @@ def build_momentum_block(
     league_code: str,
     home_tri: str | None = None,
     as_of_seconds: float | None = None,
+    include_rows: bool = False,
 ) -> dict[str, Any]:
     """Both series on both axes for ONE game, or a STATED REASON.
 
@@ -169,6 +170,17 @@ def build_momentum_block(
                 ),
             } if narrator else None,
         }
+        if include_rows:
+            # **THE RAW EVENTS, so the sweep never needs ESPN again.**
+            # A decayed series cannot be inverted back into the events that
+            # produced it, so the published series can REPLAY what was shown and
+            # cannot RE-FIT it at another half-life. These rows are what make
+            # Phase C self-sufficient.
+            #
+            # Stripped before the per-tick jsonl append -- they belong in the
+            # overwritten events artifact, not repeated in every appended row.
+            block["pressure_rows"] = pressure
+            block["narrator_rows"] = narrator
         return block
     except Exception as exc:  # pragma: no cover - defensive, never fatal
         return {
@@ -179,6 +191,78 @@ def build_momentum_block(
             "scoring_narrator": None,
             "events": 0,
         }
+
+
+def assemble_momentum_payload(
+    games: Mapping[str, Any], *, league_code: str, date_str: str
+) -> dict[str, Any]:
+    """Wrap already-built blocks in the slate envelope.
+
+    Split out so a caller can build blocks ONE AT A TIME and still produce the
+    identical payload -- see `build_momentum_payload_streamed`.
+    """
+    supported = sum(
+        1 for block in games.values()
+        if isinstance(block, Mapping) and block.get("supported") and block.get("pressure")
+    )
+    return {
+        "schema": SCHEMA,
+        "ok": True,
+        "league": str(league_code or "").strip().lower(),
+        "date": date_str,
+        "generated_at": _utc_now(),
+        "count": len(games),
+        "with_series": supported,
+        "games": dict(games),
+    }
+
+
+def build_momentum_payload_streamed(
+    event_ids: Any,
+    fetch_summary: Any,
+    *,
+    league_code: str,
+    date_str: str,
+    as_of_by_event: Mapping[str, float] | None = None,
+    on_missing: Any = None,
+    include_rows: bool = False,
+) -> dict[str, Any]:
+    """Same payload, but never holding more than ONE summary at a time.
+
+    **THIS EXISTS BECAUSE OF SLATE SIZE, and the headroom is already thin.**
+    The dict-comprehension form fetches every game's summary FIRST and holds
+    them all while the blocks are built. An ESPN basketball summary carries the
+    full play-by-play plus box score, so a late-game one is megabytes of parsed
+    Python -- and `live-odds-worker` was measured at **93.7% of its 2048MB**
+    with ~129MB of headroom while capturing a TWO-game slate.
+
+    A four-game slate multiplies the peak by four for no benefit: each summary
+    is read once, turned into a block of a few dozen sampled points, and never
+    needed again. Streaming keeps the peak at one summary regardless of how many
+    games are in play.
+
+    `on_missing` is called with the event id when a fetch returns nothing, so
+    the caller can log it without this function importing a logger.
+    """
+    as_of_map = dict(as_of_by_event or {})
+    games: dict[str, Any] = {}
+    for event_id in (event_ids or []):
+        key = str(event_id or "").strip()
+        if not key:
+            continue
+        summary = fetch_summary(key)
+        if not summary:
+            if on_missing is not None:
+                on_missing(key)
+            continue
+        games[key] = build_momentum_block(
+            summary, league_code=league_code, as_of_seconds=as_of_map.get(key),
+            include_rows=include_rows,
+        )
+        # Dropped before the next fetch, not after the loop. The whole point is
+        # that two summaries are never live at once.
+        del summary
+    return assemble_momentum_payload(games, league_code=league_code, date_str=date_str)
 
 
 def build_momentum_payload(
@@ -198,19 +282,10 @@ def build_momentum_payload(
         games[key] = build_momentum_block(
             summary, league_code=league_code, as_of_seconds=as_of_map.get(key)
         )
-    supported = sum(1 for block in games.values() if block.get("supported") and block.get("pressure"))
-    return {
-        "schema": SCHEMA,
-        "ok": True,
-        "league": str(league_code or "").strip().lower(),
-        "date": date_str,
-        "generated_at": _utc_now(),
-        "count": len(games),
-        # A COUNT THAT DISTINGUISHES "no games" FROM "games we could not read".
-        # `count` alone cannot: both are a number next to an empty chart.
-        "with_series": supported,
-        "games": games,
-    }
+    # Delegated so the streamed and buffered paths CANNOT drift: `with_series`
+    # is the number every diagnostic keys on, and two copies of that sum is two
+    # places for it to quietly disagree.
+    return assemble_momentum_payload(games, league_code=league_code, date_str=date_str)
 
 
 def momentum_artifact_path(root: Path, *, league_code: str, date_str: str) -> Path:
@@ -247,3 +322,86 @@ __all__ = [
     "build_momentum_payload",
     "momentum_artifact_path",
 ]
+
+
+def momentum_events_path(root: Path, *, league_code: str, date_str: str) -> Path:
+    """`<root>/<league>_source/.../live_lens/momentum_events_<date>.json`.
+
+    Sits beside the per-tick jsonl and under the same allowlisted directory.
+    """
+    league = str(league_code or "").strip().lower()
+    return (
+        Path(root) / f"{league}_source" / "source_artifacts" / "data" / "live_lens"
+        / f"momentum_events_{date_str}.json"
+    )
+
+
+def write_momentum_events(payload: Mapping[str, Any], *, path: Path) -> int:
+    """OVERWRITE the raw-event dump. Never append.
+
+    **BECAUSE ESPN'S FEED IS CUMULATIVE.** Every tick's summary carries the whole
+    game from tip-off, so appending would rewrite the same early plays on every
+    pass -- measured at ~20x the storage of a single overwrite for a four-game
+    slate, and the appended copy is no more complete than the last one.
+
+    The latest overwrite is therefore always the full game, with no dedup logic
+    and no cross-tick state to get wrong. ~0.1MB per night for four games.
+
+    This is the SWEEP's input. The append-only jsonl remains the CAUSAL record --
+    proof of what was displayed at instant t -- and the two are not
+    interchangeable: an overwrite cannot show what a card showed an hour ago,
+    and the sampled series in it cannot be re-fitted at another half-life.
+    """
+    rows_out: dict[str, Any] = {}
+    total = 0
+    for event_id, block in (payload.get("games") or {}).items():
+        if not isinstance(block, Mapping):
+            continue
+        pressure = block.get("pressure_rows") or []
+        narrator = block.get("narrator_rows") or []
+        if not pressure:
+            continue
+        rows_out[str(event_id)] = {
+            "home_tri": block.get("home_tri"),
+            "away_tri": block.get("away_tri"),
+            "as_of_seconds": block.get("as_of_seconds"),
+            "pressure": pressure,
+            "narrator": narrator,
+        }
+        total += len(pressure)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    # Atomic replace: a reader must never see a half-written dump, and this file
+    # is overwritten while Phase C may be reading it.
+    tmp.write_text(
+        json.dumps({
+            "schema": "basketball_momentum_events_v1",
+            "league": payload.get("league"),
+            "date": payload.get("date"),
+            "generated_at": _utc_now(),
+            "games": rows_out,
+        }, sort_keys=True),
+        encoding="utf-8",
+    )
+    tmp.replace(path)
+    return total
+
+
+def strip_rows(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """The payload without raw rows, for the append-only per-tick record.
+
+    The rows live in the overwritten events artifact. Repeating them in every
+    appended row is the 20x duplication `write_momentum_events` exists to avoid.
+    """
+    out = dict(payload)
+    games = {}
+    for event_id, block in (payload.get("games") or {}).items():
+        if isinstance(block, Mapping):
+            trimmed = {k: v for k, v in block.items()
+                       if k not in ("pressure_rows", "narrator_rows")}
+            games[event_id] = trimmed
+        else:
+            games[event_id] = block
+    out["games"] = games
+    return out

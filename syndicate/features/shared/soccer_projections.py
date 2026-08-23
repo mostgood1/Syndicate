@@ -616,7 +616,7 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
         return
 
     # THE FAIR VALUE IS COMPUTED BEFORE THE LIVE REFUSAL, AND THE ORDER IS THE
-    # WHOLE FIX (`#527`).
+    # WHOLE FIX (`#530`).
     #
     # It used to sit below the `live_reason` early-return, so on a LIVE game
     # `market_fair_prob_over` was never written at all. That is a different

@@ -207,3 +207,55 @@ def test_report_line_names_the_counters_worth_acting_on():
     assert "BET_STATUS" in line
     for token in ("orders=", "resolved=", "decided=", "won=", "lost=", "reasons="):
         assert token in line, token
+
+
+def test_every_monotone_name_is_the_one_the_board_emits():
+    """The drift that switched this whole mechanism off for MLB pitcher props.
+
+    `_MONOTONE_MARKETS` listed `pitcher_strikeouts` and `pitcher_outs`, but
+    `market_keys` canonicalises those to `strikeouts` and `outs` (`#224`) and the
+    board emits the canonical form. So `is_monotone_market("strikeouts")` was
+    False and the early-decision path never ran for the markets it was written
+    for -- inert, with passing tests, reporting `live_behind` on bets that were
+    already won.
+
+    `is_monotone_market` takes no sport, so it cannot canonicalise on lookup.
+    This is what keeps the two vocabularies together instead.
+    """
+    from syndicate.features.shared.bet_status import _MONOTONE_MARKETS, is_monotone_market
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    missing = []
+    for name in _MONOTONE_MARKETS:
+        for sport in ("mlb", "nba", "wnba"):
+            canonical = canonical_market_key(sport, name)
+            if canonical and not is_monotone_market(canonical):
+                missing.append((name, sport, canonical))
+    assert not missing, f"canonical spellings absent from the monotone set: {missing}"
+
+
+def test_the_mlb_stat_table_absorbs_both_market_spellings():
+    """The fourth instance of the same drift, found in one day.
+
+    This table read `pitcher_strikeouts` while the board emits `strikeouts`
+    (`#224`), so every MLB pitcher prop resolved to `unmapped_market` and could
+    never be graded -- which would have made the settlement figures quietly
+    hitter-only rather than visibly incomplete.
+    """
+    from syndicate.features.shared.bet_status_mlb import _MARKET_TO_STAT, _stat_for_market
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    for spelling in ("strikeouts", "pitcher_strikeouts", "outs", "pitcher_outs"):
+        assert _stat_for_market(spelling) is not None, spelling
+
+    # And the table's own keys are the canonical ones, so it cannot drift back.
+    for key in _MARKET_TO_STAT:
+        assert canonical_market_key("mlb", key) in (key, None), f"{key} is not canonical"
+
+
+def test_an_unmapped_market_is_still_refused_rather_than_guessed():
+    from syndicate.features.shared.bet_status_mlb import _stat_for_market
+
+    # A wrong stat produces a confident wrong verdict.
+    assert _stat_for_market("spreads") is None
+    assert _stat_for_market("h2h") is None

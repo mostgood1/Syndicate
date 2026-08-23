@@ -194,29 +194,74 @@ def run_execution(
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 
+    from syndicate.features.shared.execution_guard import check_order, limits, spent_today
+
+    caps = limits(mode)
+    # Seeded ONCE from the ledger and then incremented per placement. Seeded
+    # rather than started at zero, because a restart mid-slate must not hand the
+    # day its budget back; incremented rather than re-read, because a re-read
+    # between two placements in the same loop would still miss the one just
+    # made if the store lags, and the local count cannot.
+    used = spent_today(normalized, venue=venue, mode=mode)
+    print(
+        f"[execute_portfolio] LIMITS date={normalized} mode={mode} venue={venue} "
+        f"already={used} caps={caps}",
+        flush=True,
+    )
+
     placed = 0
     duplicates = 0
     skipped = 0
+    # Every refusal is COUNTED BY NAME. A single `skipped` number cannot tell a
+    # plan that named nothing bettable from a cap that stopped a good slate, and
+    # those want opposite responses.
+    refused: dict[str, int] = {}
     for position in positions:
         if not isinstance(position, Mapping):
             skipped += 1
+            refused["not_a_mapping"] = refused.get("not_a_mapping", 0) + 1
             continue
         request = _order_from_position(position, normalized, venue)
         if request is None:
             skipped += 1
+            refused["incomplete_position"] = refused.get("incomplete_position", 0) + 1
             continue
+
         before = _status_of(request)
+        if before is None:
+            # Checked only for orders that would be NEWLY placed. A duplicate
+            # places nothing, so charging it against the cap would let a re-run
+            # exhaust a budget it never spent.
+            verdict = check_order(request, mode=mode, already=used)
+            if not verdict.get("allowed"):
+                reason = str(verdict.get("reason"))
+                refused[reason] = refused.get(reason, 0) + 1
+                skipped += 1
+                continue
+
         record = place_order(request)
         if before is not None:
             duplicates += 1
-        elif record.get("status") in {"filled"}:
+            continue
+        status = str(record.get("status") or "")
+        if status in {"filled"}:
             placed += 1
+        # Charged for anything that MAY have reached the venue, matching
+        # `spent_today`'s rule. `rejected` is the one status set without a call.
+        if status in {"filled", "submitted", "failed"}:
+            used = {
+                "dollars": round(
+                    float(used.get("dollars") or 0.0) + float(request.requested_stake_dollars), 2
+                ),
+                "orders": int(used.get("orders") or 0) + 1,
+            }
 
     summary = ledger_summary(normalized)
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
-        f"duplicates={duplicates} skipped={skipped} summary={summary}",
+        f"duplicates={duplicates} skipped={skipped} refused={refused} "
+        f"spent={used} summary={summary}",
         flush=True,
     )
     return {
@@ -230,6 +275,9 @@ def run_execution(
         # idempotency works in production rather than only in a test.
         "duplicates": duplicates,
         "skipped": skipped,
+        "refused": refused,
+        "spent": used,
+        "limits": caps,
         "summary": summary,
     }
 

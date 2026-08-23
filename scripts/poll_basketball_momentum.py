@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -36,7 +37,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.basketball_momentum_artifacts import append_momentum_artifact
-from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload
+from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload_streamed
+from syndicate.features.shared.basketball_momentum_artifacts import momentum_events_path
+from syndicate.features.shared.basketball_momentum_artifacts import strip_rows
+from syndicate.features.shared.basketball_momentum_artifacts import write_momentum_events
 from syndicate.features.shared.basketball_momentum_artifacts import momentum_artifact_path
 
 _SPORT_PATH = {
@@ -92,6 +96,20 @@ def _get_json(url: str, *, timeout: int = 25, browser_ua: bool = False) -> dict[
         return {}
 
 
+def scoreboard_url(league: str, date_str: str) -> str:
+    """The scoreboard URL, built in ONE place.
+
+    **`_SPORT_PATH` ALREADY CONTAINS `sports/`.** The season backfill rewrote
+    this line by hand and prefixed `sports/` a second time, producing
+    `.../v2/sports/sports/basketball/wnba/scoreboard` and HTTP 400 on every date
+    of a season pull. Two callers, two spellings, one of them wrong.
+
+    A URL that is known to work is reused, not retyped.
+    """
+    return (f"https://site.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}"
+            f"/scoreboard?dates={date_str.replace('-', '')}")
+
+
 def live_event_ids(league: str, date_str: str) -> list[str]:
     """Event ids for games IN PROGRESS. Not scheduled, not final.
 
@@ -100,7 +118,7 @@ def live_event_ids(league: str, date_str: str) -> list[str]:
     `poll_soccer_live_state` keeps the same separation for the same reason.
     """
     ymd = date_str.replace("-", "")
-    url = f"https://site.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}/scoreboard?dates={ymd}"
+    url = scoreboard_url(league, date_str)
     # NO browser UA: `site.api.espn.com` 403s on it from Render (see `_get_json`).
     scoreboard = _get_json(url)
     events = scoreboard.get("events")
@@ -143,18 +161,234 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
     return payload
 
 
+# ---------------------------------------------------------------------------
+# ONE-SHOT SEASON BACKFILL
+# ---------------------------------------------------------------------------
+# **GATED HERE RATHER THAN IN THE WORKER ENTRYPOINT, DELIBERATELY.**
+# `scripts/run_refresh_worker.py` is the natural home and is CLAIMED by the OPEN
+# lane `portfolio-ledger-service-split` (opened 2026-08-22). Editing a contested
+# shared entrypoint to schedule my own lane's job is exactly what the lane
+# protocol exists to stop, and this file is already the momentum subsystem's
+# entry point on the worker.
+#
+# Set `SYNDICATE_WNBA_MOMENTUM_BACKFILL=<start>..<end>` to run once. It is:
+#   - DAEMON-THREADED, so a live slate's capture is never blocked by it;
+#   - RESUMABLE, so a restart re-scans and skips finished dates cheaply;
+#   - SENTINEL-GUARDED, so a worker that restarts hourly does not re-run it;
+#   - RATE-LIMITED at 0.25s between ESPN calls -- a WNBA season is ~286 requests
+#     and there is no reason to go faster.
+_BACKFILL_ENV = "SYNDICATE_WNBA_MOMENTUM_BACKFILL"
+_VERIFY_ENV = "SYNDICATE_WNBA_MOMENTUM_VERIFY"
+_SWEEP_ENV = "SYNDICATE_WNBA_MOMENTUM_SWEEP"
+_backfill_started = False
+_verify_started = False
+_sweep_started = False
+
+
+def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
+    safe = spec.replace("..", "_to_").replace("/", "-")
+    return Path(out_root) / f"{league}_source" / "source_artifacts" / "data" / "live_lens" / f".backfill_{safe}.done"
+
+
+def maybe_start_backfill(league: str, out_root: Path) -> bool:
+    """Kick the one-shot backfill if requested and not already done."""
+    global _backfill_started
+    spec = str(os.environ.get(_BACKFILL_ENV) or "").strip()
+    if not spec or _backfill_started:
+        return False
+    # **A MALFORMED SPEC IS NAMED, NOT IGNORED.** Dropping it into the same
+    # silent `return False` as "unset" means someone who sets
+    # `...BACKFILL=2026-05-01` and expects a season gets nothing, with nothing
+    # said -- the exact ambiguity every diagnostic in this file exists to remove.
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] BACKFILL_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, spec)
+    if sentinel.exists():
+        # Said out loud. A silent skip is indistinguishable from a backfill that
+        # never started, which is the ambiguity every diagnostic here exists to
+        # remove.
+        print(f"[basketball_momentum] BACKFILL_ALREADY_DONE spec={spec} "
+              f"sentinel={sentinel}", flush=True)
+        _backfill_started = True
+        return False
+
+    _backfill_started = True
+
+    def _run() -> None:
+        import threading  # noqa: F401 - imported for symmetry with the caller
+        print(f"[basketball_momentum] BACKFILL_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.backfill_basketball_momentum_history import main as _backfill_main
+
+            code = _backfill_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] BACKFILL_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover - never kills the worker
+            print(f"[basketball_momentum] BACKFILL_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-backfill", daemon=True).start()
+    return True
+
+
+def maybe_start_verify(league: str, out_root: Path) -> bool:
+    """Run the projection-substrate check over a captured range, once.
+
+    **THE LEAKAGE GUARD HAS ONLY EVER RUN ON FIXTURES**, which proved the logic
+    and not the feed. This points it at real games before anything is fitted.
+    Same one-shot shape as the backfill -- daemon-threaded, sentinel-guarded --
+    but no sentinel is written on FAILURE, so a leak is re-reported on every
+    restart rather than silently marked done.
+    """
+    global _verify_started
+    spec = str(os.environ.get(_VERIFY_ENV) or "").strip()
+    if not spec or _verify_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] VERIFY_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"verify_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] VERIFY_ALREADY_DONE spec={spec}", flush=True)
+        _verify_started = True
+        return False
+    _verify_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] VERIFY_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.verify_momentum_projection_rows import main as _verify_main
+
+            code = _verify_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] VERIFY_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            # ONLY on a clean pass. A leak that gets marked done is a leak that
+            # stops being reported, and this check exists to be noisy.
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] VERIFY_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-verify", daemon=True).start()
+    return True
+
+
+
+def maybe_start_sweep(league: str, out_root: Path) -> bool:
+    """The pooled momentum sweep over a captured range, once.
+
+    **THIS IS THE QUESTION THE WHOLE LANE WAS OPENED TO ANSWER**: does momentum
+    lead scoring, at what half-life, on which axis, over the intervals that are
+    actually traded. It has never been run on real data.
+
+    Gated separately from the verify rather than chained to it, deliberately: a
+    sweep that only runs when a check passes is a sweep whose absence is
+    ambiguous between "clean but unrun" and "blocked". Two flags, two readings.
+    """
+    global _sweep_started
+    spec = str(os.environ.get(_SWEEP_ENV) or "").strip()
+    if not spec or _sweep_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] SWEEP_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"sweep_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] SWEEP_ALREADY_DONE spec={spec}", flush=True)
+        _sweep_started = True
+        return False
+    _sweep_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] SWEEP_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.analyze_basketball_momentum import season_main
+
+            code = season_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] SWEEP_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] SWEEP_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-sweep", daemon=True).start()
+    return True
+
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
+    # Fires at most once per process, and returns immediately -- the work runs
+    # on a daemon thread so a live slate is never waiting on history.
+    maybe_start_backfill(league, out_root)
+    maybe_start_verify(league, out_root)
+    maybe_start_sweep(league, out_root)
+
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
-    summaries = {event_id: fetch_summary(league, event_id) for event_id in event_ids}
-    summaries = {k: v for k, v in summaries.items() if v}
-
-    payload = build_momentum_payload(summaries, league_code=league, date_str=date_str)
+    # **ONE SUMMARY IN MEMORY AT A TIME, not the whole slate.** The previous
+    # form fetched every game first and held them all while blocks were built.
+    # An ESPN basketball summary carries the full play-by-play plus box score,
+    # so a late-game one is megabytes of parsed Python -- and this worker was
+    # measured at 93.7% of its 2048MB with ~129MB headroom on a TWO-game slate.
+    # Four games would have multiplied the peak for no benefit: each summary is
+    # read once, reduced to a few dozen sampled points, and never needed again.
+    missing: list[str] = []
+    payload = build_momentum_payload_streamed(
+        event_ids,
+        lambda event_id: fetch_summary(league, event_id),
+        league_code=league,
+        date_str=date_str,
+        on_missing=missing.append,
+        include_rows=True,
+    )
+    fetched = int(payload.get("count") or 0)
+    # **NAMED, NOT SILENTLY DROPPED.** On a one-game slate a failed fetch showed
+    # up as `live_events=1 fetched=0`. With four games in play, three successes
+    # would hide the fourth entirely unless the miss says which one.
+    if missing:
+        print(
+            f"[basketball_momentum] SUMMARY_MISSING league={league} date={date_str} "
+            f"events={','.join(missing)}",
+            flush=True,
+        )
     # `with_series` NOT `count`: a slate of games we fetched but could not read
     # and a slate with no games are both "0 charts", and only one of them is a
     # defect. Printing the pair is what makes them distinguishable in a log.
     print(
-        f"[basketball_momentum] fetched={len(summaries)} games={payload['count']} "
+        f"[basketball_momentum] fetched={fetched} games={payload['count']} "
         f"with_series={payload['with_series']}",
         flush=True,
     )
@@ -176,20 +410,16 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     # `reason` from the block, whether `plays` arrived at all, and whether the
     # header yielded competitors (no competitors -> no home side -> every event
     # silently unsigned and dropped).
-    if summaries and not payload.get("with_series"):
+    # The summaries are gone by now -- deliberately, that is the whole point of
+    # streaming -- so this reports what the BLOCK knows rather than re-reading a
+    # feed we no longer hold. `plays`/`competitors` counts moved into the block's
+    # own `reason`, which `build_momentum_block` already states.
+    if fetched and not payload.get("with_series"):
         for event_id, block in (payload.get("games") or {}).items():
-            summary = summaries.get(event_id) or {}
-            plays = summary.get("plays")
-            header = summary.get("header") if isinstance(summary.get("header"), dict) else {}
-            competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
-            first = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
-            competitors = first.get("competitors") if isinstance(first.get("competitors"), list) else None
             print(
                 f"[basketball_momentum] NO_SERIES event={event_id} "
                 f"supported={block.get('supported')} reason={block.get('reason')!r} "
-                f"events={block.get('events')} "
-                f"plays={len(plays) if isinstance(plays, list) else 'ABSENT'} "
-                f"competitors={len(competitors) if competitors is not None else 'ABSENT'}",
+                f"events={block.get('events')}",
                 flush=True,
             )
 
@@ -214,8 +444,28 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
         )
         return payload
 
+    # **TWO ARTIFACTS, AND THEY ARE NOT INTERCHANGEABLE.**
+    #
+    # The raw-event dump is OVERWRITTEN with the latest complete feed -- ESPN is
+    # cumulative, so the newest write always holds the whole game and appending
+    # would rewrite the same early plays every tick (~20x the bytes for a
+    # four-game slate, no more complete). This is what the Phase C sweep reads,
+    # and it means the sweep NEVER NEEDS ESPN AGAIN: a decayed series cannot be
+    # inverted back into the events that made it, so re-fitting at another
+    # half-life requires the rows themselves.
+    events_path = momentum_events_path(out_root, league_code=league, date_str=date_str)
+    rows_written = write_momentum_events(payload, path=events_path)
+    print(
+        f"[basketball_momentum] events_dump rows={rows_written} games={payload['count']} "
+        f"path={events_path}",
+        flush=True,
+    )
+
+    # The per-tick record stays APPEND-ONLY and row-free. It is the causal
+    # evidence -- what a card actually showed at instant t -- which an
+    # overwritten file can never reconstruct.
     path = momentum_artifact_path(out_root, league_code=league, date_str=date_str)
-    append_momentum_artifact(payload, path=path)
+    append_momentum_artifact(strip_rows(payload), path=path)
     print(f"[basketball_momentum] appended {path}", flush=True)
 
     # **A SHAPE LINE PER CAPTURED GAME, because `with_series=1` says a series

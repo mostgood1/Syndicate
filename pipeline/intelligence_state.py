@@ -5110,6 +5110,48 @@ class IntelligenceStateService:
         # also why it is wrapped — a sizing failure must never take down the
         # board build that just succeeded.
         try:
+            # ONE HTTP CALL PER BOOT, guarded and non-fatal. Answers what
+            # Kalshi actually lists, which OddsAPI's game-lines-only feed cannot.
+            try:
+                from pipeline.kalshi_discovery import run_kalshi_discovery
+
+                run_kalshi_discovery()
+            except Exception as exc:
+                print(f"[intelligence_state] KALSHI_DISCOVERY_FAILED error={exc}", flush=True)
+
+            # KALSHI'S OWN PRICES, on Kalshi's own cadence. Called every board
+            # build, but `run_kalshi_odds_refresh` owns the interval (hourly by
+            # default) and serves the cached markets in between -- the board
+            # build's ~3min period is set by OddsAPI's rate limit and has no
+            # business deciding how often we hit a different venue. Then joined
+            # to the shortlist to produce the first Kalshi coverage number that
+            # is actually about Kalshi.
+            #
+            # The refresh also records each price into the Kalshi-native
+            # history, which is where tomorrow's lookahead lines become the
+            # OPENING prices a CLV grade needs -- those exist days before the
+            # OddsAPI board carries the slate at all.
+            kalshi_markets: list = []
+            try:
+                from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
+
+                odds = run_kalshi_odds_refresh()
+                kalshi_markets = odds.get("markets") or []
+                # `layer2_shortlist["rows"]`, NOT a bare `rows` -- there is no
+                # such name here, and the NameError would have been swallowed by
+                # the except below and printed as KALSHI_ODDS_FAILED. My bug
+                # wearing Kalshi's name is exactly the confusion this whole
+                # thread has been untangling.
+                shortlist_rows = (layer2_shortlist or {}).get("rows") or []
+                if kalshi_markets and shortlist_rows:
+                    join_to_board(
+                        kalshi_markets,
+                        list(shortlist_rows),
+                        selected_date=str(selected_date or ""),
+                    )
+            except Exception as exc:
+                print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
+
             from pipeline.portfolio_commit import run_portfolio_commit
 
             commit_result = run_portfolio_commit(str(selected_date or ""))
@@ -5186,7 +5228,36 @@ class IntelligenceStateService:
                             f"venue={venue_scope} error={exc}",
                             flush=True,
                         )
-            elif commit_result.get("reason") not in {"disabled", "no_shortlist"}:
+            # GRADE WHAT IS ALREADY DECIDED. Runs regardless of whether a commit
+            # happened this cycle -- yesterday's bets settle long after
+            # yesterday's plan stopped being written, and gating grading on a
+            # fresh commit is how `settled_count` stays 0 forever.
+            #
+            # TODAY AND YESTERDAY, because a night game finishes after midnight
+            # UTC and its orders are filed under the previous slate date
+            # (`#370`, again). Cheap to repeat: a graded order is skipped before
+            # the resolver is asked, so a re-run costs no feed lookups.
+            try:
+                from datetime import date as _date
+                from datetime import timedelta as _timedelta
+
+                from syndicate.features.shared.paper_settlement import settle_orders
+
+                _today = str(selected_date or "").strip()
+                _dates = [_today]
+                try:
+                    _dates.append(
+                        (_date.fromisoformat(_today) - _timedelta(days=1)).isoformat()
+                    )
+                except ValueError:
+                    pass
+                for _settle_date in _dates:
+                    if _settle_date:
+                        settle_orders(_settle_date)
+            except Exception as exc:
+                print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
+
+            if commit_result.get("reason") not in {"disabled", "no_shortlist"} and commit_result.get("status") != "ok":
                 # `disabled` and `no_shortlist` are the expected quiet states and
                 # would be pure noise every cycle. Anything else is a real
                 # refusal and must be readable.

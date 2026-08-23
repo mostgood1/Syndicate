@@ -55,13 +55,30 @@ if str(_REPO_ROOT) not in sys.path:
 from syndicate.features.shared.basketball_momentum import basketball_pressure_events
 from syndicate.features.shared.basketball_momentum import basketball_scoring_events
 from syndicate.features.shared.basketball_momentum_artifacts import momentum_artifact_path
+from syndicate.features.shared.basketball_momentum_artifacts import momentum_events_path
 from syndicate.features.shared.momentum_core import momentum_at
 
 # The sweep grid. Seconds are the axis soccer chose; possessions are the axis
 # that would port across NBA/WNBA/NCAAB pace regimes without re-tuning, which is
 # the whole reason both were published (scope section 7, decision 1).
-HALF_LIVES_SECONDS = (60.0, 90.0, 120.0, 180.0)
-HALF_LIVES_POSSESSIONS = (4.0, 6.0, 8.0, 12.0)
+# **THE GRID GOES OUT TO A FULL QUARTER, because the live readings said it
+# had to.** Measured on the 2026-08-22 WNBA slate at the 120s half-life this
+# shipped with: `current` moved x4.5 UP and later x0.30 DOWN, each inside 55
+# SECONDS of game clock. A quantity that swings three- to four-fold in under a
+# minute is describing "right now".
+#
+# But the horizons being predicted are a QUARTER (600s) and a HALF (1200s) --
+# those are the markets the live slate actually discovered (`spreads_q4`,
+# `totals_h2`). Asking a 120s half-life about the next ten minutes is asking a
+# fast signal a slow question, and a grid topping out at 180s could only ever
+# have returned "no signal" for the interval markets without saying why.
+#
+# So the sweep now spans 60s (twitchy) to 600s (a whole quarter), and the
+# possessions axis spans 4 to 40 -- roughly the same range in the units a
+# basketball game actually advances in (~4 combined possessions per minute,
+# measured 7/7 last night).
+HALF_LIVES_SECONDS = (60.0, 120.0, 180.0, 300.0, 600.0)
+HALF_LIVES_POSSESSIONS = (4.0, 8.0, 12.0, 20.0, 40.0)
 # **HORIZONS ARE THE INTERVALS ACTUALLY TRADED, not round numbers.**
 #
 # The stated purpose of this signal is to inform INTERVAL BETS -- moneyline,
@@ -166,6 +183,84 @@ def forward_total(
     return total
 
 
+def sweep_season(
+    games: Any,
+    *,
+    regulation_seconds: float = 2400.0,
+) -> dict[str, Any]:
+    """ONE pooled grid across every captured game, not one grid per game.
+
+    **THE PER-GAME SWEEP DOES NOT SCALE AND ITS NUMBERS DO NOT MEAN MUCH.**
+    282 games x 40 cells is 11,280 log lines nobody reads, and a correlation
+    computed on ~50 probes from a single game is noise -- one run decides it.
+
+    Pooling is also the only way the question gets answered honestly: the claim
+    "momentum leads scoring" is a claim about BASKETBALL, not about one night in
+    May. So probe/outcome pairs are accumulated across all games per cell and
+    correlated once, with the number of contributing GAMES reported beside the
+    probe count -- because probes within a game overlap and games do not.
+    """
+    # cell -> (values, margins, totals)
+    buckets: dict[tuple, tuple[list, list, list]] = {}
+    games_seen = 0
+    probes_total = 0
+
+    for game in (games or []):
+        pressure = list(game.get("pressure") or [])
+        scoring = list(game.get("narrator") or [])
+        if not pressure or not scoring:
+            continue
+        games_seen += 1
+        last = max(float(r["clock_seconds"]) for r in pressure)
+
+        for horizon in HORIZONS_SECONDS:
+            probes = []
+            t = PROBE_WARMUP_SECONDS
+            while t + horizon <= last:
+                probes.append(t)
+                t += PROBE_STEP_SECONDS
+            if len(probes) < 3:
+                continue
+            margins = [forward_margin(scoring, p, horizon) for p in probes]
+            totals = [forward_total(scoring, p, horizon) for p in probes]
+            probes_total += len(probes)
+
+            poss_at = [
+                max((float(r["possession_index"]) for r in pressure
+                     if float(r["clock_seconds"]) <= p), default=0.0)
+                for p in probes
+            ]
+
+            for axis, half_lives, axis_key, probe_values in (
+                ("seconds", HALF_LIVES_SECONDS, "clock_seconds", probes),
+                ("possessions", HALF_LIVES_POSSESSIONS, "possession_index", poss_at),
+            ):
+                for half_life in half_lives:
+                    values = [
+                        momentum_at(pressure, pv, half_life_seconds=half_life,
+                                    axis_key=axis_key)
+                        for pv in probe_values
+                    ]
+                    key = (axis, half_life, horizon)
+                    v, m, tt = buckets.setdefault(key, ([], [], []))
+                    v.extend(values)
+                    m.extend(margins)
+                    tt.extend(totals)
+
+    grid = []
+    for (axis, half_life, horizon), (values, margins, totals) in sorted(buckets.items()):
+        grid.append({
+            "axis": axis,
+            "half_life": half_life,
+            "horizon_seconds": horizon,
+            "n": len(values),
+            "r_margin": _pearson(values, margins),
+            "r_total": _pearson(values, totals),
+            "r_total_abs": _pearson([abs(x) for x in values], totals),
+        })
+    return {"ok": bool(grid), "games": games_seen, "probes": probes_total, "grid": grid}
+
+
 def sweep_game(
     summary: Mapping[str, Any],
     *,
@@ -179,7 +274,14 @@ def sweep_game(
             "ok": False,
             "reason": f"pressure={len(pressure)} scoring={len(scoring)} -- need both",
         }
+    return _sweep_from_rows(pressure, scoring)
 
+
+def _sweep_from_rows(
+    pressure: list[dict[str, Any]], scoring: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """The grid itself. Shared by the captured-rows and re-fetched paths so the
+    two can never compute a different answer from the same events."""
     last_seconds = max(float(r["clock_seconds"]) for r in pressure)
     last_poss = max(float(r["possession_index"]) for r in pressure)
 
@@ -266,6 +368,32 @@ def sweep_game(
     }
 
 
+def sweep_rows(
+    pressure: Sequence[Mapping[str, Any]],
+    scoring: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """`sweep_game`, but from ALREADY-EXTRACTED rows.
+
+    The taxonomy step (summary -> rows) is exactly what the captured event dump
+    has already done, so re-running it from a re-fetched summary would be work
+    AND a reproducibility risk: ESPN may not return the same feed later.
+    """
+    if not pressure or not scoring:
+        return {"ok": False,
+                "reason": f"pressure={len(pressure)} scoring={len(scoring)} -- need both"}
+    return _sweep_from_rows(list(pressure), list(scoring))
+
+
+def causality_check_rows(
+    rows: Iterable[Mapping[str, Any]],
+    pressure: Sequence[Mapping[str, Any]],
+    *,
+    event_id: str,
+) -> dict[str, Any]:
+    """`causality_check` against captured rows rather than a re-fetched feed."""
+    return _causality_from_pressure(rows, list(pressure), event_id=event_id)
+
+
 def causality_check(
     rows: Iterable[Mapping[str, Any]],
     summary: Mapping[str, Any],
@@ -289,6 +417,17 @@ def causality_check(
     pressure = basketball_pressure_events(summary, league_code=league_code)
     if not pressure:
         return {"ok": False, "reason": "no pressure rows in the retrospective feed"}
+    return _causality_from_pressure(rows, pressure, event_id=event_id)
+
+
+def _causality_from_pressure(
+    rows: Iterable[Mapping[str, Any]],
+    pressure: list[dict[str, Any]],
+    *,
+    event_id: str,
+) -> dict[str, Any]:
+    if not pressure:
+        return {"ok": False, "reason": "no pressure rows available"}
 
     compared = 0
     distinct_as_of: set[float] = set()
@@ -359,6 +498,107 @@ def _report(label: str, payload: Mapping[str, Any]) -> None:
     print(f"[momentum_phase_c] {label} {json.dumps(payload, sort_keys=True)}", flush=True)
 
 
+def _emit_sweep(event_id: str, swept: Mapping[str, Any]) -> None:
+    """One printer for both input paths -- a second copy is a second format."""
+    if not swept.get("ok"):
+        _report(f"SWEEP_SKIPPED event={event_id}", swept)
+        return
+    print(
+        f"[momentum_phase_c] SWEEP event={event_id} "
+        f"pressure={swept['pressure_events']} scoring={swept['scoring_events']} "
+        f"last_s={swept['last_seconds']} last_poss={swept['last_possessions']}",
+        flush=True,
+    )
+
+    def _fmt(value: Any) -> str:
+        return "NA" if value is None else f"{value:+.4f}"
+
+    for cell in swept["grid"]:
+        print(
+            f"[momentum_phase_c] CELL event={event_id} axis={cell['axis']} "
+            f"hl={cell['half_life']} horizon={cell['horizon_seconds']} "
+            f"n={cell['n']} "
+            f"r_margin={_fmt(cell['r_margin'])} "
+            f"r_total={_fmt(cell['r_total'])} "
+            f"r_total_abs={_fmt(cell['r_total_abs'])}",
+            flush=True,
+        )
+
+
+def season_main(argv: Sequence[str] | None = None) -> int:
+    """Pooled sweep over a RANGE of captured dates. One grid, not one per game.
+
+    Reads only the captured event dumps -- no network, so it runs anywhere the
+    artifacts are, and a re-run weeks from now sees the same feed it saw today.
+    """
+    parser = argparse.ArgumentParser(description="Pooled season momentum sweep")
+    parser.add_argument("--league", default="wnba")
+    parser.add_argument("--start", required=True)
+    parser.add_argument("--end", required=True)
+    parser.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT"))
+    args = parser.parse_args(argv)
+
+    from datetime import date as _date, timedelta as _timedelta
+
+    root = Path(args.data_root) if args.data_root else _REPO_ROOT / "data"
+    a, b = _date.fromisoformat(args.start), _date.fromisoformat(args.end)
+
+    games: list[dict[str, Any]] = []
+    dates_seen = 0
+    while a <= b:
+        path = momentum_events_path(root, league_code=args.league, date_str=a.isoformat())
+        a += _timedelta(days=1)
+        if not path.exists():
+            continue
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        dates_seen += 1
+        for game in (doc.get("games") or {}).values():
+            if isinstance(game, dict):
+                games.append(game)
+
+    print(f"[momentum_phase_c] SEASON league={args.league} {args.start}..{args.end} "
+          f"dates={dates_seen} games={len(games)}", flush=True)
+    if not games:
+        # Not 0. A silent empty sweep reads exactly like "no signal found".
+        print("[momentum_phase_c] NO GAMES -- nothing captured for this range", flush=True)
+        return 3
+
+    swept = sweep_season(games)
+
+    def _fmt(value: Any) -> str:
+        return "NA" if value is None else f"{value:+.4f}"
+
+    print(f"[momentum_phase_c] POOLED games={swept['games']} probes={swept['probes']} "
+          f"cells={len(swept['grid'])}", flush=True)
+    for cell in swept["grid"]:
+        print(
+            f"[momentum_phase_c] POOLED_CELL axis={cell['axis']} "
+            f"hl={cell['half_life']} horizon={cell['horizon_seconds']} n={cell['n']} "
+            f"r_margin={_fmt(cell['r_margin'])} "
+            f"r_total={_fmt(cell['r_total'])} "
+            f"r_total_abs={_fmt(cell['r_total_abs'])}",
+            flush=True,
+        )
+
+    # THE HEADLINE, so nobody has to eyeball 40 rows to find it.
+    best = max(
+        (c for c in swept["grid"] if c["r_margin"] is not None),
+        key=lambda c: abs(c["r_margin"]), default=None,
+    )
+    if best is not None:
+        print(
+            f"[momentum_phase_c] STRONGEST_MARGIN axis={best['axis']} "
+            f"hl={best['half_life']} horizon={best['horizon_seconds']} "
+            f"r={best['r_margin']:+.4f} n={best['n']} games={swept['games']} "
+            f"-- CORRELATION ONLY, no fit, no edge claim",
+            flush=True,
+        )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", default="wnba")
@@ -387,10 +627,46 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event_ids.append(event_id)
     print(f"[momentum_phase_c] games={len(event_ids)} ids={','.join(event_ids)}", flush=True)
 
+    # **PREFER THE CAPTURED EVENT DUMP OVER RE-FETCHING ESPN.**
+    #
+    # `momentum_events_<date>.json` holds the raw pressure and narrator rows,
+    # overwritten each tick with the complete cumulative feed. Reading it means
+    # the sweep needs no network at all -- which matters twice over: ESPN is 403
+    # from a Claude Code sandbox, so a fetch-only analyser could ONLY ever run
+    # on the worker; and a re-fetch weeks later may not return the same feed,
+    # making a backtest silently unreproducible.
+    #
+    # The ESPN path stays as the fallback for dates captured before the dump
+    # existed.
+    events_path = momentum_events_path(root, league_code=args.league, date_str=args.date)
+    captured: dict[str, Any] = {}
+    if events_path.exists():
+        try:
+            captured = (json.loads(events_path.read_text(encoding="utf-8")) or {}).get("games") or {}
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[momentum_phase_c] EVENTS_UNREADABLE {type(exc).__name__}: {exc}", flush=True)
+    print(
+        f"[momentum_phase_c] events_dump={'present' if captured else 'ABSENT'} "
+        f"games={len(captured)} path={events_path}",
+        flush=True,
+    )
+
     from scripts.poll_basketball_momentum import fetch_summary
 
     exit_code = 0
     for event_id in event_ids:
+        rows_for_event = captured.get(event_id) or {}
+        pressure_rows = rows_for_event.get("pressure") or []
+        narrator_rows = rows_for_event.get("narrator") or []
+        if pressure_rows and narrator_rows:
+            swept = sweep_rows(pressure_rows, narrator_rows)
+            causal = causality_check_rows(rows, pressure_rows, event_id=event_id)
+            _report(f"CAUSALITY event={event_id}", causal)
+            _emit_sweep(event_id, swept)
+            if causal.get("mismatches"):
+                exit_code = max(exit_code, 5)
+            continue
+
         if args.skip_fetch:
             continue
         summary = fetch_summary(args.league, event_id)
@@ -416,29 +692,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             # sets the exit code even though the sweep may still print.
             exit_code = max(exit_code, 5)
 
-        swept = sweep_game(summary, league_code=args.league)
-        if not swept.get("ok"):
-            _report(f"SWEEP_SKIPPED event={event_id}", swept)
-            continue
-        print(
-            f"[momentum_phase_c] SWEEP event={event_id} "
-            f"pressure={swept['pressure_events']} scoring={swept['scoring_events']} "
-            f"last_s={swept['last_seconds']} last_poss={swept['last_possessions']}",
-            flush=True,
-        )
-        def _fmt(value: float | None) -> str:
-            return "NA" if value is None else f"{value:+.4f}"
-
-        for cell in swept["grid"]:
-            print(
-                f"[momentum_phase_c] CELL event={event_id} axis={cell['axis']} "
-                f"hl={cell['half_life']} horizon={cell['horizon_seconds']} "
-                f"n={cell['n']} "
-                f"r_margin={_fmt(cell['r_margin'])} "
-                f"r_total={_fmt(cell['r_total'])} "
-                f"r_total_abs={_fmt(cell['r_total_abs'])}",
-                flush=True,
-            )
+        _emit_sweep(event_id, sweep_game(summary, league_code=args.league))
     return exit_code
 
 

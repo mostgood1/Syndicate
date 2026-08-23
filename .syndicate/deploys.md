@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-08-23 — refresh-worker `43c8e5507`: Kalshi keeps its own clock, and 154 opening lines now exist
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da57i2ou01pc73e9btk0`, live `04:41:33Z`. Commit `43c8e5507`, on
+`origin/main`. Trigger `api` (MCP), so the claim was advisory — the deploy guard
+hook matches `Bash|PowerShell` only and does not see an MCP deploy. Stated
+rather than glossed: that is a real gap in the guard, not a claim I took.
+
+**verify:** `[kalshi_odds]` lines at `04:48:11Z`, first board build after the
+deploy:
+
+```
+FETCHED markets=154 interval_s=3600 prev_age_s=None
+        per_series={'KXMLBKS': (137,'series_filter'), 'KXMLBOUTS': (17,'series_filter')}
+HISTORY status=ok opened=154 appended=154 unchanged=0 tickers=154
+        trimmed_points=0 trimmed_tickers=0
+MOVES   tracked=154 moved=0 unmoved=0 too_new=154
+BY_GAME_DATE {'2026-08-26': {'KXMLBKS': 137, 'KXMLBOUTS': 17}}
+BOARD_JOIN kalshi_markets=154 board_rows=363 matched=0
+        reasons={'market_closes_on_another_date': 154}
+```
+
+**What this proves.** The price history exists and is being written: 154 tickers
+opened on the first run, which is the thing that did not exist before — every
+Kalshi price we had ever fetched was discarded on the next fetch, so "has this
+moved" was unanswerable no matter how often we asked. `too_new=154` is the
+counter earning its keep on its very first run: one observation each, reported
+as *not watched long enough* rather than as 154 markets that have not moved.
+
+**What this does NOT prove.** The hourly gate has not been observed holding —
+`prev_age_s=None` means this was the first fetch, and the `CACHED` line that
+would demonstrate the interval had not appeared by the time of this entry. Open
+obligation.
+
+**What it CORRECTED, and this is the useful part.** `BY_GAME_DATE` put all 154
+markets on a single date, `2026-08-26`. **137 different pitchers do not all
+pitch on one day**, so `close_time` is very likely a settlement deadline rather
+than first pitch — which means `board_by_game_date` is grouping by the wrong
+field, and the join's `market_closes_on_another_date: 154` is measuring my
+assumption rather than the calendar. The date guard shipped hours earlier as a
+fix for a zero-match join; it is now the most likely CAUSE of one.
+
+Not guessed at. `93cf07d9e` prints one market's `open_time` / `close_time` /
+`expiration_time` / `ticker` / `event_ticker` per series verbatim, so the next
+run says which field carries the game date. Same choice `probe()` made for the
+price fields, which is what caught the 100x error before it shipped.
+
+**Also measured, unrelated to this deploy:**
+
+```
+LIVE_MARKS orders=58 marked=0 reasons={'market_not_on_board': 58}
+           by_venue=[('paper',0,None), ('paper:kalshi',0,None), ('paper:novig',0,None)]
+VENUE_SCOPE venue=kalshi rows_in=363 scoped=0 coverage=0.0
+           refusals={'venue_not_quoting': 363}
+PAPER2_PLAN_WRITTEN date=2026-08-22 venue=kalshi rows_in=0 positions=0 staked=$0
+```
+
+All three are the same fact: at 04:48 the board was 363 rows of European soccer
+(`alternate_totals_corners` 223, `h2h` 53, `totals` 43, `btts` 39). Kalshi does
+not quote English football corners, so nothing scoped, nothing marked, and
+paper2 wrote an empty plan. Not a defect in any of the three — but it does mean
+**no Kalshi number in this session rests on a slate the two sources share**,
+and that remains true until the board carries MLB again.
+
+---
+
 ## 2026-08-19 — refresh-worker CLAIM FORCE-BROKEN AGAIN, SAME COLLISION — plus a self-correction on the test used
 
 **NO DEPLOY.** Claim hygiene, and a correction to this session's own
@@ -24446,3 +24512,252 @@ is worth writing down because it looks exactly like the latter in the deploy lis
 45px rows, the 880px floor still in force). NOT measured on the live page: the
 local mirror has no blotter rows so `/mlb` renders no table here, and the proxy
 403s the Render host from this container. Needs a human look on a phone.
+
+## 2026-08-23 01:52:58Z — web `2f214e3a` — `#514` **MOMENTUM IS ON WNBA CARDS**
+
+- **service:** web (`srv-d88ahvrbc2fs73eodu30`), deploy `dep-da554ujncjis73fqprr0`
+- **holder:** lane `basketball-live-momentum`
+- **verify:** **`attached=3` of `games=3`, and ZERO `MOMENTUM_NO_JOIN` lines since.**
+
+      01:57:43  blocks=2 matched=1 attached=1
+      01:58:55  blocks=2 matched=2 attached=2
+      02:01:51  blocks=2 matched=2 attached=2
+      02:04:33  blocks=2 matched=2 attached=2
+      02:06:16  blocks=3 matched=3 attached=3   (x4 consecutive)
+
+**`matched == attached` ON EVERY LINE.** Every block that joined produced a
+chart — no silent chart failures behind a successful join, which is the second
+thing `matched` was split out to be able to say.
+
+The `matched=1 of blocks=2` readings are CORRECT, not partial: the second block
+is the finished game whose newest row predates the producer deploy and carries
+`('-','-')` for tricodes. Unjoinable by design rather than by accident.
+
+### THE BUG, AND THREE WRONG GUESSES BEFORE IT
+
+`LA` vs `LAS`. ESPN's tricode for the Los Angeles Sparks against this module's
+own vocabulary — away matched, home did not. `_canonical_wnba_tri` (`cards.py`
+:284) already mapped `LA -> LAS` and the comment at :314 names this exact
+ESPN-vs-canonical difference. **The join was not using a normaliser that already
+existed for this.**
+
+Every diagnosis I offered along the way was wrong:
+
+| guess | disproved by |
+|---|---|
+| the producer is not writing | `blocks=2` — blocks existed |
+| game-state dependent (finished game, stale id) | flipped 0/2/0 inside 60s on one instance |
+| ids are `AWY@HOM` | they were opaque 33-char hashes |
+| the sources disagree about which team is HOME | mirror check: CSV and live_state agree |
+
+**THE INSTRUMENT WAS RIGHT EACH TIME AND I WAS NOT.** Three increments, each
+shipped ALONE before any fix: `blocks` beside `attached`, then `matched` beside
+`attached`, then both sides' `(away, home)` pairs. The third printed the answer
+directly. Had any guess shipped alongside its instrument, the counter would have
+gone green for the wrong reason and the real cause would have stayed unnamed.
+
+### WHAT WAS DELIBERATELY NOT DONE
+
+Matching on an UNORDERED pair would have gone green two hours earlier — and
+drawn the chart MIRRORED, showing the wrong team pressing. Normalising is safe
+in the way that is not: it maps two spellings of ONE team onto each other and
+can never swap which side is home. A test pins that a reversed card still fails
+closed. A missing panel is a small bug; a confidently reversed one is a wrong
+answer, and soccer's `#160` is exactly that failure.
+
+## 2026-08-23 — WHAT THE 2026-08-22 WNBA SLATE ACTUALLY TAUGHT US
+
+**Nothing about whether momentum predicts anything. Phase C has never run**, and
+cannot be run from a Claude Code session: the jsonl lives on the worker and web
+disks (not in the checkout — `find` confirms), and ESPN is 403 from the sandbox.
+It needs a one-shot job ON the worker, reporting through the log collector.
+
+What WAS measured, from 7 real SHAPE lines across 2 games:
+
+### 1. The possession estimator is accurate AND slightly biased
+
+Ratios against ~160 combined possessions per 40 min: **1.033, 1.043, 1.017,
+1.012, 1.012, 1.035, 1.028**. Seven of seven within 4.3%, across two games and
+the full arc of one (19 → 37 minutes).
+
+**But all seven are ABOVE 1.0, mean ~1.026.** That is a systematic ~2.6%
+overcount, not noise — most likely the `0.44*FTA` coefficient or the OREB
+subtraction. Irrelevant to a chart; it needs naming before this feeds a price.
+
+### 2. The two decay axes agreed 7 of 7
+
+Including a sign flip BETWEEN games (game 1 negative throughout, game 2
+positive). That is the premise the possessions axis exists for: one half-life
+that ports across NBA/WNBA/NCAAB without re-tuning per pace regime.
+
+### 3. THE SIGNAL IS FAST AND THE GRID WAS SLOW — a real design error, caught
+
+At the shipped 120s half-life, game 1: `current` moved **x4.5 UP** and later
+**x0.30 DOWN**, each inside **55 seconds of game clock**.
+
+The horizons being predicted are a QUARTER (600s) and a HALF (1200s) — the
+markets the slate itself discovered (`spreads_q4`, `totals_h2`). A 120s
+half-life asked about the next ten minutes is a fast signal answering a slow
+question, and the grid topped out at 180s. **It could only ever have returned
+"no signal" for the interval markets, and would not have said why** — a falsely
+negative result indistinguishable from a real one. Grid widened to 60-600s and
+4-40 possessions.
+
+### 4. THE SAMPLE IS FAR THINNER THAN THE PROBE COUNT SUGGESTS
+
+Probes sit on a 30s grid, so at a 600s horizon they overlap 20-fold:
+
+    600s horizon:   55 probes/game, but only ~3 NON-OVERLAPPING windows/game
+    1200s horizon:  35 probes/game, but only ~1
+
+Across last night's ~3 games that is **~9 independent quarter-length windows and
+~3 half-length ones.** A correlation quoted on n=165 would be quoting an
+overlap artefact. This is `CLAUDE.md`'s coverage rule in a new place: report the
+number the result actually rests on, not the row count.
+
+**So a Phase C run on one night cannot settle anything.** It can only reject a
+signal so strong it would be visible in a dozen windows, or motivate collecting
+more nights. Say which before running it.
+
+## 2026-08-23 15:57:56Z — live-odds-worker `26d67b8b` — WNBA SEASON BACKFILL (one-shot)
+
+- **service:** live-odds-worker, deploy `dep-da5hh13ncjis738uv530`
+- **trigger:** an env-var write, NOT a code push — `SYNDICATE_WNBA_MOMENTUM_BACKFILL=2026-05-01..2026-08-21`
+- **verify:** PENDING — `BACKFILL_START`, then `WROTE date=... games=N rows=N` lines,
+  then `BACKFILL_DONE exit=0`.
+
+**THE ENV WRITE MERGED, IT DID NOT REPLACE.** `update_environment_variables`
+defaults `replace=false`, checked before calling. `CLAUDE.md`'s standing warning
+is that a `render.yaml` push fires `blueprint_sync` and rewrites the WHOLE env
+block; a merged API write is a different mechanism and does not. Worth keeping
+distinct — the warning is about the blueprint path, not about env changes as
+such.
+
+### WHY THE GATE IS NOT IN THE WORKER ENTRYPOINT
+
+`scripts/run_refresh_worker.py` is the natural home and is claimed by the OPEN
+lane `portfolio-ledger-service-split`, opened 2026-08-22 and plausibly LIVE —
+unlike the unowned, archived lanes crossed earlier tonight, where the protocol's
+purpose (no concurrent edits) was not actually at risk. Editing a contested
+shared entrypoint to schedule my own lane's job is what the protocol exists to
+stop, so the gate lives in `poll_basketball_momentum.py`, already the momentum
+subsystem's entry point on that worker.
+
+### THE RANGE STOPS AT 08-21, DELIBERATELY
+
+Last night's 08-22 dump came from LIVE capture and has the per-tick causal jsonl
+beside it. The backfill skips existing dates, but ending before it removes the
+question entirely. A backfilled 08-22 would be more COMPLETE (final feed) and
+less TRUE (no record of what was displayed), and those are not the same artifact.
+
+### WHAT IT BUYS
+
+There is no play-level history in this repo — measured, not assumed:
+`live_pbp_stats_*.jsonl` holds 0 clock values across 37 files, and
+`game_cards_*.csv` carries 81 distinct games of odds with no plays.
+
+    live capture      16 interval outcomes/night -> ~7 nights to 100
+    one WNBA season   ~1.8 min -> ~1,144 quarter outcomes
+
+Roughly seventy nights of live capture, for about two minutes of fetching.
+
+## 2026-08-23 16:47:55Z — live-odds-worker `0f58cf02` — season pull RETRY after a 400
+
+- **deploy:** `dep-da5i8eu417fc73fj0lr0`
+- **verify:** PENDING — `WROTE date=... games=N rows=N` in place of `SCOREBOARD_FAILED`.
+
+### THE FIRST ATTEMPT 400'd ON EVERY DATE, AND IT WAS A RETYPED URL
+
+    [backfill] SCOREBOARD_FAILED date=2026-06-19 HTTPError: HTTP Error 400
+
+...repeated across the whole range at 16:04Z. `_SPORT_PATH["wnba"]` is already
+`"sports/basketball/wnba"`; the backfill rewrote the scoreboard URL by hand and
+prefixed `sports/` a second time, so every request went to
+`.../v2/sports/sports/basketball/wnba/scoreboard`.
+
+**NOT the 403 UA trap this subsystem documents at length.** A plain 400, from a
+URL typed wrong ten lines from one that already worked. The lesson is narrower
+and more useful than "be careful with ESPN hosts": *a URL that is known to work
+is reused, not retyped.* There is now one `scoreboard_url()` and both callers
+share it — pinned by a test asserting they are the SAME FUNCTION OBJECT, so the
+divergence cannot come back.
+
+### THE FAILURE DESIGN EARNED ITS KEEP ON ITS FIRST REAL OUTING
+
+Every date failed FAST and was NAMED; nothing hung; no sentinel was written;
+and the run exited **3, not 0**.
+
+That last one is what mattered. Exiting 0 would have written the sentinel and
+marked the season permanently "done" having fetched nothing — the exact "silent
+empty run mistaken for an off-season" case the exit code was written for. It
+fired correctly the first time it was needed, which is more than most such
+guards ever get to prove.
+
+### VERIFIED 16:56:31Z — THE SEASON IS ON DISK
+
+    [backfill] DONE league=wnba 2026-05-01..2026-08-21 games=282 rows=66688 empty_dates=14
+    [basketball_momentum] BACKFILL_DONE spec=2026-05-01..2026-08-21 exit=0
+
+**282 games, 66,688 pressure rows, 3m38s.** 236 rows/game against a ~200
+estimate, so the 0.10 MB/night sizing holds. 1,128 quarter outcomes and 564
+half outcomes.
+
+**This is the first play-level history this repo has ever held.** Until today
+the answer to "what did a WNBA possession sequence look like in May" was: the
+vendor app built it in-process and threw it away. That is the gap `#514` was
+filed against, and it is closed for one season in under four minutes.
+
+For scale: 1,128 quarter outcomes is **~70 nights** of a four-game live slate,
+and `live-game-line-projection` is currently bounded at `games_with_outcome: 3`.
+
+**WHAT IS NOT YET TRUE, stated so the volume does not blur it:** no correlation
+has been measured, nothing has been fitted, and the leakage guard has only ever
+run on FIXTURES. Proving the substrate on synthetic rows proved the logic, not
+the feed. The next reading is that guard on real data, and a season is exactly
+the size of thing that embarrasses a design which looked fine on 300 synthetic
+rows.
+
+## 2026-08-23 17:10:03Z — THE LEAKAGE GUARD PASSES ON REAL DATA
+
+    [verify] SEASON dates=99 games=282 projection_rows=21065
+    [verify] LEAKAGE games_checked=282 probes_compared=12429 state_fields_that_MOVED=0 PASS
+    [verify] PACE per_min p10=3.52 median=3.87 p90=4.22
+    [verify] POSSESSIONS_AT_END median=153.0 n=282
+    [verify] FWD_600_COMPLETE 15425/21065 (73.2%)
+
+**Zero leaking fields across 12,429 probe comparisons on 282 real games.** The
+guard had only ever run on fixtures, which proved the logic and not the feed.
+It now means something, and it means something because it was shown to FAIL
+first: injecting one state field that sees the whole feed moves 215 of 215
+probes and exits 5.
+
+### A CORRECTION: MY "2.6% HIGH" ESTIMATOR BIAS WAS AN ARTEFACT
+
+This morning, from 7 readings across 2 games, I reported the possession
+estimator as "systematically ~2.6% HIGH" — ratios 1.012..1.043 against 160
+combined possessions per 40 min.
+
+**That 160 was an assumption I supplied, not a measurement.** Across 282 games
+the estimator lands at a median of **153.0** at the final buzzer, and pace
+(3.87/min x 40 = 154.8) agrees with it. So the estimator is internally
+consistent, and the "bias" was a bias in my reference constant.
+
+What is now measured: internal consistency, and ~153 combined possessions per
+WNBA game. Whether 153 matches TRUE WNBA pace needs an external reference I do
+not have and must not assert from memory. The earlier claim should not be
+carried forward.
+
+### THE ONE FINDING THAT CONSTRAINS ANY FIT
+
+**Only 73.2% of rows have a COMPLETE 600s forward window.** More than a quarter
+run past the end of the captured game. A truncated window looks like a
+low-scoring one, so a fit trained on all rows learns "late game means low
+totals" — which is false and would price fourth-quarter totals badly. The flag
+exists per row; the fit must use it.
+
+### NEXT: THE SWEEP, GATED SEPARATELY ON PURPOSE
+
+`SYNDICATE_WNBA_MOMENTUM_SWEEP` runs the pooled correlation grid — the question
+the lane was opened to answer. Deliberately NOT chained to the verify passing:
+a sweep that only runs on a clean check has an ambiguous absence, unable to
+distinguish "clean but unrun" from "blocked". Two flags, two readings.
