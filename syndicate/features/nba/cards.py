@@ -41,6 +41,10 @@ from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.status_text import BASKETBALL_LIVE_TOKENS
+from syndicate.features.shared.status_text import TERMINAL_TOKENS
+from syndicate.features.shared.status_text import looks_live_status_text as _shared_looks_live
+from syndicate.features.shared.status_text import looks_terminal_status_text as _shared_looks_terminal
 
 
 def _render_web_dyno() -> bool:
@@ -290,30 +294,18 @@ def _parse_utc_datetime(value: Any) -> datetime | None:
 
 
 def _looks_live_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
-    if not text:
-        return False
-    return any(token in text for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
+    return _shared_looks_live(*values, tokens=BASKETBALL_LIVE_TOKENS)
 
 
 def _looks_terminal_status_text(*values: Any) -> bool:
-    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
-    if not text:
-        return False
-    return any(
-        token in text
-        for token in (
-            "final",
-            "finished",
-            "complete",
-            "full time",
-            "ft",
-            "postponed",
-            "cancelled",
-            "canceled",
-            "suspended",
-        )
-    )
+    """**`"ft"` USED TO MATCH `"hal[ft]ime"`, so a halftime game read as Final.**
+
+    Measured on a live WNBA slate 2026-08-23. These were substring tests, and
+    `token in text` makes every short token a landmine inside ordinary prose.
+    The token lists were never wrong; the matching was. Boundary matching lives
+    in `shared/status_text.py` with the full chain written out.
+    """
+    return _shared_looks_terminal(*values, tokens=TERMINAL_TOKENS)
 
 
 def _normalized_game_status(
