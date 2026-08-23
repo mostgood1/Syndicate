@@ -86,6 +86,36 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         print(f"[kalshi_discovery] PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
         return {"status": "error", "reason": f"probe_error: {exc}"}
 
+    # AUTO-REGISTER player-prop series from the signed catalogue, on the worker
+    # that BUILDS THE PLAN. Discovery is per-process state, so live-odds-worker
+    # doing it does not help refresh-worker price anything.
+    try:
+        from syndicate.features.shared.kalshi_catalogue import (
+            auto_series_from_catalogue,
+            register_discovered,
+        )
+        from syndicate.features.shared.kalshi_client import discover_series
+
+        catalogue = discover_series()
+        if catalogue.get("status") == "ok":
+            result = register_discovered(auto_series_from_catalogue(catalogue.get("titles") or {}))
+            print(
+                "[kalshi_discovery] AUTO_SERIES"
+                f" added={len(result.get('added') or {})}"
+                f" total_discovered={result.get('total_discovered')}"
+                f" sample={list((result.get('added') or {}).items())[:8]}",
+                flush=True,
+            )
+        else:
+            # Named: "the catalogue did not answer" is not "Kalshi lists no
+            # player props", and only one of those is a reason to stop.
+            print(
+                f"[kalshi_discovery] AUTO_SERIES_UNAVAILABLE errors={catalogue.get('errors')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(f"[kalshi_discovery] AUTO_SERIES_ERROR {type(exc).__name__}: {exc}", flush=True)
+
     try:
         report = discover()
     except KalshiError as exc:

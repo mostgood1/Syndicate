@@ -53,15 +53,15 @@ from collections.abc import Mapping
 from typing import Any
 
 def default_sports_series() -> tuple[str, ...]:
-    """Which series to price, from the CATALOGUE rather than a list here.
+    """Every series we price: hand-registered PLUS auto-discovered.
 
-    Adding a sport is then one registry line in one file, and the fetch, the
-    join and the venue scope all pick it up at once. A list maintained here as
-    well would be a second place to forget.
+    Adding a sport is one registry line, and discovery adds the rest from
+    Kalshi's own catalogue. The fetch, the join and the venue scope all read
+    this one function, so none of them can drift from the others.
     """
-    from syndicate.features.shared.kalshi_catalogue import SERIES_SPORT
+    from syndicate.features.shared.kalshi_catalogue import all_series
 
-    return tuple(sorted(SERIES_SPORT))
+    return tuple(sorted(all_series()))
 
 
 def sports_series() -> tuple[str, ...]:
@@ -90,7 +90,15 @@ def kalshi_odds_enabled() -> bool:
     return str(raw).strip().lower() not in {"0", "false", "no", "off"}
 
 
-DEFAULT_REFRESH_INTERVAL_SECONDS = 3600
+# TWO MINUTES, not an hour. The hourly default was written when the only
+# consumer was a next-day opening line, and it is the wrong number entirely for
+# acting on a live game: a rebounds line moves every possession, and a price
+# fetched an hour ago is a memory being sent as a limit order.
+#
+# Affordable now because reads are SIGNED -- the 429s that forced pacing were
+# on the anonymous quota. Per-series, so the cost is one call per series per
+# interval and the per-tick cap only smooths the burst.
+DEFAULT_REFRESH_INTERVAL_SECONDS = 120
 # A failed fetch retries sooner than a successful one -- but not immediately.
 FAILED_RETRY_SECONDS = 600
 
@@ -162,7 +170,7 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     }
 
 
-DEFAULT_SERIES_PER_TICK = 6
+DEFAULT_SERIES_PER_TICK = 12
 
 # Total markets kept in the artifact. The keyvalue store refuses at 8MB and
 # `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded

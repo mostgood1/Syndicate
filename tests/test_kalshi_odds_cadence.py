@@ -58,15 +58,21 @@ def test_the_series_list_comes_from_the_catalogue(monkeypatch):
     assert set(mod.default_sports_series()) == set(SERIES_SPORT)
 
 
-def test_the_interval_defaults_to_hourly():
-    assert mod.refresh_interval_seconds() == 3600
+def test_the_interval_is_short_enough_to_act_on_a_live_game():
+    """Hourly was written when the only consumer was a next-day opening line.
+
+    A rebounds line moves every possession, so an hour-old price sent as a limit
+    order is a memory. Affordable now because reads are SIGNED — the 429s that
+    forced pacing were on the anonymous quota.
+    """
+    assert mod.refresh_interval_seconds() == 120
 
 
 def test_a_bad_interval_falls_back_to_the_default_not_to_zero(monkeypatch):
     monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "not-a-number")
     # Falling back to 0 would turn a typo into an unpaced loop against a venue
     # that rate-limits us -- the exact failure the gate exists to prevent.
-    assert mod.refresh_interval_seconds() == 3600
+    assert mod.refresh_interval_seconds() == mod.DEFAULT_REFRESH_INTERVAL_SECONDS
 
 
 def test_a_bad_per_tick_cap_falls_back_rather_than_to_zero(monkeypatch):

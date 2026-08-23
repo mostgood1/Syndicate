@@ -164,3 +164,69 @@ def test_the_queue_excludes_what_we_have_already_decided_not_to_cover():
     )
     # Otherwise the queue drowns in things nobody intends to do.
     assert queue == {}
+
+
+# --------------------------------------------------------------------------
+# Auto-discovery -- 13,389 series, four registered by hand
+# --------------------------------------------------------------------------
+
+
+def test_wnba_is_not_swallowed_by_the_nba_token():
+    """The whole trap. `KXWNBAREB` contains "NBA", so a naive scan registers
+    every WNBA series as NBA and prices women's rebounds off a men's box."""
+    assert cat.sport_for_ticker("KXWNBAREB") == "wnba"
+    assert cat.sport_for_ticker("KXNBAPTS") == "nba"
+    assert cat.sport_for_ticker("KXWNBATEAMTOTAL") == "wnba"
+
+
+def test_only_player_props_are_registered():
+    found = cat.auto_series_from_catalogue({
+        "KXWNBAREB": "Women's Pro Basketball Player Rebounds",
+        "KXWNBAPTS": "Women's Pro Basketball Player Points",
+        "KXWNBATEAMTOTAL": "Women's Pro Basketball Team Totals",
+        "KXWNBA1QSPREAD": "Women's Pro Basketball 1st Quarter Spread",
+        "KXWNBAROY": "WNBA Rookie of the Year",
+        "KXWNBAGAME": "Women's Pro Basketball Game",
+    })
+    # A game line has no player to join on and needs an event mapping that does
+    # not exist; a future has no game at all.
+    assert set(found) == {"KXWNBAREB", "KXWNBAPTS"}
+
+
+def test_a_player_shaped_title_we_cannot_PRICE_is_still_refused():
+    found = cat.auto_series_from_catalogue({
+        "KXWNBADUNK": "Women's Pro Basketball Player to Dunk",
+        "KXWNBAREB": "Women's Pro Basketball Player Rebounds",
+    })
+    # Both conditions or neither: a stat `market_keys` cannot name would price
+    # nothing however player-shaped the title looks.
+    assert set(found) == {"KXWNBAREB"}
+
+
+def test_an_unknown_sport_is_skipped_rather_than_guessed():
+    assert cat.auto_series_from_catalogue({"KXCRICKETRUNS": "Cricket Player Runs"}) == {}
+
+
+def test_discovery_never_overwrites_a_hand_written_entry():
+    before = dict(cat.SERIES_SPORT)
+    cat.register_discovered({"KXMLBKS": "wnba"})
+    try:
+        # "We chose this" and "a title matched" are different confidence levels
+        # and must not become indistinguishable.
+        assert cat.sport_for_series("KXMLBKS") == "mlb"
+    finally:
+        cat._DISCOVERED.clear()
+        assert dict(cat.SERIES_SPORT) == before
+
+
+def test_register_reports_what_was_ADDED_not_what_was_seen():
+    try:
+        first = cat.register_discovered({"KXTESTPTS": "wnba"})
+        second = cat.register_discovered({"KXTESTPTS": "wnba"})
+        assert first["added"] == {"KXTESTPTS": "wnba"}
+        # Idempotent: a re-run adds nothing and says so.
+        assert second["added"] == {}
+        assert cat.sport_for_series("KXTESTPTS") == "wnba"
+        assert "KXTESTPTS" in cat.all_series()
+    finally:
+        cat._DISCOVERED.clear()

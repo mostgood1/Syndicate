@@ -47,6 +47,10 @@ from typing import Any
 __all__ = [
     "SERIES_SPORT",
     "sport_for_series",
+    "sport_for_ticker",
+    "auto_series_from_catalogue",
+    "register_discovered",
+    "all_series",
     "classify_market",
     "unmapped_series",
     "GRAMMAR_PLAYER_THRESHOLD",
@@ -126,9 +130,104 @@ _TEAM_SPREAD = re.compile(
 _MONEYLINE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 
 
+# Ticker token -> sport. ORDER MATTERS AND IS THE WHOLE TRAP: "KXWNBAREB"
+# contains "NBA", so a naive scan registers every WNBA series as NBA and prices
+# women's rebounds off a men's box score. Longest-first, and WNBA before NBA.
+_SPORT_TOKENS: tuple[tuple[str, str], ...] = (
+    ("NCAAF", "ncaaf"),
+    ("NCAAB", "ncaab"),
+    ("WNBA", "wnba"),
+    ("NBA", "nba"),
+    ("MLB", "mlb"),
+    ("NFL", "nfl"),
+    ("NHL", "nhl"),
+)
+
+# A title that names a PLAYER prop. Kalshi words them "…Player Rebounds",
+# "…Player Points". The word PLAYER is the discriminator: "Team Totals",
+# "1st Quarter Spread" and "Rookie of the Year" all lack it, and every one of
+# them is a market this system must not auto-register -- a game line has no
+# player to join on and needs an event mapping that does not exist.
+_PLAYER_PROP_TITLE = re.compile(r"\bplayer\s+(?P<stat>[A-Za-z0-9 +'-]+)$", re.IGNORECASE)
+
+
+def sport_for_ticker(ticker: Any) -> str | None:
+    """The sport a series ticker names, or None. Longest token first."""
+    text = str(ticker or "").strip().upper()
+    for token, sport in _SPORT_TOKENS:
+        if token in text:
+            return sport
+    return None
+
+
+def auto_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
+    """Series Kalshi lists that are PLAYER PROPS we can already price.
+
+    THE ALTERNATIVE TO A HAND-MAINTAINED REGISTRY. Kalshi lists 13,389 series;
+    four were registered by hand, and every sport added that way is a sport
+    somebody has to remember. This reads the catalogue Kalshi gave us and keeps
+    the ones that satisfy BOTH conditions:
+
+      1. the TITLE says "Player <stat>" -- Kalshi's own word for a player prop,
+         and the discriminator that excludes team totals, quarter spreads and
+         every futures market, none of which have a player to join on; and
+      2. `market_keys` resolves that stat for that sport -- so a market we
+         cannot name is never registered, however player-shaped it looks.
+
+    Both, because either alone is a guess. A title with "Player" in it whose
+    stat we cannot resolve would price nothing; a stat we can resolve on a
+    series that is actually a game line would join to the wrong thing.
+
+    The SPORT comes from the ticker, never the title: "Women's Pro Basketball"
+    is not a token this repo uses anywhere.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    found: dict[str, str] = {}
+    for ticker, title in (titles or {}).items():
+        sport = sport_for_ticker(ticker)
+        if sport is None:
+            continue
+        match = _PLAYER_PROP_TITLE.search(str(title or "").strip())
+        if not match:
+            continue
+        if canonical_market_key(sport, match.group("stat").strip()) is None:
+            continue
+        found[str(ticker).strip().upper()] = sport
+    return found
+
+
 def sport_for_series(series: Any) -> str | None:
-    """The sport, or None. Explicit table, never a prefix rule."""
-    return SERIES_SPORT.get(str(series or "").strip().upper())
+    """The sport, or None. Hand registry first, then anything discovery added.
+
+    Discovery writes into `_DISCOVERED` rather than into `SERIES_SPORT`, so a
+    hand-written entry always wins and the two never become indistinguishable
+    -- "we chose this" and "a title matched" are different confidence levels.
+    """
+    key = str(series or "").strip().upper()
+    return SERIES_SPORT.get(key) or _DISCOVERED.get(key)
+
+
+_DISCOVERED: dict[str, str] = {}
+
+
+def register_discovered(found: Mapping[str, str]) -> dict[str, Any]:
+    """Add auto-discovered series. Reports what was ADDED, not what was seen.
+
+    Idempotent, and never overwrites a hand-written entry.
+    """
+    added = {
+        ticker: sport
+        for ticker, sport in (found or {}).items()
+        if ticker not in SERIES_SPORT and _DISCOVERED.get(ticker) != sport
+    }
+    _DISCOVERED.update(added)
+    return {"added": added, "total_discovered": len(_DISCOVERED)}
+
+
+def all_series() -> dict[str, str]:
+    """Every series we price: hand-registered plus discovered."""
+    return {**_DISCOVERED, **SERIES_SPORT}
 
 
 def threshold_to_line(threshold: Any) -> float | None:

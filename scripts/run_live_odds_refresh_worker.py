@@ -789,6 +789,31 @@ def _kalshi_series_catalogue_at_boot() -> None:
         # without an event mapping that does not exist. A ticker list cannot
         # answer that and a title list can.
         titled = report.get("titles") or {}
+        # AUTO-REGISTER the player-prop series Kalshi lists. Four were
+        # hand-written; the catalogue has 13,389, and every sport added by hand
+        # is a sport somebody has to remember. Registered only when the TITLE
+        # says "Player <stat>" AND `market_keys` resolves that stat for that
+        # sport -- either alone is a guess.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import (
+                auto_series_from_catalogue,
+                register_discovered,
+            )
+
+            discovered = auto_series_from_catalogue(titled)
+            result = register_discovered(discovered)
+            print(
+                "[live_odds_worker] KALSHI_AUTO_SERIES"
+                f" added={result.get('added')}"
+                f" total_discovered={result.get('total_discovered')}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_AUTO_SERIES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         for token in ("WNBA",):
             found = series_matching([token], tickers)
             print(
