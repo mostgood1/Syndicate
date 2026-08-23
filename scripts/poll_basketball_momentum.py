@@ -36,7 +36,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.basketball_momentum_artifacts import append_momentum_artifact
-from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload
+from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload_streamed
+from syndicate.features.shared.basketball_momentum_artifacts import momentum_events_path
+from syndicate.features.shared.basketball_momentum_artifacts import strip_rows
+from syndicate.features.shared.basketball_momentum_artifacts import write_momentum_events
 from syndicate.features.shared.basketball_momentum_artifacts import momentum_artifact_path
 
 _SPORT_PATH = {
@@ -146,15 +149,37 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
-    summaries = {event_id: fetch_summary(league, event_id) for event_id in event_ids}
-    summaries = {k: v for k, v in summaries.items() if v}
-
-    payload = build_momentum_payload(summaries, league_code=league, date_str=date_str)
+    # **ONE SUMMARY IN MEMORY AT A TIME, not the whole slate.** The previous
+    # form fetched every game first and held them all while blocks were built.
+    # An ESPN basketball summary carries the full play-by-play plus box score,
+    # so a late-game one is megabytes of parsed Python -- and this worker was
+    # measured at 93.7% of its 2048MB with ~129MB headroom on a TWO-game slate.
+    # Four games would have multiplied the peak for no benefit: each summary is
+    # read once, reduced to a few dozen sampled points, and never needed again.
+    missing: list[str] = []
+    payload = build_momentum_payload_streamed(
+        event_ids,
+        lambda event_id: fetch_summary(league, event_id),
+        league_code=league,
+        date_str=date_str,
+        on_missing=missing.append,
+        include_rows=True,
+    )
+    fetched = int(payload.get("count") or 0)
+    # **NAMED, NOT SILENTLY DROPPED.** On a one-game slate a failed fetch showed
+    # up as `live_events=1 fetched=0`. With four games in play, three successes
+    # would hide the fourth entirely unless the miss says which one.
+    if missing:
+        print(
+            f"[basketball_momentum] SUMMARY_MISSING league={league} date={date_str} "
+            f"events={','.join(missing)}",
+            flush=True,
+        )
     # `with_series` NOT `count`: a slate of games we fetched but could not read
     # and a slate with no games are both "0 charts", and only one of them is a
     # defect. Printing the pair is what makes them distinguishable in a log.
     print(
-        f"[basketball_momentum] fetched={len(summaries)} games={payload['count']} "
+        f"[basketball_momentum] fetched={fetched} games={payload['count']} "
         f"with_series={payload['with_series']}",
         flush=True,
     )
@@ -176,20 +201,16 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     # `reason` from the block, whether `plays` arrived at all, and whether the
     # header yielded competitors (no competitors -> no home side -> every event
     # silently unsigned and dropped).
-    if summaries and not payload.get("with_series"):
+    # The summaries are gone by now -- deliberately, that is the whole point of
+    # streaming -- so this reports what the BLOCK knows rather than re-reading a
+    # feed we no longer hold. `plays`/`competitors` counts moved into the block's
+    # own `reason`, which `build_momentum_block` already states.
+    if fetched and not payload.get("with_series"):
         for event_id, block in (payload.get("games") or {}).items():
-            summary = summaries.get(event_id) or {}
-            plays = summary.get("plays")
-            header = summary.get("header") if isinstance(summary.get("header"), dict) else {}
-            competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
-            first = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
-            competitors = first.get("competitors") if isinstance(first.get("competitors"), list) else None
             print(
                 f"[basketball_momentum] NO_SERIES event={event_id} "
                 f"supported={block.get('supported')} reason={block.get('reason')!r} "
-                f"events={block.get('events')} "
-                f"plays={len(plays) if isinstance(plays, list) else 'ABSENT'} "
-                f"competitors={len(competitors) if competitors is not None else 'ABSENT'}",
+                f"events={block.get('events')}",
                 flush=True,
             )
 
@@ -214,8 +235,28 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
         )
         return payload
 
+    # **TWO ARTIFACTS, AND THEY ARE NOT INTERCHANGEABLE.**
+    #
+    # The raw-event dump is OVERWRITTEN with the latest complete feed -- ESPN is
+    # cumulative, so the newest write always holds the whole game and appending
+    # would rewrite the same early plays every tick (~20x the bytes for a
+    # four-game slate, no more complete). This is what the Phase C sweep reads,
+    # and it means the sweep NEVER NEEDS ESPN AGAIN: a decayed series cannot be
+    # inverted back into the events that made it, so re-fitting at another
+    # half-life requires the rows themselves.
+    events_path = momentum_events_path(out_root, league_code=league, date_str=date_str)
+    rows_written = write_momentum_events(payload, path=events_path)
+    print(
+        f"[basketball_momentum] events_dump rows={rows_written} games={payload['count']} "
+        f"path={events_path}",
+        flush=True,
+    )
+
+    # The per-tick record stays APPEND-ONLY and row-free. It is the causal
+    # evidence -- what a card actually showed at instant t -- which an
+    # overwritten file can never reconstruct.
     path = momentum_artifact_path(out_root, league_code=league, date_str=date_str)
-    append_momentum_artifact(payload, path=path)
+    append_momentum_artifact(strip_rows(payload), path=path)
     print(f"[basketball_momentum] appended {path}", flush=True)
 
     # **A SHAPE LINE PER CAPTURED GAME, because `with_series=1` says a series

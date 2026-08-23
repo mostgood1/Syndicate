@@ -97,6 +97,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # the export endpoint returning `paths: []` for it means "never captured",
     # not "capture is broken".
     "*_source/source_artifacts/data/live_lens/live_momentum_*.jsonl",
+    "*_source/source_artifacts/data/live_lens/momentum_events_*.json",
     "*_source/source_artifacts/data/processed/recommendations*.json",
     "*_source/source_artifacts/data/processed/recommendations*.csv",
     "*_source/source_artifacts/data/processed/props_recommendations*.json",
@@ -253,6 +254,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # sport whose root resolves to the shallow layout would otherwise transfer
     # its projections and silently drop its momentum.
     "*_source/data/live_lens/live_momentum_*.jsonl",
+    "*_source/data/live_lens/momentum_events_*.json",
     "*_source/data/processed/recommendations*.json",
     "*_source/data/processed/recommendations*.csv",
     "*_source/data/processed/props_recommendations*.json",
