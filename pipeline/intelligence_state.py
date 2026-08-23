@@ -5146,6 +5146,39 @@ class IntelligenceStateService:
                         f"status={exec_result.get('status')} reason={exec_result.get('reason')}",
                         flush=True,
                     )
+
+                # PAPER2 -- the same placer against the venue-restricted plan,
+                # booked under its own `venue` so the two books never merge.
+                # Placed SECOND and in its own try/except: the unrestricted
+                # portfolio is the one that matters, and a comparison must never
+                # be able to break the thing it is comparing against.
+                venue_scope = commit_result.get("venue")
+                if venue_scope and (commit_result.get("venue_plan") or {}).get("positions"):
+                    try:
+                        paper2_result = run_execution(
+                            str(selected_date or ""), inline=True, venue_scope=venue_scope
+                        )
+                        if paper2_result.get("status") == "ok":
+                            print(
+                                f"[intelligence_state] PAPER2_EXECUTED date={selected_date} "
+                                f"venue={paper2_result.get('venue')} "
+                                f"placed={paper2_result.get('placed')} "
+                                f"duplicates={paper2_result.get('duplicates')} "
+                                f"skipped={paper2_result.get('skipped')}",
+                                flush=True,
+                            )
+                        elif paper2_result.get("reason") not in {"disabled", "no_plan"}:
+                            print(
+                                f"[intelligence_state] PAPER2_EXECUTE_SKIPPED "
+                                f"status={paper2_result.get('status')} "
+                                f"reason={paper2_result.get('reason')}",
+                                flush=True,
+                            )
+                    except Exception as exc:
+                        print(
+                            f"[intelligence_state] PAPER2_EXECUTE_FAILED error={exc}",
+                            flush=True,
+                        )
             elif commit_result.get("reason") not in {"disabled", "no_shortlist"}:
                 # `disabled` and `no_shortlist` are the expected quiet states and
                 # would be pure noise every cycle. Anything else is a real
