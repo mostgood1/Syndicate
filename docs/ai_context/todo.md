@@ -2312,6 +2312,55 @@ tree clean.
 `memory_high_water.json`, so every test run leaves an untracked file that trips
 commit hooks. `data/live/` and `reports/opportunity_contract/` are the same.
 
+### `#535` — **Interval-final score projection for live basketball betting. MOMENTUM IS DEAD; THE ARITHMETIC IS ALIVE.** — measured 2026-08-23, lane `basketball-live-momentum`
+
+**Id may need renumbering at merge — main held up to `#532` when this was
+written, and six collisions happened today.** Checking an id is free is not
+reserving it.
+
+**`#514`'s QUESTION IS ANSWERED AND THE ANSWER IS NO.** Pooled over 282 WNBA
+games: 120 correlations across 40 cells and 3 outcome measures, largest **0.0613**
+against a **pre-registered** noise floor of 0.082 median / 0.111 p95. Zero of 120
+clear even the median. Soccer reached the same verdict independently a day
+earlier. **Momentum must not feed a price** — that is measured, not cautious.
+The card chart stays: descriptive, direction-only label, `scale:
+uncalibrated_relative_to_game_peak` already declared.
+
+**WHAT REPLACED IT, AND WHY IT IS BETTER FOUNDED.** Projecting an interval's
+FINAL score from inside it is mostly ARITHMETIC — points remaining are bounded
+by possessions remaining, bounded by the clock. Measured error on the rest of
+the period, 282 games:
+
+    seconds left   0-60   60-120  120-240  240-420  420-600
+    naive_zero     2.00     6.00    13.00    23.00    37.00
+    league_rate    1.76     2.10     2.98     3.99     5.43
+    game_pace      1.59     2.11     3.14     4.37     6.50
+
+**The curve is the product.** 5.43 -> 1.76 points as the buzzer nears. A quarter
+total moves in half-points, so sub-2-point accuracy inside the final minute is
+potentially tradeable **if the market is slower** — UNTESTED, needs the live line.
+
+**GAME-TO-DATE PACE MAKES IT WORSE** (4 of 5 buckets, -0.43 overall). Small-sample
+overfitting: a game's PPP rests on ~150 possessions and estimates something
+largely league-constant (league PPP **1.1271**).
+
+**THAT REFUTES THE NAIVE LAYER, NOT THE PROPOSED ONE.** A TEAM's season profile
+is ~40 games of evidence; SITUATIONAL pace conditions on (margin x time left)
+which a game average smooths away. Correct structure: **shrink toward the league
+mean, with team and situation as adjustments** — partial pooling, not
+replacement.
+
+**NEXT:** `analyze_situational_pace` (merged, running) says whether the
+(margin x time) cells are flat. If flat, the league constant wins and this gets
+SIMPLER. Then per-team season profiles. Then, and only then, a market join —
+nothing here has been compared to a price, and `model_engine_standard.md` binds
+before it is.
+
+**INFRASTRUCTURE THIS LEAVES BEHIND:** 282 games / 66,688 rows of the first
+play-level history this repo has held; a leakage-guarded projection substrate
+(0 of 12,429 probe comparisons leaked); a season backfill that does NBA/NCAAB
+identically; and five one-shot analysis gates.
+
 ### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED AND DEPLOYED, CAPTURING ON A LIVE WNBA SLATE**; lane `basketball-live-momentum`
 
 **STATUS 2026-08-22 ~23:5xZ — the header above USED TO SAY "NOT DEPLOYED and
