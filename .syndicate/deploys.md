@@ -24344,3 +24344,55 @@ alone** before the fix so the instrument could not be confused with the guess.
 That ordering is also what caught the wrong diagnosis. Watching the counter
 across builds showed the flicker; shipping the guess alongside it would have
 "fixed" the problem and left the real cause unnamed.
+
+## 2026-08-23 01:52:58Z — web `2f214e3a` — `#514` **MOMENTUM IS ON WNBA CARDS**
+
+- **service:** web (`srv-d88ahvrbc2fs73eodu30`), deploy `dep-da554ujncjis73fqprr0`
+- **holder:** lane `basketball-live-momentum`
+- **verify:** **`attached=3` of `games=3`, and ZERO `MOMENTUM_NO_JOIN` lines since.**
+
+      01:57:43  blocks=2 matched=1 attached=1
+      01:58:55  blocks=2 matched=2 attached=2
+      02:01:51  blocks=2 matched=2 attached=2
+      02:04:33  blocks=2 matched=2 attached=2
+      02:06:16  blocks=3 matched=3 attached=3   (x4 consecutive)
+
+**`matched == attached` ON EVERY LINE.** Every block that joined produced a
+chart — no silent chart failures behind a successful join, which is the second
+thing `matched` was split out to be able to say.
+
+The `matched=1 of blocks=2` readings are CORRECT, not partial: the second block
+is the finished game whose newest row predates the producer deploy and carries
+`('-','-')` for tricodes. Unjoinable by design rather than by accident.
+
+### THE BUG, AND THREE WRONG GUESSES BEFORE IT
+
+`LA` vs `LAS`. ESPN's tricode for the Los Angeles Sparks against this module's
+own vocabulary — away matched, home did not. `_canonical_wnba_tri` (`cards.py`
+:284) already mapped `LA -> LAS` and the comment at :314 names this exact
+ESPN-vs-canonical difference. **The join was not using a normaliser that already
+existed for this.**
+
+Every diagnosis I offered along the way was wrong:
+
+| guess | disproved by |
+|---|---|
+| the producer is not writing | `blocks=2` — blocks existed |
+| game-state dependent (finished game, stale id) | flipped 0/2/0 inside 60s on one instance |
+| ids are `AWY@HOM` | they were opaque 33-char hashes |
+| the sources disagree about which team is HOME | mirror check: CSV and live_state agree |
+
+**THE INSTRUMENT WAS RIGHT EACH TIME AND I WAS NOT.** Three increments, each
+shipped ALONE before any fix: `blocks` beside `attached`, then `matched` beside
+`attached`, then both sides' `(away, home)` pairs. The third printed the answer
+directly. Had any guess shipped alongside its instrument, the counter would have
+gone green for the wrong reason and the real cause would have stayed unnamed.
+
+### WHAT WAS DELIBERATELY NOT DONE
+
+Matching on an UNORDERED pair would have gone green two hours earlier — and
+drawn the chart MIRRORED, showing the wrong team pressing. Normalising is safe
+in the way that is not: it maps two spellings of ONE team onto each other and
+can never swap which side is home. A test pins that a reversed card still fails
+closed. A missing panel is a small bug; a confidently reversed one is a wrong
+answer, and soccer's `#160` is exactly that failure.
