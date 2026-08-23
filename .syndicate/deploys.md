@@ -24692,3 +24692,27 @@ marked the season permanently "done" having fetched nothing — the exact "silen
 empty run mistaken for an off-season" case the exit code was written for. It
 fired correctly the first time it was needed, which is more than most such
 guards ever get to prove.
+
+### VERIFIED 16:56:31Z — THE SEASON IS ON DISK
+
+    [backfill] DONE league=wnba 2026-05-01..2026-08-21 games=282 rows=66688 empty_dates=14
+    [basketball_momentum] BACKFILL_DONE spec=2026-05-01..2026-08-21 exit=0
+
+**282 games, 66,688 pressure rows, 3m38s.** 236 rows/game against a ~200
+estimate, so the 0.10 MB/night sizing holds. 1,128 quarter outcomes and 564
+half outcomes.
+
+**This is the first play-level history this repo has ever held.** Until today
+the answer to "what did a WNBA possession sequence look like in May" was: the
+vendor app built it in-process and threw it away. That is the gap `#514` was
+filed against, and it is closed for one season in under four minutes.
+
+For scale: 1,128 quarter outcomes is **~70 nights** of a four-game live slate,
+and `live-game-line-projection` is currently bounded at `games_with_outcome: 3`.
+
+**WHAT IS NOT YET TRUE, stated so the volume does not blur it:** no correlation
+has been measured, nothing has been fitted, and the leakage guard has only ever
+run on FIXTURES. Proving the substrate on synthetic rows proved the logic, not
+the feed. The next reading is that guard on real data, and a season is exactly
+the size of thing that embarrasses a design which looked fine on 300 synthetic
+rows.
