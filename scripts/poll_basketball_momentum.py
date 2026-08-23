@@ -96,6 +96,20 @@ def _get_json(url: str, *, timeout: int = 25, browser_ua: bool = False) -> dict[
         return {}
 
 
+def scoreboard_url(league: str, date_str: str) -> str:
+    """The scoreboard URL, built in ONE place.
+
+    **`_SPORT_PATH` ALREADY CONTAINS `sports/`.** The season backfill rewrote
+    this line by hand and prefixed `sports/` a second time, producing
+    `.../v2/sports/sports/basketball/wnba/scoreboard` and HTTP 400 on every date
+    of a season pull. Two callers, two spellings, one of them wrong.
+
+    A URL that is known to work is reused, not retyped.
+    """
+    return (f"https://site.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}"
+            f"/scoreboard?dates={date_str.replace('-', '')}")
+
+
 def live_event_ids(league: str, date_str: str) -> list[str]:
     """Event ids for games IN PROGRESS. Not scheduled, not final.
 
@@ -104,7 +118,7 @@ def live_event_ids(league: str, date_str: str) -> list[str]:
     `poll_soccer_live_state` keeps the same separation for the same reason.
     """
     ymd = date_str.replace("-", "")
-    url = f"https://site.api.espn.com/apis/site/v2/{_SPORT_PATH[league]}/scoreboard?dates={ymd}"
+    url = scoreboard_url(league, date_str)
     # NO browser UA: `site.api.espn.com` 403s on it from Render (see `_get_json`).
     scoreboard = _get_json(url)
     events = scoreboard.get("events")
