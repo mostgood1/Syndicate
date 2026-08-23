@@ -199,11 +199,13 @@ _VERIFY_ENV = "SYNDICATE_WNBA_MOMENTUM_VERIFY"
 _SWEEP_ENV = "SYNDICATE_WNBA_MOMENTUM_SWEEP"
 _INTERVAL_ENV = "SYNDICATE_WNBA_INTERVAL_PROJECTION"
 _SITUATIONAL_ENV = "SYNDICATE_WNBA_SITUATIONAL_PACE"
+_JOIN_PROBE_ENV = "SYNDICATE_WNBA_MARKET_JOIN_PROBE"
 _backfill_started = False
 _verify_started = False
 _sweep_started = False
 _interval_started = False
 _situational_started = False
+_join_probe_started = False
 
 
 def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
@@ -476,6 +478,70 @@ def maybe_start_situational(league: str, out_root: Path) -> bool:
 
 
 
+def maybe_start_join_probe(league: str, out_root: Path) -> bool:
+    """Can the interval projection be joined to a real market line? Once.
+
+    **NOTHING MEASURED SO FAR HAS TOUCHED A PRICE.** The error curve is an error
+    curve; it becomes an edge only against a line that was actually available at
+    the moment the projection was made. That join reads two artifact families
+    built years apart -- play-level game state in GAME seconds, and book quotes
+    in WALL-CLOCK UTC -- and `CLAUDE.md` records what happens when this repo
+    joins across families without checking coverage first: four families that
+    looked like months of data and overlapped on ONE usable date.
+
+    So this reports the number of dates a join would actually rest on, and
+    refuses when any of the three requirements is missing -- including the
+    subtle one, a quote stream that exists but never moves, which is a pre-tip
+    snapshot rather than a live line.
+
+    Exit 4 means NOT_JOINABLE, and no sentinel is written for it: that is a
+    verdict about today's data, not a job that has been done.
+    """
+    global _join_probe_started
+    spec = str(os.environ.get(_JOIN_PROBE_ENV) or "").strip()
+    if not spec or _join_probe_started:
+        return False
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] JOIN_PROBE_BAD_SPEC {spec!r} -- want <start>..<end>",
+              flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, f"join_probe_{spec}")
+    if sentinel.exists():
+        print(f"[basketball_momentum] JOIN_PROBE_ALREADY_DONE spec={spec}", flush=True)
+        _join_probe_started = True
+        return False
+    _join_probe_started = True
+
+    def _run() -> None:
+        print(f"[basketball_momentum] JOIN_PROBE_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.probe_market_join_coverage import main as _probe_main
+
+            code = _probe_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] JOIN_PROBE_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            # **ONLY exit 0 SETS THE SENTINEL.** Exit 4 is NOT_JOINABLE, which is
+            # a fact about the data and can change tomorrow as more slates land.
+            # Sealing it would turn "not yet" into "never asked again".
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"[basketball_momentum] JOIN_PROBE_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-market-join-probe", daemon=True).start()
+    return True
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     # Fires at most once per process, and returns immediately -- the work runs
     # on a daemon thread so a live slate is never waiting on history.
@@ -484,6 +550,7 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     maybe_start_sweep(league, out_root)
     maybe_start_interval(league, out_root)
     maybe_start_situational(league, out_root)
+    maybe_start_join_probe(league, out_root)
 
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
