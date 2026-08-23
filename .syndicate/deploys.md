@@ -23956,9 +23956,52 @@ precondition holding, and it is the reading `#522` was built to take.
   deployed is NOT the one I checked five minutes earlier — checking the SHA
   Render actually picked, rather than the one I merged, is the step that made
   that harmless.
-- **verify:** PENDING — a `[basketball_momentum] SHAPE event=... sec_pts=N
-  poss_pts=N narrator=yes` line from a live WNBA game. That is the whole point
-  of the deploy; an entry that ends here is an unverified deploy.
+- **live at:** 23:57:26Z (instance `-fshq2`)
+- **verify:** **23:59:03.907Z, and the content check PASSES.**
+
+      [basketball_momentum] SHAPE event=401857164 events=105
+        as_of_s=1143.0 as_of_poss=78.68
+        sec_pts=20 sec_now=-0.6679 poss_pts=40 poss_now=-0.5268
+        narrator=yes narrator_events=53
+
+### WHAT THAT LINE ACTUALLY PROVES
+
+**`#514` has claimed since Phase A that this taxonomy works. Until 23:59:03Z
+every test of it ran on hand-built fixtures**, because ESPN is 403 from a Claude
+Code sandbox. This is the first reading off real data, and each field is a check
+that could have failed:
+
+| reading | expected | got | verdict |
+|---|---|---|---|
+| elapsed clock | ~19 min of game in ~59 min of wall clock (basketball runs ~3x) | `as_of_s=1143.0` = 19.05 min | **the clock tracks the real game** |
+| seconds samples | `floor(1143/60)+1 = 20` | `sec_pts=20` | exact |
+| possession samples | `floor(78.68/2)+1 = 40` | `poss_pts=40` | exact |
+| possession PACE | ~160 combined per 40 min -> 76.2 at 47.6% elapsed | `as_of_poss=78.68`, ratio **1.033** | **within 3.3% of real WNBA pace** |
+| narrator | present, under its own name | `narrator=yes narrator_events=53` of 105 | named correctly, ~50% subset |
+
+**The pace check is the one that matters most.** `poss_est = FGA + TOV +
+0.44*FTA - OREB` is computed by US from the play stream, specifically to avoid
+the thin `live_pbp_stats` family (19 of 126 records, one date). Nothing forced
+it to be right. Landing within 3.3% of published WNBA pace says the estimator is
+measuring possessions and not an artifact of the parser.
+
+**AND THE TWO AXES AGREE IN SIGN.** `sec_now=-0.6679`, `poss_now=-0.5268` —
+same direction, comparable magnitude. On the 6-event synthetic fixture used
+during development they had OPPOSITE signs (a 4-possession window against an
+8-possession half-life is nearly an unweighted sum, so early events dominate).
+That disagreement was a property of the toy, not the design; on 105 events and
+78 possessions the axes converge. **This is the first evidence the two decay
+axes measure the same underlying quantity** — which is exactly what Phase C's
+sweep is supposed to exploit.
+
+### STILL NOT PROVEN BY THIS LINE
+
+The **tenths-format clock path** (`_normalize_clock`, for ESPN's `"48.6"` under
+1:00). 105 events across two quarters must have traversed the last minute of
+Q1, and nothing crashed — but a silent drop looks identical to an absence of
+events there, which is the whole failure mode that function exists to prevent.
+`events=105` has no baseline to be compared against. Unproven, not disproven;
+it needs a row-level read of the jsonl, which is Phase C's first act.
 
 **WHY THIS SHIPPED MID-GAME.** The artifact has been capturing since 23:19:54Z
 and nothing has read its CONTENT. `with_series=1` proves a series was built,
