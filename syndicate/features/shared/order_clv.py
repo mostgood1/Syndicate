@@ -86,6 +86,7 @@ def clv_for_orders(
     *,
     date: str,
     clv_rows: Sequence[Mapping[str, Any]] | None = None,
+    unresolved_rows: Sequence[Mapping[str, Any]] | None = None,
     root: Any = None,
 ) -> dict[str, Any]:
     """Grade each order against the close. Per order, then per market, per scope.
@@ -108,6 +109,7 @@ def clv_for_orders(
             }
         )
         collected: list[Mapping[str, Any]] = []
+        collected_unresolved: list[Mapping[str, Any]] = []
         for sport in sports:
             try:
                 report = compute_clv_for_date(date, sport, root=root)
@@ -117,13 +119,29 @@ def clv_for_orders(
                 # the honest reading rather than a crash or a silent zero.
                 continue
             collected.extend(report.get("rows") or [])
+            # THE ATTRIBUTION, carried rather than discarded. An earlier version
+            # of this function kept only `rows` and reported a flat
+            # `no_close_for_market: 35` -- a number with no remedy attached,
+            # while the reason for each of those 35 was already computed one
+            # layer down. "Our book is absent from odds history" and "this
+            # market family is not tracked at all" look identical under one name
+            # and need completely different fixes.
+            collected_unresolved.extend(report.get("unresolved_rows") or [])
         clv_rows = collected
+        if unresolved_rows is None:
+            unresolved_rows = collected_unresolved
 
     by_key: dict[str, Mapping[str, Any]] = {}
     for row in clv_rows or ():
         key = row.get("key")
         if isinstance(key, str) and key:
             by_key.setdefault(key, row)
+
+    unresolved_by_key: dict[str, str] = {}
+    for row in unresolved_rows or ():
+        key = row.get("key")
+        if isinstance(key, str) and key:
+            unresolved_by_key.setdefault(key, str(row.get("reason") or ""))
 
     graded: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
@@ -161,11 +179,20 @@ def clv_for_orders(
             continue
         row = by_key.get(key)
         if row is None:
-            # No close resolved for this market. `compute_clv_for_date` counts
-            # WHY under its own `unresolved` -- market absent from history, close
-            # preceding the open, and so on -- and that detail is preserved
-            # there rather than flattened into this one name.
-            _row(REASON_NO_CLOSE, close_price=None, clv_pct=None, close_book_scope=None)
+            # No close for this market -- and WHY, when the resolver told us.
+            # `no_close_reason` distinguishes `no_market_in_history` (this
+            # family is not tracked: h2h_lay, totals_alt, h2h_3_way,
+            # spreads_alt) from `close_precedes_open` (a real close exists but
+            # predates our opening) from an opening the resolver never saw at
+            # all (None -- our book absent from the shard). Three different
+            # problems; only the flat name made them look like one.
+            _row(
+                REASON_NO_CLOSE,
+                close_price=None,
+                clv_pct=None,
+                close_book_scope=None,
+                no_close_reason=unresolved_by_key.get(key),
+            )
             continue
 
         close_price = row.get("close_price")
@@ -196,10 +223,24 @@ def clv_for_orders(
         "orders": len(orders),
         "resolved": len(resolved),
         "reasons": dict(sorted(reasons.items())),
+        # WHY the unresolved ones failed, counted. `None` means the resolver
+        # produced no row for that key at all, which is our book being absent
+        # from the shard rather than a named refusal.
+        "no_close_reasons": _no_close_reasons(graded),
         "by_market": _aggregate(resolved, ("sport", "market")),
         "by_scope": _aggregate(resolved, ("close_book_scope",)),
         "rows": graded,
     }
+
+
+def _no_close_reasons(graded: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for row in graded:
+        if row.get("reason") != REASON_NO_CLOSE:
+            continue
+        name = row.get("no_close_reason") or "opening_not_in_resolver"
+        out[str(name)] = out.get(str(name), 0) + 1
+    return dict(sorted(out.items()))
 
 
 def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[dict[str, Any]]:
@@ -260,4 +301,6 @@ def order_clv_report_line(report: Mapping[str, Any]) -> str:
         f" same_book_avg_clv_pct={headline.get('avg_clv_pct')}"
         f" same_book_beat={headline.get('beat_close', 0)}"
         f" reasons={report.get('reasons')}"
+        # The split that turns "35 unresolved" into something with a remedy.
+        f" no_close={report.get('no_close_reasons')}"
     )

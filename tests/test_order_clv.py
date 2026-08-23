@@ -208,3 +208,63 @@ def test_report_line_survives_having_no_same_book_rows():
     rows = [_clv_row(close_book_scope="different_book_close")]
     line = order_clv_report_line(clv_for_orders([_order()], date=DATE, clv_rows=rows))
     assert "same_book_n=0" in line
+
+
+# --- the attribution that was being thrown away ---------------------------
+
+
+def _unresolved(key="ok1", reason="no_market_in_history"):
+    return {"key": key, "sport": "mlb", "market": "totals_alt", "reason": reason}
+
+
+def test_no_close_carries_the_reason_when_the_resolver_gave_one():
+    """`no_close_for_market: 35` is a number with no remedy attached. The
+    resolver already knew why each one failed; this stops discarding it."""
+    report = clv_for_orders(
+        [_order()], date=DATE, clv_rows=[], unresolved_rows=[_unresolved()]
+    )
+    row = report["rows"][0]
+    assert row["reason"] == REASON_NO_CLOSE
+    assert row["no_close_reason"] == "no_market_in_history"
+
+
+def test_the_three_no_close_causes_stay_distinct():
+    """An untracked market family, a close that predates the opening, and our
+    book being absent from the shard are three different problems with three
+    different fixes. One flat name made them look like one."""
+    orders = [
+        _order(key="k1", opening_key="ok1"),
+        _order(key="k2", opening_key="ok2"),
+        _order(key="k3", opening_key="ok3"),
+    ]
+    unresolved = [
+        _unresolved("ok1", "no_market_in_history"),
+        _unresolved("ok2", "close_precedes_open"),
+        # ok3 deliberately absent -- the resolver never produced a row for it.
+    ]
+    report = clv_for_orders(orders, date=DATE, clv_rows=[], unresolved_rows=unresolved)
+    assert report["no_close_reasons"] == {
+        "close_precedes_open": 1,
+        "no_market_in_history": 1,
+        "opening_not_in_resolver": 1,
+    }
+
+
+def test_an_opening_the_resolver_never_saw_is_named_not_blank():
+    """None would render as an absent field and read as "no reason given".
+    `opening_not_in_resolver` says the specific thing: our book is not in the
+    shard for that market."""
+    report = clv_for_orders([_order()], date=DATE, clv_rows=[], unresolved_rows=[])
+    assert report["no_close_reasons"] == {"opening_not_in_resolver": 1}
+
+
+def test_resolved_orders_contribute_no_no_close_reason():
+    report = clv_for_orders([_order()], date=DATE, clv_rows=[_clv_row()])
+    assert report["no_close_reasons"] == {}
+
+
+def test_report_line_carries_the_split():
+    line = order_clv_report_line(
+        clv_for_orders([_order()], date=DATE, clv_rows=[], unresolved_rows=[_unresolved()])
+    )
+    assert "no_close={'no_market_in_history': 1}" in line
