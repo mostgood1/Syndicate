@@ -110,6 +110,12 @@ def main(argv: list[str] | None = None) -> int:
     # actually use, and removes both failure modes.
     cells: dict[tuple, dict[str, float]] = defaultdict(
         lambda: {"windows": 0.0, "poss": 0.0, "points": 0.0, "ft": 0.0, "fga": 0.0})
+    # **WHICH seconds-left values actually land in each bucket.** Windows are
+    # 60s and non-overlapping from t=0, and a WNBA period is 600s, so exactly
+    # ONE window per period has left < 120 -- the final minute. The bucket is
+    # honestly labelled `0-120s` and is sampled at a single point inside it.
+    # Printing the set stops that label being read as a range that was swept.
+    cell_lefts: dict[tuple, set] = defaultdict(set)
     team_shots: dict[str, dict[str, float]] = defaultdict(
         lambda: {"fg2": 0.0, "fg3": 0.0, "ft": 0.0, "tov": 0.0, "poss": 0.0})
     games = 0
@@ -190,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
                     cell["fga"] += sum(1 for r in window_rows
                                        if str(r.get("type")) in ("shot_attempt_2",
                                                                  "shot_attempt_3"))
+                    cell_lefts[(mkey, lkey)].add(int(left))
                 t += WINDOW
 
     if not games:
@@ -207,7 +214,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"n={int(cell['windows'])} "
                   f"pace={_pace(cell):.2f} "
                   f"ppp={_ppp(cell):.3f} "
-                  f"ft_share={_ft_share(cell):.3f}",
+                  f"ft_share={_ft_share(cell):.3f} "
+                  f"left_vals={sorted(cell_lefts[(mkey, lkey)])}",
                   flush=True)
 
     # **THE HEADLINE: does the situation move pace at all?** If the spread

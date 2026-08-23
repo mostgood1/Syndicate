@@ -138,3 +138,25 @@ def test_free_throw_share_survives_zero_inflation(tmp_path, capsys) -> None:
     assert shares, "cells must be emitted"
     assert max(shares) > 0.05, (
         f"one minute in five is all free throws; a pooled share must see it, got {shares}")
+
+
+def test_cells_report_which_seconds_left_values_populated_them(tmp_path, capsys) -> None:
+    """**A BUCKET LABEL IS NOT A SAMPLING CLAIM.** Windows are 60s and
+    non-overlapping from t=0, and a WNBA period is 600s, so exactly one window
+    per period has left < 120 -- the `0-120s` cell is the final minute, sampled
+    at a single point, not a range that was swept. Print the set so nobody (me
+    included) reads the label as coverage."""
+    out = _run(_write(tmp_path, close_late_multiplier=1.0), capsys)
+    late = [line for line in out.splitlines() if "left=0-120s" in line and "CELL " in line]
+    assert late, "the late cell must be emitted"
+    for line in late:
+        vals = line.split("left_vals=")[1].strip()
+        assert vals == "[60]", (
+            f"only the final-minute window can land in 0-120s at a 60s step, got {vals}")
+
+    wide = [line for line in out.splitlines() if "left=300-600s" in line and "CELL " in line]
+    assert wide, "the early cell must be emitted"
+    for line in wide:
+        vals = line.split("left_vals=")[1].strip()
+        assert vals == "[300, 360, 420, 480, 540]", (
+            f"the wide cell IS swept across its range, got {vals}")
