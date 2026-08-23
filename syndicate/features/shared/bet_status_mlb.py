@@ -285,25 +285,39 @@ def mlb_status_resolver(selected_date: str):
         if game_pk is None:
             return {"unavailable_reason": reason or REASON_NO_GAME_PK}
 
+        # THE MARKET CHECK RUNS BEFORE THE FEED LOOKUP, and the ordering is the
+        # whole point. "We have no stat for this market" is PERMANENT -- it will
+        # be true after the game ends, tomorrow, and forever. "The feed is not
+        # cached yet" is TEMPORARY and resolves on its own.
+        #
+        # Checked feed-first, the temporary reason swallows the permanent one:
+        # today's line read `no_live_feed: 50` while an unknown share of those
+        # 50 could never grade at all, so "50 bets pending" and "50 bets we can
+        # track" looked identical. That is the same ordering mistake the Kalshi
+        # join made this morning with its date guard, in a second place.
+        #
+        # Answering "is everything on this slate trackable" needs the permanent
+        # blockers counted BEFORE kickoff, not discovered after it.
+        market = str(order.get("market") or "").strip().lower()
+        is_game_total = market in _GAME_TOTAL_MARKETS
+        mapped = None if is_game_total else _stat_for_market(market)
+        if not is_game_total and mapped is None:
+            # Spreads, moneylines and every prop family not listed. Named rather
+            # than guessed -- a wrong stat produces a confident wrong verdict.
+            return {"unavailable_reason": REASON_UNMAPPED_MARKET}
+
         feed = _feed(game_pk)
         if not isinstance(feed, Mapping) or not feed:
             return {"unavailable_reason": REASON_NO_FEED}
 
         started = _game_has_started(feed)
         is_final = _game_is_final(feed)
-        market = str(order.get("market") or "").strip().lower()
 
-        if market in _GAME_TOTAL_MARKETS:
+        if is_game_total:
             total = _combined_score(feed)
             if total is None:
                 return {"unavailable_reason": REASON_NO_STAT}
             return {"current_value": total, "is_final": is_final, "started": started}
-
-        mapped = _stat_for_market(market)
-        if mapped is None:
-            # Spreads, moneylines and every prop family not listed. Named rather
-            # than guessed -- a wrong stat produces a confident wrong verdict.
-            return {"unavailable_reason": REASON_UNMAPPED_MARKET}
 
         group, stat = mapped
         value = final_stat_value(

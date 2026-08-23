@@ -195,3 +195,44 @@ def test_an_mlb_order_is_still_resolved(schedule, monkeypatch):
     verdict = resolve({**_order(), "sport": "mlb", "market": "strikeouts"})
     # Gets past the sport gate and the id lookup; stops at the absent feed.
     assert verdict["unavailable_reason"] == mod.REASON_NO_FEED
+
+
+def test_a_market_we_can_never_grade_says_so_BEFORE_the_game_is_played(schedule, monkeypatch):
+    """The ordering that decides whether "is this slate trackable" is answerable.
+
+    "We have no stat for this market" is PERMANENT. "The feed is not cached yet"
+    is TEMPORARY. Checked feed-first, the temporary reason swallows the
+    permanent one -- production read `no_live_feed: 50` while an unknown share
+    of those 50 could never grade at all, so "50 pending" and "50 trackable"
+    looked identical.
+    """
+    schedule.append(_game(777001, "Houston Astros", "Seattle Mariners"))
+    # No feed at all -- exactly the pre-game state.
+    monkeypatch.setattr(
+        "syndicate.features.mlb.box_score_stats.load_final_feed", lambda *a, **k: None
+    )
+    resolve = mod.mlb_status_resolver("2026-08-22")
+
+    unmappable = resolve({**_order(), "sport": "mlb", "market": "batter_doubles"})
+    assert unmappable["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
+
+    # A market we CAN grade still reports the feed as the blocker, because for
+    # that one the feed genuinely is the only thing missing.
+    mappable = resolve({**_order(), "sport": "mlb", "market": "strikeouts"})
+    assert mappable["unavailable_reason"] == mod.REASON_NO_FEED
+
+
+def test_a_game_total_is_still_graded_from_the_scoreboard(schedule, monkeypatch):
+    """`totals` has no per-player stat and must not be caught by the new check."""
+    schedule.append(_game(777001, "Houston Astros", "Seattle Mariners"))
+    monkeypatch.setattr(
+        "syndicate.features.mlb.box_score_stats.load_final_feed",
+        lambda *a, **k: {
+            "gameData": {"status": {"abstractGameState": "Final"}},
+            "liveData": {"linescore": {"teams": {"home": {"runs": 5}, "away": {"runs": 3}}}},
+        },
+    )
+    resolve = mod.mlb_status_resolver("2026-08-22")
+    verdict = resolve({**_order(), "sport": "mlb", "market": "totals"})
+    assert verdict.get("unavailable_reason") is None
+    assert verdict["current_value"] == 8.0
