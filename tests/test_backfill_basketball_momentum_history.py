@@ -116,3 +116,66 @@ def test_a_game_with_no_usable_plays_is_named_not_dropped(tmp_path, monkeypatch)
           {"401": _summary("IND", "NYL"), "402": {"header": {}, "plays": []}})
     games, _ = bf.backfill_date("wnba", "2026-06-01", out_root=tmp_path)
     assert games == 1
+
+
+# ---------------------------------------------------------------------------
+# The one-shot hook -- gated in the momentum poller, not the worker entrypoint
+# ---------------------------------------------------------------------------
+
+def _poller():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "pbm_hook", "scripts/poll_basketball_momentum.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_hook_is_inert_without_the_env_var(tmp_path, monkeypatch) -> None:
+    """**Reachability, both directions.** An unset flag must do nothing, or the
+    gate is decoration."""
+    mod = _poller()
+    monkeypatch.delenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", raising=False)
+    assert mod.maybe_start_backfill("wnba", tmp_path) is False
+
+
+def test_the_hook_fires_when_the_env_var_names_a_range(tmp_path, monkeypatch) -> None:
+    mod = _poller()
+    monkeypatch.setenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", "2026-05-01..2026-05-02")
+    started: list[str] = []
+    monkeypatch.setattr(mod, "_backfill_started", False, raising=False)
+    import threading
+    monkeypatch.setattr(threading, "Thread",
+                        lambda **kw: type("T", (), {"start": lambda self: started.append("x")})())
+    assert mod.maybe_start_backfill("wnba", tmp_path) is True
+    assert started == ["x"]
+
+
+def test_it_fires_at_most_once_per_process(tmp_path, monkeypatch) -> None:
+    """The poller runs every tick; the backfill must not restart every time."""
+    mod = _poller()
+    monkeypatch.setenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", "2026-05-01..2026-05-02")
+    import threading
+    monkeypatch.setattr(threading, "Thread",
+                        lambda **kw: type("T", (), {"start": lambda self: None})())
+    assert mod.maybe_start_backfill("wnba", tmp_path) is True
+    assert mod.maybe_start_backfill("wnba", tmp_path) is False
+
+
+def test_a_completed_backfill_is_not_repeated_after_a_restart(tmp_path, monkeypatch) -> None:
+    """The sentinel survives the process; a worker that restarts hourly must not
+    re-pull a season each time."""
+    mod = _poller()
+    spec = "2026-05-01..2026-05-02"
+    monkeypatch.setenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", spec)
+    sentinel = mod._backfill_sentinel(tmp_path, "wnba", spec)
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text(spec, encoding="utf-8")
+    assert mod.maybe_start_backfill("wnba", tmp_path) is False
+
+
+def test_a_malformed_spec_is_refused_and_named(tmp_path, monkeypatch, capsys) -> None:
+    mod = _poller()
+    monkeypatch.setenv("SYNDICATE_WNBA_MOMENTUM_BACKFILL", "2026-05-01")   # no range
+    assert mod.maybe_start_backfill("wnba", tmp_path) is False
+    assert "BACKFILL_BAD_SPEC" in capsys.readouterr().out

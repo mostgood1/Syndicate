@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -146,7 +147,89 @@ def fetch_summary(league: str, event_id: str) -> dict[str, Any]:
     return payload
 
 
+# ---------------------------------------------------------------------------
+# ONE-SHOT SEASON BACKFILL
+# ---------------------------------------------------------------------------
+# **GATED HERE RATHER THAN IN THE WORKER ENTRYPOINT, DELIBERATELY.**
+# `scripts/run_refresh_worker.py` is the natural home and is CLAIMED by the OPEN
+# lane `portfolio-ledger-service-split` (opened 2026-08-22). Editing a contested
+# shared entrypoint to schedule my own lane's job is exactly what the lane
+# protocol exists to stop, and this file is already the momentum subsystem's
+# entry point on the worker.
+#
+# Set `SYNDICATE_WNBA_MOMENTUM_BACKFILL=<start>..<end>` to run once. It is:
+#   - DAEMON-THREADED, so a live slate's capture is never blocked by it;
+#   - RESUMABLE, so a restart re-scans and skips finished dates cheaply;
+#   - SENTINEL-GUARDED, so a worker that restarts hourly does not re-run it;
+#   - RATE-LIMITED at 0.25s between ESPN calls -- a WNBA season is ~286 requests
+#     and there is no reason to go faster.
+_BACKFILL_ENV = "SYNDICATE_WNBA_MOMENTUM_BACKFILL"
+_backfill_started = False
+
+
+def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
+    safe = spec.replace("..", "_to_").replace("/", "-")
+    return Path(out_root) / f"{league}_source" / "source_artifacts" / "data" / "live_lens" / f".backfill_{safe}.done"
+
+
+def maybe_start_backfill(league: str, out_root: Path) -> bool:
+    """Kick the one-shot backfill if requested and not already done."""
+    global _backfill_started
+    spec = str(os.environ.get(_BACKFILL_ENV) or "").strip()
+    if not spec or _backfill_started:
+        return False
+    # **A MALFORMED SPEC IS NAMED, NOT IGNORED.** Dropping it into the same
+    # silent `return False` as "unset" means someone who sets
+    # `...BACKFILL=2026-05-01` and expects a season gets nothing, with nothing
+    # said -- the exact ambiguity every diagnostic in this file exists to remove.
+    start, sep, end = spec.partition("..")
+    start, end = start.strip(), end.strip()
+    if not sep or not start or not end:
+        print(f"[basketball_momentum] BACKFILL_BAD_SPEC {spec!r} -- want <start>..<end>", flush=True)
+        return False
+
+    sentinel = _backfill_sentinel(out_root, league, spec)
+    if sentinel.exists():
+        # Said out loud. A silent skip is indistinguishable from a backfill that
+        # never started, which is the ambiguity every diagnostic here exists to
+        # remove.
+        print(f"[basketball_momentum] BACKFILL_ALREADY_DONE spec={spec} "
+              f"sentinel={sentinel}", flush=True)
+        _backfill_started = True
+        return False
+
+    _backfill_started = True
+
+    def _run() -> None:
+        import threading  # noqa: F401 - imported for symmetry with the caller
+        print(f"[basketball_momentum] BACKFILL_START league={league} spec={spec}", flush=True)
+        try:
+            from scripts.backfill_basketball_momentum_history import main as _backfill_main
+
+            code = _backfill_main([
+                "--league", league, "--start", start, "--end", end,
+                "--data-root", str(out_root),
+            ])
+            print(f"[basketball_momentum] BACKFILL_DONE league={league} spec={spec} "
+                  f"exit={code}", flush=True)
+            if code == 0:
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text(spec, encoding="utf-8")
+        except Exception as exc:  # pragma: no cover - never kills the worker
+            print(f"[basketball_momentum] BACKFILL_FAILED league={league} spec={spec} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+
+    import threading
+
+    threading.Thread(target=_run, name="wnba-momentum-backfill", daemon=True).start()
+    return True
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
+    # Fires at most once per process, and returns immediately -- the work runs
+    # on a daemon thread so a live slate is never waiting on history.
+    maybe_start_backfill(league, out_root)
+
     event_ids = live_event_ids(league, date_str)
     print(f"[basketball_momentum] league={league} date={date_str} live_events={len(event_ids)}", flush=True)
     # **ONE SUMMARY IN MEMORY AT A TIME, not the whole slate.** The previous
