@@ -48,6 +48,12 @@ REASON_NO_TEAM_MATCH = "matchup_not_on_schedule"
 # and lumping them together would hide exactly how much of the backlog is
 # recoverable.
 REASON_NO_MATCHUP_ON_ORDER = "no_matchup_on_order"
+# NOT AN MLB BET. Checked first, because every refusal below is phrased as a
+# statement about MLB data and would be a lie about a soccer order: a Liverpool
+# match run through `canonical_team("mlb", ...)` returns None and would have
+# been reported as `no_matchup_on_order`, i.e. "the ledger record is too thin"
+# -- which is false, and would have sent the next fix at the wrong problem.
+REASON_NOT_MLB = "not_an_mlb_order"
 # TWO games, same teams, same day. Refused rather than picked: a doubleheader
 # graded against the wrong half is a confident wrong verdict, and the two games
 # routinely disagree.
@@ -268,6 +274,13 @@ def mlb_status_resolver(selected_date: str):
         return cache[game_pk]
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
+        # SPORT FIRST. This resolver is handed every order in the ledger, and a
+        # non-MLB one is not a defect in anything -- it just needs a different
+        # resolver that does not exist yet. Saying so plainly keeps the ungraded
+        # counts readable as a work list.
+        if str(order.get("sport") or "").strip().lower() not in {"mlb", ""}:
+            return {"unavailable_reason": REASON_NOT_MLB}
+
         game_pk, reason = _resolve_game_pk(order, schedule())
         if game_pk is None:
             return {"unavailable_reason": reason or REASON_NO_GAME_PK}

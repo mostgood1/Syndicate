@@ -166,3 +166,32 @@ def test_an_order_with_no_matchup_is_named_apart_from_one_the_slate_lacks(schedu
     # together would hide how much of the backlog is recoverable.
     assert thin == mod.REASON_NO_MATCHUP_ON_ORDER
     assert absent == mod.REASON_NO_TEAM_MATCH
+
+
+def test_a_non_mlb_order_says_so_instead_of_blaming_the_record(monkeypatch):
+    """Every other refusal is a statement about MLB data.
+
+    A Liverpool match run through `canonical_team("mlb", ...)` returns None and
+    would have been reported as `no_matchup_on_order` — "the ledger record is
+    too thin" — which is false, and would have sent the next fix at the wrong
+    problem.
+    """
+    monkeypatch.setattr(
+        "syndicate.features.mlb.box_score_stats.load_final_feed", lambda *a, **k: None
+    )
+    resolve = mod.mlb_status_resolver("2026-08-22")
+    verdict = resolve(
+        {"sport": "soccer", "home_team": "Liverpool", "away_team": "Arsenal", "market": "h2h"}
+    )
+    assert verdict["unavailable_reason"] == mod.REASON_NOT_MLB
+
+
+def test_an_mlb_order_is_still_resolved(schedule, monkeypatch):
+    schedule.append(_game(777001, "Houston Astros", "Seattle Mariners"))
+    monkeypatch.setattr(
+        "syndicate.features.mlb.box_score_stats.load_final_feed", lambda *a, **k: None
+    )
+    resolve = mod.mlb_status_resolver("2026-08-22")
+    verdict = resolve({**_order(), "sport": "mlb", "market": "strikeouts"})
+    # Gets past the sport gate and the id lookup; stops at the absent feed.
+    assert verdict["unavailable_reason"] == mod.REASON_NO_FEED
