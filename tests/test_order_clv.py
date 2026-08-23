@@ -268,3 +268,47 @@ def test_report_line_carries_the_split():
         clv_for_orders([_order()], date=DATE, clv_rows=[], unresolved_rows=[_unresolved()])
     )
     assert "no_close={'no_market_in_history': 1}" in line
+
+
+# --- the two paper books must never be averaged together ------------------
+
+
+def test_venue_is_forced_into_every_aggregate():
+    """paper2 places into the SAME ledger as the unrestricted book. Grouping by
+    market alone would average a Kalshi bet and a DraftKings bet on the same
+    market into one confident number describing neither."""
+    orders = [
+        _order(key="k1", opening_key="ok1", venue="paper"),
+        _order(key="k2", opening_key="ok2", venue="paper:kalshi"),
+    ]
+    rows = [_clv_row(key="ok1"), _clv_row(key="ok2")]
+    report = clv_for_orders(orders, date=DATE, clv_rows=rows)
+    # Same sport+market, two venues -> two rows, not one blended row.
+    assert len(report["by_market"]) == 2
+    assert {e["venue"] for e in report["by_market"]} == {"paper", "paper:kalshi"}
+    assert all(e["n"] == 1 for e in report["by_market"])
+
+
+def test_by_venue_is_its_own_view():
+    orders = [
+        _order(key="k1", opening_key="ok1", venue="paper"),
+        _order(key="k2", opening_key="ok2", venue="paper:kalshi"),
+    ]
+    report = clv_for_orders(
+        orders, date=DATE, clv_rows=[_clv_row(key="ok1"), _clv_row(key="ok2")]
+    )
+    assert {e["venue"] for e in report["by_venue"]} == {"paper", "paper:kalshi"}
+
+
+def test_the_headline_is_the_UNRESTRICTED_book_not_a_blend():
+    """paper2 gets its own field. One average of two portfolios describes
+    neither, and the headline must mean the main book."""
+    orders = [
+        _order(key="k1", opening_key="ok1", venue="paper"),
+        _order(key="k2", opening_key="ok2", venue="paper:kalshi"),
+        _order(key="k3", opening_key="ok3", venue="paper:kalshi"),
+    ]
+    rows = [_clv_row(key=k) for k in ("ok1", "ok2", "ok3")]
+    line = order_clv_report_line(clv_for_orders(orders, date=DATE, clv_rows=rows))
+    assert "same_book_n=1" in line          # the unrestricted book alone
+    assert "paper:kalshi" in line           # paper2 reported separately

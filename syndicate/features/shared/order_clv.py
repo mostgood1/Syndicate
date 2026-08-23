@@ -29,6 +29,16 @@ biased upward regardless of whether the bet was good. So every aggregate here is
 reported PER SCOPE, and the headline is same-book only. A single blended CLV
 number would be exactly the flattering, wrong statistic Stage C exists to avoid.
 
+**VENUE IS PART OF A BOOK'S IDENTITY AND IS ALWAYS IN THE GROUPING.** `paper2`
+places its venue-restricted orders into the SAME ledger as the unrestricted
+book, distinguished only by `venue` (`paper` vs `paper:kalshi`). Grouping by
+market alone would drop a Kalshi bet and a DraftKings bet on the same market
+into one bucket and average them -- destroying the exact comparison paper2
+exists to produce, while still printing a confident per-market number. So
+`venue` is forced into every aggregate on the same footing as
+`close_book_scope`: both name WHICH BOOK OF BETS a number describes, and a
+number that does not know which book it is about is not a measurement.
+
 **AGGREGATED PER MARKET, NOT POOLED.** `_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50`
 is per market for a reason, and `learnings.md` 2026-08-20 records pooling
 overstating significance 3.4x by counting rows as if they were bets. `n` rides
@@ -163,6 +173,9 @@ def clv_for_orders(
                     "side": order.get("side"),
                     "player_name": order.get("player_name"),
                     "book": order.get("book"),
+                    # WHICH BOOK OF BETS this order belongs to -- `paper` for
+                    # the unrestricted portfolio, `paper:kalshi` for paper2.
+                    "venue": order.get("venue"),
                     "entry_price": entry,
                     "stake_dollars": _as_float(order.get("fill_stake_dollars"))
                     or _as_float(order.get("requested_stake_dollars")),
@@ -229,6 +242,9 @@ def clv_for_orders(
         "no_close_reasons": _no_close_reasons(graded),
         "by_market": _aggregate(resolved, ("sport", "market")),
         "by_scope": _aggregate(resolved, ("close_book_scope",)),
+        # The paper2 comparison, as its own top-level view rather than something
+        # to reconstruct by filtering `by_market`.
+        "by_venue": _aggregate(resolved, ("venue",)),
         "rows": graded,
     }
 
@@ -250,15 +266,20 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
     average that blends a same-book close with another book's is the biased
     number this module exists to keep separate.
     """
+    # Both of these are forced into the bucket whether or not the caller asked
+    # for them, because each names WHICH BOOK a number is about: `venue` says
+    # which portfolio placed it, `close_book_scope` says what it was compared
+    # against. Averaging across either produces a confident number describing
+    # nothing in particular.
+    forced = [key for key in ("venue", "close_book_scope") if key not in keys]
     buckets: dict[tuple, list[Mapping[str, Any]]] = {}
     for row in rows:
         bucket = tuple(str(row.get(key) or "") for key in keys)
-        if "close_book_scope" not in keys:
-            bucket = bucket + (str(row.get("close_book_scope") or ""),)
+        bucket = bucket + tuple(str(row.get(key) or "") for key in forced)
         buckets.setdefault(bucket, []).append(row)
 
     out: list[dict[str, Any]] = []
-    labels = list(keys) + ([] if "close_book_scope" in keys else ["close_book_scope"])
+    labels = list(keys) + forced
     for bucket, group in sorted(buckets.items()):
         clvs = [row["clv_pct"] for row in group if row.get("clv_pct") is not None]
         beats = sum(1 for row in group if row.get("beat_close"))
@@ -283,12 +304,13 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
 
 def order_clv_report_line(report: Mapping[str, Any]) -> str:
     """One log line. `logger.info` never reaches Render's collector -- print this."""
-    same_book = [
-        entry
-        for entry in (report.get("by_scope") or [])
-        if entry.get("close_book_scope") == SCOPE_SAME_BOOK
-    ]
-    headline = same_book[0] if same_book else {}
+    # The headline is the UNRESTRICTED book's same-book number. paper2 gets its
+    # own field rather than being averaged in: they are two portfolios and one
+    # average of them describes neither.
+    scoped = report.get("by_scope") or []
+    same_book = [e for e in scoped if e.get("close_book_scope") == SCOPE_SAME_BOOK]
+    headline = next((e for e in same_book if ":" not in str(e.get("venue") or "")), {})
+    paper2 = [e for e in same_book if ":" in str(e.get("venue") or "")]
     return (
         "[order_clv] ORDER_CLV"
         f" date={report.get('date')}"
@@ -303,4 +325,5 @@ def order_clv_report_line(report: Mapping[str, Any]) -> str:
         f" reasons={report.get('reasons')}"
         # The split that turns "35 unresolved" into something with a remedy.
         f" no_close={report.get('no_close_reasons')}"
+        f" paper2={[(e.get('venue'), e.get('n'), e.get('avg_clv_pct')) for e in paper2]}"
     )
