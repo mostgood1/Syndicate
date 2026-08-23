@@ -24980,3 +24980,36 @@ new spec. **The pre-registered criterion, set before the first run and unchanged
 if the cells move, the situational layer is justified and gets built; if they are
 flat, the league constant wins and this gets simpler.** The old ratios (1.26x /
 1.21x) do not count as evidence in either direction.
+
+### 19:23Z — CORRECTION: the 18:57Z deploy was aimed at the wrong service
+
+**`SYNDICATE_WNBA_SITUATIONAL_PACE` does nothing on `refresh-worker`.** The
+one-shot gates live in `poll_basketball_momentum.py`, which is called from
+`live_lens_loop` on **`live-odds-worker`** (`srv-d91dpertqb8s73co8lt0`) — and the
+proof was in the log I had already read twice: every `[basketball_momentum]`
+and every `[situational]` line, including the 18:26:58Z `SITUATIONAL_DONE`,
+carries `resource=srv-d91dpertqb8s73co8lt0`. I set the variable on
+`srv-...ls0` and deployed that instead, so `dep-da5k5d2jobas73f0dbv0` shipped
+correct code to a service that will never run it.
+
+Corrected:
+- `live-odds-worker` `dep-da5kh9qjobas73f1f1h0` on `30c89f37` (main tip;
+  contains `3ace7dc4`, verified by merge-base) with the spec set. Claim
+  `d45ff97e98b8843b`.
+- `refresh-worker` `dep-da5khgjl550s73d59f00` sets the stray key to the EMPTY
+  STRING rather than deleting it. `update_environment_variables` merges and
+  cannot remove a key; a `replace=true` call would rewrite that service's whole
+  env block, which is the blast radius `#284` is about. The gate reads
+  `if not spec` so empty is inert. **This leaves one key of deliberate drift on
+  `refresh-worker` that is not in `render.yaml`** — recorded here because the
+  next `blueprint_sync` will silently drop it, which is the correct outcome and
+  should not read as a surprise.
+
+**COST: two unnecessary deploys of `refresh-worker`.** The first was checked
+against an in-flight sim and was clear; the second fired without re-checking,
+which was careless even though the window was almost certainly still clear.
+
+**THE ACTUAL LESSON IS NOT "check the service".** It is that I had the answer
+already: the `resource` label on the very log lines I was reading to find the
+previous run's output. I went to the env var without re-deriving WHERE the
+producer runs, on a repo whose central architectural rule is a two-service split.
