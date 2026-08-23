@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#529` — **The grader could not IDENTIFY a bet: `game_pk` on every order is the OddsAPI hash, not StatsAPI's numeric id. Recovered from the matchup, no backfill. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, follows `#528`
+
+**Measured 2026-08-23T16:00:06Z**, the first run of `#528`'s grader:
+
+```
+SETTLED date=2026-08-22 orders=58 graded=0 ungraded={'no_game_pk': 58}
+SETTLED date=2026-08-23 orders=45 graded=0 ungraded={'no_game_pk': 45}
+```
+
+**100% on both days.** The grading logic was correct and the resolver worked;
+neither could say WHICH GAME a bet was on. `layer2_board.py:1792` sets
+`"game_pk": row.get("event_id")` — the **OddsAPI hash**. StatsAPI's `gamePk` is
+a numeric id in a different space, and `intelligence_contracts` has documented
+the split all along: *"MLB board rows carry a StatsAPI gamePk while quotes carry
+an OddsAPI hash."* `int()` cannot parse a hash, so every bet was unidentifiable.
+
+**The fix recovers from the MATCHUP**, which is the path that same dataclass
+names: the ledger carries `home_team`, `away_team` and `commence_time` on every
+record, so a bet can be found on StatsAPI's own slate. **This fixes the 103
+orders already written**, not just future ones — no backfill, no migration.
+
+- Team names go through `team_aliases.canonical_team`. **Four separate
+  market-name tables drifted apart in this codebase on 2026-08-23 alone**
+  (`#527`, `#528`); a fifth private map for team names would be the same
+  mistake in the same shape.
+- **Doubleheaders are refused, not guessed.** Two games, same teams, same day,
+  and they routinely disagree. Split by start time; an order with no start time,
+  or one matching neither half within an hour, is `ambiguous_doubleheader`.
+- Refusals that look alike are split: `no_matchup_on_order` (record too thin —
+  written before `home_team` joined `_LEAN_FIELDS`) vs `matchup_not_on_schedule`
+  (names or slate disagree) vs `no_schedule_for_date` (artifact missing). Three
+  different jobs, and lumping them would hide how much of the backlog is
+  recoverable.
+- Schedule indexed **once per resolver**: 58 orders must not mean 58 file reads.
+- `mlb.cards` imported **inside** the guard — a 5,700-line module whose import
+  failure must degrade to `no_schedule_for_date`, not kill grading for the run.
+
+**`portfolio_commit` still stamps `None` rather than the row's `game_pk`, and
+now says why.** A field that looks populated and holds the wrong id is WORSE
+than an absent one: the matchup recovery only runs when it is not handed a
+plausible-looking wrong answer first. That comment exists to stop the obvious
+"fix".
+
+**NOT YET MEASURED.** Read the next `[paper_settlement] SETTLED` line. The
+remaining risk is that yesterday's orders predate `home_team` in `_LEAN_FIELDS`,
+which would show as `no_matchup_on_order` — recoverable only for orders written
+after that change. The split reasons exist precisely to answer that question in
+one reading.
+
+
 ### `#528` — **`settled_count = 0` was never a data problem: nothing had ever graded a WAGER. Grader built, plus the vocabulary drift that had silently disabled monotone early-decision for every MLB pitcher prop. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, user report ("the paper endpoint didnt reconcile any of the bets that were placed - i want to see how it performed for yestrday")
 
 **The trap that hid it for weeks.** `execution_ledger` stamps `settled_at` in
