@@ -24905,6 +24905,125 @@ adjustments to it — not a per-game average replacing it.
 `analyze_situational_pace` measures whether the situational half of that is real
 before anything is modelled.
 
+---
+
+## 2026-08-23 18:57Z — refresh-worker — situational cells re-run on a POOLED estimator
+
+lane: `basketball-live-momentum`
+service: `refresh-worker` (`srv-d91dpertqb8s73co8ls0`)
+deploy: `dep-da5k5cbtqb8s73ao1kag`, trigger `api` (env-var write, merge semantics —
+NOT `blueprint_sync`; `render.yaml` untouched)
+sha: `411d1112` (main tip; contains `3ace7dc4` = PR #21 — verified with
+`git merge-base --is-ancestor`, not by reading the deploy's commit message)
+env set: `SYNDICATE_WNBA_SITUATIONAL_PACE=2026-05-01..2026-08-22`
+(end +1 day vs. the previous spec, because the one-shot sentinel is keyed on the
+spec string and the old one is `.done`)
+claim: `c4682e1925e768ee`, acquired 18:5xZ, replacing an expired claim held by
+this same lane (209.7 min old).
+
+**PREFLIGHT COULD NOT RUN** — `deploy_preflight.py` exits 1 with `RENDER_API_KEY
+not set in the environment or .env`, as it has all session. In its place, the
+worker log was read immediately before the deploy: `MLB_DAILY_SIM_END
+date=2026-08-23 run_stamp=20260823_181643 state=finished exit_code=0
+duration_seconds=958` at 18:32:41Z, and `MLB_SIM_TICK` declining to launch
+(`reason=sport_currently_live`) — so the kill-risk job preflight exists to
+protect had already finished and no successor was in flight. Memory headroom
+~640MB of 4096. **This is weaker than preflight and should be treated as such.**
+
+### WHY THIS DEPLOY EXISTS: the previous run's numbers were an artifact
+
+The 2026-08-23 ~18:0xZ situational pass returned, and I nearly reported:
+
+    CELL margin=0-5    left=0-120s   n=414  pace=4.00 ppp=1.064 ft_share=0.286
+    CELL margin=0-5    left=120-300s n=1211 pace=3.88 ppp=1.200 ft_share=0.000
+    CELL margin=0-5    left=300-600s n=2511 pace=4.00 ppp=1.031 ft_share=0.000
+    CELL margin=5-10   left=0-120s   n=262  pace=4.76 ppp=1.031 ft_share=0.286
+    CELL margin=10-20  left=0-120s   n=250  pace=4.44 ppp=1.031 ft_share=0.286
+    CELL margin=20-999 left=0-120s   n=47   pace=4.88 ppp=1.250 ft_share=0.286
+    PACE_SPREAD min=3.88 max=4.88 ratio=1.26x
+    PPP_SPREAD  min=1.031 max=1.250 ratio=1.21x
+
+The reading I was about to give was "ft_share jumps 0.000 -> 0.286 in every
+late cell — late free-throw inflation, exactly the mechanism the user named."
+
+**That was going to be a measurement of the statistic, not of basketball.**
+Three unrelated cells, with n of 2511, 262 and 250, reported ppp=1.031 to three
+decimals; every single `left=0-120s` cell reported ft_share=0.286 = 2/7 exactly.
+Independent samples do not agree to three decimals. The cause: the cell
+statistic was a MEDIAN over 60-second windows, each holding ~4 possessions, so
+points/possession lives on a coarse lattice (4/4, 5/4, ...) and the median snaps
+to a lattice point. Free throws are worse — most windows contain none, so the
+median reads exactly 0.000 until the zero share crosses one half, then jumps.
+**The "0.000 -> 0.286 jump" IS that discontinuity.**
+
+`analyze_situational_pace` now pools totals per cell and reports ratio
+estimators over them (total possessions / windows; total points / total
+possessions; total FT / total shooting events) — which is also the estimator a
+projection layer would consume. PR #21, two mutation-checked tests, and the
+pre-existing injection tests (3x pace must be detected; no effect must read
+flat) still pass in both directions.
+
+**The team-shooting half of that run is NOT affected** — those are already
+pooled season totals per team, not medians:
+
+    TEAM GS  three_share=0.449 ft_per100=26.2 tov_per100=9.4
+    TEAM CON three_share=0.279 ft_per100=27.7 tov_per100=9.1
+    TEAM WSH three_share=0.300 ft_per100=33.0 tov_per100=9.7
+    TEAM MIN three_share=0.329 ft_per100=23.2 tov_per100=8.5
+    TEAM NY  three_share=0.431 ft_per100=26.9 tov_per100=7.3
+    TEAM POR three_share=0.428 ft_per100=24.2 tov_per100=9.3
+    TEAM TOR three_share=0.414 ft_per100=27.0 tov_per100=8.2
+
+verify: PENDING — the reading that settles this is the `[situational] CELL`,
+`PACE_SPREAD` and `PPP_SPREAD` lines from `dep-da5k5cbtqb8s73ao1kag` under the
+new spec. **The pre-registered criterion, set before the first run and unchanged:
+if the cells move, the situational layer is justified and gets built; if they are
+flat, the league constant wins and this gets simpler.** The old ratios (1.26x /
+1.21x) do not count as evidence in either direction.
+
+### 19:23Z — CORRECTION: the 18:57Z deploy was aimed at the wrong service
+
+**`SYNDICATE_WNBA_SITUATIONAL_PACE` does nothing on `refresh-worker`.** The
+one-shot gates live in `poll_basketball_momentum.py`, which is called from
+`live_lens_loop` on **`live-odds-worker`** (`srv-d91dpertqb8s73co8lt0`) — and the
+proof was in the log I had already read twice: every `[basketball_momentum]`
+and every `[situational]` line, including the 18:26:58Z `SITUATIONAL_DONE`,
+carries `resource=srv-d91dpertqb8s73co8lt0`. I set the variable on
+`srv-...ls0` and deployed that instead, so `dep-da5k5d2jobas73f0dbv0` shipped
+correct code to a service that will never run it.
+
+Corrected:
+- `live-odds-worker` `dep-da5kh9qjobas73f1f1h0` on `30c89f37` (main tip;
+  contains `3ace7dc4`, verified by merge-base) with the spec set. Claim
+  `d45ff97e98b8843b`.
+- `refresh-worker` `dep-da5khgjl550s73d59f00` sets the stray key to the EMPTY
+  STRING rather than deleting it. `update_environment_variables` merges and
+  cannot remove a key; a `replace=true` call would rewrite that service's whole
+  env block, which is the blast radius `#284` is about. The gate reads
+  `if not spec` so empty is inert. **This leaves one key of deliberate drift on
+  `refresh-worker` that is not in `render.yaml`** — recorded here because the
+  next `blueprint_sync` will silently drop it, which is the correct outcome and
+  should not read as a surprise.
+
+**COST: two unnecessary deploys of `refresh-worker`.** The first was checked
+against an in-flight sim and was clear; the second fired without re-checking,
+which was careless even though the window was almost certainly still clear.
+
+**THE ACTUAL LESSON IS NOT "check the service".** It is that I had the answer
+already: the `resource` label on the very log lines I was reading to find the
+previous run's output. I went to the env var without re-deriving WHERE the
+producer runs, on a repo whose central architectural rule is a two-service split.
+
+**CORRECTION on the deploy id, found at merge.** The entry above credits
+`dep-da5k5d2jobas73f0dbv0` to this lane. It is not mine — it belongs to
+`layer2-sim-view-and-live-projection`, whose entry follows this one, and it
+superseded my `dep-da5k5cbtqb8s73ao1kag` three seconds after I triggered it. My
+env-var write still applied (an env write lands on the service, not on the deploy
+that happens to carry it), so nothing about the run changed; only the attribution
+was wrong. **Two sessions deployed the same service within three seconds and both
+claims were held** — the claim serialises deploys within a lane's own discipline,
+it does not and cannot stop a second lane that holds its own claim on the same
+service. Worth knowing before reading a deploy id as proof of authorship.
 ## 2026-08-23 18:57-19:21Z — refresh-worker `411d1112` — `#530`/`#531`/`#536` — ALL THREE ANSWERED, and the answer moves the owner
 
 `lane layer2-sim-view-and-live-projection`, claim `3860045c9fcedfc2` (re-acquired

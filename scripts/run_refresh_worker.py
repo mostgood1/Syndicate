@@ -4096,6 +4096,7 @@ def _kalshi_auth_probe_at_boot() -> None:
             f" status={result.get('status')}"
             f" reason={result.get('reason')}"
             f" detail={result.get('detail')}"
+            f" key_shape={result.get('key_shape')}"
             # KEYS, never values. A balance is not a secret but it has no
             # business in a line whose only job is to confirm a signature.
             f" keys={result.get('keys')}"

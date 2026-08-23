@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import os
 import time
 import urllib.error
@@ -88,11 +89,79 @@ class KalshiAuthError(RuntimeError):
     """A signed call that cannot be trusted. Never swallowed into a falsy result."""
 
 
+_BASE64_LINE = re.compile(r"^[A-Za-z0-9+/=]+$")
+
+
 def _private_key_pem() -> str:
     raw = os.environ.get("KALSHI_PRIVATE_KEY") or ""
     # A PEM pasted into a dashboard field arrives with literal backslash-n. Both
     # forms are accepted; neither is logged.
-    return raw.replace("\\n", "\n").strip()
+    text = raw.replace("\\n", "\n").strip()
+    return _restore_pem_armor(text)
+
+
+def _restore_pem_armor(text: str) -> str:
+    """Put the BEGIN/END lines back when a form field has eaten them.
+
+    MEASURED 2026-08-23T19:36:17Z: `chars=1616 lines=25 header=<unrecognized>
+    has_end_marker=False has_real_newlines=True`. The newlines survived and the
+    length is right for a 2048-bit key; what was missing was the armor. Some
+    dashboard fields strip lines beginning with `-`, and the base64 body alone
+    is not a PEM.
+
+    ONLY when every line is valid base64 and no marker is present anywhere. A
+    value that is something else entirely is left exactly as it was, so it still
+    fails with its own shape reported rather than being disguised as a broken
+    key. `restored` is reported by `_pem_shape`, so this is never silent.
+    """
+    if not text or "-----" in text:
+        return text
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) < 2 or not all(_BASE64_LINE.match(line) for line in lines):
+        return text
+    body = "\n".join(lines)
+    # PKCS#8 first because it is what Kalshi issues and what `load_pem_private_key`
+    # prefers; the caller tries this string and reports the failure if it is
+    # wrong, rather than this function guessing twice and hiding which worked.
+    return f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----"
+
+
+# PEM headers we can name without revealing anything. The BODY is never touched.
+_PEM_HEADERS = (
+    "-----BEGIN PRIVATE KEY-----",            # PKCS#8, unencrypted -- what we want
+    "-----BEGIN RSA PRIVATE KEY-----",        # PKCS#1, also fine
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",  # passphrase-protected -- we cannot open it
+    "-----BEGIN OPENSSH PRIVATE KEY-----",    # ssh-keygen output, NOT a PEM key pair
+)
+
+
+def _pem_shape(pem: str) -> dict[str, Any]:
+    """Structural facts about the configured value. NEVER any of its content.
+
+    Length, header and line count are enough to tell a flattened PEM from a
+    truncated one from an ssh key pasted by mistake, and none of them is
+    material. The base64 body is never read, sliced or echoed.
+    """
+    text = str(pem or "")
+    header = next((h for h in _PEM_HEADERS if text.startswith(h)), None)
+    return {
+        "chars": len(text),
+        "lines": text.count("\n") + 1 if text else 0,
+        # Named header, or a bounded description of what it starts with instead
+        # -- "not a PEM at all" and "the wrong KIND of PEM" need different fixes.
+        "header": header or ("<unrecognized>" if text else "<empty>"),
+        "has_end_marker": "-----END" in text,
+        # A dashboard field often flattens newlines. If BOTH are false the value
+        # is one long line and no parser will read it.
+        "has_real_newlines": "\n" in text,
+        "had_escaped_newlines": "\\n" in (os.environ.get("KALSHI_PRIVATE_KEY") or ""),
+        # True when the armor was rebuilt by `_restore_pem_armor` rather than
+        # supplied. Compares the REPAIRED value against the raw one, so it means
+        # "the repair fired", not merely "the input had no markers" -- a value
+        # that is not a key at all lacks markers too and was left untouched.
+        "armor_restored": "-----" in text
+        and "-----" not in (os.environ.get("KALSHI_PRIVATE_KEY") or "").replace("\\n", "\n"),
+    }
 
 
 def load_credentials() -> dict[str, Any]:
@@ -130,10 +199,19 @@ def load_credentials() -> dict[str, Any]:
     except Exception as exc:
         # The EXCEPTION TYPE only -- the message from a key parser can echo key
         # material, and this string reaches logs.
+        #
+        # But a bare type name is not actionable: `ValueError` was the whole
+        # answer on 2026-08-23T19:28:53Z and it does not distinguish a flattened
+        # PEM from a truncated one from the wrong format entirely. So the SHAPE
+        # of the value is reported alongside it -- length, which header it
+        # carries, how many lines it has. None of that is key material and all
+        # of it separates the causes. Same choice `probe()` made for the market
+        # schema, which is what caught the 100x price error.
         return {
             "status": "unavailable",
             "reason": "unreadable_private_key",
             "detail": type(exc).__name__,
+            "key_shape": _pem_shape(pem),
         }
 
     return {"status": "ok", "key_id": key_id, "private_key": private_key}
@@ -260,7 +338,12 @@ def probe_auth() -> dict[str, Any]:
     """
     creds = load_credentials()
     if creds.get("status") != "ok":
-        return {"status": "unavailable", "reason": creds.get("reason"), "detail": creds.get("detail")}
+        return {
+            "status": "unavailable",
+            "reason": creds.get("reason"),
+            "detail": creds.get("detail"),
+            "key_shape": creds.get("key_shape"),
+        }
 
     url = f"{_base_url()}/portfolio/balance"
     try:

@@ -143,4 +143,107 @@ def test_probe_auth_reports_the_missing_credential_without_calling_out(monkeypat
         "status": "unavailable",
         "reason": "no_api_key_id",
         "detail": None,
+        # None rather than absent: a caller reading `key_shape` must not have to
+        # test whether the key exists before testing what it says.
+        "key_shape": None,
     }
+
+
+def test_an_unreadable_key_reports_its_SHAPE_so_the_cause_is_actionable(monkeypatch):
+    """`detail=ValueError` was the whole answer in production and is unusable.
+
+    It does not distinguish a flattened PEM from a truncated one from an ssh key
+    pasted by mistake — three different fixes. Length, header and line count
+    separate them and none of them is key material.
+    """
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv(
+        "KALSHI_PRIVATE_KEY",
+        "-----BEGIN PRIVATE KEY-----MIIEvQIBADANBg-----END PRIVATE KEY-----",
+    )
+    shape = kalshi_auth.load_credentials()["key_shape"]
+
+    assert shape["header"] == "-----BEGIN PRIVATE KEY-----"
+    assert shape["has_end_marker"] is True
+    # The giveaway: a PEM with no newlines cannot be parsed by anything.
+    assert shape["has_real_newlines"] is False
+    assert shape["lines"] == 1
+
+
+def test_the_shape_never_contains_the_key_body(monkeypatch):
+    secret = "SUPERSECRETBASE64BODY"
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", f"-----BEGIN PRIVATE KEY-----{secret}-----END PRIVATE KEY-----")
+    result = kalshi_auth.load_credentials()
+    # The base64 body is never read, sliced or echoed.
+    assert secret not in str(result)
+
+
+def test_an_encrypted_key_is_named_as_such(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "-----BEGIN ENCRYPTED PRIVATE KEY-----\nx\n-----END ENCRYPTED PRIVATE KEY-----")
+    shape = kalshi_auth.load_credentials()["key_shape"]
+    # We load with password=None, so a passphrase-protected key can never open.
+    assert shape["header"] == "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+
+
+def test_something_that_is_not_a_pem_says_so(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "just-some-token")
+    shape = kalshi_auth.load_credentials()["key_shape"]
+    # "Not a PEM at all" and "the wrong KIND of PEM" need different fixes.
+    assert shape["header"] == "<unrecognized>"
+
+
+def test_a_key_whose_armor_a_form_field_ate_still_loads(monkeypatch, keypair):
+    """MEASURED 2026-08-23T19:36:17Z:
+
+        chars=1616 lines=25 header=<unrecognized>
+        has_end_marker=False has_real_newlines=True
+
+    The newlines survived and the length was right for a 2048-bit key. What was
+    missing was the BEGIN/END armor — some dashboard fields strip lines starting
+    with `-`, and the base64 body alone is not a PEM.
+    """
+    _private, _public, pem = keypair
+    body = "\n".join(line for line in pem.splitlines() if line and not line.startswith("-----"))
+
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", body)
+    result = kalshi_auth.load_credentials()
+    assert result["status"] == "ok"
+
+
+def test_the_repair_is_reported_never_silent(monkeypatch, keypair):
+    """`armor_restored` means the repair FIRED, not merely that markers were
+    absent -- a value that is not a key at all lacks markers too."""
+    _private, _public, pem = keypair
+    body = "\n".join(line for line in pem.splitlines() if line and not line.startswith("-----"))
+
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "not base64 at all\n!!!")
+    assert kalshi_auth.load_credentials()["key_shape"]["armor_restored"] is False
+
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", body)
+    # A repaired value and a correct one must never be confused, so a repaired
+    # one says so even when it then loads fine.
+    monkeypatch.setattr(kalshi_auth, "_pem_shape", kalshi_auth._pem_shape)
+    assert kalshi_auth._pem_shape(kalshi_auth._private_key_pem())["armor_restored"] is True
+
+
+def test_something_that_is_not_base64_is_left_alone(monkeypatch):
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", "hello there\nthis is not a key")
+    shape = kalshi_auth.load_credentials()["key_shape"]
+    # Left exactly as it was, so it fails with its OWN shape reported rather
+    # than being disguised as a broken key.
+    assert shape["header"] == "<unrecognized>"
+
+
+def test_a_complete_pem_is_never_touched(monkeypatch, keypair):
+    _private, _public, pem = keypair
+    monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+    monkeypatch.setenv("KALSHI_PRIVATE_KEY", pem)
+    result = kalshi_auth.load_credentials()
+    assert result["status"] == "ok"
+    # No repair attempted on a value that already has its armor.

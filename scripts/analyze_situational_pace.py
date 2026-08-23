@@ -110,8 +110,15 @@ def main(argv: list[str] | None = None) -> int:
     # actually use, and removes both failure modes.
     cells: dict[tuple, dict[str, float]] = defaultdict(
         lambda: {"windows": 0.0, "poss": 0.0, "points": 0.0, "ft": 0.0, "fga": 0.0})
+    # **WHICH seconds-left values actually land in each bucket.** Windows are
+    # 60s and non-overlapping from t=0, and a WNBA period is 600s, so exactly
+    # ONE window per period has left < 120 -- the final minute. The bucket is
+    # honestly labelled `0-120s` and is sampled at a single point inside it.
+    # Printing the set stops that label being read as a range that was swept.
+    cell_lefts: dict[tuple, set] = defaultdict(set)
     team_shots: dict[str, dict[str, float]] = defaultdict(
-        lambda: {"fg2": 0.0, "fg3": 0.0, "ft": 0.0, "tov": 0.0, "poss": 0.0})
+        lambda: {"fg2": 0.0, "fg3": 0.0, "ft": 0.0, "tov": 0.0, "poss": 0.0,
+                 "pts": 0.0, "pts_sq": 0.0})
     games = 0
 
     a, b = date.fromisoformat(args.start), date.fromisoformat(args.end)
@@ -156,6 +163,27 @@ def main(argv: list[str] | None = None) -> int:
                 team_shots[away_tri]["poss"] += max(
                     float(r.get("possession_index") or 0.0) for r in pressure) / 2.0
 
+            # **PER-TEAM SCORING, AND ITS VARIANCE.** Three-point share is
+            # usually quoted as a scoring-rate fact, and for the MEAN it barely
+            # is -- a 3 at ~33% and a 2 at ~47% are worth close to the same per
+            # attempt. What it actually moves is the VARIANCE of points per
+            # possession, which is exactly the parameter an interval TOTAL is
+            # priced off. So measure both rather than assuming either.
+            #
+            # Var(points per possession) = E[X^2] - E[X]^2, over ALL possessions
+            # including the scoreless ones (they contribute 0 to both sums, and
+            # the possession COUNT is what carries them).
+            by_possession: dict[tuple, float] = defaultdict(float)
+            for row in scoring:
+                tri = str(row.get("team") or "")
+                if not tri:
+                    continue
+                by_possession[(tri, float(row.get("possession_index") or 0.0))] += abs(
+                    float(row.get("weight") or 0.0))
+            for (tri, _), pts in by_possession.items():
+                team_shots[tri]["pts"] += pts
+                team_shots[tri]["pts_sq"] += pts * pts
+
             # Rolling windows: pace and PPP measured over the next WINDOW
             # seconds, labelled by the situation at the START of the window.
             last = max(float(r["clock_seconds"]) for r in pressure)
@@ -190,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
                     cell["fga"] += sum(1 for r in window_rows
                                        if str(r.get("type")) in ("shot_attempt_2",
                                                                  "shot_attempt_3"))
+                    cell_lefts[(mkey, lkey)].add(int(left))
                 t += WINDOW
 
     if not games:
@@ -207,7 +236,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"n={int(cell['windows'])} "
                   f"pace={_pace(cell):.2f} "
                   f"ppp={_ppp(cell):.3f} "
-                  f"ft_share={_ft_share(cell):.3f}",
+                  f"ft_share={_ft_share(cell):.3f} "
+                  f"left_vals={sorted(cell_lefts[(mkey, lkey)])}",
                   flush=True)
 
     # **THE HEADLINE: does the situation move pace at all?** If the spread
@@ -228,10 +258,31 @@ def main(argv: list[str] | None = None) -> int:
         fga = s["fg2"] + s["fg3"]
         if fga < 200 or s["poss"] <= 0:
             continue
+        mean = s["pts"] / s["poss"]
+        var = max(s["pts_sq"] / s["poss"] - mean * mean, 0.0)
         print(f"[situational] TEAM {team} fga={int(fga)} "
               f"three_share={s['fg3']/fga:.3f} "
               f"ft_per100={100*s['ft']/s['poss']:.1f} "
-              f"tov_per100={100*s['tov']/s['poss']:.1f}", flush=True)
+              f"tov_per100={100*s['tov']/s['poss']:.1f} "
+              f"ppp={mean:.3f} ppp_sd={var ** 0.5:.3f}", flush=True)
+
+    # **THE COMPARISON THAT SETTLES MEAN-VS-VARIANCE.** If three-point share
+    # spreads much wider than points per possession, it is a variance parameter
+    # and belongs in the interval TOTAL's uncertainty, not its centre.
+    profiled = [s for s in team_shots.values()
+                if (s["fg2"] + s["fg3"]) >= 200 and s["poss"] > 0]
+    if len(profiled) >= 2:
+        shares = [s["fg3"] / (s["fg2"] + s["fg3"]) for s in profiled]
+        means = [s["pts"] / s["poss"] for s in profiled]
+        sds = [max(s["pts_sq"] / s["poss"] - (s["pts"] / s["poss"]) ** 2, 0.0) ** 0.5
+               for s in profiled]
+        print(f"[situational] TEAM_SPREAD teams={len(profiled)} "
+              f"three_share={min(shares):.3f}-{max(shares):.3f} "
+              f"({max(shares)/max(min(shares), 1e-9):.2f}x) "
+              f"ppp={min(means):.3f}-{max(means):.3f} "
+              f"({max(means)/max(min(means), 1e-9):.2f}x) "
+              f"ppp_sd={min(sds):.3f}-{max(sds):.3f} "
+              f"({max(sds)/max(min(sds), 1e-9):.2f}x)", flush=True)
     return 0
 
 

@@ -2528,11 +2528,25 @@ which a game average smooths away. Correct structure: **shrink toward the league
 mean, with team and situation as adjustments** — partial pooling, not
 replacement.
 
-**NEXT:** `analyze_situational_pace` (merged, running) says whether the
-(margin x time) cells are flat. If flat, the league constant wins and this gets
-SIMPLER. Then per-team season profiles. Then, and only then, a market join —
-nothing here has been compared to a price, and `model_engine_standard.md` binds
-before it is.
+**NEXT:** `analyze_situational_pace` says whether the (margin x time) cells are
+flat. If flat, the league constant wins and this gets SIMPLER. Then per-team
+season profiles. Then, and only then, a market join — nothing here has been
+compared to a price, and `model_engine_standard.md` binds before it is.
+
+**ITS FIRST RUN WAS DISCARDED — THE STATISTIC, NOT THE BASKETBALL.** The cell
+numbers were MEDIANS over 60-second windows holding ~4 possessions, so
+points/possession snapped to a coarse lattice: three unrelated cells (n=2511,
+262, 250) reported `ppp=1.031` to three decimals, and every `left=0-120s` cell
+reported `ft_share=0.286` = 2/7 exactly. **Independent samples do not agree to
+three decimals.** Free throws were worse — most windows hold none, so the median
+reads 0.000 until the zero share crosses one half and then jumps, and the
+headline I was one step from reporting ("free throws inflate late, 0.000 ->
+0.286") would have been that discontinuity and nothing else. Now pooled ratio
+estimators over cell totals (PR #21), which is also what a projection layer would
+consume; two mutation-checked tests, and the injection tests still report in both
+directions. The old 1.26x / 1.21x spreads are not evidence either way and must
+not be quoted. The team-shooting half of that run is unaffected — those were
+already pooled season totals.
 
 **INFRASTRUCTURE THIS LEAVES BEHIND:** 282 games / 66,688 rows of the first
 play-level history this repo has held; a leakage-guarded projection substrate
